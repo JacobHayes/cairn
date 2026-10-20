@@ -10,7 +10,7 @@ import { Markdown } from "../ui/markdown.tsx";
 import { setFold, useFold } from "./folds.ts";
 import { titleOf, type Ready } from "./model.ts";
 import { assignOwner } from "../acting/acts.ts";
-import { entityName } from "./sections.tsx";
+import { identityName } from "./sections.tsx";
 import type { NodeWrite } from "./write.ts";
 
 /** B2: an answer's rationale as the journey records it, rendered as markdown. */
@@ -116,10 +116,10 @@ export function Contributions({
 }
 
 /** E6: the people the deployment lists, as a select's options, each by its name through any merge. */
-export function EntityOptions({ view }: { view: Ready }) {
-  return (view.inputs.deployment.entities ?? []).map((each) => (
+export function IdentityOptions({ view }: { view: Ready }) {
+  return (view.inputs.deployment.identities ?? []).map((each) => (
     <option key={each.key} value={each.key}>
-      {entityName(view, each.key)}
+      {identityName(view, each.key)}
     </option>
   ));
 }
@@ -129,7 +129,7 @@ export function OwnerSelect({ view, write, node, placeholder, className, testId 
   return (
     <select className={className} aria-label="Assign owner" data-testid={testId} disabled={write.disabled} value="" onChange={(event) => { void write.run([assignOwner(node, event.target.value)]); }}>
       <option value="">{placeholder}</option>
-      <EntityOptions view={view} />
+      <IdentityOptions view={view} />
     </select>
   );
 }

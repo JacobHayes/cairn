@@ -4,7 +4,7 @@
 use std::collections::{BTreeMap, BTreeSet};
 
 use cairn_schema::{
-    Actor, Domain, Entity, EntityKey, Event, JourneyId, Mutation, ProposalOutline, Revision,
+    Actor, Domain, Event, Identity, IdentityKey, JourneyId, Mutation, ProposalOutline, Revision,
     RevisionOf, RouteId, RouteKind,
 };
 use cairn_store::backend;
@@ -29,7 +29,7 @@ pub(crate) async fn journeys(
     query: &JourneyQuery,
 ) -> Result<Page<JourneySummary, JourneyId>, StoreError> {
     let referencing = match &query.referencing {
-        Some(entities) => Some(referencing(connection, entities).await?),
+        Some(identities) => Some(referencing(connection, identities).await?),
         None => None,
     };
     let select = "SELECT j.id, j.name, j.status, j.lineage_route, j.lineage_version, j.revision, \
@@ -137,47 +137,47 @@ async fn latest_versions(
     Ok(latest)
 }
 
-/// E6: the journeys referring to any of `entities`, directly or through an alias, at their
+/// E6: the journeys referring to any of `identities`, directly or through an alias, at their
 /// current revisions.
 pub(crate) async fn referencing(
     connection: &Connection,
-    entities: &BTreeSet<EntityKey>,
+    identities: &BTreeSet<IdentityKey>,
 ) -> Result<BTreeMap<JourneyId, Revision>, StoreError> {
     let mut found = BTreeMap::new();
-    for journey in referencing_ids(connection, entities).await? {
+    for journey in referencing_ids(connection, identities).await? {
         let of = RevisionOf::Domain(Domain::Journey(journey.clone()));
         found.insert(journey, load::revision_of(connection, &of).await?);
     }
     Ok(found)
 }
 
-/// E6: the ids of the journeys referring to any of `entities`, directly or through an alias.
+/// E6: the ids of the journeys referring to any of `identities`, directly or through an alias.
 async fn referencing_ids(
     connection: &Connection,
-    entities: &BTreeSet<EntityKey>,
+    identities: &BTreeSet<IdentityKey>,
 ) -> Result<BTreeSet<JourneyId>, StoreError> {
     let mut aliases = BTreeMap::new();
     for row in rows(
         connection,
-        "SELECT alias, entity FROM entity_aliases",
+        "SELECT alias, identity FROM identity_aliases",
         Vec::new(),
     )
     .await?
     {
         aliases.insert(row.parse(0)?, row.parse(1)?);
     }
-    // A condition names an entity as a JSON string, so its quoted key is searched for.
+    // A condition names an identity as a JSON string, so its quoted key is searched for.
     let selects = [
         (
-            "SELECT graph_id FROM answer_entities WHERE entity = ?1",
+            "SELECT graph_id FROM answer_identities WHERE identity = ?1",
             false,
         ),
         (
-            "SELECT graph_id FROM role_fill_entities WHERE entity = ?1",
+            "SELECT graph_id FROM role_fill_identities WHERE identity = ?1",
             false,
         ),
         (
-            "SELECT graph_id FROM participation_entities WHERE entity = ?1",
+            "SELECT graph_id FROM participation_identities WHERE identity = ?1",
             false,
         ),
         (
@@ -187,7 +187,7 @@ async fn referencing_ids(
         ),
     ];
     let mut found = BTreeSet::new();
-    for key in backend::query::with_aliases(entities, &aliases) {
+    for key in backend::query::with_aliases(identities, &aliases) {
         for (select, quoted) in selects {
             let param = if quoted {
                 format!("\"{key}\"")
@@ -273,10 +273,10 @@ async fn proposal_scope(
                 .to_owned(),
             Vec::new(),
         ),
-        ProposalScope::Waiting { user, entities } => {
+        ProposalScope::Waiting { user, identities } => {
             let mut params = vec![text(user)];
             let mut names = Vec::new();
-            for journey in referencing_ids(connection, entities).await? {
+            for journey in referencing_ids(connection, identities).await? {
                 params.push(text(&journey));
                 names.push(format!("?{}", params.len()));
             }
@@ -384,23 +384,23 @@ pub(crate) async fn proposals(
     })
 }
 
-pub(crate) async fn resolve_entity(
+pub(crate) async fn resolve_identity(
     connection: &Connection,
-    key: &EntityKey,
-) -> Result<Option<Entity>, StoreError> {
+    key: &IdentityKey,
+) -> Result<Option<Identity>, StoreError> {
     let alias = first(
         connection,
-        "SELECT entity FROM entity_aliases WHERE alias = ?1",
+        "SELECT identity FROM identity_aliases WHERE alias = ?1",
         vec![text(key)],
     )
     .await?;
-    let key: EntityKey = match alias {
+    let key: IdentityKey = match alias {
         Some(row) => row.parse(0)?,
         None => key.clone(),
     };
     let Some(row) = first(
         connection,
-        "SELECT name FROM entities WHERE key = ?1",
+        "SELECT name FROM identities WHERE key = ?1",
         vec![text(&key)],
     )
     .await?
@@ -408,11 +408,11 @@ pub(crate) async fn resolve_entity(
         return Ok(None);
     };
     let mut emails = BTreeSet::new();
-    let select = "SELECT email FROM entity_emails WHERE entity = ?1";
+    let select = "SELECT email FROM identity_emails WHERE identity = ?1";
     for email in rows(connection, select, vec![text(&key)]).await? {
         emails.insert(email.parse(0)?);
     }
-    Ok(Some(Entity {
+    Ok(Some(Identity {
         key,
         name: row.parse(0)?,
         emails,

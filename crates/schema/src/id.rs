@@ -1,6 +1,6 @@
-//! Identifiers (PRD, Identity and references; ARCHITECTURE, Engine > Model): id slugs and
+//! Identifiers (PRD, Keys and references; ARCHITECTURE, Engine > Model): id slugs and
 //! paths, the readable serialization and display form, and keys, the stable opaque
-//! identity every reference is stored by. Each key type has its own fixed prefix, so a key
+//! key every reference is stored by. Each key type has its own fixed prefix, so a key
 //! of one type never parses as another, and none of them is an id: a key and an id cannot
 //! be swapped in a reference, at compile time or in a document.
 
@@ -305,8 +305,8 @@ prefixed!(
     InsertionKey, "i_"
 );
 prefixed!(
-    /// An entity's key (`e_`): deployment-scoped, so one person is one entity everywhere.
-    EntityKey, "e_"
+    /// An identity's key (`who_`): deployment-scoped, so one person is one identity everywhere.
+    IdentityKey, "who_"
 );
 prefixed!(
     /// An attachment's key (`a_`): a resource, note, or link.
@@ -401,7 +401,7 @@ pub fn fnv1a_body(parts: &[&[u8]]) -> String {
     format!("{hash:016x}")
 }
 
-/// Mints key bodies (PRD, Identity and references: a key is assigned once, when its object
+/// Mints key bodies (PRD, Keys and references: a key is assigned once, when its object
 /// is first created). The engine mints through this trait so the host decides how: random
 /// bodies in production, a counter in tests and fixtures. A body must be a slug; the caller
 /// checks the minted key against every key the graph holds or has retired.

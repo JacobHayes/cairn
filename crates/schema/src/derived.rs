@@ -12,7 +12,7 @@ use serde::{Deserialize, Serialize};
 use crate::chain::{Chain, DependencyVia, ShortChain};
 use crate::collections::{BoundedVec, ByDocumentSize, CollectionError};
 use crate::domain::{Deployment, Journey};
-use crate::id::{EntityKey, KindKey, NodeKey, RoleKey};
+use crate::id::{IdentityKey, KindKey, NodeKey, RoleKey};
 use crate::limits::{EXPLANATION_ENTRY_COUNT_MAX, Limit, WEIGHT_MAX};
 use crate::state::{Guard, GuardFailure, SnoozeTarget};
 use jiff::civil::Date;
@@ -445,7 +445,7 @@ pub struct NodeDates {
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "snake_case", deny_unknown_fields)]
 pub enum ParticipationOrigin {
-    /// Explicit entities on the node.
+    /// Explicit identities on the node.
     Explicit,
     /// The node's own role reference.
     Role(RoleKey),
@@ -459,8 +459,8 @@ pub enum ParticipationOrigin {
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
 #[serde(deny_unknown_fields)]
 pub struct EffectiveParticipation {
-    /// The entities, resolved through aliases.
-    pub entities: BTreeSet<EntityKey>,
+    /// The identities, resolved through aliases.
+    pub identities: BTreeSet<IdentityKey>,
     /// Where it comes from.
     pub origin: ParticipationOrigin,
 }
@@ -517,7 +517,7 @@ pub struct NodeDerived {
     /// Effective participations by kind.
     #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
     pub participations: BTreeMap<KindKey, EffectiveParticipation>,
-    /// Its seeding entity left the role it was broken down by (B10).
+    /// Its seeding identity left the role it was broken down by (B10).
     #[serde(default, skip_serializing_if = "crate::serde_util::is_false")]
     pub membership_lost: bool,
     /// Why a terminal node's completing guards would now fail (D4).
@@ -867,10 +867,10 @@ pub struct DeriveInputs {
     pub timezone: TimeZoneName,
     /// The rank constants.
     pub rank: RankConstants,
-    /// The viewer's entities, resolved from verified emails (H3); usually one.
+    /// The viewer's identities, resolved from verified emails (H3); usually one.
     #[serde(default, skip_serializing_if = "BTreeSet::is_empty")]
-    pub viewer: BTreeSet<EntityKey>,
-    /// The deployment context: entities, emails, and aliases at a revision (E4, E6).
+    pub viewer: BTreeSet<IdentityKey>,
+    /// The deployment context: identities, emails, and aliases at a revision (E4, E6).
     pub deployment: Deployment,
 }
 

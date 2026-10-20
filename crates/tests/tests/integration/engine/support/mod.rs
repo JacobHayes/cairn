@@ -49,9 +49,11 @@ use cairn_schema::{
 };
 
 /// Records holding a fixture's route with its route file published as version 1, as each
-/// scenario expects (fixtures/README.md), in a fresh deployment.
+/// scenario expects (fixtures/README.md), in a deployment holding the shared people.
 pub fn seeded(name: &str) -> Records {
-    let records = Records::default();
+    let records = step(&Records::default(), &crate::people::people_step())
+        .records()
+        .clone();
     match route_file(name) {
         Some(file) => published(records, &file, route_graph(name).into_document()),
         None => records,
@@ -315,13 +317,13 @@ pub fn add_nodes(nodes: &[&str]) -> String {
     mutations
 }
 
-/// The vendor evaluation after its up-front decisions, with its owner `e_lead` then merged
-/// into a new entity `e_other` (E6): answers and fills keep the old key, which reads through.
+/// The vendor evaluation after its up-front decisions, with its owner `who_k3d7qm2xw5tn6pfa` then merged
+/// into a new identity `who_other` (E6): answers and fills keep the old key, which reads through.
 pub fn vendor_lead_merged() -> Records {
     let records = vendor_after(2);
     let created = vendor_patch(
         &records,
-        "- op: create_entity\n  entity: {key: e_other, name: Other}\n",
+        "- op: create_identity\n  identity: {key: who_other, name: Other}\n",
     )
     .unwrap_or_else(|rejection| panic!("{rejection:#?}"));
     let records = created.records();
@@ -329,7 +331,7 @@ pub fn vendor_lead_merged() -> Records {
         .revision
         .get();
     let merge = format!(
-        "- op: merge_entities\n  survivor: e_other\n  merged: e_lead\n  journeys: {{j_vendor_eval: {revision}}}\n"
+        "- op: merge_identities\n  survivor: who_other\n  merged: who_k3d7qm2xw5tn6pfa\n  journeys: {{j_vendor_eval: {revision}}}\n"
     );
     let patch = patch_to(records, "deployment", &merge);
     match apply(records, &patch, &fixed_inputs()) {

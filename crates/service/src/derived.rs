@@ -1,9 +1,9 @@
 //! Derived reads (ARCHITECTURE, Engine > Read path: derive; D3, D6): a journey loaded with
-//! the deployment, derived at the caller's today with the caller's entities as the viewer,
+//! the deployment, derived at the caller's today with the caller's identities as the viewer,
 //! and memoized per everything the derive reads, so a cached value is the value a fresh
 //! derive would give.
 //!
-//! The memo key is the journey and its revision, the deployment revision (entities and
+//! The memo key is the journey and its revision, the deployment revision (identities and
 //! aliases, E6), today in the deployment's zone (A9), and the viewer; the time zone and rank
 //! constants are the service's own settings, fixed for its life. A commit moves a revision and
 //! midnight moves today, so neither ever meets an entry derived before it (D6: caching is
@@ -18,7 +18,7 @@ use std::collections::{BTreeSet, VecDeque};
 use std::sync::{Arc, Mutex, PoisonError};
 
 use cairn_engine::{Derived, Graph, derive};
-use cairn_schema::{Date, Deployment, EntityKey, Journey, JourneyId, Revision};
+use cairn_schema::{Date, Deployment, IdentityKey, Journey, JourneyId, Revision};
 
 /// How many derivations the memo keeps. A derivation at the limits holds a 2,000-node graph
 /// and its derive, tens of MiB, so the bound keeps the worst case within a few hundred MiB
@@ -32,12 +32,12 @@ pub(crate) struct MemoKey {
     pub journey: JourneyId,
     /// Its revision.
     pub revision: Revision,
-    /// The deployment revision: the entities and aliases it was derived over.
+    /// The deployment revision: the identities and aliases it was derived over.
     pub deployment: Revision,
     /// Today in the deployment's zone.
     pub today: Date,
-    /// The caller's entities.
-    pub viewer: BTreeSet<EntityKey>,
+    /// The caller's identities.
+    pub viewer: BTreeSet<IdentityKey>,
 }
 
 /// One journey derived: what every projection reads.
@@ -50,7 +50,7 @@ pub(crate) struct Derivation {
     /// Its derive.
     pub derived: Derived,
     /// The deployment it was derived over: what a three-valued re-evaluation of its
-    /// conditions (a level's relevance classes, an answer's effects) reads entity aliases from.
+    /// conditions (a level's relevance classes, an answer's effects) reads identity aliases from.
     pub deployment: Deployment,
 }
 
@@ -162,7 +162,7 @@ mod tests {
         let mut tomorrow = first.key.clone();
         tomorrow.today = "2026-10-07".parse().unwrap();
         let mut viewer = first.key.clone();
-        viewer.viewer.insert("e_someone".parse().unwrap());
+        viewer.viewer.insert("who_someone".parse().unwrap());
         for other in [&moved, &tomorrow, &viewer] {
             assert!(memo.get(other).is_none(), "{other:?}");
         }

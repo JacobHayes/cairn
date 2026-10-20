@@ -76,7 +76,7 @@ test("A3: on a phone the drawing's banner is one banner above the graph, and Esc
 test("the top bar is one short row of the four screens and the sync dot, and You is one tap from the dot", async ({ page }) => {
   await open(page, "browser", "/journeys");
   const nav = page.getByRole("navigation", { name: "Screens", exact: true });
-  await expect(nav.getByRole("link")).toHaveText(["Home", "Journeys", "Routes", "Entities"]);
+  await expect(nav.getByRole("link")).toHaveText(["Home", "Journeys", "Routes", "Identities"]);
   const bar = await page.locator(".rail").boundingBox();
   expect(bar?.height).toBeLessThanOrEqual(48);
   await expect(page.getByRole("button", { name: "Keyboard shortcuts" })).toBeHidden();

@@ -7,7 +7,7 @@ use std::collections::BTreeSet;
 use std::sync::Arc;
 
 use cairn_schema::{
-    Date, Deployment, DeriveInputs, EntityKey, RankConstants, Slug, TimeZoneName, Timestamp,
+    Date, Deployment, DeriveInputs, IdentityKey, RankConstants, Slug, TimeZoneName, Timestamp,
 };
 use cairn_store::{Notifier, Store};
 use jiff::tz::TimeZone;
@@ -75,13 +75,13 @@ impl DeploymentSettings {
         now.to_zoned(self.zone.clone()).date()
     }
 
-    /// The derive inputs for one call: today, these settings, the viewer's entities, and
+    /// The derive inputs for one call: today, these settings, the viewer's identities, and
     /// the deployment context at its revision.
     #[must_use]
     pub fn derive_inputs(
         &self,
         today: Date,
-        viewer: BTreeSet<EntityKey>,
+        viewer: BTreeSet<IdentityKey>,
         deployment: Deployment,
     ) -> DeriveInputs {
         DeriveInputs {
@@ -123,7 +123,7 @@ impl Capabilities {
         }
     }
 
-    /// The browser host's: one local identity, and no assistant, MCP, or SSE (its views
+    /// The browser host's: one local login, and no assistant, MCP, or SSE (its views
     /// subscribe to the in-process notifier directly).
     #[must_use]
     pub fn browser() -> Self {
@@ -147,7 +147,7 @@ impl Capabilities {
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct AuthMethod {
-    /// The provider's configured name, as identities record it.
+    /// The provider's configured name, as logins record it.
     pub name: Slug,
     /// What kind of provider it is.
     pub kind: AuthKind,
@@ -163,10 +163,10 @@ pub enum AuthKind {
     Oidc,
     /// The built-in OAuth server for MCP clients (I2).
     BuiltinOauth,
-    /// Tailscale identity.
+    /// Tailscale login.
     Tailscale,
     /// Google Cloud Identity-Aware Proxy's signed assertion.
     GcpIap,
-    /// The browser host's single local identity.
+    /// The browser host's single local login.
     Local,
 }

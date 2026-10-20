@@ -267,8 +267,8 @@ impl Derived {
             .into_iter()
             .filter_map(|kind| {
                 let origin = self.participation.origin(key, kind)?.clone();
-                let entities = self.participation.entities(key, kind).clone();
-                Some((kind.clone(), EffectiveParticipation { entities, origin }))
+                let identities = self.participation.identities(key, kind).clone();
+                Some((kind.clone(), EffectiveParticipation { identities, origin }))
             })
             .collect()
     }

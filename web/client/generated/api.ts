@@ -28,7 +28,7 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** The deployment: entities and aliases (E6). */
+        /** The deployment: identities and aliases (E6). */
         get: operations["getDeployment"];
         put?: never;
         post?: never;
@@ -47,7 +47,7 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** Applies a deployment patch: entities and merges (E6). */
+        /** Applies a deployment patch: identities and merges (E6). */
         post: operations["patchDeployment"];
         delete?: never;
         options?: never;
@@ -562,7 +562,7 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** Proposes saving the journey's structure as a route draft, with a participation mapping per explicit entity and an exclusion per node (B8). */
+        /** Proposes saving the journey's structure as a route draft, with a participation mapping per explicit identity and an exclusion per node (B8). */
         post: operations["proposeSaveAsRoute"];
         delete?: never;
         options?: never;
@@ -937,7 +937,7 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** The names people see for the users asked for: the entity their verified emails name, else the name their sign-in gave (H3). */
+        /** The names people see for the users asked for: the identity their verified emails name, else the name their sign-in gave (H3). */
         get: operations["listUserNames"];
         put?: never;
         post?: never;
@@ -954,7 +954,7 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** The caller and their entities (H2, H3). */
+        /** The caller and their identities (H2, H3). */
         get: operations["getViewer"];
         put?: never;
         post?: never;
@@ -1130,7 +1130,7 @@ export interface components {
         } & (unknown | unknown | unknown | unknown);
         /**
          * @description C12, E3: what answering a decision does, per choice, and the static lines every answer
-         *     of a date or entity decision carries.
+         *     of a date or identity decision carries.
          */
         AnswerEffects: {
             /**
@@ -1145,7 +1145,7 @@ export interface components {
             choices?: components["schemas"]["ChoiceEffect"][];
             /** @description The decision. */
             decision: components["schemas"]["NodeKey"];
-            /** @description The role its answer fills (E3), for an entity or entity-list decision. */
+            /** @description The role its answer fills (E3), for an identity or identity-list decision. */
             fills_role?: components["schemas"]["RoleKey"] | null;
             /** @description The milestone its answer pins (E3), for a date decision. */
             pins?: components["schemas"]["NodeKey"] | null;
@@ -1156,7 +1156,7 @@ export interface components {
          */
         AnswerText: string;
         /** @description A decision's answer type (A4). */
-        AnswerType: "boolean" | "single_choice" | "multi_choice" | "text" | "date" | "entity" | "entity_list";
+        AnswerType: "boolean" | "single_choice" | "multi_choice" | "text" | "date" | "identity" | "identity_list";
         /**
          * @description A decision's submitted answer (A4; PRD glossary, Answer). Submitted empty text or an
          *     empty list is answered.
@@ -1173,9 +1173,9 @@ export interface components {
             /** Format: date */
             date: string;
         } | {
-            entity: components["schemas"]["EntityKey"];
+            identity: components["schemas"]["IdentityKey"];
         } | {
-            entity_list: components["schemas"]["EntityKey"][];
+            identity_list: components["schemas"]["IdentityKey"][];
         };
         /**
          * @description `POST /api/journeys/{id}/assistant` and `POST /api/routes/{id}/draft/assistant`: one message of
@@ -1425,11 +1425,11 @@ export interface components {
         } | {
             not: components["schemas"]["ClauseResolved"];
         };
-        /** @description A compared value: a choice id, date, entity key, or text; at most body_bytes_max bytes. */
+        /** @description A compared value: a choice id, date, identity key, or text; at most body_bytes_max bytes. */
         ConditionText: string;
         /**
          * @description The value a clause compares an answer with: a boolean, or text that the decision's
-         *     answer type gives meaning (a choice id, a date, an entity key, or plain text).
+         *     answer type gives meaning (a choice id, a date, an identity key, or plain text).
          */
         ConditionValue: boolean | components["schemas"]["ConditionText"];
         /**
@@ -1531,7 +1531,7 @@ export interface components {
              * @description Who fills the role now (E3), when insertions map onto it: removing it hands
              *     these to the segment's nodes directly.
              */
-            members?: components["schemas"]["EntityKey"][];
+            members?: components["schemas"]["IdentityKey"][];
             /** @description What in the journey refers to it. */
             references?: components["schemas"]["RoleReference"][];
             /** @description The role. */
@@ -1760,7 +1760,7 @@ export interface components {
             /** @description The decision. */
             node: components["schemas"]["NodeKey"];
             /** @description Its owners. */
-            owners?: components["schemas"]["EntityKey"][];
+            owners?: components["schemas"]["IdentityKey"][];
             /** @description The milestone its answer pins (E3, `feeds_milestone`). */
             pins?: components["schemas"]["NodeKey"] | null;
             /** @description The rationale its answer was given with, while the answer is in effect (B2, C12). */
@@ -1801,14 +1801,14 @@ export interface components {
         /** @description The deployment domain (E6; ARCHITECTURE, Engine > Model: `Deployment`). */
         Deployment: {
             /**
-             * @description Merged entities' old keys, each resolving to the entity it was merged into (E6), at
-             *     most `alias_count_per_entity_max` resolving to one entity.
+             * @description Merged identities' old keys, each resolving to the identity it was merged into (E6), at
+             *     most `alias_count_per_identity_max` resolving to one identity.
              */
             aliases?: {
-                [key: string]: components["schemas"]["EntityKey"];
+                [key: string]: components["schemas"]["IdentityKey"];
             };
-            /** @description The entities, at most `entity_count_per_deployment_max`. */
-            entities?: components["schemas"]["Entity"][];
+            /** @description The identities, at most `identity_count_per_deployment_max`. */
+            identities?: components["schemas"]["Identity"][];
             /** @description The deployment revision (H5). */
             revision: components["schemas"]["Revision"];
         };
@@ -1817,7 +1817,7 @@ export interface components {
          *     supplied by the host and never read by the engine.
          */
         DeriveInputs: {
-            /** @description The deployment context: entities, emails, and aliases at a revision (E4, E6). */
+            /** @description The deployment context: identities, emails, and aliases at a revision (E4, E6). */
             deployment: components["schemas"]["Deployment"];
             /** @description The rank constants. */
             rank: components["schemas"]["RankConstants"];
@@ -1828,8 +1828,8 @@ export interface components {
              * @description Today, in the deployment's time zone.
              */
             today: string;
-            /** @description The viewer's entities, resolved from verified emails (H3); usually one. */
-            viewer?: components["schemas"]["EntityKey"][];
+            /** @description The viewer's identities, resolved from verified emails (H3); usually one. */
+            viewer?: components["schemas"]["IdentityKey"][];
         };
         /** @description A derived journey (ARCHITECTURE, Read path: `Derived`). */
         Derived: {
@@ -1897,7 +1897,7 @@ export interface components {
          *     `active`, `conditional`, `blocked`, `scheduled`, `ready`.
          */
         DisplayState: "ready" | "active" | "blocked" | "conditional" | "scheduled" | "snoozed" | "done" | "skipped" | "not_relevant";
-        /** @description A patch domain, by identity (A17). */
+        /** @description A patch domain (A17). */
         Domain: {
             journey: components["schemas"]["JourneyId"];
         } | {
@@ -1956,8 +1956,8 @@ export interface components {
         };
         /** @description A node's effective participation of one kind (E2). */
         EffectiveParticipation: {
-            /** @description The entities, resolved through aliases. */
-            entities: components["schemas"]["EntityKey"][];
+            /** @description The identities, resolved through aliases. */
+            identities: components["schemas"]["IdentityKey"][];
             /** @description Where it comes from. */
             origin: components["schemas"]["ParticipationOrigin"];
         };
@@ -1982,21 +1982,6 @@ export interface components {
             /** @constant */
             status: "turn_timed_out";
         };
-        /** @description A person or team journeys refer to (PRD glossary, Entity), deployment-scoped. */
-        Entity: {
-            /**
-             * @description Its emails, each held by at most one entity (H3), at most
-             *     `email_count_per_entity_max`. A merge joins two entities' emails, so the engine checks
-             *     the joined set too.
-             */
-            emails?: components["schemas"]["Email"][];
-            /** @description The entity's key. */
-            key: components["schemas"]["EntityKey"];
-            /** @description Its name. */
-            name: components["schemas"]["Title"];
-        };
-        /** @description Starts with "e_"; at most id_bytes_max (64) bytes. */
-        EntityKey: string;
         /**
          * @description An append-only audit record of one mutation (J1). The delta is the after-state of every
          *     record the mutation wrote or removed, in order, so replay applies it with nothing
@@ -2048,7 +2033,7 @@ export interface components {
          *     their content ([`Mutation::event_type`]).
          * @enum {string}
          */
-        EventType: "journey_created" | "journey_edited" | "journey_status_changed" | "journey_deleted" | "route_created" | "route_edited" | "route_retired" | "route_unretired" | "draft_opened" | "route_version_imported" | "saved_as_route" | "draft_discarded" | "route_published" | "node_added" | "node_changed" | "weight_changed" | "node_removed" | "edge_changed" | "role_changed" | "participation_kind_changed" | "default_owner_changed" | "participation_changed" | "resource_changed" | "segment_inserted" | "node_transitioned" | "milestone_reached" | "answer_set" | "recorded_date_changed" | "role_fill_changed" | "date_pinned" | "date_shifted" | "date_unpinned" | "snooze_set" | "unsnoozed" | "override_applied" | "guard_bypassed" | "override_removed" | "atomic_changed" | "annotation_added" | "annotation_edited" | "annotation_removed" | "journey_upgraded" | "relinked" | "provenance_changed" | "local_edit_changed" | "entity_created" | "entity_edited" | "entities_merged" | "proposal_created" | "proposal_edited" | "proposal_applied" | "proposal_discarded";
+        EventType: "journey_created" | "journey_edited" | "journey_status_changed" | "journey_deleted" | "route_created" | "route_edited" | "route_retired" | "route_unretired" | "draft_opened" | "route_version_imported" | "saved_as_route" | "draft_discarded" | "route_published" | "node_added" | "node_changed" | "weight_changed" | "node_removed" | "edge_changed" | "role_changed" | "participation_kind_changed" | "default_owner_changed" | "participation_changed" | "resource_changed" | "segment_inserted" | "node_transitioned" | "milestone_reached" | "answer_set" | "recorded_date_changed" | "role_fill_changed" | "date_pinned" | "date_shifted" | "date_unpinned" | "snooze_set" | "unsnoozed" | "override_applied" | "guard_bypassed" | "override_removed" | "atomic_changed" | "annotation_added" | "annotation_edited" | "annotation_removed" | "journey_upgraded" | "relinked" | "provenance_changed" | "local_edit_changed" | "identity_created" | "identity_edited" | "identities_merged" | "proposal_created" | "proposal_edited" | "proposal_applied" | "proposal_discarded";
         /**
          * @description A list of explanation entries with its total (ARCHITECTURE, Read path): complete inside
          *     the engine and the browser; a server response keeps the largest entries up to
@@ -2285,8 +2270,8 @@ export interface components {
             };
         } | {
             role_fill: {
-                /** @description The entities. */
-                entities: components["schemas"]["EntityKey"][];
+                /** @description The identities. */
+                identities: components["schemas"]["IdentityKey"][];
                 /** @description The role. */
                 role: components["schemas"]["RoleKey"];
             };
@@ -2367,6 +2352,21 @@ export interface components {
             /** @description At most a page of events, grouped by patch, in log order; a large patch spans pages. */
             patches: components["schemas"]["PatchEvents"][];
         };
+        /** @description A person or team journeys refer to (PRD glossary, Identity), deployment-scoped. */
+        Identity: {
+            /**
+             * @description Its emails, each held by at most one identity (H3), at most
+             *     `email_count_per_identity_max`. A merge joins two identities' emails, so the engine checks
+             *     the joined set too.
+             */
+            emails?: components["schemas"]["Email"][];
+            /** @description The identity's key. */
+            key: components["schemas"]["IdentityKey"];
+            /** @description Its name. */
+            name: components["schemas"]["Title"];
+        };
+        /** @description Starts with "who_"; at most id_bytes_max (64) bytes. */
+        IdentityKey: string;
         /**
          * @description An edge an insertion adds: `node` requires `requires`, one end in the segment and the
          *     other in the graph (B13).
@@ -2541,7 +2541,7 @@ export interface components {
              *     decision is filled from that decision's answer, which is derived, not stored here.
              */
             role_fills?: {
-                [key: string]: components["schemas"]["EntityKey"][];
+                [key: string]: components["schemas"]["IdentityKey"][];
             };
             /** @description Snoozes by node (B6). */
             snoozes?: {
@@ -2704,8 +2704,8 @@ export interface components {
             /** @description The version. */
             version: components["schemas"]["VersionNumber"];
         };
-        /** @description One identity a user signs in with (ARCHITECTURE, Auth: users and identities). */
-        LinkedIdentity: {
+        /** @description One login a user signs in with (ARCHITECTURE, Auth: users and logins). */
+        LinkedLogin: {
             /**
              * Format: date-time
              * @description When it was linked.
@@ -2717,7 +2717,7 @@ export interface components {
             subject: components["schemas"]["Title"];
             /**
              * @description H3: the emails the provider marked verified at the last sign-in; only these match an
-             *     entity.
+             *     identity.
              */
             verified_emails: components["schemas"]["Email"][];
         };
@@ -3034,8 +3034,8 @@ export interface components {
             /** @constant */
             op: "set_recorded_date";
         } | {
-            /** @description The entities. */
-            entities: components["schemas"]["EntityKey"][];
+            /** @description The identities. */
+            identities: components["schemas"]["IdentityKey"][];
             /** @constant */
             op: "fill_role";
             /** @description The role. */
@@ -3142,15 +3142,15 @@ export interface components {
             /** @constant */
             op: "mark_local_edit";
         } | {
-            /** @description The entity, with its key. */
-            entity: components["schemas"]["Entity"];
+            /** @description The identity, with its key. */
+            identity: components["schemas"]["Identity"];
             /** @constant */
-            op: "create_entity";
+            op: "create_identity";
         } | {
-            /** @description The entity as it should be. */
-            entity: components["schemas"]["Entity"];
+            /** @description The identity as it should be. */
+            identity: components["schemas"]["Identity"];
             /** @constant */
-            op: "edit_entity";
+            op: "edit_identity";
         } | {
             /**
              * @description Every journey referencing either, at the revision the merge was checked against;
@@ -3159,12 +3159,12 @@ export interface components {
             journeys: {
                 [key: string]: components["schemas"]["Revision"];
             };
-            /** @description The entity merged into it, whose key becomes an alias. */
-            merged: components["schemas"]["EntityKey"];
+            /** @description The identity merged into it, whose key becomes an alias. */
+            merged: components["schemas"]["IdentityKey"];
             /** @constant */
-            op: "merge_entities";
-            /** @description The entity that remains. */
-            survivor: components["schemas"]["EntityKey"];
+            op: "merge_identities";
+            /** @description The identity that remains. */
+            survivor: components["schemas"]["IdentityKey"];
         } | {
             /** @constant */
             op: "create_proposal";
@@ -3339,7 +3339,7 @@ export interface components {
              *     existing clients keep reading it.
              */
             max_child_gravity?: components["schemas"]["Score"] | null;
-            /** @description Its seeding entity left the role it was broken down by (B10). */
+            /** @description Its seeding identity left the role it was broken down by (B10). */
             membership_lost?: boolean;
             /** @description A placeholder with no children that is not atomic (B10). */
             needs_breakdown?: boolean;
@@ -3535,7 +3535,7 @@ export interface components {
             /** @description Non-terminal with its due before today (D3). */
             overdue?: boolean;
             /** @description Its owners (E2). */
-            owners?: components["schemas"]["EntityKey"][];
+            owners?: components["schemas"]["IdentityKey"][];
             /** @description Its path. */
             path: components["schemas"]["Path"];
             /** @description Its rank and terms, for nodes in the normalization set. */
@@ -3610,7 +3610,7 @@ export interface components {
             /** @description The decision. */
             node: components["schemas"]["NodeKey"];
             /** @description Its owners; empty when unassigned. */
-            owners?: components["schemas"]["EntityKey"][];
+            owners?: components["schemas"]["IdentityKey"][];
         };
         /**
          * @description One thing a proposal does to its destination's own header or lifecycle (C14), as a fact
@@ -3699,7 +3699,7 @@ export interface components {
             id: components["schemas"]["Slug"];
             /** @description The stable key: optional in a file. */
             key?: components["schemas"]["KindKey"] | null;
-            /** @description Held by several entities rather than one. */
+            /** @description Held by several identities rather than one. */
             multi?: boolean;
             /** @description A label. */
             title?: components["schemas"]["Title"] | null;
@@ -3710,13 +3710,13 @@ export interface components {
             id: components["schemas"]["Slug"];
             /** @description The stable key: optional in a file. */
             key: components["schemas"]["KindKey"];
-            /** @description Held by several entities rather than one. */
+            /** @description Held by several identities rather than one. */
             multi?: boolean;
             /** @description A label. */
             title?: components["schemas"]["Title"] | null;
         };
         /**
-         * @description What becomes of an explicit entity's participations when a journey is saved as a route
+         * @description What becomes of an explicit identity's participations when a journey is saved as a route
          *     (B8).
          */
         ParticipationMapping: "drop" | {
@@ -3741,14 +3741,14 @@ export interface components {
         };
         /**
          * @description Where a participation comes from (E2): a role reference, written as the role, or
-         *     explicit entities, written as a list.
+         *     explicit identities, written as a list.
          */
-        ParticipationSource: components["schemas"]["Slug"] | components["schemas"]["EntityKey"][];
+        ParticipationSource: components["schemas"]["Slug"] | components["schemas"]["IdentityKey"][];
         /**
          * @description Where a participation comes from (E2): a role reference, written as the role, or
-         *     explicit entities, written as a list.
+         *     explicit identities, written as a list.
          */
-        ParticipationSourceResolved: components["schemas"]["RoleKey"] | components["schemas"]["EntityKey"][];
+        ParticipationSourceResolved: components["schemas"]["RoleKey"] | components["schemas"]["IdentityKey"][];
         Participations: {
             [key: string]: components["schemas"]["ParticipationSource"];
         };
@@ -3760,7 +3760,7 @@ export interface components {
             /** @description The target's revision the patch was drafted against; 0 creates the target (A17). */
             base_revision: components["schemas"]["Revision"];
             /**
-             * @description The deployment revision a journey patch that writes an entity reference was validated
+             * @description The deployment revision a journey patch that writes an identity reference was validated
              *     against (E6, H5).
              */
             deployment_revision?: components["schemas"]["Revision"] | null;
@@ -4176,27 +4176,27 @@ export interface components {
         /**
          * @description What a proposal does, as counts of the things it names (C14): the facts about its
          *     destination's header first, then the nodes it adds, changes and removes (each node once,
-         *     by the mutations that name it), the requirements, the entities, and everything else in one
+         *     by the mutations that name it), the requirements, the identities, and everything else in one
          *     count. Derived from the mutations alone on every read, never stored.
          */
         ProposalOutline: {
-            /**
-             * Format: uint32
-             * @description Entities it creates.
-             */
-            entities_created?: number;
-            /**
-             * Format: uint32
-             * @description Entities it edits.
-             */
-            entities_edited?: number;
-            /**
-             * Format: uint32
-             * @description Entities it merges into another.
-             */
-            entities_merged?: number;
             /** @description The header and lifecycle facts, in the order the mutations make them, each once. */
             facts?: components["schemas"]["OutlineFact"][];
+            /**
+             * Format: uint32
+             * @description Identities it creates.
+             */
+            identities_created?: number;
+            /**
+             * Format: uint32
+             * @description Identities it edits.
+             */
+            identities_edited?: number;
+            /**
+             * Format: uint32
+             * @description Identities it merges into another.
+             */
+            identities_merged?: number;
             /**
              * Format: uint32
              * @description Nodes it adds.
@@ -4392,13 +4392,13 @@ export interface components {
                 journey: components["schemas"]["JourneyId"];
             };
         } | {
-            entity: components["schemas"]["Entity"];
+            identity: components["schemas"]["Identity"];
         } | {
-            entity_alias: {
+            identity_alias: {
                 /** @description The old key. */
-                alias: components["schemas"]["EntityKey"];
-                /** @description The entity it resolves to. */
-                entity: components["schemas"]["EntityKey"];
+                alias: components["schemas"]["IdentityKey"];
+                /** @description The identity it resolves to. */
+                identity: components["schemas"]["IdentityKey"];
             };
         } | {
             proposal: components["schemas"]["Proposal"];
@@ -4431,9 +4431,9 @@ export interface components {
         } | {
             deleted_journey: components["schemas"]["JourneyId"];
         } | {
-            entity: components["schemas"]["EntityKey"];
+            identity: components["schemas"]["IdentityKey"];
         } | {
-            entity_alias: components["schemas"]["EntityKey"];
+            identity_alias: components["schemas"]["IdentityKey"];
         } | {
             proposal: {
                 /** @description The destination. */
@@ -4588,8 +4588,8 @@ export interface components {
             /** @description What removing it removes, shown in review (A18). */
             removal: components["schemas"]["Removal"];
         } | {
-            /** @description The entity. */
-            entity: components["schemas"]["EntityKey"];
+            /** @description The identity. */
+            identity: components["schemas"]["IdentityKey"];
             /** @constant */
             item: "participation";
             /** @description The reviewer's choice, once made. */
@@ -4630,13 +4630,13 @@ export interface components {
         } | {
             proposal: components["schemas"]["ProposalId"];
         };
-        /** @description A role (A6): a named slot, single or multi valued, filled per journey with entities. */
+        /** @description A role (A6): a named slot, single or multi valued, filled per journey with identities. */
         Role: {
             /** @description The id, unique in the graph. */
             id: components["schemas"]["Slug"];
             /** @description The stable key: optional in a file. */
             key?: components["schemas"]["RoleKey"] | null;
-            /** @description Filled by several entities rather than one. */
+            /** @description Filled by several identities rather than one. */
             multi?: boolean;
             /** @description A label. */
             title?: components["schemas"]["Title"] | null;
@@ -4665,8 +4665,8 @@ export interface components {
             };
         } | {
             fill: {
-                /** @description The entities. */
-                entities: components["schemas"]["EntityKey"][];
+                /** @description The identities. */
+                identities: components["schemas"]["IdentityKey"][];
             };
         } | "default_owner" | {
             segment_participation: {
@@ -4683,13 +4683,13 @@ export interface components {
                 resource: components["schemas"]["Resource"];
             };
         };
-        /** @description A role (A6): a named slot, single or multi valued, filled per journey with entities. */
+        /** @description A role (A6): a named slot, single or multi valued, filled per journey with identities. */
         RoleResolved: {
             /** @description The id, unique in the graph. */
             id: components["schemas"]["Slug"];
             /** @description The stable key: optional in a file. */
             key: components["schemas"]["RoleKey"];
-            /** @description Filled by several entities rather than one. */
+            /** @description Filled by several identities rather than one. */
             multi?: boolean;
             /** @description A label. */
             title?: components["schemas"]["Title"] | null;
@@ -4715,7 +4715,7 @@ export interface components {
             /** @description A child needs breakdown. */
             needs_breakdown?: boolean;
             /** @description The distinct owners of its children. */
-            owners?: components["schemas"]["EntityKey"][];
+            owners?: components["schemas"]["IdentityKey"][];
             /**
              * @description C2, C4: the container's progress over the work beneath it, whole subtree; "decision
              *     needed" is `progress.decisions_needed > 0`.
@@ -5043,7 +5043,7 @@ export interface components {
             latest_start?: string | null;
             /** @description Its effective participations by kind. */
             participations?: {
-                [key: string]: components["schemas"]["EntityKey"][];
+                [key: string]: components["schemas"]["IdentityKey"][];
             };
             /** @description What it is and its signals. */
             row: components["schemas"]["NodeRow"];
@@ -5183,7 +5183,7 @@ export interface components {
         } | {
             insertion: components["schemas"]["InsertionKey"];
         } | {
-            entity: components["schemas"]["EntityKey"];
+            identity: components["schemas"]["IdentityKey"];
         } | {
             journey: components["schemas"]["JourneyId"];
         } | {
@@ -5353,7 +5353,7 @@ export interface components {
         UserId: string;
         /** @description A user and the name people see for them (H3). */
         UserName: {
-            /** @description Their name: the entity their verified emails name, else the name their sign-in gave. */
+            /** @description Their name: the identity their verified emails name, else the name their sign-in gave. */
             name: components["schemas"]["Title"];
             /** @description The user. */
             user: components["schemas"]["UserId"];
@@ -5373,19 +5373,19 @@ export interface components {
             version: components["schemas"]["VersionNumber"];
         };
         VersionNumber: number;
-        /** @description The caller (H2) and the entities their verified emails name (H3). */
+        /** @description The caller (H2) and the identities their verified emails name (H3). */
         Viewer: {
             /** @description The agent acting for them, when the request carries an agent token. */
             agent?: components["schemas"]["AgentId"] | null;
-            /** @description Their entities, which "mine" covers together. */
-            entities: components["schemas"]["EntityKey"][];
-            /** @description The identities they sign in with, by provider and subject. */
-            identities: components["schemas"]["LinkedIdentity"][];
+            /** @description Their identities, which "mine" covers together. */
+            identities: components["schemas"]["IdentityKey"][];
+            /** @description The logins they sign in with, by provider and subject. */
+            logins: components["schemas"]["LinkedLogin"][];
             /**
-             * @description H3: present when their emails name more than one entity, which are then offered for
+             * @description H3: present when their emails name more than one identity, which are then offered for
              *     merging.
              */
-            merge_offer?: components["schemas"]["EntityKey"][] | null;
+            merge_offer?: components["schemas"]["IdentityKey"][] | null;
             /** @description The user. */
             user: components["schemas"]["UserId"];
         };
@@ -5420,7 +5420,7 @@ export interface components {
          * @description What a violation breaks (PRD Invariants, D1, D4, A11, A18, A19, B6, E3, E6, H3).
          * @enum {string}
          */
-        ViolationCode: "duplicate_sibling_id" | "duplicate_key" | "retired_key_reused" | "unresolved_reference" | "wrong_reference_kind" | "containment_cycle" | "leaf_with_children" | "dependency_cycle" | "edge_to_ancestor_or_descendant" | "requires_duplicates_condition" | "contradictory_chain" | "condition_answer_type_mismatch" | "condition_on_own_subtree" | "stage_bound_not_milestone" | "undeclared_kind" | "single_kind_on_multi_role" | "fills_role_cardinality" | "several_filling_decisions" | "feeds_milestone_not_milestone" | "several_feeding_decisions" | "several_final_milestones" | "field_not_on_kind" | "state_not_on_kind" | "limit_exceeded" | "dangling_reference" | "removal_widened" | "still_referenced" | "answer_type_mismatch" | "entity_unresolved" | "illegal_transition" | "reason_required" | "guard_failed" | "not_relevant" | "snooze_on_self" | "snooze_cycle" | "snooze_not_actionable" | "snoozed_through_container" | "filled_through_decision" | "pinned_through_decision" | "mutation_not_for_target" | "lineage_invalid" | "archived_journey" | "target_exists" | "target_missing" | "deleted_journey_id" | "draft_exists" | "no_draft" | "version_in_use" | "segment_rule" | "insertion_invalid" | "insertion_key_taken" | "not_a_process_route" | "entity_key_taken" | "email_taken" | "alias_cycle" | "merge_breaks_journey" | "proposal_not_open" | "unresolved_review_item";
+        ViolationCode: "duplicate_sibling_id" | "duplicate_key" | "retired_key_reused" | "unresolved_reference" | "wrong_reference_kind" | "containment_cycle" | "leaf_with_children" | "dependency_cycle" | "edge_to_ancestor_or_descendant" | "requires_duplicates_condition" | "contradictory_chain" | "condition_answer_type_mismatch" | "condition_on_own_subtree" | "stage_bound_not_milestone" | "undeclared_kind" | "single_kind_on_multi_role" | "fills_role_cardinality" | "several_filling_decisions" | "feeds_milestone_not_milestone" | "several_feeding_decisions" | "several_final_milestones" | "field_not_on_kind" | "state_not_on_kind" | "limit_exceeded" | "dangling_reference" | "removal_widened" | "still_referenced" | "answer_type_mismatch" | "identity_unresolved" | "illegal_transition" | "reason_required" | "guard_failed" | "not_relevant" | "snooze_on_self" | "snooze_cycle" | "snooze_not_actionable" | "snoozed_through_container" | "filled_through_decision" | "pinned_through_decision" | "mutation_not_for_target" | "lineage_invalid" | "archived_journey" | "target_exists" | "target_missing" | "deleted_journey_id" | "draft_exists" | "no_draft" | "version_in_use" | "segment_rule" | "insertion_invalid" | "insertion_key_taken" | "not_a_process_route" | "identity_key_taken" | "email_taken" | "alias_cycle" | "merge_breaks_journey" | "proposal_not_open" | "unresolved_review_item";
         /** @description A violation list with at least one entry (a rejection always says why). */
         Violations: components["schemas"]["Violation"][];
         /** @description What a stream watches: `deployment`, `journey:<id>`, `route:<id>`, `proposal:<id>`, `journeys`, `routes`, or `proposals`. */
@@ -5487,7 +5487,7 @@ export interface operations {
                     "text/plain": string;
                 };
             };
-            /** @description The auth layer refused the peer: a local-only provider and a remote peer, or identity headers from a peer no proxy-mode provider trusts (in text). */
+            /** @description The auth layer refused the peer: a local-only provider and a remote peer, or login headers from a peer no proxy-mode provider trusts (in text). */
             403: {
                 headers: {
                     [name: string]: unknown;
@@ -5505,7 +5505,7 @@ export interface operations {
                     "application/json": components["schemas"]["Problem"];
                 };
             };
-            /** @description A limit was reached or the request timed out; retry after `Retry-After`. Or: The auth layer could not ask an identity provider (in text, without `Retry-After`). */
+            /** @description A limit was reached or the request timed out; retry after `Retry-After`. Or: The auth layer could not ask a sign-in provider (in text, without `Retry-After`). */
             503: {
                 headers: {
                     [name: string]: unknown;
@@ -5553,7 +5553,7 @@ export interface operations {
                     "text/plain": string;
                 };
             };
-            /** @description The auth layer refused the peer: a local-only provider and a remote peer, or identity headers from a peer no proxy-mode provider trusts (in text). */
+            /** @description The auth layer refused the peer: a local-only provider and a remote peer, or login headers from a peer no proxy-mode provider trusts (in text). */
             403: {
                 headers: {
                     [name: string]: unknown;
@@ -5571,7 +5571,7 @@ export interface operations {
                     "application/json": components["schemas"]["Problem"];
                 };
             };
-            /** @description A limit was reached or the request timed out; retry after `Retry-After`. Or: The auth layer could not ask an identity provider (in text, without `Retry-After`). */
+            /** @description A limit was reached or the request timed out; retry after `Retry-After`. Or: The auth layer could not ask a sign-in provider (in text, without `Retry-After`). */
             503: {
                 headers: {
                     [name: string]: unknown;
@@ -5623,7 +5623,7 @@ export interface operations {
                     "text/plain": string;
                 };
             };
-            /** @description The auth layer refused the peer: a local-only provider and a remote peer, or identity headers from a peer no proxy-mode provider trusts (in text). */
+            /** @description The auth layer refused the peer: a local-only provider and a remote peer, or login headers from a peer no proxy-mode provider trusts (in text). */
             403: {
                 headers: {
                     [name: string]: unknown;
@@ -5677,7 +5677,7 @@ export interface operations {
                     "application/json": components["schemas"]["Problem"];
                 };
             };
-            /** @description A limit was reached or the request timed out; retry after `Retry-After`. Or: The auth layer could not ask an identity provider (in text, without `Retry-After`). */
+            /** @description A limit was reached or the request timed out; retry after `Retry-After`. Or: The auth layer could not ask a sign-in provider (in text, without `Retry-After`). */
             503: {
                 headers: {
                     [name: string]: unknown;
@@ -5732,7 +5732,7 @@ export interface operations {
                     "text/plain": string;
                 };
             };
-            /** @description The auth layer refused the peer: a local-only provider and a remote peer, or identity headers from a peer no proxy-mode provider trusts (in text). */
+            /** @description The auth layer refused the peer: a local-only provider and a remote peer, or login headers from a peer no proxy-mode provider trusts (in text). */
             403: {
                 headers: {
                     [name: string]: unknown;
@@ -5750,7 +5750,7 @@ export interface operations {
                     "application/json": components["schemas"]["Problem"];
                 };
             };
-            /** @description A limit was reached or the request timed out; retry after `Retry-After`. Or: The auth layer could not ask an identity provider (in text, without `Retry-After`). */
+            /** @description A limit was reached or the request timed out; retry after `Retry-After`. Or: The auth layer could not ask a sign-in provider (in text, without `Retry-After`). */
             503: {
                 headers: {
                     [name: string]: unknown;
@@ -5802,7 +5802,7 @@ export interface operations {
                     "text/plain": string;
                 };
             };
-            /** @description The auth layer refused the peer: a local-only provider and a remote peer, or identity headers from a peer no proxy-mode provider trusts (in text). */
+            /** @description The auth layer refused the peer: a local-only provider and a remote peer, or login headers from a peer no proxy-mode provider trusts (in text). */
             403: {
                 headers: {
                     [name: string]: unknown;
@@ -5856,7 +5856,7 @@ export interface operations {
                     "application/json": components["schemas"]["Problem"];
                 };
             };
-            /** @description A limit was reached or the request timed out; retry after `Retry-After`. Or: The auth layer could not ask an identity provider (in text, without `Retry-After`). */
+            /** @description A limit was reached or the request timed out; retry after `Retry-After`. Or: The auth layer could not ask a sign-in provider (in text, without `Retry-After`). */
             503: {
                 headers: {
                     [name: string]: unknown;
@@ -5907,7 +5907,7 @@ export interface operations {
                     "text/plain": string;
                 };
             };
-            /** @description The auth layer refused the peer: a local-only provider and a remote peer, or identity headers from a peer no proxy-mode provider trusts (in text). */
+            /** @description The auth layer refused the peer: a local-only provider and a remote peer, or login headers from a peer no proxy-mode provider trusts (in text). */
             403: {
                 headers: {
                     [name: string]: unknown;
@@ -5934,7 +5934,7 @@ export interface operations {
                     "application/json": components["schemas"]["Problem"];
                 };
             };
-            /** @description A limit was reached or the request timed out; retry after `Retry-After`. Or: The auth layer could not ask an identity provider (in text, without `Retry-After`). */
+            /** @description A limit was reached or the request timed out; retry after `Retry-After`. Or: The auth layer could not ask a sign-in provider (in text, without `Retry-After`). */
             503: {
                 headers: {
                     [name: string]: unknown;
@@ -5989,7 +5989,7 @@ export interface operations {
                     "text/plain": string;
                 };
             };
-            /** @description The auth layer refused the peer: a local-only provider and a remote peer, or identity headers from a peer no proxy-mode provider trusts (in text). */
+            /** @description The auth layer refused the peer: a local-only provider and a remote peer, or login headers from a peer no proxy-mode provider trusts (in text). */
             403: {
                 headers: {
                     [name: string]: unknown;
@@ -6052,7 +6052,7 @@ export interface operations {
                     "application/json": components["schemas"]["Problem"];
                 };
             };
-            /** @description A limit was reached or the request timed out; retry after `Retry-After`. Or: The auth layer could not ask an identity provider (in text, without `Retry-After`). */
+            /** @description A limit was reached or the request timed out; retry after `Retry-After`. Or: The auth layer could not ask a sign-in provider (in text, without `Retry-After`). */
             503: {
                 headers: {
                     [name: string]: unknown;
@@ -6107,7 +6107,7 @@ export interface operations {
                     "text/plain": string;
                 };
             };
-            /** @description The auth layer refused the peer: a local-only provider and a remote peer, or identity headers from a peer no proxy-mode provider trusts (in text). */
+            /** @description The auth layer refused the peer: a local-only provider and a remote peer, or login headers from a peer no proxy-mode provider trusts (in text). */
             403: {
                 headers: {
                     [name: string]: unknown;
@@ -6170,7 +6170,7 @@ export interface operations {
                     "application/json": components["schemas"]["Problem"];
                 };
             };
-            /** @description A limit was reached or the request timed out; retry after `Retry-After`. Or: The auth layer could not ask an identity provider (in text, without `Retry-After`). */
+            /** @description A limit was reached or the request timed out; retry after `Retry-After`. Or: The auth layer could not ask a sign-in provider (in text, without `Retry-After`). */
             503: {
                 headers: {
                     [name: string]: unknown;
@@ -6225,7 +6225,7 @@ export interface operations {
                     "text/plain": string;
                 };
             };
-            /** @description The auth layer refused the peer: a local-only provider and a remote peer, or identity headers from a peer no proxy-mode provider trusts (in text). */
+            /** @description The auth layer refused the peer: a local-only provider and a remote peer, or login headers from a peer no proxy-mode provider trusts (in text). */
             403: {
                 headers: {
                     [name: string]: unknown;
@@ -6288,7 +6288,7 @@ export interface operations {
                     "application/json": components["schemas"]["Problem"];
                 };
             };
-            /** @description A limit was reached or the request timed out; retry after `Retry-After`. Or: The auth layer could not ask an identity provider (in text, without `Retry-After`). */
+            /** @description A limit was reached or the request timed out; retry after `Retry-After`. Or: The auth layer could not ask a sign-in provider (in text, without `Retry-After`). */
             503: {
                 headers: {
                     [name: string]: unknown;
@@ -6339,7 +6339,7 @@ export interface operations {
                     "text/plain": string;
                 };
             };
-            /** @description The auth layer refused the peer: a local-only provider and a remote peer, or identity headers from a peer no proxy-mode provider trusts (in text). */
+            /** @description The auth layer refused the peer: a local-only provider and a remote peer, or login headers from a peer no proxy-mode provider trusts (in text). */
             403: {
                 headers: {
                     [name: string]: unknown;
@@ -6366,7 +6366,7 @@ export interface operations {
                     "application/json": components["schemas"]["Problem"];
                 };
             };
-            /** @description A limit was reached or the request timed out; retry after `Retry-After`. Or: The auth layer could not ask an identity provider (in text, without `Retry-After`). */
+            /** @description A limit was reached or the request timed out; retry after `Retry-After`. Or: The auth layer could not ask a sign-in provider (in text, without `Retry-After`). */
             503: {
                 headers: {
                     [name: string]: unknown;
@@ -6421,7 +6421,7 @@ export interface operations {
                     "text/plain": string;
                 };
             };
-            /** @description The auth layer refused the peer: a local-only provider and a remote peer, or identity headers from a peer no proxy-mode provider trusts (in text). */
+            /** @description The auth layer refused the peer: a local-only provider and a remote peer, or login headers from a peer no proxy-mode provider trusts (in text). */
             403: {
                 headers: {
                     [name: string]: unknown;
@@ -6484,7 +6484,7 @@ export interface operations {
                     "application/json": components["schemas"]["Problem"];
                 };
             };
-            /** @description A limit was reached or the request timed out; retry after `Retry-After`. Or: The auth layer could not ask an identity provider (in text, without `Retry-After`). */
+            /** @description A limit was reached or the request timed out; retry after `Retry-After`. Or: The auth layer could not ask a sign-in provider (in text, without `Retry-After`). */
             503: {
                 headers: {
                     [name: string]: unknown;
@@ -6551,7 +6551,7 @@ export interface operations {
                     "text/plain": string;
                 };
             };
-            /** @description The auth layer refused the peer: a local-only provider and a remote peer, or identity headers from a peer no proxy-mode provider trusts (in text). */
+            /** @description The auth layer refused the peer: a local-only provider and a remote peer, or login headers from a peer no proxy-mode provider trusts (in text). */
             403: {
                 headers: {
                     [name: string]: unknown;
@@ -6569,7 +6569,7 @@ export interface operations {
                     "application/json": components["schemas"]["Problem"];
                 };
             };
-            /** @description A limit was reached or the request timed out; retry after `Retry-After`. Or: The auth layer could not ask an identity provider (in text, without `Retry-After`). */
+            /** @description A limit was reached or the request timed out; retry after `Retry-After`. Or: The auth layer could not ask a sign-in provider (in text, without `Retry-After`). */
             503: {
                 headers: {
                     [name: string]: unknown;
@@ -6620,7 +6620,7 @@ export interface operations {
                     "text/plain": string;
                 };
             };
-            /** @description The auth layer refused the peer: a local-only provider and a remote peer, or identity headers from a peer no proxy-mode provider trusts (in text). */
+            /** @description The auth layer refused the peer: a local-only provider and a remote peer, or login headers from a peer no proxy-mode provider trusts (in text). */
             403: {
                 headers: {
                     [name: string]: unknown;
@@ -6638,7 +6638,7 @@ export interface operations {
                     "application/json": components["schemas"]["Problem"];
                 };
             };
-            /** @description A limit was reached or the request timed out; retry after `Retry-After`. Or: The auth layer could not ask an identity provider (in text, without `Retry-After`). */
+            /** @description A limit was reached or the request timed out; retry after `Retry-After`. Or: The auth layer could not ask a sign-in provider (in text, without `Retry-After`). */
             503: {
                 headers: {
                     [name: string]: unknown;
@@ -6659,8 +6659,8 @@ export interface operations {
                 route?: components["schemas"]["RouteId"];
                 /** @description Journeys on this version of their route. */
                 version?: components["schemas"]["VersionNumber"];
-                /** @description Journeys referring to any of these entities, directly or through an alias (E6). */
-                referencing?: components["schemas"]["EntityKey"][];
+                /** @description Journeys referring to any of these identities, directly or through an alias (E6). */
+                referencing?: components["schemas"]["IdentityKey"][];
                 /** @description Journeys whose route has, or has not, published a newer version. */
                 upgrade_available?: boolean;
                 /** @description The page starts after this journey. */
@@ -6701,7 +6701,7 @@ export interface operations {
                     "text/plain": string;
                 };
             };
-            /** @description The auth layer refused the peer: a local-only provider and a remote peer, or identity headers from a peer no proxy-mode provider trusts (in text). */
+            /** @description The auth layer refused the peer: a local-only provider and a remote peer, or login headers from a peer no proxy-mode provider trusts (in text). */
             403: {
                 headers: {
                     [name: string]: unknown;
@@ -6719,7 +6719,7 @@ export interface operations {
                     "application/json": components["schemas"]["Problem"];
                 };
             };
-            /** @description A limit was reached or the request timed out; retry after `Retry-After`. Or: The auth layer could not ask an identity provider (in text, without `Retry-After`). */
+            /** @description A limit was reached or the request timed out; retry after `Retry-After`. Or: The auth layer could not ask a sign-in provider (in text, without `Retry-After`). */
             503: {
                 headers: {
                     [name: string]: unknown;
@@ -6770,7 +6770,7 @@ export interface operations {
                     "text/plain": string;
                 };
             };
-            /** @description The auth layer refused the peer: a local-only provider and a remote peer, or identity headers from a peer no proxy-mode provider trusts (in text). */
+            /** @description The auth layer refused the peer: a local-only provider and a remote peer, or login headers from a peer no proxy-mode provider trusts (in text). */
             403: {
                 headers: {
                     [name: string]: unknown;
@@ -6797,7 +6797,7 @@ export interface operations {
                     "application/json": components["schemas"]["Problem"];
                 };
             };
-            /** @description A limit was reached or the request timed out; retry after `Retry-After`. Or: The auth layer could not ask an identity provider (in text, without `Retry-After`). */
+            /** @description A limit was reached or the request timed out; retry after `Retry-After`. Or: The auth layer could not ask a sign-in provider (in text, without `Retry-After`). */
             503: {
                 headers: {
                     [name: string]: unknown;
@@ -6848,7 +6848,7 @@ export interface operations {
                     "text/plain": string;
                 };
             };
-            /** @description Only a user may do this, not an agent acting for one. Or: The auth layer refused the peer: a local-only provider and a remote peer, or identity headers from a peer no proxy-mode provider trusts (in text). */
+            /** @description Only a user may do this, not an agent acting for one. Or: The auth layer refused the peer: a local-only provider and a remote peer, or login headers from a peer no proxy-mode provider trusts (in text). */
             403: {
                 headers: {
                     [name: string]: unknown;
@@ -6876,7 +6876,7 @@ export interface operations {
                     "application/json": components["schemas"]["Problem"];
                 };
             };
-            /** @description A limit was reached or the request timed out; retry after `Retry-After`. Or: The auth layer could not ask an identity provider (in text, without `Retry-After`). */
+            /** @description A limit was reached or the request timed out; retry after `Retry-After`. Or: The auth layer could not ask a sign-in provider (in text, without `Retry-After`). */
             503: {
                 headers: {
                     [name: string]: unknown;
@@ -6931,7 +6931,7 @@ export interface operations {
                     "text/plain": string;
                 };
             };
-            /** @description Only a user may do this, not an agent acting for one. Or: The auth layer refused the peer: a local-only provider and a remote peer, or identity headers from a peer no proxy-mode provider trusts (in text). */
+            /** @description Only a user may do this, not an agent acting for one. Or: The auth layer refused the peer: a local-only provider and a remote peer, or login headers from a peer no proxy-mode provider trusts (in text). */
             403: {
                 headers: {
                     [name: string]: unknown;
@@ -6977,7 +6977,7 @@ export interface operations {
                     "application/json": components["schemas"]["Problem"];
                 };
             };
-            /** @description A limit was reached or the request timed out; retry after `Retry-After`. Or: The auth layer could not ask an identity provider (in text, without `Retry-After`). */
+            /** @description A limit was reached or the request timed out; retry after `Retry-After`. Or: The auth layer could not ask a sign-in provider (in text, without `Retry-After`). */
             503: {
                 headers: {
                     [name: string]: unknown;
@@ -7028,7 +7028,7 @@ export interface operations {
                     "text/plain": string;
                 };
             };
-            /** @description The auth layer refused the peer: a local-only provider and a remote peer, or identity headers from a peer no proxy-mode provider trusts (in text). */
+            /** @description The auth layer refused the peer: a local-only provider and a remote peer, or login headers from a peer no proxy-mode provider trusts (in text). */
             403: {
                 headers: {
                     [name: string]: unknown;
@@ -7055,7 +7055,7 @@ export interface operations {
                     "application/json": components["schemas"]["Problem"];
                 };
             };
-            /** @description A limit was reached or the request timed out; retry after `Retry-After`. Or: The auth layer could not ask an identity provider (in text, without `Retry-After`). */
+            /** @description A limit was reached or the request timed out; retry after `Retry-After`. Or: The auth layer could not ask a sign-in provider (in text, without `Retry-After`). */
             503: {
                 headers: {
                     [name: string]: unknown;
@@ -7106,7 +7106,7 @@ export interface operations {
                     "text/plain": string;
                 };
             };
-            /** @description The auth layer refused the peer: a local-only provider and a remote peer, or identity headers from a peer no proxy-mode provider trusts (in text). */
+            /** @description The auth layer refused the peer: a local-only provider and a remote peer, or login headers from a peer no proxy-mode provider trusts (in text). */
             403: {
                 headers: {
                     [name: string]: unknown;
@@ -7133,7 +7133,7 @@ export interface operations {
                     "application/json": components["schemas"]["Problem"];
                 };
             };
-            /** @description A limit was reached or the request timed out; retry after `Retry-After`. Or: The auth layer could not ask an identity provider (in text, without `Retry-After`). */
+            /** @description A limit was reached or the request timed out; retry after `Retry-After`. Or: The auth layer could not ask a sign-in provider (in text, without `Retry-After`). */
             503: {
                 headers: {
                     [name: string]: unknown;
@@ -7184,7 +7184,7 @@ export interface operations {
                     "text/plain": string;
                 };
             };
-            /** @description The auth layer refused the peer: a local-only provider and a remote peer, or identity headers from a peer no proxy-mode provider trusts (in text). */
+            /** @description The auth layer refused the peer: a local-only provider and a remote peer, or login headers from a peer no proxy-mode provider trusts (in text). */
             403: {
                 headers: {
                     [name: string]: unknown;
@@ -7211,7 +7211,7 @@ export interface operations {
                     "application/json": components["schemas"]["Problem"];
                 };
             };
-            /** @description A limit was reached or the request timed out; retry after `Retry-After`. Or: The auth layer could not ask an identity provider (in text, without `Retry-After`). */
+            /** @description A limit was reached or the request timed out; retry after `Retry-After`. Or: The auth layer could not ask a sign-in provider (in text, without `Retry-After`). */
             503: {
                 headers: {
                     [name: string]: unknown;
@@ -7267,7 +7267,7 @@ export interface operations {
                     "text/plain": string;
                 };
             };
-            /** @description The auth layer refused the peer: a local-only provider and a remote peer, or identity headers from a peer no proxy-mode provider trusts (in text). */
+            /** @description The auth layer refused the peer: a local-only provider and a remote peer, or login headers from a peer no proxy-mode provider trusts (in text). */
             403: {
                 headers: {
                     [name: string]: unknown;
@@ -7294,7 +7294,7 @@ export interface operations {
                     "application/json": components["schemas"]["Problem"];
                 };
             };
-            /** @description A limit was reached or the request timed out; retry after `Retry-After`. Or: The auth layer could not ask an identity provider (in text, without `Retry-After`). */
+            /** @description A limit was reached or the request timed out; retry after `Retry-After`. Or: The auth layer could not ask a sign-in provider (in text, without `Retry-After`). */
             503: {
                 headers: {
                     [name: string]: unknown;
@@ -7321,8 +7321,8 @@ export interface operations {
                 top?: components["schemas"]["NodeKind"][];
                 /** @description The list's filters with no argument; with any filter, `owner` or `text`, a node is drawn only when it matches every one or holds a node that does. */
                 flag?: components["schemas"]["ListFlag"][];
-                /** @description Only nodes this entity owns, and what holds them. */
-                owner?: components["schemas"]["EntityKey"];
+                /** @description Only nodes this identity owns, and what holds them. */
+                owner?: components["schemas"]["IdentityKey"];
                 /** @description Text found in the title, description, notes, or resources, ignoring ASCII case; nodes holding a match are kept too. */
                 text?: components["schemas"]["Title"];
                 /** @description The node selected: drawn whatever would hide it, with every container above it within the level, none of them collapsed. A key outside the level has no effect. */
@@ -7364,7 +7364,7 @@ export interface operations {
                     "text/plain": string;
                 };
             };
-            /** @description The auth layer refused the peer: a local-only provider and a remote peer, or identity headers from a peer no proxy-mode provider trusts (in text). */
+            /** @description The auth layer refused the peer: a local-only provider and a remote peer, or login headers from a peer no proxy-mode provider trusts (in text). */
             403: {
                 headers: {
                     [name: string]: unknown;
@@ -7391,7 +7391,7 @@ export interface operations {
                     "application/json": components["schemas"]["Problem"];
                 };
             };
-            /** @description A limit was reached or the request timed out; retry after `Retry-After`. Or: The auth layer could not ask an identity provider (in text, without `Retry-After`). */
+            /** @description A limit was reached or the request timed out; retry after `Retry-After`. Or: The auth layer could not ask a sign-in provider (in text, without `Retry-After`). */
             503: {
                 headers: {
                     [name: string]: unknown;
@@ -7445,7 +7445,7 @@ export interface operations {
                     "text/plain": string;
                 };
             };
-            /** @description The auth layer refused the peer: a local-only provider and a remote peer, or identity headers from a peer no proxy-mode provider trusts (in text). */
+            /** @description The auth layer refused the peer: a local-only provider and a remote peer, or login headers from a peer no proxy-mode provider trusts (in text). */
             403: {
                 headers: {
                     [name: string]: unknown;
@@ -7472,7 +7472,7 @@ export interface operations {
                     "application/json": components["schemas"]["Problem"];
                 };
             };
-            /** @description A limit was reached or the request timed out; retry after `Retry-After`. Or: The auth layer could not ask an identity provider (in text, without `Retry-After`). */
+            /** @description A limit was reached or the request timed out; retry after `Retry-After`. Or: The auth layer could not ask a sign-in provider (in text, without `Retry-After`). */
             503: {
                 headers: {
                     [name: string]: unknown;
@@ -7534,7 +7534,7 @@ export interface operations {
                     "text/plain": string;
                 };
             };
-            /** @description The auth layer refused the peer: a local-only provider and a remote peer, or identity headers from a peer no proxy-mode provider trusts (in text). */
+            /** @description The auth layer refused the peer: a local-only provider and a remote peer, or login headers from a peer no proxy-mode provider trusts (in text). */
             403: {
                 headers: {
                     [name: string]: unknown;
@@ -7561,7 +7561,7 @@ export interface operations {
                     "application/json": components["schemas"]["Problem"];
                 };
             };
-            /** @description A limit was reached or the request timed out; retry after `Retry-After`. Or: The auth layer could not ask an identity provider (in text, without `Retry-After`). */
+            /** @description A limit was reached or the request timed out; retry after `Retry-After`. Or: The auth layer could not ask a sign-in provider (in text, without `Retry-After`). */
             503: {
                 headers: {
                     [name: string]: unknown;
@@ -7580,8 +7580,8 @@ export interface operations {
                 flag?: components["schemas"]["ListFlag"][];
                 /** @description Only nodes beneath this container. */
                 within?: components["schemas"]["NodeKey"];
-                /** @description Only nodes this entity owns. */
-                owner?: components["schemas"]["EntityKey"];
+                /** @description Only nodes this identity owns. */
+                owner?: components["schemas"]["IdentityKey"];
                 /** @description Only nodes in these stored states; any when none. */
                 state?: components["schemas"]["State"][];
                 /** @description Only nodes showing these display states; any when none. */
@@ -7633,7 +7633,7 @@ export interface operations {
                     "text/plain": string;
                 };
             };
-            /** @description The auth layer refused the peer: a local-only provider and a remote peer, or identity headers from a peer no proxy-mode provider trusts (in text). */
+            /** @description The auth layer refused the peer: a local-only provider and a remote peer, or login headers from a peer no proxy-mode provider trusts (in text). */
             403: {
                 headers: {
                     [name: string]: unknown;
@@ -7669,7 +7669,7 @@ export interface operations {
                     "application/json": components["schemas"]["Problem"];
                 };
             };
-            /** @description A limit was reached or the request timed out; retry after `Retry-After`. Or: The auth layer could not ask an identity provider (in text, without `Retry-After`). */
+            /** @description A limit was reached or the request timed out; retry after `Retry-After`. Or: The auth layer could not ask a sign-in provider (in text, without `Retry-After`). */
             503: {
                 headers: {
                     [name: string]: unknown;
@@ -7722,7 +7722,7 @@ export interface operations {
                     "text/plain": string;
                 };
             };
-            /** @description The auth layer refused the peer: a local-only provider and a remote peer, or identity headers from a peer no proxy-mode provider trusts (in text). */
+            /** @description The auth layer refused the peer: a local-only provider and a remote peer, or login headers from a peer no proxy-mode provider trusts (in text). */
             403: {
                 headers: {
                     [name: string]: unknown;
@@ -7749,7 +7749,7 @@ export interface operations {
                     "application/json": components["schemas"]["Problem"];
                 };
             };
-            /** @description A limit was reached or the request timed out; retry after `Retry-After`. Or: The auth layer could not ask an identity provider (in text, without `Retry-After`). */
+            /** @description A limit was reached or the request timed out; retry after `Retry-After`. Or: The auth layer could not ask a sign-in provider (in text, without `Retry-After`). */
             503: {
                 headers: {
                     [name: string]: unknown;
@@ -7809,7 +7809,7 @@ export interface operations {
                     "text/plain": string;
                 };
             };
-            /** @description The auth layer refused the peer: a local-only provider and a remote peer, or identity headers from a peer no proxy-mode provider trusts (in text). */
+            /** @description The auth layer refused the peer: a local-only provider and a remote peer, or login headers from a peer no proxy-mode provider trusts (in text). */
             403: {
                 headers: {
                     [name: string]: unknown;
@@ -7845,7 +7845,7 @@ export interface operations {
                     "application/json": components["schemas"]["Problem"];
                 };
             };
-            /** @description A limit was reached or the request timed out; retry after `Retry-After`. Or: The auth layer could not ask an identity provider (in text, without `Retry-After`). */
+            /** @description A limit was reached or the request timed out; retry after `Retry-After`. Or: The auth layer could not ask a sign-in provider (in text, without `Retry-After`). */
             503: {
                 headers: {
                     [name: string]: unknown;
@@ -7900,7 +7900,7 @@ export interface operations {
                     "text/plain": string;
                 };
             };
-            /** @description The auth layer refused the peer: a local-only provider and a remote peer, or identity headers from a peer no proxy-mode provider trusts (in text). */
+            /** @description The auth layer refused the peer: a local-only provider and a remote peer, or login headers from a peer no proxy-mode provider trusts (in text). */
             403: {
                 headers: {
                     [name: string]: unknown;
@@ -7963,7 +7963,7 @@ export interface operations {
                     "application/json": components["schemas"]["Problem"];
                 };
             };
-            /** @description A limit was reached or the request timed out; retry after `Retry-After`. Or: The auth layer could not ask an identity provider (in text, without `Retry-After`). */
+            /** @description A limit was reached or the request timed out; retry after `Retry-After`. Or: The auth layer could not ask a sign-in provider (in text, without `Retry-After`). */
             503: {
                 headers: {
                     [name: string]: unknown;
@@ -8021,7 +8021,7 @@ export interface operations {
                     "text/plain": string;
                 };
             };
-            /** @description The auth layer refused the peer: a local-only provider and a remote peer, or identity headers from a peer no proxy-mode provider trusts (in text). */
+            /** @description The auth layer refused the peer: a local-only provider and a remote peer, or login headers from a peer no proxy-mode provider trusts (in text). */
             403: {
                 headers: {
                     [name: string]: unknown;
@@ -8048,7 +8048,7 @@ export interface operations {
                     "application/json": components["schemas"]["Problem"];
                 };
             };
-            /** @description A limit was reached or the request timed out; retry after `Retry-After`. Or: The auth layer could not ask an identity provider (in text, without `Retry-After`). */
+            /** @description A limit was reached or the request timed out; retry after `Retry-After`. Or: The auth layer could not ask a sign-in provider (in text, without `Retry-After`). */
             503: {
                 headers: {
                     [name: string]: unknown;
@@ -8103,7 +8103,7 @@ export interface operations {
                     "text/plain": string;
                 };
             };
-            /** @description The auth layer refused the peer: a local-only provider and a remote peer, or identity headers from a peer no proxy-mode provider trusts (in text). */
+            /** @description The auth layer refused the peer: a local-only provider and a remote peer, or login headers from a peer no proxy-mode provider trusts (in text). */
             403: {
                 headers: {
                     [name: string]: unknown;
@@ -8166,7 +8166,7 @@ export interface operations {
                     "application/json": components["schemas"]["Problem"];
                 };
             };
-            /** @description A limit was reached or the request timed out; retry after `Retry-After`. Or: The auth layer could not ask an identity provider (in text, without `Retry-After`). */
+            /** @description A limit was reached or the request timed out; retry after `Retry-After`. Or: The auth layer could not ask a sign-in provider (in text, without `Retry-After`). */
             503: {
                 headers: {
                     [name: string]: unknown;
@@ -8219,7 +8219,7 @@ export interface operations {
                     "text/plain": string;
                 };
             };
-            /** @description The auth layer refused the peer: a local-only provider and a remote peer, or identity headers from a peer no proxy-mode provider trusts (in text). */
+            /** @description The auth layer refused the peer: a local-only provider and a remote peer, or login headers from a peer no proxy-mode provider trusts (in text). */
             403: {
                 headers: {
                     [name: string]: unknown;
@@ -8246,7 +8246,7 @@ export interface operations {
                     "application/json": components["schemas"]["Problem"];
                 };
             };
-            /** @description A limit was reached or the request timed out; retry after `Retry-After`. Or: The auth layer could not ask an identity provider (in text, without `Retry-After`). */
+            /** @description A limit was reached or the request timed out; retry after `Retry-After`. Or: The auth layer could not ask a sign-in provider (in text, without `Retry-After`). */
             503: {
                 headers: {
                     [name: string]: unknown;
@@ -8303,7 +8303,7 @@ export interface operations {
                     "text/plain": string;
                 };
             };
-            /** @description The auth layer refused the peer: a local-only provider and a remote peer, or identity headers from a peer no proxy-mode provider trusts (in text). */
+            /** @description The auth layer refused the peer: a local-only provider and a remote peer, or login headers from a peer no proxy-mode provider trusts (in text). */
             403: {
                 headers: {
                     [name: string]: unknown;
@@ -8366,7 +8366,7 @@ export interface operations {
                     "application/json": components["schemas"]["Problem"];
                 };
             };
-            /** @description A limit was reached or the request timed out; retry after `Retry-After`. Or: The auth layer could not ask an identity provider (in text, without `Retry-After`). */
+            /** @description A limit was reached or the request timed out; retry after `Retry-After`. Or: The auth layer could not ask a sign-in provider (in text, without `Retry-After`). */
             503: {
                 headers: {
                     [name: string]: unknown;
@@ -8423,7 +8423,7 @@ export interface operations {
                     "text/plain": string;
                 };
             };
-            /** @description The auth layer refused the peer: a local-only provider and a remote peer, or identity headers from a peer no proxy-mode provider trusts (in text). */
+            /** @description The auth layer refused the peer: a local-only provider and a remote peer, or login headers from a peer no proxy-mode provider trusts (in text). */
             403: {
                 headers: {
                     [name: string]: unknown;
@@ -8486,7 +8486,7 @@ export interface operations {
                     "application/json": components["schemas"]["Problem"];
                 };
             };
-            /** @description A limit was reached or the request timed out; retry after `Retry-After`. Or: The auth layer could not ask an identity provider (in text, without `Retry-After`). */
+            /** @description A limit was reached or the request timed out; retry after `Retry-After`. Or: The auth layer could not ask a sign-in provider (in text, without `Retry-After`). */
             503: {
                 headers: {
                     [name: string]: unknown;
@@ -8543,7 +8543,7 @@ export interface operations {
                     "text/plain": string;
                 };
             };
-            /** @description The auth layer refused the peer: a local-only provider and a remote peer, or identity headers from a peer no proxy-mode provider trusts (in text). */
+            /** @description The auth layer refused the peer: a local-only provider and a remote peer, or login headers from a peer no proxy-mode provider trusts (in text). */
             403: {
                 headers: {
                     [name: string]: unknown;
@@ -8606,7 +8606,7 @@ export interface operations {
                     "application/json": components["schemas"]["Problem"];
                 };
             };
-            /** @description A limit was reached or the request timed out; retry after `Retry-After`. Or: The auth layer could not ask an identity provider (in text, without `Retry-After`). */
+            /** @description A limit was reached or the request timed out; retry after `Retry-After`. Or: The auth layer could not ask a sign-in provider (in text, without `Retry-After`). */
             503: {
                 headers: {
                     [name: string]: unknown;
@@ -8659,7 +8659,7 @@ export interface operations {
                     "text/plain": string;
                 };
             };
-            /** @description The auth layer refused the peer: a local-only provider and a remote peer, or identity headers from a peer no proxy-mode provider trusts (in text). */
+            /** @description The auth layer refused the peer: a local-only provider and a remote peer, or login headers from a peer no proxy-mode provider trusts (in text). */
             403: {
                 headers: {
                     [name: string]: unknown;
@@ -8686,7 +8686,7 @@ export interface operations {
                     "application/json": components["schemas"]["Problem"];
                 };
             };
-            /** @description A limit was reached or the request timed out; retry after `Retry-After`. Or: The auth layer could not ask an identity provider (in text, without `Retry-After`). */
+            /** @description A limit was reached or the request timed out; retry after `Retry-After`. Or: The auth layer could not ask a sign-in provider (in text, without `Retry-After`). */
             503: {
                 headers: {
                     [name: string]: unknown;
@@ -8743,7 +8743,7 @@ export interface operations {
                     "text/plain": string;
                 };
             };
-            /** @description The auth layer refused the peer: a local-only provider and a remote peer, or identity headers from a peer no proxy-mode provider trusts (in text). */
+            /** @description The auth layer refused the peer: a local-only provider and a remote peer, or login headers from a peer no proxy-mode provider trusts (in text). */
             403: {
                 headers: {
                     [name: string]: unknown;
@@ -8806,7 +8806,7 @@ export interface operations {
                     "application/json": components["schemas"]["Problem"];
                 };
             };
-            /** @description A limit was reached or the request timed out; retry after `Retry-After`. Or: The auth layer could not ask an identity provider (in text, without `Retry-After`). */
+            /** @description A limit was reached or the request timed out; retry after `Retry-After`. Or: The auth layer could not ask a sign-in provider (in text, without `Retry-After`). */
             503: {
                 headers: {
                     [name: string]: unknown;
@@ -8861,7 +8861,7 @@ export interface operations {
                     "text/plain": string;
                 };
             };
-            /** @description The auth layer refused the peer: a local-only provider and a remote peer, or identity headers from a peer no proxy-mode provider trusts (in text). */
+            /** @description The auth layer refused the peer: a local-only provider and a remote peer, or login headers from a peer no proxy-mode provider trusts (in text). */
             403: {
                 headers: {
                     [name: string]: unknown;
@@ -8924,7 +8924,7 @@ export interface operations {
                     "application/json": components["schemas"]["Problem"];
                 };
             };
-            /** @description A limit was reached or the request timed out; retry after `Retry-After`. Or: The auth layer could not ask an identity provider (in text, without `Retry-After`). */
+            /** @description A limit was reached or the request timed out; retry after `Retry-After`. Or: The auth layer could not ask a sign-in provider (in text, without `Retry-After`). */
             503: {
                 headers: {
                     [name: string]: unknown;
@@ -8979,7 +8979,7 @@ export interface operations {
                     "text/plain": string;
                 };
             };
-            /** @description The auth layer refused the peer: a local-only provider and a remote peer, or identity headers from a peer no proxy-mode provider trusts (in text). */
+            /** @description The auth layer refused the peer: a local-only provider and a remote peer, or login headers from a peer no proxy-mode provider trusts (in text). */
             403: {
                 headers: {
                     [name: string]: unknown;
@@ -9042,7 +9042,7 @@ export interface operations {
                     "application/json": components["schemas"]["Problem"];
                 };
             };
-            /** @description A limit was reached or the request timed out; retry after `Retry-After`. Or: The auth layer could not ask an identity provider (in text, without `Retry-After`). */
+            /** @description A limit was reached or the request timed out; retry after `Retry-After`. Or: The auth layer could not ask a sign-in provider (in text, without `Retry-After`). */
             503: {
                 headers: {
                     [name: string]: unknown;
@@ -9102,7 +9102,7 @@ export interface operations {
                     "text/plain": string;
                 };
             };
-            /** @description The auth layer refused the peer: a local-only provider and a remote peer, or identity headers from a peer no proxy-mode provider trusts (in text). */
+            /** @description The auth layer refused the peer: a local-only provider and a remote peer, or login headers from a peer no proxy-mode provider trusts (in text). */
             403: {
                 headers: {
                     [name: string]: unknown;
@@ -9138,7 +9138,7 @@ export interface operations {
                     "application/json": components["schemas"]["Problem"];
                 };
             };
-            /** @description A limit was reached or the request timed out; retry after `Retry-After`. Or: The auth layer could not ask an identity provider (in text, without `Retry-After`). */
+            /** @description A limit was reached or the request timed out; retry after `Retry-After`. Or: The auth layer could not ask a sign-in provider (in text, without `Retry-After`). */
             503: {
                 headers: {
                     [name: string]: unknown;
@@ -9189,7 +9189,7 @@ export interface operations {
                     "text/plain": string;
                 };
             };
-            /** @description The auth layer refused the peer: a local-only provider and a remote peer, or identity headers from a peer no proxy-mode provider trusts (in text). */
+            /** @description The auth layer refused the peer: a local-only provider and a remote peer, or login headers from a peer no proxy-mode provider trusts (in text). */
             403: {
                 headers: {
                     [name: string]: unknown;
@@ -9216,7 +9216,7 @@ export interface operations {
                     "application/json": components["schemas"]["Problem"];
                 };
             };
-            /** @description A limit was reached or the request timed out; retry after `Retry-After`. Or: The auth layer could not ask an identity provider (in text, without `Retry-After`). */
+            /** @description A limit was reached or the request timed out; retry after `Retry-After`. Or: The auth layer could not ask a sign-in provider (in text, without `Retry-After`). */
             503: {
                 headers: {
                     [name: string]: unknown;
@@ -9267,7 +9267,7 @@ export interface operations {
                     "text/plain": string;
                 };
             };
-            /** @description The auth layer refused the peer: a local-only provider and a remote peer, or identity headers from a peer no proxy-mode provider trusts (in text). */
+            /** @description The auth layer refused the peer: a local-only provider and a remote peer, or login headers from a peer no proxy-mode provider trusts (in text). */
             403: {
                 headers: {
                     [name: string]: unknown;
@@ -9294,7 +9294,7 @@ export interface operations {
                     "application/json": components["schemas"]["Problem"];
                 };
             };
-            /** @description A limit was reached or the request timed out; retry after `Retry-After`. Or: The auth layer could not ask an identity provider (in text, without `Retry-After`). */
+            /** @description A limit was reached or the request timed out; retry after `Retry-After`. Or: The auth layer could not ask a sign-in provider (in text, without `Retry-After`). */
             503: {
                 headers: {
                     [name: string]: unknown;
@@ -9347,7 +9347,7 @@ export interface operations {
                     "text/plain": string;
                 };
             };
-            /** @description The auth layer refused the peer: a local-only provider and a remote peer, or identity headers from a peer no proxy-mode provider trusts (in text). */
+            /** @description The auth layer refused the peer: a local-only provider and a remote peer, or login headers from a peer no proxy-mode provider trusts (in text). */
             403: {
                 headers: {
                     [name: string]: unknown;
@@ -9374,7 +9374,7 @@ export interface operations {
                     "application/json": components["schemas"]["Problem"];
                 };
             };
-            /** @description A limit was reached or the request timed out; retry after `Retry-After`. Or: The auth layer could not ask an identity provider (in text, without `Retry-After`). */
+            /** @description A limit was reached or the request timed out; retry after `Retry-After`. Or: The auth layer could not ask a sign-in provider (in text, without `Retry-After`). */
             503: {
                 headers: {
                     [name: string]: unknown;
@@ -9429,7 +9429,7 @@ export interface operations {
                     "text/plain": string;
                 };
             };
-            /** @description The auth layer refused the peer: a local-only provider and a remote peer, or identity headers from a peer no proxy-mode provider trusts (in text). */
+            /** @description The auth layer refused the peer: a local-only provider and a remote peer, or login headers from a peer no proxy-mode provider trusts (in text). */
             403: {
                 headers: {
                     [name: string]: unknown;
@@ -9492,7 +9492,7 @@ export interface operations {
                     "application/json": components["schemas"]["Problem"];
                 };
             };
-            /** @description A limit was reached or the request timed out; retry after `Retry-After`. Or: The auth layer could not ask an identity provider (in text, without `Retry-After`). */
+            /** @description A limit was reached or the request timed out; retry after `Retry-After`. Or: The auth layer could not ask a sign-in provider (in text, without `Retry-After`). */
             503: {
                 headers: {
                     [name: string]: unknown;
@@ -9549,7 +9549,7 @@ export interface operations {
                     "text/plain": string;
                 };
             };
-            /** @description The auth layer refused the peer: a local-only provider and a remote peer, or identity headers from a peer no proxy-mode provider trusts (in text). */
+            /** @description The auth layer refused the peer: a local-only provider and a remote peer, or login headers from a peer no proxy-mode provider trusts (in text). */
             403: {
                 headers: {
                     [name: string]: unknown;
@@ -9567,7 +9567,7 @@ export interface operations {
                     "application/json": components["schemas"]["Problem"];
                 };
             };
-            /** @description A limit was reached or the request timed out; retry after `Retry-After`. Or: The auth layer could not ask an identity provider (in text, without `Retry-After`). */
+            /** @description A limit was reached or the request timed out; retry after `Retry-After`. Or: The auth layer could not ask a sign-in provider (in text, without `Retry-After`). */
             503: {
                 headers: {
                     [name: string]: unknown;
@@ -9622,7 +9622,7 @@ export interface operations {
                     "text/plain": string;
                 };
             };
-            /** @description The auth layer refused the peer: a local-only provider and a remote peer, or identity headers from a peer no proxy-mode provider trusts (in text). */
+            /** @description The auth layer refused the peer: a local-only provider and a remote peer, or login headers from a peer no proxy-mode provider trusts (in text). */
             403: {
                 headers: {
                     [name: string]: unknown;
@@ -9640,7 +9640,7 @@ export interface operations {
                     "application/json": components["schemas"]["Problem"];
                 };
             };
-            /** @description A limit was reached or the request timed out; retry after `Retry-After`. Or: The auth layer could not ask an identity provider (in text, without `Retry-After`). */
+            /** @description A limit was reached or the request timed out; retry after `Retry-After`. Or: The auth layer could not ask a sign-in provider (in text, without `Retry-After`). */
             503: {
                 headers: {
                     [name: string]: unknown;
@@ -9691,7 +9691,7 @@ export interface operations {
                     "text/plain": string;
                 };
             };
-            /** @description The auth layer refused the peer: a local-only provider and a remote peer, or identity headers from a peer no proxy-mode provider trusts (in text). */
+            /** @description The auth layer refused the peer: a local-only provider and a remote peer, or login headers from a peer no proxy-mode provider trusts (in text). */
             403: {
                 headers: {
                     [name: string]: unknown;
@@ -9718,7 +9718,7 @@ export interface operations {
                     "application/json": components["schemas"]["Problem"];
                 };
             };
-            /** @description A limit was reached or the request timed out; retry after `Retry-After`. Or: The auth layer could not ask an identity provider (in text, without `Retry-After`). */
+            /** @description A limit was reached or the request timed out; retry after `Retry-After`. Or: The auth layer could not ask a sign-in provider (in text, without `Retry-After`). */
             503: {
                 headers: {
                     [name: string]: unknown;
@@ -9769,7 +9769,7 @@ export interface operations {
                     "text/plain": string;
                 };
             };
-            /** @description Only a user may do this, not an agent acting for one. Or: The auth layer refused the peer: a local-only provider and a remote peer, or identity headers from a peer no proxy-mode provider trusts (in text). */
+            /** @description Only a user may do this, not an agent acting for one. Or: The auth layer refused the peer: a local-only provider and a remote peer, or login headers from a peer no proxy-mode provider trusts (in text). */
             403: {
                 headers: {
                     [name: string]: unknown;
@@ -9797,7 +9797,7 @@ export interface operations {
                     "application/json": components["schemas"]["Problem"];
                 };
             };
-            /** @description A limit was reached or the request timed out; retry after `Retry-After`. Or: The auth layer could not ask an identity provider (in text, without `Retry-After`). */
+            /** @description A limit was reached or the request timed out; retry after `Retry-After`. Or: The auth layer could not ask a sign-in provider (in text, without `Retry-After`). */
             503: {
                 headers: {
                     [name: string]: unknown;
@@ -9852,7 +9852,7 @@ export interface operations {
                     "text/plain": string;
                 };
             };
-            /** @description Only a user may do this, not an agent acting for one. Or: The auth layer refused the peer: a local-only provider and a remote peer, or identity headers from a peer no proxy-mode provider trusts (in text). */
+            /** @description Only a user may do this, not an agent acting for one. Or: The auth layer refused the peer: a local-only provider and a remote peer, or login headers from a peer no proxy-mode provider trusts (in text). */
             403: {
                 headers: {
                     [name: string]: unknown;
@@ -9898,7 +9898,7 @@ export interface operations {
                     "application/json": components["schemas"]["Problem"];
                 };
             };
-            /** @description A limit was reached or the request timed out; retry after `Retry-After`. Or: The auth layer could not ask an identity provider (in text, without `Retry-After`). */
+            /** @description A limit was reached or the request timed out; retry after `Retry-After`. Or: The auth layer could not ask a sign-in provider (in text, without `Retry-After`). */
             503: {
                 headers: {
                     [name: string]: unknown;
@@ -9952,7 +9952,7 @@ export interface operations {
                     "text/plain": string;
                 };
             };
-            /** @description The auth layer refused the peer: a local-only provider and a remote peer, or identity headers from a peer no proxy-mode provider trusts (in text). */
+            /** @description The auth layer refused the peer: a local-only provider and a remote peer, or login headers from a peer no proxy-mode provider trusts (in text). */
             403: {
                 headers: {
                     [name: string]: unknown;
@@ -9979,7 +9979,7 @@ export interface operations {
                     "application/json": components["schemas"]["Problem"];
                 };
             };
-            /** @description A limit was reached or the request timed out; retry after `Retry-After`. Or: The auth layer could not ask an identity provider (in text, without `Retry-After`). */
+            /** @description A limit was reached or the request timed out; retry after `Retry-After`. Or: The auth layer could not ask a sign-in provider (in text, without `Retry-After`). */
             503: {
                 headers: {
                     [name: string]: unknown;
@@ -10034,7 +10034,7 @@ export interface operations {
                     "text/plain": string;
                 };
             };
-            /** @description The auth layer refused the peer: a local-only provider and a remote peer, or identity headers from a peer no proxy-mode provider trusts (in text). */
+            /** @description The auth layer refused the peer: a local-only provider and a remote peer, or login headers from a peer no proxy-mode provider trusts (in text). */
             403: {
                 headers: {
                     [name: string]: unknown;
@@ -10097,7 +10097,7 @@ export interface operations {
                     "application/json": components["schemas"]["Problem"];
                 };
             };
-            /** @description A limit was reached or the request timed out; retry after `Retry-After`. Or: The auth layer could not ask an identity provider (in text, without `Retry-After`). */
+            /** @description A limit was reached or the request timed out; retry after `Retry-After`. Or: The auth layer could not ask a sign-in provider (in text, without `Retry-After`). */
             503: {
                 headers: {
                     [name: string]: unknown;
@@ -10152,7 +10152,7 @@ export interface operations {
                     "text/plain": string;
                 };
             };
-            /** @description The auth layer refused the peer: a local-only provider and a remote peer, or identity headers from a peer no proxy-mode provider trusts (in text). */
+            /** @description The auth layer refused the peer: a local-only provider and a remote peer, or login headers from a peer no proxy-mode provider trusts (in text). */
             403: {
                 headers: {
                     [name: string]: unknown;
@@ -10215,7 +10215,7 @@ export interface operations {
                     "application/json": components["schemas"]["Problem"];
                 };
             };
-            /** @description A limit was reached or the request timed out; retry after `Retry-After`. Or: The auth layer could not ask an identity provider (in text, without `Retry-After`). */
+            /** @description A limit was reached or the request timed out; retry after `Retry-After`. Or: The auth layer could not ask a sign-in provider (in text, without `Retry-After`). */
             503: {
                 headers: {
                     [name: string]: unknown;
@@ -10273,7 +10273,7 @@ export interface operations {
                     "text/plain": string;
                 };
             };
-            /** @description The auth layer refused the peer: a local-only provider and a remote peer, or identity headers from a peer no proxy-mode provider trusts (in text). */
+            /** @description The auth layer refused the peer: a local-only provider and a remote peer, or login headers from a peer no proxy-mode provider trusts (in text). */
             403: {
                 headers: {
                     [name: string]: unknown;
@@ -10300,7 +10300,7 @@ export interface operations {
                     "application/json": components["schemas"]["Problem"];
                 };
             };
-            /** @description A limit was reached or the request timed out; retry after `Retry-After`. Or: The auth layer could not ask an identity provider (in text, without `Retry-After`). */
+            /** @description A limit was reached or the request timed out; retry after `Retry-After`. Or: The auth layer could not ask a sign-in provider (in text, without `Retry-After`). */
             503: {
                 headers: {
                     [name: string]: unknown;
@@ -10355,7 +10355,7 @@ export interface operations {
                     "text/plain": string;
                 };
             };
-            /** @description The auth layer refused the peer: a local-only provider and a remote peer, or identity headers from a peer no proxy-mode provider trusts (in text). */
+            /** @description The auth layer refused the peer: a local-only provider and a remote peer, or login headers from a peer no proxy-mode provider trusts (in text). */
             403: {
                 headers: {
                     [name: string]: unknown;
@@ -10418,7 +10418,7 @@ export interface operations {
                     "application/json": components["schemas"]["Problem"];
                 };
             };
-            /** @description A limit was reached or the request timed out; retry after `Retry-After`. Or: The auth layer could not ask an identity provider (in text, without `Retry-After`). */
+            /** @description A limit was reached or the request timed out; retry after `Retry-After`. Or: The auth layer could not ask a sign-in provider (in text, without `Retry-After`). */
             503: {
                 headers: {
                     [name: string]: unknown;
@@ -10471,7 +10471,7 @@ export interface operations {
                     "text/plain": string;
                 };
             };
-            /** @description The auth layer refused the peer: a local-only provider and a remote peer, or identity headers from a peer no proxy-mode provider trusts (in text). */
+            /** @description The auth layer refused the peer: a local-only provider and a remote peer, or login headers from a peer no proxy-mode provider trusts (in text). */
             403: {
                 headers: {
                     [name: string]: unknown;
@@ -10498,7 +10498,7 @@ export interface operations {
                     "application/json": components["schemas"]["Problem"];
                 };
             };
-            /** @description A limit was reached or the request timed out; retry after `Retry-After`. Or: The auth layer could not ask an identity provider (in text, without `Retry-After`). */
+            /** @description A limit was reached or the request timed out; retry after `Retry-After`. Or: The auth layer could not ask a sign-in provider (in text, without `Retry-After`). */
             503: {
                 headers: {
                     [name: string]: unknown;
@@ -10555,7 +10555,7 @@ export interface operations {
                     "text/plain": string;
                 };
             };
-            /** @description The auth layer refused the peer: a local-only provider and a remote peer, or identity headers from a peer no proxy-mode provider trusts (in text). */
+            /** @description The auth layer refused the peer: a local-only provider and a remote peer, or login headers from a peer no proxy-mode provider trusts (in text). */
             403: {
                 headers: {
                     [name: string]: unknown;
@@ -10618,7 +10618,7 @@ export interface operations {
                     "application/json": components["schemas"]["Problem"];
                 };
             };
-            /** @description A limit was reached or the request timed out; retry after `Retry-After`. Or: The auth layer could not ask an identity provider (in text, without `Retry-After`). */
+            /** @description A limit was reached or the request timed out; retry after `Retry-After`. Or: The auth layer could not ask a sign-in provider (in text, without `Retry-After`). */
             503: {
                 headers: {
                     [name: string]: unknown;
@@ -10675,7 +10675,7 @@ export interface operations {
                     "text/plain": string;
                 };
             };
-            /** @description The auth layer refused the peer: a local-only provider and a remote peer, or identity headers from a peer no proxy-mode provider trusts (in text). */
+            /** @description The auth layer refused the peer: a local-only provider and a remote peer, or login headers from a peer no proxy-mode provider trusts (in text). */
             403: {
                 headers: {
                     [name: string]: unknown;
@@ -10738,7 +10738,7 @@ export interface operations {
                     "application/json": components["schemas"]["Problem"];
                 };
             };
-            /** @description A limit was reached or the request timed out; retry after `Retry-After`. Or: The auth layer could not ask an identity provider (in text, without `Retry-After`). */
+            /** @description A limit was reached or the request timed out; retry after `Retry-After`. Or: The auth layer could not ask a sign-in provider (in text, without `Retry-After`). */
             503: {
                 headers: {
                     [name: string]: unknown;
@@ -10795,7 +10795,7 @@ export interface operations {
                     "text/plain": string;
                 };
             };
-            /** @description The auth layer refused the peer: a local-only provider and a remote peer, or identity headers from a peer no proxy-mode provider trusts (in text). */
+            /** @description The auth layer refused the peer: a local-only provider and a remote peer, or login headers from a peer no proxy-mode provider trusts (in text). */
             403: {
                 headers: {
                     [name: string]: unknown;
@@ -10858,7 +10858,7 @@ export interface operations {
                     "application/json": components["schemas"]["Problem"];
                 };
             };
-            /** @description A limit was reached or the request timed out; retry after `Retry-After`. Or: The auth layer could not ask an identity provider (in text, without `Retry-After`). */
+            /** @description A limit was reached or the request timed out; retry after `Retry-After`. Or: The auth layer could not ask a sign-in provider (in text, without `Retry-After`). */
             503: {
                 headers: {
                     [name: string]: unknown;
@@ -10911,7 +10911,7 @@ export interface operations {
                     "text/plain": string;
                 };
             };
-            /** @description The auth layer refused the peer: a local-only provider and a remote peer, or identity headers from a peer no proxy-mode provider trusts (in text). */
+            /** @description The auth layer refused the peer: a local-only provider and a remote peer, or login headers from a peer no proxy-mode provider trusts (in text). */
             403: {
                 headers: {
                     [name: string]: unknown;
@@ -10938,7 +10938,7 @@ export interface operations {
                     "application/json": components["schemas"]["Problem"];
                 };
             };
-            /** @description A limit was reached or the request timed out; retry after `Retry-After`. Or: The auth layer could not ask an identity provider (in text, without `Retry-After`). */
+            /** @description A limit was reached or the request timed out; retry after `Retry-After`. Or: The auth layer could not ask a sign-in provider (in text, without `Retry-After`). */
             503: {
                 headers: {
                     [name: string]: unknown;
@@ -10995,7 +10995,7 @@ export interface operations {
                     "text/plain": string;
                 };
             };
-            /** @description The auth layer refused the peer: a local-only provider and a remote peer, or identity headers from a peer no proxy-mode provider trusts (in text). */
+            /** @description The auth layer refused the peer: a local-only provider and a remote peer, or login headers from a peer no proxy-mode provider trusts (in text). */
             403: {
                 headers: {
                     [name: string]: unknown;
@@ -11058,7 +11058,7 @@ export interface operations {
                     "application/json": components["schemas"]["Problem"];
                 };
             };
-            /** @description A limit was reached or the request timed out; retry after `Retry-After`. Or: The auth layer could not ask an identity provider (in text, without `Retry-After`). */
+            /** @description A limit was reached or the request timed out; retry after `Retry-After`. Or: The auth layer could not ask a sign-in provider (in text, without `Retry-After`). */
             503: {
                 headers: {
                     [name: string]: unknown;
@@ -11109,7 +11109,7 @@ export interface operations {
                     "text/plain": string;
                 };
             };
-            /** @description The auth layer refused the peer: a local-only provider and a remote peer, or identity headers from a peer no proxy-mode provider trusts (in text). */
+            /** @description The auth layer refused the peer: a local-only provider and a remote peer, or login headers from a peer no proxy-mode provider trusts (in text). */
             403: {
                 headers: {
                     [name: string]: unknown;
@@ -11136,7 +11136,7 @@ export interface operations {
                     "application/json": components["schemas"]["Problem"];
                 };
             };
-            /** @description A limit was reached or the request timed out; retry after `Retry-After`. Or: The auth layer could not ask an identity provider (in text, without `Retry-After`). */
+            /** @description A limit was reached or the request timed out; retry after `Retry-After`. Or: The auth layer could not ask a sign-in provider (in text, without `Retry-After`). */
             503: {
                 headers: {
                     [name: string]: unknown;
@@ -11189,7 +11189,7 @@ export interface operations {
                     "text/plain": string;
                 };
             };
-            /** @description The auth layer refused the peer: a local-only provider and a remote peer, or identity headers from a peer no proxy-mode provider trusts (in text). */
+            /** @description The auth layer refused the peer: a local-only provider and a remote peer, or login headers from a peer no proxy-mode provider trusts (in text). */
             403: {
                 headers: {
                     [name: string]: unknown;
@@ -11216,7 +11216,7 @@ export interface operations {
                     "application/json": components["schemas"]["Problem"];
                 };
             };
-            /** @description A limit was reached or the request timed out; retry after `Retry-After`. Or: The auth layer could not ask an identity provider (in text, without `Retry-After`). */
+            /** @description A limit was reached or the request timed out; retry after `Retry-After`. Or: The auth layer could not ask a sign-in provider (in text, without `Retry-After`). */
             503: {
                 headers: {
                     [name: string]: unknown;
@@ -11271,7 +11271,7 @@ export interface operations {
                     "text/plain": string;
                 };
             };
-            /** @description The auth layer refused the peer: a local-only provider and a remote peer, or identity headers from a peer no proxy-mode provider trusts (in text). */
+            /** @description The auth layer refused the peer: a local-only provider and a remote peer, or login headers from a peer no proxy-mode provider trusts (in text). */
             403: {
                 headers: {
                     [name: string]: unknown;
@@ -11289,7 +11289,7 @@ export interface operations {
                     "application/json": components["schemas"]["Problem"];
                 };
             };
-            /** @description A limit was reached or the request timed out; retry after `Retry-After`. Or: The auth layer could not ask an identity provider (in text, without `Retry-After`). */
+            /** @description A limit was reached or the request timed out; retry after `Retry-After`. Or: The auth layer could not ask a sign-in provider (in text, without `Retry-After`). */
             503: {
                 headers: {
                     [name: string]: unknown;
@@ -11340,7 +11340,7 @@ export interface operations {
                     "text/plain": string;
                 };
             };
-            /** @description The auth layer refused the peer: a local-only provider and a remote peer, or identity headers from a peer no proxy-mode provider trusts (in text). */
+            /** @description The auth layer refused the peer: a local-only provider and a remote peer, or login headers from a peer no proxy-mode provider trusts (in text). */
             403: {
                 headers: {
                     [name: string]: unknown;
@@ -11358,7 +11358,7 @@ export interface operations {
                     "application/json": components["schemas"]["Problem"];
                 };
             };
-            /** @description A limit was reached or the request timed out; retry after `Retry-After`. Or: The auth layer could not ask an identity provider (in text, without `Retry-After`). */
+            /** @description A limit was reached or the request timed out; retry after `Retry-After`. Or: The auth layer could not ask a sign-in provider (in text, without `Retry-After`). */
             503: {
                 headers: {
                     [name: string]: unknown;
@@ -11406,7 +11406,7 @@ export interface operations {
                     "text/plain": string;
                 };
             };
-            /** @description The auth layer refused the peer: a local-only provider and a remote peer, or identity headers from a peer no proxy-mode provider trusts (in text). */
+            /** @description The auth layer refused the peer: a local-only provider and a remote peer, or login headers from a peer no proxy-mode provider trusts (in text). */
             403: {
                 headers: {
                     [name: string]: unknown;
@@ -11424,7 +11424,7 @@ export interface operations {
                     "application/json": components["schemas"]["Problem"];
                 };
             };
-            /** @description A limit was reached or the request timed out; retry after `Retry-After`. Or: The auth layer could not ask an identity provider (in text, without `Retry-After`). */
+            /** @description A limit was reached or the request timed out; retry after `Retry-After`. Or: The auth layer could not ask a sign-in provider (in text, without `Retry-After`). */
             503: {
                 headers: {
                     [name: string]: unknown;
@@ -11472,7 +11472,7 @@ export interface operations {
                     "text/plain": string;
                 };
             };
-            /** @description Only a user may do this, not an agent acting for one. Or: The auth layer refused the peer: a local-only provider and a remote peer, or identity headers from a peer no proxy-mode provider trusts (in text). */
+            /** @description Only a user may do this, not an agent acting for one. Or: The auth layer refused the peer: a local-only provider and a remote peer, or login headers from a peer no proxy-mode provider trusts (in text). */
             403: {
                 headers: {
                     [name: string]: unknown;
@@ -11491,7 +11491,7 @@ export interface operations {
                     "application/json": components["schemas"]["Problem"];
                 };
             };
-            /** @description A limit was reached or the request timed out; retry after `Retry-After`. Or: The auth layer could not ask an identity provider (in text, without `Retry-After`). */
+            /** @description A limit was reached or the request timed out; retry after `Retry-After`. Or: The auth layer could not ask a sign-in provider (in text, without `Retry-After`). */
             503: {
                 headers: {
                     [name: string]: unknown;
@@ -11543,7 +11543,7 @@ export interface operations {
                     "text/plain": string;
                 };
             };
-            /** @description Only a user may do this, not an agent acting for one. Or: The auth layer refused the peer: a local-only provider and a remote peer, or identity headers from a peer no proxy-mode provider trusts (in text). */
+            /** @description Only a user may do this, not an agent acting for one. Or: The auth layer refused the peer: a local-only provider and a remote peer, or login headers from a peer no proxy-mode provider trusts (in text). */
             403: {
                 headers: {
                     [name: string]: unknown;
@@ -11580,7 +11580,7 @@ export interface operations {
                     "application/json": components["schemas"]["Problem"];
                 };
             };
-            /** @description A limit was reached or the request timed out; retry after `Retry-After`. Or: The auth layer could not ask an identity provider (in text, without `Retry-After`). */
+            /** @description A limit was reached or the request timed out; retry after `Retry-After`. Or: The auth layer could not ask a sign-in provider (in text, without `Retry-After`). */
             503: {
                 headers: {
                     [name: string]: unknown;
@@ -11629,7 +11629,7 @@ export interface operations {
                     "text/plain": string;
                 };
             };
-            /** @description Only a user may do this, not an agent acting for one. Or: The auth layer refused the peer: a local-only provider and a remote peer, or identity headers from a peer no proxy-mode provider trusts (in text). */
+            /** @description Only a user may do this, not an agent acting for one. Or: The auth layer refused the peer: a local-only provider and a remote peer, or login headers from a peer no proxy-mode provider trusts (in text). */
             403: {
                 headers: {
                     [name: string]: unknown;
@@ -11657,7 +11657,7 @@ export interface operations {
                     "application/json": components["schemas"]["Problem"];
                 };
             };
-            /** @description A limit was reached or the request timed out; retry after `Retry-After`. Or: The auth layer could not ask an identity provider (in text, without `Retry-After`). */
+            /** @description A limit was reached or the request timed out; retry after `Retry-After`. Or: The auth layer could not ask a sign-in provider (in text, without `Retry-After`). */
             503: {
                 headers: {
                     [name: string]: unknown;

@@ -3,7 +3,7 @@
 // is built with `pathTo` or one of the helpers below, and the rail asks `sectionOf`. Nothing
 // else in the app writes or splits a path by hand. A proposal lives under its destination, so a proposal has
 // no address of its own: `/journeys/<journey>/proposals/<proposal>`, `/routes/<route>/proposals/<proposal>`,
-// or `/entities/proposals/<proposal>` for the deployment. Each is the destination's own page with the
+// or `/identities/proposals/<proposal>` for the deployment. Each is the destination's own page with the
 // proposal layer on (proposals/layer.ts); a journey's and a route's have `/nodes/<key>` below them, the
 // deployment has no nodes.
 import { createContext, useContext, useMemo } from "react";
@@ -12,7 +12,7 @@ import { generatePath, matchPath, useParams } from "react-router";
 import type { Schema } from "@cairn/client";
 
 /** The rail entry a page belongs to. */
-export type Section = "home" | "journeys" | "routes" | "entities" | "me";
+export type Section = "home" | "journeys" | "routes" | "identities" | "me";
 
 /** Each pattern; the router ranks the static `new` pages above the ones with a parameter in their place. */
 export const ADDRESSES = [
@@ -32,9 +32,9 @@ export const ADDRESSES = [
   { name: "routeProposals", path: "/routes/:route/proposals", section: "routes" },
   { name: "routeProposal", path: "/routes/:route/proposals/:proposal", section: "routes" },
   { name: "routeProposalNode", path: "/routes/:route/proposals/:proposal/nodes/:key", section: "routes" },
-  { name: "entities", path: "/entities", section: "entities" },
-  { name: "deploymentProposals", path: "/entities/proposals", section: "entities" },
-  { name: "deploymentProposal", path: "/entities/proposals/:proposal", section: "entities" },
+  { name: "identities", path: "/identities", section: "identities" },
+  { name: "deploymentProposals", path: "/identities/proposals", section: "identities" },
+  { name: "deploymentProposal", path: "/identities/proposals/:proposal", section: "identities" },
   { name: "me", path: "/me", section: "me" },
 ] as const;
 
@@ -109,7 +109,7 @@ export function proposalAddress(destination: Domain, proposal: string, key?: str
   return key === undefined ? pathTo("routeProposal", { route, proposal }) : pathTo("routeProposalNode", { route, proposal, key });
 }
 
-/** The destination the router's params name: the journey, the route, else the deployment (`/entities/proposals`). */
+/** The destination the router's params name: the journey, the route, else the deployment (`/identities/proposals`). */
 export function destinationIn(params: Readonly<Record<string, string | undefined>>): Domain {
   if (params.journey !== undefined) {
     return { journey: params.journey };

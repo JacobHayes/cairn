@@ -1,4 +1,4 @@
-//! Who a sign-in is (ARCHITECTURE, Auth): the identity an auth provider vouches for, which
+//! Who a sign-in is (ARCHITECTURE, Auth): the login an auth provider vouches for, which
 //! the auth crate resolves to a user and the API, MCP, and service layers share (H1, H3).
 
 use std::collections::BTreeSet;
@@ -13,7 +13,7 @@ use crate::text::{Email, Title};
 /// subject for the account. A user owns many (ARCHITECTURE, Auth).
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
 #[serde(deny_unknown_fields)]
-pub struct Identity {
+pub struct Login {
     /// The provider, by its configured name.
     pub provider: Slug,
     /// The provider's stable subject for the account.
@@ -21,7 +21,7 @@ pub struct Identity {
     /// The name the provider gives the account.
     pub display: Title,
     /// H3: only the emails the provider's issuer marks verified; an unverified email never
-    /// matches an entity or links a user.
+    /// matches an identity or links a user.
     #[serde(default, skip_serializing_if = "BTreeSet::is_empty")]
     pub verified_emails: BTreeSet<Email>,
 }

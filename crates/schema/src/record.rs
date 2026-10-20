@@ -8,14 +8,14 @@ use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
 use crate::attachment::{Annotation, Resource};
-use crate::domain::{Domain, Entity, GraphId, JourneyHeader, RouteHeader};
+use crate::domain::{Domain, GraphId, Identity, JourneyHeader, RouteHeader};
 use crate::field::{NodeField, NodeFieldValue};
 use crate::graph::{Edge, Insertion, ParticipationKind, Role};
 use crate::id::{
-    AttachmentKey, EntityKey, InsertionKey, JourneyId, KindKey, NodeKey, ProposalId, RoleKey,
+    AttachmentKey, IdentityKey, InsertionKey, JourneyId, KindKey, NodeKey, ProposalId, RoleKey,
     RouteId,
 };
-use crate::node::{EntitySet, Node, ParticipationSource};
+use crate::node::{IdentitySet, Node, ParticipationSource};
 use crate::number::VersionNumber;
 use crate::proposal::Proposal;
 use crate::refs::KeyRefs;
@@ -108,8 +108,8 @@ pub enum GraphRecord {
     RoleFill {
         /// The role.
         role: RoleKey,
-        /// The entities.
-        entities: EntitySet,
+        /// The identities.
+        identities: IdentitySet,
     },
     /// A pin.
     Pin {
@@ -178,14 +178,14 @@ pub enum Record {
         /// When it was deleted.
         deleted_at: Timestamp,
     },
-    /// An entity.
-    Entity(Entity),
-    /// A merged entity's old key and the entity it resolves to (E6).
-    EntityAlias {
+    /// An identity.
+    Identity(Identity),
+    /// A merged identity's old key and the identity it resolves to (E6).
+    IdentityAlias {
         /// The old key.
-        alias: EntityKey,
-        /// The entity it resolves to.
-        entity: EntityKey,
+        alias: IdentityKey,
+        /// The identity it resolves to.
+        identity: IdentityKey,
     },
     /// A proposal.
     Proposal(Proposal),
@@ -295,10 +295,10 @@ pub enum RecordKey {
     },
     /// A deleted journey's id.
     DeletedJourney(JourneyId),
-    /// An entity.
-    Entity(EntityKey),
-    /// An entity alias.
-    EntityAlias(EntityKey),
+    /// An identity.
+    Identity(IdentityKey),
+    /// An identity alias.
+    IdentityAlias(IdentityKey),
     /// A proposal, within its destination domain.
     Proposal {
         /// The destination.
@@ -434,8 +434,8 @@ impl Record {
                 version: *version,
             },
             Record::DeletedJourney { journey, .. } => RecordKey::DeletedJourney(journey.clone()),
-            Record::Entity(entity) => RecordKey::Entity(entity.key.clone()),
-            Record::EntityAlias { alias, .. } => RecordKey::EntityAlias(alias.clone()),
+            Record::Identity(identity) => RecordKey::Identity(identity.key.clone()),
+            Record::IdentityAlias { alias, .. } => RecordKey::IdentityAlias(alias.clone()),
             Record::Proposal(proposal) => RecordKey::Proposal {
                 destination: proposal.destination.clone(),
                 id: proposal.id.clone(),
@@ -459,7 +459,7 @@ impl RecordKey {
             RecordKey::RouteHeader(route)
             | RecordKey::RouteDraft(route)
             | RecordKey::RouteVersion { route, .. } => Domain::Route(route.clone()),
-            RecordKey::DeletedJourney(_) | RecordKey::Entity(_) | RecordKey::EntityAlias(_) => {
+            RecordKey::DeletedJourney(_) | RecordKey::Identity(_) | RecordKey::IdentityAlias(_) => {
                 Domain::Deployment
             }
         }

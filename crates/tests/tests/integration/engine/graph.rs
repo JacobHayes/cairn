@@ -228,11 +228,11 @@ const BREAKAGES: &[(&str, Breakage, ViolationCode)] = &[
         ViolationCode::SingleKindOnMultiRole,
     ),
     (
-        "an entity decision filling a multi role",
+        "an identity decision filling a multi role",
         |d| {
             edit(d, "n_who_owns", |n| {
                 if let Payload::Decision(decision) = &mut n.payload {
-                    decision.answer = AnswerSpec::Entity {
+                    decision.answer = AnswerSpec::Identity {
                         fills_role: Some(role("r_stakeholders")),
                     }
                 }
@@ -245,7 +245,7 @@ const BREAKAGES: &[(&str, Breakage, ViolationCode)] = &[
         |d| {
             edit(d, "n_findings_reviewer", |n| {
                 if let Payload::Decision(decision) = &mut n.payload {
-                    decision.answer = AnswerSpec::Entity {
+                    decision.answer = AnswerSpec::Identity {
                         fills_role: Some(role("r_eval_owner")),
                     }
                 }

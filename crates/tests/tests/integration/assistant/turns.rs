@@ -297,7 +297,7 @@ async fn a_per_member_breakdown_writes_explicit_participations() {
     let world = World::new();
     let lead = user("u_lead");
     world.vendor_journey(&lead).await;
-    let members = ["e_stakeholder_a", "e_stakeholder_b"];
+    let members = ["who_d4m6uk2eqf5rbhzs", "who_e7h2jv3nxc4yaw6t"];
     let mut mutations = Vec::new();
     for (index, member) in members.iter().enumerate() {
         let key = format!("n_workload_member_{index}");

@@ -1,10 +1,10 @@
-// H5: an entity edit kept after a conflict is drafted against the deployment revision the
+// H5: an identity edit kept after a conflict is drafted against the deployment revision the
 // rejection reports, so the retry works before the tab hears the tick.
 import { describe, expect, it } from "vitest";
 
-import { deploymentRebase } from "./Entities.tsx";
+import { deploymentRebase } from "./Identities.tsx";
 
-describe("rebasing an entity edit (H5)", () => {
+describe("rebasing an identity edit (H5)", () => {
   const stale = (current: number) => ({
     rejection: "stale" as const,
     conflicts: [

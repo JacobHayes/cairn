@@ -84,7 +84,7 @@ mod conformance {
         races:
         a_long_commit_blocks_neither_reads_nor_another_journeys_commit,
         two_creates_of_one_journey_in_flight_yield_one_journey,
-        two_entity_creates_of_one_key_in_flight_yield_one_entity,
+        two_identity_creates_of_one_key_in_flight_yield_one_identity,
         a_delete_racing_a_child_insert_leaves_no_orphan,
         turso_lets_a_child_insert_race_its_parents_delete,
         a_crash_mid_commit_keeps_every_earlier_commit_and_nothing_of_its_own,

@@ -10,9 +10,9 @@ import { ParticipationEditor } from "./editors.tsx";
 import { foldKey } from "./folds.ts";
 import type { NodeDetail, Ready } from "./model.ts";
 import { Section } from "./parts.tsx";
-import { entityName, kindTitle } from "./sections.tsx";
+import { identityName, kindTitle } from "./sections.tsx";
 
-/** Each participation kind's entities and where they come from (E2). */
+/** Each participation kind's identities and where they come from (E2). */
 export function People({ view, detail }: { view: Ready; detail: NodeDetail }) {
   const kinds = Object.entries(detail.derived.participations ?? {});
   return (
@@ -22,7 +22,7 @@ export function People({ view, detail }: { view: Ready; detail: NodeDetail }) {
         {kinds.map(([kind, participation]) => (
           <li key={kind} data-testid="participation" data-kind={kind}>
             <strong>{kindTitle(view, kind)}</strong>:{" "}
-            {participation.entities.length === 0 ? "no one" : participation.entities.map((key) => entityName(view, key)).join(", ")}{" "}
+            {participation.identities.length === 0 ? "no one" : participation.identities.map((key) => identityName(view, key)).join(", ")}{" "}
             <span className="muted small">({originText(participation.origin, view)})</span>
           </li>
         ))}

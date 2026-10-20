@@ -1,6 +1,6 @@
 // A1, A2, B4: the palette that adds a node: its kind, its title, and the container it goes in
 // (the one drilled into, by default). Its key is minted here and its id made from the title,
-// unique among its siblings (Identity and references). A new decision asks its title as a
+// unique among its siblings (Keys and references). A new decision asks its title as a
 // yes-or-no question until its form changes the answer type. In a journey it is local (B4).
 // The new node opens in its form once it lands.
 import { NODE_COUNT_MAX, TITLE_BYTES_MAX } from "@cairn/client";

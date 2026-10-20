@@ -48,7 +48,7 @@ on_both_stores!(
     a_subtree_removal_conflicts_with_an_edit_inside_it,
     a_removal_retried_after_an_insertion_beneath_it_is_not_widened,
     a_merge_that_breaks_a_referencing_journey_is_rejected_naming_it,
-    a_merge_moves_emails_and_an_email_stays_on_one_entity,
+    a_merge_moves_emails_and_an_email_stays_on_one_identity,
     a_merge_is_stale_once_a_journey_it_checked_moves_or_a_new_one_refers,
     publishing_a_route_never_touches_its_journeys,
     an_archived_journey_takes_only_unarchiving_or_deletion_and_its_id_never_returns,
@@ -103,10 +103,19 @@ async fn a_fixture_scenario_lands_as_the_engine_alone_would(
     service: &Service,
     _: &InProcessNotifier,
 ) {
+    let (people_call, people) = crate::people::people_write();
+    applied(service.patch(&people_call, &people).await);
+    let people_step = crate::people::people_step();
+    let mut reference = engine_step(
+        &Records::default(),
+        &people_step.patch,
+        &people_call,
+        Some(people_step.note.as_str()),
+    );
     let seed = publish_fixture_route("vendor-evaluation");
     let seed_call = call("u_author", "2026-09-01T12:00:00Z");
     applied(service.patch(&seed_call, &domain(seed.clone())).await);
-    let mut reference = engine_step(&Records::default(), &seed, &seed_call, None);
+    reference = engine_step(&reference, &seed, &seed_call, None);
     let steps = scenario("vendor-evaluation").steps;
     for step in steps.as_slice() {
         let call = step_call(step);
@@ -283,10 +292,10 @@ async fn a_merge_that_breaks_a_referencing_journey_is_rejected_naming_it(
         "{journey: j_vendor_eval}",
         2,
         "\
-- op: create_entity\n  entity: {key: e_other, name: Other}\n\
+- op: create_identity\n  identity: {key: who_other, name: Other}\n\
 - op: add_node\n  node: {key: n_start, id: start, kind: milestone, title: Start}\n\
 - op: set_pin\n  node: n_start\n  date: \"2026-11-10\"\n\
-- op: add_node\n  node: {key: n_long, id: long, kind: action, title: Long, estimate: 30, relevant_when: {equals: {decision: n_who_owns, value: e_other}}, not_before: {after: n_start}, due_by: {before: n_decision_meeting}}\n",
+- op: add_node\n  node: {key: n_long, id: long, kind: action, title: Long, estimate: 30, relevant_when: {equals: {decision: n_who_owns, value: who_other}}, not_before: {after: n_start}, due_by: {before: n_decision_meeting}}\n",
     );
     applied(
         service
@@ -297,7 +306,7 @@ async fn a_merge_that_breaks_a_referencing_journey_is_rejected_naming_it(
         "p_merge",
         "deployment",
         2,
-        "- op: merge_entities\n  survivor: e_other\n  merged: e_lead\n  journeys: {j_vendor_eval: 3}\n",
+        "- op: merge_identities\n  survivor: who_other\n  merged: who_k3d7qm2xw5tn6pfa\n  journeys: {j_vendor_eval: 3}\n",
     );
     let refused = rejected(
         service
@@ -324,9 +333,9 @@ async fn a_merge_that_breaks_a_referencing_journey_is_rejected_naming_it(
     );
 }
 
-/// H3, E6: a merge moves the merged entity's emails to the survivor and leaves its key as an
-/// alias; an email already on another entity cannot be given to a second one.
-async fn a_merge_moves_emails_and_an_email_stays_on_one_entity(
+/// H3, E6: a merge moves the merged identity's emails to the survivor and leaves its key as an
+/// alias; an email already on another identity cannot be given to a second one.
+async fn a_merge_moves_emails_and_an_email_stays_on_one_identity(
     service: &Service,
     _: &InProcessNotifier,
 ) {
@@ -335,7 +344,7 @@ async fn a_merge_moves_emails_and_an_email_stays_on_one_entity(
         "p_taken",
         "deployment",
         1,
-        "- op: edit_entity\n  entity: {key: e_stakeholder_b, name: Stakeholder B, emails: [Lead@Example.org]}\n",
+        "- op: edit_identity\n  identity: {key: who_e7h2jv3nxc4yaw6t, name: Eli Park, emails: [Ana@Example.org]}\n",
     );
     let refused = rejected(service.patch(&call("u_lead", AT), &domain(taken)).await);
     assert!(matches!(refused, Rejection::Invalid { .. }), "{refused:#?}");
@@ -344,29 +353,31 @@ async fn a_merge_moves_emails_and_an_email_stays_on_one_entity(
         "p_give",
         "deployment",
         1,
-        "- op: edit_entity\n  entity: {key: e_stakeholder_b, name: Stakeholder B, emails: [b@example.org]}\n",
+        "- op: edit_identity\n  identity: {key: who_e7h2jv3nxc4yaw6t, name: Eli Park, emails: [b@example.org]}\n",
     );
     applied(service.patch(&call("u_lead", AT), &domain(give)).await);
     let merge = patch(
         "p_merge",
         "deployment",
         2,
-        "- op: merge_entities\n  survivor: e_stakeholder_a\n  merged: e_stakeholder_b\n  journeys: {j_vendor_eval: 2}\n",
+        "- op: merge_identities\n  survivor: who_d4m6uk2eqf5rbhzs\n  merged: who_e7h2jv3nxc4yaw6t\n  journeys: {j_vendor_eval: 2}\n",
     );
     applied(service.patch(&call("u_lead", AT), &domain(merge)).await);
     let deployment = service.deployment().await.unwrap();
-    let survivor_key = "e_stakeholder_a".parse().unwrap();
+    let survivor_key = "who_d4m6uk2eqf5rbhzs".parse().unwrap();
     assert_eq!(
-        deployment.aliases.get(&"e_stakeholder_b".parse().unwrap()),
+        deployment
+            .aliases
+            .get(&"who_e7h2jv3nxc4yaw6t".parse().unwrap()),
         Some(&survivor_key),
         "the alias resolves"
     );
-    let survivor = deployment.entities.get(&survivor_key).unwrap();
+    let survivor = deployment.identities.get(&survivor_key).unwrap();
     assert!(survivor.emails.contains(&"b@example.org".parse().unwrap()));
 }
 
 /// E6, H5: a merge names the journeys it was checked against at their revisions; one of them
-/// edited since, or a journey newly referring to either entity, makes it stale.
+/// edited since, or a journey newly referring to either identity, makes it stale.
 async fn a_merge_is_stale_once_a_journey_it_checked_moves_or_a_new_one_refers(
     service: &Service,
     _: &InProcessNotifier,
@@ -377,7 +388,7 @@ async fn a_merge_is_stale_once_a_journey_it_checked_moves_or_a_new_one_refers(
             id,
             "deployment",
             1,
-            "- op: merge_entities\n  survivor: e_stakeholder_a\n  merged: e_stakeholder_b\n  journeys: {j_vendor_eval: 2}\n",
+            "- op: merge_identities\n  survivor: who_d4m6uk2eqf5rbhzs\n  merged: who_e7h2jv3nxc4yaw6t\n  journeys: {j_vendor_eval: 2}\n",
         ))
     };
     let edit = patch(
@@ -404,7 +415,7 @@ async fn a_merge_is_stale_once_a_journey_it_checked_moves_or_a_new_one_refers(
         "\
 - op: create_journey\n  name: New\n\
 - op: add_role\n  role: {key: r_lead, id: lead, title: Lead}\n\
-- op: fill_role\n  role: r_lead\n  entities: [e_stakeholder_b]\n",
+- op: fill_role\n  role: r_lead\n  identities: [who_e7h2jv3nxc4yaw6t]\n",
     );
     let refer = cairn_schema::Patch {
         deployment_revision: Some(cairn_schema::Revision::NONE.next()),
@@ -415,12 +426,12 @@ async fn a_merge_is_stale_once_a_journey_it_checked_moves_or_a_new_one_refers(
         "p_merge_two",
         "deployment",
         1,
-        "- op: merge_entities\n  survivor: e_stakeholder_a\n  merged: e_stakeholder_b\n  journeys: {j_vendor_eval: 3}\n",
+        "- op: merge_identities\n  survivor: who_d4m6uk2eqf5rbhzs\n  merged: who_e7h2jv3nxc4yaw6t\n  journeys: {j_vendor_eval: 3}\n",
     ));
     let Rejection::Stale { conflicts, .. } =
         rejected(service.patch(&call("u_lead", AT), &fresh).await)
     else {
-        panic!("a journey newly refers to a merged entity");
+        panic!("a journey newly refers to a merged identity");
     };
     let newcomer = RevisionOf::Domain(Domain::Journey(journey_id("j_new")));
     assert!(
@@ -594,7 +605,7 @@ async fn a_users_patch_and_their_agents_land_alike_but_for_the_stamp(
 }
 
 /// H6: every commit is announced: the journey a patch moved, and the deployment when an
-/// entity create riding in it moved that too; a subscriber hears only what it watches.
+/// identity create riding in it moved that too; a subscriber hears only what it watches.
 async fn every_commit_is_announced_with_each_revision_it_moved(
     service: &Service,
     _: &InProcessNotifier,
@@ -612,7 +623,7 @@ async fn every_commit_is_announced_with_each_revision_it_moved(
         "p_riding",
         "{journey: j_new}",
         0,
-        "- op: create_journey\n  name: New\n- op: create_entity\n  entity: {key: e_new, name: New}\n",
+        "- op: create_journey\n  name: New\n- op: create_identity\n  identity: {key: who_new, name: New}\n",
     );
     applied(service.patch(&call("u_lead", AT), &domain(riding)).await);
     let route = patch(
@@ -746,7 +757,7 @@ fn every_operation_can_be_awaited_on_another_thread() {
 }
 
 /// H6: a hard delete moves no deployment revision in the store, so none is announced; the
-/// entity create that later moves it to 1 is heard.
+/// identity create that later moves it to 1 is heard.
 async fn a_hard_delete_announces_no_deployment_revision_it_did_not_commit(
     service: &Service,
     _: &InProcessNotifier,
@@ -770,13 +781,13 @@ async fn a_hard_delete_announces_no_deployment_revision_it_did_not_commit(
     ));
     applied(service.patch(&call("u_lead", AT), &delete).await);
     assert_eq!(take(), Take::Empty, "the deployment did not move");
-    let entity = domain(patch(
-        "p_entity",
+    let identity = domain(patch(
+        "p_identity",
         "deployment",
         0,
-        "- op: create_entity\n  entity: {key: e_new, name: New}\n",
+        "- op: create_identity\n  identity: {key: who_new, name: New}\n",
     ));
-    applied(service.patch(&call("u_lead", AT), &entity).await);
+    applied(service.patch(&call("u_lead", AT), &identity).await);
     assert_eq!(
         take(),
         Take::Ticks(vec![Tick {

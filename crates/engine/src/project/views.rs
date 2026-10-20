@@ -46,8 +46,8 @@ impl DerivedJourney<'_> {
                 let (pins, fills) = match &self.node(&key).payload {
                     Payload::Decision(decision) => match &decision.answer {
                         AnswerSpec::Date { feeds_milestone } => (feeds_milestone.clone(), None),
-                        AnswerSpec::Entity { fills_role }
-                        | AnswerSpec::EntityList { fills_role } => (None, fills_role.clone()),
+                        AnswerSpec::Identity { fills_role }
+                        | AnswerSpec::IdentityList { fills_role } => (None, fills_role.clone()),
                         AnswerSpec::Boolean
                         | AnswerSpec::SingleChoice(_)
                         | AnswerSpec::MultiChoice(_)

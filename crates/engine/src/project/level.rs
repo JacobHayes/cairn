@@ -54,7 +54,7 @@ use std::collections::{BTreeMap, BTreeSet};
 
 use cairn_schema::limits::CONTAINMENT_DEPTH_MAX;
 use cairn_schema::{
-    DependencyVia, Deployment, EdgeOrigin, EntityKey, Level, LevelDisplay, LevelEdge, LevelNode,
+    DependencyVia, Deployment, EdgeOrigin, IdentityKey, Level, LevelDisplay, LevelEdge, LevelNode,
     LevelQuery, NodeKey, NodeKind, Progress, Relevance, RollUp, State, UnderlyingEdge,
 };
 
@@ -91,7 +91,7 @@ impl<'a> DerivedJourney<'a> {
     /// container its roll-ups; the edges re-targeted to visible stand-ins, duplicates
     /// collapsed and self-edges dropped; and C1's count of what each class left out hides.
     /// `deployment` is the one the journey was derived over; it is read only when a relevance
-    /// class is left out. `viewer` is the caller's entities, read only by the `mine` filter
+    /// class is left out. `viewer` is the caller's identities, read only by the `mine` filter
     /// (C9).
     ///
     /// # Errors
@@ -102,7 +102,7 @@ impl<'a> DerivedJourney<'a> {
         &self,
         query: &LevelQuery,
         deployment: &Deployment,
-        viewer: &BTreeSet<EntityKey>,
+        viewer: &BTreeSet<IdentityKey>,
     ) -> Result<Level, ProjectionError> {
         let classes = (query.display.len() < LevelDisplay::ALL.len())
             .then(|| classify(self.graph, deployment));
@@ -114,7 +114,7 @@ impl<'a> DerivedJourney<'a> {
         &self,
         query: &LevelQuery,
         classes: Option<&Relevances>,
-        viewer: &BTreeSet<EntityKey>,
+        viewer: &BTreeSet<IdentityKey>,
     ) -> Result<Level, ProjectionError> {
         if let Some(key) = &query.container {
             self.known(key)?;
@@ -180,7 +180,7 @@ impl<'a> DerivedJourney<'a> {
 
     /// C2, C9: the nodes the query's filters match, and every node holding one: what a level
     /// that filters keeps. Each match walks up its ancestors until one is already kept.
-    fn kept(&self, query: &LevelQuery, viewer: &BTreeSet<EntityKey>) -> BTreeSet<&'a NodeKey> {
+    fn kept(&self, query: &LevelQuery, viewer: &BTreeSet<IdentityKey>) -> BTreeSet<&'a NodeKey> {
         let matcher = self.matcher(
             &query.flags,
             query.owner.as_ref(),

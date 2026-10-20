@@ -30,13 +30,13 @@
           "type": "string"
         },
         {
-          "const": "entity",
-          "description": "One entity.",
+          "const": "identity",
+          "description": "One identity.",
           "type": "string"
         },
         {
-          "const": "entity_list",
-          "description": "A list of entities.",
+          "const": "identity_list",
+          "description": "A list of identities.",
           "type": "string"
         }
       ]
@@ -327,7 +327,7 @@
       ]
     },
     "ConditionText": {
-      "description": "A compared value: a choice id, date, entity key, or text; at most body_bytes_max bytes.",
+      "description": "A compared value: a choice id, date, identity key, or text; at most body_bytes_max bytes.",
       "maxLength": 65536,
       "type": "string"
     },
@@ -342,7 +342,7 @@
           "description": "Every other answer type, as text."
         }
       ],
-      "description": "The value a clause compares an answer with: a boolean, or text that the decision's\nanswer type gives meaning (a choice id, a date, an entity key, or plain text)."
+      "description": "The value a clause compares an answer with: a boolean, or text that the decision's\nanswer type gives meaning (a choice id, a date, an identity key, or plain text)."
     },
     "DateRule": {
       "additionalProperties": false,
@@ -413,16 +413,16 @@
       "minimum": 0,
       "type": "integer"
     },
-    "EntityKey": {
-      "description": "Starts with \"e_\"; at most id_bytes_max (64) bytes.",
-      "maxLength": 64,
-      "minLength": 1,
-      "pattern": "^e_[a-z0-9][a-z0-9_-]*$",
-      "type": "string"
-    },
     "FormatVersion": {
       "const": 1,
       "description": "The file format version."
+    },
+    "IdentityKey": {
+      "description": "Starts with \"who_\"; at most id_bytes_max (64) bytes.",
+      "maxLength": 64,
+      "minLength": 1,
+      "pattern": "^who_[a-z0-9][a-z0-9_-]*$",
+      "type": "string"
     },
     "KindKey": {
       "description": "Starts with \"k_\"; at most id_bytes_max (64) bytes.",
@@ -731,7 +731,7 @@
           "if": {
             "properties": {
               "answer_type": {
-                "const": "entity"
+                "const": "identity"
               }
             },
             "required": [
@@ -749,7 +749,7 @@
           "if": {
             "properties": {
               "answer_type": {
-                "const": "entity_list"
+                "const": "identity_list"
               }
             },
             "required": [
@@ -976,7 +976,7 @@
           "description": "The stable key: optional in a file."
         },
         "multi": {
-          "description": "Held by several entities rather than one.",
+          "description": "Held by several identities rather than one.",
           "type": "boolean"
         },
         "title": {
@@ -1003,16 +1003,16 @@
           "description": "Whoever fills the role."
         },
         {
-          "description": "These entities; an empty list is an explicit \"none\".",
+          "description": "These identities; an empty list is an explicit \"none\".",
           "items": {
-            "$ref": "#/$defs/EntityKey"
+            "$ref": "#/$defs/IdentityKey"
           },
           "maxItems": 100,
           "type": "array",
           "uniqueItems": true
         }
       ],
-      "description": "Where a participation comes from (E2): a role reference, written as the role, or\nexplicit entities, written as a list."
+      "description": "Where a participation comes from (E2): a role reference, written as the role, or\nexplicit identities, written as a list."
     },
     "Participations": {
       "additionalProperties": {
@@ -1098,7 +1098,7 @@
     },
     "Role": {
       "additionalProperties": false,
-      "description": "A role (A6): a named slot, single or multi valued, filled per journey with entities.",
+      "description": "A role (A6): a named slot, single or multi valued, filled per journey with identities.",
       "properties": {
         "id": {
           "$ref": "#/$defs/Slug",
@@ -1116,7 +1116,7 @@
           "description": "The stable key: optional in a file."
         },
         "multi": {
-          "description": "Filled by several entities rather than one.",
+          "description": "Filled by several identities rather than one.",
           "type": "boolean"
         },
         "title": {

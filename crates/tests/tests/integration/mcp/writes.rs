@@ -249,7 +249,7 @@ async fn a_merge_resubmitted_after_its_journeys_moved_is_answered_from_its_recei
     world.vendor_journey(&ann).await;
     let informed = json!({
         "journey": "j_vendor_eval", "decision": "n_who_informed",
-        "value": { "entity_list": ["e_stakeholder_a", "e_stakeholder_b"] },
+        "value": { "identity_list": ["who_d4m6uk2eqf5rbhzs", "who_e7h2jv3nxc4yaw6t"] },
         "deployment_revision": 1, "patch_id": "p_informed", "base_revision": 1,
     });
     world.ok(&ann, "answer_decision", informed).await;
@@ -260,8 +260,8 @@ async fn a_merge_resubmitted_after_its_journeys_moved_is_answered_from_its_recei
     let merged = world
         .ok(
             &ann,
-            "manage_entity",
-            merge("e_stakeholder_a", "e_stakeholder_b"),
+            "manage_identity",
+            merge("who_d4m6uk2eqf5rbhzs", "who_e7h2jv3nxc4yaw6t"),
         )
         .await;
     assert_eq!(merged["status"], "applied");
@@ -272,14 +272,18 @@ async fn a_merge_resubmitted_after_its_journeys_moved_is_answered_from_its_recei
     let again = world
         .ok(
             &ann,
-            "manage_entity",
-            merge("e_stakeholder_a", "e_stakeholder_b"),
+            "manage_identity",
+            merge("who_d4m6uk2eqf5rbhzs", "who_e7h2jv3nxc4yaw6t"),
         )
         .await;
     assert_eq!(again["status"], "already_applied");
     assert_eq!(again["receipt"], merged["receipt"]);
     let other = world
-        .call(&ann, "manage_entity", merge("e_lead", "e_stakeholder_a"))
+        .call(
+            &ann,
+            "manage_identity",
+            merge("who_k3d7qm2xw5tn6pfa", "who_d4m6uk2eqf5rbhzs"),
+        )
         .await;
     let reused = matches!(
         other,

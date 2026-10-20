@@ -251,7 +251,7 @@ fn walk_journey(records: &Records, ops: &mut BTreeSet<String>) -> Records {
 - op: edit_journey\n  name: Evaluate the analytics vendor again\n\
 - op: set_recorded_date\n  node: n_access\n  end: start\n  date: \"2026-10-05\"\n\
 - op: add_role\n  role: {key: r_helper, id: helper}\n\
-- op: fill_role\n  role: r_helper\n  entities: [e_lead]\n\
+- op: fill_role\n  role: r_helper\n  identities: [who_k3d7qm2xw5tn6pfa]\n\
 - op: clear_role_fill\n  role: r_helper\n\
 - op: set_pin\n  node: n_review_opens\n  date: \"2026-11-01\"\n\
 - op: shift_pin\n  node: n_review_opens\n  offset_days: -2\n\
@@ -279,18 +279,18 @@ fn walk_journey(records: &Records, ops: &mut BTreeSet<String>) -> Records {
     records
 }
 
-/// E6, H3: an entity's emails edited, and two entities merged with the journeys that
+/// E6, H3: an identity's emails edited, and two identities merged with the journeys that
 /// reference them named at their revisions.
 fn walk_deployment(records: &Records, ops: &mut BTreeSet<String>) -> Records {
-    let edit = "- op: edit_entity\n  entity: {key: e_stakeholder_a, name: Stakeholder A, emails: [a@example.org]}\n";
+    let edit = "- op: edit_identity\n  identity: {key: who_d4m6uk2eqf5rbhzs, name: Dara Singh, emails: [a@example.org]}\n";
     let records = accept(records, "deployment", edit, ops);
     let journey = records.journeys.values().next().unwrap().revision;
     let merge = format!(
-        "- op: merge_entities\n  survivor: e_stakeholder_a\n  merged: e_stakeholder_b\n  journeys: {{j_vendor_eval: {}}}\n",
+        "- op: merge_identities\n  survivor: who_d4m6uk2eqf5rbhzs\n  merged: who_e7h2jv3nxc4yaw6t\n  journeys: {{j_vendor_eval: {}}}\n",
         journey.get()
     );
     let stale = format!(
-        "- op: merge_entities\n  survivor: e_stakeholder_a\n  merged: e_stakeholder_b\n  journeys: {{j_vendor_eval: {}}}\n",
+        "- op: merge_identities\n  survivor: who_d4m6uk2eqf5rbhzs\n  merged: who_e7h2jv3nxc4yaw6t\n  journeys: {{j_vendor_eval: {}}}\n",
         journey.get() - 1
     );
     let patch = support::patch_to(&records, "deployment", &stale);
@@ -305,8 +305,8 @@ fn walk_deployment(records: &Records, ops: &mut BTreeSet<String>) -> Records {
     };
     let before = informed(&records);
     assert!(
-        matches!(&before, cairn_schema::AnswerValue::EntityList(list) if list.as_set().contains(&"e_stakeholder_b".parse().unwrap())),
-        "the journey names the entity the merge folds away"
+        matches!(&before, cairn_schema::AnswerValue::IdentityList(list) if list.as_set().contains(&"who_e7h2jv3nxc4yaw6t".parse().unwrap())),
+        "the journey names the identity the merge folds away"
     );
     let records = accept(&records, "deployment", &merge, ops);
     assert_eq!(
@@ -317,13 +317,13 @@ fn walk_deployment(records: &Records, ops: &mut BTreeSet<String>) -> Records {
     let deployment = &records.deployment;
     assert!(
         deployment
-            .entities
-            .get(&"e_stakeholder_b".parse().unwrap())
+            .identities
+            .get(&"who_e7h2jv3nxc4yaw6t".parse().unwrap())
             .is_none()
     );
     assert_eq!(
-        deployment.aliases[&"e_stakeholder_b".parse().unwrap()],
-        "e_stakeholder_a".parse().unwrap()
+        deployment.aliases[&"who_e7h2jv3nxc4yaw6t".parse().unwrap()],
+        "who_d4m6uk2eqf5rbhzs".parse().unwrap()
     );
     records
 }

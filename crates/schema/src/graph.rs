@@ -20,7 +20,7 @@ use crate::refs::{FileRefs, KeyRefs, References, key_absent};
 use crate::state::JourneyState;
 use crate::text::{Markdown, Title};
 
-/// A role (A6): a named slot, single or multi valued, filled per journey with entities.
+/// A role (A6): a named slot, single or multi valued, filled per journey with identities.
 #[derive(
     Clone, Debug, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize, JsonSchema,
 )]
@@ -35,7 +35,7 @@ pub struct Role<R: References> {
     /// A label.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub title: Option<Title>,
-    /// Filled by several entities rather than one.
+    /// Filled by several identities rather than one.
     #[serde(default, skip_serializing_if = "crate::serde_util::is_false")]
     pub multi: bool,
 }
@@ -55,7 +55,7 @@ pub struct ParticipationKind<R: References> {
     /// A label.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub title: Option<Title>,
-    /// Held by several entities rather than one.
+    /// Held by several identities rather than one.
     #[serde(default, skip_serializing_if = "crate::serde_util::is_false")]
     pub multi: bool,
 }

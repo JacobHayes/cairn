@@ -10,10 +10,10 @@ description: Record answers a person gives in conversation as decision answers, 
    - `single_choice`: one choice's id; `multi_choice`: a list of choice ids;
    - `text`: free text, possibly empty;
    - `date`: a calendar date;
-   - `entity`: one entity key; `entity_list`: a list of entity keys.
-2. **People are entities.** An entity answer names an entity's key. If the person named
-   someone Cairn does not know, create them first with `manage_entity` (`create`), or ask.
-   A write naming entities carries the `deployment_revision` the snapshot reported.
+   - `identity`: one identity key; `identity_list`: a list of identity keys.
+2. **People are identities.** An identity answer names an identity's key. If the person named
+   someone Cairn does not know, create them first with `manage_identity` (`create`), or ask.
+   A write naming identities carries the `deployment_revision` the snapshot reported.
 3. **Record why, when the person said.** `answer_decision` also takes a `rationale`
    (markdown): the reason this answer was given, in the person's terms. It belongs to
    that answer alone, so repeat it when you revise an answer for the same reason, and

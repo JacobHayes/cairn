@@ -58,7 +58,7 @@ async fn the_route_tools_read_what_was_published() {
 }
 
 /// The journey index, search, and history read the journey as it stands; "mine" lists
-/// nothing for a user no entity names.
+/// nothing for a user no identity names.
 #[tokio::test]
 async fn the_journey_tools_read_what_is_held() {
     let world = World::new();
@@ -75,7 +75,7 @@ async fn the_journey_tools_read_what_is_held() {
     assert_eq!(
         mine["journeys"],
         json!([]),
-        "no entity holds the user's email"
+        "no identity holds the user's email"
     );
     let found = world
         .ok(&ann, "search", json!({ "text": "ANALYTICS" }))

@@ -111,7 +111,7 @@ async function widths({ page, look, check }: Walk): Promise<void> {
         await look(`the route's ${view} at 390px`);
       }
     }
-    for (const path of ["/", "/journeys", "/routes", "/entities", "/me"]) {
+    for (const path of ["/", "/journeys", "/routes", "/identities", "/me"]) {
       await open(page, "browser", path);
       await look(`${path} at ${String(width)}px`);
     }

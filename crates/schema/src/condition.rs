@@ -16,13 +16,13 @@ use std::fmt;
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
-use crate::collections::{BoundedVec, CollectionError, EntityCountPerFill};
+use crate::collections::{BoundedVec, CollectionError, IdentityCountPerFill};
 use crate::limits::Limit;
 use crate::refs::References;
 use crate::text::TextError;
 
 /// The value a clause compares an answer with: a boolean, or text that the decision's
-/// answer type gives meaning (a choice id, a date, an entity key, or plain text).
+/// answer type gives meaning (a choice id, a date, an identity key, or plain text).
 #[derive(
     Clone, Debug, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize, JsonSchema,
 )]
@@ -86,14 +86,14 @@ impl JsonSchema for ConditionText {
     fn json_schema(_: &mut schemars::SchemaGenerator) -> schemars::Schema {
         schemars::json_schema!({
             "type": "string",
-            "description": "A compared value: a choice id, date, entity key, or text; at most body_bytes_max bytes.",
+            "description": "A compared value: a choice id, date, identity key, or text; at most body_bytes_max bytes.",
             "maxLength": Limit::BodyBytes.max(),
         })
     }
 }
 
 /// The values an `in` clause accepts.
-pub type ConditionValues = BoundedVec<ConditionValue, EntityCountPerFill>;
+pub type ConditionValues = BoundedVec<ConditionValue, IdentityCountPerFill>;
 
 /// `{decision, value}`: the operand of `equals`, `not_equals`, and `contains`.
 #[derive(

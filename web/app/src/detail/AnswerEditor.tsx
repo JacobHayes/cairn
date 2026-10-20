@@ -3,7 +3,7 @@
 // Save. Nothing is preselected; what is picked is a draft that survives a reload and is sent
 // only by Save, which is enabled only when the draft differs from what is stored. A decision
 // that fills a role or pins a milestone is the only way to change that value (E3), and says so.
-// An entity answer picks an entity or names a new one, made in the same patch as the answer
+// An identity answer picks an identity or names a new one, made in the same patch as the answer
 // (B3, E6). A blocked decision shows its form with Save disabled; answering anyway is a guard
 // bypass with a reason (D4).
 import type { Schema } from "@cairn/client";
@@ -14,16 +14,16 @@ import { valueOf } from "../data/keyed-read.ts";
 import { useDraft } from "../data/drafts.ts";
 import type { OperationId } from "../data/edit-record.ts";
 import { newPatchId, type Mutation } from "../data/writes.ts";
-import { newEntityKey } from "../people/model.ts";
+import { newIdentityKey } from "../people/model.ts";
 import { choiceId, choiceLabel } from "../status/answer.ts";
 import { Button, Field } from "../ui/kit.tsx";
 import { Markdown } from "../ui/markdown.tsx";
 import { effectOf, effectOfOption, outgoing, sameAnswer } from "./answer.ts";
 import { answerable, failingGuards, guardBypass, titleOf, type AnswerValue, type GraphNode, type NodeDetail, type Ready } from "./model.ts";
-import { EntityOptions, NodeLink, Rationale } from "./parts.tsx";
+import { IdentityOptions, NodeLink, Rationale } from "./parts.tsx";
 import { useSavePreview } from "./preview.ts";
 import { bypassReady, Rejected } from "./Rejected.tsx";
-import { answerText, entityName, resolveEntity, roleTitle } from "./sections.tsx";
+import { answerText, identityName, resolveIdentity, roleTitle } from "./sections.tsx";
 import { effectWords, savingWords } from "./words.ts";
 import { useFormDraft, useNodeWrite, type NodeWrite } from "./write.ts";
 
@@ -36,13 +36,13 @@ const INLINE_MULTI_MAX = 8;
 /** The select's value for naming a new person. */
 const NEW_PERSON = "__new";
 
-/** E6: an entity answer as the deployment names its entities now, through any merge. */
+/** E6: an identity answer as the deployment names its identities now, through any merge. */
 export function resolvedAnswer(view: Ready, answer: AnswerValue | undefined): AnswerValue | undefined {
-  if (answer !== undefined && "entity" in answer) {
-    return { entity: resolveEntity(view, answer.entity) };
+  if (answer !== undefined && "identity" in answer) {
+    return { identity: resolveIdentity(view, answer.identity) };
   }
-  if (answer !== undefined && "entity_list" in answer) {
-    return { entity_list: [...new Set(answer.entity_list.map((key) => resolveEntity(view, key)))] };
+  if (answer !== undefined && "identity_list" in answer) {
+    return { identity_list: [...new Set(answer.identity_list.map((key) => resolveIdentity(view, key)))] };
   }
   return answer;
 }
@@ -66,7 +66,7 @@ function Checks({ options, chosen, onChange }: { options: [string, string][]; ch
 /** An answer of the decision's type, as typed (the proposal editor's input, 5.7; the inspector draws its own). */
 export function Input({ view, node, value, onChange }: { view: Ready; node: GraphNode; value: AnswerValue; onChange: (value: AnswerValue) => void }) {
   const choices: [string, string][] = (node.choices ?? []).map((choice) => [choiceId(choice), choiceLabel(choice)]);
-  const entities: [string, string][] = (view.inputs.deployment.entities ?? []).map((entity) => [entity.key, entityName(view, entity.key)]);
+  const identities: [string, string][] = (view.inputs.deployment.identities ?? []).map((identity) => [identity.key, identityName(view, identity.key)]);
   const select = (options: [string, string][], chosen: string, wrap: (id: string) => AnswerValue) => (
     <select aria-label="Answer" value={chosen} onChange={(event) => { onChange(wrap(event.target.value)); }}>
       <option value="">Choose</option>
@@ -86,11 +86,11 @@ export function Input({ view, node, value, onChange }: { view: Ready; node: Grap
   if ("multi_choice" in value) {
     return <Checks options={choices} chosen={value.multi_choice} onChange={(next) => { onChange({ multi_choice: next }); }} />;
   }
-  if ("entity" in value) {
-    return select(entities, value.entity, (id) => ({ entity: id }));
+  if ("identity" in value) {
+    return select(identities, value.identity, (id) => ({ identity: id }));
   }
-  if ("entity_list" in value) {
-    return <Checks options={entities} chosen={value.entity_list} onChange={(next) => { onChange({ entity_list: next }); }} />;
+  if ("identity_list" in value) {
+    return <Checks options={identities} chosen={value.identity_list} onChange={(next) => { onChange({ identity_list: next }); }} />;
   }
   if ("date" in value) {
     return <Field type="date" aria-label="Answer" value={value.date} onChange={(event) => { onChange({ date: event.target.value }); }} />;
@@ -99,20 +99,20 @@ export function Input({ view, node, value, onChange }: { view: Ready; node: Grap
 }
 
 /**
- * B3, B2: the answer's mutations: the answer alone, or, when a new entity is named for an entity
- * answer, the entity made first and the answer naming it (added to a list answer). A blank
+ * B3, B2: the answer's mutations: the answer alone, or, when a new identity is named for an identity
+ * answer, the identity made first and the answer naming it (added to a list answer). A blank
  * `rationale` is none: the field is left off, as the server refuses blank text.
  */
-export function answerMutations(decision: string, value: AnswerValue, named: string, rationale: string, key: (name: string) => string = newEntityKey): Mutation[] {
+export function answerMutations(decision: string, value: AnswerValue, named: string, rationale: string, key: () => string = () => newIdentityKey()): Mutation[] {
   const why = rationale.trim();
   const reason = why === "" ? {} : { rationale: why };
   const name = named.trim();
-  if (name === "" || !("entity" in value || "entity_list" in value)) {
+  if (name === "" || !("identity" in value || "identity_list" in value)) {
     return [{ op: "answer", decision, value, ...reason }];
   }
-  const entity = key(name);
-  const answer: AnswerValue = "entity" in value ? { entity } : { entity_list: [...value.entity_list, entity] };
-  return [{ op: "create_entity", entity: { key: entity, name } }, { op: "answer", decision, value: answer, ...reason }];
+  const identity = key();
+  const answer: AnswerValue = "identity" in value ? { identity } : { identity_list: [...value.identity_list, identity] };
+  return [{ op: "create_identity", identity: { key: identity, name } }, { op: "answer", decision, value: answer, ...reason }];
 }
 
 /** One choice of the decision: a radio or a checkbox, its title, and what picking it would do. */
@@ -202,9 +202,9 @@ function MultiInput({ node, value, pick, effects }: InputProps) {
   );
 }
 
-function EntityInput({ view, value, pick, named, onNamed }: InputProps) {
+function IdentityInput({ view, value, pick, named, onNamed }: InputProps) {
   const [creating, setCreating] = useState(false);
-  const picked = value !== undefined && "entity" in value ? value.entity : "";
+  const picked = value !== undefined && "identity" in value ? value.identity : "";
   const naming = creating || named !== "";
   return (
     <div className="stack" data-testid="answer">
@@ -217,35 +217,35 @@ function EntityInput({ view, value, pick, named, onNamed }: InputProps) {
           if (next !== NEW_PERSON) {
             onNamed("");
           }
-          pick({ entity: next === NEW_PERSON ? "" : next });
+          pick({ identity: next === NEW_PERSON ? "" : next });
         }}
       >
         <option value="">Choose</option>
-        <EntityOptions view={view} />
-        <option value={NEW_PERSON}>New person</option>
+        <IdentityOptions view={view} />
+        <option value={NEW_PERSON}>Someone new</option>
       </select>
-      {naming ? <Field aria-label="New person's name" placeholder="Their name" value={named} onChange={(event) => { onNamed(event.target.value); }} /> : null}
+      {naming ? <Field aria-label="Name of someone new" placeholder="Their name" value={named} onChange={(event) => { onNamed(event.target.value); }} /> : null}
     </div>
   );
 }
 
-function EntityListInput({ view, value, pick, named, onNamed }: InputProps) {
-  const picked = value !== undefined && "entity_list" in value ? value.entity_list : [];
+function IdentityListInput({ view, value, pick, named, onNamed }: InputProps) {
+  const picked = value !== undefined && "identity_list" in value ? value.identity_list : [];
   return (
     <div className="stack" data-testid="answer">
       <div className="opts" role="group" aria-label="Answer">
-        {(view.inputs.deployment.entities ?? []).map((entity) => (
-          <Choose key={entity.key} type="checkbox" title={entityName(view, entity.key)} checked={picked.includes(entity.key)} effect={undefined} onPick={() => { pick({ entity_list: toggled(picked, entity.key) }); }} />
+        {(view.inputs.deployment.identities ?? []).map((identity) => (
+          <Choose key={identity.key} type="checkbox" title={identityName(view, identity.key)} checked={picked.includes(identity.key)} effect={undefined} onPick={() => { pick({ identity_list: toggled(picked, identity.key) }); }} />
         ))}
       </div>
       <Field
-        aria-label="New person's name"
+        aria-label="Name of someone new"
         placeholder="Add a new person"
         value={named}
         onChange={(event) => {
           onNamed(event.target.value);
           if (value === undefined) {
-            pick({ entity_list: [] });
+            pick({ identity_list: [] });
           }
         }}
       />
@@ -265,10 +265,10 @@ function AnswerInput(props: InputProps) {
       return <MultiInput {...props} />;
     case "date":
       return <Field type="date" aria-label="Answer" data-testid="answer" value={value !== undefined && "date" in value ? value.date : ""} onChange={(event) => { pick({ date: event.target.value }); }} />;
-    case "entity":
-      return <EntityInput {...props} />;
-    case "entity_list":
-      return <EntityListInput {...props} />;
+    case "identity":
+      return <IdentityInput {...props} />;
+    case "identity_list":
+      return <IdentityListInput {...props} />;
     default:
       return (
         <textarea className="grow" aria-label="Answer" data-testid="answer" rows={1} value={value !== undefined && "text" in value ? value.text : ""} onChange={(event) => { pick({ text: event.target.value }); }} />
@@ -369,10 +369,15 @@ function bypassOverride(node: string, reason: string | undefined): Mutation[] {
 }
 
 /** What the form holds, and what it would do: the drafts, what Save would send, and Save itself. */
+/** Minted once when someone is being named, so a preview of the draft is not invalidated by every keystroke. */
+function useMintedKey(naming: boolean): string {
+  return useMemo(() => (naming ? newIdentityKey() : ""), [naming]);
+}
+
 function useAnswerForm(view: Ready, detail: NodeDetail, anyway: Anyway | undefined) {
   const write = useNodeWrite(view, `answer:${detail.node.key}`, detail.node.key);
-  // The new entity's name is part of the answer's draft: kept across a reload, gone with it.
-  const [namedDraft, setNamed] = useDraft<string>(`answer-entity:${write.journey}:${detail.node.key}`);
+  // The new identity's name is part of the answer's draft: kept across a reload, gone with it.
+  const [namedDraft, setNamed] = useDraft<string>(`answer-identity:${write.journey}:${detail.node.key}`);
   const { node, record, answer, rationale } = detail;
   const form = useFormDraft<AnswerValue>(write.journey, node.key, "answer");
   const why = useFormDraft<string>(write.journey, node.key, "answer-why");
@@ -381,10 +386,9 @@ function useAnswerForm(view: Ready, detail: NodeDetail, anyway: Anyway | undefin
   const stored = resolvedAnswer(view, answer);
   const meanwhile = useAnsweredMeanwhile(write, node.key, form, stored);
   const named = namedDraft ?? "";
-  // Minted once per name, so a preview of the draft is not invalidated by every render.
-  const entityKey = useMemo(() => (named.trim() === "" ? "" : newEntityKey(named)), [named]);
+  const identityKey = useMintedKey(named.trim() !== "");
   const sending = outgoing({ stored, storedReason: rationale, draft: form.draft?.value, reason: why.draft?.value, named });
-  const mutations = sending === undefined ? undefined : answerMutations(node.key, sending.value, named, sending.reason, () => entityKey);
+  const mutations = sending === undefined ? undefined : answerMutations(node.key, sending.value, named, sending.reason, () => identityKey);
   const caused = useSavePreview(view, mutations);
   const bypass = anyway?.reason;
   const newAnswer = form.draft !== undefined && !sameAnswer(form.draft.value, stored);

@@ -292,7 +292,7 @@
       },
       "AnswerEffects": {
         "additionalProperties": false,
-        "description": "C12, E3: what answering a decision does, per choice, and the static lines every answer\nof a date or entity decision carries.",
+        "description": "C12, E3: what answering a decision does, per choice, and the static lines every answer\nof a date or identity decision carries.",
         "properties": {
           "applies": {
             "description": "Whether the decision's answer is in effect: it is relevant, and not skipped. When not,\nno answer changes any other node's relevance and every choice's effect is empty.",
@@ -318,7 +318,7 @@
                 "type": "null"
               }
             ],
-            "description": "The role its answer fills (E3), for an entity or entity-list decision."
+            "description": "The role its answer fills (E3), for an identity or identity-list decision."
           },
           "pins": {
             "anyOf": [
@@ -371,13 +371,13 @@
             "type": "string"
           },
           {
-            "const": "entity",
-            "description": "One entity.",
+            "const": "identity",
+            "description": "One identity.",
             "type": "string"
           },
           {
-            "const": "entity_list",
-            "description": "A list of entities.",
+            "const": "identity_list",
+            "description": "A list of identities.",
             "type": "string"
           }
         ]
@@ -458,24 +458,24 @@
           },
           {
             "additionalProperties": false,
-            "description": "An entity.",
+            "description": "An identity.",
             "properties": {
-              "entity": {
-                "$ref": "#/components/schemas/EntityKey"
+              "identity": {
+                "$ref": "#/components/schemas/IdentityKey"
               }
             },
             "required": [
-              "entity"
+              "identity"
             ],
             "type": "object"
           },
           {
             "additionalProperties": false,
-            "description": "Entities, possibly none.",
+            "description": "Identities, possibly none.",
             "properties": {
-              "entity_list": {
+              "identity_list": {
                 "items": {
-                  "$ref": "#/components/schemas/EntityKey"
+                  "$ref": "#/components/schemas/IdentityKey"
                 },
                 "maxItems": 100,
                 "type": "array",
@@ -483,7 +483,7 @@
               }
             },
             "required": [
-              "entity_list"
+              "identity_list"
             ],
             "type": "object"
           }
@@ -530,7 +530,7 @@
           },
           {
             "const": "tailscale",
-            "description": "Tailscale identity.",
+            "description": "Tailscale login.",
             "type": "string"
           },
           {
@@ -540,7 +540,7 @@
           },
           {
             "const": "local",
-            "description": "The browser host's single local identity.",
+            "description": "The browser host's single local login.",
             "type": "string"
           }
         ]
@@ -1409,7 +1409,7 @@
         ]
       },
       "ConditionText": {
-        "description": "A compared value: a choice id, date, entity key, or text; at most body_bytes_max bytes.",
+        "description": "A compared value: a choice id, date, identity key, or text; at most body_bytes_max bytes.",
         "maxLength": 65536,
         "type": "string"
       },
@@ -1424,7 +1424,7 @@
             "description": "Every other answer type, as text."
           }
         ],
-        "description": "The value a clause compares an answer with: a boolean, or text that the decision's\nanswer type gives meaning (a choice id, a date, an entity key, or plain text)."
+        "description": "The value a clause compares an answer with: a boolean, or text that the decision's\nanswer type gives meaning (a choice id, a date, an identity key, or plain text)."
       },
       "Conflict": {
         "description": "What a conflict is about, with the journey's side and the route's (B7, B9). A side that\nis absent is `None` (an absent edge is `false`).",
@@ -1689,7 +1689,7 @@
               "members": {
                 "description": "Who fills the role now (E3), when insertions map onto it: removing it hands\nthese to the segment's nodes directly.",
                 "items": {
-                  "$ref": "#/components/schemas/EntityKey"
+                  "$ref": "#/components/schemas/IdentityKey"
                 },
                 "maxItems": 100,
                 "type": "array",
@@ -2498,7 +2498,7 @@
           "owners": {
             "description": "Its owners.",
             "items": {
-              "$ref": "#/components/schemas/EntityKey"
+              "$ref": "#/components/schemas/IdentityKey"
             },
             "type": "array",
             "uniqueItems": true
@@ -2657,18 +2657,18 @@
         "properties": {
           "aliases": {
             "additionalProperties": false,
-            "description": "Merged entities' old keys, each resolving to the entity it was merged into (E6), at\nmost `alias_count_per_entity_max` resolving to one entity.",
+            "description": "Merged identities' old keys, each resolving to the identity it was merged into (E6), at\nmost `alias_count_per_identity_max` resolving to one identity.",
             "patternProperties": {
-              "^e_[a-z0-9][a-z0-9_-]*$": {
-                "$ref": "#/components/schemas/EntityKey"
+              "^who_[a-z0-9][a-z0-9_-]*$": {
+                "$ref": "#/components/schemas/IdentityKey"
               }
             },
             "type": "object"
           },
-          "entities": {
-            "description": "The entities, at most `entity_count_per_deployment_max`.",
+          "identities": {
+            "description": "The identities, at most `identity_count_per_deployment_max`.",
             "items": {
-              "$ref": "#/components/schemas/Entity"
+              "$ref": "#/components/schemas/Identity"
             },
             "maxItems": 5000,
             "type": "array"
@@ -2689,7 +2689,7 @@
         "properties": {
           "deployment": {
             "$ref": "#/components/schemas/Deployment",
-            "description": "The deployment context: entities, emails, and aliases at a revision (E4, E6)."
+            "description": "The deployment context: identities, emails, and aliases at a revision (E4, E6)."
           },
           "rank": {
             "$ref": "#/components/schemas/RankConstants",
@@ -2705,9 +2705,9 @@
             "type": "string"
           },
           "viewer": {
-            "description": "The viewer's entities, resolved from verified emails (H3); usually one.",
+            "description": "The viewer's identities, resolved from verified emails (H3); usually one.",
             "items": {
-              "$ref": "#/components/schemas/EntityKey"
+              "$ref": "#/components/schemas/IdentityKey"
             },
             "type": "array",
             "uniqueItems": true
@@ -2979,7 +2979,7 @@
         ]
       },
       "Domain": {
-        "description": "A patch domain, by identity (A17).",
+        "description": "A patch domain (A17).",
         "oneOf": [
           {
             "additionalProperties": false,
@@ -3009,7 +3009,7 @@
           },
           {
             "const": "deployment",
-            "description": "The deployment: its entities and aliases.",
+            "description": "The deployment: its identities and aliases.",
             "type": "string"
           }
         ]
@@ -3170,10 +3170,10 @@
         "additionalProperties": false,
         "description": "A node's effective participation of one kind (E2).",
         "properties": {
-          "entities": {
-            "description": "The entities, resolved through aliases.",
+          "identities": {
+            "description": "The identities, resolved through aliases.",
             "items": {
-              "$ref": "#/components/schemas/EntityKey"
+              "$ref": "#/components/schemas/IdentityKey"
             },
             "type": "array",
             "uniqueItems": true
@@ -3184,7 +3184,7 @@
           }
         },
         "required": [
-          "entities",
+          "identities",
           "origin"
         ],
         "type": "object"
@@ -3269,41 +3269,6 @@
             "type": "object"
           }
         ]
-      },
-      "Entity": {
-        "additionalProperties": false,
-        "description": "A person or team journeys refer to (PRD glossary, Entity), deployment-scoped.",
-        "properties": {
-          "emails": {
-            "description": "Its emails, each held by at most one entity (H3), at most\n`email_count_per_entity_max`. A merge joins two entities' emails, so the engine checks\nthe joined set too.",
-            "items": {
-              "$ref": "#/components/schemas/Email"
-            },
-            "maxItems": 16,
-            "type": "array",
-            "uniqueItems": true
-          },
-          "key": {
-            "$ref": "#/components/schemas/EntityKey",
-            "description": "The entity's key."
-          },
-          "name": {
-            "$ref": "#/components/schemas/Title",
-            "description": "Its name."
-          }
-        },
-        "required": [
-          "key",
-          "name"
-        ],
-        "type": "object"
-      },
-      "EntityKey": {
-        "description": "Starts with \"e_\"; at most id_bytes_max (64) bytes.",
-        "maxLength": 64,
-        "minLength": 1,
-        "pattern": "^e_[a-z0-9][a-z0-9_-]*$",
-        "type": "string"
       },
       "Event": {
         "additionalProperties": false,
@@ -3456,9 +3421,9 @@
           "relinked",
           "provenance_changed",
           "local_edit_changed",
-          "entity_created",
-          "entity_edited",
-          "entities_merged",
+          "identity_created",
+          "identity_edited",
+          "identities_merged",
           "proposal_created",
           "proposal_edited",
           "proposal_applied",
@@ -4369,10 +4334,10 @@
               "role_fill": {
                 "additionalProperties": false,
                 "properties": {
-                  "entities": {
-                    "description": "The entities.",
+                  "identities": {
+                    "description": "The identities.",
                     "items": {
-                      "$ref": "#/components/schemas/EntityKey"
+                      "$ref": "#/components/schemas/IdentityKey"
                     },
                     "maxItems": 100,
                     "type": "array",
@@ -4385,7 +4350,7 @@
                 },
                 "required": [
                   "role",
-                  "entities"
+                  "identities"
                 ],
                 "type": "object"
               }
@@ -4677,6 +4642,41 @@
           "patches"
         ],
         "type": "object"
+      },
+      "Identity": {
+        "additionalProperties": false,
+        "description": "A person or team journeys refer to (PRD glossary, Identity), deployment-scoped.",
+        "properties": {
+          "emails": {
+            "description": "Its emails, each held by at most one identity (H3), at most\n`email_count_per_identity_max`. A merge joins two identities' emails, so the engine checks\nthe joined set too.",
+            "items": {
+              "$ref": "#/components/schemas/Email"
+            },
+            "maxItems": 16,
+            "type": "array",
+            "uniqueItems": true
+          },
+          "key": {
+            "$ref": "#/components/schemas/IdentityKey",
+            "description": "The identity's key."
+          },
+          "name": {
+            "$ref": "#/components/schemas/Title",
+            "description": "Its name."
+          }
+        },
+        "required": [
+          "key",
+          "name"
+        ],
+        "type": "object"
+      },
+      "IdentityKey": {
+        "description": "Starts with \"who_\"; at most id_bytes_max (64) bytes.",
+        "maxLength": 64,
+        "minLength": 1,
+        "pattern": "^who_[a-z0-9][a-z0-9_-]*$",
+        "type": "string"
       },
       "InsertedEdge": {
         "additionalProperties": false,
@@ -5109,7 +5109,7 @@
             "patternProperties": {
               "^r_[a-z0-9][a-z0-9_-]*$": {
                 "items": {
-                  "$ref": "#/components/schemas/EntityKey"
+                  "$ref": "#/components/schemas/IdentityKey"
                 },
                 "maxItems": 100,
                 "type": "array",
@@ -5555,9 +5555,9 @@
         ],
         "type": "object"
       },
-      "LinkedIdentity": {
+      "LinkedLogin": {
         "additionalProperties": false,
-        "description": "One identity a user signs in with (ARCHITECTURE, Auth: users and identities).",
+        "description": "One login a user signs in with (ARCHITECTURE, Auth: users and logins).",
         "properties": {
           "linked_at": {
             "description": "When it was linked.",
@@ -5573,7 +5573,7 @@
             "description": "The provider's subject for the account."
           },
           "verified_emails": {
-            "description": "H3: the emails the provider marked verified at the last sign-in; only these match an\nentity.",
+            "description": "H3: the emails the provider marked verified at the last sign-in; only these match an\nidentity.",
             "items": {
               "$ref": "#/components/schemas/Email"
             },
@@ -6743,10 +6743,10 @@
             "additionalProperties": false,
             "description": "Fill a role without a filling decision (E3).",
             "properties": {
-              "entities": {
-                "description": "The entities.",
+              "identities": {
+                "description": "The identities.",
                 "items": {
-                  "$ref": "#/components/schemas/EntityKey"
+                  "$ref": "#/components/schemas/IdentityKey"
                 },
                 "maxItems": 100,
                 "type": "array",
@@ -6764,7 +6764,7 @@
             "required": [
               "op",
               "role",
-              "entities"
+              "identities"
             ],
             "type": "object"
           },
@@ -7120,45 +7120,45 @@
           },
           {
             "additionalProperties": false,
-            "description": "Create an entity; may ride in any patch.",
+            "description": "Create an identity; may ride in any patch.",
             "properties": {
-              "entity": {
-                "$ref": "#/components/schemas/Entity",
-                "description": "The entity, with its key."
+              "identity": {
+                "$ref": "#/components/schemas/Identity",
+                "description": "The identity, with its key."
               },
               "op": {
-                "const": "create_entity",
+                "const": "create_identity",
                 "type": "string"
               }
             },
             "required": [
               "op",
-              "entity"
+              "identity"
             ],
             "type": "object"
           },
           {
             "additionalProperties": false,
-            "description": "Change an entity's name or emails (deployment).",
+            "description": "Change an identity's name or emails (deployment).",
             "properties": {
-              "entity": {
-                "$ref": "#/components/schemas/Entity",
-                "description": "The entity as it should be."
+              "identity": {
+                "$ref": "#/components/schemas/Identity",
+                "description": "The identity as it should be."
               },
               "op": {
-                "const": "edit_entity",
+                "const": "edit_identity",
                 "type": "string"
               }
             },
             "required": [
               "op",
-              "entity"
+              "identity"
             ],
             "type": "object"
           },
           {
             "additionalProperties": false,
-            "description": "Merge one entity into another (deployment, E6).",
+            "description": "Merge one identity into another (deployment, E6).",
             "properties": {
               "journeys": {
                 "additionalProperties": false,
@@ -7172,16 +7172,16 @@
                 "type": "object"
               },
               "merged": {
-                "$ref": "#/components/schemas/EntityKey",
-                "description": "The entity merged into it, whose key becomes an alias."
+                "$ref": "#/components/schemas/IdentityKey",
+                "description": "The identity merged into it, whose key becomes an alias."
               },
               "op": {
-                "const": "merge_entities",
+                "const": "merge_identities",
                 "type": "string"
               },
               "survivor": {
-                "$ref": "#/components/schemas/EntityKey",
-                "description": "The entity that remains."
+                "$ref": "#/components/schemas/IdentityKey",
+                "description": "The identity that remains."
               }
             },
             "required": [
@@ -7552,7 +7552,7 @@
             "if": {
               "properties": {
                 "answer_type": {
-                  "const": "entity"
+                  "const": "identity"
                 }
               },
               "required": [
@@ -7570,7 +7570,7 @@
             "if": {
               "properties": {
                 "answer_type": {
-                  "const": "entity_list"
+                  "const": "identity_list"
                 }
               },
               "required": [
@@ -7980,7 +7980,7 @@
             "if": {
               "properties": {
                 "answer_type": {
-                  "const": "entity"
+                  "const": "identity"
                 }
               },
               "required": [
@@ -7998,7 +7998,7 @@
             "if": {
               "properties": {
                 "answer_type": {
-                  "const": "entity_list"
+                  "const": "identity_list"
                 }
               },
               "required": [
@@ -8314,7 +8314,7 @@
             "description": "A container's largest child gravity, one level down.\n\nDeprecated: read `subtree_gravity`, the gravity of the container's whole area. Kept so\nexisting clients keep reading it."
           },
           "membership_lost": {
-            "description": "Its seeding entity left the role it was broken down by (B10).",
+            "description": "Its seeding identity left the role it was broken down by (B10).",
             "type": "boolean"
           },
           "needs_breakdown": {
@@ -8668,7 +8668,7 @@
           },
           {
             "const": "fills_role",
-            "description": "An entity decision's `fills_role`.",
+            "description": "An identity decision's `fills_role`.",
             "type": "string"
           },
           {
@@ -9161,7 +9161,7 @@
           "owners": {
             "description": "Its owners (E2).",
             "items": {
-              "$ref": "#/components/schemas/EntityKey"
+              "$ref": "#/components/schemas/IdentityKey"
             },
             "type": "array",
             "uniqueItems": true
@@ -9358,7 +9358,7 @@
           "owners": {
             "description": "Its owners; empty when unassigned.",
             "items": {
-              "$ref": "#/components/schemas/EntityKey"
+              "$ref": "#/components/schemas/IdentityKey"
             },
             "type": "array",
             "uniqueItems": true
@@ -9729,7 +9729,7 @@
             "description": "The stable key: optional in a file."
           },
           "multi": {
-            "description": "Held by several entities rather than one.",
+            "description": "Held by several identities rather than one.",
             "type": "boolean"
           },
           "title": {
@@ -9762,7 +9762,7 @@
             "description": "The stable key: optional in a file."
           },
           "multi": {
-            "description": "Held by several entities rather than one.",
+            "description": "Held by several identities rather than one.",
             "type": "boolean"
           },
           "title": {
@@ -9784,7 +9784,7 @@
         "type": "object"
       },
       "ParticipationMapping": {
-        "description": "What becomes of an explicit entity's participations when a journey is saved as a route\n(B8).",
+        "description": "What becomes of an explicit identity's participations when a journey is saved as a route\n(B8).",
         "oneOf": [
           {
             "const": "drop",
@@ -9829,7 +9829,7 @@
         "oneOf": [
           {
             "const": "explicit",
-            "description": "Explicit entities on the node.",
+            "description": "Explicit identities on the node.",
             "type": "string"
           },
           {
@@ -9899,16 +9899,16 @@
             "description": "Whoever fills the role."
           },
           {
-            "description": "These entities; an empty list is an explicit \"none\".",
+            "description": "These identities; an empty list is an explicit \"none\".",
             "items": {
-              "$ref": "#/components/schemas/EntityKey"
+              "$ref": "#/components/schemas/IdentityKey"
             },
             "maxItems": 100,
             "type": "array",
             "uniqueItems": true
           }
         ],
-        "description": "Where a participation comes from (E2): a role reference, written as the role, or\nexplicit entities, written as a list."
+        "description": "Where a participation comes from (E2): a role reference, written as the role, or\nexplicit identities, written as a list."
       },
       "ParticipationSourceResolved": {
         "anyOf": [
@@ -9917,16 +9917,16 @@
             "description": "Whoever fills the role."
           },
           {
-            "description": "These entities; an empty list is an explicit \"none\".",
+            "description": "These identities; an empty list is an explicit \"none\".",
             "items": {
-              "$ref": "#/components/schemas/EntityKey"
+              "$ref": "#/components/schemas/IdentityKey"
             },
             "maxItems": 100,
             "type": "array",
             "uniqueItems": true
           }
         ],
-        "description": "Where a participation comes from (E2): a role reference, written as the role, or\nexplicit entities, written as a list."
+        "description": "Where a participation comes from (E2): a role reference, written as the role, or\nexplicit identities, written as a list."
       },
       "Participations": {
         "additionalProperties": {
@@ -9959,7 +9959,7 @@
                 "type": "null"
               }
             ],
-            "description": "The deployment revision a journey patch that writes an entity reference was validated\nagainst (E6, H5)."
+            "description": "The deployment revision a journey patch that writes an identity reference was validated\nagainst (E6, H5)."
           },
           "id": {
             "$ref": "#/components/schemas/PatchId",
@@ -11023,7 +11023,7 @@
         "oneOf": [
           {
             "const": "waiting",
-            "description": "Waiting on the caller: created by them, or drafted by an agent for an active journey\nreferring to one of their entities (C16).",
+            "description": "Waiting on the caller: created by them, or drafted by an agent for an active journey\nreferring to one of their identities (C16).",
             "type": "string"
           },
           {
@@ -11040,32 +11040,32 @@
       },
       "ProposalOutline": {
         "additionalProperties": false,
-        "description": "What a proposal does, as counts of the things it names (C14): the facts about its\ndestination's header first, then the nodes it adds, changes and removes (each node once,\nby the mutations that name it), the requirements, the entities, and everything else in one\ncount. Derived from the mutations alone on every read, never stored.",
+        "description": "What a proposal does, as counts of the things it names (C14): the facts about its\ndestination's header first, then the nodes it adds, changes and removes (each node once,\nby the mutations that name it), the requirements, the identities, and everything else in one\ncount. Derived from the mutations alone on every read, never stored.",
         "properties": {
-          "entities_created": {
-            "description": "Entities it creates.",
-            "format": "uint32",
-            "minimum": 0,
-            "type": "integer"
-          },
-          "entities_edited": {
-            "description": "Entities it edits.",
-            "format": "uint32",
-            "minimum": 0,
-            "type": "integer"
-          },
-          "entities_merged": {
-            "description": "Entities it merges into another.",
-            "format": "uint32",
-            "minimum": 0,
-            "type": "integer"
-          },
           "facts": {
             "description": "The header and lifecycle facts, in the order the mutations make them, each once.",
             "items": {
               "$ref": "#/components/schemas/OutlineFact"
             },
             "type": "array"
+          },
+          "identities_created": {
+            "description": "Identities it creates.",
+            "format": "uint32",
+            "minimum": 0,
+            "type": "integer"
+          },
+          "identities_edited": {
+            "description": "Identities it edits.",
+            "format": "uint32",
+            "minimum": 0,
+            "type": "integer"
+          },
+          "identities_merged": {
+            "description": "Identities it merges into another.",
+            "format": "uint32",
+            "minimum": 0,
+            "type": "integer"
           },
           "nodes_added": {
             "description": "Nodes it adds.",
@@ -11579,42 +11579,42 @@
           },
           {
             "additionalProperties": false,
-            "description": "An entity.",
+            "description": "An identity.",
             "properties": {
-              "entity": {
-                "$ref": "#/components/schemas/Entity"
+              "identity": {
+                "$ref": "#/components/schemas/Identity"
               }
             },
             "required": [
-              "entity"
+              "identity"
             ],
             "type": "object"
           },
           {
             "additionalProperties": false,
-            "description": "A merged entity's old key and the entity it resolves to (E6).",
+            "description": "A merged identity's old key and the identity it resolves to (E6).",
             "properties": {
-              "entity_alias": {
+              "identity_alias": {
                 "additionalProperties": false,
                 "properties": {
                   "alias": {
-                    "$ref": "#/components/schemas/EntityKey",
+                    "$ref": "#/components/schemas/IdentityKey",
                     "description": "The old key."
                   },
-                  "entity": {
-                    "$ref": "#/components/schemas/EntityKey",
-                    "description": "The entity it resolves to."
+                  "identity": {
+                    "$ref": "#/components/schemas/IdentityKey",
+                    "description": "The identity it resolves to."
                   }
                 },
                 "required": [
                   "alias",
-                  "entity"
+                  "identity"
                 ],
                 "type": "object"
               }
             },
             "required": [
-              "entity_alias"
+              "identity_alias"
             ],
             "type": "object"
           },
@@ -11772,27 +11772,27 @@
           },
           {
             "additionalProperties": false,
-            "description": "An entity.",
+            "description": "An identity.",
             "properties": {
-              "entity": {
-                "$ref": "#/components/schemas/EntityKey"
+              "identity": {
+                "$ref": "#/components/schemas/IdentityKey"
               }
             },
             "required": [
-              "entity"
+              "identity"
             ],
             "type": "object"
           },
           {
             "additionalProperties": false,
-            "description": "An entity alias.",
+            "description": "An identity alias.",
             "properties": {
-              "entity_alias": {
-                "$ref": "#/components/schemas/EntityKey"
+              "identity_alias": {
+                "$ref": "#/components/schemas/IdentityKey"
               }
             },
             "required": [
-              "entity_alias"
+              "identity_alias"
             ],
             "type": "object"
           },
@@ -12354,11 +12354,11 @@
           },
           {
             "additionalProperties": false,
-            "description": "An explicit entity on nodes being saved as a route (B8).",
+            "description": "An explicit identity on nodes being saved as a route (B8).",
             "properties": {
-              "entity": {
-                "$ref": "#/components/schemas/EntityKey",
-                "description": "The entity."
+              "identity": {
+                "$ref": "#/components/schemas/IdentityKey",
+                "description": "The identity."
               },
               "item": {
                 "const": "participation",
@@ -12386,7 +12386,7 @@
             },
             "required": [
               "item",
-              "entity",
+              "identity",
               "uses"
             ],
             "type": "object"
@@ -12516,7 +12516,7 @@
       },
       "Role": {
         "additionalProperties": false,
-        "description": "A role (A6): a named slot, single or multi valued, filled per journey with entities.",
+        "description": "A role (A6): a named slot, single or multi valued, filled per journey with identities.",
         "properties": {
           "id": {
             "$ref": "#/components/schemas/Slug",
@@ -12534,7 +12534,7 @@
             "description": "The stable key: optional in a file."
           },
           "multi": {
-            "description": "Filled by several entities rather than one.",
+            "description": "Filled by several identities rather than one.",
             "type": "boolean"
           },
           "title": {
@@ -12617,7 +12617,7 @@
           },
           {
             "additionalProperties": false,
-            "description": "An entity decision fills the role.",
+            "description": "An identity decision fills the role.",
             "properties": {
               "fills_role": {
                 "additionalProperties": false,
@@ -12640,15 +12640,15 @@
           },
           {
             "additionalProperties": false,
-            "description": "The role is filled directly with these entities.",
+            "description": "The role is filled directly with these identities.",
             "properties": {
               "fill": {
                 "additionalProperties": false,
                 "properties": {
-                  "entities": {
-                    "description": "The entities.",
+                  "identities": {
+                    "description": "The identities.",
                     "items": {
-                      "$ref": "#/components/schemas/EntityKey"
+                      "$ref": "#/components/schemas/IdentityKey"
                     },
                     "maxItems": 100,
                     "type": "array",
@@ -12656,7 +12656,7 @@
                   }
                 },
                 "required": [
-                  "entities"
+                  "identities"
                 ],
                 "type": "object"
               }
@@ -12731,7 +12731,7 @@
       },
       "RoleResolved": {
         "additionalProperties": false,
-        "description": "A role (A6): a named slot, single or multi valued, filled per journey with entities.",
+        "description": "A role (A6): a named slot, single or multi valued, filled per journey with identities.",
         "properties": {
           "id": {
             "$ref": "#/components/schemas/Slug",
@@ -12742,7 +12742,7 @@
             "description": "The stable key: optional in a file."
           },
           "multi": {
-            "description": "Filled by several entities rather than one.",
+            "description": "Filled by several identities rather than one.",
             "type": "boolean"
           },
           "title": {
@@ -12802,7 +12802,7 @@
           "owners": {
             "description": "The distinct owners of its children.",
             "items": {
-              "$ref": "#/components/schemas/EntityKey"
+              "$ref": "#/components/schemas/IdentityKey"
             },
             "type": "array",
             "uniqueItems": true
@@ -13658,7 +13658,7 @@
             "patternProperties": {
               "^k_[a-z0-9][a-z0-9_-]*$": {
                 "items": {
-                  "$ref": "#/components/schemas/EntityKey"
+                  "$ref": "#/components/schemas/IdentityKey"
                 },
                 "type": "array",
                 "uniqueItems": true
@@ -14145,14 +14145,14 @@
           },
           {
             "additionalProperties": false,
-            "description": "An entity.",
+            "description": "An identity.",
             "properties": {
-              "entity": {
-                "$ref": "#/components/schemas/EntityKey"
+              "identity": {
+                "$ref": "#/components/schemas/IdentityKey"
               }
             },
             "required": [
-              "entity"
+              "identity"
             ],
             "type": "object"
           },
@@ -14563,7 +14563,7 @@
           },
           {
             "const": "mixed_mapping",
-            "description": "Its entity shares a participation with entities mapped to other roles (B8).",
+            "description": "Its identity shares a participation with identities mapped to other roles (B8).",
             "type": "string"
           },
           {
@@ -14635,7 +14635,7 @@
         "properties": {
           "name": {
             "$ref": "#/components/schemas/Title",
-            "description": "Their name: the entity their verified emails name, else the name their sign-in gave."
+            "description": "Their name: the identity their verified emails name, else the name their sign-in gave."
           },
           "user": {
             "$ref": "#/components/schemas/UserId",
@@ -14690,7 +14690,7 @@
       },
       "Viewer": {
         "additionalProperties": false,
-        "description": "The caller (H2) and the entities their verified emails name (H3).",
+        "description": "The caller (H2) and the identities their verified emails name (H3).",
         "properties": {
           "agent": {
             "anyOf": [
@@ -14703,25 +14703,25 @@
             ],
             "description": "The agent acting for them, when the request carries an agent token."
           },
-          "entities": {
-            "description": "Their entities, which \"mine\" covers together.",
+          "identities": {
+            "description": "Their identities, which \"mine\" covers together.",
             "items": {
-              "$ref": "#/components/schemas/EntityKey"
+              "$ref": "#/components/schemas/IdentityKey"
             },
             "type": "array",
             "uniqueItems": true
           },
-          "identities": {
-            "description": "The identities they sign in with, by provider and subject.",
+          "logins": {
+            "description": "The logins they sign in with, by provider and subject.",
             "items": {
-              "$ref": "#/components/schemas/LinkedIdentity"
+              "$ref": "#/components/schemas/LinkedLogin"
             },
             "type": "array"
           },
           "merge_offer": {
-            "description": "H3: present when their emails name more than one entity, which are then offered for\nmerging.",
+            "description": "H3: present when their emails name more than one identity, which are then offered for\nmerging.",
             "items": {
-              "$ref": "#/components/schemas/EntityKey"
+              "$ref": "#/components/schemas/IdentityKey"
             },
             "type": [
               "array",
@@ -14736,8 +14736,8 @@
         },
         "required": [
           "user",
-          "entities",
-          "identities"
+          "identities",
+          "logins"
         ],
         "type": "object"
       },
@@ -14854,7 +14854,7 @@
           "removal_widened",
           "still_referenced",
           "answer_type_mismatch",
-          "entity_unresolved",
+          "identity_unresolved",
           "illegal_transition",
           "reason_required",
           "guard_failed",
@@ -14878,7 +14878,7 @@
           "insertion_invalid",
           "insertion_key_taken",
           "not_a_process_route",
-          "entity_key_taken",
+          "identity_key_taken",
           "email_taken",
           "alias_cycle",
           "merge_breaks_journey",
@@ -15021,7 +15021,7 @@
                 }
               }
             },
-            "description": "The auth layer refused the peer: a local-only provider and a remote peer, or identity headers from a peer no proxy-mode provider trusts (in text)."
+            "description": "The auth layer refused the peer: a local-only provider and a remote peer, or login headers from a peer no proxy-mode provider trusts (in text)."
           },
           "500": {
             "content": {
@@ -15046,7 +15046,7 @@
                 }
               }
             },
-            "description": "A limit was reached or the request timed out; retry after `Retry-After`. Or: The auth layer could not ask an identity provider (in text, without `Retry-After`)."
+            "description": "A limit was reached or the request timed out; retry after `Retry-After`. Or: The auth layer could not ask a sign-in provider (in text, without `Retry-After`)."
           }
         },
         "summary": "What this host offers."
@@ -15094,7 +15094,7 @@
                 }
               }
             },
-            "description": "The auth layer refused the peer: a local-only provider and a remote peer, or identity headers from a peer no proxy-mode provider trusts (in text)."
+            "description": "The auth layer refused the peer: a local-only provider and a remote peer, or login headers from a peer no proxy-mode provider trusts (in text)."
           },
           "500": {
             "content": {
@@ -15119,10 +15119,10 @@
                 }
               }
             },
-            "description": "A limit was reached or the request timed out; retry after `Retry-After`. Or: The auth layer could not ask an identity provider (in text, without `Retry-After`)."
+            "description": "A limit was reached or the request timed out; retry after `Retry-After`. Or: The auth layer could not ask a sign-in provider (in text, without `Retry-After`)."
           }
         },
-        "summary": "The deployment: entities and aliases (E6)."
+        "summary": "The deployment: identities and aliases (E6)."
       }
     },
     "/api/deployment/patches": {
@@ -15177,7 +15177,7 @@
                 }
               }
             },
-            "description": "The auth layer refused the peer: a local-only provider and a remote peer, or identity headers from a peer no proxy-mode provider trusts (in text)."
+            "description": "The auth layer refused the peer: a local-only provider and a remote peer, or login headers from a peer no proxy-mode provider trusts (in text)."
           },
           "409": {
             "content": {
@@ -15242,10 +15242,10 @@
                 }
               }
             },
-            "description": "A limit was reached or the request timed out; retry after `Retry-After`. Or: The auth layer could not ask an identity provider (in text, without `Retry-After`)."
+            "description": "A limit was reached or the request timed out; retry after `Retry-After`. Or: The auth layer could not ask a sign-in provider (in text, without `Retry-After`)."
           }
         },
-        "summary": "Applies a deployment patch: entities and merges (E6)."
+        "summary": "Applies a deployment patch: identities and merges (E6)."
       }
     },
     "/api/deployment/proposals": {
@@ -15328,7 +15328,7 @@
                 }
               }
             },
-            "description": "The auth layer refused the peer: a local-only provider and a remote peer, or identity headers from a peer no proxy-mode provider trusts (in text)."
+            "description": "The auth layer refused the peer: a local-only provider and a remote peer, or login headers from a peer no proxy-mode provider trusts (in text)."
           },
           "500": {
             "content": {
@@ -15353,7 +15353,7 @@
                 }
               }
             },
-            "description": "A limit was reached or the request timed out; retry after `Retry-After`. Or: The auth layer could not ask an identity provider (in text, without `Retry-After`)."
+            "description": "A limit was reached or the request timed out; retry after `Retry-After`. Or: The auth layer could not ask a sign-in provider (in text, without `Retry-After`)."
           }
         },
         "summary": "The destination's open proposals, newest first, with their count and the destination as it is now (C14)."
@@ -15409,7 +15409,7 @@
                 }
               }
             },
-            "description": "The auth layer refused the peer: a local-only provider and a remote peer, or identity headers from a peer no proxy-mode provider trusts (in text)."
+            "description": "The auth layer refused the peer: a local-only provider and a remote peer, or login headers from a peer no proxy-mode provider trusts (in text)."
           },
           "409": {
             "content": {
@@ -15474,7 +15474,7 @@
                 }
               }
             },
-            "description": "A limit was reached or the request timed out; retry after `Retry-After`. Or: The auth layer could not ask an identity provider (in text, without `Retry-After`)."
+            "description": "A limit was reached or the request timed out; retry after `Retry-After`. Or: The auth layer could not ask a sign-in provider (in text, without `Retry-After`)."
           }
         },
         "summary": "Creates a proposal for this domain, which may not exist yet, under a client-generated id; a create resubmitted under that id answers the proposal (I6)."
@@ -15533,7 +15533,7 @@
                 }
               }
             },
-            "description": "The auth layer refused the peer: a local-only provider and a remote peer, or identity headers from a peer no proxy-mode provider trusts (in text)."
+            "description": "The auth layer refused the peer: a local-only provider and a remote peer, or login headers from a peer no proxy-mode provider trusts (in text)."
           },
           "404": {
             "content": {
@@ -15568,7 +15568,7 @@
                 }
               }
             },
-            "description": "A limit was reached or the request timed out; retry after `Retry-After`. Or: The auth layer could not ask an identity provider (in text, without `Retry-After`)."
+            "description": "A limit was reached or the request timed out; retry after `Retry-After`. Or: The auth layer could not ask a sign-in provider (in text, without `Retry-After`)."
           }
         },
         "summary": "A proposal under this destination: its editing revision, status, and content (I6)."
@@ -15635,7 +15635,7 @@
                 }
               }
             },
-            "description": "The auth layer refused the peer: a local-only provider and a remote peer, or identity headers from a peer no proxy-mode provider trusts (in text)."
+            "description": "The auth layer refused the peer: a local-only provider and a remote peer, or login headers from a peer no proxy-mode provider trusts (in text)."
           },
           "404": {
             "content": {
@@ -15710,7 +15710,7 @@
                 }
               }
             },
-            "description": "A limit was reached or the request timed out; retry after `Retry-After`. Or: The auth layer could not ask an identity provider (in text, without `Retry-After`)."
+            "description": "A limit was reached or the request timed out; retry after `Retry-After`. Or: The auth layer could not ask a sign-in provider (in text, without `Retry-After`)."
           }
         },
         "summary": "Replaces its content against its editing revision; its destination does not move (H5)."
@@ -15779,7 +15779,7 @@
                 }
               }
             },
-            "description": "The auth layer refused the peer: a local-only provider and a remote peer, or identity headers from a peer no proxy-mode provider trusts (in text)."
+            "description": "The auth layer refused the peer: a local-only provider and a remote peer, or login headers from a peer no proxy-mode provider trusts (in text)."
           },
           "404": {
             "content": {
@@ -15854,7 +15854,7 @@
                 }
               }
             },
-            "description": "A limit was reached or the request timed out; retry after `Retry-After`. Or: The auth layer could not ask an identity provider (in text, without `Retry-After`)."
+            "description": "A limit was reached or the request timed out; retry after `Retry-After`. Or: The auth layer could not ask a sign-in provider (in text, without `Retry-After`)."
           }
         },
         "summary": "Applies it at the reviewed editing revision, the caller confirming (H2); stale with what intervened when either revision moved (I6)."
@@ -15923,7 +15923,7 @@
                 }
               }
             },
-            "description": "The auth layer refused the peer: a local-only provider and a remote peer, or identity headers from a peer no proxy-mode provider trusts (in text)."
+            "description": "The auth layer refused the peer: a local-only provider and a remote peer, or login headers from a peer no proxy-mode provider trusts (in text)."
           },
           "404": {
             "content": {
@@ -15998,7 +15998,7 @@
                 }
               }
             },
-            "description": "A limit was reached or the request timed out; retry after `Retry-After`. Or: The auth layer could not ask an identity provider (in text, without `Retry-After`)."
+            "description": "A limit was reached or the request timed out; retry after `Retry-After`. Or: The auth layer could not ask a sign-in provider (in text, without `Retry-After`)."
           }
         },
         "summary": "Discards it (I6)."
@@ -16057,7 +16057,7 @@
                 }
               }
             },
-            "description": "The auth layer refused the peer: a local-only provider and a remote peer, or identity headers from a peer no proxy-mode provider trusts (in text)."
+            "description": "The auth layer refused the peer: a local-only provider and a remote peer, or login headers from a peer no proxy-mode provider trusts (in text)."
           },
           "404": {
             "content": {
@@ -16092,7 +16092,7 @@
                 }
               }
             },
-            "description": "A limit was reached or the request timed out; retry after `Retry-After`. Or: The auth layer could not ask an identity provider (in text, without `Retry-After`)."
+            "description": "A limit was reached or the request timed out; retry after `Retry-After`. Or: The auth layer could not ask a sign-in provider (in text, without `Retry-After`)."
           }
         },
         "summary": "What applying it now would do: unresolved items, violations, the graph and frontier after, consequences, and what moved since drafting (C14, D7, I6)."
@@ -16161,7 +16161,7 @@
                 }
               }
             },
-            "description": "The auth layer refused the peer: a local-only provider and a remote peer, or identity headers from a peer no proxy-mode provider trusts (in text)."
+            "description": "The auth layer refused the peer: a local-only provider and a remote peer, or login headers from a peer no proxy-mode provider trusts (in text)."
           },
           "404": {
             "content": {
@@ -16243,7 +16243,7 @@
                 }
               }
             },
-            "description": "A limit was reached or the request timed out; retry after `Retry-After`. Or: The auth layer could not ask an identity provider (in text, without `Retry-After`)."
+            "description": "A limit was reached or the request timed out; retry after `Retry-After`. Or: The auth layer could not ask a sign-in provider (in text, without `Retry-After`)."
           }
         },
         "summary": "Drafts it again on its destination as it stands, the reviewer's choices carried over; review it again before applying (I6)."
@@ -16401,7 +16401,7 @@
                 }
               }
             },
-            "description": "The auth layer refused the peer: a local-only provider and a remote peer, or identity headers from a peer no proxy-mode provider trusts (in text)."
+            "description": "The auth layer refused the peer: a local-only provider and a remote peer, or login headers from a peer no proxy-mode provider trusts (in text)."
           },
           "500": {
             "content": {
@@ -16426,7 +16426,7 @@
                 }
               }
             },
-            "description": "A limit was reached or the request timed out; retry after `Retry-After`. Or: The auth layer could not ask an identity provider (in text, without `Retry-After`)."
+            "description": "A limit was reached or the request timed out; retry after `Retry-After`. Or: The auth layer could not ask a sign-in provider (in text, without `Retry-After`)."
           }
         },
         "summary": "Events, filtered and paged in commit order (J5)."
@@ -16493,7 +16493,7 @@
                 }
               }
             },
-            "description": "The auth layer refused the peer: a local-only provider and a remote peer, or identity headers from a peer no proxy-mode provider trusts (in text)."
+            "description": "The auth layer refused the peer: a local-only provider and a remote peer, or login headers from a peer no proxy-mode provider trusts (in text)."
           },
           "500": {
             "content": {
@@ -16518,7 +16518,7 @@
                 }
               }
             },
-            "description": "A limit was reached or the request timed out; retry after `Retry-After`. Or: The auth layer could not ask an identity provider (in text, without `Retry-After`)."
+            "description": "A limit was reached or the request timed out; retry after `Retry-After`. Or: The auth layer could not ask a sign-in provider (in text, without `Retry-After`)."
           }
         },
         "summary": "Revision ticks as server-sent `tick` events, current revisions first (H6)."
@@ -16565,14 +16565,14 @@
             "style": "form"
           },
           {
-            "description": "Journeys referring to any of these entities, directly or through an alias (E6).",
+            "description": "Journeys referring to any of these identities, directly or through an alias (E6).",
             "explode": true,
             "in": "query",
             "name": "referencing",
             "required": false,
             "schema": {
               "items": {
-                "$ref": "#/components/schemas/EntityKey"
+                "$ref": "#/components/schemas/IdentityKey"
               },
               "type": "array"
             },
@@ -16653,7 +16653,7 @@
                 }
               }
             },
-            "description": "The auth layer refused the peer: a local-only provider and a remote peer, or identity headers from a peer no proxy-mode provider trusts (in text)."
+            "description": "The auth layer refused the peer: a local-only provider and a remote peer, or login headers from a peer no proxy-mode provider trusts (in text)."
           },
           "500": {
             "content": {
@@ -16678,7 +16678,7 @@
                 }
               }
             },
-            "description": "A limit was reached or the request timed out; retry after `Retry-After`. Or: The auth layer could not ask an identity provider (in text, without `Retry-After`)."
+            "description": "A limit was reached or the request timed out; retry after `Retry-After`. Or: The auth layer could not ask a sign-in provider (in text, without `Retry-After`)."
           }
         },
         "summary": "The journey index, filtered and paged (C16)."
@@ -16737,7 +16737,7 @@
                 }
               }
             },
-            "description": "The auth layer refused the peer: a local-only provider and a remote peer, or identity headers from a peer no proxy-mode provider trusts (in text)."
+            "description": "The auth layer refused the peer: a local-only provider and a remote peer, or login headers from a peer no proxy-mode provider trusts (in text)."
           },
           "404": {
             "content": {
@@ -16772,7 +16772,7 @@
                 }
               }
             },
-            "description": "A limit was reached or the request timed out; retry after `Retry-After`. Or: The auth layer could not ask an identity provider (in text, without `Retry-After`)."
+            "description": "A limit was reached or the request timed out; retry after `Retry-After`. Or: The auth layer could not ask a sign-in provider (in text, without `Retry-After`)."
           }
         },
         "summary": "A journey with its graph and state."
@@ -16836,7 +16836,7 @@
                 }
               }
             },
-            "description": "Only a user may do this, not an agent acting for one. Or: The auth layer refused the peer: a local-only provider and a remote peer, or identity headers from a peer no proxy-mode provider trusts (in text)."
+            "description": "Only a user may do this, not an agent acting for one. Or: The auth layer refused the peer: a local-only provider and a remote peer, or login headers from a peer no proxy-mode provider trusts (in text)."
           },
           "404": {
             "content": {
@@ -16871,7 +16871,7 @@
                 }
               }
             },
-            "description": "A limit was reached or the request timed out; retry after `Retry-After`. Or: The auth layer could not ask an identity provider (in text, without `Retry-After`)."
+            "description": "A limit was reached or the request timed out; retry after `Retry-After`. Or: The auth layer could not ask a sign-in provider (in text, without `Retry-After`)."
           }
         },
         "summary": "The caller's conversation with the assistant about a journey, as kept, when the capabilities offer the assistant (I5)."
@@ -16943,7 +16943,7 @@
                 }
               }
             },
-            "description": "Only a user may do this, not an agent acting for one. Or: The auth layer refused the peer: a local-only provider and a remote peer, or identity headers from a peer no proxy-mode provider trusts (in text)."
+            "description": "Only a user may do this, not an agent acting for one. Or: The auth layer refused the peer: a local-only provider and a remote peer, or login headers from a peer no proxy-mode provider trusts (in text)."
           },
           "404": {
             "content": {
@@ -16998,7 +16998,7 @@
                 }
               }
             },
-            "description": "A limit was reached or the request timed out; retry after `Retry-After`. Or: The auth layer could not ask an identity provider (in text, without `Retry-After`)."
+            "description": "A limit was reached or the request timed out; retry after `Retry-After`. Or: The auth layer could not ask a sign-in provider (in text, without `Retry-After`)."
           }
         },
         "summary": "One assistant turn about a journey, when the capabilities offer the assistant (I5): its direct writes with their consequences, and its proposals for review."
@@ -17057,7 +17057,7 @@
                 }
               }
             },
-            "description": "The auth layer refused the peer: a local-only provider and a remote peer, or identity headers from a peer no proxy-mode provider trusts (in text)."
+            "description": "The auth layer refused the peer: a local-only provider and a remote peer, or login headers from a peer no proxy-mode provider trusts (in text)."
           },
           "404": {
             "content": {
@@ -17092,7 +17092,7 @@
                 }
               }
             },
-            "description": "A limit was reached or the request timed out; retry after `Retry-After`. Or: The auth layer could not ask an identity provider (in text, without `Retry-After`)."
+            "description": "A limit was reached or the request timed out; retry after `Retry-After`. Or: The auth layer could not ask a sign-in provider (in text, without `Retry-After`)."
           }
         },
         "summary": "The decision view (C12)."
@@ -17151,7 +17151,7 @@
                 }
               }
             },
-            "description": "The auth layer refused the peer: a local-only provider and a remote peer, or identity headers from a peer no proxy-mode provider trusts (in text)."
+            "description": "The auth layer refused the peer: a local-only provider and a remote peer, or login headers from a peer no proxy-mode provider trusts (in text)."
           },
           "404": {
             "content": {
@@ -17186,7 +17186,7 @@
                 }
               }
             },
-            "description": "A limit was reached or the request timed out; retry after `Retry-After`. Or: The auth layer could not ask an identity provider (in text, without `Retry-After`)."
+            "description": "A limit was reached or the request timed out; retry after `Retry-After`. Or: The auth layer could not ask a sign-in provider (in text, without `Retry-After`)."
           }
         },
         "summary": "Every derived value with its explanation inputs, as the browser derives the document (D3)."
@@ -17245,7 +17245,7 @@
                 }
               }
             },
-            "description": "The auth layer refused the peer: a local-only provider and a remote peer, or identity headers from a peer no proxy-mode provider trusts (in text)."
+            "description": "The auth layer refused the peer: a local-only provider and a remote peer, or login headers from a peer no proxy-mode provider trusts (in text)."
           },
           "404": {
             "content": {
@@ -17280,7 +17280,7 @@
                 }
               }
             },
-            "description": "A limit was reached or the request timed out; retry after `Retry-After`. Or: The auth layer could not ask an identity provider (in text, without `Retry-After`)."
+            "description": "A limit was reached or the request timed out; retry after `Retry-After`. Or: The auth layer could not ask a sign-in provider (in text, without `Retry-After`)."
           }
         },
         "summary": "The domain document: the journey and the caller's derive inputs; nothing derived."
@@ -17363,7 +17363,7 @@
                 }
               }
             },
-            "description": "The auth layer refused the peer: a local-only provider and a remote peer, or identity headers from a peer no proxy-mode provider trusts (in text)."
+            "description": "The auth layer refused the peer: a local-only provider and a remote peer, or login headers from a peer no proxy-mode provider trusts (in text)."
           },
           "404": {
             "content": {
@@ -17398,7 +17398,7 @@
                 }
               }
             },
-            "description": "A limit was reached or the request timed out; retry after `Retry-After`. Or: The auth layer could not ask an identity provider (in text, without `Retry-After`)."
+            "description": "A limit was reached or the request timed out; retry after `Retry-After`. Or: The auth layer could not ask a sign-in provider (in text, without `Retry-After`)."
           }
         },
         "summary": "The journey's events, or a node's, grouped by patch and paged (J4)."
@@ -17499,13 +17499,13 @@
             "style": "form"
           },
           {
-            "description": "Only nodes this entity owns, and what holds them.",
+            "description": "Only nodes this identity owns, and what holds them.",
             "explode": true,
             "in": "query",
             "name": "owner",
             "required": false,
             "schema": {
-              "$ref": "#/components/schemas/EntityKey"
+              "$ref": "#/components/schemas/IdentityKey"
             },
             "style": "form"
           },
@@ -17571,7 +17571,7 @@
                 }
               }
             },
-            "description": "The auth layer refused the peer: a local-only provider and a remote peer, or identity headers from a peer no proxy-mode provider trusts (in text)."
+            "description": "The auth layer refused the peer: a local-only provider and a remote peer, or login headers from a peer no proxy-mode provider trusts (in text)."
           },
           "404": {
             "content": {
@@ -17606,7 +17606,7 @@
                 }
               }
             },
-            "description": "A limit was reached or the request timed out; retry after `Retry-After`. Or: The auth layer could not ask an identity provider (in text, without `Retry-After`)."
+            "description": "A limit was reached or the request timed out; retry after `Retry-After`. Or: The auth layer could not ask a sign-in provider (in text, without `Retry-After`)."
           }
         },
         "summary": "One canvas level: the kinds shown, at the top or within a container (C2)."
@@ -17679,7 +17679,7 @@
                 }
               }
             },
-            "description": "The auth layer refused the peer: a local-only provider and a remote peer, or identity headers from a peer no proxy-mode provider trusts (in text)."
+            "description": "The auth layer refused the peer: a local-only provider and a remote peer, or login headers from a peer no proxy-mode provider trusts (in text)."
           },
           "404": {
             "content": {
@@ -17714,7 +17714,7 @@
                 }
               }
             },
-            "description": "A limit was reached or the request timed out; retry after `Retry-After`. Or: The auth layer could not ask an identity provider (in text, without `Retry-After`)."
+            "description": "A limit was reached or the request timed out; retry after `Retry-After`. Or: The auth layer could not ask a sign-in provider (in text, without `Retry-After`)."
           }
         },
         "summary": "The nodes the caller participates in, by participation kind (E4)."
@@ -17831,7 +17831,7 @@
                 }
               }
             },
-            "description": "The auth layer refused the peer: a local-only provider and a remote peer, or identity headers from a peer no proxy-mode provider trusts (in text)."
+            "description": "The auth layer refused the peer: a local-only provider and a remote peer, or login headers from a peer no proxy-mode provider trusts (in text)."
           },
           "404": {
             "content": {
@@ -17866,7 +17866,7 @@
                 }
               }
             },
-            "description": "A limit was reached or the request timed out; retry after `Retry-After`. Or: The auth layer could not ask an identity provider (in text, without `Retry-After`)."
+            "description": "A limit was reached or the request timed out; retry after `Retry-After`. Or: The auth layer could not ask a sign-in provider (in text, without `Retry-After`)."
           }
         },
         "summary": "The acting frontier ranked, globally or for the caller, filtered (C10)."
@@ -17911,13 +17911,13 @@
             "style": "form"
           },
           {
-            "description": "Only nodes this entity owns.",
+            "description": "Only nodes this identity owns.",
             "explode": true,
             "in": "query",
             "name": "owner",
             "required": false,
             "schema": {
-              "$ref": "#/components/schemas/EntityKey"
+              "$ref": "#/components/schemas/IdentityKey"
             },
             "style": "form"
           },
@@ -18047,7 +18047,7 @@
                 }
               }
             },
-            "description": "The auth layer refused the peer: a local-only provider and a remote peer, or identity headers from a peer no proxy-mode provider trusts (in text)."
+            "description": "The auth layer refused the peer: a local-only provider and a remote peer, or login headers from a peer no proxy-mode provider trusts (in text)."
           },
           "404": {
             "content": {
@@ -18092,7 +18092,7 @@
                 }
               }
             },
-            "description": "A limit was reached or the request timed out; retry after `Retry-After`. Or: The auth layer could not ask an identity provider (in text, without `Retry-After`)."
+            "description": "A limit was reached or the request timed out; retry after `Retry-After`. Or: The auth layer could not ask a sign-in provider (in text, without `Retry-After`)."
           }
         },
         "summary": "The nodes a list query matches, sorted and paged (C9)."
@@ -18160,7 +18160,7 @@
                 }
               }
             },
-            "description": "The auth layer refused the peer: a local-only provider and a remote peer, or identity headers from a peer no proxy-mode provider trusts (in text)."
+            "description": "The auth layer refused the peer: a local-only provider and a remote peer, or login headers from a peer no proxy-mode provider trusts (in text)."
           },
           "404": {
             "content": {
@@ -18195,7 +18195,7 @@
                 }
               }
             },
-            "description": "A limit was reached or the request timed out; retry after `Retry-After`. Or: The auth layer could not ask an identity provider (in text, without `Retry-After`)."
+            "description": "A limit was reached or the request timed out; retry after `Retry-After`. Or: The auth layer could not ask a sign-in provider (in text, without `Retry-After`)."
           }
         },
         "summary": "One node in full; each explanation list carries its largest entries up to the response limit and its total (C8)."
@@ -18294,7 +18294,7 @@
                 }
               }
             },
-            "description": "The auth layer refused the peer: a local-only provider and a remote peer, or identity headers from a peer no proxy-mode provider trusts (in text)."
+            "description": "The auth layer refused the peer: a local-only provider and a remote peer, or login headers from a peer no proxy-mode provider trusts (in text)."
           },
           "404": {
             "content": {
@@ -18339,7 +18339,7 @@
                 }
               }
             },
-            "description": "A limit was reached or the request timed out; retry after `Retry-After`. Or: The auth layer could not ask an identity provider (in text, without `Retry-After`)."
+            "description": "A limit was reached or the request timed out; retry after `Retry-After`. Or: The auth layer could not ask a sign-in provider (in text, without `Retry-After`)."
           }
         },
         "summary": "A page of a node's explanation list, largest first (C8)."
@@ -18408,7 +18408,7 @@
                 }
               }
             },
-            "description": "The auth layer refused the peer: a local-only provider and a remote peer, or identity headers from a peer no proxy-mode provider trusts (in text)."
+            "description": "The auth layer refused the peer: a local-only provider and a remote peer, or login headers from a peer no proxy-mode provider trusts (in text)."
           },
           "404": {
             "content": {
@@ -18483,7 +18483,7 @@
                 }
               }
             },
-            "description": "A limit was reached or the request timed out; retry after `Retry-After`. Or: The auth layer could not ask an identity provider (in text, without `Retry-After`)."
+            "description": "A limit was reached or the request timed out; retry after `Retry-After`. Or: The auth layer could not ask a sign-in provider (in text, without `Retry-After`)."
           }
         },
         "summary": "Applies a journey patch; base revision 0 creates it (A17)."
@@ -18578,7 +18578,7 @@
                 }
               }
             },
-            "description": "The auth layer refused the peer: a local-only provider and a remote peer, or identity headers from a peer no proxy-mode provider trusts (in text)."
+            "description": "The auth layer refused the peer: a local-only provider and a remote peer, or login headers from a peer no proxy-mode provider trusts (in text)."
           },
           "404": {
             "content": {
@@ -18613,7 +18613,7 @@
                 }
               }
             },
-            "description": "A limit was reached or the request timed out; retry after `Retry-After`. Or: The auth layer could not ask an identity provider (in text, without `Retry-After`)."
+            "description": "A limit was reached or the request timed out; retry after `Retry-After`. Or: The auth layer could not ask a sign-in provider (in text, without `Retry-After`)."
           }
         },
         "summary": "The destination's open proposals, newest first, with their count and the destination as it is now (C14)."
@@ -18680,7 +18680,7 @@
                 }
               }
             },
-            "description": "The auth layer refused the peer: a local-only provider and a remote peer, or identity headers from a peer no proxy-mode provider trusts (in text)."
+            "description": "The auth layer refused the peer: a local-only provider and a remote peer, or login headers from a peer no proxy-mode provider trusts (in text)."
           },
           "404": {
             "content": {
@@ -18755,7 +18755,7 @@
                 }
               }
             },
-            "description": "A limit was reached or the request timed out; retry after `Retry-After`. Or: The auth layer could not ask an identity provider (in text, without `Retry-After`)."
+            "description": "A limit was reached or the request timed out; retry after `Retry-After`. Or: The auth layer could not ask a sign-in provider (in text, without `Retry-After`)."
           }
         },
         "summary": "Creates a proposal for this domain, which may not exist yet, under a client-generated id; a create resubmitted under that id answers the proposal (I6)."
@@ -18823,7 +18823,7 @@
                 }
               }
             },
-            "description": "The auth layer refused the peer: a local-only provider and a remote peer, or identity headers from a peer no proxy-mode provider trusts (in text)."
+            "description": "The auth layer refused the peer: a local-only provider and a remote peer, or login headers from a peer no proxy-mode provider trusts (in text)."
           },
           "404": {
             "content": {
@@ -18858,7 +18858,7 @@
                 }
               }
             },
-            "description": "A limit was reached or the request timed out; retry after `Retry-After`. Or: The auth layer could not ask an identity provider (in text, without `Retry-After`)."
+            "description": "A limit was reached or the request timed out; retry after `Retry-After`. Or: The auth layer could not ask a sign-in provider (in text, without `Retry-After`)."
           }
         },
         "summary": "A proposal under this destination: its editing revision, status, and content (I6)."
@@ -18934,7 +18934,7 @@
                 }
               }
             },
-            "description": "The auth layer refused the peer: a local-only provider and a remote peer, or identity headers from a peer no proxy-mode provider trusts (in text)."
+            "description": "The auth layer refused the peer: a local-only provider and a remote peer, or login headers from a peer no proxy-mode provider trusts (in text)."
           },
           "404": {
             "content": {
@@ -19009,7 +19009,7 @@
                 }
               }
             },
-            "description": "A limit was reached or the request timed out; retry after `Retry-After`. Or: The auth layer could not ask an identity provider (in text, without `Retry-After`)."
+            "description": "A limit was reached or the request timed out; retry after `Retry-After`. Or: The auth layer could not ask a sign-in provider (in text, without `Retry-After`)."
           }
         },
         "summary": "Replaces its content against its editing revision; its destination does not move (H5)."
@@ -19087,7 +19087,7 @@
                 }
               }
             },
-            "description": "The auth layer refused the peer: a local-only provider and a remote peer, or identity headers from a peer no proxy-mode provider trusts (in text)."
+            "description": "The auth layer refused the peer: a local-only provider and a remote peer, or login headers from a peer no proxy-mode provider trusts (in text)."
           },
           "404": {
             "content": {
@@ -19162,7 +19162,7 @@
                 }
               }
             },
-            "description": "A limit was reached or the request timed out; retry after `Retry-After`. Or: The auth layer could not ask an identity provider (in text, without `Retry-After`)."
+            "description": "A limit was reached or the request timed out; retry after `Retry-After`. Or: The auth layer could not ask a sign-in provider (in text, without `Retry-After`)."
           }
         },
         "summary": "Applies it at the reviewed editing revision, the caller confirming (H2); stale with what intervened when either revision moved (I6)."
@@ -19240,7 +19240,7 @@
                 }
               }
             },
-            "description": "The auth layer refused the peer: a local-only provider and a remote peer, or identity headers from a peer no proxy-mode provider trusts (in text)."
+            "description": "The auth layer refused the peer: a local-only provider and a remote peer, or login headers from a peer no proxy-mode provider trusts (in text)."
           },
           "404": {
             "content": {
@@ -19315,7 +19315,7 @@
                 }
               }
             },
-            "description": "A limit was reached or the request timed out; retry after `Retry-After`. Or: The auth layer could not ask an identity provider (in text, without `Retry-After`)."
+            "description": "A limit was reached or the request timed out; retry after `Retry-After`. Or: The auth layer could not ask a sign-in provider (in text, without `Retry-After`)."
           }
         },
         "summary": "Discards it (I6)."
@@ -19383,7 +19383,7 @@
                 }
               }
             },
-            "description": "The auth layer refused the peer: a local-only provider and a remote peer, or identity headers from a peer no proxy-mode provider trusts (in text)."
+            "description": "The auth layer refused the peer: a local-only provider and a remote peer, or login headers from a peer no proxy-mode provider trusts (in text)."
           },
           "404": {
             "content": {
@@ -19418,7 +19418,7 @@
                 }
               }
             },
-            "description": "A limit was reached or the request timed out; retry after `Retry-After`. Or: The auth layer could not ask an identity provider (in text, without `Retry-After`)."
+            "description": "A limit was reached or the request timed out; retry after `Retry-After`. Or: The auth layer could not ask a sign-in provider (in text, without `Retry-After`)."
           }
         },
         "summary": "What applying it now would do: unresolved items, violations, the graph and frontier after, consequences, and what moved since drafting (C14, D7, I6)."
@@ -19496,7 +19496,7 @@
                 }
               }
             },
-            "description": "The auth layer refused the peer: a local-only provider and a remote peer, or identity headers from a peer no proxy-mode provider trusts (in text)."
+            "description": "The auth layer refused the peer: a local-only provider and a remote peer, or login headers from a peer no proxy-mode provider trusts (in text)."
           },
           "404": {
             "content": {
@@ -19578,7 +19578,7 @@
                 }
               }
             },
-            "description": "A limit was reached or the request timed out; retry after `Retry-After`. Or: The auth layer could not ask an identity provider (in text, without `Retry-After`)."
+            "description": "A limit was reached or the request timed out; retry after `Retry-After`. Or: The auth layer could not ask a sign-in provider (in text, without `Retry-After`)."
           }
         },
         "summary": "Drafts it again on its destination as it stands, the reviewer's choices carried over; review it again before applying (I6)."
@@ -19647,7 +19647,7 @@
                 }
               }
             },
-            "description": "The auth layer refused the peer: a local-only provider and a remote peer, or identity headers from a peer no proxy-mode provider trusts (in text)."
+            "description": "The auth layer refused the peer: a local-only provider and a remote peer, or login headers from a peer no proxy-mode provider trusts (in text)."
           },
           "404": {
             "content": {
@@ -19729,7 +19729,7 @@
                 }
               }
             },
-            "description": "A limit was reached or the request timed out; retry after `Retry-After`. Or: The auth layer could not ask an identity provider (in text, without `Retry-After`)."
+            "description": "A limit was reached or the request timed out; retry after `Retry-After`. Or: The auth layer could not ask a sign-in provider (in text, without `Retry-After`)."
           }
         },
         "summary": "Proposes re-linking the journey to a published version, differences kept as local edits unless the reviewer takes the route's (B9)."
@@ -19798,7 +19798,7 @@
                 }
               }
             },
-            "description": "The auth layer refused the peer: a local-only provider and a remote peer, or identity headers from a peer no proxy-mode provider trusts (in text)."
+            "description": "The auth layer refused the peer: a local-only provider and a remote peer, or login headers from a peer no proxy-mode provider trusts (in text)."
           },
           "404": {
             "content": {
@@ -19880,10 +19880,10 @@
                 }
               }
             },
-            "description": "A limit was reached or the request timed out; retry after `Retry-After`. Or: The auth layer could not ask an identity provider (in text, without `Retry-After`)."
+            "description": "A limit was reached or the request timed out; retry after `Retry-After`. Or: The auth layer could not ask a sign-in provider (in text, without `Retry-After`)."
           }
         },
-        "summary": "Proposes saving the journey's structure as a route draft, with a participation mapping per explicit entity and an exclusion per node (B8)."
+        "summary": "Proposes saving the journey's structure as a route draft, with a participation mapping per explicit identity and an exclusion per node (B8)."
       }
     },
     "/api/journeys/{id}/snapshot": {
@@ -19985,7 +19985,7 @@
                 }
               }
             },
-            "description": "The auth layer refused the peer: a local-only provider and a remote peer, or identity headers from a peer no proxy-mode provider trusts (in text)."
+            "description": "The auth layer refused the peer: a local-only provider and a remote peer, or login headers from a peer no proxy-mode provider trusts (in text)."
           },
           "404": {
             "content": {
@@ -20030,7 +20030,7 @@
                 }
               }
             },
-            "description": "A limit was reached or the request timed out; retry after `Retry-After`. Or: The auth layer could not ask an identity provider (in text, without `Retry-After`)."
+            "description": "A limit was reached or the request timed out; retry after `Retry-After`. Or: The auth layer could not ask a sign-in provider (in text, without `Retry-After`)."
           }
         },
         "summary": "The bounded agent snapshot, scoped to a subtree and depth, its nodes paged (I3)."
@@ -20089,7 +20089,7 @@
                 }
               }
             },
-            "description": "The auth layer refused the peer: a local-only provider and a remote peer, or identity headers from a peer no proxy-mode provider trusts (in text)."
+            "description": "The auth layer refused the peer: a local-only provider and a remote peer, or login headers from a peer no proxy-mode provider trusts (in text)."
           },
           "404": {
             "content": {
@@ -20124,7 +20124,7 @@
                 }
               }
             },
-            "description": "A limit was reached or the request timed out; retry after `Retry-After`. Or: The auth layer could not ask an identity provider (in text, without `Retry-After`)."
+            "description": "A limit was reached or the request timed out; retry after `Retry-After`. Or: The auth layer could not ask a sign-in provider (in text, without `Retry-After`)."
           }
         },
         "summary": "The status summary (C18)."
@@ -20183,7 +20183,7 @@
                 }
               }
             },
-            "description": "The auth layer refused the peer: a local-only provider and a remote peer, or identity headers from a peer no proxy-mode provider trusts (in text)."
+            "description": "The auth layer refused the peer: a local-only provider and a remote peer, or login headers from a peer no proxy-mode provider trusts (in text)."
           },
           "404": {
             "content": {
@@ -20218,7 +20218,7 @@
                 }
               }
             },
-            "description": "A limit was reached or the request timed out; retry after `Retry-After`. Or: The auth layer could not ask an identity provider (in text, without `Retry-After`)."
+            "description": "A limit was reached or the request timed out; retry after `Retry-After`. Or: The auth layer could not ask a sign-in provider (in text, without `Retry-After`)."
           }
         },
         "summary": "The timeline (C13)."
@@ -20286,7 +20286,7 @@
                 }
               }
             },
-            "description": "The auth layer refused the peer: a local-only provider and a remote peer, or identity headers from a peer no proxy-mode provider trusts (in text)."
+            "description": "The auth layer refused the peer: a local-only provider and a remote peer, or login headers from a peer no proxy-mode provider trusts (in text)."
           },
           "404": {
             "content": {
@@ -20321,7 +20321,7 @@
                 }
               }
             },
-            "description": "A limit was reached or the request timed out; retry after `Retry-After`. Or: The auth layer could not ask an identity provider (in text, without `Retry-After`)."
+            "description": "A limit was reached or the request timed out; retry after `Retry-After`. Or: The auth layer could not ask a sign-in provider (in text, without `Retry-After`)."
           }
         },
         "summary": "What is upstream and downstream of a node, gravity contributors marked (C7)."
@@ -20390,7 +20390,7 @@
                 }
               }
             },
-            "description": "The auth layer refused the peer: a local-only provider and a remote peer, or identity headers from a peer no proxy-mode provider trusts (in text)."
+            "description": "The auth layer refused the peer: a local-only provider and a remote peer, or login headers from a peer no proxy-mode provider trusts (in text)."
           },
           "404": {
             "content": {
@@ -20472,7 +20472,7 @@
                 }
               }
             },
-            "description": "A limit was reached or the request timed out; retry after `Retry-After`. Or: The auth layer could not ask an identity provider (in text, without `Retry-After`)."
+            "description": "A limit was reached or the request timed out; retry after `Retry-After`. Or: The auth layer could not ask a sign-in provider (in text, without `Retry-After`)."
           }
         },
         "summary": "Proposes upgrading the journey to a newer version of its route: the merge's conflicts, kept edits, and orphans are its review items (B7)."
@@ -20569,7 +20569,7 @@
                 }
               }
             },
-            "description": "The auth layer refused the peer: a local-only provider and a remote peer, or identity headers from a peer no proxy-mode provider trusts (in text)."
+            "description": "The auth layer refused the peer: a local-only provider and a remote peer, or login headers from a peer no proxy-mode provider trusts (in text)."
           },
           "500": {
             "content": {
@@ -20594,7 +20594,7 @@
                 }
               }
             },
-            "description": "A limit was reached or the request timed out; retry after `Retry-After`. Or: The auth layer could not ask an identity provider (in text, without `Retry-After`)."
+            "description": "A limit was reached or the request timed out; retry after `Retry-After`. Or: The auth layer could not ask a sign-in provider (in text, without `Retry-After`)."
           }
         },
         "summary": "The open proposals no one destination holds: those waiting on the caller, and those that would create a journey or a route, newest first with their count (C14, C16)."
@@ -20679,7 +20679,7 @@
                 }
               }
             },
-            "description": "The auth layer refused the peer: a local-only provider and a remote peer, or identity headers from a peer no proxy-mode provider trusts (in text)."
+            "description": "The auth layer refused the peer: a local-only provider and a remote peer, or login headers from a peer no proxy-mode provider trusts (in text)."
           },
           "500": {
             "content": {
@@ -20704,7 +20704,7 @@
                 }
               }
             },
-            "description": "A limit was reached or the request timed out; retry after `Retry-After`. Or: The auth layer could not ask an identity provider (in text, without `Retry-After`)."
+            "description": "A limit was reached or the request timed out; retry after `Retry-After`. Or: The auth layer could not ask a sign-in provider (in text, without `Retry-After`)."
           }
         },
         "summary": "The route index, paged (I2)."
@@ -20763,7 +20763,7 @@
                 }
               }
             },
-            "description": "The auth layer refused the peer: a local-only provider and a remote peer, or identity headers from a peer no proxy-mode provider trusts (in text)."
+            "description": "The auth layer refused the peer: a local-only provider and a remote peer, or login headers from a peer no proxy-mode provider trusts (in text)."
           },
           "404": {
             "content": {
@@ -20798,7 +20798,7 @@
                 }
               }
             },
-            "description": "A limit was reached or the request timed out; retry after `Retry-After`. Or: The auth layer could not ask an identity provider (in text, without `Retry-After`)."
+            "description": "A limit was reached or the request timed out; retry after `Retry-After`. Or: The auth layer could not ask a sign-in provider (in text, without `Retry-After`)."
           }
         },
         "summary": "A route with its draft."
@@ -20862,7 +20862,7 @@
                 }
               }
             },
-            "description": "Only a user may do this, not an agent acting for one. Or: The auth layer refused the peer: a local-only provider and a remote peer, or identity headers from a peer no proxy-mode provider trusts (in text)."
+            "description": "Only a user may do this, not an agent acting for one. Or: The auth layer refused the peer: a local-only provider and a remote peer, or login headers from a peer no proxy-mode provider trusts (in text)."
           },
           "404": {
             "content": {
@@ -20897,7 +20897,7 @@
                 }
               }
             },
-            "description": "A limit was reached or the request timed out; retry after `Retry-After`. Or: The auth layer could not ask an identity provider (in text, without `Retry-After`)."
+            "description": "A limit was reached or the request timed out; retry after `Retry-After`. Or: The auth layer could not ask a sign-in provider (in text, without `Retry-After`)."
           }
         },
         "summary": "The caller's conversation with the assistant about a route's draft, as kept, when the capabilities offer the assistant (I5)."
@@ -20969,7 +20969,7 @@
                 }
               }
             },
-            "description": "Only a user may do this, not an agent acting for one. Or: The auth layer refused the peer: a local-only provider and a remote peer, or identity headers from a peer no proxy-mode provider trusts (in text)."
+            "description": "Only a user may do this, not an agent acting for one. Or: The auth layer refused the peer: a local-only provider and a remote peer, or login headers from a peer no proxy-mode provider trusts (in text)."
           },
           "404": {
             "content": {
@@ -21024,7 +21024,7 @@
                 }
               }
             },
-            "description": "A limit was reached or the request timed out; retry after `Retry-After`. Or: The auth layer could not ask an identity provider (in text, without `Retry-After`)."
+            "description": "A limit was reached or the request timed out; retry after `Retry-After`. Or: The auth layer could not ask a sign-in provider (in text, without `Retry-After`)."
           }
         },
         "summary": "One assistant turn about a route's draft, when the capabilities offer the assistant (I5, A12): what it drafts arrives as proposals on the draft."
@@ -21094,7 +21094,7 @@
                 }
               }
             },
-            "description": "The auth layer refused the peer: a local-only provider and a remote peer, or identity headers from a peer no proxy-mode provider trusts (in text)."
+            "description": "The auth layer refused the peer: a local-only provider and a remote peer, or login headers from a peer no proxy-mode provider trusts (in text)."
           },
           "404": {
             "content": {
@@ -21129,7 +21129,7 @@
                 }
               }
             },
-            "description": "A limit was reached or the request timed out; retry after `Retry-After`. Or: The auth layer could not ask an identity provider (in text, without `Retry-After`)."
+            "description": "A limit was reached or the request timed out; retry after `Retry-After`. Or: The auth layer could not ask a sign-in provider (in text, without `Retry-After`)."
           }
         },
         "summary": "A published version, or the draft, as a route file: every key kept, in one sorted order, naming the version it extends (A13)."
@@ -21198,7 +21198,7 @@
                 }
               }
             },
-            "description": "The auth layer refused the peer: a local-only provider and a remote peer, or identity headers from a peer no proxy-mode provider trusts (in text)."
+            "description": "The auth layer refused the peer: a local-only provider and a remote peer, or login headers from a peer no proxy-mode provider trusts (in text)."
           },
           "404": {
             "content": {
@@ -21273,7 +21273,7 @@
                 }
               }
             },
-            "description": "A limit was reached or the request timed out; retry after `Retry-After`. Or: The auth layer could not ask an identity provider (in text, without `Retry-After`)."
+            "description": "A limit was reached or the request timed out; retry after `Retry-After`. Or: The auth layer could not ask a sign-in provider (in text, without `Retry-After`)."
           }
         },
         "summary": "Imports a route file as a new route or a new draft extending a published version, matched by key or path; one route patch (A13)."
@@ -21342,7 +21342,7 @@
                 }
               }
             },
-            "description": "The auth layer refused the peer: a local-only provider and a remote peer, or identity headers from a peer no proxy-mode provider trusts (in text)."
+            "description": "The auth layer refused the peer: a local-only provider and a remote peer, or login headers from a peer no proxy-mode provider trusts (in text)."
           },
           "404": {
             "content": {
@@ -21417,7 +21417,7 @@
                 }
               }
             },
-            "description": "A limit was reached or the request timed out; retry after `Retry-After`. Or: The auth layer could not ask an identity provider (in text, without `Retry-After`)."
+            "description": "A limit was reached or the request timed out; retry after `Retry-After`. Or: The auth layer could not ask a sign-in provider (in text, without `Retry-After`)."
           }
         },
         "summary": "Applies a route patch, its draft included (A17)."
@@ -21512,7 +21512,7 @@
                 }
               }
             },
-            "description": "The auth layer refused the peer: a local-only provider and a remote peer, or identity headers from a peer no proxy-mode provider trusts (in text)."
+            "description": "The auth layer refused the peer: a local-only provider and a remote peer, or login headers from a peer no proxy-mode provider trusts (in text)."
           },
           "404": {
             "content": {
@@ -21547,7 +21547,7 @@
                 }
               }
             },
-            "description": "A limit was reached or the request timed out; retry after `Retry-After`. Or: The auth layer could not ask an identity provider (in text, without `Retry-After`)."
+            "description": "A limit was reached or the request timed out; retry after `Retry-After`. Or: The auth layer could not ask a sign-in provider (in text, without `Retry-After`)."
           }
         },
         "summary": "The destination's open proposals, newest first, with their count and the destination as it is now (C14)."
@@ -21614,7 +21614,7 @@
                 }
               }
             },
-            "description": "The auth layer refused the peer: a local-only provider and a remote peer, or identity headers from a peer no proxy-mode provider trusts (in text)."
+            "description": "The auth layer refused the peer: a local-only provider and a remote peer, or login headers from a peer no proxy-mode provider trusts (in text)."
           },
           "404": {
             "content": {
@@ -21689,7 +21689,7 @@
                 }
               }
             },
-            "description": "A limit was reached or the request timed out; retry after `Retry-After`. Or: The auth layer could not ask an identity provider (in text, without `Retry-After`)."
+            "description": "A limit was reached or the request timed out; retry after `Retry-After`. Or: The auth layer could not ask a sign-in provider (in text, without `Retry-After`)."
           }
         },
         "summary": "Creates a proposal for this domain, which may not exist yet, under a client-generated id; a create resubmitted under that id answers the proposal (I6)."
@@ -21757,7 +21757,7 @@
                 }
               }
             },
-            "description": "The auth layer refused the peer: a local-only provider and a remote peer, or identity headers from a peer no proxy-mode provider trusts (in text)."
+            "description": "The auth layer refused the peer: a local-only provider and a remote peer, or login headers from a peer no proxy-mode provider trusts (in text)."
           },
           "404": {
             "content": {
@@ -21792,7 +21792,7 @@
                 }
               }
             },
-            "description": "A limit was reached or the request timed out; retry after `Retry-After`. Or: The auth layer could not ask an identity provider (in text, without `Retry-After`)."
+            "description": "A limit was reached or the request timed out; retry after `Retry-After`. Or: The auth layer could not ask a sign-in provider (in text, without `Retry-After`)."
           }
         },
         "summary": "A proposal under this destination: its editing revision, status, and content (I6)."
@@ -21868,7 +21868,7 @@
                 }
               }
             },
-            "description": "The auth layer refused the peer: a local-only provider and a remote peer, or identity headers from a peer no proxy-mode provider trusts (in text)."
+            "description": "The auth layer refused the peer: a local-only provider and a remote peer, or login headers from a peer no proxy-mode provider trusts (in text)."
           },
           "404": {
             "content": {
@@ -21943,7 +21943,7 @@
                 }
               }
             },
-            "description": "A limit was reached or the request timed out; retry after `Retry-After`. Or: The auth layer could not ask an identity provider (in text, without `Retry-After`)."
+            "description": "A limit was reached or the request timed out; retry after `Retry-After`. Or: The auth layer could not ask a sign-in provider (in text, without `Retry-After`)."
           }
         },
         "summary": "Replaces its content against its editing revision; its destination does not move (H5)."
@@ -22021,7 +22021,7 @@
                 }
               }
             },
-            "description": "The auth layer refused the peer: a local-only provider and a remote peer, or identity headers from a peer no proxy-mode provider trusts (in text)."
+            "description": "The auth layer refused the peer: a local-only provider and a remote peer, or login headers from a peer no proxy-mode provider trusts (in text)."
           },
           "404": {
             "content": {
@@ -22096,7 +22096,7 @@
                 }
               }
             },
-            "description": "A limit was reached or the request timed out; retry after `Retry-After`. Or: The auth layer could not ask an identity provider (in text, without `Retry-After`)."
+            "description": "A limit was reached or the request timed out; retry after `Retry-After`. Or: The auth layer could not ask a sign-in provider (in text, without `Retry-After`)."
           }
         },
         "summary": "Applies it at the reviewed editing revision, the caller confirming (H2); stale with what intervened when either revision moved (I6)."
@@ -22174,7 +22174,7 @@
                 }
               }
             },
-            "description": "The auth layer refused the peer: a local-only provider and a remote peer, or identity headers from a peer no proxy-mode provider trusts (in text)."
+            "description": "The auth layer refused the peer: a local-only provider and a remote peer, or login headers from a peer no proxy-mode provider trusts (in text)."
           },
           "404": {
             "content": {
@@ -22249,7 +22249,7 @@
                 }
               }
             },
-            "description": "A limit was reached or the request timed out; retry after `Retry-After`. Or: The auth layer could not ask an identity provider (in text, without `Retry-After`)."
+            "description": "A limit was reached or the request timed out; retry after `Retry-After`. Or: The auth layer could not ask a sign-in provider (in text, without `Retry-After`)."
           }
         },
         "summary": "Discards it (I6)."
@@ -22317,7 +22317,7 @@
                 }
               }
             },
-            "description": "The auth layer refused the peer: a local-only provider and a remote peer, or identity headers from a peer no proxy-mode provider trusts (in text)."
+            "description": "The auth layer refused the peer: a local-only provider and a remote peer, or login headers from a peer no proxy-mode provider trusts (in text)."
           },
           "404": {
             "content": {
@@ -22352,7 +22352,7 @@
                 }
               }
             },
-            "description": "A limit was reached or the request timed out; retry after `Retry-After`. Or: The auth layer could not ask an identity provider (in text, without `Retry-After`)."
+            "description": "A limit was reached or the request timed out; retry after `Retry-After`. Or: The auth layer could not ask a sign-in provider (in text, without `Retry-After`)."
           }
         },
         "summary": "What applying it now would do: unresolved items, violations, the graph and frontier after, consequences, and what moved since drafting (C14, D7, I6)."
@@ -22430,7 +22430,7 @@
                 }
               }
             },
-            "description": "The auth layer refused the peer: a local-only provider and a remote peer, or identity headers from a peer no proxy-mode provider trusts (in text)."
+            "description": "The auth layer refused the peer: a local-only provider and a remote peer, or login headers from a peer no proxy-mode provider trusts (in text)."
           },
           "404": {
             "content": {
@@ -22512,7 +22512,7 @@
                 }
               }
             },
-            "description": "A limit was reached or the request timed out; retry after `Retry-After`. Or: The auth layer could not ask an identity provider (in text, without `Retry-After`)."
+            "description": "A limit was reached or the request timed out; retry after `Retry-After`. Or: The auth layer could not ask a sign-in provider (in text, without `Retry-After`)."
           }
         },
         "summary": "Drafts it again on its destination as it stands, the reviewer's choices carried over; review it again before applying (I6)."
@@ -22571,7 +22571,7 @@
                 }
               }
             },
-            "description": "The auth layer refused the peer: a local-only provider and a remote peer, or identity headers from a peer no proxy-mode provider trusts (in text)."
+            "description": "The auth layer refused the peer: a local-only provider and a remote peer, or login headers from a peer no proxy-mode provider trusts (in text)."
           },
           "404": {
             "content": {
@@ -22606,7 +22606,7 @@
                 }
               }
             },
-            "description": "A limit was reached or the request timed out; retry after `Retry-After`. Or: The auth layer could not ask an identity provider (in text, without `Retry-After`)."
+            "description": "A limit was reached or the request timed out; retry after `Retry-After`. Or: The auth layer could not ask a sign-in provider (in text, without `Retry-After`)."
           }
         },
         "summary": "A route's versions and their journeys (C17)."
@@ -22674,7 +22674,7 @@
                 }
               }
             },
-            "description": "The auth layer refused the peer: a local-only provider and a remote peer, or identity headers from a peer no proxy-mode provider trusts (in text)."
+            "description": "The auth layer refused the peer: a local-only provider and a remote peer, or login headers from a peer no proxy-mode provider trusts (in text)."
           },
           "404": {
             "content": {
@@ -22709,7 +22709,7 @@
                 }
               }
             },
-            "description": "A limit was reached or the request timed out; retry after `Retry-After`. Or: The auth layer could not ask an identity provider (in text, without `Retry-After`)."
+            "description": "A limit was reached or the request timed out; retry after `Retry-After`. Or: The auth layer could not ask a sign-in provider (in text, without `Retry-After`)."
           }
         },
         "summary": "One published route version."
@@ -22794,7 +22794,7 @@
                 }
               }
             },
-            "description": "The auth layer refused the peer: a local-only provider and a remote peer, or identity headers from a peer no proxy-mode provider trusts (in text)."
+            "description": "The auth layer refused the peer: a local-only provider and a remote peer, or login headers from a peer no proxy-mode provider trusts (in text)."
           },
           "500": {
             "content": {
@@ -22819,7 +22819,7 @@
                 }
               }
             },
-            "description": "A limit was reached or the request timed out; retry after `Retry-After`. Or: The auth layer could not ask an identity provider (in text, without `Retry-After`)."
+            "description": "A limit was reached or the request timed out; retry after `Retry-After`. Or: The auth layer could not ask a sign-in provider (in text, without `Retry-After`)."
           }
         },
         "summary": "Text search across journeys, paged."
@@ -22886,7 +22886,7 @@
                 }
               }
             },
-            "description": "The auth layer refused the peer: a local-only provider and a remote peer, or identity headers from a peer no proxy-mode provider trusts (in text)."
+            "description": "The auth layer refused the peer: a local-only provider and a remote peer, or login headers from a peer no proxy-mode provider trusts (in text)."
           },
           "500": {
             "content": {
@@ -22911,10 +22911,10 @@
                 }
               }
             },
-            "description": "A limit was reached or the request timed out; retry after `Retry-After`. Or: The auth layer could not ask an identity provider (in text, without `Retry-After`)."
+            "description": "A limit was reached or the request timed out; retry after `Retry-After`. Or: The auth layer could not ask a sign-in provider (in text, without `Retry-After`)."
           }
         },
-        "summary": "The names people see for the users asked for: the entity their verified emails name, else the name their sign-in gave (H3)."
+        "summary": "The names people see for the users asked for: the identity their verified emails name, else the name their sign-in gave (H3)."
       }
     },
     "/api/users/me": {
@@ -22959,7 +22959,7 @@
                 }
               }
             },
-            "description": "The auth layer refused the peer: a local-only provider and a remote peer, or identity headers from a peer no proxy-mode provider trusts (in text)."
+            "description": "The auth layer refused the peer: a local-only provider and a remote peer, or login headers from a peer no proxy-mode provider trusts (in text)."
           },
           "500": {
             "content": {
@@ -22984,10 +22984,10 @@
                 }
               }
             },
-            "description": "A limit was reached or the request timed out; retry after `Retry-After`. Or: The auth layer could not ask an identity provider (in text, without `Retry-After`)."
+            "description": "A limit was reached or the request timed out; retry after `Retry-After`. Or: The auth layer could not ask a sign-in provider (in text, without `Retry-After`)."
           }
         },
-        "summary": "The caller and their entities (H2, H3)."
+        "summary": "The caller and their identities (H2, H3)."
       }
     },
     "/api/users/me/tokens": {
@@ -23040,7 +23040,7 @@
                 }
               }
             },
-            "description": "Only a user may do this, not an agent acting for one. Or: The auth layer refused the peer: a local-only provider and a remote peer, or identity headers from a peer no proxy-mode provider trusts (in text)."
+            "description": "Only a user may do this, not an agent acting for one. Or: The auth layer refused the peer: a local-only provider and a remote peer, or login headers from a peer no proxy-mode provider trusts (in text)."
           },
           "500": {
             "content": {
@@ -23065,7 +23065,7 @@
                 }
               }
             },
-            "description": "A limit was reached or the request timed out; retry after `Retry-After`. Or: The auth layer could not ask an identity provider (in text, without `Retry-After`)."
+            "description": "A limit was reached or the request timed out; retry after `Retry-After`. Or: The auth layer could not ask a sign-in provider (in text, without `Retry-After`)."
           }
         },
         "summary": "The caller's agent tokens."
@@ -23126,7 +23126,7 @@
                 }
               }
             },
-            "description": "Only a user may do this, not an agent acting for one. Or: The auth layer refused the peer: a local-only provider and a remote peer, or identity headers from a peer no proxy-mode provider trusts (in text)."
+            "description": "Only a user may do this, not an agent acting for one. Or: The auth layer refused the peer: a local-only provider and a remote peer, or login headers from a peer no proxy-mode provider trusts (in text)."
           },
           "413": {
             "content": {
@@ -23171,7 +23171,7 @@
                 }
               }
             },
-            "description": "A limit was reached or the request timed out; retry after `Retry-After`. Or: The auth layer could not ask an identity provider (in text, without `Retry-After`)."
+            "description": "A limit was reached or the request timed out; retry after `Retry-After`. Or: The auth layer could not ask a sign-in provider (in text, without `Retry-After`)."
           }
         },
         "summary": "Mints an agent token, shown this once (H2)."
@@ -23228,7 +23228,7 @@
                 }
               }
             },
-            "description": "Only a user may do this, not an agent acting for one. Or: The auth layer refused the peer: a local-only provider and a remote peer, or identity headers from a peer no proxy-mode provider trusts (in text)."
+            "description": "Only a user may do this, not an agent acting for one. Or: The auth layer refused the peer: a local-only provider and a remote peer, or login headers from a peer no proxy-mode provider trusts (in text)."
           },
           "404": {
             "content": {
@@ -23263,7 +23263,7 @@
                 }
               }
             },
-            "description": "A limit was reached or the request timed out; retry after `Retry-After`. Or: The auth layer could not ask an identity provider (in text, without `Retry-After`)."
+            "description": "A limit was reached or the request timed out; retry after `Retry-After`. Or: The auth layer could not ask a sign-in provider (in text, without `Retry-After`)."
           }
         },
         "summary": "Revokes one of the caller's agent tokens."

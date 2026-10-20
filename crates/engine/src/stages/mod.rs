@@ -6,9 +6,9 @@
 
 mod deployment;
 mod derived;
-mod entities;
 mod graphs;
 mod guards;
+mod identities;
 mod segments;
 
 use std::collections::{BTreeMap, BTreeSet};
@@ -36,13 +36,13 @@ pub(crate) struct Check<'a, 'patch> {
 pub(crate) type Stage = fn(&mut Check<'_, '_>);
 
 /// The stages, in order: every graph the patch wrote holds the structural and state
-/// invariants; a segment's graphs hold its kind's rules; entity references resolve; the deployment's aliases and emails hold; the
+/// invariants; a segment's graphs hold its kind's rules; identity references resolve; the deployment's aliases and emails hold; the
 /// guards of the transitions the patch made pass, or a bypass in the patch accepts them,
 /// first those that need no derived state, then those that do, with the snoozes it made.
 pub(crate) const STAGES: [Stage; 6] = [
     graphs::check,
     segments::check,
-    entities::check,
+    identities::check,
     deployment::check,
     guards::check,
     derived::check,

@@ -6,7 +6,7 @@
 //!
 //! A [`Group`] is one domain document and the calls made over it. [`server_groups`] walks the
 //! fixtures: every projection, two proposal previews, a local apply against the server's
-//! commit, the journey after it, the route files, and the vendor evaluation after an entity
+//! commit, the journey after it, the route files, and the vendor evaluation after an identity
 //! merge (so a derive cached across a deployment change is caught). [`limits_group`] adds a
 //! document at the limits (containment at the depth limit, `node_count_max` nodes), whose
 //! expected values are the native engine's: there the point is the wasm build at the depth

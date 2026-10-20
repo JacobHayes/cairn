@@ -8,6 +8,9 @@
 //!
 //! usage: `cargo run -p cairn-engine --example blocking_walkthrough -- FIXTURES_DIR`
 
+#[path = "support/people.rs"]
+mod people;
+
 use std::error::Error;
 use std::fmt::Write as _;
 use std::path::Path;
@@ -36,7 +39,7 @@ impl Fixture {
         let scenario: Scenario =
             from_yaml(&std::fs::read_to_string(directory.join("journey.yaml"))?)?;
         let mut after = Vec::new();
-        let mut records = seed(&file)?;
+        let mut records = seed(fixtures, &file)?;
         for step in scenario.steps.as_slice() {
             let inputs = ApplyInputs {
                 today: step.today,
@@ -95,9 +98,9 @@ impl Fixture {
 }
 
 /// The route file published as version 1 in a fresh deployment (fixtures/README.md).
-fn seed(file: &RouteFile) -> Result<Records> {
+fn seed(fixtures: &Path, file: &RouteFile) -> Result<Records> {
     let graph = from_file(file, &mut SequentialKeys::default()).map_err(|v| format!("{v:?}"))?;
-    let mut records = Records::default();
+    let mut records = people::records(fixtures)?;
     let version = VersionNumber::FIRST;
     let header = RouteHeader {
         id: file.route.clone(),

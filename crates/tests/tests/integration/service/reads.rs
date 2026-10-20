@@ -14,7 +14,7 @@ use cairn_schema::{
     Cursor, Email, ExplainedField, JourneyId, NextQuery, NodeKey, SnapshotScope, Title,
 };
 use cairn_service::{Call, ReadError, Service};
-use cairn_store::{IdentityRecord, Store, UserRecord};
+use cairn_store::{LoginRecord, Store, UserRecord};
 
 use support::{applied, call, domain, patch, service_over, settings, vendor_after};
 
@@ -49,7 +49,7 @@ on_both_stores!(
     a_journey_reads_as_the_engine_alone_projects_it,
     a_snapshot_scopes_to_a_subtree_and_pages_its_nodes,
     node_detail_caps_its_explanations_and_the_rest_page,
-    cached_and_uncached_reads_agree_across_an_entity_merge,
+    cached_and_uncached_reads_agree_across_an_identity_merge,
     cached_and_uncached_reads_agree_across_midnight,
     history_pages_a_journeys_events_grouped_by_patch,
 );
@@ -246,19 +246,19 @@ async fn node_detail_caps_its_explanations_and_the_rest_page(store: Arc<dyn Stor
     assert_eq!(entries.len(), count);
 }
 
-/// D6, E6, H3: a user whose verified email names a duplicate entity sees nothing as theirs;
-/// once the lead is merged into that entity, their reads are the lead's, and a service that
+/// D6, E6, H3: a user whose verified email names a duplicate identity sees nothing as theirs;
+/// once the lead is merged into that identity, their reads are the lead's, and a service that
 /// has read before the merge answers exactly what a fresh one does.
-async fn cached_and_uncached_reads_agree_across_an_entity_merge(store: Arc<dyn Store>) {
+async fn cached_and_uncached_reads_agree_across_an_identity_merge(store: Arc<dyn Store>) {
     let (cached, _) = service_over(Arc::clone(&store));
     vendor_after(&cached, 3).await;
-    let entity = patch(
+    let identity = patch(
         "p_dup",
         "deployment",
         1,
-        "- op: create_entity\n  entity: {key: e_dup, name: Lead again, emails: [dup@example.org]}\n",
+        "- op: create_identity\n  identity: {key: who_dup, name: Lead again, emails: [dup@example.org]}\n",
     );
-    applied(cached.patch(&call("u_lead", AT), &domain(entity)).await);
+    applied(cached.patch(&call("u_lead", AT), &domain(identity)).await);
     store
         .put_user(UserRecord {
             id: "u_dup".parse().unwrap(),
@@ -268,7 +268,7 @@ async fn cached_and_uncached_reads_agree_across_an_entity_merge(store: Arc<dyn S
         .await
         .unwrap();
     store
-        .put_identity(IdentityRecord {
+        .put_login(LoginRecord {
             provider: "dev".parse().unwrap(),
             subject: "dup".parse().unwrap(),
             user: "u_dup".parse().unwrap(),
@@ -297,7 +297,7 @@ async fn cached_and_uncached_reads_agree_across_an_entity_merge(store: Arc<dyn S
         "deployment",
         2,
         &format!(
-            "- op: merge_entities\n  survivor: e_dup\n  merged: e_lead\n  journeys: {{j_vendor_eval: {revision}}}\n"
+            "- op: merge_identities\n  survivor: who_dup\n  merged: who_k3d7qm2xw5tn6pfa\n  journeys: {{j_vendor_eval: {revision}}}\n"
         ),
     );
     applied(cached.patch(&call("u_lead", AT), &domain(merge)).await);

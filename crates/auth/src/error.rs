@@ -14,7 +14,7 @@ pub enum Refusal {
     Credential,
     /// A credential accepted only from the local machine came from elsewhere.
     Peer,
-    /// The store or an identity provider failed, so the credential could not be checked.
+    /// The store or a sign-in provider failed, so the credential could not be checked.
     Unavailable(String),
 }
 
@@ -37,10 +37,10 @@ pub enum AuthError {
     Store(StoreError),
     /// The operating system's random source failed.
     Random(String),
-    /// An identity provider failed or answered with something invalid.
+    /// A sign-in provider failed or answered with something invalid.
     Upstream(String),
-    /// The identity already belongs to another user; merging users is `Later` (PRD).
-    IdentityHeldByAnotherUser {
+    /// The login already belongs to another user; merging users is `Later` (PRD).
+    LoginHeldByAnotherUser {
         /// The user holding it.
         holder: UserId,
     },
@@ -55,9 +55,9 @@ impl fmt::Display for AuthError {
         match self {
             AuthError::Store(error) => write!(formatter, "{error}"),
             AuthError::Random(reason) => write!(formatter, "random source failed: {reason}"),
-            AuthError::Upstream(reason) => write!(formatter, "identity provider: {reason}"),
-            AuthError::IdentityHeldByAnotherUser { holder } => {
-                write!(formatter, "the identity already belongs to user {holder}")
+            AuthError::Upstream(reason) => write!(formatter, "sign-in provider: {reason}"),
+            AuthError::LoginHeldByAnotherUser { holder } => {
+                write!(formatter, "the login already belongs to user {holder}")
             }
             AuthError::AgentNotAllowed => formatter.write_str("an agent cannot do this"),
             AuthError::NoSuchToken => formatter.write_str("no such agent token"),

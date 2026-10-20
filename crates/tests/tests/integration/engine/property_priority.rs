@@ -16,7 +16,7 @@ mod property {
     use cairn_engine::testing::generated::arb_journey;
     use cairn_engine::{Derived, Graph, derive};
     use cairn_schema::{
-        Deployment, EntityKey, NodeKey, NodeKind, Payload, Relevance, Score, State,
+        Deployment, IdentityKey, NodeKey, NodeKind, Payload, Relevance, Score, State,
     };
     use patina_dst_proptest::prelude::*;
 
@@ -200,8 +200,8 @@ mod property {
             let keys: BTreeSet<&NodeKey> = ranking.frontier().iter().collect();
             let unranked: BTreeSet<&NodeKey> = derived.blocking().frontier().iter().collect();
             prop_assert_eq!(keys, unranked);
-            let owners: BTreeMap<&NodeKey, &BTreeSet<EntityKey>> = graph.document().nodes.as_map().keys()
-                .map(|key| (key, derived.participation().entities(key, &cairn_schema::KindKey::owner())))
+            let owners: BTreeMap<&NodeKey, &BTreeSet<IdentityKey>> = graph.document().nodes.as_map().keys()
+                .map(|key| (key, derived.participation().identities(key, &cairn_schema::KindKey::owner())))
                 .collect();
             let global = ranking.clone();
             for viewer in owners.values() {

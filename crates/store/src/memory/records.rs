@@ -9,14 +9,14 @@ use crate::commit::StoreError;
 use crate::query::{Page, PageSize};
 use crate::records::{
     AgentTokenRecord, AuthLogEntry, AuthLogQuery, ConversationRecord, ConversationSummary,
-    IdentityRecord, LoggedAuthEntry, OAuthStateRecord, SecretHash, SessionRecord, UserRecord,
+    LoggedAuthEntry, LoginRecord, OAuthStateRecord, SecretHash, SessionRecord, UserRecord,
 };
 
 /// Auth state and conversations.
 #[derive(Debug, Default)]
 pub(super) struct Outside {
     users: BTreeMap<UserId, UserRecord>,
-    identities: BTreeMap<(Slug, Title), IdentityRecord>,
+    logins: BTreeMap<(Slug, Title), LoginRecord>,
     sessions: BTreeMap<SecretHash, SessionRecord>,
     oauth: BTreeMap<SecretHash, OAuthStateRecord>,
     tokens: BTreeMap<AgentId, AgentTokenRecord>,
@@ -41,39 +41,30 @@ impl Outside {
         self.users.get(id).cloned()
     }
 
-    pub fn put_identity(&mut self, identity: IdentityRecord) -> Result<(), StoreError> {
-        self.user_exists(&identity.user)?;
-        let key = (identity.provider.clone(), identity.subject.clone());
-        self.identities.insert(key, identity);
+    pub fn put_login(&mut self, login: LoginRecord) -> Result<(), StoreError> {
+        self.user_exists(&login.user)?;
+        let key = (login.provider.clone(), login.subject.clone());
+        self.logins.insert(key, login);
         Ok(())
     }
 
-    pub fn identity(&self, provider: &Slug, subject: &Title) -> Option<IdentityRecord> {
-        self.identities
+    pub fn login(&self, provider: &Slug, subject: &Title) -> Option<LoginRecord> {
+        self.logins
             .get(&(provider.clone(), subject.clone()))
             .cloned()
     }
 
-    pub fn identities_of(&self, user: &UserId) -> Vec<IdentityRecord> {
-        let mine = self
-            .identities
-            .values()
-            .filter(|identity| identity.user == *user);
+    pub fn logins_of(&self, user: &UserId) -> Vec<LoginRecord> {
+        let mine = self.logins.values().filter(|login| login.user == *user);
         mine.cloned().collect()
     }
 
-    pub fn identities_with_email(&self, email: &Email) -> Vec<IdentityRecord> {
+    pub fn logins_with_email(&self, email: &Email) -> Vec<LoginRecord> {
         let verified = self
-            .identities
+            .logins
             .values()
-            .filter(|identity| identity.verified_emails.contains(email));
+            .filter(|login| login.verified_emails.contains(email));
         verified.cloned().collect()
-    }
-
-    pub fn remove_identity(&mut self, provider: &Slug, subject: &Title) -> bool {
-        self.identities
-            .remove(&(provider.clone(), subject.clone()))
-            .is_some()
     }
 
     pub fn put_session(&mut self, session: SessionRecord) -> Result<(), StoreError> {

@@ -11,7 +11,7 @@ export type HomeState =
   /** The viewer or the index has not answered, or no journey has settled with anything to show. */
   | "loading"
   | "failed"
-  /** No entity of the viewer's: nothing can show as theirs. */
+  /** No identity of the viewer's: nothing can show as theirs. */
   | "unlinked"
   /** They are someone, and hold nothing in any active journey. */
   | "unassigned"
@@ -35,7 +35,7 @@ export interface HomeJourney {
  * ready to show.
  */
 export function homeState(input: {
-  viewer: "loading" | "failed" | { entities: number };
+  viewer: "loading" | "failed" | { identities: number };
   index: "loading" | "failed" | "ready";
   journeys: readonly HomeJourney[];
   /** The proposals waiting on the viewer: Home does not say nothing needs them before they are read, or while there are some (C14, C16). */
@@ -47,7 +47,7 @@ export function homeState(input: {
   if (input.viewer === "loading" || input.index === "loading") {
     return "loading";
   }
-  if (input.viewer.entities === 0) {
+  if (input.viewer.identities === 0) {
     return "unlinked";
   }
   if (input.journeys.some((each) => each.ready > 0 || each.reading === "failed")) {

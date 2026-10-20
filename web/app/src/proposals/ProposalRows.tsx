@@ -45,11 +45,11 @@ export function proposalRows(items: readonly ProposalSummary[], context?: (item:
   return items.map((item) => ({ key: item.id, render: () => <ProposalRow item={item} context={context?.(item)} current={item.id === current} /> }));
 }
 
-/** The destination as a row names it where the list does not: its name, the entities for the deployment, or the one a proposal would create. */
+/** The destination as a row names it where the list does not: its name, the identities for the deployment, or the one a proposal would create. */
 export function destinationWords(item: ProposalSummary): string {
   const { destination, now } = item;
   if (destination === "deployment") {
-    return "Entities";
+    return "Identities";
   }
   if (now.exists && now.name != null) {
     return now.name;

@@ -1,6 +1,6 @@
 [package]
 name = "cairn-auth"
-description = "Auth providers (dev, OIDC, the built-in OAuth server, Tailscale, Google Cloud IAP), users, identities, and agent tokens, with the axum layer the API and MCP endpoints sit behind."
+description = "Auth providers (dev, OIDC, the built-in OAuth server, Tailscale, Google Cloud IAP), users, logins, and agent tokens, with the axum layer the API and MCP endpoints sit behind."
 version.workspace = true
 edition.workspace = true
 rust-version.workspace = true

@@ -1,7 +1,7 @@
 // C14: the destination pages' side of the proposal layer. Each host reads the proposal at the
 // page's address, works out the destination as it would be after (the engine's, never assembled
 // here), assembles the `Layer` the views, the band and the rail read, and hands the page the
-// destination to draw: the journey after, the route after, or the entities after. A proposal
+// destination to draw: the journey after, the route after, or the identities after. A proposal
 // that is over, or never was, still gets its page, with the band saying so.
 import { useMemo, type ReactNode } from "react";
 import { Link, useLocation } from "react-router";
@@ -55,7 +55,7 @@ export function createsIt(review: ProposalReview): boolean {
 
 const NONE: ReadonlySet<string> = new Set();
 
-const ENTITIES_PATH = pathTo("entities");
+const IDENTITIES_PATH = pathTo("identities");
 
 /** A layer for a proposal that is over or absent: the destination as it is, no marks, only the band and the closed rail. */
 function plain(base: Pick<Layer, "destination" | "kind" | "id" | "exit" | "proposals">, review: ProposalReview | undefined, before: Pick<Layer, "before" | "beforeShown" | "deployment">): Layer {
@@ -101,7 +101,7 @@ function useCreatedAfter(id: string, review: ProposalReview, creating: boolean):
   const { deriver } = useSession();
   const after = review.after;
   const document = creating && after?.destination === "journey" ? after.document : undefined;
-  const key = document === undefined ? undefined : { identity: [id, review.proposal.id], freshness: [review.proposal.revision, JSON.stringify(document)], args: { deriver, journey: id, proposal: review.proposal.id, document } };
+  const key = document === undefined ? undefined : { of: [id, review.proposal.id], freshness: [review.proposal.revision, JSON.stringify(document)], args: { deriver, journey: id, proposal: review.proposal.id, document } };
   const { view } = useKeyedRead(CREATED_AFTER, key);
   return { after: valueOf(view)?.after, current: view.status === "current" };
 }
@@ -301,11 +301,11 @@ export function RouteLayerHost({ id, proposal: pid, children }: RouteHostProps) 
 
 interface DeploymentHostProps {
   proposal: string;
-  /** The page, over the entities to list: the deployment after, or as it is. */
+  /** The page, over the identities to list: the deployment after, or as it is. */
   children: (before: Deployment, after: Deployment | undefined) => ReactNode;
 }
 
-/** The entities under a proposal that is under review. */
+/** The identities under a proposal that is under review. */
 function DeploymentReviewing({ review, refetch, before, children }: Omit<DeploymentHostProps, "proposal"> & { review: ProposalReview; refetch: () => void; before: Deployment }) {
   const edits = useEdits(review, refetch);
   const proposal = review.proposal;
@@ -337,13 +337,13 @@ function DeploymentReviewing({ review, refetch, before, children }: Omit<Deploym
     creates: false,
     removed: NONE,
     drawnAs: after === undefined ? "before" : "after",
-    exit: ENTITIES_PATH,
+    exit: IDENTITIES_PATH,
     proposals: proposalsAddress("deployment"),
   };
   return <LayerContext value={layer}>{children(before, after)}</LayerContext>;
 }
 
-/** The deployment page's layer: the proposal at its address over the entities as they are. */
+/** The deployment page's layer: the proposal at its address over the identities as they are. */
 export function DeploymentLayerHost({ proposal: pid, children }: DeploymentHostProps) {
   const read = useReview("deployment", pid);
   const deployment = useDeployment();
@@ -355,7 +355,7 @@ export function DeploymentLayerHost({ proposal: pid, children }: DeploymentHostP
     return <p className="muted small">Reading the deployment...</p>;
   }
   if (review === undefined || review.proposal.status !== "open") {
-    const base = { destination: "deployment" as const, kind: "deployment" as const, id: pid, exit: ENTITIES_PATH, proposals: proposalsAddress("deployment") };
+    const base = { destination: "deployment" as const, kind: "deployment" as const, id: pid, exit: IDENTITIES_PATH, proposals: proposalsAddress("deployment") };
     return <LayerContext value={plain(base, review, { before: undefined, beforeShown: undefined, deployment: { before: deployment, after: undefined } })}>{children(deployment, undefined)}</LayerContext>;
   }
   return <DeploymentReviewing review={review} refetch={read.refresh} before={deployment}>{children}</DeploymentReviewing>;

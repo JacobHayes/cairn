@@ -9,7 +9,7 @@ use crate::engine::support;
 use std::collections::BTreeSet;
 
 use cairn_engine::{Derived, Records};
-use cairn_schema::{EntityKey, NodeKey, RankConstants, Real};
+use cairn_schema::{IdentityKey, NodeKey, RankConstants, Real};
 use support::{add_nodes as add, key};
 
 fn derived(records: &Records) -> Derived {
@@ -162,10 +162,10 @@ fn ties_break_by_slack_then_gravity_then_key() {
     );
 }
 
-const PEOPLE: &str = "- op: create_entity\n  entity: {key: e_a, name: A}\n- op: create_entity\n  entity: {key: e_b, name: B}\n";
+const PEOPLE: &str = "- op: create_identity\n  identity: {key: who_a, name: A}\n- op: create_identity\n  identity: {key: who_b, name: B}\n";
 
-fn viewer(entity: &str) -> BTreeSet<EntityKey> {
-    BTreeSet::from([entity.parse().unwrap()])
+fn viewer(identity: &str) -> BTreeSet<IdentityKey> {
+    BTreeSet::from([identity.parse().unwrap()])
 }
 
 /// Priority, "prioritize for me": each of two gates unblocks the other owner's work, so
@@ -176,10 +176,10 @@ fn prioritize_for_me_recomputes_the_owner_factor_for_the_viewer() {
     let records = support::journey(&format!(
         "{PEOPLE}{}",
         add(&[
-            "{key: n_gate_a, id: gate-a, kind: action, title: Gate, participations: {k_owner: [e_a]}}",
-            "{key: n_gate_b, id: gate-b, kind: action, title: Gate, participations: {k_owner: [e_b]}}",
-            "{key: n_work_b, id: work-b, kind: action, title: Work, requires: [n_gate_a], participations: {k_owner: [e_b]}}",
-            "{key: n_work_a, id: work-a, kind: action, title: Work, requires: [n_gate_b], participations: {k_owner: [e_a]}}",
+            "{key: n_gate_a, id: gate-a, kind: action, title: Gate, participations: {k_owner: [who_a]}}",
+            "{key: n_gate_b, id: gate-b, kind: action, title: Gate, participations: {k_owner: [who_b]}}",
+            "{key: n_work_b, id: work-b, kind: action, title: Work, requires: [n_gate_a], participations: {k_owner: [who_b]}}",
+            "{key: n_work_a, id: work-a, kind: action, title: Work, requires: [n_gate_b], participations: {k_owner: [who_a]}}",
         ])
     ));
     let derived = derived(&records);
@@ -187,11 +187,11 @@ fn prioritize_for_me_recomputes_the_owner_factor_for_the_viewer() {
     assert_eq!(names(global.frontier()), ["n_gate_a", "n_gate_b"]);
     assert_eq!(global.rank(&key("n_gate_a")), global.rank(&key("n_gate_b")));
     assert_eq!(global.unlocks(&key("n_gate_a")).unwrap().value(), 2.0);
-    let for_a = derived.rank_for(&viewer("e_a"));
+    let for_a = derived.rank_for(&viewer("who_a"));
     assert_eq!(names(for_a.frontier()), ["n_gate_a", "n_gate_b"]);
     assert_eq!(for_a.unlocks(&key("n_gate_a")).unwrap().value(), 2.0);
     assert_eq!(for_a.unlocks(&key("n_gate_b")).unwrap().value(), 1.0);
-    let for_b = derived.rank_for(&viewer("e_b"));
+    let for_b = derived.rank_for(&viewer("who_b"));
     assert_eq!(names(for_b.frontier()), ["n_gate_b", "n_gate_a"]);
     assert!(for_b.rank(&key("n_gate_b")) > for_b.rank(&key("n_gate_a")));
     assert_eq!(derived.ranking(), &global, "the shared rank is unchanged");
@@ -204,11 +204,11 @@ fn a_small_gate_ranks_early() {
     let records = support::journey(&format!(
         "{PEOPLE}{}",
         add(&[
-            "{key: n_gate, id: gate, kind: action, title: Gate, participations: {k_owner: [e_a]}}",
-            "{key: n_heavy, id: heavy, kind: action, title: Heavy, weight: 10, participations: {k_owner: [e_a]}}",
-            "{key: n_one, id: one, kind: action, title: One, requires: [n_gate], participations: {k_owner: [e_b]}}",
-            "{key: n_two, id: two, kind: action, title: Two, requires: [n_gate], participations: {k_owner: [e_b]}}",
-            "{key: n_three, id: three, kind: action, title: Three, requires: [n_gate], participations: {k_owner: [e_b]}}",
+            "{key: n_gate, id: gate, kind: action, title: Gate, participations: {k_owner: [who_a]}}",
+            "{key: n_heavy, id: heavy, kind: action, title: Heavy, weight: 10, participations: {k_owner: [who_a]}}",
+            "{key: n_one, id: one, kind: action, title: One, requires: [n_gate], participations: {k_owner: [who_b]}}",
+            "{key: n_two, id: two, kind: action, title: Two, requires: [n_gate], participations: {k_owner: [who_b]}}",
+            "{key: n_three, id: three, kind: action, title: Three, requires: [n_gate], participations: {k_owner: [who_b]}}",
         ])
     ));
     assert_eq!(
@@ -244,7 +244,7 @@ fn two_derives_rank_identically() {
     let second = support::derived(&records, "j_vendor_eval");
     assert_eq!(first.ranking(), second.ranking());
     assert_eq!(
-        first.rank_for(&viewer("e_lead")),
-        second.rank_for(&viewer("e_lead"))
+        first.rank_for(&viewer("who_k3d7qm2xw5tn6pfa")),
+        second.rank_for(&viewer("who_k3d7qm2xw5tn6pfa"))
     );
 }

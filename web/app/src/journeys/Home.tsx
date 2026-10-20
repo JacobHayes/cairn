@@ -4,8 +4,8 @@
 // line sits under it, and a journey's group appears as it is read. A row opens the node's own address; its
 // actions (Start, Done, Mark reached, Assign) act in place, and Decide opens the node's answer
 // form, which is the inspector's. The candidates are the active journeys referring to the
-// caller's entities (the host's filter, a superset); each is read in the tab and its own "mine"
-// decides (H3: every entity of the caller's counts). Kept current (H6).
+// caller's identities (the host's filter, a superset); each is read in the tab and its own "mine"
+// decides (H3: every identity of the caller's counts). Kept current (H6).
 import { useCallback, useEffect, useMemo, useState, type ReactNode } from "react";
 import { Link } from "react-router";
 
@@ -129,7 +129,7 @@ function Statement({ title, children, testId }: { title: string; children: React
 /** What Home reads: the viewer, the candidate journeys, and each journey's reading as it settles. */
 function useHome() {
   const { viewer, failed } = useViewer();
-  const query = viewer === undefined ? undefined : queryOf({ ...DEFAULT_FILTERS, mine: true }, viewer.entities);
+  const query = viewer === undefined ? undefined : queryOf({ ...DEFAULT_FILTERS, mine: true }, viewer.identities);
   const { view, refresh } = useLive(indexKey(query), journeyIndex(query));
   const found = valueOf(view);
   const proposals = useLive(listKey("waiting"), proposalsListed("waiting"));
@@ -146,7 +146,7 @@ function useHome() {
     ready: reading.status === "ready" ? reading.ready.length : 0,
   }));
   const state = homeState({
-    viewer: failed !== undefined ? "failed" : viewer === undefined ? "loading" : { entities: viewer.entities.length },
+    viewer: failed !== undefined ? "failed" : viewer === undefined ? "loading" : { identities: viewer.identities.length },
     index: view.status === "failed" ? "failed" : found === undefined ? "loading" : "ready",
     journeys,
     proposals: proposals.view.status === "failed" ? "failed" : waitingProposals === undefined ? "loading" : { waiting: waitingProposals.count },

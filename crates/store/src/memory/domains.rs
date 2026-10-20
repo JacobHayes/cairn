@@ -99,18 +99,18 @@ impl Domains {
         .unwrap_or_default()
     }
 
-    /// E6: the journeys referring to any of `entities`, directly or through an alias, at
+    /// E6: the journeys referring to any of `identities`, directly or through an alias, at
     /// their current revisions.
     pub fn journeys_referencing(
         &self,
-        entities: &BTreeSet<cairn_schema::EntityKey>,
+        identities: &BTreeSet<cairn_schema::IdentityKey>,
     ) -> BTreeMap<JourneyId, Revision> {
-        let keys = crate::backend::query::with_aliases(entities, &self.deployment.aliases);
+        let keys = crate::backend::query::with_aliases(identities, &self.deployment.aliases);
         self.journeys
             .iter()
             .filter(|(id, _)| {
                 let graph = self.graph(&GraphId::Journey((*id).clone()));
-                !crate::backend::query::entity_references(&graph).is_disjoint(&keys)
+                !crate::backend::query::identity_references(&graph).is_disjoint(&keys)
             })
             .map(|(id, (_, revision))| (id.clone(), *revision))
             .collect()
@@ -198,16 +198,16 @@ impl Domains {
             } => {
                 self.deleted_journeys.insert(journey.clone(), *deleted_at);
             }
-            Record::Entity(entity) => {
+            Record::Identity(identity) => {
                 self.deployment
-                    .entities
-                    .put(entity.clone())
-                    .map_err(|error| StoreError::Malformed(format!("entities: {error}")))?;
+                    .identities
+                    .put(identity.clone())
+                    .map_err(|error| StoreError::Malformed(format!("identities: {error}")))?;
             }
-            Record::EntityAlias { alias, entity } => {
+            Record::IdentityAlias { alias, identity } => {
                 self.deployment
                     .aliases
-                    .insert(alias.clone(), entity.clone());
+                    .insert(alias.clone(), identity.clone());
             }
             Record::Proposal(proposal) => {
                 self.proposals.insert(proposal.id.clone(), proposal.clone());
@@ -240,10 +240,10 @@ impl Domains {
                 self.drafts.remove(route);
                 self.graphs.remove(&GraphId::RouteDraft(route.clone()));
             }
-            RecordKey::Entity(entity) => {
-                self.deployment.entities.remove(entity);
+            RecordKey::Identity(identity) => {
+                self.deployment.identities.remove(identity);
             }
-            RecordKey::EntityAlias(alias) => {
+            RecordKey::IdentityAlias(alias) => {
                 self.deployment.aliases.remove(alias);
             }
             RecordKey::Proposal { id, .. } => {
@@ -396,8 +396,8 @@ fn put_state_record(graph: &mut Graph, record: &GraphRecord) -> Result<(), Store
                 None => state.rationales.remove(decision),
             };
         }
-        GraphRecord::RoleFill { role, entities } => {
-            state.role_fills.insert(role.clone(), entities.clone());
+        GraphRecord::RoleFill { role, identities } => {
+            state.role_fills.insert(role.clone(), identities.clone());
         }
         GraphRecord::Pin { node, date } => {
             state.pins.insert(node.clone(), *date);

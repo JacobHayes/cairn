@@ -18,9 +18,9 @@ pub mod event;
 pub mod field;
 pub mod graph;
 pub mod id;
-pub mod identity;
 pub mod json_schema;
 pub mod limits;
+pub mod login;
 pub mod node;
 mod node_schema;
 pub mod notice;
@@ -60,7 +60,7 @@ pub use document::{
     ParseError, WriteError, from_json, from_yaml, to_json, to_json_pretty, to_yaml,
 };
 pub use domain::{
-    Deployment, Domain, Entity, GraphId, Journey, JourneyHeader, JourneyStatus, Lineage, Route,
+    Deployment, Domain, GraphId, Identity, Journey, JourneyHeader, JourneyStatus, Lineage, Route,
     RouteDraft, RouteHeader, RouteKind, RouteVersion,
 };
 pub use event::{Actor, ChangeSet, ContentHash, Event, EventType, PatchReceipt, Subject};
@@ -69,17 +69,17 @@ pub use graph::{
     Edge, FormatVersion, Graph, Insertion, ParticipationKind, RetiredKeys, Role, RouteFile,
 };
 pub use id::{
-    AgentId, AttachmentKey, ConversationId, EntityKey, IdError, InsertionKey, JourneyId,
+    AgentId, AttachmentKey, ConversationId, IdError, IdentityKey, InsertionKey, JourneyId,
     KeyAllocator, KindKey, NodeKey, PatchId, Path, Prefixed, ProposalId, RoleKey, RouteId,
     SequentialKeys, Slug, UserId, mint,
 };
-pub use identity::Identity;
 pub use jiff::Timestamp;
 pub use jiff::civil::Date;
 pub use limits::{Limit, LimitExceeded};
+pub use login::Login;
 pub use node::{
     Action, AnswerSpec, AnswerType, Choice, Choices, DateRule, DateSource, Decision, Deliverable,
-    Direction, EntitySet, Group, KindField, LabeledChoice, Milestone, Node, NodeKind,
+    Direction, Group, IdentitySet, KindField, LabeledChoice, Milestone, Node, NodeKind,
     NodeShapeError, ParticipationSource, Participations, Payload,
 };
 pub use notice::{Notice, NoticeCode};

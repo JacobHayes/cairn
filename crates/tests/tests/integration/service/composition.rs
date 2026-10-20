@@ -1,5 +1,5 @@
 //! The composition: today per request in the deployment's zone, the capabilities document,
-//! the viewer's entities from verified emails (H3), and a late subscriber learning the
+//! the viewer's identities from verified emails (H3), and a late subscriber learning the
 //! current revisions (H6).
 #![cfg(test)]
 
@@ -9,10 +9,8 @@ mod composition {
 
     use cairn_schema::{Date, Domain, Email, RevisionOf, Slug, Timestamp, Title};
     use cairn_service::{AuthKind, AuthMethod, Capabilities};
-    use cairn_store::build::{create_entity, create_journey, deployment_patch, entity};
-    use cairn_store::{
-        AuthStore, IdentityRecord, MemoryStore, Store, Take, Tick, UserRecord, Watch,
-    };
+    use cairn_store::build::{create_identity, create_journey, deployment_patch, identity};
+    use cairn_store::{AuthStore, LoginRecord, MemoryStore, Store, Take, Tick, UserRecord, Watch};
 
     use crate::service::support::{call, run, service_over, settings};
 
@@ -62,17 +60,17 @@ mod composition {
         }
     }
 
-    /// A store whose deployment holds `e_lead` (lead@example.org), `e_alias_holder`
-    /// (lead.alt@example.org), and `e_other` (other@example.org), and the user `u_lead`.
+    /// A store whose deployment holds `who_lead` (lead@example.org), `who_alias_holder`
+    /// (lead.alt@example.org), and `who_other` (other@example.org), and the user `u_lead`.
     fn deployment_with_people() -> Arc<MemoryStore> {
         let store = Arc::new(MemoryStore::new());
         let mut patch = deployment_patch("p_people", 0);
         for (key, email) in [
-            ("e_lead", "lead@example.org"),
-            ("e_alias_holder", "lead.alt@example.org"),
-            ("e_other", "other@example.org"),
+            ("who_lead", "lead@example.org"),
+            ("who_alias_holder", "lead.alt@example.org"),
+            ("who_other", "other@example.org"),
         ] {
-            patch = create_entity(patch, entity(key, key, &[email]));
+            patch = create_identity(patch, identity(key, key, &[email]));
         }
         run(store.commit(patch.commit())).unwrap();
         let user = UserRecord {
@@ -84,8 +82,8 @@ mod composition {
         store
     }
 
-    fn identity(provider: &str, subject: &str, verified: &[&str]) -> IdentityRecord {
-        IdentityRecord {
+    fn login(provider: &str, subject: &str, verified: &[&str]) -> LoginRecord {
+        LoginRecord {
             provider: provider.parse().unwrap(),
             subject: subject.parse().unwrap(),
             user: "u_lead".parse().unwrap(),
@@ -98,56 +96,56 @@ mod composition {
     }
 
     #[test]
-    fn the_viewer_is_the_entity_holding_a_verified_email() {
-        let cases: [(&str, Vec<IdentityRecord>, &[&str]); 5] = [
+    fn the_viewer_is_the_identity_holding_a_verified_email() {
+        let cases: [(&str, Vec<LoginRecord>, &[&str]); 5] = [
             (
-                "a verified email matches its entity",
-                vec![identity("oidc", "sub-1", &["lead@example.org"])],
-                &["e_lead"],
+                "a verified email matches its identity",
+                vec![login("oidc", "sub-1", &["lead@example.org"])],
+                &["who_lead"],
             ),
             (
                 "emails match case-insensitively after trimming",
-                vec![identity("oidc", "sub-1", &["  Lead@Example.ORG "])],
-                &["e_lead"],
+                vec![login("oidc", "sub-1", &["  Lead@Example.ORG "])],
+                &["who_lead"],
             ),
             (
                 "an email the provider did not verify never matches",
-                vec![identity("tailscale", "lead@example.org", &[])],
+                vec![login("tailscale", "lead@example.org", &[])],
                 &[],
             ),
             (
-                "an email no entity holds names no one",
-                vec![identity("oidc", "sub-1", &["stranger@example.org"])],
+                "an email no identity holds names no one",
+                vec![login("oidc", "sub-1", &["stranger@example.org"])],
                 &[],
             ),
             (
-                "two identities matching two entities give both",
+                "two logins matching two identities give both",
                 vec![
-                    identity("oidc", "sub-1", &["lead@example.org"]),
-                    identity("dev", "lead", &["lead.alt@example.org"]),
+                    login("oidc", "sub-1", &["lead@example.org"]),
+                    login("dev", "lead", &["lead.alt@example.org"]),
                 ],
-                &["e_alias_holder", "e_lead"],
+                &["who_alias_holder", "who_lead"],
             ),
         ];
-        for (case, identities, expected) in cases {
+        for (case, logins, expected) in cases {
             let store = deployment_with_people();
-            for identity in identities {
-                run(store.put_identity(identity)).unwrap();
+            for login in logins {
+                run(store.put_login(login)).unwrap();
             }
             let (service, _) = service_over(store);
             let viewer = run(service.viewer(&call("u_lead", "2026-10-06T12:00:00Z"))).unwrap();
             let expected: BTreeSet<_> = expected.iter().map(|key| key.parse().unwrap()).collect();
-            assert_eq!(viewer.entities, expected, "{case}");
+            assert_eq!(viewer.identities, expected, "{case}");
             let listed: Vec<_> = viewer
-                .identities
+                .logins
                 .iter()
-                .map(|identity| (identity.provider.to_string(), identity.subject.to_string()))
+                .map(|login| (login.provider.to_string(), login.subject.to_string()))
                 .collect();
             let mut sorted = listed.clone();
             sorted.sort();
             assert_eq!(
                 listed, sorted,
-                "{case}: identities in provider and subject order"
+                "{case}: logins in provider and subject order"
             );
             assert_eq!(
                 viewer.merge_offer().is_some(),

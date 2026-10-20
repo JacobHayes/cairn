@@ -12,7 +12,7 @@ import type { ProposalAsk } from "../proposals/write.ts";
 import type { Rejection } from "./writes.ts";
 
 /** The record schema version; the only one `readRecord` accepts. */
-export const EDIT_RECORD_VERSION = 3;
+export const EDIT_RECORD_VERSION = 4;
 
 /** What names one edit's delivery: its patch id (H5), the same on every resend. */
 export type OperationId = string;

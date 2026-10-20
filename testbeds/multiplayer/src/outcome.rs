@@ -355,7 +355,7 @@ mod tests {
                 acks: Vec::new(),
             };
             history.land(&patches::create_journey(2), Revision::NONE);
-            history.land(&patches::create_entities(1), Revision::NONE);
+            history.land(&patches::create_identities(1), Revision::NONE);
             history
         }
 
@@ -505,7 +505,7 @@ mod tests {
         outcome
             .truth
             .log
-            .retain(|event| event.patch_id.as_str() != "p_setup_entities");
+            .retain(|event| event.patch_id.as_str() != "p_setup_identities");
         assert!(labels(&outcome).contains("replay-equals-state"));
     }
 }

@@ -6,7 +6,7 @@
 use std::collections::BTreeSet;
 
 use async_trait::async_trait;
-use cairn_schema::{Email, Identity, Slug, Title};
+use cairn_schema::{Email, Login, Slug, Title};
 
 use crate::error::{ConfigError, Refusal};
 use crate::provider::{AuthProvider, Listener, Presented, Verdict};
@@ -17,14 +17,14 @@ use crate::secret::{SECRET_PREFIX, secrets_equal};
 pub struct DevConfig {
     /// The provider's name.
     pub name: Slug,
-    /// The dev user's name: the identity's subject and display name.
+    /// The dev user's name: the login's subject and display name.
     pub user: Title,
     /// Emails the operator vouches for, listed as verified (H3).
     pub verified_emails: BTreeSet<Email>,
     /// With a token, a request signs in by presenting it as a bearer token; without one,
     /// every request is the dev user.
     pub token: Option<String>,
-    /// H3: link a new identity to the user holding one of its verified emails.
+    /// H3: link a new login to the user holding one of its verified emails.
     pub auto_link: bool,
     /// The override: serve requests from other machines too.
     pub allow_off_loopback: bool,
@@ -34,7 +34,7 @@ pub struct DevConfig {
 #[derive(Debug)]
 pub struct DevProvider {
     config: DevConfig,
-    identity: Identity,
+    login: Login,
 }
 
 impl DevProvider {
@@ -62,13 +62,13 @@ impl DevProvider {
                 "the dev token is empty or starts with Cairn's prefix",
             ));
         }
-        let identity = Identity {
+        let login = Login {
             provider: config.name.clone(),
             subject: config.user.clone(),
             display: config.user.clone(),
             verified_emails: config.verified_emails.clone(),
         };
-        Ok(Self { config, identity })
+        Ok(Self { config, login })
     }
 
     fn verdict(&self, request: Presented<'_>) -> Verdict {
@@ -89,7 +89,7 @@ impl DevProvider {
         } else if !self.config.allow_off_loopback && !request.peer.is_local() {
             Verdict::Refused(Refusal::Peer)
         } else {
-            Verdict::Identity(self.identity.clone())
+            Verdict::Login(self.login.clone())
         }
     }
 }

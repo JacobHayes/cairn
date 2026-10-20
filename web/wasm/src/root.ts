@@ -1,6 +1,6 @@
 // The in-browser host (ARCHITECTURE, Web UI: in-browser host): the module's composition root
 // (the service over the memory store seeded from the fixtures, the in-process notifier, one
-// local identity) with the API's JSON for its answers, and the loop that hands subscribers
+// local user) with the API's JSON for its answers, and the loop that hands subscribers
 // their ticks (H6): after every write, and again when the coalescing interval asks it to wait.
 import type { Schema } from "@cairn/client";
 

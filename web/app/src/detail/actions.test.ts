@@ -1,5 +1,5 @@
 // The panel's writes: F5's move sent with the rejected edit, D4's bypass offered per node and
-// guard and E6's deployment revision named only by a patch that writes an entity.
+// guard and E6's deployment revision named only by a patch that writes an identity.
 import type { Schema } from "@cairn/client";
 import { describe, expect, it } from "vitest";
 
@@ -9,9 +9,9 @@ import { isComplete } from "./contributions.ts";
 import { answerInEffect } from "./editors.tsx";
 import type { Mutation } from "./model.ts";
 import { bypassable, bypassReady, withMove } from "./Rejected.tsx";
-import { entityName } from "./sections.tsx";
+import { identityName } from "./sections.tsx";
 import { testView } from "./view.test-support.ts";
-import { writesEntities } from "./write.ts";
+import { writesIdentities } from "./write.ts";
 
 const violation = (node: string, bypass?: Schema<"Guard">): Schema<"Violation"> => ({
   code: "guard_failed",
@@ -42,31 +42,31 @@ describe("resolving a rejection", () => {
   });
 });
 
-describe("writesEntities (E6)", () => {
+describe("writesIdentities (E6)", () => {
   const cases: [string, Mutation[], boolean][] = [
-    ["an entity answer", [{ op: "answer", decision: "n_d", value: { entity: "e_one" } }], true],
-    ["explicit participants", [{ op: "set_participation", node: "n_a", kind: "k_owner", source: ["e_one"] }], true],
+    ["an identity answer", [{ op: "answer", decision: "n_d", value: { identity: "who_one" } }], true],
+    ["explicit participants", [{ op: "set_participation", node: "n_a", kind: "k_owner", source: ["who_one"] }], true],
     ["a role participation", [{ op: "set_participation", node: "n_a", kind: "k_owner", source: "r_owner" }], false],
     ["a date answer", [{ op: "answer", decision: "n_d", value: { date: "2026-11-20" } }], false],
     ["a pin", [{ op: "set_pin", node: "n_a", date: "2026-11-20" }], false],
   ];
   it.each(cases)("%s: %s", (_, mutations, expected) => {
-    expect(writesEntities(mutations)).toBe(expected);
+    expect(writesIdentities(mutations)).toBe(expected);
   });
 });
 
-describe("merged entities (E6)", () => {
+describe("merged identities (E6)", () => {
   const view = testView();
-  view.inputs.deployment.aliases = { e_old: "e_one", e_older: "e_old" };
+  view.inputs.deployment.aliases = { who_old: "who_one", who_older: "who_old" };
 
-  it("names an answer's entity through the aliases a merge left", () => {
-    expect(entityName(view, "e_older")).toBe("Person One");
-    expect(entityName(view, "e_two")).toBe("Person Two");
+  it("names an answer's identity through the aliases a merge left", () => {
+    expect(identityName(view, "who_older")).toBe("Person One");
+    expect(identityName(view, "who_two")).toBe("Person Two");
   });
 
-  it("starts an answer editor on the surviving entities, each once", () => {
-    expect(resolvedAnswer(view, { entity: "e_old" })).toEqual({ entity: "e_one" });
-    expect(resolvedAnswer(view, { entity_list: ["e_older", "e_one", "e_two"] })).toEqual({ entity_list: ["e_one", "e_two"] });
+  it("starts an answer editor on the surviving identities, each once", () => {
+    expect(resolvedAnswer(view, { identity: "who_old" })).toEqual({ identity: "who_one" });
+    expect(resolvedAnswer(view, { identity_list: ["who_older", "who_one", "who_two"] })).toEqual({ identity_list: ["who_one", "who_two"] });
   });
 });
 

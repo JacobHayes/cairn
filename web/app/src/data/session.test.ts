@@ -176,7 +176,7 @@ describe("a read the sync chip counts", () => {
     const { state, source } = routeRead();
     const clock = new SimulatedClock();
     const actor = createActor(keyedRead, { clock, input: { source, env: session.readEnv } }).start();
-    actor.send({ type: "want", key: { identity: ["r_a"], freshness: [], args: undefined } });
+    actor.send({ type: "want", key: { of: ["r_a"], freshness: [], args: undefined } });
     await advance(0);
     host.open();
     await settled();
@@ -200,7 +200,7 @@ describe("a read the sync chip counts", () => {
     const { host, session, advance } = await started();
     const { state, source } = routeRead();
     const actor = createActor(keyedRead, { input: { source, env: session.readEnv } }).start();
-    actor.send({ type: "want", key: { identity: ["r_a"], freshness: [], args: undefined } });
+    actor.send({ type: "want", key: { of: ["r_a"], freshness: [], args: undefined } });
     await advance(0);
     host.open();
     await settled();

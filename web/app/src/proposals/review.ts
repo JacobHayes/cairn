@@ -222,7 +222,7 @@ export function useJourneyAfter(before: Ready | undefined, proposal: Proposal, d
     before === undefined || proposal.status !== "open"
       ? undefined
       : {
-          identity: [before.journey.header.id, proposal.id],
+          of: [before.journey.header.id, proposal.id],
           freshness: [JSON.stringify(before.key), proposal.revision, JSON.stringify(draft), user],
           args: { host, deriver, before, proposal, draft, user },
         };

@@ -58,7 +58,7 @@ export const ROUTE_GRAPH: ReadSource<{ host: Host; id: string; version: number |
 
 /** The key of a route's graph: the same read for the same route and version; `freshness` is whatever else says it is to be read again (a proposal that created the route applying). */
 export function routeGraphKey(host: Host, id: string, version: number | undefined, freshness: readonly unknown[] = []): ReadKey<{ host: Host; id: string; version: number | undefined }> {
-  return { identity: [id, version], freshness, args: { host, id, version } };
+  return { of: [id, version], freshness, args: { host, id, version } };
 }
 
 /** What a route's level is derived from. */
@@ -78,7 +78,7 @@ export const ROUTE_LEVEL: ReadSource<LevelArgs, Level> = {
 /**
  * The key of a shown graph's level for `request` (journeys/requests.ts, `levelRequestOf`, the one
  * place a view state becomes a level query, a journey's or a route's): the route, what it shows
- * and the request are the identity (another request's level laid out under this one would hint
+ * and the request are what it is of (another request's level laid out under this one would hint
  * its first layout with another graph's positions); the graph, the deployment and the day are
  * what it is read from.
  */
@@ -87,7 +87,7 @@ export function routeLevelKey(deriver: Deriver, shown: Shown, request: LevelRequ
     return undefined;
   }
   return {
-    identity: [shown.route.header.id, shown.of, JSON.stringify(request)],
+    of: [shown.route.header.id, shown.of, JSON.stringify(request)],
     freshness: [shown.graph, deployment.revision, today],
     args: { deriver, shown, deployment, today, request },
   };
@@ -106,10 +106,10 @@ export const ROUTE_SCHEDULE: ReadSource<ScheduleArgs, RouteSchedule> = {
   read: ({ deriver, shown, deployment }) => deriver.routeSchedule({ graph: shown.graph, deployment }),
 };
 
-/** The key of a shown graph's schedule: the route and what it shows are the identity; the graph and the deployment are what it is read from. */
+/** The key of a shown graph's schedule: the route and what it shows are what it is of; the graph and the deployment are what it is read from. */
 export function routeScheduleKey(deriver: Deriver, shown: Shown, deployment: Deployment | undefined): ReadKey<ScheduleArgs> | undefined {
   if (deployment === undefined) {
     return undefined;
   }
-  return { identity: [shown.route.header.id, shown.of], freshness: [shown.graph, deployment.revision], args: { deriver, shown, deployment } };
+  return { of: [shown.route.header.id, shown.of], freshness: [shown.graph, deployment.revision], args: { deriver, shown, deployment } };
 }

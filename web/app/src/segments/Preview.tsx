@@ -36,7 +36,7 @@ export function InsertionCanvas({ preview, domain, today }: { preview: InsertPre
   const { deriver } = useSession();
   const diff = useMemo(() => graphDiff(preview.before, preview.after), [preview]);
   const marks = useMemo(() => noteOrigins(diffMarks(diff, [], new Set()), preview.members), [diff, preview]);
-  const { view } = useKeyedRead(LEVEL, deployment === undefined ? undefined : { identity: [`insert:${domain}`], freshness: [preview.after, deployment.revision, today], args: { deriver, graph: preview.after, deployment, today } });
+  const { view } = useKeyedRead(LEVEL, deployment === undefined ? undefined : { of: [`insert:${domain}`], freshness: [preview.after, deployment.revision, today], args: { deriver, graph: preview.after, deployment, today } });
   const level = valueOf(view);
   const model = useMemo<CanvasModel | undefined>(() => {
     const nodes = preview.after.nodes ?? [];

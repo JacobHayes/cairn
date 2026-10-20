@@ -23,7 +23,7 @@ const NOTICES: ReadSource<{ deriver: Deriver; graph: Schema<"Graph"> }, Notice[]
 /** The draft's notices as the engine lists them now; none while they are being read, or when they cannot be. */
 export function useRouteNotices(graph: Schema<"Graph"> | undefined): Found {
   const { deriver } = useSession();
-  const { view } = useKeyedRead(NOTICES, graph === undefined ? undefined : { identity: ["route-notices"], freshness: [graph], args: { deriver, graph } });
+  const { view } = useKeyedRead(NOTICES, graph === undefined ? undefined : { of: ["route-notices"], freshness: [graph], args: { deriver, graph } });
   if (view.status === "current") {
     return { notices: view.value, failed: undefined };
   }

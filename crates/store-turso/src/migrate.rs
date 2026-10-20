@@ -5,21 +5,76 @@
 use cairn_store::StoreError;
 use turso::Connection;
 
-use crate::sql::{execute, first, int, rows};
+use crate::sql::{SqlError, execute, int, rows};
+
+/// One step of a migration: statements, or code for what SQL cannot tell apart (JSON whose
+/// tags and keys sit among text a person wrote).
+pub(crate) enum Step {
+    Sql(&'static str),
+    Identities,
+}
 
 /// Every migration, numbered from 1, in order. A migration is never edited once released;
-/// a change is a new one.
-pub(crate) const MIGRATIONS: [(u32, &str); 10] = [
-    (1, include_str!("migrations/0001_initial.sql")),
-    (2, include_str!("migrations/0002_outside_domains.sql")),
-    (3, include_str!("migrations/0003_receipt_footprints.sql")),
-    (4, include_str!("migrations/0004_log_barrier.sql")),
-    (5, include_str!("migrations/0005_answer_rationale.sql")),
-    (6, include_str!("migrations/0006_requires_note.sql")),
-    (7, include_str!("migrations/0007_segments.sql")),
-    (8, include_str!("migrations/0008_drop_log_barrier.sql")),
-    (9, include_str!("migrations/0009_container_snoozes.sql")),
-    (10, include_str!("migrations/0010_proposal_lists.sql")),
+/// a change is a new one. It is a list of steps run in one transaction with its number.
+pub(crate) const MIGRATIONS: [(u32, &[Step]); 11] = [
+    (1, &[Step::Sql(include_str!("migrations/0001_initial.sql"))]),
+    (
+        2,
+        &[Step::Sql(include_str!(
+            "migrations/0002_outside_domains.sql"
+        ))],
+    ),
+    (
+        3,
+        &[Step::Sql(include_str!(
+            "migrations/0003_receipt_footprints.sql"
+        ))],
+    ),
+    (
+        4,
+        &[Step::Sql(include_str!("migrations/0004_log_barrier.sql"))],
+    ),
+    (
+        5,
+        &[Step::Sql(include_str!(
+            "migrations/0005_answer_rationale.sql"
+        ))],
+    ),
+    (
+        6,
+        &[Step::Sql(include_str!("migrations/0006_requires_note.sql"))],
+    ),
+    (
+        7,
+        &[Step::Sql(include_str!("migrations/0007_segments.sql"))],
+    ),
+    (
+        8,
+        &[Step::Sql(include_str!(
+            "migrations/0008_drop_log_barrier.sql"
+        ))],
+    ),
+    (
+        9,
+        &[Step::Sql(include_str!(
+            "migrations/0009_container_snoozes.sql"
+        ))],
+    ),
+    (
+        10,
+        &[Step::Sql(include_str!(
+            "migrations/0010_proposal_lists.sql"
+        ))],
+    ),
+    (
+        11,
+        &[
+            Step::Sql(include_str!("migrations/0011_logins.sql")),
+            Step::Sql(include_str!("migrations/0011_identity_keys.sql")),
+            Step::Identities,
+            Step::Sql(include_str!("migrations/0011_identities.sql")),
+        ],
+    ),
 ];
 
 /// Puts the database in MVCC mode and applies the migrations it lacks.
@@ -31,28 +86,34 @@ pub(crate) async fn run(connection: &Connection) -> Result<(), StoreError> {
         Vec::new(),
     )
     .await?;
-    let applied = first(
+    let recorded: Vec<i64> = rows(
         connection,
-        "SELECT max(version) FROM schema_migrations",
+        "SELECT version FROM schema_migrations",
         Vec::new(),
     )
     .await?
-    .and_then(|row| row.opt_int(0).ok().flatten())
-    .unwrap_or(0);
+    .iter()
+    .map(|row| row.int(0))
+    .collect::<Result<_, _>>()?;
     let pending: Vec<_> = MIGRATIONS
         .iter()
-        .filter(|(number, _)| i64::from(*number) > applied)
+        .filter(|(number, _)| !recorded.contains(&i64::from(*number)))
         .collect();
     if pending.is_empty() {
         return Ok(());
     }
     execute(connection, "BEGIN", Vec::new()).await?;
-    for (number, sql) in pending {
+    for (number, steps) in pending {
         let applied = async {
-            connection
-                .execute_batch(sql)
-                .await
-                .map_err(crate::sql::SqlError::from)?;
+            for step in *steps {
+                match step {
+                    Step::Sql(sql) => connection
+                        .execute_batch(sql)
+                        .await
+                        .map_err(SqlError::from)?,
+                    Step::Identities => crate::to_identities::run(connection).await?,
+                }
+            }
             execute(
                 connection,
                 "INSERT INTO schema_migrations (version) VALUES (?1)",

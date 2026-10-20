@@ -133,8 +133,8 @@ impl DerivedJourney<'_> {
             participations: kinds
                 .into_iter()
                 .filter_map(|kind| {
-                    let entities = derived.participation().entities(key, &kind);
-                    (!entities.is_empty()).then(|| (kind, entities.clone()))
+                    let identities = derived.participation().identities(key, &kind);
+                    (!identities.is_empty()).then(|| (kind, identities.clone()))
                 })
                 .collect(),
             blocked_by: derived.blocked_by(key),

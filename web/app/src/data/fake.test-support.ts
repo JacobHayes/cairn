@@ -49,7 +49,7 @@ export class FakeHost implements Host {
 
   /** The index queries asked, in turn. */
   readonly queries: (JourneyIndexQuery | undefined)[] = [];
-  viewerHeld: Viewer = { user: "u_fake", entities: [], identities: [] };
+  viewerHeld: Viewer = { user: "u_fake", identities: [], logins: [] };
 
   journeys(query?: JourneyIndexQuery): Promise<JourneyPage> {
     this.queries.push(query);

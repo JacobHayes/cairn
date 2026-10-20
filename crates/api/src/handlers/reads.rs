@@ -34,7 +34,7 @@ pub async fn journey(State(api): State<Api>, Path(id): Path<String>) -> Answer<J
         .ok_or_else(|| ApiError::not_found(format_args!("journey {id}")))
 }
 
-/// `GET /api/journeys/{id}/document`: at the caller's today, with their entities as the viewer.
+/// `GET /api/journeys/{id}/document`: at the caller's today, with their identities as the viewer.
 pub async fn document(
     State(api): State<Api>,
     Extension(actor): Extension<Actor>,

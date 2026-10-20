@@ -17,7 +17,7 @@
 //! Given the Google OAuth client IAP's programmatic access allows, the provider also relays
 //! an MCP client's sign-in to Google (`relay`), so the bearer the client ends up holding is
 //! a Google ID token IAP accepts. Such a bearer counts only beside a valid assertion on the
-//! same request, which names the user; Cairn never reads identity from the bearer itself
+//! same request, which names the user; Cairn never reads login from the bearer itself
 //! (decisions/2026-10-16-mcp-clients-behind-iap-sign-in-through-a-relay-to-google.md).
 
 mod relay;
@@ -26,7 +26,7 @@ use std::sync::Arc;
 
 use async_trait::async_trait;
 use axum::Router;
-use cairn_schema::{Email, Identity, Slug, Timestamp, Title};
+use cairn_schema::{Email, Login, Slug, Timestamp, Title};
 use openidconnect::core::{
     CoreIdToken, CoreIdTokenClaims, CoreIdTokenVerifier, CoreJsonWebKeySet, CoreJwsSigningAlgorithm,
 };
@@ -65,7 +65,7 @@ pub struct GcpIapConfig {
     /// `/projects/<project number>/global/backendServices/<backend service id>` behind a
     /// load balancer.
     pub audience: String,
-    /// H3: link a new identity to the user holding one of its verified emails.
+    /// H3: link a new login to the user holding one of its verified emails.
     pub auto_link: bool,
     /// I2: the Google OAuth client on IAP's programmatic allowlist, through which MCP
     /// clients sign in; without it the provider serves no OAuth endpoints.
@@ -203,7 +203,7 @@ impl GcpIapProvider {
         })
     }
 
-    /// The identity a presented assertion names, or why it is refused.
+    /// The login a presented assertion names, or why it is refused.
     async fn verify(&self, assertion: &str) -> Verdict {
         let Ok(token) = assertion.parse::<CoreIdToken>() else {
             return Verdict::Refused(Refusal::Credential);
@@ -239,7 +239,7 @@ impl GcpIapProvider {
         };
         drop(kept);
         match checked {
-            Ok(claims) => self.identity(&claims),
+            Ok(claims) => self.login(&claims),
             Err(_) => Verdict::Refused(Refusal::Credential),
         }
     }
@@ -297,9 +297,9 @@ impl GcpIapProvider {
         })
     }
 
-    /// The identity verified claims name: the subject is IAP's stable account id, and the
+    /// The login verified claims name: the subject is IAP's stable account id, and the
     /// email is Google's, verified by Google (H3).
-    fn identity(&self, claims: &CoreIdTokenClaims) -> Verdict {
+    fn login(&self, claims: &CoreIdTokenClaims) -> Verdict {
         let Ok(subject) = claims.subject().as_str().parse::<Title>() else {
             return Verdict::Refused(Refusal::Credential);
         };
@@ -311,7 +311,7 @@ impl GcpIapProvider {
             .and_then(|email| email.parse::<Email>().ok())
             .into_iter()
             .collect();
-        Verdict::Identity(Identity {
+        Verdict::Login(Login {
             provider: self.config.name.clone(),
             subject,
             display,

@@ -1,6 +1,6 @@
 // E4, C16: one journey's "mine", projected in the derive worker over the journey the tab
 // holds derived (and keeps current, H6), with the derive inputs' viewer: the nodes where the
-// caller's entities hold a participation, with the kinds they hold. The cross-journey "mine"
+// caller's identities hold a participation, with the kinds they hold. The cross-journey "mine"
 // list and the index's "mine" filter are both the union of these, unranked.
 import type { Schema } from "@cairn/client";
 import { useCallback, useEffect, useState } from "react";

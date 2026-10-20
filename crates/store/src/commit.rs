@@ -5,15 +5,15 @@ use std::collections::BTreeSet;
 use std::fmt;
 
 use cairn_schema::{
-    ChangeSet, EntityKey, JourneyId, PatchReceipt, PatchTarget, Rejection, Revision, RevisionOf,
+    ChangeSet, IdentityKey, JourneyId, PatchReceipt, PatchTarget, Rejection, Revision, RevisionOf,
 };
 
 /// What a commit checks besides its target's base revision.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum Precondition {
     /// A revision that must not have moved: the deployment revision a journey patch that
-    /// writes an entity reference was validated against (E6), the proposal revision a
-    /// reviewer applied (I6), or a journey an entity merge was checked against (E6). A
+    /// writes an identity reference was validated against (E6), the proposal revision a
+    /// reviewer applied (I6), or a journey an identity merge was checked against (E6). A
     /// domain or proposal that does not exist is at revision 0.
     Revision {
         /// Whose revision.
@@ -21,12 +21,12 @@ pub enum Precondition {
         /// The revision the patch was checked against.
         expected: Revision,
     },
-    /// E6: an entity merge's referencing journeys are unchanged, so no journey outside
-    /// `journeys` references any of `entities` (directly or through an alias). The
+    /// E6: an identity merge's referencing journeys are unchanged, so no journey outside
+    /// `journeys` references any of `identities` (directly or through an alias). The
     /// journeys in the set are held by their own revision preconditions.
     ReferencingJourneys {
-        /// The entities the merge touches.
-        entities: BTreeSet<EntityKey>,
+        /// The identities the merge touches.
+        identities: BTreeSet<IdentityKey>,
         /// The journeys it was checked against.
         journeys: BTreeSet<JourneyId>,
     },
@@ -69,7 +69,7 @@ impl Committed {
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum CommitError {
     /// The patch is stale, reuses a patch id, or breaks a rule only the commit can check
-    /// (a deleted journey id, an entity key or email taken meanwhile, the graph size cap):
+    /// (a deleted journey id, an identity key or email taken meanwhile, the graph size cap):
     /// the same rejection shapes the engine returns (A15, H5).
     Rejected(Rejection),
     /// The store failed or the change set was malformed.

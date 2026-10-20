@@ -24,14 +24,14 @@ use serde::{Deserialize, Serialize};
 
 use crate::attachment::{AnnotationBody, Resource};
 use crate::collections::{BoundedVec, CollectionError, MutationCountPerPatch};
-use crate::domain::{Domain, Entity, JourneyStatus, Lineage, RouteKind};
+use crate::domain::{Domain, Identity, JourneyStatus, Lineage, RouteKind};
 use crate::field::{NodeField, NodeFieldValue};
 use crate::graph::{Edge, ParticipationKind, Role};
 use crate::id::{
-    AttachmentKey, EntityKey, InsertionKey, JourneyId, KindKey, NodeKey, PatchId, ProposalId,
+    AttachmentKey, IdentityKey, InsertionKey, JourneyId, KindKey, NodeKey, PatchId, ProposalId,
     RoleKey, RouteId, Slug,
 };
-use crate::node::{EntitySet, Node, ParticipationSource};
+use crate::node::{IdentitySet, Node, ParticipationSource};
 use crate::number::{Revision, SignedDays, VersionNumber};
 use crate::proposal::ProposalDraft;
 use crate::refs::KeyRefs;
@@ -141,7 +141,7 @@ pub struct Patch {
     pub target: PatchTarget,
     /// The target's revision the patch was drafted against; 0 creates the target (A17).
     pub base_revision: Revision,
-    /// The deployment revision a journey patch that writes an entity reference was validated
+    /// The deployment revision a journey patch that writes an identity reference was validated
     /// against (E6, H5).
     #[serde(skip_serializing_if = "Option::is_none")]
     pub deployment_revision: Option<Revision>,
@@ -579,8 +579,8 @@ pub enum Mutation {
     FillRole {
         /// The role.
         role: RoleKey,
-        /// The entities.
-        entities: EntitySet,
+        /// The identities.
+        identities: IdentitySet,
     },
     /// Empty a directly filled role.
     ClearRoleFill {
@@ -691,23 +691,23 @@ pub enum Mutation {
         marked: bool,
     },
 
-    // Entities (E6, H3).
-    /// Create an entity; may ride in any patch.
-    CreateEntity {
-        /// The entity, with its key.
-        entity: Entity,
+    // Identities (E6, H3).
+    /// Create an identity; may ride in any patch.
+    CreateIdentity {
+        /// The identity, with its key.
+        identity: Identity,
     },
-    /// Change an entity's name or emails (deployment).
-    EditEntity {
-        /// The entity as it should be.
-        entity: Entity,
+    /// Change an identity's name or emails (deployment).
+    EditIdentity {
+        /// The identity as it should be.
+        identity: Identity,
     },
-    /// Merge one entity into another (deployment, E6).
-    MergeEntities {
-        /// The entity that remains.
-        survivor: EntityKey,
-        /// The entity merged into it, whose key becomes an alias.
-        merged: EntityKey,
+    /// Merge one identity into another (deployment, E6).
+    MergeIdentities {
+        /// The identity that remains.
+        survivor: IdentityKey,
+        /// The identity merged into it, whose key becomes an alias.
+        merged: IdentityKey,
         /// Every journey referencing either, at the revision the merge was checked against;
         /// at most `journey_count_per_merge_max`.
         #[serde(deserialize_with = "merge_journeys")]
@@ -794,7 +794,7 @@ impl Mutation {
             | Mutation::Relink { .. }
             | Mutation::SetProvenance { .. }
             | Mutation::MarkLocalEdit { .. }
-            | Mutation::MergeEntities { .. }
+            | Mutation::MergeIdentities { .. }
             | Mutation::ApplyProposal { .. } => ChangeClass::Structural,
             Mutation::SetNodeField { value, .. } => match value.field() {
                 // A journey weight override is state (B5); every other field is structure.
@@ -821,8 +821,8 @@ impl Mutation {
             | Mutation::AddAnnotation { .. }
             | Mutation::EditAnnotation { .. }
             | Mutation::RemoveAnnotation { .. }
-            | Mutation::CreateEntity { .. }
-            | Mutation::EditEntity { .. }
+            | Mutation::CreateIdentity { .. }
+            | Mutation::EditIdentity { .. }
             | Mutation::CreateProposal { .. }
             | Mutation::EditProposal { .. }
             | Mutation::DiscardProposal {} => ChangeClass::State,

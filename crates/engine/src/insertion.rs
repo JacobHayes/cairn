@@ -116,8 +116,8 @@ impl Remap<'_> {
             .map(|(kind, source)| {
                 let source = match source {
                     ParticipationSource::Role(role) => ParticipationSource::Role((self.role)(role)),
-                    ParticipationSource::Entities(entities) => {
-                        ParticipationSource::Entities(entities.clone())
+                    ParticipationSource::Identities(identities) => {
+                        ParticipationSource::Identities(identities.clone())
                     }
                 };
                 ((self.kind)(kind), source)
@@ -179,10 +179,10 @@ impl Remap<'_> {
                     AnswerSpec::Date { feeds_milestone } => AnswerSpec::Date {
                         feeds_milestone: feeds_milestone.as_ref().map(|key| (self.node)(key)),
                     },
-                    AnswerSpec::Entity { fills_role } => AnswerSpec::Entity {
+                    AnswerSpec::Identity { fills_role } => AnswerSpec::Identity {
                         fills_role: fills_role.as_ref().map(|role| (self.role)(role)),
                     },
-                    AnswerSpec::EntityList { fills_role } => AnswerSpec::EntityList {
+                    AnswerSpec::IdentityList { fills_role } => AnswerSpec::IdentityList {
                         fills_role: fills_role.as_ref().map(|role| (self.role)(role)),
                     },
                     other => other.clone(),

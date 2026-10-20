@@ -1,4 +1,4 @@
-//! Building a graph from a file document (A13, A14; PRD, Identity and references): supplied
+//! Building a graph from a file document (A13, A14; PRD, Keys and references): supplied
 //! keys are kept; against a base version, a keyless node takes the key of the base node at
 //! its path, a keyless role or kind the key of the base one with its id, and a keyless
 //! resource the key of the base node's resource with its title; the rest are minted through
@@ -546,8 +546,8 @@ impl Resolver {
                 ParticipationSource::Role(role) => {
                     self.role(role, None).map(ParticipationSource::Role)
                 }
-                ParticipationSource::Entities(entities) => {
-                    Some(ParticipationSource::Entities(entities.clone()))
+                ParticipationSource::Identities(identities) => {
+                    Some(ParticipationSource::Identities(identities.clone()))
                 }
             };
             if let (Some(kind), Some(source)) = (kind, source) {
@@ -670,10 +670,10 @@ impl Resolver {
                 feeds_milestone: self
                     .optional_path(feeds_milestone.as_ref(), NodeField::FeedsMilestone),
             },
-            AnswerSpec::Entity { fills_role } => AnswerSpec::Entity {
+            AnswerSpec::Identity { fills_role } => AnswerSpec::Identity {
                 fills_role: fills(self, fills_role.as_ref()),
             },
-            AnswerSpec::EntityList { fills_role } => AnswerSpec::EntityList {
+            AnswerSpec::IdentityList { fills_role } => AnswerSpec::IdentityList {
                 fills_role: fills(self, fills_role.as_ref()),
             },
         }

@@ -2,11 +2,11 @@
 
 use std::collections::BTreeSet;
 
-use cairn_schema::{AgentId, Email, EntityKey, Slug, Timestamp, Title, UserId};
+use cairn_schema::{AgentId, Email, IdentityKey, Slug, Timestamp, Title, UserId};
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
-/// The caller (H2) and the entities their verified emails name (H3).
+/// The caller (H2) and the identities their verified emails name (H3).
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
 #[serde(deny_unknown_fields)]
 pub struct Viewer {
@@ -15,33 +15,33 @@ pub struct Viewer {
     /// The agent acting for them, when the request carries an agent token.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub agent: Option<AgentId>,
-    /// Their entities, which "mine" covers together.
-    pub entities: BTreeSet<EntityKey>,
-    /// H3: present when their emails name more than one entity, which are then offered for
+    /// Their identities, which "mine" covers together.
+    pub identities: BTreeSet<IdentityKey>,
+    /// H3: present when their emails name more than one identity, which are then offered for
     /// merging.
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub merge_offer: Option<BTreeSet<EntityKey>>,
-    /// The identities they sign in with, by provider and subject.
-    pub identities: Vec<LinkedIdentity>,
+    pub merge_offer: Option<BTreeSet<IdentityKey>>,
+    /// The logins they sign in with, by provider and subject.
+    pub logins: Vec<LinkedLogin>,
 }
 
-/// One identity a user signs in with (ARCHITECTURE, Auth: users and identities).
+/// One login a user signs in with (ARCHITECTURE, Auth: users and logins).
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
 #[serde(deny_unknown_fields)]
-pub struct LinkedIdentity {
+pub struct LinkedLogin {
     /// The provider, by its configured name.
     pub provider: Slug,
     /// The provider's subject for the account.
     pub subject: Title,
     /// H3: the emails the provider marked verified at the last sign-in; only these match an
-    /// entity.
+    /// identity.
     pub verified_emails: BTreeSet<Email>,
     /// When it was linked.
     pub linked_at: Timestamp,
 }
 
-impl From<cairn_store::IdentityRecord> for LinkedIdentity {
-    fn from(record: cairn_store::IdentityRecord) -> Self {
+impl From<cairn_store::LoginRecord> for LinkedLogin {
+    fn from(record: cairn_store::LoginRecord) -> Self {
         Self {
             provider: record.provider,
             subject: record.subject,
@@ -57,7 +57,7 @@ impl From<cairn_store::IdentityRecord> for LinkedIdentity {
 pub struct UserName {
     /// The user.
     pub user: UserId,
-    /// Their name: the entity their verified emails name, else the name their sign-in gave.
+    /// Their name: the identity their verified emails name, else the name their sign-in gave.
     pub name: Title,
 }
 

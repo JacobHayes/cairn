@@ -23,7 +23,7 @@ function summaryJourney(): Ready {
   findings.dates = { due: { date: "2026-10-01", chain: { constraints: [] } }, overdue_days: 5 };
   report.stale = ["missing_artifact", { open_dependency: "n_findings" }];
   report.dates.shortfall = { chain: { constraints: [] }, shortfall_days: 3 };
-  meeting.participations = { k_owner: { entities: ["e_two"], origin: "explicit" } };
+  meeting.participations = { k_owner: { identities: ["who_two"], origin: "explicit" } };
   return view;
 }
 
@@ -35,7 +35,7 @@ const projected: StatusSummary = {
   shortfalls: ["n_report"],
   stale: ["n_report"],
   upcoming_milestones: [{ node: "n_meeting", date: { date: "2026-11-20", origin: "pin" } }],
-  open_decisions: [{ node: "n_when", owners: ["e_one"] }],
+  open_decisions: [{ node: "n_when", owners: ["who_one"] }],
 };
 
 describe("C18: the status summary", () => {
@@ -66,8 +66,8 @@ describe("C18: the status summary", () => {
 
   it("lists upcoming milestones with date, origin, and owner, and open decisions with owners", () => {
     const model = summaryModel(summaryJourney(), projected);
-    expect(model.upcoming).toEqual([{ key: "n_meeting", title: "Meeting", date: "2026-11-20", origin: "pin", owners: ["e_two"] }]);
-    expect(model.openDecisions).toEqual([{ key: "n_when", title: "Meeting date", owners: ["e_one"] }]);
+    expect(model.upcoming).toEqual([{ key: "n_meeting", title: "Meeting", date: "2026-11-20", origin: "pin", owners: ["who_two"] }]);
+    expect(model.openDecisions).toEqual([{ key: "n_when", title: "Meeting date", owners: ["who_one"] }]);
   });
 
   it("lists nothing where the projection lists nothing", () => {

@@ -248,7 +248,7 @@ fn writes() -> Vec<Operation> {
         },
         patch(
             &at::PATCH_DEPLOYMENT,
-            "Applies a deployment patch: entities and merges (E6).",
+            "Applies a deployment patch: identities and merges (E6).",
         ),
     ]
 }
@@ -395,7 +395,7 @@ fn bulk() -> Vec<Operation> {
         drafted::<SaveAsRouteRequest>(
             &at::SAVE_AS_ROUTE,
             "Proposes saving the journey's structure as a route draft, with a participation \
-             mapping per explicit entity and an exclusion per node (B8).",
+             mapping per explicit identity and an exclusion per node (B8).",
         ),
         drafted::<RelinkRequest>(
             &at::RELINK,
@@ -472,7 +472,7 @@ fn reads() -> Vec<Operation> {
         },
         read::<Deployment>(
             &at::DEPLOYMENT,
-            "The deployment: entities and aliases (E6).",
+            "The deployment: identities and aliases (E6).",
         ),
         Operation {
             query: query::SEARCH_PARAMS,
@@ -500,12 +500,12 @@ fn users() -> Vec<Operation> {
                 "Revision ticks as server-sent `tick` events, current revisions first (H6).",
             )
         },
-        read::<Viewer>(&at::VIEWER, "The caller and their entities (H2, H3)."),
+        read::<Viewer>(&at::VIEWER, "The caller and their identities (H2, H3)."),
         Operation {
             query: query::USER_NAME_PARAMS,
             ..read::<Vec<UserName>>(
                 &at::USER_NAMES,
-                "The names people see for the users asked for: the entity their verified emails \
+                "The names people see for the users asked for: the identity their verified emails \
                  name, else the name their sign-in gave (H3).",
             )
         },
@@ -791,7 +791,7 @@ fn responses(
 
 /// The auth layer's own answers, which stand in front of every operation in plain text
 /// (3.2): 401 with its `WWW-Authenticate` challenge, 403 for a peer a local-only provider
-/// or a proxy-mode provider refuses, and 503 when an identity provider cannot be asked (no `Retry-After`). A status
+/// or a proxy-mode provider refuses, and 503 when a sign-in provider cannot be asked (no `Retry-After`). A status
 /// the API also answers as a problem gets the text body beside it.
 fn auth_refusals(answers: &mut Map<String, Value>) {
     let refusals = [
@@ -802,11 +802,11 @@ fn auth_refusals(answers: &mut Map<String, Value>) {
         (
             "403",
             "The auth layer refused the peer: a local-only provider and a remote peer, or \
-             identity headers from a peer no proxy-mode provider trusts (in text).",
+             login headers from a peer no proxy-mode provider trusts (in text).",
         ),
         (
             "503",
-            "The auth layer could not ask an identity provider (in text, without `Retry-After`).",
+            "The auth layer could not ask a sign-in provider (in text, without `Retry-After`).",
         ),
     ];
     for (status, description) in refusals {

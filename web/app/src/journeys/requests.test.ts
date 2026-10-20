@@ -17,7 +17,7 @@ const nodes = view.journey.graph.nodes ?? [];
 
 const narrowed: ViewState = {
   ...DEFAULT_VIEW_STATE,
-  filter: { mine: true, owner: "e_one", flags: ["stale", "overdue"], notRelevant: false, conditional: true },
+  filter: { mine: true, owner: "who_one", flags: ["stale", "overdue"], notRelevant: false, conditional: true },
   text: "  plan  ",
 };
 
@@ -42,7 +42,7 @@ describe("the level every view draws from", () => {
 
   it("carries Only mine, the owner, the flags in the Filter's order and the trimmed search", () => {
     const request = levelRequestOf(narrowed, "actions", ["n_stage"]);
-    expect([request.flags, request.owner, request.text, request.collapsed]).toEqual([["mine", "overdue", "stale"], "e_one", "plan", ["n_stage"]]);
+    expect([request.flags, request.owner, request.text, request.collapsed]).toEqual([["mine", "overdue", "stale"], "who_one", "plan", ["n_stage"]]);
   });
 
   it("is the same with Frontier on: it only lights", () => {
@@ -87,7 +87,7 @@ describe("the list's table and the walk through", () => {
 
   it("reads the walk's cards from the frontier in rank order, with the Filter and the search, and only decisions at Decisions depth", () => {
     expect(walkQueryOf(DEFAULT_VIEW_STATE, "actions")).toEqual({ flags: ["next_up"], sort: "rank" });
-    expect(walkQueryOf(narrowed, "decisions")).toEqual({ flags: ["next_up", "mine", "overdue", "stale"], sort: "rank", kinds: ["decision"], owner: "e_one", text: "plan" });
+    expect(walkQueryOf(narrowed, "decisions")).toEqual({ flags: ["next_up", "mine", "overdue", "stale"], sort: "rank", kinds: ["decision"], owner: "who_one", text: "plan" });
     for (const depth of STEPS.filter((each) => each !== "decisions")) {
       expect(walkQueryOf(DEFAULT_VIEW_STATE, depth).kinds, depth).toBeUndefined();
     }

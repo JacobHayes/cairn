@@ -15,7 +15,7 @@ use std::time::Duration;
 
 use cairn_schema::{Domain, EventType, GraphRecord, Record, RecordKey, Rejection, Subject, Write};
 use cairn_store::build::{
-    action, create_entity, create_journey, entity, id, journey_graph, journey_patch, put_in,
+    action, create_identity, create_journey, id, identity, journey_graph, journey_patch, put_in,
     revision,
 };
 use cairn_store::conformance::{Backend, applied, both, deployment, journey};
@@ -189,10 +189,10 @@ pub async fn two_creates_of_one_journey_in_flight_yield_one_journey(backend: &Tu
     );
 }
 
-/// E6: two entity creates of one key, riding in patches to two journeys at once (a unique
-/// key race on the entity and the deployment's revision row): the second waits its turn,
-/// then finds the key taken; one entity results and the deployment revision moves once.
-pub async fn two_entity_creates_of_one_key_in_flight_yield_one_entity(backend: &Turso) {
+/// E6: two identity creates of one key, riding in patches to two journeys at once (a unique
+/// key race on the identity and the deployment's revision row): the second waits its turn,
+/// then finds the key taken; one identity results and the deployment revision moves once.
+pub async fn two_identity_creates_of_one_key_in_flight_yield_one_identity(backend: &Turso) {
     let faults = Faults::default();
     let store = backend.open(faults.clone()).await;
     applied(
@@ -207,9 +207,9 @@ pub async fn two_entity_creates_of_one_key_in_flight_yield_one_entity(backend: &
     .await;
     let gate = Gate::at(CommitPoint::BetweenStateAndEvents, &faults);
     let ride = |patch: &str, journey: &str, name: &str| {
-        create_entity(
+        create_identity(
             journey_patch(patch, journey, 1),
-            entity("e_shared", name, &[]),
+            identity("who_shared", name, &[]),
         )
         .commit()
     };
@@ -227,7 +227,7 @@ pub async fn two_entity_creates_of_one_key_in_flight_yield_one_entity(backend: &
     let people = deployment(&store).await;
     assert_eq!(people.revision, revision(1));
     let names: Vec<_> = people
-        .entities
+        .identities
         .values()
         .map(|held| held.name.as_str().to_owned())
         .collect();
@@ -239,7 +239,7 @@ pub async fn two_entity_creates_of_one_key_in_flight_yield_one_entity(backend: &
     };
     assert_eq!(
         violations.as_slice()[0].code,
-        cairn_schema::ViolationCode::EntityKeyTaken
+        cairn_schema::ViolationCode::IdentityKeyTaken
     );
 }
 
@@ -425,7 +425,7 @@ async fn crash(path: &std::path::Path) -> ! {
     unreachable!("the commit aborts the process");
 }
 
-fn answer_with(patch: &str, journey: &str, base: u32, entity_key: &str) -> Commit {
+fn answer_with(patch: &str, journey: &str, base: u32, identity_key: &str) -> Commit {
     journey_patch(patch, journey, base)
         .expects(cairn_schema::RevisionOf::Domain(Domain::Deployment), 1)
         .event(
@@ -435,7 +435,7 @@ fn answer_with(patch: &str, journey: &str, base: u32, entity_key: &str) -> Commi
                 &journey_graph(journey),
                 GraphRecord::Answer {
                     decision: id("n_who"),
-                    value: cairn_schema::AnswerValue::Entity(id(entity_key)),
+                    value: cairn_schema::AnswerValue::Identity(id(identity_key)),
                     rationale: None,
                 },
             )],
@@ -445,40 +445,40 @@ fn answer_with(patch: &str, journey: &str, base: u32, entity_key: &str) -> Commi
 
 fn merge(patch: &str) -> Commit {
     cairn_store::build::deployment_patch(patch, 1)
-        .referencing(&["e_a", "e_b"], &[])
+        .referencing(&["who_a", "who_b"], &[])
         .event(
-            EventType::EntitiesMerged,
-            Subject::Entity(id("e_b")),
+            EventType::IdentitiesMerged,
+            Subject::Identity(id("who_b")),
             vec![
-                Write::Remove(RecordKey::Entity(id("e_b"))),
-                Write::Put(Record::EntityAlias {
-                    alias: id("e_b"),
-                    entity: id("e_a"),
+                Write::Remove(RecordKey::Identity(id("who_b"))),
+                Write::Put(Record::IdentityAlias {
+                    alias: id("who_b"),
+                    identity: id("who_a"),
                 }),
             ],
         )
         .commit()
 }
 
-/// E6: a journey patch starting to reference an entity and a merge of that entity, in
+/// E6: a journey patch starting to reference an identity and a merge of that identity, in
 /// flight together, do not both commit: the merge would miss the new reference. The patch
 /// writing the reference holds the deployment's revision row, so the merge waits its turn
-/// and is then stale on the journey that now references its entity.
+/// and is then stale on the journey that now references its identity.
 pub async fn a_reference_and_a_merge_in_flight_do_not_both_commit(backend: &Turso) {
     let faults = Faults::default();
     let store = backend.open(faults.clone()).await;
     let people = cairn_store::build::deployment_patch("p_people", 0).event(
-        EventType::EntityCreated,
-        Subject::Entity(id("e_a")),
+        EventType::IdentityCreated,
+        Subject::Identity(id("who_a")),
         vec![
-            Write::Put(Record::Entity(entity("e_a", "A", &[]))),
-            Write::Put(Record::Entity(entity("e_b", "B", &[]))),
+            Write::Put(Record::Identity(identity("who_a", "A", &[]))),
+            Write::Put(Record::Identity(identity("who_b", "B", &[]))),
         ],
     );
     applied(&store, people.commit()).await;
     let who = cairn_store::build::node(serde_json::json!({
         "key": "n_who", "id": "who", "kind": "decision", "title": "Who",
-        "prompt": "Who?", "answer_type": "entity",
+        "prompt": "Who?", "answer_type": "identity",
     }));
     applied(&store, create_journey("p_one", "j_one", vec![who]).commit()).await;
     let gate = Gate::at(CommitPoint::BetweenStateAndEvents, &faults);
@@ -486,7 +486,7 @@ pub async fn a_reference_and_a_merge_in_flight_do_not_both_commit(backend: &Turs
     let (referenced, merged) = beside_held(
         &store,
         &gate,
-        answer_with("p_answer", "j_one", 1, "e_b"),
+        answer_with("p_answer", "j_one", 1, "who_b"),
         meanwhile,
     )
     .await;

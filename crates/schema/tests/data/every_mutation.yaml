@@ -146,9 +146,9 @@ mutations:
   date: "2026-10-02"
 - op: fill_role
   role: r_watchers
-  entities:
-  - e_one
-  - e_two
+  identities:
+  - who_one
+  - who_two
 - op: clear_role_fill
   role: r_watchers
 - op: set_pin
@@ -229,19 +229,19 @@ mutations:
   edit:
     field: title
   marked: false
-- op: create_entity
-  entity:
-    key: e_one
+- op: create_identity
+  identity:
+    key: who_one
     name: First person
     emails:
     - first@example.org
-- op: edit_entity
-  entity:
-    key: e_one
+- op: edit_identity
+  identity:
+    key: who_one
     name: First Person
-- op: merge_entities
-  survivor: e_one
-  merged: e_two
+- op: merge_identities
+  survivor: who_one
+  merged: who_two
   journeys:
     j_sample: 7
 - op: create_proposal

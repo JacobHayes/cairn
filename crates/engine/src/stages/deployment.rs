@@ -1,8 +1,8 @@
-//! The deployment holds (E6, H3): every alias names an entity and is not one itself, so an
-//! alias resolves in one step with no cycle, and each email belongs to one entity; a merge
-//! joins two entities' emails and aliases, so each entity is held to its email and alias
+//! The deployment holds (E6, H3): every alias names an identity and is not one itself, so an
+//! alias resolves in one step with no cycle, and each email belongs to one identity; a merge
+//! joins two identities' emails and aliases, so each identity is held to its email and alias
 //! limits here too. Checked when the patch wrote deployment records. Cost: one pass over
-//! entities and aliases.
+//! identities and aliases.
 
 use std::collections::BTreeMap;
 
@@ -15,19 +15,20 @@ use crate::validate::violation;
 pub(super) fn check(check: &mut Check<'_, '_>) {
     let session = check.session;
     let wrote = matches!(session.patch.target, PatchTarget::Deployment)
-        || !session.created_entities.is_empty();
+        || !session.created_identities.is_empty();
     if !wrote {
         return;
     }
     let deployment = &session.candidate.deployment;
     for (alias, target) in &deployment.aliases {
-        if deployment.entities.get(alias).is_some() || deployment.entities.get(target).is_none() {
+        if deployment.identities.get(alias).is_some() || deployment.identities.get(target).is_none()
+        {
             let mut found = violation(
                 ViolationCode::AliasCycle,
-                "an alias resolves to one existing entity and is not an entity itself (E6)",
+                "an alias resolves to one existing identity and is not an identity itself (E6)",
             );
-            found.at.subject = Some(Subject::Entity(alias.clone()));
-            found.related.push(Subject::Entity(target.clone()));
+            found.at.subject = Some(Subject::Identity(alias.clone()));
+            found.related.push(Subject::Identity(target.clone()));
             check.violations.push(found);
         }
     }
@@ -45,44 +46,44 @@ pub(super) fn check(check: &mut Check<'_, '_>) {
         found.limit = Some(Limit::GraphBytes);
         check.violations.push(found);
     }
-    entity_limits(check);
+    identity_limits(check);
     let mut holders = BTreeMap::new();
-    for entity in deployment.entities.values() {
-        for email in &entity.emails {
-            if let Some(first) = holders.insert(email, &entity.key) {
+    for identity in deployment.identities.values() {
+        for email in &identity.emails {
+            if let Some(first) = holders.insert(email, &identity.key) {
                 let mut found = violation(
                     ViolationCode::EmailTaken,
-                    format!("{} is held by two entities (H3)", email.as_str()),
+                    format!("{} is held by two identities (H3)", email.as_str()),
                 );
-                found.at.subject = Some(Subject::Entity(entity.key.clone()));
-                found.related.push(Subject::Entity(first.clone()));
+                found.at.subject = Some(Subject::Identity(identity.key.clone()));
+                found.related.push(Subject::Identity(first.clone()));
                 check.violations.push(found);
             }
         }
     }
 }
 
-/// PRACTICES, Explicit limits: each entity holds at most `email_count_per_entity_max` emails
-/// and is the target of at most `alias_count_per_entity_max` aliases.
-fn entity_limits(check: &mut Check<'_, '_>) {
+/// PRACTICES, Explicit limits: each identity holds at most `email_count_per_identity_max` emails
+/// and is the target of at most `alias_count_per_identity_max` aliases.
+fn identity_limits(check: &mut Check<'_, '_>) {
     let deployment = &check.session.candidate.deployment;
-    let emails = deployment.entities.values().filter_map(|entity| {
-        Limit::EmailCountPerEntity
-            .check(entity.emails.len())
+    let emails = deployment.identities.values().filter_map(|identity| {
+        Limit::EmailCountPerIdentity
+            .check(identity.emails.len())
             .err()
-            .map(|exceeded| (&entity.key, exceeded))
+            .map(|exceeded| (&identity.key, exceeded))
     });
     let aliases = deployment.alias_counts_exceeded();
     for (key, exceeded) in emails.chain(aliases) {
         let mut found = violation(
             ViolationCode::LimitExceeded,
             format!(
-                "the entity has {}, past {}",
+                "the identity has {}, past {}",
                 exceeded.count,
                 exceeded.limit.name()
             ),
         );
-        found.at.subject = Some(Subject::Entity(key.clone()));
+        found.at.subject = Some(Subject::Identity(key.clone()));
         found.limit = Some(exceeded.limit);
         check.violations.push(found);
     }

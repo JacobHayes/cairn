@@ -1,5 +1,5 @@
 // The write path for the screens around a journey (the index, the overview, the route
-// screens, entities): one patch through the edit manager (H5's safe retry, D7's save, nothing
+// screens, identities): one patch through the edit manager (H5's safe retry, D7's save, nothing
 // sent under version skew). The write is the manager's, found again by the screen's edit key:
 // its rejection shows inline (A15) and is counted on the sync chip until it is discarded or
 // the next write of the edit replaces it, wherever the person has gone since.

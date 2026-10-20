@@ -18,7 +18,7 @@ use axum::http::header::LOCATION;
 use axum::http::{Extensions, HeaderMap, HeaderValue, StatusCode};
 use axum::response::{IntoResponse, Response};
 use axum::routing::get;
-use cairn_schema::{Actor, Email, Identity, Slug, Title, UserId};
+use cairn_schema::{Actor, Email, Login, Slug, Title, UserId};
 use cairn_store::{OAuthStateKind, OAuthStateRecord};
 use openidconnect::core::{
     CoreAuthenticationFlow, CoreClient, CoreClientAuthMethod, CoreIdTokenClaims,
@@ -51,7 +51,7 @@ pub struct OidcConfig {
     pub client_id: String,
     /// Cairn's client secret at the issuer, for a confidential client.
     pub client_secret: Option<String>,
-    /// H3: link a new identity to the user holding one of its verified emails.
+    /// H3: link a new login to the user holding one of its verified emails.
     pub auto_link: bool,
 }
 
@@ -77,7 +77,7 @@ struct Pending {
     verifier_digest: String,
     return_to: String,
     /// The user the browser was signed in as when the sign-in started: the callback links
-    /// the identity to this user only if the browser is still them.
+    /// the login to this user only if the browser is still them.
     initiator: Option<UserId>,
 }
 
@@ -222,8 +222,8 @@ impl Inner {
         let claims = id_token
             .claims(&verifier, &nonce)
             .map_err(|_| Failure::Refused("the ID token is not valid"))?;
-        let identity = self.identity(claims)?;
-        self.sign_in(headers, &identity, signed_in, &pending.return_to)
+        let login = self.login(claims)?;
+        self.sign_in(headers, &login, signed_in, &pending.return_to)
             .await
     }
 
@@ -250,9 +250,9 @@ impl Inner {
         Ok(pending)
     }
 
-    /// The identity an ID token's claims describe; its email only if the issuer marks it
+    /// The login an ID token's claims describe; its email only if the issuer marks it
     /// verified (H3).
-    fn identity(&self, claims: &CoreIdTokenClaims) -> Result<Identity, Failure> {
+    fn login(&self, claims: &CoreIdTokenClaims) -> Result<Login, Failure> {
         let subject: Title = claims
             .subject()
             .as_str()
@@ -273,7 +273,7 @@ impl Inner {
             .flatten()
             .find_map(|text| text.parse::<Title>().ok())
             .unwrap_or_else(|| subject.clone());
-        Ok(Identity {
+        Ok(Login {
             provider: self.config.name.clone(),
             subject,
             display,
@@ -281,20 +281,18 @@ impl Inner {
         })
     }
 
-    /// Resolves the identity, linking it to the browser's user if it is signed in, and
+    /// Resolves the login, linking it to the browser's user if it is signed in, and
     /// starts a new session in place of any it had.
     async fn sign_in(
         &self,
         headers: &HeaderMap,
-        identity: &Identity,
+        login: &Login,
         signed_in: Option<UserId>,
         return_to: &str,
     ) -> Result<Response, Failure> {
         let existing = cookies::read(headers, SESSION_COOKIE);
         let auto_link = self.config.auto_link;
-        let user = self
-            .accounts
-            .resolve(identity, signed_in.as_ref(), auto_link);
+        let user = self.accounts.resolve(login, signed_in.as_ref(), auto_link);
         let user = user.await?;
         if let Some(token) = &existing {
             self.accounts.end_session(token).await?;
@@ -377,7 +375,7 @@ impl IntoResponse for Failure {
             Failure::BadRequest(_) => StatusCode::BAD_REQUEST,
             Failure::Refused(_) | Failure::Browser(Refusal::Credential) => StatusCode::UNAUTHORIZED,
             Failure::Browser(Refusal::Peer) => StatusCode::FORBIDDEN,
-            Failure::Auth(AuthError::IdentityHeldByAnotherUser { .. }) => StatusCode::CONFLICT,
+            Failure::Auth(AuthError::LoginHeldByAnotherUser { .. }) => StatusCode::CONFLICT,
             Failure::Auth(AuthError::Upstream(_)) => StatusCode::BAD_GATEWAY,
             Failure::Browser(Refusal::Unavailable(_)) | Failure::Auth(_) => {
                 StatusCode::SERVICE_UNAVAILABLE
@@ -438,7 +436,7 @@ struct Routes {
 impl Routes {
     /// The user the browser is signed in as, by its session or by a provider that signs
     /// each request in (Tailscale, the dev user), past a lapsed session cookie: the user a
-    /// new identity links to. An agent is no one's browser, and a refused credential is
+    /// new login links to. An agent is no one's browser, and a refused credential is
     /// what signing in replaces; a credential that could not be checked fails the step,
     /// rather than signing in as someone new.
     async fn browser_user(
@@ -469,7 +467,7 @@ async fn start(
     started.unwrap_or_else(IntoResponse::into_response)
 }
 
-/// The callback: the identity links to the browser's user, who must be the one who
+/// The callback: the login links to the browser's user, who must be the one who
 /// started the sign-in.
 async fn finish(
     State(routes): State<Arc<Routes>>,

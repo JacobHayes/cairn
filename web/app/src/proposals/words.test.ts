@@ -14,7 +14,7 @@ const graph: Graph = {
   ],
 } as Graph;
 
-const names = namesOf([graph], { revision: 1, entities: [{ key: "e_ann", name: "Ann" }] });
+const names = namesOf([graph], { revision: 1, identities: [{ key: "who_ann", name: "Ann" }] });
 
 describe("mutationWords", () => {
   const cases: [string, Mutation, string[], string[]][] = [
@@ -79,7 +79,7 @@ describe("outlineWords (C14)", () => {
 
 describe("stateValueWords (C14)", () => {
   const cases: [string, string, unknown, string[], string[]][] = [
-    ["an entity answer by the entity's name", "answers", { entity: "e_ann" }, ["Ann"], ["e_ann", "{"]],
+    ["an identity answer by the identity's name", "answers", { identity: "who_ann" }, ["Ann"], ["who_ann", "{"]],
     ["a choice answer by its label", "answers", { single_choice: "partner_team" }, ["Partner"], ["partner_team", "{"]],
     ["a snooze on a node by its title", "snoozes", { node: "n_test" }, ["Run the tests"], ["n_test", "{"]],
     ["a snooze on a date in words", "snoozes", { date: "2026-11-25" }, ["Nov 25"], ["2026-11-25", "{"]],

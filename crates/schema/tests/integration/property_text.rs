@@ -22,7 +22,7 @@ mod property {
             node in arb_node_key(),
             role in arb_role_key(),
             kind in arb_kind_key(),
-            entity in arb_entity_key(),
+            identity in arb_identity_key(),
             attachment in arb_attachment_key(),
             journey in arb_journey_id(),
             patch in arb_patch_id(),
@@ -37,7 +37,7 @@ mod property {
             json_round_trip(&node);
             json_round_trip(&role);
             json_round_trip(&kind);
-            json_round_trip(&entity);
+            json_round_trip(&identity);
             json_round_trip(&attachment);
             json_round_trip(&journey);
             json_round_trip(&patch);
@@ -77,7 +77,7 @@ mod property {
         #[test]
         fn a_key_never_parses_as_another_key_type(node in arb_node_key()) {
             prop_assert!(node.as_str().parse::<cairn_schema::RoleKey>().is_err());
-            prop_assert!(node.as_str().parse::<cairn_schema::EntityKey>().is_err());
+            prop_assert!(node.as_str().parse::<cairn_schema::IdentityKey>().is_err());
         }
     }
 }

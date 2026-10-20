@@ -121,7 +121,7 @@ pub fn claims_of(subject: &str, email: &str, now: i64) -> Value {
         "hd": "example.org",
         "iat": now,
         "exp": now + 600,
-        "identity_source": "GOOGLE",
+        "login_source": "GOOGLE",
         "google": { "access_levels": [] },
     })
 }

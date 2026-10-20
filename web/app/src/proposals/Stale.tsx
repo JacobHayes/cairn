@@ -39,7 +39,7 @@ const INTERVENING: ReadSource<InterveningArgs, PatchEvents[]> = {
 /** I6: journey `journey`'s patches between `expected` and `current`, read from its history. */
 function useIntervening(journey: string | undefined, expected: number, current: number): PatchEvents[] | { failed: string } | undefined {
   const { host } = useSession();
-  const { view } = useKeyedRead(INTERVENING, journey === undefined ? undefined : { identity: [journey], freshness: [expected, current], args: { host, journey, expected, current } });
+  const { view } = useKeyedRead(INTERVENING, journey === undefined ? undefined : { of: [journey], freshness: [expected, current], args: { host, journey, expected, current } });
   if (view.status === "current") {
     return view.value;
   }

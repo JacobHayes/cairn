@@ -22,7 +22,7 @@ pub use reads::{
     EventPage, InsertionUse, JourneyMatches, JourneyPage, JourneySummary, LoggedEvent, RouteDetail,
     RoutePage, RouteSummary, SearchHit, SearchPage, VersionJourneys,
 };
-pub use users::{AgentToken, LinkedIdentity, MintedToken, TokenRequest, UserName, Viewer};
+pub use users::{AgentToken, LinkedLogin, MintedToken, TokenRequest, UserName, Viewer};
 
 use std::collections::BTreeMap;
 
@@ -152,11 +152,11 @@ pub enum AuthKind {
     Oidc,
     /// The built-in OAuth server for MCP clients (I2).
     BuiltinOauth,
-    /// Tailscale identity.
+    /// Tailscale login.
     Tailscale,
     /// Google Cloud Identity-Aware Proxy's signed assertion.
     GcpIap,
-    /// The browser host's single local identity.
+    /// The browser host's single local login.
     Local,
 }
 

@@ -38,7 +38,7 @@ function reading() {
       actor.send({ type: "want", key });
       await settle();
     },
-    show: (key: ReadKey<unknown> | undefined) => readView<string>(actor.getSnapshot(), key?.identity, key?.freshness),
+    show: (key: ReadKey<unknown> | undefined) => readView<string>(actor.getSnapshot(), key?.of, key?.freshness),
   };
 }
 
@@ -51,7 +51,7 @@ describe("what a projection shows", () => {
     await read.ask(first);
     expect(read.show(first)).toMatchObject({ status: "current", value: "answer" });
     const next = projectedKey(deriver, ready(2), level("group"));
-    expect(next?.identity).toEqual(first?.identity);
+    expect(next?.of).toEqual(first?.of);
     expect(read.show(next)).toMatchObject({ status: "refreshing", value: "answer" });
   });
 
@@ -60,7 +60,7 @@ describe("what a projection shows", () => {
     await read.ask(projectedKey(deriver, ready(1), level("group")));
     const other = projectedKey(deriver, ready(1), level("action"));
     expect(read.show(other)).toEqual({ status: "loading" });
-    expect(projectedKey(deriver, ready(1), level("group"))?.identity).not.toEqual(projectedKey(deriver, { key: { ...ready(1).key, journey: "j_two" } } as unknown as Ready, level("group"))?.identity);
+    expect(projectedKey(deriver, ready(1), level("group"))?.of).not.toEqual(projectedKey(deriver, { key: { ...ready(1).key, journey: "j_two" } } as unknown as Ready, level("group"))?.of);
     expect(read.show(projectedKey(deriver, ready(1), undefined))).toEqual({ status: "idle" });
   });
 
@@ -106,8 +106,8 @@ describe("what the other canvas reads are keyed by", () => {
   test("a joined trace by the keys it joins, and the list's rows by the query", () => {
     expect(joinedTraceKey(deriver, ready(1), [])).toBeUndefined();
     const keys = joinedTraceKey(deriver, ready(1), ["n_a", "n_b"]);
-    expect(keys?.identity).not.toEqual(joinedTraceKey(deriver, ready(1), ["n_a", "n_c"])?.identity);
+    expect(keys?.of).not.toEqual(joinedTraceKey(deriver, ready(1), ["n_a", "n_c"])?.of);
     expect(keys?.freshness).not.toEqual(joinedTraceKey(deriver, ready(2), ["n_a", "n_b"])?.freshness);
-    expect(rowsKey(deriver, ready(1), { status: ["open"] } as never).identity).not.toEqual(rowsKey(deriver, ready(1), { status: ["done"] } as never).identity);
+    expect(rowsKey(deriver, ready(1), { status: ["open"] } as never).of).not.toEqual(rowsKey(deriver, ready(1), { status: ["done"] } as never).of);
   });
 });

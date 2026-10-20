@@ -9,7 +9,7 @@ const narrowed: ViewState = {
   depth: "decisions",
   fade: true,
   frontier: true,
-  filter: { mine: true, owner: "e_lead", flags: ["overdue", "stale"], notRelevant: true, conditional: false },
+  filter: { mine: true, owner: "who_lead", flags: ["overdue", "stale"], notRelevant: true, conditional: false },
   text: "plan",
 };
 
@@ -107,13 +107,13 @@ describe("changing the view state", () => {
 });
 
 describe("the view state a route reads", () => {
-  const asked = "depth=stages&fade=1&frontier=1&mine=1&owner=e_lead&flag=overdue&show=notrelevant&q=ship";
+  const asked = "depth=stages&fade=1&frontier=1&mine=1&owner=who_lead&flag=overdue&show=notrelevant&q=ship";
   const route = (search: string) => viewStateFrom(new URLSearchParams(search), ROUTE_OFFERS);
 
   it("keeps the depth, Fade, the conditional class and the search, and nothing a route has no state for", () => {
     expect(route(asked)).toEqual({ depth: "stages", fade: true, frontier: false, filter: { ...DEFAULT_FILTER, conditional: false }, text: "ship" });
     // A journey reads every one of them.
-    expect(read(asked).filter).toMatchObject({ mine: true, owner: "e_lead", flags: ["overdue"], notRelevant: true });
+    expect(read(asked).filter).toMatchObject({ mine: true, owner: "who_lead", flags: ["overdue"], notRelevant: true });
   });
 
   it("writes back an address without what a route does not offer", () => {

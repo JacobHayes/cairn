@@ -70,7 +70,7 @@ pub enum Segment<R: References> {
     Text(String),
     /// A journey field.
     Journey(JourneyField),
-    /// The names of the entities filling a role.
+    /// The names of the identities filling a role.
     RoleName(R::Role),
     /// A decision's answer.
     Answer(R::Node),

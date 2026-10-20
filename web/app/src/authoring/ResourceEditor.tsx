@@ -1,7 +1,7 @@
 // A10: `ResourceEditor` adds, edits, and removes a node's resources: a markdown tip, a link to
 // a template, an example, or a reference, or a message draft. A draft's placeholders are
 // picked from what the graph holds (journey fields, each role's names, each decision's
-// answer) and written as a route file writes them, then stored with keys (Identity and
+// answer) and written as a route file writes them, then stored with keys (Keys and
 // references), so renaming a role or moving a decision breaks nothing. Limits and a link's
 // form are checked before sending.
 import { BODY_BYTES_MAX, RESOURCE_COUNT_PER_NODE_MAX, TITLE_BYTES_MAX } from "@cairn/client";

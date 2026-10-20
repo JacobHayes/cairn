@@ -75,7 +75,7 @@ out_of_reach=(
   service-patch-lost-at-commit
   service-resubmission-raced-original
   service-stale-patch-completed-with-intervening
-  # A read of the revisions failing in the instant after a commit that creates an entity in
+  # A read of the revisions failing in the instant after a commit that creates an identity in
   # passing: injected errors land there too rarely for a smoke campaign.
   service-deployment-revision-unread
   # Derived reads, proposals, and route-file imports: the plan writes domain patches only.

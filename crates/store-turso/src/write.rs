@@ -4,7 +4,7 @@
 use std::collections::BTreeSet;
 
 use cairn_schema::{
-    AnswerValue, Domain, Edge, Entity, GraphId, GraphRecord, Insertion, JourneyHeader, Lineage,
+    AnswerValue, Domain, Edge, GraphId, GraphRecord, Identity, Insertion, JourneyHeader, Lineage,
     Node, NodeKey, ParticipationKind, ParticipationSource, Proposal, ProposalDraft, Record,
     RecordKey, Resource, RetiredKey, Revision, Role, RouteHeader, SnoozeTarget, Write,
     limits::{EDGE_COUNT_PER_NODE_MAX, KIND_COUNT_MAX},
@@ -21,9 +21,9 @@ use crate::sql::{
 
 /// The tables holding one graph's records, children before parents.
 pub(crate) const GRAPH_TABLES: [&str; 20] = [
-    "participation_entities",
-    "answer_entities",
-    "role_fill_entities",
+    "participation_identities",
+    "answer_identities",
+    "role_fill_identities",
     "edges",
     "participations",
     "resources",
@@ -162,11 +162,11 @@ impl<'connection> Writer<'connection> {
                 )
                 .await?;
             }
-            Record::Entity(entity) => self.put_entity(entity).await?,
-            Record::EntityAlias { alias, entity } => {
+            Record::Identity(identity) => self.put_identity(identity).await?,
+            Record::IdentityAlias { alias, identity } => {
                 self.run(
-                    "INSERT OR REPLACE INTO entity_aliases (alias, entity) VALUES (?1, ?2)",
-                    vec![text(alias), text(entity)],
+                    "INSERT OR REPLACE INTO identity_aliases (alias, identity) VALUES (?1, ?2)",
+                    vec![text(alias), text(identity)],
                 )
                 .await?;
             }
@@ -238,22 +238,22 @@ impl<'connection> Writer<'connection> {
         Ok(())
     }
 
-    async fn put_entity(&mut self, entity: &Entity) -> Result<(), Abort> {
-        let Entity { key, name, emails } = entity;
+    async fn put_identity(&mut self, identity: &Identity) -> Result<(), Abort> {
+        let Identity { key, name, emails } = identity;
         self.run(
-            "INSERT INTO entities (key, name) VALUES (?1, ?2) \
+            "INSERT INTO identities (key, name) VALUES (?1, ?2) \
              ON CONFLICT (key) DO UPDATE SET name = excluded.name",
             vec![text(key), text(name)],
         )
         .await?;
         self.run(
-            "DELETE FROM entity_emails WHERE entity = ?1",
+            "DELETE FROM identity_emails WHERE identity = ?1",
             vec![text(key)],
         )
         .await?;
         for email in emails {
             self.run(
-                "INSERT INTO entity_emails (entity, email) VALUES (?1, ?2)",
+                "INSERT INTO identity_emails (identity, email) VALUES (?1, ?2)",
                 vec![text(key), text(email)],
             )
             .await?;
@@ -454,7 +454,7 @@ impl<'connection> Writer<'connection> {
         let params = || vec![text(id), text(key)];
         for table in [
             "edges",
-            "participation_entities",
+            "participation_identities",
             "participations",
             "resources",
         ] {
@@ -486,13 +486,13 @@ impl<'connection> Writer<'connection> {
     ) -> Result<(), Abort> {
         let params = || vec![text(id), text(node), text(kind)];
         self.run(
-            "DELETE FROM participation_entities WHERE graph_id = ?1 AND node = ?2 AND kind = ?3",
+            "DELETE FROM participation_identities WHERE graph_id = ?1 AND node = ?2 AND kind = ?3",
             params(),
         )
         .await?;
         let role = match source {
             ParticipationSource::Role(role) => text(role),
-            ParticipationSource::Entities(_) => Value::Null,
+            ParticipationSource::Identities(_) => Value::Null,
         };
         let mut values = params();
         values.push(role);
@@ -502,12 +502,12 @@ impl<'connection> Writer<'connection> {
             values,
         )
         .await?;
-        if let ParticipationSource::Entities(entities) = source {
-            for entity in entities.iter() {
+        if let ParticipationSource::Identities(identities) = source {
+            for identity in identities.iter() {
                 let mut values = params();
-                values.push(text(entity));
+                values.push(text(identity));
                 self.run(
-                    "INSERT INTO participation_entities (graph_id, node, kind, entity) \
+                    "INSERT INTO participation_identities (graph_id, node, kind, identity) \
                      VALUES (?1, ?2, ?3, ?4)",
                     values,
                 )
@@ -598,18 +598,21 @@ impl<'connection> Writer<'connection> {
                 )
                 .await?;
             }
-            RecordKey::Entity(entity) => {
+            RecordKey::Identity(identity) => {
                 self.run(
-                    "DELETE FROM entity_emails WHERE entity = ?1",
-                    vec![text(entity)],
+                    "DELETE FROM identity_emails WHERE identity = ?1",
+                    vec![text(identity)],
                 )
                 .await?;
-                self.run("DELETE FROM entities WHERE key = ?1", vec![text(entity)])
-                    .await?;
-            }
-            RecordKey::EntityAlias(alias) => {
                 self.run(
-                    "DELETE FROM entity_aliases WHERE alias = ?1",
+                    "DELETE FROM identities WHERE key = ?1",
+                    vec![text(identity)],
+                )
+                .await?;
+            }
+            RecordKey::IdentityAlias(alias) => {
+                self.run(
+                    "DELETE FROM identity_aliases WHERE alias = ?1",
                     vec![text(alias)],
                 )
                 .await?;
@@ -701,11 +704,11 @@ fn kind_row(kind: &ParticipationKind<KeyRefs>) -> [Value; 4] {
     [text(key), text(id), opt_text(title.as_ref()), flag(*multi)]
 }
 
-/// The entities an answer names.
-pub(crate) fn answer_entities(value: &AnswerValue) -> Vec<cairn_schema::EntityKey> {
+/// The identities an answer names.
+pub(crate) fn answer_identities(value: &AnswerValue) -> Vec<cairn_schema::IdentityKey> {
     match value {
-        AnswerValue::Entity(entity) => vec![entity.clone()],
-        AnswerValue::EntityList(entities) => entities.iter().cloned().collect(),
+        AnswerValue::Identity(identity) => vec![identity.clone()],
+        AnswerValue::IdentityList(identities) => identities.iter().cloned().collect(),
         AnswerValue::Boolean(_)
         | AnswerValue::SingleChoice(_)
         | AnswerValue::MultiChoice(_)

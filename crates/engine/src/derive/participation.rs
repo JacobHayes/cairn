@@ -1,39 +1,39 @@
 //! Pass 3, participation (E1, E2, E3, E5, B10; ARCHITECTURE, Read path: derive). Each
-//! node's effective participation of each kind resolves in E2's order: explicit entities on
+//! node's effective participation of each kind resolves in E2's order: explicit identities on
 //! the node, then its own role reference, then the nearest declaring ancestor's value, then
 //! `default_owner` (owner only), then none. An explicit empty list is "none" and stops
 //! inheritance. Multi-valued kinds replace at the nearest declaring level; nothing unions.
 //!
-//! Live, not copied: a node records only where its value resolves (explicit entities on
-//! some node, or a role), and entities are read through that source, so a role's members
+//! Live, not copied: a node records only where its value resolves (explicit identities on
+//! some node, or a role), and identities are read through that source, so a role's members
 //! changing re-derives every participation that reaches it while explicit ones stay (E5).
 //! A role's members are its filling decision's answer while that answer is in effect
-//! (decided and relevant, E3), else its direct fill; entities resolve through aliases (E6).
+//! (decided and relevant, E3), else its direct fill; identities resolve through aliases (E6).
 //! A node whose owner resolves to no one is `unassigned` (E1). The membership-loss flag
-//! (B10) marks a node holding one explicit entity for a kind whose inherited value would be
-//! a role that entity has left: the per-member breakdown's seeding entity is gone.
+//! (B10) marks a node holding one explicit identity for a kind whose inherited value would be
+//! a role that identity has left: the per-member breakdown's seeding identity is gone.
 //!
 //! Cost at `node_count_max` (2,000 nodes, 33 kinds with `owner`, 32 roles of up to 100
-//! entities): one walk down the tree, one resolution record per node and kind (66,000, a few
-//! megabytes), role members resolved once per role (3,200 entities), and each explicit list
-//! resolved once; no entity list is copied per node.
+//! identities): one walk down the tree, one resolution record per node and kind (66,000, a few
+//! megabytes), role members resolved once per role (3,200 identities), and each explicit list
+//! resolved once; no identity list is copied per node.
 
 use std::collections::{BTreeMap, BTreeSet};
 
 use cairn_schema::{
-    AnswerValue, Deployment, EntityKey, KindKey, NodeKey, ParticipationOrigin, ParticipationSource,
-    RoleKey,
+    AnswerValue, Deployment, IdentityKey, KindKey, NodeKey, ParticipationOrigin,
+    ParticipationSource, RoleKey,
 };
 
 use super::relevance::Relevances;
-use crate::entity;
 use crate::graph::{Document, Graph};
+use crate::identity;
 use crate::validate::state::filling_decisions;
 
-/// Where a resolved participation's entities are read from.
+/// Where a resolved participation's identities are read from.
 #[derive(Clone, Debug, PartialEq, Eq)]
 enum Source {
-    /// The explicit entities declared on this node for the kind.
+    /// The explicit identities declared on this node for the kind.
     Explicit(NodeKey),
     /// The role's members.
     Role(RoleKey),
@@ -50,23 +50,23 @@ struct Resolved {
 #[derive(Clone, Debug, Default, PartialEq, Eq)]
 pub struct Participation {
     /// Each role's members, resolved through aliases.
-    roles: BTreeMap<RoleKey, BTreeSet<EntityKey>>,
-    /// Each explicit declaration's entities, resolved through aliases.
-    explicit: BTreeMap<(NodeKey, KindKey), BTreeSet<EntityKey>>,
+    roles: BTreeMap<RoleKey, BTreeSet<IdentityKey>>,
+    /// Each explicit declaration's identities, resolved through aliases.
+    explicit: BTreeMap<(NodeKey, KindKey), BTreeSet<IdentityKey>>,
     /// Each node's resolution per kind; a kind that resolves to nothing is absent.
     nodes: BTreeMap<NodeKey, BTreeMap<KindKey, Resolved>>,
     unassigned: BTreeSet<NodeKey>,
     membership_lost: BTreeMap<NodeKey, BTreeSet<KindKey>>,
-    /// Merged entities' old keys, each with the entity it resolves to (E6).
-    aliases: BTreeMap<EntityKey, EntityKey>,
+    /// Merged identities' old keys, each with the identity it resolves to (E6).
+    aliases: BTreeMap<IdentityKey, IdentityKey>,
 }
 
 impl Participation {
     /// E3: the role's members now: its filling decision's answer while in effect, else its
     /// direct fill; empty when unfilled.
     #[must_use]
-    pub fn members(&self, role: &RoleKey) -> &BTreeSet<EntityKey> {
-        static EMPTY: BTreeSet<EntityKey> = BTreeSet::new();
+    pub fn members(&self, role: &RoleKey) -> &BTreeSet<IdentityKey> {
+        static EMPTY: BTreeSet<IdentityKey> = BTreeSet::new();
         self.roles.get(role).unwrap_or(&EMPTY)
     }
 
@@ -77,10 +77,10 @@ impl Participation {
         Some(&resolved.origin)
     }
 
-    /// E2: the node's effective entities for `kind`, empty when none.
+    /// E2: the node's effective identities for `kind`, empty when none.
     #[must_use]
-    pub fn entities(&self, node: &NodeKey, kind: &KindKey) -> &BTreeSet<EntityKey> {
-        static EMPTY: BTreeSet<EntityKey> = BTreeSet::new();
+    pub fn identities(&self, node: &NodeKey, kind: &KindKey) -> &BTreeSet<IdentityKey> {
+        static EMPTY: BTreeSet<IdentityKey> = BTreeSet::new();
         let Some(resolved) = self.nodes.get(node).and_then(|kinds| kinds.get(kind)) else {
             return &EMPTY;
         };
@@ -97,14 +97,14 @@ impl Participation {
         self.unassigned.contains(node)
     }
 
-    /// E6: the entity a key names once aliases are followed, so a key from before a merge
+    /// E6: the identity a key names once aliases are followed, so a key from before a merge
     /// reads through to the survivor; an unknown key stands for itself.
     #[must_use]
-    pub fn canonical_entity<'a>(&'a self, key: &'a EntityKey) -> &'a EntityKey {
+    pub fn canonical_identity<'a>(&'a self, key: &'a IdentityKey) -> &'a IdentityKey {
         self.aliases.get(key).unwrap_or(key)
     }
 
-    /// B10: the kinds whose seeding entity has left the role the node would inherit.
+    /// B10: the kinds whose seeding identity has left the role the node would inherit.
     #[must_use]
     pub fn membership_lost(&self, node: &NodeKey) -> &BTreeSet<KindKey> {
         static EMPTY: BTreeSet<KindKey> = BTreeSet::new();
@@ -112,9 +112,9 @@ impl Participation {
     }
 }
 
-/// The entity a key names once aliases are followed (E6); an unknown key stands for itself.
-fn canonical(deployment: &Deployment, key: &EntityKey) -> EntityKey {
-    entity::resolve(deployment, key).unwrap_or(key).clone()
+/// The identity a key names once aliases are followed (E6); an unknown key stands for itself.
+fn canonical(deployment: &Deployment, key: &IdentityKey) -> IdentityKey {
+    identity::resolve(deployment, key).unwrap_or(key).clone()
 }
 
 /// E3: each role's members.
@@ -122,21 +122,21 @@ fn role_members(
     document: &Document,
     relevances: &Relevances,
     deployment: &Deployment,
-) -> BTreeMap<RoleKey, BTreeSet<EntityKey>> {
+) -> BTreeMap<RoleKey, BTreeSet<IdentityKey>> {
     let fillers = filling_decisions(document);
     let mut roles = BTreeMap::new();
     for role in document.roles.as_map().keys() {
-        let members: Vec<&EntityKey> = match fillers.get(role) {
+        let members: Vec<&IdentityKey> = match fillers.get(role) {
             Some(decision) => match relevances.answer_in_effect(document, decision) {
-                Some(AnswerValue::Entity(entity)) => vec![entity],
-                Some(AnswerValue::EntityList(entities)) => entities.iter().collect(),
+                Some(AnswerValue::Identity(identity)) => vec![identity],
+                Some(AnswerValue::IdentityList(identities)) => identities.iter().collect(),
                 Some(_) | None => Vec::new(),
             },
             None => document
                 .state
                 .role_fills
                 .get(role)
-                .map(|entities| entities.iter().collect())
+                .map(|identities| identities.iter().collect())
                 .unwrap_or_default(),
         };
         let resolved = members.into_iter().map(|key| canonical(deployment, key));
@@ -173,7 +173,7 @@ pub(crate) fn pass(
         for kind in &kinds {
             participation.resolve(document, deployment, tree.parent(key), key, kind);
         }
-        if participation.entities(key, &KindKey::owner()).is_empty() {
+        if participation.identities(key, &KindKey::owner()).is_empty() {
             participation.unassigned.insert(key.clone());
         }
     }
@@ -205,10 +205,10 @@ impl Participation {
             own.as_ref().map(|own| &own.source),
             from_above.as_ref().map(|above| &above.source),
         ) {
-            let entities = self.explicit.get(&(key.clone(), kind.clone()));
-            let seeded = entities.filter(|entities| entities.len() == 1);
+            let identities = self.explicit.get(&(key.clone(), kind.clone()));
+            let seeded = identities.filter(|identities| identities.len() == 1);
             let members = self.members(role);
-            if seeded.is_some_and(|entities| !entities.is_subset(members)) {
+            if seeded.is_some_and(|identities| !identities.is_subset(members)) {
                 let lost = self.membership_lost.entry(key.clone()).or_default();
                 lost.insert(kind.clone());
             }
@@ -253,7 +253,7 @@ fn inherited_value(
 }
 
 impl Participation {
-    /// The node's own declaration for `kind`, recording explicit entities.
+    /// The node's own declaration for `kind`, recording explicit identities.
     fn declared(
         &mut self,
         document: &Document,
@@ -263,8 +263,10 @@ impl Participation {
     ) -> Option<Resolved> {
         let node = document.nodes.get(key)?;
         match node.participations.as_map().get(kind)? {
-            ParticipationSource::Entities(entities) => {
-                let resolved = entities.iter().map(|entity| canonical(deployment, entity));
+            ParticipationSource::Identities(identities) => {
+                let resolved = identities
+                    .iter()
+                    .map(|identity| canonical(deployment, identity));
                 self.explicit
                     .insert((key.clone(), kind.clone()), resolved.collect());
                 Some(Resolved {

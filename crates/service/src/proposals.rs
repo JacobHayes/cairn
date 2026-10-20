@@ -66,7 +66,7 @@ pub struct ProposalReview {
     /// candidate breaks a rule.
     pub after: Option<DestinationAfter>,
     /// D7, by journey: what applying it would newly cause in each journey it changes, or
-    /// whose meaning an entity merge in it changes; a journey with nothing new is left out.
+    /// whose meaning an identity merge in it changes; a journey with nothing new is left out.
     pub consequences: BTreeMap<JourneyId, Consequences>,
     /// I6: the destination moved since the proposal was drafted, so applying it is stale until
     /// it is refreshed and reviewed again.
@@ -240,7 +240,7 @@ impl Service {
     }
 
     /// C16: the open proposals waiting on `call`'s user: the ones they created, and the ones
-    /// an agent drafted for an active journey referring to one of their entities.
+    /// an agent drafted for an active journey referring to one of their identities.
     ///
     /// # Errors
     ///
@@ -255,7 +255,7 @@ impl Service {
         self.proposals(
             ProposalScope::Waiting {
                 user: viewer.user,
-                entities: viewer.entities,
+                identities: viewer.identities,
             },
             after,
             size,
@@ -539,7 +539,7 @@ impl Service {
 }
 
 /// D7 for a deployment proposal: what its resolved mutations would newly cause in each
-/// journey an entity merge in it was checked against.
+/// journey an identity merge in it was checked against.
 fn merged(
     records: &Records,
     draft: &ProposalDraft,

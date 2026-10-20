@@ -1,6 +1,6 @@
 //! D7: what an accepted patch newly caused in derived state, for each journey it changed or
-//! whose meaning it changed: the patch's own journey, and every journey an entity merge was
-//! checked against (aliases change what a condition comparing entities evaluates to, E6).
+//! whose meaning it changed: the patch's own journey, and every journey an identity merge was
+//! checked against (aliases change what a condition comparing identities evaluates to, E6).
 //! Both sides are derived with the same today, the request's, so the passing of midnight is
 //! never blamed on the patch. Computed for the response and never stored.
 //!
@@ -26,7 +26,7 @@ pub(crate) fn of(
 ) -> BTreeMap<JourneyId, Consequences> {
     let journeys: BTreeSet<&JourneyId> = match target {
         PatchTarget::Journey(id) => [id].into_iter().collect(),
-        // Every journey loaded for a deployment patch is one an entity merge was checked
+        // Every journey loaded for a deployment patch is one an identity merge was checked
         // against; a route patch never touches a journey (Journey durability).
         PatchTarget::Deployment => before.journeys.keys().collect(),
         PatchTarget::Route(_) | PatchTarget::Proposal { .. } => BTreeSet::new(),

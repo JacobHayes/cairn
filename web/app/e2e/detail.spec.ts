@@ -2,8 +2,8 @@
 // in-browser host (each page load seeds the fixtures afresh): a date pin the chain rejects
 // (F5), with the rejection and an unsent bypass reason surviving a reload (D4), counted by the
 // sync chip wherever you go, and resolved with a listed move. A node's actions hold one open
-// form, which a reload brings back (D1, B6), also from the drafts an older build kept. The
-// inspector's sections, forms and offers are vitest's.
+// form, which a reload brings back (D1, B6). The inspector's sections, forms and offers are
+// vitest's.
 import { expect, test } from "./test.ts";
 
 import { openNode, pin, section } from "./detail.ts";
@@ -85,23 +85,6 @@ test("choosing Mark done again from the graph's menu keeps what was typed in its
   await nodeCard(page, "n_docs").click({ button: "right" });
   await page.getByTestId("context-done-with-evidence").click();
   await expect(panel.getByLabel("Artifact address")).toHaveValue(typed);
-});
-
-test("drafts an older build kept for several forms open one, the first the old screen showed (D1)", async ({ page }) => {
-  // The older build kept a draft per form; a tab open across the deploy still holds them.
-  await page.addInitScript(() => {
-    if (sessionStorage.getItem("seeded") === null) {
-      sessionStorage.setItem("seeded", "yes");
-      const seen = { base: 1, deployment: 1 };
-      sessionStorage.setItem("cairn:draft:skip:j_launch:n_announcement", JSON.stringify({ value: "Typed under the old build", ...seen }));
-      sessionStorage.setItem("cairn:draft:snooze:j_launch:n_announcement", JSON.stringify({ value: { aside: "n_announcement", until: "tomorrow", date: "2026-10-07", target: "" }, ...seen }));
-    }
-  });
-  const panel = await openNode(page, "browser", "j_launch", "n_announcement");
-  await expect(panel.getByTestId("skip-form").getByLabel("Why skip it")).toHaveValue("Typed under the old build");
-  await expect(panel.getByTestId("snooze")).toHaveCount(0);
-  const kept = await page.evaluate(() => Object.keys(sessionStorage).filter((key) => key.startsWith("cairn:draft:")));
-  expect(kept).toEqual(["cairn:draft:actions:j_launch:n_announcement"]);
 });
 
 test("Discard on the chip clears a section's rejection on its screen, and it does not come back after a reload", async ({ page }) => {

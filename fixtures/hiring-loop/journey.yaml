@@ -5,49 +5,32 @@ description: >-
   participations; the screen is skipped with a reason; the offer branch becomes relevant once the
   decision is made.
 steps:
-- note: Start the loop and create the hiring manager and the panel.
+- note: Start the loop and fill the hiring manager role.
   today: "2026-10-01"
   at: "2026-10-01T09:00:00Z"
   actor:
-    user: u_manager
+    user: u_ben
   patch:
     id: p_hl_01
     target:
       journey: j_hiring
     base_revision: 0
+    deployment_revision: 1
     mutations:
     - op: create_journey
       name: Hire a platform engineer
       from:
         route: hiring-loop
         version: 1
-    - op: create_entity
-      entity:
-        key: e_manager
-        name: Hiring Manager
-        emails:
-        - manager@example.org
-    - op: create_entity
-      entity:
-        key: e_panelist_one
-        name: Panelist One
-    - op: create_entity
-      entity:
-        key: e_panelist_two
-        name: Panelist Two
-    - op: create_entity
-      entity:
-        key: e_panelist_three
-        name: Panelist Three
     - op: fill_role
       role: r_hiring_manager
-      entities:
-      - e_manager
+      identities:
+      - who_b6r2vz4jhs7cnqe3
 - note: The panel decision fills the multi-valued panel role.
   today: "2026-10-01"
   at: "2026-10-01T09:05:00Z"
   actor:
-    user: u_manager
+    user: u_ben
   patch:
     id: p_hl_02
     target:
@@ -58,15 +41,15 @@ steps:
     - op: answer
       decision: n_choose_panel
       value:
-        entity_list:
-        - e_panelist_one
-        - e_panelist_three
-        - e_panelist_two
+        identity_list:
+        - who_c5y3tw7ldp2aoxgm
+        - who_f2q5nr7xbd3kwzh4
+        - who_k3d7qm2xw5tn6pfa
 - note: The candidate came by referral, so the screen is skipped with a reason.
   today: "2026-10-02"
   at: "2026-10-02T10:00:00Z"
   actor:
-    user: u_manager
+    user: u_ben
   patch:
     id: p_hl_03
     target:
@@ -84,7 +67,7 @@ steps:
   today: "2026-10-03"
   at: "2026-10-03T11:00:00Z"
   actor:
-    user: u_manager
+    user: u_ben
     agent: ag_assistant
   patch:
     id: p_hl_04
@@ -102,7 +85,7 @@ steps:
         title: Interview with Panelist One
         participations:
           k_interviewer:
-          - e_panelist_one
+          - who_k3d7qm2xw5tn6pfa
     - op: add_node
       node:
         key: n_interview_two
@@ -112,7 +95,7 @@ steps:
         title: Interview with Panelist Two
         participations:
           k_interviewer:
-          - e_panelist_two
+          - who_c5y3tw7ldp2aoxgm
     - op: add_node
       node:
         key: n_interview_three
@@ -122,12 +105,12 @@ steps:
         title: Interview with Panelist Three
         participations:
           k_interviewer:
-          - e_panelist_three
+          - who_f2q5nr7xbd3kwzh4
 - note: The interviews, the scorecard, and the debrief are done.
   today: "2026-10-09"
   at: "2026-10-09T17:00:00Z"
   actor:
-    user: u_manager
+    user: u_ben
   patch:
     id: p_hl_05
     target:
@@ -161,7 +144,7 @@ steps:
   today: "2026-10-10"
   at: "2026-10-10T12:00:00Z"
   actor:
-    user: u_manager
+    user: u_ben
   patch:
     id: p_hl_06
     target:

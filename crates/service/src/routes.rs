@@ -222,7 +222,7 @@ fn invalid(found: cairn_schema::Violation) -> WriteError {
     }
 }
 
-/// Mints key bodies from a patch id (PRD, Identity and references: the host decides how):
+/// Mints key bodies from a patch id (PRD, Login and references: the host decides how):
 /// the FNV-1a hash of the id, the key's prefix, and a counter, as 16 hex digits. The same
 /// patch id mints the same keys, so a resubmitted import is the same patch (H5); different
 /// patch ids mint different keys with overwhelming likelihood, and the engine draws again for

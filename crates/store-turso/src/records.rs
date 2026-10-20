@@ -7,7 +7,7 @@ use cairn_schema::{ConversationId, Email, Slug, Timestamp, Title, UserId};
 use cairn_store::backend;
 use cairn_store::{
     AgentTokenRecord, AuthLogEntry, AuthLogQuery, ConversationMessage, ConversationRecord,
-    ConversationSummary, IdentityRecord, LoggedAuthEntry, OAuthStateRecord, Page, PageSize,
+    ConversationSummary, LoggedAuthEntry, LoginRecord, OAuthStateRecord, Page, PageSize,
     SecretHash, SessionRecord, StoreError, UserRecord,
 };
 use turso::{Connection, Value};
@@ -59,29 +59,29 @@ pub(crate) async fn user(
     }))
 }
 
-pub(crate) async fn put_identity(
+pub(crate) async fn put_login(
     connection: &Connection,
-    identity: &IdentityRecord,
+    login: &LoginRecord,
 ) -> Result<(), StoreError> {
-    let IdentityRecord {
+    let LoginRecord {
         provider,
         subject,
         user,
         verified_emails,
         linked_at,
-    } = identity;
+    } = login;
     user_exists(connection, user).await?;
     let key = || vec![text(provider), text(subject)];
     execute(
         connection,
-        "INSERT OR REPLACE INTO user_identities (provider, subject, user_id, linked_at) \
+        "INSERT OR REPLACE INTO user_logins (provider, subject, user_id, linked_at) \
          VALUES (?1, ?2, ?3, ?4)",
         vec![text(provider), text(subject), text(user), time(*linked_at)?],
     )
     .await?;
     execute(
         connection,
-        "DELETE FROM identity_emails WHERE provider = ?1 AND subject = ?2",
+        "DELETE FROM login_emails WHERE provider = ?1 AND subject = ?2",
         key(),
     )
     .await?;
@@ -90,7 +90,7 @@ pub(crate) async fn put_identity(
         params.push(text(email));
         execute(
             connection,
-            "INSERT INTO identity_emails (provider, subject, email) VALUES (?1, ?2, ?3)",
+            "INSERT INTO login_emails (provider, subject, email) VALUES (?1, ?2, ?3)",
             params,
         )
         .await?;
@@ -98,18 +98,18 @@ pub(crate) async fn put_identity(
     Ok(())
 }
 
-async fn identities(
+async fn logins(
     connection: &Connection,
     filter: &str,
     params: Vec<Value>,
-) -> Result<Vec<IdentityRecord>, StoreError> {
+) -> Result<Vec<LoginRecord>, StoreError> {
     let select = format!(
-        "SELECT provider, subject, user_id, linked_at FROM user_identities WHERE {filter} \
+        "SELECT provider, subject, user_id, linked_at FROM user_logins WHERE {filter} \
          ORDER BY provider, subject"
     );
     let mut found = Vec::new();
     for row in rows(connection, &select, params).await? {
-        let select = "SELECT email FROM identity_emails WHERE provider = ?1 AND subject = ?2";
+        let select = "SELECT email FROM login_emails WHERE provider = ?1 AND subject = ?2";
         let mut verified_emails = BTreeSet::new();
         for email in rows(
             connection,
@@ -120,7 +120,7 @@ async fn identities(
         {
             verified_emails.insert(email.parse(0)?);
         }
-        found.push(IdentityRecord {
+        found.push(LoginRecord {
             provider: row.parse(0)?,
             subject: row.parse(1)?,
             user: row.parse(2)?,
@@ -131,52 +131,31 @@ async fn identities(
     Ok(found)
 }
 
-pub(crate) async fn identity(
+pub(crate) async fn login(
     connection: &Connection,
     provider: &Slug,
     subject: &Title,
-) -> Result<Option<IdentityRecord>, StoreError> {
+) -> Result<Option<LoginRecord>, StoreError> {
     let filter = "provider = ?1 AND subject = ?2";
-    let found = identities(connection, filter, vec![text(provider), text(subject)]).await?;
+    let found = logins(connection, filter, vec![text(provider), text(subject)]).await?;
     Ok(found.into_iter().next())
 }
 
-pub(crate) async fn identities_of(
+pub(crate) async fn logins_of(
     connection: &Connection,
     user: &UserId,
-) -> Result<Vec<IdentityRecord>, StoreError> {
-    identities(connection, "user_id = ?1", vec![text(user)]).await
+) -> Result<Vec<LoginRecord>, StoreError> {
+    logins(connection, "user_id = ?1", vec![text(user)]).await
 }
 
-pub(crate) async fn identities_with_email(
+pub(crate) async fn logins_with_email(
     connection: &Connection,
     email: &Email,
-) -> Result<Vec<IdentityRecord>, StoreError> {
-    let filter = "EXISTS (SELECT 1 FROM identity_emails AS verified \
-                  WHERE verified.provider = user_identities.provider \
-                  AND verified.subject = user_identities.subject AND verified.email = ?1)";
-    identities(connection, filter, vec![text(email)]).await
-}
-
-pub(crate) async fn remove_identity(
-    connection: &Connection,
-    provider: &Slug,
-    subject: &Title,
-) -> Result<bool, StoreError> {
-    let key = || vec![text(provider), text(subject)];
-    execute(
-        connection,
-        "DELETE FROM identity_emails WHERE provider = ?1 AND subject = ?2",
-        key(),
-    )
-    .await?;
-    let removed = execute(
-        connection,
-        "DELETE FROM user_identities WHERE provider = ?1 AND subject = ?2",
-        key(),
-    )
-    .await?;
-    Ok(removed > 0)
+) -> Result<Vec<LoginRecord>, StoreError> {
+    let filter = "EXISTS (SELECT 1 FROM login_emails AS verified \
+                  WHERE verified.provider = user_logins.provider \
+                  AND verified.subject = user_logins.subject AND verified.email = ?1)";
+    logins(connection, filter, vec![text(email)]).await
 }
 
 pub(crate) async fn put_session(

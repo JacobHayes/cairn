@@ -7,7 +7,7 @@
 use std::cmp::Ordering;
 use std::collections::BTreeSet;
 
-use cairn_schema::{Cursor, EntityKey, KindKey, NodeKey, NodeRow, Real, SortBy};
+use cairn_schema::{Cursor, IdentityKey, KindKey, NodeKey, NodeRow, Real, SortBy};
 
 use super::DerivedJourney;
 use crate::derive::Ranking;
@@ -88,11 +88,11 @@ impl DerivedJourney<'_> {
         sorted
     }
 
-    /// E4: the participation kinds the viewer's entities hold on the node.
+    /// E4: the participation kinds the viewer's identities hold on the node.
     pub(crate) fn kinds_held(
         &self,
         key: &NodeKey,
-        viewer: &BTreeSet<EntityKey>,
+        viewer: &BTreeSet<IdentityKey>,
     ) -> BTreeSet<KindKey> {
         let participation = self.derived.participation();
         let mut kinds: Vec<KindKey> = self
@@ -106,7 +106,7 @@ impl DerivedJourney<'_> {
         kinds.push(KindKey::owner());
         kinds
             .into_iter()
-            .filter(|kind| !participation.entities(key, kind).is_disjoint(viewer))
+            .filter(|kind| !participation.identities(key, kind).is_disjoint(viewer))
             .collect()
     }
 }

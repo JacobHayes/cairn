@@ -59,8 +59,8 @@ fn reader() -> Call {
 }
 
 /// The server: the service over the memory store, in UTC like the in-browser root, seeded
-/// with every fixture, with the root's local identity signed in, so every read here is
-/// derived with that identity's entities (one lead per fixture) as the viewer (H3).
+/// with every fixture, with the root's local login signed in, so every read here is
+/// derived with that login's identities (one lead per fixture) as the viewer (H3).
 fn server() -> Service {
     let settings = DeploymentSettings::new(parsed("UTC"), TimeZone::UTC, RankConstants::default());
     let store: Arc<dyn Store> = Arc::new(MemoryStore::new());
@@ -148,7 +148,7 @@ fn server_projection(service: &Service, id: &JourneyId, request: &Projection) ->
 }
 
 /// C2, C9: levels under the Stages rule and the list's filters: the top-level kinds, a search
-/// for part of a title with a flag, the first entity as owner, and the viewer's own.
+/// for part of a title with a flag, the first identity as owner, and the viewer's own.
 fn filtered_levels(document: &DomainDocument, shown: &BTreeSet<NodeKind>) -> Vec<Projection> {
     let every = || LevelQuery::of_kinds(shown.clone(), None);
     let mut requests = vec![
@@ -176,9 +176,9 @@ fn filtered_levels(document: &DomainDocument, shown: &BTreeSet<NodeKind>) -> Vec
             ..every()
         }));
     }
-    if let Some(entity) = document.inputs.deployment.entities.values().next() {
+    if let Some(identity) = document.inputs.deployment.identities.values().next() {
         requests.push(Projection::Level(LevelQuery {
-            owner: Some(entity.key.clone()),
+            owner: Some(identity.key.clone()),
             ..every()
         }));
     }
@@ -620,7 +620,7 @@ fn route_group(service: &Service) -> Group {
     }
 }
 
-/// E6: one of the vendor evaluation's stakeholders merged into a new entity, then the journey
+/// E6: one of the vendor evaluation's stakeholders merged into a new identity, then the journey
 /// derived again over the new deployment. The merge moves neither a journey revision nor the
 /// viewer (the lead), so only the deployment revision tells a cached derive apart.
 fn merge_group(service: &Service) -> Group {
@@ -628,25 +628,25 @@ fn merge_group(service: &Service) -> Group {
     let deployment = served(now_or_never(service.deployment()), "deployment").revision;
     let journey = document(service, &id).journey.revision;
     let create: Patch = parsed(&format!(
-        "id: p_wasm_entity\ntarget: deployment\nbase_revision: {deployment}\nmutations:\n- op: create_entity\n  entity: {{key: e_stakeholder_again, name: Stakeholder A}}\n"
+        "id: p_wasm_identity\ntarget: deployment\nbase_revision: {deployment}\nmutations:\n- op: create_identity\n  identity: {{key: who_n4q6tx2vkc5jhsd7, name: Eli Park}}\n"
     ));
     served(
         now_or_never(service.patch(&reader(), &served(DomainPatch::new(create, None), "patch"))),
-        "entity create",
+        "identity create",
     );
     let merge: Patch = parsed(&format!(
-        "id: p_wasm_merge\ntarget: deployment\nbase_revision: {}\nmutations:\n- op: merge_entities\n  survivor: e_stakeholder_again\n  merged: e_stakeholder_a\n  journeys: {{{id}: {journey}}}\n",
+        "id: p_wasm_merge\ntarget: deployment\nbase_revision: {}\nmutations:\n- op: merge_identities\n  survivor: who_n4q6tx2vkc5jhsd7\n  merged: who_d4m6uk2eqf5rbhzs\n  journeys: {{{id}: {journey}}}\n",
         deployment.next()
     ));
     served(
         now_or_never(service.patch(&reader(), &served(DomainPatch::new(merge, None), "patch"))),
-        "entity merge",
+        "identity merge",
     );
     let after = document(service, &id);
     assert_eq!(after.journey.revision, journey, "a merge moves no journey");
     after_group(
         service,
-        "vendor-evaluation after an entity merge",
+        "vendor-evaluation after an identity merge",
         &id,
         &after,
     )

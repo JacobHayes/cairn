@@ -3,7 +3,7 @@
 // operator is reachable: `all`, `any`, and `not` compose; the leaves compare a decision's
 // answer. Which leaves a decision offers follows its answer type exactly as the engine checks
 // it (crates/engine validate/references.rs, `Comparable::fits`), and a value is picked from
-// what that type holds (a choice, yes or no, a date, an entity), so a type mismatch cannot be
+// what that type holds (a choice, yes or no, a date, an identity), so a type mismatch cannot be
 // entered. A condition cannot name a decision in its own node's subtree (Invariants), so the
 // editor never offers one. Rendering to a sentence is for display and never parsed back.
 import { CONDITION_CLAUSE_COUNT_MAX, CONDITION_DEPTH_MAX } from "@cairn/client";
@@ -32,9 +32,9 @@ const LEAVES: Record<AnswerType, readonly Leaf[]> = {
   single_choice: ["equals", "not_equals", "in", "answered"],
   text: ["equals", "not_equals", "in", "contains", "answered"],
   date: ["equals", "not_equals", "in", "answered"],
-  entity: ["equals", "not_equals", "in", "answered"],
+  identity: ["equals", "not_equals", "in", "answered"],
   multi_choice: ["contains", "answered"],
-  entity_list: ["contains", "answered"],
+  identity_list: ["contains", "answered"],
 };
 
 /** A5: the leaf operators a decision of `answer` offers. */
@@ -54,12 +54,12 @@ export const OPERATOR_WORDS: Record<Operator, string> = {
   not: "not",
 };
 
-/** How a decision's values are picked: from its choices, yes or no, a date, an entity, or typed. */
+/** How a decision's values are picked: from its choices, yes or no, a date, an identity, or typed. */
 export type ValueInput =
   | { input: "choice"; choices: { id: string; label: string }[] }
   | { input: "boolean" }
   | { input: "date" }
-  | { input: "entity" }
+  | { input: "identity" }
   | { input: "text" };
 
 /** A5: what a decision's clause compares against, by its answer type. */
@@ -72,16 +72,16 @@ export function valueInput(decision: GraphNode): ValueInput {
       return { input: "boolean" };
     case "date":
       return { input: "date" };
-    case "entity":
-    case "entity_list":
-      return { input: "entity" };
+    case "identity":
+    case "identity_list":
+      return { input: "identity" };
     case "text":
       return { input: "text" };
   }
 }
 
 /** A value the input offers first, so a new clause is complete and well typed from the start. */
-export function firstValue(input: ValueInput, today: string, entity: string | undefined): Value {
+export function firstValue(input: ValueInput, today: string, identity: string | undefined): Value {
   switch (input.input) {
     case "choice":
       return input.choices[0]?.id ?? "";
@@ -89,8 +89,8 @@ export function firstValue(input: ValueInput, today: string, entity: string | un
       return true;
     case "date":
       return today;
-    case "entity":
-      return entity ?? "";
+    case "identity":
+      return identity ?? "";
     case "text":
       return "";
   }
@@ -267,9 +267,9 @@ export interface ConditionNames {
 /**
  * The names a condition is read with, over the decisions `lookup` finds: a decision by its
  * title, a compared value as its decision's type says (a choice by its label, yes or no, a date
- * in words, an entity by name), never an id.
+ * in words, an identity by name), never an id.
  */
-export function conditionNames(lookup: (decision: string) => GraphNode | undefined, entity: (key: string) => string): ConditionNames {
+export function conditionNames(lookup: (decision: string) => GraphNode | undefined, identity: (key: string) => string): ConditionNames {
   return {
     title: (decision) => nodeTitle(lookup(decision)?.title),
     value: (decision, value) => {
@@ -281,8 +281,8 @@ export function conditionNames(lookup: (decision: string) => GraphNode | undefin
       switch (input?.input) {
         case "choice":
           return `"${choiceNamed(node?.choices, value)}"`;
-        case "entity":
-          return entity(value);
+        case "identity":
+          return identity(value);
         case "date":
           return dateWords(value);
         default:

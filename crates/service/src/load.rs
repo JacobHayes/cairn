@@ -6,15 +6,15 @@
 //! its mutations read, as if the patch held them.
 //!
 //! Cost: one load for the deployment, one for the target, one per proposal the patch edits or
-//! applies, one per route version the patch reads, and for each entity merge one index query
-//! plus one load per journey referencing either entity (E6); every load is one graph within
+//! applies, one per route version the patch reads, and for each identity merge one index query
+//! plus one load per journey referencing either identity (E6); every load is one graph within
 //! `graph_bytes_max`.
 
 use std::collections::{BTreeMap, BTreeSet};
 
 use cairn_engine::Records;
 use cairn_schema::{
-    AnswerType, Domain, EntityKey, JourneyId, Lineage, Mutation, Patch, PatchTarget, Payload,
+    AnswerType, Domain, IdentityKey, JourneyId, Lineage, Mutation, Patch, PatchTarget, Payload,
     ProposalId, Revision, RevisionOf, RouteId,
 };
 use cairn_store::{Document, LoadTarget, Precondition, Store, StoreError};
@@ -24,17 +24,17 @@ use cairn_store::{Document, LoadTarget, Precondition, Store, StoreError};
 pub(crate) struct Loaded {
     /// The records the patch reads.
     pub records: Records,
-    /// E6: each entity merge's two entities and the journeys it named, at their revisions.
-    merges: Vec<(BTreeSet<EntityKey>, BTreeMap<JourneyId, Revision>)>,
+    /// E6: each identity merge's two identities and the journeys it named, at their revisions.
+    merges: Vec<(BTreeSet<IdentityKey>, BTreeMap<JourneyId, Revision>)>,
 }
 
 impl Loaded {
     /// The revisions the commit rechecks besides the target's base (ARCHITECTURE, Store
     /// trait: `commit`): the deployment revision a journey or route patch was validated
     /// against (E6, H5), and for each merge the journeys it was checked against and the set
-    /// referencing its entities (E6).
+    /// referencing its identities (E6).
     ///
-    /// A journey whose conditions compare an entity decision's answer is valid only under
+    /// A journey whose conditions compare an identity decision's answer is valid only under
     /// the aliases it was checked with (E6: a merge can change what such a condition
     /// evaluates to), so a patch leaving one is also held to the deployment revision it was
     /// loaded at, whether or not it named one: a merge committed in between makes it stale
@@ -45,7 +45,7 @@ impl Loaded {
             PatchTarget::Journey(id) => after
                 .journeys
                 .get(id)
-                .is_some_and(|journey| compares_entities(&journey.graph)),
+                .is_some_and(|journey| compares_identities(&journey.graph)),
             PatchTarget::Route(_) | PatchTarget::Deployment | PatchTarget::Proposal { .. } => false,
         };
         let expected = patch
@@ -72,7 +72,7 @@ impl Loaded {
                 expected: reviewed,
             });
         }
-        for (entities, named) in &self.merges {
+        for (identities, named) in &self.merges {
             for (journey, expected) in named {
                 found.push(Precondition::Revision {
                     of: RevisionOf::Domain(Domain::Journey(journey.clone())),
@@ -80,7 +80,7 @@ impl Loaded {
                 });
             }
             found.push(Precondition::ReferencingJourneys {
-                entities: entities.clone(),
+                identities: identities.clone(),
                 journeys: named.keys().cloned().collect(),
             });
         }
@@ -88,10 +88,10 @@ impl Loaded {
     }
 }
 
-/// Loads what `patch` reads: the deployment (always: entity references resolve through
+/// Loads what `patch` reads: the deployment (always: identity references resolve through
 /// it), its target domain unless the patch creates it, the proposal it edits or applies, the
 /// published route versions it (or a proposal it applies) copies or moves from and to, and
-/// for an entity merge every journey referencing either entity as well as every journey it
+/// for an identity merge every journey referencing either identity as well as every journey it
 /// names, so the engine sees any difference between the two (E6).
 pub(crate) async fn records(store: &dyn Store, patch: &Patch) -> Result<Loaded, StoreError> {
     let mut records = Records::default();
@@ -142,8 +142,8 @@ pub(crate) async fn records(store: &dyn Store, patch: &Patch) -> Result<Loaded, 
             records.versions.insert(lineage, version);
         }
     }
-    for (entities, named) in &merges {
-        let referencing = store.journeys_referencing(entities).await?;
+    for (identities, named) in &merges {
+        let referencing = store.journeys_referencing(identities).await?;
         for id in referencing.keys().chain(named.keys()) {
             if !records.journeys.contains_key(id)
                 && let Some(journey) = journey(store, id).await?
@@ -330,12 +330,12 @@ fn kinds_read(mutations: &[&Mutation]) -> BTreeSet<RouteId> {
         .collect()
 }
 
-/// E6: each entity merge's two entities and the journeys it names.
-fn merges(mutations: &[&Mutation]) -> Vec<(BTreeSet<EntityKey>, BTreeMap<JourneyId, Revision>)> {
+/// E6: each identity merge's two identities and the journeys it names.
+fn merges(mutations: &[&Mutation]) -> Vec<(BTreeSet<IdentityKey>, BTreeMap<JourneyId, Revision>)> {
     mutations
         .iter()
         .filter_map(|mutation| match mutation {
-            Mutation::MergeEntities {
+            Mutation::MergeIdentities {
                 survivor,
                 merged,
                 journeys,
@@ -348,9 +348,9 @@ fn merges(mutations: &[&Mutation]) -> Vec<(BTreeSet<EntityKey>, BTreeMap<Journey
         .collect()
 }
 
-/// E6: whether any condition in `graph` compares the answer of an entity decision, which
+/// E6: whether any condition in `graph` compares the answer of an identity decision, which
 /// reads the deployment's aliases.
-fn compares_entities(graph: &cairn_schema::Graph) -> bool {
+fn compares_identities(graph: &cairn_schema::Graph) -> bool {
     graph
         .nodes
         .values()
@@ -363,7 +363,7 @@ fn compares_entities(graph: &cairn_schema::Graph) -> bool {
                 .is_some_and(|node| match &node.payload {
                     Payload::Decision(spec) => matches!(
                         spec.answer.answer_type(),
-                        AnswerType::Entity | AnswerType::EntityList
+                        AnswerType::Identity | AnswerType::IdentityList
                     ),
                     Payload::Deliverable(_)
                     | Payload::Action(_)
@@ -402,10 +402,10 @@ mod tests {
     }
 
     #[test]
-    fn a_journey_comparing_entities_is_held_to_the_deployment_it_was_checked_with() {
-        let decision = "- {key: n_who, id: who, kind: decision, title: Who, prompt: Who?, answer_type: entity}\n";
+    fn a_journey_comparing_identities_is_held_to_the_deployment_it_was_checked_with() {
+        let decision = "- {key: n_who, id: who, kind: decision, title: Who, prompt: Who?, answer_type: identity}\n";
         let compared = format!(
-            "{decision}- {{key: n_do, id: do, kind: action, title: Do, relevant_when: {{equals: {{decision: n_who, value: e_a}}}}}}\n"
+            "{decision}- {{key: n_do, id: do, kind: action, title: Do, relevant_when: {{equals: {{decision: n_who, value: who_a}}}}}}\n"
         );
         let plain = format!("{decision}- {{key: n_do, id: do, kind: action, title: Do}}\n");
         let deployment = Precondition::Revision {

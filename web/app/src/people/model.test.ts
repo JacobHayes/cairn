@@ -1,22 +1,24 @@
-// E6, H3: entity keys and emails as the screens send them, a merge naming every journey that
-// refers to either entity at the revision seen, aliases resolving to the survivor, and the
-// merge offered for a caller's duplicate entities.
+// E6, H3: identity keys and emails as the screens send them, a merge naming every journey that
+// refers to either identity at the revision seen, aliases resolving to the survivor, and the
+// merge offered for a caller's duplicate identities.
 import type { Schema } from "@cairn/client";
 import { describe, expect, it } from "vitest";
 
-import { linkable } from "./Identity.tsx";
-import { aliasesOf, emailProblem, entityOf, mergeMutation, newEntityKey, offeredMerge } from "./model.ts";
+import { linkable } from "./You.tsx";
+import { aliasesOf, emailProblem, identityOf, mergeMutation, newIdentityKey, offeredMerge } from "./model.ts";
 
-describe("entities as sent (E6, H3)", () => {
-  it.each(["Ann Example", "", "Équipe d'achats", "y".repeat(300)])("mints a key the host accepts from %j", (name) => {
-    const key = newEntityKey(name, () => "abc123");
-    expect(key).toMatch(/^e_[a-z0-9][a-z0-9_-]*$/);
-    expect(key.length).toBeLessThanOrEqual(64);
+describe("identities as sent (E6, H3)", () => {
+  it("mints keys the host accepts that differ from one another and carry no name", () => {
+    const keys = Array.from({ length: 50 }, () => newIdentityKey());
+    for (const key of keys) {
+      expect(key).toMatch(/^who_[a-z2-7]{16}$/);
+    }
+    expect(new Set(keys).size).toBe(keys.length);
   });
 
   it("holds the emails it is given, none when none", () => {
-    expect(entityOf("e_a", " Ann ", [])).toEqual({ key: "e_a", name: "Ann" });
-    expect(entityOf("e_a", "Ann", ["ann@example.org"])).toEqual({ key: "e_a", name: "Ann", emails: ["ann@example.org"] });
+    expect(identityOf("who_a", " Ann ", [])).toEqual({ key: "who_a", name: "Ann" });
+    expect(identityOf("who_a", "Ann", ["ann@example.org"])).toEqual({ key: "who_a", name: "Ann", emails: ["ann@example.org"] });
   });
 
   it.each([
@@ -36,23 +38,23 @@ describe("entities as sent (E6, H3)", () => {
 describe("a merge (E6)", () => {
   it("names each referring journey at the revision it was read at", () => {
     const summary = (id: string, revision: number): Schema<"JourneySummary"> => ({ id, name: id, status: "archived", revision, created_at: "2026-10-01T00:00:00Z", upgrade_available: false });
-    expect(mergeMutation("e_keep", "e_old", [summary("j_one", 4), summary("j_two", 9)])).toEqual({
-      op: "merge_entities",
-      survivor: "e_keep",
-      merged: "e_old",
+    expect(mergeMutation("who_keep", "who_old", [summary("j_one", 4), summary("j_two", 9)])).toEqual({
+      op: "merge_identities",
+      survivor: "who_keep",
+      merged: "who_old",
       journeys: { j_one: 4, j_two: 9 },
     });
   });
 
-  it("lists the old keys resolving to an entity", () => {
-    const deployment = { revision: 3, aliases: { e_old: "e_keep", e_older: "e_keep", e_else: "e_other" } };
-    expect(aliasesOf(deployment, "e_keep")).toEqual(["e_old", "e_older"]);
-    expect(aliasesOf(deployment, "e_none")).toEqual([]);
+  it("lists the old keys resolving to an identity", () => {
+    const deployment = { revision: 3, aliases: { who_old: "who_keep", who_older: "who_keep", who_else: "who_other" } };
+    expect(aliasesOf(deployment, "who_keep")).toEqual(["who_old", "who_older"]);
+    expect(aliasesOf(deployment, "who_none")).toEqual([]);
   });
 
-  it("offers one merge at a time for a caller's duplicates, and none for one entity (H3)", () => {
-    expect(offeredMerge(["e_b", "e_a", "e_c"])).toEqual({ survivor: "e_a", merged: "e_b" });
-    expect(offeredMerge(["e_a"])).toBeUndefined();
+  it("offers one merge at a time for a caller's duplicates, and none for one identity (H3)", () => {
+    expect(offeredMerge(["who_b", "who_a", "who_c"])).toEqual({ survivor: "who_a", merged: "who_b" });
+    expect(offeredMerge(["who_a"])).toBeUndefined();
     expect(offeredMerge(null)).toBeUndefined();
   });
 });

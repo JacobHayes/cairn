@@ -7,8 +7,8 @@ import { setFrontier } from "./acting.ts";
 import { pin } from "./detail.ts";
 import { menuItem, nodePanel, openFilter, openFromCanvas, rename, setDepth } from "./shell.ts";
 
-/** The viewer's entity on the in-browser host, as the vendor evaluation names it. */
-export const VIEWER = "e_lead";
+/** The viewer's identity on the in-browser host, as the vendor evaluation names it. */
+export const VIEWER = "who_k3d7qm2xw5tn6pfa";
 
 /** The Filter's popover. */
 export const filterOf = (page: Page) => page.getByTestId("filter-panel");
@@ -42,7 +42,7 @@ export async function retitleAndPin(page: Page, node: string, title: string, dat
   if (assign) {
     await menuItem(panel, "assign");
     await panel.getByTestId("assign").getByLabel("Assign owner").selectOption(VIEWER);
-    await expect(panel.getByTestId("participations")).toContainText("Evaluation Lead");
+    await expect(panel.getByTestId("participations")).toContainText("Ana Ruiz");
   }
   await pin(panel, date);
   await expect(panel.getByTestId("date").first()).toHaveAttribute("data-origin", /pin/);

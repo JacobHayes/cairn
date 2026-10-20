@@ -14,8 +14,8 @@ use std::collections::BTreeSet;
 use std::str::FromStr;
 
 use cairn_schema::{
-    Actor, Annotation, ChangeSet, Date, Deployment, Domain, Entity, Event, EventType, GraphId,
-    GraphRecord, JourneyHeader, JourneyId, JourneyStatus, Lineage, Node, NodeKey, PatchId,
+    Actor, Annotation, ChangeSet, Date, Deployment, Domain, Event, EventType, GraphId, GraphRecord,
+    Identity, JourneyHeader, JourneyId, JourneyStatus, Lineage, Node, NodeKey, PatchId,
     PatchReceipt, PatchTarget, Record, RecordKey, Revision, RevisionOf, RouteHeader, RouteId,
     RouteKind, Subject, Timestamp, Title, VersionNumber, Write, refs::KeyRefs,
 };
@@ -109,10 +109,10 @@ pub fn action(key: &str, slug: &str, parent: Option<&str>) -> Node<KeyRefs> {
     node(fields)
 }
 
-/// An entity.
+/// An identity.
 #[must_use]
-pub fn entity(key: &str, name: &str, emails: &[&str]) -> Entity {
-    Entity {
+pub fn identity(key: &str, name: &str, emails: &[&str]) -> Identity {
+    Identity {
         key: id(key),
         name: title(name),
         emails: emails.iter().map(|email| id(email)).collect(),
@@ -287,11 +287,11 @@ impl PatchBuilder {
         self
     }
 
-    /// Names an entity merge's referencing journeys (E6).
+    /// Names an identity merge's referencing journeys (E6).
     #[must_use]
-    pub fn referencing(mut self, entities: &[&str], journeys: &[&str]) -> Self {
+    pub fn referencing(mut self, identities: &[&str], journeys: &[&str]) -> Self {
         self.preconditions.push(Precondition::ReferencingJourneys {
-            entities: entities.iter().map(|key| id(key)).collect(),
+            identities: identities.iter().map(|key| id(key)).collect(),
             journeys: journeys
                 .iter()
                 .map(|key| id(key))
@@ -357,18 +357,18 @@ pub fn create_journey(patch: &str, journey: &str, nodes: Vec<Node<KeyRefs>>) -> 
     builder
 }
 
-/// An entity create, riding in any patch (E6).
+/// An identity create, riding in any patch (E6).
 #[must_use]
-pub fn create_entity(builder: PatchBuilder, created: Entity) -> PatchBuilder {
-    let subject = Subject::Entity(created.key.clone());
+pub fn create_identity(builder: PatchBuilder, created: Identity) -> PatchBuilder {
+    let subject = Subject::Identity(created.key.clone());
     builder.event(
-        EventType::EntityCreated,
+        EventType::IdentityCreated,
         subject,
-        vec![Write::Put(Record::Entity(created))],
+        vec![Write::Put(Record::Identity(created))],
     )
 }
 
-/// The deployment with no entities, at `revision`.
+/// The deployment with no identities, at `revision`.
 #[must_use]
 pub fn empty_deployment(at_revision: u32) -> Deployment {
     Deployment {
@@ -467,7 +467,7 @@ pub fn every_content_graph() -> cairn_schema::Graph {
              "choices": ["narrow", {"id": "wide", "title": "Wide, with extras"}],
              "help": "Pick every part that applies.", "not_before": {"after": "n_kickoff"}},
             {"key": "n_lead", "id": "lead-pick", "kind": "decision", "title": "Lead",
-             "prompt": "Who leads the work?", "answer_type": "entity", "fills_role": "r_lead"},
+             "prompt": "Who leads the work?", "answer_type": "identity", "fills_role": "r_lead"},
             {"key": "n_target", "id": "target-date", "kind": "decision", "title": "Target date",
              "prompt": "When should the work wrap up?", "answer_type": "date",
              "feeds_milestone": "n_wrap"},
@@ -479,7 +479,7 @@ pub fn every_content_graph() -> cairn_schema::Graph {
              "prompt": "How large?", "answer_type": "single_choice",
              "choices": ["small", "large"]},
             {"key": "n_panel", "id": "panel", "kind": "decision", "title": "Panel",
-             "prompt": "Who reviews?", "answer_type": "entity_list",
+             "prompt": "Who reviews?", "answer_type": "identity_list",
              "fills_role": "r_reviewers"},
             {"key": "n_plan", "id": "plan", "parent": "n_work", "kind": "deliverable",
              "title": "Plan", "estimate": 3, "placeholder": true, "requires_artifact": true,
@@ -490,7 +490,7 @@ pub fn every_content_graph() -> cairn_schema::Graph {
              ]},
              "due_by": {"before": ["n_target", "n_wrap"], "offset": 5},
              "participations": {
-                 "k_informed": ["e_observer"], "k_owner": "r_lead", "k_reviewer": [],
+                 "k_informed": ["who_observer"], "k_owner": "r_lead", "k_reviewer": [],
              },
              "resources": [
                  {"key": "a_tip", "title": "Tip", "tip": "Start from the last plan."},
@@ -526,14 +526,14 @@ pub fn every_state() -> cairn_schema::JourneyState {
         ]},
         "answers": {
             "n_scope": {"multi_choice": ["narrow"]},
-            "n_lead": {"entity": "e_lead"},
+            "n_lead": {"identity": "who_lead"},
             "n_target": {"date": "2026-11-01"},
             "n_go": {"boolean": true},
             "n_remarks": {"text": ""},
             "n_size": {"single_choice": "large"},
-            "n_panel": {"entity_list": ["e_lead", "e_observer"]},
+            "n_panel": {"identity_list": ["who_lead", "who_observer"]},
         },
-        "role_fills": {"r_sponsor": ["e_sponsor"], "r_helpers": []},
+        "role_fills": {"r_sponsor": ["who_sponsor"], "r_helpers": []},
         "pins": {"n_wrap": "2026-12-01"},
         "snoozes": {"n_steps": {"date": "2026-10-10"}, "n_go": {"node": "n_plan"}},
         "overrides": {"n_steps": {

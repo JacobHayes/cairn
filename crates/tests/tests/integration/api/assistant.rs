@@ -346,7 +346,7 @@ mod in_process {
 
     /// The up-front decisions answered directly, reported with what they caused (D7).
     async fn answer_directly(world: &World, provider: &ScriptedProvider, ann: &Transport) {
-        // The bake-off's entities moved the deployment to revision 2.
+        // The shared people are the deployment's revision 1.
         let mut answers = proposed_answers();
         for answer in answers.as_array_mut().unwrap() {
             if answer["decision"] == "n_meeting_date" {
@@ -354,7 +354,7 @@ mod in_process {
             }
         }
         let answer = json!({ "patch": { "id": "p_up_front", "target": { "journey": JOURNEY },
-            "base_revision": 1, "deployment_revision": 2, "mutations": answers } });
+            "base_revision": 1, "deployment_revision": 1, "mutations": answers } });
         provider.push([
             Step::call("apply_patch", answer),
             Step::say("Answered. The decision meeting on the 6th leaves the work before it short."),

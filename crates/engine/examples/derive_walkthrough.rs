@@ -6,6 +6,9 @@
 //!
 //! usage: `cargo run -p cairn-engine --example derive_walkthrough -- FIXTURES_DIR`
 
+#[path = "support/people.rs"]
+mod people;
+
 use std::error::Error;
 use std::fmt::Write as _;
 use std::path::Path;
@@ -41,7 +44,7 @@ impl Fixture {
         let file: RouteFile = from_yaml(&std::fs::read_to_string(directory.join("route.yaml"))?)?;
         let scenario: Scenario =
             from_yaml(&std::fs::read_to_string(directory.join("journey.yaml"))?)?;
-        let mut after = vec![seed(&file)?];
+        let mut after = vec![seed(fixtures, &file)?];
         for step in scenario.steps.as_slice() {
             let inputs = ApplyInputs {
                 today: step.today,
@@ -65,9 +68,9 @@ impl Fixture {
 }
 
 /// The route file published as version 1 in a fresh deployment (fixtures/README.md).
-fn seed(file: &RouteFile) -> Result<Records> {
+fn seed(fixtures: &Path, file: &RouteFile) -> Result<Records> {
     let graph = from_file(file, &mut SequentialKeys::default()).map_err(|v| format!("{v:?}"))?;
-    let mut records = Records::default();
+    let mut records = people::records(fixtures)?;
     let version = VersionNumber::FIRST;
     let header = RouteHeader {
         id: file.route.clone(),
@@ -234,15 +237,15 @@ fn relevance_table(fixture: &Fixture, out: &mut String) -> Result<()> {
 
 fn participation_cell(graph: &Graph, derived: &Derived, key: &NodeKey, kind: &KindKey) -> String {
     let participation = derived.participation();
-    let entities: Vec<String> = participation
-        .entities(key, kind)
+    let identities: Vec<String> = participation
+        .identities(key, kind)
         .iter()
-        .map(|entity| format!("`{entity}`"))
+        .map(|identity| format!("`{identity}`"))
         .collect();
-    let who = if entities.is_empty() {
+    let who = if identities.is_empty() {
         "none".to_owned()
     } else {
-        entities.join(", ")
+        identities.join(", ")
     };
     let role = |role: &cairn_schema::RoleKey| {
         graph
@@ -448,7 +451,7 @@ fn skip(fixture: &Fixture, out: &mut String) -> Result<()> {
 /// a member.
 fn role_change(fixture: &Fixture, out: &mut String) -> Result<()> {
     writeln!(out, "\n## A role change re-derives participations\n")?;
-    let mutations = "- op: answer\n  decision: n_choose_panel\n  value: {entity_list: [e_panelist_one, e_panelist_two]}\n";
+    let mutations = "- op: answer\n  decision: n_choose_panel\n  value: {identity_list: [who_k3d7qm2xw5tn6pfa, who_c5y3tw7ldp2aoxgm]}\n";
     writeln!(
         out,
         "The hiring loop after the assistant's per-member breakdown (step 4); the panel decision is then revised to drop the third panelist:\n\n```yaml\n{mutations}```\n"

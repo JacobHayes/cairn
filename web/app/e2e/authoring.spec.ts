@@ -28,7 +28,7 @@ async function authorRoute(page: Page): Promise<Record<string, string>> {
   const keys: Record<string, string> = {};
   keys["Kickoff"] = await addNode(page, "milestone", "Kickoff");
   keys["Who leads"] = await addNode(page, "decision", "Who leads");
-  await formField(page, "answer_type").getByLabel("Answer type").selectOption("entity");
+  await formField(page, "answer_type").getByLabel("Answer type").selectOption("identity");
   await pickByTitle(formField(page, "fills_role").getByLabel("Fills the role"), "Lead");
   await saveForm(page);
   keys["Include training"] = await addNode(page, "decision", "Include training");

@@ -30,7 +30,7 @@ test("C16: a row action on Home writes in place and the address stays `/`", asyn
   expect(new URL(page.url()).pathname + new URL(page.url()).search).toBe("/");
 });
 
-test("the rail lights Home at `/` only, Journeys on the journey pages and their proposals, Routes on the route pages and theirs, and Entities on its page and its proposals", async ({ page }) => {
+test("the rail lights Home at `/` only, Journeys on the journey pages and their proposals, Routes on the route pages and theirs, and Identities on its page and its proposals", async ({ page }) => {
   const rail = page.getByRole("navigation", { name: "Screens", exact: true });
   const current = rail.locator("[aria-current=page]");
   const cases: [string, string][] = [
@@ -43,8 +43,8 @@ test("the rail lights Home at `/` only, Journeys on the journey pages and their 
     ["/journeys/j_vendor_eval/proposals", "Journeys"],
     ["/routes", "Routes"],
     ["/routes/vendor-evaluation/proposals", "Routes"],
-    ["/entities", "Entities"],
-    ["/entities/proposals", "Entities"],
+    ["/identities", "Identities"],
+    ["/identities/proposals", "Identities"],
     ["/routes/new", "Routes"],
     ["/routes/vendor-evaluation", "Routes"],
   ];

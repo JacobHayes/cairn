@@ -9,7 +9,7 @@ use std::fmt;
 use std::str::FromStr;
 
 use cairn_schema::{
-    Cursor, DisplayState, Domain, EntityKey, EventType, JourneyId, JourneyStatus, KindKey,
+    Cursor, DisplayState, Domain, EventType, IdentityKey, JourneyId, JourneyStatus, KindKey,
     LevelDisplay, LevelQuery, ListFlag, ListQuery, NextQuery, NodeKey, NodeKind, PatchId,
     ProposalId, Revision, RevisionOf, RouteId, RouteKind, SnapshotScope, SortBy, State, Timestamp,
     Title, UserId, VersionNumber,
@@ -79,9 +79,9 @@ pub const JOURNEY_PARAMS: &[ParamSpec] = &[
     ParamSpec::many::<JourneyStatus>("status", "Journeys in any of these statuses."),
     ParamSpec::one::<RouteId>("route", "Journeys following this route."),
     ParamSpec::one::<VersionNumber>("version", "Journeys on this version of their route."),
-    ParamSpec::many::<EntityKey>(
+    ParamSpec::many::<IdentityKey>(
         "referencing",
-        "Journeys referring to any of these entities, directly or through an alias (E6).",
+        "Journeys referring to any of these identities, directly or through an alias (E6).",
     ),
     ParamSpec::one::<bool>(
         "upgrade_available",
@@ -123,7 +123,7 @@ pub const PROPOSAL_SCOPE_PARAMS: &[ParamSpec] = &[
 #[serde(rename_all = "snake_case")]
 pub enum ProposalListing {
     /// Waiting on the caller: created by them, or drafted by an agent for an active journey
-    /// referring to one of their entities (C16).
+    /// referring to one of their identities (C16).
     Waiting,
     /// Those whose destination is a journey that does not exist yet.
     NewJourneys,
@@ -258,7 +258,10 @@ pub const LEVEL_PARAMS: &[ParamSpec] = &[
         "The list's filters with no argument; with any filter, `owner` or `text`, a node is \
          drawn only when it matches every one or holds a node that does.",
     ),
-    ParamSpec::one::<EntityKey>("owner", "Only nodes this entity owns, and what holds them."),
+    ParamSpec::one::<IdentityKey>(
+        "owner",
+        "Only nodes this identity owns, and what holds them.",
+    ),
     ParamSpec::one::<Title>(
         "text",
         "Text found in the title, description, notes, or resources, ignoring ASCII case; nodes \
@@ -290,7 +293,7 @@ pub const LIST_PARAMS: &[ParamSpec] = &[
         "Filters with no argument; every one given must hold.",
     ),
     ParamSpec::one::<NodeKey>("within", "Only nodes beneath this container."),
-    ParamSpec::one::<EntityKey>("owner", "Only nodes this entity owns."),
+    ParamSpec::one::<IdentityKey>("owner", "Only nodes this identity owns."),
     ParamSpec::many::<State>("state", "Only nodes in these stored states; any when none."),
     ParamSpec::many::<DisplayState>(
         "display_state",
@@ -438,7 +441,7 @@ impl Params {
 ///
 /// A bad request for a parameter that does not parse.
 pub fn journeys(params: &Params) -> Result<JourneyQuery, ApiError> {
-    let referencing: Vec<EntityKey> = params.all("referencing")?;
+    let referencing: Vec<IdentityKey> = params.all("referencing")?;
     Ok(JourneyQuery {
         statuses: params.all("status")?.into_iter().collect(),
         route: params.one("route")?,

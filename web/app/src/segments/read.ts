@@ -27,7 +27,7 @@ export function useSegmentOffers(except: string | undefined): { offers: SegmentO
   // The segments and their latest versions are what the offers are read from.
   const asked = listed.map((route) => `${route.header.id}@${String(route.latest_version)}`).join(" ");
   const settled = index.status !== "idle" && index.status !== "loading";
-  const offered = useKeyedRead(OFFERS, settled ? { identity: ["segment-offers"], freshness: [asked], args: { host, listed } } : undefined).view;
+  const offered = useKeyedRead(OFFERS, settled ? { of: ["segment-offers"], freshness: [asked], args: { host, listed } } : undefined).view;
   const offers = offered.status === "current" ? offered.value : [];
   const loading = offered.status !== "current" && offered.status !== "failed";
   return { offers, loading, leftOut: published.length > listed.length };
@@ -63,7 +63,7 @@ const SEGMENT_VERSION: ReadSource<{ host: Host; route: string; version: number }
 /** The segment `route` at `version`, once read. */
 export function useSegmentVersion(route: string | undefined, version: number | undefined): SegmentVersion | undefined {
   const { host } = useSession();
-  const key = route === undefined || version === undefined ? undefined : { identity: [route, version], freshness: [], args: { host, route, version } };
+  const key = route === undefined || version === undefined ? undefined : { of: [route, version], freshness: [], args: { host, route, version } };
   return valueOf(useKeyedRead(SEGMENT_VERSION, key).view);
 }
 

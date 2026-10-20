@@ -12,10 +12,10 @@ use crate::engine::support;
 use std::collections::{BTreeMap, BTreeSet};
 
 use cairn_engine::{DerivedJourney, Records};
-use cairn_schema::{EntityKey, Level, LevelDisplay, LevelQuery, ListFlag, NodeKind};
+use cairn_schema::{IdentityKey, Level, LevelDisplay, LevelQuery, ListFlag, NodeKind};
 use support::{add_nodes as add, key};
 
-const PEOPLE: &str = "- op: create_entity\n  entity: {key: e_a, name: A}\n- op: create_entity\n  entity: {key: e_b, name: B}\n";
+const PEOPLE: &str = "- op: create_identity\n  identity: {key: who_a, name: A}\n- op: create_identity\n  identity: {key: who_b, name: B}\n";
 
 /// A group holding two deliverables owned by A (one with two actions, which inherit A) and one
 /// owned by B, the second action and B's deliverable applying only when a decision says so;
@@ -23,11 +23,11 @@ const PEOPLE: &str = "- op: create_entity\n  entity: {key: e_a, name: A}\n- op: 
 fn journey() -> Records {
     let nodes = add(&[
         "{key: n_group, id: group, kind: group, title: Group}",
-        "{key: n_work, id: work, parent: n_group, kind: deliverable, title: Work, description: Moored at the harbour., participations: {k_owner: [e_a]}}",
+        "{key: n_work, id: work, parent: n_group, kind: deliverable, title: Work, description: Moored at the harbour., participations: {k_owner: [who_a]}}",
         "{key: n_step, id: step, parent: n_work, kind: action, title: Step}",
         "{key: n_other, id: other, parent: n_work, kind: action, title: Other, requires: [n_step], relevant_when: {equals: {decision: n_ask, value: true}}}",
-        "{key: n_side, id: side, parent: n_group, kind: deliverable, title: Side, description: Moored too., requires: [n_step, n_other], participations: {k_owner: [e_a]}}",
-        "{key: n_spare, id: spare, parent: n_group, kind: deliverable, title: Spare, participations: {k_owner: [e_b]}, relevant_when: {equals: {decision: n_ask, value: true}}}",
+        "{key: n_side, id: side, parent: n_group, kind: deliverable, title: Side, description: Moored too., requires: [n_step, n_other], participations: {k_owner: [who_a]}}",
+        "{key: n_spare, id: spare, parent: n_group, kind: deliverable, title: Spare, participations: {k_owner: [who_b]}, relevant_when: {equals: {decision: n_ask, value: true}}}",
         "{key: n_ask, id: ask, kind: decision, title: Ask, prompt: Go?, answer_type: boolean}",
         "{key: n_loose, id: loose, kind: deliverable, title: Loose}",
         "{key: n_gate, id: gate, kind: milestone, title: Gate, requires: [n_loose]}",
@@ -41,7 +41,7 @@ fn journey() -> Records {
 fn level_of(records: &Records, query: &LevelQuery, viewer: &[&str]) -> Level {
     let graph = support::journey_graph(records, support::JOURNEY);
     let derived = support::derived(records, support::JOURNEY);
-    let viewer: BTreeSet<EntityKey> = viewer.iter().map(|key| key.parse().unwrap()).collect();
+    let viewer: BTreeSet<IdentityKey> = viewer.iter().map(|key| key.parse().unwrap()).collect();
     DerivedJourney::new(&graph, &derived)
         .level(query, &records.deployment, &viewer)
         .unwrap()
@@ -113,7 +113,7 @@ fn a_search_draws_its_matches_and_what_holds_them() {
     assert_eq!(rolled_up(&harbour, "n_group"), ["n_side", "n_spare"]);
 }
 
-/// C9, E6: the owner filter follows aliases, and Only mine reads the viewer's own entities.
+/// C9, E6: the owner filter follows aliases, and Only mine reads the viewer's own identities.
 #[test]
 fn the_owner_filter_follows_aliases_and_mine_reads_the_viewer() {
     let records = journey();
@@ -129,7 +129,7 @@ fn the_owner_filter_follows_aliases_and_mine_reads_the_viewer() {
     };
     let a = ["n_group", "n_other", "n_side", "n_step", "n_work"];
     assert_eq!(
-        owned_by(&records, "e_a"),
+        owned_by(&records, "who_a"),
         a,
         "the actions inherit their deliverable's owner"
     );
@@ -143,21 +143,21 @@ fn the_owner_filter_follows_aliases_and_mine_reads_the_viewer() {
             .map(str::to_owned)
             .collect::<Vec<_>>()
     };
-    assert_eq!(drawn("e_b"), ["n_group", "n_spare"]);
-    assert_eq!(drawn("e_a"), a);
+    assert_eq!(drawn("who_b"), ["n_group", "n_spare"]);
+    assert_eq!(drawn("who_a"), a);
     let revision = records.journeys.values().next().unwrap().revision.get();
     let merge = format!(
-        "- op: merge_entities\n  survivor: e_a\n  merged: e_b\n  journeys: {{{}: {revision}}}\n",
+        "- op: merge_identities\n  survivor: who_a\n  merged: who_b\n  journeys: {{{}: {revision}}}\n",
         support::JOURNEY
     );
     let patch = support::patch_to(&records, "deployment", &merge);
     let merged = support::apply(&records, &patch, &support::fixed_inputs()).unwrap();
     assert_eq!(
-        owned_by(merged.records(), "e_b"),
+        owned_by(merged.records(), "who_b"),
         [
             "n_group", "n_other", "n_side", "n_spare", "n_step", "n_work"
         ],
-        "the merged entity's alias reads as the survivor"
+        "the merged identity's alias reads as the survivor"
     );
 }
 

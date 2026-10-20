@@ -9,6 +9,9 @@
 //! usage: `cargo run -p cairn-engine --example projection_walkthrough -- FIXTURES_DIR`
 
 use std::collections::BTreeSet;
+#[path = "support/people.rs"]
+mod people;
+
 use std::error::Error;
 use std::fmt::Write as _;
 use std::path::Path;
@@ -39,9 +42,9 @@ impl Fixture {
             from_yaml(&std::fs::read_to_string(directory.join("journey.yaml"))?)?;
         let route = directory.join("route.yaml");
         let mut records = if route.exists() {
-            seed(&from_yaml(&std::fs::read_to_string(route)?)?)?
+            seed(fixtures, &from_yaml(&std::fs::read_to_string(route)?)?)?
         } else {
-            Records::default()
+            people::records(fixtures)?
         };
         let mut after = vec![records.clone()];
         let mut events = Vec::new();
@@ -81,9 +84,9 @@ impl Fixture {
 }
 
 /// The route file published as version 1 in a fresh deployment (fixtures/README.md).
-fn seed(file: &RouteFile) -> Result<Records> {
+fn seed(fixtures: &Path, file: &RouteFile) -> Result<Records> {
     let graph = from_file(file, &mut SequentialKeys::default()).map_err(|v| format!("{v:?}"))?;
-    let mut records = Records::default();
+    let mut records = people::records(fixtures)?;
     let version = VersionNumber::FIRST;
     let header = RouteHeader {
         id: file.route.clone(),
@@ -203,7 +206,7 @@ fn level_table(level: &Level, out: &mut String) -> Result<()> {
             let owners: Vec<&str> = roll
                 .owners
                 .iter()
-                .map(cairn_schema::EntityKey::as_str)
+                .map(cairn_schema::IdentityKey::as_str)
                 .collect();
             if !owners.is_empty() {
                 badges.push(format!("owners {}", owners.join(", ")));

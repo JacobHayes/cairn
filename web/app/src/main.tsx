@@ -24,8 +24,8 @@ import { JourneyPage, NoSuchPage } from "./screens/JourneyRoutes.tsx";
 import { Shell } from "./shell/Shell.tsx";
 
 const NewJourney = lazy(() => import("./journeys/NewJourney.tsx").then((module) => ({ default: module.NewJourney })));
-const Entities = lazy(() => import("./people/Entities.tsx").then((module) => ({ default: module.Entities })));
-const Identity = lazy(() => import("./people/Identity.tsx").then((module) => ({ default: module.Identity })));
+const Identities = lazy(() => import("./people/Identities.tsx").then((module) => ({ default: module.Identities })));
+const You = lazy(() => import("./people/You.tsx").then((module) => ({ default: module.You })));
 const NewRoutePage = lazy(() => import("./routes/NewRoute.tsx").then((module) => ({ default: module.NewRoutePage })));
 const RouteIndex = lazy(() => import("./routes/RouteIndex.tsx").then((module) => ({ default: module.RouteIndex })));
 const RoutePage = lazy(() => import("./screens/RoutePage.tsx").then((module) => ({ default: module.RoutePage })));
@@ -48,10 +48,10 @@ const SCREENS: Record<AddressName, ReactElement> = {
   routeProposals: <RoutePage />,
   routeProposal: <RoutePage />,
   routeProposalNode: <RoutePage />,
-  entities: <Entities />,
-  deploymentProposals: <Entities />,
-  deploymentProposal: <Entities />,
-  me: <Identity />,
+  identities: <Identities />,
+  deploymentProposals: <Identities />,
+  deploymentProposal: <Identities />,
+  me: <You />,
 };
 
 function App({ session, layouts }: { session: Session; layouts: Layouts }) {

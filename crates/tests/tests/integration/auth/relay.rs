@@ -15,7 +15,7 @@ mod relay {
     use axum::http::{Response, StatusCode};
     use base64::Engine as _;
     use base64::engine::general_purpose::URL_SAFE_NO_PAD;
-    use cairn_auth::limits::IDENTITY_CALL_DURATION_MAX;
+    use cairn_auth::limits::PROVIDER_CALL_DURATION_MAX;
     use cairn_auth::{AuthProvider, GcpIapConfig, GcpIapProvider, GoogleEndpoints, RelayClient};
     use cairn_store::AuthStore;
     use openidconnect::PkceCodeChallenge;
@@ -228,7 +228,7 @@ mod relay {
         post_form(setup, &form).await
     }
 
-    /// Nothing durable: no user, identity, or token (each would be in the auth log), and no
+    /// Nothing durable: no user, login, or token (each would be in the auth log), and no
     /// session or OAuth state, however long from now.
     async fn stored_nothing(world: &World) -> bool {
         let later = world.clock.clock().now() + jiff::SignedDuration::from_hours(24 * 3650);
@@ -577,9 +577,9 @@ mod relay {
             .unwrap();
         let started = tokio::time::Instant::now();
         let answered =
-            tokio::time::timeout(IDENTITY_CALL_DURATION_MAX * 2, send(&setup.router, request));
+            tokio::time::timeout(PROVIDER_CALL_DURATION_MAX * 2, send(&setup.router, request));
         let answered = answered.await.unwrap();
-        assert!(started.elapsed() <= IDENTITY_CALL_DURATION_MAX);
+        assert!(started.elapsed() <= PROVIDER_CALL_DURATION_MAX);
         assert!(answered.status().is_server_error(), "{}", answered.status());
         assert!(json_of(answered).await.get("access_token").is_none());
     }
@@ -617,13 +617,13 @@ mod relay {
             .unwrap();
         tokio::time::pause();
         let paused = tokio::time::Instant::now();
-        tokio::time::advance(IDENTITY_CALL_DURATION_MAX).await;
-        let answered = tokio::time::timeout(IDENTITY_CALL_DURATION_MAX * 2, answered);
+        tokio::time::advance(PROVIDER_CALL_DURATION_MAX).await;
+        let answered = tokio::time::timeout(PROVIDER_CALL_DURATION_MAX * 2, answered);
         let answered = answered.await.unwrap().unwrap();
         // A timer fires on the millisecond tick after its deadline, so within a second of it.
         let tick = Duration::from_secs(1);
         assert!(
-            paused.elapsed() < IDENTITY_CALL_DURATION_MAX + tick,
+            paused.elapsed() < PROVIDER_CALL_DURATION_MAX + tick,
             "{:?}",
             paused.elapsed()
         );

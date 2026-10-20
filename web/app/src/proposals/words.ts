@@ -12,7 +12,7 @@ import { fieldWords, upperFirst } from "../status/words.ts";
 import { nodeTitle } from "../ui/gone.ts";
 import { removedChoices, type Conflict, type ResolutionKind, type ReviewItem } from "./model.ts";
 import { plural } from "../ui/words.ts";
-import { entityNamed, kindNamed, roleNamed, type Slot } from "../detail/sections.tsx";
+import { identityNamed, kindNamed, roleNamed, type Slot } from "../detail/sections.tsx";
 import type { Deployment } from "../data/host.ts";
 
 /** Names by key over the graphs a review shows (before and after), falling back to words for what is gone. */
@@ -20,7 +20,7 @@ export interface Names {
   node: (key: string) => string;
   role: (key: string) => string;
   kind: (key: string) => string;
-  entity: (key: string) => string;
+  identity: (key: string) => string;
   /** What an answer to `decision` calls its choice `id`. */
   choice: (decision: string, id: string) => string;
   /** What a condition calls its decisions and the values it compares. */
@@ -29,7 +29,7 @@ export interface Names {
   date: (date: string) => string;
 }
 
-/** Names from `graphs` (the later one wins) and the deployment's entities, through its merges. */
+/** Names from `graphs` (the later one wins) and the deployment's identities, through its merges. */
 export function namesOf(graphs: (Graph | null | undefined)[], deployment: Deployment, today?: string): Names {
   const nodes = new Map<string, GraphNode>();
   const roles = new Map<string, Slot>();
@@ -45,14 +45,14 @@ export function namesOf(graphs: (Graph | null | undefined)[], deployment: Deploy
       kinds.set(kind.key, kind);
     }
   }
-  const entity = (key: string) => entityNamed(deployment, key);
+  const identity = (key: string) => identityNamed(deployment, key);
   return {
     node: (key) => nodeTitle(nodes.get(key)?.title),
     role: (key) => roleNamed([...roles.values()], key),
     kind: (key) => kindNamed([...kinds.values()], key),
-    entity,
+    identity,
     choice: (decision, id) => choiceNamed(nodes.get(decision)?.choices, id),
-    condition: conditionNames((decision) => nodes.get(decision), entity),
+    condition: conditionNames((decision) => nodes.get(decision), identity),
     date: (date) => dateWords(date, today),
   };
 }
@@ -109,7 +109,7 @@ export function stateValueWords(field: string, value: unknown, node: string, nam
       return parts.filter((part) => part !== undefined).join(", ");
     }
     case "answers":
-      return answerWords(value as Parameters<typeof answerWords>[0], { choice: (id) => names.choice(node, id), entity: (key) => names.entity(key), date: names.date });
+      return answerWords(value as Parameters<typeof answerWords>[0], { choice: (id) => names.choice(node, id), identity: (key) => names.identity(key), date: names.date });
     case "rationales":
       return typeof value === "string" ? quoted(briefly(value)) : "a reason";
     case "pins":
@@ -162,7 +162,7 @@ export function mutationWords(mutation: Mutation, names: Names): string {
     case "remove_edge":
       return `Drop the requirement of ${node(mutation.edge.node)} on ${node(mutation.edge.requires)}`;
     case "answer": {
-      const value = answerWords(mutation.value, { choice: (id) => names.choice(mutation.decision, id), entity: (key) => names.entity(key), date: names.date });
+      const value = answerWords(mutation.value, { choice: (id) => names.choice(mutation.decision, id), identity: (key) => names.identity(key), date: names.date });
       return `Answer ${node(mutation.decision)}: ${value}${mutation.rationale == null ? "" : `, because ${quoted(briefly(mutation.rationale))}`}`;
     }
     case "set_pin":
@@ -273,7 +273,7 @@ export function itemHeading(item: ReviewItem, names: Names): string {
     case "orphan":
       return `Orphan: ${quoted(names.node(item.node))}, which the new version removed`;
     case "participation":
-      return `Who stands in for ${quoted(names.entity(item.entity))} in the route`;
+      return `Who stands in for ${quoted(names.identity(item.identity))} in the route`;
     case "exclusion":
       return quoted(names.node(item.node));
     case "cascade":
@@ -326,7 +326,7 @@ const counted = (count: number, one: string, many: string) => `${String(count)} 
 /**
  * C14: what a proposal changes, in one sentence, from the outline the engine worked out of its
  * mutations (the listing's and the preview's are the same value): its header and lifecycle facts
- * first, then the nodes, requirements and entities it names. "Upgrades to version 2 and adds 1 node."
+ * first, then the nodes, requirements and identities it names. "Upgrades to version 2 and adds 1 node."
  */
 export function outlineWords(outline: Outline): string {
   const phrases = [
@@ -336,9 +336,9 @@ export function outlineWords(outline: Outline): string {
     ...(outline.nodes_removed ? [`removes ${counted(outline.nodes_removed, "node", "nodes")}`] : []),
     ...(outline.requirements_added ? [`adds ${counted(outline.requirements_added, "requirement", "requirements")}`] : []),
     ...(outline.requirements_removed ? [`removes ${counted(outline.requirements_removed, "requirement", "requirements")}`] : []),
-    ...(outline.entities_created ? [`creates ${counted(outline.entities_created, "entity", "entities")}`] : []),
-    ...(outline.entities_edited ? [`edits ${counted(outline.entities_edited, "entity", "entities")}`] : []),
-    ...(outline.entities_merged ? [`merges ${counted(outline.entities_merged, "entity", "entities")}`] : []),
+    ...(outline.identities_created ? [`creates ${counted(outline.identities_created, "identity", "identities")}`] : []),
+    ...(outline.identities_edited ? [`edits ${counted(outline.identities_edited, "identity", "identities")}`] : []),
+    ...(outline.identities_merged ? [`merges ${counted(outline.identities_merged, "identity", "identities")}`] : []),
     ...(outline.other ? ["adjusts roles, kinds or defaults"] : []),
   ];
   if (phrases.length === 0) {

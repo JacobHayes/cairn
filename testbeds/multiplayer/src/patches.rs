@@ -4,12 +4,12 @@
 //! Three kinds land on the shared journey or the deployment: a note (`annotate`), which
 //! touches only its own annotation, so a stale one is always safe to retry (H5); a rename
 //! of one of a few nodes (`rename`), which overlaps another rename of the same node, so
-//! some conflicts are surfaced; and an entity merge (`merge`), which moves the deployment
+//! some conflicts are surfaced; and an identity merge (`merge`), which moves the deployment
 //! and ticks every view watching it (H6, E6).
 
 use std::fmt::Write as _;
 
-use cairn_schema::{EntityKey, JourneyId, NodeKey, Patch, Revision};
+use cairn_schema::{IdentityKey, JourneyId, NodeKey, Patch, Revision};
 
 /// What a client drafts, before it is a patch at some base revision.
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -18,10 +18,10 @@ pub enum Draft {
     Annotate { key: String },
     /// A new title for a node.
     Rename { node: NodeKey, title: String },
-    /// Merge one entity into another.
+    /// Merge one identity into another.
     Merge {
-        survivor: EntityKey,
-        merged: EntityKey,
+        survivor: IdentityKey,
+        merged: IdentityKey,
     },
 }
 
@@ -41,7 +41,7 @@ impl Draft {
             )),
             Draft::Merge { survivor, merged } => parse(&format!(
                 "id: {id}\ntarget: deployment\nbase_revision: {base}\nmutations:\n\
-                 - op: merge_entities\n  survivor: {survivor}\n  merged: {merged}\n  journeys: {{}}\n"
+                 - op: merge_identities\n  survivor: {survivor}\n  merged: {merged}\n  journeys: {{}}\n"
             )),
         }
     }
@@ -62,11 +62,12 @@ pub fn node(index: u32) -> NodeKey {
     key(&format!("n_{index}"))
 }
 
-/// Entity pair `index`, as (survivor, merged).
-pub fn merge_pair(index: u32) -> (EntityKey, EntityKey) {
+/// Identity pair `index`, as (survivor, merged): keys are opaque, so the pair is told apart
+/// by its place in the testbed's own data, the survivor first.
+pub fn merge_pair(index: u32) -> (IdentityKey, IdentityKey) {
     (
-        key(&format!("e_survivor_{index}")),
-        key(&format!("e_merged_{index}")),
+        key(&format!("who_{}", 2 * index)),
+        key(&format!("who_{}", 2 * index + 1)),
     )
 }
 
@@ -87,16 +88,16 @@ pub fn create_journey(nodes: u32) -> Patch {
     parse(&yaml)
 }
 
-/// Creates `pairs` pairs of entities for merges, in one deployment patch.
-pub fn create_entities(pairs: u32) -> Patch {
+/// Creates `pairs` pairs of identities for merges, in one deployment patch.
+pub fn create_identities(pairs: u32) -> Patch {
     let mut yaml =
-        "id: p_setup_entities\ntarget: deployment\nbase_revision: 0\nmutations:\n".to_owned();
+        "id: p_setup_identities\ntarget: deployment\nbase_revision: 0\nmutations:\n".to_owned();
     for index in 0..pairs {
         let (survivor, merged) = merge_pair(index);
-        for (entity, name) in [(survivor, "Survivor"), (merged, "Merged")] {
+        for (identity, name) in [(survivor, "Survivor"), (merged, "Merged")] {
             let _ = writeln!(
                 yaml,
-                "- op: create_entity\n  entity: {{key: {entity}, name: {name} {index}}}"
+                "- op: create_identity\n  identity: {{key: {identity}, name: {name} {index}}}"
             );
         }
     }
@@ -153,6 +154,6 @@ mod tests {
             PatchTarget::Journey(journey()),
             "setup creates the shared journey"
         );
-        assert_eq!(create_entities(2).mutations.as_slice().len(), 4);
+        assert_eq!(create_identities(2).mutations.as_slice().len(), 4);
     }
 }

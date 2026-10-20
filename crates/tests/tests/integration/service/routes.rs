@@ -460,7 +460,7 @@ async fn saved_and_published(service: &Service, lead: &Call) -> RouteId {
         "p_named",
         "{journey: j_vendor_eval}",
         journey.revision.get(),
-        "- op: set_participation\n  node: n_findings\n  kind: k_reviewer\n  source: [e_stakeholder_a]\n",
+        "- op: set_participation\n  node: n_findings\n  kind: k_reviewer\n  source: [who_d4m6uk2eqf5rbhzs]\n",
     );
     applied(service.patch(lead, &domain(named)).await);
     let route: RouteId = id("vendor-evaluation-saved");
@@ -478,20 +478,20 @@ async fn saved_and_published(service: &Service, lead: &Call) -> RouteId {
             .await
             .unwrap(),
     );
-    let mut mapped_entities = Vec::new();
+    let mut mapped_identities = Vec::new();
     let mapped = chosen(&drafted, |item| {
         if let ReviewItem::Participation {
-            entity, mapping, ..
+            identity, mapping, ..
         } = item
         {
-            mapped_entities.push(entity.to_string());
+            mapped_identities.push(identity.to_string());
             *mapping = Some(ParticipationMapping::Role(id("r_findings_reviewer")));
         }
     });
     assert_eq!(
-        mapped_entities,
-        ["e_stakeholder_a"],
-        "each explicit entity is an item"
+        mapped_identities,
+        ["who_d4m6uk2eqf5rbhzs"],
+        "each explicit identity is an item"
     );
     let target = Domain::Route(route.clone());
     saved(

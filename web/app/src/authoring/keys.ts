@@ -1,4 +1,4 @@
-// Identity and references: what a new node, role, kind, or resource is called. Its key is
+// Keys and references: what a new node, role, kind, or resource is called. Its key is
 // minted once in the tab, with its type's prefix and random, so it never collides with a key
 // the graph holds or retired; its id is a slug from its title, unique among its siblings.
 import { ID_BYTES_MAX } from "@cairn/client";

@@ -17,9 +17,9 @@ mod structure;
 use std::collections::{BTreeMap, BTreeSet};
 
 use cairn_schema::{
-    Domain, EntityKey, GraphId, GraphKey, GraphRecord, Journey, JourneyId, JourneyStatus, KeyRefs,
-    Lineage, LocalEdit, Mutation, Node, NodeKey, Patch, PatchTarget, Provenance, Record, RecordKey,
-    RevisionConflict, Subject, Violation, ViolationCode, Write,
+    Domain, GraphId, GraphKey, GraphRecord, IdentityKey, Journey, JourneyId, JourneyStatus,
+    KeyRefs, Lineage, LocalEdit, Mutation, Node, NodeKey, Patch, PatchTarget, Provenance, Record,
+    RecordKey, RevisionConflict, Subject, Violation, ViolationCode, Write,
 };
 
 use crate::edit::RemovalIndex;
@@ -57,14 +57,14 @@ pub(crate) struct Session<'a> {
     /// with one, with the mutation that named them: refused on the graph the patch produces
     /// while a container's snooze still holds over them (B6).
     pub unsnoozed_through: BTreeMap<NodeKey, u32>,
-    /// Entities created in this patch (E6).
-    pub created_entities: BTreeSet<EntityKey>,
+    /// Identities created in this patch (E6).
+    pub created_identities: BTreeSet<IdentityKey>,
     /// Route versions published in this patch.
     pub published: Vec<Lineage>,
     /// Roles and kinds a mutation in this patch gave the other cardinality: no insertion may
     /// map onto one in the graph the patch produces (B13).
     pub cardinality_changed: BTreeSet<Subject>,
-    /// Journeys the entity merges in this patch are checked against, every merge's (E6).
+    /// Journeys the identity merges in this patch are checked against, every merge's (E6).
     pub merge_checked: BTreeSet<JourneyId>,
     /// What node removals reach in the patch's graph, built at the first removal and kept
     /// up to date by every later write (A18; [`RemovalIndex`]).
@@ -87,7 +87,7 @@ enum Scope {
     Graph,
     /// The deployment.
     Deployment,
-    /// Any domain: an entity create rides in any patch (E6).
+    /// Any domain: an identity create rides in any patch (E6).
     AnyDomain,
     /// Any domain: a proposal applies to its own destination (I6).
     Apply,
@@ -146,8 +146,8 @@ fn scope(mutation: &Mutation) -> Scope {
         | Mutation::EditResource { .. }
         | Mutation::RemoveResource { .. }
         | Mutation::InsertSegment { .. } => Scope::Graph,
-        Mutation::EditEntity { .. } | Mutation::MergeEntities { .. } => Scope::Deployment,
-        Mutation::CreateEntity { .. } => Scope::AnyDomain,
+        Mutation::EditIdentity { .. } | Mutation::MergeIdentities { .. } => Scope::Deployment,
+        Mutation::CreateIdentity { .. } => Scope::AnyDomain,
         Mutation::ApplyProposal { .. } => Scope::Apply,
         Mutation::CreateProposal { .. }
         | Mutation::EditProposal { .. }
@@ -176,7 +176,7 @@ pub(crate) fn apply(session: &mut Session<'_>, mutation: &Mutation, delta: &mut 
         Scope::Proposal => proposal::apply(session, mutation),
     };
     // A rejected mutation writes nothing (A15: nothing partial), and every write stays in
-    // the patch's domain, or the deployment for an entity create or a deleted journey (E6,
+    // the patch's domain, or the deployment for an identity create or a deleted journey (E6,
     // A19).
     assert!(writes.is_empty() || session.violations.len() == found_before);
     let domain = session.domain();
@@ -210,7 +210,7 @@ impl<'a> Session<'a> {
             snoozed: BTreeMap::new(),
             cardinality_changed: BTreeSet::new(),
             unsnoozed_through: BTreeMap::new(),
-            created_entities: BTreeSet::new(),
+            created_identities: BTreeSet::new(),
             published: Vec::new(),
             merge_checked: BTreeSet::new(),
             removal_index: None,
@@ -271,8 +271,8 @@ impl Session<'_> {
             return Err((ViolationCode::MutationNotForTarget, message));
         }
         // A proposal's own mutations may create its destination, so applying one does not
-        // need the target to exist yet; everything else, a riding entity create included,
-        // does (an entity create rides in a patch to something).
+        // need the target to exist yet; everything else, a riding identity create included,
+        // does (an identity create rides in a patch to something).
         let rides = scope == Scope::Apply;
         match &self.patch.target {
             PatchTarget::Journey(id) => self.admits_in_journey(id, mutation, rides),
@@ -302,7 +302,7 @@ impl Session<'_> {
         }
     }
 
-    /// A journey patch: the archived write ban holds for every mutation, entity creates
+    /// A journey patch: the archived write ban holds for every mutation, identity creates
     /// included (B11, A19); a proposal apply is let through to have each of its own mutations
     /// held to it. Other mutations need the journey to exist, and a create needs it not to.
     fn admits_in_journey(

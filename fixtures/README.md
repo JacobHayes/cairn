@@ -5,12 +5,19 @@ engine's scenario tests, the in-browser host, and the server's integration tests
 them (ARCHITECTURE, Testing the engine). Nothing here refers to a real use case, person, or
 organization (PRD, Domain-free).
 
+`people.yaml` is one deployment patch creating the people the scenarios share: invented,
+generic, with opaque keys, emails on some. Every scenario runs in the deployment it leaves,
+at revision 1, and binds those people to its own roles, so one person plays different roles in
+different journeys: Ana Ruiz owns the vendor evaluation, sits on the hiring panel, judges the
+bake-off, and leads the product launch. No identity is named after a role. A scenario's actors
+are users for those people (`u_ana`, `u_ben`, `u_gus`), each signed in with that person's
+email. A patch that creates identities advances the deployment revision by one (the vendor
+evaluation creates its findings reviewer this way); a patch that refers to existing identities
+names the revision it was written against (E6).
+
 Each directory holds a `route.yaml` (a route file: the file format, which
 `schema/route-file.schema.json` describes) and a `journey.yaml` (a scenario: patches in
-order, each with the clock it applies at and who submits it). Each scenario runs in a fresh
-deployment at revision 0. A patch that creates entities advances the deployment revision by
-one; a later patch that refers to existing entities names that revision (E6). A scenario's
-first patch
+order, each with the clock it applies at and who submits it). A scenario's first patch
 creates its journey at base revision 0 from version 1 of the route beside it; the route
 file is that version. Route files carry every key, so scenario patches can refer to nodes,
 roles, and kinds by key. Every file is written in canonical form: parsing and writing it
@@ -20,7 +27,7 @@ the engine's insertion tests insert it into another fixture's journey.
 
 The derived values below are read from this file by
 `crates/tests/tests/integration/engine/fixture_readme.rs` and checked against the engine: its
-tables, and each fixture's projection lines. A change that moves one of them fails that test
+tables, and each fixture's projection lines. The tables name people by name; the test resolves each name through the deployment. A change that moves one of them fails that test
 until this file is updated with it.
 
 ## `vendor-evaluation/`
@@ -73,14 +80,14 @@ on a gate is blocked. The scenario's `fixture_readme.rs` checks these values.
 
 | Node and kind | created (step 1) | up-front decisions (step 2) | comparison set (step 6) | findings reviewer (step 8) |
 |---|---|---|---|---|
-| every node, `owner` | none (default owner `eval_owner`); every unfinished node but the groups flagged unassigned | `e_lead` (default owner `eval_owner`) | `e_lead` (default owner `eval_owner`) | `e_lead` (default owner `eval_owner`) |
-| `reporting`, `informed` | none (role `stakeholders`) | `e_stakeholder_a`, `e_stakeholder_b` (role `stakeholders`) | `e_stakeholder_a`, `e_stakeholder_b` (role `stakeholders`) | `e_stakeholder_a`, `e_stakeholder_b` (role `stakeholders`) |
-| `reporting/final-review`, `informed` | none (from `reporting`) | `e_stakeholder_a`, `e_stakeholder_b` (from `reporting`) | `e_stakeholder_a`, `e_stakeholder_b` (from `reporting`) | `e_stakeholder_a`, `e_stakeholder_b` (from `reporting`) |
-| `reporting/final-review/final-report`, `informed` | none (from `reporting`) | `e_stakeholder_a`, `e_stakeholder_b` (from `reporting`) | `e_stakeholder_a`, `e_stakeholder_b` (from `reporting`) | `e_stakeholder_a`, `e_stakeholder_b` (from `reporting`) |
-| `reporting/findings`, `informed` | none (from `reporting`) | `e_stakeholder_a`, `e_stakeholder_b` (from `reporting`) | `e_stakeholder_a`, `e_stakeholder_b` (from `reporting`) | `e_stakeholder_a`, `e_stakeholder_b` (from `reporting`) |
-| `reporting/findings-reviewer`, `informed` | none (from `reporting`) | `e_stakeholder_a`, `e_stakeholder_b` (from `reporting`) | `e_stakeholder_a`, `e_stakeholder_b` (from `reporting`) | `e_stakeholder_a`, `e_stakeholder_b` (from `reporting`) |
-| `reporting/review-opens`, `informed` | none (from `reporting`) | `e_stakeholder_a`, `e_stakeholder_b` (from `reporting`) | `e_stakeholder_a`, `e_stakeholder_b` (from `reporting`) | `e_stakeholder_a`, `e_stakeholder_b` (from `reporting`) |
-| `reporting/final-review/final-report`, `reviewer` | none (role `findings_reviewer`) | none (role `findings_reviewer`) | none (role `findings_reviewer`) | `e_reviewer` (role `findings_reviewer`) |
+| every node, `owner` | none (default owner `eval_owner`); every unfinished node but the groups flagged unassigned | `Ana Ruiz` (default owner `eval_owner`) | `Ana Ruiz` (default owner `eval_owner`) | `Ana Ruiz` (default owner `eval_owner`) |
+| `reporting`, `informed` | none (role `stakeholders`) | `Dara Singh`, `Eli Park` (role `stakeholders`) | `Dara Singh`, `Eli Park` (role `stakeholders`) | `Dara Singh`, `Eli Park` (role `stakeholders`) |
+| `reporting/final-review`, `informed` | none (from `reporting`) | `Dara Singh`, `Eli Park` (from `reporting`) | `Dara Singh`, `Eli Park` (from `reporting`) | `Dara Singh`, `Eli Park` (from `reporting`) |
+| `reporting/final-review/final-report`, `informed` | none (from `reporting`) | `Dara Singh`, `Eli Park` (from `reporting`) | `Dara Singh`, `Eli Park` (from `reporting`) | `Dara Singh`, `Eli Park` (from `reporting`) |
+| `reporting/findings`, `informed` | none (from `reporting`) | `Dara Singh`, `Eli Park` (from `reporting`) | `Dara Singh`, `Eli Park` (from `reporting`) | `Dara Singh`, `Eli Park` (from `reporting`) |
+| `reporting/findings-reviewer`, `informed` | none (from `reporting`) | `Dara Singh`, `Eli Park` (from `reporting`) | `Dara Singh`, `Eli Park` (from `reporting`) | `Dara Singh`, `Eli Park` (from `reporting`) |
+| `reporting/review-opens`, `informed` | none (from `reporting`) | `Dara Singh`, `Eli Park` (from `reporting`) | `Dara Singh`, `Eli Park` (from `reporting`) | `Dara Singh`, `Eli Park` (from `reporting`) |
+| `reporting/final-review/final-report`, `reviewer` | none (role `findings_reviewer`) | none (role `findings_reviewer`) | none (role `findings_reviewer`) | `Farid Haddad` (role `findings_reviewer`) |
 
 Due dates once the decision meeting is pinned (brief 2.3): answering the meeting date in step 2
 pins `decision-meeting` to 2026-11-20 (E3), and every unfinished node a bound reaches gets
@@ -183,7 +190,7 @@ checks these items.
 ## `hiring-loop/`
 
 A small route with deep containment (interview loop, onsite, debrief, notes, scorecard) and a
-multi-valued `panel` role filled by an entity-list decision. The hiring manager role has no
+multi-valued `panel` role filled by an identity-list decision. The hiring manager role has no
 filling decision and is filled directly. The interviews deliverable is a placeholder with an
 `interviewer` participation on the panel role. An offer decision gates two branches by
 condition: the offer letter when it is yes, the close-out otherwise. The phone screen requires a
@@ -225,7 +232,7 @@ hidden, what rolls up, and the first three items of the next list.
 
 The PRD's ad-hoc sibling: a journey with no route. It is created empty; the assistant drafts a
 two-week bake-off between two options as a proposal (three decisions, four deliverables, one
-milestone, two entities, and a `judges` role declared on the journey); the owner applies it; the
+milestone, two identities, and a `judges` role declared on the journey); the owner applies it; the
 criteria and judges are decided and both trials start.
 
 Projected at the end of the scenario (brief 2.6), read at 2026-10-06: the level with actions
@@ -240,7 +247,7 @@ next list.
 
 A segment: a group root holding *Data sensitivity* (a single choice: low, moderate, high),
 *Threat model* (a deliverable relevant unless the sensitivity is low, owned by the `reviewer`
-role), and *Who reviews?* (an entity decision that fills `reviewer`). It has no final milestone
+role), and *Who reviews?* (an identity decision that fills `reviewer`). It has no final milestone
 and no default owner (a segment declares neither). The tests in `crates/tests/tests/integration/engine/insertion.rs` publish it as version 1 and
 insert it into the finished hiring-loop journey twice: first with the defaults, wired after the
 panel decision, then with *Who reviews?* left out (the first insertion's decision already fills

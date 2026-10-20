@@ -6,9 +6,9 @@
 
 pub mod derive;
 mod edit;
-mod entity;
 pub mod format;
 pub mod graph;
+mod identity;
 mod insertion;
 mod mutate;
 mod notices;

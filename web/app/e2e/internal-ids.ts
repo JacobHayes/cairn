@@ -1,4 +1,4 @@
-// The invariant that no screen shows a key where a name belongs: a user, entity, node, journey,
+// The invariant that no screen shows a key where a name belongs: a user, identity, node, journey,
 // proposal or patch id, an agent or conversation id, a digest, or a revision number, in text a
 // person reads or in a tooltip or label. Every browser test ends by checking the pages it
 // opened (e2e/test.ts), so a screen that prints one fails whatever it was testing. The patterns

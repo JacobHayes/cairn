@@ -71,7 +71,7 @@ impl DerivedJourney<'_> {
         };
         let (fills_role, pins) = match &decision.answer {
             AnswerSpec::Date { feeds_milestone } => (None, feeds_milestone.clone()),
-            AnswerSpec::Entity { fills_role } | AnswerSpec::EntityList { fills_role } => {
+            AnswerSpec::Identity { fills_role } | AnswerSpec::IdentityList { fills_role } => {
                 (fills_role.clone(), None)
             }
             AnswerSpec::Boolean
@@ -181,8 +181,8 @@ impl DerivedJourney<'_> {
             }
             AnswerSpec::Text
             | AnswerSpec::Date { .. }
-            | AnswerSpec::Entity { .. }
-            | AnswerSpec::EntityList { .. } => Vec::new(),
+            | AnswerSpec::Identity { .. }
+            | AnswerSpec::IdentityList { .. } => Vec::new(),
         }
     }
 

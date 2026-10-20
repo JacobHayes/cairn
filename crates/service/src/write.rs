@@ -225,15 +225,15 @@ impl Service {
         }))
     }
 
-    /// H5, E6: whether `patch`, a lone entity merge whose id is committed, asks for the
-    /// merge that id committed. A merge names the journeys referencing either entity at
+    /// H5, E6: whether `patch`, a lone identity merge whose id is committed, asks for the
+    /// merge that id committed. A merge names the journeys referencing either identity at
     /// their revisions when it was drafted, which a client reads from the index, so a
     /// resubmission after any of them moved carries other content for the same merge; it is
     /// matched by what it merges (briefs/4.3-mcp.md, Decision log): the committed patch's
-    /// one event merged the same entity into the same survivor.
+    /// one event merged the same identity into the same survivor.
     async fn merged_as(&self, patch: &Patch) -> Result<bool, WriteError> {
         let [
-            Mutation::MergeEntities {
+            Mutation::MergeIdentities {
                 survivor, merged, ..
             },
         ] = patch.mutations.as_slice()
@@ -253,13 +253,13 @@ impl Service {
         let [logged] = events.as_slice() else {
             return Ok(false);
         };
-        let alias = Record::EntityAlias {
+        let alias = Record::IdentityAlias {
             alias: merged.clone(),
-            entity: survivor.clone(),
+            identity: survivor.clone(),
         };
         let event = &logged.event;
-        Ok(event.event_type == EventType::EntitiesMerged
-            && event.subject == Subject::Entity(merged.clone())
+        Ok(event.event_type == EventType::IdentitiesMerged
+            && event.subject == Subject::Identity(merged.clone())
             && event.delta.contains(&Write::Put(alias)))
     }
 
@@ -310,7 +310,7 @@ impl Service {
 
     /// H6: announces every revision a commit moved: its domain's, or for a patch to a
     /// proposal the proposal's (I6: drafting never moves the destination); each proposal a
-    /// domain patch applied; and the deployment's when an entity create riding in a journey or
+    /// domain patch applied; and the deployment's when an identity create riding in a journey or
     /// route patch moved it. The deployment's revision is read back from the store, which
     /// another such commit may have moved further in the meantime: announcing an older one
     /// would be ignored by a subscriber that heard the newer, and announcing one never
@@ -336,13 +336,13 @@ impl Service {
                     .publish(&RevisionOf::Proposal(id.clone()), proposal.revision);
             }
         }
-        let creates_entities = applied.change_set().writes().any(|write| {
+        let creates_identities = applied.change_set().writes().any(|write| {
             matches!(
                 write,
-                Write::Put(Record::Entity(_) | Record::EntityAlias { .. })
+                Write::Put(Record::Identity(_) | Record::IdentityAlias { .. })
             )
         });
-        if domain == Domain::Deployment || !creates_entities {
+        if domain == Domain::Deployment || !creates_identities {
             return;
         }
         // The store's revision, or, when it cannot be read back, the one the engine's records

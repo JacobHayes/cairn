@@ -359,10 +359,10 @@ fn drilling_in_shows_the_containers_contents() {
 
 const GROUP: &str = "{key: n_group, id: group, kind: group, title: Group}";
 const ASK: &str = "{key: n_ask, id: ask, parent: n_group, kind: decision, title: Ask, prompt: Go?, answer_type: boolean}";
-const WORK: &str = "{key: n_work, id: work, parent: n_group, kind: deliverable, title: Work, participations: {k_owner: [e_a]}}";
+const WORK: &str = "{key: n_work, id: work, parent: n_group, kind: deliverable, title: Work, participations: {k_owner: [who_a]}}";
 const STEP: &str = "{key: n_step, id: step, parent: n_work, kind: action, title: Step}";
-const TODO: &str = "{key: n_todo, id: todo, parent: n_group, kind: deliverable, title: To do, placeholder: true, participations: {k_owner: [e_b]}}";
-const PEOPLE: &str = "- op: create_entity\n  entity: {key: e_a, name: A}\n- op: create_entity\n  entity: {key: e_b, name: B}\n";
+const TODO: &str = "{key: n_todo, id: todo, parent: n_group, kind: deliverable, title: To do, placeholder: true, participations: {k_owner: [who_b]}}";
+const PEOPLE: &str = "- op: create_identity\n  identity: {key: who_a, name: A}\n- op: create_identity\n  identity: {key: who_b, name: B}\n";
 
 fn transition(node: &str, transition: &str) -> String {
     format!("- op: transition\n  node: {node}\n  transition: {transition}\n")
@@ -384,9 +384,9 @@ fn a_container_rolls_up_its_childrens_badges() {
     let owners: Vec<&str> = badges
         .owners
         .iter()
-        .map(cairn_schema::EntityKey::as_str)
+        .map(cairn_schema::IdentityKey::as_str)
         .collect();
-    assert_eq!(owners, ["e_a", "e_b"]);
+    assert_eq!(owners, ["who_a", "who_b"]);
     assert_eq!(
         badges.max_child_gravity,
         Some(Score::from_millionths(1_000_000))

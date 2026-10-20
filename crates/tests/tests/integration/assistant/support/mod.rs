@@ -143,14 +143,21 @@ impl World {
         self.service.patch(&call, &patch).await.unwrap();
     }
 
+    /// Creates the people the fixtures share; once a service is enough.
+    pub async fn people(&self) {
+        let (call, people) = crate::people::people_write();
+        self.service.patch(&call, &people).await.unwrap();
+    }
+
     /// Publishes a fixture's route as version 1.
     pub async fn publish(&self, actor: &Actor, fixture: &str) {
         self.patch(actor, publish_fixture_route(fixture)).await;
     }
 
     /// Publishes the vendor evaluation and starts `j_vendor_eval` from its version 1 with
-    /// its people (the scenario's first step): the journey at revision 1.
+    /// the shared people created first (the scenario's first step): the journey at revision 1.
     pub async fn vendor_journey(&self, actor: &Actor) {
+        self.people().await;
         self.publish(actor, "vendor-evaluation").await;
         let path = fixtures_root()
             .join("vendor-evaluation")
@@ -163,6 +170,7 @@ impl World {
     /// Starts the bake-off's empty journey, as its owner (its scenario's first step): the
     /// journey at revision 1, with no route.
     pub async fn empty_bakeoff(&self) {
+        self.people().await;
         let first = scenario("bake-off").steps.as_slice()[0].patch.clone();
         self.patch(&user("u_owner"), first).await;
     }

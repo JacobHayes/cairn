@@ -208,10 +208,10 @@
   background: var(--color-change);
 }
 
-.entity-row[data-diff="added"] { background: var(--color-add); }
-.entity-row[data-diff="changed"] { background: var(--color-change); }
-.entity-row[data-diff="removed"] { background: var(--color-del); }
-.entity-row[data-diff="removed"] [data-testid="entity-name"] { text-decoration: line-through; text-decoration-thickness: 1px; }
+.identity-row[data-diff="added"] { background: var(--color-add); }
+.identity-row[data-diff="changed"] { background: var(--color-change); }
+.identity-row[data-diff="removed"] { background: var(--color-del); }
+.identity-row[data-diff="removed"] [data-testid="identity-name"] { text-decoration: line-through; text-decoration-thickness: 1px; }
 
 .proposals-none {
   margin: 0;

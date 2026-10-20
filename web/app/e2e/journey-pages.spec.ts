@@ -52,7 +52,7 @@ function listRow(page: Page, node: string): Locator {
 
 /**
  * Makes X on a fresh journey's graph: an up-front decision on the frontier, given the viewer's
- * entity as owner and a pin two days back (so overdue), and the only node whose title holds the
+ * identity as owner and a pin two days back (so overdue), and the only node whose title holds the
  * word it returns.
  */
 async function makeX(page: Page, id: string, x: string): Promise<string> {

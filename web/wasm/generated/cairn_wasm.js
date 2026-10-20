@@ -81,7 +81,7 @@ export class BrowserRoot {
         }
     }
     /**
-     * The deployment: its entities, aliases, and revision (E6).
+     * The deployment: its identities, aliases, and revision (E6).
      *
      * # Errors
      *

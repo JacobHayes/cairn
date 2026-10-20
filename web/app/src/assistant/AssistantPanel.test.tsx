@@ -88,7 +88,7 @@ describe("a turn's writes in the panel (I5, D7)", () => {
       { outcome: "proposed", tool: "create_proposal", proposal: "pr_three", destination: "deployment", because: { reason: "asked" } },
     ];
     const markup = shown(reasons);
-    for (const href of ["/journeys/j_one/proposals/pr_one", "/routes/r_two/proposals/pr_two", "/entities/proposals/pr_three"]) {
+    for (const href of ["/journeys/j_one/proposals/pr_one", "/routes/r_two/proposals/pr_two", "/identities/proposals/pr_three"]) {
       expect(markup).toContain(`href="${href}"`);
     }
     expect(count(markup, 'data-testid="review-proposal"')).toBe(reasons.length);

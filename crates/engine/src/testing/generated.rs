@@ -669,11 +669,14 @@ fn people() -> Document {
         .put(kind)
         .unwrap_or_else(|e| panic!("{e}"));
     document.default_owner = Some(parse("r_one"));
-    let fills = [("r_one", &["e_a"][..]), ("r_many", &["e_a", "e_b"][..])];
-    for (role, entities) in fills {
-        let entities = BoundedSet::new(entities.iter().map(|entity| parse(entity)));
-        let entities = entities.unwrap_or_else(|e| panic!("{e}"));
-        document.state.role_fills.insert(parse(role), entities);
+    let fills = [
+        ("r_one", &["who_a"][..]),
+        ("r_many", &["who_a", "who_b"][..]),
+    ];
+    for (role, identities) in fills {
+        let identities = BoundedSet::new(identities.iter().map(|identity| parse(identity)));
+        let identities = identities.unwrap_or_else(|e| panic!("{e}"));
+        document.state.role_fills.insert(parse(role), identities);
     }
     document
 }
@@ -684,19 +687,19 @@ fn participations(seed: Option<(bool, u8)>) -> Participations<KeyRefs> {
         return Participations::default();
     };
     let (kind, role, lists): (KindKey, &str, &[&[&str]]) = if owner {
-        (KindKey::owner(), "r_one", &[&["e_a"], &["e_b"], &[]])
+        (KindKey::owner(), "r_one", &[&["who_a"], &["who_b"], &[]])
     } else {
         (
             parse("k_many"),
             "r_many",
-            &[&["e_a"], &["e_b"], &["e_a", "e_c"], &[]],
+            &[&["who_a"], &["who_b"], &["who_a", "who_c"], &[]],
         )
     };
     let choice = usize::from(source) % (lists.len() + 1);
     let found = match lists.get(choice) {
-        Some(entities) => {
-            let entities = BoundedSet::new(entities.iter().map(|entity| parse(entity)));
-            ParticipationSource::Entities(entities.unwrap_or_else(|e| panic!("{e}")))
+        Some(identities) => {
+            let identities = BoundedSet::new(identities.iter().map(|identity| parse(identity)));
+            ParticipationSource::Identities(identities.unwrap_or_else(|e| panic!("{e}")))
         }
         None => ParticipationSource::Role(parse(role)),
     };

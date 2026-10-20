@@ -1,5 +1,5 @@
 //! Resolving a proposal (C14, I6; B7 to B9): the mutations it was drafted with, rewritten by
-//! the save-as-route choices (nodes excluded with their subtrees, explicit entities mapped to
+//! the save-as-route choices (nodes excluded with their subtrees, explicit identities mapped to
 //! roles), then the mutations each conflict resolution stands for, then the orphans removed.
 //! Only an item that still needs a choice blocks; everything else the items say is ordinary
 //! mutations, so apply runs them like any patch's and validates the result strictly.
@@ -10,7 +10,7 @@
 use std::collections::{BTreeMap, BTreeSet};
 
 use cairn_schema::{
-    Conflict, ConflictResolution, EntityKey, EntitySet, LocalEdit, Mutation, NodeFieldValue,
+    Conflict, ConflictResolution, IdentityKey, IdentitySet, LocalEdit, Mutation, NodeFieldValue,
     NodeKey, ParticipationMapping, ParticipationSource, Participations, ProposalDraft, Removal,
     ReviewItem, RoleKey, RoleReference, Transition, UnresolvedItem, UnresolvedReason,
     removed_choices,
@@ -97,12 +97,12 @@ fn blocked(index: usize, reason: UnresolvedReason) -> UnresolvedItem {
     }
 }
 
-/// B8: each explicit entity's role (none when dropped), the roles mappings create, and the
-/// item that maps each entity.
+/// B8: each explicit identity's role (none when dropped), the roles mappings create, and the
+/// item that maps each identity.
 #[derive(Default)]
 struct Mapping {
-    roles: BTreeMap<EntityKey, Option<RoleKey>>,
-    items: BTreeMap<EntityKey, usize>,
+    roles: BTreeMap<IdentityKey, Option<RoleKey>>,
+    items: BTreeMap<IdentityKey, usize>,
     new_roles: BTreeMap<RoleKey, cairn_schema::Role<cairn_schema::KeyRefs>>,
 }
 
@@ -121,14 +121,14 @@ impl Mapping {
         let mut mapping = Mapping::default();
         for (index, item) in draft.items.as_slice().iter().enumerate() {
             let ReviewItem::Participation {
-                entity,
+                identity,
                 mapping: chosen,
                 ..
             } = item
             else {
                 continue;
             };
-            mapping.items.insert(entity.clone(), index);
+            mapping.items.insert(identity.clone(), index);
             let role = match chosen {
                 None => {
                     unresolved.push(blocked(index, UnresolvedReason::NoChoice));
@@ -148,14 +148,14 @@ impl Mapping {
                     default_owner.clone()
                 }
             };
-            mapping.roles.insert(entity.clone(), role);
+            mapping.roles.insert(identity.clone(), role);
         }
         mapping
     }
 
-    /// B8: a participation naming explicit entities becomes the one role they map to, or
-    /// goes when all are dropped. Entities mapped to different roles leave it as it is and
-    /// block their items; so does an entity with no choice yet.
+    /// B8: a participation naming explicit identities becomes the one role they map to, or
+    /// goes when all are dropped. Identities mapped to different roles leave it as it is and
+    /// block their items; so does an identity with no choice yet.
     fn participations(
         &self,
         participations: &Participations<cairn_schema::KeyRefs>,
@@ -163,12 +163,12 @@ impl Mapping {
     ) -> Participations<cairn_schema::KeyRefs> {
         let mut rewritten = participations.as_map().clone();
         for (kind, source) in participations.as_map() {
-            let ParticipationSource::Entities(entities) = source else {
+            let ParticipationSource::Identities(identities) = source else {
                 continue;
             };
-            let mapped: Option<BTreeSet<&RoleKey>> = entities
+            let mapped: Option<BTreeSet<&RoleKey>> = identities
                 .iter()
-                .map(|entity| self.roles.get(entity).map(Option::as_ref))
+                .map(|identity| self.roles.get(identity).map(Option::as_ref))
                 .collect::<Option<Vec<_>>>()
                 .map(|roles| roles.into_iter().flatten().collect());
             match mapped {
@@ -183,9 +183,9 @@ impl Mapping {
                     }
                 }
                 Some(_) => unresolved.extend(
-                    entities
+                    identities
                         .iter()
-                        .filter_map(|entity| self.items.get(entity))
+                        .filter_map(|identity| self.items.get(identity))
                         .map(|index| blocked(*index, UnresolvedReason::MixedMapping)),
                 ),
             }
@@ -241,7 +241,7 @@ fn excluded(draft: &ProposalDraft) -> BTreeSet<NodeKey> {
 }
 
 /// A drafted mutation as the save-as-route choices leave it: an excluded node is not added,
-/// edges into one are dropped, and explicit entities become roles.
+/// edges into one are dropped, and explicit identities become roles.
 fn rewrite(
     mutation: &Mutation,
     excluded: &BTreeSet<NodeKey>,
@@ -320,7 +320,7 @@ struct Claimed {
     roles: BTreeMap<RoleKey, Option<RoleKey>>,
     /// What a removed role hands a segment's node that names it (B13): a kind item moving
     /// the participation carries it along.
-    handed: BTreeMap<(NodeKey, RoleKey), EntitySet>,
+    handed: BTreeMap<(NodeKey, RoleKey), IdentitySet>,
 }
 
 impl Claimed {
@@ -788,14 +788,14 @@ fn rewritten(
     role: &RoleKey,
     reference: &RoleReference,
     to: Option<&RoleKey>,
-    members: &EntitySet,
+    members: &IdentitySet,
 ) -> Vec<Mutation> {
     match (reference, to) {
         (RoleReference::SegmentParticipation { node, kind }, _) => {
             vec![Mutation::SetParticipation {
                 node: node.clone(),
                 kind: kind.clone(),
-                source: ParticipationSource::Entities(members.clone()),
+                source: ParticipationSource::Identities(members.clone()),
             }]
         }
         (RoleReference::Participation { node, kind }, Some(to)) => {
@@ -815,11 +815,11 @@ fn rewritten(
             node: node.clone(),
             value: NodeFieldValue::FillsRole(to.cloned()),
         }],
-        (RoleReference::Fill { entities }, to) => {
+        (RoleReference::Fill { identities }, to) => {
             let mut moved = vec![Mutation::ClearRoleFill { role: role.clone() }];
             moved.extend(to.map(|to| Mutation::FillRole {
                 role: to.clone(),
-                entities: entities.clone(),
+                identities: identities.clone(),
             }));
             moved
         }
@@ -865,10 +865,10 @@ fn kind(conflict: &Conflict, resolution: &ConflictResolution, claimed: &Claimed)
                 Some(None) => claimed
                     .handed
                     .get(&(node.clone(), role.clone()))
-                    .map(|members| ParticipationSource::Entities(members.clone())),
+                    .map(|members| ParticipationSource::Identities(members.clone())),
                 None => Some(source.clone()),
             },
-            ParticipationSource::Entities(_) => Some(source.clone()),
+            ParticipationSource::Identities(_) => Some(source.clone()),
         };
         if let (ConflictResolution::RemapKind { kind: to }, Some(source)) = (resolution, source) {
             mutations.push(Mutation::SetParticipation {

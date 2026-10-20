@@ -7,15 +7,15 @@
 //!
 //! Evaluation is iterative, with an explicit stack bounded by the condition's own limits
 //! (8 levels, 16 clauses: PRACTICES, No recursion), so one condition costs at most a few
-//! dozen steps. Entity values compare through aliases (E6), so a merge can change what a
+//! dozen steps. Identity values compare through aliases (E6), so a merge can change what a
 //! condition evaluates to.
 
 use cairn_schema::{
-    AnswerValue, Clause, Condition, ConditionValue, Deployment, EntityKey, KeyRefs, NodeKey,
+    AnswerValue, Clause, Condition, ConditionValue, Deployment, IdentityKey, KeyRefs, NodeKey,
 };
 use jiff::civil::Date;
 
-use crate::entity;
+use crate::identity;
 
 /// A truth value in Kleene's three-valued logic.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -171,16 +171,16 @@ fn value_test(term: Term<'_>, test: impl Fn(&AnswerValue) -> bool) -> Truth {
     }
 }
 
-/// The entity a key names once aliases are followed (E6); an unknown key stands for itself.
-fn canonical<'a>(deployment: &'a Deployment, key: &'a EntityKey) -> &'a EntityKey {
-    entity::resolve(deployment, key).unwrap_or(key)
+/// The identity a key names once aliases are followed (E6); an unknown key stands for itself.
+fn canonical<'a>(deployment: &'a Deployment, key: &'a IdentityKey) -> &'a IdentityKey {
+    identity::resolve(deployment, key).unwrap_or(key)
 }
 
-fn same_entity(deployment: &Deployment, answer: &EntityKey, value: &ConditionValue) -> bool {
+fn same_identity(deployment: &Deployment, answer: &IdentityKey, value: &ConditionValue) -> bool {
     match value {
         ConditionValue::Text(text) => text
             .as_str()
-            .parse::<EntityKey>()
+            .parse::<IdentityKey>()
             .is_ok_and(|key| canonical(deployment, &key) == canonical(deployment, answer)),
         ConditionValue::Boolean(_) => false,
     }
@@ -199,29 +199,29 @@ fn equal(answer: &AnswerValue, value: &ConditionValue, deployment: &Deployment) 
             .as_str()
             .parse::<Date>()
             .is_ok_and(|value| value == *date),
-        (AnswerValue::Entity(entity), value) => same_entity(deployment, entity, value),
+        (AnswerValue::Identity(identity), value) => same_identity(deployment, identity, value),
         (
             AnswerValue::Boolean(_)
             | AnswerValue::SingleChoice(_)
             | AnswerValue::Text(_)
             | AnswerValue::Date(_)
             | AnswerValue::MultiChoice(_)
-            | AnswerValue::EntityList(_),
+            | AnswerValue::IdentityList(_),
             _,
         ) => false,
     }
 }
 
-/// `contains`: a multi-choice answer holds the choice, an entity list the entity, a text
+/// `contains`: a multi-choice answer holds the choice, an identity list the identity, a text
 /// answer the text.
 fn contains(answer: &AnswerValue, value: &ConditionValue, deployment: &Deployment) -> bool {
     match (answer, value) {
         (AnswerValue::MultiChoice(choices), ConditionValue::Text(text)) => choices
             .iter()
             .any(|choice| choice.as_str() == text.as_str()),
-        (AnswerValue::EntityList(entities), value) => entities
+        (AnswerValue::IdentityList(identities), value) => identities
             .iter()
-            .any(|entity| same_entity(deployment, entity, value)),
+            .any(|identity| same_identity(deployment, identity, value)),
         (AnswerValue::Text(answer), ConditionValue::Text(text)) => {
             answer.as_str().contains(text.as_str())
         }
@@ -230,7 +230,7 @@ fn contains(answer: &AnswerValue, value: &ConditionValue, deployment: &Deploymen
             | AnswerValue::SingleChoice(_)
             | AnswerValue::Text(_)
             | AnswerValue::Date(_)
-            | AnswerValue::Entity(_)
+            | AnswerValue::Identity(_)
             | AnswerValue::MultiChoice(_),
             _,
         ) => false,
@@ -290,8 +290,8 @@ mod tests {
 
     #[test]
     fn each_answer_type_compares_its_values() {
-        let entities: cairn_schema::EntitySet =
-            cairn_schema::BoundedSet::new(["e_one".parse().unwrap()]).unwrap();
+        let identities: cairn_schema::IdentitySet =
+            cairn_schema::BoundedSet::new(["who_one".parse().unwrap()]).unwrap();
         let cases: &[(AnswerValue, &str, bool)] = &[
             (
                 AnswerValue::SingleChoice("left".parse().unwrap()),
@@ -309,8 +309,8 @@ mod tests {
                 true,
             ),
             (
-                AnswerValue::EntityList(entities),
-                r#"{"contains": {"decision": "n_a", "value": "e_two"}}"#,
+                AnswerValue::IdentityList(identities),
+                r#"{"contains": {"decision": "n_a", "value": "who_two"}}"#,
                 false,
             ),
         ];
@@ -324,17 +324,17 @@ mod tests {
     }
 
     #[test]
-    fn entity_values_compare_through_aliases() {
+    fn identity_values_compare_through_aliases() {
         let mut deployment = Deployment::default();
         deployment
-            .entities
-            .put(from_json(r#"{"key": "e_kept", "name": "Kept"}"#).unwrap())
+            .identities
+            .put(from_json(r#"{"key": "who_kept", "name": "Kept"}"#).unwrap())
             .unwrap();
         deployment
             .aliases
-            .insert("e_merged".parse().unwrap(), "e_kept".parse().unwrap());
-        let answer = AnswerValue::Entity("e_merged".parse().unwrap());
-        let json = r#"{"equals": {"decision": "n_a", "value": "e_kept"}}"#;
+            .insert("who_merged".parse().unwrap(), "who_kept".parse().unwrap());
+        let answer = AnswerValue::Identity("who_merged".parse().unwrap());
+        let json = r#"{"equals": {"decision": "n_a", "value": "who_kept"}}"#;
         let truth = evaluate(&condition(json), |_| Term::Answered(&answer), &deployment);
         assert_eq!(truth, Truth::True);
     }

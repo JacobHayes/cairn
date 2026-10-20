@@ -1,6 +1,6 @@
 //! The derived reads (I3, C2, C8, C9, C10): the snapshot an agent reads first, a canvas
 //! level, one node in full, and the ranked frontier and its filtered lists. Each is derived
-//! at the caller's today with the caller's entities as the viewer (H3), and answers the
+//! at the caller's today with the caller's identities as the viewer (H3), and answers the
 //! revision it was derived at.
 
 use std::collections::{BTreeMap, BTreeSet};

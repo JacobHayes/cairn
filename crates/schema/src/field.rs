@@ -61,7 +61,7 @@ pub enum NodeField {
     Help,
     /// A choice decision's choices.
     Choices,
-    /// An entity decision's `fills_role`.
+    /// An identity decision's `fills_role`.
     FillsRole,
     /// A date decision's `feeds_milestone`.
     FeedsMilestone,
@@ -265,7 +265,7 @@ impl<R: References> NodeFieldValue<R> {
                 _ => None,
             },
             (NodeField::FillsRole, Payload::Decision(decision)) => match &decision.answer {
-                AnswerSpec::Entity { fills_role } | AnswerSpec::EntityList { fills_role } => {
+                AnswerSpec::Identity { fills_role } | AnswerSpec::IdentityList { fills_role } => {
                     Some(NodeFieldValue::FillsRole(fills_role.clone()))
                 }
                 _ => None,
@@ -341,7 +341,8 @@ impl<R: References> NodeFieldValue<R> {
             }
             (NodeFieldValue::FillsRole(role), Payload::Decision(decision)) => {
                 match &mut decision.answer {
-                    AnswerSpec::Entity { fills_role } | AnswerSpec::EntityList { fills_role } => {
+                    AnswerSpec::Identity { fills_role }
+                    | AnswerSpec::IdentityList { fills_role } => {
                         *fills_role = role;
                     }
                     _ => return false,
@@ -395,14 +396,14 @@ mod tests {
 
     #[test]
     fn answer_fields_follow_the_answer_type() {
-        let entity = node(
-            json!({"id": "e", "kind": "decision", "title": "E", "prompt": "Who?", "answer_type": "entity"}),
+        let identity = node(
+            json!({"id": "e", "kind": "decision", "title": "E", "prompt": "Who?", "answer_type": "identity"}),
         );
         let text = node(
             json!({"id": "t", "kind": "decision", "title": "T", "prompt": "What?", "answer_type": "text"}),
         );
         let role = NodeFieldValue::FillsRole(Some("owner_role".parse().unwrap()));
-        let mut filled = entity.clone();
+        let mut filled = identity.clone();
         assert!(role.clone().write(&mut filled));
         assert_eq!(
             NodeFieldValue::read(NodeField::FillsRole, &filled),

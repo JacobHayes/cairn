@@ -49,7 +49,7 @@ describe("C11 the done form (G2, G4)", () => {
 
 describe("D2: assign owner", () => {
   it("sets the owner explicitly", () => {
-    expect(assignOwner("n_pick", "e_one")).toEqual({ op: "set_participation", node: "n_pick", kind: "k_owner", source: ["e_one"] });
+    expect(assignOwner("n_pick", "who_one")).toEqual({ op: "set_participation", node: "n_pick", kind: "k_owner", source: ["who_one"] });
   });
 });
 

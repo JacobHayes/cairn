@@ -33,8 +33,8 @@ pub fn touched_nodes(patch: &Patch, journey: Option<&Graph>) -> Option<BTreeSet<
             | RecordKey::RouteHeader(_)
             | RecordKey::RouteVersion { .. }
             | RecordKey::DeletedJourney(_)
-            | RecordKey::Entity(_)
-            | RecordKey::EntityAlias(_)
+            | RecordKey::Identity(_)
+            | RecordKey::IdentityAlias(_)
             | RecordKey::Proposal { .. } => {}
         }
     }

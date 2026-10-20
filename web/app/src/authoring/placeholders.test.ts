@@ -1,4 +1,4 @@
-// A10, Identity and references: a message draft is written with roles by id and decisions by
+// A10, Keys and references: a message draft is written with roles by id and decisions by
 // path, stored with keys, and survives a rename because it names keys; a placeholder that
 // names nothing is caught before sending.
 import { describe, expect, it } from "vitest";

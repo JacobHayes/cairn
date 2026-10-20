@@ -90,7 +90,7 @@ export function isAncestor(tree: Tree, ancestor: string, node: string): boolean 
   return ancestorsOf(tree, node).some((each) => each.key === ancestor);
 }
 
-/** Identity and references: a node's path, the slash-joined ids from the root. */
+/** Keys and references: a node's path, the slash-joined ids from the root. */
 export function pathOf(tree: Tree, key: string): string {
   const node = tree.byKey.get(key);
   if (node === undefined) {

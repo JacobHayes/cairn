@@ -22,7 +22,7 @@
 //!   success.
 //!
 //! `resource` (RFC 8707) is checked here against the deployment and never sent to Google.
-//! Every request to these endpoints ends within `IDENTITY_CALL_DURATION_MAX`, its body
+//! Every request to these endpoints ends within `PROVIDER_CALL_DURATION_MAX`, its body
 //! read included.
 
 use std::sync::Arc;
@@ -51,7 +51,7 @@ use url::Url;
 use super::{GoogleEndpoints, RelayClient};
 use crate::cookies;
 use crate::lifetimes::BROWSER_STEP_LIFETIME;
-use crate::limits::IDENTITY_CALL_DURATION_MAX;
+use crate::limits::PROVIDER_CALL_DURATION_MAX;
 use crate::oauth::client::{Client, RELAY, Registration};
 use crate::oauth::metadata::{AUTHORIZE, Metadata, REGISTER, TOKEN};
 use crate::oauth::pkce::{is_challenge, is_verifier};
@@ -162,7 +162,7 @@ pub(super) fn is_id_token(token: &str) -> bool {
 }
 
 /// The relay's routes: the metadata, registration, authorize, the callback, and the token
-/// endpoint, each request ending within `IDENTITY_CALL_DURATION_MAX` and its body within
+/// endpoint, each request ending within `PROVIDER_CALL_DURATION_MAX` and its body within
 /// `BODY_BYTES_MAX` (these public endpoints take only small forms and JSON).
 pub(super) fn router(relay: &Arc<Relay>) -> Router {
     let endpoints = Router::new()
@@ -181,9 +181,9 @@ pub(super) fn router(relay: &Arc<Relay>) -> Router {
 
 /// Auth's routes sit outside the API's request duration, and a body that trickles in or a
 /// Google that does not answer would otherwise hold the request open: one deadline covers
-/// the whole request (PRACTICES, Explicit limits: outbound identity call).
+/// the whole request (PRACTICES, Explicit limits: outbound login call).
 async fn deadline(request: Request, next: Next) -> Response {
-    match tokio::time::timeout(IDENTITY_CALL_DURATION_MAX, next.run(request)).await {
+    match tokio::time::timeout(PROVIDER_CALL_DURATION_MAX, next.run(request)).await {
         Ok(response) => response,
         Err(_) => oauth_error(
             StatusCode::SERVICE_UNAVAILABLE,

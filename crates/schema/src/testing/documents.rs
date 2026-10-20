@@ -5,14 +5,14 @@ use proptest::prelude::*;
 use super::model::{bounded_set, bounded_vec, keyed};
 
 use super::{
-    ArbRefs, arb_annotation, arb_attachment_key, arb_date, arb_email, arb_entity_key,
-    arb_entity_set, arb_insertion_key, arb_journey_id, arb_kind_key, arb_markdown, arb_node,
+    ArbRefs, arb_annotation, arb_attachment_key, arb_date, arb_email, arb_identity_key,
+    arb_identity_set, arb_insertion_key, arb_journey_id, arb_kind_key, arb_markdown, arb_node,
     arb_node_field, arb_node_key, arb_reason, arb_revision, arb_role_key, arb_route_id, arb_slug,
     arb_timestamp, arb_title, arb_version_number,
 };
 
 use crate::domain::{
-    Deployment, Entity, Journey, JourneyHeader, JourneyStatus, Lineage, Route, RouteDraft,
+    Deployment, Identity, Journey, JourneyHeader, JourneyStatus, Lineage, Route, RouteDraft,
     RouteHeader, RouteKind, RouteVersion,
 };
 use crate::graph::{
@@ -168,8 +168,8 @@ pub fn arb_answer_value() -> impl Strategy<Value = AnswerValue> {
             Err(error) => panic!("strategy exceeded a limit: {error}"),
         })),
         arb_date().prop_map(AnswerValue::Date),
-        arb_entity_key().prop_map(AnswerValue::Entity),
-        arb_entity_set().prop_map(AnswerValue::EntityList),
+        arb_identity_key().prop_map(AnswerValue::Identity),
+        arb_identity_set().prop_map(AnswerValue::IdentityList),
     ]
 }
 
@@ -242,7 +242,7 @@ pub fn arb_journey_state() -> impl Strategy<Value = JourneyState> {
             (arb_answer_value(), prop::option::of(arb_markdown())),
             0..3,
         ),
-        prop::collection::btree_map(arb_role_key(), arb_entity_set(), 0..2),
+        prop::collection::btree_map(arb_role_key(), arb_identity_set(), 0..2),
         prop::collection::btree_map(arb_node_key(), arb_date(), 0..2),
         prop::collection::btree_map(arb_node_key(), arb_snooze_target(), 0..2),
         prop::collection::btree_map(arb_node_key(), arb_overrides(), 0..2),
@@ -423,26 +423,26 @@ pub fn arb_route_version() -> impl Strategy<Value = RouteVersion> {
         })
 }
 
-/// An entity.
-pub fn arb_entity() -> impl Strategy<Value = Entity> {
+/// An identity.
+pub fn arb_identity() -> impl Strategy<Value = Identity> {
     (
-        arb_entity_key(),
+        arb_identity_key(),
         arb_title(),
         prop::collection::btree_set(arb_email(), 0..2),
     )
-        .prop_map(|(key, name, emails)| Entity { key, name, emails })
+        .prop_map(|(key, name, emails)| Identity { key, name, emails })
 }
 
 /// The deployment domain.
 pub fn arb_deployment() -> impl Strategy<Value = Deployment> {
     (
         arb_revision(),
-        prop::collection::vec(arb_entity(), 0..3),
-        prop::collection::btree_map(arb_entity_key(), arb_entity_key(), 0..2),
+        prop::collection::vec(arb_identity(), 0..3),
+        prop::collection::btree_map(arb_identity_key(), arb_identity_key(), 0..2),
     )
-        .prop_map(|(revision, entities, aliases)| Deployment {
+        .prop_map(|(revision, identities, aliases)| Deployment {
             revision,
-            entities: keyed(entities),
+            identities: keyed(identities),
             aliases,
         })
 }

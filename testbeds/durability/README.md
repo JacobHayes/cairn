@@ -11,7 +11,7 @@ never runs it.
 ## The program
 
 - `plan.rs`: a seeded plan of 24 domain patches over three journeys and the deployment
-  (journey creates, nodes, renames, transitions, edges, entity creates, some riding in a
+  (journey creates, nodes, renames, transitions, edges, identity creates, some riding in a
   journey patch). A pure function of its seed; its tests apply every patch of 64 plans
   through the engine, so a rejection in a run is a finding.
 - `ledger.rs`: the client's memory on the same disk: the plan's seed, an intent before

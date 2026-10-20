@@ -20,6 +20,7 @@ mod records;
 mod sequence;
 mod sql;
 mod state;
+mod to_identities;
 mod write;
 mod write_state;
 
@@ -28,14 +29,14 @@ use std::path::Path;
 
 use async_trait::async_trait;
 use cairn_schema::{
-    ConversationId, Email, Entity, EntityKey, JourneyId, PatchId, PatchReceipt, Proposal,
+    ConversationId, Email, Identity, IdentityKey, JourneyId, PatchId, PatchReceipt, Proposal,
     ProposalId, Revision, RevisionConflict, RouteId, Slug, Timestamp, Title, TouchedSet, UserId,
 };
 use cairn_store::{
     AgentTokenRecord, AuthLogEntry, AuthLogQuery, AuthStore, Commit, CommitError, Committed,
     ConversationRecord, ConversationStore, ConversationSummary, Document, EventQuery, Faults,
-    IdentityRecord, JourneyMatches, JourneyQuery, JourneySummary, LoadTarget, LoggedAuthEntry,
-    LoggedEvent, OAuthStateRecord, Page, PageSize, ProposalPage, ProposalQuery, Revisions,
+    JourneyMatches, JourneyQuery, JourneySummary, LoadTarget, LoggedAuthEntry, LoggedEvent,
+    LoginRecord, OAuthStateRecord, Page, PageSize, ProposalPage, ProposalQuery, Revisions,
     RouteDetail, SearchQuery, SecretHash, SessionRecord, Store, StoreError, UserRecord,
 };
 
@@ -296,13 +297,13 @@ impl Store for TursoStore {
 
     async fn journeys_referencing(
         &self,
-        entities: &BTreeSet<EntityKey>,
+        identities: &BTreeSet<IdentityKey>,
     ) -> Result<BTreeMap<JourneyId, Revision>, StoreError> {
-        read!(self, connection => queries::referencing(connection, entities))
+        read!(self, connection => queries::referencing(connection, identities))
     }
 
-    async fn resolve_entity(&self, key: &EntityKey) -> Result<Option<Entity>, StoreError> {
-        read!(self, connection => queries::resolve_entity(connection, key))
+    async fn resolve_identity(&self, key: &IdentityKey) -> Result<Option<Identity>, StoreError> {
+        read!(self, connection => queries::resolve_identity(connection, key))
     }
 
     async fn events(&self, query: &EventQuery) -> Result<Page<LoggedEvent, u64>, StoreError> {
@@ -328,31 +329,24 @@ impl AuthStore for TursoStore {
         read!(self, connection => records::user(connection, id))
     }
 
-    async fn put_identity(&self, identity: IdentityRecord) -> Result<(), StoreError> {
-        in_transaction!(self, connection => records::put_identity(connection, &identity))
+    async fn put_login(&self, login: LoginRecord) -> Result<(), StoreError> {
+        in_transaction!(self, connection => records::put_login(connection, &login))
     }
 
-    async fn identity(
+    async fn login(
         &self,
         provider: &Slug,
         subject: &Title,
-    ) -> Result<Option<IdentityRecord>, StoreError> {
-        read!(self, connection => records::identity(connection, provider, subject))
+    ) -> Result<Option<LoginRecord>, StoreError> {
+        read!(self, connection => records::login(connection, provider, subject))
     }
 
-    async fn identities_of(&self, user: &UserId) -> Result<Vec<IdentityRecord>, StoreError> {
-        read!(self, connection => records::identities_of(connection, user))
+    async fn logins_of(&self, user: &UserId) -> Result<Vec<LoginRecord>, StoreError> {
+        read!(self, connection => records::logins_of(connection, user))
     }
 
-    async fn identities_with_email(
-        &self,
-        email: &Email,
-    ) -> Result<Vec<IdentityRecord>, StoreError> {
-        read!(self, connection => records::identities_with_email(connection, email))
-    }
-
-    async fn remove_identity(&self, provider: &Slug, subject: &Title) -> Result<bool, StoreError> {
-        in_transaction!(self, connection => records::remove_identity(connection, provider, subject))
+    async fn logins_with_email(&self, email: &Email) -> Result<Vec<LoginRecord>, StoreError> {
+        read!(self, connection => records::logins_with_email(connection, email))
     }
 
     async fn put_session(&self, session: SessionRecord) -> Result<(), StoreError> {

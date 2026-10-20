@@ -39,7 +39,7 @@ function MessageDraft({ view, node, resource }: { view: Ready; node: string; res
   const { deriver } = useSession();
   const journey = view.journey.header.id;
   const [copied, setCopied] = useState(false);
-  const read = useKeyedRead(DRAFT, { identity: [journey, node, resource], freshness: [JSON.stringify(view.key)], args: { deriver, journey, node, resource } }).view;
+  const read = useKeyedRead(DRAFT, { of: [journey, node, resource], freshness: [JSON.stringify(view.key)], args: { deriver, journey, node, resource } }).view;
   const rendered = valueOf(read);
   if (rendered === undefined) {
     return read.status === "failed" ? <span className="callout callout-bad"><Failed what="The draft" verb="rendered" error={read.error} /></span> : <span className="muted small">Rendering...</span>;

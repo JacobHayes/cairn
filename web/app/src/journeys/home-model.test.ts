@@ -5,7 +5,7 @@ import { actingView } from "../acting/acting.test-support.ts";
 import type { NodeRow } from "../acting/why.ts";
 import { heldBack, homeState, readyLine, type HomeJourney } from "./home-model.ts";
 
-const linked = { entities: 1 };
+const linked = { identities: 1 };
 const none = { waiting: 0 };
 const journey = (reading: HomeJourney["reading"], participates = false, ready = 0): HomeJourney => ({ reading, participates, ready });
 
@@ -15,8 +15,8 @@ describe("homeState", () => {
     ["the index not yet read", { viewer: linked, index: "loading", journeys: [], proposals: none }, "loading"],
     ["a viewer that could not be read", { viewer: "failed", index: "ready", journeys: [], proposals: none }, "failed"],
     ["an index that could not be read", { viewer: linked, index: "failed", journeys: [], proposals: none }, "failed"],
-    ["no entity of the viewer's", { viewer: { entities: 0 }, index: "ready", journeys: [], proposals: none }, "unlinked"],
-    ["entities and no active journey referring to them", { viewer: linked, index: "ready", journeys: [], proposals: none }, "unassigned"],
+    ["no identity of the viewer's", { viewer: { identities: 0 }, index: "ready", journeys: [], proposals: none }, "unlinked"],
+    ["identities and no active journey referring to them", { viewer: linked, index: "ready", journeys: [], proposals: none }, "unassigned"],
     ["journeys read, none of them holding anything of theirs", { viewer: linked, index: "ready", journeys: [journey("ready"), journey("gone")], proposals: none }, "unassigned"],
     ["work that is all waiting", { viewer: linked, index: "ready", journeys: [journey("ready", true, 0)], proposals: none }, "quiet"],
     ["only finished participation", { viewer: linked, index: "ready", journeys: [journey("ready", true, 0), journey("ready", false, 0)], proposals: none }, "quiet"],

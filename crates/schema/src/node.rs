@@ -7,7 +7,7 @@
 //!   kind: decision
 //!   title: Evaluation owner
 //!   prompt: Who owns the evaluation?
-//!   answer_type: entity
+//!   answer_type: identity
 //!   fills_role: eval_owner
 //! ```
 //!
@@ -22,10 +22,10 @@ use serde::{Deserialize, Serialize};
 use crate::attachment::Resource;
 use crate::collections::{
     BoundedSet, BoundedVec, ChoiceCountPerDecision, CollectionError, EdgeCountPerNode,
-    EntityCountPerFill, OneOrMany, ResourceCountPerNode,
+    IdentityCountPerFill, OneOrMany, ResourceCountPerNode,
 };
 use crate::condition::Condition;
-use crate::id::{EntityKey, Slug};
+use crate::id::{IdentityKey, Slug};
 use crate::limits::Limit;
 use crate::number::{Days, Weight};
 use crate::refs::{References, key_absent};
@@ -108,10 +108,10 @@ pub enum AnswerType {
     Text,
     /// A calendar date.
     Date,
-    /// One entity.
-    Entity,
-    /// A list of entities.
-    EntityList,
+    /// One identity.
+    Identity,
+    /// A list of identities.
+    IdentityList,
 }
 
 impl AnswerType {
@@ -122,8 +122,8 @@ impl AnswerType {
         AnswerType::MultiChoice,
         AnswerType::Text,
         AnswerType::Date,
-        AnswerType::Entity,
-        AnswerType::EntityList,
+        AnswerType::Identity,
+        AnswerType::IdentityList,
     ];
 
     /// The answer type as written.
@@ -135,8 +135,8 @@ impl AnswerType {
             AnswerType::MultiChoice => "multi_choice",
             AnswerType::Text => "text",
             AnswerType::Date => "date",
-            AnswerType::Entity => "entity",
-            AnswerType::EntityList => "entity_list",
+            AnswerType::Identity => "identity",
+            AnswerType::IdentityList => "identity_list",
         }
     }
 }
@@ -270,13 +270,13 @@ pub enum AnswerSpec<R: References> {
         /// The milestone the answer pins.
         feeds_milestone: Option<R::Node>,
     },
-    /// One entity, optionally filling a single-valued role.
-    Entity {
+    /// One identity, optionally filling a single-valued role.
+    Identity {
         /// The role the answer fills.
         fills_role: Option<R::Role>,
     },
-    /// A list of entities, optionally filling a multi-valued role.
-    EntityList {
+    /// A list of identities, optionally filling a multi-valued role.
+    IdentityList {
         /// The role the answer fills.
         fills_role: Option<R::Role>,
     },
@@ -292,8 +292,8 @@ impl<R: References> AnswerSpec<R> {
             AnswerSpec::MultiChoice(_) => AnswerType::MultiChoice,
             AnswerSpec::Text => AnswerType::Text,
             AnswerSpec::Date { .. } => AnswerType::Date,
-            AnswerSpec::Entity { .. } => AnswerType::Entity,
-            AnswerSpec::EntityList { .. } => AnswerType::EntityList,
+            AnswerSpec::Identity { .. } => AnswerType::Identity,
+            AnswerSpec::IdentityList { .. } => AnswerType::IdentityList,
         }
     }
 }
@@ -555,24 +555,24 @@ impl<R: References> From<DateRule<R>> for DateRuleWire<R> {
     }
 }
 
-/// Explicit entities on a node: a set, possibly empty (E2: explicit empty means none and
-/// stops inheritance), at most `entity_count_per_fill_max`.
-pub type EntitySet = BoundedSet<EntityKey, EntityCountPerFill>;
+/// Explicit identities on a node: a set, possibly empty (E2: explicit empty means none and
+/// stops inheritance), at most `identity_count_per_fill_max`.
+pub type IdentitySet = BoundedSet<IdentityKey, IdentityCountPerFill>;
 
 /// Where a participation comes from (E2): a role reference, written as the role, or
-/// explicit entities, written as a list.
+/// explicit identities, written as a list.
 //
 // Read by hand rather than as an untagged enum, whose only error is "did not match any
-// variant": a list past `entity_count_per_fill_max` is rejected naming that limit, a repeated
-// entity naming it, and anything but a string or a list as such.
+// variant": a list past `identity_count_per_fill_max` is rejected naming that limit, a repeated
+// identity naming it, and anything but a string or a list as such.
 #[derive(Clone, Debug, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, JsonSchema)]
 #[serde(untagged, bound = "")]
 #[schemars(bound = "R: References", rename = "ParticipationSource{R}")]
 pub enum ParticipationSource<R: References> {
     /// Whoever fills the role.
     Role(R::Role),
-    /// These entities; an empty list is an explicit "none".
-    Entities(EntitySet),
+    /// These identities; an empty list is an explicit "none".
+    Identities(IdentitySet),
 }
 
 impl<'de, R: References> Deserialize<'de> for ParticipationSource<R> {
@@ -583,7 +583,7 @@ impl<'de, R: References> Deserialize<'de> for ParticipationSource<R> {
             type Value = ParticipationSource<R>;
 
             fn expecting(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
-                formatter.write_str("a role, or a list of entities")
+                formatter.write_str("a role, or a list of identities")
             }
 
             fn visit_str<E: serde::de::Error>(self, text: &str) -> Result<Self::Value, E> {
@@ -596,16 +596,16 @@ impl<'de, R: References> Deserialize<'de> for ParticipationSource<R> {
                 self,
                 mut access: A,
             ) -> Result<Self::Value, A::Error> {
-                let mut entities = Vec::new();
-                while let Some(entity) = access.next_element::<EntityKey>()? {
-                    entities.push(entity);
+                let mut identities = Vec::new();
+                while let Some(identity) = access.next_element::<IdentityKey>()? {
+                    identities.push(identity);
                     // Checked as entries arrive, so an oversized list fails before it is read.
-                    Limit::EntityCountPerFill
-                        .check(entities.len())
+                    Limit::IdentityCountPerFill
+                        .check(identities.len())
                         .map_err(serde::de::Error::custom)?;
                 }
-                EntitySet::new(entities)
-                    .map(ParticipationSource::Entities)
+                IdentitySet::new(identities)
+                    .map(ParticipationSource::Identities)
                     .map_err(serde::de::Error::custom)
             }
         }
@@ -625,7 +625,7 @@ impl<'de, R: References> Deserialize<'de> for Participations<R> {
     fn deserialize<D: serde::Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
         crate::serde_util::unique_entries(
             deserializer,
-            "a map from participation kind to a role or a list of entities",
+            "a map from participation kind to a role or a list of identities",
             Some(Limit::KindCount),
         )
         .map(Participations)
@@ -767,7 +767,7 @@ pub enum KindField {
     AnswerType,
     /// `choices`: single- and multi-choice decisions (required there).
     Choices,
-    /// `fills_role`: entity and entity-list decisions.
+    /// `fills_role`: identity and identity-list decisions.
     FillsRole,
     /// `feeds_milestone`: date decisions.
     FeedsMilestone,
@@ -847,7 +847,9 @@ impl KindField {
             KindField::Choices => {
                 matches!(answer, AnswerType::SingleChoice | AnswerType::MultiChoice)
             }
-            KindField::FillsRole => matches!(answer, AnswerType::Entity | AnswerType::EntityList),
+            KindField::FillsRole => {
+                matches!(answer, AnswerType::Identity | AnswerType::IdentityList)
+            }
             KindField::FeedsMilestone => matches!(answer, AnswerType::Date),
             KindField::Estimate
             | KindField::Placeholder
@@ -1162,10 +1164,10 @@ impl<R: References> NodeWire<R> {
             AnswerType::Date => AnswerSpec::Date {
                 feeds_milestone: self.feeds_milestone.take(),
             },
-            AnswerType::Entity => AnswerSpec::Entity {
+            AnswerType::Identity => AnswerSpec::Identity {
                 fills_role: self.fills_role.take(),
             },
-            AnswerType::EntityList => AnswerSpec::EntityList {
+            AnswerType::IdentityList => AnswerSpec::IdentityList {
                 fills_role: self.fills_role.take(),
             },
         })
@@ -1224,7 +1226,8 @@ impl<R: References> NodeWire<R> {
                         self.choices = Some(choices);
                     }
                     AnswerSpec::Date { feeds_milestone } => self.feeds_milestone = feeds_milestone,
-                    AnswerSpec::Entity { fills_role } | AnswerSpec::EntityList { fills_role } => {
+                    AnswerSpec::Identity { fills_role }
+                    | AnswerSpec::IdentityList { fills_role } => {
                         self.fills_role = fills_role;
                     }
                     AnswerSpec::Boolean | AnswerSpec::Text => {}
@@ -1351,11 +1354,11 @@ mod tests {
             ("single_choice", json!({}), false),
             ("single_choice", json!({"choices": []}), false),
             ("single_choice", json!({"choices": ["one", "one"]}), false),
-            ("entity", json!({"fills_role": "owner_role"}), true),
-            ("entity_list", json!({"fills_role": "watchers"}), true),
+            ("identity", json!({"fills_role": "owner_role"}), true),
+            ("identity_list", json!({"fills_role": "watchers"}), true),
             ("boolean", json!({"fills_role": "owner_role"}), false),
             ("date", json!({"feeds_milestone": "kickoff"}), true),
-            ("entity", json!({"feeds_milestone": "kickoff"}), false),
+            ("identity", json!({"feeds_milestone": "kickoff"}), false),
         ];
         for (answer_type, extra, ok) in cases {
             assert_eq!(
@@ -1379,14 +1382,14 @@ mod tests {
     #[test]
     fn the_payload_carries_what_the_kind_has() {
         let node: Node<FileRefs> =
-            serde_json::from_value(decision("entity", &json!({"fills_role": "owner_role"})))
+            serde_json::from_value(decision("identity", &json!({"fills_role": "owner_role"})))
                 .unwrap();
         assert_eq!(node.kind(), NodeKind::Decision);
         let Payload::Decision(decision) = &node.payload else {
             panic!("a decision")
         };
         assert!(
-            matches!(&decision.answer, AnswerSpec::Entity { fills_role: Some(role) } if role.as_str() == "owner_role")
+            matches!(&decision.answer, AnswerSpec::Identity { fills_role: Some(role) } if role.as_str() == "owner_role")
         );
         assert_eq!(node.effective_weight(), Weight::DEFAULT);
         let group: Node<FileRefs> =
@@ -1431,9 +1434,9 @@ mod tests {
     }
 
     #[test]
-    fn participations_read_a_role_or_a_list_of_entities() {
+    fn participations_read_a_role_or_a_list_of_identities() {
         let node = json!({"id": "a", "kind": "action", "title": "A",
-            "participations": {"owner": "owner_role", "informed": ["e_one"], "reviewer": []}});
+            "participations": {"owner": "owner_role", "informed": ["who_one"], "reviewer": []}});
         let node: Node<FileRefs> = serde_json::from_value(node).unwrap();
         let sources: Vec<bool> = node
             .participations

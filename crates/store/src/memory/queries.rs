@@ -4,7 +4,7 @@
 use std::collections::{BTreeMap, BTreeSet};
 
 use cairn_schema::{
-    Domain, Entity, EntityKey, GraphId, JourneyId, ProposalOutline, ProposalStatus, RouteId,
+    Domain, GraphId, Identity, IdentityKey, JourneyId, ProposalOutline, ProposalStatus, RouteId,
     RouteKind, VersionNumber,
 };
 
@@ -33,7 +33,7 @@ impl State {
         let referencing = query
             .referencing
             .as_ref()
-            .map(|entities| self.domains.journeys_referencing(entities));
+            .map(|identities| self.domains.journeys_referencing(identities));
         let mut items = Vec::new();
         for (id, (header, revision)) in &self.domains.journeys {
             let summary = JourneySummary {
@@ -99,9 +99,9 @@ impl State {
 
     pub(super) fn proposals(&self, query: &ProposalQuery) -> ProposalPage {
         let waiting = match &query.scope {
-            ProposalScope::Waiting { entities, .. } => Some(
+            ProposalScope::Waiting { identities, .. } => Some(
                 self.domains
-                    .journeys_referencing(entities)
+                    .journeys_referencing(identities)
                     .into_keys()
                     .collect(),
             ),
@@ -178,10 +178,10 @@ impl State {
         })
     }
 
-    pub(super) fn resolve_entity(&self, key: &EntityKey) -> Option<Entity> {
+    pub(super) fn resolve_identity(&self, key: &IdentityKey) -> Option<Identity> {
         let deployment = &self.domains.deployment;
         let key = deployment.aliases.get(key).unwrap_or(key);
-        deployment.entities.get(key).cloned()
+        deployment.identities.get(key).cloned()
     }
 
     pub(super) fn events(&self, query: &EventQuery) -> Page<LoggedEvent, u64> {
@@ -280,16 +280,16 @@ fn graph_hits(graph: &cairn_schema::Graph, needle: &str) -> BTreeSet<SearchHit> 
     hits
 }
 
-/// The journeys referencing entities, for the trait's query.
+/// The journeys referencing identities, for the trait's query.
 pub(super) fn referencing(
     state: &State,
-    entities: &BTreeSet<EntityKey>,
+    identities: &BTreeSet<IdentityKey>,
 ) -> BTreeMap<JourneyId, cairn_schema::Revision> {
-    state.domains.journeys_referencing(entities)
+    state.domains.journeys_referencing(identities)
 }
 
 /// C14, C16: whether an open proposal belongs in a listing's scope. `waiting` is the journeys
-/// referring to the scope's entities, when the scope is the viewer's waiting list.
+/// referring to the scope's identities, when the scope is the viewer's waiting list.
 fn proposal_listed(
     scope: &ProposalScope,
     summary: &ProposalSummary,

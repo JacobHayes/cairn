@@ -111,7 +111,7 @@ describe("a reviewer's edits (C14)", () => {
     items: [
       { item: "conflict", conflict: { about: "default_owner", journey: "r_a", route: "r_b" } },
       { item: "orphan", node: "n_b", keep: true, removal: { node: "n_b" } },
-      { item: "participation", entity: "e_a", uses: [{ node: "n_a", kind: "k_owner" }] },
+      { item: "participation", identity: "who_a", uses: [{ node: "n_a", kind: "k_owner" }] },
       { item: "exclusion", node: "n_c", excluded: false },
     ],
     mutations: [{ op: "upgrade", to: 2 }, { op: "clear_pin", node: "n_a" }],
@@ -184,14 +184,14 @@ describe("reviewEntries (C14)", () => {
 });
 
 describe("unresolvedHere (C14)", () => {
-  it("finds a conflict with no choice or one it does not offer, and an unmapped entity", () => {
+  it("finds a conflict with no choice or one it does not offer, and an unmapped identity", () => {
     const conflict = { about: "default_owner", journey: "r_a", route: "r_b" } as const;
     const found = unresolvedHere([
       { item: "conflict", conflict },
       { item: "conflict", conflict, resolution: "reopen" },
       { item: "conflict", conflict, resolution: "take_route" },
-      { item: "participation", entity: "e_a", uses: [] },
-      { item: "participation", entity: "e_b", uses: [], mapping: "drop" },
+      { item: "participation", identity: "who_a", uses: [] },
+      { item: "participation", identity: "who_b", uses: [], mapping: "drop" },
       { item: "orphan", node: "n_a", keep: true, removal: { node: "n_a" } },
     ]);
     expect([...found]).toEqual([

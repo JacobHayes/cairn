@@ -22,13 +22,13 @@ pub(super) fn apply(session: &mut Session<'_>, mutation: &Mutation) -> Vec<Write
             rationale,
         } => answer(session, decision, value, rationale.as_ref()),
         Mutation::SetRecordedDate { node, end, date } => recorded_date(session, node, *end, *date),
-        Mutation::FillRole { role, entities } => {
+        Mutation::FillRole { role, identities } => {
             if !direct_fill(session, role) {
                 return Vec::new();
             }
             vec![session.put(GraphRecord::RoleFill {
                 role: role.clone(),
-                entities: entities.clone(),
+                identities: identities.clone(),
             })]
         }
         Mutation::ClearRoleFill { role } => clear_fill(session, role),

@@ -135,7 +135,7 @@ fn change_class_follows_the_glossary() {
             ChangeClass::Structural,
         ),
         (
-            "- {op: set_participation, node: n_a, kind: k_owner, source: [e_one]}",
+            "- {op: set_participation, node: n_a, kind: k_owner, source: [who_one]}",
             ChangeClass::State,
         ),
     ];
@@ -295,7 +295,7 @@ fn merge_journeys_at_and_past_their_limit() {
         let journeys: serde_json::Map<_, _> = (0..count)
             .map(|index| (format!("j_{index}"), Value::from(1)))
             .collect();
-        serde_json::json!({"op": "merge_entities", "survivor": "e_a", "merged": "e_b", "journeys": journeys})
+        serde_json::json!({"op": "merge_identities", "survivor": "who_a", "merged": "who_b", "journeys": journeys})
     };
     assert!(serde_json::from_value::<Mutation>(merge(limit.max())).is_ok());
     let error = serde_json::from_value::<Mutation>(merge(limit.max() + 1)).unwrap_err();

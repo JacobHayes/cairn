@@ -1,11 +1,11 @@
 journey: j_vendor_eval
 description: "One evaluation from the route's first version: the four up-front decisions, kickoff opening setup, the workload broken down, a gated decision answered once the plan exists, a snooze, an earlier pin on the final report, and the findings reviewer filled late."
 steps:
-- note: Start the journey from version 1 and create the people it refers to.
+- note: Start the journey from version 1.
   today: "2026-10-01"
   at: "2026-10-01T14:00:00Z"
   actor:
-    user: u_lead
+    user: u_ana
   patch:
     id: p_ve_01
     target:
@@ -17,27 +17,13 @@ steps:
       from:
         route: vendor-evaluation
         version: 1
-    - op: create_entity
-      entity:
-        key: e_lead
-        name: Evaluation Lead
-        emails:
-        - lead@example.org
-    - op: create_entity
-      entity:
-        key: e_stakeholder_a
-        name: Stakeholder A
-    - op: create_entity
-      entity:
-        key: e_stakeholder_b
-        name: Stakeholder B
 - note: >-
     Answer the up-front decisions; the owner and stakeholder roles fill and the
     meeting date pins the decision meeting.
   today: "2026-10-01"
   at: "2026-10-01T14:10:00Z"
   actor:
-    user: u_lead
+    user: u_ana
   patch:
     id: p_ve_02
     target:
@@ -52,13 +38,13 @@ steps:
     - op: answer
       decision: n_who_owns
       value:
-        entity: e_lead
+        identity: who_k3d7qm2xw5tn6pfa
     - op: answer
       decision: n_who_informed
       value:
-        entity_list:
-        - e_stakeholder_a
-        - e_stakeholder_b
+        identity_list:
+        - who_d4m6uk2eqf5rbhzs
+        - who_e7h2jv3nxc4yaw6t
     - op: answer
       decision: n_meeting_date
       value:
@@ -71,7 +57,7 @@ steps:
   today: "2026-10-05"
   at: "2026-10-05T09:00:00Z"
   actor:
-    user: u_lead
+    user: u_ana
   patch:
     id: p_ve_03
     target:
@@ -85,7 +71,7 @@ steps:
   today: "2026-10-06"
   at: "2026-10-06T10:00:00Z"
   actor:
-    user: u_lead
+    user: u_ana
   patch:
     id: p_ve_04
     target:
@@ -106,7 +92,7 @@ steps:
   today: "2026-10-08"
   at: "2026-10-08T16:00:00Z"
   actor:
-    user: u_lead
+    user: u_ana
     agent: ag_assistant
   patch:
     id: p_ve_05
@@ -139,7 +125,7 @@ steps:
   today: "2026-10-12"
   at: "2026-10-12T15:00:00Z"
   actor:
-    user: u_lead
+    user: u_ana
   patch:
     id: p_ve_06
     target:
@@ -165,7 +151,7 @@ steps:
   today: "2026-10-13"
   at: "2026-10-13T11:00:00Z"
   actor:
-    user: u_lead
+    user: u_ana
   patch:
     id: p_ve_07
     target:
@@ -186,7 +172,7 @@ steps:
   today: "2026-10-26"
   at: "2026-10-26T17:00:00Z"
   actor:
-    user: u_lead
+    user: u_ana
   patch:
     id: p_ve_08
     target:
@@ -208,14 +194,14 @@ steps:
     - op: transition
       node: n_findings
       transition: complete
-    - op: create_entity
-      entity:
-        key: e_reviewer
-        name: Findings Reviewer
+    - op: create_identity
+      identity:
+        key: who_j5v2nx6cwr4tdkq7
+        name: Farid Haddad
     - op: answer
       decision: n_findings_reviewer
       value:
-        entity: e_reviewer
+        identity: who_j5v2nx6cwr4tdkq7
     - op: add_annotation
       annotation:
         key: a_report_link

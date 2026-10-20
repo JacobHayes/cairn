@@ -10,7 +10,7 @@ use std::collections::BTreeSet;
 
 use cairn_engine::{Derived, DerivedJourney, Graph, Records};
 use cairn_schema::{
-    DisplayState, EntityKey, KindKey, ListFlag, ListQuery, NextQuery, NodeKind, SortBy, State,
+    DisplayState, IdentityKey, KindKey, ListFlag, ListQuery, NextQuery, NodeKind, SortBy, State,
 };
 use support::{add_nodes as add, key};
 
@@ -44,7 +44,7 @@ impl Derive {
 
     /// The keys the list query matches, in its order, across every page.
     fn listed(&self, query: &ListQuery, viewer: &[&str]) -> Vec<String> {
-        let viewer = entities(viewer);
+        let viewer = identities(viewer);
         let mut keys = Vec::new();
         let mut query = query.clone();
         loop {
@@ -58,7 +58,7 @@ impl Derive {
     }
 
     fn next(&self, query: &NextQuery, viewer: &[&str]) -> Vec<String> {
-        let next = self.journey().next(query, &entities(viewer)).unwrap();
+        let next = self.journey().next(query, &identities(viewer)).unwrap();
         next.items
             .iter()
             .map(|row| row.key.as_str().to_owned())
@@ -66,7 +66,7 @@ impl Derive {
     }
 }
 
-fn entities(keys: &[&str]) -> BTreeSet<EntityKey> {
+fn identities(keys: &[&str]) -> BTreeSet<IdentityKey> {
     keys.iter().map(|key| key.parse().unwrap()).collect()
 }
 
@@ -105,12 +105,12 @@ fn the_people_filters_keep_whose_nodes_they_name() {
     );
     assert_eq!(decided.listed(&flag(ListFlag::Unassigned), &[]).len(), 0);
     let lead = ListQuery {
-        owner: Some("e_lead".parse().unwrap()),
+        owner: Some("who_k3d7qm2xw5tn6pfa".parse().unwrap()),
         ..ListQuery::default()
     };
     assert_eq!(decided.listed(&lead, &[]).len(), all);
     assert_eq!(
-        sorted(decided.listed(&flag(ListFlag::Mine), &["e_stakeholder_a"])),
+        sorted(decided.listed(&flag(ListFlag::Mine), &["who_d4m6uk2eqf5rbhzs"])),
         [
             "n_final_report",
             "n_final_review",
@@ -360,10 +360,10 @@ fn next_is_the_ranked_acting_frontier_with_breadcrumbs() {
     };
     let decided = Derive::vendor(2);
     assert_eq!(
-        decided.next(&mine, &["e_lead"]),
+        decided.next(&mine, &["who_k3d7qm2xw5tn6pfa"]),
         ["n_kickoff", "n_decision_meeting"]
     );
-    assert_eq!(decided.next(&mine, &["e_stakeholder_a"]).len(), 0);
+    assert_eq!(decided.next(&mine, &["who_d4m6uk2eqf5rbhzs"]).len(), 0);
 }
 
 /// C10: re-sorting by one signal: a heavy action with no deadline outranks nothing urgent, but
@@ -434,12 +434,12 @@ fn the_launch_ranks_by_gravity_at_the_scenario_day_and_re_sorts_by_slack() {
 #[test]
 fn next_ranks_for_the_viewer() {
     let records = support::journey(&format!(
-        "- op: create_entity\n  entity: {{key: e_a, name: A}}\n- op: create_entity\n  entity: {{key: e_b, name: B}}\n{}",
+        "- op: create_identity\n  identity: {{key: who_a, name: A}}\n- op: create_identity\n  identity: {{key: who_b, name: B}}\n{}",
         add(&[
-            "{key: n_gate_a, id: gate-a, kind: action, title: Gate, participations: {k_owner: [e_a]}}",
-            "{key: n_gate_b, id: gate-b, kind: action, title: Gate, participations: {k_owner: [e_b]}}",
-            "{key: n_work_b, id: work-b, kind: action, title: Work, requires: [n_gate_a], participations: {k_owner: [e_b]}}",
-            "{key: n_work_a, id: work-a, kind: action, title: Work, requires: [n_gate_b], participations: {k_owner: [e_a]}}",
+            "{key: n_gate_a, id: gate-a, kind: action, title: Gate, participations: {k_owner: [who_a]}}",
+            "{key: n_gate_b, id: gate-b, kind: action, title: Gate, participations: {k_owner: [who_b]}}",
+            "{key: n_work_b, id: work-b, kind: action, title: Work, requires: [n_gate_a], participations: {k_owner: [who_b]}}",
+            "{key: n_work_a, id: work-a, kind: action, title: Work, requires: [n_gate_b], participations: {k_owner: [who_a]}}",
         ])
     ));
     let derive = Derive::test(&records);
@@ -448,10 +448,10 @@ fn next_ranks_for_the_viewer() {
         ..NextQuery::default()
     };
     assert_eq!(
-        derive.next(&NextQuery::default(), &["e_b"]),
+        derive.next(&NextQuery::default(), &["who_b"]),
         ["n_gate_a", "n_gate_b"]
     );
-    assert_eq!(derive.next(&for_me, &["e_b"]), ["n_gate_b", "n_gate_a"]);
+    assert_eq!(derive.next(&for_me, &["who_b"]), ["n_gate_b", "n_gate_a"]);
 }
 
 /// C5, D5: with the acting frontier empty, the next list carries what the journey waits on.
@@ -471,12 +471,12 @@ fn an_empty_next_list_says_what_the_journey_waits_on() {
     assert!(next.stalled.is_some());
 }
 
-/// E4: "mine" is the nodes the viewer's entity participates in, by kind.
+/// E4: "mine" is the nodes the viewer's identity participates in, by kind.
 #[test]
 fn mine_is_where_the_viewer_participates() {
     let decided = Derive::vendor(2);
     let journey = decided.journey();
-    let informed = journey.mine(&entities(&["e_stakeholder_a"]), &BTreeSet::new());
+    let informed = journey.mine(&identities(&["who_d4m6uk2eqf5rbhzs"]), &BTreeSet::new());
     assert_eq!(informed.len(), 6);
     assert!(
         informed
@@ -485,11 +485,60 @@ fn mine_is_where_the_viewer_participates() {
     );
     let owned = BTreeSet::from([KindKey::owner()]);
     assert_eq!(
-        journey.mine(&entities(&["e_stakeholder_a"]), &owned).len(),
+        journey
+            .mine(&identities(&["who_d4m6uk2eqf5rbhzs"]), &owned)
+            .len(),
         0
     );
     let all = decided.graph.document().nodes.len();
-    assert_eq!(journey.mine(&entities(&["e_lead"]), &owned).len(), all);
+    assert_eq!(
+        journey
+            .mine(&identities(&["who_k3d7qm2xw5tn6pfa"]), &owned)
+            .len(),
+        all
+    );
+}
+
+/// E4, E6: one route's role is filled by a different person in each journey made from it,
+/// so "mine" for a person differs by journey: Ana owns the first evaluation, Dara the
+/// second, and neither is the other's.
+#[test]
+fn mine_follows_who_fills_the_role_in_each_journey() {
+    let ana = crate::people::keys::ANA;
+    let dara = crate::people::keys::DARA;
+    let first = support::vendor_after(2);
+    let both = support::accepted_on(
+        &first,
+        "j_second",
+        "- op: create_journey\n  name: Second evaluation\n  from: {route: vendor-evaluation, version: 1}\n",
+    );
+    let both = support::accepted_on(
+        &both,
+        "j_second",
+        &format!("- op: answer\n  decision: n_who_owns\n  value: {{identity: {dara}}}\n"),
+    );
+    let owned = BTreeSet::from([KindKey::owner()]);
+    let mine = |journey: &str, person: &str| {
+        let derive = Derive::on(&both, journey, "2026-10-06");
+        derive.journey().mine(&identities(&[person]), &owned).len()
+    };
+    let first_nodes = both.journeys[&VENDOR.parse().unwrap()].graph.nodes.len();
+    let second_nodes = both.journeys[&"j_second".parse().unwrap()]
+        .graph
+        .nodes
+        .len();
+    assert_eq!(mine(VENDOR, ana), first_nodes);
+    assert_eq!(
+        mine(VENDOR, dara),
+        0,
+        "Dara owns nothing in Ana's evaluation"
+    );
+    assert_eq!(mine("j_second", dara), second_nodes);
+    assert_eq!(
+        mine("j_second", ana),
+        0,
+        "Ana owns nothing in Dara's evaluation"
+    );
 }
 
 fn key_kind(text: &str) -> KindKey {
@@ -498,7 +547,7 @@ fn key_kind(text: &str) -> KindKey {
 
 // Review round 1 regressions.
 
-/// C9, E4, E6: after the owner is merged into another entity, filtering by the old key and
+/// C9, E4, E6: after the owner is merged into another identity, filtering by the old key and
 /// "mine" for a viewer still holding it read through to the survivor.
 #[test]
 fn owner_filters_and_mine_read_through_a_merge() {
@@ -506,14 +555,22 @@ fn owner_filters_and_mine_read_through_a_merge() {
     let derive = Derive::on(&records, VENDOR, "2026-10-06");
     let all = derive.graph.document().nodes.len();
     let old_owner = ListQuery {
-        owner: Some("e_lead".parse().unwrap()),
+        owner: Some("who_k3d7qm2xw5tn6pfa".parse().unwrap()),
         ..ListQuery::default()
     };
     assert_eq!(derive.listed(&old_owner, &[]).len(), all);
-    assert_eq!(derive.listed(&flag(ListFlag::Mine), &["e_lead"]).len(), all);
+    assert_eq!(
+        derive
+            .listed(&flag(ListFlag::Mine), &["who_k3d7qm2xw5tn6pfa"])
+            .len(),
+        all
+    );
     let owned = BTreeSet::from([KindKey::owner()]);
     assert_eq!(
-        derive.journey().mine(&entities(&["e_lead"]), &owned).len(),
+        derive
+            .journey()
+            .mine(&identities(&["who_k3d7qm2xw5tn6pfa"]), &owned)
+            .len(),
         all
     );
 }

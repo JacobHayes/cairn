@@ -24,7 +24,7 @@ nodes:
   kind: decision
   title: Interview panel
   prompt: Who sits on the interview panel?
-  answer_type: entity_list
+  answer_type: identity_list
   fills_role: panel
 - key: n_loop
   id: loop

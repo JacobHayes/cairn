@@ -16,5 +16,5 @@ export function slotName(slot: { id: string; title?: string | null | undefined }
 }
 /** A participation kind the graph no longer holds. */
 export const KIND_GONE = "a kind that was removed";
-/** An entity the deployment does not hold. */
-export const ENTITY_GONE = "someone unknown";
+/** An identity the deployment does not hold. */
+export const IDENTITY_GONE = "someone unknown";

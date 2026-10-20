@@ -52,7 +52,7 @@ const cases: [NodeKind, AnswerType | undefined][] = [
   ["deliverable", undefined],
   ["action", undefined],
   ["milestone", undefined],
-  ...(["boolean", "single_choice", "multi_choice", "text", "date", "entity", "entity_list"] as const).map((answer): [NodeKind, AnswerType] => ["decision", answer]),
+  ...(["boolean", "single_choice", "multi_choice", "text", "date", "identity", "identity_list"] as const).map((answer): [NodeKind, AnswerType] => ["decision", answer]),
 ];
 
 describe("fieldsOf (A1a)", () => {

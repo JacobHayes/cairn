@@ -1,8 +1,8 @@
 //! The store-backed reads (ARCHITECTURE, Store trait): whole documents by id, the journey
-//! index (C16), the route index, route detail (C17), text search across journeys, events (J5), entity
+//! index (C16), the route index, route detail (C17), text search across journeys, events (J5), identity
 //! resolution (E6), and subscriptions (H6). None depends on who asks: one deployment is one
 //! trust boundary (H4), so reads take no call. Derived reads and projections, which depend on
-//! the caller's today and entities, are in `projections`.
+//! the caller's today and identities, are in `projections`.
 
 use std::collections::BTreeSet;
 
@@ -117,7 +117,7 @@ impl Service {
         }))
     }
 
-    /// The deployment: entities, aliases, and its revision (E6). It always exists.
+    /// The deployment: identities, aliases, and its revision (E6). It always exists.
     ///
     /// # Errors
     ///

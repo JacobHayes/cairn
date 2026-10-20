@@ -5,7 +5,7 @@ use std::collections::{BTreeMap, BTreeSet};
 
 use async_trait::async_trait;
 use cairn_schema::{
-    ConversationId, Email, Entity, EntityKey, JourneyId, PatchId, PatchReceipt, Proposal,
+    ConversationId, Email, Identity, IdentityKey, JourneyId, PatchId, PatchReceipt, Proposal,
     ProposalId, Revision, RevisionConflict, RouteId, Slug, Timestamp, Title, TouchedSet, UserId,
 };
 
@@ -16,7 +16,7 @@ use crate::query::{
 };
 use crate::records::{
     AgentTokenRecord, AuthLogEntry, AuthLogQuery, ConversationRecord, ConversationSummary,
-    IdentityRecord, LoggedAuthEntry, OAuthStateRecord, SecretHash, SessionRecord, UserRecord,
+    LoggedAuthEntry, LoginRecord, OAuthStateRecord, SecretHash, SessionRecord, UserRecord,
 };
 use crate::target::{Document, LoadTarget};
 
@@ -52,11 +52,11 @@ pub trait Store: AuthStore + ConversationStore + Send + Sync {
     /// content it is rejected), check the target's base revision and every precondition
     /// (all that moved are listed, with the touched set of the intervening events), reject a
     /// create at a hard-deleted journey's id (A19), write the change set's records, check
-    /// what only the commit can (an entity create riding in a journey or route patch takes a
-    /// key that is neither an entity nor an alias, E6; emails stay unique, H3; every graph
+    /// what only the commit can (an identity create riding in a journey or route patch takes a
+    /// key that is neither an identity nor an alias, E6; emails stay unique, H3; every graph
     /// written stays within `graph_bytes_max`), append the events, store the receipt, and
     /// bump the revision. A domain that does not exist is at revision 0, and its first
-    /// commit takes base revision 0 and produces revision 1 (A17). Entity creates riding in
+    /// commit takes base revision 0 and produces revision 1 (A17). Identity creates riding in
     /// another domain's patch bump the deployment revision too (E6). A patch to a proposal
     /// bumps the proposal's revision, not its destination's (H5).
     async fn commit(&self, commit: Commit) -> Result<Committed, CommitError>;
@@ -89,15 +89,15 @@ pub trait Store: AuthStore + ConversationStore + Send + Sync {
     /// C17: a route's published versions with the journeys on each.
     async fn route_detail(&self, route: &RouteId) -> Result<Option<RouteDetail>, StoreError>;
 
-    /// E6: the journeys referring to any of `entities`, directly or through an alias, at
-    /// their current revisions: what an entity merge is checked against.
+    /// E6: the journeys referring to any of `identities`, directly or through an alias, at
+    /// their current revisions: what an identity merge is checked against.
     async fn journeys_referencing(
         &self,
-        entities: &BTreeSet<EntityKey>,
+        identities: &BTreeSet<IdentityKey>,
     ) -> Result<BTreeMap<JourneyId, Revision>, StoreError>;
 
-    /// E6: the entity a key names, resolving a merged entity's old key through its alias.
-    async fn resolve_entity(&self, key: &EntityKey) -> Result<Option<Entity>, StoreError>;
+    /// E6: the identity a key names, resolving a merged identity's old key through its alias.
+    async fn resolve_identity(&self, key: &IdentityKey) -> Result<Option<Identity>, StoreError>;
 
     /// J5: events by journey, node, user, type, patch, and time, in commit order, paged.
     async fn events(&self, query: &EventQuery) -> Result<Page<LoggedEvent, u64>, StoreError>;
@@ -111,7 +111,7 @@ pub trait Store: AuthStore + ConversationStore + Send + Sync {
 }
 
 /// Auth state outside every domain (ARCHITECTURE, Auth; Schema outline): plain record
-/// operations the auth crate builds on (3.2). An identity, session, or agent token names a
+/// operations the auth crate builds on (3.2). A login, session, or agent token names a
 /// user that exists; a record that does not is a malformed write.
 #[async_trait]
 pub trait AuthStore: Send + Sync {
@@ -121,26 +121,22 @@ pub trait AuthStore: Send + Sync {
     /// A user by id.
     async fn user(&self, id: &UserId) -> Result<Option<UserRecord>, StoreError>;
 
-    /// Stores an identity, replacing any with its provider and subject.
-    async fn put_identity(&self, identity: IdentityRecord) -> Result<(), StoreError>;
+    /// Stores a login, replacing any with its provider and subject.
+    async fn put_login(&self, login: LoginRecord) -> Result<(), StoreError>;
 
-    /// An identity by provider and subject: who a sign-in is.
-    async fn identity(
+    /// A login by provider and subject: who a sign-in is.
+    async fn login(
         &self,
         provider: &Slug,
         subject: &Title,
-    ) -> Result<Option<IdentityRecord>, StoreError>;
+    ) -> Result<Option<LoginRecord>, StoreError>;
 
-    /// A user's identities, by provider and subject.
-    async fn identities_of(&self, user: &UserId) -> Result<Vec<IdentityRecord>, StoreError>;
+    /// A user's logins, by provider and subject.
+    async fn logins_of(&self, user: &UserId) -> Result<Vec<LoginRecord>, StoreError>;
 
-    /// H3: the identities whose provider marked `email` verified, by provider and subject:
-    /// what auto-linking a new identity on a matching verified email looks for (3.2).
-    async fn identities_with_email(&self, email: &Email)
-    -> Result<Vec<IdentityRecord>, StoreError>;
-
-    /// Removes an identity; whether there was one.
-    async fn remove_identity(&self, provider: &Slug, subject: &Title) -> Result<bool, StoreError>;
+    /// H3: the logins whose provider marked `email` verified, by provider and subject:
+    /// what auto-linking a new login on a matching verified email looks for (3.2).
+    async fn logins_with_email(&self, email: &Email) -> Result<Vec<LoginRecord>, StoreError>;
 
     /// Stores a session, replacing any with its token digest.
     async fn put_session(&self, session: SessionRecord) -> Result<(), StoreError>;

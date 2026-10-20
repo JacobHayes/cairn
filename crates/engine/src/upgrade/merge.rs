@@ -1,7 +1,7 @@
 //! The three-way merge behind an upgrade (B7; ARCHITECTURE, Upgrade, save-as-route, re-link):
 //! the journey's route version (the base), the version it moves to (the target), and the
 //! journey itself, compared by key over nodes (field by field, A1a), edges, participations
-//! and resources (by identity), roles, kinds, and the default owner. The journey's local-edit
+//! and resources (by key), roles, kinds, and the default owner. The journey's local-edit
 //! markers (B4) say what it edited on route-copied nodes; roles, kinds, and the default owner
 //! carry no markers, so a value that differs from the base's is the journey's edit.
 //!
@@ -27,7 +27,7 @@
 use std::collections::{BTreeMap, BTreeSet};
 
 use cairn_schema::{
-    AnswerSpec, Conflict, EntitySet, InsertionKey, Kept, KeyRefs, KindKey, LocalEdit, Node,
+    AnswerSpec, Conflict, IdentitySet, InsertionKey, Kept, KeyRefs, KindKey, LocalEdit, Node,
     NodeField, NodeFieldValue, NodeKey, NodeState, ParticipationSource, Payload, Provenance,
     RoleKey, RoleReference, removed_choices,
 };
@@ -521,7 +521,7 @@ impl Merger<'_> {
                     let references = references();
                     let fill_too_large = !after.multi
                         && references.iter().any(|reference| {
-                            matches!(reference, RoleReference::Fill { entities } if entities.len() > 1)
+                            matches!(reference, RoleReference::Fill { identities } if identities.len() > 1)
                         });
                     if fill_too_large {
                         Some((Some(held), Some(after), references))
@@ -560,7 +560,7 @@ impl Merger<'_> {
                     route: route.cloned(),
                     references,
                     insertions,
-                    members: EntitySet::default(),
+                    members: IdentitySet::default(),
                 });
             }
         }
@@ -728,7 +728,7 @@ pub(crate) fn role_references(graph: &Document, role: &RoleKey) -> BTreeSet<Role
             }
         }
         if let Payload::Decision(decision) = &node.payload
-            && let AnswerSpec::Entity { fills_role } | AnswerSpec::EntityList { fills_role } =
+            && let AnswerSpec::Identity { fills_role } | AnswerSpec::IdentityList { fills_role } =
                 &decision.answer
             && fills_role.as_ref() == Some(role)
         {
@@ -749,9 +749,9 @@ pub(crate) fn role_references(graph: &Document, role: &RoleKey) -> BTreeSet<Role
             }
         }
     }
-    if let Some(entities) = graph.state.role_fills.get(role) {
+    if let Some(identities) = graph.state.role_fills.get(role) {
         found.insert(RoleReference::Fill {
-            entities: entities.clone(),
+            identities: identities.clone(),
         });
     }
     if graph.default_owner.as_ref() == Some(role) {

@@ -27,7 +27,7 @@ use std::fmt;
 
 use cairn_schema::limits::NODE_COUNT_MAX;
 use cairn_schema::{
-    AnswerValue, DeriveInputs, DomainDocument, EntitySet, Journey, KeyRefs, Markdown, Node,
+    AnswerValue, DeriveInputs, DomainDocument, IdentitySet, Journey, KeyRefs, Markdown, Node,
     NodeKey, State,
 };
 
@@ -136,7 +136,7 @@ impl<'a> DerivedJourney<'a> {
         ancestors
     }
 
-    /// E3, E6: the decision's answer while in effect, its entities read through aliases so
+    /// E3, E6: the decision's answer while in effect, its identities read through aliases so
     /// an answer given before a merge names the survivor.
     fn answer(&self, decision: &NodeKey) -> Option<AnswerValue> {
         let answer = self
@@ -145,16 +145,16 @@ impl<'a> DerivedJourney<'a> {
             .answer_in_effect(self.graph.document(), decision)?;
         let participation = self.derived.participation();
         Some(match answer {
-            AnswerValue::Entity(entity) => {
-                AnswerValue::Entity(participation.canonical_entity(entity).clone())
+            AnswerValue::Identity(identity) => {
+                AnswerValue::Identity(participation.canonical_identity(identity).clone())
             }
-            AnswerValue::EntityList(entities) => {
-                let resolved = entities
+            AnswerValue::IdentityList(identities) => {
+                let resolved = identities
                     .iter()
-                    .map(|entity| participation.canonical_entity(entity).clone());
+                    .map(|identity| participation.canonical_identity(identity).clone());
                 // Resolving only merges keys, so the list stays within its limit.
-                AnswerValue::EntityList(
-                    EntitySet::new(resolved).unwrap_or_else(|error| panic!("{error}")),
+                AnswerValue::IdentityList(
+                    IdentitySet::new(resolved).unwrap_or_else(|error| panic!("{error}")),
                 )
             }
             other => other.clone(),
@@ -175,10 +175,10 @@ impl<'a> DerivedJourney<'a> {
     }
 
     /// The node's owners (E2).
-    fn owners(&self, key: &NodeKey) -> &'a BTreeSet<cairn_schema::EntityKey> {
+    fn owners(&self, key: &NodeKey) -> &'a BTreeSet<cairn_schema::IdentityKey> {
         self.derived
             .participation()
-            .entities(key, &cairn_schema::KindKey::owner())
+            .identities(key, &cairn_schema::KindKey::owner())
     }
 }
 

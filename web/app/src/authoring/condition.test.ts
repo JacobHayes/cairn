@@ -22,7 +22,7 @@ import {
 import { applyToDraft, seeded } from "./engine.test-support.ts";
 import { treeOf, type AnswerType, type GraphNode } from "./graph.ts";
 
-const ANSWER_TYPES: AnswerType[] = ["boolean", "single_choice", "multi_choice", "text", "date", "entity", "entity_list"];
+const ANSWER_TYPES: AnswerType[] = ["boolean", "single_choice", "multi_choice", "text", "date", "identity", "identity_list"];
 const LEAVES: Leaf[] = ["equals", "not_equals", "in", "contains", "answered"];
 
 const decision = (answer: AnswerType): GraphNode => ({
@@ -53,7 +53,7 @@ describe("leavesFor (A5)", () => {
 
   it.each(ANSWER_TYPES)("a %s decision offers exactly the comparisons the engine accepts", (answer) => {
     const asked = decision(answer);
-    const value = firstValue(valueInput(asked), "2026-10-06", "e_lead");
+    const value = firstValue(valueInput(asked), "2026-10-06", "who_lead");
     for (const operator of LEAVES) {
       const condition = leaf(operator, asked.key, [value]);
       const outcome = applyToDraft(engine, deployment, { nodes: [asked, subject] }, [{ op: "set_node_field", node: subject.key, value: { relevant_when: condition } }]);

@@ -111,12 +111,12 @@ Hard-coded named constants; validation rejects a patch that would exceed one, an
 | explicit edges per node, in plus out | 64 | A milestone that gates a whole stage does so through one implicit edge, not 64 explicit ones. Past this the canvas is unreadable and the author should restructure. |
 | mutations per patch | 8,000 | An import of a full graph is roughly four mutations per node (node, edges, participations, resources); 4 x the node limit, enforced by a `const` assertion. |
 | roles, participation kinds per graph | 32 each | A process with more than a couple dozen distinct roles is several processes. A node has at most one participation per kind, so this bounds a node's participations too. |
-| choices per decision | 32 | A single-choice question with more options is a text or entity answer in disguise. |
-| entities per role fill, entity-list answer, or explicit participation; values per `in` clause | 100 | A stakeholder list; past 100 it is a team, which the PRD does not model. An `in` clause compares against such a list. |
-| emails per entity | 16 | Work, personal, and a few former addresses, with room for a merge to join two people's lists. |
-| aliases per entity | 32 | Each merge of a duplicate adds one; a person imported from several sources gathers a handful. |
-| entities per deployment | 5,000 | Hundreds of journeys naming tens of people each, mostly shared; past this the deployment is a staff directory, which the PRD does not model. |
-| journeys named by one entity merge | 1,000 | A merge names every journey referencing either entity, and the PRD sizes a deployment at hundreds of journeys. |
+| choices per decision | 32 | A single-choice question with more options is a text or identity answer in disguise. |
+| identities per role fill, identity-list answer, or explicit participation; values per `in` clause | 100 | A stakeholder list; past 100 it is a team, which the PRD does not model. An `in` clause compares against such a list. |
+| emails per identity | 16 | Work, personal, and a few former addresses, with room for a merge to join two people's lists. |
+| aliases per identity | 32 | Each merge of a duplicate adds one; a person imported from several sources gathers a handful. |
+| identities per deployment | 5,000 | Hundreds of journeys naming tens of people each, mostly shared; past this the deployment is a staff directory, which the PRD does not model. |
+| journeys named by one identity merge | 1,000 | A merge names every journey referencing either identity, and the PRD sizes a deployment at hundreds of journeys. |
 | resources per node | 16 | A tip, a template, an example or two; past 16 it is a reading list, which belongs in one linked document. |
 | notes per node, or on the journey | 100 | A running log of status notes over a long piece of work; past 100 the discussion belongs in a linked conversation. |
 | links per node, or on the journey | 32 | The artifacts, references, and conversations of one piece of work; past 32 they belong in a folder behind one link. |
@@ -140,7 +140,7 @@ Hard-coded named constants; validation rejects a patch that would exceed one, an
 | assistant provider call | 120 s | One non-streamed model response, including a long proposal; past this the provider is down and the turn reports it. |
 | assistant turn | 10 min | The iteration limit at typical provider latency, with room. |
 | store connection acquire | 5 s | Commits take milliseconds; five seconds of waiting is contention, which at this scale is a bug. |
-| outbound identity call (OIDC, Tailscale whois, IAP key set, Google token exchange), and a whole request to the IAP relay's endpoints | 10 s | An identity provider that slow is down; the login fails. |
+| outbound sign-in provider call (OIDC, Tailscale whois, IAP key set, Google token exchange), and a whole request to the IAP relay's endpoints | 10 s | A sign-in provider that slow is down; the login fails. |
 | IAP key set refetch on an unknown key id | once per 60 s | Google rotates IAP's keys rarely; a stream of forged key ids must not fetch on every request. |
 | IAP assertion clock skew | 30 s | IAP's assertions last ten minutes and NTP keeps clocks well inside this. |
 | SSE coalescing interval | 250 ms | Feels live; at most four ticks a second per domain. |

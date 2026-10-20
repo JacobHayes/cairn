@@ -2,7 +2,7 @@
 //! written, refers to nodes by path and to roles and kinds by id, and may leave keys out
 //! for import to match or mint; the graph form, resolved, refers to everything by key and
 //! always carries keys. The graph types are generic over [`References`], so the file
-//! document and the graph document are two types with one shape (PRD, Identity and
+//! document and the graph document are two types with one shape (PRD, Keys and
 //! references: references are stored by key; paths and ids are the serialization form).
 
 use std::fmt;

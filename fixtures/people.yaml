@@ -1,0 +1,52 @@
+note: >-
+  Create the people the scenarios share. Every scenario runs in the deployment
+  this leaves, at revision 1.
+today: "2026-09-01"
+at: "2026-09-01T08:00:00Z"
+actor:
+  user: u_author
+patch:
+  id: p_people
+  target: deployment
+  base_revision: 0
+  mutations:
+  - op: create_identity
+    identity:
+      key: who_k3d7qm2xw5tn6pfa
+      name: Ana Ruiz
+      emails:
+      - ana@example.org
+  - op: create_identity
+    identity:
+      key: who_b6r2vz4jhs7cnqe3
+      name: Ben Okafor
+      emails:
+      - ben@example.org
+  - op: create_identity
+    identity:
+      key: who_c5y3tw7ldp2aoxgm
+      name: Chen Wei
+      emails:
+      - chen@example.org
+  - op: create_identity
+    identity:
+      key: who_d4m6uk2eqf5rbhzs
+      name: Dara Singh
+  - op: create_identity
+    identity:
+      key: who_e7h2jv3nxc4yaw6t
+      name: Eli Park
+  - op: create_identity
+    identity:
+      key: who_f2q5nr7xbd3kwzh4
+      name: Fatima Noor
+  - op: create_identity
+    identity:
+      key: who_g6t4ycm2pe7vsjan
+      name: Gus Lindqvist
+      emails:
+      - gus@example.org
+  - op: create_identity
+    identity:
+      key: who_h3w7bs5xkq2dfnr6
+      name: Hana Kimura

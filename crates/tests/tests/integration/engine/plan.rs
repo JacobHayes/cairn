@@ -266,19 +266,19 @@ fn an_answer_at_both_ends_is_not_offered_as_a_move() {
 fn a_merge_that_breaks_the_plan_carries_its_chains() {
     let records = support::vendor_after(2);
     let prepare = "\
-- op: create_entity\n  entity: {key: e_other, name: Other}\n\
-- op: create_entity\n  entity: {key: e_x, name: X}\n\
-- op: create_entity\n  entity: {key: e_y, name: Y}\n\
+- op: create_identity\n  identity: {key: who_other, name: Other}\n\
+- op: create_identity\n  identity: {key: who_x, name: X}\n\
+- op: create_identity\n  identity: {key: who_y, name: Y}\n\
 - op: add_node\n  node: {key: n_start, id: start, kind: milestone, title: Start}\n\
 - op: set_pin\n  node: n_start\n  date: \"2026-11-10\"\n\
-- op: add_node\n  node: {key: n_long, id: long, kind: action, title: Long, estimate: 30, relevant_when: {equals: {decision: n_who_owns, value: e_other}}, not_before: {after: n_start}, due_by: {before: n_decision_meeting}}\n";
+- op: add_node\n  node: {key: n_long, id: long, kind: action, title: Long, estimate: 30, relevant_when: {equals: {decision: n_who_owns, value: who_other}}, not_before: {after: n_start}, due_by: {before: n_decision_meeting}}\n";
     let prepared = support::vendor_patch(&records, prepare).unwrap();
     let records = prepared.records();
     let revision = records.journeys.values().next().unwrap().revision.get();
     let breaking = format!(
-        "- op: merge_entities\n  survivor: e_other\n  merged: e_lead\n  journeys: {{j_vendor_eval: {revision}}}\n"
+        "- op: merge_identities\n  survivor: who_other\n  merged: who_k3d7qm2xw5tn6pfa\n  journeys: {{j_vendor_eval: {revision}}}\n"
     );
-    let unrelated = "- op: merge_entities\n  survivor: e_x\n  merged: e_y\n  journeys: {}\n";
+    let unrelated = "- op: merge_identities\n  survivor: who_x\n  merged: who_y\n  journeys: {}\n";
     for mutations in [
         breaking.clone(),
         format!("{breaking}{unrelated}"),

@@ -1,8 +1,8 @@
 //! Value-level limits (PRACTICES, Explicit limits): hard-coded, enforced when a value is
 //! deserialized or constructed, and named in the error when one is exceeded. Limits that a
 //! patch can reach one write at a time (explicit edges in plus out, containment depth over
-//! the tree, resources, notes, and links per node, a merged entity's emails and aliases,
-//! entities per deployment) are also checked by validation in the engine, against the same
+//! the tree, resources, notes, and links per node, a merged identity's emails and aliases,
+//! identities per deployment) are also checked by validation in the engine, against the same
 //! constants.
 
 use std::fmt;
@@ -22,8 +22,8 @@ pub const ROLE_COUNT_MAX: u32 = 32;
 pub const KIND_COUNT_MAX: u32 = 32;
 /// Choices per decision.
 pub const CHOICE_COUNT_PER_DECISION_MAX: u32 = 32;
-/// Entities per role fill or entity-list answer.
-pub const ENTITY_COUNT_PER_FILL_MAX: u32 = 100;
+/// Identities per role fill or identity-list answer.
+pub const IDENTITY_COUNT_PER_FILL_MAX: u32 = 100;
 /// Condition tree depth: a lone clause is depth 1.
 pub const CONDITION_DEPTH_MAX: u32 = 8;
 /// Clauses (leaf predicates) per condition tree.
@@ -42,14 +42,14 @@ pub const EMAIL_BYTES_MAX: u32 = 254;
 /// Bytes in the reason a skip, override, or bypass requires: a sentence or a short
 /// paragraph; a longer account is a note.
 pub const REASON_BYTES_MAX: u32 = 4 * 1024;
-/// Emails per entity: work, personal, and a few former addresses, with room for a merge to
+/// Emails per identity: work, personal, and a few former addresses, with room for a merge to
 /// join two people's lists.
-pub const EMAIL_COUNT_PER_ENTITY_MAX: u32 = 16;
-/// Merged keys (aliases) resolving to one entity: each merge of a duplicate adds one.
-pub const ALIAS_COUNT_PER_ENTITY_MAX: u32 = 32;
-/// Entities per deployment: hundreds of journeys naming tens of people each, mostly shared.
-pub const ENTITY_COUNT_PER_DEPLOYMENT_MAX: u32 = 5_000;
-/// Journeys one entity merge names: every journey referencing either entity.
+pub const EMAIL_COUNT_PER_IDENTITY_MAX: u32 = 16;
+/// Merged keys (aliases) resolving to one identity: each merge of a duplicate adds one.
+pub const ALIAS_COUNT_PER_IDENTITY_MAX: u32 = 32;
+/// Identities per deployment: hundreds of journeys naming tens of people each, mostly shared.
+pub const IDENTITY_COUNT_PER_DEPLOYMENT_MAX: u32 = 5_000;
+/// Journeys one identity merge names: every journey referencing either identity.
 pub const JOURNEY_COUNT_PER_MERGE_MAX: u32 = 1_000;
 /// Resources per node: a tip, a template, an example or two.
 pub const RESOURCE_COUNT_PER_NODE_MAX: u32 = 16;
@@ -104,8 +104,8 @@ pub enum Limit {
     KindCount,
     /// [`CHOICE_COUNT_PER_DECISION_MAX`].
     ChoiceCountPerDecision,
-    /// [`ENTITY_COUNT_PER_FILL_MAX`].
-    EntityCountPerFill,
+    /// [`IDENTITY_COUNT_PER_FILL_MAX`].
+    IdentityCountPerFill,
     /// [`CONDITION_DEPTH_MAX`].
     ConditionDepth,
     /// [`CONDITION_CLAUSE_COUNT_MAX`].
@@ -122,12 +122,12 @@ pub enum Limit {
     EmailBytes,
     /// [`REASON_BYTES_MAX`].
     ReasonBytes,
-    /// [`EMAIL_COUNT_PER_ENTITY_MAX`].
-    EmailCountPerEntity,
-    /// [`ALIAS_COUNT_PER_ENTITY_MAX`].
-    AliasCountPerEntity,
-    /// [`ENTITY_COUNT_PER_DEPLOYMENT_MAX`].
-    EntityCountPerDeployment,
+    /// [`EMAIL_COUNT_PER_IDENTITY_MAX`].
+    EmailCountPerIdentity,
+    /// [`ALIAS_COUNT_PER_IDENTITY_MAX`].
+    AliasCountPerIdentity,
+    /// [`IDENTITY_COUNT_PER_DEPLOYMENT_MAX`].
+    IdentityCountPerDeployment,
     /// [`JOURNEY_COUNT_PER_MERGE_MAX`].
     JourneyCountPerMerge,
     /// [`RESOURCE_COUNT_PER_NODE_MAX`].
@@ -160,7 +160,7 @@ impl Limit {
         Limit::RoleCount,
         Limit::KindCount,
         Limit::ChoiceCountPerDecision,
-        Limit::EntityCountPerFill,
+        Limit::IdentityCountPerFill,
         Limit::ConditionDepth,
         Limit::ConditionClauseCount,
         Limit::IdBytes,
@@ -169,9 +169,9 @@ impl Limit {
         Limit::LinkBytes,
         Limit::EmailBytes,
         Limit::ReasonBytes,
-        Limit::EmailCountPerEntity,
-        Limit::AliasCountPerEntity,
-        Limit::EntityCountPerDeployment,
+        Limit::EmailCountPerIdentity,
+        Limit::AliasCountPerIdentity,
+        Limit::IdentityCountPerDeployment,
         Limit::JourneyCountPerMerge,
         Limit::ResourceCountPerNode,
         Limit::NoteCountPerNode,
@@ -195,7 +195,7 @@ impl Limit {
             Limit::RoleCount => ROLE_COUNT_MAX,
             Limit::KindCount => KIND_COUNT_MAX,
             Limit::ChoiceCountPerDecision => CHOICE_COUNT_PER_DECISION_MAX,
-            Limit::EntityCountPerFill => ENTITY_COUNT_PER_FILL_MAX,
+            Limit::IdentityCountPerFill => IDENTITY_COUNT_PER_FILL_MAX,
             Limit::ConditionDepth => CONDITION_DEPTH_MAX,
             Limit::ConditionClauseCount => CONDITION_CLAUSE_COUNT_MAX,
             Limit::IdBytes => ID_BYTES_MAX,
@@ -204,9 +204,9 @@ impl Limit {
             Limit::LinkBytes => LINK_BYTES_MAX,
             Limit::EmailBytes => EMAIL_BYTES_MAX,
             Limit::ReasonBytes => REASON_BYTES_MAX,
-            Limit::EmailCountPerEntity => EMAIL_COUNT_PER_ENTITY_MAX,
-            Limit::AliasCountPerEntity => ALIAS_COUNT_PER_ENTITY_MAX,
-            Limit::EntityCountPerDeployment => ENTITY_COUNT_PER_DEPLOYMENT_MAX,
+            Limit::EmailCountPerIdentity => EMAIL_COUNT_PER_IDENTITY_MAX,
+            Limit::AliasCountPerIdentity => ALIAS_COUNT_PER_IDENTITY_MAX,
+            Limit::IdentityCountPerDeployment => IDENTITY_COUNT_PER_DEPLOYMENT_MAX,
             Limit::JourneyCountPerMerge => JOURNEY_COUNT_PER_MERGE_MAX,
             Limit::ResourceCountPerNode => RESOURCE_COUNT_PER_NODE_MAX,
             Limit::NoteCountPerNode => NOTE_COUNT_PER_NODE_MAX,
@@ -231,7 +231,7 @@ impl Limit {
             Limit::RoleCount => "role_count_max",
             Limit::KindCount => "kind_count_max",
             Limit::ChoiceCountPerDecision => "choice_count_per_decision_max",
-            Limit::EntityCountPerFill => "entity_count_per_fill_max",
+            Limit::IdentityCountPerFill => "identity_count_per_fill_max",
             Limit::ConditionDepth => "condition_depth_max",
             Limit::ConditionClauseCount => "condition_clause_count_max",
             Limit::IdBytes => "id_bytes_max",
@@ -240,9 +240,9 @@ impl Limit {
             Limit::LinkBytes => "link_bytes_max",
             Limit::EmailBytes => "email_bytes_max",
             Limit::ReasonBytes => "reason_bytes_max",
-            Limit::EmailCountPerEntity => "email_count_per_entity_max",
-            Limit::AliasCountPerEntity => "alias_count_per_entity_max",
-            Limit::EntityCountPerDeployment => "entity_count_per_deployment_max",
+            Limit::EmailCountPerIdentity => "email_count_per_identity_max",
+            Limit::AliasCountPerIdentity => "alias_count_per_identity_max",
+            Limit::IdentityCountPerDeployment => "identity_count_per_deployment_max",
             Limit::JourneyCountPerMerge => "journey_count_per_merge_max",
             Limit::ResourceCountPerNode => "resource_count_per_node_max",
             Limit::NoteCountPerNode => "note_count_per_node_max",

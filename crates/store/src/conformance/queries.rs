@@ -12,7 +12,7 @@ use serde_json::json;
 
 use super::{Backend, applied, failed, open};
 use crate::build::{
-    self, action, create_journey, create_route, deployment_patch, entity, id, journey_graph,
+    self, action, create_journey, create_route, deployment_patch, id, identity, journey_graph,
     journey_header, journey_patch, node, node_key, put_in, revision, route_patch, version,
 };
 use crate::commit::CommitError;
@@ -26,22 +26,22 @@ fn keys(items: &[&str]) -> Vec<JourneyId> {
     items.iter().map(|item| id(item)).collect()
 }
 
-/// E6: an alias resolves to the entity it was merged into, and a journey referring to the
-/// old key counts as referring to that entity; an alias must point at an entity.
-pub async fn aliases_resolve_to_their_entity<B: Backend>(backend: &B) {
+/// E6: an alias resolves to the identity it was merged into, and a journey referring to the
+/// old key counts as referring to that identity; an alias must point at an identity.
+pub async fn aliases_resolve_to_their_identity<B: Backend>(backend: &B) {
     let store = open(backend).await;
     let setup = deployment_patch("p_people", 0).event(
-        EventType::EntitiesMerged,
-        Subject::Entity(id("e_old")),
+        EventType::IdentitiesMerged,
+        Subject::Identity(id("who_old")),
         vec![
-            Write::Put(Record::Entity(entity("e_a", "A", &["a@example.org"]))),
-            Write::Put(Record::EntityAlias {
-                alias: id("e_old"),
-                entity: id("e_a"),
+            Write::Put(Record::Identity(identity("who_a", "A", &["a@example.org"]))),
+            Write::Put(Record::IdentityAlias {
+                alias: id("who_old"),
+                identity: id("who_a"),
             }),
-            Write::Put(Record::EntityAlias {
-                alias: id("e_older"),
-                entity: id("e_a"),
+            Write::Put(Record::IdentityAlias {
+                alias: id("who_older"),
+                identity: id("who_a"),
             }),
         ],
     );
@@ -51,7 +51,7 @@ pub async fn aliases_resolve_to_their_entity<B: Backend>(backend: &B) {
         "j_one",
         vec![node(json!({
             "key": "n_who", "id": "who", "kind": "decision", "title": "Who",
-            "prompt": "Who?", "answer_type": "entity",
+            "prompt": "Who?", "answer_type": "identity",
         }))],
     )
     .event(
@@ -61,7 +61,7 @@ pub async fn aliases_resolve_to_their_entity<B: Backend>(backend: &B) {
             &journey_graph("j_one"),
             GraphRecord::Answer {
                 decision: node_key("n_who"),
-                value: cairn_schema::AnswerValue::Entity(id("e_old")),
+                value: cairn_schema::AnswerValue::Identity(id("who_old")),
                 rationale: None,
             },
         )],
@@ -74,8 +74,10 @@ pub async fn aliases_resolve_to_their_entity<B: Backend>(backend: &B) {
             &journey_graph("j_two"),
             GraphRecord::RoleFill {
                 role: id("r_owner"),
-                entities: cairn_schema::BoundedSet::new([id::<cairn_schema::EntityKey>("e_older")])
-                    .unwrap(),
+                identities: cairn_schema::BoundedSet::new([id::<cairn_schema::IdentityKey>(
+                    "who_older",
+                )])
+                .unwrap(),
             },
         )],
     );
@@ -86,12 +88,15 @@ pub async fn aliases_resolve_to_their_entity<B: Backend>(backend: &B) {
     )
     .await;
 
-    let a = Some(entity("e_a", "A", &["a@example.org"]));
-    assert_eq!(store.resolve_entity(&id("e_old")).await.unwrap(), a);
-    assert_eq!(store.resolve_entity(&id("e_a")).await.unwrap(), a);
-    assert_eq!(store.resolve_entity(&id("e_nobody")).await.unwrap(), None);
-    // Any key of an entity finds every journey holding any key of it.
-    for asked in ["e_a", "e_old", "e_older"] {
+    let a = Some(identity("who_a", "A", &["a@example.org"]));
+    assert_eq!(store.resolve_identity(&id("who_old")).await.unwrap(), a);
+    assert_eq!(store.resolve_identity(&id("who_a")).await.unwrap(), a);
+    assert_eq!(
+        store.resolve_identity(&id("who_nobody")).await.unwrap(),
+        None
+    );
+    // Any key of an identity finds every journey holding any key of it.
+    for asked in ["who_a", "who_old", "who_older"] {
         let referencing = store
             .journeys_referencing(&BTreeSet::from([id(asked)]))
             .await
@@ -104,11 +109,11 @@ pub async fn aliases_resolve_to_their_entity<B: Backend>(backend: &B) {
     }
 
     let dangling = deployment_patch("p_dangling", 1).event(
-        EventType::EntitiesMerged,
-        Subject::Entity(id("e_gone")),
-        vec![Write::Put(Record::EntityAlias {
-            alias: id("e_gone"),
-            entity: id("e_missing"),
+        EventType::IdentitiesMerged,
+        Subject::Identity(id("who_gone")),
+        vec![Write::Put(Record::IdentityAlias {
+            alias: id("who_gone"),
+            identity: id("who_missing"),
         })],
     );
     let error = failed(&store, dangling.commit()).await;
@@ -116,7 +121,7 @@ pub async fn aliases_resolve_to_their_entity<B: Backend>(backend: &B) {
         panic!("expected an invalid rejection, got {error:?}");
     };
     let codes: Vec<_> = violations.as_slice().iter().map(|v| v.code).collect();
-    assert_eq!(codes, vec![ViolationCode::EntityUnresolved]);
+    assert_eq!(codes, vec![ViolationCode::IdentityUnresolved]);
 }
 
 /// H6: the current revisions list every journey, route, proposal, and the deployment.
@@ -175,7 +180,7 @@ pub async fn current_revisions_list_every_domain_and_proposal<B: Backend>(backen
 
 /// Routes `vendor` (versions 1 and 2) and `hiring` (version 1), and four journeys:
 /// `j_a` on vendor 1 (active), `j_b` on vendor 2 (completed), `j_c` on hiring 1 (archived),
-/// and `j_d` with no route (active), which refers to `e_x`.
+/// and `j_d` with no route (active), which refers to `who_x`.
 async fn index_fixture(store: &dyn Store) {
     applied(store, create_route("p_vendor", "vendor").commit()).await;
     applied(
@@ -230,7 +235,7 @@ async fn index_fixture(store: &dyn Store) {
                     &journey_graph(journey),
                     GraphRecord::Node(node(json!({
                         "key": "n_task", "id": "task", "kind": "action", "title": "Task",
-                        "participations": {"k_owner": ["e_x"]},
+                        "participations": {"k_owner": ["who_x"]},
                     }))),
                 )],
             );
@@ -258,7 +263,7 @@ async fn index_fixture(store: &dyn Store) {
     }
 }
 
-/// C16: the journey index filters by status, route, version, the entities referred to
+/// C16: the journey index filters by status, route, version, the identities referred to
 /// ("mine", narrowed), and whether an upgrade is available; every filter given must hold.
 pub async fn the_journey_index_filters_by_status_route_version_reference_and_upgrade<B: Backend>(
     backend: &B,
@@ -298,7 +303,7 @@ pub async fn the_journey_index_filters_by_status_route_version_reference_and_upg
         ),
         (
             JourneyQuery {
-                referencing: Some(BTreeSet::from([id("e_x")])),
+                referencing: Some(BTreeSet::from([id("who_x")])),
                 ..query()
             },
             vec!["j_d"],
@@ -725,13 +730,13 @@ pub async fn proposal_listings_hold_each_scope_newest_first_with_counts<B: Backe
     use cairn_schema::ProposalStatus::{Applied, Open};
     let store = open(backend).await;
     let merge = deployment_patch("p_people", 0).event(
-        EventType::EntitiesMerged,
-        Subject::Entity(id("e_old")),
+        EventType::IdentitiesMerged,
+        Subject::Identity(id("who_old")),
         vec![
-            Write::Put(Record::Entity(entity("e_a", "A", &["a@example.org"]))),
-            Write::Put(Record::EntityAlias {
-                alias: id("e_old"),
-                entity: id("e_a"),
+            Write::Put(Record::Identity(identity("who_a", "A", &["a@example.org"]))),
+            Write::Put(Record::IdentityAlias {
+                alias: id("who_old"),
+                identity: id("who_a"),
             }),
         ],
     );
@@ -756,9 +761,9 @@ pub async fn proposal_listings_hold_each_scope_newest_first_with_counts<B: Backe
                     &journey_graph(journey),
                     GraphRecord::RoleFill {
                         role: id("r_owner"),
-                        entities: cairn_schema::BoundedSet::new([id::<cairn_schema::EntityKey>(
-                            "e_old",
-                        )])
+                        identities: cairn_schema::BoundedSet::new([
+                            id::<cairn_schema::IdentityKey>("who_old"),
+                        ])
                         .unwrap(),
                     },
                 )],
@@ -853,7 +858,7 @@ pub async fn proposal_listings_hold_each_scope_newest_first_with_counts<B: Backe
 
     let waiting = ProposalScope::Waiting {
         user: id("u_me"),
-        entities: BTreeSet::from([id("e_a")]),
+        identities: BTreeSet::from([id("who_a")]),
     };
     let cases = [
         (

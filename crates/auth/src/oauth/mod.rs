@@ -1,10 +1,10 @@
 //! The built-in OAuth provider (ARCHITECTURE, Auth): Cairn's own authorization server, so
-//! an MCP client connects with a sign-in click and no identity-provider setup (I2). It
+//! an MCP client connects with a sign-in click and no login-provider setup (I2). It
 //! serves protected resource metadata (RFC 9728) and authorization server metadata (RFC
 //! 8414), dynamic client registration (RFC 7591), the authorization-code flow with PKCE
 //! S256 only, behind a consent page, and a token endpoint that mints an agent token for
 //! the client. A browser without a session is sent to sign in with the provider the
-//! configuration names (federating sign-in to OIDC). No scopes: a token is an identity.
+//! configuration names (federating sign-in to OIDC). No scopes: a token is a login.
 //!
 //! The same provider accepts the agent tokens Cairn mints, from this flow or from the UI
 //! for scripts, as bearer tokens.

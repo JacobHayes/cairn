@@ -75,7 +75,7 @@ function Relevance({ props }: { props: FieldsProps & { authored: Authored } }) {
         onChange={(next) => { props.change({ relevant_when: next }); }}
         tree={props.tree}
         node={props.nodeKey}
-        entities={props.authored.deployment.entities ?? []}
+        identities={props.authored.deployment.identities ?? []}
         today={props.authored.today}
       />
     </FieldBox>

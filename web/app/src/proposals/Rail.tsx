@@ -217,7 +217,7 @@ function useContexts(layer: Layer, model: LayerModel) {
       names: model.names,
       tree,
       roles,
-      deployment: deployment ?? { revision: 0, entities: [], aliases: {} },
+      deployment: deployment ?? { revision: 0, identities: [], aliases: {} },
       today: model.today,
       ready: layer.before,
       editable: model.editable,

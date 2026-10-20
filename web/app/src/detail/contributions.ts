@@ -50,7 +50,7 @@ export function useContributions(view: Ready, key: string, field: Schema<"Explai
   const { deriver } = useSession();
   const journey = view.journey.header.id;
   const capped = !isComplete(explained);
-  const paged = useKeyedRead(PAGED, capped ? { identity: [journey, key, field], freshness: [JSON.stringify(view.key)], args: { deriver, journey, key, field } } : undefined).view;
+  const paged = useKeyedRead(PAGED, capped ? { of: [journey, key, field], freshness: [JSON.stringify(view.key)], args: { deriver, journey, key, field } } : undefined).view;
   if (!capped) {
     return { entries: explained.entries, complete: true };
   }

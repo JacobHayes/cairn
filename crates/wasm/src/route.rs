@@ -42,7 +42,7 @@ fn route_derived(
 }
 
 /// C2: one canvas level of a route's graph (its draft or a version), with the deployment its
-/// conditions read entities from and the day its date rules are read on.
+/// conditions read identities from and the day its date rules are read on.
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct RouteLevelRequest {
@@ -126,7 +126,7 @@ pub fn route_notices(request: &str) -> Result<String, String> {
 /// is read, and no calendar date leaves the function.
 const SCHEDULE_START: Date = Date::constant(2000, 1, 1);
 
-/// C13: a route's graph to schedule, with the deployment its conditions read entities from.
+/// C13: a route's graph to schedule, with the deployment its conditions read identities from.
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct RouteScheduleRequest {

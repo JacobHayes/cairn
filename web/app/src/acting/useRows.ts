@@ -34,7 +34,7 @@ const ROWS: ReadSource<RowsArgs, NodeRow[]> = {
 /** The key of a list's rows: the same read for the same journey and query, read again when the derivation moves. */
 export function rowsKey(deriver: Deriver, view: Ready, query: ListQuery): ReadKey<RowsArgs> {
   const journey = view.key.journey;
-  return { identity: [journey, JSON.stringify(query)], freshness: [JSON.stringify(view.key)], args: { deriver, journey, query } };
+  return { of: [journey, JSON.stringify(query)], freshness: [JSON.stringify(view.key)], args: { deriver, journey, query } };
 }
 
 export function useRows(view: Ready | undefined, query: ListQuery): { rows: NodeRow[] | undefined; error: string | undefined } {

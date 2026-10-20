@@ -49,7 +49,7 @@ pub struct ApplyRequest {
 #[serde(deny_unknown_fields)]
 pub struct AppliedLocally {
     /// The document after: the journey as the patch leaves it, with the same derive inputs
-    /// (the deployment as the patch leaves it, when it creates entities).
+    /// (the deployment as the patch leaves it, when it creates identities).
     pub document: DomainDocument,
     /// D7: what the patch newly causes in the journey, as the server's patch answer reports
     /// it (empty when nothing).
@@ -103,7 +103,7 @@ pub struct RouteApplyRequest {
     /// The segments an insertion in the patch reads (B13), as `GET /api/routes/{id}` answers them.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub segments: Vec<Route>,
-    /// The deployment context (E6): entities a participation names.
+    /// The deployment context (E6): identities a participation names.
     pub deployment: Deployment,
     /// The patch; it targets the route.
     pub patch: Patch,

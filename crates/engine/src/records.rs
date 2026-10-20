@@ -20,12 +20,12 @@ use cairn_schema::{
 use crate::edit;
 
 /// Every stored record a patch may read or write, by domain. For one patch a host loads the
-/// target domain (absent when the patch creates it), the deployment (always: entity
+/// target domain (absent when the patch creates it), the deployment (always: identity
 /// references resolve through it), the route versions the patch reads, the proposal it edits
-/// or applies, and for an entity merge the journeys referencing either entity.
+/// or applies, and for an identity merge the journeys referencing either identity.
 #[derive(Clone, Debug, Default, PartialEq, Eq)]
 pub struct Records {
-    /// The deployment: entities, aliases, revision (E6).
+    /// The deployment: identities, aliases, revision (E6).
     pub deployment: Deployment,
     /// Journeys by id, each with its graph and state.
     pub journeys: BTreeMap<JourneyId, Journey>,
@@ -192,14 +192,14 @@ impl Records {
             } => {
                 self.deleted_journeys.insert(journey.clone(), *deleted_at);
             }
-            Record::Entity(entity) => {
-                let put = self.deployment.entities.put(entity.clone());
-                assert!(put.is_ok(), "an entity write past the document cap");
+            Record::Identity(identity) => {
+                let put = self.deployment.identities.put(identity.clone());
+                assert!(put.is_ok(), "an identity write past the document cap");
             }
-            Record::EntityAlias { alias, entity } => {
+            Record::IdentityAlias { alias, identity } => {
                 self.deployment
                     .aliases
-                    .insert(alias.clone(), entity.clone());
+                    .insert(alias.clone(), identity.clone());
             }
             Record::Proposal(proposal) => {
                 self.proposals.insert(proposal.id.clone(), proposal.clone());
@@ -224,10 +224,10 @@ impl Records {
             RecordKey::Graph(graph) => *self.graph_mut(graph) = Graph::default(),
             RecordKey::InGraph { graph, key } => remove_in_graph(self.graph_mut(graph), key),
             RecordKey::RouteDraft(route) => self.route_mut(route).draft = None,
-            RecordKey::Entity(entity) => {
-                self.deployment.entities.remove(entity);
+            RecordKey::Identity(identity) => {
+                self.deployment.identities.remove(identity);
             }
-            RecordKey::EntityAlias(alias) => {
+            RecordKey::IdentityAlias(alias) => {
                 self.deployment.aliases.remove(alias);
             }
             RecordKey::Proposal { id, .. } => {
@@ -264,7 +264,7 @@ impl Records {
     /// Advances the revisions one patch's events move (A17, H5;
     /// decisions/2026-10-06-the-revisions-a-commit-moves-besides-its-targets.md): the patch's
     /// domain advances by one, unless the patch only edits a proposal, whose record carries
-    /// its own revision; a patch to another domain that writes deployment records (an entity
+    /// its own revision; a patch to another domain that writes deployment records (an identity
     /// create, a deleted journey id) also advances the deployment by one.
     pub fn advance(&mut self, events: &[cairn_schema::Event]) {
         let Some(first) = events.first() else {
@@ -392,8 +392,8 @@ fn put_state(graph: &mut Graph, record: &GraphRecord) {
                 None => state.rationales.remove(decision),
             };
         }
-        GraphRecord::RoleFill { role, entities } => {
-            state.role_fills.insert(role.clone(), entities.clone());
+        GraphRecord::RoleFill { role, identities } => {
+            state.role_fills.insert(role.clone(), identities.clone());
         }
         GraphRecord::Pin { node, date } => {
             state.pins.insert(node.clone(), *date);

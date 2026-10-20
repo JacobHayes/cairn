@@ -98,7 +98,10 @@ fn every_i2_capability_has_a_tool() {
             "force-include, keep under skipped ancestors, and bypass guards",
             &["override"],
         ),
-        ("manage entities (create, link, merge)", &["manage_entity"]),
+        (
+            "manage identities (create, link, merge)",
+            &["manage_identity"],
+        ),
         ("route import/export", &["import_route", "export_route"]),
         ("save as route", &["save_as_route"]),
         ("re-link", &["relink"]),

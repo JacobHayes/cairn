@@ -76,7 +76,7 @@ test("C16: Home ends with a link to every journey, not a second journey table, a
 test("C16, C17, E6: the three indexes put the primary action and the toolbar in the same places", async ({ page }) => {
   await page.setViewportSize({ width: 1280, height: 800 });
   const places = [];
-  for (const [path, action, toolbar] of [["/journeys", "new-journey", "index-filters"], ["/routes", "new-route-link", "index-filters"], ["/entities", undefined, "index-filters"]] as const) {
+  for (const [path, action, toolbar] of [["/journeys", "new-journey", "index-filters"], ["/routes", "new-route-link", "index-filters"], ["/identities", undefined, "index-filters"]] as const) {
     await open(page, "browser", path);
     const bar = page.getByTestId(toolbar);
     await expect(bar).toBeVisible();

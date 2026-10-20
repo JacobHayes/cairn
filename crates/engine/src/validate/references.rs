@@ -6,7 +6,7 @@
 use std::collections::BTreeMap;
 
 use cairn_schema::{
-    AnswerSpec, Clause, ConditionValue, Date, DateSource, EntityKey, KeyRefs, Node, NodeField,
+    AnswerSpec, Clause, ConditionValue, Date, DateSource, IdentityKey, KeyRefs, Node, NodeField,
     NodeKey, NodeKind, ParticipationSource, Payload, ResourceContent, RoleKey, Segment, Subject,
     Violation, ViolationCode,
 };
@@ -205,20 +205,20 @@ fn equal_fits(spec: &AnswerSpec<KeyRefs>, value: &ConditionValue) -> bool {
         AnswerSpec::SingleChoice(choices) => is_choice(choices, value),
         AnswerSpec::Text => matches!(value, ConditionValue::Text(_)),
         AnswerSpec::Date { .. } => parses::<Date>(value),
-        AnswerSpec::Entity { .. } => parses::<EntityKey>(value),
-        AnswerSpec::MultiChoice(_) | AnswerSpec::EntityList { .. } => false,
+        AnswerSpec::Identity { .. } => parses::<IdentityKey>(value),
+        AnswerSpec::MultiChoice(_) | AnswerSpec::IdentityList { .. } => false,
     }
 }
 
 fn member_fits(spec: &AnswerSpec<KeyRefs>, value: &ConditionValue) -> bool {
     match spec {
         AnswerSpec::MultiChoice(choices) => is_choice(choices, value),
-        AnswerSpec::EntityList { .. } => parses::<EntityKey>(value),
+        AnswerSpec::IdentityList { .. } => parses::<IdentityKey>(value),
         AnswerSpec::Text => matches!(value, ConditionValue::Text(_)),
         AnswerSpec::Boolean
         | AnswerSpec::SingleChoice(_)
         | AnswerSpec::Date { .. }
-        | AnswerSpec::Entity { .. } => false,
+        | AnswerSpec::Identity { .. } => false,
     }
 }
 
@@ -298,10 +298,10 @@ fn answer_spec(check: &GraphCheck<'_>, node: &GraphNode, out: &mut Vec<Violation
         return;
     };
     match &decision.answer {
-        AnswerSpec::Entity {
+        AnswerSpec::Identity {
             fills_role: Some(role),
         } => fills_role(check, node, role, false, out),
-        AnswerSpec::EntityList {
+        AnswerSpec::IdentityList {
             fills_role: Some(role),
         } => fills_role(check, node, role, true, out),
         AnswerSpec::Date {
@@ -321,8 +321,8 @@ fn answer_spec(check: &GraphCheck<'_>, node: &GraphNode, out: &mut Vec<Violation
                 out.push(related_to(found, field, milestone));
             }
         }
-        AnswerSpec::Entity { fills_role: None }
-        | AnswerSpec::EntityList { fills_role: None }
+        AnswerSpec::Identity { fills_role: None }
+        | AnswerSpec::IdentityList { fills_role: None }
         | AnswerSpec::Date {
             feeds_milestone: None,
         }
@@ -347,7 +347,7 @@ fn fills_role(
         ),
         Some(found) if found.multi != list => (
             ViolationCode::FillsRoleCardinality,
-            "an entity decision fills a single role, an entity-list decision a multi role (A6)",
+            "an identity decision fills a single role, an identity-list decision a multi role (A6)",
         ),
         Some(_) => return,
     };
@@ -357,7 +357,7 @@ fn fills_role(
     out.push(found);
 }
 
-/// A7 and E2: participations use declared kinds, and a single-valued kind holds one entity.
+/// A7 and E2: participations use declared kinds, and a single-valued kind holds one identity.
 fn participations(check: &GraphCheck<'_>, node: &GraphNode, out: &mut Vec<Violation>) {
     let document = check.document;
     for (kind, source) in node.participations.as_map() {
@@ -390,12 +390,12 @@ fn participations(check: &GraphCheck<'_>, node: &GraphNode, out: &mut Vec<Violat
                 ),
                 Some(_) => continue,
             },
-            ParticipationSource::Entities(entities) if entities.len() > 1 && !multi_kind => (
+            ParticipationSource::Identities(identities) if identities.len() > 1 && !multi_kind => (
                 ViolationCode::SingleKindOnMultiRole,
-                "a single-valued kind holds at most one entity (A7)",
+                "a single-valued kind holds at most one identity (A7)",
                 Subject::Kind(kind.clone()),
             ),
-            ParticipationSource::Entities(_) => continue,
+            ParticipationSource::Identities(_) => continue,
         };
         let mut found = at_node(check.tree, &node.key, code, message);
         found.related.push(related);
@@ -450,10 +450,10 @@ fn one_per_graph(check: &GraphCheck<'_>, out: &mut Vec<Violation>) {
         match &node.payload {
             Payload::Milestone(milestone) if milestone.is_final => finals.push(&node.key),
             Payload::Decision(decision) => match &decision.answer {
-                AnswerSpec::Entity {
+                AnswerSpec::Identity {
                     fills_role: Some(role),
                 }
-                | AnswerSpec::EntityList {
+                | AnswerSpec::IdentityList {
                     fills_role: Some(role),
                 } => {
                     fillers.entry(role).or_default().push(&node.key);
@@ -463,8 +463,8 @@ fn one_per_graph(check: &GraphCheck<'_>, out: &mut Vec<Violation>) {
                 } => {
                     feeders.entry(milestone).or_default().push(&node.key);
                 }
-                AnswerSpec::Entity { fills_role: None }
-                | AnswerSpec::EntityList { fills_role: None }
+                AnswerSpec::Identity { fills_role: None }
+                | AnswerSpec::IdentityList { fills_role: None }
                 | AnswerSpec::Date {
                     feeds_milestone: None,
                 }

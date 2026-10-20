@@ -14,8 +14,8 @@ use std::collections::{BTreeMap, BTreeSet};
 
 use cairn_schema::limits::PAGE_ITEM_COUNT_MAX;
 use cairn_schema::{
-    Annotation, AnnotationContent, DisplayState, EntityKey, KindKey, ListFlag, ListPage, ListQuery,
-    MineEntry, Next, NextQuery, NodeKey, NodeKind, ResourceContent, State, Title,
+    Annotation, AnnotationContent, DisplayState, IdentityKey, KindKey, ListFlag, ListPage,
+    ListQuery, MineEntry, Next, NextQuery, NodeKey, NodeKind, ResourceContent, State, Title,
 };
 
 use super::rows::{count, page};
@@ -27,10 +27,10 @@ use crate::derive::Ranking;
 pub(super) struct Matcher<'q, 'a> {
     journey: &'q DerivedJourney<'a>,
     flags: &'q BTreeSet<ListFlag>,
-    owner: Option<&'q EntityKey>,
+    owner: Option<&'q IdentityKey>,
     /// The search, in lower case.
     text: Option<String>,
-    viewer: BTreeSet<EntityKey>,
+    viewer: BTreeSet<IdentityKey>,
     next_up: BTreeSet<&'a NodeKey>,
     notes: BTreeMap<&'q NodeKey, Vec<&'q Annotation>>,
 }
@@ -63,7 +63,7 @@ impl<'a> DerivedJourney<'a> {
     pub fn next(
         &self,
         query: &NextQuery,
-        viewer: &BTreeSet<EntityKey>,
+        viewer: &BTreeSet<IdentityKey>,
     ) -> Result<Next, ProjectionError> {
         if let Some(within) = &query.within {
             self.known(within)?;
@@ -103,7 +103,7 @@ impl<'a> DerivedJourney<'a> {
     pub fn list(
         &self,
         query: &ListQuery,
-        viewer: &BTreeSet<EntityKey>,
+        viewer: &BTreeSet<IdentityKey>,
     ) -> Result<ListPage, ProjectionError> {
         if let Some(within) = &query.within {
             self.known(within)?;
@@ -147,9 +147,9 @@ impl<'a> DerivedJourney<'a> {
     pub(super) fn matcher<'q>(
         &'q self,
         flags: &'q BTreeSet<ListFlag>,
-        owner: Option<&'q EntityKey>,
+        owner: Option<&'q IdentityKey>,
         text: Option<&Title>,
-        viewer: &BTreeSet<EntityKey>,
+        viewer: &BTreeSet<IdentityKey>,
     ) -> Matcher<'q, 'a> {
         Matcher {
             journey: self,
@@ -166,10 +166,14 @@ impl<'a> DerivedJourney<'a> {
         }
     }
 
-    /// E4: the nodes the viewer's entities participate in, with the kinds they hold, only
+    /// E4: the nodes the viewer's identities participate in, with the kinds they hold, only
     /// those of `kinds` when it is not empty; in tree order.
     #[must_use]
-    pub fn mine(&self, viewer: &BTreeSet<EntityKey>, kinds: &BTreeSet<KindKey>) -> Vec<MineEntry> {
+    pub fn mine(
+        &self,
+        viewer: &BTreeSet<IdentityKey>,
+        kinds: &BTreeSet<KindKey>,
+    ) -> Vec<MineEntry> {
         let viewer = &self.canonical_viewer(viewer);
         self.tree_order(None)
             .into_iter()
@@ -187,13 +191,13 @@ impl<'a> DerivedJourney<'a> {
             .collect()
     }
 
-    /// E6: the entity a key names once aliases are followed.
-    fn canonical<'k>(&'k self, key: &'k EntityKey) -> &'k EntityKey {
-        self.derived.participation().canonical_entity(key)
+    /// E6: the identity a key names once aliases are followed.
+    fn canonical<'k>(&'k self, key: &'k IdentityKey) -> &'k IdentityKey {
+        self.derived.participation().canonical_identity(key)
     }
 
-    /// E6: the viewer's entities, each read through aliases.
-    fn canonical_viewer(&self, viewer: &BTreeSet<EntityKey>) -> BTreeSet<EntityKey> {
+    /// E6: the viewer's identities, each read through aliases.
+    fn canonical_viewer(&self, viewer: &BTreeSet<IdentityKey>) -> BTreeSet<IdentityKey> {
         viewer
             .iter()
             .map(|key| self.canonical(key).clone())
@@ -210,7 +214,7 @@ impl<'a> DerivedJourney<'a> {
         &self,
         flag: ListFlag,
         key: &NodeKey,
-        viewer: &BTreeSet<EntityKey>,
+        viewer: &BTreeSet<IdentityKey>,
         next_up: &BTreeSet<&NodeKey>,
     ) -> bool {
         let derived = self.derived;

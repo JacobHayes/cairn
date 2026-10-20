@@ -1,5 +1,5 @@
 // C14: the proposal layer's pure parts: which nodes are marked how, how removed things are put
-// back in place on a canvas and in a list, the entities' diff, which revision Apply sends, and
+// back in place on a canvas and in a list, the identities' diff, which revision Apply sends, and
 // the one gate every live write reads.
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
@@ -7,7 +7,7 @@ import { describe, expect, it } from "vitest";
 import type { Graph } from "../authoring/graph.ts";
 import type { Card, Line } from "../canvas/model.ts";
 import type { Deployment } from "../data/host.ts";
-import { applyRevision, entityDiff, LayerContext, layerMarks, useReviewing, withRemoved, withRemovedRows, type Layer } from "./layer.ts";
+import { applyRevision, identityDiff, LayerContext, layerMarks, useReviewing, withRemoved, withRemovedRows, type Layer } from "./layer.ts";
 
 const node = (key: string, parent?: string, requires: string[] = []) => ({ key, id: key, kind: "action" as const, title: key, ...(parent === undefined ? {} : { parent }), ...(requires.length === 0 ? {} : { requires }) });
 
@@ -93,30 +93,30 @@ describe("withRemovedRows (C14)", () => {
   });
 });
 
-describe("entityDiff (C14)", () => {
-  const entity = (key: string, name: string, emails: string[] = []) => ({ key, name, emails });
-  const deployment = (entities: ReturnType<typeof entity>[], aliases: Record<string, string> = {}) => ({ revision: 1, entities, aliases }) as unknown as Deployment;
+describe("identityDiff (C14)", () => {
+  const identity = (key: string, name: string, emails: string[] = []) => ({ key, name, emails });
+  const deployment = (identities: ReturnType<typeof identity>[], aliases: Record<string, string> = {}) => ({ revision: 1, identities, aliases }) as unknown as Deployment;
 
-  it("marks a new entity added, an edited one changed, and a merged one removed saying whom it went into", () => {
-    const rows = entityDiff(
-      deployment([entity("e_a", "Ana"), entity("e_b", "Bo"), entity("e_c", "Cy")]),
-      deployment([entity("e_a", "Ana R."), entity("e_c", "Cy", ["cy@example.test"]), entity("e_d", "Di")], { e_b: "e_c" }),
+  it("marks a new identity added, an edited one changed, and a merged one removed saying whom it went into", () => {
+    const rows = identityDiff(
+      deployment([identity("who_a", "Ana"), identity("who_b", "Bo"), identity("who_c", "Cy")]),
+      deployment([identity("who_a", "Ana R."), identity("who_c", "Cy", ["cy@example.test"]), identity("who_d", "Di")], { who_b: "who_c" }),
     );
-    expect(rows.map((each) => [each.entity.key, each.mark?.kind, each.mark?.into])).toEqual([
-      ["e_a", "changed", undefined],
-      ["e_b", "removed", "e_c"],
-      ["e_c", "changed", undefined],
-      ["e_d", "added", undefined],
+    expect(rows.map((each) => [each.identity.key, each.mark?.kind, each.mark?.into])).toEqual([
+      ["who_a", "changed", undefined],
+      ["who_b", "removed", "who_c"],
+      ["who_c", "changed", undefined],
+      ["who_d", "added", undefined],
     ]);
   });
 
-  it("lists the rows by name, a created entity among them rather than last", () => {
-    const rows = entityDiff(deployment([entity("e_b", "Bea"), entity("e_d", "Dev")]), deployment([entity("e_b", "Bea"), entity("e_d", "Dev"), entity("e_a", "Ada")]));
-    expect(rows.map((each) => [each.entity.key, each.mark?.kind])).toEqual([["e_a", "added"], ["e_b", undefined], ["e_d", undefined]]);
+  it("lists the rows by name, a created identity among them rather than last", () => {
+    const rows = identityDiff(deployment([identity("who_b", "Bea"), identity("who_d", "Dev")]), deployment([identity("who_b", "Bea"), identity("who_d", "Dev"), identity("who_a", "Ada")]));
+    expect(rows.map((each) => [each.identity.key, each.mark?.kind])).toEqual([["who_a", "added"], ["who_b", undefined], ["who_d", undefined]]);
   });
 
   it("marks nothing while there is no deployment after", () => {
-    expect(entityDiff(deployment([entity("e_a", "Ana")]), undefined).map((each) => each.mark)).toEqual([undefined]);
+    expect(identityDiff(deployment([identity("who_a", "Ana")]), undefined).map((each) => each.mark)).toEqual([undefined]);
   });
 });
 

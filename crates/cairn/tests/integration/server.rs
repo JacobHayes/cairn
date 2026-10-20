@@ -211,7 +211,7 @@ mod in_process {
     /// it. The peer is always 127.0.0.1, the one loopback address every kernel answers, so
     /// one server lists it as the proxy and another lists a different machine.
     #[tokio::test]
-    async fn behind_a_listed_proxy_only_its_identity_headers_sign_in() {
+    async fn behind_a_listed_proxy_only_its_login_headers_sign_in() {
         async fn serve_listing(proxy: &str) -> std::net::SocketAddr {
             let tailscale = format!(
                 "[[auth]]\nkind = \"tailscale\"\nname = \"tailnet\"\nmode = \"proxy\"\ntrusted_proxies = [\"{proxy}\"]\n"
@@ -227,17 +227,17 @@ mod in_process {
             .unwrap();
             support::serve(app).await
         }
-        let login = [
+        let headers = [
             ("tailscale-user-login", "ann@example.org"),
             ("tailscale-user-name", "Ann"),
         ];
 
         let proxied = serve_listing("127.0.0.1").await;
-        let me = support::send(proxied, "GET", PUBLIC_HOST, "/api/users/me", &login, None).await;
+        let me = support::send(proxied, "GET", PUBLIC_HOST, "/api/users/me", &headers, None).await;
         assert_eq!(me.status, 200, "{}", me.text());
-        let identity = &me.json()["identities"][0];
-        assert_eq!(identity["provider"], json!("tailnet"));
-        assert_eq!(identity["subject"], json!("ann@example.org"));
+        let login = &me.json()["logins"][0];
+        assert_eq!(login["provider"], json!("tailnet"));
+        assert_eq!(login["subject"], json!("ann@example.org"));
         let anonymous =
             support::send(proxied, "GET", PUBLIC_HOST, "/api/users/me", &[], None).await;
         assert_eq!(anonymous.status, 401);
@@ -249,8 +249,15 @@ mod in_process {
         assert_eq!(misdirected.status, 421);
 
         let elsewhere = serve_listing("127.0.0.2").await;
-        let refused =
-            support::send(elsewhere, "GET", PUBLIC_HOST, "/api/users/me", &login, None).await;
+        let refused = support::send(
+            elsewhere,
+            "GET",
+            PUBLIC_HOST,
+            "/api/users/me",
+            &headers,
+            None,
+        )
+        .await;
         assert_eq!(refused.status, 403, "{}", refused.text());
     }
 

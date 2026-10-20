@@ -1,5 +1,5 @@
 //! The `AuthProvider` trait (ARCHITECTURE, Auth): given a request, a provider answers with
-//! the identity it vouches for, an actor Cairn already knows, nothing, or a refusal.
+//! the login it vouches for, an actor Cairn already knows, nothing, or a refusal.
 //! Providers are configured independently and run together; each may serve its own routes
 //! (a login and its callback, the OAuth endpoints).
 
@@ -10,7 +10,7 @@ use async_trait::async_trait;
 use axum::Router;
 use axum::http::HeaderMap;
 use axum::http::header::AUTHORIZATION;
-use cairn_schema::{Actor, Identity, Slug};
+use cairn_schema::{Actor, Login, Slug};
 
 use crate::error::Refusal;
 use crate::layer::Authenticate;
@@ -20,8 +20,8 @@ use crate::layer::Authenticate;
 pub enum Verdict {
     /// The request carries nothing this provider reads.
     Absent,
-    /// The provider vouches for this identity; Cairn resolves it to a user.
-    Identity(Identity),
+    /// The provider vouches for this login; Cairn resolves it to a user.
+    Login(Login),
     /// A credential Cairn issued itself (an agent token) names this actor directly.
     Actor(Actor),
     /// The request carries this provider's credential and it is not good. The request is
@@ -101,7 +101,7 @@ impl Presented<'_> {
 /// One way of authenticating (ARCHITECTURE, Auth).
 #[async_trait]
 pub trait AuthProvider: Send + Sync {
-    /// The provider's configured name: the `provider` of every identity it vouches for.
+    /// The provider's configured name: the `provider` of every login it vouches for.
     fn name(&self) -> &Slug;
 
     /// What this provider makes of a request. A provider refuses only a credential of its
@@ -115,7 +115,7 @@ pub trait AuthProvider: Send + Sync {
         false
     }
 
-    /// H3: whether a new identity from this provider links to the user already holding one
+    /// H3: whether a new login from this provider links to the user already holding one
     /// of its verified emails, a per-provider security choice (ARCHITECTURE, Auth).
     fn auto_link(&self) -> bool {
         false

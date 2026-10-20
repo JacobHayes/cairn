@@ -13,7 +13,7 @@ use crate::domain::Domain;
 use crate::field::NodeField;
 use crate::graph::Edge;
 use crate::id::{
-    AgentId, AttachmentKey, EntityKey, InsertionKey, JourneyId, KindKey, NodeKey, PatchId,
+    AgentId, AttachmentKey, IdentityKey, InsertionKey, JourneyId, KindKey, NodeKey, PatchId,
     ProposalId, RoleKey, RouteId, UserId,
 };
 use crate::number::Revision;
@@ -76,9 +76,9 @@ pub enum EventType {
     Relinked,
     ProvenanceChanged,
     LocalEditChanged,
-    EntityCreated,
-    EntityEdited,
-    EntitiesMerged,
+    IdentityCreated,
+    IdentityEdited,
+    IdentitiesMerged,
     ProposalCreated,
     ProposalEdited,
     ProposalApplied,
@@ -103,8 +103,8 @@ pub enum Subject {
     Attachment(AttachmentKey),
     /// A segment insertion.
     Insertion(InsertionKey),
-    /// An entity.
-    Entity(EntityKey),
+    /// An identity.
+    Identity(IdentityKey),
     /// A journey.
     Journey(JourneyId),
     /// A route.
@@ -277,9 +277,9 @@ impl Mutation {
             Mutation::Relink { .. } => EventType::Relinked,
             Mutation::SetProvenance { .. } => EventType::ProvenanceChanged,
             Mutation::MarkLocalEdit { .. } => EventType::LocalEditChanged,
-            Mutation::CreateEntity { .. } => EventType::EntityCreated,
-            Mutation::EditEntity { .. } => EventType::EntityEdited,
-            Mutation::MergeEntities { .. } => EventType::EntitiesMerged,
+            Mutation::CreateIdentity { .. } => EventType::IdentityCreated,
+            Mutation::EditIdentity { .. } => EventType::IdentityEdited,
+            Mutation::MergeIdentities { .. } => EventType::IdentitiesMerged,
             Mutation::CreateProposal { .. } => EventType::ProposalCreated,
             Mutation::EditProposal { .. } => EventType::ProposalEdited,
             Mutation::ApplyProposal { .. } => EventType::ProposalApplied,
@@ -319,10 +319,10 @@ impl Mutation {
             Mutation::AddAnnotation { annotation } | Mutation::EditAnnotation { annotation } => {
                 Subject::Attachment(annotation.key.clone())
             }
-            Mutation::CreateEntity { entity } | Mutation::EditEntity { entity } => {
-                Subject::Entity(entity.key.clone())
+            Mutation::CreateIdentity { identity } | Mutation::EditIdentity { identity } => {
+                Subject::Identity(identity.key.clone())
             }
-            Mutation::MergeEntities { merged, .. } => Subject::Entity(merged.clone()),
+            Mutation::MergeIdentities { merged, .. } => Subject::Identity(merged.clone()),
             Mutation::ApplyProposal { proposal, .. } => Subject::Proposal(proposal.clone()),
             Mutation::InsertSegment { insertion, .. } => Subject::Insertion(insertion.clone()),
             other => other

@@ -1,10 +1,10 @@
 //! Derived reads through the service (ARCHITECTURE, Engine > Projections; I1, I3, C8): every
 //! projection the engine offers, over a journey derived at the caller's today with the
-//! caller's entities as the viewer (H3), each answered with the revisions it was derived from
+//! caller's identities as the viewer (H3), each answered with the revisions it was derived from
 //! so a client compares a revision tick with what it holds (H6). Derivations are memoized
 //! ([`crate::derived`]); a projection is cheap next to a derive and is computed per read.
 //!
-//! Cost per read: a journey load, the caller's identities, and a deployment load; on a memo
+//! Cost per read: a journey load, the caller's logins, and a deployment load; on a memo
 //! miss one derive; then the projection, whose cost its engine module states.
 
 use std::collections::BTreeSet;
@@ -14,7 +14,7 @@ use std::sync::Arc;
 use cairn_engine::{DerivedJourney, ProjectionError};
 use cairn_schema::{
     Annotation, AnswerEffects, AnswerValue, Cursor, Date, DecisionView, Deployment, DisplayState,
-    Domain, EntityKey, ExplainedField, ExplanationPage, JourneyId, KeyRefs, KindKey, Level,
+    Domain, ExplainedField, ExplanationPage, IdentityKey, JourneyId, KeyRefs, KindKey, Level,
     LevelQuery, ListPage, ListQuery, LocalEdit, Markdown, MineEntry, Next, NextQuery, Node,
     NodeDerived, NodeKey, NodeKind, NodeState, Overrides, PatchEvents, Path, ProposalId, Revision,
     Snapshot, SnapshotScope, State, StatusSummary, StillWaiting, Timeline, Title, Trace,
@@ -374,7 +374,7 @@ impl Service {
     }
 
     /// Runs `projection` over the journey derived for `call`, the deployment it was derived
-    /// over, and the caller's entities.
+    /// over, and the caller's identities.
     async fn project_in<T>(
         &self,
         call: &Call,
@@ -382,7 +382,7 @@ impl Service {
         projection: impl FnOnce(
             &DerivedJourney<'_>,
             &Deployment,
-            &BTreeSet<EntityKey>,
+            &BTreeSet<IdentityKey>,
         ) -> Result<T, ProjectionError>,
     ) -> Result<Projected<T>, ReadError> {
         let derivation = self.derivation(call, id).await?;
@@ -404,7 +404,10 @@ impl Service {
         &self,
         call: &Call,
         id: &JourneyId,
-        projection: impl FnOnce(&DerivedJourney<'_>, &BTreeSet<EntityKey>) -> Result<T, ProjectionError>,
+        projection: impl FnOnce(
+            &DerivedJourney<'_>,
+            &BTreeSet<IdentityKey>,
+        ) -> Result<T, ProjectionError>,
     ) -> Result<Projected<T>, ReadError> {
         let derivation = self.derivation(call, id).await?;
         let value = engine(&Domain::Journey(id.clone()), || {
@@ -421,21 +424,21 @@ impl Service {
     }
 
     /// D3, D6: the journey derived for `call`: at its today, over the current deployment,
-    /// with its entities as the viewer, from the memo when it holds that derivation.
+    /// with its identities as the viewer, from the memo when it holds that derivation.
     async fn derivation(&self, call: &Call, id: &JourneyId) -> Result<Arc<Derivation>, ReadError> {
         let journey = self
             .journey(id)
             .await?
             .ok_or_else(|| ReadError::JourneyMissing(id.clone()))?;
-        // One deployment read serves the viewer's entities and the derive, so they agree.
-        let identities = self.store.identities_of(&call.actor.user).await?;
+        // One deployment read serves the viewer's identities and the derive, so they agree.
+        let logins = self.store.logins_of(&call.actor.user).await?;
         let deployment = self.deployment().await?;
         let key = MemoKey {
             journey: id.clone(),
             revision: journey.revision,
             deployment: deployment.revision,
             today: self.settings.today(call.now),
-            viewer: crate::viewer::entities_of(&identities, &deployment),
+            viewer: crate::viewer::identities_of(&logins, &deployment),
         };
         if let Some(found) = self.memo.get(&key) {
             patina_dst::reachable!("service-derived-read-answered-from-memo");

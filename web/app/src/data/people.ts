@@ -2,7 +2,7 @@
 // names a batch of users in one read (never one per row): a screen asks for the names it shows
 // as it draws, the asks of one moment go out together, and the answers are held for the tab. A
 // user the host has no record of is "someone no longer here"; one whose name has not arrived
-// yet is plainly "someone", never the id. The names follow the deployment, since an entity's
+// yet is plainly "someone", never the id. The names follow the deployment, since an identity's
 // name is the one a linked user goes by: a newer deployment reads the held ones again.
 import { backoffDelayMs } from "@cairn/client";
 

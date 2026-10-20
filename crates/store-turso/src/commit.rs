@@ -209,9 +209,9 @@ async fn within(
             violations.push(backend::deleted_journey(journey));
         }
     }
-    if !shape.created_entities.is_empty() {
+    if !shape.created_identities.is_empty() {
         let before = load::deployment(connection).await?;
-        violations.extend(backend::entity_create_violations(shape, &before)?);
+        violations.extend(backend::identity_create_violations(shape, &before)?);
     }
     let nodes = event_nodes(connection, commit).await?;
     let taken_proposals = proposals_of_deleted(connection, shape).await?;
@@ -329,8 +329,8 @@ async fn lock(
 /// (decisions/2026-10-06-a-turso-commit-writes-the-revision-row-of-every-domain.md). Those
 /// are every revision a precondition names, a proposal's destination (so a proposal cannot
 /// be created while its journey is hard-deleted), and the deployment when the commit writes
-/// an entity reference (so a merge cannot miss a journey that starts referencing its
-/// entities, E6).
+/// an identity reference (so a merge cannot miss a journey that starts referencing its
+/// identities, E6).
 async fn lock_dependencies(
     connection: &Connection,
     commit: &Commit,
@@ -370,7 +370,7 @@ fn dependencies(commit: &Commit, shape: &Shape) -> Vec<RevisionOf> {
     if let PatchTarget::Proposal { destination, .. } = &commit.target {
         dependencies.push(RevisionOf::Domain(destination.clone()));
     }
-    if shape.references_entities && shape.domain != Domain::Deployment {
+    if shape.references_identities && shape.domain != Domain::Deployment {
         dependencies.push(RevisionOf::Domain(Domain::Deployment));
     }
     dependencies
@@ -402,8 +402,12 @@ async fn check_revisions(
         }
     }
     for precondition in &commit.preconditions {
-        if let Precondition::ReferencingJourneys { entities, journeys } = precondition {
-            for (journey, now) in crate::queries::referencing(connection, entities).await? {
+        if let Precondition::ReferencingJourneys {
+            identities,
+            journeys,
+        } = precondition
+        {
+            for (journey, now) in crate::queries::referencing(connection, identities).await? {
                 if !journeys.contains(&journey) {
                     conflicts.push(RevisionConflict {
                         of: RevisionOf::Domain(Domain::Journey(journey)),
@@ -490,7 +494,7 @@ async fn owned(connection: &Connection, graph: &GraphId) -> Result<bool, Abort> 
 }
 
 /// The revisions besides the lock: a proposal's must be the one the commit produces, a
-/// domain must still have its fields unless it was deleted, and entity creates riding in
+/// domain must still have its fields unless it was deleted, and identity creates riding in
 /// move the deployment's (E6). Returns the deployment revision after the commit.
 async fn advance(connection: &Connection, shape: &Shape) -> Result<Revision, Abort> {
     let after = load::revision_of(connection, &shape.advances).await?;

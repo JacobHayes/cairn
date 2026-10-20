@@ -15,10 +15,10 @@ use crate::domain::{Deployment, Domain, JourneyStatus, Route, RouteVersion};
 use crate::field::NodeFieldValue;
 use crate::graph::{Edge, ParticipationKind, Role};
 use crate::id::{
-    AgentId, AttachmentKey, EntityKey, InsertionKey, KindKey, NodeKey, ProposalId, RoleKey, Slug,
+    AgentId, AttachmentKey, IdentityKey, InsertionKey, KindKey, NodeKey, ProposalId, RoleKey, Slug,
     UserId,
 };
-use crate::node::{Choices, EntitySet, Node, ParticipationSource};
+use crate::node::{Choices, IdentitySet, Node, ParticipationSource};
 use crate::notice::Notice;
 use crate::number::{Revision, VersionNumber};
 use crate::patch::{Mutation, ParticipationRef, Removal};
@@ -96,15 +96,15 @@ pub enum RoleReference {
         /// The kind.
         kind: KindKey,
     },
-    /// An entity decision fills the role.
+    /// An identity decision fills the role.
     FillsRole {
         /// The decision.
         node: NodeKey,
     },
-    /// The role is filled directly with these entities.
+    /// The role is filled directly with these identities.
     Fill {
-        /// The entities.
-        entities: EntitySet,
+        /// The identities.
+        identities: IdentitySet,
     },
     /// The role is the graph's `default_owner`.
     DefaultOwner,
@@ -234,8 +234,8 @@ pub enum Conflict {
         insertions: BTreeSet<InsertionKey>,
         /// Who fills the role now (E3), when insertions map onto it: removing it hands
         /// these to the segment's nodes directly.
-        #[serde(default, skip_serializing_if = "EntitySet::is_empty")]
-        members: EntitySet,
+        #[serde(default, skip_serializing_if = "IdentitySet::is_empty")]
+        members: IdentitySet,
     },
     /// A participation kind both sides changed, or one the route removed that the journey
     /// still uses.
@@ -343,11 +343,11 @@ impl Conflict {
     }
 }
 
-/// A6: a single-valued role cannot hold a direct fill of several entities.
+/// A6: a single-valued role cannot hold a direct fill of several identities.
 fn too_narrow(role: &Role<KeyRefs>, references: &BTreeSet<RoleReference>) -> bool {
     !role.multi
         && references.iter().any(
-            |reference| matches!(reference, RoleReference::Fill { entities } if entities.len() > 1),
+            |reference| matches!(reference, RoleReference::Fill { identities } if identities.len() > 1),
         )
 }
 
@@ -361,8 +361,8 @@ pub fn removed_choices<'a>(answer: &'a AnswerValue, choices: &Choices) -> BTreeS
         AnswerValue::Boolean(_)
         | AnswerValue::Text(_)
         | AnswerValue::Date(_)
-        | AnswerValue::Entity(_)
-        | AnswerValue::EntityList(_) => Vec::new(),
+        | AnswerValue::Identity(_)
+        | AnswerValue::IdentityList(_) => Vec::new(),
     };
     named
         .into_iter()
@@ -407,7 +407,7 @@ pub enum Kept {
     DefaultOwner,
 }
 
-/// What becomes of an explicit entity's participations when a journey is saved as a route
+/// What becomes of an explicit identity's participations when a journey is saved as a route
 /// (B8).
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "snake_case", deny_unknown_fields)]
@@ -450,10 +450,10 @@ pub enum ReviewItem {
         /// What removing it removes, shown in review (A18).
         removal: Removal,
     },
-    /// An explicit entity on nodes being saved as a route (B8).
+    /// An explicit identity on nodes being saved as a route (B8).
     Participation {
-        /// The entity.
-        entity: EntityKey,
+        /// The identity.
+        identity: IdentityKey,
         /// The participations naming it.
         uses: BTreeSet<ParticipationRef>,
         /// The reviewer's choice, once made.
@@ -490,7 +490,7 @@ pub enum UnresolvedReason {
     NoChoice,
     /// Its choice is not one the item offers.
     NotOffered,
-    /// Its entity shares a participation with entities mapped to other roles (B8).
+    /// Its identity shares a participation with identities mapped to other roles (B8).
     MixedMapping,
     /// It maps to the graph's `default_owner`, and the graph has none (B8).
     NoDefaultOwner,
@@ -577,7 +577,7 @@ pub enum OutlineFact {
 
 /// What a proposal does, as counts of the things it names (C14): the facts about its
 /// destination's header first, then the nodes it adds, changes and removes (each node once,
-/// by the mutations that name it), the requirements, the entities, and everything else in one
+/// by the mutations that name it), the requirements, the identities, and everything else in one
 /// count. Derived from the mutations alone on every read, never stored.
 #[derive(Clone, Debug, Default, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
 #[serde(deny_unknown_fields)]
@@ -600,22 +600,22 @@ pub struct ProposalOutline {
     /// Requirements it removes.
     #[serde(default, skip_serializing_if = "crate::serde_util::is_zero")]
     pub requirements_removed: u32,
-    /// Entities it creates.
+    /// Identities it creates.
     #[serde(default, skip_serializing_if = "crate::serde_util::is_zero")]
-    pub entities_created: u32,
-    /// Entities it edits.
+    pub identities_created: u32,
+    /// Identities it edits.
     #[serde(default, skip_serializing_if = "crate::serde_util::is_zero")]
-    pub entities_edited: u32,
-    /// Entities it merges into another.
+    pub identities_edited: u32,
+    /// Identities it merges into another.
     #[serde(default, skip_serializing_if = "crate::serde_util::is_zero")]
-    pub entities_merged: u32,
+    pub identities_merged: u32,
     /// Roles, participation kinds, role fills, the default owner and annotations it changes.
     #[serde(default, skip_serializing_if = "crate::serde_util::is_zero")]
     pub other: u32,
 }
 
 impl ProposalOutline {
-    /// C14: the facts `mutations` make, in order, and the nodes, requirements, entities and
+    /// C14: the facts `mutations` make, in order, and the nodes, requirements, identities and
     /// other things they name. A node is counted once, by the first thing that happened to it:
     /// a node added and then changed is added, one added and then removed is not counted at
     /// all; state mutations (pins, answers, transitions, snoozes, overrides) count as changes
@@ -704,7 +704,7 @@ fn lifecycle_fact(mutation: &Mutation) -> Option<OutlineFact> {
 }
 
 /// Tallies the mutations that name no node of their own (a lifecycle fact, a requirement, an
-/// entity, a role or the like), and says whether `mutation` was one of them. The node mutations
+/// identity, a role or the like), and says whether `mutation` was one of them. The node mutations
 /// are left to the caller, which tallies them against each other.
 fn tally_other(outline: &mut ProposalOutline, mutation: &Mutation) -> bool {
     if let Some(next) = lifecycle_fact(mutation) {
@@ -714,9 +714,9 @@ fn tally_other(outline: &mut ProposalOutline, mutation: &Mutation) -> bool {
     match mutation {
         Mutation::AddEdge { .. } => outline.requirements_added += 1,
         Mutation::RemoveEdge { .. } => outline.requirements_removed += 1,
-        Mutation::CreateEntity { .. } => outline.entities_created += 1,
-        Mutation::EditEntity { .. } => outline.entities_edited += 1,
-        Mutation::MergeEntities { .. } => outline.entities_merged += 1,
+        Mutation::CreateIdentity { .. } => outline.identities_created += 1,
+        Mutation::EditIdentity { .. } => outline.identities_edited += 1,
+        Mutation::MergeIdentities { .. } => outline.identities_merged += 1,
         Mutation::AddRole { .. }
         | Mutation::EditRole { .. }
         | Mutation::RemoveRole { .. }

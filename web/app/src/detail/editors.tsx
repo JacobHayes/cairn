@@ -12,7 +12,7 @@ import { Saving, type Sending } from "../ui/Receipt.tsx";
 import { type Mutation, type NodeDetail, nodeOf, OWNER_KIND, type Ready, titleOf, transition } from "./model.ts";
 import { NodeLink } from "./parts.tsx";
 import { Rejected } from "./Rejected.tsx";
-import { entityName } from "./sections.tsx";
+import { identityName } from "./sections.tsx";
 import { setAsideOptions, UNTIL_OPTIONS, untilOf, withinScope, type SnoozeDraft } from "./snooze.ts";
 import { useFormDraft, useNodeWrite, type NodeWrite, type Seen } from "./write.ts";
 
@@ -299,14 +299,14 @@ export function WeightEditor({ view, detail }: { view: Ready; detail: NodeDetail
   );
 }
 
-/** B5, E2: set a kind's participation to explicit entities on this node, or restore inheritance. */
+/** B5, E2: set a kind's participation to explicit identities on this node, or restore inheritance. */
 export function ParticipationEditor({ view, detail }: { view: Ready; detail: NodeDetail }) {
   const write = useNodeWrite(view, `participation:${detail.node.key}`, detail.node.key);
   const key = detail.node.key;
   const form = useFormDraft<{ kind: string; chosen: string[] }>(write.journey, key, "participation");
   const kinds = [OWNER_KIND, ...(view.journey.graph.participation_kinds ?? []).map((each) => each.key)];
   const own = Object.keys(nodeOf(view, key)?.participations ?? {});
-  const entities = view.inputs.deployment.entities ?? [];
+  const identities = view.inputs.deployment.identities ?? [];
   const draft = form.draft;
   const save = async (kind: string, chosen: string[], seen: Seen) => {
     if (await write.run([{ op: "set_participation", node: key, kind, source: chosen }], seen)) {
@@ -336,17 +336,17 @@ export function ParticipationEditor({ view, detail }: { view: Ready; detail: Nod
       </span>
       {draft === undefined || draft.value.kind === "" ? null : (
         <span className="row">
-          {entities.map((entity) => (
-            <label key={entity.key}>
+          {identities.map((identity) => (
+            <label key={identity.key}>
               <input
                 type="checkbox"
-                checked={draft.value.chosen.includes(entity.key)}
+                checked={draft.value.chosen.includes(identity.key)}
                 onChange={() => {
                   const { chosen } = draft.value;
-                  form.change({ ...draft.value, chosen: chosen.includes(entity.key) ? chosen.filter((each) => each !== entity.key) : [...chosen, entity.key] });
+                  form.change({ ...draft.value, chosen: chosen.includes(identity.key) ? chosen.filter((each) => each !== identity.key) : [...chosen, identity.key] });
                 }}
               />{" "}
-              {entityName(view, entity.key)}
+              {identityName(view, identity.key)}
             </label>
           ))}
           <Button primary disabled={write.disabled} onClick={() => void save(draft.value.kind, draft.value.chosen, draft)}>

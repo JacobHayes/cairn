@@ -9,7 +9,7 @@ import type { APIRequestContext } from "@playwright/test";
 import { expect, test } from "./test.ts";
 
 import { startVendorJourney } from "./acting.ts";
-import { addEntity, mergeEntities } from "./around.ts";
+import { addIdentity, mergeIdentities } from "./around.ts";
 import { addNode, newRoute, routeName } from "./authoring.ts";
 import { section } from "./detail.ts";
 import {
@@ -116,18 +116,18 @@ test("a deployment tick refetches the deployment context and re-derives: a merge
       deploymentFetches.push(request.url());
     }
   });
-  await open(one, "server", "/entities");
-  const first = await addEntity(one, fresh("Owner"));
-  const second = await addEntity(one, fresh("Survivor"));
+  await open(one, "server", "/identities");
+  const first = await addIdentity(one, fresh("Owner"));
+  const second = await addIdentity(one, fresh("Survivor"));
   const journey = await journeyOwnedBy(one.request, first);
   await openJourney(two, "server", journey);
   await live(two);
-  const survivor = (await one.locator(`[data-testid="entity"][data-entity="${second}"]`).getByTestId("entity-name").textContent()) ?? "";
+  const survivor = (await one.locator(`[data-testid="identity"][data-identity="${second}"]`).getByTestId("identity-name").textContent()) ?? "";
   // The card names an owner only when it is the viewer or missing: the node's detail names this one.
   const owners = await section(await openFromCanvas(two, "n_task"), "participations");
   await expect(owners).not.toContainText(survivor);
   const [before, fetchedBefore] = [await derivedRevision(two), deploymentFetches.length];
-  await mergeEntities(one, second, first);
+  await mergeIdentities(one, second, first);
   const deployment = (await (await one.request.get("/api/deployment")).json()) as { revision: number };
   await expect(syncChip(two)).toHaveAttribute("data-deployment", String(deployment.revision));
   await expect(owners).toContainText(survivor);
@@ -135,20 +135,20 @@ test("a deployment tick refetches the deployment context and re-derives: a merge
   expect(deploymentFetches.length).toBe(fetchedBefore + 1);
 });
 
-test("an identity signed in with the stub issuer links to the user, and its verified email names their entity", { tag: "@server" }, async ({ page }) => {
+test("an identity signed in with the stub issuer links to the user, and its verified email names their identity", { tag: "@server" }, async ({ page }) => {
   const email = `${fresh("linked").replace(/\W/g, "-")}@example.org`;
-  await open(page, "server", "/entities");
-  const entity = await addEntity(page, fresh("Linked person"), [email]);
+  await open(page, "server", "/identities");
+  const identity = await addIdentity(page, fresh("Linked person"), [email]);
   await open(page, "server", "/me");
-  await expect(page.getByTestId("identity")).toHaveCount(1);
-  await expect(page.locator(`[data-testid="your-entity"][data-entity="${entity}"]`)).toHaveCount(0);
-  await page.getByTestId("link-identity").getByRole("link", { name: "Sign in with stub" }).click();
+  await expect(page.getByTestId("login")).toHaveCount(1);
+  await expect(page.locator(`[data-testid="your-identity"][data-identity="${identity}"]`)).toHaveCount(0);
+  await page.getByTestId("link-login").getByRole("link", { name: "Sign in with stub" }).click();
   await page.getByLabel("Email").fill(email);
   await page.getByRole("button", { name: "Sign in" }).click();
-  await expect(page.getByTestId("identity-screen")).toBeVisible();
-  await expect(page.locator('[data-testid="identity"][data-provider="stub"]').getByTestId("identity-emails")).toContainText(email);
-  await expect(page.locator('[data-testid="identity"][data-provider="dev"]')).toBeVisible();
-  await expect(page.locator(`[data-testid="your-entity"][data-entity="${entity}"]`)).toBeVisible();
+  await expect(page.getByTestId("you-screen")).toBeVisible();
+  await expect(page.locator('[data-testid="login"][data-provider="stub"]').getByTestId("login-emails")).toContainText(email);
+  await expect(page.locator('[data-testid="login"][data-provider="dev"]')).toBeVisible();
+  await expect(page.locator(`[data-testid="your-identity"][data-identity="${identity}"]`)).toBeVisible();
 });
 
 test("a route's canvas keeps its graph while its reads fail, says BEHIND, and catches up once they recover", { tag: "@server" }, async ({ context }) => {
@@ -178,7 +178,7 @@ test("a route's canvas keeps its graph while its reads fail, says BEHIND, and ca
 });
 
 test("a failed read says what happened in a sentence, and keeps the server's message, ids and all, behind Details", { tag: "@server" }, async ({ page }) => {
-  const raw = "read of j_hiring at revision 4 failed in e_lead";
+  const raw = "read of j_hiring at revision 4 failed in who_lead";
   await page.route((url) => url.pathname === "/api/journeys", (route) => route.fulfill({ status: 500, body: raw }));
   await open(page, "server", "/journeys");
   const failed = page.getByText("The journeys could not be read.");
@@ -194,8 +194,8 @@ test("a failed read says what happened in a sentence, and keeps the server's mes
 
 test("C14: a proposal drafted in another page appears in a journey's Proposals tab with no reload", { tag: "@server" }, async ({ context }) => {
   const [one, two] = [await context.newPage(), await context.newPage()];
-  await open(one, "server", "/entities");
-  const owner = await addEntity(one, fresh("Owner"));
+  await open(one, "server", "/identities");
+  const owner = await addIdentity(one, fresh("Owner"));
   const journey = await journeyOwnedBy(one.request, owner);
   await openJourney(two, "server", journey);
   await live(two);
@@ -214,22 +214,22 @@ test("C14: a proposal drafted in another page appears in a journey's Proposals t
   await expect(two.getByTestId("proposal-row")).toContainText("Add a follow-up");
 });
 
-test("C14: the deployment's open proposals are a panel on Entities, found at its own address", { tag: "@server" }, async ({ page }) => {
-  await open(page, "server", "/entities");
+test("C14: the deployment's open proposals are a panel on Identities, found at its own address", { tag: "@server" }, async ({ page }) => {
+  await open(page, "server", "/identities");
   const deployment = (await (await page.request.get("/api/deployment")).json()) as { revision: number };
   const drafted = await page.request.post("/api/deployment/proposals", {
     data: {
       id: `pr_${crypto.randomUUID().replaceAll("-", "")}`,
       patch_id: patchId(),
-      draft: { title: "Add a reviewer", destination_revision: deployment.revision, mutations: [{ op: "create_entity", entity: { key: `e_reviewer_${crypto.randomUUID().slice(0, 8)}`, name: "Reviewer", emails: [] } }] },
+      draft: { title: "Add a reviewer", destination_revision: deployment.revision, mutations: [{ op: "create_identity", identity: { key: `who_${Array.from(crypto.getRandomValues(new Uint8Array(16)), (byte) => "abcdefghijklmnopqrstuvwxyz234567"[byte % 32]).join("")}`, name: "Nina Alvarez", emails: [] } }] },
     },
   });
   expect(drafted.ok(), await drafted.text()).toBe(true);
   await page.getByTestId("tab-proposals").click();
   await expect(page.getByTestId("proposals-pane").getByTestId("proposal-row")).toContainText("Add a reviewer");
   await page.getByTestId("proposals-pane").getByRole("link", { name: "Add a reviewer" }).click();
-  await expect(page).toHaveURL(/\/entities\/proposals\/pr_[0-9a-f]+$/);
-  // The entities page, with the new entity marked as added in place.
+  await expect(page).toHaveURL(/\/identities\/proposals\/pr_[0-9a-f]+$/);
+  // The identities page, with the new identity marked as added in place.
   await expect(page.getByTestId("layer-band")).toHaveAttribute("data-mode", "reviewing");
-  await expect(page.locator('[data-testid="entity"][data-diff="added"]')).toContainText("Reviewer");
+  await expect(page.locator('[data-testid="identity"][data-diff="added"]')).toContainText("Nina Alvarez");
 });

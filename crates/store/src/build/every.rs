@@ -11,8 +11,8 @@ use std::collections::{BTreeMap, BTreeSet};
 
 use cairn_schema::{
     Action, Annotation, AnnotationBody, AnnotationContent, AnswerSpec, AnswerType, AnswerValue,
-    BoundedSet, Bypass, Choices, Date, Days, Decision, Deliverable, Domain, Entity, Graph, Group,
-    Guard, GuardFailure, Insertion, JourneyHeader, JourneyState, JourneyStatus, Keyed, Lineage,
+    BoundedSet, Bypass, Choices, Date, Days, Decision, Deliverable, Domain, Graph, Group, Guard,
+    GuardFailure, Identity, Insertion, JourneyHeader, JourneyState, JourneyStatus, Keyed, Lineage,
     LocalEdit, Milestone, Node, NodeField, NodeKey, NodeKind, NodeState, Overrides,
     ParticipationKind, ParticipationSource, Participations, Payload, Proposal, ProposalDraft,
     ProposalStatus, Provenance, Resource, ResourceContent, RetiredKeys, Role, RouteHeader,
@@ -128,9 +128,9 @@ pub fn answer_values() -> Vec<AnswerValue> {
             }
             AnswerType::Text => AnswerValue::Text("Some remarks.".to_owned().try_into().unwrap()),
             AnswerType::Date => AnswerValue::Date(day(20)),
-            AnswerType::Entity => AnswerValue::Entity(id("e_a")),
-            AnswerType::EntityList => {
-                AnswerValue::EntityList(BoundedSet::new([id("e_a"), id("e_b")]).unwrap())
+            AnswerType::Identity => AnswerValue::Identity(id("who_a")),
+            AnswerType::IdentityList => {
+                AnswerValue::IdentityList(BoundedSet::new([id("who_a"), id("who_b")]).unwrap())
             }
         })
         .collect()
@@ -228,9 +228,8 @@ pub fn oauth_state_kinds() -> Vec<OAuthStateKind> {
 #[must_use]
 pub fn auth_events() -> Vec<AuthEvent> {
     chain(AuthEvent::UserCreated, |event| match event {
-        AuthEvent::UserCreated => Some(AuthEvent::IdentityLinked),
-        AuthEvent::IdentityLinked => Some(AuthEvent::IdentityUnlinked),
-        AuthEvent::IdentityUnlinked => Some(AuthEvent::TokenMinted),
+        AuthEvent::UserCreated => Some(AuthEvent::LoginLinked),
+        AuthEvent::LoginLinked => Some(AuthEvent::TokenMinted),
         AuthEvent::TokenMinted => Some(AuthEvent::TokenRevoked),
         AuthEvent::TokenRevoked => None,
     })
@@ -263,10 +262,10 @@ fn payloads(fill: Fill) -> Vec<Payload<KeyRefs>> {
                         AnswerType::Date => AnswerSpec::Date {
                             feeds_milestone: fill.some(node_key(1)),
                         },
-                        AnswerType::Entity => AnswerSpec::Entity {
+                        AnswerType::Identity => AnswerSpec::Identity {
                             fills_role: fill.some(id("r_lead")),
                         },
-                        AnswerType::EntityList => AnswerSpec::EntityList {
+                        AnswerType::IdentityList => AnswerSpec::IdentityList {
                             fills_role: fill.some(id("r_other")),
                         },
                     };
@@ -308,12 +307,12 @@ fn nodes(fill: Fill) -> Vec<Node<KeyRefs>> {
     let participations = BTreeMap::from([
         (id("k_role"), ParticipationSource::Role(id("r_lead"))),
         (
-            id("k_entities"),
-            ParticipationSource::Entities(BoundedSet::new([id("e_a"), id("e_b")]).unwrap()),
+            id("k_identities"),
+            ParticipationSource::Identities(BoundedSet::new([id("who_a"), id("who_b")]).unwrap()),
         ),
         (
             id("k_none"),
-            ParticipationSource::Entities(BoundedSet::new([]).unwrap()),
+            ParticipationSource::Identities(BoundedSet::new([]).unwrap()),
         ),
     ]);
     let resources: Vec<Resource<KeyRefs>> = (0..)
@@ -372,7 +371,7 @@ pub fn content(fill: Fill) -> Graph {
             title: fill.some(title("A role")),
             multi: fill.on(),
         });
-    let kinds = [("k_role", "role"), ("k_entities", "entities")]
+    let kinds = [("k_role", "role"), ("k_identities", "identities")]
         .into_iter()
         .map(|(key, slug)| ParticipationKind {
             key: id(key),
@@ -412,7 +411,7 @@ pub fn insertion(fill: Fill) -> Insertion {
             BTreeMap::new()
         },
         kinds: if fill.on() {
-            BTreeMap::from([(id("k_role"), id("k_entities"))])
+            BTreeMap::from([(id("k_role"), id("k_identities"))])
         } else {
             BTreeMap::new()
         },
@@ -459,7 +458,7 @@ pub fn state(fill: Fill) -> JourneyState {
             created_at: at(1),
             edited_at: fill.some(at(2)),
         });
-    let fills = [("r_lead", vec!["e_a", "e_b"]), ("r_other", Vec::new())];
+    let fills = [("r_lead", vec!["who_a", "who_b"]), ("r_other", Vec::new())];
     JourneyState {
         nodes: nodes.collect(),
         local_edits: BTreeMap::from([(node_key(0), local_edits())]),
@@ -482,9 +481,9 @@ pub fn state(fill: Fill) -> JourneyState {
             .rotate(fills.to_vec())
             .into_iter()
             .zip(["r_lead", "r_other"])
-            .map(|((_, entities), role)| {
-                let entities = entities.into_iter().map(id);
-                (id(role), BoundedSet::new(entities).unwrap())
+            .map(|((_, identities), role)| {
+                let identities = identities.into_iter().map(id);
+                (id(role), BoundedSet::new(identities).unwrap())
             })
             .collect(),
         pins: BTreeMap::from([(node_key(0), day(if fill.on() { 3 } else { 4 }))]),
@@ -560,11 +559,11 @@ pub fn route_header(route: &str, fill: Fill) -> RouteHeader {
     }
 }
 
-/// An entity, with emails when filled.
+/// An identity, with emails when filled.
 #[must_use]
-pub fn entity(key: &str, fill: Fill) -> Entity {
+pub fn identity(key: &str, fill: Fill) -> Identity {
     let emails = fill.some(["e@example.org", "f@example.org"]);
-    Entity {
+    Identity {
         key: id(key),
         name: title(if fill.on() { "Every field" } else { "Cleared" }),
         emails: emails.into_iter().flatten().map(id).collect(),

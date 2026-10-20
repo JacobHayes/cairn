@@ -1,6 +1,6 @@
 // A5: `ConditionEditor` builds a `relevant_when` condition clause by clause. A leaf picks a
 // decision outside the node's own subtree, then one of the comparisons its answer type takes,
-// then a value of that type (a choice, yes or no, a date, an entity, or text), so a type
+// then a value of that type (a choice, yes or no, a date, an identity, or text), so a type
 // mismatch cannot be entered; `all`, `any`, and `not` compose leaves, and every operator is
 // reachable. The condition reads back as a sentence; the limits on depth and clauses are
 // checked before it is sent.
@@ -32,10 +32,10 @@ import {
   type ValueInput,
 } from "./condition.ts";
 import type { GraphNode, Tree } from "./graph.ts";
-import { ENTITY_GONE } from "../ui/gone.ts";
+import { IDENTITY_GONE } from "../ui/gone.ts";
 import { Picker } from "./parts.tsx";
 
-type Entity = Schema<"Entity">;
+type Identity = Schema<"Identity">;
 
 export interface ConditionEditorProps {
   value: Schema<"ConditionResolved"> | null;
@@ -43,7 +43,7 @@ export interface ConditionEditorProps {
   tree: Tree;
   /** The node the condition is on; its own subtree's decisions are never offered. */
   node: string | undefined;
-  entities: readonly Entity[];
+  identities: readonly Identity[];
   today: string;
 }
 
@@ -53,19 +53,19 @@ interface Context extends ConditionEditorProps {
 }
 
 /** A new leaf on `decision`, comparing as its type allows first. */
-function newLeaf(decision: GraphNode, context: Pick<Context, "today" | "entities">): Clause {
+function newLeaf(decision: GraphNode, context: Pick<Context, "today" | "identities">): Clause {
   const operators = leavesFor(decision.answer_type ?? "boolean");
   const operator = operators.includes("equals") ? "equals" : (operators[0] ?? "answered");
-  return leaf(operator, decision.key, [firstValue(valueInput(decision), context.today, context.entities[0]?.key)]);
+  return leaf(operator, decision.key, [firstValue(valueInput(decision), context.today, context.identities[0]?.key)]);
 }
 
-/** The names the editor's sentence reads with: decisions of the tree, entities by name. */
-function namesOf(tree: Tree, entities: readonly Entity[]) {
-  return conditionNames((decision) => tree.byKey.get(decision), (key) => entities.find((entity) => entity.key === key)?.name ?? ENTITY_GONE);
+/** The names the editor's sentence reads with: decisions of the tree, identities by name. */
+function namesOf(tree: Tree, identities: readonly Identity[]) {
+  return conditionNames((decision) => tree.byKey.get(decision), (key) => identities.find((identity) => identity.key === key)?.name ?? IDENTITY_GONE);
 }
 
 /** One value of a leaf, picked as the decision's type allows. */
-function ValueControl({ input, value, entities, onChange }: { input: ValueInput; value: Value; entities: readonly Entity[]; onChange: (next: Value) => void }) {
+function ValueControl({ input, value, identities, onChange }: { input: ValueInput; value: Value; identities: readonly Identity[]; onChange: (next: Value) => void }) {
   switch (input.input) {
     case "choice":
       return <Picker aria-label="Value" value={String(value)} options={input.choices.map((choice) => ({ value: choice.id, label: choice.label }))} onChange={(event) => { onChange(event.target.value); }} />;
@@ -75,8 +75,8 @@ function ValueControl({ input, value, entities, onChange }: { input: ValueInput;
       );
     case "date":
       return <Field type="date" aria-label="Value" value={String(value)} onChange={(event) => { onChange(event.target.value); }} />;
-    case "entity":
-      return <Picker aria-label="Value" value={String(value)} options={entities.map((entity) => ({ value: entity.key, label: entity.name }))} onChange={(event) => { onChange(event.target.value); }} />;
+    case "identity":
+      return <Picker aria-label="Value" value={String(value)} options={identities.map((identity) => ({ value: identity.key, label: identity.name }))} onChange={(event) => { onChange(event.target.value); }} />;
     case "text":
       return <Field aria-label="Value" value={String(value)} onChange={(event) => { onChange(event.target.value); }} />;
   }
@@ -99,11 +99,11 @@ function LeafValues({ context, clause, path }: { context: Context; clause: Claus
     <>
       {values.map((value, at) => (
         <span key={at} className="row">
-          <ValueControl input={input} value={value} entities={context.entities} onChange={(next) => { set(values.map((each, index) => (index === at ? next : each))); }} />
+          <ValueControl input={input} value={value} identities={context.identities} onChange={(next) => { set(values.map((each, index) => (index === at ? next : each))); }} />
           {operator === "in" && values.length > 1 ? <Button aria-label="Remove this value" onClick={() => { set(values.filter((_, index) => index !== at)); }}>Remove</Button> : null}
         </span>
       ))}
-      {operator === "in" ? <Button onClick={() => { set([...values, firstValue(input, context.today, context.entities[0]?.key)]); }}>Add a value</Button> : null}
+      {operator === "in" ? <Button onClick={() => { set([...values, firstValue(input, context.today, context.identities[0]?.key)]); }}>Add a value</Button> : null}
     </>
   );
 }
@@ -135,7 +135,7 @@ function LeafClause({ context, clause, path }: { context: Context; clause: Claus
         options={operators.map((operator) => ({ value: operator, label: OPERATOR_WORDS[operator] }))}
         onChange={(event) => {
           const values = valuesOf(clause);
-          replace(leaf(event.target.value as Leaf, decisionKey, values.length > 0 || decision === undefined ? values : [firstValue(valueInput(decision), context.today, context.entities[0]?.key)]));
+          replace(leaf(event.target.value as Leaf, decisionKey, values.length > 0 || decision === undefined ? values : [firstValue(valueInput(decision), context.today, context.identities[0]?.key)]));
         }}
       />
       <LeafValues context={context} clause={clause} path={path} />
@@ -214,7 +214,7 @@ export function ConditionEditor(props: ConditionEditorProps) {
   return (
     <div className="stack" data-testid="condition-editor">
       <span className="muted small" data-testid="condition-words">
-        Relevant when {conditionWords(props.value, namesOf(props.tree, props.entities))}
+        Relevant when {conditionWords(props.value, namesOf(props.tree, props.identities))}
       </span>
       <ClauseView context={context} clause={props.value} path={[]} />
     </div>

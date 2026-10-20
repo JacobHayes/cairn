@@ -137,7 +137,7 @@ mod open {
                 "DROP TABLE insertions",
                 "DROP INDEX proposals_by_destination",
                 "DROP INDEX proposals_by_creator",
-                "DELETE FROM schema_migrations WHERE version >= 5",
+                "DELETE FROM schema_migrations WHERE version BETWEEN 5 AND 10",
             ] {
                 connection.execute(statement, ()).await.unwrap();
             }
@@ -226,7 +226,10 @@ mod open {
                 connection.execute(statement, ()).await.unwrap();
             }
             connection
-                .execute("DELETE FROM schema_migrations WHERE version >= 9", ())
+                .execute(
+                    "DELETE FROM schema_migrations WHERE version BETWEEN 9 AND 10",
+                    (),
+                )
                 .await
                 .unwrap();
             drop(connection);
@@ -257,7 +260,7 @@ mod open {
     const GLOSSARY: &[(&str, &[&str])] = &[
         (
             "Deployment",
-            &["deployment.revision", "entities", "entity_aliases"],
+            &["deployment.revision", "identities", "identity_aliases"],
         ),
         ("Graph", &["graphs"]),
         ("Route, Segment", &["routes", "routes.kind"]),
@@ -296,7 +299,7 @@ mod open {
         ("Container, Parent / child", &["nodes.parent_key"]),
         (
             "Answer, Rationale",
-            &["answers", "answer_entities", "answers.rationale"],
+            &["answers", "answer_identities", "answers.rationale"],
         ),
         ("Edge", &["edges"]),
         ("Condition", &["nodes.relevant_when"]),
@@ -305,10 +308,10 @@ mod open {
         ("Participation kind", &["participation_kinds"]),
         (
             "Participation, Owner",
-            &["participations", "participation_entities"],
+            &["participations", "participation_identities"],
         ),
-        ("Entity", &["entities", "entity_emails"]),
-        ("User", &["users", "user_identities", "identity_emails"]),
+        ("Identity", &["identities", "identity_emails"]),
+        ("User", &["users", "user_logins", "login_emails"]),
         ("Pin", &["pins"]),
         ("Date rule", &["nodes.due_by", "nodes.not_before"]),
         (

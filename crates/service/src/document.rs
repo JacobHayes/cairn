@@ -9,7 +9,7 @@ use crate::{Call, Service, ServiceError};
 impl Service {
     /// A journey's domain document for `call`'s user, or none: its graph and state, the
     /// derive inputs at `call`'s today in the deployment's zone (A9) with the user's
-    /// entities as the viewer (H3) and the current deployment context (E4, E6). Nothing
+    /// identities as the viewer (H3) and the current deployment context (E4, E6). Nothing
     /// derived is in it.
     ///
     /// # Errors
@@ -23,11 +23,11 @@ impl Service {
         let Some(journey) = self.journey(id).await? else {
             return Ok(None);
         };
-        // One deployment read serves both the viewer's entities and the context, so they
+        // One deployment read serves both the viewer's identities and the context, so they
         // agree on its revision.
-        let identities = self.store.identities_of(&call.actor.user).await?;
+        let logins = self.store.logins_of(&call.actor.user).await?;
         let deployment = self.deployment().await?;
-        let viewer = crate::viewer::entities_of(&identities, &deployment);
+        let viewer = crate::viewer::identities_of(&logins, &deployment);
         let today = self.settings.today(call.now);
         let inputs = self.settings.derive_inputs(today, viewer, deployment);
         Ok(Some(project::document(&journey, &inputs)))

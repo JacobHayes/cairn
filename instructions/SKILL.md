@@ -73,7 +73,7 @@ out, though its relevance reads `not_relevant` and counts for nothing until then
   code, and a message. Fix all of them at once; nothing was written.
 - **Arguments.** A call whose arguments do not match the tool's schema is refused with the
   path that did not match.
-- **Entities.** A write that names entities (an entity answer, explicit participants)
+- **Identities.** A write that names identities (an identity answer, explicit participants)
   carries the `deployment_revision` the snapshot reported.
 
 ## Direct writes or proposals
@@ -142,9 +142,9 @@ it declares no final milestone or default owner. The insert-segment workflow has
 
 Every node, role, and participation kind has a `key` (`n_`, `r_`, and so on, with a slug)
 that never changes and is never reused; its `id` is a readable slug unique among its
-siblings. New journeys, routes, proposals, and entities take ids you choose: `j_`, a route
-slug, `pr_`, and `e_` with a slug. Read keys from the snapshot or the route; never guess
-them.
+siblings. New journeys, routes, and proposals take ids you choose: `j_`, a route slug, and
+`pr_`, with a slug. A new identity's key is `who_` and 16 random lowercase letters and digits;
+never derive it from a name. Read keys from the snapshot or the route; never guess them.
 
 ## Workflows
 
@@ -171,7 +171,7 @@ Each workflow is also served as an MCP prompt by its name.
 | Change structure | `create_proposal`, `list_proposals`, `get_proposal`, `edit_proposal`, `apply_proposal`, `apply_patch` |
 | Journeys and routes | `create_journey`, `open_draft`, `publish_draft`, `import_route`, `export_route` |
 | Lineage | `upgrade`, `save_as_route`, `relink` |
-| People and teams | `manage_entity` |
+| People and teams | `manage_identity` |
 
 Lists that can grow come a page at a time: pass the `next` you were given back as the
 cursor the list names (`cursor` or `after`; a node's children and notes take

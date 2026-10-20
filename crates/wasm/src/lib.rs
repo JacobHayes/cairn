@@ -11,7 +11,7 @@
 //! server's byte for byte.
 //!
 //! For the in-browser host, its composition root ([`BrowserRoot`]): the service over the
-//! memory store seeded from the fixtures, the in-process notifier, and one local identity,
+//! memory store seeded from the fixtures, the in-process notifier, and one local login,
 //! with the API's reads, writes, and proposals.
 //!
 //! A failure is thrown to JavaScript as the JSON of a [`HostError`]. A panic aborts the
@@ -46,7 +46,7 @@ pub use proposals::{
     UpgradeRequest,
 };
 pub use reads::{
-    JourneyIndexQuery, LinkedIdentity, RouteDetail, RouteImport, RoutePage, RouteSummary,
+    JourneyIndexQuery, LinkedLogin, RouteDetail, RouteImport, RoutePage, RouteSummary,
     VersionJourneys, Viewer,
 };
 pub use root::{

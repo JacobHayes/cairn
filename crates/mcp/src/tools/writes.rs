@@ -2,13 +2,13 @@
 //! so a lost response can be resubmitted safely (H5), against the base revision the agent
 //! read. A journey's state tools (answer, transition, snooze, assign, dates, overrides) are
 //! one mutation each; `apply_patch` takes any domain patch; the route tools open and publish
-//! a draft and import a route file; `manage_entity` writes the deployment.
+//! a draft and import a route file; `manage_identity` writes the deployment.
 
 use std::collections::BTreeMap;
 
 use cairn_schema::{
-    AnswerValue, Date, Entity, EntityKey, JourneyId, KeyRefs, KindKey, Lineage, Markdown, Mutation,
-    Mutations, NodeKey, OverrideKind, ParticipationSource, Patch, PatchId, PatchTarget,
+    AnswerValue, Date, Identity, IdentityKey, JourneyId, KeyRefs, KindKey, Lineage, Markdown,
+    Mutation, Mutations, NodeKey, OverrideKind, ParticipationSource, Patch, PatchId, PatchTarget,
     RecordedEnd, Revision, RouteFile, RouteId, SignedDays, SnoozeTarget, Title, Transition,
     from_yaml,
 };
@@ -30,10 +30,10 @@ pub(crate) const SPECS: &[Spec] = &[
     Spec {
         name: "answer_decision",
         description: "Records a decision's answer (A8): a choice, choices, a boolean, text, a \
-            date, an entity, or entities, matching the decision's answer type. Answering \
+            date, an identity, or identities, matching the decision's answer type. Answering \
             changes what is relevant, fills roles, and pins dates; the result lists the \
             consequences: warnings, and what the answer unlocked, took out of scope, or \
-            brought into scope. Name the deployment revision when the answer names entities.",
+            brought into scope. Name the deployment revision when the answer names identities.",
         writes: true,
         destructive: true,
         schema: schema::<AnswerDecision>,
@@ -51,7 +51,7 @@ pub(crate) const SPECS: &[Spec] = &[
     Spec {
         name: "assign",
         description: "Sets who holds a participation kind (owner, or one of the graph's own) on \
-            a node: a role, or explicit entities (an empty list is an explicit none). Omit \
+            a node: a role, or explicit identities (an empty list is an explicit none). Omit \
             `source` to clear it, so the node inherits again (E2).",
         writes: true,
         destructive: true,
@@ -159,13 +159,13 @@ pub(crate) const SPECS: &[Spec] = &[
         output: schema::<WriteOutput>,
     },
     Spec {
-        name: "manage_entity",
-        description: "Creates an entity (a person or team journeys refer to), edits its name \
+        name: "manage_identity",
+        description: "Creates an identity (a person or team journeys refer to), edits its name \
             or emails (an email links it to the user who signs in with it, H3), or merges a \
             duplicate into another (E6). A deployment patch.",
         writes: true,
         destructive: true,
-        schema: schema::<ManageEntity>,
+        schema: schema::<ManageIdentity>,
         output: schema::<WriteOutput>,
     },
 ];
@@ -211,7 +211,7 @@ impl ToolSet {
             "apply_patch" => parse::<ApplyPatch>(arguments)?.patch(),
             "open_draft" => parse::<OpenDraft>(arguments)?.patch(),
             "publish_draft" => parse::<PublishDraft>(arguments)?.patch(),
-            "manage_entity" => self.entity_patch(parse(arguments)?).await,
+            "manage_identity" => self.identity_patch(parse(arguments)?).await,
             _ => return Ok(None),
         }?;
         Ok(Some(drafted))
@@ -238,16 +238,16 @@ impl ToolSet {
         Ok(written.into())
     }
 
-    /// `manage_entity`: a merge names every journey referring to either entity at the
+    /// `manage_identity`: a merge names every journey referring to either identity at the
     /// revision it was checked against (E6), which the tool reads from the journey index.
-    async fn entity_patch(&self, arguments: ManageEntity) -> Result<DomainPatch, ToolError> {
+    async fn identity_patch(&self, arguments: ManageIdentity) -> Result<DomainPatch, ToolError> {
         let mutation = match arguments.change {
-            EntityChange::Create { entity } => Mutation::CreateEntity { entity },
-            EntityChange::Edit { entity } => Mutation::EditEntity { entity },
-            EntityChange::Merge { survivor, merged } => {
+            IdentityChange::Create { identity } => Mutation::CreateIdentity { identity },
+            IdentityChange::Edit { identity } => Mutation::EditIdentity { identity },
+            IdentityChange::Merge { survivor, merged } => {
                 let referencing = [survivor.clone(), merged.clone()].into();
                 let journeys = self.revisions_referencing(referencing).await?;
-                Mutation::MergeEntities {
+                Mutation::MergeIdentities {
                     survivor,
                     merged,
                     journeys,
@@ -265,15 +265,15 @@ impl ToolSet {
         )
     }
 
-    /// Every journey referring to any of `entities`, directly or through an alias, at its
+    /// Every journey referring to any of `identities`, directly or through an alias, at its
     /// current revision: one index read per page of journeys.
     async fn revisions_referencing(
         &self,
-        entities: std::collections::BTreeSet<EntityKey>,
+        identities: std::collections::BTreeSet<IdentityKey>,
     ) -> Result<BTreeMap<JourneyId, Revision>, ToolError> {
         let mut found = BTreeMap::new();
         let mut query = JourneyQuery {
-            referencing: Some(entities),
+            referencing: Some(identities),
             size: PageSize::MAX,
             ..JourneyQuery::default()
         };
@@ -370,8 +370,8 @@ pub(crate) struct AnswerDecision {
     /// none leaves the decision without one, so repeat the reason when it still holds.
     #[serde(default)]
     rationale: Option<Markdown>,
-    /// The deployment revision the named entities were read at; needed when the answer
-    /// names an entity.
+    /// The deployment revision the named identities were read at; needed when the answer
+    /// names an identity.
     #[serde(default)]
     deployment_revision: Option<Revision>,
     /// A new id for this write, unique to it (`p_` and a slug). Resubmitting the same id with
@@ -444,11 +444,11 @@ pub(crate) struct Assign {
     node: NodeKey,
     /// The participation kind: `owner`, or one the graph defines.
     kind: KindKey,
-    /// A role's key, or a list of entity keys; absent clears it.
+    /// A role's key, or a list of identity keys; absent clears it.
     #[serde(default)]
     source: Option<ParticipationSource<KeyRefs>>,
-    /// The deployment revision the named entities were read at; needed when the source
-    /// names entities.
+    /// The deployment revision the named identities were read at; needed when the source
+    /// names identities.
     #[serde(default)]
     deployment_revision: Option<Revision>,
     /// A new id for this write, unique to it (`p_` and a slug). Resubmitting the same id with
@@ -656,7 +656,7 @@ pub(crate) struct ResolveDateConflict {
     /// The mutations the conflict refused, applied after the resolution in the same patch.
     #[serde(default)]
     then: Vec<Mutation>,
-    /// The deployment revision, when the resolution or the mutations name entities.
+    /// The deployment revision, when the resolution or the mutations name identities.
     #[serde(default)]
     deployment_revision: Option<Revision>,
     /// A new id for this write, unique to it (`p_` and a slug). Resubmitting the same id with
@@ -876,12 +876,12 @@ pub(crate) struct ImportRoute {
     note: Option<Markdown>,
 }
 
-/// `manage_entity`.
+/// `manage_identity`.
 #[derive(Debug, Deserialize, JsonSchema)]
 #[serde(deny_unknown_fields)]
-pub(crate) struct ManageEntity {
+pub(crate) struct ManageIdentity {
     /// The change.
-    change: EntityChange,
+    change: IdentityChange,
     /// A new id for this write.
     patch_id: PatchId,
     /// The deployment revision it was drafted against.
@@ -891,25 +891,26 @@ pub(crate) struct ManageEntity {
     note: Option<Markdown>,
 }
 
-/// A change to the deployment's entities (E6).
+/// A change to the deployment's identities (E6).
 #[derive(Debug, Deserialize, JsonSchema)]
 #[serde(rename_all = "snake_case", deny_unknown_fields)]
-pub(crate) enum EntityChange {
-    /// Create an entity with its key (`e_` and a slug).
+pub(crate) enum IdentityChange {
+    /// Create an identity with its key: `who_` and 16 random lowercase letters and digits, never
+    /// derived from a name.
     Create {
-        /// The entity.
-        entity: Entity,
+        /// The identity.
+        identity: Identity,
     },
-    /// Replace an entity's name and emails.
+    /// Replace an identity's name and emails.
     Edit {
-        /// The entity as it should be.
-        entity: Entity,
+        /// The identity as it should be.
+        identity: Identity,
     },
     /// Merge `merged` into `survivor`; `merged`'s key becomes an alias of it.
     Merge {
-        /// The entity that remains.
-        survivor: EntityKey,
+        /// The identity that remains.
+        survivor: IdentityKey,
         /// The duplicate.
-        merged: EntityKey,
+        merged: IdentityKey,
     },
 }

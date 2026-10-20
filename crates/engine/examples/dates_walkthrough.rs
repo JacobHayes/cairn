@@ -7,6 +7,9 @@
 //!
 //! usage: `cargo run -p cairn-engine --example dates_walkthrough -- FIXTURES_DIR`
 
+#[path = "support/people.rs"]
+mod people;
+
 use std::error::Error;
 use std::fmt::Write as _;
 use std::path::Path;
@@ -35,7 +38,7 @@ impl Fixture {
         let scenario: Scenario =
             from_yaml(&std::fs::read_to_string(directory.join("journey.yaml"))?)?;
         let first = scenario.steps.as_slice().first().ok_or("no steps")?.today;
-        let mut after = vec![(seed(&file)?, first)];
+        let mut after = vec![(seed(fixtures, &file)?, first)];
         for step in scenario.steps.as_slice() {
             let inputs = ApplyInputs {
                 today: step.today,
@@ -73,9 +76,9 @@ impl Fixture {
 }
 
 /// The route file published as version 1 in a fresh deployment (fixtures/README.md).
-fn seed(file: &RouteFile) -> Result<Records> {
+fn seed(fixtures: &Path, file: &RouteFile) -> Result<Records> {
     let graph = from_file(file, &mut SequentialKeys::default()).map_err(|v| format!("{v:?}"))?;
-    let mut records = Records::default();
+    let mut records = people::records(fixtures)?;
     let version = VersionNumber::FIRST;
     let header = RouteHeader {
         id: file.route.clone(),
@@ -295,7 +298,7 @@ fn rejected(fixture: &Fixture, out: &mut String) -> Result<()> {
         today: *today,
         at: "2026-10-13T11:00:00Z".parse()?,
         actor: cairn_schema::Actor {
-            user: "u_lead".parse()?,
+            user: "u_ana".parse()?,
             agent: None,
         },
         note: None,

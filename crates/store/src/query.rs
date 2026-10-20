@@ -1,5 +1,5 @@
 //! What the store's queries take and return: the current revisions (H6), the journey index
-//! (C16), route detail (C17), the journeys referencing an entity (E6), event history (J5),
+//! (C16), route detail (C17), the journeys referencing an identity (E6), event history (J5),
 //! and text search across journeys.
 
 use std::collections::{BTreeMap, BTreeSet};
@@ -7,9 +7,9 @@ use std::collections::{BTreeMap, BTreeSet};
 use serde::{Deserialize, Serialize};
 
 use cairn_schema::{
-    AgentId, AttachmentKey, Domain, EntityKey, Event, EventType, GraphId, InsertionKey, JourneyId,
-    JourneyStatus, Lineage, NodeKey, PatchId, ProposalId, ProposalOutline, Revision, RouteHeader,
-    RouteId, Timestamp, Title, UserId, VersionNumber,
+    AgentId, AttachmentKey, Domain, Event, EventType, GraphId, IdentityKey, InsertionKey,
+    JourneyId, JourneyStatus, Lineage, NodeKey, PatchId, ProposalId, ProposalOutline, Revision,
+    RouteHeader, RouteId, Timestamp, Title, UserId, VersionNumber,
 };
 
 use crate::limits::PAGE_ITEM_COUNT_MAX;
@@ -90,7 +90,7 @@ impl<T, C> Page<T, C> {
 }
 
 /// C16: the journey index's filters. Every filter given must hold. "Mine" is derived (D3),
-/// so the store narrows to the journeys that refer to the viewer's entities at all, and the
+/// so the store narrows to the journeys that refer to the viewer's identities at all, and the
 /// service derives the rest.
 #[derive(Clone, Debug, Default, PartialEq, Eq)]
 pub struct JourneyQuery {
@@ -100,8 +100,8 @@ pub struct JourneyQuery {
     pub route: Option<RouteId>,
     /// Journeys on this version of their route.
     pub version: Option<VersionNumber>,
-    /// Journeys referring to any of these entities, directly or through an alias (E6).
-    pub referencing: Option<BTreeSet<EntityKey>>,
+    /// Journeys referring to any of these identities, directly or through an alias (E6).
+    pub referencing: Option<BTreeSet<IdentityKey>>,
     /// Journeys whose route has, or has not, published a version newer than theirs.
     pub upgrade_available: Option<bool>,
     /// The page starts after this journey.
@@ -189,12 +189,12 @@ pub enum ProposalScope {
     /// The ones whose destination is a route that does not exist yet.
     CreatingRoutes,
     /// C16: the ones waiting on a viewer: created by `user`, or drafted by an agent for an
-    /// active journey referring to any of `entities`, directly or through an alias.
+    /// active journey referring to any of `identities`, directly or through an alias.
     Waiting {
         /// The viewer.
         user: UserId,
-        /// The viewer's entities.
-        entities: BTreeSet<EntityKey>,
+        /// The viewer's identities.
+        identities: BTreeSet<IdentityKey>,
     },
 }
 

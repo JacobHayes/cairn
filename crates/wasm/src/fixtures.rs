@@ -3,10 +3,11 @@
 //! route published as version 1, then its scenario's steps submitted through the service in
 //! order, every fixture into one deployment.
 //!
-//! Each scenario is written for a fresh deployment at revision 0; seeded one after another,
-//! a step that names a deployment revision names it counted from where its fixture started,
-//! so seeding moves it by the deployment revision the fixture started at. Entity keys are
-//! distinct across the fixtures, so nothing else collides.
+//! Every scenario is written for the deployment the shared people leave, at revision 1, which
+//! is seeded first; seeded one after another, a step that names a deployment revision names it
+//! counted from where its fixture started, so seeding moves it by how far the deployment has
+//! moved since the people. The identities a scenario creates are distinct across the fixtures,
+//! so nothing else collides.
 //!
 //! Cost: one service write per route and per step, a few dozen in all.
 
@@ -16,7 +17,7 @@ use cairn_schema::{
     Scenario, ScenarioStep, SequentialKeys, Timestamp, from_yaml,
 };
 use cairn_service::{Call, DomainPatch, Service};
-use cairn_store::{IdentityRecord, Store, UserRecord};
+use cairn_store::{LoginRecord, Store, UserRecord};
 
 /// One fixture: its name, its route file if it has one, and its journey scenario.
 #[derive(Clone, Copy, Debug)]
@@ -28,6 +29,9 @@ pub struct Fixture {
     /// Its `journey.yaml`.
     pub journey: &'static str,
 }
+
+/// The patch that creates the people every scenario starts from (`fixtures/people.yaml`).
+const PEOPLE: &str = include_str!("../../../fixtures/people.yaml");
 
 /// Every fixture, in the order they are seeded.
 pub const FIXTURES: [Fixture; 4] = [
@@ -165,12 +169,22 @@ fn author_call() -> Call {
 ///
 /// When a fixture does not parse or the service does not commit a step.
 pub async fn seed(service: &Service) -> Result<(), SeedError> {
+    let people: ScenarioStep =
+        from_yaml(PEOPLE).map_err(|error| SeedError(format!("people: {error}")))?;
+    seed_step(service, &people, Revision::NONE).await?;
+    let base = service
+        .deployment()
+        .await
+        .map_err(|error| SeedError(error.to_string()))?
+        .revision;
     for fixture in &FIXTURES {
-        let start = service
+        let at = service
             .deployment()
             .await
             .map_err(|error| SeedError(error.to_string()))?
             .revision;
+        let start = Revision::try_from(at.get() - base.get())
+            .map_err(|error| SeedError(format!("{}: {error:?}", fixture.name)))?;
         if let Some(patch) = fixture.route_patch()? {
             submit(service, &author_call(), patch, None).await?;
         }
@@ -249,47 +263,58 @@ async fn submit(
         .map_err(|error| SeedError(format!("{id}: {error:?}")))
 }
 
-/// The verified emails of the browser host's local identity: each fixture's lead, so the
-/// viewer is one entity in every fixture (H3) and "mine", the owner factor, and the ranking
-/// for the viewer show that lead's work.
-pub const LOCAL_EMAILS: [&str; 4] = [
-    "owner@example.org",
-    "manager@example.org",
-    "launch-lead@example.org",
-    "lead@example.org",
-];
+/// The email the browser host's local login is verified for: Ana Ruiz's, who is in every
+/// fixture, so the viewer is one identity in every journey (H3) and "mine", the owner factor,
+/// and the ranking for the viewer show her work across all of them.
+pub const LOCAL_EMAIL: &str = "ana@example.org";
 
-/// The users the fixtures' events name (the routes' publisher and the scenarios' actors), as
-/// users with a name, so a history says who rather than an id. Their names stand for the
-/// roles the fixtures give them.
+/// The users the fixtures' events name (the routes' publisher and the scenarios' actors),
+/// each with the person's name and, but for the publisher, one login verified for that
+/// person's email, so a history says who rather than an id.
 ///
 /// # Errors
 ///
 /// When the store fails.
 pub async fn put_fixture_users(store: &dyn Store, at: Timestamp) -> Result<(), SeedError> {
-    const USERS: [(&str, &str); 5] = [
-        ("u_author", "Route author"),
-        ("u_lead", "Lead"),
-        ("u_manager", "Manager"),
-        ("u_launch_lead", "Launch lead"),
-        ("u_owner", "Owner"),
+    const USERS: [(&str, &str, Option<&str>); 4] = [
+        ("u_author", "Route author", None),
+        ("u_ana", "Ana Ruiz", Some("ana@example.org")),
+        ("u_ben", "Ben Okafor", Some("ben@example.org")),
+        ("u_gus", "Gus Lindqvist", Some("gus@example.org")),
     ];
-    for (id, name) in USERS {
-        let parse_failed = |what: &str| SeedError(format!("{what}: not a valid user"));
+    fn parse<T: std::str::FromStr<Err: std::fmt::Debug>>(text: &str) -> Result<T, SeedError> {
+        text.parse()
+            .map_err(|error| SeedError(format!("{text}: {error:?}")))
+    }
+    let failed = |error: cairn_store::StoreError| SeedError(error.to_string());
+    for (id, name, email) in USERS {
+        let user: cairn_schema::UserId = parse(id)?;
         store
             .put_user(UserRecord {
-                id: id.parse().map_err(|_| parse_failed(id))?,
-                name: name.parse().map_err(|_| parse_failed(name))?,
+                id: user.clone(),
+                name: parse(name)?,
                 created_at: at,
             })
             .await
-            .map_err(|error| SeedError(error.to_string()))?;
+            .map_err(failed)?;
+        if let Some(email) = email {
+            store
+                .put_login(LoginRecord {
+                    provider: parse("fixture")?,
+                    subject: parse(id)?,
+                    user,
+                    verified_emails: [parse::<Email>(email)?].into_iter().collect(),
+                    linked_at: at,
+                })
+                .await
+                .map_err(failed)?;
+        }
     }
     Ok(())
 }
 
-/// Signs in the browser host's one local identity on `store`: user `u_local` through the
-/// `local` method, verified for [`LOCAL_EMAILS`]. Who everything in the root is done as.
+/// Signs in the browser host's one local login on `store`: user `u_local` through the
+/// `local` method, verified for [`LOCAL_EMAIL`]. Who everything in the root is done as.
 ///
 /// # Errors
 ///
@@ -310,12 +335,9 @@ pub async fn sign_in_local(store: &dyn Store, at: Timestamp) -> Result<Actor, Se
         })
         .await
         .map_err(failed)?;
-    let verified_emails = LOCAL_EMAILS
-        .iter()
-        .map(|email| parse::<Email>(email))
-        .collect::<Result<_, _>>()?;
+    let verified_emails = [parse::<Email>(LOCAL_EMAIL)?].into_iter().collect();
     store
-        .put_identity(IdentityRecord {
+        .put_login(LoginRecord {
             provider: parse("local")?,
             subject: parse("local")?,
             user: user.clone(),

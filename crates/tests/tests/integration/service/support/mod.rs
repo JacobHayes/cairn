@@ -212,6 +212,8 @@ pub fn rejected(written: Result<Written, WriteError>) -> cairn_schema::Rejection
 
 /// Seeds the vendor evaluation's route and runs its scenario's first `steps` steps.
 pub async fn vendor_after(service: &Service, steps: usize) {
+    let (people_call, people) = crate::people::people_write();
+    applied(service.patch(&people_call, &people).await);
     let seed = publish_fixture_route("vendor-evaluation");
     applied(
         service

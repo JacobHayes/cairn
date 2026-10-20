@@ -39,7 +39,7 @@ fn a_stale_deployment_revision_is_a_rejection() {
     let mut patch = support::patch_to(
         &records,
         "{journey: j_vendor_eval}",
-        "- op: answer\n  decision: n_who_owns\n  value: {entity: e_lead}\n",
+        "- op: answer\n  decision: n_who_owns\n  value: {identity: who_k3d7qm2xw5tn6pfa}\n",
     );
     patch.deployment_revision = Some(cairn_schema::Revision::NONE);
     assert!(matches!(
@@ -185,7 +185,7 @@ fn a_removal_that_misses_what_the_subtree_holds_is_rejected() {
             "a participation added",
             REMOVE_PARTNER_LED,
             Some(
-                "- op: set_participation\n  node: n_criteria\n  kind: k_owner\n  source: [e_lead]\n",
+                "- op: set_participation\n  node: n_criteria\n  kind: k_owner\n  source: [who_k3d7qm2xw5tn6pfa]\n",
             ),
         ),
         (
@@ -238,7 +238,7 @@ fn edits_to_route_copied_nodes_set_markers_and_reset_clears_them() {
     let edits = "\
 - op: set_node_field\n  node: n_access\n  value: {title: \"Environment access, granted\"}\n\
 - op: add_edge\n  edge: {node: n_findings, requires: n_access}\n\
-- op: set_participation\n  node: n_access\n  kind: k_owner\n  source: [e_lead]\n\
+- op: set_participation\n  node: n_access\n  kind: k_owner\n  source: [who_k3d7qm2xw5tn6pfa]\n\
 - op: add_resource\n  node: n_access\n  resource: {key: a_tip, tip: Ask early.}\n\
 - op: set_node_field\n  node: n_workload_ingest\n  value: {title: Ingest the workload}\n";
     let applied = vendor_patch(&records, edits).unwrap();
@@ -376,7 +376,7 @@ fn a_role_with_a_filling_decision_and_a_fed_milestone_change_only_through_the_de
     let records = vendor_after(2);
     // The client routes both through the decision (decisions/2026-10-07-a-direct-fill-of-a-decision-filled-role-is-routed.md).
     for direct in [
-        "- op: fill_role\n  role: r_eval_owner\n  entities: [e_lead]\n",
+        "- op: fill_role\n  role: r_eval_owner\n  identities: [who_k3d7qm2xw5tn6pfa]\n",
         "- op: clear_role_fill\n  role: r_eval_owner\n",
     ] {
         assert_eq!(
@@ -416,25 +416,33 @@ fn a_role_with_a_filling_decision_and_a_fed_milestone_change_only_through_the_de
 }
 
 #[test]
-fn an_entity_created_in_a_journey_patch_advances_the_deployment_once() {
+fn an_identity_created_in_a_journey_patch_advances_the_deployment_once() {
     let (initial, applied) = support::run("vendor-evaluation");
-    assert_eq!(initial.deployment.revision, cairn_schema::Revision::NONE);
-    // Step 1 creates three entities in one journey patch.
+    let people = initial.deployment.identities.len();
     assert_eq!(
-        applied[0].records().deployment.revision,
+        initial.deployment.revision,
         cairn_schema::Revision::NONE.next()
     );
-    assert_eq!(applied[0].records().deployment.entities.len(), 3);
-    let again = "- op: create_entity\n  entity: {key: e_lead, name: Someone Else}\n";
+    // Step 1 names people who already exist: the deployment does not move.
+    assert_eq!(
+        applied[0].records().deployment.revision,
+        initial.deployment.revision
+    );
+    // The findings reviewer is created in the patch that answers with them, once.
+    let last = applied.last().unwrap().records();
+    assert_eq!(last.deployment.revision, initial.deployment.revision.next());
+    assert_eq!(last.deployment.identities.len(), people + 1);
+    let again =
+        "- op: create_identity\n  identity: {key: who_k3d7qm2xw5tn6pfa, name: Someone Else}\n";
     let records = applied[0].records();
     assert_eq!(
         codes(vendor_patch(records, again)),
-        [ViolationCode::EntityKeyTaken]
+        [ViolationCode::IdentityKeyTaken]
     );
-    let unknown = "- op: answer\n  decision: n_who_owns\n  value: {entity: e_nobody}\n";
+    let unknown = "- op: answer\n  decision: n_who_owns\n  value: {identity: who_nobody}\n";
     assert_eq!(
         codes(vendor_patch(records, unknown)),
-        [ViolationCode::EntityUnresolved]
+        [ViolationCode::IdentityUnresolved]
     );
 }
 
@@ -494,18 +502,18 @@ fn a_completion_reopened_in_the_same_patch_still_meets_its_guards() {
     );
 }
 
-/// Entities within their own limits can still fill the deployment record past its cap: the
-/// cap is the backstop behind the per-entity limits.
+/// Identities within their own limits can still fill the deployment record past its cap: the
+/// cap is the backstop behind the per-identity limits.
 #[test]
 fn a_deployment_past_its_size_cap_is_rejected() {
-    use cairn_schema::limits::{EMAIL_BYTES_MAX, EMAIL_COUNT_PER_ENTITY_MAX};
+    use cairn_schema::limits::{EMAIL_BYTES_MAX, EMAIL_COUNT_PER_IDENTITY_MAX};
     let records = vendor_after(1);
     let domain = "@example.org";
     let padding = "a".repeat(usize::try_from(EMAIL_BYTES_MAX).unwrap() - domain.len() - 8);
-    let entity = |index: u32| cairn_schema::Entity {
-        key: format!("e_large_{index}").parse().unwrap(),
+    let identity = |index: u32| cairn_schema::Identity {
+        key: format!("who_large_{index}").parse().unwrap(),
         name: "Large".parse().unwrap(),
-        emails: (0..EMAIL_COUNT_PER_ENTITY_MAX)
+        emails: (0..EMAIL_COUNT_PER_IDENTITY_MAX)
             .map(|email| {
                 format!("{index:06}{email:02}{padding}{domain}")
                     .parse()
@@ -513,16 +521,16 @@ fn a_deployment_past_its_size_cap_is_rejected() {
             })
             .collect(),
     };
-    // Enough entities at their email limit to pass 16 MiB of emails alone.
-    let per_entity = EMAIL_COUNT_PER_ENTITY_MAX * EMAIL_BYTES_MAX;
-    let count = cairn_schema::limits::GRAPH_BYTES_MAX / per_entity + 1;
+    // Enough identities at their email limit to pass 16 MiB of emails alone.
+    let per_identity = EMAIL_COUNT_PER_IDENTITY_MAX * EMAIL_BYTES_MAX;
+    let count = cairn_schema::limits::GRAPH_BYTES_MAX / per_identity + 1;
     let mut patch = support::patch_to(
         &records,
         "{journey: j_vendor_eval}",
-        "- op: create_entity\n  entity: {key: e_placeholder, name: Placeholder}\n",
+        "- op: create_identity\n  identity: {key: who_placeholder, name: Placeholder}\n",
     );
-    let creates = (0..count).map(|index| cairn_schema::Mutation::CreateEntity {
-        entity: entity(index),
+    let creates = (0..count).map(|index| cairn_schema::Mutation::CreateIdentity {
+        identity: identity(index),
     });
     patch.mutations = cairn_schema::Mutations::new(creates.collect()).unwrap();
     let Err(Rejection::Invalid { violations }) =
@@ -565,11 +573,11 @@ fn a_proposal_is_edited_only_through_its_own_destination() {
 }
 
 #[test]
-fn an_archived_journey_takes_no_riding_entity_create() {
+fn an_archived_journey_takes_no_riding_identity_create() {
     let records = vendor_after(2);
     let archived =
         vendor_patch(&records, "- op: set_journey_status\n  status: archived\n").unwrap();
-    let create = "- op: create_entity\n  entity: {key: e_new, name: New Person}\n";
+    let create = "- op: create_identity\n  identity: {key: who_new, name: New Person}\n";
     assert_eq!(
         codes(vendor_patch(archived.records(), create)),
         [ViolationCode::ArchivedJourney]
@@ -610,9 +618,9 @@ fn a_removal_marks_the_route_copied_nodes_that_lose_an_edge() {
 }
 
 #[test]
-fn an_entity_create_rides_only_in_a_patch_to_something_that_exists() {
+fn an_identity_create_rides_only_in_a_patch_to_something_that_exists() {
     let records = support::seeded("vendor-evaluation");
-    let create = "- op: create_entity\n  entity: {key: e_new, name: New Person}\n";
+    let create = "- op: create_identity\n  identity: {key: who_new, name: New Person}\n";
     assert_eq!(
         codes(vendor_patch(&records, create)),
         [ViolationCode::TargetMissing]
@@ -701,24 +709,25 @@ fn bypassed_failures_are_recorded_on_the_bypass_event() {
 // Review round 3 regressions.
 
 #[test]
-fn a_merge_counts_a_journey_whose_conditions_compare_the_entities() {
+fn a_merge_counts_a_journey_whose_conditions_compare_the_identities() {
     let records = vendor_after(2);
     let prepare = "\
-- op: create_entity\n  entity: {key: e_one, name: One}\n\
-- op: create_entity\n  entity: {key: e_two, name: Two}\n\
-- op: add_node\n  node:\n    key: n_follow_up\n    id: follow-up\n    kind: action\n    title: Follow up\n    relevant_when: {equals: {decision: n_who_owns, value: e_one}}\n";
+- op: create_identity\n  identity: {key: who_one, name: One}\n\
+- op: create_identity\n  identity: {key: who_two, name: Two}\n\
+- op: add_node\n  node:\n    key: n_follow_up\n    id: follow-up\n    kind: action\n    title: Follow up\n    relevant_when: {equals: {decision: n_who_owns, value: who_one}}\n";
     let prepared = vendor_patch(&records, prepare).unwrap();
     let records = prepared.records();
     let revision = records.journeys.values().next().unwrap().revision.get();
     let merge = format!(
-        "- op: merge_entities\n  survivor: e_two\n  merged: e_one\n  journeys: {{j_vendor_eval: {revision}}}\n"
+        "- op: merge_identities\n  survivor: who_two\n  merged: who_one\n  journeys: {{j_vendor_eval: {revision}}}\n"
     );
     let patch = support::patch_to(records, "deployment", &merge);
     assert!(
         support::apply(records, &patch, &support::fixed_inputs()).is_ok(),
         "E6: the condition makes the journey a referencing one"
     );
-    let unnamed = "- op: merge_entities\n  survivor: e_two\n  merged: e_one\n  journeys: {}\n";
+    let unnamed =
+        "- op: merge_identities\n  survivor: who_two\n  merged: who_one\n  journeys: {}\n";
     let patch = support::patch_to(records, "deployment", unnamed);
     assert!(
         matches!(

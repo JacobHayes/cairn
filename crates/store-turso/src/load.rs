@@ -3,7 +3,7 @@
 use std::collections::BTreeMap;
 
 use cairn_schema::{
-    Deployment, Domain, Entity, GraphId, Journey, JourneyHeader, JourneyId, Lineage, PatchId,
+    Deployment, Domain, GraphId, Identity, Journey, JourneyHeader, JourneyId, Lineage, PatchId,
     PatchReceipt, Proposal, ProposalDraft, ProposalId, Revision, RevisionOf, Route, RouteDraft,
     RouteHeader, RouteId, RouteVersion, VersionNumber,
 };
@@ -156,12 +156,12 @@ pub(crate) async fn deployment(connection: &Connection) -> Result<Deployment, St
     .await?
     .ok_or_else(|| corrupt("the deployment row is missing"))?;
     let revision = row.number(0)?;
-    let mut entities: BTreeMap<String, Entity> = BTreeMap::new();
-    for row in rows(connection, "SELECT key, name FROM entities", Vec::new()).await? {
+    let mut identities: BTreeMap<String, Identity> = BTreeMap::new();
+    for row in rows(connection, "SELECT key, name FROM identities", Vec::new()).await? {
         let key = row.text(0)?;
-        entities.insert(
+        identities.insert(
             key.clone(),
-            Entity {
+            Identity {
                 key: parse(&key)?,
                 name: row.parse(1)?,
                 emails: std::collections::BTreeSet::new(),
@@ -170,20 +170,20 @@ pub(crate) async fn deployment(connection: &Connection) -> Result<Deployment, St
     }
     for row in rows(
         connection,
-        "SELECT entity, email FROM entity_emails",
+        "SELECT identity, email FROM identity_emails",
         Vec::new(),
     )
     .await?
     {
-        let entity = entities
+        let identity = identities
             .get_mut(&row.text(0)?)
-            .ok_or_else(|| corrupt("an email of no entity"))?;
-        entity.emails.insert(row.parse(1)?);
+            .ok_or_else(|| corrupt("an email of no identity"))?;
+        identity.emails.insert(row.parse(1)?);
     }
     let mut aliases = BTreeMap::new();
     for row in rows(
         connection,
-        "SELECT alias, entity FROM entity_aliases",
+        "SELECT alias, identity FROM identity_aliases",
         Vec::new(),
     )
     .await?
@@ -192,8 +192,8 @@ pub(crate) async fn deployment(connection: &Connection) -> Result<Deployment, St
     }
     Ok(Deployment {
         revision,
-        entities: cairn_schema::Keyed::new(entities.into_values())
-            .map_err(|error| corrupt(&format!("entities: {error}")))?,
+        identities: cairn_schema::Keyed::new(identities.into_values())
+            .map_err(|error| corrupt(&format!("identities: {error}")))?,
         aliases,
     })
 }

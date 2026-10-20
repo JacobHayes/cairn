@@ -1,6 +1,6 @@
 // A6, A7: `RolesAndKindsPanel` declares a graph's roles (single or multi valued) and its
 // participation kinds beyond the built-in owner, edits and removes them, and names the
-// `default_owner` role (single valued only, since an owner is one entity). Removing a role or
+// `default_owner` role (single valued only, since an owner is one identity). Removing a role or
 // a kind shows its cascade first (A18): every participation, filling decision, default owner,
 // and message draft placeholder naming it is rewritten in the same patch. Limits are checked
 // before sending.

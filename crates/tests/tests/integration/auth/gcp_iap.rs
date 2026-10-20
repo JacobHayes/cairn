@@ -102,13 +102,9 @@ mod gcp_iap {
             .body(Body::empty())
             .unwrap();
         let ann = whoami(&router, get).await.unwrap();
-        let identities = world.store.identities_of(&ann.user).await.unwrap();
-        assert_eq!(identities[0].subject.as_str(), SUBJECT);
-        assert!(
-            identities[0]
-                .verified_emails
-                .contains(&EMAIL.parse().unwrap())
-        );
+        let logins = world.store.logins_of(&ann.user).await.unwrap();
+        assert_eq!(logins[0].subject.as_str(), SUBJECT);
+        assert!(logins[0].verified_emails.contains(&EMAIL.parse().unwrap()));
         let again = request("/whoami", REMOTE)
             .header(ASSERTION_HEADER, &assertion)
             .body(Body::empty())
@@ -129,7 +125,7 @@ mod gcp_iap {
         let at = now(&world);
         assert_eq!(verdict(&iap, None).await, Verdict::Absent);
         let good = verdict(&iap, Some(&sign(&claims(at), &signer))).await;
-        assert!(matches!(good, Verdict::Identity(_)), "{good:?}");
+        assert!(matches!(good, Verdict::Login(_)), "{good:?}");
 
         let with = |field: &str, value: Value| {
             let mut claims = claims(at);
@@ -140,10 +136,7 @@ mod gcp_iap {
             i64::try_from(cairn_auth::limits::IAP_ASSERTION_CLOCK_SKEW_MAX.as_secs()).unwrap();
         let within_skew = sign(&with("exp", json!(at - skew + 1)), &signer);
         let within_skew = verdict(&iap, Some(&within_skew)).await;
-        assert!(
-            matches!(within_skew, Verdict::Identity(_)),
-            "{within_skew:?}"
-        );
+        assert!(matches!(within_skew, Verdict::Login(_)), "{within_skew:?}");
         let mut tampered = sign(&claims(at), &signer);
         tampered.replace_range(tampered.len() - 4.., "AAAA");
         let cases = [
@@ -189,13 +182,13 @@ mod gcp_iap {
         let world = World::new();
         let iap = provider(&world, &keys);
         let good = verdict(&iap, Some(&sign(&claims(now(&world)), &old))).await;
-        assert!(matches!(good, Verdict::Identity(_)), "{good:?}");
+        assert!(matches!(good, Verdict::Login(_)), "{good:?}");
         assert_eq!(keys.fetches(), 1);
 
         keys.publish(&[&old, &new]);
         world.clock.advance(61);
         let rotated = verdict(&iap, Some(&sign(&claims(now(&world)), &new))).await;
-        assert!(matches!(rotated, Verdict::Identity(_)), "{rotated:?}");
+        assert!(matches!(rotated, Verdict::Login(_)), "{rotated:?}");
         assert_eq!(keys.fetches(), 2);
 
         let forged = key("forged", 11);
@@ -348,8 +341,8 @@ mod gcp_iap {
         let ann = whoami(&router, call(Some(&assertion), Some(&bearer)))
             .await
             .unwrap();
-        let identities = world.store.identities_of(&ann.user).await.unwrap();
-        assert_eq!(identities[0].subject.as_str(), SUBJECT);
+        let logins = world.store.logins_of(&ann.user).await.unwrap();
+        assert_eq!(logins[0].subject.as_str(), SUBJECT);
         let browser = whoami(&router, call(Some(&assertion), None)).await.unwrap();
         assert_eq!(browser, ann);
     }

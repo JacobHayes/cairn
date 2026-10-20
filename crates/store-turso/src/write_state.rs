@@ -8,7 +8,7 @@ use turso::Value;
 
 use crate::sql::{Abort, date, flag, json, json_enum, opt_json, opt_text, opt_time, text, time};
 use crate::state::{annotation_columns, local_edit_columns};
-use crate::write::{Writer, answer_entities, retired_columns, snooze_columns};
+use crate::write::{Writer, answer_identities, retired_columns, snooze_columns};
 
 /// A statement and its parameters.
 type Statement = (String, Vec<Value>);
@@ -34,11 +34,11 @@ fn statement(sql: &str, params: Vec<Value>) -> Statement {
     (sql.to_owned(), params)
 }
 
-/// The statements putting a role's fill: its row, then its entities.
+/// The statements putting a role's fill: its row, then its identities.
 fn role_fill_puts(
     id: &str,
     role: &cairn_schema::RoleKey,
-    entities: &cairn_schema::EntitySet,
+    identities: &cairn_schema::IdentitySet,
 ) -> Vec<Statement> {
     let params = || vec![text(id), text(role)];
     let mut statements = vec![
@@ -47,15 +47,15 @@ fn role_fill_puts(
             params(),
         ),
         statement(
-            "DELETE FROM role_fill_entities WHERE graph_id = ?1 AND role = ?2",
+            "DELETE FROM role_fill_identities WHERE graph_id = ?1 AND role = ?2",
             params(),
         ),
     ];
-    for entity in entities.iter() {
+    for identity in identities.iter() {
         let mut values = params();
-        values.push(text(entity));
+        values.push(text(identity));
         statements.push(statement(
-            "INSERT INTO role_fill_entities (graph_id, role, entity) VALUES (?1, ?2, ?3)",
+            "INSERT INTO role_fill_identities (graph_id, role, identity) VALUES (?1, ?2, ?3)",
             values,
         ));
     }
@@ -83,7 +83,7 @@ fn puts(id: &str, record: &GraphRecord) -> Result<Vec<Statement>, Abort> {
             )]
         }
         GraphRecord::Answer { .. } => answer_puts(id, record)?,
-        GraphRecord::RoleFill { role, entities } => role_fill_puts(id, role, entities),
+        GraphRecord::RoleFill { role, identities } => role_fill_puts(id, role, identities),
         GraphRecord::Pin { node, date: day } => vec![statement(
             "INSERT OR REPLACE INTO pins (graph_id, node, date) VALUES (?1, ?2, ?3)",
             vec![graph, text(node), date(*day)],
@@ -165,15 +165,15 @@ fn answer_puts(id: &str, answer: &GraphRecord) -> Result<Vec<Statement>, Abort> 
             values,
         ),
         statement(
-            "DELETE FROM answer_entities WHERE graph_id = ?1 AND decision = ?2",
+            "DELETE FROM answer_identities WHERE graph_id = ?1 AND decision = ?2",
             params(),
         ),
     ];
-    for entity in answer_entities(value) {
+    for identity in answer_identities(value) {
         let mut values = params();
-        values.push(text(&entity));
+        values.push(text(&identity));
         statements.push(statement(
-            "INSERT INTO answer_entities (graph_id, decision, entity) VALUES (?1, ?2, ?3)",
+            "INSERT INTO answer_identities (graph_id, decision, identity) VALUES (?1, ?2, ?3)",
             values,
         ));
     }
@@ -254,7 +254,7 @@ fn removal(id: &str, key: &GraphKey) -> Result<Vec<Statement>, Abort> {
             "UPDATE graphs SET default_owner = NULL WHERE id = ?1".to_owned(),
             vec![graph()],
         )],
-        GraphKey::Participation { node, kind } => ["participation_entities", "participations"]
+        GraphKey::Participation { node, kind } => ["participation_identities", "participations"]
             .iter()
             .map(|table| {
                 (
@@ -304,11 +304,11 @@ fn keyed_removal(id: &str, key: &GraphKey) -> Vec<Statement> {
         }
         GraphKey::NodeState(node) => vec![("node_states", "node", node.as_str())],
         GraphKey::Answer(node) => vec![
-            ("answer_entities", "decision", node.as_str()),
+            ("answer_identities", "decision", node.as_str()),
             ("answers", "decision", node.as_str()),
         ],
         GraphKey::RoleFill(role) => vec![
-            ("role_fill_entities", "role", role.as_str()),
+            ("role_fill_identities", "role", role.as_str()),
             ("role_fills", "role", role.as_str()),
         ],
         GraphKey::Pin(node) => vec![("pins", "node", node.as_str())],
@@ -349,13 +349,13 @@ fn node_removal(id: &str, node: &NodeKey) -> Vec<Statement> {
         params(),
     )];
     let tables = [
-        ("participation_entities", "node"),
+        ("participation_identities", "node"),
         ("participations", "node"),
         ("resources", "node"),
         ("nodes", "key"),
         ("node_states", "node"),
         ("local_edits", "node"),
-        ("answer_entities", "decision"),
+        ("answer_identities", "decision"),
         ("answers", "decision"),
         ("pins", "node"),
         ("snoozes", "node"),

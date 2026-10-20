@@ -1,7 +1,7 @@
 //! The in-browser root (ARCHITECTURE, Service layer and composition; Web UI: in-browser
 //! host): the browser host's composition root. The same service as the server's, over the
 //! memory store seeded from the fixtures on every load, with the in-process notifier, one
-//! local identity, and no assistant, MCP, or SSE. Nothing persists and each page is its own.
+//! local login, and no assistant, MCP, or SSE. Nothing persists and each page is its own.
 //!
 //! Its answers are the API's JSON for the same operations (a patch answer, a journey page,
 //! a revision tick), so a data layer reads either host with one set of types. The memory
@@ -258,7 +258,7 @@ impl BrowserRoot {
         &self.service
     }
 
-    /// The local identity's call at `now` (an RFC 3339 timestamp).
+    /// The local login's call at `now` (an RFC 3339 timestamp).
     pub(crate) fn call(&self, now: &str) -> Result<Call, HostError> {
         Ok(Call {
             actor: self.local.clone(),
@@ -425,7 +425,7 @@ impl BrowserRoot {
         }
     }
 
-    /// The deployment: its entities, aliases, and revision (E6).
+    /// The deployment: its identities, aliases, and revision (E6).
     ///
     /// # Errors
     ///

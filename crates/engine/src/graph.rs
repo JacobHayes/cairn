@@ -245,7 +245,7 @@ pub struct Graph {
 impl Graph {
     /// Validates a graph document (A15: every violation listed), its plan layer included
     /// (F5). Relevance, which decides which date constraints apply, reads the deployment's
-    /// entity aliases, so a journey is checked against the deployment it lives in; a route,
+    /// identity aliases, so a journey is checked against the deployment it lives in; a route,
     /// which has no answers, against any.
     ///
     /// # Errors

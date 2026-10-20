@@ -107,8 +107,8 @@ in-app assistant when one is configured.
 ## Run your own
 
 Cairn is one binary over one database file. It serves the app, the API, and the MCP
-server on one port, and leaves TLS to a proxy in front of it. Sign-in can use your
-identity provider (OIDC), Tailscale, or Google Cloud IAP. [`docs/running.md`](docs/running.md)
+server on one port, and leaves TLS to a proxy in front of it. Sign-in can use an OIDC
+provider, Tailscale, or Google Cloud IAP. [`docs/running.md`](docs/running.md)
 covers configuration, sign-in, proxies, upgrades, and backups.
 
 ## Develop

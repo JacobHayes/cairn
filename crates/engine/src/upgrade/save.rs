@@ -1,6 +1,6 @@
 //! Save as route (B8): a journey's structure (nodes, edges, roles, kinds, conditions, rules,
 //! weights, resources; no state, pins, answers, or notes) proposed as a new route's draft or
-//! a new draft of an existing route, keys preserved. The review maps each explicit entity to a
+//! a new draft of an existing route, keys preserved. The review maps each explicit identity to a
 //! role, drops it, or makes it the default owner, and may exclude nodes with their subtrees;
 //! children a breakdown of a placeholder created start excluded.
 //!
@@ -10,7 +10,7 @@
 use std::collections::{BTreeMap, BTreeSet};
 
 use cairn_schema::{
-    Domain, DraftSource, EntityKey, JourneyId, Mutation, ParticipationRef, ParticipationSource,
+    Domain, DraftSource, IdentityKey, JourneyId, Mutation, ParticipationRef, ParticipationSource,
     Payload, ProposalDraft, Provenance, ReviewItem, Revision, RouteId, Title,
 };
 
@@ -20,7 +20,7 @@ use crate::records::Records;
 
 /// B8: the proposal that saves a journey as a draft of `route`: created with `name` when
 /// the records hold no such route, or a new draft of it (A11: rejected at apply while
-/// another draft is open). Every violation of a trial apply, with every entity dropped and
+/// another draft is open). Every violation of a trial apply, with every identity dropped and
 /// nothing more excluded, is listed.
 ///
 /// # Errors
@@ -148,16 +148,16 @@ fn retired_in_route(
         .collect()
 }
 
-/// B8: one item per explicit entity, naming every participation that names it.
+/// B8: one item per explicit identity, naming every participation that names it.
 fn participation_items(structure: &cairn_schema::Graph) -> Vec<ReviewItem> {
-    let mut uses: BTreeMap<EntityKey, BTreeSet<ParticipationRef>> = BTreeMap::new();
+    let mut uses: BTreeMap<IdentityKey, BTreeSet<ParticipationRef>> = BTreeMap::new();
     for node in structure.nodes.values() {
         for (kind, source) in node.participations.as_map() {
-            let ParticipationSource::Entities(entities) = source else {
+            let ParticipationSource::Identities(identities) = source else {
                 continue;
             };
-            for entity in entities.iter() {
-                uses.entry(entity.clone())
+            for identity in identities.iter() {
+                uses.entry(identity.clone())
                     .or_default()
                     .insert(ParticipationRef {
                         node: node.key.clone(),
@@ -167,8 +167,8 @@ fn participation_items(structure: &cairn_schema::Graph) -> Vec<ReviewItem> {
         }
     }
     uses.into_iter()
-        .map(|(entity, uses)| ReviewItem::Participation {
-            entity,
+        .map(|(identity, uses)| ReviewItem::Participation {
+            identity,
             uses,
             mapping: None,
         })
@@ -205,11 +205,11 @@ fn exclusion_items(journey: &cairn_schema::Graph) -> Vec<ReviewItem> {
         .collect()
 }
 
-/// The proposal with every entity dropped, for the trial apply before anyone has chosen.
+/// The proposal with every identity dropped, for the trial apply before anyone has chosen.
 fn everything_dropped(proposal: &ProposalDraft) -> ProposalDraft {
     let items = proposal.items.as_slice().iter().map(|item| match item {
-        ReviewItem::Participation { entity, uses, .. } => ReviewItem::Participation {
-            entity: entity.clone(),
+        ReviewItem::Participation { identity, uses, .. } => ReviewItem::Participation {
+            identity: identity.clone(),
             uses: uses.clone(),
             mapping: Some(cairn_schema::ParticipationMapping::Drop),
         },

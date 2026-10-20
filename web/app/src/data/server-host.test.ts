@@ -1,4 +1,4 @@
-// C16: the journey index's query as `GET /api/journeys` reads it: repeated statuses and entities,
+// C16: the journey index's query as `GET /api/journeys` reads it: repeated statuses and identities,
 // and nothing for a filter left empty. A domain document is read only under the build the page
 // was loaded from (ARCHITECTURE, Web UI: version skew).
 import { afterEach, describe, expect, it, vi } from "vitest";
@@ -10,11 +10,11 @@ import { indexParams, serverHost } from "./server-host.ts";
 
 describe("the index's query parameters", () => {
   it("names each filter given and leaves out the empty ones", () => {
-    expect(indexParams({ status: ["active"], route: "r", version: 2, referencing: ["e_a", "e_b"], upgrade_available: false, after: "j_x" })).toEqual({
+    expect(indexParams({ status: ["active"], route: "r", version: 2, referencing: ["who_a", "who_b"], upgrade_available: false, after: "j_x" })).toEqual({
       status: ["active"],
       route: "r",
       version: 2,
-      referencing: ["e_a", "e_b"],
+      referencing: ["who_a", "who_b"],
       upgrade_available: false,
       after: "j_x",
     });

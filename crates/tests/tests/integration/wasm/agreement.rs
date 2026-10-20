@@ -1,6 +1,6 @@
 //! Brief 4.5, Acceptance (native half): every call the browser host makes over each
 //! fixture's domain document (the derive, every projection, two proposal previews, a local
-//! apply, a touched set, the route files, and the vendor evaluation after an entity merge)
+//! apply, a touched set, the route files, and the vendor evaluation after an identity merge)
 //! answers what the server's service answers, byte for byte, when this crate runs natively.
 //! The browser tests run the same calls in the derive worker's wasm (I1, D3, C14,
 //! A13, E6). The in-browser root's documents are the server's too.
@@ -60,7 +60,7 @@ fn the_in_browser_root_serves_each_journey_as_the_server_does() {
 }
 
 /// The walk checks the viewer and D7, not empty values: in every fixture the local user's
-/// entity has work ("mine" is not empty), the walk's patch causes consequences, and the
+/// identity has work ("mine" is not empty), the walk's patch causes consequences, and the
 /// journey's derive after it differs from before (H3, D7).
 #[test]
 fn the_walk_reads_as_a_viewer_and_its_patch_changes_every_fixture() {

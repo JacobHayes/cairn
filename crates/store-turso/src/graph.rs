@@ -10,8 +10,8 @@ use std::collections::{BTreeMap, BTreeSet};
 
 use cairn_schema::collections::{InsertionCount, LimitOf};
 use cairn_schema::{
-    Action, AnswerSpec, AnswerType, BoundedSet, Choices, Days, Decision, Deliverable, EntityKey,
-    Graph, GraphId, Group, HasKey, Insertion, Keyed, KindField, KindKey, Lineage, Markdown,
+    Action, AnswerSpec, AnswerType, BoundedSet, Choices, Days, Decision, Deliverable, Graph,
+    GraphId, Group, HasKey, IdentityKey, Insertion, Keyed, KindField, KindKey, Lineage, Markdown,
     Milestone, Node, NodeKey, NodeKind, ParticipationKind, ParticipationSource, Participations,
     Payload, Resource, ResourceContent, RetiredKeys, Role, RoleKey, Weight, node::Requires,
     refs::KeyRefs,
@@ -157,7 +157,8 @@ impl KindColumns {
                     AnswerSpec::Date { feeds_milestone } => {
                         columns.feeds_milestone.clone_from(feeds_milestone);
                     }
-                    AnswerSpec::Entity { fills_role } | AnswerSpec::EntityList { fills_role } => {
+                    AnswerSpec::Identity { fills_role }
+                    | AnswerSpec::IdentityList { fills_role } => {
                         columns.fills_role.clone_from(fills_role);
                     }
                 }
@@ -338,10 +339,10 @@ impl KindColumns {
                     AnswerType::Date => AnswerSpec::Date {
                         feeds_milestone: self.feeds_milestone,
                     },
-                    AnswerType::Entity => AnswerSpec::Entity {
+                    AnswerType::Identity => AnswerSpec::Identity {
                         fills_role: self.fills_role,
                     },
-                    AnswerType::EntityList => AnswerSpec::EntityList {
+                    AnswerType::IdentityList => AnswerSpec::IdentityList {
                         fills_role: self.fills_role,
                     },
                 };
@@ -555,10 +556,10 @@ impl From<StoreError> for SqlError {
 /// A graph's edges, participations, and resources, by node.
 struct Children {
     requires: BTreeMap<NodeKey, BTreeSet<NodeKey>>,
-    /// Each participation's role, or none for explicit entities.
+    /// Each participation's role, or none for explicit identities.
     participations: BTreeMap<NodeKey, BTreeMap<KindKey, Option<RoleKey>>>,
-    /// The entities of each participation without a role.
-    entities: BTreeMap<(NodeKey, KindKey), BTreeSet<EntityKey>>,
+    /// The identities of each participation without a role.
+    identities: BTreeMap<(NodeKey, KindKey), BTreeSet<IdentityKey>>,
     resources: BTreeMap<NodeKey, Vec<Resource<KeyRefs>>>,
 }
 
@@ -593,12 +594,12 @@ impl Children {
                 .or_default()
                 .insert(row.parse(1)?, row.opt_parse(2)?);
         }
-        let mut entities: BTreeMap<(NodeKey, KindKey), BTreeSet<EntityKey>> = BTreeMap::new();
+        let mut identities: BTreeMap<(NodeKey, KindKey), BTreeSet<IdentityKey>> = BTreeMap::new();
         let select = format!(
-            "SELECT node, kind, entity FROM participation_entities WHERE graph_id = ?1{only}"
+            "SELECT node, kind, identity FROM participation_identities WHERE graph_id = ?1{only}"
         );
         for row in rows(connection, &select, params()).await? {
-            entities
+            identities
                 .entry((row.parse(0)?, row.parse(1)?))
                 .or_default()
                 .insert(row.parse(2)?);
@@ -618,7 +619,7 @@ impl Children {
         Ok(Self {
             requires,
             participations,
-            entities,
+            identities,
             resources,
         })
     }
@@ -631,15 +632,15 @@ impl Children {
     fn participations(&mut self, node: &NodeKey) -> Result<Participations<KeyRefs>, StoreError> {
         let mut sources = BTreeMap::new();
         for (kind, role) in self.participations.remove(node).unwrap_or_default() {
-            let entities = self.entities.remove(&(node.clone(), kind.clone()));
-            let source = match (role, entities) {
+            let identities = self.identities.remove(&(node.clone(), kind.clone()));
+            let source = match (role, identities) {
                 (Some(role), None) => ParticipationSource::Role(role),
-                (None, entities) => ParticipationSource::Entities(
-                    BoundedSet::new(entities.unwrap_or_default())
+                (None, identities) => ParticipationSource::Identities(
+                    BoundedSet::new(identities.unwrap_or_default())
                         .map_err(|error| corrupt(&format!("{node} {kind}: {error}")))?,
                 ),
                 (Some(_), Some(_)) => {
-                    return Err(corrupt(&format!("{node} {kind} has a role and entities")));
+                    return Err(corrupt(&format!("{node} {kind} has a role and identities")));
                 }
             };
             sources.insert(kind, source);
@@ -655,7 +656,9 @@ impl Children {
             .chain(self.resources.keys())
             .next()
             .map(ToString::to_string)
-            .or_else(|| (self.entities.keys().next()).map(|(node, kind)| format!("{node} {kind}")));
+            .or_else(|| {
+                (self.identities.keys().next()).map(|(node, kind)| format!("{node} {kind}"))
+            });
         match stray {
             Some(stray) => Err(corrupt(&format!(
                 "child rows of {stray} have no parent row"

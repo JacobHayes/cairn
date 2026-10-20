@@ -15,7 +15,7 @@ use crate::derived::{
     Relevance, Score, Stalled,
 };
 use crate::event::Event;
-use crate::id::{EntityKey, KindKey, NodeKey, PatchId, Path, RoleKey, Slug};
+use crate::id::{IdentityKey, KindKey, NodeKey, PatchId, Path, RoleKey, Slug};
 use crate::node::NodeKind;
 use crate::state::{AnswerValue, SnoozeTarget, State};
 use crate::text::{Markdown, Title};
@@ -162,7 +162,7 @@ pub struct RollUp {
     pub min_child_slack_days: Option<i32>,
     /// The distinct owners of its children.
     #[serde(default, skip_serializing_if = "BTreeSet::is_empty")]
-    pub owners: BTreeSet<EntityKey>,
+    pub owners: BTreeSet<IdentityKey>,
 }
 
 /// C2: one visible node at a level.
@@ -275,10 +275,10 @@ pub struct LevelQuery {
     /// filters keep.
     #[serde(default, skip_serializing_if = "BTreeSet::is_empty")]
     pub flags: BTreeSet<ListFlag>,
-    /// Only nodes this entity owns, as the list reads it (aliases followed), and what holds
+    /// Only nodes this identity owns, as the list reads it (aliases followed), and what holds
     /// them.
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub owner: Option<EntityKey>,
+    pub owner: Option<IdentityKey>,
     /// Text found in the title, description, notes, or resources, ignoring ASCII case, as the
     /// list's search reads it; nodes holding a match are kept too.
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -414,13 +414,13 @@ pub struct ChoiceEffect {
 }
 
 /// C12, E3: what answering a decision does, per choice, and the static lines every answer
-/// of a date or entity decision carries.
+/// of a date or identity decision carries.
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
 #[serde(deny_unknown_fields)]
 pub struct AnswerEffects {
     /// The decision.
     pub decision: NodeKey,
-    /// The role its answer fills (E3), for an entity or entity-list decision.
+    /// The role its answer fills (E3), for an identity or identity-list decision.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub fills_role: Option<RoleKey>,
     /// The milestone its answer pins (E3), for a date decision.
@@ -535,7 +535,7 @@ pub struct NodeRow {
     pub effectively_skipped: bool,
     /// Its owners (E2).
     #[serde(default, skip_serializing_if = "BTreeSet::is_empty")]
-    pub owners: BTreeSet<EntityKey>,
+    pub owners: BTreeSet<IdentityKey>,
     /// No owner (E1).
     #[serde(default, skip_serializing_if = "crate::serde_util::is_false")]
     pub unassigned: bool,
@@ -647,9 +647,9 @@ pub struct ListQuery {
     /// Only nodes beneath this container (by group).
     #[serde(skip_serializing_if = "Option::is_none")]
     pub within: Option<NodeKey>,
-    /// Only nodes this entity owns.
+    /// Only nodes this identity owns.
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub owner: Option<EntityKey>,
+    pub owner: Option<IdentityKey>,
     /// Only nodes in these stored states; any when empty.
     #[serde(default, skip_serializing_if = "BTreeSet::is_empty")]
     pub states: BTreeSet<State>,
@@ -717,7 +717,7 @@ pub struct SnapshotNode {
     pub row: NodeRow,
     /// Its effective participations by kind.
     #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
-    pub participations: BTreeMap<KindKey, BTreeSet<EntityKey>>,
+    pub participations: BTreeMap<KindKey, BTreeSet<IdentityKey>>,
     /// What blocks it itself (Gating, Blocked).
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub blocked_by: Vec<Blocker>,
@@ -885,7 +885,7 @@ pub struct DecisionEntry {
     pub rationale: Option<Markdown>,
     /// Its owners.
     #[serde(default, skip_serializing_if = "BTreeSet::is_empty")]
-    pub owners: BTreeSet<EntityKey>,
+    pub owners: BTreeSet<IdentityKey>,
     /// The nodes whose relevance a condition reading it decides, their descendants included.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub affects: Vec<NodeKey>,
@@ -1015,7 +1015,7 @@ pub struct OpenDecision {
     pub node: NodeKey,
     /// Its owners; empty when unassigned.
     #[serde(default, skip_serializing_if = "BTreeSet::is_empty")]
-    pub owners: BTreeSet<EntityKey>,
+    pub owners: BTreeSet<IdentityKey>,
 }
 
 /// C18: a milestone not yet reached and its effective date.

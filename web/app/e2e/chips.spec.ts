@@ -1,4 +1,4 @@
-// The multi-value email field on the entities screen (H3): each email a removable chip, taken on
+// The multi-value email field on the identities screen (H3): each email a removable chip, taken on
 // Enter, comma, a paste or leaving the field; a bad or repeated one stays under its reason; Backspace
 // in the empty input removes the last; it saves the list as chips. On the in-browser host, desktop and phone.
 import type { Page } from "@playwright/test";
@@ -6,18 +6,18 @@ import type { Page } from "@playwright/test";
 import { open } from "./shell.ts";
 import { expect, test } from "./test.ts";
 
-const field = (page: Page) => page.getByTestId("create-entity").getByLabel("Emails");
-const chips = (page: Page) => page.getByTestId("create-entity").getByTestId("chip-value");
+const field = (page: Page) => page.getByTestId("create-identity").getByLabel("Emails");
+const chips = (page: Page) => page.getByTestId("create-identity").getByTestId("chip-value");
 
 for (const [name, viewport] of [["desktop", { width: 1280, height: 800 }], ["phone", { width: 390, height: 844 }]] as const) {
   test(`H3: emails are chips taken from the keyboard, refused with a reason, and saved as a list (${name})`, async ({ page }) => {
     await page.setViewportSize(viewport);
-    await open(page, "browser", "/entities");
+    await open(page, "browser", "/identities");
     await field(page).fill("Ann@Example.org");
     await field(page).press("Enter");
     await field(page).pressSequentially("bob@example.org,");
     await field(page).fill("cy@example.org");
-    await page.getByTestId("create-entity").getByLabel("Name").focus();
+    await page.getByTestId("create-identity").getByLabel("Name").focus();
     await expect(chips(page)).toHaveText(["ann@example.org", "bob@example.org", "cy@example.org"]);
 
     await field(page).fill("not-an-email");
@@ -29,7 +29,7 @@ for (const [name, viewport] of [["desktop", { width: 1280, height: 800 }], ["pho
     await expect(page.getByTestId("chips-reason")).toContainText("already");
     await expect(chips(page)).toHaveCount(3);
     // A refused value blocks the save rather than being dropped.
-    await expect(page.getByRole("button", { name: "Add an entity" })).toBeDisabled();
+    await expect(page.getByRole("button", { name: "Add an identity" })).toBeDisabled();
 
     await field(page).fill("");
     await field(page).press("Backspace");
@@ -37,10 +37,10 @@ for (const [name, viewport] of [["desktop", { width: 1280, height: 800 }], ["pho
     await page.getByRole("button", { name: "Remove ann@example.org" }).click();
     await expect(chips(page)).toHaveText(["bob@example.org"]);
 
-    await page.getByTestId("create-entity").getByLabel("Name").fill("Chip person");
-    await page.getByRole("button", { name: "Add an entity" }).click();
-    const row = page.getByTestId("entity").filter({ hasText: "Chip person" });
-    await expect(row.getByTestId("entity-emails")).toHaveText("bob@example.org");
+    await page.getByTestId("create-identity").getByLabel("Name").fill("Chip person");
+    await page.getByRole("button", { name: "Add an identity" }).click();
+    const row = page.getByTestId("identity").filter({ hasText: "Chip person" });
+    await expect(row.getByTestId("identity-emails")).toHaveText("bob@example.org");
     await row.getByRole("button", { name: "Edit" }).click();
     await expect(row.getByRole("button", { name: "Remove bob@example.org" })).toBeVisible();
     expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
@@ -48,7 +48,7 @@ for (const [name, viewport] of [["desktop", { width: 1280, height: 800 }], ["pho
 }
 
 test("H3: a pasted list becomes chips, one per address", async ({ page }) => {
-  await open(page, "browser", "/entities");
+  await open(page, "browser", "/identities");
   await field(page).focus();
   await page.evaluate(() => {
     const data = new DataTransfer();
@@ -59,7 +59,7 @@ test("H3: a pasted list becomes chips, one per address", async ({ page }) => {
 });
 
 test("H3: a refused value is selected so a paste replaces it, and Tab still leaves the field", async ({ page }) => {
-  await open(page, "browser", "/entities");
+  await open(page, "browser", "/identities");
   await field(page).fill("bad");
   await field(page).press("Enter");
   await expect(page.getByTestId("chips-reason")).toContainText("bad");
@@ -80,13 +80,13 @@ test("H3: a refused value is selected so a paste replaces it, and Tab still leav
 });
 
 test("the merge is folded until asked for, and open when a link names the two to merge", async ({ page }) => {
-  await open(page, "browser", "/entities");
-  await expect(page.getByTestId("merge-entities")).toHaveCount(0);
-  await page.getByRole("button", { name: "Merge entities" }).click();
-  await expect(page.getByTestId("merge-entities")).toBeVisible();
+  await open(page, "browser", "/identities");
+  await expect(page.getByTestId("merge-identities")).toHaveCount(0);
+  await page.getByRole("button", { name: "Merge identities" }).click();
+  await expect(page.getByTestId("merge-identities")).toBeVisible();
   await page.getByRole("button", { name: "Close merge" }).click();
-  await expect(page.getByTestId("merge-entities")).toHaveCount(0);
-  await open(page, "browser", "/entities?merge=e_lead,e_owner");
-  await expect(page.getByTestId("merge-entities")).toBeVisible();
-  await expect(page.getByTestId("merge-entities").getByLabel("Keep")).toHaveValue("e_lead");
+  await expect(page.getByTestId("merge-identities")).toHaveCount(0);
+  await open(page, "browser", "/identities?merge=who_k3d7qm2xw5tn6pfa,who_g6t4ycm2pe7vsjan");
+  await expect(page.getByTestId("merge-identities")).toBeVisible();
+  await expect(page.getByTestId("merge-identities").getByLabel("Keep")).toHaveValue("who_k3d7qm2xw5tn6pfa");
 });

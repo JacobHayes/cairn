@@ -183,7 +183,7 @@ pub fn router_beside(
         None => routes,
     };
     // The duration limit is the API's, inside the auth layer: auth's own routes and layer
-    // wait on identity providers under their own limit.
+    // wait on sign-in providers under their own limit.
     let routes = admission::timed(routes);
     // I5: the assistant's turns, outside the request duration (PRACTICES, Explicit limits:
     // its provider call and turn limits hold them instead).

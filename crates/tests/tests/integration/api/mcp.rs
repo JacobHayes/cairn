@@ -32,7 +32,7 @@ mod mcp_in_process {
         let revision = date_conflict(&agent, revision).await;
         proposals(&agent, revision).await;
         routes(&agent).await;
-        entities(&agent).await;
+        identities(&agent).await;
         let empty =
             json!({ "journey": "j_blank", "name": "A blank journey", "patch_id": "p_blank" });
         let created = agent.ok("create_journey", empty).await;
@@ -109,7 +109,7 @@ mod mcp_in_process {
             ("unsnooze", json!({ "node": "n_access" })),
             (
                 "assign",
-                json!({ "node": "n_access", "kind": "k_reviewer", "source": ["e_lead"], "deployment_revision": 1 }),
+                json!({ "node": "n_access", "kind": "k_reviewer", "source": ["who_k3d7qm2xw5tn6pfa"], "deployment_revision": 1 }),
             ),
             (
                 "set_date",
@@ -237,16 +237,16 @@ mod mcp_in_process {
         }
     }
 
-    /// E6, H3: an entity created, then merged into another, the merge naming the journey
+    /// E6, H3: an identity created, then merged into another, the merge naming the journey
     /// that refers to both.
-    async fn entities(agent: &Agent) {
-        let create = json!({ "change": { "create": { "entity": { "key": "e_contact", "name": "Vendor contact" } } },
+    async fn identities(agent: &Agent) {
+        let create = json!({ "change": { "create": { "identity": { "key": "who_contact", "name": "Vendor contact" } } },
             "patch_id": "p_contact", "base_revision": 1 });
-        let created = agent.ok("manage_entity", create).await;
+        let created = agent.ok("manage_identity", create).await;
         let base = created["receipt"]["revision"].clone();
-        let merge = json!({ "change": { "merge": { "survivor": "e_stakeholder_a", "merged": "e_stakeholder_b" } },
+        let merge = json!({ "change": { "merge": { "survivor": "who_d4m6uk2eqf5rbhzs", "merged": "who_e7h2jv3nxc4yaw6t" } },
             "patch_id": "p_merge", "base_revision": base });
-        let merged = agent.ok("manage_entity", merge).await;
+        let merged = agent.ok("manage_identity", merge).await;
         assert_eq!(merged["status"], "applied");
     }
 
@@ -519,7 +519,7 @@ mod mcp_in_process {
             ("create_journey", Some(false), Some(false), Some(true)),
             ("create_proposal", Some(false), Some(false), Some(true)),
             ("edit_proposal", Some(false), Some(true), Some(true)),
-            ("manage_entity", Some(false), Some(true), Some(true)),
+            ("manage_identity", Some(false), Some(true), Some(true)),
             ("apply_patch", Some(false), Some(true), Some(true)),
         ];
         for (name, read_only, destructive, idempotent) in cases {

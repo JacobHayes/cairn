@@ -1,6 +1,6 @@
 // B2: what an answer form would send, from what is stored and what has been typed. Nothing is
 // preselected: with nothing stored and nothing chosen there is nothing to send, so Save stays
-// disabled until the draft differs from what is stored (a different answer, a new entity, or a
+// disabled until the draft differs from what is stored (a different answer, a new identity, or a
 // different reason). A different answer starts a new answer: its reason starts empty.
 import type { Schema } from "@cairn/client";
 
@@ -10,7 +10,7 @@ type ChoiceEffect = Schema<"ChoiceEffect">;
 
 /** What the form holds. */
 export interface AnswerState {
-  /** The recorded answer, resolved through merged entities. */
+  /** The recorded answer, resolved through merged identities. */
   stored: AnswerValue | undefined;
   /** The reason it was recorded with. */
   storedReason: string | undefined;
@@ -18,7 +18,7 @@ export interface AnswerState {
   draft: AnswerValue | undefined;
   /** The reason as typed; none while its field is untouched. */
   reason: string | undefined;
-  /** The new entity's name, for an entity answer, as typed. */
+  /** The new identity's name, for an identity answer, as typed. */
   named: string;
 }
 
@@ -33,10 +33,10 @@ export function sameAnswer(left: AnswerValue | undefined, right: AnswerValue | u
   return JSON.stringify(left) === JSON.stringify(right);
 }
 
-/** Whether an answer says something: an entity answer names an entity (or a new one), a date has a date. */
+/** Whether an answer says something: an identity answer names an identity (or a new one), a date has a date. */
 function answers(value: AnswerValue, named: string): boolean {
-  if ("entity" in value) {
-    return value.entity !== "" || named.trim() !== "";
+  if ("identity" in value) {
+    return value.identity !== "" || named.trim() !== "";
   }
   if ("date" in value) {
     return value.date !== "";

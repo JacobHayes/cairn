@@ -46,12 +46,12 @@ limit_markers! {
     KindCount => KindCount,
     /// `choice_count_per_decision_max`.
     ChoiceCountPerDecision => ChoiceCountPerDecision,
-    /// `entity_count_per_fill_max`.
-    EntityCountPerFill => EntityCountPerFill,
-    /// `email_count_per_entity_max`.
-    EmailCountPerEntity => EmailCountPerEntity,
-    /// `entity_count_per_deployment_max`.
-    EntityCountPerDeployment => EntityCountPerDeployment,
+    /// `identity_count_per_fill_max`.
+    IdentityCountPerFill => IdentityCountPerFill,
+    /// `email_count_per_identity_max`.
+    EmailCountPerIdentity => EmailCountPerIdentity,
+    /// `identity_count_per_deployment_max`.
+    IdentityCountPerDeployment => IdentityCountPerDeployment,
     /// `journey_count_per_merge_max`.
     JourneyCountPerMerge => JourneyCountPerMerge,
     /// `resource_count_per_node_max`.
@@ -467,7 +467,7 @@ mod tests {
     use super::*;
 
     type Choices = BoundedVec<u32, ChoiceCountPerDecision>;
-    type Entities = BoundedSet<u32, EntityCountPerFill>;
+    type Identities = BoundedSet<u32, IdentityCountPerFill>;
 
     #[test]
     fn bounded_list_at_and_past_its_limit() {
@@ -485,16 +485,20 @@ mod tests {
     #[test]
     fn bounded_set_at_and_past_its_limit() {
         let at: Vec<u32> = (0..100).collect();
-        assert!(serde_json::from_value::<Entities>(serde_json::json!(at)).is_ok());
+        assert!(serde_json::from_value::<Identities>(serde_json::json!(at)).is_ok());
         let past: Vec<u32> = (0..101).collect();
-        let error = serde_json::from_value::<Entities>(serde_json::json!(past)).unwrap_err();
-        assert!(error.to_string().contains(Limit::EntityCountPerFill.name()));
+        let error = serde_json::from_value::<Identities>(serde_json::json!(past)).unwrap_err();
+        assert!(
+            error
+                .to_string()
+                .contains(Limit::IdentityCountPerFill.name())
+        );
     }
 
     #[test]
     fn bounded_set_rejects_duplicates_and_sorts() {
-        assert!(serde_json::from_str::<Entities>("[2, 1, 2]").is_err());
-        let set: Entities = serde_json::from_str("[3, 1, 2]").unwrap();
+        assert!(serde_json::from_str::<Identities>("[2, 1, 2]").is_err());
+        let set: Identities = serde_json::from_str("[3, 1, 2]").unwrap();
         assert_eq!(serde_json::to_string(&set).unwrap(), "[1,2,3]");
     }
 

@@ -68,7 +68,7 @@ export function useCandidate(authored: Authored, mutation: Mutation | undefined,
     mutation === undefined || segment === undefined
       ? undefined
       : {
-          identity: [JSON.stringify(authored.target)],
+          of: [JSON.stringify(authored.target)],
           // The segment's route revision and version are what it inserts; the deployment and the day are what the engine reads besides the graph.
           freshness: [authored.revision, authored.deploymentRevision, authored.today, authored.route?.revision, JSON.stringify(mutation), segment.version.version, segment.segment.revision, user],
           args: { deriver, user, authored, mutation, segment },

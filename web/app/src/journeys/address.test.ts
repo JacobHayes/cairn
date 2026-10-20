@@ -1,5 +1,5 @@
 // C16: the index's filters live in the address and become the host's query; "mine" asks for
-// the journeys referring to the caller's entities, active only (B11), or nothing at all. A journey, a
+// the journeys referring to the caller's identities, active only (B11), or nothing at all. A journey, a
 // node and an edge each have one address; the view is its `view=`, written only off the default.
 import { describe, expect, it } from "vitest";
 
@@ -56,16 +56,16 @@ describe("the host's query for the filters", () => {
     expect(queryOf({ ...DEFAULT_FILTERS, status: "any" }, [])).toEqual({});
   });
 
-  it("asks for the active journeys referring to the caller's entities for mine", () => {
-    expect(queryOf({ ...DEFAULT_FILTERS, status: "any", mine: true }, ["e_a", "e_b"])).toEqual({
+  it("asks for the active journeys referring to the caller's identities for mine", () => {
+    expect(queryOf({ ...DEFAULT_FILTERS, status: "any", mine: true }, ["who_a", "who_b"])).toEqual({
       status: ["active"],
-      referencing: ["e_a", "e_b"],
+      referencing: ["who_a", "who_b"],
     });
   });
 
-  it("asks for nothing when mine can hold nothing: no entity, or a status that leaves mine", () => {
+  it("asks for nothing when mine can hold nothing: no identity, or a status that leaves mine", () => {
     expect(queryOf({ ...DEFAULT_FILTERS, mine: true }, [])).toBeUndefined();
-    expect(queryOf({ ...DEFAULT_FILTERS, status: "completed", mine: true }, ["e_a"])).toBeUndefined();
+    expect(queryOf({ ...DEFAULT_FILTERS, status: "completed", mine: true }, ["who_a"])).toBeUndefined();
   });
 });
 
@@ -146,7 +146,7 @@ describe("opening and closing a node keeps the view", () => {
   it("takes a node off a proposal under any destination and adds one", () => {
     expect(nodeAddress(page("journeyProposalNode", { ...J, proposal: "p_1", key: "n_x" }), "", "n_y")).toBe("/journeys/j_a/proposals/p_1/nodes/n_y");
     expect(nodeAddress(page("routeProposal", { route: "r", proposal: "p_1" }), "?view=list", "n_y")).toBe("/routes/r/proposals/p_1/nodes/n_y?view=list");
-    expect(nodeAddress(page("deploymentProposal", { proposal: "p_1" }), "", "n_x")).toBe("/entities/proposals/p_1");
+    expect(nodeAddress(page("deploymentProposal", { proposal: "p_1" }), "", "n_x")).toBe("/identities/proposals/p_1");
   });
 
   it.each([
@@ -154,7 +154,7 @@ describe("opening and closing a node keeps the view", () => {
     ["a route's opens it in the route's draft", page("routeProposals", { route: "r" }), "n_x", "/routes/r/nodes/n_x"],
     ["a journey's has none to close", page("journeyProposals", J), undefined, "/journeys/j_a/proposals"],
     ["a route's has none to close", page("routeProposals", { route: "r" }), undefined, "/routes/r/proposals"],
-    ["the deployment's has no nodes", page("deploymentProposals"), "n_x", "/entities/proposals"],
+    ["the deployment's has no nodes", page("deploymentProposals"), "n_x", "/identities/proposals"],
   ])("a node from open proposals: %s", (_, at, key, expected) => {
     expect(nodeAddress(at, "", key)).toBe(expected);
   });

@@ -29,8 +29,8 @@ const ANSWER_TYPES: { value: AnswerType; label: string }[] = [
   { value: "multi_choice", label: "Several choices" },
   { value: "text", label: "Text" },
   { value: "date", label: "A date" },
-  { value: "entity", label: "A person or team" },
-  { value: "entity_list", label: "People or teams" },
+  { value: "identity", label: "A person or team" },
+  { value: "identity_list", label: "People or teams" },
 ];
 
 /** Whether the kind (and answer type) has `field`, so its control is offered (A1a). */
@@ -162,7 +162,7 @@ function AddChoice({ choices, onAdd }: { choices: readonly Choice[]; onAdd: (cho
 
 /** A4, A6, E3: a decision's prompt, help, answer type, choices, and the role it fills or the milestone it pins. */
 export function DecisionFields({ props }: { props: FieldsProps }) {
-  const multi = props.draft.answer_type === "entity_list";
+  const multi = props.draft.answer_type === "identity_list";
   const roles = props.roles.filter((role) => (role.multi ?? false) === multi);
   const milestones = nodesByPath(props.tree, "milestone");
   return (

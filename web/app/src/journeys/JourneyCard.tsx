@@ -103,7 +103,7 @@ function Folds({ ready, model, selected }: { ready: Ready; model: SummaryModel; 
             {model.openDecisions.map((each) => (
               <li key={each.key} data-node={each.key} data-selected={each.key === selected}>
                 <NodeLink view={ready} node={each.key} />{" "}
-                <span className="muted small">{ownerWords(ready, each.owners, viewer?.entities)}</span>
+                <span className="muted small">{ownerWords(ready, each.owners, viewer?.identities)}</span>
               </li>
             ))}
           </ul>

@@ -1,4 +1,4 @@
-// The head every index page shares (Journeys, Routes, Entities): the title with the page's
+// The head every index page shares (Journeys, Routes, Identities): the title with the page's
 // primary action at its right end, and under it one toolbar row of filters and tools. The
 // action and the toolbar sit in the same place on every index.
 import type { ReactNode } from "react";

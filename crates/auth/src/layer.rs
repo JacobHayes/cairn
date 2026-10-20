@@ -161,10 +161,10 @@ impl Auth {
                 Verdict::Absent => continue,
                 Verdict::Refused(refusal) => return Err(refusal),
                 Verdict::Actor(actor) => actor,
-                Verdict::Identity(_) if found.is_some() => continue,
-                Verdict::Identity(identity) => {
+                Verdict::Login(_) if found.is_some() => continue,
+                Verdict::Login(login) => {
                     let accounts = &self.inner.accounts;
-                    let user = accounts.resolve(&identity, None, provider.auto_link());
+                    let user = accounts.resolve(&login, None, provider.auto_link());
                     Actor {
                         user: user.await?,
                         agent: None,

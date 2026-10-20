@@ -16,8 +16,9 @@ use std::collections::{BTreeMap, BTreeSet};
 
 use async_trait::async_trait;
 use cairn_schema::{
-    ConversationId, Domain, Email, Entity, EntityKey, JourneyId, PatchId, PatchReceipt, Proposal,
-    ProposalId, Revision, RevisionConflict, RevisionOf, Slug, Timestamp, Title, TouchedSet, UserId,
+    ConversationId, Domain, Email, Identity, IdentityKey, JourneyId, PatchId, PatchReceipt,
+    Proposal, ProposalId, Revision, RevisionConflict, RevisionOf, Slug, Timestamp, Title,
+    TouchedSet, UserId,
 };
 
 use crate::backend::{self, Shape, StoredReceipt};
@@ -30,7 +31,7 @@ use crate::query::{
 };
 use crate::records::{
     AgentTokenRecord, AuthLogEntry, AuthLogQuery, ConversationRecord, ConversationSummary,
-    IdentityRecord, LoggedAuthEntry, OAuthStateRecord, SecretHash, SessionRecord, UserRecord,
+    LoggedAuthEntry, LoginRecord, OAuthStateRecord, SecretHash, SessionRecord, UserRecord,
 };
 use crate::store::{AuthStore, ConversationStore, Store};
 use crate::target::{Document, LoadTarget};
@@ -105,7 +106,7 @@ impl MemoryStore {
         {
             violations.push(backend::deleted_journey(journey));
         }
-        violations.extend(backend::entity_create_violations(
+        violations.extend(backend::identity_create_violations(
             &shape,
             &state.domains.deployment,
         )?);
@@ -209,8 +210,12 @@ impl State {
             }
         }
         for precondition in &commit.preconditions {
-            if let Precondition::ReferencingJourneys { entities, journeys } = precondition {
-                for (journey, current) in self.domains.journeys_referencing(entities) {
+            if let Precondition::ReferencingJourneys {
+                identities,
+                journeys,
+            } = precondition
+            {
+                for (journey, current) in self.domains.journeys_referencing(identities) {
                     if !journeys.contains(&journey) {
                         conflicts.push(RevisionConflict {
                             of: RevisionOf::Domain(Domain::Journey(journey)),
@@ -280,7 +285,7 @@ impl Domains {
     }
 
     /// Moves the revisions the commit advances: its domain's or proposal's, and the
-    /// deployment's when entity creates rode in (E6).
+    /// deployment's when identity creates rode in (E6).
     fn advance(&mut self, shape: &Shape) -> Result<(), StoreError> {
         let deleted = shape.deletes_journey.is_some();
         match &shape.advances {
@@ -384,13 +389,13 @@ impl Store for MemoryStore {
 
     async fn journeys_referencing(
         &self,
-        entities: &BTreeSet<EntityKey>,
+        identities: &BTreeSet<IdentityKey>,
     ) -> Result<BTreeMap<JourneyId, Revision>, StoreError> {
-        Ok(queries::referencing(&self.state(), entities))
+        Ok(queries::referencing(&self.state(), identities))
     }
 
-    async fn resolve_entity(&self, key: &EntityKey) -> Result<Option<Entity>, StoreError> {
-        Ok(self.state().resolve_entity(key))
+    async fn resolve_identity(&self, key: &IdentityKey) -> Result<Option<Identity>, StoreError> {
+        Ok(self.state().resolve_identity(key))
     }
 
     async fn events(&self, query: &EventQuery) -> Result<Page<LoggedEvent, u64>, StoreError> {
@@ -416,31 +421,24 @@ impl AuthStore for MemoryStore {
         Ok(self.state().outside.user(id))
     }
 
-    async fn put_identity(&self, identity: IdentityRecord) -> Result<(), StoreError> {
-        self.state().outside.put_identity(identity)
+    async fn put_login(&self, login: LoginRecord) -> Result<(), StoreError> {
+        self.state().outside.put_login(login)
     }
 
-    async fn identity(
+    async fn login(
         &self,
         provider: &Slug,
         subject: &Title,
-    ) -> Result<Option<IdentityRecord>, StoreError> {
-        Ok(self.state().outside.identity(provider, subject))
+    ) -> Result<Option<LoginRecord>, StoreError> {
+        Ok(self.state().outside.login(provider, subject))
     }
 
-    async fn identities_of(&self, user: &UserId) -> Result<Vec<IdentityRecord>, StoreError> {
-        Ok(self.state().outside.identities_of(user))
+    async fn logins_of(&self, user: &UserId) -> Result<Vec<LoginRecord>, StoreError> {
+        Ok(self.state().outside.logins_of(user))
     }
 
-    async fn identities_with_email(
-        &self,
-        email: &Email,
-    ) -> Result<Vec<IdentityRecord>, StoreError> {
-        Ok(self.state().outside.identities_with_email(email))
-    }
-
-    async fn remove_identity(&self, provider: &Slug, subject: &Title) -> Result<bool, StoreError> {
-        Ok(self.state().outside.remove_identity(provider, subject))
+    async fn logins_with_email(&self, email: &Email) -> Result<Vec<LoginRecord>, StoreError> {
+        Ok(self.state().outside.logins_with_email(email))
     }
 
     async fn put_session(&self, session: SessionRecord) -> Result<(), StoreError> {

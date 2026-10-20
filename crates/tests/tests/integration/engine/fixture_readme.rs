@@ -13,7 +13,7 @@ use std::collections::{BTreeMap, BTreeSet};
 use cairn_engine::derive::Producer;
 use cairn_engine::{Applied, DerivedJourney, Records};
 use cairn_schema::{
-    Deployment, EntityKey, KindKey, LevelQuery, NextQuery, NodeKey, NodeKind, Path, Relevance,
+    Deployment, IdentityKey, KindKey, LevelQuery, NextQuery, NodeKey, NodeKind, Path, Relevance,
 };
 
 const VENDOR: &str = "vendor-evaluation";
@@ -191,7 +191,7 @@ fn the_display_state_table_is_what_derive_gives() {
     }
 }
 
-/// The participation table: the entities in each node's participation of each kind at each
+/// The participation table: the identities in each node's participation of each kind at each
 /// decision point, for every node where the row says so.
 #[test]
 fn the_participation_table_is_what_derive_gives() {
@@ -222,14 +222,22 @@ fn the_participation_table_is_what_derive_gives() {
             } else {
                 vec![at_path(&graph, spans[0])]
             };
+            // The README names people by name; the deployment says which key each is.
+            let people: BTreeMap<&str, &str> = vendor
+                .after(*step)
+                .deployment
+                .identities
+                .values()
+                .map(|identity| (identity.name.as_str(), identity.key.as_str()))
+                .collect();
             let expected: BTreeSet<&str> = quoted(&row[column + 1])
                 .into_iter()
-                .filter(|span| span.starts_with("e_"))
+                .filter_map(|span| people.get(span).copied())
                 .collect();
             let derived = vendor.derived(*step);
             for node in nodes {
-                let entities = derived.participation().entities(&node, &kind);
-                let found: BTreeSet<&str> = entities.iter().map(EntityKey::as_str).collect();
+                let identities = derived.participation().identities(&node, &kind);
+                let found: BTreeSet<&str> = identities.iter().map(IdentityKey::as_str).collect();
                 assert_eq!(found, expected, "step {step}: {node} {kind_id}");
             }
         }

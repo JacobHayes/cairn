@@ -18,7 +18,7 @@ export interface Authored {
   tree: Tree;
   /** The target's revision this graph is at: what an edit is drafted against (H5). */
   revision: number;
-  /** The deployment revision a patch writing an entity reference names (E6). */
+  /** The deployment revision a patch writing an identity reference names (E6). */
   deploymentRevision: number;
   deployment: Deployment;
   /** The deployment's today. */

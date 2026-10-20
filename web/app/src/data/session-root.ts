@@ -59,7 +59,7 @@ export type RootEvent =
   /** A write landed and left this save. */
   | { type: "saved"; save: Omit<SaveEvent, "id"> }
   | SubscriptionEvent
-  /** A shown read is keyed; `hidden` when it stops or changes identity. */
+  /** A shown read is keyed; `hidden` when it stops or changes its `of`. */
   | { type: "shown"; id: string; read: AnyActorRef }
   | { type: "hidden"; id: string }
   | { type: "xstate.snapshot.subscription"; snapshot: SubscriptionSnapshot }

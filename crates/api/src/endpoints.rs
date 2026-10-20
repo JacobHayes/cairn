@@ -102,7 +102,7 @@ pub static PATCH_JOURNEY: Endpoint =
     endpoint(Method::POST, "/api/journeys/{id}/patches", "patchJourney");
 /// `POST /api/routes/{id}/patches`: a route patch, its draft included.
 pub static PATCH_ROUTE: Endpoint = endpoint(Method::POST, "/api/routes/{id}/patches", "patchRoute");
-/// `POST /api/deployment/patches`: a deployment patch (entities, merges).
+/// `POST /api/deployment/patches`: a deployment patch (identities, merges).
 pub static PATCH_DEPLOYMENT: Endpoint =
     endpoint(Method::POST, "/api/deployment/patches", "patchDeployment");
 /// `POST /api/journeys/{id}/proposals`: a proposal for a journey, which may not exist yet (I6).
@@ -298,7 +298,7 @@ pub static ROUTE_VERSION: Endpoint = endpoint(
     "/api/routes/{id}/versions/{version}",
     "getRouteVersion",
 );
-/// `GET /api/deployment`: entities and aliases at the deployment revision.
+/// `GET /api/deployment`: identities and aliases at the deployment revision.
 pub static DEPLOYMENT: Endpoint = endpoint(Method::GET, "/api/deployment", "getDeployment");
 /// `GET /api/search`: text search across journeys.
 pub static SEARCH: Endpoint = endpoint(Method::GET, "/api/search", "searchJourneys");
@@ -306,7 +306,7 @@ pub static SEARCH: Endpoint = endpoint(Method::GET, "/api/search", "searchJourne
 pub static EVENTS: Endpoint = endpoint(Method::GET, "/api/events", "listEvents");
 /// `GET /api/events/stream`: revision ticks over SSE, current revisions first (H6).
 pub static STREAM: Endpoint = endpoint(Method::GET, "/api/events/stream", "streamRevisions");
-/// `GET /api/users/me`: the caller and their entities (H3).
+/// `GET /api/users/me`: the caller and their identities (H3).
 pub static VIEWER: Endpoint = endpoint(Method::GET, "/api/users/me", "getViewer");
 /// `GET /api/users`: the names of the users asked for (H3).
 pub static USER_NAMES: Endpoint = endpoint(Method::GET, "/api/users", "listUserNames");

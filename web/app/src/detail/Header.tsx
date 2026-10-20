@@ -69,13 +69,13 @@ function Orphaned({ view, detail, removeTo }: { view: Ready; detail: NodeDetail;
 function Meta({ view, detail }: { view: Ready; detail: NodeDetail }) {
   const write = useNodeWrite(view, `assign:${detail.node.key}`);
   const { node, derived } = detail;
-  const people = view.inputs.deployment.entities ?? [];
+  const people = view.inputs.deployment.identities ?? [];
   const { viewer } = useViewer();
   const owner =
     derived.unassigned === true && people.length > 0 ? (
       <OwnerSelect key="assign" view={view} write={write} node={node.key} placeholder="Assign" className="assign-owner" testId="assign-owner" />
     ) : (
-      ownerWords(view, ownersOf(view, node.key), viewer?.entities)
+      ownerWords(view, ownersOf(view, node.key), viewer?.identities)
     );
   return (
     <div className="meta muted" data-testid="detail-meta">

@@ -18,7 +18,7 @@ function OwnerText({ view, owners }: { view: Ready; owners: string[] | undefined
   if (owners === undefined) {
     return null;
   }
-  const words = ownerWords(view, owners, viewer?.entities);
+  const words = ownerWords(view, owners, viewer?.identities);
   return (
     <div className="row-side">
       <span className="row-owner row-owner-static" title={owners.length === 0 ? undefined : `Owned by ${words}`}>

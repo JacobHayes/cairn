@@ -1,7 +1,7 @@
 //! The limits requests are held to (PRACTICES, Explicit limits): the request body size and
 //! the requests in flight, for every request, and the request duration, for the API's own
-//! endpoints only: auth's routes and layer make outbound identity calls under their own,
-//! longer limit (`IDENTITY_CALL_DURATION_MAX`). The SSE subscriber limit is the notifier's,
+//! endpoints only: auth's routes and layer make outbound login calls under their own,
+//! longer limit (`PROVIDER_CALL_DURATION_MAX`). The SSE subscriber limit is the notifier's,
 //! and the stream enforces its own write stall.
 
 use std::sync::Arc;

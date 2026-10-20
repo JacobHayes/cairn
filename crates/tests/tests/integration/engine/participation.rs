@@ -8,7 +8,7 @@ use crate::engine::support;
 use std::collections::BTreeSet;
 
 use cairn_engine::Records;
-use cairn_schema::{EntityKey, KindKey, ParticipationOrigin};
+use cairn_schema::{IdentityKey, KindKey, ParticipationOrigin};
 use support::key;
 
 const VENDOR: &str = "j_vendor_eval";
@@ -17,7 +17,7 @@ fn kind(text: &str) -> KindKey {
     text.parse().unwrap()
 }
 
-fn entities(names: &[&str]) -> BTreeSet<EntityKey> {
+fn identities(names: &[&str]) -> BTreeSet<IdentityKey> {
     names.iter().map(|name| name.parse().unwrap()).collect()
 }
 
@@ -25,7 +25,7 @@ fn role(text: &str) -> cairn_schema::RoleKey {
     text.parse().unwrap()
 }
 
-/// Asserts a node's origin and entities for a kind.
+/// Asserts a node's origin and identities for a kind.
 fn resolves(
     records: &Records,
     journey: &str,
@@ -40,8 +40,8 @@ fn resolves(
             "{node} {of}"
         );
         assert_eq!(
-            participation.entities(&key(node), &kind(of)),
-            &entities(expected),
+            participation.identities(&key(node), &kind(of)),
+            &identities(expected),
             "{node} {of}"
         );
     }
@@ -60,19 +60,19 @@ fn each_resolution_step_in_order() {
                 "n_reporting",
                 "k_informed",
                 Some(ParticipationOrigin::Role(role("r_stakeholders"))),
-                &["e_stakeholder_a", "e_stakeholder_b"],
+                &["who_d4m6uk2eqf5rbhzs", "who_e7h2jv3nxc4yaw6t"],
             ),
             (
                 "n_final_report",
                 "k_informed",
                 Some(ParticipationOrigin::Ancestor(key("n_reporting"))),
-                &["e_stakeholder_a", "e_stakeholder_b"],
+                &["who_d4m6uk2eqf5rbhzs", "who_e7h2jv3nxc4yaw6t"],
             ),
             (
                 "n_access",
                 "k_owner",
                 Some(ParticipationOrigin::DefaultOwner(role("r_eval_owner"))),
-                &["e_lead"],
+                &["who_k3d7qm2xw5tn6pfa"],
             ),
             ("n_access", "k_informed", None, &[]),
             (
@@ -83,8 +83,7 @@ fn each_resolution_step_in_order() {
             ),
         ],
     );
-    let explicit =
-        "- op: set_participation\n  node: n_setup\n  kind: k_owner\n  source: [e_stakeholder_a]\n";
+    let explicit = "- op: set_participation\n  node: n_setup\n  kind: k_owner\n  source: [who_d4m6uk2eqf5rbhzs]\n";
     resolves(
         &support::accepted_on(&records, VENDOR, explicit),
         VENDOR,
@@ -93,13 +92,13 @@ fn each_resolution_step_in_order() {
                 "n_setup",
                 "k_owner",
                 Some(ParticipationOrigin::Explicit),
-                &["e_stakeholder_a"],
+                &["who_d4m6uk2eqf5rbhzs"],
             ),
             (
                 "n_plan_draft",
                 "k_owner",
                 Some(ParticipationOrigin::Ancestor(key("n_setup"))),
-                &["e_stakeholder_a"],
+                &["who_d4m6uk2eqf5rbhzs"],
             ),
         ],
     );
@@ -117,7 +116,7 @@ fn explicit_empty_stops_inheritance_until_removed() {
     for node in ["n_setup", "n_plan", "n_plan_draft"] {
         assert!(
             participation
-                .entities(&key(node), &KindKey::owner())
+                .identities(&key(node), &KindKey::owner())
                 .is_empty(),
             "{node}"
         );
@@ -129,8 +128,8 @@ fn explicit_empty_stops_inheritance_until_removed() {
     assert_eq!(
         restored
             .participation()
-            .entities(&key("n_plan_draft"), &KindKey::owner()),
-        &entities(&["e_lead"])
+            .identities(&key("n_plan_draft"), &KindKey::owner()),
+        &identities(&["who_k3d7qm2xw5tn6pfa"])
     );
 }
 
@@ -161,8 +160,8 @@ fn roles_fill_through_their_decisions() {
     assert!(derived.participation().is_unassigned(&key("n_access")));
 }
 
-/// E5: changing a role's entities re-derives what inherits from it and keeps explicit
-/// overrides. B10: a per-member child whose entity leaves the role is flagged.
+/// E5: changing a role's identities re-derives what inherits from it and keeps explicit
+/// overrides. B10: a per-member child whose identity leaves the role is flagged.
 #[test]
 fn role_changes_rederive_inheritance_and_flag_lost_members() {
     let records = support::after("hiring-loop", 4);
@@ -171,7 +170,7 @@ fn role_changes_rederive_inheritance_and_flag_lost_members() {
     let before = support::derived(&records, "j_hiring");
     let panel = before
         .participation()
-        .entities(&interviews, &interviewer)
+        .identities(&interviews, &interviewer)
         .clone();
     assert_eq!(panel.len(), 3);
     for child in ["n_interview_one", "n_interview_two", "n_interview_three"] {
@@ -183,18 +182,18 @@ fn role_changes_rederive_inheritance_and_flag_lost_members() {
             "{child}"
         );
     }
-    let smaller = "- op: answer\n  decision: n_choose_panel\n  value: {entity_list: [e_panelist_one, e_panelist_two]}\n";
+    let smaller = "- op: answer\n  decision: n_choose_panel\n  value: {identity_list: [who_k3d7qm2xw5tn6pfa, who_c5y3tw7ldp2aoxgm]}\n";
     let changed = support::accepted_on(&records, "j_hiring", smaller);
     let after = support::derived(&changed, "j_hiring");
     let participation = after.participation();
     assert_eq!(
-        participation.entities(&interviews, &interviewer),
-        &entities(&["e_panelist_one", "e_panelist_two"]),
+        participation.identities(&interviews, &interviewer),
+        &identities(&["who_k3d7qm2xw5tn6pfa", "who_c5y3tw7ldp2aoxgm"]),
         "inherited participation follows the role (E5)"
     );
     assert_eq!(
-        participation.entities(&key("n_interview_three"), &interviewer),
-        &entities(&["e_panelist_three"]),
+        participation.identities(&key("n_interview_three"), &interviewer),
+        &identities(&["who_f2q5nr7xbd3kwzh4"]),
         "the explicit participation stays (E5)"
     );
     assert_eq!(
@@ -216,12 +215,12 @@ fn an_explicit_participation_survives_a_role_change() {
     let records = support::accepted_on(
         &records,
         VENDOR,
-        "- op: set_participation\n  node: n_access\n  kind: k_owner\n  source: [e_stakeholder_a]\n",
+        "- op: set_participation\n  node: n_access\n  kind: k_owner\n  source: [who_d4m6uk2eqf5rbhzs]\n",
     );
     let records = support::accepted_on(
         &records,
         VENDOR,
-        "- op: answer\n  decision: n_who_owns\n  value: {entity: e_stakeholder_b}\n",
+        "- op: answer\n  decision: n_who_owns\n  value: {identity: who_e7h2jv3nxc4yaw6t}\n",
     );
     let graph = support::vendor_graph(&records);
     let owner = &graph
@@ -231,7 +230,7 @@ fn an_explicit_participation_survives_a_role_change() {
         .participations
         .as_map()[&kind("k_owner")];
     assert!(
-        matches!(owner, cairn_schema::ParticipationSource::Entities(found) if found.iter().any(|e| e.as_str() == "e_stakeholder_a"))
+        matches!(owner, cairn_schema::ParticipationSource::Identities(found) if found.iter().any(|e| e.as_str() == "who_d4m6uk2eqf5rbhzs"))
     );
     assert!(
         graph.state.local_edits[&key("n_access")]

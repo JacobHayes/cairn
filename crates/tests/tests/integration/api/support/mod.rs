@@ -21,7 +21,7 @@ use cairn_auth::{
 };
 use cairn_engine::from_file;
 use cairn_schema::{
-    DraftSource, Identity, Mutation, Mutations, Patch, PatchTarget, RankConstants, Revision,
+    DraftSource, Login, Mutation, Mutations, Patch, PatchTarget, RankConstants, Revision,
     RouteFile, Scenario, SequentialKeys, Slug, Timestamp, from_yaml,
 };
 use cairn_service::{AuthKind, AuthMethod, Capabilities, DeploymentSettings, Parts, Service};
@@ -34,7 +34,7 @@ use crate::auth::support::iap::{self, AUDIENCE, FakeIap, KeySet};
 use crate::auth::support::issuer::Issuer;
 
 /// The team the test sign-in provider knows, with each one's verified email.
-pub const TEAM: [(&str, &str); 2] = [("ann", "lead@example.org"), ("bob", "bob@example.org")];
+pub const TEAM: [(&str, &str); 2] = [("ann", "ana@example.org"), ("bob", "bob@example.org")];
 
 /// A clock the test sets.
 #[derive(Clone, Default)]
@@ -81,7 +81,7 @@ impl AuthProvider for TeamProvider {
             .and_then(|name| TEAM.iter().find(|(member, _)| *member == name));
         match member {
             None => Verdict::Absent,
-            Some((name, email)) => Verdict::Identity(Identity {
+            Some((name, email)) => Verdict::Login(Login {
                 provider: self.name.clone(),
                 subject: name.parse().unwrap(),
                 display: name.parse().unwrap(),
@@ -230,6 +230,8 @@ impl World {
     /// `steps` steps, each at its own time; answers `ann`'s transport.
     pub async fn vendor_after(&self, steps: usize) -> Transport {
         let ann = self.signed_in("ann");
+        let (people_call, people) = crate::people::people_write();
+        self.service.patch(&people_call, &people).await.unwrap();
         let seed = publish_fixture_route("vendor-evaluation");
         let reply = post(
             &ann,
@@ -441,7 +443,7 @@ pub fn request(patch: &Patch) -> serde_json::Value {
 /// A proposal for each kind of destination, as `(create endpoint, its path, proposal id,
 /// draft)`, against the vendor evaluation after kickoff: the journey's adds a charter that
 /// kickoff, already reached, requires, so its preview has consequences (D7); the route's
-/// creates a route at revision 0; the deployment's creates an entity.
+/// creates a route at revision 0; the deployment's creates an identity.
 pub async fn proposals_of_every_domain(
     transport: &Transport,
 ) -> Vec<(
@@ -466,10 +468,10 @@ pub async fn proposals_of_every_domain(
         "destination_revision": 0,
         "mutations": [{"op": "create_route", "name": "New route"}],
     });
-    let entity = serde_json::json!({
+    let identity = serde_json::json!({
         "title": "A new person",
         "destination_revision": deployment.revision,
-        "mutations": [{"op": "create_entity", "entity": {"key": "e_new", "name": "New person"}}],
+        "mutations": [{"op": "create_identity", "identity": {"key": "who_new", "name": "New person"}}],
     });
     vec![
         (
@@ -487,8 +489,8 @@ pub async fn proposals_of_every_domain(
         (
             &at::PROPOSE_DEPLOYMENT,
             "/api/deployment/proposals".to_owned(),
-            "pr_entity",
-            entity,
+            "pr_identity",
+            identity,
         ),
     ]
 }

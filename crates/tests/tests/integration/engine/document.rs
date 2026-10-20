@@ -28,10 +28,10 @@ fn a_document_sent_and_derived_gives_what_the_host_derives() {
         let mut inputs = cairn_engine::testing::derive_inputs(deployment);
         inputs.viewer = inputs
             .deployment
-            .entities
+            .identities
             .values()
             .take(1)
-            .map(|entity| entity.key.clone())
+            .map(|identity| identity.key.clone())
             .collect();
         let created_on = journey.header.created_on;
         let host_graph = Graph::new(journey.graph.clone(), &inputs.deployment).unwrap();

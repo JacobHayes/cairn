@@ -52,7 +52,7 @@ export function projectedKey(deriver: Deriver, view: Ready | undefined, request:
     return undefined;
   }
   const journey = view.key.journey;
-  return { identity: [journey, JSON.stringify(request)], freshness: [JSON.stringify(view.key)], args: { deriver, journey, request } };
+  return { of: [journey, JSON.stringify(request)], freshness: [JSON.stringify(view.key)], args: { deriver, journey, request } };
 }
 
 /**
@@ -120,7 +120,7 @@ const TRACE: ReadSource<TraceArgs, Schema<"Trace">> = {
 /** The key of a joined trace: none for no keys. It is shown only for the derivation it was read from. */
 export function joinedTraceKey(deriver: Deriver, view: Ready, keys: readonly string[]): ReadKey<TraceArgs> | undefined {
   const journey = view.key.journey;
-  return keys.length === 0 ? undefined : { identity: [journey, JSON.stringify(keys)], freshness: [JSON.stringify(view.key)], args: { deriver, journey, keys } };
+  return keys.length === 0 ? undefined : { of: [journey, JSON.stringify(keys)], freshness: [JSON.stringify(view.key)], args: { deriver, journey, keys } };
 }
 
 /**
@@ -160,11 +160,11 @@ const LAYOUT: ReadSource<LayoutArgs, LaidOut> = {
 };
 
 /**
- * The key of a canvas's layout: the domain is the identity (another domain's positions never hint
+ * The key of a canvas's layout: the domain is what it is of (another domain's positions never hint
  * this one's), the view and the model are what it is laid out from. None before there is a model.
  */
 export function laidOutKey(layouts: Layouts, domain: string, view: string, model: CanvasModel | undefined): ReadKey<LayoutArgs> | undefined {
-  return model === undefined ? undefined : { identity: [domain], freshness: [view, model], args: { layouts, domain, view, model } };
+  return model === undefined ? undefined : { of: [domain], freshness: [view, model], args: { layouts, domain, view, model } };
 }
 
 /**

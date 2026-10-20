@@ -1,13 +1,13 @@
-//! Users, their identities, and browser sessions, over the store's auth records
+//! Users, their logins, and browser sessions, over the store's auth records
 //! (ARCHITECTURE, Auth; Store trait). Creating a user on first sign-in and linking an
-//! identity are auth operations, written to the auth log rather than to any domain (J2).
+//! login are auth operations, written to the auth log rather than to any domain (J2).
 
 use std::collections::BTreeSet;
 use std::sync::Arc;
 
-use cairn_schema::{Identity, Title, UserId};
+use cairn_schema::{Login, Title, UserId};
 use cairn_store::{
-    AuthEvent, AuthLogEntry, AuthLogQuery, IdentityRecord, LoggedAuthEntry, Page, SessionRecord,
+    AuthEvent, AuthLogEntry, AuthLogQuery, LoggedAuthEntry, LoginRecord, Page, SessionRecord,
     Store, UserRecord,
 };
 use tokio::sync::Mutex;
@@ -17,13 +17,13 @@ use crate::error::AuthError;
 use crate::lifetimes::SESSION_LIFETIME;
 use crate::secret::{Secret, SecretKind, digest, mint_id};
 
-/// Users, identities, and sessions over one store.
+/// Users, logins, and sessions over one store.
 #[derive(Clone)]
 pub struct Accounts {
     store: Arc<dyn Store>,
     clock: Clock,
     /// Resolution is a read then writes; one at a time, so two first sign-ins of one
-    /// identity cannot both create a user. One process serves a deployment (ARCHITECTURE,
+    /// login cannot both create a user. One process serves a deployment (ARCHITECTURE,
     /// Concurrency and notification), so a lock in the process is enough.
     resolving: Arc<Mutex<()>>,
 }
@@ -51,70 +51,66 @@ impl Accounts {
         &self.clock
     }
 
-    /// H1, H3: the user an identity signs in as. A known identity is its user, with the
+    /// H1, H3: the user a login signs in as. A known login is its user, with the
     /// verified emails the provider lists now. A new one is linked to `signed_in` when the
     /// browser is already signed in (linking another provider), else, with `auto_link`, to
-    /// the one user holding an identity with one of its verified emails, else to a new
-    /// user. An identity held by another user than `signed_in` is refused: merging users
+    /// the one user holding a login with one of its verified emails, else to a new
+    /// user. A login held by another user than `signed_in` is refused: merging users
     /// is `Later` (PRD).
     ///
     /// # Errors
     ///
-    /// The identity is held by another user, or the store failed.
+    /// The login is held by another user, or the store failed.
     pub async fn resolve(
         &self,
-        identity: &Identity,
+        login: &Login,
         signed_in: Option<&UserId>,
         auto_link: bool,
     ) -> Result<UserId, AuthError> {
-        let (provider, subject) = (&identity.provider, &identity.subject);
-        // Every request through a per-request provider resolves its identity, so the usual
-        // case, a known identity whose emails are unchanged, takes no lock.
-        let known = self.store.identity(provider, subject).await?;
-        if let Some(held) = known.filter(|held| held.verified_emails == identity.verified_emails) {
+        let (provider, subject) = (&login.provider, &login.subject);
+        // Every request through a per-request provider resolves its login, so the usual
+        // case, a known login whose emails are unchanged, takes no lock.
+        let known = self.store.login(provider, subject).await?;
+        if let Some(held) = known.filter(|held| held.verified_emails == login.verified_emails) {
             return holder(held, signed_in);
         }
         let _resolving = self.resolving.lock().await;
-        if let Some(held) = self.store.identity(provider, subject).await? {
-            return self.refresh(held, identity, signed_in).await;
+        if let Some(held) = self.store.login(provider, subject).await? {
+            return self.refresh(held, login, signed_in).await;
         }
         let user = match signed_in {
             Some(user) => user.clone(),
-            None => match self.auto_link_target(identity, auto_link).await? {
+            None => match self.auto_link_target(login, auto_link).await? {
                 Some(user) => user,
-                None => self.create_user(identity).await?,
+                None => self.create_user(login).await?,
             },
         };
         self.store
-            .put_identity(IdentityRecord {
-                provider: identity.provider.clone(),
-                subject: identity.subject.clone(),
+            .put_login(LoginRecord {
+                provider: login.provider.clone(),
+                subject: login.subject.clone(),
                 user: user.clone(),
-                verified_emails: identity.verified_emails.clone(),
+                verified_emails: login.verified_emails.clone(),
                 linked_at: self.clock.now(),
             })
             .await?;
-        self.log(
-            AuthEvent::IdentityLinked,
-            &user,
-            Some(identity_subject(identity)),
-        )
-        .await?;
+        self.log(AuthEvent::LoginLinked, &user, Some(login_subject(login)))
+            .await?;
         Ok(user)
     }
 
-    /// A known identity's user, after recording the emails its provider verifies now.
+    /// A known login's user, after recording the emails its provider verifies now.
     async fn refresh(
         &self,
-        held: IdentityRecord,
-        identity: &Identity,
+        held: LoginRecord,
+        login: &Login,
         signed_in: Option<&UserId>,
     ) -> Result<UserId, AuthError> {
         let user = holder(held.clone(), signed_in)?;
-        if held.verified_emails != identity.verified_emails {
-            let verified_emails = identity.verified_emails.clone();
+        if held.verified_emails != login.verified_emails {
+            let verified_emails = login.verified_emails.clone();
             self.store
-                .put_identity(IdentityRecord {
+                .put_login(LoginRecord {
                     verified_emails,
                     ..held
                 })
@@ -123,20 +119,20 @@ impl Accounts {
         Ok(user)
     }
 
-    /// H3: the one user holding an identity with one of `identity`'s verified emails, when
+    /// H3: the one user holding a login with one of `login`'s verified emails, when
     /// the provider auto-links. None when emails point at two users: that is a person with
     /// two accounts, which is not for a sign-in to guess between.
     async fn auto_link_target(
         &self,
-        identity: &Identity,
+        login: &Login,
         auto_link: bool,
     ) -> Result<Option<UserId>, AuthError> {
         if !auto_link {
             return Ok(None);
         }
         let mut users = BTreeSet::new();
-        for email in &identity.verified_emails {
-            for held in self.store.identities_with_email(email).await? {
+        for email in &login.verified_emails {
+            for held in self.store.logins_with_email(email).await? {
                 users.insert(held.user);
             }
         }
@@ -147,12 +143,12 @@ impl Accounts {
         })
     }
 
-    async fn create_user(&self, identity: &Identity) -> Result<UserId, AuthError> {
+    async fn create_user(&self, login: &Login) -> Result<UserId, AuthError> {
         let user: UserId = mint_id()?;
         self.store
             .put_user(UserRecord {
                 id: user.clone(),
-                name: identity.display.clone(),
+                name: login.display.clone(),
                 created_at: self.clock.now(),
             })
             .await?;
@@ -233,20 +229,20 @@ impl Accounts {
     }
 }
 
-/// The user holding a known identity, unless the browser is signed in as someone else.
-fn holder(held: IdentityRecord, signed_in: Option<&UserId>) -> Result<UserId, AuthError> {
+/// The user holding a known login, unless the browser is signed in as someone else.
+fn holder(held: LoginRecord, signed_in: Option<&UserId>) -> Result<UserId, AuthError> {
     match signed_in {
         Some(user) if *user != held.user => {
-            Err(AuthError::IdentityHeldByAnotherUser { holder: held.user })
+            Err(AuthError::LoginHeldByAnotherUser { holder: held.user })
         }
         _ => Ok(held.user),
     }
 }
 
-/// How the auth log names an identity: `provider:subject`, or the subject alone when the
+/// How the auth log names a login: `provider:subject`, or the subject alone when the
 /// pair would pass the title limit (a subject is already a title).
-fn identity_subject(identity: &Identity) -> Title {
-    format!("{}:{}", identity.provider, identity.subject)
+fn login_subject(login: &Login) -> Title {
+    format!("{}:{}", login.provider, login.subject)
         .parse()
-        .unwrap_or_else(|_| identity.subject.clone())
+        .unwrap_or_else(|_| login.subject.clone())
 }

@@ -66,7 +66,7 @@ export function useViewer(): { viewer: Viewer | undefined; failed: string | unde
   return useSelector(useSession().viewer, viewerReading, (left, right) => left.viewer === right.viewer && left.failed === right.failed);
 }
 
-/** H3: a user as people read them: their name (the entity their verified emails name, else the name they signed in with), never their id. */
+/** H3: a user as people read them: their name (the identity their verified emails name, else the name they signed in with), never their id. */
 export function useUserName(): (user: string) => string {
   const people = useSession().people;
   useSyncExternalStore(people.subscribe, people.version);
@@ -294,16 +294,16 @@ export function useCapabilities(): Capabilities {
 
 /**
  * A read (keyed-read.ts) the component owns for as long as it is mounted. `key` is what it asks for
- * now: the read is made afresh for a new identity, and reads again for a new freshness, keeping the
+ * now: the read is made afresh for a new `of`, and reads again for a new freshness, keeping the
  * answer held until then. The key is sent after every render, and an equal key changes nothing, so
- * `args` may be built afresh each time; `shown` is the identity the view is read for (the key's, unless
+ * `args` may be built afresh each time; `shown` is what the view is read of (the key's, unless
  * the caller keeps showing the last answer while it asks for nothing). A read that holds a resource
  * must not run here: StrictMode stops and starts a component's actors again.
  */
 export function useKeyedRead<A, T>(
   source: ReadSource<A, T>,
   key: ReadKey<A> | undefined,
-  shown: readonly unknown[] | undefined = key?.identity,
+  shown: readonly unknown[] | undefined = key?.of,
 ): { view: ReadView<T>; refresh: () => void } {
   const session = useSession();
   const ref = useActorRef(keyedRead, { input: { source, env: session.readEnv } });
@@ -323,5 +323,5 @@ export function useKeyedRead<A, T>(
  */
 export function useLive<T>(key: string | undefined, spec: (session: Session) => LiveSpec<T>): { view: ReadView<T>; refresh: () => void } {
   const session = useSession();
-  return useKeyedRead(liveSource<T>(), key === undefined ? undefined : { identity: [key], freshness: [], args: { spec: spec(session) } });
+  return useKeyedRead(liveSource<T>(), key === undefined ? undefined : { of: [key], freshness: [], args: { spec: spec(session) } });
 }

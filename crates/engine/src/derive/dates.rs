@@ -330,7 +330,7 @@ impl PlanCheck {
 
 /// F5: checks a graph's plan layer for contradictory chains, each with its constraints, their
 /// sources, the pins on it, its shortfall in days, and the moves that would resolve it.
-/// Relevance reads the deployment (entity aliases), so the same one apply validates with.
+/// Relevance reads the deployment (identity aliases), so the same one apply validates with.
 #[must_use]
 pub fn check_plan(graph: &Graph, deployment: &Deployment) -> PlanCheck {
     let early = super::early(graph, deployment);

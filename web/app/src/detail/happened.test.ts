@@ -15,7 +15,7 @@ const TITLES: Record<string, string> = { n_plan: "Plan the launch", n_review: "R
 const words: Words = {
   viewed: "n_plan",
   node: (key) => TITLES[key] ?? "an item that was removed",
-  entity: (key) => (key === "e_ana" ? "Ana Reyes" : "Someone"),
+  identity: (key) => (key === "who_ana" ? "Ana Reyes" : "Someone"),
   role: (key) => (key === "r_lead" ? "Lead" : "A role"),
   kind: (key) => (key === "k_owner" ? "owner" : "Reviewer"),
   day: (date) => `on ${date}`,
@@ -66,14 +66,14 @@ const CASES: Record<EventType, Case> = {
   role_changed: { event: event("role_changed", { role: "r_lead" }) },
   participation_kind_changed: { event: event("participation_kind_changed", { kind: "k_owner" }) },
   default_owner_changed: { event: event("default_owner_changed", plan, [put({ default_owner: "r_lead" })]) },
-  participation_changed: { event: event("participation_changed", plan, [put({ participation: { node: "n_plan", kind: "k_owner", source: ["e_ana"] } })]), facts: { entities: ["Ana Reyes"] } },
+  participation_changed: { event: event("participation_changed", plan, [put({ participation: { node: "n_plan", kind: "k_owner", source: ["who_ana"] } })]), facts: { identities: ["Ana Reyes"] } },
   resource_changed: { event: event("resource_changed", plan, [put({ resource: { node: "n_plan", resource: { key: "a_tip", tip: "Start early", title: "A tip" } } })]) },
   segment_inserted: { event: event("segment_inserted", { insertion: "i_one" }) },
   node_transitioned: { event: event("node_transitioned", plan, [state("n_plan", { state: "active" })]), facts: { state: "active" } },
   milestone_reached: { event: event("milestone_reached", plan, [state("n_plan", { state: "reached" })]), facts: { state: "reached" } },
   answer_set: { event: event("answer_set", { node: "n_decide" }, [put({ answer: { decision: "n_decide", value: { boolean: true } } })]) },
   recorded_date_changed: { event: event("recorded_date_changed", plan, [state("n_plan", { state: "done", finished_on: "2026-10-05" })]), facts: { date: "2026-10-05", recorded: "finished" } },
-  role_fill_changed: { event: event("role_fill_changed", { role: "r_lead" }, [put({ role_fill: { role: "r_lead", entities: ["e_ana"] } })]), facts: { entities: ["Ana Reyes"] } },
+  role_fill_changed: { event: event("role_fill_changed", { role: "r_lead" }, [put({ role_fill: { role: "r_lead", identities: ["who_ana"] } })]), facts: { identities: ["Ana Reyes"] } },
   date_pinned: { event: event("date_pinned", plan, [put({ pin: { node: "n_plan", date: "2026-10-31" } })]), facts: { date: "2026-10-31" } },
   date_shifted: { event: event("date_shifted", plan, [put({ pin: { node: "n_plan", date: "2026-11-02" } })]), facts: { date: "2026-11-02" } },
   date_unpinned: { event: event("date_unpinned", plan) },
@@ -90,16 +90,16 @@ const CASES: Record<EventType, Case> = {
   relinked: { event: event("relinked", { journey: "j_test" }) },
   provenance_changed: { event: event("provenance_changed", plan, [state("n_plan", { state: "todo", provenance: "from_route" })]) },
   local_edit_changed: { event: event("local_edit_changed", plan) },
-  entity_created: { event: event("entity_created", { entity: "e_ana" }, [{ put: { entity: { key: "e_ana", name: "Ana Reyes" } } }]) },
-  entity_edited: { event: event("entity_edited", { entity: "e_ana" }, [{ put: { entity: { key: "e_ana", name: "Ana Reyes" } } }]) },
-  entities_merged: { event: event("entities_merged", { entity: "e_ana" }, [{ put: { entity: { key: "e_ana", name: "Ana Reyes" } } }]) },
+  identity_created: { event: event("identity_created", { identity: "who_ana" }, [{ put: { identity: { key: "who_ana", name: "Ana Reyes" } } }]) },
+  identity_edited: { event: event("identity_edited", { identity: "who_ana" }, [{ put: { identity: { key: "who_ana", name: "Ana Reyes" } } }]) },
+  identities_merged: { event: event("identities_merged", { identity: "who_ana" }, [{ put: { identity: { key: "who_ana", name: "Ana Reyes" } } }]) },
   proposal_created: { event: event("proposal_created", { proposal: "pr_one" }) },
   proposal_edited: { event: event("proposal_edited", { proposal: "pr_one" }) },
   proposal_applied: { event: event("proposal_applied", { proposal: "pr_one" }, [], { confirming_user: "u_boss" }), facts: { confirmedBy: "u_boss" } },
   proposal_discarded: { event: event("proposal_discarded", { proposal: "pr_one" }) },
 };
 
-/** A sentence that names something by its key: an id like `n_plan`, `u_ana`, `e_ana`, `pr_one`. */
+/** A sentence that names something by its key: an id like `n_plan`, `u_ana`, `who_ana`, `pr_one`. */
 const KEY = /\b(?:[a-z]{1,2})_[a-z0-9-]+\b/;
 
 function told(each: Case) {

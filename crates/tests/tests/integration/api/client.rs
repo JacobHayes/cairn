@@ -242,10 +242,10 @@ mod in_process {
         assert!(tracker.ticked(&first), "newer than what it fetched");
     }
 
-    /// H6, E6: an entity merge moves the deployment revision, and a view watching the
+    /// H6, E6: an identity merge moves the deployment revision, and a view watching the
     /// deployment hears it.
     #[tokio::test]
-    async fn an_entity_merge_ticks_the_deployment() {
+    async fn an_identity_merge_ticks_the_deployment() {
         let world = World::start().await;
         let ann = world.vendor_after(2).await;
         let mut view = View::open(world.client("ann"), "j_vendor_eval").await;
@@ -254,7 +254,7 @@ mod in_process {
             "p_merge",
             "deployment",
             1,
-            "- op: merge_entities\n  survivor: e_stakeholder_a\n  merged: e_stakeholder_b\n  journeys: {j_vendor_eval: 2}\n",
+            "- op: merge_identities\n  survivor: who_d4m6uk2eqf5rbhzs\n  merged: who_e7h2jv3nxc4yaw6t\n  journeys: {j_vendor_eval: 2}\n",
         );
         landed(view.client.patch(merge, None).await);
         let heard = view.follow().await;

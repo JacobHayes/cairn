@@ -107,8 +107,8 @@ impl Model {
         self.next_key
     }
 
-    /// The next patch: a deployment patch creating an entity one time in eight, otherwise a
-    /// patch to a drawn journey (its creation first), now and then with an entity create
+    /// The next patch: a deployment patch creating an identity one time in eight, otherwise a
+    /// patch to a drawn journey (its creation first), now and then with an identity create
     /// riding along (which moves the deployment's revision too).
     fn next(&mut self, index: usize, draw: &mut Draw) -> Patch {
         let id = format!("p_step_{index}");
@@ -116,8 +116,9 @@ impl Model {
             let key = self.key();
             let base = self.deployment_revision;
             self.deployment_revision += 1;
-            let mutations =
-                format!("- op: create_entity\n  entity: {{key: e_k{key}, name: Entity {key}}}\n");
+            let mutations = format!(
+                "- op: create_identity\n  identity: {{key: who_k{key}, name: Identity {key}}}\n"
+            );
             return patch(&id, "deployment", base, &mutations);
         }
         let which = draw.below(JOURNEYS.len());
@@ -137,7 +138,7 @@ impl Model {
             let key = self.key();
             let _ = writeln!(
                 mutations,
-                "- op: create_entity\n  entity: {{key: e_k{key}, name: Entity {key}}}"
+                "- op: create_identity\n  identity: {{key: who_k{key}, name: Identity {key}}}"
             );
             self.deployment_revision += 1;
         }

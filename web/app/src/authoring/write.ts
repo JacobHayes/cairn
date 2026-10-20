@@ -18,7 +18,7 @@ import { useKeyedRead, useSession, useViewer, useWrite } from "../data/react.ts"
 import type { WriteView } from "../data/write-machine.ts";
 import type { ReceiptState } from "../ui/receipt.ts";
 import { newPatchId, type Rejection } from "../data/writes.ts";
-import { writesEntities } from "../detail/write.ts";
+import { writesIdentities } from "../detail/write.ts";
 import type { Mutation } from "./graph.ts";
 import { domainOf, type Authored } from "./target.ts";
 import { placesOf, type Place } from "./violations.ts";
@@ -65,7 +65,7 @@ export const LOCAL_USER = "u_local";
 /** The patch `mutations` make of `authored`'s graph, drafted against `base` and named `id`. */
 export function authoredPatchOf(authored: Authored, mutations: Mutation[], base = authored.revision, id = newPatchId()): Schema<"Patch"> {
   const patch: Schema<"Patch"> = { id, target: authored.target, base_revision: base, mutations };
-  return "journey" in authored.target && writesEntities(mutations) ? { ...patch, deployment_revision: authored.deploymentRevision } : patch;
+  return "journey" in authored.target && writesIdentities(mutations) ? { ...patch, deployment_revision: authored.deploymentRevision } : patch;
 }
 
 /** A local apply's failure as a preview: the engine's rejection, or why there is no preview. */
@@ -143,7 +143,7 @@ export function usePublishPreviewRead(authored: Authored): Preview | undefined {
   const { deriver, host } = useSession();
   const { viewer } = useViewer();
   const user = viewer?.user ?? LOCAL_USER;
-  const key: ReadKey<PublishArgs> = { identity: [JSON.stringify(authored.target)], freshness: [authored.graph, authored.deploymentRevision, authored.today, user], args: { deriver, host, user, authored } };
+  const key: ReadKey<PublishArgs> = { of: [JSON.stringify(authored.target)], freshness: [authored.graph, authored.deploymentRevision, authored.today, user], args: { deriver, host, user, authored } };
   const { view } = useKeyedRead(PUBLISH_PREVIEW, key);
   return view.status === "current" ? view.value : undefined;
 }
@@ -204,10 +204,10 @@ const previewSource = (policy: ReadPolicy): ReadSource<PreviewArgs, Preview> => 
 export const LIVE_PREVIEW = previewSource(previewPolicy(PREVIEW_SETTLE_MS));
 const AT_ONCE_PREVIEW = previewSource(DERIVE);
 
-/** The key of a preview: the target is the identity; the revisions it is read against, the day, the viewer and the mutations are what it is read from. */
+/** The key of a preview: the target is what it is of; the revisions it is read against, the day, the viewer and the mutations are what it is read from. */
 export function previewKey(deriver: Deriver, user: string, authored: Authored, mutations: Mutation[]): ReadKey<PreviewArgs> {
   const { target, revision, deploymentRevision, today, route } = authored;
-  return { identity: [JSON.stringify(target)], freshness: [revision, deploymentRevision, today, route?.revision, user, JSON.stringify(mutations)], args: { deriver, user, authored, mutations } };
+  return { of: [JSON.stringify(target)], freshness: [revision, deploymentRevision, today, route?.revision, user, JSON.stringify(mutations)], args: { deriver, user, authored, mutations } };
 }
 
 function usePreviewRead(source: ReadSource<PreviewArgs, Preview>, authored: Authored, mutations: Mutation[] | undefined): Preview | undefined {

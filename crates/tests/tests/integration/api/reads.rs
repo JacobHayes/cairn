@@ -139,27 +139,30 @@ mod in_process {
         assert_eq!(rest.items.len(), 3);
 
         let viewer: Viewer = get(&ann, "/api/users/me").await;
-        assert_eq!(viewer.entities, ["e_lead".parse().unwrap()].into());
+        assert_eq!(
+            viewer.identities,
+            ["who_k3d7qm2xw5tn6pfa".parse().unwrap()].into()
+        );
         assert_eq!((viewer.agent, viewer.merge_offer), (None, None));
         let emails: Vec<_> = viewer
-            .identities
+            .logins
             .iter()
-            .flat_map(|identity| &identity.verified_emails)
+            .flat_map(|login| &login.verified_emails)
             .collect();
         assert!(
-            !viewer.identities.is_empty() && !emails.is_empty(),
-            "the identity that names the entity is listed with its verified email"
+            !viewer.logins.is_empty() && !emails.is_empty(),
+            "the login that names the identity is listed with its verified email"
         );
         let capabilities: Capabilities = get(&ann, "/api/capabilities").await;
         assert_eq!(capabilities, Capabilities::from(service.capabilities()));
         assert!(capabilities.sse && capabilities.mcp && !capabilities.assistant);
     }
 
-    /// H3: a user goes by the entity their verified email names, else by the name their
+    /// H3: a user goes by the identity their verified email names, else by the name their
     /// sign-in gave; a user that does not exist is left out, and a request for more users
     /// than a page holds is refused.
     #[tokio::test]
-    async fn a_user_goes_by_their_entity_else_their_sign_in_name() {
+    async fn a_user_goes_by_their_identity_else_their_sign_in_name() {
         let world = World::start().await;
         let ann = world.vendor_after(3).await;
         let bob = world.signed_in("bob");
@@ -176,9 +179,9 @@ mod in_process {
         };
         let deployment: Deployment = get(&ann, "/api/deployment").await;
         let lead = deployment
-            .entities
+            .identities
             .values()
-            .find(|entity| entity.key.as_str() == "e_lead")
+            .find(|identity| identity.key.as_str() == "who_k3d7qm2xw5tn6pfa")
             .unwrap();
         assert_eq!(name_of(&ann_user), Some(lead.name.to_string()));
         assert_eq!(name_of(&bob_user), Some("bob".to_owned()));
@@ -219,7 +222,10 @@ mod in_process {
             "2026-10-05",
             "today in the deployment's zone"
         );
-        assert_eq!(document.inputs.viewer, ["e_lead".parse().unwrap()].into());
+        assert_eq!(
+            document.inputs.viewer,
+            ["who_k3d7qm2xw5tn6pfa".parse().unwrap()].into()
+        );
 
         let deployment = world.service.deployment().await.unwrap();
         let today = support::settings().today("2026-10-06T03:00:00Z".parse().unwrap());

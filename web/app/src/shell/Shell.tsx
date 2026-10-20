@@ -24,7 +24,7 @@ function Rail({ pathname }: { pathname: string }) {
     { to: HOME_PATH, label: "Home", on: section === "home" },
     { to: indexPath(), label: "Journeys", on: section === "journeys" },
     { to: ROUTES_INDEX_PATH, label: "Routes", on: section === "routes" },
-    { to: pathTo("entities"), label: "Entities", on: section === "entities" },
+    { to: pathTo("identities"), label: "Identities", on: section === "identities" },
   ];
   return (
     <aside className="rail">

@@ -46,8 +46,8 @@ test("the in-browser host boots, derives in the worker, applies a patch, and sur
   expect(await page.evaluate(() => (window as unknown as { seenErrors: string[] }).seenErrors)).toEqual([]);
 
   // A tab kept open across a deployment: a screen's file is gone, the frame stays, another screen opens.
-  await page.route(/\/(src\/people|assets)\/Entities[.-]/, (route) => route.abort());
-  await page.getByRole("navigation", { name: "Screens", exact: true }).getByRole("link", { name: "Entities" }).click();
+  await page.route(/\/(src\/people|assets)\/Identities[.-]/, (route) => route.abort());
+  await page.getByRole("navigation", { name: "Screens", exact: true }).getByRole("link", { name: "Identities" }).click();
   await expect(page.getByTestId("load-failure").getByRole("button", { name: "Reload" })).toBeVisible();
   await expect(syncChip(page)).toBeVisible();
   await goWithin(page, "/");

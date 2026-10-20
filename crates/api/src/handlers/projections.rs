@@ -1,5 +1,5 @@
 //! The derived reads (ARCHITECTURE, HTTP API: Resources; I1, I3, C8): every projection of a
-//! journey, derived by the service at the caller's today with their entities as the viewer,
+//! journey, derived by the service at the caller's today with their identities as the viewer,
 //! answered with the revisions it came from; node detail with its explanation lists capped
 //! and pageable; and history by page.
 

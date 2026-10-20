@@ -52,7 +52,7 @@ use std::collections::BTreeSet;
 
 use cairn_schema::limits::{NODE_COUNT_MAX, WEIGHT_MAX};
 use cairn_schema::{
-    Contribution, EntityKey, KindKey, NodeKey, NodeKind, OwnerFactor, RankConstants, Relevance,
+    Contribution, IdentityKey, KindKey, NodeKey, NodeKind, OwnerFactor, RankConstants, Relevance,
     Score, UndecidedDiscount,
 };
 
@@ -98,7 +98,7 @@ pub struct Priority {
     /// Per node: in scope and not closed.
     open: Vec<bool>,
     /// Per node: its owners (E2), which the owner factor compares.
-    owners: Vec<BTreeSet<EntityKey>>,
+    owners: Vec<BTreeSet<IdentityKey>>,
     /// Per node in the normalization set: the nodes completing it would unblock.
     unblocks: Vec<Vec<NodeIndex>>,
     unlocks: Vec<Score>,
@@ -184,7 +184,7 @@ impl Priority {
         };
         self.counted.push(counted);
         self.owners
-            .push(participation.entities(key, &KindKey::owner()).clone());
+            .push(participation.identities(key, &KindKey::owner()).clone());
     }
 
     /// The discount's thousandths when undecided, else a thousand.
@@ -341,7 +341,7 @@ impl Priority {
 
     /// One unblocked target's term: its weight, discounted when undecided, times the owner
     /// factor when its owners and `acting` differ.
-    fn term(&self, target: usize, acting: Option<&BTreeSet<EntityKey>>) -> (u64, bool) {
+    fn term(&self, target: usize, acting: Option<&BTreeSet<IdentityKey>>) -> (u64, bool) {
         let weight = u64::from(self.weights.get(target).copied().unwrap_or(0));
         let undecided = self.undecided.get(target).copied().unwrap_or(false);
         let other = !same_owner(acting, self.owners.get(target));
@@ -358,7 +358,7 @@ impl Priority {
     fn unlocks_at(
         &self,
         at: usize,
-        acting: Option<&BTreeSet<EntityKey>>,
+        acting: Option<&BTreeSet<IdentityKey>>,
     ) -> (Score, Vec<Contribution>) {
         let targets = self.unblocks.get(at).map_or(&[][..], Vec::as_slice);
         let mut contributions: Vec<Contribution> = targets
@@ -382,9 +382,12 @@ impl Priority {
 }
 
 /// The owner factor's test (Priority): the target's owners and the acting owners share an
-/// entity, or neither has any. A target no one owns differs from an owned node, and an owned
+/// identity, or neither has any. A target no one owns differs from an owned node, and an owned
 /// target from an unowned node.
-fn same_owner(acting: Option<&BTreeSet<EntityKey>>, target: Option<&BTreeSet<EntityKey>>) -> bool {
+fn same_owner(
+    acting: Option<&BTreeSet<IdentityKey>>,
+    target: Option<&BTreeSet<IdentityKey>>,
+) -> bool {
     let empty = BTreeSet::new();
     let acting = acting.unwrap_or(&empty);
     let target = target.unwrap_or(&empty);
@@ -485,9 +488,9 @@ impl Priority {
     }
 
     /// Priority, "prioritize for me": the node's unlocks with the owner factor relative to
-    /// the viewer's entities rather than the node's owners.
+    /// the viewer's identities rather than the node's owners.
     #[must_use]
-    pub fn unlocks_for(&self, key: &NodeKey, viewer: &BTreeSet<EntityKey>) -> Score {
+    pub fn unlocks_for(&self, key: &NodeKey, viewer: &BTreeSet<IdentityKey>) -> Score {
         self.at(key)
             .map(|at| self.unlocks_at(at, Some(viewer)).0)
             .unwrap_or_default()

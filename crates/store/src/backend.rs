@@ -7,7 +7,7 @@
 use std::collections::{BTreeMap, BTreeSet};
 
 use cairn_schema::{
-    ChangeSet, Deployment, Domain, EntityKey, EventType, Graph, GraphId, GraphRecord, JourneyId,
+    ChangeSet, Deployment, Domain, EventType, Graph, GraphId, GraphRecord, IdentityKey, JourneyId,
     JourneyState, Limit, Location, NodeKey, PatchReceipt, PatchTarget, ProposalId, Record,
     RecordKey, Rejection, RetiredKey, RetiredKeys, Revision, RevisionConflict, RevisionOf, Slug,
     Subject, TouchedSet, Violation, ViolationCode, Violations, Write, limits::GRAPH_BYTES_MAX,
@@ -17,7 +17,7 @@ use crate::commit::{Commit, CommitError, Committed, StoreError};
 
 pub mod query;
 
-use query::entity_keys_in;
+use query::identity_keys_in;
 
 /// What a commit's change set says about itself, checked before anything is read.
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -28,26 +28,26 @@ pub struct Shape {
     pub advances: RevisionOf,
     /// The revision it produces.
     pub revision: Revision,
-    /// The entity keys the change set creates (E6), wherever they ride.
-    pub created_entities: BTreeSet<EntityKey>,
-    /// A patch outside the deployment that writes entities: the deployment revision moves
+    /// The identity keys the change set creates (E6), wherever they ride.
+    pub created_identities: BTreeSet<IdentityKey>,
+    /// A patch outside the deployment that writes identities: the deployment revision moves
     /// too (E6).
     pub bumps_deployment: bool,
     /// The journey a hard delete removes (A19).
     pub deletes_journey: Option<JourneyId>,
     /// Every graph the change set writes into.
     pub graphs: BTreeSet<GraphId>,
-    /// Whether the change set writes the deployment's entities or aliases.
+    /// Whether the change set writes the deployment's identities or aliases.
     pub writes_deployment: bool,
-    /// Whether it writes a graph record that names an entity (an answer, a role fill, a
-    /// participation, a node): what an entity merge checks journeys for (E6).
-    pub references_entities: bool,
+    /// Whether it writes a graph record that names an identity (an answer, a role fill, a
+    /// participation, a node): what an identity merge checks journeys for (E6).
+    pub references_identities: bool,
 }
 
 impl Shape {
     /// The rules a change set must follow whatever the stored state: its receipt names the
     /// target's domain and the revision after the base; its events are the patch's, in
-    /// order; and every write stays in the domain, except entity creates riding in another
+    /// order; and every write stays in the domain, except identity creates riding in another
     /// domain's patch (E6) and a hard-deleted journey's id (A19).
     ///
     /// # Errors
@@ -78,12 +78,12 @@ impl Shape {
             domain,
             advances,
             revision: receipt.revision,
-            created_entities: BTreeSet::new(),
+            created_identities: BTreeSet::new(),
             bumps_deployment: false,
             deletes_journey: None,
             graphs: BTreeSet::new(),
             writes_deployment: false,
-            references_entities: false,
+            references_identities: false,
         };
         for event in &change_set.events {
             for write in &event.delta {
@@ -93,21 +93,21 @@ impl Shape {
         Ok(shape)
     }
 
-    /// Whether an entity an event of `event_type` puts is a new one: an entity create, or a
-    /// proposal applied to a journey or route, whose mutations may create entities (they ride
+    /// Whether an identity an event of `event_type` puts is a new one: an identity create, or a
+    /// proposal applied to a journey or route, whose mutations may create identities (they ride
     /// in any patch) but never edit one (deployment only).
-    fn creates_entity(&self, event_type: EventType) -> bool {
-        event_type == EventType::EntityCreated
+    fn creates_identity(&self, event_type: EventType) -> bool {
+        event_type == EventType::IdentityCreated
             || (event_type == EventType::ProposalApplied && self.domain != Domain::Deployment)
     }
 
     fn classify(&mut self, write: &Write, event_type: EventType) -> Result<(), StoreError> {
         let key = match write {
             Write::Put(record) => {
-                if let Record::Entity(entity) = record
-                    && self.creates_entity(event_type)
+                if let Record::Identity(identity) = record
+                    && self.creates_identity(event_type)
                 {
-                    self.created_entities.insert(entity.key.clone());
+                    self.created_identities.insert(identity.key.clone());
                 }
                 record.key()
             }
@@ -123,18 +123,18 @@ impl Shape {
             self.graphs.insert(graph.clone());
         }
         if let Write::Put(Record::Graph { record, .. }) = write
-            && names_an_entity(record)
+            && names_an_identity(record)
         {
-            self.references_entities = true;
+            self.references_identities = true;
         }
-        if matches!(key, RecordKey::Entity(_) | RecordKey::EntityAlias(_)) {
+        if matches!(key, RecordKey::Identity(_) | RecordKey::IdentityAlias(_)) {
             self.writes_deployment = true;
         }
         if key.domain() == self.domain {
             return Ok(());
         }
         let riding_create =
-            matches!(write, Write::Put(Record::Entity(_))) && self.creates_entity(event_type);
+            matches!(write, Write::Put(Record::Identity(_))) && self.creates_identity(event_type);
         let own_deletion = matches!(
             (write, &self.domain),
             (Write::Put(Record::DeletedJourney { journey, .. }), Domain::Journey(target)) if journey == target
@@ -153,8 +153,8 @@ impl Shape {
     }
 }
 
-/// Whether a graph record names an entity key anywhere in its written form.
-fn names_an_entity(record: &GraphRecord) -> bool {
+/// Whether a graph record names an identity key anywhere in its written form.
+fn names_an_identity(record: &GraphRecord) -> bool {
     let named = matches!(
         record,
         GraphRecord::Answer { .. }
@@ -162,7 +162,8 @@ fn names_an_entity(record: &GraphRecord) -> bool {
             | GraphRecord::Participation { .. }
             | GraphRecord::Node(_)
     );
-    named && serde_json::to_value(record).is_ok_and(|written| !entity_keys_in(&written).is_empty())
+    named
+        && serde_json::to_value(record).is_ok_and(|written| !identity_keys_in(&written).is_empty())
 }
 
 /// The events are the receipt's patch's, numbered from 0 in order, each in the patch's
@@ -202,14 +203,14 @@ pub struct StoredReceipt {
     /// The proposal the patch targeted, when it did: its revision is the receipt's.
     pub proposal: Option<ProposalId>,
     /// The deployment revision the commit produced, when it moved it: a deployment patch,
-    /// or an entity create riding in another domain's patch (E6).
+    /// or an identity create riding in another domain's patch (E6).
     pub deployment_revision: Option<Revision>,
     /// The revisions the commit left the proposals it wrote at, when it targeted a domain
     /// (applying a proposal writes it from its destination's patch, I6); 0 for a proposal it
     /// removed, directly or by hard-deleting its journey (A19). The backend adds the
     /// proposals a hard delete takes, which the change set does not name.
     pub proposals: BTreeMap<ProposalId, Revision>,
-    /// What the commit wrote in the deployment, kept with the receipt: a riding entity
+    /// What the commit wrote in the deployment, kept with the receipt: a riding identity
     /// create's event is in its journey's log, which a hard delete removes (A19), and a
     /// stale deployment patch must still be told what moved (H5).
     pub deployment_touched: TouchedSet,
@@ -319,19 +320,19 @@ pub fn resubmission(
 }
 
 /// The rejection listing every violation found, each once (two checks can find one problem:
-/// an entity created at an alias's key is both a taken key and an alias that is an
-/// entity), or nothing when there are none.
+/// an identity created at an alias's key is both a taken key and an alias that is an
+/// identity), or nothing when there are none.
 ///
 /// # Errors
 ///
 /// [`Rejection::Invalid`] with the violations.
 pub fn reject_violations(mut violations: Vec<Violation>) -> Result<(), CommitError> {
     // A key taken is one problem however it was found; other violations of one code on one
-    // subject are distinct problems (two emails another entity holds), told apart by message.
+    // subject are distinct problems (two emails another identity holds), told apart by message.
     let mut seen = BTreeSet::new();
     violations.retain(|violation| {
         let detail =
-            (violation.code != ViolationCode::EntityKeyTaken).then(|| violation.message.clone());
+            (violation.code != ViolationCode::IdentityKeyTaken).then(|| violation.message.clone());
         seen.insert((violation.code, violation.at.subject.clone(), detail))
     });
     if violations.is_empty() {
@@ -383,66 +384,69 @@ pub fn deleted_journey(journey: &JourneyId) -> Violation {
     )
 }
 
-/// E6: entity creates whose key is already an entity or an alias, against the deployment
+/// E6: identity creates whose key is already an identity or an alias, against the deployment
 /// as it was before the commit.
-fn taken_entity_keys(created: &BTreeSet<EntityKey>, before: &Deployment) -> Vec<Violation> {
+fn taken_identity_keys(created: &BTreeSet<IdentityKey>, before: &Deployment) -> Vec<Violation> {
     created
         .iter()
-        .filter(|key| before.entities.get(key).is_some() || before.aliases.contains_key(key))
+        .filter(|key| before.identities.get(key).is_some() || before.aliases.contains_key(key))
         .map(|key| {
             violation(
-                ViolationCode::EntityKeyTaken,
-                Subject::Entity(key.clone()),
-                format!("entity key {key} is already an entity or an alias"),
+                ViolationCode::IdentityKeyTaken,
+                Subject::Identity(key.clone()),
+                format!("identity key {key} is already an identity or an alias"),
             )
         })
         .collect()
 }
 
-/// The checks on the entities a commit creates, made before its writes are applied: each
-/// key not already taken ([`taken_entity_keys`]), and, for creates riding in a journey's or
-/// route's patch, the deployment within its entity limit ([`entity_count_violation`]). A
+/// The checks on the identities a commit creates, made before its writes are applied: each
+/// key not already taken ([`taken_identity_keys`]), and, for creates riding in a journey's or
+/// route's patch, the deployment within its identity limit ([`identity_count_violation`]). A
 /// deployment patch is checked against the deployment revision it was validated at, and may
-/// remove entities (a merge) before it creates one, so the engine's count already holds for it.
+/// remove identities (a merge) before it creates one, so the engine's count already holds for it.
 ///
 /// # Errors
 ///
 /// The rejection, at once, when riding creates would overfill the deployment: the commit's
 /// writes could not be applied to check anything else.
-pub fn entity_create_violations(
+pub fn identity_create_violations(
     shape: &Shape,
     before: &Deployment,
 ) -> Result<Vec<Violation>, CommitError> {
-    let created = &shape.created_entities;
-    let mut violations = taken_entity_keys(created, before);
+    let created = &shape.created_identities;
+    let mut violations = taken_identity_keys(created, before);
     if shape.domain == Domain::Deployment {
         return Ok(violations);
     }
-    if let Some(full) = entity_count_violation(created, before) {
+    if let Some(full) = identity_count_violation(created, before) {
         violations.push(full);
         return Err(rejection(violations));
     }
     Ok(violations)
 }
 
-/// PRACTICES, Explicit limits: the entities a commit creates fit under
-/// `entity_count_per_deployment_max` on top of those the deployment already holds. A create
+/// PRACTICES, Explicit limits: the identities a commit creates fit under
+/// `identity_count_per_deployment_max` on top of those the deployment already holds. A create
 /// riding in a journey patch takes no deployment revision (E6), so two patches validated
 /// against the same deployment can each fit and together not; the commit is where that shows.
 /// Checked before the commit's writes are applied, which could not hold the overflow.
-fn entity_count_violation(created: &BTreeSet<EntityKey>, before: &Deployment) -> Option<Violation> {
+fn identity_count_violation(
+    created: &BTreeSet<IdentityKey>,
+    before: &Deployment,
+) -> Option<Violation> {
     let added = created
         .iter()
-        .filter(|key| before.entities.get(key).is_none())
+        .filter(|key| before.identities.get(key).is_none())
         .count();
-    let exceeded = Limit::EntityCountPerDeployment
-        .check(before.entities.len() + added)
+    let exceeded = Limit::IdentityCountPerDeployment
+        .check(before.identities.len() + added)
         .err()?;
     let mut found = violation(
         ViolationCode::LimitExceeded,
         Subject::Deployment,
         format!(
-            "the deployment would hold {} entities, past {}",
+            "the deployment would hold {} identities, past {}",
             exceeded.count,
             exceeded.limit.name()
         ),
@@ -451,35 +455,35 @@ fn entity_count_violation(created: &BTreeSet<EntityKey>, before: &Deployment) ->
     Some(found)
 }
 
-/// E6, H3: the deployment a commit produced keeps aliases off entity keys and pointing at an
-/// entity, and each email on one entity.
+/// E6, H3: the deployment a commit produced keeps aliases off identity keys and pointing at an
+/// identity, and each email on one identity.
 #[must_use]
 pub fn deployment_violations(deployment: &Deployment) -> Vec<Violation> {
     let mut violations = Vec::new();
-    for (alias, entity) in &deployment.aliases {
-        if deployment.entities.get(alias).is_some() {
+    for (alias, identity) in &deployment.aliases {
+        if deployment.identities.get(alias).is_some() {
             violations.push(violation(
-                ViolationCode::EntityKeyTaken,
-                Subject::Entity(alias.clone()),
-                format!("{alias} is both an entity and an alias"),
+                ViolationCode::IdentityKeyTaken,
+                Subject::Identity(alias.clone()),
+                format!("{alias} is both an identity and an alias"),
             ));
         }
-        if deployment.entities.get(entity).is_none() {
+        if deployment.identities.get(identity).is_none() {
             violations.push(violation(
-                ViolationCode::EntityUnresolved,
-                Subject::Entity(alias.clone()),
-                format!("alias {alias} points at {entity}, which is not an entity"),
+                ViolationCode::IdentityUnresolved,
+                Subject::Identity(alias.clone()),
+                format!("alias {alias} points at {identity}, which is not an identity"),
             ));
         }
     }
-    let mut holders: BTreeMap<&str, &EntityKey> = BTreeMap::new();
-    for entity in deployment.entities.values() {
-        for email in &entity.emails {
-            if let Some(holder) = holders.insert(email.as_str(), &entity.key) {
+    let mut holders: BTreeMap<&str, &IdentityKey> = BTreeMap::new();
+    for identity in deployment.identities.values() {
+        for email in &identity.emails {
+            if let Some(holder) = holders.insert(email.as_str(), &identity.key) {
                 violations.push(violation(
                     ViolationCode::EmailTaken,
-                    Subject::Entity(entity.key.clone()),
-                    format!("email {email} is held by {holder} and {}", entity.key),
+                    Subject::Identity(identity.key.clone()),
+                    format!("email {email} is held by {holder} and {}", identity.key),
                 ));
             }
         }
@@ -488,7 +492,7 @@ pub fn deployment_violations(deployment: &Deployment) -> Vec<Violation> {
 }
 
 /// The checks on one graph a commit wrote: within `graph_bytes_max` serialized with its
-/// state, and sibling ids unique (PRD Identity and references). Sibling uniqueness is
+/// state, and sibling ids unique (PRD Login and references). Sibling uniqueness is
 /// checked here, at the end of the commit, rather than by a unique index, since a patch may
 /// swap two siblings' ids and pass through a duplicate on the way
 /// (decisions/2026-10-06-uniqueness-a-patch-may-pass-through-is-checked-at-the-end.md).
@@ -615,9 +619,9 @@ fn state_records(state: &JourneyState) -> Vec<GraphRecord> {
             rationale,
         });
     }
-    for (role, entities) in role_fills {
-        let (role, entities) = (role.clone(), entities.clone());
-        records.push(GraphRecord::RoleFill { role, entities });
+    for (role, identities) in role_fills {
+        let (role, identities) = (role.clone(), identities.clone());
+        records.push(GraphRecord::RoleFill { role, identities });
     }
     for (node, date) in pins {
         let (node, date) = (node.clone(), *date);
@@ -669,7 +673,7 @@ mod tests {
     use cairn_schema::{EventType, Record, Subject};
 
     #[test]
-    fn a_write_outside_the_domain_is_malformed_and_so_is_an_entity_edit_riding_in() {
+    fn a_write_outside_the_domain_is_malformed_and_so_is_an_identity_edit_riding_in() {
         let foreign = build::journey_patch("p_one", "j_one", 1)
             .event(
                 EventType::NodeAdded,
@@ -684,10 +688,10 @@ mod tests {
 
         let edit_riding = build::journey_patch("p_three", "j_one", 1)
             .event(
-                EventType::EntityEdited,
-                Subject::Entity(id("e_new")),
-                vec![Write::Put(Record::Entity(build::entity(
-                    "e_new",
+                EventType::IdentityEdited,
+                Subject::Identity(id("who_new")),
+                vec![Write::Put(Record::Identity(build::identity(
+                    "who_new",
                     "Renamed",
                     &[],
                 )))],
@@ -710,9 +714,9 @@ mod tests {
     fn a_receipt_moved_past_a_revision_by_what_it_advanced() {
         let journey = RevisionOf::Domain(Domain::Journey(id("j_one")));
         let deployment = RevisionOf::Domain(Domain::Deployment);
-        let riding = build::create_entity(
+        let riding = build::create_identity(
             build::journey_patch("p_one", "j_one", 4),
-            build::entity("e_new", "New", &[]),
+            build::identity("who_new", "New", &[]),
         )
         .commit();
         let shape = Shape::of(&riding).unwrap();

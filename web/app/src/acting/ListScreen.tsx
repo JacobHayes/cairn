@@ -286,7 +286,7 @@ export function ListBody({ view, state, picks, list, selected, selection }: { vi
   }, [view, allRows, entries, tree, list.sort, folds.open, placed, containers, fromBefore, was]);
   const everyLine = lines.flatMap((line) => (line.row === undefined ? [] : [line.row.key]));
   const columns = columnsOf(list, decisionColumns, layer?.mode === "reviewing");
-  const context: CellContext = { view, tree, decisions, ranks, frontier, sort: list.sort, viewer: viewer?.entities ?? [], onFold: folds.fold };
+  const context: CellContext = { view, tree, decisions, ranks, frontier, sort: list.sort, viewer: viewer?.identities ?? [], onFold: folds.fold };
   const error = levelError ?? rowsError;
   return (
     <section className="stack list" aria-label="List" data-testid="list">

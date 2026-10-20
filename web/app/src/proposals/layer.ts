@@ -4,7 +4,7 @@
 // sends. The views read it from `LayerContext` (one value, provided by the destination's page),
 // so a page needs no parameter threaded through it, and the one gate on every live write reads
 // it too (`useReviewing`). The pure functions beside the context are what the unit tests check:
-// which nodes are marked how, how removed things are put back in place, the entities' diff, and
+// which nodes are marked how, how removed things are put back in place, the identities' diff, and
 // which proposal revision Apply may send.
 import type { Schema } from "@cairn/client";
 import { createContext, useContext } from "react";
@@ -118,7 +118,7 @@ export function useLayer(): Layer | undefined {
 /**
  * The layer while a proposal is under review, or none: the one gate every live write on a page
  * reads. Acting on a picture of the future would be wrong, so the shared entries of node
- * actions, authoring, the header's write items and the entities' forms draw nothing under it.
+ * actions, authoring, the header's write items and the identities' forms draw nothing under it.
  */
 export function useReviewing(): Layer | undefined {
   const layer = useContext(LayerContext);
@@ -214,31 +214,31 @@ export function withRemoved(after: CanvasModel, before: CanvasModel | undefined,
   return { model: { cards, lines: [...lines.values()] }, removedLines, shrunk };
 }
 
-/** One entity row of the entities' diff: the entity, and what the proposal does to it. */
-export interface EntityMark {
+/** One identity row of the identities' diff: the identity, and what the proposal does to it. */
+export interface IdentityMark {
   kind: DiffKind;
-  /** A removed entity merged into another: the survivor's key. */
+  /** A removed identity merged into another: the survivor's key. */
   into?: string;
 }
 
-/** The people the entities' page lists, in the order it lists them, each with its mark (none for an entity the proposal leaves alone). */
-export interface EntityRow {
-  entity: Schema<"Entity">;
-  mark: EntityMark | undefined;
+/** The people the identities' page lists, in the order it lists them, each with its mark (none for an identity the proposal leaves alone). */
+export interface IdentityRow {
+  identity: Schema<"Identity">;
+  mark: IdentityMark | undefined;
 }
 
 /**
- * C14: the entities after, with each row marked against the entities before: a new key is added,
+ * C14: the identities after, with each row marked against the identities before: a new key is added,
  * a name or emails that differ is changed (a survivor that took a merged one's emails included),
  * and a key that is now an alias is removed, kept where it was and saying whom it was merged into
  * (the end of the alias chain). The engine made the after, merges included; this only compares.
  */
-export function entityDiff(before: Deployment, after: Deployment | undefined): EntityRow[] {
-  const was = before.entities ?? [];
+export function identityDiff(before: Deployment, after: Deployment | undefined): IdentityRow[] {
+  const was = before.identities ?? [];
   if (after === undefined) {
-    return was.map((entity) => ({ entity, mark: undefined }));
+    return was.map((identity) => ({ identity, mark: undefined }));
   }
-  const now = after.entities ?? [];
+  const now = after.identities ?? [];
   const aliases = after.aliases ?? {};
   const survivor = (key: string): string => {
     let at = key;
@@ -247,20 +247,20 @@ export function entityDiff(before: Deployment, after: Deployment | undefined): E
     }
     return at;
   };
-  const kept = new Map(now.map((entity) => [entity.key, entity]));
-  const rows: EntityRow[] = was.map((entity) => {
-    const next = kept.get(entity.key);
+  const kept = new Map(now.map((identity) => [identity.key, identity]));
+  const rows: IdentityRow[] = was.map((identity) => {
+    const next = kept.get(identity.key);
     if (next === undefined) {
-      const into = survivor(entity.key);
-      return { entity, mark: { kind: "removed", ...(into === entity.key ? {} : { into }) } };
+      const into = survivor(identity.key);
+      return { identity, mark: { kind: "removed", ...(into === identity.key ? {} : { into }) } };
     }
-    const same = JSON.stringify([entity.name, entity.emails ?? []]) === JSON.stringify([next.name, next.emails ?? []]);
-    return { entity: next, mark: same ? undefined : { kind: "changed" } };
+    const same = JSON.stringify([identity.name, identity.emails ?? []]) === JSON.stringify([next.name, next.emails ?? []]);
+    return { identity: next, mark: same ? undefined : { kind: "changed" } };
   });
-  const known = new Set(was.map((entity) => entity.key));
-  const created = now.filter((entity) => !known.has(entity.key)).map((entity): EntityRow => ({ entity, mark: { kind: "added" } }));
+  const known = new Set(was.map((identity) => identity.key));
+  const created = now.filter((identity) => !known.has(identity.key)).map((identity): IdentityRow => ({ identity, mark: { kind: "added" } }));
   // The page's own order, by name, so a proposal's creations and renames sit where the directory lists them.
-  return [...rows, ...created].sort((left, right) => left.entity.name.localeCompare(right.entity.name) || left.entity.key.localeCompare(right.entity.key));
+  return [...rows, ...created].sort((left, right) => left.identity.name.localeCompare(right.identity.name) || left.identity.key.localeCompare(right.identity.key));
 }
 
 /** The nodes of a level that lists rows: the key, and the drawn node it is drawn under. */

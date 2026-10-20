@@ -21,7 +21,7 @@ import { overBytes } from "../authoring/limits.ts";
 import { STEP_WORDS, stepOf, stepsFor } from "../canvas/ladder.ts";
 import type { Step } from "../canvas/model.ts";
 import type { GraphNode, Ready } from "../detail/model.ts";
-import { entityName } from "../detail/sections.tsx";
+import { identityName } from "../detail/sections.tsx";
 import type { Screen } from "../journeys/address.ts";
 import { FILTER_FLAGS, filterChanged, filterChips, isStock, stockView, useViewState, withViewState, type ViewFilter } from "../journeys/view.ts";
 import { useMedia, PHONE_WIDTH } from "../shell/frame.tsx";
@@ -159,7 +159,7 @@ export function FilterBody({ subject, screen }: { subject: ViewSubject; screen: 
     onState({ ...state, filter: { ...filter, ...changed } });
   };
   const { journey } = subject;
-  const owners = (journey?.inputs.deployment.entities ?? []).map((entity) => ({ key: entity.key, text: journey === undefined ? entity.key : entityName(journey, entity.key) }));
+  const owners = (journey?.inputs.deployment.identities ?? []).map((identity) => ({ key: identity.key, text: journey === undefined ? identity.key : identityName(journey, identity.key) }));
   const reason = CLASS_REASON[screen];
   return (
     <div className="stack" role="group" aria-label="Filter" data-testid="filter-body">
@@ -386,7 +386,7 @@ export function ViewBar({ subject, screen, end, badges }: { subject: ViewSubject
   const { pathname, search } = useLocation();
   const { state } = useViewState();
   const { journey } = subject;
-  const chips = filterChips(state, (key) => (journey === undefined ? key : entityName(journey, key))).map((chip) => ({ id: chip.id, label: chip.label, without: `${pathname}${withViewState(search, chip.without)}` }));
+  const chips = filterChips(state, (key) => (journey === undefined ? key : identityName(journey, key))).map((chip) => ({ id: chip.id, label: chip.label, without: `${pathname}${withViewState(search, chip.without)}` }));
   return (
     <div className="view-bar stack">
       <ViewControls subject={subject} screen={screen} end={end} badges={badges} />

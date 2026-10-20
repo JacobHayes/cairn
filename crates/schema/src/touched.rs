@@ -176,7 +176,7 @@ impl Mutation {
         graph_keys.unwrap_or_else(|| self.domain_keys(target.domain()))
     }
 
-    /// Records outside the graph: headers, entities, proposals, or the whole domain.
+    /// Records outside the graph: headers, identities, proposals, or the whole domain.
     fn domain_keys(&self, domain: Domain) -> TouchedSet {
         let keys = match (self, &domain) {
             (
@@ -191,18 +191,18 @@ impl Mutation {
             ) => {
                 vec![RecordKey::RouteHeader(route.clone())]
             }
-            (Mutation::CreateEntity { entity } | Mutation::EditEntity { entity }, _) => {
-                vec![RecordKey::Entity(entity.key.clone())]
+            (Mutation::CreateIdentity { identity } | Mutation::EditIdentity { identity }, _) => {
+                vec![RecordKey::Identity(identity.key.clone())]
             }
             (
-                Mutation::MergeEntities {
+                Mutation::MergeIdentities {
                     survivor, merged, ..
                 },
                 _,
             ) => vec![
-                RecordKey::Entity(survivor.clone()),
-                RecordKey::Entity(merged.clone()),
-                RecordKey::EntityAlias(merged.clone()),
+                RecordKey::Identity(survivor.clone()),
+                RecordKey::Identity(merged.clone()),
+                RecordKey::IdentityAlias(merged.clone()),
             ],
             (Mutation::ApplyProposal { proposal, .. }, _) => vec![
                 RecordKey::Domain(domain.clone()),

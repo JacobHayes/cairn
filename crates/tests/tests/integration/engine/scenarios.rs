@@ -68,15 +68,16 @@ fn answered(name: &str) -> BTreeSet<cairn_schema::NodeKey> {
         .collect()
 }
 
-/// E6: the deployment's revision after a fixture's scenario: one for each step that creates
-/// entities, directly or in the proposal it drafts (whose creates ride in its apply).
-fn entity_steps(name: &str) -> u32 {
+/// E6: the deployment's revision after a fixture's scenario: one for the shared people, and one
+/// for each step that creates identities, directly or in the proposal it drafts (whose creates
+/// ride in its apply).
+fn identity_steps(name: &str) -> u32 {
     let creates = |step: &Vec<Mutation>| {
         step.iter()
-            .any(|mutation| matches!(mutation, Mutation::CreateEntity { .. }))
+            .any(|mutation| matches!(mutation, Mutation::CreateIdentity { .. }))
     };
     let steps = submitted(name).iter().filter(|step| creates(step)).count();
-    u32::try_from(steps).unwrap()
+    1 + u32::try_from(steps).unwrap()
 }
 
 fn only_graph(records: &cairn_engine::Records) -> &Graph {
@@ -88,7 +89,7 @@ fn state_of(graph: &Graph, node: &str) -> State {
 }
 
 /// B1, B6, B10, E6: the placeholder is broken down into the children it names, completing
-/// the baseline lifted its snooze, the final report is pinned, and an entity is created and
+/// the baseline lifted its snooze, the final report is pinned, and an identity is created and
 /// used in one patch.
 #[test]
 fn the_vendor_evaluation_ends_broken_down_and_pinned() {
@@ -117,15 +118,15 @@ fn the_vendor_evaluation_ends_broken_down_and_pinned() {
     let deployment = &records.deployment;
     assert!(
         deployment
-            .entities
-            .get(&"e_reviewer".parse().unwrap())
+            .identities
+            .get(&"who_j5v2nx6cwr4tdkq7".parse().unwrap())
             .is_some(),
         "E6"
     );
     assert_eq!(
         deployment.revision.get(),
-        entity_steps("vendor-evaluation"),
-        "each patch that created entities moved the deployment once (E6)"
+        identity_steps("vendor-evaluation"),
+        "each patch that created identities moved the deployment once (E6)"
     );
 }
 
@@ -147,7 +148,7 @@ fn the_hiring_loop_ends_with_explicit_panelists() {
     for interview in interviews {
         let source = interview.participations.as_map().values().next();
         assert!(
-            matches!(source, Some(ParticipationSource::Entities(found)) if found.len() == 1),
+            matches!(source, Some(ParticipationSource::Identities(found)) if found.len() == 1),
             "one explicit panelist each (B10)"
         );
     }
@@ -167,7 +168,7 @@ fn the_product_launch_records_a_late_actual() {
 }
 
 /// B1, I6, E6: the proposal is applied, a role is declared on the journey, and the
-/// proposal's entity creates rode in its apply.
+/// proposal's identity creates rode in its apply.
 #[test]
 fn the_bake_off_applies_its_proposal() {
     let records = finished("bake-off");
@@ -181,5 +182,8 @@ fn the_bake_off_applies_its_proposal() {
     );
     assert!(graph.roles.get(&"r_judges".parse().unwrap()).is_some());
     assert_eq!(state_of(graph, "n_trial_a"), State::Active);
-    assert_eq!(records.deployment.revision.get(), entity_steps("bake-off"));
+    assert_eq!(
+        records.deployment.revision.get(),
+        identity_steps("bake-off")
+    );
 }

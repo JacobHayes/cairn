@@ -1,6 +1,6 @@
 //! Limits a patch reaches one write at a time (PRACTICES, Explicit limits): resources, notes,
-//! and links per node, entities per deployment, and the emails and aliases a merge joins onto
-//! one entity. Each is accepted at its limit and rejected one past it, naming the limit.
+//! and links per node, identities per deployment, and the emails and aliases a merge joins onto
+//! one identity. Each is accepted at its limit and rejected one past it, naming the limit.
 
 #![cfg(test)]
 
@@ -74,12 +74,12 @@ fn notes_and_links_per_node_and_on_the_journey_at_and_past_their_limits() {
     }
 }
 
-fn create_entity(key: &str, emails: u32) -> String {
+fn create_identity(key: &str, emails: u32) -> String {
     let emails: Vec<String> = (0..emails)
         .map(|n| format!("{key}.{n}@example.org"))
         .collect();
     format!(
-        "- op: create_entity\n  entity: {{key: {key}, name: Someone, emails: [{}]}}\n",
+        "- op: create_identity\n  identity: {{key: {key}, name: Someone, emails: [{}]}}\n",
         emails.join(", ")
     )
 }
@@ -98,7 +98,7 @@ fn merge_then(
     for (survivor, merged) in pairs {
         writeln!(
             merges,
-            "- op: merge_entities\n  survivor: {survivor}\n  merged: {merged}\n  journeys: {{}}"
+            "- op: merge_identities\n  survivor: {survivor}\n  merged: {merged}\n  journeys: {{}}"
         )
         .unwrap();
     }
@@ -108,12 +108,12 @@ fn merge_then(
 }
 
 #[test]
-fn entities_per_deployment_at_and_past_the_limit() {
-    let limit = Limit::EntityCountPerDeployment;
-    let add = |index: u32| create_entity(&format!("e_{index}"), 0);
+fn identities_per_deployment_at_and_past_the_limit() {
+    let limit = Limit::IdentityCountPerDeployment;
+    let add = |index: u32| create_identity(&format!("who_{index}"), 0);
     let full = support::accepted(&a_journey_with_a_node(), &repeated(limit.max(), add));
     assert_eq!(
-        full.deployment.entities.len(),
+        full.deployment.identities.len(),
         usize::try_from(limit.max()).unwrap()
     );
     let past = support::journey_patch(&full, &add(limit.max()));
@@ -122,21 +122,22 @@ fn entities_per_deployment_at_and_past_the_limit() {
 
 #[test]
 fn a_merge_joins_emails_up_to_the_limit() {
-    let limit = Limit::EmailCountPerEntity.max();
+    let limit = Limit::EmailCountPerIdentity.max();
     let half = limit / 2;
-    for (extra, expected) in [(0, vec![]), (1, vec![Some(Limit::EmailCountPerEntity)])] {
+    for (extra, expected) in [(0, vec![]), (1, vec![Some(Limit::EmailCountPerIdentity)])] {
         let created = support::accepted(
             &a_journey_with_a_node(),
-            &(create_entity("e_kept", half + extra) + &create_entity("e_gone", limit - half)),
+            &(create_identity("who_kept", half + extra)
+                + &create_identity("who_gone", limit - half)),
         );
-        match merge(&created, &[("e_kept", "e_gone")]) {
+        match merge(&created, &[("who_kept", "who_gone")]) {
             Ok(merged) => {
                 assert!(expected.is_empty(), "a merge past the limit was accepted");
                 let kept = merged
                     .records()
                     .deployment
-                    .entities
-                    .get(&"e_kept".parse().unwrap());
+                    .identities
+                    .get(&"who_kept".parse().unwrap());
                 assert_eq!(kept.unwrap().emails.len(), usize::try_from(limit).unwrap());
             }
             rejected => assert_eq!(limits_named(rejected), expected),
@@ -148,14 +149,14 @@ fn a_merge_joins_emails_up_to_the_limit() {
 /// even when a later edit in its patch would bring the survivor back within it.
 #[test]
 fn a_merge_past_the_email_limit_is_refused_though_trimmed_after() {
-    let limit = Limit::EmailCountPerEntity.max();
+    let limit = Limit::EmailCountPerIdentity.max();
     let created = support::accepted(
         &a_journey_with_a_node(),
-        &(create_entity("e_kept", limit) + &create_entity("e_gone", 1)),
+        &(create_identity("who_kept", limit) + &create_identity("who_gone", 1)),
     );
-    let trim = "- op: edit_entity\n  entity: {key: e_kept, name: Someone}\n";
-    let past = merge_then(&created, &[("e_kept", "e_gone")], trim);
-    assert_eq!(limits_named(past), [Some(Limit::EmailCountPerEntity)]);
+    let trim = "- op: edit_identity\n  identity: {key: who_kept, name: Someone}\n";
+    let past = merge_then(&created, &[("who_kept", "who_gone")], trim);
+    assert_eq!(limits_named(past), [Some(Limit::EmailCountPerIdentity)]);
 }
 
 /// A merge built in code, as a host builds one from the journeys it found, holds the same
@@ -164,7 +165,7 @@ fn a_merge_past_the_email_limit_is_refused_though_trimmed_after() {
 fn a_merge_naming_too_many_journeys_is_refused() {
     let created = support::accepted(
         &a_journey_with_a_node(),
-        &(create_entity("e_kept", 0) + &create_entity("e_gone", 0)),
+        &(create_identity("who_kept", 0) + &create_identity("who_gone", 0)),
     );
     let limit = Limit::JourneyCountPerMerge;
     let journeys = (0..=limit.max())
@@ -178,11 +179,11 @@ fn a_merge_naming_too_many_journeys_is_refused() {
     let mut patch = support::patch_to(
         &created,
         "deployment",
-        "- op: merge_entities\n  survivor: e_kept\n  merged: e_gone\n  journeys: {}\n",
+        "- op: merge_identities\n  survivor: who_kept\n  merged: who_gone\n  journeys: {}\n",
     );
-    patch.mutations = cairn_schema::Mutations::new(vec![cairn_schema::Mutation::MergeEntities {
-        survivor: "e_kept".parse().unwrap(),
-        merged: "e_gone".parse().unwrap(),
+    patch.mutations = cairn_schema::Mutations::new(vec![cairn_schema::Mutation::MergeIdentities {
+        survivor: "who_kept".parse().unwrap(),
+        merged: "who_gone".parse().unwrap(),
         journeys,
     }])
     .unwrap();
@@ -194,17 +195,17 @@ fn a_merge_naming_too_many_journeys_is_refused() {
 /// passes it, is reported for each.
 #[test]
 fn merges_add_aliases_up_to_the_limit() {
-    let limit = Limit::AliasCountPerEntity.max();
-    let survivors = ["e_a", "e_b"];
+    let limit = Limit::AliasCountPerIdentity.max();
+    let survivors = ["who_a", "who_b"];
     let merged = |survivor: &str, index: u32| format!("{survivor}_{index}");
     let mut writes = String::new();
     for survivor in survivors {
-        writes.push_str(&create_entity(survivor, 0));
+        writes.push_str(&create_identity(survivor, 0));
         writes.push_str(&repeated(limit + 1, |index| {
-            create_entity(&merged(survivor, index), 0)
+            create_identity(&merged(survivor, index), 0)
         }));
     }
-    let entities = support::accepted(&a_journey_with_a_node(), &writes);
+    let identities = support::accepted(&a_journey_with_a_node(), &writes);
     let names: Vec<(&str, String)> = survivors
         .iter()
         .flat_map(|survivor| (0..=limit).map(move |index| (*survivor, merged(survivor, index))))
@@ -215,13 +216,13 @@ fn merges_add_aliases_up_to_the_limit() {
         .collect();
     let last = format!("_{limit}");
     let (past, at): (Vec<_>, Vec<_>) = pairs.iter().partition(|(_, name)| name.ends_with(&last));
-    let full = merge(&entities, &at).unwrap_or_else(|rejection| panic!("{rejection:#?}"));
+    let full = merge(&identities, &at).unwrap_or_else(|rejection| panic!("{rejection:#?}"));
     let past = merge(full.records(), &past);
     assert_eq!(
         limits_named(past),
         [
-            Some(Limit::AliasCountPerEntity),
-            Some(Limit::AliasCountPerEntity)
+            Some(Limit::AliasCountPerIdentity),
+            Some(Limit::AliasCountPerIdentity)
         ]
     );
 }
@@ -262,16 +263,16 @@ fn an_upgrade_that_overfills_resources_is_refused_though_trimmed_after() {
     }
 }
 
-/// At the entity limit, a deployment patch that merges two entities may then create one:
+/// At the identity limit, a deployment patch that merges two identities may then create one:
 /// the count never passes the limit.
 #[test]
-fn a_merge_makes_room_for_a_create_at_the_entity_limit() {
-    let limit = Limit::EntityCountPerDeployment;
-    let add = |index: u32| create_entity(&format!("e_{index}"), 0);
+fn a_merge_makes_room_for_a_create_at_the_identity_limit() {
+    let limit = Limit::IdentityCountPerDeployment;
+    let add = |index: u32| create_identity(&format!("who_{index}"), 0);
     let full = support::accepted(&a_journey_with_a_node(), &repeated(limit.max(), add));
-    let then_create = create_entity("e_new", 0);
-    let made = merge_then(&full, &[("e_0", "e_1")], &then_create)
+    let then_create = create_identity("who_new", 0);
+    let made = merge_then(&full, &[("who_0", "who_1")], &then_create)
         .unwrap_or_else(|rejection| panic!("{rejection:#?}"));
-    let count = made.records().deployment.entities.len();
+    let count = made.records().deployment.identities.len();
     assert_eq!(count, usize::try_from(limit.max()).unwrap());
 }

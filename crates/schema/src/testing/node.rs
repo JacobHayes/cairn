@@ -2,7 +2,7 @@
 
 use proptest::prelude::*;
 
-use super::arb_entity_key;
+use super::arb_identity_key;
 use super::model::{bounded_set, bounded_vec};
 use super::{
     ArbRefs, arb_condition, arb_days, arb_markdown, arb_resource, arb_slug, arb_title, arb_weight,
@@ -61,9 +61,9 @@ fn arb_answer_spec<R: ArbRefs>() -> impl Strategy<Value = AnswerSpec<R>> {
         prop::option::of(R::arb_node_ref())
             .prop_map(|feeds_milestone| AnswerSpec::Date { feeds_milestone }),
         prop::option::of(R::arb_role_ref())
-            .prop_map(|fills_role| AnswerSpec::Entity { fills_role }),
+            .prop_map(|fills_role| AnswerSpec::Identity { fills_role }),
         prop::option::of(R::arb_role_ref())
-            .prop_map(|fills_role| AnswerSpec::EntityList { fills_role }),
+            .prop_map(|fills_role| AnswerSpec::IdentityList { fills_role }),
     ]
 }
 
@@ -132,7 +132,7 @@ pub fn arb_payload<R: ArbRefs>() -> impl Strategy<Value = Payload<R>> {
 pub fn arb_participations<R: ArbRefs>() -> impl Strategy<Value = Participations<R>> {
     let source = prop_oneof![
         R::arb_role_ref().prop_map(ParticipationSource::Role),
-        arb_entity_set().prop_map(ParticipationSource::Entities),
+        arb_identity_set().prop_map(ParticipationSource::Identities),
     ];
     prop::collection::btree_map(R::arb_kind_ref(), source, 0..3).prop_map(|map| {
         match Participations::try_from(map) {
@@ -188,9 +188,9 @@ pub fn arb_node_field() -> impl Strategy<Value = NodeField> {
     prop::sample::select(NodeField::ALL.to_vec())
 }
 
-/// A set of explicit entities, possibly empty.
-pub fn arb_entity_set() -> impl Strategy<Value = crate::node::EntitySet> {
-    prop::collection::vec(arb_entity_key(), 0..4).prop_map(bounded_set)
+/// A set of explicit identities, possibly empty.
+pub fn arb_identity_set() -> impl Strategy<Value = crate::node::IdentitySet> {
+    prop::collection::vec(arb_identity_key(), 0..4).prop_map(bounded_set)
 }
 
 /// A new value for a node field.

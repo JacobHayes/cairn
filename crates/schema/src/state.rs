@@ -10,9 +10,9 @@ use serde::{Deserialize, Serialize};
 use crate::attachment::Annotation;
 use crate::collections::{BoundedSet, ByDocumentSize, ChoiceCountPerDecision, Keyed};
 use crate::field::NodeField;
-use crate::id::{AttachmentKey, EntityKey, KindKey, NodeKey, RoleKey, Slug};
+use crate::id::{AttachmentKey, IdentityKey, KindKey, NodeKey, RoleKey, Slug};
 use crate::limits::{Limit, LimitExceeded};
-use crate::node::{AnswerType, EntitySet, NodeKind};
+use crate::node::{AnswerType, IdentitySet, NodeKind};
 use crate::text::{Markdown, Reason};
 use jiff::civil::Date;
 
@@ -184,10 +184,10 @@ pub enum AnswerValue {
     Text(AnswerText),
     /// A date.
     Date(Date),
-    /// An entity.
-    Entity(EntityKey),
-    /// Entities, possibly none.
-    EntityList(EntitySet),
+    /// An identity.
+    Identity(IdentityKey),
+    /// Identities, possibly none.
+    IdentityList(IdentitySet),
 }
 
 impl AnswerValue {
@@ -201,8 +201,8 @@ impl AnswerValue {
             AnswerValue::MultiChoice(_) => AnswerType::MultiChoice,
             AnswerValue::Text(_) => AnswerType::Text,
             AnswerValue::Date(_) => AnswerType::Date,
-            AnswerValue::Entity(_) => AnswerType::Entity,
-            AnswerValue::EntityList(_) => AnswerType::EntityList,
+            AnswerValue::Identity(_) => AnswerType::Identity,
+            AnswerValue::IdentityList(_) => AnswerType::IdentityList,
         }
     }
 }
@@ -395,7 +395,7 @@ pub struct JourneyState {
         deserialize_with = "crate::serde_util::unique_map_per_role"
     )]
     #[schemars(extend("maxProperties" = crate::limits::ROLE_COUNT_MAX))]
-    pub role_fills: BTreeMap<RoleKey, EntitySet>,
+    pub role_fills: BTreeMap<RoleKey, IdentitySet>,
     /// Pins: explicit journey-level dates on nodes (PRD glossary, Pin). A pin from a
     /// `feeds_milestone` answer is derived from the answer, not stored here (E3).
     #[serde(

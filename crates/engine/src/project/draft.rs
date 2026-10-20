@@ -2,7 +2,7 @@
 //! parsed, so rendering never re-parses). Journey fields come from the journey's header (its
 //! `created_at` as the deployment-local day it was created, A9) and the host's link to it;
 //! a role's names from its members now (E3: the filling decision's answer while in effect,
-//! else the direct fill) through the deployment's entities; an answer from the decision's
+//! else the direct fill) through the deployment's identities; an answer from the decision's
 //! answer while in effect, choices by their labels. Whatever has no value is a visible marker
 //! naming the placeholder as written; rendering never fails.
 //!
@@ -11,7 +11,7 @@
 use std::collections::BTreeSet;
 
 use cairn_schema::{
-    AnswerSpec, AnswerValue, Deployment, EntityKey, JourneyField, JourneyHeader, JourneyStatus,
+    AnswerSpec, AnswerValue, Deployment, IdentityKey, JourneyField, JourneyHeader, JourneyStatus,
     KeyRefs, MessageTemplate, NodeKey, Payload, RenderedDraft, RenderedSegment, Segment, Url,
 };
 
@@ -24,7 +24,7 @@ pub struct DraftContext<'a> {
     pub header: &'a JourneyHeader,
     /// The link to the journey, which only the host knows; none renders a marker.
     pub url: Option<&'a Url>,
-    /// The deployment, whose entities name role members and entity answers.
+    /// The deployment, whose identities name role members and identity answers.
     pub deployment: &'a Deployment,
 }
 
@@ -84,9 +84,11 @@ impl DerivedJourney<'_> {
             AnswerValue::MultiChoice(ids) => ids.iter().map(choice).collect::<Vec<_>>().join(", "),
             AnswerValue::Text(text) => text.as_str().to_owned(),
             AnswerValue::Date(date) => date.to_string(),
-            AnswerValue::Entity(entity) => names(&BTreeSet::from([entity.clone()]), deployment),
-            AnswerValue::EntityList(entities) => {
-                names(&entities.iter().cloned().collect(), deployment)
+            AnswerValue::Identity(identity) => {
+                names(&BTreeSet::from([identity.clone()]), deployment)
+            }
+            AnswerValue::IdentityList(identities) => {
+                names(&identities.iter().cloned().collect(), deployment)
             }
         })
     }
@@ -140,18 +142,18 @@ fn journey_field(field: JourneyField, context: &DraftContext<'_>) -> Option<Stri
     }
 }
 
-/// The entities' names, each key read through aliases (E6), in key order, joined; a key the
+/// The identities' names, each key read through aliases (E6), in key order, joined; a key the
 /// deployment does not know stands for itself.
-fn names(entities: &BTreeSet<EntityKey>, deployment: &Deployment) -> String {
-    entities
+fn names(identities: &BTreeSet<IdentityKey>, deployment: &Deployment) -> String {
+    identities
         .iter()
-        .map(|key| crate::entity::resolve(deployment, key).unwrap_or(key))
-        .collect::<BTreeSet<&EntityKey>>()
+        .map(|key| crate::identity::resolve(deployment, key).unwrap_or(key))
+        .collect::<BTreeSet<&IdentityKey>>()
         .into_iter()
         .map(|key| {
-            deployment.entities.get(key).map_or_else(
+            deployment.identities.get(key).map_or_else(
                 || key.as_str().to_owned(),
-                |entity| entity.name.as_str().to_owned(),
+                |identity| identity.name.as_str().to_owned(),
             )
         })
         .collect::<Vec<_>>()

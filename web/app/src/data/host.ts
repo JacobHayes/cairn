@@ -92,7 +92,7 @@ export interface Host {
   exportRoute(route: string, version?: number): Promise<RouteFile>;
   /** A13: imports a route file: a new route, or a new draft of the file's route. */
   importRoute(request: RouteImport): Promise<Answered<HttpFailure>>;
-  /** The caller, their identities, and the entities their verified emails name (H3). */
+  /** The caller, their logins, and the identities their verified emails name (H3). */
   viewer(): Promise<Viewer>;
   /** H3: the names of `users` (at most a page of them); one that does not exist is left out. */
   userNames(users: readonly string[]): Promise<UserName[]>;

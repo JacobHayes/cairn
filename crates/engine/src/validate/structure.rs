@@ -116,7 +116,7 @@ fn retired_keys(check: &GraphCheck<'_>, out: &mut Vec<Violation>) {
     }
 }
 
-/// PRD Identity and references: role and kind ids are unique in the graph, and `owner` is
+/// PRD Keys and references: role and kind ids are unique in the graph, and `owner` is
 /// the built-in kind's id and key.
 fn role_and_kind_ids(check: &GraphCheck<'_>, out: &mut Vec<Violation>) {
     let document = check.document;

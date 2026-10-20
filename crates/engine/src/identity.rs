@@ -1,17 +1,17 @@
-//! Entity references and their resolution through aliases (E6, H3): where a graph names
-//! entities, and which entity a key names once merges are followed.
+//! Identity references and their resolution through aliases (E6, H3): where a graph names
+//! identities, and which identity a key names once merges are followed.
 
 use cairn_schema::{
-    AnswerSpec, AnswerValue, Clause, ConditionValue, Deployment, EntityKey, NodeKey,
+    AnswerSpec, AnswerValue, Clause, ConditionValue, Deployment, IdentityKey, NodeKey,
     ParticipationSource, Payload,
 };
 
 use crate::graph::Document;
 
-/// Where a graph names an entity.
+/// Where a graph names an identity.
 #[derive(Clone, Debug, PartialEq, Eq, PartialOrd, Ord)]
 pub(crate) enum Mention {
-    /// An entity or entity-list answer to a decision.
+    /// An identity or identity-list answer to a decision.
     Answer(NodeKey),
     /// A direct role fill.
     RoleFill(cairn_schema::RoleKey),
@@ -19,18 +19,20 @@ pub(crate) enum Mention {
     Participation(NodeKey),
 }
 
-/// Every entity a graph names, with where it names it.
+/// Every identity a graph names, with where it names it.
 #[must_use]
-pub(crate) fn mentions(document: &Document) -> Vec<(Mention, &EntityKey)> {
+pub(crate) fn mentions(document: &Document) -> Vec<(Mention, &IdentityKey)> {
     let mut found = Vec::new();
     for (decision, answer) in &document.state.answers {
         match answer {
-            AnswerValue::Entity(entity) => found.push((Mention::Answer(decision.clone()), entity)),
-            AnswerValue::EntityList(entities) => {
+            AnswerValue::Identity(identity) => {
+                found.push((Mention::Answer(decision.clone()), identity));
+            }
+            AnswerValue::IdentityList(identities) => {
                 found.extend(
-                    entities
+                    identities
                         .iter()
-                        .map(|entity| (Mention::Answer(decision.clone()), entity)),
+                        .map(|identity| (Mention::Answer(decision.clone()), identity)),
                 );
             }
             AnswerValue::Boolean(_)
@@ -40,20 +42,20 @@ pub(crate) fn mentions(document: &Document) -> Vec<(Mention, &EntityKey)> {
             | AnswerValue::Date(_) => {}
         }
     }
-    for (role, entities) in &document.state.role_fills {
+    for (role, identities) in &document.state.role_fills {
         found.extend(
-            entities
+            identities
                 .iter()
-                .map(|entity| (Mention::RoleFill(role.clone()), entity)),
+                .map(|identity| (Mention::RoleFill(role.clone()), identity)),
         );
     }
     for node in document.nodes.values() {
         for source in node.participations.as_map().values() {
-            if let ParticipationSource::Entities(entities) = source {
+            if let ParticipationSource::Identities(identities) = source {
                 found.extend(
-                    entities
+                    identities
                         .iter()
-                        .map(|entity| (Mention::Participation(node.key.clone()), entity)),
+                        .map(|identity| (Mention::Participation(node.key.clone()), identity)),
                 );
             }
         }
@@ -61,11 +63,11 @@ pub(crate) fn mentions(document: &Document) -> Vec<(Mention, &EntityKey)> {
     found
 }
 
-/// Every entity a node's condition compares an entity or entity-list decision with (E6: a
+/// Every identity a node's condition compares an identity or identity-list decision with (E6: a
 /// merge can change what such a condition evaluates to), by the node holding the condition.
 /// Cost: one walk of each condition, at most 16 clauses.
 #[must_use]
-pub(crate) fn condition_mentions(document: &Document) -> Vec<(NodeKey, EntityKey)> {
+pub(crate) fn condition_mentions(document: &Document) -> Vec<(NodeKey, IdentityKey)> {
     let mut found = Vec::new();
     for node in document.nodes.values() {
         let Some(condition) = &node.relevant_when else {
@@ -91,28 +93,28 @@ pub(crate) fn condition_mentions(document: &Document) -> Vec<(NodeKey, EntityKey
                     membership.values.as_slice().iter().collect(),
                 ),
             };
-            let entity_typed =
+            let identity_typed =
                 document
                     .nodes
                     .get(decision)
                     .is_some_and(|target| match &target.payload {
                         Payload::Decision(spec) => matches!(
                             spec.answer,
-                            AnswerSpec::Entity { .. } | AnswerSpec::EntityList { .. }
+                            AnswerSpec::Identity { .. } | AnswerSpec::IdentityList { .. }
                         ),
                         Payload::Deliverable(_)
                         | Payload::Action(_)
                         | Payload::Milestone(_)
                         | Payload::Group(_) => false,
                     });
-            if !entity_typed {
+            if !identity_typed {
                 continue;
             }
             for value in values {
                 if let ConditionValue::Text(text) = value
-                    && let Ok(entity) = text.as_str().parse::<EntityKey>()
+                    && let Ok(identity) = text.as_str().parse::<IdentityKey>()
                 {
-                    found.push((node.key.clone(), entity));
+                    found.push((node.key.clone(), identity));
                 }
             }
         }
@@ -120,15 +122,20 @@ pub(crate) fn condition_mentions(document: &Document) -> Vec<(NodeKey, EntityKey
     found
 }
 
-/// E6: the entity a key names, following an alias left by a merge; `None` when it names no
-/// entity. Aliases always point at an entity (the deployment stage checks), so one step is
+/// E6: the identity a key names, following an alias left by a merge; `None` when it names no
+/// identity. Aliases always point at an identity (the deployment stage checks), so one step is
 /// the whole walk.
 #[must_use]
-pub(crate) fn resolve<'a>(deployment: &'a Deployment, key: &'a EntityKey) -> Option<&'a EntityKey> {
-    if deployment.entities.get(key).is_some() {
+pub(crate) fn resolve<'a>(
+    deployment: &'a Deployment,
+    key: &'a IdentityKey,
+) -> Option<&'a IdentityKey> {
+    if deployment.identities.get(key).is_some() {
         return Some(key);
     }
     let target = deployment.aliases.get(key)?;
-    assert!(!deployment.aliases.contains_key(target) || deployment.entities.get(target).is_none());
-    deployment.entities.get(target).map(|_| target)
+    assert!(
+        !deployment.aliases.contains_key(target) || deployment.identities.get(target).is_none()
+    );
+    deployment.identities.get(target).map(|_| target)
 }

@@ -51,22 +51,22 @@ fn each_node_is_counted_once_by_what_first_happened_to_it() {
     assert_eq!((state.nodes_added, state.nodes_changed), (0, 2));
 }
 
-/// A removal counts the nodes it names with their descendants; entity creates and merges count
-/// as entities, never as nodes; an upgrade is a fact of its own.
+/// A removal counts the nodes it names with their descendants; identity creates and merges count
+/// as identities, never as nodes; an upgrade is a fact of its own.
 #[test]
-fn removals_entities_and_upgrades_are_counted_apart() {
+fn removals_identities_and_upgrades_are_counted_apart() {
     let removed =
         outline("- op: remove_node\n  removal: {node: n_access, descendants: [n_signoff]}\n");
     assert_eq!(removed.nodes_removed, 2);
 
-    let entities = outline(
-        "- op: create_entity\n  entity: {key: e_new, name: New}\n- op: merge_entities\n  survivor: e_new\n  merged: e_old\n  journeys: {}\n",
+    let identities = outline(
+        "- op: create_identity\n  identity: {key: who_new, name: New}\n- op: merge_identities\n  survivor: who_new\n  merged: who_old\n  journeys: {}\n",
     );
     assert_eq!(
         (
-            entities.entities_created,
-            entities.entities_merged,
-            entities.nodes_changed
+            identities.identities_created,
+            identities.identities_merged,
+            identities.nodes_changed
         ),
         (1, 1, 0)
     );
@@ -113,7 +113,7 @@ fn a_routes_after_is_the_route_even_with_no_draft() {
 }
 
 /// A journey's after carries the deployment the candidate leaves: a proposal that creates an
-/// entity and assigns a node to it derives against the entity, and one that deletes the
+/// identity and assigns a node to it derives against the identity, and one that deletes the
 /// journey leaves nothing to draw.
 #[test]
 fn a_journeys_after_carries_its_deployment_and_can_be_gone() {

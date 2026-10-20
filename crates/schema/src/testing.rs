@@ -7,7 +7,7 @@
 use proptest::prelude::*;
 
 use crate::{
-    AgentId, AttachmentKey, Date, Days, Email, EntityKey, InsertionKey, JourneyId, KindKey,
+    AgentId, AttachmentKey, Date, Days, Email, IdentityKey, InsertionKey, JourneyId, KindKey,
     Markdown, NodeKey, PatchId, Path, ProposalId, Reason, Revision, RoleKey, RouteId, Slug,
     Timestamp, Title, Url, UserId, VersionNumber, Weight,
 };
@@ -57,8 +57,8 @@ arb_prefixed!(
     arb_kind_key, KindKey, "k_"
 );
 arb_prefixed!(
-    /// An entity key.
-    arb_entity_key, EntityKey, "e_"
+    /// An identity key.
+    arb_identity_key, IdentityKey, "who_"
 );
 arb_prefixed!(
     /// An attachment key.

@@ -6,6 +6,9 @@
 //! usage: `cargo run -p cairn-engine --example walkthrough -- FIXTURES_DIR`
 
 use std::collections::BTreeSet;
+#[path = "support/people.rs"]
+mod people;
+
 use std::error::Error;
 use std::fmt::Write as _;
 use std::path::Path;
@@ -26,7 +29,7 @@ fn main() -> Result<()> {
     let file: RouteFile = from_yaml(&std::fs::read_to_string(directory.join("route.yaml"))?)?;
     let scenario: Scenario = from_yaml(&std::fs::read_to_string(directory.join("journey.yaml"))?)?;
     let mut out = String::new();
-    let initial = seed(&file, &mut out)?;
+    let initial = seed(Path::new(&fixtures), &file, &mut out)?;
     let (records, events) = walk(&initial, &scenario, &mut out)?;
     reject(&records, &mut out)?;
     replayed(&initial, &records, &events, &mut out);
@@ -35,7 +38,7 @@ fn main() -> Result<()> {
 }
 
 /// The route file built into a graph with no base (A13) and published as version 1.
-fn seed(file: &RouteFile, out: &mut String) -> Result<Records> {
+fn seed(fixtures: &Path, file: &RouteFile, out: &mut String) -> Result<Records> {
     let graph = from_file(file, &mut SequentialKeys::default())
         .map_err(|violations| format!("{violations:?}"))?;
     let document = graph.into_document();
@@ -47,7 +50,7 @@ fn seed(file: &RouteFile, out: &mut String) -> Result<Records> {
         document.roles.len(),
         document.participation_kinds.len()
     )?;
-    let mut records = Records::default();
+    let mut records = people::records(fixtures)?;
     let version = VersionNumber::FIRST;
     records.routes.insert(
         file.route.clone(),
@@ -164,7 +167,7 @@ fn changes(
     Ok(())
 }
 
-/// What else a step recorded: answers, pins, snoozes, notes and links, entities.
+/// What else a step recorded: answers, pins, snoozes, notes and links, identities.
 fn other_changes(
     before: &Records,
     after: &Records,
@@ -226,12 +229,12 @@ fn other_changes(
             ));
         }
     }
-    for entity in after.deployment.entities.values() {
-        if before.deployment.entities.get(&entity.key).is_none() {
+    for identity in after.deployment.identities.values() {
+        if before.deployment.identities.get(&identity.key).is_none() {
             other.push(format!(
-                "entity `{}` ({})",
-                entity.key,
-                entity.name.as_str()
+                "identity `{}` ({})",
+                identity.key,
+                identity.name.as_str()
             ));
         }
     }
@@ -295,7 +298,7 @@ fn reject(records: &Records, out: &mut String) -> Result<()> {
         today: "2026-10-27".parse()?,
         at: "2026-10-27T09:00:00Z".parse()?,
         actor: cairn_schema::Actor {
-            user: "u_lead".parse()?,
+            user: "u_ana".parse()?,
             agent: None,
         },
         note: None,
@@ -341,7 +344,7 @@ fn replayed(initial: &Records, records: &Records, events: &[Event], out: &mut St
     let _ = writeln!(out, "## Replay reproduces the state\n");
     let _ = writeln!(
         out,
-        "Replaying the {} events of {} patches from the seeded records rebuilds records equal to what apply produced: **{}**. The journey is at revision {}, with {} nodes and {} answers; the deployment is at revision {} with {} entities.\n",
+        "Replaying the {} events of {} patches from the seeded records rebuilds records equal to what apply produced: **{}**. The journey is at revision {}, with {} nodes and {} answers; the deployment is at revision {} with {} identities.\n",
         events.len(),
         patches.len(),
         if rebuilt == *records {
@@ -353,6 +356,6 @@ fn replayed(initial: &Records, records: &Records, events: &[Event], out: &mut St
         journey.map_or(0, |journey| journey.graph.nodes.len()),
         journey.map_or(0, |journey| journey.graph.state.answers.len()),
         records.deployment.revision.get(),
-        records.deployment.entities.len()
+        records.deployment.identities.len()
     );
 }

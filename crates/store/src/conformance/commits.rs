@@ -1,5 +1,5 @@
 //! Conformance cases for commits: revisions (H5), atomicity (A17, J2), receipts (H5), the
-//! size cap, the write semantics, entities (E6, H3), deletion (A19), and proposals (I6).
+//! size cap, the write semantics, identities (E6, H3), deletion (A19), and proposals (I6).
 
 use std::collections::BTreeSet;
 
@@ -12,7 +12,7 @@ use serde_json::json;
 
 use super::{Backend, applied, both, deployment, failed, journey, open, route, snapshot};
 use crate::build::{
-    self, action, create_entity, create_journey, create_route, deployment_patch, entity, id,
+    self, action, create_identity, create_journey, create_route, deployment_patch, id, identity,
     journey_graph, journey_patch, node, node_key, proposal_patch, put_in, remove_in, revision,
     route_patch,
 };
@@ -116,9 +116,10 @@ pub async fn a_first_commit_creates_the_domain_and_a_second_from_zero_conflicts<
         )]
     );
 
-    let entities = create_entity(deployment_patch("p_five", 0), entity("e_a", "A", &[])).commit();
-    applied(&store, entities).await;
-    let again = create_entity(deployment_patch("p_six", 0), entity("e_b", "B", &[])).commit();
+    let identities =
+        create_identity(deployment_patch("p_five", 0), identity("who_a", "A", &[])).commit();
+    applied(&store, identities).await;
+    let again = create_identity(deployment_patch("p_six", 0), identity("who_b", "B", &[])).commit();
     let (conflicts, _) = stale_parts(failed(&store, again).await);
     assert_eq!(
         conflicts,
@@ -139,9 +140,9 @@ pub async fn a_revision_conflict_is_rejected_and_leaves_state_untouched<B: Backe
     applied(&store, second.clone()).await;
     let before = snapshot(&store).await;
 
-    let stale = create_entity(
+    let stale = create_identity(
         journey_patch("p_three", "j_one", 1),
-        entity("e_rider", "Rider", &[]),
+        identity("who_rider", "Rider", &[]),
     )
     .event(
         EventType::NodeAdded,
@@ -161,14 +162,14 @@ pub async fn a_revision_conflict_is_rejected_and_leaves_state_untouched<B: Backe
 
 /// H5: asked directly, the store reports what intervened since a revision exactly as a stale
 /// commit does: the touched set of every commit that moved it past the one expected,
-/// including deployment records written by an entity create riding in a journey patch.
+/// including deployment records written by an identity create riding in a journey patch.
 pub async fn what_intervened_since_a_revision_is_reported_on_request<B: Backend>(backend: &B) {
     let store = open(backend).await;
     let first = create_journey("p_one", "j_one", vec![action("n_a", "a", None)]).commit();
     applied(&store, first.clone()).await;
-    let second = create_entity(
+    let second = create_identity(
         add_node_builder("p_two", "j_one", 1, action("n_b", "b", None)),
-        entity("e_rider", "Rider", &[]),
+        identity("who_rider", "Rider", &[]),
     )
     .commit();
     applied(&store, second.clone()).await;
@@ -217,9 +218,9 @@ pub async fn a_failure_between_state_and_events_leaves_nothing<B: Backend>(backe
     .await;
     let before = snapshot(&store).await;
 
-    let commit = create_entity(
+    let commit = create_identity(
         journey_patch("p_two", "j_one", 1),
-        entity("e_new", "New", &[]),
+        identity("who_new", "New", &[]),
     )
     .event(
         EventType::NodeAdded,
@@ -253,15 +254,18 @@ pub async fn a_commit_fails_whole_when_either_precondition_is_stale<B: Backend>(
     let cases = [(true, false), (false, true), (true, true)];
     for (journey_moved, deployment_moved) in cases {
         let store = open(backend).await;
-        let setup =
-            create_entity(deployment_patch("p_entity", 0), entity("e_a", "A", &[])).commit();
+        let setup = create_identity(
+            deployment_patch("p_identity", 0),
+            identity("who_a", "A", &[]),
+        )
+        .commit();
         applied(&store, setup).await;
         let create = create_journey(
             "p_one",
             "j_one",
             vec![build::node(json!({
                 "key": "n_owner", "id": "owner", "kind": "decision", "title": "Owner",
-                "prompt": "Who?", "answer_type": "entity",
+                "prompt": "Who?", "answer_type": "identity",
             }))],
         )
         .commit();
@@ -276,9 +280,13 @@ pub async fn a_commit_fails_whole_when_either_precondition_is_stale<B: Backend>(
         if deployment_moved {
             let edit = deployment_patch("p_edit", 1)
                 .event(
-                    EventType::EntityEdited,
-                    Subject::Entity(id("e_a")),
-                    vec![Write::Put(Record::Entity(entity("e_a", "Renamed", &[])))],
+                    EventType::IdentityEdited,
+                    Subject::Identity(id("who_a")),
+                    vec![Write::Put(Record::Identity(identity(
+                        "who_a",
+                        "Renamed",
+                        &[],
+                    )))],
                 )
                 .commit();
             applied(&store, edit).await;
@@ -293,7 +301,7 @@ pub async fn a_commit_fails_whole_when_either_precondition_is_stale<B: Backend>(
                     &journey_graph("j_one"),
                     GraphRecord::Answer {
                         decision: node_key("n_owner"),
-                        value: cairn_schema::AnswerValue::Entity(id("e_a")),
+                        value: cairn_schema::AnswerValue::Identity(id("who_a")),
                         rationale: None,
                     },
                 )],
@@ -308,8 +316,10 @@ pub async fn a_commit_fails_whole_when_either_precondition_is_stale<B: Backend>(
             expected.push(conflict(deployment_of.clone(), 1, 2));
         }
         assert_eq!(conflicts, expected, "{journey_moved} {deployment_moved}");
-        let entity_edited = intervening.as_set().contains(&RecordKey::Entity(id("e_a")));
-        assert_eq!(entity_edited, deployment_moved);
+        let identity_edited = intervening
+            .as_set()
+            .contains(&RecordKey::Identity(id("who_a")));
+        assert_eq!(identity_edited, deployment_moved);
         assert_eq!(snapshot(&store).await, before);
     }
 }
@@ -550,18 +560,18 @@ pub async fn a_journey_round_trips_every_record<B: Backend>(backend: &B) {
     );
 
     let people = deployment_patch("p_people", 0).event(
-        EventType::EntityCreated,
-        Subject::Entity(id("e_lead")),
+        EventType::IdentityCreated,
+        Subject::Identity(id("who_lead")),
         vec![
-            Write::Put(Record::Entity(entity(
-                "e_lead",
+            Write::Put(Record::Identity(identity(
+                "who_lead",
                 "Lead",
                 &["lead@example.org", "l@example.org"],
             ))),
-            Write::Put(Record::Entity(entity("e_observer", "Observer", &[]))),
-            Write::Put(Record::EntityAlias {
-                alias: id("e_former"),
-                entity: id("e_lead"),
+            Write::Put(Record::Identity(identity("who_observer", "Observer", &[]))),
+            Write::Put(Record::IdentityAlias {
+                alias: id("who_former"),
+                identity: id("who_lead"),
             }),
         ],
     );
@@ -569,20 +579,20 @@ pub async fn a_journey_round_trips_every_record<B: Backend>(backend: &B) {
     let loaded = deployment(&store).await;
     assert_eq!(loaded.revision, revision(1));
     let keys: Vec<_> = loaded
-        .entities
+        .identities
         .values()
         .map(|held| held.key.clone())
         .collect();
-    assert_eq!(keys, vec![id("e_lead"), id("e_observer")]);
+    assert_eq!(keys, vec![id("who_lead"), id("who_observer")]);
     assert_eq!(
-        loaded.entities.get(&id("e_lead")),
-        Some(&entity(
-            "e_lead",
+        loaded.identities.get(&id("who_lead")),
+        Some(&identity(
+            "who_lead",
             "Lead",
             &["lead@example.org", "l@example.org"]
         ))
     );
-    assert_eq!(loaded.aliases.get(&id("e_former")), Some(&id("e_lead")));
+    assert_eq!(loaded.aliases.get(&id("who_former")), Some(&id("who_lead")));
 }
 
 /// The write semantics every backend shares (`crate::memory`): a field write changes one
@@ -760,7 +770,7 @@ fn sibling(key: &str, slug: &str) -> cairn_schema::Node<cairn_schema::refs::KeyR
     action(key, slug, Some("n_root"))
 }
 
-/// PRD Identity and references: sibling ids are unique in the graph a commit produces, and
+/// PRD Login and references: sibling ids are unique in the graph a commit produces, and
 /// a commit may swap two of them on the way, checked at the commit's end
 /// (decisions/2026-10-06-uniqueness-a-patch-may-pass-through-is-checked-at-the-end.md).
 pub async fn sibling_ids_may_swap_within_a_commit_but_not_end_duplicated<B: Backend>(backend: &B) {
@@ -819,34 +829,44 @@ pub async fn sibling_ids_may_swap_within_a_commit_but_not_end_duplicated<B: Back
     assert_eq!(snapshot(&store).await, before);
 }
 
-/// H3: an email may move between entities within one commit, in either order, and each
-/// email ends on one entity.
-pub async fn emails_may_move_between_entities_within_a_commit_but_stay_unique<B: Backend>(
+/// H3: an email may move between identities within one commit, in either order, and each
+/// email ends on one identity.
+pub async fn emails_may_move_between_identities_within_a_commit_but_stay_unique<B: Backend>(
     backend: &B,
 ) {
     let store = open(backend).await;
-    let put = |key: &str, emails: &[&str]| Write::Put(Record::Entity(entity(key, key, emails)));
+    let put = |key: &str, emails: &[&str]| Write::Put(Record::Identity(identity(key, key, emails)));
     let create = deployment_patch("p_one", 0).event(
-        EventType::EntityCreated,
-        Subject::Entity(id("e_one")),
-        vec![put("e_one", &["shared@example.org"]), put("e_two", &[])],
+        EventType::IdentityCreated,
+        Subject::Identity(id("who_one")),
+        vec![put("who_one", &["shared@example.org"]), put("who_two", &[])],
     );
     applied(&store, create.commit()).await;
     let moved = deployment_patch("p_move", 1).event(
-        EventType::EntityEdited,
-        Subject::Entity(id("e_two")),
-        vec![put("e_two", &["shared@example.org"]), put("e_one", &[])],
+        EventType::IdentityEdited,
+        Subject::Identity(id("who_two")),
+        vec![put("who_two", &["shared@example.org"]), put("who_one", &[])],
     );
     applied(&store, moved.commit()).await;
     let loaded = deployment(&store).await;
-    assert_eq!(loaded.entities.get(&id("e_two")).unwrap().emails.len(), 1);
-    assert!(loaded.entities.get(&id("e_one")).unwrap().emails.is_empty());
+    assert_eq!(
+        loaded.identities.get(&id("who_two")).unwrap().emails.len(),
+        1
+    );
+    assert!(
+        loaded
+            .identities
+            .get(&id("who_one"))
+            .unwrap()
+            .emails
+            .is_empty()
+    );
 
     let before = snapshot(&store).await;
     let taken = deployment_patch("p_taken", 2).event(
-        EventType::EntityEdited,
-        Subject::Entity(id("e_one")),
-        vec![put("e_one", &["shared@example.org"])],
+        EventType::IdentityEdited,
+        Subject::Identity(id("who_one")),
+        vec![put("who_one", &["shared@example.org"])],
     );
     let error = failed(&store, taken.commit()).await;
     assert_eq!(violation_codes(&error), vec![ViolationCode::EmailTaken]);
@@ -854,15 +874,18 @@ pub async fn emails_may_move_between_entities_within_a_commit_but_stay_unique<B:
 
     // Two emails held by two others are two violations, each listed (A15).
     let others = deployment_patch("p_others", 2).event(
-        EventType::EntityCreated,
-        Subject::Entity(id("e_three")),
-        vec![put("e_three", &["third@example.org"])],
+        EventType::IdentityCreated,
+        Subject::Identity(id("who_three")),
+        vec![put("who_three", &["third@example.org"])],
     );
     applied(&store, others.commit()).await;
     let both_taken = deployment_patch("p_both", 3).event(
-        EventType::EntityCreated,
-        Subject::Entity(id("e_four")),
-        vec![put("e_four", &["shared@example.org", "third@example.org"])],
+        EventType::IdentityCreated,
+        Subject::Identity(id("who_four")),
+        vec![put(
+            "who_four",
+            &["shared@example.org", "third@example.org"],
+        )],
     );
     let error = failed(&store, both_taken.commit()).await;
     assert_eq!(
@@ -871,20 +894,20 @@ pub async fn emails_may_move_between_entities_within_a_commit_but_stay_unique<B:
     );
 }
 
-/// E6: an entity create riding in a journey patch commits with it, without a deployment
+/// E6: an identity create riding in a journey patch commits with it, without a deployment
 /// revision check, and moves the deployment revision.
-pub async fn an_entity_create_in_a_journey_patch_bumps_the_deployment_revision<B: Backend>(
+pub async fn an_identity_create_in_a_journey_patch_bumps_the_deployment_revision<B: Backend>(
     backend: &B,
 ) {
     let store = open(backend).await;
-    let riding = create_entity(
+    let riding = create_identity(
         create_journey("p_one", "j_one", Vec::new()),
-        entity("e_new", "New", &["new@example.org"]),
+        identity("who_new", "New", &["new@example.org"]),
     );
     applied(&store, riding.commit()).await;
     let loaded = deployment(&store).await;
     assert_eq!(loaded.revision, revision(1));
-    assert!(loaded.entities.get(&id("e_new")).is_some());
+    assert!(loaded.identities.get(&id("who_new")).is_some());
     assert_eq!(
         journey(&store, "j_one").await.unwrap().revision,
         revision(1)
@@ -892,9 +915,9 @@ pub async fn an_entity_create_in_a_journey_patch_bumps_the_deployment_revision<B
     let revisions = store.revisions().await.unwrap();
     assert_eq!(revisions.deployment, revision(1));
 
-    let stale = create_entity(
+    let stale = create_identity(
         deployment_patch("p_two", 0),
-        entity("e_other", "Other", &[]),
+        identity("who_other", "Other", &[]),
     );
     let (conflicts, intervening) = stale_parts(failed(&store, stale.commit()).await);
     assert_eq!(
@@ -904,14 +927,14 @@ pub async fn an_entity_create_in_a_journey_patch_bumps_the_deployment_revision<B
     assert!(
         intervening
             .as_set()
-            .contains(&RecordKey::Entity(id("e_new")))
+            .contains(&RecordKey::Identity(id("who_new")))
     );
 }
 
-/// E6, I6: an entity a proposal applied to a journey creates rides as a direct create does:
+/// E6, I6: an identity a proposal applied to a journey creates rides as a direct create does:
 /// it moves the deployment revision, a key already taken is refused, and a deployment patch
-/// from before it is stale with the entity among what intervened.
-pub async fn an_entity_an_applied_proposal_creates_bumps_the_deployment_revision<B: Backend>(
+/// from before it is stale with the identity among what intervened.
+pub async fn an_identity_an_applied_proposal_creates_bumps_the_deployment_revision<B: Backend>(
     backend: &B,
 ) {
     let store = open(backend).await;
@@ -925,27 +948,30 @@ pub async fn an_entity_an_applied_proposal_creates_bumps_the_deployment_revision
             .event(
                 EventType::ProposalApplied,
                 Subject::Journey(id("j_one")),
-                vec![Write::Put(Record::Entity(entity(key, "Proposed", &[])))],
+                vec![Write::Put(Record::Identity(identity(key, "Proposed", &[])))],
             )
             .commit()
     };
-    applied(&store, apply("p_two", 1, "e_proposed")).await;
+    applied(&store, apply("p_two", 1, "who_proposed")).await;
     let loaded = deployment(&store).await;
     assert_eq!(loaded.revision, revision(1));
-    assert!(loaded.entities.get(&id("e_proposed")).is_some());
+    assert!(loaded.identities.get(&id("who_proposed")).is_some());
     assert_eq!(
         journey(&store, "j_one").await.unwrap().revision,
         revision(2)
     );
 
     let before = snapshot(&store).await;
-    let error = failed(&store, apply("p_three", 2, "e_proposed")).await;
-    assert_eq!(violation_codes(&error), vec![ViolationCode::EntityKeyTaken]);
+    let error = failed(&store, apply("p_three", 2, "who_proposed")).await;
+    assert_eq!(
+        violation_codes(&error),
+        vec![ViolationCode::IdentityKeyTaken]
+    );
     assert_eq!(snapshot(&store).await, before);
 
-    let stale = create_entity(
+    let stale = create_identity(
         deployment_patch("p_four", 0),
-        entity("e_other", "Other", &[]),
+        identity("who_other", "Other", &[]),
     );
     let (conflicts, intervening) = stale_parts(failed(&store, stale.commit()).await);
     assert_eq!(
@@ -955,22 +981,24 @@ pub async fn an_entity_an_applied_proposal_creates_bumps_the_deployment_revision
     assert!(
         intervening
             .as_set()
-            .contains(&RecordKey::Entity(id("e_proposed")))
+            .contains(&RecordKey::Identity(id("who_proposed")))
     );
 }
 
-/// E6: an entity create whose key is already an entity or an alias is rejected, wherever
+/// E6: an identity create whose key is already an identity or an alias is rejected, wherever
 /// it rides.
-pub async fn an_entity_create_whose_key_is_an_entity_or_alias_is_rejected<B: Backend>(backend: &B) {
+pub async fn an_identity_create_whose_key_is_an_identity_or_alias_is_rejected<B: Backend>(
+    backend: &B,
+) {
     let store = open(backend).await;
     let setup = deployment_patch("p_one", 0).event(
-        EventType::EntityCreated,
-        Subject::Entity(id("e_a")),
+        EventType::IdentityCreated,
+        Subject::Identity(id("who_a")),
         vec![
-            Write::Put(Record::Entity(entity("e_a", "A", &[]))),
-            Write::Put(Record::EntityAlias {
-                alias: id("e_old"),
-                entity: id("e_a"),
+            Write::Put(Record::Identity(identity("who_a", "A", &[]))),
+            Write::Put(Record::IdentityAlias {
+                alias: id("who_old"),
+                identity: id("who_a"),
             }),
         ],
     );
@@ -981,45 +1009,48 @@ pub async fn an_entity_create_whose_key_is_an_entity_or_alias_is_rejected<B: Bac
     )
     .await;
     let before = snapshot(&store).await;
-    for (patch, key) in [("p_entity", "e_a"), ("p_alias", "e_old")] {
-        let riding = create_entity(journey_patch(patch, "j_one", 1), entity(key, "Again", &[]));
+    for (patch, key) in [("p_identity", "who_a"), ("p_alias", "who_old")] {
+        let riding = create_identity(
+            journey_patch(patch, "j_one", 1),
+            identity(key, "Again", &[]),
+        );
         let error = failed(&store, riding.commit()).await;
         assert_eq!(
             violation_codes(&error),
-            vec![ViolationCode::EntityKeyTaken],
+            vec![ViolationCode::IdentityKeyTaken],
             "{key}"
         );
-        let direct = create_entity(
+        let direct = create_identity(
             deployment_patch(&format!("{patch}_d"), 1),
-            entity(key, "Again", &[]),
+            identity(key, "Again", &[]),
         );
         let error = failed(&store, direct.commit()).await;
         assert_eq!(
             violation_codes(&error),
-            vec![ViolationCode::EntityKeyTaken],
+            vec![ViolationCode::IdentityKeyTaken],
             "{key}"
         );
     }
     assert_eq!(snapshot(&store).await, before);
 }
 
-/// PRACTICES, Explicit limits: entity creates riding in two journeys' patches take no
+/// PRACTICES, Explicit limits: identity creates riding in two journeys' patches take no
 /// deployment revision (E6), so each can be validated against a deployment one short of
-/// `entity_count_per_deployment_max`; the first commit fills it and the second is rejected
+/// `identity_count_per_deployment_max`; the first commit fills it and the second is rejected
 /// naming the limit, leaving the store as it was. A deployment patch at the limit may still
-/// remove an entity and create another.
-pub async fn riding_entity_creates_stop_at_the_entity_limit<B: Backend>(backend: &B) {
+/// remove an identity and create another.
+pub async fn riding_identity_creates_stop_at_the_identity_limit<B: Backend>(backend: &B) {
     let store = open(backend).await;
-    let limit = cairn_schema::Limit::EntityCountPerDeployment;
+    let limit = cairn_schema::Limit::IdentityCountPerDeployment;
     let setup: Vec<Write> = (1..limit.max())
         .map(|index| {
-            let key = format!("e_{index}");
-            Write::Put(Record::Entity(entity(&key, "Someone", &[])))
+            let key = format!("who_{index}");
+            Write::Put(Record::Identity(identity(&key, "Someone", &[])))
         })
         .collect();
     let fill = deployment_patch("p_fill", 0).event(
-        EventType::EntityCreated,
-        Subject::Entity(id("e_1")),
+        EventType::IdentityCreated,
+        Subject::Identity(id("who_1")),
         setup,
     );
     applied(&store, fill.commit()).await;
@@ -1027,13 +1058,16 @@ pub async fn riding_entity_creates_stop_at_the_entity_limit<B: Backend>(backend:
         applied(&store, create_journey(patch, journey, Vec::new()).commit()).await;
     }
     let riding = |patch: &str, journey: &str, key: &str| {
-        create_entity(journey_patch(patch, journey, 1), entity(key, "New", &[])).commit()
+        create_identity(journey_patch(patch, journey, 1), identity(key, "New", &[])).commit()
     };
-    applied(&store, riding("p_at", "j_one", "e_at")).await;
+    applied(&store, riding("p_at", "j_one", "who_at")).await;
     let loaded = deployment(&store).await;
-    assert_eq!(loaded.entities.len(), usize::try_from(limit.max()).unwrap());
+    assert_eq!(
+        loaded.identities.len(),
+        usize::try_from(limit.max()).unwrap()
+    );
     let before = snapshot(&store).await;
-    let error = failed(&store, riding("p_past", "j_two", "e_past")).await;
+    let error = failed(&store, riding("p_past", "j_two", "who_past")).await;
     let CommitError::Rejected(Rejection::Invalid { violations }) = &error else {
         panic!("expected a rejection, got {error:?}")
     };
@@ -1045,21 +1079,21 @@ pub async fn riding_entity_creates_stop_at_the_entity_limit<B: Backend>(backend:
     assert_eq!(named, vec![(ViolationCode::LimitExceeded, Some(limit))]);
     assert_eq!(snapshot(&store).await, before);
 
-    // A deployment patch, checked at its revision, may remove an entity and then create one.
+    // A deployment patch, checked at its revision, may remove an identity and then create one.
     let swap = deployment_patch("p_swap", 2).event(
-        EventType::EntityCreated,
-        Subject::Entity(id("e_swapped")),
+        EventType::IdentityCreated,
+        Subject::Identity(id("who_swapped")),
         vec![
-            Write::Remove(RecordKey::Entity(id("e_1"))),
-            Write::Put(Record::Entity(entity("e_swapped", "New", &[]))),
+            Write::Remove(RecordKey::Identity(id("who_1"))),
+            Write::Put(Record::Identity(identity("who_swapped", "New", &[]))),
         ],
     );
     applied(&store, swap.commit()).await;
     assert!(
         deployment(&store)
             .await
-            .entities
-            .get(&id("e_swapped"))
+            .identities
+            .get(&id("who_swapped"))
             .is_some()
     );
 }
@@ -1085,9 +1119,9 @@ fn delete_journey(patch: &str, journey: &str, base: u32) -> crate::commit::Commi
 /// deployment log keeps the one event naming the deletion; the receipts still answer.
 pub async fn a_hard_delete_removes_events_and_keeps_the_deployment_event<B: Backend>(backend: &B) {
     let store = open(backend).await;
-    let create = create_entity(
+    let create = create_identity(
         create_journey("p_one", "j_one", vec![action("n_a", "a", None)]),
-        entity("e_rider", "Rider", &[]),
+        identity("who_rider", "Rider", &[]),
     )
     .commit();
     applied(&store, create.clone()).await;
@@ -1140,11 +1174,11 @@ pub async fn a_hard_delete_removes_events_and_keeps_the_deployment_event<B: Back
     assert_eq!(events[1].event, deletion.change_set.events[0]);
     let again = store.commit(create).await.unwrap();
     assert!(matches!(again, Committed::AlreadyApplied(_)), "{again:?}");
-    // The entity created riding in the deleted journey's patch stays, and a deployment
+    // The identity created riding in the deleted journey's patch stays, and a deployment
     // patch drafted before it is still told what moved.
-    let stale = create_entity(
+    let stale = create_identity(
         deployment_patch("p_people", 0),
-        entity("e_other", "Other", &[]),
+        identity("who_other", "Other", &[]),
     );
     let (conflicts, intervening) = stale_parts(failed(&store, stale.commit()).await);
     assert_eq!(
@@ -1154,7 +1188,7 @@ pub async fn a_hard_delete_removes_events_and_keeps_the_deployment_event<B: Back
     assert!(
         intervening
             .as_set()
-            .contains(&RecordKey::Entity(id("e_rider")))
+            .contains(&RecordKey::Identity(id("who_rider")))
     );
     // The proposal the deletion took is gone, and an edit drafted before is told so.
     let late = proposal_patch("p_late", "pr_one", destination.clone(), 1).event(
@@ -1306,18 +1340,20 @@ pub async fn a_proposal_revision_is_independent_of_its_destination<B: Backend>(b
     }));
 }
 
-/// E6: an entity merge names the journeys referencing its entities; one that starts
+/// E6: an identity merge names the journeys referencing its identities; one that starts
 /// referencing them meanwhile makes the merge stale.
-pub async fn an_entity_merge_is_stale_when_another_journey_references_its_entities<B: Backend>(
+pub async fn an_identity_merge_is_stale_when_another_journey_references_its_identities<
+    B: Backend,
+>(
     backend: &B,
 ) {
     let store = open(backend).await;
     let setup = deployment_patch("p_people", 0).event(
-        EventType::EntityCreated,
-        Subject::Entity(id("e_a")),
+        EventType::IdentityCreated,
+        Subject::Identity(id("who_a")),
         vec![
-            Write::Put(Record::Entity(entity("e_a", "A", &[]))),
-            Write::Put(Record::Entity(entity("e_b", "B", &[]))),
+            Write::Put(Record::Identity(identity("who_a", "A", &[]))),
+            Write::Put(Record::Identity(identity("who_b", "B", &[]))),
         ],
     );
     applied(&store, setup.commit()).await;
@@ -1330,9 +1366,9 @@ pub async fn an_entity_merge_is_stale_when_another_journey_references_its_entiti
                     &journey_graph(journey),
                     GraphRecord::RoleFill {
                         role: id("r_owner"),
-                        entities: cairn_schema::BoundedSet::new([id::<cairn_schema::EntityKey>(
-                            key,
-                        )])
+                        identities: cairn_schema::BoundedSet::new([
+                            id::<cairn_schema::IdentityKey>(key),
+                        ])
                         .unwrap(),
                     },
                 )],
@@ -1344,7 +1380,7 @@ pub async fn an_entity_merge_is_stale_when_another_journey_references_its_entiti
         create_journey("p_one", "j_one", Vec::new()).commit(),
     )
     .await;
-    applied(&store, fill("p_fill_one", "j_one", 1, "e_a")).await;
+    applied(&store, fill("p_fill_one", "j_one", 1, "who_a")).await;
     applied(
         &store,
         create_journey("p_two", "j_two", Vec::new()).commit(),
@@ -1353,21 +1389,21 @@ pub async fn an_entity_merge_is_stale_when_another_journey_references_its_entiti
     let merge = |patch: &str| {
         deployment_patch(patch, 1)
             .expects(journey_of("j_one"), 2)
-            .referencing(&["e_a", "e_b"], &["j_one"])
+            .referencing(&["who_a", "who_b"], &["j_one"])
             .event(
-                EventType::EntitiesMerged,
-                Subject::Entity(id("e_b")),
+                EventType::IdentitiesMerged,
+                Subject::Identity(id("who_b")),
                 vec![
-                    Write::Remove(RecordKey::Entity(id("e_b"))),
-                    Write::Put(Record::EntityAlias {
-                        alias: id("e_b"),
-                        entity: id("e_a"),
+                    Write::Remove(RecordKey::Identity(id("who_b"))),
+                    Write::Put(Record::IdentityAlias {
+                        alias: id("who_b"),
+                        identity: id("who_a"),
                     }),
                 ],
             )
             .commit()
     };
-    applied(&store, fill("p_fill_two", "j_two", 1, "e_b")).await;
+    applied(&store, fill("p_fill_two", "j_two", 1, "who_b")).await;
     let (conflicts, _) = stale_parts(failed(&store, merge("p_merge_stale")).await);
     assert_eq!(conflicts, vec![conflict(journey_of("j_two"), 0, 2)]);
 
@@ -1384,6 +1420,6 @@ pub async fn an_entity_merge_is_stale_when_another_journey_references_its_entiti
     applied(&store, clear).await;
     applied(&store, merge("p_merge")).await;
     let merged = deployment(&store).await;
-    assert!(merged.entities.get(&id("e_b")).is_none());
-    assert_eq!(merged.aliases.get(&id("e_b")), Some(&id("e_a")));
+    assert!(merged.identities.get(&id("who_b")).is_none());
+    assert_eq!(merged.aliases.get(&id("who_b")), Some(&id("who_a")));
 }

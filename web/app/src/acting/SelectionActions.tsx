@@ -13,7 +13,7 @@ import { ACT_LABELS } from "../detail/offers.ts";
 import { snoozeStart, untilOf, withinScope, type SnoozeDraft } from "../detail/snooze.ts";
 import { Menu } from "../screens/Menu.tsx";
 import { Rejected } from "../detail/Rejected.tsx";
-import { EntityOptions } from "../detail/parts.tsx";
+import { IdentityOptions } from "../detail/parts.tsx";
 import { useFormDraft, useNodeWrite, type Seen } from "../detail/write.ts";
 import { Button, Field } from "../ui/kit.tsx";
 import { reasonFor, runBulk, type BulkAction, type Facts } from "./acts.ts";
@@ -40,7 +40,7 @@ function actionOf({ form, value, snooze }: Filled, today: string): BulkAction | 
     case "skip":
       return text === "" ? undefined : { act: "skip", reason: text };
     case "assign":
-      return text === "" ? undefined : { act: "assign", entity: text };
+      return text === "" ? undefined : { act: "assign", identity: text };
     case "snooze": {
       const until = untilOf(snooze, today);
       return until === undefined ? undefined : { act: "snooze", until };
@@ -56,7 +56,7 @@ interface Offer {
 }
 
 /** A form's entry: before it is filled it asks for what its action needs to be offered (a snooze, set aside anything unfinished). */
-const form = (kind: Form): Offer => ({ words: FORM_WORDS[kind], asks: kind === "snooze" ? { act: "snooze", until: { date: "" } } : kind === "skip" ? { act: "skip", reason: "" } : { act: "assign", entity: "" }, form: kind });
+const form = (kind: Form): Offer => ({ words: FORM_WORDS[kind], asks: kind === "snooze" ? { act: "snooze", until: { date: "" } } : kind === "skip" ? { act: "skip", reason: "" } : { act: "assign", identity: "" }, form: kind });
 
 const STATUS: Offer[] = [{ words: ACT_LABELS.start, asks: { act: "start" } }, { words: ACT_LABELS.done, asks: { act: "done" } }, form("skip")];
 const ASSIGN = form("assign");
@@ -72,7 +72,7 @@ function FormInput({ view, open, within, onChange }: { view: Ready; open: Filled
     return (
       <select aria-label="Owner for them" value={value} onChange={(event) => { onChange({ ...open, value: event.target.value }); }}>
         <option value="">Choose</option>
-        <EntityOptions view={view} />
+        <IdentityOptions view={view} />
       </select>
     );
   }

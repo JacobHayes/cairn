@@ -231,7 +231,7 @@ async fn round_trip(
     answer["code"].clone()
 }
 
-/// Nothing durable: no user, identity, or token (each would be in the auth log), and no
+/// Nothing durable: no user, login, or token (each would be in the auth log), and no
 /// session or OAuth state, however long from now.
 async fn stored_nothing(world: &World) -> bool {
     use cairn_store::{AuthLogQuery, AuthStore};
@@ -402,9 +402,9 @@ mod mcp_in_process {
         let actor = &first_actor;
         assert!(actor.get("agent").is_none_or(Value::is_null), "{actor}");
         let user = actor["user"].as_str().unwrap().parse().unwrap();
-        let identities = world.store.identities_of(&user).await.unwrap();
+        let logins = world.store.logins_of(&user).await.unwrap();
         let subject = format!("accounts.google.com:{}", PAT.subject);
-        assert_eq!(identities[0].subject.as_str(), subject);
+        assert_eq!(logins[0].subject.as_str(), subject);
         let tokens = world.store.agent_tokens_of(&user).await.unwrap();
         assert_eq!(tokens.len(), 0, "Cairn minted no token");
 

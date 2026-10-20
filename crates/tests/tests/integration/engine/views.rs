@@ -48,7 +48,7 @@ fn names(keys: &[NodeKey]) -> Vec<&str> {
 
 /// C12: every decision, in tree order, with what its answer affects: the partner decision
 /// decides the partner-led subset's relevance and the comparison set the baseline's; the date
-/// pins the meeting; the entity answers fill roles. A decision gated by work that is hidden
+/// pins the meeting; the identity answers fill roles. A decision gated by work that is hidden
 /// carries the marker.
 #[test]
 fn the_decision_view_shows_what_each_answer_affects() {
@@ -194,7 +194,7 @@ fn the_status_summary_counts_and_lists() {
             let owners = decision
                 .owners
                 .iter()
-                .map(cairn_schema::EntityKey::as_str)
+                .map(cairn_schema::IdentityKey::as_str)
                 .collect();
             (decision.node.as_str(), owners)
         })
@@ -202,8 +202,8 @@ fn the_status_summary_counts_and_lists() {
     assert_eq!(
         open,
         [
-            ("n_comparison_set", vec!["e_lead"]),
-            ("n_findings_reviewer", vec!["e_lead"])
+            ("n_comparison_set", vec!["who_k3d7qm2xw5tn6pfa"]),
+            ("n_findings_reviewer", vec!["who_k3d7qm2xw5tn6pfa"])
         ]
     );
     assert_eq!((summary.overdue.len(), summary.stale.len()), (0, 0));
@@ -235,7 +235,7 @@ fn a_message_draft_marks_what_it_cannot_fill() {
         ),
         (
             2,
-            "Hello, Evaluation Lead needs access to the evaluation environment for Evaluate the analytics vendor. The purpose is: purchase.",
+            "Hello, Ana Ruiz needs access to the evaluation environment for Evaluate the analytics vendor. The purpose is: purchase.",
             true,
         ),
     ] {
@@ -315,9 +315,9 @@ fn a_decision_affects_what_its_condition_holds_beneath_it() {
     assert_eq!(affects("n_b"), "n_child");
 }
 
-/// A10, E6: an entity answer given before a merge renders the survivor's name.
+/// A10, E6: an identity answer given before a merge renders the survivor's name.
 #[test]
-fn a_merged_entity_answer_renders_the_survivors_name() {
+fn a_merged_identity_answer_renders_the_survivors_name() {
     let derive = Derive::of(support::vendor_lead_merged(), VENDOR);
     let template: MessageTemplate<KeyRefs> = "Owner: {{answers.n_who_owns}}".parse().unwrap();
     let context = DraftContext {
@@ -389,14 +389,14 @@ fn an_effectively_skipped_decision_is_not_open() {
     assert_eq!(snapshot.open_decisions.len(), 0);
 }
 
-/// I3, C12, E6: an entity answer given before a merge names the survivor in the snapshot and
+/// I3, C12, E6: an identity answer given before a merge names the survivor in the snapshot and
 /// the decision view, as owners do.
 #[test]
-fn a_merged_entity_answer_names_the_survivor_in_snapshot_and_decision_view() {
+fn a_merged_identity_answer_names_the_survivor_in_snapshot_and_decision_view() {
     let derive = Derive::of(support::vendor_lead_merged(), VENDOR);
     let journey = derive.journey();
     let who = key("n_who_owns");
-    let survivor = Some(AnswerValue::Entity("e_other".parse().unwrap()));
+    let survivor = Some(AnswerValue::Identity("who_other".parse().unwrap()));
     let view = journey.decision_view();
     let entry = view
         .decisions
@@ -511,7 +511,7 @@ fn answer_effects_do_not_open_a_decision_under_a_skip() {
 /// one already chosen shows what removing it does; a date decision has no choices, only the
 /// milestone it pins.
 #[test]
-fn answer_effects_toggle_multi_choices_and_name_what_a_date_or_entity_answer_pins_or_fills() {
+fn answer_effects_toggle_multi_choices_and_name_what_a_date_or_identity_answer_pins_or_fills() {
     let records = support::journey(&support::add_nodes(&[
         "{key: n_m, id: m, kind: decision, title: M, prompt: M?, answer_type: multi_choice, choices: [a, b]}",
         "{key: n_for_a, id: for-a, kind: action, title: For a, relevant_when: {contains: {decision: n_m, value: a}}}",

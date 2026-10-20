@@ -21,9 +21,9 @@ pub async fn viewer(State(api): State<Api>, Extension(actor): Extension<Actor>) 
     Ok(Json(Viewer {
         user: viewer.user,
         agent,
-        entities: viewer.entities,
+        identities: viewer.identities,
         merge_offer,
-        identities: viewer.identities.into_iter().map(Into::into).collect(),
+        logins: viewer.logins.into_iter().map(Into::into).collect(),
     }))
 }
 

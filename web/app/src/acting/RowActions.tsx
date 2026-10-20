@@ -91,7 +91,7 @@ export function RowActions({ view, row, to, owner = true, column = false, yours 
       void navigate(to, { state: { choice: { node: row.key, id: what } } });
     }
   };
-  const owners = ownerWords(view, row.owners, viewer?.entities);
+  const owners = ownerWords(view, row.owners, viewer?.identities);
   return (
     <>
       <div className="row-side">

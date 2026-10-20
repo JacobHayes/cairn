@@ -1,40 +1,40 @@
-//! Entity references resolve (PRD Invariants: journey, entity answers resolve to entities;
-//! E6): every entity a graph the patch wrote names is an entity of the candidate deployment
-//! or an alias of one. An entity merge is checked against every journey referencing either
-//! entity: each must still hold every invariant with the merge applied.
+//! Identity references resolve (PRD Invariants: journey, identity answers resolve to identities;
+//! E6): every identity a graph the patch wrote names is an identity of the candidate deployment
+//! or an alias of one. An identity merge is checked against every journey referencing either
+//! identity: each must still hold every invariant with the merge applied.
 
 use cairn_schema::{Deployment, Subject, Violation, ViolationCode};
 
 use super::Check;
-use crate::entity::{self, Mention};
 use crate::graph::{Document, Tree};
+use crate::identity::{self, Mention};
 use crate::validate::{GraphCheck, at_node, violation};
 
-/// Every entity mention in `document` that resolves to no entity.
+/// Every identity mention in `document` that resolves to no identity.
 fn unresolved(document: &Document, tree: &Tree, deployment: &Deployment) -> Vec<Violation> {
     let mut found = Vec::new();
-    for (mention, key) in entity::mentions(document) {
-        if entity::resolve(deployment, key).is_some() {
+    for (mention, key) in identity::mentions(document) {
+        if identity::resolve(deployment, key).is_some() {
             continue;
         }
-        let message = format!("{key} is not an entity of this deployment (E6)");
+        let message = format!("{key} is not an identity of this deployment (E6)");
         let mut missing = match &mention {
             Mention::Answer(node) | Mention::Participation(node) => {
-                at_node(tree, node, ViolationCode::EntityUnresolved, message)
+                at_node(tree, node, ViolationCode::IdentityUnresolved, message)
             }
             Mention::RoleFill(role) => {
-                let mut missing = violation(ViolationCode::EntityUnresolved, message);
+                let mut missing = violation(ViolationCode::IdentityUnresolved, message);
                 missing.at.subject = Some(Subject::Role(role.clone()));
                 missing
             }
         };
-        missing.related.push(Subject::Entity(key.clone()));
+        missing.related.push(Subject::Identity(key.clone()));
         found.push(missing);
     }
     found
 }
 
-/// Runs the entity checks.
+/// Runs the identity checks.
 pub(super) fn check(check: &mut Check<'_, '_>) {
     let session = check.session;
     let candidate = &session.candidate;

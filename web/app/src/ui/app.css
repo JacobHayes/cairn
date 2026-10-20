@@ -1014,9 +1014,9 @@ table.data {
     grid-template-columns: minmax(0, 1fr);
   }
 }
-/* An entity's row in its Panel: paper, a hairline under each, as the node rows. */
+/* An identity's row in its Panel: paper, a hairline under each, as the node rows. */
 /* DESIGN's Table: a row 8px high-padded, its two lines close, in two columns: the name block and its emails, and Edit, which keeps its column at every width. The head's left inset is the Panel head's, so both share an edge. */
-.entity-row {
+.identity-row {
   display: grid;
   grid-template-columns: minmax(0, 1fr) auto;
   align-items: start;
@@ -1025,27 +1025,27 @@ table.data {
   border-bottom: 1px solid var(--color-edge);
   background: var(--color-surface);
 }
-.entity-head {
+.identity-head {
   display: contents;
 }
-.entity-head > button {
+.identity-head > button {
   grid-column: 2;
   grid-row: 1 / span 2;
 }
-.entity-row > [data-testid="entity-emails"] {
+.identity-row > [data-testid="identity-emails"] {
   grid-column: 1;
 }
-.entity-row > :not(.entity-head, [data-testid="entity-emails"]) {
+.identity-row > :not(.identity-head, [data-testid="identity-emails"]) {
   grid-column: 1 / -1;
 }
-.entity-title {
+.identity-title {
   min-width: 0;
 }
-.entity-title > strong {
+.identity-title > strong {
   min-width: 0;
   overflow-wrap: anywhere;
 }
-.node-rows > .entity-row:last-child {
+.node-rows > .identity-row:last-child {
   border-bottom: 0;
 }
 /* Multi-value input (DESIGN): an input's box holding a chip per value and the input that takes the next. */

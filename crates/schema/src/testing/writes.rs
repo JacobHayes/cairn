@@ -5,13 +5,13 @@ use proptest::prelude::*;
 use super::model::bounded_vec;
 use super::{
     arb_agent_id, arb_annotation, arb_annotation_body, arb_answer_value, arb_attachment_key,
-    arb_choices, arb_date, arb_entity, arb_entity_key, arb_entity_set, arb_guard, arb_insertion,
-    arb_insertion_key, arb_journey_header, arb_journey_id, arb_journey_status, arb_kind_key,
-    arb_lineage, arb_local_edit, arb_markdown, arb_node, arb_node_field_value, arb_node_key,
-    arb_node_state, arb_overrides, arb_participation_kind, arb_patch_id, arb_proposal_id,
-    arb_reason, arb_resource, arb_revision, arb_role, arb_role_key, arb_route_header, arb_route_id,
-    arb_route_kind, arb_slug, arb_snooze_target, arb_timestamp, arb_title, arb_user_id,
-    arb_version_number,
+    arb_choices, arb_date, arb_guard, arb_identity, arb_identity_key, arb_identity_set,
+    arb_insertion, arb_insertion_key, arb_journey_header, arb_journey_id, arb_journey_status,
+    arb_kind_key, arb_lineage, arb_local_edit, arb_markdown, arb_node, arb_node_field_value,
+    arb_node_key, arb_node_state, arb_overrides, arb_participation_kind, arb_patch_id,
+    arb_proposal_id, arb_reason, arb_resource, arb_revision, arb_role, arb_role_key,
+    arb_route_header, arb_route_id, arb_route_kind, arb_slug, arb_snooze_target, arb_timestamp,
+    arb_title, arb_user_id, arb_version_number,
 };
 use crate::domain::{Domain, GraphId};
 use crate::event::{Actor, ChangeSet, Event, PatchReceipt, Subject};
@@ -151,7 +151,7 @@ fn arb_lifecycle_mutation() -> BoxedStrategy<Mutation> {
 fn arb_structure_mutation() -> BoxedStrategy<Mutation> {
     let source = prop_oneof![
         arb_role_key().prop_map(ParticipationSource::Role),
-        arb_entity_set().prop_map(ParticipationSource::Entities),
+        arb_identity_set().prop_map(ParticipationSource::Identities),
     ];
     prop_oneof![
         arb_node::<KeyRefs>().prop_map(|node| Mutation::AddNode { node }),
@@ -257,8 +257,8 @@ fn arb_state_mutation() -> BoxedStrategy<Mutation> {
             arb_date()
         )
             .prop_map(|(node, end, date)| Mutation::SetRecordedDate { node, end, date }),
-        (arb_role_key(), arb_entity_set())
-            .prop_map(|(role, entities)| Mutation::FillRole { role, entities }),
+        (arb_role_key(), arb_identity_set())
+            .prop_map(|(role, identities)| Mutation::FillRole { role, identities }),
         arb_role_key().prop_map(|role| Mutation::ClearRoleFill { role }),
         (arb_node_key(), arb_date()).prop_map(|(node, date)| Mutation::SetPin { node, date }),
         (arb_node_key(), shift)
@@ -280,7 +280,7 @@ fn arb_state_mutation() -> BoxedStrategy<Mutation> {
     .boxed()
 }
 
-fn arb_lineage_and_entity_mutation() -> BoxedStrategy<Mutation> {
+fn arb_lineage_and_identity_mutation() -> BoxedStrategy<Mutation> {
     let provenance = prop::sample::select(vec![
         Provenance::FromRoute,
         Provenance::Local,
@@ -294,14 +294,14 @@ fn arb_lineage_and_entity_mutation() -> BoxedStrategy<Mutation> {
             .prop_map(|(node, provenance)| Mutation::SetProvenance { node, provenance }),
         (arb_node_key(), arb_local_edit(), any::<bool>())
             .prop_map(|(node, edit, marked)| Mutation::MarkLocalEdit { node, edit, marked }),
-        arb_entity().prop_map(|entity| Mutation::CreateEntity { entity }),
-        arb_entity().prop_map(|entity| Mutation::EditEntity { entity }),
+        arb_identity().prop_map(|identity| Mutation::CreateIdentity { identity }),
+        arb_identity().prop_map(|identity| Mutation::EditIdentity { identity }),
         (
-            arb_entity_key(),
-            arb_entity_key(),
+            arb_identity_key(),
+            arb_identity_key(),
             prop::collection::btree_map(arb_journey_id(), arb_revision(), 0..2)
         )
-            .prop_map(|(survivor, merged, journeys)| Mutation::MergeEntities {
+            .prop_map(|(survivor, merged, journeys)| Mutation::MergeIdentities {
                 survivor,
                 merged,
                 journeys
@@ -316,7 +316,7 @@ pub fn arb_domain_mutation() -> BoxedStrategy<Mutation> {
         arb_lifecycle_mutation(),
         arb_structure_mutation(),
         arb_state_mutation(),
-        arb_lineage_and_entity_mutation()
+        arb_lineage_and_identity_mutation()
     ]
     .boxed()
 }
@@ -340,7 +340,7 @@ pub fn arb_conflict_resolution() -> BoxedStrategy<ConflictResolution> {
 fn arb_source() -> BoxedStrategy<ParticipationSource<KeyRefs>> {
     prop_oneof![
         arb_role_key().prop_map(ParticipationSource::Role),
-        arb_entity_set().prop_map(ParticipationSource::Entities),
+        arb_identity_set().prop_map(ParticipationSource::Identities),
     ]
     .boxed()
 }
@@ -352,7 +352,7 @@ fn arb_role_reference() -> BoxedStrategy<RoleReference> {
         (arb_node_key(), arb_kind_key())
             .prop_map(|(node, kind)| RoleReference::SegmentParticipation { node, kind }),
         arb_node_key().prop_map(|node| RoleReference::FillsRole { node }),
-        arb_entity_set().prop_map(|entities| RoleReference::Fill { entities }),
+        arb_identity_set().prop_map(|identities| RoleReference::Fill { identities }),
         Just(RoleReference::DefaultOwner),
         (arb_node_key(), arb_resource::<KeyRefs>())
             .prop_map(|(node, resource)| RoleReference::Draft { node, resource }),
@@ -436,7 +436,7 @@ fn arb_graph_conflict() -> BoxedStrategy<Conflict> {
             prop::option::of(arb_role::<KeyRefs>()),
             prop::collection::btree_set(arb_role_reference(), 0..3),
             prop::collection::btree_set(arb_insertion_key(), 0..2),
-            arb_entity_set()
+            arb_identity_set()
         )
             .prop_map(|(role, journey, route, references, insertions, members)| {
                 Conflict::Role {
@@ -506,13 +506,15 @@ pub fn arb_review_item() -> BoxedStrategy<ReviewItem> {
                 removal,
             }
         }),
-        (arb_entity_key(), uses, prop::option::of(mapping)).prop_map(|(entity, uses, mapping)| {
-            ReviewItem::Participation {
-                entity,
-                uses,
-                mapping,
+        (arb_identity_key(), uses, prop::option::of(mapping)).prop_map(
+            |(identity, uses, mapping)| {
+                ReviewItem::Participation {
+                    identity,
+                    uses,
+                    mapping,
+                }
             }
-        }),
+        ),
         (arb_node_key(), any::<bool>())
             .prop_map(|(node, excluded)| ReviewItem::Exclusion { node, excluded }),
         arb_removal().prop_map(|removal| ReviewItem::Cascade { removal }),
@@ -662,7 +664,7 @@ fn arb_retired_key() -> BoxedStrategy<RetiredKey> {
 fn arb_content_record() -> BoxedStrategy<GraphRecord> {
     let source = prop_oneof![
         arb_role_key().prop_map(ParticipationSource::Role),
-        arb_entity_set().prop_map(ParticipationSource::Entities),
+        arb_identity_set().prop_map(ParticipationSource::Identities),
     ];
     prop_oneof![
         arb_node::<KeyRefs>().prop_map(GraphRecord::Node),
@@ -698,8 +700,8 @@ fn arb_state_record() -> BoxedStrategy<GraphRecord> {
                 value,
                 rationale
             }),
-        (arb_role_key(), arb_entity_set())
-            .prop_map(|(role, entities)| GraphRecord::RoleFill { role, entities }),
+        (arb_role_key(), arb_identity_set())
+            .prop_map(|(role, identities)| GraphRecord::RoleFill { role, identities }),
         (arb_node_key(), arb_date()).prop_map(|(node, date)| GraphRecord::Pin { node, date }),
         (arb_node_key(), arb_snooze_target())
             .prop_map(|(node, until)| GraphRecord::Snooze { node, until }),
@@ -730,9 +732,9 @@ fn arb_domain_record() -> BoxedStrategy<Record> {
                 deleted_at,
             }
         }),
-        arb_entity().prop_map(Record::Entity),
-        (arb_entity_key(), arb_entity_key())
-            .prop_map(|(alias, entity)| Record::EntityAlias { alias, entity }),
+        arb_identity().prop_map(Record::Identity),
+        (arb_identity_key(), arb_identity_key())
+            .prop_map(|(alias, identity)| Record::IdentityAlias { alias, identity }),
         arb_proposal().prop_map(Record::Proposal),
     ]
     .boxed()
@@ -813,7 +815,7 @@ pub fn arb_change_set() -> BoxedStrategy<ChangeSet> {
 pub fn arb_subject() -> BoxedStrategy<Subject> {
     prop_oneof![
         arb_node_key().prop_map(Subject::Node),
-        arb_entity_key().prop_map(Subject::Entity),
+        arb_identity_key().prop_map(Subject::Identity),
         Just(Subject::Deployment)
     ]
     .boxed()

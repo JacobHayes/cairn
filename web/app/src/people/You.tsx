@@ -1,8 +1,8 @@
-// H3, H1: who you are here. Your user, the identities you sign in with and the emails each
-// provider verified, and the entities those emails name: you are each of them, so "mine"
+// H3, H1: who you are here. Your user, the logins you sign in with and the emails each
+// provider verified, and the identities those emails name: you are each of them, so "mine"
 // works with no link step. Two or more are duplicates of one person, and merging them is
 // offered (H3). On the server, signing in with another provider while signed in links that
-// identity to you (ARCHITECTURE, Auth: users and identities); it comes back here.
+// login to you (ARCHITECTURE, Auth: users and logins); it comes back here.
 import { Link } from "react-router";
 
 import { pathTo } from "../address.ts";
@@ -23,7 +23,7 @@ export function linkable(capabilities: Capabilities): string[] {
   return capabilities.auth.filter((method) => method.kind === "oidc").map((method) => method.name);
 }
 
-function Identities({ viewer }: { viewer: Viewer }) {
+function Logins({ viewer }: { viewer: Viewer }) {
   return (
     <div className="table-wrap">
       <table className="data">
@@ -36,12 +36,12 @@ function Identities({ viewer }: { viewer: Viewer }) {
           </tr>
         </thead>
         <tbody>
-          {viewer.identities.map((identity) => (
-            <tr key={`${identity.provider}:${identity.subject}`} data-testid="identity" data-provider={identity.provider}>
-              <td>{identity.provider}</td>
-              <td className="mono">{identity.subject}</td>
-              <td className="mono" data-testid="identity-emails">{identity.verified_emails.join(", ") || <span className="muted small">None</span>}</td>
-              <td className="muted small">{identity.linked_at}</td>
+          {viewer.logins.map((login) => (
+            <tr key={`${login.provider}:${login.subject}`} data-testid="login" data-provider={login.provider}>
+              <td>{login.provider}</td>
+              <td className="mono">{login.subject}</td>
+              <td className="mono" data-testid="login-emails">{login.verified_emails.join(", ") || <span className="muted small">None</span>}</td>
+              <td className="muted small">{login.linked_at}</td>
             </tr>
           ))}
         </tbody>
@@ -50,24 +50,24 @@ function Identities({ viewer }: { viewer: Viewer }) {
   );
 }
 
-function YourEntities({ viewer }: { viewer: Viewer }) {
+function YourIdentities({ viewer }: { viewer: Viewer }) {
   const deployment = useDeployment();
-  const entities = byName((deployment?.entities ?? []).filter((entity) => viewer.entities.includes(entity.key)));
+  const identities = byName((deployment?.identities ?? []).filter((identity) => viewer.identities.includes(identity.key)));
   const merge = offeredMerge(viewer.merge_offer);
   return (
-    <section className="stack" aria-label="Your entities" data-testid="your-entities">
+    <section className="stack" aria-label="Your identities" data-testid="your-identities">
       <strong>You are</strong>
-      {entities.length === 0 ? <span className="muted small" data-testid="no-entity">No entity holds a verified email of yours yet: add one to an entity on the entities screen, or link an identity whose email one holds.</span> : null}
+      {identities.length === 0 ? <span className="muted small" data-testid="no-identity">No identity holds a verified email of yours yet: add one to an identity on the identities screen, or link a login whose email one holds.</span> : null}
       <ul className="row plain-list">
-        {entities.map((entity) => (
-          <li key={entity.key} className="badge" data-testid="your-entity" data-entity={entity.key}>
-            {entity.name}
+        {identities.map((identity) => (
+          <li key={identity.key} className="badge" data-testid="your-identity" data-identity={identity.key}>
+            {identity.name}
           </li>
         ))}
       </ul>
       {merge === undefined ? null : (
         <div className="callout stack" data-testid="merge-offer">
-          <span>Your verified emails name {entities.length} entities: they are one person. "Mine" already covers them all; merging makes them one.</span>
+          <span>Your verified emails name {identities.length} identities: they are one person. "Mine" already covers them all; merging makes them one.</span>
           <Link to={mergePath(merge.survivor, merge.merged)}>Merge them</Link>
         </div>
       )}
@@ -108,7 +108,7 @@ function Licenses() {
   );
 }
 
-export function Identity() {
+export function You() {
   const { viewer, failed } = useViewer();
   const { host } = useSession();
   const capabilities = useCapabilities();
@@ -118,19 +118,19 @@ export function Identity() {
   }
   const providers = linkable(capabilities);
   return (
-    <section className="stack" aria-label="You" data-testid="identity-screen">
+    <section className="stack" aria-label="You" data-testid="you-screen">
       <span className="row">
         <h1>You</h1>
         <span className="muted small" data-testid="user">{userName(viewer.user)}</span>
-        {host.kind === "browser" ? <span className="muted small">The demo's one local identity.</span> : null}
+        {host.kind === "browser" ? <span className="muted small">The demo's one local login.</span> : null}
       </span>
-      <Identities viewer={viewer} />
-      <YourEntities viewer={viewer} />
+      <Logins viewer={viewer} />
+      <YourIdentities viewer={viewer} />
       <ThemeControl />
       <Licenses />
       {providers.length === 0 ? null : (
-        <span className="row" data-testid="link-identity">
-          <span>Link another identity:</span>
+        <span className="row" data-testid="link-login">
+          <span>Link another login:</span>
           {providers.map((name) => (
             <a key={name} className="button" href={signInHref(name)}>
               Sign in with {name}

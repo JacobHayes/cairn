@@ -38,7 +38,7 @@ export interface ChangesContext {
   /** The journey the proposal is for, derived, when it is one: answers read it. */
   ready: Ready | undefined;
   editable: boolean;
-  /** The destination has a graph to add nodes and edges to (the deployment's entities have none). */
+  /** The destination has a graph to add nodes and edges to (the deployment's identities have none). */
   hasGraph: boolean;
   /** Where a new node goes unless another is picked (a breakdown's placeholder). */
   defaultParent: string | undefined;
@@ -112,7 +112,7 @@ function AddedNode({ editor, node, onChange, context }: { editor: string; node: 
         </Section>
       ) : null}
       <Section title="Relevance and dates" testId="added-dates">
-        <ConditionEditor value={draft.relevant_when} onChange={(next) => { change({ relevant_when: next }); }} tree={context.tree} node={node.key} entities={context.deployment.entities ?? []} today={context.today} />
+        <ConditionEditor value={draft.relevant_when} onChange={(next) => { change({ relevant_when: next }); }} tree={context.tree} node={node.key} identities={context.deployment.identities ?? []} today={context.today} />
         {(["due_by", "not_before"] as const).map((which) => (
           <DateRuleEditor key={which} which={which} value={draft[which]} onChange={(next) => { change({ [which]: next }); }} tree={context.tree} node={node.key} />
         ))}
@@ -175,7 +175,7 @@ function FieldValue({ editor, mutation, onChange, context }: { editor: string; m
       {field === "fills_role" ? <Picker aria-label={fieldWords(field)} value={draft.fills_role} none="No role" options={context.roles.map((role) => ({ value: role.key, label: role.title ?? role.id }))} onChange={(event) => { change({ fills_role: event.target.value }); }} /> : null}
       {field === "parent" ? <ParentValue mutation={mutation} onChange={onChange} context={context} /> : null}
       {field === "choices" ? <ChoicesEditor props={props} /> : null}
-      {field === "relevant_when" ? <ConditionEditor value={draft.relevant_when} onChange={(next) => { change({ relevant_when: next }); }} tree={context.tree} node={mutation.node} entities={context.deployment.entities ?? []} today={context.today} /> : null}
+      {field === "relevant_when" ? <ConditionEditor value={draft.relevant_when} onChange={(next) => { change({ relevant_when: next }); }} tree={context.tree} node={mutation.node} identities={context.deployment.identities ?? []} today={context.today} /> : null}
       {field === "due_by" || field === "not_before" ? <DateRuleEditor which={field} value={draft[field]} onChange={(next) => { change({ [field]: next }); }} tree={context.tree} node={mutation.node} /> : null}
     </FieldBox>
   );

@@ -1,5 +1,5 @@
 //! The OIDC provider against a stub issuer on loopback (H1: OAuth/OIDC against a
-//! registered provider): a sign-in ends in a session for the identity the ID token names,
+//! registered provider): a sign-in ends in a session for the login the ID token names,
 //! and every way an ID token or a callback can be wrong is refused (3.2, Security).
 
 #[cfg(test)]
@@ -15,7 +15,7 @@ mod oidc {
     use cairn_auth::{
         AuthProvider, DevConfig, DevProvider, OidcConfig, OidcProvider, Presented, Refusal, Verdict,
     };
-    use cairn_schema::{Actor, Identity, Slug, UserId};
+    use cairn_schema::{Actor, Login, Slug, UserId};
     use cairn_store::AuthStore;
 
     use crate::auth::support::issuer::{Advertise, Issuer, Person, Spoil};
@@ -133,20 +133,15 @@ mod oidc {
             .unwrap()
     }
 
-    /// H1: a sign-in through the issuer ends in a session for a user holding the identity
+    /// H1: a sign-in through the issuer ends in a session for a user holding the login
     /// the ID token names, with its verified email (H3).
     #[tokio::test]
-    async fn a_sign_in_ends_in_a_session_for_the_identity_the_issuer_names() {
+    async fn a_sign_in_ends_in_a_session_for_the_login_the_issuer_names() {
         let setup = setup(false).await;
         let session = sign_in(&setup, &ANN, Spoil::Nothing, "").await.unwrap();
         let signed_in = actor(&setup, &session).await;
-        let held = setup
-            .world
-            .store
-            .identities_of(&signed_in.user)
-            .await
-            .unwrap();
-        let identity = Identity {
+        let held = setup.world.store.logins_of(&signed_in.user).await.unwrap();
+        let login = Login {
             provider: "oidc".parse().unwrap(),
             subject: ANN.subject.parse().unwrap(),
             display: ANN.name.parse().unwrap(),
@@ -155,9 +150,9 @@ mod oidc {
         assert_eq!(held.len(), 1);
         assert_eq!(
             (&held[0].provider, &held[0].subject),
-            (&identity.provider, &identity.subject)
+            (&login.provider, &login.subject)
         );
-        assert_eq!(held[0].verified_emails, identity.verified_emails);
+        assert_eq!(held[0].verified_emails, login.verified_emails);
         let user = setup
             .world
             .store
@@ -165,7 +160,7 @@ mod oidc {
             .await
             .unwrap()
             .unwrap();
-        assert_eq!(user.name, identity.display);
+        assert_eq!(user.name, login.display);
         let again = sign_in(&setup, &ANN, Spoil::Nothing, "").await.unwrap();
         assert_eq!(actor(&setup, &again).await, signed_in);
     }
@@ -211,11 +206,11 @@ mod oidc {
         assert_eq!(replay.status(), StatusCode::BAD_REQUEST);
     }
 
-    /// Signing in while signed in links the identity to the browser's user.
+    /// Signing in while signed in links the login to the browser's user.
     #[tokio::test]
-    async fn signing_in_while_signed_in_links_the_identity() {
+    async fn signing_in_while_signed_in_links_the_login() {
         let setup = setup(false).await;
-        let tailnet = Identity {
+        let tailnet = Login {
             provider: "tailscale".parse().unwrap(),
             subject: "ann@tailnet".parse().unwrap(),
             display: "Ann".parse().unwrap(),
@@ -233,10 +228,7 @@ mod oidc {
             .await
             .unwrap();
         assert_eq!(actor(&setup, &renewed).await.user, user);
-        assert_eq!(
-            setup.world.store.identities_of(&user).await.unwrap().len(),
-            2
-        );
+        assert_eq!(setup.world.store.logins_of(&user).await.unwrap().len(), 2);
         let old = with_cookie(request("/whoami", LOCAL), &cookie).body(Body::empty());
         assert_eq!(
             whoami(&setup.router, old.unwrap()).await,
@@ -249,7 +241,7 @@ mod oidc {
     #[tokio::test]
     async fn an_unverified_email_never_auto_links() {
         let setup = setup(true).await;
-        let holder = Identity {
+        let holder = Login {
             provider: "tailscale".parse().unwrap(),
             subject: "ann@tailnet".parse().unwrap(),
             display: "Ann".parse().unwrap(),
@@ -271,7 +263,7 @@ mod oidc {
             .unwrap();
         let stranger = actor(&setup, &session).await.user;
         assert_ne!(stranger, user);
-        let held = setup.world.store.identities_of(&stranger).await.unwrap();
+        let held = setup.world.store.logins_of(&stranger).await.unwrap();
         assert_eq!(held[0].verified_emails, std::collections::BTreeSet::new());
         let verified = Person {
             subject: "verified",
@@ -324,9 +316,9 @@ mod oidc {
     }
 
     /// A browser another provider already signs in (here the named dev user, as Tailscale
-    /// would) links the OIDC identity to that user rather than making a new one.
+    /// would) links the OIDC login to that user rather than making a new one.
     #[tokio::test]
-    async fn signing_in_while_signed_in_by_another_provider_links_the_identity() {
+    async fn signing_in_while_signed_in_by_another_provider_links_the_login() {
         let world = World::new();
         let issuer = Issuer::start(world.clock.clock()).await;
         let dev = DevConfig {
@@ -360,30 +352,23 @@ mod oidc {
         );
         let dev_user = before.await.unwrap().user;
         sign_in(&setup, &ANN, Spoil::Nothing, "").await.unwrap();
-        let identities = setup.world.store.identities_of(&dev_user).await.unwrap();
-        let providers: Vec<&str> = identities
-            .iter()
-            .map(|held| held.provider.as_str())
-            .collect();
+        let logins = setup.world.store.logins_of(&dev_user).await.unwrap();
+        let providers: Vec<&str> = logins.iter().map(|held| held.provider.as_str()).collect();
         assert_eq!(providers, ["dev", "oidc"]);
     }
     async fn session_for(world: &World, subject: &str) -> (UserId, String) {
-        let identity = Identity {
+        let login = Login {
             provider: "tailscale".parse().unwrap(),
             subject: subject.parse().unwrap(),
             display: subject.parse().unwrap(),
             verified_emails: std::collections::BTreeSet::new(),
         };
-        let user = world
-            .accounts
-            .resolve(&identity, None, false)
-            .await
-            .unwrap();
+        let user = world.accounts.resolve(&login, None, false).await.unwrap();
         let session = world.accounts.start_session(&user).await.unwrap();
         (user, format!("cairn_session={}", session.expose()))
     }
 
-    /// The identity links only to the user who started the sign-in: a browser that
+    /// The login links only to the user who started the sign-in: a browser that
     /// changed accounts before the callback is refused, and neither user gains it.
     #[tokio::test]
     async fn a_sign_in_links_only_to_the_user_who_started_it() {
@@ -398,10 +383,7 @@ mod oidc {
         let response = callback(&setup, &code, &state_of(&started.location), &switched).await;
         assert_eq!(response.status(), StatusCode::BAD_REQUEST);
         for user in [&ann, &bob] {
-            assert_eq!(
-                setup.world.store.identities_of(user).await.unwrap().len(),
-                1
-            );
+            assert_eq!(setup.world.store.logins_of(user).await.unwrap().len(), 1);
         }
     }
 
@@ -484,7 +466,7 @@ mod oidc {
     }
 
     /// A browser the dev user signs in, carrying a lapsed session cookie, still links the
-    /// identity to the dev user.
+    /// login to the dev user.
     #[tokio::test]
     async fn a_lapsed_session_does_not_hide_the_provider_that_signs_the_browser_in() {
         let world = World::new();
@@ -532,7 +514,7 @@ mod oidc {
         let providers: Vec<String> = setup
             .world
             .store
-            .identities_of(&dev_user)
+            .logins_of(&dev_user)
             .await
             .unwrap()
             .into_iter()

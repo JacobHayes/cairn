@@ -36,7 +36,7 @@ export interface CellContext {
   /** The acting frontier while Frontier is on: its rows say why they are there and carry their actions. */
   frontier: ReadonlySet<string> | undefined;
   sort: ListSettings["sort"];
-  /** The viewer's entities, so an owner column says "You". */
+  /** The viewer's identities, so an owner column says "You". */
   viewer: readonly string[];
   onFold: (container: string) => void;
 }

@@ -69,7 +69,7 @@ pub(crate) enum ProviderFile {
     Oidc(OidcFile),
     /// The built-in OAuth server for MCP clients and agent tokens (I2).
     BuiltinOauth(OAuthFile),
-    /// Tailscale identity, direct or behind `tailscale serve`.
+    /// Tailscale login, direct or behind `tailscale serve`.
     Tailscale(TailscaleFile),
     /// Google Cloud Identity-Aware Proxy's signed assertion on each request.
     GcpIap(GcpIapFile),
@@ -157,7 +157,7 @@ pub(crate) struct GcpIapFile {
 pub(crate) enum TailscaleModeFile {
     /// Ask tailscaled who the peer is.
     Direct,
-    /// Trust an authenticating proxy's identity headers.
+    /// Trust an authenticating proxy's login headers.
     Proxy,
 }
 

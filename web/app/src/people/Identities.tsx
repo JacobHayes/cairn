@@ -1,7 +1,7 @@
-// E6, B3, H3: the deployment's entities. Each with its name, its emails (each held by one
-// entity), and the old keys merged into it; made with a name alone and enriched later; edited;
+// E6, B3, H3: the deployment's identities. Each with its name, its emails (each held by one
+// identity), and the old keys merged into it; made with a name alone and enriched later; edited;
 // and merged, the merged key kept as an alias so journeys and their history resolve to the
-// survivor unchanged. Which entities are the caller's is marked. Kept current (H6). An edit
+// survivor unchanged. Which identities are the caller's is marked. Kept current (H6). An edit
 // is drafted against the deployment revision its author saw, and forms survive a reload.
 import { useState } from "react";
 import { useLocation, useParams } from "react-router";
@@ -12,7 +12,7 @@ import { useDeployment, useViewer } from "../data/react.ts";
 import { Band } from "../proposals/Band.tsx";
 import { DestinationProposals } from "../proposals/DestinationProposals.tsx";
 import { DeploymentLayerHost } from "../proposals/Hosts.tsx";
-import { entityDiff, useLayer, useReviewing, type EntityRow as DiffRow } from "../proposals/layer.ts";
+import { identityDiff, useLayer, useReviewing, type IdentityRow as DiffRow } from "../proposals/layer.ts";
 import { DIFF_LABELS } from "../proposals/model.ts";
 import { Rail } from "../proposals/Rail.tsx";
 import type { Rejection } from "../data/writes.ts";
@@ -24,12 +24,12 @@ import { Chip, Chips } from "../ui/Chip.tsx";
 import { ChipsInput } from "../ui/ChipsInput.tsx";
 import { IndexHead } from "../ui/IndexHead.tsx";
 import { Badge, Button, Field } from "../ui/kit.tsx";
-import { MergeEntities } from "./MergeEntities.tsx";
-import { aliasesOf, byName, EMAIL_RULES, entityOf, mergeAsked, newEntityKey, type Entity } from "./model.ts";
+import { MergeIdentities } from "./MergeIdentities.tsx";
+import { aliasesOf, byName, EMAIL_RULES, identityOf, mergeAsked, newIdentityKey, type Identity } from "./model.ts";
 import { plural } from "../ui/words.ts";
 
-/** An entity's edit as typed, and the deployment revision its author saw when they opened it (H5). */
-interface EntityDraft {
+/** An identity's edit as typed, and the deployment revision its author saw when they opened it (H5). */
+interface IdentityDraft {
   name: string;
   emails: string[];
   /** The email typed and not yet taken as a chip. */
@@ -50,9 +50,9 @@ export function deploymentRebase(rejection: Rejection, held: number): number {
   return Math.max(held, ...reported);
 }
 
-function EntityEditor({ entity, deployment, draft, setDraft, write }: { entity: Entity; deployment: Deployment; draft: EntityDraft; setDraft: (draft: EntityDraft | undefined) => void; write: ScreenWrite }) {
+function IdentityEditor({ identity, deployment, draft, setDraft, write }: { identity: Identity; deployment: Deployment; draft: IdentityDraft; setDraft: (draft: IdentityDraft | undefined) => void; write: ScreenWrite }) {
   const save = async () => {
-    const mutation = { op: "edit_entity" as const, entity: entityOf(entity.key, draft.name, draft.emails) };
+    const mutation = { op: "edit_identity" as const, identity: identityOf(identity.key, draft.name, draft.emails) };
     if (await write.run({ target: "deployment", baseRevision: draft.base, mutations: [mutation] })) {
       setDraft(undefined);
     }
@@ -86,66 +86,66 @@ function EntityEditor({ entity, deployment, draft, setDraft, write }: { entity: 
   );
 }
 
-function EntityRow({ entity, deployment, yours, mark, intoName }: { entity: Entity; deployment: Deployment; yours: boolean; mark?: DiffRow["mark"]; intoName?: string | undefined }) {
+function IdentityRow({ identity, deployment, yours, mark, intoName }: { identity: Identity; deployment: Deployment; yours: boolean; mark?: DiffRow["mark"]; intoName?: string | undefined }) {
   const reviewing = useReviewing() !== undefined;
-  const [draft, setDraft] = useDraft<EntityDraft>(`entity-edit:${entity.key}`);
+  const [draft, setDraft] = useDraft<IdentityDraft>(`identity-edit:${identity.key}`);
   // The row holds the write, so a save in flight keeps Edit closed until it settles: its
   // landing closes the draft it sent, never one opened after it.
-  const write = useScreenWrite(`entity:${entity.key}`, entity.name);
-  const aliases = aliasesOf(deployment, entity.key);
+  const write = useScreenWrite(`identity:${identity.key}`, identity.name);
+  const aliases = aliasesOf(deployment, identity.key);
   return (
-    <li className="entity-row" data-testid="entity" data-entity={entity.key} data-diff={mark?.kind}>
-      <span className="entity-head">
-        <span className="row entity-title">
+    <li className="identity-row" data-testid="identity" data-identity={identity.key} data-diff={mark?.kind}>
+      <span className="identity-head">
+        <span className="row identity-title">
           {mark === undefined ? null : (
             <span className="layer-word" data-testid="row-diff" data-diff={mark.kind}>
               {mark.into === undefined ? DIFF_LABELS[mark.kind] : `Merged into ${intoName ?? mark.into}`}
             </span>
           )}
-          <strong data-testid="entity-name">{entity.name}</strong>
+          <strong data-testid="identity-name">{identity.name}</strong>
           {yours ? <Badge tone="good" data-testid="yours">You</Badge> : null}
           {aliases.length === 0 ? null : <span className="muted small" data-testid="aliases">merged from {plural(aliases.length, "other entry", "other entries")}</span>}
         </span>
         {draft === undefined && !reviewing ? (
-          <Button disabled={write.disabled} onClick={() => { setDraft({ name: entity.name, emails: [...(entity.emails ?? [])], emailText: "", base: deployment.revision }); }}>Edit</Button>
+          <Button disabled={write.disabled} onClick={() => { setDraft({ name: identity.name, emails: [...(identity.emails ?? [])], emailText: "", base: deployment.revision }); }}>Edit</Button>
         ) : null}
       </span>
       {draft !== undefined && !reviewing ? null : (
-        <span data-testid="entity-emails">
-          {(entity.emails ?? []).length === 0 ? <span className="muted small">No emails</span> : <Chips>{(entity.emails ?? []).map((email) => <Chip key={email}>{email}</Chip>)}</Chips>}
+        <span data-testid="identity-emails">
+          {(identity.emails ?? []).length === 0 ? <span className="muted small">No emails</span> : <Chips>{(identity.emails ?? []).map((email) => <Chip key={email}>{email}</Chip>)}</Chips>}
         </span>
       )}
-      {draft === undefined || reviewing ? null : <EntityEditor entity={entity} deployment={deployment} draft={draft} setDraft={setDraft} write={write} />}
+      {draft === undefined || reviewing ? null : <IdentityEditor identity={identity} deployment={deployment} draft={draft} setDraft={setDraft} write={write} />}
     </li>
   );
 }
 
-function CreateEntity({ deployment }: { deployment: Deployment }) {
-  const write = useScreenWrite("new-entity");
-  const [draft, setDraft] = useDraft<{ name: string; emails: string[]; emailText: string }>("entity-new");
+function CreateIdentity({ deployment }: { deployment: Deployment }) {
+  const write = useScreenWrite("new-identity");
+  const [draft, setDraft] = useDraft<{ name: string; emails: string[]; emailText: string }>("identity-new");
   const { name, emails, emailText } = draft ?? { name: "", emails: [], emailText: "" };
   const create = async () => {
-    const mutation = { op: "create_entity" as const, entity: entityOf(newEntityKey(name), name, emails) };
+    const mutation = { op: "create_identity" as const, identity: identityOf(newIdentityKey(), name, emails) };
     if (await write.run({ target: "deployment", baseRevision: deployment.revision, mutations: [mutation] })) {
       setDraft(undefined);
     }
   };
   return (
-    <form className="stack" data-testid="create-entity" onSubmit={(event) => { event.preventDefault(); void create(); }}>
+    <form className="stack" data-testid="create-identity" onSubmit={(event) => { event.preventDefault(); void create(); }}>
       <span className="row">
         <Field label="Name" value={name} onChange={(event) => { setDraft({ name: event.target.value, emails, emailText }); }} />
         <ChipsInput label="Emails (optional)" placeholder="Add an email" inputMode="email" rules={EMAIL_RULES} values={emails} text={emailText} onChange={(next, nextText) => { setDraft({ name, emails: next, emailText: nextText }); }} />
       </span>
       <span className="row">
-        <Button primary type="submit" disabled={write.disabled || name.trim() === "" || emailText.trim() !== ""}>Add an entity</Button>
+        <Button primary type="submit" disabled={write.disabled || name.trim() === "" || emailText.trim() !== ""}>Add an identity</Button>
         {write.rejection === undefined ? <WriteStatus view={write.status} /> : <RejectionView rejection={write.rejection} onDismiss={write.dismiss} />}
       </span>
     </form>
   );
 }
 
-/** The entities page: the entities as they are, or, with a proposal's layer on, as it would leave them with every change marked. */
-function EntitiesList({ deployment, rows }: { deployment: Deployment; rows: DiffRow[] | undefined }) {
+/** The identities page: the identities as they are, or, with a proposal's layer on, as it would leave them with every change marked. */
+function IdentitiesList({ deployment, rows }: { deployment: Deployment; rows: DiffRow[] | undefined }) {
   const { viewer } = useViewer();
   const { search } = useLocation();
   const asked = mergeAsked(search);
@@ -154,24 +154,24 @@ function EntitiesList({ deployment, rows }: { deployment: Deployment; rows: Diff
   const layer = useLayer();
   const reviewing = useReviewing() !== undefined;
   const mergeOpen = !reviewing && (merge?.asked === asked.join(",") ? merge.open : asked.length > 0);
-  const yours = new Set(viewer?.entities ?? []);
-  const listed: DiffRow[] = rows ?? byName(deployment.entities ?? []).map((entity) => ({ entity, mark: undefined }));
-  const names = new Map(listed.map((row) => [row.entity.key, row.entity.name]));
+  const yours = new Set(viewer?.identities ?? []);
+  const listed: DiffRow[] = rows ?? byName(deployment.identities ?? []).map((identity) => ({ identity, mark: undefined }));
+  const names = new Map(listed.map((row) => [row.identity.key, row.identity.name]));
   return (
-    <section className="stack" aria-label="Entities" data-testid="entities" data-revision={deployment.revision} data-layer={layer?.mode} data-rows-page tabIndex={-1}>
-      <IndexHead title="Entities">
-        {reviewing ? null : <Button aria-expanded={mergeOpen} aria-controls="merge-entities" onClick={() => { setMerge({ asked: asked.join(","), open: !mergeOpen }); }}>{mergeOpen ? "Close merge" : "Merge entities"}</Button>}
+    <section className="stack" aria-label="Identities" data-testid="identities" data-revision={deployment.revision} data-layer={layer?.mode} data-rows-page tabIndex={-1}>
+      <IndexHead title="Identities">
+        {reviewing ? null : <Button aria-expanded={mergeOpen} aria-controls="merge-identities" onClick={() => { setMerge({ asked: asked.join(","), open: !mergeOpen }); }}>{mergeOpen ? "Close merge" : "Merge identities"}</Button>}
       </IndexHead>
       <Band />
-      <span className="muted small">People and teams journeys refer to, across every journey. They need not be users; an entity holding your verified email is you.</span>
-      {reviewing ? null : <CreateEntity deployment={deployment} />}
-      {mergeOpen ? <MergeEntities key={asked.join(",")} deployment={deployment} entities={byName(deployment.entities ?? [])} asked={asked} /> : null}
+      <span className="muted small">People and teams journeys refer to, across every journey. They need not be users; an identity holding your verified email is you.</span>
+      {reviewing ? null : <CreateIdentity deployment={deployment} />}
+      {mergeOpen ? <MergeIdentities key={asked.join(",")} deployment={deployment} identities={byName(deployment.identities ?? [])} asked={asked} /> : null}
       {listed.length === 0 ? (
-        <p className="muted small" data-testid="entities-empty">No entities yet.</p>
+        <p className="muted small" data-testid="identities-empty">No identities yet.</p>
       ) : (
-        <NodePanel title="Entities" count={listed.length} testId="entity-list">
-          {listed.map(({ entity, mark }) => (
-            <EntityRow key={entity.key} entity={entity} deployment={deployment} yours={yours.has(entity.key)} mark={mark} intoName={mark?.into === undefined ? undefined : names.get(mark.into)} />
+        <NodePanel title="Identities" count={listed.length} testId="identity-list">
+          {listed.map(({ identity, mark }) => (
+            <IdentityRow key={identity.key} identity={identity} deployment={deployment} yours={yours.has(identity.key)} mark={mark} intoName={mark?.into === undefined ? undefined : names.get(mark.into)} />
           ))}
         </NodePanel>
       )}
@@ -180,30 +180,30 @@ function EntitiesList({ deployment, rows }: { deployment: Deployment; rows: Diff
 }
 
 /** Under the layer, the rows diffed (in the order the page lists them) and the rail beside them. */
-function LayeredEntities() {
+function LayeredIdentities() {
   const layer = useLayer();
   const deployment = layer?.deployment;
   if (layer === undefined || deployment === undefined) {
     return null;
   }
-  const rows = layer.mode === "reviewing" ? entityDiff(deployment.before, deployment.after) : undefined;
+  const rows = layer.mode === "reviewing" ? identityDiff(deployment.before, deployment.after) : undefined;
   return (
     <>
-      <EntitiesList deployment={deployment.before} rows={rows} />
+      <IdentitiesList deployment={deployment.before} rows={rows} />
       {layer.review === undefined ? null : <Rail selected={undefined} />}
     </>
   );
 }
 
-export function Entities() {
+export function Identities() {
   const deployment = useDeployment();
   const proposal = useParams()["proposal"];
   if (deployment === undefined) {
-    return <p className="muted small">Reading the entities...</p>;
+    return <p className="muted small">Reading the identities...</p>;
   }
   return (
     <>
-      {proposal === undefined ? <EntitiesList deployment={deployment} rows={undefined} /> : <DeploymentLayerHost proposal={proposal}>{() => <LayeredEntities />}</DeploymentLayerHost>}
+      {proposal === undefined ? <IdentitiesList deployment={deployment} rows={undefined} /> : <DeploymentLayerHost proposal={proposal}>{() => <LayeredIdentities />}</DeploymentLayerHost>}
       <DestinationProposals destination="deployment" />
     </>
   );

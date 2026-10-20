@@ -26,7 +26,7 @@ use crate::touched::TouchedSet;
 #[serde(rename_all = "snake_case")]
 #[allow(missing_docs)]
 pub enum ViolationCode {
-    // Identity and references.
+    // Keys and references.
     DuplicateSiblingId,
     DuplicateKey,
     RetiredKeyReused,
@@ -60,7 +60,7 @@ pub enum ViolationCode {
     StillReferenced,
     // Journey state.
     AnswerTypeMismatch,
-    EntityUnresolved,
+    IdentityUnresolved,
     IllegalTransition,
     ReasonRequired,
     GuardFailed,
@@ -86,8 +86,8 @@ pub enum ViolationCode {
     InsertionInvalid,
     InsertionKeyTaken,
     NotAProcessRoute,
-    // Entities (E6, H3).
-    EntityKeyTaken,
+    // Identities (E6, H3).
+    IdentityKeyTaken,
     EmailTaken,
     AliasCycle,
     MergeBreaksJourney,

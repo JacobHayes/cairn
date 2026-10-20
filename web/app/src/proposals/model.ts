@@ -39,10 +39,10 @@ export function removedChoices(answer: AnswerValue, choices: readonly Choice[]):
   return [...new Set(named)].filter((choice) => !remaining.has(choice)).sort();
 }
 
-/** A6: a single-valued role cannot hold a direct fill of several entities. */
+/** A6: a single-valued role cannot hold a direct fill of several identities. */
 function tooNarrow(conflict: Extract<Conflict, { about: "role" }>): boolean {
   const route = conflict.route;
-  return route != null && route.multi !== true && (conflict.references ?? []).some((reference) => typeof reference === "object" && "fill" in reference && reference.fill.entities.length > 1);
+  return route != null && route.multi !== true && (conflict.references ?? []).some((reference) => typeof reference === "object" && "fill" in reference && reference.fill.identities.length > 1);
 }
 
 /** B13: an insertion maps a segment role or kind onto what the route removed, so it can only be kept or removed. */
@@ -162,7 +162,7 @@ export function withOrphanKept(draft: ProposalDraft, index: number, keep: boolea
   return withItem(draft, index, (item) => (item.item === "orphan" ? { ...item, keep } : item));
 }
 
-/** B8: the draft with entity `index`'s participations mapped, or the mapping cleared. */
+/** B8: the draft with identity `index`'s participations mapped, or the mapping cleared. */
 export function withMapping(draft: ProposalDraft, index: number, mapping: Mapping | null): ProposalDraft {
   return withItem(draft, index, (item) => (item.item === "participation" ? { ...item, mapping } : item));
 }
@@ -410,7 +410,7 @@ export function reviewEntries(diff: GraphDiff, marks: Record<string, DiffMark>, 
 
 /**
  * C14: the items still needing a choice as the review itself can tell, for edits no preview
- * has seen yet: a conflict with no resolution or one it does not offer, an entity with no
+ * has seen yet: a conflict with no resolution or one it does not offer, an identity with no
  * mapping. The engine's preview also finds mappings that cannot hold together; this never
  * replaces it, it only stands in until the edits are previewed.
  */

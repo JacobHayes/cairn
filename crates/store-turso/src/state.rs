@@ -5,7 +5,7 @@ use std::collections::{BTreeMap, BTreeSet};
 use std::str::FromStr;
 
 use cairn_schema::{
-    Annotation, AnnotationBody, AnnotationContent, BoundedSet, EntityKey, JourneyState, Keyed,
+    Annotation, AnnotationBody, AnnotationContent, BoundedSet, IdentityKey, JourneyState, Keyed,
     LocalEdit, NodeState, Overrides, RoleKey, SnoozeTarget,
 };
 use cairn_store::StoreError;
@@ -128,11 +128,11 @@ async fn local_edits(
 async fn role_fills(
     connection: &Connection,
     id: &str,
-) -> Result<BTreeMap<RoleKey, cairn_schema::EntitySet>, StoreError> {
-    let mut entities: BTreeMap<RoleKey, BTreeSet<EntityKey>> = BTreeMap::new();
-    let select = "SELECT role, entity FROM role_fill_entities WHERE graph_id = ?1";
+) -> Result<BTreeMap<RoleKey, cairn_schema::IdentitySet>, StoreError> {
+    let mut identities: BTreeMap<RoleKey, BTreeSet<IdentityKey>> = BTreeMap::new();
+    let select = "SELECT role, identity FROM role_fill_identities WHERE graph_id = ?1";
     for row in rows(connection, select, vec![text(id)]).await? {
-        entities
+        identities
             .entry(row.parse(0)?)
             .or_default()
             .insert(row.parse(1)?);
@@ -141,12 +141,14 @@ async fn role_fills(
     let select = "SELECT role FROM role_fills WHERE graph_id = ?1";
     for row in rows(connection, select, vec![text(id)]).await? {
         let role: RoleKey = row.parse(0)?;
-        let filled = BoundedSet::new(entities.remove(&role).unwrap_or_default())
+        let filled = BoundedSet::new(identities.remove(&role).unwrap_or_default())
             .map_err(|error| corrupt(&format!("{role} fill: {error}")))?;
         fills.insert(role, filled);
     }
-    match entities.keys().next() {
-        Some(role) => Err(corrupt(&format!("entities fill {role}, which has no fill"))),
+    match identities.keys().next() {
+        Some(role) => Err(corrupt(&format!(
+            "identities fill {role}, which has no fill"
+        ))),
         None => Ok(fills),
     }
 }

@@ -92,7 +92,7 @@ fn fills_role(node: &Node<KeyRefs>) -> bool {
         Payload::Decision(decision)
             if matches!(
                 decision.answer,
-                AnswerSpec::Entity { fills_role: Some(_) } | AnswerSpec::EntityList { fills_role: Some(_) }
+                AnswerSpec::Identity { fills_role: Some(_) } | AnswerSpec::IdentityList { fills_role: Some(_) }
             )
     )
 }

@@ -313,7 +313,7 @@ export function SummaryPage({ ready, note }: { ready: Ready; note?: ReactNode })
   if (isEmpty(ready) || summary === undefined || frontier === undefined || mine.status !== "ready") {
     return <Waiting ready={ready} error={errorWords(read) ?? errorWords(next) ?? (mine.status === "failed" ? mine.message : undefined)} />;
   }
-  // E4, C18: "yours" is the engine's "mine", the entries where the viewer's entities own it.
+  // E4, C18: "yours" is the engine's "mine", the entries where the viewer's identities own it.
   const owned = mine.entries.filter((entry) => entry.kinds.includes(OWNER_KIND));
   const model = summaryModel(ready, summary);
   const entries = entriesOf(ready, model, frontier, new Set(owned.map((entry) => entry.node)));

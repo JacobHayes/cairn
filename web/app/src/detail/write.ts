@@ -14,7 +14,7 @@ import { titleOf, type Mutation, type Ready } from "./model.ts";
 
 /**
  * What an edit was drafted against: the journey revision its author saw (H5) and the
- * deployment revision (E6: an entity chosen under one deployment revision is stale once a
+ * deployment revision (E6: an identity chosen under one deployment revision is stale once a
  * merge moves it, never silently redirected).
  */
 export interface Seen {
@@ -63,11 +63,11 @@ export interface NodeWrite {
   receipt: ReceiptState | undefined;
 }
 
-/** E6: whether a patch writes an entity reference, so it names the deployment revision it saw. */
-export function writesEntities(mutations: Mutation[]): boolean {
+/** E6: whether a patch writes an identity reference, so it names the deployment revision it saw. */
+export function writesIdentities(mutations: Mutation[]): boolean {
   return mutations.some(
     (mutation) =>
-      (mutation.op === "answer" && ("entity" in mutation.value || "entity_list" in mutation.value)) ||
+      (mutation.op === "answer" && ("identity" in mutation.value || "identity_list" in mutation.value)) ||
       (mutation.op === "set_participation" && Array.isArray(mutation.source)) ||
       mutation.op === "fill_role",
   );
@@ -80,7 +80,7 @@ export function nodeEdit(journey: string, scope: string): string {
 
 /** The patch a section sends: `mutations` of `journey` drafted against `seen`, under the patch id `id`. */
 export function nodeCommand(journey: string, mutations: Mutation[], seen: Seen, id: OperationId = newPatchId()): Command {
-  const patch = patchOf({ target: { journey }, baseRevision: seen.base, mutations, ...(writesEntities(mutations) ? { deploymentRevision: seen.deployment } : {}) }, id);
+  const patch = patchOf({ target: { journey }, baseRevision: seen.base, mutations, ...(writesIdentities(mutations) ? { deploymentRevision: seen.deployment } : {}) }, id);
   return { kind: "patch", patch };
 }
 

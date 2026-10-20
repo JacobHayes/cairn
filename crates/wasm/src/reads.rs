@@ -1,13 +1,13 @@
 //! The in-browser root's reads for the screens around a journey (brief 5.5): the journey
 //! index filtered as `GET /api/journeys` filters it (C16), the route index and route detail (C17),
 //! route files exported and imported through the service (A13), and the caller with their
-//! identities and entities (H3). Each answers the API's JSON for the same request, so the
+//! logins and identities (H3). Each answers the API's JSON for the same request, so the
 //! app's one data layer reads either host.
 
 use std::collections::BTreeSet;
 
 use cairn_schema::{
-    AgentId, Domain, Email, EntityKey, GraphId, InsertionKey, JourneyId, JourneyStatus, Markdown,
+    AgentId, Domain, Email, GraphId, IdentityKey, InsertionKey, JourneyId, JourneyStatus, Markdown,
     PatchId, Revision, RouteFile, RouteHeader, RouteId, Slug, Timestamp, Title, UserId,
     VersionNumber,
 };
@@ -20,7 +20,7 @@ use crate::now_or_never;
 use crate::root::{BrowserRoot, JourneyPage, JourneySummary, PatchAnswer, failed};
 
 /// `GET /api/journeys`'s query (C16) as JSON: the statuses, the lineage route and version, the
-/// entities referred to (E6), whether an upgrade is available, and the page.
+/// identities referred to (E6), whether an upgrade is available, and the page.
 #[derive(Clone, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct JourneyIndexQuery {
@@ -33,9 +33,9 @@ pub struct JourneyIndexQuery {
     /// Journeys on this version of their route.
     #[serde(default)]
     pub version: Option<VersionNumber>,
-    /// Journeys referring to any of these entities, directly or through an alias.
+    /// Journeys referring to any of these identities, directly or through an alias.
     #[serde(default)]
-    pub referencing: BTreeSet<EntityKey>,
+    pub referencing: BTreeSet<IdentityKey>,
     /// Journeys whose route has, or has not, published a version newer than theirs.
     #[serde(default)]
     pub upgrade_available: Option<bool>,
@@ -144,10 +144,10 @@ pub struct RouteImport {
     pub note: Option<Markdown>,
 }
 
-/// One identity the caller signs in with, as the API's `LinkedIdentity`.
+/// One login the caller signs in with, as the API's `LinkedLogin`.
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
-pub struct LinkedIdentity {
+pub struct LinkedLogin {
     /// The provider, by its configured name.
     pub provider: Slug,
     /// The provider's subject for the account.
@@ -158,7 +158,7 @@ pub struct LinkedIdentity {
     pub linked_at: Timestamp,
 }
 
-/// The caller (H2) and the entities their verified emails name (H3), as the API's `Viewer`.
+/// The caller (H2) and the identities their verified emails name (H3), as the API's `Viewer`.
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct Viewer {
@@ -167,13 +167,13 @@ pub struct Viewer {
     /// The agent acting for them: never, in the browser.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub agent: Option<AgentId>,
-    /// Their entities, which "mine" covers together.
-    pub entities: BTreeSet<EntityKey>,
-    /// H3: present when their emails name more than one entity.
+    /// Their identities, which "mine" covers together.
+    pub identities: BTreeSet<IdentityKey>,
+    /// H3: present when their emails name more than one identity.
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub merge_offer: Option<BTreeSet<EntityKey>>,
-    /// The identities they sign in with, by provider and subject.
-    pub identities: Vec<LinkedIdentity>,
+    pub merge_offer: Option<BTreeSet<IdentityKey>>,
+    /// The logins they sign in with, by provider and subject.
+    pub logins: Vec<LinkedLogin>,
 }
 
 /// A user and the name people see for them (H3), as the API's `UserName`.
@@ -277,7 +277,7 @@ impl BrowserRoot {
         })
     }
 
-    /// The caller: the local user, its identity, and the entities its emails name (H3).
+    /// The caller: the local user, its login, and the identities its emails name (H3).
     ///
     /// # Errors
     ///
@@ -286,7 +286,7 @@ impl BrowserRoot {
         let call = self.call(now)?;
         let viewer = now_or_never(self.service().viewer(&call)).map_err(failed)?;
         let merge_offer = viewer.merge_offer().cloned();
-        let identities = viewer.identities.into_iter().map(|record| LinkedIdentity {
+        let logins = viewer.logins.into_iter().map(|record| LinkedLogin {
             provider: record.provider,
             subject: record.subject,
             verified_emails: record.verified_emails,
@@ -295,9 +295,9 @@ impl BrowserRoot {
         Ok(Viewer {
             user: viewer.user,
             agent: None,
-            entities: viewer.entities,
+            identities: viewer.identities,
             merge_offer,
-            identities: identities.collect(),
+            logins: logins.collect(),
         })
     }
 

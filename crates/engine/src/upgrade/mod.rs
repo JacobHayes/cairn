@@ -13,9 +13,9 @@ pub use save::save_as_route;
 use std::fmt;
 
 use cairn_schema::{
-    Conflict, ConflictResolution, Deployment, Domain, EntitySet, GraphKey, GraphRecord, JourneyId,
-    Lineage, Mutation, Mutations, Patch, PatchTarget, ProposalDraft, Rejection, RetiredKey,
-    ReviewItem, VersionNumber,
+    Conflict, ConflictResolution, Deployment, Domain, GraphKey, GraphRecord, IdentitySet,
+    JourneyId, Lineage, Mutation, Mutations, Patch, PatchTarget, ProposalDraft, Rejection,
+    RetiredKey, ReviewItem, VersionNumber,
 };
 
 use crate::graph::{Document, Graph, Tree};
@@ -255,7 +255,7 @@ fn with_members(conflicts: &mut [Conflict], journey: &Document, deployment: &Dep
         } = conflict
             && !insertions.is_empty()
         {
-            *members = EntitySet::new(participation.members(role).iter().cloned())
+            *members = IdentitySet::new(participation.members(role).iter().cloned())
                 .unwrap_or_else(|error| unreachable!("a role's members fit a fill: {error}"));
         }
     }

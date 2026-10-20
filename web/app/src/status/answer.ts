@@ -1,5 +1,5 @@
 // One voice for an answer: a choice is called by its label (never its id), a boolean by yes or
-// no, a date in words, an entity by name. Every surface that says what was answered, or what a
+// no, a date in words, an identity by name. Every surface that says what was answered, or what a
 // condition compares to, goes through here.
 import type { Schema } from "@cairn/client";
 
@@ -24,10 +24,10 @@ export function choiceNamed(choices: readonly Choice[] | undefined, id: string):
   return found === undefined ? id : choiceLabel(found);
 }
 
-/** What an answer's choices and entities are called. */
+/** What an answer's choices and identities are called. */
 export interface AnswerNames {
   choice: (id: string) => string;
-  entity: (key: string) => string;
+  identity: (key: string) => string;
   /** A date in words; the year shows unless it is today's. */
   date?: (date: string) => string;
 }
@@ -45,11 +45,11 @@ export function answerWords(value: AnswerValue, names: AnswerNames): string {
   if ("multi_choice" in value) {
     return listOf(value.multi_choice.map((id) => names.choice(id)));
   }
-  if ("entity" in value) {
-    return names.entity(value.entity);
+  if ("identity" in value) {
+    return names.identity(value.identity);
   }
-  if ("entity_list" in value) {
-    return listOf(value.entity_list.map((key) => names.entity(key)));
+  if ("identity_list" in value) {
+    return listOf(value.identity_list.map((key) => names.identity(key)));
   }
   if ("date" in value) {
     return (names.date ?? dateWords)(value.date);

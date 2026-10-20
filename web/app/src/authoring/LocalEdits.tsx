@@ -35,7 +35,7 @@ const LINEAGE_VERSION: ReadSource<{ host: Host; route: string; version: number }
 /** The route version a journey follows, once read; none for an empty journey. */
 export function useLineageVersion(lineage: Lineage | undefined): RouteVersion | undefined {
   const { host } = useSession();
-  const { view } = useKeyedRead(LINEAGE_VERSION, lineage === undefined ? undefined : { identity: [lineage.route, lineage.version], freshness: [], args: { host, route: lineage.route, version: lineage.version } });
+  const { view } = useKeyedRead(LINEAGE_VERSION, lineage === undefined ? undefined : { of: [lineage.route, lineage.version], freshness: [], args: { host, route: lineage.route, version: lineage.version } });
   return valueOf(view);
 }
 

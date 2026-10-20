@@ -9,6 +9,9 @@
 //! usage: `cargo run -p cairn-engine --example rank_walkthrough -- FIXTURES_DIR`
 
 use std::collections::BTreeSet;
+#[path = "support/people.rs"]
+mod people;
+
 use std::error::Error;
 use std::fmt::Write as _;
 use std::path::Path;
@@ -17,7 +20,7 @@ use cairn_engine::derive::Ranking;
 use cairn_engine::testing::derive_inputs;
 use cairn_engine::{ApplyInputs, Derived, Graph, Records, apply, derive, from_file};
 use cairn_schema::{
-    Contribution, EntityKey, JourneyId, Lineage, NodeKey, Patch, Payload, Route, RouteFile,
+    Contribution, IdentityKey, JourneyId, Lineage, NodeKey, Patch, Payload, Route, RouteFile,
     RouteHeader, RouteVersion, Scenario, Score, SequentialKeys, VersionNumber, from_yaml,
 };
 
@@ -36,7 +39,7 @@ impl Fixture {
         let scenario: Scenario =
             from_yaml(&std::fs::read_to_string(directory.join("journey.yaml"))?)?;
         let mut after = Vec::new();
-        let mut records = seed(&file)?;
+        let mut records = seed(fixtures, &file)?;
         for step in scenario.steps.as_slice() {
             let inputs = ApplyInputs {
                 today: step.today,
@@ -92,9 +95,9 @@ impl Fixture {
 }
 
 /// The route file published as version 1 in a fresh deployment (fixtures/README.md).
-fn seed(file: &RouteFile) -> Result<Records> {
+fn seed(fixtures: &Path, file: &RouteFile) -> Result<Records> {
     let graph = from_file(file, &mut SequentialKeys::default()).map_err(|v| format!("{v:?}"))?;
-    let mut records = Records::default();
+    let mut records = people::records(fixtures)?;
     let version = VersionNumber::FIRST;
     let header = RouteHeader {
         id: file.route.clone(),
@@ -213,8 +216,8 @@ fn vendor_ranks(vendor: &Fixture, out: &mut String) -> Result<()> {
     Ok(())
 }
 
-fn viewer(entity: &str) -> Result<BTreeSet<EntityKey>> {
-    Ok(BTreeSet::from([entity.parse()?]))
+fn viewer(identity: &str) -> Result<BTreeSet<IdentityKey>> {
+    Ok(BTreeSet::from([identity.parse()?]))
 }
 
 fn ordered(ranking: &Ranking) -> String {
@@ -230,20 +233,19 @@ fn ordered(ranking: &Ranking) -> String {
 /// global ranking, and each viewer's.
 fn per_viewer(launch: &Fixture, out: &mut String) -> Result<()> {
     writeln!(out, "## Prioritize for me\n")?;
-    let mutations =
-        "- op: set_participation\n  node: n_features\n  kind: k_owner\n  source: [e_writer]\n";
+    let mutations = "- op: set_participation\n  node: n_features\n  kind: k_owner\n  source: [who_h3w7bs5xkq2dfnr6]\n";
     let records = launch.patched(1, mutations)?;
     let (_, derived) = launch.derive(&records)?;
     let global = derived.ranking().clone();
-    let lead = derived.rank_for(&viewer("e_launch_lead")?);
-    let writer = derived.rank_for(&viewer("e_writer")?);
+    let lead = derived.rank_for(&viewer("who_k3d7qm2xw5tn6pfa")?);
+    let writer = derived.rank_for(&viewer("who_h3w7bs5xkq2dfnr6")?);
     writeln!(
         out,
-        "The product launch after its first step, with `n_features` (feature work, which kickoff unblocks) given to `e_writer`; everything else is `e_launch_lead`'s. Unlocks and rank globally (each node's owner factor relative to its own owner) and for each viewer:\n"
+        "The product launch after its first step, with `n_features` (feature work, which kickoff unblocks) given to `who_h3w7bs5xkq2dfnr6`; everything else is `who_k3d7qm2xw5tn6pfa`'s. Unlocks and rank globally (each node's owner factor relative to its own owner) and for each viewer:\n"
     )?;
     writeln!(
         out,
-        "| Node | Unlocks | Rank | For `e_launch_lead` | For `e_writer` |"
+        "| Node | Unlocks | Rank | For `who_k3d7qm2xw5tn6pfa` | For `who_h3w7bs5xkq2dfnr6` |"
     )?;
     writeln!(out, "|---|---|---|---|---|")?;
     for key in global.frontier() {
@@ -262,8 +264,8 @@ fn per_viewer(launch: &Fixture, out: &mut String) -> Result<()> {
         )?;
     }
     writeln!(out, "\nGlobal order: {}.\n", ordered(&global))?;
-    writeln!(out, "For `e_launch_lead`: {}.\n", ordered(&lead))?;
-    writeln!(out, "For `e_writer`: {}.\n", ordered(&writer))?;
+    writeln!(out, "For `who_k3d7qm2xw5tn6pfa`: {}.\n", ordered(&lead))?;
+    writeln!(out, "For `who_h3w7bs5xkq2dfnr6`: {}.\n", ordered(&writer))?;
     let unchanged = derived.ranking() == &global;
     writeln!(
         out,

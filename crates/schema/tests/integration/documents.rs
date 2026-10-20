@@ -233,10 +233,10 @@ fn a_file_using_every_field_round_trips_byte_for_byte() {
 fn a_document_with_many_yaml_nodes_parses() {
     // The YAML reader's default budget stops at 250,000 nodes; documents within Cairn's limits
     // can hold more (many multi-valued participations), and the request cap bounds them.
-    let entities: Vec<String> = (0..300_000).map(|index| format!("e_{index}")).collect();
-    let yaml = to_yaml(&entities).unwrap();
-    let back: Vec<cairn_schema::EntityKey> = from_yaml(&yaml).unwrap();
-    assert_eq!(back.len(), entities.len());
+    let identities: Vec<String> = (0..300_000).map(|index| format!("who_{index}")).collect();
+    let yaml = to_yaml(&identities).unwrap();
+    let back: Vec<cairn_schema::IdentityKey> = from_yaml(&yaml).unwrap();
+    assert_eq!(back.len(), identities.len());
 }
 
 /// A parse of one text in both formats.
@@ -259,7 +259,7 @@ fn a_map_key_written_twice_is_rejected_in_both_formats() {
     let answer = |key: &str, yes: bool| format!(r#""{key}":{{"boolean":{yes}}}"#);
     let journeys = |entries: &str| {
         format!(
-            r#"{{"op":"merge_entities","survivor":"e_a","merged":"e_b","journeys":{{{entries}}}}}"#
+            r#"{{"op":"merge_identities","survivor":"who_a","merged":"who_b","journeys":{{{entries}}}}}"#
         )
     };
     let aliases = |entries: &str| format!(r#"{{"revision":1,"aliases":{{{entries}}}}}"#);
@@ -301,7 +301,7 @@ fn a_map_key_written_twice_is_rejected_in_both_formats() {
             ),
         ),
         (
-            "merge_entities.journeys",
+            "merge_identities.journeys",
             parses::<Mutation>,
             journeys(r#""j_one":1,"j_two":5"#),
             journeys(r#""j_one":1,"j_one":5"#),
@@ -309,8 +309,8 @@ fn a_map_key_written_twice_is_rejected_in_both_formats() {
         (
             "deployment.aliases",
             parses::<Deployment>,
-            aliases(r#""e_a":"e_c","e_b":"e_c""#),
-            aliases(r#""e_a":"e_c","e_a":"e_d""#),
+            aliases(r#""who_a":"who_c","who_b":"who_c""#),
+            aliases(r#""who_a":"who_c","who_a":"who_d""#),
         ),
     ];
     for (name, parse, once, twice) in cases {
@@ -319,39 +319,45 @@ fn a_map_key_written_twice_is_rejected_in_both_formats() {
     }
 }
 
-/// E2: a participation's entities past `entity_count_per_fill_max` are rejected naming that
-/// limit, in both formats; a repeated entity, and a value that is neither a role nor a list
-/// of entities, are rejected too.
+/// E2: a participation's identities past `identity_count_per_fill_max` are rejected naming that
+/// limit, in both formats; a repeated identity, and a value that is neither a role nor a list
+/// of identities, are rejected too.
 #[test]
 fn a_participation_source_says_what_is_wrong() {
     let node = |source: &str| {
         format!(r#"{{"id":"a","kind":"action","title":"A","participations":{{"owner":{source}}}}}"#)
     };
-    let entities = |count: u32| {
-        let keys: Vec<String> = (0..count).map(|index| format!(r#""e_{index}""#)).collect();
+    let identities = |count: u32| {
+        let keys: Vec<String> = (0..count)
+            .map(|index| format!(r#""who_{index}""#))
+            .collect();
         format!("[{}]", keys.join(","))
     };
-    let max = Limit::EntityCountPerFill.max();
-    for good in [r#""owner_role""#.to_owned(), "[]".to_owned(), entities(max)] {
+    let max = Limit::IdentityCountPerFill.max();
+    for good in [
+        r#""owner_role""#.to_owned(),
+        "[]".to_owned(),
+        identities(max),
+    ] {
         assert_eq!(
             parses::<Node<FileRefs>>(&node(&good)),
             [true, true],
             "{good}"
         );
     }
-    let past = node(&entities(max + 1));
+    let past = node(&identities(max + 1));
     for error in [
         from_json::<Node<FileRefs>>(&past).unwrap_err(),
         from_yaml::<Node<FileRefs>>(&past).unwrap_err(),
     ] {
         assert!(
-            error.message.contains(Limit::EntityCountPerFill.name()),
+            error.message.contains(Limit::IdentityCountPerFill.name()),
             "{error}"
         );
     }
     for bad in [
-        r#"["e_a","e_a"]"#,
-        r#"["not-an-entity"]"#,
+        r#"["who_a","who_a"]"#,
+        r#"["not-an-identity"]"#,
         r#"{"role":"owner_role"}"#,
         "1",
     ] {

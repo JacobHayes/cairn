@@ -59,9 +59,9 @@ describe("the route graph read", () => {
 
   it("is the same read for the same route and version, and another for another", () => {
     const host = new FakeHost();
-    expect(routeGraphKey(host, "r_a", undefined).identity).toEqual(["r_a", undefined]);
-    expect(routeGraphKey(host, "r_a", 2).identity).toEqual(["r_a", 2]);
-    expect(routeGraphKey(host, "r_b", 2).identity).not.toEqual(routeGraphKey(host, "r_a", 2).identity);
+    expect(routeGraphKey(host, "r_a", undefined).of).toEqual(["r_a", undefined]);
+    expect(routeGraphKey(host, "r_a", 2).of).toEqual(["r_a", 2]);
+    expect(routeGraphKey(host, "r_b", 2).of).not.toEqual(routeGraphKey(host, "r_a", 2).of);
   });
 });
 
@@ -78,14 +78,14 @@ describe("the level of a shown graph", () => {
   });
 
   it("is another read for another request of the same graph, laid out afresh", () => {
-    expect(key({ step: "stages" })?.identity).not.toEqual(key({})?.identity);
-    expect(key({ text: "ship" })?.identity).not.toEqual(key({})?.identity);
+    expect(key({ step: "stages" })?.of).not.toEqual(key({})?.of);
+    expect(key({ text: "ship" })?.of).not.toEqual(key({})?.of);
   });
 
   it("is read again, keeping what it shows, when the graph, the deployment or the day moves", () => {
     const base = key({});
     const moved = key({ shown: { ...shown, graph: { nodes: [] } } });
-    expect(sameKey(moved?.identity, base?.identity)).toBe(true);
+    expect(sameKey(moved?.of, base?.of)).toBe(true);
     // Keys compare like effect dependencies: a graph read again is another object, whatever it holds.
     expect(sameKey(moved?.freshness, base?.freshness)).toBe(false);
     expect(sameKey(key({ deployment: { revision: 5 } })?.freshness, base?.freshness)).toBe(false);
@@ -95,7 +95,7 @@ describe("the level of a shown graph", () => {
 
   it("is another read for the same request of another route's graph", () => {
     const other: Shown = { ...shown, route: routeOf({ header: { ...header, id: "r_b" } }) };
-    expect(key({ shown: other })?.identity).not.toEqual(key({})?.identity);
+    expect(key({ shown: other })?.of).not.toEqual(key({})?.of);
   });
 
   it("is derived from the graph and the day with the request's query, whole and without its tag", async () => {
@@ -120,8 +120,8 @@ describe("the schedule of a shown graph", () => {
 
   it("is keyed by the route and what it shows, and read again when the graph or the deployment moves", () => {
     const base = routeScheduleKey(new FakeDeriver(), shown, deployment);
-    expect(base?.identity).toEqual(["r_a", 2]);
-    expect(routeScheduleKey(new FakeDeriver(), { ...shown, of: 1 }, deployment)?.identity).not.toEqual(base?.identity);
+    expect(base?.of).toEqual(["r_a", 2]);
+    expect(routeScheduleKey(new FakeDeriver(), { ...shown, of: 1 }, deployment)?.of).not.toEqual(base?.of);
     expect(sameKey(routeScheduleKey(new FakeDeriver(), { ...shown, graph: { nodes: [] } }, deployment)?.freshness, base?.freshness)).toBe(false);
     expect(sameKey(routeScheduleKey(new FakeDeriver(), shown, { revision: 5 })?.freshness, base?.freshness)).toBe(false);
     expect(routeScheduleKey(new FakeDeriver(), shown, undefined)).toBeUndefined();

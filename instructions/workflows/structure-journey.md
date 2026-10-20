@@ -14,8 +14,8 @@ but on the journey itself.
    deliverables, actions, and milestones under them. For phases bounded by milestones, see Stages in the Cairn guide.
 3. **Draft one proposal.** `create_proposal` with `destination` `{"journey": "<journey>"}`,
    the journey's revision as `destination_revision`, and the `add_role`, `add_node`, and
-   `add_edge` mutations in order. People involved who are not yet entities are created in
-   the same proposal with `create_entity`.
+   `add_edge` mutations in order. People involved who are not yet identities are created in
+   the same proposal with `create_identity`.
 4. **Review and hand over.** `get_proposal` with `review` shows the frontier the journey
    would have and any violations. Fix violations with `edit_proposal`, then summarize the
    structure and what would be first to do, and ask the person to apply it.

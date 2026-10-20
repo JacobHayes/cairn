@@ -10,7 +10,7 @@ mod property {
     use cairn_engine::testing::generated::{arb_journey, plan_held};
     use cairn_engine::{Derived, Graph, derive};
     use cairn_schema::{
-        Deployment, EntityKey, KindKey, NodeKey, ParticipationOrigin, ParticipationSource,
+        Deployment, IdentityKey, KindKey, NodeKey, ParticipationOrigin, ParticipationSource,
         Relevance, RoleKey, State, ViolationCode,
     };
     use patina_dst_proptest::prelude::*;
@@ -109,7 +109,7 @@ mod property {
         Some((None, ParticipationSource::Role(role)))
     }
 
-    fn members(graph: &Graph, role: &RoleKey) -> BTreeSet<EntityKey> {
+    fn members(graph: &Graph, role: &RoleKey) -> BTreeSet<IdentityKey> {
         graph
             .document()
             .state
@@ -124,24 +124,24 @@ mod property {
         graph: &Graph,
         key: &NodeKey,
         kind: &KindKey,
-    ) -> (Option<ParticipationOrigin>, BTreeSet<EntityKey>) {
+    ) -> (Option<ParticipationOrigin>, BTreeSet<IdentityKey>) {
         let Some((at, source)) = nearest(graph, Some(key), kind) else {
             return (None, BTreeSet::new());
         };
-        let entities = match &source {
-            ParticipationSource::Entities(set) => set.iter().cloned().collect(),
+        let identities = match &source {
+            ParticipationSource::Identities(set) => set.iter().cloned().collect(),
             ParticipationSource::Role(role) => members(graph, role),
         };
         let origin = match (at, source) {
             (None, ParticipationSource::Role(role)) => ParticipationOrigin::DefaultOwner(role),
             (Some(at), _) if at != *key => ParticipationOrigin::Ancestor(at),
-            (_, ParticipationSource::Entities(_)) => ParticipationOrigin::Explicit,
+            (_, ParticipationSource::Identities(_)) => ParticipationOrigin::Explicit,
             (_, ParticipationSource::Role(role)) => ParticipationOrigin::Role(role),
         };
-        (Some(origin), entities)
+        (Some(origin), identities)
     }
 
-    /// B10 by its definition: one explicit entity, not a member of the role the node would
+    /// B10 by its definition: one explicit identity, not a member of the role the node would
     /// otherwise inherit.
     fn naive_lost(graph: &Graph, key: &NodeKey, kind: &KindKey) -> bool {
         let own = graph
@@ -151,17 +151,17 @@ mod property {
             .as_map()
             .get(kind)
             .cloned();
-        let Some(ParticipationSource::Entities(entities)) = own else {
+        let Some(ParticipationSource::Identities(identities)) = own else {
             return false;
         };
         let inherited = nearest(graph, graph.tree().parent(key), kind);
         let Some((_, ParticipationSource::Role(role))) = inherited else {
             return false;
         };
-        entities.len() == 1
-            && !entities
+        identities.len() == 1
+            && !identities
                 .iter()
-                .all(|entity| members(graph, &role).contains(entity))
+                .all(|identity| members(graph, &role).contains(identity))
     }
 
     /// D1a: with every decision terminal, no node's relevance is undecided.
@@ -270,9 +270,9 @@ mod property {
             let kinds = [KindKey::owner(), "k_many".parse().unwrap()];
             for key in graph.document().nodes.as_map().keys() {
                 for kind in &kinds {
-                    let (origin, entities) = naive_participation(&graph, key, kind);
+                    let (origin, identities) = naive_participation(&graph, key, kind);
                     prop_assert_eq!(participation.origin(key, kind), origin.as_ref(), "{} {}", key, kind);
-                    prop_assert_eq!(participation.entities(key, kind), &entities, "{} {}", key, kind);
+                    prop_assert_eq!(participation.identities(key, kind), &identities, "{} {}", key, kind);
                     prop_assert_eq!(participation.membership_lost(key).contains(kind), naive_lost(&graph, key, kind), "{} {}", key, kind);
                 }
                 let owned = naive_participation(&graph, key, &KindKey::owner()).1;

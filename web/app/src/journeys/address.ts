@@ -87,12 +87,12 @@ export function filterParams(filters: IndexFilters): URLSearchParams {
 
 /**
  * C16: the host's query for `filters`. "Mine" asks the host for the journeys referring to the
- * caller's entities (a superset of those where they hold a participation, E6), active only
+ * caller's identities (a superset of those where they hold a participation, E6), active only
  * (B11: a completed journey leaves "mine"); the index then keeps those where the journey's own
- * "mine" is not empty. None when "mine" can hold nothing: the caller has no entity, or the
+ * "mine" is not empty. None when "mine" can hold nothing: the caller has no identity, or the
  * status asked for is not active.
  */
-export function queryOf(filters: IndexFilters, entities: readonly string[]): JourneyIndexQuery | undefined {
+export function queryOf(filters: IndexFilters, identities: readonly string[]): JourneyIndexQuery | undefined {
   const query: JourneyIndexQuery = {};
   if (filters.status !== "any") {
     query.status = [filters.status];
@@ -107,11 +107,11 @@ export function queryOf(filters: IndexFilters, entities: readonly string[]): Jou
     query.upgrade_available = true;
   }
   if (filters.mine) {
-    if (entities.length === 0 || (filters.status !== "any" && filters.status !== "active")) {
+    if (identities.length === 0 || (filters.status !== "any" && filters.status !== "active")) {
       return undefined;
     }
     query.status = ["active"];
-    query.referencing = [...entities];
+    query.referencing = [...identities];
   }
   return query;
 }

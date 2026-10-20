@@ -193,7 +193,7 @@ impl Derivation {
     }
 
     /// A10, G3: the message draft `request` names, rendered with the journey's context:
-    /// its header, the page's link to it, and the deployment's entities.
+    /// its header, the page's link to it, and the deployment's identities.
     ///
     /// # Errors
     ///

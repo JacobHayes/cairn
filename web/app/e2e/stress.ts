@@ -7,7 +7,7 @@
 import { expect, type Page } from "@playwright/test";
 
 import { publishDraft, startJourney, versionSelect, journeyName } from "./around.ts";
-import { addEntity } from "./around.ts";
+import { addIdentity } from "./around.ts";
 import { daysAfter } from "./acting.ts";
 import { importRoute, openAt, open, openSheet, derivedRevision } from "./shell.ts";
 
@@ -22,7 +22,7 @@ const SHORT = "Short";
 /** Titles a character-class width estimate got wrong: one that wraps shorter than counted, and one that wraps longer. */
 const NARROW = "Review the partner's criteria";
 const WIDE = "Mmmm mmmm mmmm mmmm mmmm";
-const NAME = `${LONG.slice(0, 120)} the owner with the longest name that an entity may be given in a deployment`;
+const NAME = `${LONG.slice(0, 120)} the owner with the longest name that an identity may be given in a deployment`;
 
 /** The stress route's id, and the node keys the walks reach. */
 export const STRESS = {
@@ -120,8 +120,8 @@ async function answer(page: Page, journey: string, key: string, how: (page: Page
 
 /** Moves the stress journey into every display state, owner and snooze the walks read. */
 async function setStates(page: Page, journey: string): Promise<void> {
-  await open(page, "browser", "/entities");
-  const owner = await addEntity(page, NAME);
+  await open(page, "browser", "/identities");
+  const owner = await addIdentity(page, NAME);
   await answer(page, journey, "n_flag", (on) => on.getByRole("radio", { name: /^no\b/i }).check());
   await answer(page, journey, "n_when", (on) => on.getByTestId("answer").fill(daysAfter(TODAY, 60)));
   await openAt(page, "browser", journey, "list");

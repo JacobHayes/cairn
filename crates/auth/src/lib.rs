@@ -1,5 +1,5 @@
 //! Cairn's auth (ARCHITECTURE, Auth): one [`AuthProvider`] trait and its providers, users
-//! and their identities, agent tokens, and the auth log, all stored through the store's
+//! and their logins, agent tokens, and the auth log, all stored through the store's
 //! records outside every domain, plus the axum layer the HTTP API and MCP endpoint sit
 //! behind ([`Auth::protect`]). No RBAC: every authenticated user reads and writes
 //! everything in a deployment (H4), so authentication is all there is.

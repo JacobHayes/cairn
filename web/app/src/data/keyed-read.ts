@@ -3,11 +3,11 @@
 // answers to the same questions: is there data, is it for what is asked, is a newer read out,
 // did the last one fail, and when does it try again.
 //
-// A key is the read's identity (what is shown), its freshness (what the answer is read from)
-// and its arguments. A new identity resets the read: what was in flight stops, what is held is
-// released and forgotten. A new freshness of the same identity keeps what is held (shown as
+// A key says what the read is of (what is shown), its freshness (what the answer is read from)
+// and its arguments. A new `of` resets the read: what was in flight stops, what is held is
+// released and forgotten. A new freshness of the same `of` keeps what is held (shown as
 // refreshing, or as behind if the read for it failed) and reads again once the read in flight
-// ends. A value, or a failure, shows only for its own identity, and a failure only for its own
+// ends. A value, or a failure, shows only for its own `of`, and a failure only for its own
 // freshness. One read runs at a time; ticks and key changes that arrive meanwhile coalesce into
 // one more read.
 //
@@ -39,7 +39,7 @@ import { Missing, ReadFailed, Skewed } from "./host.ts";
 
 /** What is shown, what it is read from, and the arguments of the read. Lists compare element by element. */
 export interface ReadKey<A> {
-  identity: readonly unknown[];
+  of: readonly unknown[];
   freshness: readonly unknown[];
   args: A;
 }
@@ -79,7 +79,7 @@ export interface Ticks<T> {
 
 /** What a read is told of the machine that runs it. */
 export interface ReadAt<T> {
-  /** What the machine holds from an earlier read of the same identity. */
+  /** What the machine holds from an earlier read of the same `of`. */
   held: T | undefined;
   /** Aborted when the machine no longer waits for this read's answer. */
   signal: AbortSignal;
@@ -90,7 +90,7 @@ export interface ReadSource<A, T> {
   read(args: A, at: ReadAt<T>): Promise<T>;
   policy: ReadPolicy;
   ticks?(args: A): Ticks<T>;
-  /** Frees what a value owns, once the machine drops it: replaced, gone, a new identity, or stopped. */
+  /** Frees what a value owns, once the machine drops it: replaced, gone, a new `of`, or stopped. */
   release?(value: T): void;
 }
 
@@ -176,7 +176,7 @@ interface Failed {
 export interface ReadContext {
   source: AnySource;
   env: ReadEnv;
-  identity: readonly unknown[] | undefined;
+  of: readonly unknown[] | undefined;
   /** The newest key asked for; none when the caller asks for nothing now. */
   want: ReadKey<unknown> | undefined;
   ticks: Ticks<unknown> | undefined;
@@ -372,14 +372,14 @@ export const keyedRead = setup({
   },
   guards: {
     keyed: ({ event }) => wantOf(event) !== undefined,
-    newIdentity: ({ context, event }) => {
+    newOf: ({ context, event }) => {
       const key = wantOf(event);
-      return key !== undefined && !sameKey(context.identity, key.identity);
+      return key !== undefined && !sameKey(context.of, key.of);
     },
     unwanted: ({ context, event }) => wantOf(event) === undefined && context.want !== undefined,
     newFreshness: ({ context, event }) => {
       const key = wantOf(event);
-      return key !== undefined && sameKey(context.identity, key.identity) && !sameKey(freshOf(context), key.freshness);
+      return key !== undefined && sameKey(context.of, key.of) && !sameKey(freshOf(context), key.freshness);
     },
     nothingWanted: ({ context }) => context.want === undefined,
     quiet: ({ context }) => !pending(context),
@@ -410,7 +410,7 @@ export const keyedRead = setup({
   actions: {
     begin: assign(({ context, event }) => {
       const key = wantOf(event);
-      return { ...fresh(context), identity: key?.identity, want: key, ticks: key === undefined ? undefined : context.source.ticks?.(key.args as never) };
+      return { ...fresh(context), of: key?.of, want: key, ticks: key === undefined ? undefined : context.source.ticks?.(key.args as never) };
     }),
     wantMore: assign(({ event }) => ({ want: wantOf(event), settled: false })),
     unwant: assign({ want: undefined }),
@@ -511,7 +511,7 @@ export const keyedRead = setup({
   context: ({ input }) => ({
     source: input.source,
     env: input.env,
-    identity: undefined,
+    of: undefined,
     want: undefined,
     ticks: undefined,
     held: undefined,
@@ -543,7 +543,7 @@ export const keyedRead = setup({
       },
       on: {
         want: [
-          { guard: "newIdentity", target: "keyed", reenter: true, actions: ["releaseHeld", "begin"] },
+          { guard: "newOf", target: "keyed", reenter: true, actions: ["releaseHeld", "begin"] },
           { guard: "unwanted", target: ".deciding", actions: "unwant" },
           { guard: "newFreshness", actions: "wantMore" },
         ],
@@ -618,7 +618,7 @@ export const keyedRead = setup({
         },
         // Version skew stops new work; it never lifts.
         stopped: { entry: "stopped", on: { "stream.tick": {}, "stream.opened": {}, refresh: {} } },
-        // The subject no longer exists (A19): left only for another identity, or by a refresh.
+        // The subject no longer exists (A19): left only for another `of`, or by a refresh.
         gone: {
           entry: ["releaseHeld", "ended"],
           on: { "stream.tick": {}, "stream.opened": {}, refresh: { target: "deciding", actions: "owe" } },
@@ -649,7 +649,7 @@ const LOADING = { status: "loading" } as const;
 const GONE = { status: "gone" } as const;
 
 /**
- * What the read shows for `shown` (an identity) read from `freshness`. Another identity's value
+ * What the read shows for `shown` (what it is of) read from `freshness`. Another `of`'s value
  * or failure never shows (a caller whose key moved sees the read catch up on its next turn), and
  * a failure shows only for the freshness it failed at. Without a freshness a value held is current.
  */
@@ -658,7 +658,7 @@ export function readView<T>(snapshot: ReadSnapshot, shown: readonly unknown[] | 
   if (shown === undefined) {
     return IDLE;
   }
-  if (!sameKey(context.identity, shown)) {
+  if (!sameKey(context.of, shown)) {
     return LOADING;
   }
   if (snapshot.matches({ keyed: "gone" })) {

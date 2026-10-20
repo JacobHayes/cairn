@@ -3,7 +3,7 @@
 // there, and its derive read back. The journey manager, a child of the session root, keeps one
 // keyed read per journey in an explicit map, and keeps the views current (H6): a journey tick
 // newer than the revision held refetches it, as does a deployment tick newer than the
-// deployment its document was derived with (owners and entities feed rank) and the date passing
+// deployment its document was derived with (owners and identities feed rank) and the date passing
 // in the deployment's zone. A document from another engine (`Skewed`) latches the tab into skew
 // instead of being derived. Revisions only move forward: an older document is never shown.
 //
@@ -187,7 +187,7 @@ export const journeyManager = setup({
         return;
       }
       if (entry.ref.getSnapshot().matches("idle")) {
-        enqueue.sendTo(entry.ref, { type: "want", key: { identity: [id], freshness: [], args: { id } } });
+        enqueue.sendTo(entry.ref, { type: "want", key: { of: [id], freshness: [], args: { id } } });
         return;
       }
       enqueue.sendTo(entry.ref, { type: "show" });

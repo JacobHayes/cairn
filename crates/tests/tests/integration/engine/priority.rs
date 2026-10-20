@@ -172,7 +172,7 @@ fn owned(node: &str, requires: &str, weight: u32, owner: Option<&str>) -> String
     )
 }
 
-const PEOPLE: &str = "- op: create_entity\n  entity: {key: e_a, name: A}\n- op: create_entity\n  entity: {key: e_b, name: B}\n";
+const PEOPLE: &str = "- op: create_identity\n  identity: {key: who_a, name: A}\n- op: create_identity\n  identity: {key: who_b, name: B}\n";
 
 /// Priority, Unlocks: an unblocked node owned by someone other than the node's owner counts
 /// double, and so does one no one owns when the node is owned; when the node is unowned, an
@@ -180,13 +180,13 @@ const PEOPLE: &str = "- op: create_entity\n  entity: {key: e_a, name: A}\n- op: 
 #[test]
 fn the_owner_factor_favors_other_owners_and_the_unowned_target() {
     let nodes = [
-        "{key: n_gate, id: gate, kind: action, title: Gate, participations: {k_owner: [e_a]}}"
+        "{key: n_gate, id: gate, kind: action, title: Gate, participations: {k_owner: [who_a]}}"
             .to_owned(),
-        owned("n_mine", "n_gate", 2, Some("e_a")),
-        owned("n_theirs", "n_gate", 3, Some("e_b")),
+        owned("n_mine", "n_gate", 2, Some("who_a")),
+        owned("n_theirs", "n_gate", 3, Some("who_b")),
         owned("n_nobodys", "n_gate", 4, None),
         "{key: n_free, id: free, kind: action, title: Free}".to_owned(),
-        owned("n_owned", "n_free", 3, Some("e_b")),
+        owned("n_owned", "n_free", 3, Some("who_b")),
         owned("n_loose", "n_free", 2, None),
     ];
     let nodes: Vec<&str> = nodes.iter().map(String::as_str).collect();
@@ -288,11 +288,11 @@ fn completing_kept_work_unblocks_the_skipped_containers_dependents() {
 #[test]
 fn a_small_gate_unlocks_much_and_weighs_little() {
     let mut nodes = vec![
-        "{key: n_gate, id: gate, kind: action, title: Gate, participations: {k_owner: [e_a]}}"
+        "{key: n_gate, id: gate, kind: action, title: Gate, participations: {k_owner: [who_a]}}"
             .to_owned(),
-        "{key: n_heavy, id: heavy, kind: action, title: Heavy, weight: 10, participations: {k_owner: [e_a]}}".to_owned(),
+        "{key: n_heavy, id: heavy, kind: action, title: Heavy, weight: 10, participations: {k_owner: [who_a]}}".to_owned(),
     ];
-    nodes.extend((1..=3).map(|at| owned(&format!("n_part{at}"), "n_gate", 1, Some("e_b"))));
+    nodes.extend((1..=3).map(|at| owned(&format!("n_part{at}"), "n_gate", 1, Some("who_b"))));
     let nodes: Vec<&str> = nodes.iter().map(String::as_str).collect();
     let records = support::journey(&format!("{PEOPLE}{}", add(&nodes)));
     let derived = derived(&records);

@@ -1,15 +1,15 @@
 journey: j_bakeoff
 description: >-
   A journey with no route. It starts empty; the assistant proposes a two-week
-  bake-off between two options (three decisions, four deliverables, one milestone, two
-  entities, and a role declared on the journey itself), the user applies the
-  proposal, and work starts.
+  bake-off between two options (three decisions, four deliverables, one milestone, and
+  a role declared on the journey itself), the user applies the proposal, and work
+  starts.
 steps:
 - note: Create an empty journey, with no lineage.
   today: "2026-10-05"
   at: "2026-10-05T09:00:00Z"
   actor:
-    user: u_owner
+    user: u_gus
   patch:
     id: p_bo_01
     target:
@@ -25,7 +25,7 @@ steps:
   today: "2026-10-05"
   at: "2026-10-05T09:02:00Z"
   actor:
-    user: u_owner
+    user: u_gus
     agent: ag_assistant
   patch:
     id: p_bo_02
@@ -41,21 +41,17 @@ steps:
         title: Structure a two-week bake-off between two options
         destination_revision: 1
         mutations:
-        - op: create_entity
-          entity:
-            key: e_owner
-            name: Bake-off Owner
-            emails:
-            - owner@example.org
-        - op: create_entity
-          entity:
-            key: e_judge
-            name: Second Judge
         - op: add_role
           role:
             key: r_judges
             id: judges
             title: Judges
+            multi: true
+        - op: add_participation_kind
+          kind:
+            key: k_judge
+            id: judge
+            title: Judge
             multi: true
         - op: add_node
           node:
@@ -72,7 +68,7 @@ steps:
             kind: decision
             title: Judges
             prompt: Who judges the bake-off?
-            answer_type: entity_list
+            answer_type: identity_list
             fills_role: r_judges
         - op: add_node
           node:
@@ -104,7 +100,7 @@ steps:
             - n_trial_b
             participations:
               k_owner:
-              - e_owner
+              - who_g6t4ycm2pe7vsjan
         - op: add_node
           node:
             key: n_summary
@@ -137,13 +133,15 @@ steps:
             - option-b
             requires:
             - n_summary
+            participations:
+              k_judge: r_judges
 - note: >-
     The owner reviews the proposal and applies it; its mutations commit with the
     applied status in one patch.
   today: "2026-10-05"
   at: "2026-10-05T09:30:00Z"
   actor:
-    user: u_owner
+    user: u_gus
   patch:
     id: p_bo_03
     target:
@@ -157,7 +155,7 @@ steps:
   today: "2026-10-06"
   at: "2026-10-06T10:00:00Z"
   actor:
-    user: u_owner
+    user: u_gus
   patch:
     id: p_bo_04
     target:
@@ -172,9 +170,9 @@ steps:
     - op: answer
       decision: n_judges
       value:
-        entity_list:
-        - e_judge
-        - e_owner
+        identity_list:
+        - who_g6t4ycm2pe7vsjan
+        - who_k3d7qm2xw5tn6pfa
     - op: transition
       node: n_trial_a
       transition: start

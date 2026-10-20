@@ -20,7 +20,7 @@ pub enum LoadTarget {
         /// The version.
         version: VersionNumber,
     },
-    /// The deployment: entities and aliases. Always exists, at revision 0 before any
+    /// The deployment: identities and aliases. Always exists, at revision 0 before any
     /// commit.
     Deployment,
 }

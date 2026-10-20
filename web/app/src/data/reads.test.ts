@@ -36,7 +36,7 @@ async function reading(query: JourneyIndexQuery) {
   const clock = new CountingClock();
   const session = await Session.start({ host, deriver: new FakeDeriver(), clock });
   const read = createActor(keyedRead, { clock, input: { source: liveSource<JourneySummary[]>(), env: session.readEnv } }).start();
-  read.send({ type: "want", key: { identity: [indexKey(query)], freshness: [], args: { spec: journeyIndex(query)(session) } } });
+  read.send({ type: "want", key: { of: [indexKey(query)], freshness: [], args: { spec: journeyIndex(query)(session) } } });
   clock.increment(0);
   await settled();
   host.open();

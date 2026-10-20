@@ -10,7 +10,7 @@ use std::time::Duration;
 
 use cairn_auth::{Accounts, Auth, AuthProvider, Clock, DevConfig, DevProvider, Listener};
 use cairn_schema::{
-    EntityKey, JourneyId, NodeKey, PatchReceipt, RankConstants, Revision, TouchedSet,
+    IdentityKey, JourneyId, NodeKey, PatchReceipt, RankConstants, Revision, TouchedSet,
 };
 use cairn_service::{AuthKind, AuthMethod, Capabilities, DeploymentSettings, Parts, Service};
 use cairn_store::InProcessNotifier;
@@ -32,7 +32,7 @@ const DATABASE: &str = "/multiplayer.db";
 const SHUTDOWN_TIMEOUT: Duration = Duration::from_secs(1);
 /// Nodes in the shared journey: few, so edits to one node's title collide often.
 pub const NODE_COUNT: u32 = 3;
-/// Entity pairs set up for merges: the first client merges one pair mid-run.
+/// Identity pairs set up for merges: the first client merges one pair mid-run.
 pub const MERGE_COUNT: u32 = 1;
 
 /// The server, serving until stopped.
@@ -164,32 +164,32 @@ fn slug(text: &str) -> cairn_schema::Slug {
     }
 }
 
-/// What every client starts from: the shared journey and its nodes, the entities set up to
+/// What every client starts from: the shared journey and its nodes, the identities set up to
 /// be merged, and the revisions setup left.
 #[derive(Clone, Debug)]
 pub struct Setup {
     pub journey: JourneyId,
     pub nodes: Vec<NodeKey>,
     /// Each pair is (survivor, merged).
-    pub merges: Vec<(EntityKey, EntityKey)>,
+    pub merges: Vec<(IdentityKey, IdentityKey)>,
     pub deployment_revision: Revision,
     /// What setup's own patches were acknowledged with, and what each touches.
     pub receipts: Vec<(PatchReceipt, TouchedSet)>,
 }
 
-/// Creates the shared journey and the entities to merge, through the API.
+/// Creates the shared journey and the identities to merge, through the API.
 ///
 /// # Errors
 ///
 /// A liveness miss when setup cannot land.
 pub async fn set_up(client: &Client) -> Result<Setup, Stop> {
     let created = client.land(patches::create_journey(NODE_COUNT)).await?;
-    let entities = client.land(patches::create_entities(MERGE_COUNT)).await?;
+    let identities = client.land(patches::create_identities(MERGE_COUNT)).await?;
     Ok(Setup {
         journey: patches::journey(),
         nodes: (0..NODE_COUNT).map(patches::node).collect(),
         merges: (0..MERGE_COUNT).map(patches::merge_pair).collect(),
-        deployment_revision: entities.0.revision,
-        receipts: vec![created, entities],
+        deployment_revision: identities.0.revision,
+        receipts: vec![created, identities],
     })
 }

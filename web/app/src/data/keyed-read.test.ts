@@ -107,7 +107,7 @@ function harness(options: Options = {}) {
     now: () => state.now,
   };
   const ref = createActor(keyedRead, { clock, input: { source, env } }).start();
-  const keyed = (identity: string, freshness: string[] = [], args = identity): ReadKey<string> => ({ identity: [identity], freshness, args });
+  const keyed = (of: string, freshness: string[] = [], args = of): ReadKey<string> => ({ of: [of], freshness, args });
   return {
     clock,
     stream,
@@ -119,7 +119,7 @@ function harness(options: Options = {}) {
     want: (key: ReadKey<string> | undefined) => {
       ref.send({ type: "want", key });
     },
-    view: (identity: string | undefined, freshness?: string[]) => readView<Answer>(ref.getSnapshot(), identity === undefined ? undefined : [identity], freshness),
+    view: (of: string | undefined, freshness?: string[]) => readView<Answer>(ref.getSnapshot(), of === undefined ? undefined : [of], freshness),
     /** Lets the read's answer reach the machine. */
     flush: async () => {
       for (let turn = 0; turn < 6; turn += 1) {
@@ -138,7 +138,7 @@ function harness(options: Options = {}) {
 const failed503 = () => new ReadFailed({ status: 503, message: "the host is down" });
 
 describe("a key that changes while a read is out", () => {
-  it("shows only the newest identity, whichever read answers last", async () => {
+  it("shows only the newest `of`, whichever read answers last", async () => {
     const h = harness();
     h.want(h.keyed("K1"));
     h.want(h.keyed("K2"));
@@ -502,7 +502,7 @@ describe("ticks and the stream", () => {
     expect(plain.calls).toHaveLength(1);
   });
 
-  it("are listened to only while the read is keyed, under a new registration for a new identity", () => {
+  it("are listened to only while the read is keyed, under a new registration for a new `of`", () => {
     const h = harness({ ticks: {} });
     h.want(h.keyed("K1"));
     const first = [...h.stream.watchers.keys()];
@@ -589,7 +589,7 @@ describe("version skew", () => {
 });
 
 describe("a value that owns a resource", () => {
-  it("is released when replaced, when its subject is gone, when its identity changes, and when stopped, once each", async () => {
+  it("is released when replaced, when its subject is gone, when its `of` changes, and when stopped, once each", async () => {
     const h = harness({ ticks: {}, release: true });
     h.want(h.keyed("K"));
     h.calls[0]?.resolve(answer("one", [journey, 1]));
@@ -630,7 +630,7 @@ describe("a value that owns a resource", () => {
 });
 
 describe("a read the sync chip counts", () => {
-  it("registers while keyed, under a new registration for a new identity, and leaves when stopped", () => {
+  it("registers while keyed, under a new registration for a new `of`, and leaves when stopped", () => {
     const h = harness({ ticks: { reportsLag: true } });
     h.want(h.keyed("K1"));
     const first = [...h.stream.shown.keys()];
@@ -659,7 +659,7 @@ describe("a read the sync chip counts", () => {
 });
 
 describe("what a read shows", () => {
-  it("shows nothing of another identity, and nothing for no key", async () => {
+  it("shows nothing of another `of`, and nothing for no key", async () => {
     const h = harness();
     h.want(h.keyed("K1"));
     h.calls[0]?.resolve(answer("one"));

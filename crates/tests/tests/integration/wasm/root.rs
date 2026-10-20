@@ -314,11 +314,15 @@ fn the_index_route_and_viewer_reads_are_the_apis_json() {
             .contains(&"j_vendor_eval".parse().unwrap())
     );
     let viewer: wire::Viewer = same(&root.viewer(NOW).unwrap());
-    assert_eq!(viewer.identities.len(), 1);
+    assert_eq!(viewer.logins.len(), 1);
     assert_eq!(
-        viewer.merge_offer.as_ref(),
-        Some(&viewer.entities),
-        "the local identity's emails name each fixture's lead"
+        viewer.identities.len(),
+        1,
+        "the local login's email names one person, in every fixture"
+    );
+    assert_eq!(
+        viewer.merge_offer, None,
+        "one identity has nothing to merge"
     );
 
     let exported = root.export_file("hiring-loop", "1").unwrap();

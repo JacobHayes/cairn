@@ -12,7 +12,7 @@ import { upperFirst } from "../status/words.ts";
 import { dateWords, daysUntil, daysWords, relativeDays } from "../status/when.ts";
 import { guardFailureText, namer } from "./explain.ts";
 import { nodeOf, rankPlaces, titleOf, waitsOn, type Holding, type NodeDetail, type NodeDerived, type Ready } from "./model.ts";
-import { answerText, entityName, ownersOf, ownerWords } from "./sections.tsx";
+import { answerText, identityName, ownersOf, ownerWords } from "./sections.tsx";
 import { listParts, plural } from "../ui/words.ts";
 
 /** A part of the sentence: text, a link to a node, or the Unsnooze action for the container whose snooze holds over the node. */
@@ -78,7 +78,7 @@ export function appliesIf(view: Ready, detail: NodeDetail): string | undefined {
   if (clause == null) {
     return undefined;
   }
-  return conditionWords(clause, conditionNames((decision) => nodeOf(view, decision), (key) => entityName(view, key)));
+  return conditionWords(clause, conditionNames((decision) => nodeOf(view, decision), (key) => identityName(view, key)));
 }
 
 /** D4: why a finished node is stale, in words. */

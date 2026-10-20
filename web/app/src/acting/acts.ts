@@ -75,9 +75,9 @@ export function doneMutations(key: string, evidence: Evidence = {}): Mutation[] 
   ];
 }
 
-/** D2, E2: make `entity` the owner of `key`, explicitly. */
-export function assignOwner(key: string, entity: string): Mutation {
-  return { op: "set_participation", node: key, kind: OWNER_KIND, source: [entity] };
+/** D2, E2: make `identity` the owner of `key`, explicitly. */
+export function assignOwner(key: string, identity: string): Mutation {
+  return { op: "set_participation", node: key, kind: OWNER_KIND, source: [identity] };
 }
 
 /** C9: an action over every selected node. */
@@ -85,7 +85,7 @@ export type BulkAction =
   | { act: "start" }
   | { act: "done" }
   | { act: "skip"; reason: string }
-  | { act: "assign"; entity: string }
+  | { act: "assign"; identity: string }
   | { act: "snooze"; until: Schema<"SnoozeTarget"> }
   | { act: "unsnooze" };
 
@@ -105,7 +105,7 @@ function bulkMutation(action: BulkAction, facts: Facts): Mutation | undefined {
     case "skip":
       return moves.includes("skip") ? transition(node.key, "skip", action.reason) : undefined;
     case "assign":
-      return assignOwner(node.key, action.entity);
+      return assignOwner(node.key, action.identity);
     case "snooze":
       return finished ? undefined : { op: "snooze", node: node.key, until: action.until };
     case "unsnooze":

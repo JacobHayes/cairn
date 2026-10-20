@@ -1,4 +1,4 @@
-// E6: merging one entity into another, one deployment patch. Every journey referring to
+// E6: merging one identity into another, one deployment patch. Every journey referring to
 // either (any status, archived among them) is read first and named at the revision seen, so
 // the host checks each as it would derive after the merge and rechecks the set when it
 // commits; a merge that would break a journey is refused naming it and its violations.
@@ -16,23 +16,23 @@ import { Failed } from "../ui/Failed.tsx";
 import { Button } from "../ui/kit.tsx";
 import { Receipt, useReceipt } from "../ui/Receipt.tsx";
 import { mergeFlow } from "./merge.ts";
-import type { Entity } from "./model.ts";
+import type { Identity } from "./model.ts";
 
-/** An entity's name by key. */
-function nameOf(entities: readonly Entity[], key: string): string {
-  return entities.find((entity) => entity.key === key)?.name ?? "";
+/** An identity's name by key. */
+function nameOf(identities: readonly Identity[], key: string): string {
+  return identities.find((identity) => identity.key === key)?.name ?? "";
 }
 
-function EntitySelect({ label, value, entities, onChange }: { label: string; value: string; entities: readonly Entity[]; onChange: (key: string) => void }) {
+function IdentitySelect({ label, value, identities, onChange }: { label: string; value: string; identities: readonly Identity[]; onChange: (key: string) => void }) {
   return (
     <label className="field">
       <span className="label">{label}</span>
       <select aria-label={label} value={value} onChange={(event) => { onChange(event.target.value); }}>
-        <option value="">Choose an entity</option>
-        {entities.map((entity) => (
-          <option key={entity.key} value={entity.key}>
-            {entity.name}
-            {(entity.emails ?? []).length === 0 ? "" : ` (${(entity.emails ?? []).join(", ")})`}
+        <option value="">Choose an identity</option>
+        {identities.map((identity) => (
+          <option key={identity.key} value={identity.key}>
+            {identity.name}
+            {(identity.emails ?? []).length === 0 ? "" : ` (${(identity.emails ?? []).join(", ")})`}
           </option>
         ))}
       </select>
@@ -40,19 +40,19 @@ function EntitySelect({ label, value, entities, onChange }: { label: string; val
   );
 }
 
-export function MergeEntities({ deployment, entities, asked }: { deployment: Deployment; entities: readonly Entity[]; asked: string[] }) {
+export function MergeIdentities({ deployment, identities, asked }: { deployment: Deployment; identities: readonly Identity[]; asked: string[] }) {
   const { host, edits, titleOf } = useSession();
   const skew = useSkew();
   const flow = useActorRef(mergeFlow, {
     input: {
       edits,
-      key: "merge-entities",
+      key: "merge-identities",
       referencing: (keys) => allPages<JourneySummary, string>((after) => host.journeys({ referencing: [...keys], ...(after === undefined ? {} : { after }) })),
     },
   });
   const working = useSelector(flow, (snapshot) => snapshot.hasTag("busy"));
   const failure = useSelector(flow, (snapshot) => snapshot.context.failure);
-  const write = useEdit("merge-entities");
+  const write = useEdit("merge-identities");
   const receipt = useReceipt();
   const [survivor, setSurvivor] = useState(asked[0] ?? "");
   const [merged, setMerged] = useState(asked[1] ?? "");
@@ -68,16 +68,16 @@ export function MergeEntities({ deployment, entities, asked }: { deployment: Dep
   });
   const ready = survivor !== "" && merged !== "" && survivor !== merged;
   return (
-    <section id="merge-entities" className="node-panel" aria-label="Merge two entities" data-testid="merge-entities">
+    <section id="merge-identities" className="node-panel" aria-label="Merge two identities" data-testid="merge-identities">
       <header className="node-panel-head">
-        <h2 className="node-panel-title">Merge two entities</h2>
+        <h2 className="node-panel-title">Merge two identities</h2>
       </header>
       <div className="stack merge-body">
-      <span className="muted small">Journeys and their history will show the entity you keep.</span>
-      {ready ? <span data-testid="merge-sentence">{nameOf(entities, merged)} will be merged into {nameOf(entities, survivor)}. {nameOf(entities, survivor)} will remain.</span> : null}
+      <span className="muted small">Journeys and their history will show the identity you keep.</span>
+      {ready ? <span data-testid="merge-sentence">{nameOf(identities, merged)} will be merged into {nameOf(identities, survivor)}. {nameOf(identities, survivor)} will remain.</span> : null}
       <span className="row merge-fields">
-        <EntitySelect label="Keep this entity" value={survivor} entities={entities} onChange={setSurvivor} />
-        <EntitySelect label="Merge this entity into it" value={merged} entities={entities} onChange={setMerged} />
+        <IdentitySelect label="Keep this identity" value={survivor} identities={identities} onChange={setSurvivor} />
+        <IdentitySelect label="Merge this identity into it" value={merged} identities={identities} onChange={setMerged} />
         <Button
           primary
           disabled={!ready || working || write.busy || skew}

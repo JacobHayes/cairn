@@ -40,5 +40,5 @@ nodes:
   kind: decision
   title: Who reviews?
   prompt: Who performs the security review?
-  answer_type: entity
+  answer_type: identity
   fills_role: reviewer

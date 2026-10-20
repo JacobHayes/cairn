@@ -1,6 +1,6 @@
 // C14: a proposal's review items, each with its controls: a conflict with the resolutions it
 // offers (B7: keep, take, clear, reopen, map old choices to new, remap or remove a role or
-// kind), an orphan kept or removed with its cascade shown (A18), an entity's participation
+// kind), an orphan kept or removed with its cascade shown (A18), an identity's participation
 // mapping (B8: drop, an existing role, a new role, the default owner), a node left out of a
 // saved route, and what is only shown (a kept local edit, a cascade, a violation). An item
 // still needing a choice says so, as the preview reports it.
@@ -45,7 +45,7 @@ export interface ItemsContext {
 const UNRESOLVED_WORDS: Record<UnresolvedReason, string> = {
   no_choice: "Needs a choice",
   not_offered: "That choice is not offered here",
-  mixed_mapping: "Shares a participation with entities mapped to other roles",
+  mixed_mapping: "Shares a participation with identities mapped to other roles",
   no_default_owner: "The graph has no default owner to map to",
 };
 
@@ -136,7 +136,7 @@ function RemovalList({ removal, names }: { removal: Extract<ReviewItem, { item: 
   );
 }
 
-/** B8: an entity's participations mapped for the saved route. */
+/** B8: an identity's participations mapped for the saved route. */
 function MappingControls({ index, mapping, context }: { index: number; mapping: Mapping | null | undefined; context: ItemsContext }) {
   const [title, setTitle] = useState("");
   const current = mapping == null ? "" : typeof mapping === "string" ? mapping : "role" in mapping ? `role:${mapping.role}` : "new";

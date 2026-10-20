@@ -11,7 +11,7 @@
 //! passes for anonymous or for a user
 //! (decisions/2026-10-08-tailscale-proxy-mode-trusts-the-proxies-it-lists.md).
 //!
-//! A Tailscale login name was authenticated by the tailnet's identity provider, so it is
+//! A Tailscale login name was authenticated by the tailnet's sign-in provider, so it is
 //! listed as a verified email when it has the shape of one (H3;
 //! decisions/2026-10-06-a-tailscale-login-name-is-a-verified-email.md). A tagged node is
 //! a machine, not a person: it signs no one in.
@@ -25,14 +25,14 @@ use async_trait::async_trait;
 use axum::body::Bytes;
 use axum::http::header::HOST;
 use axum::http::{HeaderMap, Request, StatusCode};
-use cairn_schema::{Email, Identity, Limit, Slug, Title};
+use cairn_schema::{Email, Limit, Login, Slug, Title};
 use http_body_util::{BodyExt, Empty, Limited};
 use hyper_util::rt::TokioIo;
 use ipnet::{IpNet, Ipv4Net};
 use serde::Deserialize;
 
 use crate::error::{ConfigError, Refusal};
-use crate::limits::IDENTITY_CALL_DURATION_MAX;
+use crate::limits::PROVIDER_CALL_DURATION_MAX;
 use crate::provider::{AuthProvider, Listener, Peer, Presented, Verdict};
 
 /// How the provider learns who a request is from.
@@ -50,7 +50,7 @@ pub enum TailscaleMode {
     },
 }
 
-/// Where proxy mode trusts the identity headers from.
+/// Where proxy mode trusts the login headers from.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum TrustedProxies {
     /// This machine (`tailscale serve`), on a listener only this machine reaches.
@@ -116,7 +116,7 @@ pub struct TailscaleConfig {
     pub name: Slug,
     /// Direct or proxy.
     pub mode: TailscaleMode,
-    /// H3: link a new identity to the user holding one of its verified emails.
+    /// H3: link a new login to the user holding one of its verified emails.
     pub auto_link: bool,
 }
 
@@ -132,7 +132,7 @@ const LOGIN_HEADER: &str = "tailscale-user-login";
 const NAME_HEADER: &str = "tailscale-user-name";
 /// The header listing a tagged node's tags: a machine, which signs no one in.
 const TAGS_HEADER: &str = "tailscale-node-tags";
-/// What every identity header's name starts with.
+/// What every login header's name starts with.
 const HEADER_PREFIX: &str = "tailscale-";
 
 impl TailscaleProvider {
@@ -199,7 +199,7 @@ impl TailscaleProvider {
         // tailscale serve encodes a display name that is not ASCII (RFC 2047); the login
         // stands in for it rather than a hand-written decoder.
         let name = header(request.headers, NAME_HEADER).filter(|name| !name.starts_with("=?"));
-        self.identity(login, name)
+        self.login(login, name)
     }
 
     /// Direct mode: tailscaled's whois of the peer.
@@ -207,11 +207,11 @@ impl TailscaleProvider {
         let Peer::Tcp(address) = peer else {
             return Verdict::Refused(Refusal::Peer);
         };
-        let looked_up = tokio::time::timeout(IDENTITY_CALL_DURATION_MAX, whois(socket, address));
+        let looked_up = tokio::time::timeout(PROVIDER_CALL_DURATION_MAX, whois(socket, address));
         match looked_up.await {
             Ok(Ok(Some(whois))) if whois.node.tags.as_ref().is_none_or(Vec::is_empty) => {
                 let profile = whois.user_profile;
-                self.identity(&profile.login_name, profile.display_name.as_deref())
+                self.login(&profile.login_name, profile.display_name.as_deref())
             }
             Ok(Ok(Some(_))) => Verdict::Absent,
             Ok(Ok(None)) => Verdict::Refused(Refusal::Peer),
@@ -220,7 +220,7 @@ impl TailscaleProvider {
         }
     }
 
-    fn identity(&self, login: &str, name: Option<&str>) -> Verdict {
+    fn login(&self, login: &str, name: Option<&str>) -> Verdict {
         let Ok(subject) = login.parse::<Title>() else {
             return Verdict::Refused(Refusal::Credential);
         };
@@ -228,7 +228,7 @@ impl TailscaleProvider {
             .and_then(|name| name.parse::<Title>().ok())
             .unwrap_or_else(|| subject.clone());
         let verified_emails = login.parse::<Email>().into_iter().collect();
-        Verdict::Identity(Identity {
+        Verdict::Login(Login {
             provider: self.config.name.clone(),
             subject,
             display,
@@ -255,7 +255,7 @@ impl AuthProvider for TailscaleProvider {
     }
 }
 
-/// Whether proxy mode trusts the identity headers from `peer`.
+/// Whether proxy mode trusts the login headers from `peer`.
 fn trusts(trusted: &TrustedProxies, peer: Peer) -> bool {
     match (trusted, peer) {
         (TrustedProxies::ThisMachine, peer) => peer.is_local(),

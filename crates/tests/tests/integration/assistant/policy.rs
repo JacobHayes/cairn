@@ -89,7 +89,7 @@ fn state_cases() -> Vec<Case> {
         (
             "assign",
             journey(
-                json!({ "node": "n_access", "kind": "k_reviewer", "source": ["e_lead"],
+                json!({ "node": "n_access", "kind": "k_reviewer", "source": ["who_k3d7qm2xw5tn6pfa"],
                 "deployment_revision": 1, "patch_id": "p_assign" }),
             ),
             Policy::Direct,
@@ -163,8 +163,8 @@ fn structural_cases(draft: u64) -> Vec<Case> {
             structural.clone(),
         ),
         (
-            "manage_entity",
-            json!({ "change": { "merge": { "survivor": "e_lead", "merged": "e_analyst" } },
+            "manage_identity",
+            json!({ "change": { "merge": { "survivor": "who_k3d7qm2xw5tn6pfa", "merged": "who_analyst" } },
                 "patch_id": "p_merge", "base_revision": 1 }),
             structural.clone(),
         ),

@@ -42,8 +42,8 @@ fn save(records: &Records) -> ProposalDraft {
 /// The draft with every participation mapped as `mapping` says.
 fn mapped(draft: &ProposalDraft, mapping: &ParticipationMapping) -> ProposalDraft {
     let items = draft.items.as_slice().iter().map(|item| match item {
-        ReviewItem::Participation { entity, uses, .. } => ReviewItem::Participation {
-            entity: entity.clone(),
+        ReviewItem::Participation { identity, uses, .. } => ReviewItem::Participation {
+            identity: identity.clone(),
             uses: uses.clone(),
             mapping: Some(mapping.clone()),
         },
@@ -205,14 +205,14 @@ fn graph_after(records: &Records, destination: &Domain, draft: &ProposalDraft) -
     }
 }
 
-/// B8: each mapping choice for an explicit entity, as the preview of the saved route's draft
+/// B8: each mapping choice for an explicit identity, as the preview of the saved route's draft
 /// shows it: dropped, mapped to a role, to a new role, or to the default owner's role.
 #[test]
 fn each_participation_mapping() {
     let records = support::accepted_on(
         &support::vendor_after(2),
         "j_vendor_eval",
-        "- op: add_node\n  node: {key: n_local, id: local, kind: action, title: Local, participations: {k_owner: [e_lead]}}\n",
+        "- op: add_node\n  node: {key: n_local, id: local, kind: action, title: Local, participations: {k_owner: [who_k3d7qm2xw5tn6pfa]}}\n",
     );
     let draft = save(&records);
     let blocked = preview(
@@ -222,7 +222,7 @@ fn each_participation_mapping() {
         &support::fixed_inputs(),
         &support::derive_inputs_of(&records),
     );
-    assert_eq!(blocked.unresolved.len(), 1, "the entity needs a choice");
+    assert_eq!(blocked.unresolved.len(), 1, "the identity needs a choice");
     let lead = || "r_lead".parse().unwrap();
     let cases = [
         (ParticipationMapping::Drop, None),

@@ -5,7 +5,7 @@
 // its local derive; the words are words.ts's.
 import { conditionNames } from "../authoring/condition.ts";
 import { type GraphNode, isStage, type NodeDerived, nodeOf, rankPlaces, type Ready, titleOf } from "../detail/model.ts";
-import { answerText, entityName, ownersOf, ownerWords, UNASSIGNED, YOU } from "../detail/sections.tsx";
+import { answerText, identityName, ownersOf, ownerWords, UNASSIGNED, YOU } from "../detail/sections.tsx";
 import { currentStagesOf } from "../journeys/requests.ts";
 import { isFinished, isOpen } from "../status/state.ts";
 import type { DisplayState } from "../status/words.ts";
@@ -59,7 +59,7 @@ function dependsBody(context: Context, node: GraphNode, derived: NodeDerived): C
   const source = derived.relevance.condition_on == null ? node : (nodeOf(view, derived.relevance.condition_on) ?? node);
   const pending = (derived.relevance.pending_on ?? []).map((key) => titleOf(view, key));
   const reads = (derived.relevance.decisions ?? []).map((key) => titleOf(view, key));
-  const words = dependsWords(source, conditionNames((key) => nodeOf(view, key), (key) => entityName(view, key))) ?? (reads.length === 0 ? undefined : reads.join(" and "));
+  const words = dependsWords(source, conditionNames((key) => nodeOf(view, key), (key) => identityName(view, key))) ?? (reads.length === 0 ? undefined : reads.join(" and "));
   if (words === undefined) {
     return undefined;
   }

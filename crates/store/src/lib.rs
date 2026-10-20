@@ -6,7 +6,7 @@
 //!
 //! The store depends on `cairn-schema`, never on the engine: it persists the change set an
 //! accepted patch produced (its events' writes) and checks only what a commit must check
-//! atomically: revisions (H5), patch receipts, deleted journey ids (A19), entity keys and
+//! atomically: revisions (H5), patch receipts, deleted journey ids (A19), identity keys and
 //! emails riding in from other domains (E6), and the per-graph size cap.
 //!
 //! The trait names no runtime. The memory backend completes every call at once, so it runs
@@ -41,7 +41,7 @@ pub use query::{
 };
 pub use records::{
     AgentTokenRecord, AuthEvent, AuthLogEntry, AuthLogQuery, ConversationMessage,
-    ConversationRecord, ConversationSummary, IdentityRecord, LoggedAuthEntry, MessageAuthor,
+    ConversationRecord, ConversationSummary, LoggedAuthEntry, LoginRecord, MessageAuthor,
     OAuthStateKind, OAuthStateRecord, SecretHash, SessionRecord, UserRecord,
 };
 pub use store::{AuthStore, ConversationStore, Store};

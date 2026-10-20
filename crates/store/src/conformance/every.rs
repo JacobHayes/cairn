@@ -22,7 +22,7 @@ use crate::target::{Document, LoadTarget};
 /// A14: every content and state record, with every field and variant, loads back equal
 /// from a route's draft, its published version, and a journey following it; so do the
 /// journey's fields in every status, an event with every field, a proposal in every
-/// status, and an entity with its emails and an alias.
+/// status, and an identity with its emails and an alias.
 pub async fn every_field_and_variant_loads_back_equal<B: Backend>(backend: &B) {
     let store = open(backend).await;
     let content = every::content(Fill::Every);
@@ -123,22 +123,25 @@ pub async fn every_field_and_variant_loads_back_equal<B: Backend>(backend: &B) {
         );
     }
 
-    let filled = every::entity("e_every", Fill::Every);
+    let filled = every::identity("who_every", Fill::Every);
     let people = deployment_patch("p_people", 0).event(
-        EventType::EntityCreated,
-        Subject::Entity(id("e_every")),
+        EventType::IdentityCreated,
+        Subject::Identity(id("who_every")),
         vec![
-            Write::Put(Record::Entity(filled.clone())),
-            Write::Put(Record::EntityAlias {
-                alias: id("e_former"),
-                entity: id("e_every"),
+            Write::Put(Record::Identity(filled.clone())),
+            Write::Put(Record::IdentityAlias {
+                alias: id("who_former"),
+                identity: id("who_every"),
             }),
         ],
     );
     applied(&store, people.commit()).await;
     let loaded = deployment(&store).await;
-    assert_eq!(loaded.entities.get(&id("e_every")), Some(&filled));
-    assert_eq!(loaded.aliases.get(&id("e_former")), Some(&id("e_every")));
+    assert_eq!(loaded.identities.get(&id("who_every")), Some(&filled));
+    assert_eq!(
+        loaded.aliases.get(&id("who_former")),
+        Some(&id("who_every"))
+    );
 }
 
 /// A cleared value put over one with every field leaves no stale column: every optional
@@ -250,16 +253,19 @@ pub async fn a_cleared_overwrite_loads_back_equal_and_every_record_removes<B: Ba
     }
 
     for (base, fill) in [(0, Fill::Every), (1, Fill::Cleared)] {
-        let put = deployment_patch(&format!("p_entity{base}"), base).event(
-            EventType::EntityEdited,
-            Subject::Entity(id("e_every")),
-            vec![Write::Put(Record::Entity(every::entity("e_every", fill)))],
+        let put = deployment_patch(&format!("p_identity{base}"), base).event(
+            EventType::IdentityEdited,
+            Subject::Identity(id("who_every")),
+            vec![Write::Put(Record::Identity(every::identity(
+                "who_every",
+                fill,
+            )))],
         );
         applied(&store, put.commit()).await;
     }
     let loaded = deployment(&store).await;
-    let expected = every::entity("e_every", Fill::Cleared);
-    assert_eq!(loaded.entities.get(&id("e_every")), Some(&expected));
+    let expected = every::identity("who_every", Fill::Cleared);
+    assert_eq!(loaded.identities.get(&id("who_every")), Some(&expected));
 }
 
 /// Every OAuth state kind, auth event, and message author loads back as written, and an

@@ -17,7 +17,7 @@ export type ProjectionRequest =
       display?: Schema<"LevelDisplay">[];
       top?: Schema<"NodeKind">[];
       flags?: Schema<"ListFlag">[];
-      owner?: Schema<"EntityKey">;
+      owner?: Schema<"IdentityKey">;
       text?: string;
       selected?: NodeKey;
     }
@@ -69,7 +69,7 @@ export interface NextQuery {
 export interface ListQuery {
   flags?: Schema<"ListFlag">[];
   within?: NodeKey;
-  owner?: Schema<"EntityKey">;
+  owner?: Schema<"IdentityKey">;
   states?: Schema<"State">[];
   display_states?: Schema<"DisplayState">[];
   kinds?: Schema<"NodeKind">[];
@@ -246,7 +246,7 @@ export interface JourneyIndexQuery {
   status?: Schema<"JourneyStatus">[];
   route?: string;
   version?: number;
-  referencing?: Schema<"EntityKey">[];
+  referencing?: Schema<"IdentityKey">[];
   upgrade_available?: boolean;
   after?: Schema<"JourneyId">;
   size?: number;

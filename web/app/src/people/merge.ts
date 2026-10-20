@@ -1,4 +1,4 @@
-// E6: merging one entity into another, as a workflow over the edit manager's writes: every
+// E6: merging one identity into another, as a workflow over the edit manager's writes: every
 // journey referring to either (any status, archived among them) is read first, then the
 // deployment patch names each at the revision seen, so the host checks each as it would derive
 // after the merge and rechecks the set when it commits.
@@ -17,11 +17,11 @@ import { currentAddress } from "../data/session.ts";
 import { newPatchId, patchOf } from "../data/writes.ts";
 import { mergeMutation } from "./model.ts";
 
-/** What the flow is started with: the manager, its write's edit key, and how to find the journeys referring to the entities. */
+/** What the flow is started with: the manager, its write's edit key, and how to find the journeys referring to the identities. */
 export interface MergeInput {
   edits: EditsRef;
   key: string;
-  referencing: (entities: readonly string[]) => Promise<JourneySummary[]>;
+  referencing: (identities: readonly string[]) => Promise<JourneySummary[]>;
 }
 
 /** What a merge asks for. */
@@ -58,7 +58,7 @@ export function mergeCommand(merge: Merge, referencing: readonly JourneySummary[
   };
 }
 
-const readJourneys = fromPromise<JourneySummary[], { referencing: MergeInput["referencing"]; entities: string[] }>(({ input }) => input.referencing(input.entities));
+const readJourneys = fromPromise<JourneySummary[], { referencing: MergeInput["referencing"]; identities: string[] }>(({ input }) => input.referencing(input.identities));
 
 export const mergeFlow = setup({
   types: { context: {} as MergeContext, events: {} as MergeEvent, input: {} as MergeInput, emitted: {} as Merged },
@@ -86,7 +86,7 @@ export const mergeFlow = setup({
       tags: ["busy"],
       invoke: {
         src: "readJourneys",
-        input: ({ context }) => ({ referencing: context.referencing, entities: [context.asked?.survivor ?? "", context.asked?.merged ?? ""] }),
+        input: ({ context }) => ({ referencing: context.referencing, identities: [context.asked?.survivor ?? "", context.asked?.merged ?? ""] }),
         onDone: { target: "delivering", actions: assign({ journeys: ({ event }) => event.output }) },
         onError: { target: "idle", actions: assign({ failure: ({ event }) => (event.error instanceof Error ? event.error.message : String(event.error)) }) },
       },

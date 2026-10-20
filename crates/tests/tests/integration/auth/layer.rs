@@ -56,7 +56,7 @@ mod layer {
         assert_eq!(first.agent, None);
         let user = world.store.user(&first.user).await.unwrap().unwrap();
         assert_eq!(user.name.as_str(), "dev user");
-        let logged = [AuthEvent::UserCreated, AuthEvent::IdentityLinked];
+        let logged = [AuthEvent::UserCreated, AuthEvent::LoginLinked];
         assert_eq!(world.log().await, logged);
     }
 

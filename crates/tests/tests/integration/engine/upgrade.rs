@@ -889,7 +889,7 @@ fn an_upgrade_leaves_alone_what_an_insertion_maps_onto() {
 fn removing_a_mapped_role_hands_its_fill_to_the_segments_nodes() {
     let direct = spare_mapped_by_an_insertion(
         "n_who_reviews",
-        "- op: fill_role\n  role: r_spare\n  entities: [e_lead]\n",
+        "- op: fill_role\n  role: r_spare\n  identities: [who_k3d7qm2xw5tn6pfa]\n",
     );
     let unanswered = spare_mapped_by_an_insertion("", "");
     let decision = &unanswered.journeys[&journey_id()]
@@ -906,7 +906,9 @@ fn removing_a_mapped_role_hands_its_fill_to_the_segments_nodes() {
     let decided = support::accepted_on(
         &unanswered,
         "j_vendor_eval",
-        &format!("- op: answer\n  decision: {decision}\n  value: {{entity: e_lead}}\n"),
+        &format!(
+            "- op: answer\n  decision: {decision}\n  value: {{identity: who_k3d7qm2xw5tn6pfa}}\n"
+        ),
     );
     for records in [direct, decided] {
         let removed = support::publish_vendor(&records, support::vendor_v2());
@@ -938,6 +940,6 @@ fn removing_a_mapped_role_hands_its_fill_to_the_segments_nodes() {
             })
             .map(|source| cairn_schema::to_json(source).unwrap())
             .collect();
-        assert_eq!(handed, [r#"["e_lead"]"#]);
+        assert_eq!(handed, [r#"["who_k3d7qm2xw5tn6pfa"]"#]);
     }
 }

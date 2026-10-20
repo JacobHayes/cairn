@@ -7,6 +7,9 @@
 //!
 //! usage: `cargo run -p cairn-engine --example route_walkthrough -- FIXTURES_DIR`
 
+#[path = "support/people.rs"]
+mod people;
+
 use std::error::Error;
 use std::fmt::Write as _;
 use std::path::Path;
@@ -44,7 +47,7 @@ fn inputs() -> Result<ApplyInputs> {
         today: "2026-10-06".parse()?,
         at: "2026-10-06T12:00:00Z".parse()?,
         actor: cairn_schema::Actor {
-            user: "u_lead".parse()?,
+            user: "u_ana".parse()?,
             agent: None,
         },
         note: None,
@@ -141,7 +144,7 @@ fn publish(records: &mut Records, graph: cairn_schema::Graph) -> Result<()> {
 fn finished(fixtures: &Path) -> Result<Records> {
     let directory = fixtures.join("vendor-evaluation");
     let file: RouteFile = from_yaml(&read(&directory.join("route.yaml"))?)?;
-    let mut records = Records::default();
+    let mut records = people::records(fixtures)?;
     let header = RouteHeader {
         id: file.route.clone(),
         name: file.name.clone(),
@@ -420,7 +423,7 @@ fn saved_and_created(out: &mut String, records: &Records, journey: &JourneyId) -
     writeln!(out, "## Save as route and re-link\n")?;
     writeln!(
         out,
-        "The finished journey saved as the new route `vendor-saved`: {} mutations (create the route, open its draft, then the structure), {} exclusion items, {} participation items (the journey names entities only in state, which is not saved). Excluded by default, as a placeholder's breakdown: {}.\n",
+        "The finished journey saved as the new route `vendor-saved`: {} mutations (create the route, open its draft, then the structure), {} exclusion items, {} participation items (the journey names identities only in state, which is not saved). Excluded by default, as a placeholder's breakdown: {}.\n",
         draft.mutations.len(),
         count(|item| matches!(item, ReviewItem::Exclusion { .. })),
         count(|item| matches!(item, ReviewItem::Participation { .. })),

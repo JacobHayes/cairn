@@ -64,8 +64,8 @@ describe("a form's preview", () => {
       previewKey(deriver, "u_two", authored, rename("A")),
     ]) {
       expect(sameKey(other.freshness, base.freshness)).toBe(false);
-      expect(sameKey(other.identity, base.identity)).toBe(true);
+      expect(sameKey(other.of, base.of)).toBe(true);
     }
-    expect(sameKey(previewKey(deriver, "u_one", { ...authored, target: { route: "r_a" } }, rename("A")).identity, base.identity)).toBe(false);
+    expect(sameKey(previewKey(deriver, "u_one", { ...authored, target: { route: "r_a" } }, rename("A")).of, base.of)).toBe(false);
   });
 });

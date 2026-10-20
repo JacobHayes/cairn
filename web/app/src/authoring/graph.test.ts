@@ -48,7 +48,7 @@ describe("moveTargets (A2)", () => {
   });
 });
 
-describe("ids and keys (Identity and references)", () => {
+describe("ids and keys (Keys and references)", () => {
   it("makes a sibling-unique slug from a title", () => {
     expect(slugOf("Review the partner's criteria!")).toBe("review-the-partner-s-criteria");
     expect(slugOf("???")).toBe("node");

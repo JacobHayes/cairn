@@ -241,7 +241,7 @@ pub(crate) struct ListJourneys {
     /// Journeys whose route has (or has not) published a version newer than theirs.
     #[serde(default)]
     upgrade_available: Option<bool>,
-    /// Only journeys that refer to the caller's entities (H3).
+    /// Only journeys that refer to the caller's identities (H3).
     #[serde(default)]
     mine: bool,
     /// The page starts after this journey: the `next` of the page before.
@@ -586,13 +586,13 @@ impl ToolSet {
     ) -> Result<JourneysOutput, ToolError> {
         let referencing = if arguments.mine {
             let viewer = self.service.viewer(call).await?;
-            if viewer.entities.is_empty() {
+            if viewer.identities.is_empty() {
                 return Ok(JourneysOutput {
                     journeys: Vec::new(),
                     next: None,
                 });
             }
-            Some(viewer.entities)
+            Some(viewer.identities)
         } else {
             None
         };

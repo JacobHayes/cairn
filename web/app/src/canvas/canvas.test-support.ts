@@ -13,7 +13,7 @@ const base = { gravity_from: none, unlocks_from: none, waits_on: none, actionabl
 const stageProgress = { done: 0, total: 2, overdue: 1, decisions_needed: 0 };
 const buildProgress = { done: 0, total: 1, overdue: 0, decisions_needed: 0 };
 const relevant = { relevance: { value: "relevant" as const } };
-const owned = { participations: { k_owner: { entities: ["e_one"], origin: "explicit" as const } } };
+const owned = { participations: { k_owner: { identities: ["who_one"], origin: "explicit" as const } } };
 const bound = (date: string) => ({ date, chain: { constraints: [], fixed: [] } });
 
 export function canvasView(): Ready {
@@ -23,7 +23,7 @@ export function canvasView(): Ready {
     inputs: {
       today,
       timezone: "UTC",
-      deployment: { revision: 1, entities: [{ key: "e_one", name: "Person One" }] },
+      deployment: { revision: 1, identities: [{ key: "who_one", name: "Person One" }] },
       rank: { urgency: 0.4, late: 0.15, gravity: 0.25, unlocks: 0.2, horizon_days: 14, undecided_discount: 0.5, other_owner_factor: 2 },
     },
     journey: {
@@ -118,7 +118,7 @@ export function wholeLevel(): Level {
       node("n_kick"),
       node("n_choose"),
       node("n_stage", { roll_up: { children_active: true, progress: stageProgress } }),
-      node("n_build", { parent: "n_stage", roll_up: { owners: ["e_one"], subtree_gravity: 9, min_child_slack_days: 40, progress: buildProgress } }),
+      node("n_build", { parent: "n_stage", roll_up: { owners: ["who_one"], subtree_gravity: 9, min_child_slack_days: 40, progress: buildProgress } }),
       node("n_check", { parent: "n_build" }),
       node("n_option"),
       node("n_old"),
@@ -134,7 +134,7 @@ export function actionsAndDecisionsHidden(): Level {
     nodes: [
       node("n_kick"),
       node("n_stage", { roll_up: { children_active: true, progress: stageProgress } }),
-      node("n_build", { parent: "n_stage", rolled_up: ["n_check"], roll_up: { owners: ["e_one"], progress: buildProgress } }),
+      node("n_build", { parent: "n_stage", rolled_up: ["n_check"], roll_up: { owners: ["who_one"], progress: buildProgress } }),
       node("n_option", { hidden_prerequisites: ["n_choose"] }),
     ],
     edges: [implicit("n_kick", "n_stage", "stage_opening"), explicit("n_option", "n_build")],

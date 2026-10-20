@@ -1,8 +1,8 @@
-//! Cairn's calls to an identity provider: discovery, its key set, the code exchange. One
+//! Cairn's calls to a sign-in provider: discovery, its key set, the code exchange. One
 //! client for all of them, so one place holds the rules: a request goes only to an origin
 //! Cairn may send secrets to (https, or http to this machine), whatever the issuer's
 //! discovery document advertises; no redirect is followed; each call ends within
-//! `IDENTITY_CALL_DURATION_MAX`; and a response body is read only up to the body limit, so
+//! `PROVIDER_CALL_DURATION_MAX`; and a response body is read only up to the body limit, so
 //! an issuer cannot make Cairn hold an unbounded answer (PRACTICES, Explicit limits).
 
 use std::fmt;
@@ -13,22 +13,22 @@ use cairn_schema::Limit;
 use openidconnect::{AsyncHttpClient, HttpRequest, HttpResponse, http, reqwest};
 use url::Url;
 
-use crate::limits::IDENTITY_CALL_DURATION_MAX;
+use crate::limits::PROVIDER_CALL_DURATION_MAX;
 
-/// The bytes of one identity-provider response: discovery documents, key sets, and token
+/// The bytes of one login-provider response: discovery documents, key sets, and token
 /// responses are a few kilobytes, and the body limit is the nearest named limit
 /// (decisions/2026-10-06-values-the-limits-table-does-not-name-take-the-nearest-named.md).
 fn response_bytes_max() -> usize {
     usize::try_from(Limit::BodyBytes.max()).unwrap_or(usize::MAX)
 }
 
-/// The client for an identity provider's endpoints.
+/// The client for a sign-in provider's endpoints.
 #[derive(Clone, Debug)]
 pub(crate) struct Outbound {
     client: reqwest::Client,
 }
 
-/// Why a call to an identity provider failed.
+/// Why a call to a sign-in provider failed.
 #[derive(Debug)]
 pub(crate) struct OutboundError(String);
 
@@ -46,7 +46,7 @@ impl Outbound {
         // Following redirects would let an issuer point Cairn's calls anywhere.
         let client = reqwest::Client::builder()
             .redirect(reqwest::redirect::Policy::none())
-            .timeout(IDENTITY_CALL_DURATION_MAX)
+            .timeout(PROVIDER_CALL_DURATION_MAX)
             .build()
             .map_err(|error| error.to_string())?;
         Ok(Self { client })

@@ -34,7 +34,7 @@ export function useSavePreview(view: Ready, mutations: Mutation[] | undefined): 
   const { deriver } = useSession();
   const { viewer } = useViewer();
   const user = viewer?.user ?? "u_local";
-  const key = mutations === undefined ? undefined : { identity: [view.journey.header.id], freshness: [JSON.stringify(view.key), view.journey.revision, user, JSON.stringify(mutations)], args: { deriver, ready: view, user, mutations } };
+  const key = mutations === undefined ? undefined : { of: [view.journey.header.id], freshness: [JSON.stringify(view.key), view.journey.revision, user, JSON.stringify(mutations)], args: { deriver, ready: view, user, mutations } };
   const { view: read } = useKeyedRead(SAVE_PREVIEW, key);
   return read.status === "current" ? read.value : undefined;
 }

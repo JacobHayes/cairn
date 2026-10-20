@@ -32,7 +32,7 @@ export const FLAG_WORDS: Partial<Record<ListFlag, string>> = {
 export interface ViewFilter {
   /** Only the viewer's own nodes (E4). */
   mine: boolean;
-  /** Only the nodes this entity owns. */
+  /** Only the nodes this identity owns. */
   owner: string | undefined;
   /** Only the nodes carrying every one of these flags (`FILTER_FLAGS`, in its order). */
   flags: ListFlag[];

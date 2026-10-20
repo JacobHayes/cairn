@@ -1,5 +1,5 @@
 //! Records outside every domain, with no events (ARCHITECTURE, Store trait; Schema
-//! outline): auth state (users, their identities, login sessions, transient OAuth state,
+//! outline): auth state (users, their logins, login sessions, transient OAuth state,
 //! agent tokens, and the auth log) and assistant conversations. Plain records the auth and
 //! assistant crates build their own types over (3.2, 4.4). Secrets are never stored: a
 //! session or agent token, or an OAuth code, is held only as its SHA-256 digest, so a
@@ -58,9 +58,9 @@ pub struct UserRecord {
     pub created_at: Timestamp,
 }
 
-/// One of a user's identities, keyed by provider and subject (ARCHITECTURE, Auth).
+/// One of a user's logins, keyed by provider and subject (ARCHITECTURE, Auth).
 #[derive(Clone, Debug, PartialEq, Eq)]
-pub struct IdentityRecord {
+pub struct LoginRecord {
     /// The provider, by its configured name.
     pub provider: Slug,
     /// The provider's subject for the account.
@@ -135,10 +135,8 @@ pub struct AgentTokenRecord {
 pub enum AuthEvent {
     /// A user was created on first sign-in.
     UserCreated,
-    /// An identity was linked to a user.
-    IdentityLinked,
-    /// An identity was unlinked.
-    IdentityUnlinked,
+    /// A login was linked to a user.
+    LoginLinked,
     /// An agent token was minted.
     TokenMinted,
     /// An agent token was revoked.
@@ -155,7 +153,7 @@ pub struct AuthLogEntry {
     pub event: AuthEvent,
     /// Whose account.
     pub user: UserId,
-    /// What it was about: an identity's provider and subject, or a token's agent.
+    /// What it was about: a login's provider and subject, or a token's agent.
     pub subject: Option<Title>,
 }
 

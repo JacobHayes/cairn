@@ -11,8 +11,8 @@ use crate::commit::StoreError;
 use crate::query::PageSize;
 use crate::records::{
     AgentTokenRecord, AuthEvent, AuthLogEntry, AuthLogQuery, ConversationMessage,
-    ConversationRecord, IdentityRecord, MessageAuthor, OAuthStateKind, OAuthStateRecord,
-    SecretHash, SessionRecord, UserRecord,
+    ConversationRecord, LoginRecord, MessageAuthor, OAuthStateKind, OAuthStateRecord, SecretHash,
+    SessionRecord, UserRecord,
 };
 use crate::store::{AuthStore, ConversationStore};
 
@@ -29,8 +29,8 @@ fn user(key: &str) -> UserRecord {
     }
 }
 
-fn identity(provider: &str, subject: &str, user: &str) -> IdentityRecord {
-    IdentityRecord {
+fn login(provider: &str, subject: &str, user: &str) -> LoginRecord {
+    LoginRecord {
         provider: id(provider),
         subject: id(subject),
         user: id(user),
@@ -68,7 +68,7 @@ fn oauth(digit: char, expires_at: Timestamp) -> OAuthStateRecord {
     }
 }
 
-/// Auth records are stored as written and load back equal; an identity, session, or
+/// Auth records are stored as written and load back equal; a login, session, or
 /// agent token naming a user that does not exist is not stored.
 pub async fn auth_records_round_trip<B: Backend>(backend: &B) {
     let store = open(backend).await;
@@ -77,34 +77,18 @@ pub async fn auth_records_round_trip<B: Backend>(backend: &B) {
     assert_eq!(store.user(&id("u_ann")).await.unwrap(), Some(ann));
     assert_eq!(store.user(&id("u_nobody")).await.unwrap(), None);
 
-    let identities = [
-        identity("oidc", "sub-1", "u_ann"),
-        identity("tailscale", "ann@tailnet", "u_ann"),
+    let logins = [
+        login("oidc", "sub-1", "u_ann"),
+        login("tailscale", "ann@tailnet", "u_ann"),
     ];
-    for held in &identities {
-        store.put_identity(held.clone()).await.unwrap();
+    for held in &logins {
+        store.put_login(held.clone()).await.unwrap();
     }
-    let found = store.identity(&id("oidc"), &id("sub-1")).await.unwrap();
-    assert_eq!(found, Some(identities[0].clone()));
+    let found = store.login(&id("oidc"), &id("sub-1")).await.unwrap();
+    assert_eq!(found, Some(logins[0].clone()));
     assert_eq!(
-        store.identities_of(&id("u_ann")).await.unwrap(),
-        identities.to_vec()
-    );
-    assert!(
-        store
-            .remove_identity(&id("oidc"), &id("sub-1"))
-            .await
-            .unwrap()
-    );
-    assert!(
-        !store
-            .remove_identity(&id("oidc"), &id("sub-1"))
-            .await
-            .unwrap()
-    );
-    assert_eq!(
-        store.identities_of(&id("u_ann")).await.unwrap(),
-        identities[1..].to_vec()
+        store.logins_of(&id("u_ann")).await.unwrap(),
+        logins.to_vec()
     );
 
     let held = session('a', "u_ann", at(60));
@@ -117,9 +101,7 @@ pub async fn auth_records_round_trip<B: Backend>(backend: &B) {
     assert_eq!(store.session(&digest('a'), at(30)).await.unwrap(), None);
 
     let orphans = [
-        store
-            .put_identity(identity("oidc", "sub-2", "u_nobody"))
-            .await,
+        store.put_login(login("oidc", "sub-2", "u_nobody")).await,
         store.put_session(session('b', "u_nobody", at(60))).await,
         store
             .put_agent_token(token("ag_orphan", 'c', "u_nobody"))
@@ -133,25 +115,25 @@ pub async fn auth_records_round_trip<B: Backend>(backend: &B) {
     }
 }
 
-/// H3: identities are found by a verified email, across providers and users, and an
-/// identity's emails are replaced by a put rather than accumulated.
-pub async fn identities_are_found_by_verified_email<B: Backend>(backend: &B) {
+/// H3: logins are found by a verified email, across providers and users, and an
+/// login's emails are replaced by a put rather than accumulated.
+pub async fn logins_are_found_by_verified_email<B: Backend>(backend: &B) {
     let store = open(backend).await;
     for key in ["u_ann", "u_bob"] {
         store.put_user(user(key)).await.unwrap();
     }
-    let mut work = identity("oidc", "sub-1", "u_ann");
-    let mut tailnet = identity("tailscale", "ann@tailnet", "u_ann");
-    let mut other = identity("oidc", "sub-2", "u_bob");
+    let mut work = login("oidc", "sub-1", "u_ann");
+    let mut tailnet = login("tailscale", "ann@tailnet", "u_ann");
+    let mut other = login("oidc", "sub-2", "u_bob");
     work.verified_emails = BTreeSet::from([id("ann@example.org"), id("a@example.org")]);
     tailnet.verified_emails = BTreeSet::from([id("ann@example.org")]);
     other.verified_emails = BTreeSet::from([id("bob@example.org")]);
     for held in [&work, &tailnet, &other] {
-        store.put_identity(held.clone()).await.unwrap();
+        store.put_login(held.clone()).await.unwrap();
     }
     let with = |email: &'static str| {
         let store = &store;
-        async move { store.identities_with_email(&id(email)).await.unwrap() }
+        async move { store.logins_with_email(&id(email)).await.unwrap() }
     };
     assert_eq!(
         with("ann@example.org").await,
@@ -161,7 +143,7 @@ pub async fn identities_are_found_by_verified_email<B: Backend>(backend: &B) {
     assert_eq!(with("nobody@example.org").await, Vec::new());
 
     work.verified_emails = BTreeSet::from([id("a@example.org")]);
-    store.put_identity(work.clone()).await.unwrap();
+    store.put_login(work.clone()).await.unwrap();
     assert_eq!(with("ann@example.org").await, vec![tailnet]);
     assert_eq!(with("a@example.org").await, vec![work]);
 }
@@ -238,7 +220,7 @@ pub async fn the_auth_log_appends_in_order_and_pages_by_user<B: Backend>(backend
     let store = open(backend).await;
     let entries = [
         ("u_ann", AuthEvent::UserCreated, None),
-        ("u_ann", AuthEvent::IdentityLinked, Some("oidc sub-1")),
+        ("u_ann", AuthEvent::LoginLinked, Some("oidc sub-1")),
         ("u_bob", AuthEvent::UserCreated, None),
         ("u_ann", AuthEvent::TokenMinted, Some("ag_script")),
         ("u_ann", AuthEvent::TokenRevoked, Some("ag_script")),
@@ -276,7 +258,7 @@ pub async fn the_auth_log_appends_in_order_and_pages_by_user<B: Backend>(backend
         events,
         vec![
             AuthEvent::UserCreated,
-            AuthEvent::IdentityLinked,
+            AuthEvent::LoginLinked,
             AuthEvent::TokenMinted,
             AuthEvent::TokenRevoked,
         ]

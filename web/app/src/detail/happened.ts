@@ -10,9 +10,9 @@ import type { Schema } from "@cairn/client";
 import { SNOOZE_NODE_TAIL } from "../status/snooze.ts";
 import { dateWords } from "../status/when.ts";
 import { fieldWords } from "../status/words.ts";
-import { ENTITY_GONE, KIND_GONE, NODE_GONE, ROLE_GONE } from "../ui/gone.ts";
+import { IDENTITY_GONE, KIND_GONE, NODE_GONE, ROLE_GONE } from "../ui/gone.ts";
 import { isStage, kindWord, type Ready, titleOf } from "./model.ts";
-import { entityName, kindTitle, roleTitle } from "./sections.tsx";
+import { identityName, kindTitle, roleTitle } from "./sections.tsx";
 import { namedList } from "../ui/words.ts";
 
 type Event = Schema<"Event">;
@@ -21,12 +21,12 @@ type State = Schema<"State">;
 type Write = Schema<"Write">;
 type GraphRecord = Schema<"GraphRecord">;
 
-/** What the sentence names, by key: nodes by title, entities by name, and so on, never the key. */
+/** What the sentence names, by key: nodes by title, identities by name, and so on, never the key. */
 export interface Words {
   /** The node the history is of: it reads as "this". */
   viewed: string;
   node(key: string): string;
-  entity(key: string): string;
+  identity(key: string): string;
   role(key: string): string;
   kind(key: string): string;
   /** A calendar date in words. */
@@ -61,8 +61,8 @@ export interface Facts {
   waitsFor?: string;
   /** The node fields the event changed. */
   fields?: string[];
-  /** The names of the entities involved. */
-  entities?: string[];
+  /** The names of the identities involved. */
+  identities?: string[];
   /** The skip reason or override reason. */
   reason?: string;
   /** The user who confirmed a proposal this event applied. */
@@ -126,8 +126,8 @@ function fieldRecords(c: Context): { node: string; value: Schema<"NodeFieldValue
 }
 
 
-function entitiesOf(c: Context, keys: readonly string[]): string[] {
-  return keys.map((key) => c.words.entity(key));
+function identitiesOf(c: Context, keys: readonly string[]): string[] {
+  return keys.map((key) => c.words.identity(key));
 }
 
 /** A rename whose old title is not known: the node is named by what it is called now, which is the new title unless it was renamed again, so it is not named at all. */
@@ -219,8 +219,8 @@ function participation(c: Context): Said {
       if (typeof source === "string") {
         return { what: `made ${c.words.role(source)} the ${label} of ${it(c, record.participation.node)}` };
       }
-      const names = entitiesOf(c, source);
-      return { what: names.length === 0 ? `set no ${label} on ${it(c, record.participation.node)}` : `set the ${label} of ${it(c, record.participation.node)} to ${namedList(names, Infinity)}`, facts: { entities: names } };
+      const names = identitiesOf(c, source);
+      return { what: names.length === 0 ? `set no ${label} on ${it(c, record.participation.node)}` : `set the ${label} of ${it(c, record.participation.node)} to ${namedList(names, Infinity)}`, facts: { identities: names } };
     }
   }
   return { what: `cleared a participation on ${it(c)}` };
@@ -229,9 +229,9 @@ function participation(c: Context): Said {
 function roleFill(c: Context): Said {
   for (const record of c.records) {
     if ("role_fill" in record) {
-      const names = entitiesOf(c, record.role_fill.entities);
+      const names = identitiesOf(c, record.role_fill.identities);
       const role = c.words.role(record.role_fill.role);
-      return { what: names.length === 0 ? `cleared who fills ${role}` : `set who fills ${role} to ${namedList(names, Infinity)}`, facts: { entities: names } };
+      return { what: names.length === 0 ? `cleared who fills ${role}` : `set who fills ${role} to ${namedList(names, Infinity)}`, facts: { identities: names } };
     }
   }
   return { what: "cleared who fills a role" };
@@ -273,10 +273,10 @@ function journeyStatus(c: Context): Said {
   return { what: "changed the journey's status" };
 }
 
-function entityNamed(c: Context): string | undefined {
+function identityNamed(c: Context): string | undefined {
   for (const write of c.writes) {
-    if ("put" in write && "entity" in write.put) {
-      return write.put.entity.name;
+    if ("put" in write && "identity" in write.put) {
+      return write.put.identity.name;
     }
   }
   return undefined;
@@ -378,9 +378,9 @@ const SAY: Record<EventType, (c: Context) => Said> = {
     return { what: provenance === "local" ? `made ${it(c)} local to this journey` : provenance === "from_route" ? `returned ${it(c)} to the route's version` : `changed where ${it(c)} came from` };
   },
   local_edit_changed: (c) => ({ what: `changed what stays local on ${it(c)}` }),
-  entity_created: (c) => ({ what: entityNamed(c) === undefined ? "added an entity" : `added ${quoted(entityNamed(c) ?? "")} to the entities` }),
-  entity_edited: (c) => ({ what: entityNamed(c) === undefined ? "edited an entity" : `edited the entity ${quoted(entityNamed(c) ?? "")}` }),
-  entities_merged: (c) => ({ what: entityNamed(c) === undefined ? "merged two entities" : `merged entities into ${quoted(entityNamed(c) ?? "")}` }),
+  identity_created: (c) => ({ what: identityNamed(c) === undefined ? "added an identity" : `added ${quoted(identityNamed(c) ?? "")} to the identities` }),
+  identity_edited: (c) => ({ what: identityNamed(c) === undefined ? "edited an identity" : `edited the identity ${quoted(identityNamed(c) ?? "")}` }),
+  identities_merged: (c) => ({ what: identityNamed(c) === undefined ? "merged two identities" : `merged identities into ${quoted(identityNamed(c) ?? "")}` }),
   proposal_created: () => ({ what: "proposed a change" }),
   proposal_edited: () => ({ what: "edited a proposal" }),
   proposal_applied: (c) => {
@@ -436,7 +436,7 @@ export function wordsOf(view: Ready | undefined, viewed: string, person: (user: 
   return {
     viewed,
     node: (key) => (view === undefined ? NODE_GONE : titleOf(view, key)),
-    entity: (key) => (view === undefined ? ENTITY_GONE : entityName(view, key)),
+    identity: (key) => (view === undefined ? IDENTITY_GONE : identityName(view, key)),
     role: (key) => (view === undefined ? ROLE_GONE : roleTitle(view, key)),
     kind: (key) => (view === undefined ? KIND_GONE : kindTitle(view, key)),
     day: (date) => (view === undefined ? date : dateWords(date, view.derived.today)),

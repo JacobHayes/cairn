@@ -1,6 +1,6 @@
 // What the browser tests of the screens around a journey share (brief 5.5): starting a
 // journey from the form, the journey's status under its `⋯`, route detail's versions and actions,
-// a file exported from it as the browser saves it, and the entities screen's merge.
+// a file exported from it as the browser saves it, and the identities screen's merge.
 import { readFile } from "node:fs/promises";
 import { fileURLToPath } from "node:url";
 
@@ -102,29 +102,29 @@ export async function savedText(page: Page, click: () => Promise<void>): Promise
   return readFile(path, "utf8");
 }
 
-/** Merges `merged` into `survivor` on the entities screen and waits for the alias to show. */
-export async function mergeEntities(page: Page, survivor: string, merged: string): Promise<void> {
-  const form = page.getByTestId("merge-entities");
+/** Merges `merged` into `survivor` on the identities screen and waits for the alias to show. */
+export async function mergeIdentities(page: Page, survivor: string, merged: string): Promise<void> {
+  const form = page.getByTestId("merge-identities");
   if ((await form.count()) === 0) {
-    await page.getByRole("button", { name: "Merge entities" }).click();
+    await page.getByRole("button", { name: "Merge identities" }).click();
   }
   await form.getByLabel("Keep").selectOption(survivor);
-  await form.getByLabel("Merge this entity into it").selectOption(merged);
+  await form.getByLabel("Merge this identity into it").selectOption(merged);
   await form.getByRole("button", { name: "Merge", exact: true }).click();
-  await expect(page.locator(`[data-testid="entity"][data-entity="${survivor}"]`).getByTestId("aliases")).toBeVisible();
+  await expect(page.locator(`[data-testid="identity"][data-identity="${survivor}"]`).getByTestId("aliases")).toBeVisible();
 }
 
-/** Adds an entity on the entities screen; its key, once listed. */
-export async function addEntity(page: Page, name: string, emails: readonly string[] = []): Promise<string> {
-  const form = page.getByTestId("create-entity");
+/** Adds an identity on the identities screen; its key, once listed. */
+export async function addIdentity(page: Page, name: string, emails: readonly string[] = []): Promise<string> {
+  const form = page.getByTestId("create-identity");
   await form.getByLabel("Name").fill(name);
   const field = form.getByLabel("Emails");
   for (const email of emails) {
     await field.fill(email);
     await field.press("Enter");
   }
-  await form.getByRole("button", { name: "Add an entity" }).click();
-  const row = page.getByTestId("entity").filter({ has: page.getByTestId("entity-name").getByText(name, { exact: true }) });
+  await form.getByRole("button", { name: "Add an identity" }).click();
+  const row = page.getByTestId("identity").filter({ has: page.getByTestId("identity-name").getByText(name, { exact: true }) });
   await expect(row).toHaveCount(1);
-  return (await row.getAttribute("data-entity")) ?? "";
+  return (await row.getAttribute("data-identity")) ?? "";
 }

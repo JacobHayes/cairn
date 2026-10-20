@@ -1,7 +1,7 @@
 //! Journey state (PRD Invariants: journey; D1; E3; B6; B10): every node has a stored state its
 //! kind's machine has, answers match their decisions, direct role fills and pins never stand
 //! in for a filling or feeding decision, and every record of state hangs off something that
-//! exists. A route version or draft has no state at all. Entity references are checked with
+//! exists. A route version or draft has no state at all. Identity references are checked with
 //! the deployment by the apply pipeline. Each node, and the journey itself, holds at most its
 //! limits of notes and links. Cost at the limits: one pass over each state map, each entry
 //! one lookup by key.
@@ -154,8 +154,8 @@ pub(crate) fn answer_fits(spec: &AnswerSpec<KeyRefs>, answer: &AnswerValue) -> b
         AnswerSpec::Boolean
         | AnswerSpec::Text
         | AnswerSpec::Date { .. }
-        | AnswerSpec::Entity { .. }
-        | AnswerSpec::EntityList { .. } => spec.answer_type() == answer.answer_type(),
+        | AnswerSpec::Identity { .. }
+        | AnswerSpec::IdentityList { .. } => spec.answer_type() == answer.answer_type(),
     }
 }
 
@@ -166,16 +166,16 @@ pub(crate) fn filling_decisions(document: &cairn_schema::Graph) -> BTreeMap<&Rol
     for node in document.nodes.values() {
         if let Payload::Decision(decision) = &node.payload {
             match &decision.answer {
-                AnswerSpec::Entity {
+                AnswerSpec::Identity {
                     fills_role: Some(role),
                 }
-                | AnswerSpec::EntityList {
+                | AnswerSpec::IdentityList {
                     fills_role: Some(role),
                 } => {
                     fillers.insert(role, &node.key);
                 }
-                AnswerSpec::Entity { fills_role: None }
-                | AnswerSpec::EntityList { fills_role: None }
+                AnswerSpec::Identity { fills_role: None }
+                | AnswerSpec::IdentityList { fills_role: None }
                 | AnswerSpec::Boolean
                 | AnswerSpec::SingleChoice(_)
                 | AnswerSpec::MultiChoice(_)
@@ -204,11 +204,11 @@ pub(crate) fn feeding_decisions(document: &cairn_schema::Graph) -> BTreeMap<&Nod
 }
 
 /// E3: a role with a filling decision is filled only through it; A6: a single role holds one
-/// entity.
+/// identity.
 fn role_fills(check: &GraphCheck<'_>, out: &mut Vec<Violation>) {
     let document = check.document;
     let fillers = filling_decisions(document);
-    for (role, entities) in &document.state.role_fills {
+    for (role, identities) in &document.state.role_fills {
         let (code, message) = match document.roles.get(role) {
             None => (
                 missing_role_code(document, role),
@@ -218,9 +218,9 @@ fn role_fills(check: &GraphCheck<'_>, out: &mut Vec<Violation>) {
                 ViolationCode::FilledThroughDecision,
                 "the role has a filling decision and is filled only through it (E3)",
             ),
-            Some(found) if !found.multi && entities.len() > 1 => (
+            Some(found) if !found.multi && identities.len() > 1 => (
                 ViolationCode::FillsRoleCardinality,
-                "a single-valued role is filled by one entity (A6)",
+                "a single-valued role is filled by one identity (A6)",
             ),
             Some(_) => continue,
         };

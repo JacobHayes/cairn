@@ -33,14 +33,14 @@ mod cost {
 
     fn records(graph: Graph) -> Records {
         let mut records = Records::default();
-        // The entities the generated journey's fills and participations name.
-        for key in ["e_a", "e_b", "e_c"] {
-            let entity = cairn_schema::Entity {
+        // The identities the generated journey's fills and participations name.
+        for key in ["who_a", "who_b", "who_c"] {
+            let identity = cairn_schema::Identity {
                 key: parse(key),
                 name: parse(key),
                 emails: std::collections::BTreeSet::new(),
             };
-            records.deployment.entities.put(entity).unwrap();
+            records.deployment.identities.put(identity).unwrap();
         }
         let id = journey_id();
         records.journeys.insert(

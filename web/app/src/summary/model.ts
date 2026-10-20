@@ -52,7 +52,7 @@ export interface SummaryModel {
   stale: (Listed & { reasons: string[] })[];
   /** Milestones not yet reached with their effective dates (F1), earliest first. */
   upcoming: (Listed & { date: string; origin: DateOrigin; owners: string[] })[];
-  /** Open decisions with their owners (entity keys), in rank order; no owner is unassigned. */
+  /** Open decisions with their owners (identity keys), in rank order; no owner is unassigned. */
   openDecisions: (Listed & { owners: string[] })[];
 }
 

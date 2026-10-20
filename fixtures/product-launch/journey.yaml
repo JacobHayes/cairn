@@ -5,36 +5,27 @@ steps:
   today: "2026-09-01"
   at: "2026-09-01T09:00:00Z"
   actor:
-    user: u_launch_lead
+    user: u_ana
   patch:
     id: p_pl_01
     target:
       journey: j_launch
     base_revision: 0
+    deployment_revision: 1
     mutations:
     - op: create_journey
       name: Launch the reporting release
       from:
         route: product-launch
         version: 1
-    - op: create_entity
-      entity:
-        key: e_launch_lead
-        name: Launch Lead
-        emails:
-        - launch-lead@example.org
-    - op: create_entity
-      entity:
-        key: e_writer
-        name: Technical Writer
     - op: fill_role
       role: r_launch_lead
-      entities:
-      - e_launch_lead
+      identities:
+      - who_k3d7qm2xw5tn6pfa
     - op: fill_role
       role: r_writers
-      entities:
-      - e_writer
+      identities:
+      - who_h3w7bs5xkq2dfnr6
     - op: set_pin
       node: n_launch
       date: "2026-11-16"
@@ -42,7 +33,7 @@ steps:
   today: "2026-09-05"
   at: "2026-09-05T10:00:00Z"
   actor:
-    user: u_launch_lead
+    user: u_ana
   patch:
     id: p_pl_02
     target:
@@ -61,7 +52,7 @@ steps:
   today: "2026-10-01"
   at: "2026-10-01T16:00:00Z"
   actor:
-    user: u_launch_lead
+    user: u_ana
   patch:
     id: p_pl_03
     target:
@@ -77,7 +68,7 @@ steps:
   today: "2026-11-04"
   at: "2026-11-04T18:00:00Z"
   actor:
-    user: u_launch_lead
+    user: u_ana
   patch:
     id: p_pl_04
     target:

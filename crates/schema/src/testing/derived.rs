@@ -4,7 +4,7 @@ use proptest::prelude::*;
 
 use super::model::bounded_vec;
 use super::{
-    arb_date, arb_deployment, arb_domain, arb_entity_key, arb_guard_failure, arb_journey,
+    arb_date, arb_deployment, arb_domain, arb_guard_failure, arb_identity_key, arb_journey,
     arb_kind_key, arb_node_field, arb_node_key, arb_patch_id, arb_path, arb_proposal_id,
     arb_revision, arb_role_key, arb_snooze_target, arb_subject, arb_write,
 };
@@ -316,8 +316,11 @@ fn arb_participation() -> BoxedStrategy<EffectiveParticipation> {
         arb_node_key().prop_map(ParticipationOrigin::Ancestor),
         arb_role_key().prop_map(ParticipationOrigin::DefaultOwner),
     ];
-    (prop::collection::btree_set(arb_entity_key(), 0..3), origin)
-        .prop_map(|(entities, origin)| EffectiveParticipation { entities, origin })
+    (
+        prop::collection::btree_set(arb_identity_key(), 0..3),
+        origin,
+    )
+        .prop_map(|(identities, origin)| EffectiveParticipation { identities, origin })
         .boxed()
 }
 
@@ -572,7 +575,7 @@ pub fn arb_derive_inputs() -> BoxedStrategy<DeriveInputs> {
     (
         arb_date(),
         timezone,
-        prop::collection::btree_set(arb_entity_key(), 0..2),
+        prop::collection::btree_set(arb_identity_key(), 0..2),
         arb_deployment(),
     )
         .prop_map(|(today, timezone, viewer, deployment)| DeriveInputs {

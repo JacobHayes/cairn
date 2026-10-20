@@ -97,6 +97,6 @@ fn what_the_parser_rejects_the_schema_rejects() {
 
 #[test]
 fn a_kind_written_twice_is_rejected_not_overwritten() {
-    let node = r#"{"id":"a","kind":"action","title":"A","participations":{"owner":["e_one"],"owner":["e_two"]}}"#;
+    let node = r#"{"id":"a","kind":"action","title":"A","participations":{"owner":["who_one"],"owner":["who_two"]}}"#;
     assert!(cairn_schema::from_json::<cairn_schema::Node<cairn_schema::FileRefs>>(node).is_err());
 }

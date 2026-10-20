@@ -422,7 +422,7 @@ impl Client {
         Ok(report)
     }
 
-    /// What client `index` drafts at `sequence`: the first client merges an entity pair
+    /// What client `index` drafts at `sequence`: the first client merges an identity pair
     /// halfway through; otherwise a note or a rename of one of the few nodes.
     fn draft(&self, setup: &Setup, sequence: u32, actions: u32, random: &mut Random) -> Draft {
         if self.index == 0

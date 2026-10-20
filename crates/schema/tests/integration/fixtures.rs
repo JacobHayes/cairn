@@ -200,22 +200,22 @@ fn decision_mechanisms(route: &RouteFile) -> Mechanisms {
     };
     vec![
         (
-            "an entity decision filling a role",
+            "an identity decision filling a role",
             decision(&|answer| {
                 matches!(
                     answer,
-                    AnswerSpec::Entity {
+                    AnswerSpec::Identity {
                         fills_role: Some(_)
                     }
                 )
             }),
         ),
         (
-            "an entity-list decision filling a role",
+            "an identity-list decision filling a role",
             decision(&|answer| {
                 matches!(
                     answer,
-                    AnswerSpec::EntityList {
+                    AnswerSpec::IdentityList {
                         fills_role: Some(_)
                     }
                 )
@@ -292,19 +292,19 @@ fn structure_mechanisms(route: &RouteFile) -> Mechanisms {
     ]
 }
 
-/// Every entity key a value mentions (entity keys are the strings with the `e_` prefix).
-fn entity_keys(value: &serde_json::Value, found: &mut BTreeSet<String>) {
+/// Every identity key a value mentions (identity keys are the strings with the `who_` prefix).
+fn identity_keys(value: &serde_json::Value, found: &mut BTreeSet<String>) {
     match value {
-        serde_json::Value::String(text) if text.starts_with("e_") => {
+        serde_json::Value::String(text) if text.starts_with("who_") => {
             found.insert(text.clone());
         }
-        serde_json::Value::Array(items) => items.iter().for_each(|item| entity_keys(item, found)),
+        serde_json::Value::Array(items) => items.iter().for_each(|item| identity_keys(item, found)),
         serde_json::Value::Object(map) => {
             map.iter().for_each(|(key, item)| {
-                if key.starts_with("e_") {
+                if key.starts_with("who_") {
                     found.insert(key.clone());
                 }
-                entity_keys(item, found);
+                identity_keys(item, found);
             });
         }
         _ => {}
@@ -312,31 +312,34 @@ fn entity_keys(value: &serde_json::Value, found: &mut BTreeSet<String>) {
 }
 
 #[test]
-fn patches_referring_to_existing_entities_name_the_deployment_revision() {
-    // E6, H5: a journey patch that writes a reference to an entity it did not create names
-    // the deployment revision it was validated against. Each scenario starts a fresh
-    // deployment; a patch creating entities advances its revision by one.
+fn patches_referring_to_existing_identities_name_the_deployment_revision() {
+    // E6, H5: a journey patch that writes a reference to an identity it did not create names
+    // the deployment revision it was validated against. Each scenario starts in the deployment
+    // `people.yaml` leaves, at revision 1; a patch creating identities advances it by one.
+    let people = read_canonical::<cairn_schema::ScenarioStep>(&fixtures_root().join("people.yaml"));
+    assert_eq!(people.patch.target, PatchTarget::Deployment);
+    assert_eq!(people.patch.base_revision, Revision::NONE);
     for (name, _, scenario) in fixtures() {
-        let mut deployment = Revision::NONE;
-        // Entities a proposal creates are created when it is applied.
+        let mut deployment = Revision::NONE.next();
+        // Identities a proposal creates are created when it is applied.
         let mut proposed: BTreeSet<String> = BTreeSet::new();
         for (index, step) in scenario.steps.as_slice().iter().enumerate() {
             let mut created = BTreeSet::new();
             let mut referenced = BTreeSet::new();
             for mutation in step.patch.mutations.as_slice() {
                 match mutation {
-                    Mutation::CreateEntity { entity } => {
-                        created.insert(entity.key.as_str().to_owned());
+                    Mutation::CreateIdentity { identity } => {
+                        created.insert(identity.key.as_str().to_owned());
                     }
                     Mutation::CreateProposal { proposal } | Mutation::EditProposal { proposal } => {
                         for inner in proposal.mutations.as_slice() {
-                            if let Mutation::CreateEntity { entity } = inner {
-                                proposed.insert(entity.key.as_str().to_owned());
+                            if let Mutation::CreateIdentity { identity } = inner {
+                                proposed.insert(identity.key.as_str().to_owned());
                             }
                         }
                     }
                     Mutation::ApplyProposal { .. } => created.append(&mut proposed),
-                    other => entity_keys(&serde_json::to_value(other).unwrap(), &mut referenced),
+                    other => identity_keys(&serde_json::to_value(other).unwrap(), &mut referenced),
                 }
             }
             let existing: Vec<&String> = referenced.difference(&created).collect();

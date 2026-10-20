@@ -41,14 +41,14 @@ nodes:
   kind: decision
   title: Evaluation owner
   prompt: Who owns the evaluation?
-  answer_type: entity
+  answer_type: identity
   fills_role: eval_owner
 - key: n_who_informed
   id: who-informed
   kind: decision
   title: Stakeholders
   prompt: Who should be kept informed?
-  answer_type: entity_list
+  answer_type: identity_list
   fills_role: stakeholders
 - key: n_meeting_date
   id: meeting-date
@@ -185,7 +185,7 @@ nodes:
   kind: decision
   title: Findings reviewer
   prompt: Who reviews the findings?
-  answer_type: entity
+  answer_type: identity
   fills_role: findings_reviewer
   requires:
   - reporting/findings

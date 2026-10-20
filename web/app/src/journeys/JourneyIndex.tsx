@@ -60,7 +60,7 @@ export function JourneyIndex() {
   const navigate = useNavigate();
   const filters = filtersFrom(new URLSearchParams(search));
   const { viewer, failed } = useViewer();
-  const query = queryOf(filters, viewer?.entities ?? []);
+  const query = queryOf(filters, viewer?.identities ?? []);
   const waiting = filters.mine && viewer === undefined && failed === undefined;
   const { view, refresh } = useLive(indexKey(waiting ? undefined : query), journeyIndex(waiting ? undefined : query));
   const routes = useLive("routes", routeIndex).view;

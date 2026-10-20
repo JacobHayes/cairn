@@ -53,7 +53,7 @@ nodes:
   kind: decision
   title: Lead
   prompt: Who leads the work?
-  answer_type: entity
+  answer_type: identity
   fills_role: lead
 - id: target-date
   kind: decision
@@ -87,7 +87,7 @@ nodes:
     offset: 5
   participations:
     informed:
-    - e_observer
+    - who_observer
     owner: lead
     reviewer: []
   resources:

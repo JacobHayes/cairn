@@ -145,10 +145,10 @@ mod tailscale {
             Arc::new(TailscaleProvider::new(config(mode), tailnet()).unwrap());
         let router = app(&world.auth(tailnet(), vec![provider]));
         let ann = whoami(&router, get_from(ANN_PEER)).await.unwrap();
-        let identities = world.store.identities_of(&ann.user).await.unwrap();
-        assert_eq!(identities[0].subject.as_str(), "ann@example.org");
+        let logins = world.store.logins_of(&ann.user).await.unwrap();
+        assert_eq!(logins[0].subject.as_str(), "ann@example.org");
         let email = "ann@example.org".parse().unwrap();
-        assert!(identities[0].verified_emails.contains(&email));
+        assert!(logins[0].verified_emails.contains(&email));
         assert_eq!(
             whoami(&router, get_from(TAGGED_PEER)).await,
             Err(StatusCode::UNAUTHORIZED)
@@ -288,8 +288,8 @@ mod tailscale {
             let outcome = answered.as_ref().map(|_| ()).map_err(|status| *status);
             assert_eq!(outcome, expected, "{peer} {headers:?}");
             if let Ok(actor) = answered {
-                let identities = world.store.identities_of(&actor.user).await.unwrap();
-                assert_eq!(identities[0].subject.as_str(), "ann@example.org");
+                let logins = world.store.logins_of(&actor.user).await.unwrap();
+                assert_eq!(logins[0].subject.as_str(), "ann@example.org");
                 let user = world.store.user(&actor.user).await.unwrap().unwrap();
                 assert_eq!(user.name.as_str(), "Ann");
             }

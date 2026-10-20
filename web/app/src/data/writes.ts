@@ -19,7 +19,7 @@ export interface WriteIntent {
   target: Patch["target"];
   /** The target's revision the author saw when they started this edit. */
   baseRevision: number;
-  /** The deployment revision it was validated against, for a patch writing an entity reference (E6). */
+  /** The deployment revision it was validated against, for a patch writing an identity reference (E6). */
   deploymentRevision?: number;
   mutations: Mutation[];
   note?: Markdown;
@@ -98,7 +98,7 @@ export function subjectOf(mutation: Mutation): string | undefined {
 
 /**
  * D7: the node a landed write acted on (the first mutation about one: an evidence annotation or
- * a new entity may come before the action) and what it unlocked, for a pass over the acting
+ * a new identity may come before the action) and what it unlocked, for a pass over the acting
  * frontier; undefined when the write is about no node.
  */
 export function unlockedOf(intent: Pick<WriteIntent, "target" | "mutations">, answer: Schema<"PatchAnswer">, began: number): Unlocked | undefined {

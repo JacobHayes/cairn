@@ -1,4 +1,4 @@
-// A10, Identity and references: a message draft's placeholders. An author writes and reads
+// A10, Keys and references: a message draft's placeholders. An author writes and reads
 // them as a route file does (`{{roles.eval_owner.name}}`, `{{answers.testing/scope}}`, roles
 // by id and decisions by path) and picks them from what the graph holds; the draft is stored
 // with keys (`{{roles.r_eval_owner.name}}`, `{{answers.n_scope}}`), so renaming or moving a

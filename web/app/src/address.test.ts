@@ -25,8 +25,8 @@ describe("the address table", () => {
   it("puts a proposal under its destination, in that destination's section of the rail", () => {
     expect(proposalAddress({ journey: "j_a" }, "pr_a")).toBe("/journeys/j_a/proposals/pr_a");
     expect(proposalAddress({ route: "r_a" }, "pr_a", "n_x")).toBe("/routes/r_a/proposals/pr_a/nodes/n_x");
-    expect(proposalAddress("deployment", "pr_a")).toBe("/entities/proposals/pr_a");
+    expect(proposalAddress("deployment", "pr_a")).toBe("/identities/proposals/pr_a");
     expect(sectionOf("/routes/r_a/proposals/pr_a")).toBe("routes");
-    expect(sectionOf("/entities/proposals/pr_a")).toBe("entities");
+    expect(sectionOf("/identities/proposals/pr_a")).toBe("identities");
   });
 });

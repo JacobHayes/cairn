@@ -3,7 +3,7 @@
 //! service stores the draft as an ordinary proposal, reviewed and applied like any other
 //! (C14, I6, I7). A proposal whose destination moved is refreshed (I6): an upgrade, save, or
 //! re-link is drafted again on the new base with the reviewer's choices carried over by what
-//! they are about (node and field, edge, entity, role, kind), anything else is re-based as it
+//! they are about (node and field, edge, identity, role, kind), anything else is re-based as it
 //! stands, and the edit gives it a new revision, so it must be reviewed again before it can be
 //! applied. A write resubmitted under its patch id is answered from its receipt before
 //! anything is drafted, since the destination may have moved since (H5), and a proposal
@@ -118,7 +118,7 @@ impl Service {
 
     /// B8: proposes saving `journey`'s structure as a draft of `route` (created with `name`
     /// when it does not exist), as proposal `id`, with a participation item per explicit
-    /// entity and an exclusion item per node for the reviewer.
+    /// identity and an exclusion item per node for the reviewer.
     ///
     /// # Errors
     ///
@@ -192,7 +192,7 @@ impl Service {
     /// re-link is drafted again on the new base, carrying each choice the reviewer made to the
     /// item about the same thing (a conflict by node and field, edge, participation, resource,
     /// role, kind, or default owner, when the new item still offers it; an orphan's keep, an
-    /// entity's mapping, a node's exclusion); any other proposal keeps its mutations and items
+    /// identity's mapping, a node's exclusion); any other proposal keeps its mutations and items
     /// and names the current revision. Its title and description stay as edited. The edit
     /// moves the proposal's revision, so it must be reviewed again before it applies.
     ///
@@ -395,7 +395,7 @@ enum About {
     Kind(KindKey),
     DefaultOwner,
     Orphan(NodeKey),
-    Entity(cairn_schema::EntityKey),
+    Identity(cairn_schema::IdentityKey),
     Exclusion(NodeKey),
 }
 
@@ -418,7 +418,7 @@ fn about(item: &ReviewItem) -> Option<About> {
             Conflict::DefaultOwner { .. } => About::DefaultOwner,
         },
         ReviewItem::Orphan { node, .. } => About::Orphan(node.clone()),
-        ReviewItem::Participation { entity, .. } => About::Entity(entity.clone()),
+        ReviewItem::Participation { identity, .. } => About::Identity(identity.clone()),
         ReviewItem::Exclusion { node, .. } => About::Exclusion(node.clone()),
         ReviewItem::KeptLocalEdit { .. }
         | ReviewItem::Cascade { .. }
@@ -429,7 +429,7 @@ fn about(item: &ReviewItem) -> Option<About> {
 }
 
 /// I6: carries each choice in `old` to the item in `new` about the same thing: a conflict's
-/// resolution when the new conflict offers it, an orphan's keep, an entity's mapping, and a
+/// resolution when the new conflict offers it, an orphan's keep, an identity's mapping, and a
 /// node's exclusion. An item with no counterpart keeps the draft's default.
 fn carry(old: &[ReviewItem], new: &mut [ReviewItem]) {
     let chosen: BTreeMap<About, &ReviewItem> = old

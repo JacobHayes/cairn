@@ -42,11 +42,11 @@ function openFresh(mutations: Mutation[] = []): DerivedJourney {
   return derived;
 }
 
-/** `journey` derived again with `viewer` as the caller's entities, and `aliases` (old key to survivor) merged in the deployment. */
+/** `journey` derived again with `viewer` as the caller's identities, and `aliases` (old key to survivor) merged in the deployment. */
 function asViewer(journey: DerivedJourney, viewer: readonly string[], aliases?: Record<string, string>): DerivedJourney {
   const { inputs } = journey.ready;
-  // A merged entity's key no longer names an entity: it resolves through the alias.
-  const deployment = aliases === undefined ? inputs.deployment : { ...inputs.deployment, aliases, entities: (inputs.deployment.entities ?? []).filter((entity) => !(entity.key in aliases)) };
+  // A merged identity's key no longer names an identity: it resolves through the alias.
+  const deployment = aliases === undefined ? inputs.deployment : { ...inputs.deployment, aliases, identities: (inputs.deployment.identities ?? []).filter((identity) => !(identity.key in aliases)) };
   const derived = derivedJourney(host, JSON.stringify({ journey: journey.ready.journey, inputs: { ...inputs, deployment, viewer: [...viewer] } }));
   held.push(derived);
   return derived;
@@ -54,7 +54,7 @@ function asViewer(journey: DerivedJourney, viewer: readonly string[], aliases?: 
 
 /**
  * The front page's values for `journey`: the viewer's owned nodes are the engine's "mine" (the
- * journey re-derived with `viewer` as the caller's entities, when one is given).
+ * journey re-derived with `viewer` as the caller's identities, when one is given).
  */
 function pageOf(journey: DerivedJourney, viewer?: readonly string[], aliases?: Record<string, string>) {
   const seen = viewer === undefined && aliases === undefined ? journey : asViewer(journey, viewer ?? journey.ready.inputs.viewer ?? [], aliases);
@@ -65,7 +65,7 @@ function pageOf(journey: DerivedJourney, viewer?: readonly string[], aliases?: R
 }
 
 const keys = (rows: { key: string }[]) => rows.map((row) => row.key);
-const owner = (node: string, entity: string): Mutation => ({ op: "set_participation", node, kind: "k_owner", source: [entity] });
+const owner = (node: string, identity: string): Mutation => ({ op: "set_participation", node, kind: "k_owner", source: [identity] });
 
 describe("C13, F1, F6: the lead's milestone line", () => {
   it("names the final milestone with its pin", () => {
@@ -162,23 +162,23 @@ describe("C18, D3, D4, F6: what needs attention", () => {
 
 describe("C10, C11, E1, E4: one action row per node", () => {
   it("claims the viewer's owned frontier items first, whatever their kind, and the rest by kind", () => {
-    const journey = open("j_bakeoff", [owner("n_trial_a", "e_owner")]);
+    const journey = open("j_bakeoff", [owner("n_trial_a", "who_k3d7qm2xw5tn6pfa")]);
     const { frontier, actions } = pageOf(journey);
     expect(keys(actions.yours)).toEqual(["n_trial_a"]);
     expect(keys(actions.nextUp)).toEqual(keys(frontier).filter((key) => key !== "n_trial_a"));
   });
 
   it("does not claim another person's or an informed participant's item", () => {
-    const informed = (node: string): Mutation => ({ op: "set_participation", node, kind: "k_informed", source: ["e_lead"] });
-    const journey = open("j_vendor_eval", [owner("n_review_opens", "e_reviewer"), owner("n_decision_meeting", "e_stakeholder_a"), informed("n_review_opens"), informed("n_decision_meeting")]);
-    const { actions } = pageOf(journey, ["e_lead"]);
+    const informed = (node: string): Mutation => ({ op: "set_participation", node, kind: "k_informed", source: ["who_k3d7qm2xw5tn6pfa"] });
+    const journey = open("j_vendor_eval", [owner("n_review_opens", "who_j5v2nx6cwr4tdkq7"), owner("n_decision_meeting", "who_d4m6uk2eqf5rbhzs"), informed("n_review_opens"), informed("n_decision_meeting")]);
+    const { actions } = pageOf(journey, ["who_k3d7qm2xw5tn6pfa"]);
     expect(keys(actions.yours)).toEqual([]);
     expect(keys(actions.nextUp)).toEqual(["n_review_opens", "n_decision_meeting"]);
   });
 
-  it("claims an item owned through a merged entity", () => {
-    const journey = open("j_bakeoff", [owner("n_trial_a", "e_writer")]);
-    const { actions } = pageOf(journey, ["e_owner"], { e_writer: "e_owner" });
+  it("claims an item owned through a merged identity", () => {
+    const journey = open("j_bakeoff", [owner("n_trial_a", "who_h3w7bs5xkq2dfnr6")]);
+    const { actions } = pageOf(journey, ["who_g6t4ycm2pe7vsjan"], { who_h3w7bs5xkq2dfnr6: "who_g6t4ycm2pe7vsjan" });
     expect(keys(actions.yours)).toEqual(["n_trial_a"]);
   });
 
@@ -186,7 +186,7 @@ describe("C10, C11, E1, E4: one action row per node", () => {
     const decisions = ["d1", "d2", "d3", "d4", "d5", "d6"];
     const journey = open("j_bakeoff", [
       ...decisions.map((id): Mutation => ({ op: "add_node", node: { key: `n_${id}`, id, kind: "decision", title: `Choose ${id}`, prompt: "Which?", answer_type: "text" } })),
-      ...decisions.map((id) => owner(`n_${id}`, "e_owner")),
+      ...decisions.map((id) => owner(`n_${id}`, "who_k3d7qm2xw5tn6pfa")),
     ]);
     const { actions } = pageOf(journey);
     expect(keys(actions.yours).filter((key) => key.startsWith("n_d"))).toHaveLength(6);
@@ -196,7 +196,7 @@ describe("C10, C11, E1, E4: one action row per node", () => {
   it("puts each node in one set, whatever the viewer", () => {
     for (const id of ["j_vendor_eval", "j_launch", "j_bakeoff", "j_hiring"]) {
       const journey = open(id);
-      for (const viewer of [[], ["e_owner"], ["e_lead", "e_manager"]]) {
+      for (const viewer of [[], ["who_g6t4ycm2pe7vsjan"], ["who_k3d7qm2xw5tn6pfa", "who_b6r2vz4jhs7cnqe3"]]) {
         const { actions, frontier } = pageOf(journey, viewer);
         const all = [...keys(actions.yours), ...keys(actions.decide), ...keys(actions.nextUp), ...keys(actions.waiting)];
         expect(new Set(all).size).toBe(all.length);
@@ -210,7 +210,7 @@ describe("C10, C11, E1, E4: one action row per node", () => {
     const decisions = Array.from({ length: 900 }, (_, at): Mutation => ({ op: "add_node", node: { key: `n_x${String(at)}`, id: `x${String(at)}`, kind: "decision", title: `Open ${String(at)}`, prompt: "Which?", answer_type: "text" } }));
     const waits = Array.from({ length: 80 }, (_, at): Mutation => ({ op: "add_edge", edge: { node: `n_x${String(at)}`, requires: `n_w${String(at)}` } }));
     const journey = open("j_bakeoff", [...work, ...decisions, ...waits]);
-    const { frontier, actions, model } = pageOf(journey, ["e_owner"]);
+    const { frontier, actions, model } = pageOf(journey, ["who_g6t4ycm2pe7vsjan"]);
     const all = [...actions.yours, ...actions.decide, ...actions.nextUp];
     expect(all.length).toBe(frontier.length);
     expect(new Set(keys(all)).size).toBe(frontier.length);

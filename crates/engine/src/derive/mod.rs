@@ -46,8 +46,8 @@ pub(crate) mod stale;
 use std::collections::BTreeSet;
 
 use cairn_schema::{
-    Blocker, Date, DependencyVia, Deployment, DeriveInputs, EntityKey, GuardFailure, KeyRefs, Node,
-    NodeKey, RankConstants, Relevance, State,
+    Blocker, Date, DependencyVia, Deployment, DeriveInputs, GuardFailure, IdentityKey, KeyRefs,
+    Node, NodeKey, RankConstants, Relevance, State,
 };
 
 use crate::graph::{Document, Graph};
@@ -129,9 +129,9 @@ impl Derived {
     }
 
     /// Priority, "prioritize for me": the ranking with the owner factor of unlocks relative to the
-    /// viewer's entities (H3) instead of each node's owner. The global ranking is unchanged.
+    /// viewer's identities (H3) instead of each node's owner. The global ranking is unchanged.
     #[must_use]
-    pub fn rank_for(&self, viewer: &BTreeSet<EntityKey>) -> Ranking {
+    pub fn rank_for(&self, viewer: &BTreeSet<IdentityKey>) -> Ranking {
         Ranking::pass(
             &self.priority,
             &self.dates,

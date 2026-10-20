@@ -5,8 +5,8 @@
 //! the same rows therefore waits for it and then sees what it did: a resubmission meets its
 //! original's receipt, and a stale commit is answered with what really intervened, never
 //! with a revision still in flight (H5). Commits to different domains wait on each other
-//! only at a row both write: every commit that writes an entity reference or creates an
-//! entity claims the deployment's revision row, so those queue across journeys and routes.
+//! only at a row both write: every commit that writes an identity reference or creates an
+//! identity claims the deployment's revision row, so those queue across journeys and routes.
 //! Turns are taken in one order (the claims' order), so no commit waits on one that waits
 //! on it.
 

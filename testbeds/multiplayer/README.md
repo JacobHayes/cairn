@@ -15,13 +15,13 @@ axum on `127.0.0.1:7878`. Everything runs as tasks on a multi-thread tokio runti
 run on several threads and PCT reorders them
 (`decisions/2026-10-18-the-multiplayer-testbed-runs-a-multi-thread-runtime.md`).
 
-Setup creates journey `j_shared` with three nodes and one pair of entities. Then:
+Setup creates journey `j_shared` with three nodes and one pair of identities. Then:
 
 - **Clients** (`--clients`, default 4; `src/client.rs`): each drafts `--actions` patches
   (default 8), a seeded pause apart, against the journey or deployment as it last fetched
   it: a note (touches only its own annotation, so a stale one is always safe to resubmit), a
   rename of one of the three nodes (two renames of one node overlap, so some conflicts are
-  surfaced), and, for client 0 halfway through, an entity merge (moves the deployment). Each
+  surfaced), and, for client 0 halfway through, an identity merge (moves the deployment). Each
   patch goes through 4.2's `client::retry::submit` (H5: a stale patch is rebased and
   resubmitted when what intervened cannot overlap it, surfaced otherwise) over a transport
   retry that resends a request whose answer did not arrive within 200 ms, unchanged, so a
@@ -67,7 +67,7 @@ own and landed, an overlapping conflict surfaced, a resubmission answered from i
 completed with what intervened, a patch that lost at commit, and a resubmission that raced its
 original to commit. Some of `cairn_service`'s sites are out of this testbed's reach and
 listed in `sim.sh` (`out_of_reach`): the announce fallback when the deployment's revision
-cannot be read back after an entity create riding in a journey patch (the testbed rides none
+cannot be read back after an identity create riding in a journey patch (the testbed rides none
 and fails no read); the receipt recheck after the engine answers stale (it needs the original
 to commit between a resubmission's receipt lookup and its load, and no site delays a load);
 the derived-read memo (the views refetch the journey document, never a derived read); the

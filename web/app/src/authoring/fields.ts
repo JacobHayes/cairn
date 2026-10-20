@@ -1,7 +1,7 @@
 // A1a: the fields each kind has, and a node form's draft of them. A kind's form offers exactly
 // its fields: the shared ones on every kind, then the kind's own (an estimate on work, a
 // stage's bounds on a group, a decision's prompt and answer), and on a decision the ones its
-// answer type allows (choices on a choice, `fills_role` on an entity or entity list,
+// answer type allows (choices on a choice, `fills_role` on an identity or identity list,
 // `feeds_milestone` on a date). A saved draft is the one-field mutations of what changed;
 // an answer-type change replaces the node whole, the only way the engine takes one (B7:
 // a shape change).
@@ -35,8 +35,8 @@ function answerFields(answer: AnswerType): FormField[] {
     case "single_choice":
     case "multi_choice":
       return ["choices"];
-    case "entity":
-    case "entity_list":
+    case "identity":
+    case "identity_list":
       return ["fills_role"];
     case "date":
       return ["feeds_milestone"];
