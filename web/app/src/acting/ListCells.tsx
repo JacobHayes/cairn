@@ -11,10 +11,9 @@ import { screenSwitched, useNodeAddresses } from "../journeys/address.ts";
 import { useJourneyTarget } from "../journeys/useJourneyTarget.ts";
 import { entityName } from "../detail/sections.tsx";
 import { rollups } from "../plan/tree.ts";
-import { snoozeWords } from "../canvas/words.ts";
+import { snoozeWords } from "../status/snooze.ts";
 import { statusTone, statusWord } from "../status/words.ts";
-import { dateWords } from "../timeline/model.ts";
-import { daysWords, dueWords } from "../status/when.ts";
+import { dateInk, dateWords, daysWords, dueWords, inkClass } from "../status/when.ts";
 import { Badge } from "../ui/kit.tsx";
 import { TreeFold, TreeGuides } from "../ui/Tree.tsx";
 import type { ListSettings } from "./address.ts";
@@ -70,7 +69,7 @@ function Progress({ view, line }: { view: Ready; line: Line }) {
   return (
     <span className="muted small" data-testid="progress">
       {roll.done} of {roll.total} done
-      {attention === undefined ? null : <span className={roll.overdue > 0 ? "list-late" : ""}> · {attention}</span>}
+      {attention === undefined ? null : <span className={roll.overdue > 0 ? "flag-bad" : ""}> · {attention}</span>}
     </span>
   );
 }
@@ -166,7 +165,7 @@ export function Cell({ column, line, context }: { column: Column; line: Line; co
     case "owner":
       return (row.owners ?? []).length > 0 ? (row.owners ?? []).map((key) => entityName(view, key)).join(", ") : row.unassigned === true ? <span className="list-unassigned">Unassigned</span> : null;
     case "due":
-      return row.due == null || !open ? null : <span className={row.overdue === true ? "list-late" : ""} data-testid="list-due">{dueWords(row.due, today, node.kind === "decision")}</span>;
+      return row.due == null || !open ? null : <span className={inkClass(dateInk(row.due, today))} data-testid="list-due">{dueWords(row.due, today, node.kind === "decision")}</span>;
     case "rank": {
       const place = context.ranks.get(line.key);
       return place === undefined ? null : `#${String(place)}`;

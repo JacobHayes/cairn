@@ -27,7 +27,7 @@ import { stepsFor } from "../canvas/ladder.ts";
 import { graphViewFrom } from "../canvas/settings.ts";
 import type { Route } from "../data/host.ts";
 import { valueOf } from "../data/keyed-read.ts";
-import { useDeployment, useKeyedRead, useSession } from "../data/react.ts";
+import { useDeployment, useKeyedRead, useSession, useToday } from "../data/react.ts";
 import { useNodeAddresses, type Screen } from "../journeys/address.ts";
 import { ROUTE_OFFERS, useViewState, ViewStateContext, viewStateFrom } from "../journeys/view.ts";
 import { DestinationProposals } from "../proposals/DestinationProposals.tsx";
@@ -341,7 +341,8 @@ function Loaded({ shown, selected, write, imports, result, setResult }: { shown:
 /** The draft as the authoring surfaces edit it; none for a version. */
 function useAuthored(shown: Shown): Authored | undefined {
   const deployment = useDeployment();
-  return useMemo(() => (shown.of !== "draft" || deployment === undefined ? undefined : routeAuthored(shown.route, deployment, new Date().toISOString().slice(0, 10))), [shown, deployment]);
+  const today = useToday();
+  return useMemo(() => (shown.of !== "draft" || deployment === undefined ? undefined : routeAuthored(shown.route, deployment, today)), [shown, deployment, today]);
 }
 
 /** A route's page, and its open proposals in the inspector's Proposals tab (C14). */

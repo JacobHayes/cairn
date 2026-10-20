@@ -79,6 +79,11 @@ export function useUserWords(): (user: string) => string {
   return (user) => (user === viewer?.user ? "you" : name(user));
 }
 
+/** Today's date (YYYY-MM-DD) for a screen with no journey in hand, from the session's clock (`Session.today`). */
+export function useToday(): string {
+  return useSession().today();
+}
+
 /** The deployment context (E6), once fetched. */
 export function useDeployment(): Deployment | undefined {
   return useSelector(useSession().deployment, (snapshot) => heldValue<Deployment>(snapshot));

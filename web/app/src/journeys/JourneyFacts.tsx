@@ -4,7 +4,6 @@
 import { useState } from "react";
 import { Link } from "react-router";
 
-import type { ListFlag } from "../acting/address.ts";
 import { valueOf } from "../data/keyed-read.ts";
 import { useLive } from "../data/react.ts";
 import { indexKey, journeyIndex, routeIndex } from "../data/reads.ts";
@@ -13,27 +12,18 @@ import { JourneyFlow } from "../proposals/Entries.tsx";
 import { Badge } from "../ui/kit.tsx";
 import { routePath } from "../routes/address.ts";
 import type { SummaryModel } from "../summary/model.ts";
-import { dateWords } from "../timeline/model.ts";
+import { dateWords } from "../status/when.ts";
+import { TROUBLES } from "../status/words.ts";
 import { upgradeWords } from "./figures-model.ts";
 import { listPath } from "./view.ts";
 
-const nodes = (count: number) => `${String(count)} ${count === 1 ? "node" : "nodes"}`;
-
-/** What a flag is called in a sentence (`words`, on the journey card), how the Summary says it of `count` nodes, and its ink there (D3, D4, F6). */
-const FLAGS: { flag: ListFlag; words: string; sentence: (count: number) => string; tone: "bad" | "warn"; count: (model: SummaryModel) => number }[] = [
-  { flag: "overdue", words: "overdue", sentence: (count) => `${nodes(count)} overdue`, tone: "bad", count: (model) => model.overdue.length },
-  { flag: "shortfall", words: "short of days", sentence: (count) => `${nodes(count)} without the days they need`, tone: "bad", count: (model) => model.shortfalls.length },
-  { flag: "stale", words: "stale", sentence: (count) => `${nodes(count)} stale`, tone: "warn", count: (model) => model.stale.length },
-];
-
 /**
  * What needs a look, as one short sentence of links into the plan list: only what is not zero.
- * `toned` (the Summary's) says overdue and short in error ink and stale in warning ink, always
- * with the words.
+ * Overdue and short are said in error ink and stale in warning ink, always with the words.
  */
-export function Flags({ ready, model, toned = false }: { ready: Ready; model: SummaryModel; toned?: boolean }) {
+export function Flags({ ready, model }: { ready: Ready; model: SummaryModel }) {
   const journey = ready.journey.header.id;
-  const flags = FLAGS.map((each) => ({ ...each, count: each.count(model) })).filter((each) => each.count > 0);
+  const flags = TROUBLES.map((each) => ({ ...each, count: each.count(model) })).filter((each) => each.count > 0);
   if (flags.length === 0) {
     return null;
   }
@@ -44,10 +34,10 @@ export function Flags({ ready, model, toned = false }: { ready: Ready; model: Su
           {at === 0 ? "" : ", "}
           <Link
             to={listPath(journey, { flags: [each.flag] })}
-            className={toned ? `flag-${each.tone}` : undefined}
+            className={`flag-${each.tone}`}
             data-testid={`card-flag-${each.flag}`}
           >
-            {toned ? each.sentence(each.count) : `${String(each.count)} ${each.words}`}
+            {each.words(each.count)}
           </Link>
         </span>
       ))}

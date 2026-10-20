@@ -13,11 +13,11 @@ import type { RouteSchedule, ScheduleEntry } from "@cairn/wasm";
 
 import { childrenOf, nodesByPath, titleIn, type Tree } from "../authoring/graph.ts";
 import { nodeOf, recordOf, type GraphNode, type NodeKind, type Ready } from "../detail/model.ts";
-import { snoozeWords } from "../canvas/words.ts";
+import { snoozeWords } from "../status/snooze.ts";
 import { ancestorsOf, planOrder, rollups, treeOf } from "../plan/tree.ts";
-import { daysWords, dueWords, daysUntil } from "../status/when.ts";
-import type { DisplayState } from "../status/words.ts";
-import { dateWords, dayOf, dayWords, type DateOrigin, type Timeline, type TimelineEntry } from "./model.ts";
+import { dateWords, daysUntil, daysWords, dueWords, originWord } from "../status/when.ts";
+import { upperFirst, type DisplayState } from "../status/words.ts";
+import { dayOf, dayWords, type DateOrigin, type Timeline, type TimelineEntry } from "./model.ts";
 import { NODE_GONE } from "../ui/gone.ts";
 
 /** How a row is drawn. */
@@ -122,7 +122,7 @@ function wordsOf(view: Ready, node: GraphNode, own: Own | undefined, progress: C
   const finished = recordOf(view, node).finished_on ?? undefined;
   switch (own.shape) {
     case "milestone":
-      return late > 0 ? `${daysWords(late)} late` : own.origin === "actual" ? `Reached ${dateWords(own.to, today)}` : own.origin === "pin" ? `Pinned ${dateWords(own.to, today)}` : `Estimated ${dateWords(own.to, today)}`;
+      return late > 0 ? `${daysWords(late)} late` : own.origin === "actual" ? `Reached ${dateWords(own.to, today)}` : `${upperFirst(originWord(own.origin ?? "due"))} ${dateWords(own.to, today)}`;
     case "decision":
       return finished !== undefined && own.entry === undefined ? `Decided ${dateWords(finished, today)}` : dueWords(own.to, today, true);
     default:

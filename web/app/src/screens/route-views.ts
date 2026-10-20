@@ -6,20 +6,15 @@ import type { RouteSchedule } from "@cairn/wasm";
 
 import { useLevelBy, type LevelRead } from "../canvas/hooks.ts";
 import { type ReadView } from "../data/keyed-read.ts";
-import { useDeployment, useKeyedRead, useSession } from "../data/react.ts";
+import { useDeployment, useKeyedRead, useSession, useToday } from "../data/react.ts";
 import type { LevelRequest } from "../journeys/requests.ts";
 import { nodesOf, ROUTE_LEVEL, ROUTE_SCHEDULE, routeLevelKey, routeScheduleKey, type Shown } from "./route-reads.ts";
-
-/** Today's date, the day a route's level is derived on. */
-export function today(): string {
-  return new Date().toISOString().slice(0, 10);
-}
 
 /** The level of `shown` that `request` asks for, with `selected` always drawn (C7), and the keys it draws. */
 export function useRouteLevel(shown: Shown, request: LevelRequest | undefined, selected?: string): LevelRead {
   const { deriver } = useSession();
   const deployment = useDeployment();
-  const day = today();
+  const day = useToday();
   return useLevelBy((asked) => useKeyedRead(ROUTE_LEVEL, routeLevelKey(deriver, shown, asked, deployment, day)).view, nodesOf(shown), request, selected);
 }
 

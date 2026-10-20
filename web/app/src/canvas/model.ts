@@ -26,9 +26,6 @@ export const KINDS: NodeKind[] = ["group", "decision", "deliverable", "action", 
 /** C5: how many of the acting frontier's top-ranked items carry a rank tag on the canvas (the Signals lens shows the rest). */
 export const RANK_TAG_COUNT = 3;
 
-/** C6: a due date this many days away or fewer, and not yet late, is marked as coming up. */
-export const DUE_SOON_DAYS = 7;
-
 /** C2: Depth's steps, coarsest first, each named after the deepest kind it draws (5.1). */
 export const STEPS = ["stages", "decisions", "deliverables", "actions"] as const;
 export type Step = (typeof STEPS)[number];
@@ -318,16 +315,4 @@ export function cardsOf(level: Level, graph: GraphNode[], looks?: Looks): Card[]
       },
     ];
   });
-}
-
-/** C6: the due badge's tone: late, coming up within `DUE_SOON_DAYS`, or plain. */
-export function dueTone(due: string, today: string, overdue: boolean, finished: boolean): Tone {
-  if (finished) {
-    return "plain";
-  }
-  if (overdue) {
-    return "bad";
-  }
-  const days = Math.round((Date.parse(due) - Date.parse(today)) / 86_400_000);
-  return days <= DUE_SOON_DAYS ? "warn" : "plain";
 }

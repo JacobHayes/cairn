@@ -31,6 +31,7 @@ import {
   type SyncRef,
   type ToastsRef,
 } from "./session-root.ts";
+import { todayIn } from "./today.ts";
 import { saveEventOf, saveOf } from "./writes.ts";
 import { NODE_GONE } from "../ui/gone.ts";
 
@@ -86,6 +87,7 @@ export class Session {
   /** The assistant conversations, the root's child. */
   readonly conversations: ConversationsRef;
   readonly #monotonic: () => number;
+  readonly #now: () => Date;
   /** How many writes have been sent: a later write has a higher count. */
   #begun = 0;
   /** The network came or went: whatever waits on the connection looks again. */
@@ -99,6 +101,7 @@ export class Session {
     this.deriver = parts.deriver;
     this.capabilities = capabilities;
     this.#monotonic = parts.monotonic ?? (() => performance.now());
+    this.#now = parts.now ?? (() => new Date());
     this.root = this.#startRoot(parts);
     this.subscription = subscriptionOf(this.root);
     this.edits = editsOf(this.root);
@@ -152,6 +155,15 @@ export class Session {
     page?.removeEventListener("offline", this.#wake);
   }
 
+  /**
+   * Today's date for a screen with no journey in hand (a route's), from the session's clock in the
+   * tab's own time zone: never the UTC date, which is tomorrow here in the evening. A journey's
+   * screens read the host's `today` in the deployment's zone from the journey (H6).
+   */
+  today(): string {
+    return todayIn(Intl.DateTimeFormat().resolvedOptions().timeZone, this.#now());
+  }
+
   /** The session root over the host: the edit manager's environment is the session's own stores and the connection. */
   #startRoot(parts: SessionParts): SessionRootRef {
     const root = createActor(sessionRoot, {
@@ -160,7 +172,7 @@ export class Session {
         host: parts.host,
         deriver: parts.deriver,
         open: parts.host.openTicks,
-        today: parts.now ?? (() => new Date()),
+        today: this.#now,
         now: this.#monotonic,
         conversations: { assistant: parts.host.assistant, turns: draftTurns },
         edits: {

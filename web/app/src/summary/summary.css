@@ -57,14 +57,6 @@
   letter-spacing: 0;
 }
 
-.flag-bad {
-  color: var(--color-error);
-}
-
-.flag-warn {
-  color: var(--color-warning);
-}
-
 .summary-grid {
   display: grid;
   grid-template-columns: minmax(0, 1fr);

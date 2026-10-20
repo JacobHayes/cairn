@@ -18,7 +18,7 @@ import { beforeWork, HOST_READ, previewPolicy, valueOf, type ReadKey, type ReadS
 import { useDraft } from "../data/drafts.ts";
 import type { Answer } from "../data/edit-record.ts";
 import type { Domain, ProposalReview } from "../data/proposals.ts";
-import { useDeployment, useJourney, useKeyedRead, useLive, useSession, useViewer } from "../data/react.ts";
+import { useDeployment, useJourney, useKeyedRead, useLive, useSession, useToday, useViewer } from "../data/react.ts";
 import { isPatchAnswer } from "../data/writes.ts";
 import type { Ready } from "../detail/model.ts";
 import { Section } from "../detail/parts.tsx";
@@ -325,6 +325,7 @@ interface Model {
 function useReviewModel({ review, ready, before, deployment }: BodyProps, draft: ProposalDraft, writing: boolean): Model {
   const proposal = review.proposal;
   const local = useLocalPreview(ready, proposal, draft);
+  const sessionToday = useToday();
   // A journey's preview follows the edits; any other's is the host's, of the proposal as saved.
   const previewOfEdits = local !== undefined && "preview" in local;
   const preview = previewOfEdits ? local.preview : review.preview;
@@ -354,7 +355,7 @@ function useReviewModel({ review, ready, before, deployment }: BodyProps, draft:
     names: useMemo(() => namesOf([added, before, after], deployment.entities ?? []), [added, before, after, deployment]),
     tree: useMemo(() => treeOf(structure), [structure]),
     structure,
-    today: ready?.key.today ?? new Date().toISOString().slice(0, 10),
+    today: ready?.key.today ?? sessionToday,
     editable: proposal.status === "open" && !writing,
   };
 }

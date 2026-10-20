@@ -9,7 +9,8 @@ import { rollups } from "../plan/tree.ts";
 import type { DisplayState } from "../status/words.ts";
 import { currentStages, isStage } from "./ladder.ts";
 import type { CardBadge, CardBody, CardState, JourneyExtras, LevelNode, Looks, Signals } from "./model.ts";
-import { dependsWords, firstParagraph, footWords, snoozeWords } from "./words.ts";
+import { dependsWords, firstParagraph, footWords } from "./words.ts";
+import { snoozeWords } from "../status/snooze.ts";
 import { NODE_GONE } from "../ui/gone.ts";
 
 /** A node's display state (D8): the engine's one state, which the canvas shows as it is. */
@@ -32,14 +33,14 @@ function ownersOf(view: Ready, key: string): string[] {
   return owners.map((entity) => entityName(view, entity));
 }
 
-/** C2: the one roll-up badge a container carries, in the fixed order: a decision to make, late, all blocked, ready to finish, needs breakdown. */
+/** C2: the one roll-up badge a container carries, in the fixed order: a decision to make, overdue, all blocked, ready to finish, needs breakdown. */
 export function rollUpBadge(derived: NodeDerived, at: LevelNode): CardBadge | undefined {
   const roll = at.roll_up;
   if (roll?.decision_needed === true) {
     return { flag: "decision to make", tone: "warn" };
   }
   if (derived.overdue === true) {
-    return { flag: "late", tone: "bad" };
+    return { flag: "overdue", tone: "bad" };
   }
   if (roll?.all_blocked === true) {
     return { flag: "all blocked", tone: "warn" };

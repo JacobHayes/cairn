@@ -9,7 +9,7 @@ import { useEffect, useRef, useState } from "react";
 import type { Host } from "../data/host.ts";
 import { useSession, useUserName, useUserWords } from "../data/react.ts";
 import { Button } from "../ui/kit.tsx";
-import { dateWords } from "../timeline/model.ts";
+import { dateWords } from "../status/when.ts";
 import { Markdown } from "../ui/markdown.tsx";
 import { type AnswerValue, type GraphNode, type NodeDetail, type Ready } from "./model.ts";
 import { listed, recount, wordsOf, type Happened, type Words } from "./happened.ts";

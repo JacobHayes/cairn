@@ -685,10 +685,6 @@ button.list-sort {
   cursor: pointer;
 }
 
-.list-late {
-  color: var(--color-error);
-}
-
 .list-unassigned {
   color: var(--color-warning);
 }
@@ -958,10 +954,4 @@ button.list-sort {
 }
 .stall-snoozed {
   opacity: var(--opacity-snoozed);
-}
-.stall-soon {
-  color: var(--color-warning);
-}
-.stall-late {
-  color: var(--color-error);
 }

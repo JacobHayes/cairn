@@ -5,7 +5,8 @@
 import type { Schema } from "@cairn/client";
 
 import { feedingDecision, nodeOf, titleOf, type Mutation, type Ready } from "./model.ts";
-import { dateWords } from "../timeline/model.ts";
+import { dateWords, originWord } from "../status/when.ts";
+import { upperFirst } from "../status/words.ts";
 import { ROLE_GONE } from "../ui/gone.ts";
 
 export type Bound = Schema<"Bound">;
@@ -26,7 +27,7 @@ export function namer(view: Ready): Namer {
   return (key, point) => {
     const kind = nodeOf(view, key)?.kind;
     const single = kind === "decision" || kind === "milestone";
-    return point === undefined || single ? titleOf(view, key) : `${titleOf(view, key)} ${point}`;
+    return point === undefined || single ? titleOf(view, key) : `the ${point} of ${titleOf(view, key)}`;
   };
 }
 
@@ -83,13 +84,13 @@ export function sourceText(source: ConstraintSource, name: Namer): string {
 export function constraintText(constraint: Constraint, name: Namer): string {
   const days = constraint.offset_days;
   const offset = days === 0 ? "" : days > 0 ? ` + ${String(days)} days` : ` - ${String(-days)} days`;
-  return `${instantText(constraint.after, name)} no earlier than ${instantText(constraint.before, name)}${offset}`;
+  return `${upperFirst(instantText(constraint.after, name))} no earlier than ${instantText(constraint.before, name)}${offset}`;
 }
 
 /** What fixes a date on a chain, in words. */
 export function fixedText(fixed: FixedDate, name: Namer): string {
-  const by = { pin: "pinned", actual: "actual", answer: "answered", today: "today" }[fixed.fixed_by];
-  return `${instantText(fixed.instant, name)}: ${dateWords(fixed.date)} (${by})`;
+  const by = { pin: originWord("pin"), actual: originWord("actual"), answer: "answered", today: "today" }[fixed.fixed_by];
+  return `${upperFirst(instantText(fixed.instant, name))}: ${dateWords(fixed.date)} (${by})`;
 }
 
 /** F7: a pin or rule whose edit changes a bound. Actuals and today are facts, not edits. */

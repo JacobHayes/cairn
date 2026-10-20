@@ -10,6 +10,7 @@ import { isStage } from "../canvas/ladder.ts";
 import { Menu } from "../screens/Menu.tsx";
 import { RejectionView } from "../screens/RejectionView.tsx";
 import { WriteStatus } from "../screens/WriteStatus.tsx";
+import { dateInk, dueWords, inkClass } from "../status/when.ts";
 import { statusTone, statusWord } from "../status/words.ts";
 import { Badge, Button, Field } from "../ui/kit.tsx";
 import { flagsOf, isTerminal, type NodeDetail, type Ready } from "./model.ts";
@@ -17,7 +18,6 @@ import { NodeLink } from "./parts.tsx";
 import { entityName } from "./sections.tsx";
 import { ownerName } from "./sentence.ts";
 import type { Rename } from "./rename.ts";
-import { dueLine } from "./words.ts";
 import { rebasedOnto, useNodeWrite } from "./write.ts";
 
 /** The title as an input: saving sends one `set_node_field` against the revision it was drafted on (H5), and from then on the edit manager owns the write. */
@@ -98,7 +98,8 @@ function Meta({ view, detail, position }: { view: Ready; detail: NodeDetail; pos
     ) : (
       ownerName(view, node.key)
     );
-  const date = open ? dueLine(node.kind, derived.dates.due?.date, view.derived.today) : undefined;
+  const due = open ? (derived.dates.due?.date ?? undefined) : undefined;
+  const date = due === undefined ? undefined : <span className={inkClass(dateInk(due, view.derived.today))}>{dueWords(due, view.derived.today, node.kind === "decision")}</span>;
   const parts = [owner, date, position === undefined ? undefined : `Rank #${String(position)}`].filter((part) => part !== undefined);
   return (
     <div className="meta muted" data-testid="detail-meta">

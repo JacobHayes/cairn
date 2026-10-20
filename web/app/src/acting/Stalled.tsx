@@ -7,8 +7,8 @@ import { titleOf, transition, type Ready } from "../detail/model.ts";
 import { ACT_LABELS } from "../detail/offers.ts";
 import { Rejected } from "../detail/Rejected.tsx";
 import { useNodeWrite, type NodeWrite } from "../detail/write.ts";
-import { isSoon } from "../status/when.ts";
-import { dateAway, dateWords } from "../timeline/model.ts";
+import { SNOOZE_NODE_TAIL, snoozeEndWords } from "../status/snooze.ts";
+import { dateInk, dateWords, inkClass, whenWords } from "../status/when.ts";
 import { Button } from "../ui/kit.tsx";
 import { DetailLink } from "./Parts.tsx";
 
@@ -28,7 +28,7 @@ type Cause = NonNullable<Ready["derived"]["stalled"]>["waiting_on"][number];
 function CauseLine({ view, write, cause, reach }: { view: Ready; write: NodeWrite; cause: Cause; reach: Reach }) {
   const { today } = view.derived;
   const title = (node: string) => <NodeTitle view={view} node={node} reach={reach} />;
-  const away = (date: string) => <span className={date < today ? "stall-late" : isSoon(date, today) ? "stall-soon" : undefined}>{dateAway(date, today)}</span>;
+  const inkOf = (date: string) => inkClass(dateInk(date, today));
   if ("gate" in cause) {
     return (
       <li className="stall-cause" data-testid="stall-cause" data-status="gate" data-node={cause.gate}>
@@ -43,7 +43,7 @@ function CauseLine({ view, write, cause, reach }: { view: Ready; write: NodeWrit
         <span>
           <span className="stall-snoozed">{title(node)}</span>{" "}
           <span className="muted">
-            · snoozed until {"date" in until ? away(until.date) : <>{title(until.node)} is finished</>}
+            · snoozed until {"date" in until ? <span className={inkOf(until.date)}>{snoozeEndWords(view, until)}</span> : <>{title(until.node)}{SNOOZE_NODE_TAIL}</>}
           </span>
         </span>
         {reach.readOnly ? null : (
@@ -57,7 +57,7 @@ function CauseLine({ view, write, cause, reach }: { view: Ready; write: NodeWrit
   const { node, date } = cause.auto_reach;
   return (
     <li className="stall-cause" data-testid="stall-cause" data-status="auto_reach" data-node={node}>
-      <span>{title(node)} <span className="muted">· {away(date)}</span></span>
+      <span>{title(node)} <span className={inkOf(date) ?? "muted"}>· {whenWords(date, undefined, today)}</span></span>
       {reach.readOnly ? null : (
         <Button disabled={write.disabled} onClick={() => void write.run([transition(node, "reach")])}>
           {ACT_LABELS["reach-now"]}

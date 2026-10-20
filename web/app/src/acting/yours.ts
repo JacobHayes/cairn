@@ -4,7 +4,7 @@
 import type { MineEntry } from "../journeys/mine.ts";
 import { isTerminal, nodeOf, recordOf, titleOf, type Ready } from "../detail/model.ts";
 import { resolveEntity } from "../detail/sections.tsx";
-import { dateWords } from "../timeline/model.ts";
+import { snoozeEndWords } from "../status/snooze.ts";
 import { unblockersOf } from "./waiting.ts";
 
 /** E1, E2: whether one of the viewer's `entities`, through any merge, owns the node whose owners are `owners`. */
@@ -79,7 +79,7 @@ export function waitsOnWords(view: Ready, next: NextForYou): string {
   if (next.after.length > 0) {
     return `after ${named(next.after)}`;
   }
-  return next.snoozedUntil === undefined ? "" : `snoozed until ${dateWords(next.snoozedUntil, view.derived.today)}`;
+  return next.snoozedUntil === undefined ? "" : `snoozed until ${snoozeEndWords(view, { date: next.snoozedUntil })}`;
 }
 
 /** The line, in words. */

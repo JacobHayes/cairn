@@ -1,30 +1,11 @@
 // What a card says in plain words (5.5, the density call): the one date in its foot, a
 // condition's "if" sentence, a snooze's target, a container's progress. Pure and apart from the
 // components, so the unit tests read the same sentences the canvas draws.
-import { nodeOf, type GraphNode, type NodeDerived, type NodeKind, type Ready } from "../detail/model.ts";
+import type { GraphNode, NodeKind } from "../detail/model.ts";
+import { dateWords, daysUntil, dueWords, isSoon, NEAR_DAYS, SOON_DAYS } from "../status/when.ts";
 import type { DisplayState } from "../status/words.ts";
 import type { Tone } from "./model.ts";
 import { NODE_GONE } from "../ui/gone.ts";
-
-/** A date in days from `today` (negative in the past). Both are ISO dates. */
-export function daysFrom(today: string, date: string): number {
-  return Math.round((Date.parse(date) - Date.parse(today)) / 86_400_000);
-}
-
-/** One date format everywhere: `Oct 14` in the current year, `Oct 14 2027` otherwise. */
-export function dateWords(date: string, today: string): string {
-  const day = new Date(`${date}T00:00:00Z`).toLocaleDateString("en-US", { month: "short", day: "numeric", timeZone: "UTC" });
-  return date.slice(0, 4) === today.slice(0, 4) ? day : `${day} ${date.slice(0, 4)}`;
-}
-
-function daysWord(count: number): string {
-  return `${String(count)} ${count === 1 ? "day" : "days"}`;
-}
-
-/** A due date within this many days is said as days to go, and is marked as coming up. */
-export const SOON_DAYS = 7;
-/** A latest start within this many days of an unstarted node is the date its foot gives. */
-export const START_SOON_DAYS = 14;
 
 /** What a card's foot knows about its node. */
 export interface FootFacts {
@@ -40,8 +21,8 @@ export interface FootFacts {
 
 /**
  * The one date a card's foot gives, in words, with the tone it reads in: how late when late;
- * "Start by" when the node has not started and must within two weeks; days to go when the due
- * date is within a week; else the date. A finished or ruled-out node has none (a milestone says
+ * "Start by" when the node has not started and must within two weeks; else its due words
+ * (warning ink within a week). A finished or ruled-out node has none (a milestone says
  * when it was reached).
  */
 export function footWords(facts: FootFacts): { words: string; tone: Tone } | undefined {
@@ -53,51 +34,17 @@ export function footWords(facts: FootFacts): { words: string; tone: Tone } | und
     return undefined;
   }
   if (due !== undefined && overdue) {
-    return { words: `${daysWord(Math.max(1, -daysFrom(today, due)))} late`, tone: "bad" };
+    return { words: dueWords(due, today), tone: "bad" };
   }
   const started = state === "active";
-  if (latestStart !== undefined && !started && kind !== "decision" && kind !== "milestone" && daysFrom(today, latestStart) <= START_SOON_DAYS) {
-    const left = daysFrom(today, latestStart);
+  if (latestStart !== undefined && !started && kind !== "decision" && kind !== "milestone" && daysUntil(latestStart, today) <= NEAR_DAYS) {
+    const left = daysUntil(latestStart, today);
     return { words: `Start by ${dateWords(latestStart, today)}`, tone: left < 0 ? "bad" : left <= SOON_DAYS ? "warn" : "plain" };
   }
   if (due === undefined) {
     return kind === "milestone" && reached !== undefined ? { words: dateWords(reached, today), tone: "plain" } : undefined;
   }
-  const left = daysFrom(today, due);
-  if (left <= SOON_DAYS) {
-    return { words: left <= 0 ? "Due today" : left === 1 ? "Due tomorrow" : `Due in ${daysWord(left)}`, tone: "warn" };
-  }
-  return { words: `${kind === "decision" ? "Decide by" : "Due"} ${dateWords(due, today)}`, tone: "plain" };
-}
-
-/** `Oct 20` or the node's title: where a snooze ends. */
-export function snoozeTarget(view: Ready, derived: NodeDerived): string | undefined {
-  const target = derived.snoozed;
-  if (target == null) {
-    return undefined;
-  }
-  return "date" in target ? dateWords(target.date, view.derived.today) : (view.journey.graph.nodes ?? []).find((node) => node.key === target.node)?.title;
-}
-
-/**
- * Where a snooze ends, in words, for every surface that shows it (a card's foot, a list row, a
- * timeline row): `Until Oct 20`, `Until <node> is done` (the `tail` is what a short room must not
- * cut, so the name takes the ellipsis), or `Via <container>` for a node held by its container's
- * snooze. `title` is the full sentence for a tooltip. None when the node is not snoozed.
- */
-export function snoozeWords(view: Ready, derived: NodeDerived): { words: string; tail?: string; title: string } | undefined {
-  if (derived.snoozed_via != null) {
-    const via = nodeOf(view, derived.snoozed_via)?.title ?? derived.snoozed_via;
-    return { words: `Via ${via}`, title: `Snoozed through ${via}` };
-  }
-  const target = derived.snoozed;
-  if (derived.display_state !== "snoozed" || target == null) {
-    return undefined;
-  }
-  const until = snoozeTarget(view, derived) ?? "";
-  // The chip already says snoozed, so the words are where it ends, the one fact that must not be cut.
-  const tail = "date" in target ? undefined : " is done";
-  return { words: `Until ${until}`, ...(tail === undefined ? {} : { tail }), title: `Snoozed until ${until}${tail ?? ""}` };
+  return { words: dueWords(due, today, kind === "decision"), tone: isSoon(due, today) ? "warn" : "plain" };
 }
 
 /** Progress as words: `3 of 10 done`. */

@@ -5,10 +5,11 @@
 import type { Schema } from "@cairn/client";
 import { useId, type ReactNode } from "react";
 
-import { dateWords } from "../timeline/model.ts";
+import { snoozeEndWords } from "../status/snooze.ts";
+import { dateWords } from "../status/when.ts";
 import { Button, Field } from "../ui/kit.tsx";
 import { Saving, type Sending } from "../ui/Receipt.tsx";
-import { nodeOf, transition, type Mutation, type NodeDetail, type Ready } from "./model.ts";
+import { nodeOf, titleOf, transition, type Mutation, type NodeDetail, type Ready } from "./model.ts";
 import { NodeLink } from "./parts.tsx";
 import { Rejected } from "./Rejected.tsx";
 import { entityName } from "./sections.tsx";
@@ -182,8 +183,8 @@ function UntilFields({ view, group, value, onChange }: { view: Ready; group: str
 /** B6: what a snooze says it does, as a sentence's end: "Kickoff until Oct 20". */
 export function snoozeWords(view: Ready, draft: SnoozeDraft): string {
   const until = untilOf(draft, view.derived.today);
-  const when = until === undefined ? "a time not chosen" : "date" in until ? dateWords(until.date, view.derived.today) : `${nodeOf(view, until.node)?.title ?? until.node} is done`;
-  return `${nodeOf(view, draft.aside)?.title ?? draft.aside} until ${when}`;
+  const when = until === undefined ? "a time not chosen" : snoozeEndWords(view, until);
+  return `${titleOf(view, draft.aside)} until ${when}`;
 }
 
 /**

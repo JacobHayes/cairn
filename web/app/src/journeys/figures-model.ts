@@ -7,9 +7,9 @@ import type { Schema } from "@cairn/client";
 import type { FactTone } from "../acting/reasons.ts";
 import { openForViewer } from "../acting/yours.ts";
 import type { Ready } from "../detail/model.ts";
-import { dueWords, isSoon } from "../status/when.ts";
+import { dateInk, whenWords } from "../status/when.ts";
+import { TROUBLES } from "../status/words.ts";
 import type { SummaryModel } from "../summary/model.ts";
-import { dayOf } from "../timeline/model.ts";
 import type { JourneyStatus } from "./address.ts";
 import type { MineEntry } from "./mine.ts";
 
@@ -43,28 +43,14 @@ export interface Trouble {
  * then that nothing can move yet (untoned: it is often an ordinary wait). Only what is not zero.
  */
 export function troubleOf(model: SummaryModel, stalled: boolean): Trouble[] {
-  const found: Trouble[] = [
-    { kind: "overdue", count: model.overdue.length, tone: "bad" },
-    { kind: "shortfall", count: model.shortfalls.length, tone: "bad" },
-    { kind: "stale", count: model.stale.length, tone: "warn" },
-    { kind: "stalled", count: stalled ? 1 : 0, tone: undefined },
-  ];
+  const found: Trouble[] = [...TROUBLES.map((each) => ({ kind: each.flag, count: each.count(model), tone: each.tone })), { kind: "stalled", count: stalled ? 1 : 0, tone: undefined }];
   return found.filter((each) => each.count > 0);
 }
 
-/** A trouble in words: `2 late`, `2 date shortfalls`, `1 finished node to recheck`, `Nothing can move yet`. */
+/** A trouble in words, as the one table says it: `2 nodes overdue`, `Nothing can move yet`. */
 export function troubleWords(trouble: Trouble): string {
-  const { count } = trouble;
-  switch (trouble.kind) {
-    case "overdue":
-      return `${String(count)} late`;
-    case "shortfall":
-      return `${String(count)} date ${count === 1 ? "shortfall" : "shortfalls"}`;
-    case "stale":
-      return `${String(count)} finished ${count === 1 ? "node" : "nodes"} to recheck`;
-    case "stalled":
-      return "Nothing can move yet";
-  }
+  const each = TROUBLES.find((found) => found.flag === trouble.kind);
+  return each === undefined ? "Nothing can move yet" : each.words(trouble.count);
 }
 
 /** What is the viewer's in a journey, for the cell that says so. */
@@ -108,13 +94,13 @@ export function forYouWords(forYou: ForYou): string {
   }
 }
 
-/** The next milestone as the table says it: its title, its date in words (when it is due, or how late), and the ink for a soon or late date. */
+/** The next milestone as the table says it: its title, its date in words (how far off, or how late), and the ink for a soon or late date. */
 export function milestoneOf(model: SummaryModel, today: string): { title: string; when: string; tone: FactTone | undefined } | undefined {
   const next = model.upcoming[0];
   if (next === undefined) {
     return undefined;
   }
-  return { title: next.title, when: dueWords(next.date, today), tone: dayOf(next.date) < dayOf(today) ? "bad" : isSoon(next.date, today) ? "warn" : undefined };
+  return { title: next.title, when: whenWords(next.date, next.origin, today), tone: dateInk(next.date, today) };
 }
 
 /** C16: that a journey's route has a newer version, from the host's field and never worked out from versions; none when it has not. */

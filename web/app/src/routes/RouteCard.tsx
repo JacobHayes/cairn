@@ -12,9 +12,9 @@ import { Link } from "react-router";
 import { RowsPanel, type PanelRow } from "../acting/RowsPanel.tsx";
 import { journeyIndex, routeIndex, routeRead, type RouteRead } from "../data/reads.ts";
 import { valueOf } from "../data/keyed-read.ts";
-import { useLive } from "../data/react.ts";
+import { useLive, useToday } from "../data/react.ts";
 import { DEFAULT_FILTERS, indexPath, journeyPath, newJourneyPath } from "../journeys/address.ts";
-import { dateWords } from "../timeline/model.ts";
+import { dateWords } from "../status/when.ts";
 import { routePath } from "./address.ts";
 import { upgradable, versionRows, type VersionRow } from "./model.ts";
 
@@ -24,9 +24,6 @@ type InsertionUse = Schema<"InsertionUse">;
 export function useRouteRead(id: string): RouteRead | undefined {
   return valueOf(useLive(`route:${id}`, routeRead(id)).view);
 }
-
-/** Today as the card's dates say it. */
-const todayOf = () => new Date().toISOString().slice(0, 10);
 
 /** The route's description, and, for a route, how many of its journeys can upgrade to its latest version. */
 export function RouteFacts({ read, children }: { read: RouteRead; children?: ReactNode }) {
@@ -117,12 +114,13 @@ export function VersionCard({ read, version }: { read: RouteRead; version: numbe
   const rows = versionRows(read);
   const row = rows.find((each) => each.version === version);
   const hostOf = useHostNames();
+  const today = useToday();
   const uses = read.detail.versions.find((each) => each.version === version)?.insertions ?? [];
   return (
     <aside className="detail-panel panel stack version-card" aria-label={`Version ${String(version)}`} data-testid="version-card" data-version={version}>
       <div className="stack detail-lead">
         <h2>Version {version}</h2>
-        {row === undefined ? null : <span className="muted small">Published {dateWords(row.publishedAt.slice(0, 10), todayOf())}</span>}
+        {row === undefined ? null : <span className="muted small">Published {dateWords(row.publishedAt.slice(0, 10), today)}</span>}
       </div>
       <RouteFacts read={read}>
         {segment || header.retired === true ? null : (

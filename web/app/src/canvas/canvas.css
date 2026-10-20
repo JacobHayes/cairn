@@ -499,6 +499,8 @@
 
 /* The foot is one line, as cards.ts sized it: a date too long for the card ends in an ellipsis (the card's title holds the rest) rather than wrap below the border. */
 .node-foot > .node-date {
+  flex: 0 0 auto;
+  max-width: 100%;
   min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -523,8 +525,12 @@
   white-space: pre;
 }
 
+/* The date is the fact the foot is for, so a short card cuts the owner's name first (it is on the title's hover and in the inspector). */
 .node-foot > .node-owner {
-  flex: none;
+  flex: 0 100 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .node-date.warn {

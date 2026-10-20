@@ -4,7 +4,7 @@ import { childrenOfClause, decisionOf, operatorOf, valuesOf, type Clause } from 
 import { ruleWords } from "../authoring/dates.ts";
 import type { Graph, Mutation } from "../authoring/graph.ts";
 import { removedChoices, type Conflict, type ResolutionKind, type ReviewItem } from "./model.ts";
-import { dateWords } from "../timeline/model.ts";
+import { dateWords } from "../status/when.ts";
 import { ENTITY_GONE, KIND_GONE, NODE_GONE, ROLE_GONE } from "../ui/gone.ts";
 
 /** Names by key over the graphs a review shows (before and after), falling back to the key. */

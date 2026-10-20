@@ -1,6 +1,7 @@
 // C8: a node's children as a checklist. Work (actions and deliverables) is checked off and
 // unchecked in place, each one transition patch (complete, reopen); any other child shows its
 // state and opens its own detail.
+import { dueWords } from "../status/when.ts";
 import { statusTone, statusWord } from "../status/words.ts";
 import { Badge } from "../ui/kit.tsx";
 import { foldKey } from "./folds.ts";
@@ -8,7 +9,6 @@ import { isTerminal, transition, type Child, type NodeDetail, type Ready } from 
 import { NodeLink, Section } from "./parts.tsx";
 import { Rejected } from "./Rejected.tsx";
 import { ownerName } from "./sentence.ts";
-import { dueLine } from "./words.ts";
 import { useNodeWrite, type NodeWrite } from "./write.ts";
 
 const work = (child: Child) => child.kind === "action" || child.kind === "deliverable";
@@ -16,7 +16,8 @@ const work = (child: Child) => child.kind === "action" || child.kind === "delive
 function Item({ view, child, write }: { view: Ready; child: Child; write: NodeWrite }) {
   const done = child.state === "done";
   // The one fact on the right: the date while it is open, else who owns it.
-  const due = isTerminal(child.state) ? undefined : dueLine(child.kind, view.derived.nodes[child.key]?.dates.due?.date, view.derived.today);
+  const dueDate = isTerminal(child.state) ? undefined : view.derived.nodes[child.key]?.dates.due?.date;
+  const due = dueDate === undefined ? undefined : dueWords(dueDate, view.derived.today, child.kind === "decision");
   const fact = due ?? ownerName(view, child.key);
   return (
     <li data-testid="child" data-node={child.key} data-status={child.state}>

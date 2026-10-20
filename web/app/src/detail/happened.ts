@@ -7,7 +7,8 @@
 // order. Pure, so the unit tests check the facts without a page.
 import type { Schema } from "@cairn/client";
 
-import { dateWords } from "../timeline/model.ts";
+import { SNOOZE_NODE_TAIL } from "../status/snooze.ts";
+import { dateWords } from "../status/when.ts";
 import { ENTITY_GONE, KIND_GONE, NODE_GONE, ROLE_GONE } from "../ui/gone.ts";
 import { titleOf, type Ready } from "./model.ts";
 import { entityName, kindTitle, roleTitle } from "./sections.tsx";
@@ -144,7 +145,7 @@ const FIELD_WORDS: Record<string, string> = {
   requires_artifact: "artifact requirement",
   requires_note: "note requirement",
   final: "final setting",
-  auto_reach: "auto-reach setting",
+  auto_reach: "reached-by-itself setting",
   opens_at: "opening date",
   closes_at: "closing date",
   gates: "gates",
@@ -209,7 +210,7 @@ function snoozed(c: Context): Said {
       if ("date" in until) {
         return { what: `snoozed ${it(c, node)} until ${c.words.day(until.date)}`, facts: { date: until.date } };
       }
-      return { what: `snoozed ${it(c, node)} until ${quoted(c.words.node(until.node))} is settled`, facts: { waitsFor: until.node } };
+      return { what: `snoozed ${it(c, node)} until ${quoted(c.words.node(until.node))}${SNOOZE_NODE_TAIL}`, facts: { waitsFor: until.node } };
     }
   }
   return { what: `snoozed ${it(c)}` };

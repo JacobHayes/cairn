@@ -23,8 +23,7 @@ import { LineageBlock, Flags, useLineage } from "../journeys/JourneyFacts.tsx";
 import { progressOf } from "../journeys/figures-model.ts";
 import { useMineOf } from "../journeys/mine.ts";
 import { useAssistantAsk } from "../assistant/ask.ts";
-import { isSoon } from "../status/when.ts";
-import { dateWords, dayOf } from "../timeline/model.ts";
+import { dateInk, dateWords, inkClass, originWord, whenWords } from "../status/when.ts";
 import { Button, Meter } from "../ui/kit.tsx";
 import { Markdown } from "../ui/markdown.tsx";
 import { nodeAddress, planAddress, timelineAddress } from "./links.ts";
@@ -36,13 +35,11 @@ import {
   isEmpty,
   lifecycleLine,
   milestoneLine,
-  ORIGIN_WORDS,
   ownersOf,
   recentlyFinished,
   shortfallWords,
   summaryModel,
   underWay,
-  whenWords,
   type MilestoneLine,
   type SummaryModel,
 } from "./model.ts";
@@ -69,12 +66,11 @@ function MilestoneWhen({ ready, line }: { ready: Ready; line: MilestoneLine }) {
   }
   // F1: an auto-reaching milestone whose date has passed is reached, whatever its date came from.
   const reached = line.reached;
-  const late = !reached && dayOf(line.date) < dayOf(today);
-  const soon = !reached && isSoon(line.date, today);
-  const origin = line.origin === undefined ? undefined : ORIGIN_WORDS[line.origin];
+  const ink = reached ? undefined : inkClass(dateInk(line.date, today));
+  const origin = line.origin === undefined ? undefined : originWord(line.origin);
   return (
     <>
-      <span className={late ? "flag-bad" : soon ? "flag-warn" : undefined} title={origin === undefined ? undefined : `This date is ${origin}`}>
+      <span className={ink} title={origin === undefined ? undefined : `This date is ${origin}`}>
         {whenWords(line.date, reached ? "actual" : line.origin, today)}
       </span>
       .
@@ -150,13 +146,12 @@ function Dates({ ready, model, skip }: { ready: Ready; model: SummaryModel; skip
     <NodePanel title="Milestones" count={rows.length} testId="summary-milestones" foot={<Link to={timelineAddress(journey)}>Open the timeline</Link>}>
       {rows.map((each) => {
         const short = ready.derived.nodes[each.key]?.dates.shortfall?.shortfall_days;
-        const origin = ORIGIN_WORDS[each.origin];
         return (
           <li key={each.key} className="summary-date" data-testid="summary-date" data-node={each.key}>
             <Link to={nodeAddress(journey, each.key)} className="node-title">
               {each.title}
             </Link>
-            <span className={isSoon(each.date, today) ? "summary-date-when flag-warn" : "summary-date-when muted"} title={origin === undefined ? undefined : `This date is ${origin}`}>
+            <span className={`summary-date-when ${inkClass(dateInk(each.date, today)) ?? "muted"}`} title={`This date is ${originWord(each.origin)}`}>
               {whenWords(each.date, each.origin, today)}
             </span>
             {short === undefined ? null : <span className="flag-bad summary-date-short">{shortfallWords(ready, each.key, short)}</span>}
@@ -343,7 +338,7 @@ function NeedsLook({ ready, model }: { ready: Ready; model: SummaryModel }) {
   return (
     <span className="summary-flags" data-testid="summary-exceptions">
       <span className="muted">Open in the list: </span>
-      <Flags ready={ready} model={model} toned />
+      <Flags ready={ready} model={model} />
     </span>
   );
 }

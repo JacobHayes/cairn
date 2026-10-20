@@ -12,7 +12,7 @@ import { Link, useNavigate } from "react-router";
 import { pathTo } from "../address.ts";
 import type { SaveEvent } from "../data/activity.ts";
 import { useDerivation, useProblems, useSaves, useSavedAnnouncement, useSession, useSkew, useStreamStatus, useSync } from "../data/react.ts";
-import { dateWords } from "../timeline/model.ts";
+import { dateWords } from "../status/when.ts";
 import type { Problem, SyncSummary } from "../data/sync.ts";
 import { Button } from "../ui/kit.tsx";
 import { popoverAnchor, popoverPinned, popoverShown, syncPopover, type Anchor } from "./sync-popover.ts";

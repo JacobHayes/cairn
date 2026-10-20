@@ -5,7 +5,7 @@
 // routes through a feeding decision when there is one (E3).
 import type { ReactNode } from "react";
 
-import { dateWords } from "../timeline/model.ts";
+import { dateWords, originWord } from "../status/when.ts";
 import { ChainView } from "./ChainView.tsx";
 import type { Bound } from "./explain.ts";
 import type { Mutation, NodeDetail, Ready } from "./model.ts";
@@ -29,9 +29,6 @@ export function boundOrigin(bound: Bound, node: string): BoundOrigin {
   return fixed.fixed_by === "actual" ? "actual" : fixed.fixed_by === "today" ? "derived" : "pin";
 }
 
-/** Where a date comes from, in quiet words: the origin attribute keeps the engine's term. */
-const ORIGIN_WORDS: Record<BoundOrigin | "due", string> = { pin: "pinned", actual: "recorded", derived: "worked out", due: "worked out" };
-
 function BoundRow({ view, node, label, bound }: { view: Ready; node: string; label: string; bound: Bound | null | undefined }) {
   if (bound == null) {
     return (
@@ -43,7 +40,7 @@ function BoundRow({ view, node, label, bound }: { view: Ready; node: string; lab
   const origin = boundOrigin(bound, node);
   return (
     <div className="date-row" data-testid="date" data-label={label} data-origin={origin}>
-      <span className="date-label">{label}</span> <strong>{dateWords(bound.date, view.derived.today)}</strong> <span className="muted small">{ORIGIN_WORDS[origin]}</span>
+      <span className="date-label">{label}</span> <strong>{dateWords(bound.date, view.derived.today)}</strong> <span className="muted small">{originWord(origin)}</span>
       <details>
         <summary className="muted small">Why</summary>
         <ChainView view={view} chain={bound.chain} />
@@ -95,7 +92,7 @@ export function DatesSection({
           {dates.effective_date == null ? null : (
             <span data-testid="effective-date">
               <span className="date-label">Effective date</span> <strong>{dateWords(dates.effective_date.date, view.derived.today)}</strong>{" "}
-              <span className="muted small">{ORIGIN_WORDS[dates.effective_date.origin]}</span>
+              <span className="muted small">{originWord(dates.effective_date.origin)}</span>
             </span>
           )}
           <span data-testid="slack">

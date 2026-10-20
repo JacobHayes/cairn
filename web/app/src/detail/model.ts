@@ -277,7 +277,7 @@ export function unansweredOf(view: Ready, key: string): string[] {
 export type FlagTone = "good" | "warn" | "bad" | "plain";
 
 /**
- * D3: the derived flags a node carries (C8) that are real attention, those that are set. What
+ * D3: the derived flags a node carries (C8) that are real attention, those that are set. The one list every surface (inspector, rows, cards) renders. What
  * its display state already says (blocked, snoozed, skipped, actionable, auto-reached) is not
  * a flag (D8); `state` is the stored one, for work started before its gates are met.
  */
@@ -290,9 +290,10 @@ export function flagsOf(derived: NodeDerived, state: State): { flag: string; ton
   };
   add(startedEarly(derived, state), "started early", "plain");
   add(derived.unassigned, "unassigned", "warn");
-  add((derived.stale ?? []).length > 0, "stale", "warn");
   add(derived.overdue, "overdue", "bad");
-  add(derived.needs_breakdown, "needs_breakdown", "warn");
+  add(derived.dates.shortfall != null, "short of days", "bad");
+  add((derived.stale ?? []).length > 0, "stale", "warn");
+  add(derived.needs_breakdown, "needs breakdown", "warn");
   add(derived.membership_lost, "membership lost", "warn");
   return flags;
 }

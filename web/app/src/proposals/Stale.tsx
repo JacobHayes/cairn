@@ -8,9 +8,10 @@ import type { Host } from "../data/host.ts";
 import { HOST_READ, type ReadSource } from "../data/keyed-read.ts";
 import { allPages } from "../data/live.ts";
 import type { ProposalReview } from "../data/proposals.ts";
-import { useJourney, useKeyedRead, useSession, useUserWords } from "../data/react.ts";
+import { useJourney, useKeyedRead, useSession, useToday, useUserWords } from "../data/react.ts";
 import { listed, recount, wordsOf } from "../detail/happened.ts";
 import { useRecordWords } from "../screens/RejectionView.tsx";
+import { dateWords } from "../status/when.ts";
 import { Button } from "../ui/kit.tsx";
 import { intervening } from "./model.ts";
 import { Failed } from "../ui/Failed.tsx";
@@ -64,6 +65,8 @@ function joined(patches: PatchEvents[]): PatchEvents[] {
 function InterveningPatches({ journey, patches }: { journey: string; patches: PatchEvents[] }) {
   const view = useJourney(journey);
   const name = useUserWords();
+  const sessionToday = useToday();
+  const today = view.status === "ready" ? view.key.today : sessionToday;
   const told = recount(
     patches.flatMap((patch) => patch.events),
     wordsOf(view.status === "ready" ? view : undefined, "", name),
@@ -78,7 +81,7 @@ function InterveningPatches({ journey, patches }: { journey: string; patches: Pa
         const [lead] = mine;
         return first === undefined || lead === undefined ? null : (
           <li key={patch.patch_id} data-testid="intervening-patch">
-            <span className="muted small">{first.at.slice(0, 10)}</span> {name(lead.actor)} {listed([...new Set(mine.map((each) => each.what))])}
+            <span className="muted small">{dateWords(first.at.slice(0, 10), today)}</span> {name(lead.actor)} {listed([...new Set(mine.map((each) => each.what))])}
           </li>
         );
       })}

@@ -16,10 +16,11 @@ import { ownedBy } from "../acting/yours.ts";
 import { guardFailureText, namer } from "../detail/explain.ts";
 import { feedingDecision, nodeOf, recordOf, titleOf, type GraphNode, type Ready } from "../detail/model.ts";
 import { entityName } from "../detail/sections.tsx";
-import { daysWords } from "../status/when.ts";
+import { snoozeEndWords } from "../status/snooze.ts";
+import { dateWords, daysUntil, daysWords } from "../status/when.ts";
 import { DISPLAY_STATES, stateWord, type DisplayState } from "../status/words.ts";
 import { treeOf } from "../plan/tree.ts";
-import { dateWords, dayOf, type DateOrigin } from "../timeline/model.ts";
+import type { DateOrigin } from "../timeline/model.ts";
 
 export type StatusSummary = Schema<"StatusSummary">;
 
@@ -65,7 +66,7 @@ export function ownersOf(ready: Ready, key: string): string[] {
 
 function overdueOf(ready: Ready, key: string): SummaryModel["overdue"][number] {
   const due = ready.derived.nodes[key]?.dates.due?.date;
-  return { ...listed(ready, key), due, lateDays: due === undefined ? undefined : dayOf(ready.derived.today) - dayOf(due) };
+  return { ...listed(ready, key), due, lateDays: due === undefined ? undefined : -daysUntil(due, ready.derived.today) };
 }
 
 function staleOf(ready: Ready, key: string): SummaryModel["stale"][number] {
@@ -156,26 +157,6 @@ export function milestoneLine(ready: Ready, model: SummaryModel): MilestoneLine 
   };
 }
 
-/**
- * F1: where a milestone's date stands in words, the nearness first and the calendar date after it:
- * `in 18 days (Nov 23)`, `3 days late (Oct 2)`, `due today (Oct 6)`; an actual date is `reached Nov 20`
- * (never late).
- */
-export function whenWords(date: string, origin: DateOrigin | undefined, today: string): string {
-  if (origin === "actual") {
-    return `reached ${dateWords(date, today)}`;
-  }
-  const away = dayOf(date) - dayOf(today);
-  const when = dateWords(date, today);
-  if (away < 0) {
-    return `${daysWords(-away)} late (${when})`;
-  }
-  return away === 0 ? `due today (${when})` : `in ${daysWords(away)} (${when})`;
-}
-
-/** The words for where a date comes from; an actual date says it by `whenWords`. */
-export const ORIGIN_WORDS: Record<DateOrigin, string | undefined> = { actual: undefined, pin: "pinned", due: "derived" };
-
 /** A node that needs a look, with every reason, worst first (C18). */
 export interface Attention {
   key: string;
@@ -239,7 +220,7 @@ export function waitingFact(ready: Ready, node: GraphNode): string | undefined {
   const { unblockers, snoozedUntil } = unblockersOf(ready, node);
   const [first, ...rest] = [...unblockers].sort((left, right) => Number(right.kind === "milestone") - Number(left.kind === "milestone") || left.node.localeCompare(right.node));
   if (first === undefined) {
-    return snoozedUntil === undefined ? undefined : `Snoozed until ${dateWords(snoozedUntil, ready.derived.today)}`;
+    return snoozedUntil === undefined ? undefined : `Snoozed until ${snoozeEndWords(ready, { date: snoozedUntil })}`;
   }
   return `Waiting for ${titleOf(ready, first.node)}${rest.length === 0 ? "" : ` and ${String(rest.length)} more`}`;
 }

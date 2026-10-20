@@ -1,9 +1,8 @@
-// The plain words the inspector says things in (C8, D8): dates as "Due in 3 days", each
+// The plain words the inspector says things in (C8, D8): each
 // choice's effect beside it, a condition as a phrase, what a save would cause. Pure, so the unit
-// tests check the wording without a page. Nothing here is a code or an abbreviation.
+// tests check the behaviour without a page. Nothing here is a code or an abbreviation.
 import type { Schema } from "@cairn/client";
 
-import { dateWords, dayOf } from "../timeline/model.ts";
 import type { FormCase } from "./actions-form.ts";
 import type { NodeKind } from "./model.ts";
 
@@ -49,41 +48,6 @@ export function keptWords(kind: FormCase, node: NodeKind): string {
 /** "1 node", "3 nodes". */
 export function plural(count: number, one: string, many = `${one}s`): string {
   return `${String(count)} ${count === 1 ? one : many}`;
-}
-
-/** Whole days from `today` to `date`: negative when it has passed. */
-export function daysFrom(date: string, today: string): number {
-  return dayOf(date) - dayOf(today);
-}
-
-/** A moment in days, in words: "today", "tomorrow", "in 5 days", "3 days ago". */
-export function relativeDays(days: number): string {
-  if (days === 0) {
-    return "today";
-  }
-  if (days === 1) {
-    return "tomorrow";
-  }
-  return days > 0 ? `in ${plural(days, "day")}` : days === -1 ? "yesterday" : `${plural(-days, "day")} ago`;
-}
-
-/** How far ahead a date is said in days; beyond it, as a calendar date. */
-const SOON_DAYS = 14;
-
-/** The node's one date in words: "Due in 3 days", "Decide by Oct 14", "3 days late". */
-export function dueLine(kind: NodeKind, due: string | undefined, today: string): string | undefined {
-  if (due === undefined) {
-    return undefined;
-  }
-  const days = daysFrom(due, today);
-  const verb = kind === "decision" ? "Decide" : "Due";
-  if (days < 0) {
-    return `${plural(-days, "day")} late`;
-  }
-  if (days <= SOON_DAYS) {
-    return days === 0 ? `${verb} today` : days === 1 ? `${verb} tomorrow` : `${verb} ${relativeDays(days)}`;
-  }
-  return kind === "decision" ? `Decide by ${dateWords(due, today)}` : `Due ${dateWords(due, today)}`;
 }
 
 /** A node count with its word: "6 nodes". */

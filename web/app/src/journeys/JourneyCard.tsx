@@ -10,7 +10,7 @@ import { AnnotationList } from "../detail/Attachments.tsx";
 import type { Ready } from "../detail/model.ts";
 import { NodeLink, Section } from "../detail/parts.tsx";
 import { summaryModel, type SummaryModel } from "../summary/model.ts";
-import { dateAway } from "../timeline/model.ts";
+import { dateInk, inkClass, whenWords } from "../status/when.ts";
 import { Meter } from "../ui/kit.tsx";
 import { Markdown } from "../ui/markdown.tsx";
 import { yoursOf } from "./figures-model.ts";
@@ -83,7 +83,7 @@ function NextMilestone({ ready, model }: { ready: Ready; model: SummaryModel }) 
     <section className="stack" aria-label="Next milestone" data-testid="card-next-milestone" data-node={next.key}>
       <span className="muted small">Next milestone</span>
       <span>
-        <NodeLink view={ready} node={next.key} /> <span className="muted small">{dateAway(next.date, ready.derived.today)}</span>
+        <NodeLink view={ready} node={next.key} /> <span className={inkClass(dateInk(next.date, ready.derived.today)) ?? "muted small"}>· {whenWords(next.date, next.origin, ready.derived.today)}</span>
       </span>
     </section>
   );

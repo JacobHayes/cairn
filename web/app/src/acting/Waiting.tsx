@@ -8,6 +8,8 @@ import { valueOf } from "../data/keyed-read.ts";
 import { namer, viaText } from "../detail/explain.ts";
 import { titleOf, type Ready } from "../detail/model.ts";
 import { useNodeAddresses } from "../journeys/address.ts";
+import { SNOOZE_NODE_TAIL, snoozeEndWords } from "../status/snooze.ts";
+import { dateWords } from "../status/when.ts";
 import { Badge, Button } from "../ui/kit.tsx";
 import { DetailLink } from "./Parts.tsx";
 import { RowActions } from "./RowActions.tsx";
@@ -22,7 +24,7 @@ function UnblockerLine({ view, unblocker, row }: { view: Ready; unblocker: Unblo
       <span>
         <Badge tone={unblocker.kind === "milestone" ? "warn" : "plain"}>{unblocker.kind}</Badge> <DetailLink view={view} node={unblocker.node} />{" "}
         <span className="muted small">
-          ({unblocker.via === "snooze" ? "it is snoozed until this is finished" : viaText(unblocker.via, name)}
+          ({unblocker.via === "snooze" ? `it is snoozed until this${SNOOZE_NODE_TAIL}` : viaText(unblocker.via, name)}
           {unblocker.through === undefined ? "" : ` of ${titleOf(view, unblocker.through)}, which holds it`})
         </span>
       </span>
@@ -55,8 +57,8 @@ export function WaitingDecisions({ view, onContinue }: { view: Ready; onContinue
             <span>
               <DetailLink view={view} node={each.decision} />
               <span className="muted small">
-                {each.earliest === undefined ? "" : `, can start ${each.earliest}`}
-                {each.snoozedUntil === undefined ? "" : `, snoozed until ${each.snoozedUntil}`}
+                {each.earliest === undefined ? "" : `, can start ${dateWords(each.earliest, view.derived.today)}`}
+                {each.snoozedUntil === undefined ? "" : `, snoozed until ${snoozeEndWords(view, { date: each.snoozedUntil })}`}
               </span>
             </span>
             <ul className="detail-list stack">

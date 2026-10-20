@@ -1269,3 +1269,11 @@ button.tree-fold[aria-expanded="true"] .tree-chevron {
   transform: rotate(90deg);
 }
 
+/* The ink a date or a count is said in, on every screen: error once past, warning while soon (DESIGN, Dates). */
+.flag-bad {
+  color: var(--color-error);
+}
+
+.flag-warn {
+  color: var(--color-warning);
+}

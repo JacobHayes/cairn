@@ -6,9 +6,7 @@ import { describe, expect, it } from "vitest";
 import {
   AXIS_MARGIN_DAYS,
   TICK_COUNT_MAX,
-  dateAway,
   dateOf,
-  dateWords,
   dayOf,
   endAnchor,
   axisOf,
@@ -113,20 +111,6 @@ describe("C13: the axis", () => {
       }
     });
   }
-});
-
-describe("dates in words", () => {
-  it("name the month and day, and the year only when it is not this one's", () => {
-    expect(dateWords("2026-10-30", today)).toBe("Oct 30");
-    expect(dateWords("2027-01-04", today)).toBe("Jan 4, 2027");
-  });
-
-  it("say how far off a date is, in plain days", () => {
-    expect(dateAway("2026-10-30", today)).toBe("Oct 30, in 24 days");
-    expect(dateAway("2026-10-07", today)).toBe("Oct 7, in 1 day");
-    expect(dateAway(today, today)).toMatch(/, today$/);
-    expect(dateAway("2026-10-02", today)).toBe("Oct 2, 4 days late");
-  });
 });
 
 describe("C13: a route's axis, in days from its start", () => {

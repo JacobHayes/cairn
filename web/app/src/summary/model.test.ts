@@ -7,7 +7,7 @@ import { describe, expect, it } from "vitest";
 import type { Ready } from "../detail/model.ts";
 import { testView } from "../detail/view.test-support.ts";
 import { DISPLAY_STATES } from "../status/words.ts";
-import { summaryModel, whenWords, type StatusSummary } from "./model.ts";
+import { summaryModel, type StatusSummary } from "./model.ts";
 
 /** The test journey with the findings overdue since 2026-10-01, the report stale and short, and the meeting owned. */
 function summaryJourney(): Ready {
@@ -74,19 +74,5 @@ describe("C18: the status summary", () => {
     const model = summaryModel(summaryJourney(), { by_state: {}, by_display_state: {}, remaining: 0 });
     expect([model.byState, model.overdue, model.shortfalls, model.stale, model.upcoming, model.openDecisions]).toEqual([[], [], [], [], [], []]);
     expect(model.inScope).toBe(0);
-  });
-});
-
-describe("F1: a milestone's date in words", () => {
-  const today = "2026-10-06";
-
-  it("says an actual date was reached, never late", () => {
-    expect(whenWords("2026-10-01", "actual", today)).toContain("reached");
-    expect(whenWords("2026-10-01", "actual", today)).not.toContain("late");
-  });
-
-  it.each(["pin", "due"] as const)("says a %s date that has gone by is late, and one ahead how far off it is", (origin) => {
-    expect(whenWords("2026-10-01", origin, today)).toContain("late");
-    expect(whenWords("2026-10-30", origin, today)).toMatch(/^in 24 days/);
   });
 });

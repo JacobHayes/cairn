@@ -6,11 +6,13 @@ import type { Schema } from "@cairn/client";
 
 import { rankParts, type NodeRow } from "../acting/why.ts";
 import { rollups } from "../plan/tree.ts";
-import { dateWords } from "../timeline/model.ts";
+import { SNOOZE_NODE_TAIL } from "../status/snooze.ts";
+import { upperFirst } from "../status/words.ts";
+import { dateWords, daysUntil, daysWords, relativeDays } from "../status/when.ts";
 import { guardFailureText, namer } from "./explain.ts";
 import { INITIAL_STATE, isTerminal, nodeOf, titleOf, unansweredOf, type NodeDetail, type NodeDerived, type Ready } from "./model.ts";
 import { answerText, entityName } from "./sections.tsx";
-import { conditionPhrase, daysFrom, plural, relativeDays } from "./words.ts";
+import { conditionPhrase, plural } from "./words.ts";
 
 /** A part of the sentence: text, a link to a node, or the Unsnooze action for the container whose snooze holds over the node. */
 export type Piece = string | { node: string };
@@ -103,7 +105,6 @@ export function waitingPhrase(view: Ready, key: string): Piece[] {
   return held.length === 0 ? ["earlier work"] : listed(held.map((each) => (own(each) ? namedWithOwner(view, each.node) : holdingPhrase(view, each))));
 }
 
-const cap = (word: string) => word.slice(0, 1).toUpperCase() + word.slice(1);
 
 /** The decisions to name when a node waits on answers: those its relevance reads that are still open. */
 function undecidedNames(view: Ready, key: string): Piece[] {
@@ -135,6 +136,12 @@ function staleWords(view: Ready, failures: Schema<"GuardFailure">[]): Piece[] {
   );
 }
 
+/** That a node's date has come or gone, after "it": `is due in 5 days`, `is 2 days late`. */
+function dueClause(due: string, today: string): string {
+  const days = daysUntil(due, today);
+  return days < 0 ? `is ${daysWords(-days)} late` : `is due ${relativeDays(days)}`;
+}
+
 /** Priority: why the node ranks where it does, in the top one or two terms' words. */
 export function rankClause(view: Ready, derived: NodeDerived, facts: RankFacts): string {
   const { position, row } = facts;
@@ -147,7 +154,7 @@ export function rankClause(view: Ready, derived: NodeDerived, facts: RankFacts):
   const phrases = parts.flatMap((part): string[] => {
     switch (part.signal) {
       case "urgency":
-        return due === undefined ? (slack == null ? [] : [`must start ${relativeDays(slack)}`]) : [`is due ${relativeDays(daysFrom(due, view.derived.today))}`];
+        return due === undefined ? (slack == null ? [] : [`must start ${relativeDays(slack)}`]) : [dueClause(due, view.derived.today)];
       case "late":
         return slack == null ? [] : [`is ${plural(-slack, "day")} past its latest start`];
       case "gravity":
@@ -159,7 +166,7 @@ export function rankClause(view: Ready, derived: NodeDerived, facts: RankFacts):
   // Whatever the blend's top terms were, say at least one thing in words: its date, or what it holds up.
   const fallback =
     due !== undefined
-      ? [`is due ${relativeDays(daysFrom(due, view.derived.today))}`]
+      ? [dueClause(due, view.derived.today)]
       : derived.gravity_from.total > 0
         ? [`holds up ${plural(derived.gravity_from.total, "node")}`]
         : [];
@@ -228,12 +235,12 @@ function stateSentence(view: Ready, detail: NodeDetail, rank: RankFacts): Piece[
     }
     case "scheduled": {
       const date = derived.dates.effective_date?.date ?? derived.dates.due?.date;
-      return [date === undefined ? "Waiting for its date (auto-reach)." : `Scheduled for ${on(date)} (auto-reach).`];
+      return [date === undefined ? "Waiting for its date, then it counts as reached by itself." : `Scheduled for ${on(date)}; it counts as reached by itself that day.`];
     }
     case "snoozed": {
       const via = derived.snoozed_via ?? undefined;
       const target = derived.snoozed;
-      const until = target == null ? [] : "date" in target ? [` until ${on(target.date)}`] : [" until ", { node: target.node }, " is done"];
+      const until = target == null ? [] : "date" in target ? [` until ${on(target.date)}`] : [" until ", { node: target.node }, SNOOZE_NODE_TAIL];
       return via !== undefined && stored === undefined ? ["Snoozed", ...until, ", through ", { node: via }, "."] : ["Snoozed", ...until, "."];
     }
     case "done": {
@@ -254,7 +261,7 @@ function stateSentence(view: Ready, detail: NodeDetail, rank: RankFacts): Piece[
       const answer = decided === undefined ? undefined : view.journey.graph.state?.answers?.[decided];
       const because: Piece[] =
         decided === undefined || answer === undefined ? ["Doesn't apply here."] : ["Doesn't apply because ", { node: decided }, ` = ${answerText(view, answer, nodeOf(view, decided))}.`];
-      const kept = record.state !== INITIAL_STATE[node.kind] ? [` Recorded ${cap(record.state)}${finished} before it stopped applying; the record is kept.`] : [];
+      const kept = record.state !== INITIAL_STATE[node.kind] ? [` Recorded ${upperFirst(record.state)}${finished} before it stopped applying; the record is kept.`] : [];
       return [...because, ...kept];
     }
   }

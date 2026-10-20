@@ -7,7 +7,7 @@
 import type { Schema } from "@cairn/client";
 
 import { useUserWords } from "../data/react.ts";
-import { dateWords } from "../timeline/model.ts";
+import { dateWords } from "../status/when.ts";
 import { Badge, Button, Field } from "../ui/kit.tsx";
 import { Markdown, safeHref } from "../ui/markdown.tsx";
 import { foldKey } from "./folds.ts";

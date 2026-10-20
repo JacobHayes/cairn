@@ -7,8 +7,9 @@
 import { Link, useLocation } from "react-router";
 
 import type { Route } from "../data/host.ts";
+import { useToday } from "../data/react.ts";
 import { Menu } from "../screens/Menu.tsx";
-import { dateWords } from "../timeline/model.ts";
+import { dateWords } from "../status/when.ts";
 import { routePath, spotOf } from "./address.ts";
 import { useRouteRead } from "./RouteCard.tsx";
 import { versionRows } from "./model.ts";
@@ -31,7 +32,7 @@ export function VersionSelect({ route, of }: { route: Route; of: "draft" | numbe
   const rows = new Map((read === undefined ? [] : versionRows(read)).map((row) => [row.version, row] as const));
   const published = [...(route.versions ?? [])].sort((left, right) => right - left);
   const words = of === "draft" ? draftWords(route) : `Version ${String(of)}`;
-  const today = new Date().toISOString().slice(0, 10);
+  const today = useToday();
   const to = (version: number | undefined) => routePath(id, { version, screen: spotOf(new URLSearchParams(search)).screen }, search);
   return (
     <Menu label={words} title="Which version the views show: the draft, or a published version" testId="version-select" className="no-print version-select" trigger={of === "draft" ? <>Draft<span className="version-from">{words.slice("Draft".length)}</span> ▾</> : <>{words} ▾</>}>

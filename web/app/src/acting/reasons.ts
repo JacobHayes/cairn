@@ -4,8 +4,7 @@
 // caller can tone it, and `factWords` says it. Every surface that shows a row's action-priority
 // fact takes it from `actionFact`, so a row reads the same wherever it is listed.
 import { nodeOf, type Ready } from "../detail/model.ts";
-import { daysUntil, daysWords, dueWords, isSoon } from "../status/when.ts";
-import { dateWords } from "../timeline/model.ts";
+import { dateWords, daysUntil, daysWords, dueWords, isSoon } from "../status/when.ts";
 import { missingEvidence } from "./acts.ts";
 import type { SortBy } from "./address.ts";
 import { rankParts, type NodeRow, type RankPart } from "./why.ts";

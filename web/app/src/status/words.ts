@@ -6,6 +6,7 @@
 import type { Schema } from "@cairn/client";
 
 import type { NodeKind } from "../detail/model.ts";
+import type { SummaryModel } from "../summary/model.ts";
 import type { Tone } from "../ui/kit.tsx";
 
 export type DisplayState = Schema<"DisplayState">;
@@ -74,4 +75,24 @@ export function statusTone(state: DisplayState): Tone {
     case "not_relevant":
       return "superseded";
   }
+}
+
+/**
+ * What needs a look in a journey, worst first, said once for every surface that counts it (the
+ * journey index and Home, the journey card, the Summary): a count of nodes with what is wrong
+ * with them (`2 nodes overdue`), so a count is never taken for days, and its ink (D3, D4, F6).
+ */
+export const TROUBLES: readonly { flag: "overdue" | "shortfall" | "stale"; words: (count: number) => string; tone: "bad" | "warn"; count: (model: SummaryModel) => number }[] = [
+  { flag: "overdue", words: (count) => `${nodesWords(count)} overdue`, tone: "bad", count: (model) => model.overdue.length },
+  { flag: "shortfall", words: (count) => `${nodesWords(count)} short of days`, tone: "bad", count: (model) => model.shortfalls.length },
+  { flag: "stale", words: (count) => `${nodesWords(count)} stale`, tone: "warn", count: (model) => model.stale.length },
+];
+
+function nodesWords(count: number): string {
+  return `${String(count)} ${count === 1 ? "node" : "nodes"}`;
+}
+
+/** A word or phrase as a sentence's first words: `the finish of X` becomes `The finish of X`. */
+export function upperFirst(text: string): string {
+  return `${text.slice(0, 1).toUpperCase()}${text.slice(1)}`;
 }
