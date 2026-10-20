@@ -243,7 +243,7 @@ impl<'connection> Writer<'connection> {
         self.run(
             "INSERT INTO identities (key, name) VALUES (?1, ?2) \
              ON CONFLICT (key) DO UPDATE SET name = excluded.name",
-            vec![text(key), text(name)],
+            vec![text(key), opt_text(name.as_ref())],
         )
         .await?;
         self.run(

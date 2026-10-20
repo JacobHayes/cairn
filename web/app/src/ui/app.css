@@ -893,6 +893,12 @@ table.data {
 .index-table td.num .meter {
   margin-top: var(--space-1);
 }
+/* The short actions keep their words on one line; the description column yields the room. */
+@media (min-width: 720px) {
+  .index-table table.data td:is([data-column="use"], [data-column="act"]) {
+    white-space: nowrap;
+  }
+}
 .index-table .cell-description {
   overflow: hidden;
   text-overflow: ellipsis;
@@ -1052,13 +1058,16 @@ table.data {
 .chips-field {
   display: flex;
   flex-direction: column;
-  gap: 3px;
+  gap: var(--space-1);
   flex: 2 1 18rem;
   min-width: 0;
 }
+/* The label is the plain field's, so a name and an email field sit on one line. */
 .chips-field > .label {
-  font-size: 11px;
-  line-height: 1.2;
+  font: 500 12px / 1.4 var(--font-mono);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--color-secondary);
 }
 .merge-fields {
   align-items: flex-end;

@@ -20,6 +20,7 @@ import { diffMarks, graphDiff, reviewEntries, type DiffKind, type DiffMark, type
 import type { Blocker } from "./model.ts";
 import type { Names } from "./words.ts";
 import type { ProposalWrite } from "./write.ts";
+import { identityLabel } from "../people/label.ts";
 
 /** The reviewer's edits not yet saved, and the proposal revision they started from (H5). */
 export interface Kept {
@@ -260,7 +261,7 @@ export function identityDiff(before: Deployment, after: Deployment | undefined):
   const known = new Set(was.map((identity) => identity.key));
   const created = now.filter((identity) => !known.has(identity.key)).map((identity): IdentityRow => ({ identity, mark: { kind: "added" } }));
   // The page's own order, by name, so a proposal's creations and renames sit where the directory lists them.
-  return [...rows, ...created].sort((left, right) => left.identity.name.localeCompare(right.identity.name) || left.identity.key.localeCompare(right.identity.key));
+  return [...rows, ...created].sort((left, right) => identityLabel(left.identity).localeCompare(identityLabel(right.identity)) || left.identity.key.localeCompare(right.identity.key));
 }
 
 /** The nodes of a level that lists rows: the key, and the drawn node it is drawn under. */

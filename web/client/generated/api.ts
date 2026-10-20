@@ -955,7 +955,7 @@ export interface paths {
             cookie?: never;
         };
         /** The caller and their identities (H2, H3). */
-        get: operations["getViewer"];
+        get: operations["getCaller"];
         put?: never;
         post?: never;
         delete?: never;
@@ -1248,6 +1248,17 @@ export interface components {
             guards: components["schemas"]["Guard"][];
             /** @description Why. */
             reason: components["schemas"]["Reason"];
+        };
+        /** @description The caller (H2) and the identities their verified emails name (H3). */
+        Caller: {
+            /** @description The agent acting for them, when the request carries an agent token. */
+            agent?: components["schemas"]["AgentId"] | null;
+            /** @description Their identities, which "mine" covers together. */
+            identities: components["schemas"]["IdentityKey"][];
+            /** @description The logins they sign in with, by provider and subject. */
+            logins: components["schemas"]["LinkedLogin"][];
+            /** @description The user. */
+            user: components["schemas"]["UserId"];
         };
         /** @description The capabilities document (`GET /api/capabilities`): what this host offers. */
         Capabilities: {
@@ -2362,8 +2373,12 @@ export interface components {
             emails?: components["schemas"]["Email"][];
             /** @description The identity's key. */
             key: components["schemas"]["IdentityKey"];
-            /** @description Its name. */
-            name: components["schemas"]["Title"];
+            /**
+             * @description Its name, if it has one. An identity has a name, an email, or both (H3), so one a
+             *     sign-in created from an account that gave no name is shown by its first email until
+             *     its person is asked for one.
+             */
+            name?: components["schemas"]["Title"] | null;
         };
         /** @description Starts with "who_"; at most id_bytes_max (64) bytes. */
         IdentityKey: string;
@@ -2711,6 +2726,8 @@ export interface components {
              * @description When it was linked.
              */
             linked_at: string;
+            /** @description The name the provider gave the account at the last sign-in, if it gave one. */
+            name?: components["schemas"]["Title"] | null;
             /** @description The provider, by its configured name. */
             provider: components["schemas"]["Slug"];
             /** @description The provider's subject for the account. */
@@ -5353,7 +5370,10 @@ export interface components {
         UserId: string;
         /** @description A user and the name people see for them (H3). */
         UserName: {
-            /** @description Their name: the identity their verified emails name, else the name their sign-in gave. */
+            /**
+             * @description Their name: their identity's name, else its first email; with no identity, the name
+             *     their login gave, else its first verified email.
+             */
             name: components["schemas"]["Title"];
             /** @description The user. */
             user: components["schemas"]["UserId"];
@@ -5373,22 +5393,6 @@ export interface components {
             version: components["schemas"]["VersionNumber"];
         };
         VersionNumber: number;
-        /** @description The caller (H2) and the identities their verified emails name (H3). */
-        Viewer: {
-            /** @description The agent acting for them, when the request carries an agent token. */
-            agent?: components["schemas"]["AgentId"] | null;
-            /** @description Their identities, which "mine" covers together. */
-            identities: components["schemas"]["IdentityKey"][];
-            /** @description The logins they sign in with, by provider and subject. */
-            logins: components["schemas"]["LinkedLogin"][];
-            /**
-             * @description H3: present when their emails name more than one identity, which are then offered for
-             *     merging.
-             */
-            merge_offer?: components["schemas"]["IdentityKey"][] | null;
-            /** @description The user. */
-            user: components["schemas"]["UserId"];
-        };
         /** @description One violation. */
         Violation: {
             /** @description Where. */
@@ -5420,7 +5424,7 @@ export interface components {
          * @description What a violation breaks (PRD Invariants, D1, D4, A11, A18, A19, B6, E3, E6, H3).
          * @enum {string}
          */
-        ViolationCode: "duplicate_sibling_id" | "duplicate_key" | "retired_key_reused" | "unresolved_reference" | "wrong_reference_kind" | "containment_cycle" | "leaf_with_children" | "dependency_cycle" | "edge_to_ancestor_or_descendant" | "requires_duplicates_condition" | "contradictory_chain" | "condition_answer_type_mismatch" | "condition_on_own_subtree" | "stage_bound_not_milestone" | "undeclared_kind" | "single_kind_on_multi_role" | "fills_role_cardinality" | "several_filling_decisions" | "feeds_milestone_not_milestone" | "several_feeding_decisions" | "several_final_milestones" | "field_not_on_kind" | "state_not_on_kind" | "limit_exceeded" | "dangling_reference" | "removal_widened" | "still_referenced" | "answer_type_mismatch" | "identity_unresolved" | "illegal_transition" | "reason_required" | "guard_failed" | "not_relevant" | "snooze_on_self" | "snooze_cycle" | "snooze_not_actionable" | "snoozed_through_container" | "filled_through_decision" | "pinned_through_decision" | "mutation_not_for_target" | "lineage_invalid" | "archived_journey" | "target_exists" | "target_missing" | "deleted_journey_id" | "draft_exists" | "no_draft" | "version_in_use" | "segment_rule" | "insertion_invalid" | "insertion_key_taken" | "not_a_process_route" | "identity_key_taken" | "email_taken" | "alias_cycle" | "merge_breaks_journey" | "proposal_not_open" | "unresolved_review_item";
+        ViolationCode: "duplicate_sibling_id" | "duplicate_key" | "retired_key_reused" | "unresolved_reference" | "wrong_reference_kind" | "containment_cycle" | "leaf_with_children" | "dependency_cycle" | "edge_to_ancestor_or_descendant" | "requires_duplicates_condition" | "contradictory_chain" | "condition_answer_type_mismatch" | "condition_on_own_subtree" | "stage_bound_not_milestone" | "undeclared_kind" | "single_kind_on_multi_role" | "fills_role_cardinality" | "several_filling_decisions" | "feeds_milestone_not_milestone" | "several_feeding_decisions" | "several_final_milestones" | "field_not_on_kind" | "state_not_on_kind" | "limit_exceeded" | "dangling_reference" | "removal_widened" | "still_referenced" | "answer_type_mismatch" | "identity_unresolved" | "illegal_transition" | "reason_required" | "guard_failed" | "not_relevant" | "snooze_on_self" | "snooze_cycle" | "snooze_not_actionable" | "snoozed_through_container" | "filled_through_decision" | "pinned_through_decision" | "mutation_not_for_target" | "lineage_invalid" | "archived_journey" | "target_exists" | "target_missing" | "deleted_journey_id" | "draft_exists" | "no_draft" | "version_in_use" | "segment_rule" | "insertion_invalid" | "insertion_key_taken" | "not_a_process_route" | "identity_key_taken" | "identity_empty" | "email_taken" | "alias_cycle" | "merge_breaks_journey" | "proposal_not_open" | "unresolved_review_item";
         /** @description A violation list with at least one entry (a rejection always says why). */
         Violations: components["schemas"]["Violation"][];
         /** @description What a stream watches: `deployment`, `journey:<id>`, `route:<id>`, `proposal:<id>`, `journeys`, `routes`, or `proposals`. */
@@ -11370,7 +11374,7 @@ export interface operations {
             };
         };
     };
-    getViewer: {
+    getCaller: {
         parameters: {
             query?: never;
             header?: never;
@@ -11385,7 +11389,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["Viewer"];
+                    "application/json": components["schemas"]["Caller"];
                 };
             };
             /** @description The request is malformed. */

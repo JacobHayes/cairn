@@ -16,7 +16,7 @@ mod oidc {
         AuthProvider, DevConfig, DevProvider, OidcConfig, OidcProvider, Presented, Refusal, Verdict,
     };
     use cairn_schema::{Actor, Login, Slug, UserId};
-    use cairn_store::AuthStore;
+    use cairn_store::{AuthLogQuery, AuthStore};
 
     use crate::auth::support::issuer::{Advertise, Issuer, Person, Spoil};
     use crate::auth::support::{
@@ -144,7 +144,7 @@ mod oidc {
         let login = Login {
             provider: "oidc".parse().unwrap(),
             subject: ANN.subject.parse().unwrap(),
-            display: ANN.name.parse().unwrap(),
+            name: Some(ANN.name.parse().unwrap()),
             verified_emails: [ANN.email.parse().unwrap()].into(),
         };
         assert_eq!(held.len(), 1);
@@ -153,14 +153,7 @@ mod oidc {
             (&login.provider, &login.subject)
         );
         assert_eq!(held[0].verified_emails, login.verified_emails);
-        let user = setup
-            .world
-            .store
-            .user(&signed_in.user)
-            .await
-            .unwrap()
-            .unwrap();
-        assert_eq!(user.name, login.display);
+        assert_eq!(held[0].name, login.name);
         let again = sign_in(&setup, &ANN, Spoil::Nothing, "").await.unwrap();
         assert_eq!(actor(&setup, &again).await, signed_in);
     }
@@ -213,8 +206,8 @@ mod oidc {
         let tailnet = Login {
             provider: "tailscale".parse().unwrap(),
             subject: "ann@tailnet".parse().unwrap(),
-            display: "Ann".parse().unwrap(),
-            verified_emails: std::collections::BTreeSet::new(),
+            name: None,
+            verified_emails: ["ann@tailnet.example".parse().unwrap()].into(),
         };
         let user = setup
             .world
@@ -237,14 +230,15 @@ mod oidc {
     }
 
     /// H3: with auto-link on, a verified email joins the user already holding it; an email
-    /// the issuer does not mark verified never links and is not listed.
+    /// the issuer does not mark verified never links, and a sign-in with no verified email
+    /// at all is refused, starting no session and creating no user.
     #[tokio::test]
     async fn an_unverified_email_never_auto_links() {
         let setup = setup(true).await;
         let holder = Login {
             provider: "tailscale".parse().unwrap(),
             subject: "ann@tailnet".parse().unwrap(),
-            display: "Ann".parse().unwrap(),
+            name: None,
             verified_emails: [ANN.email.parse().unwrap()].into(),
         };
         let user = setup
@@ -258,13 +252,11 @@ mod oidc {
             email_verified: false,
             ..ANN
         };
-        let session = sign_in(&setup, &unverified, Spoil::Nothing, "")
-            .await
-            .unwrap();
-        let stranger = actor(&setup, &session).await.user;
-        assert_ne!(stranger, user);
-        let held = setup.world.store.logins_of(&stranger).await.unwrap();
-        assert_eq!(held[0].verified_emails, std::collections::BTreeSet::new());
+        let refused = sign_in(&setup, &unverified, Spoil::Nothing, "").await;
+        assert_eq!(refused, Err(StatusCode::FORBIDDEN));
+        let query = AuthLogQuery::default();
+        let logged = setup.world.accounts.auth_log(&query).await.unwrap();
+        assert_eq!(logged.items.len(), 2, "no user or login was added");
         let verified = Person {
             subject: "verified",
             ..ANN
@@ -324,7 +316,7 @@ mod oidc {
         let dev = DevConfig {
             name: "dev".parse().unwrap(),
             user: "Dev".parse().unwrap(),
-            verified_emails: std::collections::BTreeSet::new(),
+            verified_emails: ["dev@example.org".parse().unwrap()].into(),
             token: None,
             auto_link: false,
             allow_off_loopback: false,
@@ -360,8 +352,11 @@ mod oidc {
         let login = Login {
             provider: "tailscale".parse().unwrap(),
             subject: subject.parse().unwrap(),
-            display: subject.parse().unwrap(),
-            verified_emails: std::collections::BTreeSet::new(),
+            name: None,
+            verified_emails: [format!("{}@example.org", subject.replace('@', "."))
+                .parse()
+                .unwrap()]
+            .into(),
         };
         let user = world.accounts.resolve(&login, None, false).await.unwrap();
         let session = world.accounts.start_session(&user).await.unwrap();
@@ -474,7 +469,7 @@ mod oidc {
         let dev = DevConfig {
             name: "dev".parse().unwrap(),
             user: "Dev".parse().unwrap(),
-            verified_emails: std::collections::BTreeSet::new(),
+            verified_emails: ["dev@example.org".parse().unwrap()].into(),
             token: None,
             auto_link: false,
             allow_off_loopback: false,

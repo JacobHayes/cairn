@@ -433,4 +433,34 @@ mod identities {
             assert_eq!(emails.len(), 2);
         });
     }
+
+    /// A login keeps its provider's name, and the user record's copy is gone; an identity
+    /// may have no name, so the column takes NULL. The logins that existed start with none.
+    #[test]
+    fn names_move_to_the_login_and_an_identity_may_have_none() {
+        run(async {
+            let (path, store, _) = migrated("names").await;
+            let logins = store
+                .logins_of(&cairn_store::build::id("u_lead"))
+                .await
+                .unwrap();
+            assert!(logins.iter().all(|login| login.name.is_none()));
+            drop(store);
+            let users = rows(&path, "SELECT name FROM pragma_table_info('users')").await;
+            assert!(users.iter().all(|column| column[0] != "name"), "{users:?}");
+            let columns = rows(
+                &path,
+                "SELECT name, \"notnull\" FROM pragma_table_info('identities') WHERE name = 'name'",
+            )
+            .await;
+            assert_eq!(columns, vec![vec!["name", "0"]]);
+            let named = rows(
+                &path,
+                "SELECT count(*) FROM identities WHERE name IS NOT NULL",
+            )
+            .await;
+            let total = rows(&path, "SELECT count(*) FROM identities").await;
+            assert_eq!(named, total, "every name survived the move");
+        });
+    }
 }

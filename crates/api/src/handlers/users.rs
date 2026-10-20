@@ -11,19 +11,17 @@ use crate::Api;
 use crate::error::ApiError;
 use crate::extract::{JsonBody, Path, segment};
 use crate::query::{self, Params};
-use crate::wire::{AgentToken, MintedToken, TokenRequest, UserName, Viewer};
+use crate::wire::{AgentToken, Caller, MintedToken, TokenRequest, UserName};
 
 /// `GET /api/users/me` (H2, H3).
-pub async fn viewer(State(api): State<Api>, Extension(actor): Extension<Actor>) -> Answer<Viewer> {
+pub async fn caller(State(api): State<Api>, Extension(actor): Extension<Actor>) -> Answer<Caller> {
     let agent = actor.agent.clone();
-    let viewer = api.service.viewer(&api.call(actor)).await?;
-    let merge_offer = viewer.merge_offer().cloned();
-    Ok(Json(Viewer {
-        user: viewer.user,
+    let caller = api.service.caller(&api.call(actor)).await?;
+    Ok(Json(Caller {
+        user: caller.user,
         agent,
-        identities: viewer.identities,
-        merge_offer,
-        logins: viewer.logins.into_iter().map(Into::into).collect(),
+        identities: caller.identities,
+        logins: caller.logins.into_iter().map(Into::into).collect(),
     }))
 }
 

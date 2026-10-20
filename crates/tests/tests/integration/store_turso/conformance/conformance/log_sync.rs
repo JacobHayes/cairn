@@ -203,7 +203,6 @@ pub async fn a_commit_in_flight_when_the_store_fails_closed_is_not_applied(backe
 fn user(key: &str) -> UserRecord {
     UserRecord {
         id: id(key),
-        name: id("Someone"),
         created_at: at(0),
     }
 }

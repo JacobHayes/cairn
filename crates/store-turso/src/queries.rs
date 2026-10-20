@@ -4,8 +4,8 @@
 use std::collections::{BTreeMap, BTreeSet};
 
 use cairn_schema::{
-    Actor, Domain, Event, Identity, IdentityKey, JourneyId, Mutation, ProposalOutline, Revision,
-    RevisionOf, RouteId, RouteKind,
+    Actor, Domain, Email, Event, Identity, IdentityKey, JourneyId, Mutation, ProposalOutline,
+    Revision, RevisionOf, RouteId, RouteKind,
 };
 use cairn_store::backend;
 use cairn_store::{
@@ -384,6 +384,20 @@ pub(crate) async fn proposals(
     })
 }
 
+pub(crate) async fn identities_with_emails(
+    connection: &Connection,
+    emails: &BTreeSet<Email>,
+) -> Result<BTreeSet<IdentityKey>, StoreError> {
+    let mut found = BTreeSet::new();
+    for email in emails {
+        let select = "SELECT identity FROM identity_emails WHERE email = ?1";
+        for row in rows(connection, select, vec![text(email)]).await? {
+            found.insert(row.parse(0)?);
+        }
+    }
+    Ok(found)
+}
+
 pub(crate) async fn resolve_identity(
     connection: &Connection,
     key: &IdentityKey,
@@ -414,7 +428,7 @@ pub(crate) async fn resolve_identity(
     }
     Ok(Some(Identity {
         key,
-        name: row.parse(0)?,
+        name: row.opt_parse(0)?,
         emails,
     }))
 }

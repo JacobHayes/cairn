@@ -8,11 +8,9 @@ import type { MineEntry } from "./mine.ts";
 
 /** What Home is in: still reading, unable to read, or one of the four states a read page can be in (C16). */
 export type HomeState =
-  /** The viewer or the index has not answered, or no journey has settled with anything to show. */
+  /** The caller or the index has not answered, or no journey has settled with anything to show. */
   | "loading"
   | "failed"
-  /** No identity of the viewer's: nothing can show as theirs. */
-  | "unlinked"
   /** They are someone, and hold nothing in any active journey. */
   | "unassigned"
   /** They hold work, none of it able to move now. */
@@ -35,20 +33,17 @@ export interface HomeJourney {
  * ready to show.
  */
 export function homeState(input: {
-  viewer: "loading" | "failed" | { identities: number };
+  caller: "loading" | "failed" | "ready";
   index: "loading" | "failed" | "ready";
   journeys: readonly HomeJourney[];
   /** The proposals waiting on the viewer: Home does not say nothing needs them before they are read, or while there are some (C14, C16). */
   proposals: "loading" | "failed" | { waiting: number };
 }): HomeState {
-  if (input.viewer === "failed" || input.index === "failed") {
+  if (input.caller === "failed" || input.index === "failed") {
     return "failed";
   }
-  if (input.viewer === "loading" || input.index === "loading") {
+  if (input.caller === "loading" || input.index === "loading") {
     return "loading";
-  }
-  if (input.viewer.identities === 0) {
-    return "unlinked";
   }
   if (input.journeys.some((each) => each.ready > 0 || each.reading === "failed")) {
     return "ready";

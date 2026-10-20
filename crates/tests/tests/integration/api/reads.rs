@@ -8,8 +8,8 @@ mod in_process {
     use axum::http::{Method, StatusCode};
     use cairn_api::error::status_of;
     use cairn_api::wire::{
-        AgentToken, Capabilities, EventPage, JourneyPage, MintedToken, Problem, ProblemCode,
-        RouteDetail, RoutePage, SearchHit, SearchPage, UserName, Viewer,
+        AgentToken, Caller, Capabilities, EventPage, JourneyPage, MintedToken, Problem,
+        ProblemCode, RouteDetail, RoutePage, SearchHit, SearchPage, UserName,
     };
     use cairn_engine::{Graph, derive};
     use cairn_schema::{Deployment, DomainDocument, Journey, Route, RouteVersion};
@@ -138,24 +138,56 @@ mod in_process {
         .await;
         assert_eq!(rest.items.len(), 3);
 
-        let viewer: Viewer = get(&ann, "/api/users/me").await;
+        let caller: Caller = get(&ann, "/api/users/me").await;
         assert_eq!(
-            viewer.identities,
+            caller.identities,
             ["who_k3d7qm2xw5tn6pfa".parse().unwrap()].into()
         );
-        assert_eq!((viewer.agent, viewer.merge_offer), (None, None));
-        let emails: Vec<_> = viewer
+        assert_eq!(caller.agent, None);
+        let emails: Vec<_> = caller
             .logins
             .iter()
             .flat_map(|login| &login.verified_emails)
             .collect();
         assert!(
-            !viewer.logins.is_empty() && !emails.is_empty(),
+            !caller.logins.is_empty() && !emails.is_empty(),
             "the login that names the identity is listed with its verified email"
         );
         let capabilities: Capabilities = get(&ann, "/api/capabilities").await;
         assert_eq!(capabilities, Capabilities::from(service.capabilities()));
         assert!(capabilities.sse && capabilities.mcp && !capabilities.assistant);
+    }
+
+    /// H3: a user's first request gives them an identity holding their verified email, named
+    /// by their login; later requests, over HTTP and MCP alike, find it rather than adding
+    /// another.
+    #[tokio::test]
+    async fn a_first_request_gives_the_caller_an_identity_and_later_ones_reuse_it() {
+        let world = World::start().await;
+        let bob = world.signed_in("bob");
+        let first: Caller = get(&bob, "/api/users/me").await;
+        assert_eq!(first.identities.len(), 1);
+        let deployment: Deployment = get(&bob, "/api/deployment").await;
+        let identity = deployment.identities.values().next().unwrap();
+        assert_eq!(
+            identity.name.as_ref().map(cairn_schema::Title::as_str),
+            Some("bob")
+        );
+        let emails: Vec<&str> = identity
+            .emails
+            .iter()
+            .map(cairn_schema::Email::as_str)
+            .collect();
+        assert_eq!(emails, ["bob@example.org"]);
+
+        let again: Caller = get(&bob, "/api/users/me").await;
+        let _: Deployment = get(&bob, "/api/deployment").await;
+        assert_eq!(again.identities, first.identities);
+        let after: Deployment = get(&bob, "/api/deployment").await;
+        assert_eq!(
+            after.revision, deployment.revision,
+            "nothing more was created"
+        );
     }
 
     /// H3: a user goes by the identity their verified email names, else by the name their
@@ -166,8 +198,8 @@ mod in_process {
         let world = World::start().await;
         let ann = world.vendor_after(3).await;
         let bob = world.signed_in("bob");
-        let ann_user = get::<Viewer>(&ann, "/api/users/me").await.user;
-        let bob_user = get::<Viewer>(&bob, "/api/users/me").await.user;
+        let ann_user = get::<Caller>(&ann, "/api/users/me").await.user;
+        let bob_user = get::<Caller>(&bob, "/api/users/me").await.user;
 
         let ask = format!("/api/users?id={ann_user}&id=u_nobody&id={bob_user}");
         let named: Vec<UserName> = get(&ann, &ask).await;
@@ -183,7 +215,7 @@ mod in_process {
             .values()
             .find(|identity| identity.key.as_str() == "who_k3d7qm2xw5tn6pfa")
             .unwrap();
-        assert_eq!(name_of(&ann_user), Some(lead.name.to_string()));
+        assert_eq!(name_of(&ann_user), Some(lead.display().to_owned()));
         assert_eq!(name_of(&bob_user), Some("bob".to_owned()));
         assert_eq!(named.len(), 2, "u_nobody has no name to give");
 
@@ -256,8 +288,8 @@ mod in_process {
         assert_eq!(reply.status, StatusCode::CREATED);
         let minted: MintedToken = reply.json().unwrap();
         let agent = world.bearer(&minted.token);
-        let as_agent: Viewer = get(&agent, "/api/users/me").await;
-        let as_user: Viewer = get(&ann, "/api/users/me").await;
+        let as_agent: Caller = get(&agent, "/api/users/me").await;
+        let as_user: Caller = get(&ann, "/api/users/me").await;
         assert_eq!(
             (&as_agent.user, as_agent.agent.as_ref()),
             (&as_user.user, Some(&minted.agent))

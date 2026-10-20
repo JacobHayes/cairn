@@ -4,11 +4,11 @@
 // the set when it commits; reads resolve the merged key through its alias afterwards.
 import type { Schema } from "@cairn/client";
 
-import { pathTo } from "../address.ts";
 import { EMAIL_BYTES_MAX, EMAIL_COUNT_PER_IDENTITY_MAX } from "@cairn/client";
 import { overBytes } from "../authoring/limits.ts";
 import type { Mutation } from "../data/writes.ts";
 import type { ChipRules } from "../ui/chips.ts";
+import { identityLabel } from "./label.ts";
 
 export type Identity = Schema<"Identity">;
 export type Deployment = Schema<"Deployment">;
@@ -36,10 +36,12 @@ export function emailProblem(email: string): string | undefined {
   return shaped ? overBytes(email, EMAIL_BYTES_MAX, "The email") : `${email} is not an email address: write it as name@example.org.`;
 }
 
-/** E6: an identity as it should be, its name trimmed and its emails (already normalized chips) as the list it holds. */
+/** E6, H3: an identity as it should be: its name trimmed (none when blank) and its emails (already normalized chips) as the list it holds. */
 export function identityOf(key: string, name: string, emails: readonly string[]): Identity {
-  return { key, name: name.trim(), ...(emails.length === 0 ? {} : { emails: [...emails] }) };
+  const trimmed = name.trim();
+  return { key, ...(trimmed === "" ? {} : { name: trimmed }), ...(emails.length === 0 ? {} : { emails: [...emails] }) };
 }
+
 
 /** E6: the merge of `merged` into `survivor`, naming each journey referring to either at the revision seen. */
 export function mergeMutation(survivor: string, merged: string, referencing: readonly JourneySummary[]): Mutation {
@@ -58,26 +60,7 @@ export function aliasesOf(deployment: Deployment, key: string): string[] {
     .sort();
 }
 
-/** The identities by name, then key. */
+/** The identities by how they are shown (a name, else the first email), then key. */
 export function byName(identities: readonly Identity[]): Identity[] {
-  return [...identities].sort((left, right) => left.name.localeCompare(right.name) || left.key.localeCompare(right.key));
-}
-
-/**
- * H3: the merge the caller is offered when their verified emails name several identities: the
- * first (by key) survives and the next is merged into it; one merge at a time, until one is left.
- */
-export function offeredMerge(offer: readonly string[] | null | undefined): { survivor: string; merged: string } | undefined {
-  const [survivor, merged] = [...(offer ?? [])].sort();
-  return survivor === undefined || merged === undefined ? undefined : { survivor, merged };
-}
-
-/** H3: the identities screen with the merge of `merged` into `survivor` open (`?merge=<survivor>,<merged>`). */
-export function mergePath(survivor: string, merged: string): string {
-  return `${pathTo("identities")}?${new URLSearchParams({ merge: `${survivor},${merged}` }).toString()}`;
-}
-
-/** The identities the identities screen's `search` asks to merge (`mergePath`), the survivor first. */
-export function mergeAsked(search: string): string[] {
-  return (new URLSearchParams(search).get("merge") ?? "").split(",").filter((key) => key !== "");
+  return [...identities].sort((left, right) => identityLabel(left).localeCompare(identityLabel(right)) || left.key.localeCompare(right.key));
 }

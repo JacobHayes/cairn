@@ -95,6 +95,18 @@ pub async fn aliases_resolve_to_their_identity<B: Backend>(backend: &B) {
         store.resolve_identity(&id("who_nobody")).await.unwrap(),
         None
     );
+    // H3: the identities holding any of some emails.
+    let held = |emails: &[&str]| {
+        let emails = emails.iter().map(|email| id(email)).collect();
+        let store = &store;
+        async move { store.identities_with_emails(&emails).await.unwrap() }
+    };
+    assert_eq!(
+        held(&["a@example.org", "x@example.org"]).await,
+        BTreeSet::from([id("who_a")])
+    );
+    assert_eq!(held(&["x@example.org"]).await, BTreeSet::new());
+    assert_eq!(held(&[]).await, BTreeSet::new());
     // Any key of an identity finds every journey holding any key of it.
     for asked in ["who_a", "who_old", "who_older"] {
         let referencing = store

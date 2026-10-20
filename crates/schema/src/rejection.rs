@@ -88,6 +88,7 @@ pub enum ViolationCode {
     NotAProcessRoute,
     // Identities (E6, H3).
     IdentityKeyTaken,
+    IdentityEmpty,
     EmailTaken,
     AliasCycle,
     MergeBreaksJourney,

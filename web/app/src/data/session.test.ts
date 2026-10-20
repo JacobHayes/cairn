@@ -225,18 +225,18 @@ describe("the caller", () => {
     clock.increment(0);
     host.open();
     await settled();
-    expect(host.viewerFetches).toBe(1);
+    expect(host.callerFetches).toBe(1);
     // The deployment recovers at a newer revision: it is held, and the caller is read for it.
     host.deploymentFails = false;
     host.deploymentRevision = 2;
     host.tick({ of: deployment, revision: 2 });
     await settled();
     expect(session.deployment.getSnapshot().context.held?.value).toEqual({ revision: 2 });
-    expect(host.viewerFetches).toBe(2);
+    expect(host.callerFetches).toBe(2);
     // The same revision again asks for nothing.
     host.tick({ of: deployment, revision: 2 });
     await settled();
-    expect(host.viewerFetches).toBe(2);
+    expect(host.callerFetches).toBe(2);
     session.close();
   });
 });

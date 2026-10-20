@@ -58,7 +58,8 @@ endpoint = "https://api.anthropic.com/v1"
 model = "a-model-name"
 ```
 
-Each provider kind's settings: `dev` (`user`, `verified_emails`, `token`, `auto_link`,
+Each provider kind's settings: `dev` (`user`, `verified_emails`, which must hold at least one email,
+`token`, `auto_link`,
 `allow_off_loopback`), `oidc` (`issuer`, `client_id`, `client_secret`, `auto_link`),
 `builtin_oauth` (`sign_in_with`), `tailscale` (`mode` direct with `socket`, or proxy, with
 `trusted_proxies` listing the addresses or networks of a proxy on another machine, or left

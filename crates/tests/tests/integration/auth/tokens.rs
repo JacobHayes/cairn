@@ -25,10 +25,18 @@ mod tokens {
     async fn ann(world: &World) -> Actor {
         let user = UserRecord {
             id: "u_ann".parse().unwrap(),
-            name: "Ann".parse().unwrap(),
             created_at: world.accounts.clock().now(),
         };
         world.store.put_user(user).await.unwrap();
+        let login = cairn_store::LoginRecord {
+            provider: "oidc".parse().unwrap(),
+            subject: "ann".parse().unwrap(),
+            user: "u_ann".parse().unwrap(),
+            name: None,
+            verified_emails: ["ann@example.org".parse().unwrap()].into(),
+            linked_at: world.accounts.clock().now(),
+        };
+        world.store.put_login(login).await.unwrap();
         Actor {
             user: "u_ann".parse().unwrap(),
             agent: None,
@@ -85,6 +93,26 @@ mod tokens {
         assert!(listed[0].revoked_at.is_some());
         let logged = [AuthEvent::TokenMinted, AuthEvent::TokenRevoked];
         assert_eq!(world.log().await, logged);
+    }
+
+    /// H3: a token of a user none of whose logins has a verified email, which predates sign-in
+    /// requiring one, is refused like a revoked one: the user signs in again.
+    #[tokio::test]
+    async fn a_token_of_a_user_with_no_verified_email_is_refused() {
+        let world = World::new();
+        let ann = ann(&world).await;
+        let router = app(&world.auth(loopback(), vec![oauth(&world)]));
+        let minted = world
+            .accounts
+            .mint_token(&ann, named("nightly"))
+            .await
+            .unwrap();
+        assert!(whoami(&router, bearer(minted.token.expose())).await.is_ok());
+        let mut login = world.store.logins_of(&ann.user).await.unwrap().remove(0);
+        login.verified_emails.clear();
+        world.store.put_login(login).await.unwrap();
+        let refused = whoami(&router, bearer(minted.token.expose())).await;
+        assert_eq!(refused, Err(StatusCode::UNAUTHORIZED));
     }
 
     /// A stored token is never readable in plain text: the store holds its digest, and the

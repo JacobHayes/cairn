@@ -66,7 +66,8 @@ timezone = "UTC"
 [[auth]]
 kind = "dev"
 name = "dev"
-user = "dev"
+user = "Ana Ruiz"
+verified_emails = ["ana@example.org"]
 
 [[auth]]
 kind = "oidc"

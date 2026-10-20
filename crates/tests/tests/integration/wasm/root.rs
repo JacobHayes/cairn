@@ -313,16 +313,12 @@ fn the_index_route_and_viewer_reads_are_the_apis_json() {
             .journeys
             .contains(&"j_vendor_eval".parse().unwrap())
     );
-    let viewer: wire::Viewer = same(&root.viewer(NOW).unwrap());
-    assert_eq!(viewer.logins.len(), 1);
+    let caller: wire::Caller = same(&root.caller(NOW).unwrap());
+    assert_eq!(caller.logins.len(), 1);
     assert_eq!(
-        viewer.identities.len(),
+        caller.identities.len(),
         1,
         "the local login's email names one person, in every fixture"
-    );
-    assert_eq!(
-        viewer.merge_offer, None,
-        "one identity has nothing to merge"
     );
 
     let exported = root.export_file("hiring-loop", "1").unwrap();
@@ -340,4 +336,36 @@ fn the_index_route_and_viewer_reads_are_the_apis_json() {
     );
     let text = cairn_wasm::route_file_text(&again).unwrap();
     assert_eq!(cairn_wasm::read_route_file(&text).unwrap(), again);
+}
+
+/// H3: the local user arrives as a signed-in request does: an identity they no longer hold
+/// through is made again, so "mine" never goes empty.
+#[test]
+fn the_local_user_is_given_an_identity_when_none_holds_their_email() {
+    let root = BrowserRoot::seeded().unwrap();
+    let before = root.caller_now(NOW).unwrap();
+    assert_eq!(before.identities.len(), 1);
+    let own = before.identities.iter().next().unwrap().to_string();
+    let deployment: serde_json::Value = serde_json::from_str(&root.deployment().unwrap()).unwrap();
+    let revision = deployment["revision"].as_u64().unwrap();
+    let edit = serde_json::json!({
+        "patch": {
+            "id": "p_drop_email",
+            "target": "deployment",
+            "base_revision": revision,
+            "mutations": [{
+                "op": "edit_identity",
+                "identity": { "key": own, "name": "Kept name" },
+            }],
+        },
+    })
+    .to_string();
+    root.patch(&edit, NOW).unwrap();
+    let after = root.caller_now(NOW).unwrap();
+    assert_eq!(after.identities.len(), 1);
+    assert!(
+        !after
+            .identities
+            .contains(&before.identities.iter().next().unwrap().clone())
+    );
 }

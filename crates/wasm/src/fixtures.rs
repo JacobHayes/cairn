@@ -269,8 +269,8 @@ async fn submit(
 pub const LOCAL_EMAIL: &str = "ana@example.org";
 
 /// The users the fixtures' events name (the routes' publisher and the scenarios' actors),
-/// each with the person's name and, but for the publisher, one login verified for that
-/// person's email, so a history says who rather than an id.
+/// each but the publisher with one login, named for the person and verified for their email,
+/// so a history says who rather than an id.
 ///
 /// # Errors
 ///
@@ -292,7 +292,6 @@ pub async fn put_fixture_users(store: &dyn Store, at: Timestamp) -> Result<(), S
         store
             .put_user(UserRecord {
                 id: user.clone(),
-                name: parse(name)?,
                 created_at: at,
             })
             .await
@@ -303,6 +302,7 @@ pub async fn put_fixture_users(store: &dyn Store, at: Timestamp) -> Result<(), S
                     provider: parse("fixture")?,
                     subject: parse(id)?,
                     user,
+                    name: Some(parse(name)?),
                     verified_emails: [parse::<Email>(email)?].into_iter().collect(),
                     linked_at: at,
                 })
@@ -330,7 +330,6 @@ pub async fn sign_in_local(store: &dyn Store, at: Timestamp) -> Result<Actor, Se
     store
         .put_user(UserRecord {
             id: user.clone(),
-            name: parse("Local user")?,
             created_at: at,
         })
         .await
@@ -341,6 +340,7 @@ pub async fn sign_in_local(store: &dyn Store, at: Timestamp) -> Result<Actor, Se
             provider: parse("local")?,
             subject: parse("local")?,
             user: user.clone(),
+            name: None,
             verified_emails,
             linked_at: at,
         })

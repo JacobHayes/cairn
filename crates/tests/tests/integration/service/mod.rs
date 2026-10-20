@@ -3,6 +3,7 @@
 #[cfg(test)]
 mod support;
 
+mod arrival;
 mod composition;
 mod in_flight;
 mod property_write;

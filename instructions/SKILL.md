@@ -74,7 +74,8 @@ out, though its relevance reads `not_relevant` and counts for nothing until then
 - **Arguments.** A call whose arguments do not match the tool's schema is refused with the
   path that did not match.
 - **Identities.** A write that names identities (an identity answer, explicit participants)
-  carries the `deployment_revision` the snapshot reported.
+  carries the `deployment_revision` the snapshot reported. An identity has a name, emails,
+  or both; a person who only signed in has emails and no name.
 
 ## Direct writes or proposals
 

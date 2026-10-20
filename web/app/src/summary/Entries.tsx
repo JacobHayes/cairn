@@ -9,16 +9,16 @@ import { RowsPanel } from "../acting/RowsPanel.tsx";
 import type { NodeRow } from "../acting/why.ts";
 import type { Ready } from "../detail/model.ts";
 import { nodeAddress } from "./links.ts";
-import { useViewer } from "../data/react.ts";
+import { useCaller } from "../data/react.ts";
 import { ownerWords } from "../detail/sections.tsx";
 
 /** The owner as a row says it when it offers no actions: who has it, or that nobody does. */
 function OwnerText({ view, owners }: { view: Ready; owners: string[] | undefined }) {
-  const { viewer } = useViewer();
+  const { caller } = useCaller();
   if (owners === undefined) {
     return null;
   }
-  const words = ownerWords(view, owners, viewer?.identities);
+  const words = ownerWords(view, owners, caller?.identities);
   return (
     <div className="row-side">
       <span className="row-owner row-owner-static" title={owners.length === 0 ? undefined : `Owned by ${words}`}>

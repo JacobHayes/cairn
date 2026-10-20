@@ -356,7 +356,7 @@ mod gcp_iap {
         let dev = DevConfig {
             name: "dev".parse().unwrap(),
             user: "Dev".parse().unwrap(),
-            verified_emails: std::collections::BTreeSet::new(),
+            verified_emails: ["dev@example.org".parse().unwrap()].into(),
             token: None,
             auto_link: false,
             allow_off_loopback: false,

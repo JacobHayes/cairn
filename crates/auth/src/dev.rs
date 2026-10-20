@@ -17,7 +17,7 @@ use crate::secret::{SECRET_PREFIX, secrets_equal};
 pub struct DevConfig {
     /// The provider's name.
     pub name: Slug,
-    /// The dev user's name: the login's subject and display name.
+    /// The dev user's name: the login's subject and name.
     pub user: Title,
     /// Emails the operator vouches for, listed as verified (H3).
     pub verified_emails: BTreeSet<Email>,
@@ -65,7 +65,7 @@ impl DevProvider {
         let login = Login {
             provider: config.name.clone(),
             subject: config.user.clone(),
-            display: config.user.clone(),
+            name: Some(config.user.clone()),
             verified_emails: config.verified_emails.clone(),
         };
         Ok(Self { config, login })

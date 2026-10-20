@@ -4,11 +4,11 @@
 // survivor unchanged. Which identities are the caller's is marked. Kept current (H6). An edit
 // is drafted against the deployment revision its author saw, and forms survive a reload.
 import { useState } from "react";
-import { useLocation, useParams } from "react-router";
+import { useParams } from "react-router";
 
 import type { Deployment } from "../data/host.ts";
 import { useDraft } from "../data/drafts.ts";
-import { useDeployment, useViewer } from "../data/react.ts";
+import { useCaller, useDeployment } from "../data/react.ts";
 import { Band } from "../proposals/Band.tsx";
 import { DestinationProposals } from "../proposals/DestinationProposals.tsx";
 import { DeploymentLayerHost } from "../proposals/Hosts.tsx";
@@ -24,8 +24,9 @@ import { Chip, Chips } from "../ui/Chip.tsx";
 import { ChipsInput } from "../ui/ChipsInput.tsx";
 import { IndexHead } from "../ui/IndexHead.tsx";
 import { Badge, Button, Field } from "../ui/kit.tsx";
+import { identityLabel } from "./label.ts";
 import { MergeIdentities } from "./MergeIdentities.tsx";
-import { aliasesOf, byName, EMAIL_RULES, identityOf, mergeAsked, newIdentityKey, type Identity } from "./model.ts";
+import { aliasesOf, byName, EMAIL_RULES, identityOf, newIdentityKey, type Identity } from "./model.ts";
 import { plural } from "../ui/words.ts";
 
 /** An identity's edit as typed, and the deployment revision its author saw when they opened it (H5). */
@@ -65,7 +66,7 @@ function IdentityEditor({ identity, deployment, draft, setDraft, write }: { iden
           <ChipsInput label="Emails" placeholder="Add an email" inputMode="email" rules={EMAIL_RULES} values={draft.emails} text={draft.emailText} onChange={(emails, emailText) => { setDraft({ ...draft, emails, emailText }); }} />
         </span>
         <span className="row">
-          <Button primary type="submit" disabled={write.disabled || draft.name.trim() === "" || draft.emailText.trim() !== ""}>Save</Button>
+          <Button primary type="submit" disabled={write.disabled || (draft.name.trim() === "" && draft.emails.length === 0) || draft.emailText.trim() !== ""}>Save</Button>
           <Button onClick={() => { setDraft(undefined); write.dismiss(); }}>Cancel</Button>
         </span>
       </form>
@@ -91,7 +92,7 @@ function IdentityRow({ identity, deployment, yours, mark, intoName }: { identity
   const [draft, setDraft] = useDraft<IdentityDraft>(`identity-edit:${identity.key}`);
   // The row holds the write, so a save in flight keeps Edit closed until it settles: its
   // landing closes the draft it sent, never one opened after it.
-  const write = useScreenWrite(`identity:${identity.key}`, identity.name);
+  const write = useScreenWrite(`identity:${identity.key}`, identityLabel(identity));
   const aliases = aliasesOf(deployment, identity.key);
   return (
     <li className="identity-row" data-testid="identity" data-identity={identity.key} data-diff={mark?.kind}>
@@ -102,12 +103,12 @@ function IdentityRow({ identity, deployment, yours, mark, intoName }: { identity
               {mark.into === undefined ? DIFF_LABELS[mark.kind] : `Merged into ${intoName ?? mark.into}`}
             </span>
           )}
-          <strong data-testid="identity-name">{identity.name}</strong>
+          <strong data-testid="identity-name" className={identity.name === undefined || identity.name === null ? "mono" : undefined}>{identityLabel(identity)}</strong>
           {yours ? <Badge tone="good" data-testid="yours">You</Badge> : null}
           {aliases.length === 0 ? null : <span className="muted small" data-testid="aliases">merged from {plural(aliases.length, "other entry", "other entries")}</span>}
         </span>
         {draft === undefined && !reviewing ? (
-          <Button disabled={write.disabled} onClick={() => { setDraft({ name: identity.name, emails: [...(identity.emails ?? [])], emailText: "", base: deployment.revision }); }}>Edit</Button>
+          <Button disabled={write.disabled} onClick={() => { setDraft({ name: identity.name ?? "", emails: [...(identity.emails ?? [])], emailText: "", base: deployment.revision }); }}>Edit</Button>
         ) : null}
       </span>
       {draft !== undefined && !reviewing ? null : (
@@ -133,11 +134,11 @@ function CreateIdentity({ deployment }: { deployment: Deployment }) {
   return (
     <form className="stack" data-testid="create-identity" onSubmit={(event) => { event.preventDefault(); void create(); }}>
       <span className="row">
-        <Field label="Name" value={name} onChange={(event) => { setDraft({ name: event.target.value, emails, emailText }); }} />
+        <Field label="Name (optional)" value={name} onChange={(event) => { setDraft({ name: event.target.value, emails, emailText }); }} />
         <ChipsInput label="Emails (optional)" placeholder="Add an email" inputMode="email" rules={EMAIL_RULES} values={emails} text={emailText} onChange={(next, nextText) => { setDraft({ name, emails: next, emailText: nextText }); }} />
       </span>
       <span className="row">
-        <Button primary type="submit" disabled={write.disabled || name.trim() === "" || emailText.trim() !== ""}>Add an identity</Button>
+        <Button primary type="submit" disabled={write.disabled || (name.trim() === "" && emails.length === 0) || emailText.trim() !== ""}>Add an identity</Button>
         {write.rejection === undefined ? <WriteStatus view={write.status} /> : <RejectionView rejection={write.rejection} onDismiss={write.dismiss} />}
       </span>
     </form>
@@ -146,26 +147,23 @@ function CreateIdentity({ deployment }: { deployment: Deployment }) {
 
 /** The identities page: the identities as they are, or, with a proposal's layer on, as it would leave them with every change marked. */
 function IdentitiesList({ deployment, rows }: { deployment: Deployment; rows: DiffRow[] | undefined }) {
-  const { viewer } = useViewer();
-  const { search } = useLocation();
-  const asked = mergeAsked(search);
-  // Merging is closed until asked for, or until a link (the sign-in page's offer) names the two to merge.
-  const [merge, setMerge] = useState<{ asked: string; open: boolean } | undefined>(undefined);
+  const { caller } = useCaller();
+  // Merging is closed until asked for.
+  const [mergeOpen, setMergeOpen] = useState(false);
   const layer = useLayer();
   const reviewing = useReviewing() !== undefined;
-  const mergeOpen = !reviewing && (merge?.asked === asked.join(",") ? merge.open : asked.length > 0);
-  const yours = new Set(viewer?.identities ?? []);
+  const yours = new Set(caller?.identities ?? []);
   const listed: DiffRow[] = rows ?? byName(deployment.identities ?? []).map((identity) => ({ identity, mark: undefined }));
-  const names = new Map(listed.map((row) => [row.identity.key, row.identity.name]));
+  const names = new Map(listed.map((row) => [row.identity.key, identityLabel(row.identity)]));
   return (
     <section className="stack" aria-label="Identities" data-testid="identities" data-revision={deployment.revision} data-layer={layer?.mode} data-rows-page tabIndex={-1}>
       <IndexHead title="Identities">
-        {reviewing ? null : <Button aria-expanded={mergeOpen} aria-controls="merge-identities" onClick={() => { setMerge({ asked: asked.join(","), open: !mergeOpen }); }}>{mergeOpen ? "Close merge" : "Merge identities"}</Button>}
+        {reviewing ? null : <Button aria-expanded={mergeOpen} aria-controls="merge-identities" onClick={() => { setMergeOpen(!mergeOpen); }}>{mergeOpen ? "Close merge" : "Merge identities"}</Button>}
       </IndexHead>
       <Band />
-      <span className="muted small">People and teams journeys refer to, across every journey. They need not be users; an identity holding your verified email is you.</span>
+      <span className="muted small">People and teams journeys refer to, across every journey. They need not be users; an identity holding your verified email is you. Each needs a name or at least one email.</span>
       {reviewing ? null : <CreateIdentity deployment={deployment} />}
-      {mergeOpen ? <MergeIdentities key={asked.join(",")} deployment={deployment} identities={byName(deployment.identities ?? [])} asked={asked} /> : null}
+      {mergeOpen && !reviewing ? <MergeIdentities deployment={deployment} identities={byName(deployment.identities ?? [])} /> : null}
       {listed.length === 0 ? (
         <p className="muted small" data-testid="identities-empty">No identities yet.</p>
       ) : (

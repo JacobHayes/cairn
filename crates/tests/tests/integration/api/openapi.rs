@@ -49,7 +49,7 @@ mod in_process {
             ("search", vec![&at::SEARCH]),
             ("events", vec![&at::EVENTS]),
             ("subscribe", vec![&at::STREAM]),
-            ("viewer", vec![&at::VIEWER]),
+            ("caller", vec![&at::CALLER]),
             ("user_names", vec![&at::USER_NAMES]),
             ("snapshot", vec![&at::SNAPSHOT]),
             ("level", vec![&at::LEVEL]),
@@ -89,9 +89,10 @@ mod in_process {
     }
 
     /// Methods of the service that are not operations: assembling it, the settings the host
-    /// reads, and a proposal by its id alone, which the MCP tools and the assistant name
-    /// their proposals by (the API addresses one under its destination).
-    const NOT_OPERATIONS: [&str; 3] = ["new", "settings", "proposal"];
+    /// reads, a proposal by its id alone, which the MCP tools and the assistant name their
+    /// proposals by (the API addresses one under its destination), and the arrival every
+    /// authenticated request makes before its handler.
+    const NOT_OPERATIONS: [&str; 4] = ["new", "settings", "proposal", "arrive"];
 
     /// The public methods of every `impl Service` block in the service's
     /// sources.
@@ -215,7 +216,7 @@ mod in_process {
             (&at::DEPLOYMENT, "/api/deployment"),
             (&at::SEARCH, "/api/search?text=vendor"),
             (&at::EVENTS, "/api/events?size=3"),
-            (&at::VIEWER, "/api/users/me"),
+            (&at::CALLER, "/api/users/me"),
             (&at::TOKENS, "/api/users/me/tokens"),
             (
                 &at::SNAPSHOT,

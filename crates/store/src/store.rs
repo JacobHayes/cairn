@@ -96,6 +96,13 @@ pub trait Store: AuthStore + ConversationStore + Send + Sync {
         identities: &BTreeSet<IdentityKey>,
     ) -> Result<BTreeMap<JourneyId, Revision>, StoreError>;
 
+    /// H3: the identities holding any of `emails`, each email being held by at most one. An
+    /// indexed lookup that loads no deployment, so every request can ask it.
+    async fn identities_with_emails(
+        &self,
+        emails: &BTreeSet<Email>,
+    ) -> Result<BTreeSet<IdentityKey>, StoreError>;
+
     /// E6: the identity a key names, resolving a merged identity's old key through its alias.
     async fn resolve_identity(&self, key: &IdentityKey) -> Result<Option<Identity>, StoreError>;
 

@@ -229,7 +229,7 @@ pub async fn two_identity_creates_of_one_key_in_flight_yield_one_identity(backen
     let names: Vec<_> = people
         .identities
         .values()
-        .map(|held| held.name.as_str().to_owned())
+        .filter_map(|held| held.name.as_ref().map(|name| name.as_str().to_owned()))
         .collect();
     assert_eq!(names, vec!["From one"]);
     let again = ride("p_b_again", "j_two", "From two");

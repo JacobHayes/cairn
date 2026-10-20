@@ -7,7 +7,7 @@
 import { useActorRef, useSelector } from "@xstate/react";
 import { createContext, useContext, useEffect, useMemo } from "react";
 
-import { useSession, useViewer, useWriteById } from "../data/react.ts";
+import { useSession, useCaller, useWriteById } from "../data/react.ts";
 import { currentAddress } from "../data/session.ts";
 import { reasonOf } from "../data/writes.ts";
 import { ViolationLines } from "../screens/RejectionView.tsx";
@@ -63,7 +63,7 @@ export interface EdgeDrawing extends Connecting {
 /** The page's edge drawing for the graph `authored`; undefined `authored` is a page with nothing to author. */
 export function useEdgeDrawing(authored: Authored | undefined): EdgeDrawing {
   const session = useSession();
-  const { viewer } = useViewer();
+  const { caller } = useCaller();
   const actor = useActorRef(edgeDrawing, {
     input: {
       edits: session.edits,
@@ -93,7 +93,7 @@ export function useEdgeDrawing(authored: Authored | undefined): EdgeDrawing {
       if (authored === undefined || !actor.getSnapshot().matches("active")) {
         return false;
       }
-      actor.send({ type: "pick", to, authored, user: viewer?.user ?? LOCAL_USER, address: currentAddress() });
+      actor.send({ type: "pick", to, authored, user: caller?.user ?? LOCAL_USER, address: currentAddress() });
       return true;
     },
   };

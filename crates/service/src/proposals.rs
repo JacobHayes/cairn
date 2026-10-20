@@ -251,11 +251,11 @@ impl Service {
         after: Option<ProposalCursor>,
         size: PageSize,
     ) -> Result<ProposalPage, ServiceError> {
-        let viewer = self.viewer(call).await?;
+        let caller = self.caller(call).await?;
         self.proposals(
             ProposalScope::Waiting {
-                user: viewer.user,
-                identities: viewer.identities,
+                user: caller.user,
+                identities: caller.identities,
             },
             after,
             size,

@@ -56,22 +56,26 @@ impl Accounts {
     /// browser is already signed in (linking another provider), else, with `auto_link`, to
     /// the one user holding a login with one of its verified emails, else to a new
     /// user. A login held by another user than `signed_in` is refused: merging users
-    /// is `Later` (PRD).
+    /// is `Later` (PRD). A login with no verified email is refused: an identity is found by
+    /// email, so a user without one could never be matched again (H3).
     ///
     /// # Errors
     ///
-    /// The login is held by another user, or the store failed.
+    /// The login has no verified email, it is held by another user, or the store failed.
     pub async fn resolve(
         &self,
         login: &Login,
         signed_in: Option<&UserId>,
         auto_link: bool,
     ) -> Result<UserId, AuthError> {
+        if login.verified_emails.is_empty() {
+            return Err(AuthError::NoVerifiedEmail);
+        }
         let (provider, subject) = (&login.provider, &login.subject);
         // Every request through a per-request provider resolves its login, so the usual
-        // case, a known login whose emails are unchanged, takes no lock.
+        // case, a known login unchanged since its last sign-in, takes no lock.
         let known = self.store.login(provider, subject).await?;
-        if let Some(held) = known.filter(|held| held.verified_emails == login.verified_emails) {
+        if let Some(held) = known.filter(|held| unchanged(held, login)) {
             return holder(held, signed_in);
         }
         let _resolving = self.resolving.lock().await;
@@ -82,7 +86,7 @@ impl Accounts {
             Some(user) => user.clone(),
             None => match self.auto_link_target(login, auto_link).await? {
                 Some(user) => user,
-                None => self.create_user(login).await?,
+                None => self.create_user().await?,
             },
         };
         self.store
@@ -90,6 +94,7 @@ impl Accounts {
                 provider: login.provider.clone(),
                 subject: login.subject.clone(),
                 user: user.clone(),
+                name: login.name.clone(),
                 verified_emails: login.verified_emails.clone(),
                 linked_at: self.clock.now(),
             })
@@ -99,7 +104,7 @@ impl Accounts {
         Ok(user)
     }
 
-    /// A known login's user, after recording the emails its provider verifies now.
+    /// A known login's user, after recording the name and emails its provider gives now.
     async fn refresh(
         &self,
         held: LoginRecord,
@@ -107,11 +112,11 @@ impl Accounts {
         signed_in: Option<&UserId>,
     ) -> Result<UserId, AuthError> {
         let user = holder(held.clone(), signed_in)?;
-        if held.verified_emails != login.verified_emails {
-            let verified_emails = login.verified_emails.clone();
+        if !unchanged(&held, login) {
             self.store
                 .put_login(LoginRecord {
-                    verified_emails,
+                    name: login.name.clone(),
+                    verified_emails: login.verified_emails.clone(),
                     ..held
                 })
                 .await?;
@@ -143,17 +148,28 @@ impl Accounts {
         })
     }
 
-    async fn create_user(&self, login: &Login) -> Result<UserId, AuthError> {
+    async fn create_user(&self) -> Result<UserId, AuthError> {
         let user: UserId = mint_id()?;
         self.store
             .put_user(UserRecord {
                 id: user.clone(),
-                name: login.display.clone(),
                 created_at: self.clock.now(),
             })
             .await?;
         self.log(AuthEvent::UserCreated, &user, None).await?;
         Ok(user)
+    }
+
+    /// Whether `user` has a login with a verified email, as every sign-in now requires
+    /// (H3): a session or agent token of a user without one, which predates the rule, is
+    /// not honoured, so they sign in again.
+    ///
+    /// # Errors
+    ///
+    /// The store failed.
+    pub async fn can_be_matched(&self, user: &UserId) -> Result<bool, AuthError> {
+        let logins = self.store.logins_of(user).await?;
+        Ok(logins.iter().any(|login| !login.verified_emails.is_empty()))
     }
 
     /// Starts a browser session for `user`; the token is the cookie's value, handed over
@@ -227,6 +243,11 @@ impl Accounts {
         self.store.append_auth_log(entry).await?;
         Ok(())
     }
+}
+
+/// Whether a stored login already says what its provider says now.
+fn unchanged(held: &LoginRecord, login: &Login) -> bool {
+    held.name == login.name && held.verified_emails == login.verified_emails
 }
 
 /// The user holding a known login, unless the browser is signed in as someone else.

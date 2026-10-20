@@ -7,7 +7,7 @@
 import { Link, useLocation, useNavigate } from "react-router";
 
 import { valueOf } from "../data/keyed-read.ts";
-import { useLive, useViewer } from "../data/react.ts";
+import { useLive, useCaller } from "../data/react.ts";
 import { indexKey, isSegment, journeyIndex, routeIndex } from "../data/reads.ts";
 import { NewDestinations } from "../proposals/NewDestinations.tsx";
 import { IndexHead } from "../ui/IndexHead.tsx";
@@ -59,14 +59,14 @@ export function JourneyIndex() {
   const { search } = useLocation();
   const navigate = useNavigate();
   const filters = filtersFrom(new URLSearchParams(search));
-  const { viewer, failed } = useViewer();
-  const query = queryOf(filters, viewer?.identities ?? []);
-  const waiting = filters.mine && viewer === undefined && failed === undefined;
+  const { caller, failed } = useCaller();
+  const query = queryOf(filters, caller?.identities ?? []);
+  const waiting = filters.mine && caller === undefined && failed === undefined;
   const { view, refresh } = useLive(indexKey(waiting ? undefined : query), journeyIndex(waiting ? undefined : query));
   const routes = useLive("routes", routeIndex).view;
   const known = valueOf(routes) ?? [];
   const found = valueOf(view);
-  const unknownViewer = filters.mine && viewer === undefined && failed !== undefined;
+  const unknownViewer = filters.mine && caller === undefined && failed !== undefined;
   return (
     <section className="stack index-page" aria-label="Journeys" data-rows-page tabIndex={-1}>
       <IndexHead

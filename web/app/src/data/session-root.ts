@@ -23,7 +23,7 @@ import { editManager, inFlightOf, type EditsInput, type EditsRef } from "./edit-
 import type { Deriver, Host } from "./host.ts";
 import { journeyManager } from "./journeys.ts";
 import { keyedRead, type ReadEnv } from "./keyed-read.ts";
-import { DEPLOYMENT_KEY, deploymentSource, viewerKey, viewerSource } from "./session-reads.ts";
+import { DEPLOYMENT_KEY, deploymentSource, callerKey, callerSource } from "./session-reads.ts";
 import { syncMachine, type SyncRef } from "./sync.ts";
 import { toastMachine, type ToastsRef } from "./toasts.ts";
 import type { WriteEnv } from "./write-machine.ts";
@@ -88,7 +88,7 @@ export const sessionRoot = setup({
     countInFlight: sendTo("sync", ({ event }) => ({ type: "inFlight" as const, count: inFlightOf((event as Extract<RootEvent, { type: "xstate.snapshot.edits" }>).snapshot.context.writes) })),
     wantDeployment: sendTo("deployment", { type: "want", key: DEPLOYMENT_KEY }),
     // The deployment moved: the caller is read once its first read settled, and again for each newer one held.
-    keyViewer: sendTo("viewer", ({ event }) => ({ type: "want" as const, key: viewerKey((event as Extract<RootEvent, { type: "xstate.snapshot.deployment" }>).snapshot) })),
+    keyCaller: sendTo("caller", ({ event }) => ({ type: "want" as const, key: callerKey((event as Extract<RootEvent, { type: "xstate.snapshot.deployment" }>).snapshot) })),
     // A change of the stream's state wakes the writes waiting on the connection.
     streamMoved: enqueueActions(({ context, event, enqueue }) => {
       const status = streamStatus((event as Extract<RootEvent, { type: "xstate.snapshot.subscription" }>).snapshot);
@@ -110,9 +110,9 @@ export const sessionRoot = setup({
       id: "deployment",
       src: "read",
       input: ({ context, self }) => ({ source: deploymentSource(context.host), env: readEnvOf(self, context.now) }),
-      onSnapshot: { actions: "keyViewer" },
+      onSnapshot: { actions: "keyCaller" },
     },
-    { id: "viewer", src: "read", input: ({ context, self }) => ({ source: viewerSource(context.host), env: readEnvOf(self, context.now) }) },
+    { id: "caller", src: "read", input: ({ context, self }) => ({ source: callerSource(context.host), env: readEnvOf(self, context.now) }) },
     {
       id: "journeys",
       src: "journeys",
@@ -179,7 +179,7 @@ export function readEnvOf(root: RootPort, now: () => number): ReadEnv {
   };
 }
 
-function childOf<K extends "edits" | "journeys" | "subscription" | "deployment" | "viewer" | "sync" | "toasts" | "conversations">(root: SessionRootRef, id: K) {
+function childOf<K extends "edits" | "journeys" | "subscription" | "deployment" | "caller" | "sync" | "toasts" | "conversations">(root: SessionRootRef, id: K) {
   const child = root.getSnapshot().children[id];
   if (child === undefined) {
     throw new Error(`the session root is not running its ${id}`);
@@ -196,7 +196,7 @@ export const subscriptionOf = (root: SessionRootRef): SubscriptionRef => childOf
 /** The root's deployment read. */
 export const deploymentOf = (root: SessionRootRef): ReadRef => childOf(root, "deployment");
 /** The root's caller read. */
-export const viewerOf = (root: SessionRootRef): ReadRef => childOf(root, "viewer");
+export const callerOf = (root: SessionRootRef): ReadRef => childOf(root, "caller");
 /** The root's sync scheduler. */
 export const syncOf = (root: SessionRootRef): SyncRef => childOf(root, "sync");
 /** The root's toast. */

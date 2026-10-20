@@ -135,6 +135,31 @@ test("a deployment tick refetches the deployment context and re-derives: a merge
   expect(deploymentFetches.length).toBe(fetchedBefore + 1);
 });
 
+test("H3: an identity with no name is asked for its name on load, and Save names it everywhere it shows", { tag: "@server" }, async ({ page }) => {
+  await open(page, "server", "/identities");
+  // Ana's: the dev user's, before the sign-in test below gives the user a second identity.
+  const key = "who_k3d7qm2xw5tn6pfa";
+  const yours = page.locator(`[data-testid="identity"][data-identity="${key}"]`);
+  await expect(yours.getByTestId("yours")).toBeVisible();
+  const name = (await yours.getByTestId("identity-name").textContent()) ?? "";
+  await yours.getByRole("button", { name: "Edit" }).click();
+  await yours.getByLabel("Name").fill("");
+  await yours.getByRole("button", { name: "Save" }).click();
+  await expect(yours.getByTestId("identity-name")).toContainText("@");
+  await page.reload();
+  const prompt = page.getByTestId("name-prompt");
+  await expect(prompt).toBeVisible();
+  await prompt.getByRole("button", { name: "Later" }).click();
+  await expect(prompt).toHaveCount(0);
+  await page.reload();
+  await prompt.getByLabel("Name").fill(name);
+  await prompt.getByRole("button", { name: "Save" }).click();
+  await expect(prompt).toHaveCount(0);
+  await expect(page.locator(`[data-testid="identity"][data-identity="${key}"]`).getByTestId("identity-name")).toHaveText(name);
+  await page.getByRole("navigation", { name: "Screens", exact: true }).getByRole("link", { name: "You" }).click();
+  await expect(page.getByTestId("your-identity").first()).toContainText(name);
+});
+
 test("an identity signed in with the stub issuer links to the user, and its verified email names their identity", { tag: "@server" }, async ({ page }) => {
   const email = `${fresh("linked").replace(/\W/g, "-")}@example.org`;
   await open(page, "server", "/identities");

@@ -234,7 +234,7 @@ fn other_changes(
             other.push(format!(
                 "identity `{}` ({})",
                 identity.key,
-                identity.name.as_str()
+                identity.display()
             ));
         }
     }

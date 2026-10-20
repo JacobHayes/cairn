@@ -224,8 +224,11 @@ pub struct RouteVersion {
 pub struct Identity {
     /// The identity's key.
     pub key: IdentityKey,
-    /// Its name.
-    pub name: Title,
+    /// Its name, if it has one. An identity has a name, an email, or both (H3), so one a
+    /// sign-in created from an account that gave no name is shown by its first email until
+    /// its person is asked for one.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub name: Option<Title>,
     /// Its emails, each held by at most one identity (H3), at most
     /// `email_count_per_identity_max`. A merge joins two identities' emails, so the engine checks
     /// the joined set too.
@@ -243,6 +246,19 @@ fn identity_emails<'de, D: serde::Deserializer<'de>>(
     deserializer: D,
 ) -> Result<BTreeSet<Email>, D::Error> {
     BoundedSet::<Email, EmailCountPerIdentity>::deserialize(deserializer).map(BoundedSet::into_set)
+}
+
+impl Identity {
+    /// How the identity is shown (H3): its name, else its first email. An identity has one of
+    /// them, so this is never empty.
+    #[must_use]
+    pub fn display(&self) -> &str {
+        match (&self.name, self.emails.first()) {
+            (Some(name), _) => name.as_str(),
+            (None, Some(email)) => email.as_str(),
+            (None, None) => unreachable!("an identity has a name, an email, or both (H3)"),
+        }
+    }
 }
 
 impl HasKey for Identity {

@@ -4,7 +4,7 @@
 import type { Schema } from "@cairn/client";
 import type { Deriver } from "../data/host.ts";
 import { beforeWork, previewPolicy, type ReadSource } from "../data/keyed-read.ts";
-import { useKeyedRead, useSession, useViewer } from "../data/react.ts";
+import { useKeyedRead, useSession, useCaller } from "../data/react.ts";
 import { newPatchId } from "../data/writes.ts";
 import type { Mutation, Ready } from "./model.ts";
 
@@ -32,8 +32,8 @@ const SAVE_PREVIEW: ReadSource<SaveArgs, Schema<"Consequences">> = {
 /** D7: what applying `mutations` to the journey would newly cause; none until read, or for no draft. */
 export function useSavePreview(view: Ready, mutations: Mutation[] | undefined): Schema<"Consequences"> | undefined {
   const { deriver } = useSession();
-  const { viewer } = useViewer();
-  const user = viewer?.user ?? "u_local";
+  const { caller } = useCaller();
+  const user = caller?.user ?? "u_local";
   const key = mutations === undefined ? undefined : { of: [view.journey.header.id], freshness: [JSON.stringify(view.key), view.journey.revision, user, JSON.stringify(mutations)], args: { deriver, ready: view, user, mutations } };
   const { view: read } = useKeyedRead(SAVE_PREVIEW, key);
   return read.status === "current" ? read.value : undefined;

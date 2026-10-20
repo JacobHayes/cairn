@@ -186,6 +186,7 @@ impl From<cairn_auth::AuthError> for ApiError {
             cairn_auth::AuthError::Store(error) => ServiceError::Store(error).into(),
             cairn_auth::AuthError::Random(_)
             | cairn_auth::AuthError::Upstream(_)
+            | cairn_auth::AuthError::NoVerifiedEmail
             | cairn_auth::AuthError::LoginHeldByAnotherUser { .. } => {
                 tracing::error!(%error, "auth failed");
                 ApiError::problem(ProblemCode::Internal, error.to_string())

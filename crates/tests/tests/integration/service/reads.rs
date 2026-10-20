@@ -10,9 +10,7 @@ use std::sync::Arc;
 
 use cairn_engine::{DerivedJourney, Graph, derive};
 use cairn_schema::limits::{EXPLANATION_ENTRY_COUNT_MAX, PAGE_ITEM_COUNT_MAX};
-use cairn_schema::{
-    Cursor, Email, ExplainedField, JourneyId, NextQuery, NodeKey, SnapshotScope, Title,
-};
+use cairn_schema::{Cursor, Email, ExplainedField, JourneyId, NextQuery, NodeKey, SnapshotScope};
 use cairn_service::{Call, ReadError, Service};
 use cairn_store::{LoginRecord, Store, UserRecord};
 
@@ -262,7 +260,6 @@ async fn cached_and_uncached_reads_agree_across_an_identity_merge(store: Arc<dyn
     store
         .put_user(UserRecord {
             id: "u_dup".parse().unwrap(),
-            name: "Duplicate".parse::<Title>().unwrap(),
             created_at: AT.parse().unwrap(),
         })
         .await
@@ -272,6 +269,7 @@ async fn cached_and_uncached_reads_agree_across_an_identity_merge(store: Arc<dyn
             provider: "dev".parse().unwrap(),
             subject: "dup".parse().unwrap(),
             user: "u_dup".parse().unwrap(),
+            name: None,
             verified_emails: ["dup@example.org".parse::<Email>().unwrap()]
                 .into_iter()
                 .collect(),

@@ -197,6 +197,9 @@ mod in_process {
     async fn two_views_of_one_journey_stay_current() {
         let world = World::start().await;
         tree(&world.client("ann")).await;
+        // Arriving gives a user an identity, which moves the deployment's revision: both
+        // have arrived before either subscribes, so that is not an event of this test.
+        world.client("bob").deployment().await.unwrap();
         let mut ann = View::open(world.client("ann"), "j_tree").await;
         let mut bob = View::open(world.client("bob"), "j_tree").await;
         landed(ann.client.patch(note("p_ann", "a_ann", 1), None).await);

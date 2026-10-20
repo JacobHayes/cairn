@@ -427,10 +427,17 @@ pub fn arb_route_version() -> impl Strategy<Value = RouteVersion> {
 pub fn arb_identity() -> impl Strategy<Value = Identity> {
     (
         arb_identity_key(),
-        arb_title(),
+        prop::option::of(arb_title()),
         prop::collection::btree_set(arb_email(), 0..2),
+        arb_email(),
     )
-        .prop_map(|(key, name, emails)| Identity { key, name, emails })
+        .prop_map(|(key, name, mut emails, spare)| {
+            // H3: an identity has a name, an email, or both.
+            if name.is_none() && emails.is_empty() {
+                emails.insert(spare);
+            }
+            Identity { key, name, emails }
+        })
 }
 
 /// The deployment domain.

@@ -37,7 +37,7 @@ mod cost {
         for key in ["who_a", "who_b", "who_c"] {
             let identity = cairn_schema::Identity {
                 key: parse(key),
-                name: parse(key),
+                name: Some(parse(key)),
                 emails: std::collections::BTreeSet::new(),
             };
             records.deployment.identities.put(identity).unwrap();

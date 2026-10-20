@@ -266,17 +266,11 @@ impl Inner {
         let name = claims
             .name()
             .and_then(|name| name.get(None))
-            .map(|name| name.as_str());
-        let username = claims.preferred_username().map(|name| name.as_str());
-        let display = [name, username, claims.email().map(|email| email.as_str())]
-            .into_iter()
-            .flatten()
-            .find_map(|text| text.parse::<Title>().ok())
-            .unwrap_or_else(|| subject.clone());
+            .and_then(|name| name.as_str().parse::<Title>().ok());
         Ok(Login {
             provider: self.config.name.clone(),
             subject,
-            display,
+            name,
             verified_emails,
         })
     }
@@ -374,7 +368,8 @@ impl IntoResponse for Failure {
         let status = match &self {
             Failure::BadRequest(_) => StatusCode::BAD_REQUEST,
             Failure::Refused(_) | Failure::Browser(Refusal::Credential) => StatusCode::UNAUTHORIZED,
-            Failure::Browser(Refusal::Peer) => StatusCode::FORBIDDEN,
+            Failure::Browser(Refusal::Peer | Refusal::NoVerifiedEmail)
+            | Failure::Auth(AuthError::NoVerifiedEmail) => StatusCode::FORBIDDEN,
             Failure::Auth(AuthError::LoginHeldByAnotherUser { .. }) => StatusCode::CONFLICT,
             Failure::Auth(AuthError::Upstream(_)) => StatusCode::BAD_GATEWAY,
             Failure::Browser(Refusal::Unavailable(_)) | Failure::Auth(_) => {

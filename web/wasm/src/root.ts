@@ -86,8 +86,8 @@ export class InBrowserHost {
   }
 
   /** The caller, as `GET /api/users/me` answers it (H3). */
-  viewer(): Schema<"Viewer"> {
-    return parsed<Schema<"Viewer">>(hosted(() => this.#root.viewer(this.#clock())));
+  caller(): Schema<"Caller"> {
+    return parsed<Schema<"Caller">>(hosted(() => this.#root.caller(this.#clock())));
   }
 
   /** H3: the names of `users`, as `GET /api/users` answers it; a user that does not exist is left out. */

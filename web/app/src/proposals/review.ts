@@ -10,7 +10,7 @@ import { useDraft } from "../data/drafts.ts";
 import type { Deployment, Deriver, Host, RouteVersion } from "../data/host.ts";
 import { beforeWork, previewPolicy, valueOf, type ReadSource } from "../data/keyed-read.ts";
 import type { ProposalReview } from "../data/proposals.ts";
-import { useKeyedRead, useSession, useToday, useViewer } from "../data/react.ts";
+import { useKeyedRead, useSession, useToday, useCaller } from "../data/react.ts";
 import { isPatchAnswer } from "../data/writes.ts";
 import type { Ready } from "../detail/model.ts";
 import { addedRoles, insertionMembers } from "../segments/model.ts";
@@ -215,8 +215,8 @@ const JOURNEY_AFTER: ReadSource<AfterArgs, JourneyAfter> = {
 /** The read of a journey proposal's preview: what it holds, its failure, and whether it is of the edits now on screen. */
 export function useJourneyAfter(before: Ready | undefined, proposal: Proposal, draft: ProposalDraft) {
   const { deriver, host } = useSession();
-  const { viewer } = useViewer();
-  const user = viewer?.user ?? "u_local";
+  const { caller } = useCaller();
+  const user = caller?.user ?? "u_local";
   // Only an open proposal is previewed here: one applied or discarded has nothing left to apply.
   const key =
     before === undefined || proposal.status !== "open"

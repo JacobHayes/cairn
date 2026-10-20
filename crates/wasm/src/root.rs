@@ -11,6 +11,7 @@
 use std::cell::Cell;
 use std::collections::{BTreeMap, BTreeSet};
 use std::sync::Arc;
+use std::sync::atomic::{AtomicU32, Ordering};
 use std::time::Duration;
 
 use cairn_schema::{
@@ -213,12 +214,24 @@ fn position(after: f64) -> Result<Option<u64>, HostError> {
     Ok(Some(after as u64))
 }
 
+/// Key bodies for arrival: a count, which differs for every key minted in a load.
+struct Minted<'a>(&'a AtomicU32);
+
+impl cairn_schema::KeyAllocator for Minted<'_> {
+    fn next_body(&mut self, _prefix: &'static str) -> String {
+        format!("arrived{}", self.0.fetch_add(1, Ordering::Relaxed))
+    }
+}
+
 /// The browser host's composition root.
 #[wasm_bindgen]
 #[derive(Debug)]
 pub struct BrowserRoot {
     service: Service,
     local: Actor,
+    /// How many keys arrival has minted: the browser host has no random source, and a
+    /// load's deployment is its own, so a count makes keys that differ.
+    minted: AtomicU32,
 }
 
 impl BrowserRoot {
@@ -249,7 +262,11 @@ impl BrowserRoot {
             .parse()
             .map_err(|error| failed(format!("{error:?}")))?;
         let local = now_or_never(sign_in_local(&*store, at)).map_err(failed)?;
-        Ok(Self { service, local })
+        Ok(Self {
+            service,
+            local,
+            minted: AtomicU32::new(0),
+        })
     }
 
     /// The service, for a native host or test that drives it directly.
@@ -259,13 +276,20 @@ impl BrowserRoot {
     }
 
     /// The local login's call at `now` (an RFC 3339 timestamp).
+    ///
+    /// H3: the local user arrives first, as a signed-in request does on the server: matched
+    /// to the identity holding their email, or given one.
     pub(crate) fn call(&self, now: &str) -> Result<Call, HostError> {
-        Ok(Call {
+        let call = Call {
             actor: self.local.clone(),
             now: now
                 .parse()
                 .map_err(|error| HostError::unreadable("now", error))?,
-        })
+        };
+        let mut keys = Minted(&self.minted);
+        now_or_never(self.service.arrive(&call, &mut keys))
+            .map_err(|error| failed(format!("{error:?}")))?;
+        Ok(call)
     }
 
     /// A patch as the local user at `now`: the API's patch answer, or the rejection.

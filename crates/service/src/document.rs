@@ -27,7 +27,7 @@ impl Service {
         // agree on its revision.
         let logins = self.store.logins_of(&call.actor.user).await?;
         let deployment = self.deployment().await?;
-        let viewer = crate::viewer::identities_of(&logins, &deployment);
+        let viewer = crate::caller::identities_of(&logins, &deployment);
         let today = self.settings.today(call.now);
         let inputs = self.settings.derive_inputs(today, viewer, deployment);
         Ok(Some(project::document(&journey, &inputs)))

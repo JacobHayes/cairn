@@ -307,7 +307,7 @@ pub static EVENTS: Endpoint = endpoint(Method::GET, "/api/events", "listEvents")
 /// `GET /api/events/stream`: revision ticks over SSE, current revisions first (H6).
 pub static STREAM: Endpoint = endpoint(Method::GET, "/api/events/stream", "streamRevisions");
 /// `GET /api/users/me`: the caller and their identities (H3).
-pub static VIEWER: Endpoint = endpoint(Method::GET, "/api/users/me", "getViewer");
+pub static CALLER: Endpoint = endpoint(Method::GET, "/api/users/me", "getCaller");
 /// `GET /api/users`: the names of the users asked for (H3).
 pub static USER_NAMES: Endpoint = endpoint(Method::GET, "/api/users", "listUserNames");
 /// `GET /api/users/me/tokens`: the caller's agent tokens.
@@ -411,7 +411,7 @@ pub static ALL: [&Endpoint; 68] = [
     &SEARCH,
     &EVENTS,
     &STREAM,
-    &VIEWER,
+    &CALLER,
     &USER_NAMES,
     &TOKENS,
     &MINT_TOKEN,

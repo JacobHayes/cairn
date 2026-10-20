@@ -499,3 +499,32 @@ fn a_patch_to_the_wrong_kind_of_target_is_rejected() {
         [ViolationCode::NoDraft]
     );
 }
+
+/// H3: an identity has a name, an email, or both: one with neither is rejected, whether it
+/// is created so or edited into it, and an unnamed identity with an email is accepted.
+#[test]
+fn an_identity_with_neither_a_name_nor_an_email_is_rejected() {
+    let records = support::vendor_after(1);
+    let reject = |mutations: &str| {
+        let patch = support::patch_to(&records, "deployment", mutations);
+        match support::apply(&records, &patch, &support::fixed_inputs()) {
+            Err(Rejection::Invalid { violations }) => violations
+                .as_slice()
+                .iter()
+                .map(|violation| violation.code)
+                .collect::<Vec<_>>(),
+            other => panic!("expected a rejection, got {other:#?}"),
+        }
+    };
+    assert_eq!(
+        reject("- op: create_identity\n  identity: {key: who_empty}\n"),
+        [ViolationCode::IdentityEmpty]
+    );
+    let emptied = "- op: edit_identity\n  identity: {key: who_d4m6uk2eqf5rbhzs}\n";
+    assert_eq!(reject(emptied), [ViolationCode::IdentityEmpty]);
+
+    let unnamed =
+        "- op: create_identity\n  identity: {key: who_bare, emails: [bare@example.org]}\n";
+    let patch = support::patch_to(&records, "deployment", unnamed);
+    assert!(support::apply(&records, &patch, &support::fixed_inputs()).is_ok());
+}

@@ -9,7 +9,7 @@ use serde::{Deserialize, Serialize};
 /// The caller (H2) and the identities their verified emails name (H3).
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
 #[serde(deny_unknown_fields)]
-pub struct Viewer {
+pub struct Caller {
     /// The user.
     pub user: UserId,
     /// The agent acting for them, when the request carries an agent token.
@@ -17,10 +17,6 @@ pub struct Viewer {
     pub agent: Option<AgentId>,
     /// Their identities, which "mine" covers together.
     pub identities: BTreeSet<IdentityKey>,
-    /// H3: present when their emails name more than one identity, which are then offered for
-    /// merging.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub merge_offer: Option<BTreeSet<IdentityKey>>,
     /// The logins they sign in with, by provider and subject.
     pub logins: Vec<LinkedLogin>,
 }
@@ -33,6 +29,9 @@ pub struct LinkedLogin {
     pub provider: Slug,
     /// The provider's subject for the account.
     pub subject: Title,
+    /// The name the provider gave the account at the last sign-in, if it gave one.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub name: Option<Title>,
     /// H3: the emails the provider marked verified at the last sign-in; only these match an
     /// identity.
     pub verified_emails: BTreeSet<Email>,
@@ -45,6 +44,7 @@ impl From<cairn_store::LoginRecord> for LinkedLogin {
         Self {
             provider: record.provider,
             subject: record.subject,
+            name: record.name,
             verified_emails: record.verified_emails,
             linked_at: record.linked_at,
         }
@@ -57,7 +57,8 @@ impl From<cairn_store::LoginRecord> for LinkedLogin {
 pub struct UserName {
     /// The user.
     pub user: UserId,
-    /// Their name: the identity their verified emails name, else the name their sign-in gave.
+    /// Their name: their identity's name, else its first email; with no identity, the name
+    /// their login gave, else its first verified email.
     pub name: Title,
 }
 

@@ -160,7 +160,7 @@ impl Auth {
             let actor = match provider.authenticate(request).await {
                 Verdict::Absent => continue,
                 Verdict::Refused(refusal) => return Err(refusal),
-                Verdict::Actor(actor) => actor,
+                Verdict::Actor(actor) => self.matchable(actor).await?,
                 Verdict::Login(_) if found.is_some() => continue,
                 Verdict::Login(login) => {
                     let accounts = &self.inner.accounts;
@@ -182,8 +182,19 @@ impl Auth {
             return Ok(None);
         };
         match self.inner.accounts.session_user(&token).await? {
-            Some(user) => Ok(Some(Actor { user, agent: None })),
+            Some(user) => self.matchable(Actor { user, agent: None }).await.map(Some),
             None => Err(Refusal::Credential),
+        }
+    }
+
+    /// H3: `actor`, unless their user has no login with a verified email, as a session or
+    /// agent token from before sign-in required one may not. They are refused as an
+    /// invalid credential, so they sign in again.
+    async fn matchable(&self, actor: Actor) -> Result<Actor, Refusal> {
+        if self.inner.accounts.can_be_matched(&actor.user).await? {
+            Ok(actor)
+        } else {
+            Err(Refusal::Credential)
         }
     }
 
@@ -261,7 +272,9 @@ async fn require_actor(State(auth): State<Auth>, mut request: Request, next: Nex
             let had_session = cookies::read(request.headers(), SESSION_COOKIE).is_some();
             auth.challenge(&path, Some("invalid_token"), had_session)
         }
-        Err(Refusal::Peer) => (StatusCode::FORBIDDEN, Refusal::Peer.to_string()).into_response(),
+        Err(refusal @ (Refusal::Peer | Refusal::NoVerifiedEmail)) => {
+            (StatusCode::FORBIDDEN, refusal.to_string()).into_response()
+        }
         Err(refusal @ Refusal::Unavailable(_)) => {
             (StatusCode::SERVICE_UNAVAILABLE, refusal.to_string()).into_response()
         }

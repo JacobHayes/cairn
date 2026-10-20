@@ -16,7 +16,7 @@ pub(crate) enum Step {
 
 /// Every migration, numbered from 1, in order. A migration is never edited once released;
 /// a change is a new one. It is a list of steps run in one transaction with its number.
-pub(crate) const MIGRATIONS: [(u32, &[Step]); 11] = [
+pub(crate) const MIGRATIONS: [(u32, &[Step]); 12] = [
     (1, &[Step::Sql(include_str!("migrations/0001_initial.sql"))]),
     (
         2,
@@ -74,6 +74,12 @@ pub(crate) const MIGRATIONS: [(u32, &[Step]); 11] = [
             Step::Identities,
             Step::Sql(include_str!("migrations/0011_identities.sql")),
         ],
+    ),
+    (
+        12,
+        &[Step::Sql(include_str!(
+            "migrations/0012_sign_in_identities.sql"
+        ))],
     ),
 ];
 

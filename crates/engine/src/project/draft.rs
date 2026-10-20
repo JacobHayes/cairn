@@ -153,7 +153,7 @@ fn names(identities: &BTreeSet<IdentityKey>, deployment: &Deployment) -> String 
         .map(|key| {
             deployment.identities.get(key).map_or_else(
                 || key.as_str().to_owned(),
-                |identity| identity.name.as_str().to_owned(),
+                |identity| identity.display().to_owned(),
             )
         })
         .collect::<Vec<_>>()

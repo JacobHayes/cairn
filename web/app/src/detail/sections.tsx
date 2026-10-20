@@ -7,6 +7,7 @@ import type { NodeDetail, Ready } from "./model.ts";
 import { IDENTITY_GONE, KIND_GONE, ROLE_GONE, slotName } from "../ui/gone.ts";
 import type { Schema } from "@cairn/client";
 import { namedList } from "../ui/words.ts";
+import { identityLabel } from "../people/label.ts";
 import { OWNER_KIND } from "./model.ts";
 
 export type Slot = { key: string; id: string; title?: string | null | undefined };
@@ -44,10 +45,11 @@ export function resolveAlias(deployment: Deployment, key: string): string {
   return found;
 }
 
-/** An identity's name from `deployment` (E6), through any merge, or words for one it does not hold. */
+/** An identity's name (else its first email, H3) from `deployment` (E6), through any merge, or words for one it does not hold. */
 export function identityNamed(deployment: Deployment, key: string): string {
   const resolved = resolveAlias(deployment, key);
-  return (deployment.identities ?? []).find((identity) => identity.key === resolved)?.name ?? IDENTITY_GONE;
+  const found = (deployment.identities ?? []).find((identity) => identity.key === resolved);
+  return found === undefined ? IDENTITY_GONE : identityLabel(found);
 }
 
 /** E6: the identity a key names now in the journey's deployment. */

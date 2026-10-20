@@ -281,18 +281,20 @@
 }
 
 /* A modal <dialog>: the browser draws the backdrop and keeps the focus inside. */
-.key-sheet {
+.key-sheet,
+.modal {
   box-shadow: var(--shadow-lg);
   width: min(28rem, 92vw);
   color: var(--color-text);
 }
 
-.key-sheet .modal-body {
+.modal-body {
   max-height: min(80dvh, 640px);
   overflow-y: auto;
 }
 
-.key-sheet::backdrop {
+.key-sheet::backdrop,
+.modal::backdrop {
   background: color-mix(in srgb, var(--color-ground) 60%, transparent);
 }
 

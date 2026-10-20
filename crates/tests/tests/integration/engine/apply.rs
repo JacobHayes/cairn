@@ -512,7 +512,7 @@ fn a_deployment_past_its_size_cap_is_rejected() {
     let padding = "a".repeat(usize::try_from(EMAIL_BYTES_MAX).unwrap() - domain.len() - 8);
     let identity = |index: u32| cairn_schema::Identity {
         key: format!("who_large_{index}").parse().unwrap(),
-        name: "Large".parse().unwrap(),
+        name: Some("Large".parse().unwrap()),
         emails: (0..EMAIL_COUNT_PER_IDENTITY_MAX)
             .map(|email| {
                 format!("{index:06}{email:02}{padding}{domain}")

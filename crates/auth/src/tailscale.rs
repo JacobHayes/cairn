@@ -224,14 +224,12 @@ impl TailscaleProvider {
         let Ok(subject) = login.parse::<Title>() else {
             return Verdict::Refused(Refusal::Credential);
         };
-        let display = name
-            .and_then(|name| name.parse::<Title>().ok())
-            .unwrap_or_else(|| subject.clone());
+        let name = name.and_then(|name| name.parse::<Title>().ok());
         let verified_emails = login.parse::<Email>().into_iter().collect();
         Verdict::Login(Login {
             provider: self.config.name.clone(),
             subject,
-            display,
+            name,
             verified_emails,
         })
     }

@@ -20,6 +20,7 @@ timezone = "America/New_York"
 kind = "dev"
 name = "dev"
 user = "Dev"
+verified_emails = ["dev@example.org"]
 "#;
 
 fn parsed(text: &str) -> Result<Config, Vec<Problem>> {
@@ -126,8 +127,8 @@ fn each_malformed_value_is_named() {
         ),
         ("database = \"cairn.db\"", "database = \"/\"", "database"),
         (
-            "user = \"Dev\"",
-            "user = \"Dev\"\nverified_emails = [\"no-at-sign\"]",
+            "verified_emails = [\"dev@example.org\"]",
+            "verified_emails = [\"no-at-sign\"]",
             "auth.dev.verified_emails",
         ),
         (
@@ -313,7 +314,7 @@ fn iap_relay_mistakes_are_named_by_provider() {
 fn provider_mistakes_are_named_by_provider() {
     let cases = [
         (
-            "[[auth]]\nkind = \"dev\"\nname = \"dev\"\nuser = \"Again\"",
+            "[[auth]]\nkind = \"dev\"\nname = \"dev\"\nuser = \"Again\"\nverified_emails = [\"again@example.org\"]",
             "auth.dev",
         ),
         (

@@ -163,7 +163,7 @@ pub(crate) async fn deployment(connection: &Connection) -> Result<Deployment, St
             key.clone(),
             Identity {
                 key: parse(&key)?,
-                name: row.parse(1)?,
+                name: row.opt_parse(1)?,
                 emails: std::collections::BTreeSet::new(),
             },
         );

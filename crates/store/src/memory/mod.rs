@@ -394,6 +394,13 @@ impl Store for MemoryStore {
         Ok(queries::referencing(&self.state(), identities))
     }
 
+    async fn identities_with_emails(
+        &self,
+        emails: &BTreeSet<Email>,
+    ) -> Result<BTreeSet<IdentityKey>, StoreError> {
+        Ok(self.state().identities_with_emails(emails))
+    }
+
     async fn resolve_identity(&self, key: &IdentityKey) -> Result<Option<Identity>, StoreError> {
         Ok(self.state().resolve_identity(key))
     }

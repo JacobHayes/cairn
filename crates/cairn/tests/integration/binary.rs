@@ -40,6 +40,7 @@ timezone = "UTC"
 kind = "dev"
 name = "dev"
 user = "Dev"
+verified_emails = ["dev@example.org"]
 "#;
 
 /// `cairn <arguments>`, with none of the caller's `CAIRN_` variables but the web build's

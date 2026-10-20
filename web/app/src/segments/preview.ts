@@ -7,7 +7,7 @@ import type { Graph, Mutation } from "../authoring/graph.ts";
 import type { Authored } from "../authoring/target.ts";
 import { Skewed, type Deriver } from "../data/host.ts";
 import { beforeWork, previewPolicy, type ReadSource } from "../data/keyed-read.ts";
-import { useKeyedRead, useSession, useViewer } from "../data/react.ts";
+import { useKeyedRead, useSession, useCaller } from "../data/react.ts";
 import { newPatchId, reasonOf, violationWords } from "../data/writes.ts";
 import type { SegmentVersion } from "./read.ts";
 
@@ -61,8 +61,8 @@ const CANDIDATE: ReadSource<CandidateArgs, Candidate> = {
 /** The graph `authored` would hold after `mutation` inserts `segment`, or why not; pending while it settles. */
 export function useCandidate(authored: Authored, mutation: Mutation | undefined, segment: SegmentVersion | undefined): Candidate {
   const { deriver } = useSession();
-  const { viewer } = useViewer();
-  const user = viewer?.user ?? "u_local";
+  const { caller } = useCaller();
+  const user = caller?.user ?? "u_local";
   const { view } = useKeyedRead(
     CANDIDATE,
     mutation === undefined || segment === undefined

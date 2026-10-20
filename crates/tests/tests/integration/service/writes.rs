@@ -746,7 +746,8 @@ fn every_operation_can_be_awaited_on_another_thread() {
     ));
     let call = call("u_lead", AT);
     send(&memory.patch(&call, &created));
-    send(&memory.viewer(&call));
+    send(&memory.caller(&call));
+    send(&memory.arrive(&call, &mut cairn_schema::SequentialKeys::default()));
     send(&memory.subscribe(BTreeSet::new()));
     send(&memory.journey(&journey_id("j_one")));
     support::run(async {

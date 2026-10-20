@@ -33,6 +33,7 @@ import {
 } from "./condition.ts";
 import type { GraphNode, Tree } from "./graph.ts";
 import { IDENTITY_GONE } from "../ui/gone.ts";
+import { identityLabel } from "../people/label.ts";
 import { Picker } from "./parts.tsx";
 
 type Identity = Schema<"Identity">;
@@ -61,7 +62,10 @@ function newLeaf(decision: GraphNode, context: Pick<Context, "today" | "identiti
 
 /** The names the editor's sentence reads with: decisions of the tree, identities by name. */
 function namesOf(tree: Tree, identities: readonly Identity[]) {
-  return conditionNames((decision) => tree.byKey.get(decision), (key) => identities.find((identity) => identity.key === key)?.name ?? IDENTITY_GONE);
+  return conditionNames((decision) => tree.byKey.get(decision), (key) => {
+    const found = identities.find((identity) => identity.key === key);
+    return found === undefined ? IDENTITY_GONE : identityLabel(found);
+  });
 }
 
 /** One value of a leaf, picked as the decision's type allows. */
@@ -76,7 +80,7 @@ function ValueControl({ input, value, identities, onChange }: { input: ValueInpu
     case "date":
       return <Field type="date" aria-label="Value" value={String(value)} onChange={(event) => { onChange(event.target.value); }} />;
     case "identity":
-      return <Picker aria-label="Value" value={String(value)} options={identities.map((identity) => ({ value: identity.key, label: identity.name }))} onChange={(event) => { onChange(event.target.value); }} />;
+      return <Picker aria-label="Value" value={String(value)} options={identities.map((identity) => ({ value: identity.key, label: identityLabel(identity) }))} onChange={(event) => { onChange(event.target.value); }} />;
     case "text":
       return <Field aria-label="Value" value={String(value)} onChange={(event) => { onChange(event.target.value); }} />;
   }

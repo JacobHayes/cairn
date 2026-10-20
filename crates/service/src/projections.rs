@@ -438,7 +438,7 @@ impl Service {
             revision: journey.revision,
             deployment: deployment.revision,
             today: self.settings.today(call.now),
-            viewer: crate::viewer::identities_of(&logins, &deployment),
+            viewer: crate::caller::identities_of(&logins, &deployment),
         };
         if let Some(found) = self.memo.get(&key) {
             patina_dst::reachable!("service-derived-read-answered-from-memo");

@@ -12,6 +12,7 @@
 //! over the memory store.
 
 mod call;
+mod caller;
 mod compose;
 mod consequence;
 mod derived;
@@ -25,10 +26,10 @@ mod projections;
 mod proposals;
 mod reads;
 mod routes;
-mod viewer;
 mod write;
 
 pub use call::Call;
+pub use caller::{Caller, UserName};
 pub use compose::{AuthKind, AuthMethod, Capabilities, DeploymentSettings, Parts};
 pub use drafting::ProposeError;
 pub use error::ServiceError;
@@ -37,7 +38,6 @@ pub use projections::{ChildEntry, History, NodeDetail, Projected, ReadError};
 pub use proposals::{ProposalReview, ProposalWritten, StaleBase};
 pub use reads::RouteSummary;
 pub use routes::PatchKeys;
-pub use viewer::{UserName, Viewer};
 pub use write::{DomainPatch, NotADomainPatch, WriteError, Written};
 
 use std::sync::Arc;

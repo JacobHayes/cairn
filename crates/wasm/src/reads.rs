@@ -152,16 +152,19 @@ pub struct LinkedLogin {
     pub provider: Slug,
     /// The provider's subject for the account.
     pub subject: Title,
+    /// The name the provider gave the account, if it gave one.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub name: Option<Title>,
     /// The emails the provider marked verified at the last sign-in (H3).
     pub verified_emails: BTreeSet<Email>,
     /// When it was linked.
     pub linked_at: Timestamp,
 }
 
-/// The caller (H2) and the identities their verified emails name (H3), as the API's `Viewer`.
+/// The caller (H2) and the identities their verified emails name (H3), as the API's `Caller`.
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
-pub struct Viewer {
+pub struct Caller {
     /// The user.
     pub user: UserId,
     /// The agent acting for them: never, in the browser.
@@ -169,9 +172,6 @@ pub struct Viewer {
     pub agent: Option<AgentId>,
     /// Their identities, which "mine" covers together.
     pub identities: BTreeSet<IdentityKey>,
-    /// H3: present when their emails name more than one identity.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub merge_offer: Option<BTreeSet<IdentityKey>>,
     /// The logins they sign in with, by provider and subject.
     pub logins: Vec<LinkedLogin>,
 }
@@ -282,21 +282,20 @@ impl BrowserRoot {
     /// # Errors
     ///
     /// When the store fails.
-    pub fn viewer_now(&self, now: &str) -> Result<Viewer, HostError> {
+    pub fn caller_now(&self, now: &str) -> Result<Caller, HostError> {
         let call = self.call(now)?;
-        let viewer = now_or_never(self.service().viewer(&call)).map_err(failed)?;
-        let merge_offer = viewer.merge_offer().cloned();
-        let logins = viewer.logins.into_iter().map(|record| LinkedLogin {
+        let caller = now_or_never(self.service().caller(&call)).map_err(failed)?;
+        let logins = caller.logins.into_iter().map(|record| LinkedLogin {
             provider: record.provider,
             subject: record.subject,
+            name: record.name,
             verified_emails: record.verified_emails,
             linked_at: record.linked_at,
         });
-        Ok(Viewer {
-            user: viewer.user,
+        Ok(Caller {
+            user: caller.user,
             agent: None,
-            identities: viewer.identities,
-            merge_offer,
+            identities: caller.identities,
             logins: logins.collect(),
         })
     }
@@ -425,8 +424,8 @@ impl BrowserRoot {
     /// # Errors
     ///
     /// The JSON of a [`HostError`].
-    pub fn viewer(&self, now: &str) -> Result<String, String> {
-        Ok(json(&self.viewer_now(now)?))
+    pub fn caller(&self, now: &str) -> Result<String, String> {
+        Ok(json(&self.caller_now(now)?))
     }
 
     /// The names of the users in `users`, a JSON array of ids, as `GET /api/users` answers it

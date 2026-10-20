@@ -1,5 +1,5 @@
 //! The composition: today per request in the deployment's zone, the capabilities document,
-//! the viewer's identities from verified emails (H3), and a late subscriber learning the
+//! the caller's identities from verified emails (H3), and a late subscriber learning the
 //! current revisions (H6).
 #![cfg(test)]
 
@@ -7,7 +7,7 @@ mod composition {
     use std::collections::BTreeSet;
     use std::sync::Arc;
 
-    use cairn_schema::{Date, Domain, Email, RevisionOf, Slug, Timestamp, Title};
+    use cairn_schema::{Date, Domain, Email, RevisionOf, Slug, Timestamp};
     use cairn_service::{AuthKind, AuthMethod, Capabilities};
     use cairn_store::build::{create_identity, create_journey, deployment_patch, identity};
     use cairn_store::{AuthStore, LoginRecord, MemoryStore, Store, Take, Tick, UserRecord, Watch};
@@ -75,7 +75,6 @@ mod composition {
         run(store.commit(patch.commit())).unwrap();
         let user = UserRecord {
             id: "u_lead".parse().unwrap(),
-            name: "Lead".parse::<Title>().unwrap(),
             created_at: "2026-10-01T00:00:00Z".parse().unwrap(),
         };
         run(store.put_user(user)).unwrap();
@@ -87,6 +86,7 @@ mod composition {
             provider: provider.parse().unwrap(),
             subject: subject.parse().unwrap(),
             user: "u_lead".parse().unwrap(),
+            name: None,
             verified_emails: verified
                 .iter()
                 .map(|email| email.parse::<Email>().unwrap())
@@ -96,7 +96,7 @@ mod composition {
     }
 
     #[test]
-    fn the_viewer_is_the_identity_holding_a_verified_email() {
+    fn the_caller_is_the_identity_holding_a_verified_email() {
         let cases: [(&str, Vec<LoginRecord>, &[&str]); 5] = [
             (
                 "a verified email matches its identity",
@@ -133,10 +133,10 @@ mod composition {
                 run(store.put_login(login)).unwrap();
             }
             let (service, _) = service_over(store);
-            let viewer = run(service.viewer(&call("u_lead", "2026-10-06T12:00:00Z"))).unwrap();
+            let caller = run(service.caller(&call("u_lead", "2026-10-06T12:00:00Z"))).unwrap();
             let expected: BTreeSet<_> = expected.iter().map(|key| key.parse().unwrap()).collect();
-            assert_eq!(viewer.identities, expected, "{case}");
-            let listed: Vec<_> = viewer
+            assert_eq!(caller.identities, expected, "{case}");
+            let listed: Vec<_> = caller
                 .logins
                 .iter()
                 .map(|login| (login.provider.to_string(), login.subject.to_string()))
@@ -146,11 +146,6 @@ mod composition {
             assert_eq!(
                 listed, sorted,
                 "{case}: logins in provider and subject order"
-            );
-            assert_eq!(
-                viewer.merge_offer().is_some(),
-                expected.len() > 1,
-                "{case}: H3 offers a merge only for duplicates"
             );
         }
     }

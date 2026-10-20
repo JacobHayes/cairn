@@ -84,7 +84,7 @@ impl AuthProvider for TeamProvider {
             Some((name, email)) => Verdict::Login(Login {
                 provider: self.name.clone(),
                 subject: name.parse().unwrap(),
-                display: name.parse().unwrap(),
+                name: Some(name.parse().unwrap()),
                 verified_emails: BTreeSet::from([email.parse().unwrap()]),
             }),
         }

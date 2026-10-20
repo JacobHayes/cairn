@@ -24,7 +24,6 @@ fn digest(digit: char) -> SecretHash {
 fn user(key: &str) -> UserRecord {
     UserRecord {
         id: id(key),
-        name: id("Someone"),
         created_at: at(0),
     }
 }
@@ -34,6 +33,7 @@ fn login(provider: &str, subject: &str, user: &str) -> LoginRecord {
         provider: id(provider),
         subject: id(subject),
         user: id(user),
+        name: Some(id("Someone")),
         verified_emails: BTreeSet::from([id("someone@example.org")]),
         linked_at: at(1),
     }
@@ -77,10 +77,12 @@ pub async fn auth_records_round_trip<B: Backend>(backend: &B) {
     assert_eq!(store.user(&id("u_ann")).await.unwrap(), Some(ann));
     assert_eq!(store.user(&id("u_nobody")).await.unwrap(), None);
 
-    let logins = [
-        login("oidc", "sub-1", "u_ann"),
-        login("tailscale", "ann@tailnet", "u_ann"),
-    ];
+    // A login's name is optional: one with a name and one without both load back as written.
+    let unnamed = LoginRecord {
+        name: None,
+        ..login("tailscale", "ann@tailnet", "u_ann")
+    };
+    let logins = [login("oidc", "sub-1", "u_ann"), unnamed];
     for held in &logins {
         store.put_login(held.clone()).await.unwrap();
     }

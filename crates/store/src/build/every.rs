@@ -559,13 +559,13 @@ pub fn route_header(route: &str, fill: Fill) -> RouteHeader {
     }
 }
 
-/// An identity, with emails when filled.
+/// An identity, with a name and emails when filled.
 #[must_use]
 pub fn identity(key: &str, fill: Fill) -> Identity {
     let emails = fill.some(["e@example.org", "f@example.org"]);
     Identity {
         key: id(key),
-        name: title(if fill.on() { "Every field" } else { "Cleared" }),
+        name: fill.some(title("Every field")),
         emails: emails.into_iter().flatten().map(id).collect(),
     }
 }

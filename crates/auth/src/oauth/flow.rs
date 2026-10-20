@@ -347,7 +347,7 @@ struct Lapsed(bool);
 fn refused(refusal: &Refusal) -> Response {
     let status = match refusal {
         Refusal::Credential => StatusCode::UNAUTHORIZED,
-        Refusal::Peer => StatusCode::FORBIDDEN,
+        Refusal::Peer | Refusal::NoVerifiedEmail => StatusCode::FORBIDDEN,
         Refusal::Unavailable(_) => StatusCode::SERVICE_UNAVAILABLE,
     };
     page(status, &refusal.to_string())

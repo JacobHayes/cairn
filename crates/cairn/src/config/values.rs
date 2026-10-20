@@ -322,7 +322,16 @@ fn dev(name: Option<Slug>, written: DevFile, at: &mut At<'_>) -> Option<Provider
         .parse::<Title>()
         .map_err(|error| at.push("user", error.to_string()))
         .ok();
-    let verified_emails = emails(&written.verified_emails, at);
+    let verified_emails = emails(&written.verified_emails, at).filter(|emails| {
+        let any = !emails.is_empty();
+        if !any {
+            at.push(
+                "verified_emails",
+                "needs an email: sign-in finds its identity by email",
+            );
+        }
+        any
+    });
     Some(Provider::Dev(DevConfig {
         name: name?,
         user: user?,

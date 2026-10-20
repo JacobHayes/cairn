@@ -18,6 +18,14 @@ export class BrowserRoot {
      */
     applyProposal(destination: string, id: string, request: string, now: string): string;
     /**
+     * The caller at `now`, as `GET /api/users/me` answers it (H3).
+     *
+     * # Errors
+     *
+     * The JSON of a [`HostError`].
+     */
+    caller(now: string): string;
+    /**
      * The capabilities document: one local sign-in, no assistant, MCP, or SSE.
      */
     capabilities(): string;
@@ -238,14 +246,6 @@ export class BrowserRoot {
      * The JSON of a [`HostError`].
      */
     userNames(users: string): string;
-    /**
-     * The caller at `now`, as `GET /api/users/me` answers it (H3).
-     *
-     * # Errors
-     *
-     * The JSON of a [`HostError`].
-     */
-    viewer(now: string): string;
 }
 
 /**
@@ -447,6 +447,7 @@ export interface InitOutput {
     readonly apply: (a: number, b: number, c: number, d: number, e: number) => void;
     readonly applyRoute: (a: number, b: number, c: number) => void;
     readonly browserroot_applyProposal: (a: number, b: number, c: number, d: number, e: number, f: number, g: number, h: number, i: number, j: number) => void;
+    readonly browserroot_caller: (a: number, b: number, c: number, d: number) => void;
     readonly browserroot_capabilities: (a: number, b: number) => void;
     readonly browserroot_deployment: (a: number, b: number) => void;
     readonly browserroot_discardProposal: (a: number, b: number, c: number, d: number, e: number, f: number, g: number, h: number, i: number, j: number) => void;
@@ -473,7 +474,6 @@ export interface InitOutput {
     readonly browserroot_routes: (a: number, b: number, c: number, d: number) => void;
     readonly browserroot_subscribe: (a: number, b: number, c: number, d: number) => void;
     readonly browserroot_userNames: (a: number, b: number, c: number, d: number) => void;
-    readonly browserroot_viewer: (a: number, b: number, c: number, d: number) => void;
     readonly derivation_derived: (a: number, b: number) => void;
     readonly derivation_key: (a: number, b: number) => void;
     readonly derivation_new: (a: number, b: number, c: number) => void;

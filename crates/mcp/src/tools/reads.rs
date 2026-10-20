@@ -585,14 +585,7 @@ impl ToolSet {
         arguments: ListJourneys,
     ) -> Result<JourneysOutput, ToolError> {
         let referencing = if arguments.mine {
-            let viewer = self.service.viewer(call).await?;
-            if viewer.identities.is_empty() {
-                return Ok(JourneysOutput {
-                    journeys: Vec::new(),
-                    next: None,
-                });
-            }
-            Some(viewer.identities)
+            Some(self.service.caller(call).await?.identities)
         } else {
             None
         };

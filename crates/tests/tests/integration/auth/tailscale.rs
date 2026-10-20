@@ -230,8 +230,11 @@ mod tailscale {
                 .unwrap()
         };
         let ann = whoami(&router, proxied(LOCAL)).await.unwrap();
-        let user = world.store.user(&ann.user).await.unwrap().unwrap();
-        assert_eq!(user.name.as_str(), "Ann");
+        let logins = world.store.logins_of(&ann.user).await.unwrap();
+        assert_eq!(
+            logins[0].name.as_ref().map(cairn_schema::Title::as_str),
+            Some("Ann")
+        );
         assert_eq!(
             whoami(&router, proxied(REMOTE)).await,
             Err(StatusCode::FORBIDDEN)
@@ -290,8 +293,10 @@ mod tailscale {
             if let Ok(actor) = answered {
                 let logins = world.store.logins_of(&actor.user).await.unwrap();
                 assert_eq!(logins[0].subject.as_str(), "ann@example.org");
-                let user = world.store.user(&actor.user).await.unwrap().unwrap();
-                assert_eq!(user.name.as_str(), "Ann");
+                assert_eq!(
+                    logins[0].name.as_ref().map(cairn_schema::Title::as_str),
+                    Some("Ann")
+                );
             }
         }
     }

@@ -40,7 +40,7 @@ import { useRows } from "./useRows.ts";
 import "./acting.css";
 import { Failed } from "../ui/Failed.tsx";
 import { plural } from "../ui/words.ts";
-import { useViewer } from "../data/react.ts";
+import { useCaller } from "../data/react.ts";
 import { useViewLevel } from "../canvas/viewLevel.ts";
 
 /** The columns held at the left while the table scrolls sideways. */
@@ -273,7 +273,7 @@ export function ListBody({ view, state, picks, list, selected, selection }: { vi
   const tree = list.sort === undefined;
   const addresses = useNodeAddresses();
   const navigate = useNavigate();
-  const { viewer } = useViewer();
+  const { caller } = useCaller();
   const folds = useFolds(nodes, current, state.depth, step, picks, selected, (key) => void navigate(addresses.open(key)));
   const kept = useMemo(() => (rows === undefined || drawn === undefined ? undefined : rows.filter((row) => drawn.has(row.key))), [rows, drawn]);
   const { entries, rows: allRows, order: placed, was, fromBefore } = useRemovedRows({ view, layer, request, query, level, kept, order });
@@ -286,7 +286,7 @@ export function ListBody({ view, state, picks, list, selected, selection }: { vi
   }, [view, allRows, entries, tree, list.sort, folds.open, placed, containers, fromBefore, was]);
   const everyLine = lines.flatMap((line) => (line.row === undefined ? [] : [line.row.key]));
   const columns = columnsOf(list, decisionColumns, layer?.mode === "reviewing");
-  const context: CellContext = { view, tree, decisions, ranks, frontier, sort: list.sort, viewer: viewer?.identities ?? [], onFold: folds.fold };
+  const context: CellContext = { view, tree, decisions, ranks, frontier, sort: list.sort, viewer: caller?.identities ?? [], onFold: folds.fold };
   const error = levelError ?? rowsError;
   return (
     <section className="stack list" aria-label="List" data-testid="list">

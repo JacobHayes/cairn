@@ -14,7 +14,7 @@ mod accounts {
         Login {
             provider: provider.parse().unwrap(),
             subject: subject.parse().unwrap(),
-            display: format!("{subject} at {provider}").parse().unwrap(),
+            name: Some(format!("{subject} at {provider}").parse().unwrap()),
             verified_emails: emails.iter().map(|email| email.parse().unwrap()).collect(),
         }
     }
@@ -27,18 +27,17 @@ mod accounts {
             .unwrap()
     }
 
-    /// H1: a first sign-in creates a user named after the login and links the login;
-    /// the next sign-in finds them both.
+    /// H1: a first sign-in creates a user and links the login, which keeps the name its
+    /// provider gave; the next sign-in finds them both.
     #[tokio::test]
     async fn a_first_sign_in_creates_a_user_and_later_ones_find_it() {
         let world = World::new();
         let ann = login("oidc", "sub-ann", &["ann@example.org"]);
         let user = sign_in(&world, &ann, false).await;
         assert_eq!(sign_in(&world, &ann, false).await, user);
-        let record = world.store.user(&user).await.unwrap().unwrap();
-        assert_eq!(record.name, ann.display);
         let logins = world.store.logins_of(&user).await.unwrap();
         assert_eq!(logins.len(), 1);
+        assert_eq!(logins[0].name, ann.name);
         assert_eq!(logins[0].verified_emails, ann.verified_emails);
         let logged = [AuthEvent::UserCreated, AuthEvent::LoginLinked];
         assert_eq!(world.log().await, logged);
@@ -49,9 +48,19 @@ mod accounts {
     #[tokio::test]
     async fn linking_while_signed_in_attaches_an_login_but_never_moves_one() {
         let world = World::new();
-        let ann = sign_in(&world, &login("oidc", "sub-ann", &[]), false).await;
-        let bob = sign_in(&world, &login("oidc", "sub-bob", &[]), false).await;
-        let tailnet = login("tailscale", "ann@tailnet", &[]);
+        let ann = sign_in(
+            &world,
+            &login("oidc", "sub-ann", &["ann@example.org"]),
+            false,
+        )
+        .await;
+        let bob = sign_in(
+            &world,
+            &login("oidc", "sub-bob", &["bob@example.org"]),
+            false,
+        )
+        .await;
+        let tailnet = login("tailscale", "ann@tailnet", &["ann@tailnet.example"]);
         let linked = world.accounts.resolve(&tailnet, Some(&ann), false).await;
         assert_eq!(linked, Ok(ann.clone()));
         assert_eq!(sign_in(&world, &tailnet, false).await, ann);
@@ -78,7 +87,6 @@ mod accounts {
             ("linked", &["ann@example.org"][..], true, Some(&ann)),
             ("not-configured", &["ann@example.org"][..], false, None),
             ("no-shared-email", &["ann@elsewhere.org"][..], true, None),
-            ("unverified", &[][..], true, None),
             (
                 "two-users",
                 &["ann@example.org", "bob@example.org"][..],
@@ -92,6 +100,42 @@ mod accounts {
                 Some(expected) => assert_eq!(&user, expected, "{subject}"),
                 None => assert!(user != ann && user != bob, "{subject}"),
             }
+        }
+    }
+
+    /// H3: an identity is found by email, so a login with no verified email is refused
+    /// before a user or a login is stored, new or known.
+    #[tokio::test]
+    async fn a_login_with_no_verified_email_is_refused() {
+        let world = World::new();
+        let none = login("oidc", "sub-ann", &[]);
+        let refused = world.accounts.resolve(&none, None, true).await;
+        assert_eq!(refused, Err(AuthError::NoVerifiedEmail));
+        assert_eq!(world.log().await, Vec::new());
+
+        let user = sign_in(
+            &world,
+            &login("oidc", "sub-ann", &["ann@example.org"]),
+            false,
+        )
+        .await;
+        let later = world.accounts.resolve(&none, None, false).await;
+        assert_eq!(later, Err(AuthError::NoVerifiedEmail));
+        assert_eq!(world.store.logins_of(&user).await.unwrap().len(), 1);
+    }
+
+    /// A login's name is what its provider says at the latest sign-in, and a name that
+    /// is no longer given is forgotten rather than kept.
+    #[tokio::test]
+    async fn a_sign_in_records_the_name_its_provider_gives_now() {
+        let world = World::new();
+        let mut ann = login("oidc", "sub-ann", &["ann@example.org"]);
+        let user = sign_in(&world, &ann, false).await;
+        for name in [Some("Ann Lee".parse().unwrap()), None] {
+            ann.name = name;
+            assert_eq!(sign_in(&world, &ann, false).await, user);
+            let held = world.store.logins_of(&user).await.unwrap();
+            assert_eq!(held[0].name, ann.name);
         }
     }
 

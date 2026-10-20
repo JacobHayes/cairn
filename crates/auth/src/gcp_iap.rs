@@ -304,9 +304,6 @@ impl GcpIapProvider {
             return Verdict::Refused(Refusal::Credential);
         };
         let email = claims.email().map(|email| email.as_str());
-        let display = email
-            .and_then(|email| email.parse::<Title>().ok())
-            .unwrap_or_else(|| subject.clone());
         let verified_emails = email
             .and_then(|email| email.parse::<Email>().ok())
             .into_iter()
@@ -314,7 +311,7 @@ impl GcpIapProvider {
         Verdict::Login(Login {
             provider: self.config.name.clone(),
             subject,
-            display,
+            name: None,
             verified_emails,
         })
     }

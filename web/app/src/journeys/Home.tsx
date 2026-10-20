@@ -9,7 +9,6 @@
 import { useCallback, useEffect, useMemo, useState, type ReactNode } from "react";
 import { Link } from "react-router";
 
-import { pathTo } from "../address.ts";
 import { NodeItem, NodePanel } from "../acting/NodeItem.tsx";
 import { factOf } from "../acting/reasons.ts";
 import { RowActions } from "../acting/RowActions.tsx";
@@ -17,7 +16,7 @@ import { RowsPanel, type PanelRow } from "../acting/RowsPanel.tsx";
 import { nextForYou, waitsOnWords } from "../acting/yours.ts";
 import "../acting/acting.css";
 import { valueOf } from "../data/keyed-read.ts";
-import { useLive, useRetryJourney, useViewer } from "../data/react.ts";
+import { useLive, useCaller, useRetryJourney } from "../data/react.ts";
 import { indexKey, journeyIndex, type JourneySummary } from "../data/reads.ts";
 import { destinationWords, ProposalRow } from "../proposals/ProposalRows.tsx";
 import { listKey, proposalsListed, type Proposals } from "../proposals/read.ts";
@@ -126,10 +125,10 @@ function Statement({ title, children, testId }: { title: string; children: React
   );
 }
 
-/** What Home reads: the viewer, the candidate journeys, and each journey's reading as it settles. */
+/** What Home reads: the caller, the candidate journeys, and each journey's reading as it settles. */
 function useHome() {
-  const { viewer, failed } = useViewer();
-  const query = viewer === undefined ? undefined : queryOf({ ...DEFAULT_FILTERS, mine: true }, viewer.identities);
+  const { caller, failed } = useCaller();
+  const query = caller === undefined ? undefined : queryOf({ ...DEFAULT_FILTERS, mine: true }, caller.identities);
   const { view, refresh } = useLive(indexKey(query), journeyIndex(query));
   const found = valueOf(view);
   const proposals = useLive(listKey("waiting"), proposalsListed("waiting"));
@@ -146,7 +145,7 @@ function useHome() {
     ready: reading.status === "ready" ? reading.ready.length : 0,
   }));
   const state = homeState({
-    viewer: failed !== undefined ? "failed" : viewer === undefined ? "loading" : { identities: viewer.identities.length },
+    caller: failed !== undefined ? "failed" : caller === undefined ? "loading" : "ready",
     index: view.status === "failed" ? "failed" : found === undefined ? "loading" : "ready",
     journeys,
     proposals: proposals.view.status === "failed" ? "failed" : waitingProposals === undefined ? "loading" : { waiting: waitingProposals.count },
@@ -180,13 +179,6 @@ function Said({ state }: { state: HomeState }) {
   switch (state) {
     case "loading":
       return <p className="muted home-reading">Reading your journeys...</p>;
-    case "unlinked":
-      return (
-        <Statement title="Cairn cannot match your sign-in to a person yet, so nothing shows as yours." testId="home-unlinked">
-          <p>No person or team holds a verified email of yours.</p>
-          <Link to={pathTo("me")}>Check who you are &rsaquo;</Link>
-        </Statement>
-      );
     case "unassigned":
       return (
         <Statement title="No work in an active journey is assigned to you." testId="home-unassigned">

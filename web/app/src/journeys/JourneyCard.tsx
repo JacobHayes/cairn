@@ -20,7 +20,7 @@ import "./journeys.css";
 import { Failed } from "../ui/Failed.tsx";
 import { plural } from "../ui/words.ts";
 import { ownerWords } from "../detail/sections.tsx";
-import { useViewer } from "../data/react.ts";
+import { useCaller } from "../data/react.ts";
 
 /** The most items "next up" lists on the card; the Summary lists the whole frontier. */
 const NEXT_UP_SHOWN = 3;
@@ -93,7 +93,7 @@ function NextMilestone({ ready, model }: { ready: Ready; model: SummaryModel }) 
 
 function Folds({ ready, model, selected }: { ready: Ready; model: SummaryModel; selected: string | undefined }) {
   const { header } = ready.journey;
-  const { viewer } = useViewer();
+  const { caller } = useCaller();
   const annotations = (ready.journey.graph.state?.annotations ?? []).filter((annotation) => annotation.body.node == null);
   return (
     <div className="detail-folds" data-testid="card-folds">
@@ -103,7 +103,7 @@ function Folds({ ready, model, selected }: { ready: Ready; model: SummaryModel; 
             {model.openDecisions.map((each) => (
               <li key={each.key} data-node={each.key} data-selected={each.key === selected}>
                 <NodeLink view={ready} node={each.key} />{" "}
-                <span className="muted small">{ownerWords(ready, each.owners, viewer?.identities)}</span>
+                <span className="muted small">{ownerWords(ready, each.owners, caller?.identities)}</span>
               </li>
             ))}
           </ul>

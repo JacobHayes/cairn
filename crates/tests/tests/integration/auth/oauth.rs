@@ -160,10 +160,18 @@ mod oauth {
     async fn signed_in(world: &World, user: &str) -> String {
         let record = UserRecord {
             id: user.parse().unwrap(),
-            name: "Someone".parse().unwrap(),
             created_at: world.accounts.clock().now(),
         };
         world.store.put_user(record).await.unwrap();
+        let login = cairn_store::LoginRecord {
+            provider: "oidc".parse().unwrap(),
+            subject: user.parse().unwrap(),
+            user: user.parse().unwrap(),
+            name: None,
+            verified_emails: [format!("{user}@example.org").parse().unwrap()].into(),
+            linked_at: world.accounts.clock().now(),
+        };
+        world.store.put_login(login).await.unwrap();
         let session = world
             .accounts
             .start_session(&user.parse().unwrap())
@@ -514,7 +522,7 @@ mod oauth {
         let dev = cairn_auth::DevConfig {
             name: "dev".parse().unwrap(),
             user: "Dev".parse().unwrap(),
-            verified_emails: std::collections::BTreeSet::new(),
+            verified_emails: ["dev@example.org".parse().unwrap()].into(),
             token: None,
             auto_link: false,
             allow_off_loopback: false,

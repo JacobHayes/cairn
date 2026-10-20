@@ -8,6 +8,7 @@ export const __wbg_rootsubscription_free: (a: number, b: number) => void;
 export const apply: (a: number, b: number, c: number, d: number, e: number) => void;
 export const applyRoute: (a: number, b: number, c: number) => void;
 export const browserroot_applyProposal: (a: number, b: number, c: number, d: number, e: number, f: number, g: number, h: number, i: number, j: number) => void;
+export const browserroot_caller: (a: number, b: number, c: number, d: number) => void;
 export const browserroot_capabilities: (a: number, b: number) => void;
 export const browserroot_deployment: (a: number, b: number) => void;
 export const browserroot_discardProposal: (a: number, b: number, c: number, d: number, e: number, f: number, g: number, h: number, i: number, j: number) => void;
@@ -34,7 +35,6 @@ export const browserroot_routeVersion: (a: number, b: number, c: number, d: numb
 export const browserroot_routes: (a: number, b: number, c: number, d: number) => void;
 export const browserroot_subscribe: (a: number, b: number, c: number, d: number) => void;
 export const browserroot_userNames: (a: number, b: number, c: number, d: number) => void;
-export const browserroot_viewer: (a: number, b: number, c: number, d: number) => void;
 export const derivation_derived: (a: number, b: number) => void;
 export const derivation_key: (a: number, b: number) => void;
 export const derivation_new: (a: number, b: number, c: number) => void;

@@ -14,7 +14,7 @@ import { unansweredOf } from "../data/edit-manager.ts";
 import type { Deriver, Host } from "../data/host.ts";
 import { Skewed } from "../data/host.ts";
 import { beforeWork, DERIVE, previewPolicy, type ReadAt, type ReadKey, type ReadPolicy, type ReadSource } from "../data/keyed-read.ts";
-import { useKeyedRead, useSession, useViewer, useWrite } from "../data/react.ts";
+import { useKeyedRead, useSession, useCaller, useWrite } from "../data/react.ts";
 import type { WriteView } from "../data/write-machine.ts";
 import type { ReceiptState } from "../ui/receipt.ts";
 import { newPatchId, type Rejection } from "../data/writes.ts";
@@ -141,8 +141,8 @@ const PUBLISH_PREVIEW: ReadSource<PublishArgs, Preview> = { policy: DERIVE, read
 /** What publishing `authored`'s draft would be refused for (A15), read again whenever the draft or the deployment moves. */
 export function usePublishPreviewRead(authored: Authored): Preview | undefined {
   const { deriver, host } = useSession();
-  const { viewer } = useViewer();
-  const user = viewer?.user ?? LOCAL_USER;
+  const { caller } = useCaller();
+  const user = caller?.user ?? LOCAL_USER;
   const key: ReadKey<PublishArgs> = { of: [JSON.stringify(authored.target)], freshness: [authored.graph, authored.deploymentRevision, authored.today, user], args: { deriver, host, user, authored } };
   const { view } = useKeyedRead(PUBLISH_PREVIEW, key);
   return view.status === "current" ? view.value : undefined;
@@ -171,12 +171,12 @@ async function checkOf(args: PreviewArgs): Promise<Rejection | undefined> {
  */
 export function useAuthorWrite(authored: Authored, scope: string, label?: string): AuthorWrite {
   const { deriver } = useSession();
-  const { viewer } = useViewer();
+  const { caller } = useCaller();
   const write = useWrite(authorEdit(authored, scope), label);
   const sent = write.write?.command.kind === "patch" ? write.write.command.patch.mutations : undefined;
   return {
     run: async (mutations, base = authored.revision) => {
-      const check = () => checkOf({ deriver, user: viewer?.user ?? LOCAL_USER, authored, mutations });
+      const check = () => checkOf({ deriver, user: caller?.user ?? LOCAL_USER, authored, mutations });
       return (await write.submit(authorCommand(authored, mutations, base), check)) !== undefined;
     },
     pending: write.busy,
@@ -212,9 +212,9 @@ export function previewKey(deriver: Deriver, user: string, authored: Authored, m
 
 function usePreviewRead(source: ReadSource<PreviewArgs, Preview>, authored: Authored, mutations: Mutation[] | undefined): Preview | undefined {
   const { deriver } = useSession();
-  const { viewer } = useViewer();
+  const { caller } = useCaller();
   const asked = mutations === undefined || mutations.length === 0 ? undefined : mutations;
-  const { view } = useKeyedRead(source, asked === undefined ? undefined : previewKey(deriver, viewer?.user ?? LOCAL_USER, authored, asked));
+  const { view } = useKeyedRead(source, asked === undefined ? undefined : previewKey(deriver, caller?.user ?? LOCAL_USER, authored, asked));
   return view.status === "current" ? view.value : undefined;
 }
 

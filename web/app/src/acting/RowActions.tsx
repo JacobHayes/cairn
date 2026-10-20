@@ -7,7 +7,7 @@
 import type { ReactNode } from "react";
 import { useNavigate } from "react-router";
 
-import { useViewer } from "../data/react.ts";
+import { useCaller } from "../data/react.ts";
 import { useReviewing } from "../proposals/layer.ts";
 import { ActButton, type Opens } from "../detail/ActButton.tsx";
 import { EvidenceForm, type Needs } from "../detail/DoneEvidence.tsx";
@@ -69,7 +69,7 @@ function RowEvidence({ write, node, needs, form }: { write: NodeWrite; node: str
  */
 export function RowActions({ view, row, to, owner = true, column = false, yours = false }: { view: Ready; row: NodeRow; to: string; owner?: boolean; column?: boolean; yours?: boolean }): ReactNode {
   const navigate = useNavigate();
-  const { viewer } = useViewer();
+  const { caller } = useCaller();
   const write = useNodeWrite(view, `acts:${row.key}`, row.key);
   const evidence = useFormDraft<EvidenceDraft | string>(write.journey, row.key, "done-artifact");
   const facts = factsOf(view, row.key);
@@ -91,7 +91,7 @@ export function RowActions({ view, row, to, owner = true, column = false, yours 
       void navigate(to, { state: { choice: { node: row.key, id: what } } });
     }
   };
-  const owners = ownerWords(view, row.owners, viewer?.identities);
+  const owners = ownerWords(view, row.owners, caller?.identities);
   return (
     <>
       <div className="row-side">

@@ -24,7 +24,7 @@ import {
   subscriptionOf,
   syncOf,
   toastsOf,
-  viewerOf,
+  callerOf,
   type ConversationsRef,
   type SessionRootRef,
   type SubscriptionRef,
@@ -77,7 +77,7 @@ export class Session {
   /** The deployment context, read for the tab's whole life. */
   readonly deployment: ReadRef;
   /** The caller, read again for each newer deployment held. */
-  readonly viewer: ReadRef;
+  readonly caller: ReadRef;
   /** The names of the users the screens show. */
   readonly people: People;
   /** What every read is given of the session. */
@@ -109,7 +109,7 @@ export class Session {
     this.edits = editsOf(this.root);
     this.journeys = journeysOf(this.root);
     this.deployment = deploymentOf(this.root);
-    this.viewer = viewerOf(this.root);
+    this.caller = callerOf(this.root);
     this.people = new People(parts.host);
     this.readEnv = readEnvOf(this.root, this.#monotonic);
     this.sync = syncOf(this.root);

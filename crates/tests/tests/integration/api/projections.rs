@@ -11,7 +11,7 @@ mod in_process {
 
     use axum::http::Method;
     use cairn_api::client::Transport;
-    use cairn_api::wire::{History, Mine, NodeDetail, Problem, ProblemCode, Projected, Viewer};
+    use cairn_api::wire::{Caller, History, Mine, NodeDetail, Problem, ProblemCode, Projected};
     use cairn_schema::limits::{EXPLANATION_ENTRY_COUNT_MAX, PAGE_ITEM_COUNT_MAX};
     use cairn_schema::{
         Actor, ExplainedField, ExplanationPage, LevelDisplay, LevelQuery, ListFlag, ListPage,
@@ -26,7 +26,7 @@ mod in_process {
 
     /// The service's call for the member `transport` signs in as, at [`NOW`].
     async fn call_of(transport: &Transport) -> Call {
-        let viewer: Viewer = get(transport, "/api/users/me").await;
+        let viewer: Caller = get(transport, "/api/users/me").await;
         Call {
             actor: Actor {
                 user: viewer.user,

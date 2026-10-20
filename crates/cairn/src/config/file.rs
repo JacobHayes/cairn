@@ -94,7 +94,6 @@ impl ProviderFile {
 pub(crate) struct DevFile {
     pub name: String,
     pub user: String,
-    #[serde(default)]
     pub verified_emails: Vec<String>,
     pub token: Option<String>,
     #[serde(default)]

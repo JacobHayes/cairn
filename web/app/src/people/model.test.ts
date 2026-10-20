@@ -1,11 +1,12 @@
 // E6, H3: identity keys and emails as the screens send them, a merge naming every journey that
-// refers to either identity at the revision seen, aliases resolving to the survivor, and the
-// merge offered for a caller's duplicate identities.
+// refers to either identity at the revision seen, aliases resolving to the survivor, and an
+// identity shown by its name or else its first email.
 import type { Schema } from "@cairn/client";
 import { describe, expect, it } from "vitest";
 
+import { identityLabel } from "./label.ts";
 import { linkable } from "./You.tsx";
-import { aliasesOf, emailProblem, identityOf, mergeMutation, newIdentityKey, offeredMerge } from "./model.ts";
+import { aliasesOf, emailProblem, identityOf, mergeMutation, newIdentityKey } from "./model.ts";
 
 describe("identities as sent (E6, H3)", () => {
   it("mints keys the host accepts that differ from one another and carry no name", () => {
@@ -52,10 +53,10 @@ describe("a merge (E6)", () => {
     expect(aliasesOf(deployment, "who_none")).toEqual([]);
   });
 
-  it("offers one merge at a time for a caller's duplicates, and none for one identity (H3)", () => {
-    expect(offeredMerge(["who_b", "who_a", "who_c"])).toEqual({ survivor: "who_a", merged: "who_b" });
-    expect(offeredMerge(["who_a"])).toBeUndefined();
-    expect(offeredMerge(null)).toBeUndefined();
+  it("shows an identity by its name, else its first email, and sends a blank name as none (H3)", () => {
+    expect(identityLabel({ name: "Ana", emails: ["ana@example.org"] })).toBe("Ana");
+    expect(identityLabel({ emails: ["ana@example.org", "a@example.org"] })).toBe("ana@example.org");
+    expect(identityOf("who_a", "  ", ["ana@example.org"])).toEqual({ key: "who_a", emails: ["ana@example.org"] });
   });
 });
 

@@ -302,6 +302,13 @@ impl Store for TursoStore {
         read!(self, connection => queries::referencing(connection, identities))
     }
 
+    async fn identities_with_emails(
+        &self,
+        emails: &BTreeSet<Email>,
+    ) -> Result<BTreeSet<IdentityKey>, StoreError> {
+        read!(self, connection => queries::identities_with_emails(connection, emails))
+    }
+
     async fn resolve_identity(&self, key: &IdentityKey) -> Result<Option<Identity>, StoreError> {
         read!(self, connection => queries::resolve_identity(connection, key))
     }

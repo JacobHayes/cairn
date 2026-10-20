@@ -15,12 +15,14 @@ import { WriteStatus } from "../screens/WriteStatus.tsx";
 import { Failed } from "../ui/Failed.tsx";
 import { Button } from "../ui/kit.tsx";
 import { Receipt, useReceipt } from "../ui/Receipt.tsx";
+import { identityLabel } from "./label.ts";
 import { mergeFlow } from "./merge.ts";
 import type { Identity } from "./model.ts";
 
-/** An identity's name by key. */
+/** An identity's label by key (its name, else its first email). */
 function nameOf(identities: readonly Identity[], key: string): string {
-  return identities.find((identity) => identity.key === key)?.name ?? "";
+  const found = identities.find((identity) => identity.key === key);
+  return found === undefined ? "" : identityLabel(found);
 }
 
 function IdentitySelect({ label, value, identities, onChange }: { label: string; value: string; identities: readonly Identity[]; onChange: (key: string) => void }) {
@@ -31,8 +33,7 @@ function IdentitySelect({ label, value, identities, onChange }: { label: string;
         <option value="">Choose an identity</option>
         {identities.map((identity) => (
           <option key={identity.key} value={identity.key}>
-            {identity.name}
-            {(identity.emails ?? []).length === 0 ? "" : ` (${(identity.emails ?? []).join(", ")})`}
+            {identity.name === undefined || identity.name === null ? identityLabel(identity) : `${identity.name}${(identity.emails ?? []).length === 0 ? "" : ` (${(identity.emails ?? []).join(", ")})`}`}
           </option>
         ))}
       </select>
@@ -40,7 +41,7 @@ function IdentitySelect({ label, value, identities, onChange }: { label: string;
   );
 }
 
-export function MergeIdentities({ deployment, identities, asked }: { deployment: Deployment; identities: readonly Identity[]; asked: string[] }) {
+export function MergeIdentities({ deployment, identities }: { deployment: Deployment; identities: readonly Identity[] }) {
   const { host, edits, titleOf } = useSession();
   const skew = useSkew();
   const flow = useActorRef(mergeFlow, {
@@ -54,8 +55,8 @@ export function MergeIdentities({ deployment, identities, asked }: { deployment:
   const failure = useSelector(flow, (snapshot) => snapshot.context.failure);
   const write = useEdit("merge-identities");
   const receipt = useReceipt();
-  const [survivor, setSurvivor] = useState(asked[0] ?? "");
-  const [merged, setMerged] = useState(asked[1] ?? "");
+  const [survivor, setSurvivor] = useState("");
+  const [merged, setMerged] = useState("");
   // Told of a landing only while this control is on screen.
   useEffect(() => {
     const subscription = flow.on("merged", ({ answer }) => {

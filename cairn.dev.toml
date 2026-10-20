@@ -10,3 +10,4 @@ timezone = "UTC"
 kind = "dev"
 name = "dev"
 user = "Dev"
+verified_emails = ["dev@example.org"]

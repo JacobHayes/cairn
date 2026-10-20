@@ -10,7 +10,7 @@ import type { KeptTurns } from "../assistant/conversation.ts";
 import type { AssistantHost } from "./assistant.ts";
 import type { Answer, Command } from "./edit-record.ts";
 import type { Domain, ProposalHost, ProposalWritten } from "./proposals.ts";
-import { Missing, ReadFailed, Skewed, type Deriver, type Host, type JourneyIndexQuery, type JourneyPage, type Route, type RouteFile, type RouteImport, type RouteVersion, type Viewer } from "./host.ts";
+import { Missing, ReadFailed, Skewed, type Deriver, type Host, type JourneyIndexQuery, type JourneyPage, type Route, type RouteFile, type RouteImport, type RouteVersion, type Caller } from "./host.ts";
 import type { WriteEnv } from "./write-machine.ts";
 
 export interface FakeJourney {
@@ -49,7 +49,7 @@ export class FakeHost implements Host {
 
   /** The index queries asked, in turn. */
   readonly queries: (JourneyIndexQuery | undefined)[] = [];
-  viewerHeld: Viewer = { user: "u_fake", identities: [], logins: [] };
+  callerHeld: Caller = { user: "u_fake", identities: [], logins: [] };
 
   journeys(query?: JourneyIndexQuery): Promise<JourneyPage> {
     this.queries.push(query);
@@ -116,11 +116,11 @@ export class FakeHost implements Host {
   }
 
   /** How many times the caller was read. */
-  viewerFetches = 0;
+  callerFetches = 0;
 
-  viewer(): Promise<Viewer> {
-    this.viewerFetches += 1;
-    return Promise.resolve(this.viewerHeld);
+  caller(): Promise<Caller> {
+    this.callerFetches += 1;
+    return Promise.resolve(this.callerHeld);
   }
 
   /** The names `userNames` gives, by user. */

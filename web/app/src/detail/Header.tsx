@@ -6,7 +6,7 @@ import { Link } from "react-router";
 
 import { RejectionView } from "../screens/RejectionView.tsx";
 import { WriteStatus } from "../screens/WriteStatus.tsx";
-import { useViewer } from "../data/react.ts";
+import { useCaller } from "../data/react.ts";
 import { statusTone, statusWord } from "../status/words.ts";
 import { Badge, Button, Field } from "../ui/kit.tsx";
 import { Receipt } from "../ui/Receipt.tsx";
@@ -70,12 +70,12 @@ function Meta({ view, detail }: { view: Ready; detail: NodeDetail }) {
   const write = useNodeWrite(view, `assign:${detail.node.key}`);
   const { node, derived } = detail;
   const people = view.inputs.deployment.identities ?? [];
-  const { viewer } = useViewer();
+  const { caller } = useCaller();
   const owner =
     derived.unassigned === true && people.length > 0 ? (
       <OwnerSelect key="assign" view={view} write={write} node={node.key} placeholder="Assign" className="assign-owner" testId="assign-owner" />
     ) : (
-      ownerWords(view, ownersOf(view, node.key), viewer?.identities)
+      ownerWords(view, ownersOf(view, node.key), caller?.identities)
     );
   return (
     <div className="meta muted" data-testid="detail-meta">

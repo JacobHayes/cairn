@@ -114,7 +114,17 @@ pub fn action(key: &str, slug: &str, parent: Option<&str>) -> Node<KeyRefs> {
 pub fn identity(key: &str, name: &str, emails: &[&str]) -> Identity {
     Identity {
         key: id(key),
-        name: title(name),
+        name: Some(title(name)),
+        emails: emails.iter().map(|email| id(email)).collect(),
+    }
+}
+
+/// An identity with no name, only emails (H3).
+#[must_use]
+pub fn unnamed_identity(key: &str, emails: &[&str]) -> Identity {
+    Identity {
+        key: id(key),
+        name: None,
         emails: emails.iter().map(|email| id(email)).collect(),
     }
 }

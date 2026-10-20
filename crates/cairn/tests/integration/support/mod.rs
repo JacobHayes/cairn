@@ -45,7 +45,9 @@ timezone = "UTC"
 /// it.
 pub fn dev_provider(token: Option<&str>) -> String {
     let token = token.map_or(String::new(), |token| format!("token = \"{token}\""));
-    format!("[[auth]]\nkind = \"dev\"\nname = \"dev\"\nuser = \"Dev\"\n{token}\n")
+    format!(
+        "[[auth]]\nkind = \"dev\"\nname = \"dev\"\nuser = \"Dev\"\nverified_emails = [\"dev@example.org\"]\n{token}\n"
+    )
 }
 
 /// A stand-in web build: a page and one bundle.

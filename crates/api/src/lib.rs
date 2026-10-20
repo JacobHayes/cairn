@@ -12,6 +12,7 @@
 #![forbid(unsafe_code)]
 
 pub mod admission;
+mod arrival;
 pub mod client;
 pub mod endpoints;
 pub mod error;
@@ -85,7 +86,7 @@ fn served(assistant: bool) -> Served {
         (&at::SEARCH, get(handle::reads::search)),
         (&at::EVENTS, get(handle::reads::events)),
         (&at::STREAM, get(stream::stream)),
-        (&at::VIEWER, get(handle::users::viewer)),
+        (&at::CALLER, get(handle::users::caller)),
         (&at::USER_NAMES, get(handle::users::user_names)),
         (&at::TOKENS, get(handle::users::tokens)),
         (&at::MINT_TOKEN, post(handle::users::mint_token)),
@@ -152,6 +153,7 @@ pub fn router_beside(
         auth: auth.clone(),
         assistant,
     };
+    let arriving = middleware::from_fn_with_state(api.clone(), arrival::arrive);
     let served = served(api.assistant.is_some());
     let mut routes = Router::new();
     for (endpoint, method_router) in served {
@@ -184,11 +186,12 @@ pub fn router_beside(
     };
     // The duration limit is the API's, inside the auth layer: auth's own routes and layer
     // wait on sign-in providers under their own limit.
-    let routes = admission::timed(routes);
+    // H3: arrival runs inside it, so a stalled lookup or create times out like any request.
+    let routes = admission::timed(routes.layer(arriving.clone()));
     // I5: the assistant's turns, outside the request duration (PRACTICES, Explicit limits:
     // its provider call and turn limits hold them instead).
     let routes = match conversing {
-        Some(conversing) => routes.merge(conversing),
+        Some(conversing) => routes.merge(conversing.layer(arriving)),
         None => routes,
     };
     // The server's prefixes, whole: what no endpoint there serves is no endpoint, never the
@@ -203,6 +206,8 @@ pub fn router_beside(
             reserved = reserved.route(&path, any(handle::no_such_endpoint));
         }
     }
+    // H3: a user arrives, and is matched to an identity or given one, once per request after
+    // authentication and before any handler; MCP and the assistant's turns included.
     let whole = auth
         .protect(routes)
         .merge(health)

@@ -3,7 +3,7 @@ import { streamStatus, type StreamStatus } from "@cairn/client";
 import { useActorRef, useSelector } from "@xstate/react";
 import { createContext, useCallback, useContext, useEffect, useLayoutEffect, useMemo, useRef, useSyncExternalStore } from "react";
 
-import type { Capabilities, Deployment, Viewer } from "./host.ts";
+import type { Capabilities, Deployment, Caller } from "./host.ts";
 import { derivationOf, journeyView, sameDerivation, type Derivation, type JourneyView } from "./journeys.ts";
 import { heldValue, keyedRead, readView, type ReadKey, type ReadSnapshot, type ReadSource, type ReadView } from "./keyed-read.ts";
 import { liveSource, type LiveSpec } from "./live.ts";
@@ -57,13 +57,13 @@ export function useDerivation(): Derivation | undefined {
 }
 
 /** What the caller's read shows: the caller once fetched, and why not while it has not been. */
-function viewerReading(snapshot: ReadSnapshot): { viewer: Viewer | undefined; failed: string | undefined } {
-  return { viewer: heldValue<Viewer>(snapshot), failed: snapshot.context.failure?.error.message };
+function callerReading(snapshot: ReadSnapshot): { caller: Caller | undefined; failed: string | undefined } {
+  return { caller: heldValue<Caller>(snapshot), failed: snapshot.context.failure?.error.message };
 }
 
 /** The caller (H3), once fetched; refetched whenever a newer deployment is held. */
-export function useViewer(): { viewer: Viewer | undefined; failed: string | undefined } {
-  return useSelector(useSession().viewer, viewerReading, (left, right) => left.viewer === right.viewer && left.failed === right.failed);
+export function useCaller(): { caller: Caller | undefined; failed: string | undefined } {
+  return useSelector(useSession().caller, callerReading, (left, right) => left.caller === right.caller && left.failed === right.failed);
 }
 
 /** H3: a user as people read them: their name (the identity their verified emails name, else the name they signed in with), never their id. */
@@ -74,11 +74,11 @@ export function useUserName(): (user: string) => string {
   return (user) => people.name(user, revision);
 }
 
-/** A user in a sentence: "you" for the viewer, else their name. */
+/** A user in a sentence: "you" for the caller, else their name. */
 export function useUserWords(): (user: string) => string {
-  const { viewer } = useViewer();
+  const { caller } = useCaller();
   const name = useUserName();
-  return (user) => (user === viewer?.user ? "you" : name(user));
+  return (user) => (user === caller?.user ? "you" : name(user));
 }
 
 /** Today's date (YYYY-MM-DD) for a screen with no journey in hand, from the session's clock (`Session.today`). */

@@ -14,6 +14,8 @@ pub enum Refusal {
     Credential,
     /// A credential accepted only from the local machine came from elsewhere.
     Peer,
+    /// The sign-in carries no verified email (H3).
+    NoVerifiedEmail,
     /// The store or a sign-in provider failed, so the credential could not be checked.
     Unavailable(String),
 }
@@ -23,6 +25,9 @@ impl fmt::Display for Refusal {
         match self {
             Refusal::Credential => formatter.write_str("the presented credential is not valid"),
             Refusal::Peer => formatter.write_str("this credential is accepted only locally"),
+            Refusal::NoVerifiedEmail => {
+                formatter.write_str("Cairn signs in only with a verified email")
+            }
             Refusal::Unavailable(reason) => write!(formatter, "authentication failed: {reason}"),
         }
     }
@@ -39,6 +44,8 @@ pub enum AuthError {
     Random(String),
     /// A sign-in provider failed or answered with something invalid.
     Upstream(String),
+    /// The login carries no verified email, so no identity could ever be matched to it (H3).
+    NoVerifiedEmail,
     /// The login already belongs to another user; merging users is `Later` (PRD).
     LoginHeldByAnotherUser {
         /// The user holding it.
@@ -56,6 +63,9 @@ impl fmt::Display for AuthError {
             AuthError::Store(error) => write!(formatter, "{error}"),
             AuthError::Random(reason) => write!(formatter, "random source failed: {reason}"),
             AuthError::Upstream(reason) => write!(formatter, "sign-in provider: {reason}"),
+            AuthError::NoVerifiedEmail => {
+                formatter.write_str("Cairn signs in only with a verified email")
+            }
             AuthError::LoginHeldByAnotherUser { holder } => {
                 write!(formatter, "the login already belongs to user {holder}")
             }
@@ -75,7 +85,10 @@ impl From<StoreError> for AuthError {
 
 impl From<AuthError> for Refusal {
     fn from(error: AuthError) -> Self {
-        Refusal::Unavailable(error.to_string())
+        match error {
+            AuthError::NoVerifiedEmail => Refusal::NoVerifiedEmail,
+            other => Refusal::Unavailable(other.to_string()),
+        }
     }
 }
 

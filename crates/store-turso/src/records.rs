@@ -30,15 +30,11 @@ async fn user_exists(connection: &Connection, user: &UserId) -> Result<(), Store
 }
 
 pub(crate) async fn put_user(connection: &Connection, user: &UserRecord) -> Result<(), StoreError> {
-    let UserRecord {
-        id,
-        name,
-        created_at,
-    } = user;
+    let UserRecord { id, created_at } = user;
     execute(
         connection,
-        "INSERT OR REPLACE INTO users (id, name, created_at) VALUES (?1, ?2, ?3)",
-        vec![text(id), text(name), time(*created_at)?],
+        "INSERT OR REPLACE INTO users (id, created_at) VALUES (?1, ?2)",
+        vec![text(id), time(*created_at)?],
     )
     .await?;
     Ok(())
@@ -48,14 +44,13 @@ pub(crate) async fn user(
     connection: &Connection,
     id: &UserId,
 ) -> Result<Option<UserRecord>, StoreError> {
-    let select = "SELECT name, created_at FROM users WHERE id = ?1";
+    let select = "SELECT created_at FROM users WHERE id = ?1";
     let Some(row) = first(connection, select, vec![text(id)]).await? else {
         return Ok(None);
     };
     Ok(Some(UserRecord {
         id: id.clone(),
-        name: row.parse(0)?,
-        created_at: row.timestamp(1)?,
+        created_at: row.timestamp(0)?,
     }))
 }
 
@@ -67,6 +62,7 @@ pub(crate) async fn put_login(
         provider,
         subject,
         user,
+        name,
         verified_emails,
         linked_at,
     } = login;
@@ -74,9 +70,15 @@ pub(crate) async fn put_login(
     let key = || vec![text(provider), text(subject)];
     execute(
         connection,
-        "INSERT OR REPLACE INTO user_logins (provider, subject, user_id, linked_at) \
-         VALUES (?1, ?2, ?3, ?4)",
-        vec![text(provider), text(subject), text(user), time(*linked_at)?],
+        "INSERT OR REPLACE INTO user_logins (provider, subject, user_id, name, linked_at) \
+         VALUES (?1, ?2, ?3, ?4, ?5)",
+        vec![
+            text(provider),
+            text(subject),
+            text(user),
+            opt_text(name.as_ref()),
+            time(*linked_at)?,
+        ],
     )
     .await?;
     execute(
@@ -104,7 +106,7 @@ async fn logins(
     params: Vec<Value>,
 ) -> Result<Vec<LoginRecord>, StoreError> {
     let select = format!(
-        "SELECT provider, subject, user_id, linked_at FROM user_logins WHERE {filter} \
+        "SELECT provider, subject, user_id, name, linked_at FROM user_logins WHERE {filter} \
          ORDER BY provider, subject"
     );
     let mut found = Vec::new();
@@ -124,8 +126,9 @@ async fn logins(
             provider: row.parse(0)?,
             subject: row.parse(1)?,
             user: row.parse(2)?,
+            name: row.opt_parse(3)?,
             verified_emails,
-            linked_at: row.timestamp(3)?,
+            linked_at: row.timestamp(4)?,
         });
     }
     Ok(found)

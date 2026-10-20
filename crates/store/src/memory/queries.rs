@@ -4,8 +4,8 @@
 use std::collections::{BTreeMap, BTreeSet};
 
 use cairn_schema::{
-    Domain, GraphId, Identity, IdentityKey, JourneyId, ProposalOutline, ProposalStatus, RouteId,
-    RouteKind, VersionNumber,
+    Domain, Email, GraphId, Identity, IdentityKey, JourneyId, ProposalOutline, ProposalStatus,
+    RouteId, RouteKind, VersionNumber,
 };
 
 use super::State;
@@ -176,6 +176,14 @@ impl State {
             revision: *revision,
             versions,
         })
+    }
+
+    pub(super) fn identities_with_emails(&self, emails: &BTreeSet<Email>) -> BTreeSet<IdentityKey> {
+        let identities = self.domains.deployment.identities.values();
+        identities
+            .filter(|identity| identity.emails.iter().any(|email| emails.contains(email)))
+            .map(|identity| identity.key.clone())
+            .collect()
     }
 
     pub(super) fn resolve_identity(&self, key: &IdentityKey) -> Option<Identity> {

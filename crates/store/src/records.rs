@@ -52,8 +52,6 @@ impl fmt::Display for SecretHash {
 pub struct UserRecord {
     /// The user.
     pub id: UserId,
-    /// The name shown for the user.
-    pub name: Title,
     /// When the user first signed in.
     pub created_at: Timestamp,
 }
@@ -67,6 +65,8 @@ pub struct LoginRecord {
     pub subject: Title,
     /// The user it signs in as.
     pub user: UserId,
+    /// The name the provider gave the account at the last sign-in, if it gave one (H3).
+    pub name: Option<Title>,
     /// The emails the provider marked verified at the last sign-in (H3).
     pub verified_emails: std::collections::BTreeSet<Email>,
     /// When it was linked.

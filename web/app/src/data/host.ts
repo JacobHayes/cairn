@@ -40,7 +40,7 @@ export type RoutePage = Schema<"RoutePage">;
 export type RouteDetail = Schema<"RouteDetail">;
 export type RouteFile = Schema<"RouteFile">;
 export type RouteImport = Schema<"RouteImport">;
-export type Viewer = Schema<"Viewer">;
+export type Caller = Schema<"Caller">;
 export type UserName = Schema<"UserName">;
 export type { JourneyIndexQuery };
 
@@ -93,7 +93,7 @@ export interface Host {
   /** A13: imports a route file: a new route, or a new draft of the file's route. */
   importRoute(request: RouteImport): Promise<Answered<HttpFailure>>;
   /** The caller, their logins, and the identities their verified emails name (H3). */
-  viewer(): Promise<Viewer>;
+  caller(): Promise<Caller>;
   /** H3: the names of `users` (at most a page of them); one that does not exist is left out. */
   userNames(users: readonly string[]): Promise<UserName[]>;
   /** A13: route files as the page's engine reads and writes them (YAML on disk, JSON on the wire). */

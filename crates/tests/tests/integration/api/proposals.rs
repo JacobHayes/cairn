@@ -10,8 +10,8 @@ mod in_process {
     use axum::http::{Method, StatusCode};
     use cairn_api::client::{Reply, Transport};
     use cairn_api::wire::{
-        EventPage, MintedToken, PatchAnswer, Problem, ProblemCode, ProposalAnswer, ProposalReview,
-        Viewer,
+        Caller, EventPage, MintedToken, PatchAnswer, Problem, ProblemCode, ProposalAnswer,
+        ProposalReview,
     };
     use cairn_schema::{Proposal, ProposalStatus, Rejection, RevisionOf};
     use serde_json::{Value, json};
@@ -154,7 +154,7 @@ mod in_process {
         assert_eq!(resubmitted, PatchAnswer::AlreadyApplied { receipt }, "H5");
         let held: Proposal = get(&bob, PR_NOTE).await;
         assert_eq!(held.status, ProposalStatus::Applied);
-        let reviewer: Viewer = get(&bob, "/api/users/me").await;
+        let reviewer: Caller = get(&bob, "/api/users/me").await;
         let events: EventPage = get(&bob, "/api/events?patch=p_apply").await;
         assert_ne!(events.items.len(), 0);
         for logged in events.items {

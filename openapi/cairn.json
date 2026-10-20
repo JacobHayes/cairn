@@ -707,6 +707,48 @@
         ],
         "type": "object"
       },
+      "Caller": {
+        "additionalProperties": false,
+        "description": "The caller (H2) and the identities their verified emails name (H3).",
+        "properties": {
+          "agent": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/AgentId"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The agent acting for them, when the request carries an agent token."
+          },
+          "identities": {
+            "description": "Their identities, which \"mine\" covers together.",
+            "items": {
+              "$ref": "#/components/schemas/IdentityKey"
+            },
+            "type": "array",
+            "uniqueItems": true
+          },
+          "logins": {
+            "description": "The logins they sign in with, by provider and subject.",
+            "items": {
+              "$ref": "#/components/schemas/LinkedLogin"
+            },
+            "type": "array"
+          },
+          "user": {
+            "$ref": "#/components/schemas/UserId",
+            "description": "The user."
+          }
+        },
+        "required": [
+          "user",
+          "identities",
+          "logins"
+        ],
+        "type": "object"
+      },
       "Capabilities": {
         "additionalProperties": false,
         "description": "The capabilities document (`GET /api/capabilities`): what this host offers.",
@@ -4661,13 +4703,19 @@
             "description": "The identity's key."
           },
           "name": {
-            "$ref": "#/components/schemas/Title",
-            "description": "Its name."
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Title"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Its name, if it has one. An identity has a name, an email, or both (H3), so one a\nsign-in created from an account that gave no name is shown by its first email until\nits person is asked for one."
           }
         },
         "required": [
-          "key",
-          "name"
+          "key"
         ],
         "type": "object"
       },
@@ -5563,6 +5611,17 @@
             "description": "When it was linked.",
             "format": "date-time",
             "type": "string"
+          },
+          "name": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Title"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The name the provider gave the account at the last sign-in, if it gave one."
           },
           "provider": {
             "$ref": "#/components/schemas/Slug",
@@ -14635,7 +14694,7 @@
         "properties": {
           "name": {
             "$ref": "#/components/schemas/Title",
-            "description": "Their name: the identity their verified emails name, else the name their sign-in gave."
+            "description": "Their name: their identity's name, else its first email; with no identity, the name\ntheir login gave, else its first verified email."
           },
           "user": {
             "$ref": "#/components/schemas/UserId",
@@ -14687,59 +14746,6 @@
       "VersionNumber": {
         "minimum": 1,
         "type": "integer"
-      },
-      "Viewer": {
-        "additionalProperties": false,
-        "description": "The caller (H2) and the identities their verified emails name (H3).",
-        "properties": {
-          "agent": {
-            "anyOf": [
-              {
-                "$ref": "#/components/schemas/AgentId"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "description": "The agent acting for them, when the request carries an agent token."
-          },
-          "identities": {
-            "description": "Their identities, which \"mine\" covers together.",
-            "items": {
-              "$ref": "#/components/schemas/IdentityKey"
-            },
-            "type": "array",
-            "uniqueItems": true
-          },
-          "logins": {
-            "description": "The logins they sign in with, by provider and subject.",
-            "items": {
-              "$ref": "#/components/schemas/LinkedLogin"
-            },
-            "type": "array"
-          },
-          "merge_offer": {
-            "description": "H3: present when their emails name more than one identity, which are then offered for\nmerging.",
-            "items": {
-              "$ref": "#/components/schemas/IdentityKey"
-            },
-            "type": [
-              "array",
-              "null"
-            ],
-            "uniqueItems": true
-          },
-          "user": {
-            "$ref": "#/components/schemas/UserId",
-            "description": "The user."
-          }
-        },
-        "required": [
-          "user",
-          "identities",
-          "logins"
-        ],
-        "type": "object"
       },
       "Violation": {
         "additionalProperties": false,
@@ -14879,6 +14885,7 @@
           "insertion_key_taken",
           "not_a_process_route",
           "identity_key_taken",
+          "identity_empty",
           "email_taken",
           "alias_cycle",
           "merge_breaks_journey",
@@ -22919,13 +22926,13 @@
     },
     "/api/users/me": {
       "get": {
-        "operationId": "getViewer",
+        "operationId": "getCaller",
         "responses": {
           "200": {
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/Viewer"
+                  "$ref": "#/components/schemas/Caller"
                 }
               }
             },

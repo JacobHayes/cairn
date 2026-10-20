@@ -79,14 +79,11 @@ test("H3: a refused value is selected so a paste replaces it, and Tab still leav
   await expect(page.getByTestId("chips-reason")).toBeVisible();
 });
 
-test("the merge is folded until asked for, and open when a link names the two to merge", async ({ page }) => {
+test("the merge is folded until asked for", async ({ page }) => {
   await open(page, "browser", "/identities");
   await expect(page.getByTestId("merge-identities")).toHaveCount(0);
   await page.getByRole("button", { name: "Merge identities" }).click();
   await expect(page.getByTestId("merge-identities")).toBeVisible();
   await page.getByRole("button", { name: "Close merge" }).click();
   await expect(page.getByTestId("merge-identities")).toHaveCount(0);
-  await open(page, "browser", "/identities?merge=who_k3d7qm2xw5tn6pfa,who_g6t4ycm2pe7vsjan");
-  await expect(page.getByTestId("merge-identities")).toBeVisible();
-  await expect(page.getByTestId("merge-identities").getByLabel("Keep")).toHaveValue("who_k3d7qm2xw5tn6pfa");
 });

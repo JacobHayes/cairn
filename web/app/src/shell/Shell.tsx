@@ -12,6 +12,7 @@ import { ROUTES_INDEX_PATH } from "../routes/address.ts";
 import { FrameActionsContext, FrameStateContext } from "./frame.tsx";
 import { InspectorColumn } from "./InspectorColumn.tsx";
 import { KeysHint } from "./KeysHint.tsx";
+import { NamePrompt } from "./NamePrompt.tsx";
 import { LoadFailure } from "./LoadFailure.tsx";
 import { SyncChip } from "./SyncChip.tsx";
 import { Toast } from "./Toast.tsx";
@@ -61,6 +62,7 @@ export function Shell() {
       <FrameStateContext value={frame.state}>
         <div className="frame" data-inspector={frame.folded ? "folded" : frame.open ? "on" : "off"} data-sheet={frame.snap}>
           <Rail pathname={pathname} />
+          <NamePrompt />
           <main className="workspace" data-screen={`${pathname}${search}`}>
             <div className="ws-body">
               <LoadFailure screen={pathname}>

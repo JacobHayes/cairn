@@ -12,6 +12,7 @@ mod layer {
     use axum::http::header::{AUTHORIZATION, WWW_AUTHENTICATE};
     use cairn_auth::lifetimes::SESSION_LIFETIME;
     use cairn_auth::{AuthProvider, DevConfig, DevProvider, Listener};
+    use cairn_schema::UserId;
     use cairn_store::{AuthEvent, AuthStore};
 
     use crate::auth::support::{
@@ -23,11 +24,38 @@ mod layer {
         DevConfig {
             name: name.parse().unwrap(),
             user: format!("{name} user").parse().unwrap(),
-            verified_emails: BTreeSet::new(),
+            verified_emails: BTreeSet::from(["dev@example.org".parse().unwrap()]),
             token: token.map(str::to_owned),
             auto_link: false,
             allow_off_loopback: false,
         }
+    }
+
+    /// A user with one login, verified for `email` when given.
+    async fn signed_up(world: &World, user: &str, email: Option<&str>) -> UserId {
+        let user: UserId = user.parse().unwrap();
+        let store = world.accounts.store();
+        let created_at = world.accounts.clock().now();
+        let record = cairn_store::UserRecord {
+            id: user.clone(),
+            created_at,
+        };
+        store.put_user(record).await.unwrap();
+        store
+            .put_login(cairn_store::LoginRecord {
+                provider: "oidc".parse().unwrap(),
+                subject: user.as_str().parse().unwrap(),
+                user: user.clone(),
+                name: None,
+                verified_emails: email
+                    .map(|email| email.parse().unwrap())
+                    .into_iter()
+                    .collect(),
+                linked_at: created_at,
+            })
+            .await
+            .unwrap();
+        user
     }
 
     fn provider(config: DevConfig, listener: Listener) -> Arc<dyn AuthProvider> {
@@ -54,8 +82,11 @@ mod layer {
         let again = whoami(&router, get("/whoami", LOCAL)).await.unwrap();
         assert_eq!(first, again);
         assert_eq!(first.agent, None);
-        let user = world.store.user(&first.user).await.unwrap().unwrap();
-        assert_eq!(user.name.as_str(), "dev user");
+        let logins = world.store.logins_of(&first.user).await.unwrap();
+        assert_eq!(
+            logins[0].name.as_ref().map(cairn_schema::Title::as_str),
+            Some("dev user")
+        );
         let logged = [AuthEvent::UserCreated, AuthEvent::LoginLinked];
         assert_eq!(world.log().await, logged);
     }
@@ -133,19 +164,28 @@ mod layer {
         assert_eq!(basic, Err(StatusCode::UNAUTHORIZED));
     }
 
+    /// H3: a session of a user from before sign-in required a verified email, with none on
+    /// any login, is refused and cleared like a lapsed one, so they sign in again.
+    #[tokio::test]
+    async fn a_session_of_a_user_with_no_verified_email_is_refused() {
+        let world = World::new();
+        let router = app(&world.auth(loopback(), Vec::new()));
+        let ann = signed_up(&world, "u_ann", None).await;
+        let token = world.accounts.start_session(&ann).await.unwrap();
+        let cookie = format!("cairn_session={}", token.expose());
+        let signed_in = with_cookie(request("/whoami", LOCAL), &cookie).body(Body::empty());
+        let response = send(&router, signed_in.unwrap()).await;
+        assert_eq!(response.status(), StatusCode::UNAUTHORIZED);
+        assert!(!cookies_set(&response).is_empty(), "the cookie is cleared");
+    }
+
     /// A session cookie signs the browser in until it lapses or is ended; a lapsed, ended,
     /// or forged one is refused and cleared rather than ignored.
     #[tokio::test]
     async fn a_session_signs_in_until_it_lapses_or_ends() {
         let world = World::new();
         let router = app(&world.auth(loopback(), Vec::new()));
-        let user = world.accounts.store().put_user(cairn_store::UserRecord {
-            id: "u_ann".parse().unwrap(),
-            name: "Ann".parse().unwrap(),
-            created_at: world.accounts.clock().now(),
-        });
-        user.await.unwrap();
-        let ann = "u_ann".parse().unwrap();
+        let ann = signed_up(&world, "u_ann", Some("ann@example.org")).await;
         let token = world.accounts.start_session(&ann).await.unwrap();
         let cookie = format!("cairn_session={}", token.expose());
         let signed_in = || with_cookie(request("/whoami", LOCAL), &cookie).body(Body::empty());

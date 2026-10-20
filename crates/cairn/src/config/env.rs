@@ -197,6 +197,7 @@ mod tests {
             kind = "dev"
             name = "local-dev"
             user = "Dev"
+            verified_emails = ["dev@example.org"]
             [[auth]]
             kind = "oidc"
             name = "corp"

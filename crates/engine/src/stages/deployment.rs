@@ -1,5 +1,6 @@
 //! The deployment holds (E6, H3): every alias names an identity and is not one itself, so an
-//! alias resolves in one step with no cycle, and each email belongs to one identity; a merge
+//! alias resolves in one step with no cycle, each identity has a name, an email, or both, and
+//! each email belongs to one identity; a merge
 //! joins two identities' emails and aliases, so each identity is held to its email and alias
 //! limits here too. Checked when the patch wrote deployment records. Cost: one pass over
 //! identities and aliases.
@@ -49,6 +50,14 @@ pub(super) fn check(check: &mut Check<'_, '_>) {
     identity_limits(check);
     let mut holders = BTreeMap::new();
     for identity in deployment.identities.values() {
+        if identity.name.is_none() && identity.emails.is_empty() {
+            let mut found = violation(
+                ViolationCode::IdentityEmpty,
+                "an identity has a name, an email, or both (H3)",
+            );
+            found.at.subject = Some(Subject::Identity(identity.key.clone()));
+            check.violations.push(found);
+        }
         for email in &identity.emails {
             if let Some(first) = holders.insert(email, &identity.key) {
                 let mut found = violation(

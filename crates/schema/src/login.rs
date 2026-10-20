@@ -18,8 +18,10 @@ pub struct Login {
     pub provider: Slug,
     /// The provider's stable subject for the account.
     pub subject: Title,
-    /// The name the provider gives the account.
-    pub display: Title,
+    /// The name the provider gives the account, when it gives a person's name: never a
+    /// username, an email, or a stand-in for one. It names the identity a sign-in creates (H3).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub name: Option<Title>,
     /// H3: only the emails the provider's issuer marks verified; an unverified email never
     /// matches an identity or links a user.
     #[serde(default, skip_serializing_if = "BTreeSet::is_empty")]

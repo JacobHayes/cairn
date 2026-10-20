@@ -13,11 +13,11 @@ use serde_json::{Map, Value, json};
 use crate::endpoints::{self, Endpoint};
 use crate::query::{self, ParamSpec, schema_of};
 use crate::wire::{
-    AgentToken, AssistantRequest, Capabilities, Conversation, EventPage, Health, History,
+    AgentToken, AssistantRequest, Caller, Capabilities, Conversation, EventPage, Health, History,
     JourneyPage, Mine, MintedToken, NodeDetail, PatchAnswer, PatchRequest, Problem, Projected,
     ProposalAnswer, ProposalApply, ProposalCreate, ProposalEdit, ProposalList, ProposalReview,
     ProposalStep, RelinkRequest, RouteDetail, RouteImport, RoutePage, SaveAsRouteRequest,
-    SearchPage, Tick, TokenRequest, TurnReply, UpgradeRequest, UserName, Viewer,
+    SearchPage, Tick, TokenRequest, TurnReply, UpgradeRequest, UserName,
 };
 use cairn_schema::{
     AgentId, DecisionView, Deployment, Derived, DomainDocument, ExplainedField, ExplanationPage,
@@ -500,7 +500,7 @@ fn users() -> Vec<Operation> {
                 "Revision ticks as server-sent `tick` events, current revisions first (H6).",
             )
         },
-        read::<Viewer>(&at::VIEWER, "The caller and their identities (H2, H3)."),
+        read::<Caller>(&at::CALLER, "The caller and their identities (H2, H3)."),
         Operation {
             query: query::USER_NAME_PARAMS,
             ..read::<Vec<UserName>>(

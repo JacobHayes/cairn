@@ -276,7 +276,6 @@ pub async fn every_auth_and_conversation_field_and_variant_loads_back_equal<B: B
     let store = open(backend).await;
     let user = UserRecord {
         id: id("u_ann"),
-        name: id("Ann"),
         created_at: build::at(0),
     };
     store.put_user(user).await.unwrap();

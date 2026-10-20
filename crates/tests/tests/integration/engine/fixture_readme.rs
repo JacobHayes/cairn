@@ -228,7 +228,7 @@ fn the_participation_table_is_what_derive_gives() {
                 .deployment
                 .identities
                 .values()
-                .map(|identity| (identity.name.as_str(), identity.key.as_str()))
+                .map(|identity| (identity.display(), identity.key.as_str()))
                 .collect();
             let expected: BTreeSet<&str> = quoted(&row[column + 1])
                 .into_iter()

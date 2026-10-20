@@ -1,17 +1,18 @@
-// H3, H1: who you are here. Your user, the logins you sign in with and the emails each
-// provider verified, and the identities those emails name: you are each of them, so "mine"
-// works with no link step. Two or more are duplicates of one person, and merging them is
-// offered (H3). On the server, signing in with another provider while signed in links that
-// login to you (ARCHITECTURE, Auth: users and logins); it comes back here.
+// H3, H1: who you are here. Your identity (the one holding a verified email of yours, made at
+// your first sign-in when none did), the logins you sign in with and the emails each provider
+// verified. On the server, signing in with another provider while signed in links that login to
+// you (ARCHITECTURE, Auth: users and logins); it comes back here.
 import { Link } from "react-router";
 
 import { pathTo } from "../address.ts";
-import type { Capabilities, Viewer } from "../data/host.ts";
-import { useCapabilities, useDeployment, useSession, useUserName, useViewer } from "../data/react.ts";
+import type { Capabilities, Caller } from "../data/host.ts";
+import { useCapabilities, useCaller, useDeployment, useToday } from "../data/react.ts";
+import { dateWords } from "../status/when.ts";
 import { Segmented } from "../ui/kit.tsx";
 import { THEME_CHOICES, useThemeChoice, type ThemeChoice } from "../ui/theme.ts";
 import { Failed } from "../ui/Failed.tsx";
-import { byName, mergePath, offeredMerge } from "./model.ts";
+import { identityLabel } from "./label.ts";
+import { byName } from "./model.ts";
 
 /** Where a sign-in with provider `name` starts, coming back to this screen (the tab keeps its host). */
 export function signInHref(name: string): string {
@@ -23,54 +24,45 @@ export function linkable(capabilities: Capabilities): string[] {
   return capabilities.auth.filter((method) => method.kind === "oidc").map((method) => method.name);
 }
 
-function Logins({ viewer }: { viewer: Viewer }) {
+function Logins({ caller }: { caller: Caller }) {
+  const today = useToday();
   return (
-    <div className="table-wrap">
-      <table className="data">
-        <thead>
-          <tr>
-            <th>Provider</th>
-            <th>Account</th>
-            <th>Verified emails</th>
-            <th>Linked</th>
-          </tr>
-        </thead>
-        <tbody>
-          {viewer.logins.map((login) => (
-            <tr key={`${login.provider}:${login.subject}`} data-testid="login" data-provider={login.provider}>
-              <td>{login.provider}</td>
-              <td className="mono">{login.subject}</td>
-              <td className="mono" data-testid="login-emails">{login.verified_emails.join(", ") || <span className="muted small">None</span>}</td>
-              <td className="muted small">{login.linked_at}</td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
-    </div>
+    <ul className="stack plain-list" data-testid="logins">
+      {caller.logins.map((login) => {
+        const linked = login.linked_at.slice(0, 10);
+        return (
+          <li key={`${login.provider}:${login.subject}`} className="stack login" data-testid="login" data-provider={login.provider}>
+            <span className="row">
+              <strong>{login.provider}</strong>
+              <span className="mono">{login.subject}</span>
+            </span>
+            <span className="small" data-testid="login-emails">
+              <span className="muted">Verified emails: </span>
+              <span className="mono">{login.verified_emails.join(", ") || "none"}</span>
+            </span>
+            <span className="muted small mono" title={login.linked_at}>Linked {dateWords(linked, today)}</span>
+          </li>
+        );
+      })}
+    </ul>
   );
 }
 
-function YourIdentities({ viewer }: { viewer: Viewer }) {
+function YourIdentities({ caller }: { caller: Caller }) {
   const deployment = useDeployment();
-  const identities = byName((deployment?.identities ?? []).filter((identity) => viewer.identities.includes(identity.key)));
-  const merge = offeredMerge(viewer.merge_offer);
+  const identities = byName((deployment?.identities ?? []).filter((identity) => caller.identities.includes(identity.key)));
   return (
-    <section className="stack" aria-label="Your identities" data-testid="your-identities">
-      <strong>You are</strong>
-      {identities.length === 0 ? <span className="muted small" data-testid="no-identity">No identity holds a verified email of yours yet: add one to an identity on the identities screen, or link a login whose email one holds.</span> : null}
-      <ul className="row plain-list">
+    <section className="stack" aria-label="Your identity" data-testid="your-identities">
+      <span className="label">Your identity</span>
+      <ul className="stack plain-list">
         {identities.map((identity) => (
-          <li key={identity.key} className="badge" data-testid="your-identity" data-identity={identity.key}>
-            {identity.name}
+          <li key={identity.key} className="row" data-testid="your-identity" data-identity={identity.key}>
+            <strong>{identityLabel(identity)}</strong>
+            <span className="mono muted small">{(identity.emails ?? []).join(", ")}</span>
           </li>
         ))}
       </ul>
-      {merge === undefined ? null : (
-        <div className="callout stack" data-testid="merge-offer">
-          <span>Your verified emails name {identities.length} identities: they are one person. "Mine" already covers them all; merging makes them one.</span>
-          <Link to={mergePath(merge.survivor, merge.merged)}>Merge them</Link>
-        </div>
-      )}
+      <Link to={pathTo("identities")}>Edit on the identities page</Link>
     </section>
   );
 }
@@ -109,35 +101,32 @@ function Licenses() {
 }
 
 export function You() {
-  const { viewer, failed } = useViewer();
-  const { host } = useSession();
+  const { caller, failed } = useCaller();
   const capabilities = useCapabilities();
-  const userName = useUserName();
-  if (viewer === undefined) {
+  if (caller === undefined) {
     return <p className={failed === undefined ? "muted small" : "callout callout-bad"}>{failed === undefined ? "Reading who you are..." : <Failed what="Who you are" error={failed} />}</p>;
   }
   const providers = linkable(capabilities);
   return (
     <section className="stack" aria-label="You" data-testid="you-screen">
-      <span className="row">
-        <h1>You</h1>
-        <span className="muted small" data-testid="user">{userName(viewer.user)}</span>
-        {host.kind === "browser" ? <span className="muted small">The demo's one local login.</span> : null}
-      </span>
-      <Logins viewer={viewer} />
-      <YourIdentities viewer={viewer} />
+      <h1>You</h1>
+      <YourIdentities caller={caller} />
+      <section className="stack" aria-label="Sign-in methods" data-testid="sign-in-methods">
+        <span className="label">Sign-in methods</span>
+        <Logins caller={caller} />
+        {providers.length === 0 ? null : (
+          <span className="row" data-testid="link-login">
+            <span>Link another login:</span>
+            {providers.map((name) => (
+              <a key={name} className="button" href={signInHref(name)}>
+                Sign in with {name}
+              </a>
+            ))}
+          </span>
+        )}
+      </section>
       <ThemeControl />
       <Licenses />
-      {providers.length === 0 ? null : (
-        <span className="row" data-testid="link-login">
-          <span>Link another login:</span>
-          {providers.map((name) => (
-            <a key={name} className="button" href={signInHref(name)}>
-              Sign in with {name}
-            </a>
-          ))}
-        </span>
-      )}
     </section>
   );
 }

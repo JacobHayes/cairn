@@ -14,6 +14,7 @@ import { IDENTITY_GONE, KIND_GONE, NODE_GONE, ROLE_GONE } from "../ui/gone.ts";
 import { isStage, kindWord, type Ready, titleOf } from "./model.ts";
 import { identityName, kindTitle, roleTitle } from "./sections.tsx";
 import { namedList } from "../ui/words.ts";
+import { identityLabel } from "../people/label.ts";
 
 type Event = Schema<"Event">;
 type EventType = Schema<"EventType">;
@@ -276,7 +277,7 @@ function journeyStatus(c: Context): Said {
 function identityNamed(c: Context): string | undefined {
   for (const write of c.writes) {
     if ("put" in write && "identity" in write.put) {
-      return write.put.identity.name;
+      return identityLabel(write.put.identity);
     }
   }
   return undefined;

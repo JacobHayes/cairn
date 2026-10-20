@@ -6,7 +6,7 @@
 // the caller again for each newer deployment it holds.
 import type { RevisionOf } from "@cairn/client";
 
-import type { Deployment, Host, Viewer } from "./host.ts";
+import type { Deployment, Host, Caller } from "./host.ts";
 import { HOST_READ, heldValue, type ReadKey, type ReadSnapshot, type ReadSource } from "./keyed-read.ts";
 
 const DEPLOYMENT: RevisionOf = { domain: "deployment" };
@@ -31,17 +31,17 @@ export function deploymentSource(host: Host): ReadSource<undefined, Deployment> 
 }
 
 /** The caller. */
-export function viewerSource(host: Host): ReadSource<undefined, Viewer> {
-  return { policy: HOST_READ, read: () => host.viewer() };
+export function callerSource(host: Host): ReadSource<undefined, Caller> {
+  return { policy: HOST_READ, read: () => host.caller() };
 }
 
 /**
  * The caller's key once the deployment's first read has settled, held or failed, so the caller is
  * read once whatever the deployment answered, and again for each newer deployment held.
  */
-export function viewerKey(deployment: ReadSnapshot): ReadKey<undefined> | undefined {
+export function callerKey(deployment: ReadSnapshot): ReadKey<undefined> | undefined {
   if (deployment.context.attempted === undefined || deployment.hasTag("busy")) {
     return undefined;
   }
-  return { of: ["viewer"], freshness: [heldValue<Deployment>(deployment)?.revision], args: undefined };
+  return { of: ["caller"], freshness: [heldValue<Deployment>(deployment)?.revision], args: undefined };
 }
