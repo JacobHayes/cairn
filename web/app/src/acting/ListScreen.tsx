@@ -50,9 +50,6 @@ function onRow(event: MouseEvent): boolean {
   return !(event.target instanceof Element && event.target.closest("a, button, select, input, textarea, label"));
 }
 
-/** What a column's heading says about its cells, where a cell's absence needs saying. */
-const HELP: Partial<Record<Column, string>> = { rank: "The place on the acting frontier; blank for work that cannot be acted on yet" };
-
 function Head({ column, columns, list, onSort }: { column: Column; columns: readonly Column[]; list: ListSettings; onSort: (sort: ListSettings["sort"]) => void }) {
   const sort = SORT_OF[column];
   const words = columnWords(column);
@@ -62,7 +59,7 @@ function Head({ column, columns, list, onSort }: { column: Column; columns: read
   const active = list.sort === sort;
   return (
     <th scope="col" aria-sort={active ? "descending" : "none"} data-column={column} data-gives-way={givesWay(column)} className={pinned(column, columns)} data-testid={`sort-${column}`}>
-      <button type="button" className="list-sort" aria-label={`Sort by ${words.toLowerCase()}`} title={HELP[column]} onClick={() => { onSort(active ? undefined : sort); }}>
+      <button type="button" className="list-sort" aria-label={`Sort by ${words.toLowerCase()}`} onClick={() => { onSort(active ? undefined : sort); }}>
         {words}
         {active ? <span aria-hidden="true"> ▾</span> : null}
       </button>

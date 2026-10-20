@@ -114,6 +114,13 @@ describe("the end anchor's label (C13)", () => {
     expect(endLabelWords(full, { at: 1, anchor: "end" }, now, 230)).toBe("Ends");
   });
 
+  it("gives up even its short name where Today is that close, so no two labels overlap and Today keeps its words", () => {
+    // Today 15px before the end line on a 900px axis: neither the full words nor "Ends" fit beside it.
+    expect(endLabelWords(full, { at: 1, anchor: "end" }, { at: 1 - 15 / 900, anchor: "end", words: "Today" }, 900)).toBe("");
+    // Far enough apart, the short name returns.
+    expect(endLabelWords(full, { at: 1, anchor: "end" }, { at: 1 - 90 / 900, anchor: "end", words: "Today" }, 900)).not.toBe("");
+  });
+
   it("has nothing to clear when Today is off the axis or the axis is not measured yet", () => {
     expect(endLabelWords(full, { at: 1, anchor: "end" }, undefined, 230)).toBe(full);
     expect(endLabelWords(full, { at: 1, anchor: "end" }, now, 0)).toBe(full);

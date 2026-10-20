@@ -8,6 +8,8 @@ The Launch journey on the List, sorted by rank. A node that cannot be acted on h
 
 ![List sorted by rank](list-rank.png)
 
+Work that cannot be acted on yet shows a quiet dash (read as "Not on the frontier"), so a blank is never a mystery.
+
 The same journey, Documentation opened: its place in the inspector is the number in its row.
 
 ![Inspector and row agree](list-inspector.png)
@@ -35,6 +37,10 @@ A week after Beta starts' date, the Timeline row said "Estimated Nov 13" for a m
 |---|---|---|
 | Row text | Estimated Nov 13, 2 days short | Reached Nov 13, 2 days short |
 
+When Today is a few days from the end, the axis keeps Today's label and gives up the end label (its line stays; hover names it, and the sentence above the chart says it).
+
+![Timeline axis, Today beside the end line](timeline-axis.png)
+
 ## Also changed, with no fixture picture
 
 - A container's progress, its overdue count and its "decision needed" badge are counted by the engine over everything beneath it, so a decision under a collapsed or hidden level still lights the badge.
@@ -42,5 +48,5 @@ A week after Beta starts' date, the Timeline row said "Estimated Nov 13" for a m
 - The "blocked" list filter matches the status shown (a group waiting only on its children is not blocked).
 
 Known limits:
-- A blocked node that outranks the top of the frontier shows an empty rank cell above "#1"; a place is only for what can be acted on.
+- A blocked node that outranks the top of the frontier shows a dash above "#1"; a place is only for what can be acted on.
 - The Summary's "In progress" panel and the canvas badges read the same on these fixtures before and after, so they have no picture; their tests cover the new counts.

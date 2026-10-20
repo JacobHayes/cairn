@@ -556,6 +556,18 @@ table.data.list-table .badge {
   min-width: var(--rank-width);
 }
 
+/* DESIGN, Table: numbers right-aligned in mono, a rank in steel. */
+.list-table th[data-column="rank"] {
+  text-align: right;
+}
+
+.list-table td[data-column="rank"] {
+  text-align: right;
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+  color: var(--color-secondary);
+}
+
 .list-table [data-column="status"].list-pinned {
   left: calc(var(--space-6) + var(--rank-width));
 }

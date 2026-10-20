@@ -66,17 +66,21 @@ function spanOf(words: string, x: number, anchor: "start" | "end"): [number, num
 }
 
 /**
- * The end anchor's label on an axis `width` px wide: `full`, or, where it would run over the Today
- * (or Start) label, just "Ends", the sentence under the bar already names the milestone.
- * `now` is where that label sits (none when it is off the axis).
+ * The end anchor's label on an axis `width` px wide: `full`; where that would run over the Today
+ * (or Start) label, just "Ends"; and where even that would, nothing (Today wins; the end line
+ * stays, its hover title and the sentence under the bar name the milestone). `now` is where
+ * the Today label sits (none when it is off the axis).
  */
 export function endLabelWords(full: string, end: { at: number; anchor: "start" | "end" }, now: { at: number; anchor: "start" | "end"; words: string } | undefined, width: number): string {
   if (now === undefined || width === 0) {
     return full;
   }
   const [nowFrom, nowTo] = spanOf(now.words, now.at * width + (now.anchor === "end" ? -4 : 4), now.anchor);
-  const [from, to] = spanOf(full, end.at * width + (end.anchor === "end" ? -4 : 4), end.anchor);
-  return from < nowTo + LABEL_GAP_PX && nowFrom < to + LABEL_GAP_PX ? "Ends" : full;
+  const clears = (words: string) => {
+    const [from, to] = spanOf(words, end.at * width + (end.anchor === "end" ? -4 : 4), end.anchor);
+    return !(from < nowTo + LABEL_GAP_PX && nowFrom < to + LABEL_GAP_PX);
+  };
+  return clears(full) ? full : clears("Ends") ? "Ends" : "";
 }
 
 const RANGE_WORDS: Record<Range, string> = { fit: "Fit", month: "Month", quarter: "Quarter" };
@@ -147,6 +151,7 @@ function AxisHead({ axis, endTitle }: { axis: Axis; endTitle: (node: string) => 
   const named = (tick: { at: number }, at: number) => at % every === 0 && clear(tick);
   const nowWords = axis.mode === "calendar" ? "Today" : "Start";
   const nowShown = axis.now >= 0 && axis.now <= 1;
+  const endWords = end === undefined ? "" : `Ends: ${endTitle(end.node)}${axis.mode === "relative" ? ` · ${dayWords(end.day)}` : ""}`;
   return (
     <svg ref={svg} className="timeline-axis-svg" width="100%" height={AXIS_PX} aria-hidden="true" data-testid="timeline-axis" data-unit={axis.unit}>
       <Backdrop axis={axis} height={AXIS_PX} />
@@ -161,10 +166,16 @@ function AxisHead({ axis, endTitle }: { axis: Axis; endTitle: (node: string) => 
           {nowWords}
         </text>
       ) : null}
+      {end === undefined || anchorAt === undefined || width === 0 ? null : (
+        // A hover target on the end line itself, so the words are there when the label gave way to Today.
+        <rect x={percent(anchorAt - 4 / width)} y={0} width={8} height={AXIS_PX} fill="transparent">
+          <title>{endWords}</title>
+        </rect>
+      )}
       {end === undefined || anchorAt === undefined ? null : (
         <text className="timeline-end-label" x={percent(anchorAt)} y={32} dx={dx(anchorAt)} textAnchor={textAnchor(anchorAt)}>
           {endLabelWords(
-            `Ends: ${endTitle(end.node)}${axis.mode === "relative" ? ` · ${dayWords(end.day)}` : ""}`,
+            endWords,
             { at: anchorAt, anchor: textAnchor(anchorAt) },
             nowShown ? { at: axis.now, anchor: textAnchor(axis.now), words: nowWords } : undefined,
             width,

@@ -185,7 +185,7 @@ export function Cell({ column, line, context }: { column: Column; line: Line; co
       return row.due == null || !open ? null : <span className={inkClass(dateInk(row.due, today))} data-testid="list-due">{dueWords(row.due, today, node.kind === "decision")}</span>;
     case "rank": {
       const place = context.ranks.get(line.key);
-      return place === undefined ? null : `#${String(place)}`;
+      return place !== undefined ? `#${String(place)}` : open ? <span className="muted" role="img" aria-label="Not on the frontier" title="Not on the frontier">–</span> : null;
     }
     case "start_by": {
       const date = derived.dates.latest_start?.date;
