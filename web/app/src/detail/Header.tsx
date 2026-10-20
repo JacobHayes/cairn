@@ -5,9 +5,7 @@
 // node came from is not here: it is the Origin section.
 import { Link } from "react-router";
 
-import { assignOwner } from "../acting/acts.ts";
 import { isStage } from "../canvas/ladder.ts";
-import { Menu } from "../screens/Menu.tsx";
 import { RejectionView } from "../screens/RejectionView.tsx";
 import { WriteStatus } from "../screens/WriteStatus.tsx";
 import { dateInk, dueWords, inkClass } from "../status/when.ts";
@@ -15,8 +13,7 @@ import { statusTone, statusWord } from "../status/words.ts";
 import { Badge, Button, Field } from "../ui/kit.tsx";
 import { Receipt } from "../ui/Receipt.tsx";
 import { flagsOf, isTerminal, type NodeDetail, type Ready } from "./model.ts";
-import { NodeLink } from "./parts.tsx";
-import { entityName } from "./sections.tsx";
+import { NodeLink, OwnerSelect } from "./parts.tsx";
 import { ownerName } from "./sentence.ts";
 import type { Rename } from "./rename.ts";
 import { rebasedOnto, useNodeWrite } from "./write.ts";
@@ -69,39 +66,21 @@ function Orphaned({ view, detail, removeTo }: { view: Ready; detail: NodeDetail;
   );
 }
 
-/** The owner, or an inline `Assign ▾` that lists the people; the date in words; the rank when it is on the acting frontier. */
-function Meta({ view, detail, position }: { view: Ready; detail: NodeDetail; position: number | undefined }) {
+/** The owner, or an inline `Assign ▾` that lists the people; the date in words. */
+function Meta({ view, detail }: { view: Ready; detail: NodeDetail }) {
   const write = useNodeWrite(view, `assign:${detail.node.key}`);
   const { node, derived, record } = detail;
   const open = !isTerminal(record.state) && derived.relevance.value !== "not_relevant";
   const people = view.inputs.deployment.entities ?? [];
   const owner =
     derived.unassigned === true && people.length > 0 ? (
-      <Menu key="assign" label="Assign owner" testId="assign-owner" trigger="Assign ▾">
-        {(close) =>
-          people.map((each) => (
-            <button
-              key={each.key}
-              type="button"
-              role="menuitem"
-              className="menu-item"
-              disabled={write.disabled}
-              onClick={() => {
-                close();
-                void write.run([assignOwner(node.key, each.key)]);
-              }}
-            >
-              {entityName(view, each.key)}
-            </button>
-          ))
-        }
-      </Menu>
+      <OwnerSelect key="assign" view={view} write={write} node={node.key} placeholder="Assign" className="assign-owner" testId="assign-owner" />
     ) : (
       ownerName(view, node.key)
     );
   const due = open ? (derived.dates.due?.date ?? undefined) : undefined;
   const date = due === undefined ? undefined : <span className={inkClass(dateInk(due, view.derived.today))}>{dueWords(due, view.derived.today, node.kind === "decision")}</span>;
-  const parts = [owner, date, position === undefined ? undefined : `Rank #${String(position)}`].filter((part) => part !== undefined);
+  const parts = [owner, date].filter((part) => part !== undefined);
   return (
     <div className="meta muted" data-testid="detail-meta">
       {parts.flatMap((part, at) => (at === 0 ? [part] : [" · ", part]))}
@@ -109,7 +88,7 @@ function Meta({ view, detail, position }: { view: Ready; detail: NodeDetail; pos
   );
 }
 
-export function Header({ view, detail, position, rename, removeTo }: { view: Ready; detail: NodeDetail; position: number | undefined; rename: Rename; removeTo: string }) {
+export function Header({ view, detail, rename, removeTo }: { view: Ready; detail: NodeDetail; rename: Rename; removeTo: string }) {
   const { node, record } = detail;
   const shown = detail.derived.display_state;
   // An unassigned node says so with the Assign control beside its meta line, not with a flag as well.
@@ -133,7 +112,7 @@ export function Header({ view, detail, position, rename, removeTo }: { view: Rea
       </div>
       {rename.open ? <RenameForm view={view} title={node.title} rename={rename} /> : <h2 data-testid="detail-title">{node.title}</h2>}
       <Receipt receipt={rename.receipt} />
-      <Meta view={view} detail={detail} position={position} />
+      <Meta view={view} detail={detail} />
       {flags.length === 0 ? null : (
         <div className="row" data-testid="flags">
           {flags.map(({ flag, tone }) => (

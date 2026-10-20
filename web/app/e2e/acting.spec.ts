@@ -25,8 +25,9 @@ test("C9, B6: a bulk snooze is one patch; the snoozed leave the frontier and an 
   await select(page, "n_docs");
   await expect(page.getByTestId("selection-panel")).toHaveAttribute("data-count", "2");
   await page.getByTestId("selection-snooze").click();
-  await page.getByRole("menuitem", { name: "Snooze until a node…" }).click();
-  await page.getByLabel("Snooze them until node").selectOption("n_beta_end");
+  await page.getByRole("menuitem", { name: "Snooze…" }).click();
+  await page.getByRole("radio", { name: "When something is done" }).check();
+  await page.getByLabel("Snooze until node").selectOption("n_beta_end");
   await page.getByRole("button", { name: "Apply to 2" }).click();
   expect(await revisionAfter(page, revision)).toBe(revision + 1);
   await expect(frontierItem(page, "n_beta_end")).toBeVisible();

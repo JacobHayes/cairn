@@ -9,7 +9,9 @@ import { useNodeAddresses } from "../journeys/address.ts";
 import { Markdown } from "../ui/markdown.tsx";
 import { setFold, useFold } from "./folds.ts";
 import { titleOf, type Ready } from "./model.ts";
+import { assignOwner } from "../acting/acts.ts";
 import { entityName } from "./sections.tsx";
+import type { NodeWrite } from "./write.ts";
 
 /** B2: an answer's rationale as the journey records it, rendered as markdown. */
 export function Rationale({ text }: { text: string | undefined }) {
@@ -113,4 +115,14 @@ export function EntityOptions({ view }: { view: Ready }) {
       {entityName(view, each.key)}
     </option>
   ));
+}
+
+/** D2, E1: make a person the node's owner by choosing them: the choice sends it. */
+export function OwnerSelect({ view, write, node, placeholder, className, testId }: { view: Ready; write: NodeWrite; node: string; placeholder: string; className?: string; testId?: string }) {
+  return (
+    <select className={className} aria-label="Assign owner" data-testid={testId} disabled={write.disabled} value="" onChange={(event) => { void write.run([assignOwner(node, event.target.value)]); }}>
+      <option value="">{placeholder}</option>
+      <EntityOptions view={view} />
+    </select>
+  );
 }

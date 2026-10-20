@@ -12,11 +12,11 @@ import { ActButton, type Opens } from "../detail/ActButton.tsx";
 import { EvidenceForm, type Needs } from "../detail/DoneEvidence.tsx";
 import type { Ready } from "../detail/model.ts";
 import { offered } from "../detail/offers.ts";
-import { EntityOptions } from "../detail/parts.tsx";
+import { OwnerSelect } from "../detail/parts.tsx";
 import { Rejected } from "../detail/Rejected.tsx";
 import { entityName } from "../detail/sections.tsx";
 import { useFormDraft, useNodeWrite, type NodeWrite } from "../detail/write.ts";
-import { assignOwner, doneMutations, evidenceDraft, factsOf, missingEvidence, type EvidenceDraft } from "./acts.ts";
+import { doneMutations, evidenceDraft, factsOf, missingEvidence, type EvidenceDraft } from "./acts.ts";
 import type { NodeRow } from "./why.ts";
 import { ownedBy } from "./yours.ts";
 
@@ -28,10 +28,7 @@ function AssignInline({ view, write, node }: { view: Ready; write: NodeWrite; no
   return (
     <span className="row-assign-slot">
       <span className="row-owner row-unassigned">Unassigned</span>
-      <select className="row-assign" aria-label="Assign owner" data-testid="assign" disabled={write.disabled} value="" onChange={(event) => { void write.run([assignOwner(node, event.target.value)]); }}>
-        <option value="">Assign</option>
-        <EntityOptions view={view} />
-      </select>
+      <OwnerSelect view={view} write={write} node={node} placeholder="Assign" className="row-assign" testId="assign" />
     </span>
   );
 }

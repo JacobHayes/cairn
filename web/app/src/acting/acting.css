@@ -215,7 +215,7 @@ summary.node-panel-head {
   min-width: 176px;
 }
 
-/* A button's words stay on one line; a row with several actions wraps them instead. */
+/* A button's words stay on one line; a row with several actions wraps them instead (the list keeps them on one line where it has room, below). */
 .row-act > button {
   white-space: nowrap;
 }
@@ -425,8 +425,46 @@ table.data.list-table .badge {
 
 /* C10: a frontier row's reason and primary action, under its title at every width. */
 .list-acting {
-  gap: var(--space-1);
-  align-items: flex-start;
+  flex-direction: row;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-1) var(--space-3);
+}
+
+/* The actions share the reason's line (so a row is a title and one line), and what they open takes a line of its own. */
+.list-acting > .row-side {
+  flex-basis: auto;
+  margin-left: auto;
+  padding-left: 0;
+}
+
+.list-acting > :not(.row-side, [data-testid="fact"]) {
+  flex-basis: 100%;
+}
+
+/* A phone's list has little room beside the title: the buttons take their own line and wrap. */
+@container journey-scroll (max-width: 560px) {
+  .list-acting > .row-side {
+    flex-basis: 100%;
+    margin-left: 0;
+  }
+
+  .list-table .list-acting .row-act {
+    flex-wrap: wrap;
+    justify-content: flex-start;
+  }
+}
+
+/* With no reason to say, the actions sit on the title's line: no blank line is kept for them. */
+.list-node:has(> .list-acting > .row-side):not(:has([data-testid="fact"])) {
+  flex-direction: row;
+  flex-wrap: wrap;
+  align-items: center;
+  column-gap: var(--space-3);
+}
+
+.list-node:has(> .list-acting > .row-side):not(:has([data-testid="fact"])) > .list-acting {
+  flex: 1 1 auto;
 }
 
 .node-row[data-state="done"] :is(.node-title, .node-fact),
@@ -464,6 +502,11 @@ table.data.list-table .badge {
 
 .list-table tbody tr[data-state]:hover td:not(.list-pinned) {
   background-image: linear-gradient(var(--color-hover), var(--color-hover)), linear-gradient(var(--row-paper), var(--row-paper));
+}
+
+/* A selected row under the pointer keeps its blue tint (selection and focus are the accent's). */
+.list-table tbody tr[data-state][aria-selected="true"]:hover td:not(.list-pinned) {
+  background-image: linear-gradient(var(--color-tint), var(--color-tint)), linear-gradient(var(--color-hover), var(--color-hover)), linear-gradient(var(--row-paper), var(--row-paper));
 }
 
 /* Under the Frontier lens the Rank column comes first and is held with them. */

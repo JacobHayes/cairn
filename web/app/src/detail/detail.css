@@ -50,17 +50,6 @@
   font-size: 13px;
 }
 
-/* `Assign ▾` reads as a word in the meta line, not as a form control. */
-.meta .dropdown-button {
-  height: auto;
-  min-height: 0;
-  padding: 0;
-  border: 0;
-  background: none;
-  font: inherit;
-  color: var(--color-accent);
-}
-
 /* The shortcut hint is plain muted text here (the chip is for the strip), and a touch screen has no keys. */
 .detail-panel kbd {
   padding: 0;

@@ -130,11 +130,11 @@ async function setStates(page: Page, journey: string): Promise<void> {
   await pick(page, ["n_d3", "n_d6"]);
   await act(page, "status", "Skip…", (on) => on.getByLabel("Why skip them").fill(LONG));
   await pick(page, ["n_d4", "n_c1"]);
-  await act(page, "snooze", "Snooze until a date…", (on) => on.getByLabel("Snooze them until").fill(daysAfter(TODAY, 40)));
+  await act(page, "snooze", "Snooze…", async (on) => { await on.getByRole("radio", { name: "A date" }).check(); await on.getByLabel("Snooze until", { exact: true }).fill(daysAfter(TODAY, 40)); });
   await pick(page, ["n_a1", "n_a3"]);
   await act(page, "status", "Start");
   await pick(page, ["n_d5", "n_a4"]);
-  await act(page, "snooze", "Snooze until a node…", async (on) => { await on.getByLabel("Snooze them until node").selectOption("n_a1"); });
+  await act(page, "snooze", "Snooze…", async (on) => { await on.getByRole("radio", { name: "When something is done" }).check(); await on.getByLabel("Snooze until node").selectOption("n_a1"); });
   await pick(page, ["n_a3", "n_a4", "n_c1"]);
   await page.getByRole("button", { name: "Assign owner…" }).click();
   await page.getByLabel("Owner for them").selectOption(owner);

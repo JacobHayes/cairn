@@ -1,6 +1,7 @@
-// What a save leaves under the control that made it (design 9.4): "Saved", and one sentence
-// only when the write has warning consequences ("Kickoff is now overdue."). Everything else
-// the save caused shows on the nodes themselves and in the sync chip's Recent. Surfaces that
+// What a save leaves under the control that made it: one sentence, and only when the write has
+// warning consequences ("Kickoff is now overdue."). That it saved is the sync chip's to say
+// (DESIGN, Sync dot), and everything else the save caused shows on the nodes themselves and in
+// the chip's Recent. Surfaces that
 // commit an edit (the inspector, the Next page) hold a `useReceipt` and render this; its
 // timing is the receipt machine's (receipt.ts).
 import { useActorRef, useSelector } from "@xstate/react";
@@ -23,17 +24,12 @@ export function useReceipt(): { receipt: ReceiptState | undefined; show: (warnin
 }
 
 export function Receipt({ receipt }: { receipt: ReceiptState | undefined }) {
-  if (receipt === undefined) {
+  if (receipt?.warning === undefined) {
     return null;
   }
   return (
-    <span className="receipt stack" data-testid="receipt">
-      <span>{"✓"} Saved</span>
-      {receipt.warning === undefined ? null : (
-        <span className="small" data-testid="receipt-warning">
-          {receipt.warning}
-        </span>
-      )}
+    <span className="receipt small" data-testid="receipt">
+      {receipt.warning}
     </span>
   );
 }

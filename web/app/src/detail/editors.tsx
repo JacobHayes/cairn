@@ -158,9 +158,8 @@ export function UntilNode({ view, label, exclude, value, onChange }: { view: Rea
 }
 
 /** B6: until when: a quick date, a date, or another node being done. */
-function UntilFields({ view, group, value, onChange }: { view: Ready; group: string; value: SnoozeDraft; onChange: (patch: Partial<SnoozeDraft>) => void }) {
-  const { aside, until, date, target } = value;
-  const scope = withinScope(view, aside);
+export function UntilFields({ view, group, exclude, value, onChange }: { view: Ready; group: string; exclude: ReadonlySet<string>; value: SnoozeDraft; onChange: (patch: Partial<SnoozeDraft>) => void }) {
+  const { until, date, target } = value;
   return (
     <>
       <fieldset className="stack">
@@ -175,7 +174,7 @@ function UntilFields({ view, group, value, onChange }: { view: Ready; group: str
         </div>
       </fieldset>
       {until === "date" ? <Field type="date" aria-label="Snooze until" value={date} onChange={(event) => { onChange({ date: event.target.value }); }} /> : null}
-      {until === "node" ? <UntilNode view={view} label="Snooze until node" exclude={scope} value={target} onChange={(next) => { onChange({ target: next }); }} /> : null}
+      {until === "node" ? <UntilNode view={view} label="Snooze until node" exclude={exclude} value={target} onChange={(next) => { onChange({ target: next }); }} /> : null}
     </>
   );
 }
@@ -226,7 +225,7 @@ export function SnoozePanel({
   return (
     <div className="stack popover-panel" role="dialog" aria-label="Snooze" data-testid="snooze" data-popover="">
       {options.length === 1 ? null : <SetAside options={options} group={group} aside={aside} onChange={(node) => { change({ aside: node }); }} />}
-      <UntilFields view={view} group={group} value={value} onChange={change} />
+      <UntilFields view={view} group={group} exclude={withinScope(view, aside)} value={value} onChange={change} />
       <span className="row">
         <Button
           primary

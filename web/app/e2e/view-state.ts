@@ -42,7 +42,6 @@ export async function retitleAndPin(page: Page, node: string, title: string, dat
   if (assign) {
     await menuItem(panel, "assign");
     await panel.getByTestId("assign").getByLabel("Assign owner").selectOption(VIEWER);
-    await panel.getByTestId("assign").getByRole("button", { name: "Assign" }).click();
     await expect(panel.getByTestId("participations")).toContainText("Evaluation Lead");
   }
   await pin(panel, date);

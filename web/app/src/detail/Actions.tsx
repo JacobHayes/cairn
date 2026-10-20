@@ -12,7 +12,7 @@ import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { useLocation, useNavigate } from "react-router";
 
 import { useFrameActions } from "../shell/frame.tsx";
-import { assignOwner, doneMutations, evidenceDraft, missingEvidence } from "../acting/acts.ts";
+import { doneMutations, evidenceDraft, missingEvidence } from "../acting/acts.ts";
 import { graphPath, graphViewFrom } from "../canvas/settings.ts";
 import { mayNotApply } from "../data/activity.ts";
 import { writeDraft } from "../data/drafts.ts";
@@ -33,7 +33,7 @@ import { SnoozePanel, snoozeWords, WeightEditor } from "./editors.tsx";
 import { foldKey, setFold } from "./folds.ts";
 import { answerable, guardBypass, isBlocked, movesFrom, storedSnooze, titleOf, transition, unansweredOf, type GraphNode, type Mutation, type NodeDetail, type Ready } from "./model.ts";
 import { menuOf, offered, type Act, type ContextId, type MenuId, type MenuItem } from "./offers.ts";
-import { EntityOptions } from "./parts.tsx";
+import { OwnerSelect } from "./parts.tsx";
 import { Rejected } from "./Rejected.tsx";
 import { snoozeStart } from "./snooze.ts";
 import { Saving, type Sending } from "../ui/Receipt.tsx";
@@ -127,22 +127,6 @@ function EditDate({ value, sending, disabled, onChange, onSave, onClose }: { val
         <Dismiss sending={sending} onClose={onClose} />
       </span>
       <Saving sending={sending} />
-    </span>
-  );
-}
-
-/** D2: assign the node's owner from the people the deployment lists. */
-function AssignOwner({ view, write, node }: { view: Ready; write: NodeWrite; node: string }) {
-  const [entity, setEntity] = useState("");
-  return (
-    <span className="row" data-testid="assign">
-      <select aria-label="Assign owner" value={entity} onChange={(event) => { setEntity(event.target.value); }}>
-        <option value="">Assign owner</option>
-        <EntityOptions view={view} />
-      </select>
-      <Button disabled={write.disabled || entity === ""} onClick={() => void write.run([assignOwner(node, entity)])}>
-        Assign
-      </Button>
     </span>
   );
 }
@@ -394,8 +378,8 @@ function OpenedForm({ opened, footer, ...props }: OpenProps & { opened: Opened; 
       return <EditDate {...shared} value={opened.value} onChange={(next) => { form.change("edit-date", next); }} onSave={(date) => { submit(opened, [{ op: "set_recorded_date", node: node.key, end: "finish", date }]); }} />;
     case "assign":
       return (
-        <span className="row">
-          <AssignOwner view={view} write={write} node={node.key} />
+        <span className="row" data-testid="assign">
+          <OwnerSelect view={view} write={write} node={node.key} placeholder="Assign owner" />
           <Button onClick={form.close}>Close</Button>
         </span>
       );

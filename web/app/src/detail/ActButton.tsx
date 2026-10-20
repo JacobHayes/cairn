@@ -66,7 +66,7 @@ export function ActButton({ act, view, node, write, waiting, open, dated = false
   const refused = waiting && (act === "done" || act === "reach");
   return (
     <Button
-      primary={act === "done" || act === "done-with-evidence" || act === "reach" || act === "reach-now" || act === "decide"}
+      primary={act === "done" || act === "done-with-evidence" || act === "reach" || act === "reach-now" || act === "decide" || act === "break-down"}
       disabled={refused || (act !== "decide" && act !== "break-down" && write.disabled)}
       data-testid={act === "break-down" ? "break-down" : undefined}
       onClick={() => {

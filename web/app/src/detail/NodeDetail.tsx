@@ -88,7 +88,7 @@ export function NodeDetailPanel({ view, nodeKey, extra, folded = false }: { view
   return (
     <FoldedSections value={folded}>
       <aside className="detail-panel panel stack" aria-label={node.title} data-testid="node-detail" data-node={nodeKey}>
-        <Header view={view} detail={detail} position={position} rename={rename} removeTo={graphPath(journey, { ...graphViewFrom(new URLSearchParams(search)), edit: true }, { node: nodeKey }, search)} />
+        <Header view={view} detail={detail} rename={rename} removeTo={graphPath(journey, { ...graphViewFrom(new URLSearchParams(search)), edit: true }, { node: nodeKey }, search)} />
         <div className="detail-lead">
           <Sentence view={view} detail={detail} rank={{ position, row }} />
           {node.kind === "decision" || description === "" ? null : <Markdown text={description} data-testid="description" />}

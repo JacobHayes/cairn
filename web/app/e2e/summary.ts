@@ -46,8 +46,9 @@ export async function stall(page: Page, journey: string, nodes: string[]): Promi
   }
   await expect(page.getByTestId("selection-panel")).toHaveAttribute("data-count", String(nodes.length));
   await page.getByTestId("selection-snooze").click();
-  await page.getByRole("menuitem", { name: "Snooze until a date…" }).click();
-  await page.getByLabel("Snooze them until").fill("2026-12-31");
+  await page.getByRole("menuitem", { name: "Snooze…" }).click();
+  await page.getByRole("radio", { name: "A date" }).check();
+  await page.getByLabel("Snooze until", { exact: true }).fill("2026-12-31");
   await page.getByRole("button", { name: `Apply to ${String(nodes.length)}` }).click();
   await goTo(page, "summary");
   await expect(page.getByTestId("stalled")).toBeVisible();

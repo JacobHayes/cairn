@@ -5,12 +5,12 @@
 // names which node failed (A15), with D4's bypass. An action every member's state does not
 // allow stays visible and disabled, its reason in the tooltip, so nothing is sent that is
 // certain to be refused.
-import { useEffect, useRef, useState, type ReactNode } from "react";
+import { useEffect, useId, useRef, useState, type ReactNode } from "react";
 
-import { UntilNode } from "../detail/editors.tsx";
+import { UntilFields } from "../detail/editors.tsx";
 import { titleOf, type Ready } from "../detail/model.ts";
 import { ACT_LABELS } from "../detail/offers.ts";
-import { withinScope } from "../detail/snooze.ts";
+import { snoozeStart, untilOf, withinScope, type SnoozeDraft } from "../detail/snooze.ts";
 import { Menu } from "../screens/Menu.tsx";
 import { Rejected } from "../detail/Rejected.tsx";
 import { EntityOptions } from "../detail/parts.tsx";
@@ -18,26 +18,33 @@ import { useFormDraft, useNodeWrite, type Seen } from "../detail/write.ts";
 import { Button, Field } from "../ui/kit.tsx";
 import { reasonFor, runBulk, type BulkAction, type Facts } from "./acts.ts";
 
-type Form = "skip" | "assign" | "snooze-date" | "snooze-node";
+type Form = "skip" | "assign" | "snooze";
 
 const FORM_WORDS: Record<Form, string> = {
   skip: "Skip…",
   assign: "Assign owner…",
-  "snooze-date": "Snooze until a date…",
-  "snooze-node": "Snooze until a node…",
+  snooze: "Snooze…",
 };
 
-/** The action a filled form asks for. */
-function actionOf(form: Form, value: string): BulkAction {
+/** What a form holds: its text, and for a snooze the same draft the inspector's snooze form keeps. */
+interface Filled {
+  form: Form;
+  value: string;
+  snooze: SnoozeDraft;
+}
+
+/** The action a filled form asks for, or none while it asks for nothing yet. */
+function actionOf({ form, value, snooze }: Filled, today: string): BulkAction | undefined {
+  const text = value.trim();
   switch (form) {
     case "skip":
-      return { act: "skip", reason: value };
+      return text === "" ? undefined : { act: "skip", reason: text };
     case "assign":
-      return { act: "assign", entity: value };
-    case "snooze-date":
-      return { act: "snooze", until: { date: value } };
-    case "snooze-node":
-      return { act: "snooze", until: { node: value } };
+      return text === "" ? undefined : { act: "assign", entity: text };
+    case "snooze": {
+      const until = untilOf(snooze, today);
+      return until === undefined ? undefined : { act: "snooze", until };
+    }
   }
 }
 
@@ -48,36 +55,36 @@ interface Offer {
   form?: Form;
 }
 
-const form = (kind: Form): Offer => ({ words: FORM_WORDS[kind], asks: actionOf(kind, ""), form: kind });
+/** A form's entry: before it is filled it asks for what its action needs to be offered (a snooze, set aside anything unfinished). */
+const form = (kind: Form): Offer => ({ words: FORM_WORDS[kind], asks: kind === "snooze" ? { act: "snooze", until: { date: "" } } : kind === "skip" ? { act: "skip", reason: "" } : { act: "assign", entity: "" }, form: kind });
 
 const STATUS: Offer[] = [{ words: ACT_LABELS.start, asks: { act: "start" } }, { words: ACT_LABELS.done, asks: { act: "done" } }, form("skip")];
 const ASSIGN = form("assign");
-const SNOOZE: Offer[] = [form("snooze-date"), form("snooze-node"), { words: ACT_LABELS.unsnooze, asks: { act: "unsnooze" } }];
+const SNOOZE: Offer[] = [form("snooze"), { words: ACT_LABELS.unsnooze, asks: { act: "unsnooze" } }];
 
-function FormInput({ view, form, within, value, onChange }: { view: Ready; form: Form; within: ReadonlySet<string>; value: string; onChange: (value: string) => void }) {
+function FormInput({ view, open, within, onChange }: { view: Ready; open: Filled; within: ReadonlySet<string>; onChange: (next: Filled) => void }) {
+  const group = useId();
+  const { form, value } = open;
   if (form === "skip") {
-    return <Field aria-label="Why skip them" placeholder="Why" value={value} onChange={(event) => { onChange(event.target.value); }} />;
-  }
-  if (form === "snooze-date") {
-    return <Field type="date" aria-label="Snooze them until" value={value} onChange={(event) => { onChange(event.target.value); }} />;
+    return <Field aria-label="Why skip them" placeholder="Why" value={value} onChange={(event) => { onChange({ ...open, value: event.target.value }); }} />;
   }
   if (form === "assign") {
     return (
-      <select aria-label="Owner for them" value={value} onChange={(event) => { onChange(event.target.value); }}>
+      <select aria-label="Owner for them" value={value} onChange={(event) => { onChange({ ...open, value: event.target.value }); }}>
         <option value="">Choose</option>
         <EntityOptions view={view} />
       </select>
     );
   }
-  return <UntilNode view={view} label="Snooze them until node" exclude={within} value={value} onChange={onChange} />;
+  return <UntilFields view={view} group={group} exclude={within} value={open.snooze} onChange={(patch) => { onChange({ ...open, snooze: { ...open.snooze, ...patch } }); }} />;
 }
 
 /** The form an action opened: its field, Apply to every member, Cancel. */
-function FormRow({ view, within, open, count, disabled, onChange, onApply, onCancel }: { view: Ready; within: ReadonlySet<string>; open: { form: Form; value: string }; count: number; disabled: boolean; onChange: (value: string) => void; onApply: () => void; onCancel: () => void }) {
+function FormRow({ view, within, open, count, disabled, onChange, onApply, onCancel }: { view: Ready; within: ReadonlySet<string>; open: Filled; count: number; disabled: boolean; onChange: (next: Filled) => void; onApply: () => void; onCancel: () => void }) {
   return (
     <div className="row" data-testid="bulk-form" data-form={open.form}>
-      <FormInput view={view} form={open.form} within={within} value={open.value} onChange={onChange} />
-      <Button primary disabled={disabled || open.value.trim() === ""} onClick={onApply}>
+      <FormInput view={view} open={open} within={within} onChange={onChange} />
+      <Button primary disabled={disabled || actionOf(open, view.derived.today) === undefined} onClick={onApply}>
         Apply to {count}
       </Button>
       <Button onClick={onCancel}>Cancel</Button>
@@ -93,7 +100,7 @@ export function SelectionActions({ view, selected, onLanded, structure }: { view
   const write = useNodeWrite(view, "bulk");
   // A form, and what a refusal said, belong to the members they were for, and go with them or with the panel.
   const scope = selected.map((facts) => facts.node.key).sort().join(",");
-  const draft = useFormDraft<{ form: Form; value: string }>(write.journey, "selection", "bulk");
+  const draft = useFormDraft<Filled>(write.journey, "selection", "bulk-form");
   const [refused, setRefused] = useState<{ scope: string; keys: string[] }>({ scope, keys: [] });
   const unable = refused.scope === scope ? refused.keys : [];
   const closing = useRef(draft.close);
@@ -113,7 +120,7 @@ export function SelectionActions({ view, selected, onLanded, structure }: { view
     if (offer.form === undefined) {
       void act(offer.asks);
     } else {
-      draft.open({ form: offer.form, value: offer.form === "snooze-date" ? view.key.today : "" }, write.seen);
+      draft.open({ form: offer.form, value: "", snooze: snoozeStart(view, "") }, write.seen);
     }
   };
   const group = (label: string, offers: Offer[]) => {
@@ -143,7 +150,7 @@ export function SelectionActions({ view, selected, onLanded, structure }: { view
         )}
       </div>
       {open === undefined ? null : (
-        <FormRow view={view} within={new Set(selected.flatMap((facts) => [...withinScope(view, facts.node.key)]))} open={open.value} count={selected.length} disabled={write.disabled} onChange={(value) => { draft.change({ ...open.value, value }); }} onApply={() => void act(actionOf(open.value.form, open.value.value.trim()), open)} onCancel={draft.close} />
+        <FormRow view={view} within={new Set(selected.flatMap((facts) => [...withinScope(view, facts.node.key)]))} open={open.value} count={selected.length} disabled={write.disabled} onChange={draft.change} onApply={() => { const action = actionOf(open.value, view.derived.today); if (action !== undefined) { void act(action, open); } }} onCancel={draft.close} />
       )}
       {unable.length === 0 ? null : (
         <p className="callout" role="alert" data-testid="bulk-unable">
