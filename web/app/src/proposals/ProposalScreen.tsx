@@ -351,7 +351,7 @@ function useReviewModel({ review, ready, before, deployment }: BodyProps, draft:
     entries: useMemo(() => reviewEntries(diff, marks, before), [diff, marks, before]),
     counts: useMemo(() => filterCounts(marks, diff), [marks, diff]),
     graphs: useMemo(() => (known ? [unionGraph(before, after), after, ...(before === undefined ? [] : [before])] : before === undefined ? [] : [before]), [known, before, after]),
-    names: useMemo(() => namesOf([added, before, after], deployment.entities ?? [], ready?.key.today ?? sessionToday), [added, before, after, deployment, ready?.key.today, sessionToday]),
+    names: useMemo(() => namesOf([added, before, after], deployment, ready?.key.today ?? sessionToday), [added, before, after, deployment, ready?.key.today, sessionToday]),
     tree: useMemo(() => treeOf(structure), [structure]),
     structure,
     today: ready?.key.today ?? sessionToday,
@@ -364,7 +364,7 @@ function PreviewNotes({ model, kept, ready }: { model: Model; kept: Kept | undef
   const { local, known, before, preview, previewOfEdits } = model;
   return (
     <>
-      {local !== undefined && "error" in local ? <p className="callout callout-bad">No preview: {local.error}</p> : null}
+      {local !== undefined && "error" in local ? <p className="callout callout-bad"><Failed what="The preview" verb="drawn" error={local.error} /></p> : null}
       {kept !== undefined && !previewOfEdits ? <p className="muted small" data-testid="preview-of-saved">{ready === undefined ? "The preview shows the proposal as saved: save your edits to preview them." : "Previewing your edits..."}</p> : null}
       {known || before === undefined || (preview.violations ?? []).length === 0 ? null : <p className="muted small" data-testid="no-graph-after">As it stands it breaks a rule, so there is no graph after to compare: the canvas shows the graph as it is, with the items marked.</p>}
     </>
@@ -486,7 +486,7 @@ function ProposalCard(props: InspectorProps) {
           <span>
             <Badge tone="warn">Still to decide {waiting.length}</Badge>
           </span>
-          <ul className="route-list">
+          <ul className="plain-list route-list">
             {waiting.map(({ item, index }) => {
               const node = itemNode(item);
               return (

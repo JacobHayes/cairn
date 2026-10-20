@@ -3,18 +3,16 @@
 // (acting/SelectionActions.tsx) or, while the structure is edited, Remove. One member is not
 // here: it is the node's own detail.
 import { useEffect } from "react";
-import { Link } from "react-router";
 
 import { RemoveSelected } from "../authoring/RemoveSelected.tsx";
 import type { Authored } from "../authoring/target.ts";
 import type { Selection } from "../canvas/selection.ts";
 import { selectionOf } from "../acting/acts.ts";
-import { NodePanel } from "../acting/NodeItem.tsx";
+import { NodeItem, NodePanel } from "../acting/NodeItem.tsx";
 import { SelectionActions } from "../acting/SelectionActions.tsx";
 import { useNodeAddresses } from "../journeys/address.ts";
-import { statusTone, statusWord } from "../status/words.ts";
-import { Badge, Button } from "../ui/kit.tsx";
-import { titleOf, type Ready } from "./model.ts";
+import { Button } from "../ui/kit.tsx";
+import { isStage, kindWord, type Ready, titleOf } from "./model.ts";
 
 export function SelectionPanel({ ready, selection, authored }: { ready: Ready; selection: Selection; authored: Authored | undefined }) {
   const addresses = useNodeAddresses();
@@ -37,21 +35,14 @@ export function SelectionPanel({ ready, selection, authored }: { ready: Ready; s
         </Button>
       </div>
       <NodePanel testId="selection-members">
-        {members.map(({ node, derived }) => (
-          <li key={node.key} className="node-row" data-state={derived.display_state} data-testid="selection-member" data-node={node.key}>
-            <div className="node-row-main">
-              <Badge tone={statusTone(derived.display_state)}>{statusWord(derived.display_state, node.kind)}</Badge>
-              <span className="node-row-text">
-                <Link to={addresses.open(node.key)} className="node-title" data-node={node.key} onClick={selection.release}>
-                  {titleOf(ready, node.key)}
-                </Link>
-                <span className="node-fact muted">{node.kind}</span>
-              </span>
+        {members.map(({ node }) => (
+          <NodeItem key={node.key} view={ready} node={node.key} to={addresses.open(node.key)} fact={kindWord(node.kind, isStage(node))} testId="selection-member" onOpen={selection.release}>
+            <div className="row-side">
               <Button ghost aria-label={`Remove ${titleOf(ready, node.key)} from the selection`} title="Remove from the selection" onClick={() => { selection.toggle(node.key); }}>
                 ×
               </Button>
             </div>
-          </li>
+          </NodeItem>
         ))}
       </NodePanel>
       <SelectionActions

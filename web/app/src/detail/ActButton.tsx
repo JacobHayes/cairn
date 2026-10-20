@@ -48,7 +48,7 @@ function Reach({ view, write, node, disabled }: { view: Ready; write: NodeWrite;
       >
         {actLabel(view, node, "reach")}
       </Button>
-      <Field type="date" aria-label="Reached on" value={date} onChange={(event) => { setDate(event.target.value); }} />
+      <Field type="date" aria-label="Reached on" title="Reached on" value={date} onChange={(event) => { setDate(event.target.value); }} />
     </span>
   );
 }

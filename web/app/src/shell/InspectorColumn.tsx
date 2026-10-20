@@ -13,6 +13,7 @@
 import { useEffect, useRef, type KeyboardEvent as ReactKeyboardEvent, type PointerEvent as ReactPointerEvent, type Ref, type RefObject } from "react";
 
 import { COLUMN, useMedia, type InspectorTab } from "./frame.tsx";
+import { plural } from "../ui/words.ts";
 
 /** The sheet's heights, as `data-sheet` on the frame (app.css sets each), smallest first. */
 export const SNAPS = ["peek", "half", "full"] as const;
@@ -179,7 +180,7 @@ function TabName({ tab, count }: { tab: InspectorTab; count: number | undefined 
   return (
     <>
       {TAB_WORDS[tab]}
-      {tab === "proposals" && count !== undefined && count > 0 ? <span className="tab-count" data-testid="proposals-count" title={`${String(count)} open ${count === 1 ? "proposal" : "proposals"}`}>{count}</span> : null}
+      {tab === "proposals" && count !== undefined && count > 0 ? <span className="tab-count" data-testid="proposals-count" title={plural(count, "open proposal")}>{count}</span> : null}
     </>
   );
 }

@@ -11,14 +11,17 @@ import { useEffect, useMemo, useState } from "react";
 import type { Graph } from "../authoring/graph.ts";
 import { GraphCanvas } from "../canvas/GraphCanvas.tsx";
 import { useLaidOut } from "../canvas/hooks.ts";
-import { KINDS, cardsOf, linesOf, type CanvasModel, type Level } from "../canvas/model.ts";
+import { cardsOf, linesOf, type CanvasModel, type Level } from "../canvas/model.ts";
 import type { CardActions } from "../canvas/NodeCard.tsx";
 import { marksOverlay } from "../canvas/overlay.ts";
 import type { Deployment, Deriver } from "../data/host.ts";
 import { errorWords, PROJECTION, valueOf, type ReadSource } from "../data/keyed-read.ts";
 import { useKeyedRead, useSession } from "../data/react.ts";
 import type { DiffMark, GraphDiff } from "./model.ts";
-import { NODE_GONE } from "../ui/gone.ts";
+
+import { nodeTitle } from "../ui/gone.ts";
+import { KINDS } from "../detail/model.ts";
+import { Failed } from "../ui/Failed.tsx";
 
 /** What a proposal canvas's level is derived from. */
 interface LevelArgs {
@@ -90,16 +93,16 @@ export function ProposalCanvas({ domain, graphs, marks, edges, dim, deployment, 
       open: onPick,
       expand: undefined,
       trace: undefined,
-      title: (key) => (graph?.nodes ?? []).find((node) => node.key === key)?.title ?? NODE_GONE,
+      title: (key) => nodeTitle((graph?.nodes ?? []).find((node) => node.key === key)?.title),
       menu: undefined,
     }),
     [onPick, graph],
   );
   if (answer !== undefined && "error" in answer && tried + 1 >= graphs.length) {
-    return <p className="callout callout-bad">The diff could not be drawn: {answer.error}</p>;
+    return <p className="callout callout-bad"><Failed what="The diff" verb="drawn" error={answer.error} /></p>;
   }
   if (error !== undefined) {
-    return <p className="callout callout-bad">The diff could not be laid out: {error}</p>;
+    return <p className="callout callout-bad"><Failed what="The diff" verb="laid out" error={error} /></p>;
   }
   if (laidOut === undefined || overlay === undefined) {
     return <p className="muted small">Laying out the diff...</p>;

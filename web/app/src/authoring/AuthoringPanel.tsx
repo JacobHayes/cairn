@@ -5,12 +5,13 @@
 import "./authoring.css";
 
 import { Section } from "../detail/parts.tsx";
-import type { GraphNode } from "./graph.ts";
+import { titleIn, type GraphNode } from "./graph.ts";
 import { LocalEdits } from "./LocalEdits.tsx";
 import { NodeForm } from "./NodeForm.tsx";
 import { ResourceEditor } from "./ResourceEditor.tsx";
 import { Breakdown, EdgesEditor, ParticipationWiring, PlaceEditor, RemoveNode } from "./StructureEditors.tsx";
 import { isJourney, type Authored } from "./target.ts";
+import { isWork } from "../detail/model.ts";
 
 export interface AuthoringPanelProps {
   authored: Authored;
@@ -22,7 +23,7 @@ export interface AuthoringPanelProps {
 export function AuthoringPanel({ authored, node, onRemoved }: AuthoringPanelProps) {
   const requires = node.requires ?? [];
   const resources = node.resources ?? [];
-  const breaksDown = node.kind === "deliverable" || node.kind === "action";
+  const breaksDown = isWork(node);
   return (
     // Keyed by node, so every editor's state and kept draft are the open node's own.
     <div key={node.key} className="stack author-panel" data-testid="authoring" data-node={node.key}>
@@ -38,7 +39,7 @@ export function AuthoringPanel({ authored, node, onRemoved }: AuthoringPanelProp
         <Section title="Requirements" summary={requires.length === 0 ? undefined : String(requires.length)} testId="author-edges">
           <EdgesEditor authored={authored} node={node} />
         </Section>
-        <Section title="Where it sits" summary={node.parent == null ? undefined : (authored.tree.byKey.get(node.parent)?.title ?? node.parent)} testId="author-place">
+        <Section title="Where it sits" summary={node.parent == null ? undefined : titleIn(authored.tree, node.parent)} testId="author-place">
           <PlaceEditor authored={authored} node={node} />
         </Section>
         {breaksDown ? (

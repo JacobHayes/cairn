@@ -10,9 +10,9 @@ import { ruleFoot } from "../authoring/dates.ts";
 import { nodesByPath, treeOf, type Tree } from "../authoring/graph.ts";
 import type { GraphNode } from "../detail/model.ts";
 import { useFolds } from "../canvas/hooks.ts";
-import { collapsedAt, drawnStep, stepOf } from "../canvas/ladder.ts";
+
 import { useNodeAddresses } from "../journeys/address.ts";
-import { badgesOf, depthFaded, levelRequestOf, outOfFocus, stepHides } from "../journeys/requests.ts";
+
 import type { ViewState } from "../journeys/view.ts";
 import { containerKeys } from "../plan/tree.ts";
 import { nodesOf, type Shown } from "./route-reads.ts";
@@ -20,8 +20,7 @@ import { useRouteLevel } from "./route-views.ts";
 import { TreeFold, TreeGuides } from "../ui/Tree.tsx";
 import { NothingMatches, routeSubject, ViewBar } from "./ViewControls.tsx";
 import { Failed } from "../ui/Failed.tsx";
-
-const NONE: ReadonlySet<string> = new Set();
+import { useViewLevel } from "../canvas/viewLevel.ts";
 
 export interface RouteListProps {
   shown: Shown;
@@ -67,13 +66,8 @@ export function RouteList({ shown, state, picks, selected, unanchored, onOpen }:
   const navigate = useNavigate();
   const nodes = nodesOf(shown);
   const tree = useMemo(() => treeOf(shown.graph), [shown.graph]);
-  const depth = stepOf({ step: state.depth }, nodes);
-  const step = drawnStep(depth, state.fade);
-  const request = useMemo(() => levelRequestOf(state, step, []), [state, step]);
-  const { level, drawn, error } = useRouteLevel(shown, request, selected);
-  const { open, fold } = useFolds(nodes, NONE, state.depth, step, picks, selected, (key) => void navigate(addresses.open(key)));
-  const faded = useMemo(() => outOfFocus(undefined, drawn === undefined ? NONE : depthFaded(state, nodes, depth, collapsedAt(depth, nodes, NONE, [], []), drawn)), [state, nodes, depth, drawn]);
-  const badges = useMemo(() => badgesOf("list", level?.hidden_by_class ?? {}, undefined, stepHides(nodes, depth, []), state.fade), [level, nodes, depth, state.fade]);
+  const { step, current, level, error, dimmed: faded, badges } = useViewLevel({ screen: "list", state, nodes, selected, read: (request, at) => useRouteLevel(shown, request, at) });
+  const { open, fold } = useFolds(nodes, current, state.depth, step, picks, selected, (key) => void navigate(addresses.open(key)));
   const rows = useListRows(tree, level, open);
   const containers = useMemo(() => containerKeys(nodes), [nodes]);
   return (
@@ -81,7 +75,7 @@ export function RouteList({ shown, state, picks, selected, unanchored, onOpen }:
       <ViewBar subject={routeSubject(nodes)} screen="list" badges={badges} />
       {error === undefined ? null : <p className="callout callout-bad"><Failed what="The list" error={error} /></p>}
       <div className="node-panel list-panel" data-testid="list-panel">
-        <ul className="route-list route-tree" data-testid="route-list">
+        <ul className="plain-list route-list route-tree" data-testid="route-list">
           {(rows ?? []).map(({ node, depth: indent, holds, guides }) => {
             const foot = ruleFoot(node, tree);
             return (

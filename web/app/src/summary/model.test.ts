@@ -64,10 +64,10 @@ describe("C18: the status summary", () => {
     expect(model.stale.map((each) => [each.key, each.reasons.length])).toEqual([["n_report", 2]]);
   });
 
-  it("lists upcoming milestones with date, origin, and owner, and open decisions with owners by name", () => {
+  it("lists upcoming milestones with date, origin, and owner, and open decisions with owners", () => {
     const model = summaryModel(summaryJourney(), projected);
-    expect(model.upcoming).toEqual([{ key: "n_meeting", title: "Meeting", date: "2026-11-20", origin: "pin", owners: ["Person Two"] }]);
-    expect(model.openDecisions).toEqual([{ key: "n_when", title: "Meeting date", owners: ["Person One"] }]);
+    expect(model.upcoming).toEqual([{ key: "n_meeting", title: "Meeting", date: "2026-11-20", origin: "pin", owners: ["e_two"] }]);
+    expect(model.openDecisions).toEqual([{ key: "n_when", title: "Meeting date", owners: ["e_one"] }]);
   });
 
   it("lists nothing where the projection lists nothing", () => {

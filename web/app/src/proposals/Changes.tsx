@@ -10,7 +10,7 @@ import { ConditionEditor } from "../authoring/ConditionEditor.tsx";
 import { planRemoval, removalMutations } from "../authoring/cascade.ts";
 import { DateRuleEditor } from "../authoring/DateRuleEditor.tsx";
 import { draftOf, draftProblems, nodeFrom, valueOf, type FormField, type NodeDraft } from "../authoring/fields.ts";
-import { KINDS, canHoldChildren, kindOption, edgeRefusal, moveTargets, newNode, nodesByPath, pathOf, type GraphNode, type Mutation, type NodeField, type NodeKind, type Role, type Tree } from "../authoring/graph.ts";
+import { canHoldChildren, kindOption, edgeRefusal, moveTargets, newNode, nodesByPath, pathOf, type GraphNode, type Mutation, type NodeField, type NodeKind, type Role, type Tree } from "../authoring/graph.ts";
 import { BasicsFields, ChoicesEditor, CompletionFields, DecisionFields, StageFields, WeightFields, has } from "../authoring/NodeFields.tsx";
 import { problemsOf } from "../authoring/NodeForm.tsx";
 import { FieldBox, Picker } from "../authoring/parts.tsx";
@@ -23,6 +23,7 @@ import { fieldWords } from "../status/words.ts";
 import { Button, Field } from "../ui/kit.tsx";
 import { carryIds, withFieldValue, withMutation, withMutationsAdded, withoutMutation, type ProposalDraft } from "./model.ts";
 import { mutationWords, type Names } from "./words.ts";
+import { KINDS } from "../detail/model.ts";
 
 /** What the change editors read and change. */
 export interface ChangesContext {
@@ -334,7 +335,7 @@ export function ChangeList({ context, only }: { context: ChangesContext; only?: 
   return (
     <div className="stack">
       {mutations.length === 0 ? <p className="muted small">No changes yet.</p> : null}
-      <ol className="stack proposal-changes" data-testid="changes">
+      <ol className="plain-list stack proposal-changes" data-testid="changes">
         {mutations.map((mutation, index) =>
           only !== undefined && !only(subjectOf(mutation)) ? null : <MutationRow key={ids[index]} editor={ids[index] ?? String(index)} index={index} mutation={mutation} context={context} />,
         )}

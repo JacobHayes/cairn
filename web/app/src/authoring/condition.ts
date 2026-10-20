@@ -9,10 +9,11 @@
 import { CONDITION_CLAUSE_COUNT_MAX, CONDITION_DEPTH_MAX } from "@cairn/client";
 import { choiceId, choiceLabel, choiceNamed } from "../status/answer.ts";
 import { dateWords } from "../status/when.ts";
-import { NODE_GONE } from "../ui/gone.ts";
+
 import type { AnswerType, GraphNode, Tree } from "./graph.ts";
 import { descendantsOf, nodesByPath } from "./graph.ts";
 import type { Condition } from "./fields.ts";
+import { nodeTitle } from "../ui/gone.ts";
 
 export type Clause = Condition;
 export type Value = boolean | string;
@@ -270,7 +271,7 @@ export interface ConditionNames {
  */
 export function conditionNames(lookup: (decision: string) => GraphNode | undefined, entity: (key: string) => string): ConditionNames {
   return {
-    title: (decision) => lookup(decision)?.title ?? NODE_GONE,
+    title: (decision) => nodeTitle(lookup(decision)?.title),
     value: (decision, value) => {
       if (typeof value === "boolean") {
         return value ? "yes" : "no";

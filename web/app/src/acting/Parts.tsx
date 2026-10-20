@@ -1,21 +1,11 @@
 // What a row on the acting surfaces shows besides its actions: a link to the node's detail
 // beside the screen, its breadcrumb (C9), and its derived flags (D3).
-import { Link } from "react-router";
 
-import { flagsOf, titleOf, type Ready } from "../detail/model.ts";
-import { useNodeAddresses } from "../journeys/address.ts";
+import { flagsOf, type Ready } from "../detail/model.ts";
+
 import { Badge } from "../ui/kit.tsx";
 import type { NodeRow } from "./why.ts";
-
-/** Node `key`'s detail in the inspector beside the screen it is on, keeping what the screen shows (5.1). */
-export function DetailLink({ view, node, className }: { view: Ready; node: string; className?: string }) {
-  const addresses = useNodeAddresses();
-  return (
-    <Link to={addresses.open(node)} data-node={node} title={titleOf(view, node)} {...(className === undefined ? {} : { className })}>
-      {titleOf(view, node)}
-    </Link>
-  );
-}
+import { NodeLink } from "../detail/parts.tsx";
 
 /** C9: the row's ancestors, root first, each opening its detail. */
 export function Crumb({ view, row }: { view: Ready; row: NodeRow }) {
@@ -28,7 +18,7 @@ export function Crumb({ view, row }: { view: Ready; row: NodeRow }) {
       {ancestors.map((key, at) => (
         <span key={key}>
           {at === 0 ? "" : " / "}
-          <DetailLink view={view} node={key} />
+          <NodeLink view={view} node={key} />
         </span>
       ))}
     </span>

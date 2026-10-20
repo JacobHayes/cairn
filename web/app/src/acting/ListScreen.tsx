@@ -14,12 +14,12 @@ import { useLocation, useNavigate } from "react-router";
 
 import { useFolds, useLevel, useProjected } from "../canvas/hooks.ts";
 import { valueOf } from "../data/keyed-read.ts";
-import { collapsedAt, drawnStep, stepOf } from "../canvas/ladder.ts";
+
 import type { Selection } from "../canvas/selection.ts";
 import { decisionRows } from "../decisions/model.ts";
 import { rankPlaces, type Ready } from "../detail/model.ts";
 import { useMineOf } from "../journeys/mine.ts";
-import { badgesOf, currentStagesOf, depthFaded, levelRequestOf, lightsUp, litOf, outOfFocus, stepHides, tableQueryOf } from "../journeys/requests.ts";
+import { tableQueryOf } from "../journeys/requests.ts";
 import type { ViewState } from "../journeys/view.ts";
 import { containerKeys, planOrder } from "../plan/tree.ts";
 import { Menu } from "../screens/Menu.tsx";
@@ -36,6 +36,9 @@ import { addableColumns, columnsOf, columnWords, flatLines, givesWay, SORT_OF, t
 import { useRows } from "./useRows.ts";
 import "./acting.css";
 import { Failed } from "../ui/Failed.tsx";
+import { plural } from "../ui/words.ts";
+import { useViewer } from "../data/react.ts";
+import { useViewLevel } from "../canvas/viewLevel.ts";
 
 /** The columns held at the left while the table scrolls sideways. */
 function pinned(column: Column, columns: readonly Column[]): string | undefined {
@@ -170,7 +173,7 @@ function RowEnd({ list, decisionColumns, total }: { list: ListSettings; decision
   return (
     <>
       <span className="muted" data-testid="list-total" data-total={total ?? ""}>
-        {total === undefined ? "Reading the list..." : `${String(total)} item${total === 1 ? "" : "s"}`}
+        {total === undefined ? "Reading the list..." : plural(total, "item")}
       </span>
       <Menu
         label="Columns"
@@ -217,10 +220,7 @@ function FrontierPanels({ view, drawn }: { view: Ready; drawn: ReadonlySet<strin
  */
 export function ListBody({ view, state, picks, list, selected, selection }: { view: Ready; state: ViewState; picks: number; list: ListSettings; selected?: string | undefined; selection: Selection }) {
   const nodes = view.journey.graph.nodes ?? [];
-  const depth = stepOf({ step: state.depth }, nodes);
-  const shown = drawnStep(depth, state.fade);
-  const request = useMemo(() => levelRequestOf(state, shown, []), [state, shown]);
-  const { level, drawn, error: levelError } = useLevel(view, request, selected);
+  const { depth, step, current, level, drawn, error: levelError, base: frontier, dimmed, badges } = useViewLevel({ screen: "list", state, nodes, selected, ready: view, read: (request, at) => useLevel(view, request, at) });
   const query = useMemo(() => tableQueryOf(list.sort), [list.sort]);
   const { rows, error: rowsError } = useRows(view, query);
   const decisionColumns = depth === "decisions";
@@ -233,24 +233,16 @@ export function ListBody({ view, state, picks, list, selected, selection }: { vi
   const tree = list.sort === undefined;
   const addresses = useNodeAddresses();
   const navigate = useNavigate();
-  const current = useMemo(() => currentStagesOf(view), [view]);
-  const folds = useFolds(nodes, current, state.depth, shown, picks, selected, (key) => void navigate(addresses.open(key)));
+  const { viewer } = useViewer();
+  const folds = useFolds(nodes, current, state.depth, step, picks, selected, (key) => void navigate(addresses.open(key)));
   const kept = useMemo(() => (rows === undefined || drawn === undefined ? undefined : rows.filter((row) => drawn.has(row.key))), [rows, drawn]);
   const lines = useMemo(
     () => (kept === undefined || level === undefined ? [] : tree ? treeLines(level.nodes, new Map(kept.map((row) => [row.key, row])), folds.open, order, containers) : flatLines(view, kept, list.sort)),
     [view, kept, level, tree, list.sort, folds.open, order, containers],
   );
-  const base = useMemo(() => litOf("list", state, view), [state, view]);
-  const lit = useMemo(() => (base === undefined ? undefined : lightsUp(nodes, base)), [nodes, base]);
-  const dimmed = useMemo(() => {
-    const hidden = collapsedAt(depth, nodes, current, [], []);
-    return outOfFocus(lit, drawn === undefined ? new Set() : depthFaded(state, nodes, depth, hidden, drawn));
-  }, [state, current, nodes, depth, drawn, lit]);
-  const frontier = useMemo(() => (state.frontier ? new Set(view.derived.acting_frontier) : undefined), [state.frontier, view.derived.acting_frontier]);
-  const badges = useMemo(() => badgesOf("list", level?.hidden_by_class ?? {}, base, stepHides(nodes, depth, []), state.fade), [level, base, nodes, depth, state.fade]);
   const everyLine = lines.flatMap((line) => (line.row === undefined ? [] : [line.row.key]));
   const columns = columnsOf(list, decisionColumns);
-  const context: CellContext = { view, tree, decisions, ranks, frontier, sort: list.sort, onFold: folds.fold };
+  const context: CellContext = { view, tree, decisions, ranks, frontier, sort: list.sort, viewer: viewer?.entities ?? [], onFold: folds.fold };
   const error = levelError ?? rowsError;
   return (
     <section className="stack list" aria-label="List" data-testid="list">

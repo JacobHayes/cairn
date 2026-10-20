@@ -2,6 +2,8 @@
 // neutral ramp by quartile of the range shown. It never re-lays out: the chip hangs outside the
 // card. Pure, so the unit tests read the same chips the canvas draws.
 import type { Card, Lens } from "./model.ts";
+import { plural } from "../ui/words.ts";
+import { daysWords } from "../status/when.ts";
 
 export const LENS_WORDS: Record<Lens, string> = { rank: "Rank", gravity: "Gravity", unlocks: "Unlocks", slack: "Slack" };
 
@@ -20,10 +22,6 @@ export interface LensChip {
   value: number;
 }
 
-function days(count: number): string {
-  return `${String(count)} ${count === 1 ? "day" : "days"}`;
-}
-
 /** The chip `lens` puts on `card`, or none when the card has no value for it. */
 export function lensChip(card: Card, lens: Lens): LensChip | undefined {
   const signals = card.journey?.signals;
@@ -38,9 +36,9 @@ export function lensChip(card: Card, lens: Lens): LensChip | undefined {
     case "unlocks":
       return signals.unlocks === undefined
         ? undefined
-        : { text: `Unlocks ${String(signals.unlocks.count)}`, title: `Frees ${String(signals.unlocks.count)} ${signals.unlocks.count === 1 ? "node" : "nodes"}, weighted ${String(signals.unlocks.weighted)}`, value: signals.unlocks.weighted };
+        : { text: `Unlocks ${String(signals.unlocks.count)}`, title: `Frees ${plural(signals.unlocks.count, "node")}, weighted ${String(signals.unlocks.weighted)}`, value: signals.unlocks.weighted };
     case "slack":
-      return signals.slackDays === undefined ? undefined : { text: `Slack ${days(signals.slackDays)}`, title: "How many days it can slip", value: -signals.slackDays };
+      return signals.slackDays === undefined ? undefined : { text: `Slack ${daysWords(signals.slackDays)}`, title: "How many days it can slip", value: -signals.slackDays };
   }
 }
 

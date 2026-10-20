@@ -4,15 +4,15 @@
 // node came from is not here: it is the Origin section.
 import { Link } from "react-router";
 
-import { isStage } from "../canvas/ladder.ts";
 import { RejectionView } from "../screens/RejectionView.tsx";
 import { WriteStatus } from "../screens/WriteStatus.tsx";
+import { useViewer } from "../data/react.ts";
 import { statusTone, statusWord } from "../status/words.ts";
 import { Badge, Button, Field } from "../ui/kit.tsx";
 import { Receipt } from "../ui/Receipt.tsx";
-import { flagsOf, type NodeDetail, type Ready } from "./model.ts";
+import { flagsOf, isStage, kindWord, type NodeDetail, type Ready } from "./model.ts";
 import { NodeLink, OwnerSelect } from "./parts.tsx";
-import { ownerName } from "./sentence.ts";
+import { ownersOf, ownerWords } from "./sections.tsx";
 import type { Rename } from "./rename.ts";
 import { rebasedOnto, useNodeWrite } from "./write.ts";
 
@@ -70,11 +70,12 @@ function Meta({ view, detail }: { view: Ready; detail: NodeDetail }) {
   const write = useNodeWrite(view, `assign:${detail.node.key}`);
   const { node, derived } = detail;
   const people = view.inputs.deployment.entities ?? [];
+  const { viewer } = useViewer();
   const owner =
     derived.unassigned === true && people.length > 0 ? (
       <OwnerSelect key="assign" view={view} write={write} node={node.key} placeholder="Assign" className="assign-owner" testId="assign-owner" />
     ) : (
-      ownerName(view, node.key)
+      ownerWords(view, ownersOf(view, node.key), viewer?.entities)
     );
   return (
     <div className="meta muted" data-testid="detail-meta">
@@ -92,7 +93,7 @@ export function Header({ view, detail, rename, removeTo }: { view: Ready; detail
     <div className="stack detail-head" data-testid="detail-header">
       <div className="row detail-band">
         <span className="detail-kind">
-          <span className="label">{isStage(node) ? "stage" : node.kind}</span>
+          <span className="label">{kindWord(node.kind, isStage(node))}</span>
           {detail.ancestors.map((ancestor) => (
             <span key={ancestor.key} className="muted small">
               {" › "}

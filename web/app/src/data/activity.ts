@@ -2,6 +2,7 @@
 // warning sentence a save's receipt shows at its control, and the saves the tab made, newest
 // first, for the sync chip's popover (in memory only; the session root holds them).
 import type { Schema } from "@cairn/client";
+import { namedList } from "../ui/words.ts";
 
 export type Consequences = Schema<"Consequences">;
 export type PatchAnswer = Schema<"PatchAnswer">;
@@ -79,12 +80,6 @@ export interface Unlocked {
 /** A node's title, given the journey it is in. */
 export type TitleOf = (journey: string, node: string) => string;
 
-/** A list of titles as words: "A", "A and B", "A and 2 more". */
-function named(titles: string[]): string {
-  const [first = "", second = ""] = titles;
-  return titles.length <= 2 ? [first, second].filter((title) => title !== "").join(" and ") : `${first} and ${String(titles.length - 1)} more`;
-}
-
 /**
  * D7: the one sentence a save's receipt adds when the write has warning consequences ("Kickoff
  * is now overdue."), or undefined when it has none. What a save merely brought in or unlocked
@@ -100,11 +95,11 @@ export function warningOf(lines: ConsequenceLine[], titleOf: TitleOf): string | 
       case "undecided":
         return `${mayNotApply(line.unanswered ?? [], (node) => titleOf(line.journey, node))}.`;
       case "overdue":
-        return `${named(titles)} ${many ? "are" : "is"} now overdue.`;
+        return `${namedList(titles)} ${many ? "are" : "is"} now overdue.`;
       case "stale":
-        return `${named(titles)} ${many ? "are" : "is"} now stale.`;
+        return `${namedList(titles)} ${many ? "are" : "is"} now stale.`;
       case "shortfall":
-        return `${named(titles)} now ${many ? "have shortfalls" : "has a shortfall"}.`;
+        return `${namedList(titles)} now ${many ? "have shortfalls" : "has a shortfall"}.`;
       case "unanchored":
         return `No chain to the final milestone, so neither priority nor dates feel it (advisory): ${line.nodes.join(", ")}.`;
     }

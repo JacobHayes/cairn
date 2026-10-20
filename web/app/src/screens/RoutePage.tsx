@@ -49,8 +49,9 @@ import { RouteList } from "./RouteList.tsx";
 import { useViewStateValue } from "./useViewStateValue.ts";
 import { withViewState } from "../journeys/view.ts";
 import { useScreenWrite, type ScreenWrite } from "./write.ts";
-import { NODE_GONE } from "../ui/gone.ts";
+
 import { Failed } from "../ui/Failed.tsx";
+import { titleIn } from "../authoring/graph.ts";
 
 /** What an import or a publish left, shown under the header until dismissed. */
 interface Result {
@@ -184,7 +185,7 @@ function DraftFrame({ shown, authored, selected, write, result, setResult, impor
   const unanchored = useMemo(() => new Set(notices.map((notice) => notice.node)), [notices]);
   const here = (node: string | undefined) => routePath(id, { screen, node }, search);
   const hrefOf = (key: string) => here(key);
-  const titleOf = (key: string) => authored.tree.byKey.get(key)?.title ?? NODE_GONE;
+  const titleOf = (key: string) => titleIn(authored.tree, key);
   const target = { route: id };
   const publish = () =>
     void write.run({ target, baseRevision: shown.route.revision, mutations: [{ op: "publish_draft" }] }, (found) => {

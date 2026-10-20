@@ -15,6 +15,7 @@ import { foldKey } from "./folds.ts";
 import { journeyPath } from "../journeys/address.ts";
 import type { NodeDetail, Ready } from "./model.ts";
 import { Section } from "./parts.tsx";
+import { Failed } from "../ui/Failed.tsx";
 
 type Resource = Schema<"Resource">;
 
@@ -41,7 +42,7 @@ function MessageDraft({ view, node, resource }: { view: Ready; node: string; res
   const read = useKeyedRead(DRAFT, { identity: [journey, node, resource], freshness: [JSON.stringify(view.key)], args: { deriver, journey, node, resource } }).view;
   const rendered = valueOf(read);
   if (rendered === undefined) {
-    return read.status === "failed" ? <span className="callout callout-bad">The draft could not be rendered: {read.error.message}</span> : <span className="muted small">Rendering...</span>;
+    return read.status === "failed" ? <span className="callout callout-bad"><Failed what="The draft" verb="rendered" error={read.error} /></span> : <span className="muted small">Rendering...</span>;
   }
   const copy = () => {
     void navigator.clipboard.writeText(draftText(rendered)).then(() => { setCopied(true); });
@@ -91,7 +92,7 @@ export function ResourceList({ view, detail }: { view: Ready; detail: NodeDetail
   }
   return (
     <Section title="Guidance" summary={String(resources.length)} open={detail.derived.display_state === "ready" || detail.derived.display_state === "active"} fold={foldKey(detail.node.kind, "guidance")} testId="resources">
-      <ul className="checklist stack">
+      <ul className="plain-list stack">
         {resources.map((resource) => (
           <Item key={resource.key} view={view} node={detail.node.key} resource={resource} />
         ))}

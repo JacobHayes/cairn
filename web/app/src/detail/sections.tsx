@@ -4,21 +4,37 @@
 import { answerWords, choiceNamed } from "../status/answer.ts";
 import { dateWords } from "../status/when.ts";
 import type { NodeDetail, Ready } from "./model.ts";
-import { ENTITY_GONE, KIND_GONE, ROLE_GONE } from "../ui/gone.ts";
+import { ENTITY_GONE, KIND_GONE, ROLE_GONE, slotName } from "../ui/gone.ts";
+import type { Schema } from "@cairn/client";
+import { namedList } from "../ui/words.ts";
+import { OWNER_KIND } from "./model.ts";
 
-/** A role by its title, or its key when it has none. */
+export type Slot = { key: string; id: string; title?: string | null | undefined };
+type Deployment = Schema<"Deployment">;
+
+/** A role by its title among `roles` (its id when it has none), or words for one that was removed. */
+export function roleNamed(roles: readonly Slot[] | undefined, role: string): string {
+  return slotName(roles?.find((each) => each.key === role), ROLE_GONE);
+}
+
+/** A participation kind by its title among `kinds`; the built-in owner kind has none in a graph. */
+export function kindNamed(kinds: readonly Slot[] | undefined, kind: string): string {
+  return kind === OWNER_KIND ? "Owner" : slotName(kinds?.find((each) => each.key === kind), KIND_GONE);
+}
+
+/** A journey's role by its title. */
 export function roleTitle(view: Ready, role: string): string {
-  return (view.journey.graph.roles ?? []).find((each) => each.key === role)?.title ?? ROLE_GONE;
+  return roleNamed(view.journey.graph.roles, role);
 }
 
-/** A participation kind by its title (the built-in owner kind has none in the graph), or its key when it has none. */
+/** A journey's participation kind by its title. */
 export function kindTitle(view: Ready, kind: string): string {
-  return kind === "k_owner" ? "Owner" : ((view.journey.graph.participation_kinds ?? []).find((each) => each.key === kind)?.title ?? KIND_GONE);
+  return kindNamed(view.journey.graph.participation_kinds, kind);
 }
 
-/** E6: the entity a key names now, following the aliases a merge left behind. */
-export function resolveEntity(view: Ready, key: string): string {
-  const aliases = view.inputs.deployment.aliases ?? {};
+/** E6: the entity a key names now in `deployment`, following the aliases a merge left behind. */
+export function resolveAlias(deployment: Deployment, key: string): string {
+  const aliases = deployment.aliases ?? {};
   let found = key;
   const seen = new Set<string>();
   while (aliases[found] !== undefined && !seen.has(found)) {
@@ -28,10 +44,49 @@ export function resolveEntity(view: Ready, key: string): string {
   return found;
 }
 
-/** An entity's name from the deployment (E6), through any merge, or its key. */
+/** An entity's name from `deployment` (E6), through any merge, or words for one it does not hold. */
+export function entityNamed(deployment: Deployment, key: string): string {
+  const resolved = resolveAlias(deployment, key);
+  return (deployment.entities ?? []).find((entity) => entity.key === resolved)?.name ?? ENTITY_GONE;
+}
+
+/** E6: the entity a key names now in the journey's deployment. */
+export function resolveEntity(view: Ready, key: string): string {
+  return resolveAlias(view.inputs.deployment, key);
+}
+
+/** An entity's name from the journey's deployment. */
 export function entityName(view: Ready, key: string): string {
-  const resolved = resolveEntity(view, key);
-  return (view.inputs.deployment.entities ?? []).find((entity) => entity.key === resolved)?.name ?? ENTITY_GONE;
+  return entityNamed(view.inputs.deployment, key);
+}
+
+/** E1, E2: whether one of the viewer's `entities`, through any merge, owns the node whose owners are `owners`. */
+export function ownedBy(view: Ready, owners: readonly string[] | undefined, entities: readonly string[]): boolean {
+  const mine = new Set(entities.map((key) => resolveEntity(view, key)));
+  return (owners ?? []).some((key) => mine.has(resolveEntity(view, key)));
+}
+
+/** E2: the keys of a node's effective owners. */
+export function ownersOf(view: Ready, key: string): string[] {
+  return view.derived.nodes[key]?.participations?.[OWNER_KIND]?.entities ?? [];
+}
+
+/** What a surface says for the viewer among a node's owners. */
+export const YOU = "You";
+/** What a surface says for a node nobody owns. */
+export const UNASSIGNED = "Unassigned";
+
+/**
+ * Who has a node, in words, on every surface: all its owners by name, the viewer (given as their
+ * `viewer` entities) as "You", and "Unassigned" for none.
+ */
+export function ownerWords(view: Ready, owners: readonly string[] | undefined, viewer: readonly string[] = []): string {
+  const keys = owners ?? [];
+  if (keys.length === 0) {
+    return UNASSIGNED;
+  }
+  const names = keys.filter((key) => !ownedBy(view, [key], viewer)).map((key) => entityName(view, key));
+  return namedList(keys.length > names.length ? [YOU, ...names] : names, Infinity);
 }
 
 /** An answer as people read it: choices by their labels, entities by name. */

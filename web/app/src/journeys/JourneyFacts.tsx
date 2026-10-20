@@ -34,7 +34,7 @@ export function Flags({ ready, model }: { ready: Ready; model: SummaryModel }) {
           {at === 0 ? "" : ", "}
           <Link
             to={listPath(journey, { flags: [each.flag] })}
-            className={`flag-${each.tone}`}
+            className={`ink-${each.tone}`}
             data-testid={`card-flag-${each.flag}`}
           >
             {each.words(each.count)}

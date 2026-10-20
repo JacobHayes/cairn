@@ -11,39 +11,22 @@ import { graphPath, type GraphView } from "../canvas/settings.ts";
 import type { Ready } from "../detail/model.ts";
 import { DeleteJourney } from "../journeys/DeleteJourney.tsx";
 import { statusActions } from "../journeys/lifecycle.ts";
-import { SCREENS, screenSwitched, type JourneyStatus, type Screen } from "../journeys/address.ts";
+import { SCREENS, screenSwitched, type Screen } from "../journeys/address.ts";
 import { useJourneyTarget } from "../journeys/useJourneyTarget.ts";
 import { useInsertEntry } from "../segments/entry.ts";
 import { useSuggested } from "../journeys/suggested.ts";
 import { OpenProposalsItem } from "../proposals/DestinationProposals.tsx";
 import { JourneyFlow, type JourneyFlowName } from "../proposals/Entries.tsx";
-import { Badge, Button } from "../ui/kit.tsx";
+import { Button } from "../ui/kit.tsx";
 import { Receipt } from "../ui/Receipt.tsx";
 import { Menu } from "./Menu.tsx";
 import { JOURNEY_VIEW_TITLE, ViewPicker } from "./ViewPicker.tsx";
 import { RejectionView } from "./RejectionView.tsx";
 import { WriteStatus } from "./WriteStatus.tsx";
 import { useScreenWrite, type ScreenWrite } from "./write.ts";
+import { JourneyStatusBadge, STATUS_WORDS } from "../journeys/StatusBadge.tsx";
 
 type Panel = JourneyFlowName | "delete";
-
-/** What a status other than active means, said on its chip. */
-const STATUS_MEANING: Record<Exclude<JourneyStatus, "active">, string> = {
-  completed: "Completed: it has left mine and the cross-journey lists. Reopen it under the menu, Status.",
-  archived: "Archived: it accepts only un-archiving or deletion. Both are under the menu, Status.",
-};
-
-/** The status as the Status row says it. */
-const STATUS_WORDS: Record<JourneyStatus, string> = { active: "Active", completed: "Completed", archived: "Archived" };
-
-/** B11: the journey's status beside its name, read-only, and only when it is not active. */
-function JourneyStatusChip({ status }: { status: JourneyStatus }) {
-  return status === "active" ? null : (
-    <Badge data-status={status} data-testid="journey-status" title={STATUS_MEANING[status]}>
-      {status}
-    </Badge>
-  );
-}
 
 /** B11, A19: the `⋯` menu's Status row, which opens in place to the moves the status allows, and deletion once archived. */
 function StatusItems({ ready, write, onDelete, close }: { ready: Ready; write: ScreenWrite; onDelete: () => void; close: () => void }) {
@@ -200,7 +183,7 @@ export function JourneyHeader({ ready, view, screen, selected }: { ready: Ready;
             </button>
             {clamped ? <span className="journey-name-cue" aria-hidden="true" data-testid="journey-name-cue">{nameOpen ? "\u25b4" : "\u25be"}</span> : null}
           </h1>
-          <JourneyStatusChip status={header.status} />
+          <JourneyStatusBadge status={header.status} />
         </div>
         <AssistantDock target={{ journey: header.id }} titleOf={journeyTitles(ready)} />
         <div className="journey-header-actions">

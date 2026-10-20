@@ -26,6 +26,7 @@ import { Badge, Button } from "../ui/kit.tsx";
 import { NoticeList } from "./RouteNotices.tsx";
 import type { Authored } from "./target.ts";
 import { usePublishPreviewRead } from "./write.ts";
+import { RetiredBadge } from "../routes/RetiredBadge.tsx";
 
 type Notice = Schema<"Notice">;
 
@@ -52,11 +53,6 @@ export interface RouteHeaderProps {
   imports: ImportFlow;
   /** The nodes' titles, for the assistant's view of the draft. */
   titleOf: (key: string) => string | undefined;
-}
-
-/** What the Retired chip says. */
-function retiredWords(route: Route): string {
-  return route.header.kind === "segment" ? "Retired: hidden from new insertions" : "Retired: hidden from new journeys";
 }
 
 /** The import control in the `⋯`: the menu closes once the file has landed. */
@@ -87,7 +83,7 @@ export function RouteHeader({ route, of, screen, node, write, blocked, onPublish
         {segment ? <span className="label" data-testid="route-kind">Segment</span> : null}
         <h1 data-testid="route-name" title={route.header.name}>{route.header.name}</h1>
         {of === undefined ? null : <VersionSelect route={route} of={of} />}
-        {route.header.retired === true ? <Badge data-testid="retired" title={retiredWords(route)}>Retired</Badge> : null}
+        {route.header.retired === true ? <RetiredBadge kind={route.header.kind} /> : null}
         <span className="spacer" />
         <AssistantDock target={{ route: id }} titleOf={titleOf} />
         {screen === undefined ? null : <ViewPicker screen={screen} screens={ROUTE_SCREENS} to={(to) => routeSwitched(id, search, to, node)} title={ROUTE_VIEW_TITLE} />}
@@ -209,5 +205,5 @@ export function DraftCard({ route, violations, notices, hrefOf, write, blocked, 
 
 /** The reason Publish is off while the draft breaks a rule, or nothing. */
 export function blockedWords(violations: readonly Violation[]): string | undefined {
-  return violations.length === 0 ? undefined : `${String(violations.length)} ${violations.length === 1 ? "thing blocks" : "things block"} publishing: see the draft card.`;
+  return violations.length === 0 ? undefined : `${violations.length === 1 ? "1 thing blocks" : `${String(violations.length)} things block`} publishing: see the draft card.`;
 }

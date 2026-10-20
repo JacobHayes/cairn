@@ -10,7 +10,7 @@ import { Link } from "react-router";
 
 import { useRetryJourney } from "../data/react.ts";
 import type { JourneySummary, RouteSummary } from "../data/reads.ts";
-import { Badge, Meter } from "../ui/kit.tsx";
+import { Meter } from "../ui/kit.tsx";
 import { routePath } from "../routes/address.ts";
 import { forYouOf, forYouWords, milestoneOf, progressOf, troubleOf, troubleWords, upgradeWords, type ForYou, type Trouble } from "./figures-model.ts";
 import { journeyPath } from "./address.ts";
@@ -18,6 +18,7 @@ import { useMineCounts, useReportMine } from "./mine.ts";
 import { useJourneyReading, type JourneyReading } from "./reading.ts";
 import { useSeen } from "./useSeen.ts";
 import { listPath } from "./view.ts";
+import { JourneyStatusBadge } from "./StatusBadge.tsx";
 
 /** A journey's lineage: its route, by name when the route index has it, and version, or that it started empty. */
 function Lineage({ summary, routes }: { summary: JourneySummary; routes: readonly RouteSummary[] }) {
@@ -42,7 +43,7 @@ export function JourneyCell({ summary, routes }: { summary: JourneySummary; rout
         <Link to={journeyPath({ journey: summary.id })}>
           {summary.name}
         </Link>
-        {summary.status === "active" ? null : <Badge>{summary.status}</Badge>}
+        <JourneyStatusBadge status={summary.status} />
       </span>
       <span className="cell-second">
         <span className="cell-lineage">
@@ -51,7 +52,7 @@ export function JourneyCell({ summary, routes }: { summary: JourneySummary; rout
         {upgrade === undefined ? null : (
           <>
             <span className="cell-sep">{" · "}</span>
-            <span className="flag-warn" data-testid="upgrade" data-status="available">
+            <span className="ink-warn" data-testid="upgrade" data-status="available">
               {upgrade}
             </span>
           </>
@@ -71,7 +72,7 @@ function TroubleCell({ journey, troubles }: { journey: string; troubles: Trouble
       </td>
     );
   }
-  const tone = first.tone === undefined ? undefined : `flag-${first.tone}`;
+  const tone = first.tone === undefined ? undefined : `ink-${first.tone}`;
   return (
     <td data-column="trouble" data-testid="row-trouble" data-kind={first.kind}>
       <Link to={first.kind === "stalled" ? journeyPath({ journey }) : listPath(journey, { flags: [first.kind] })} {...(tone === undefined ? {} : { className: tone })}>
@@ -123,7 +124,7 @@ function MilestoneCell({ reading }: { reading: Extract<JourneyReading, { status:
       ) : (
         <>
           <span className="cell-first">{next.title}</span>
-          <span className={next.tone === undefined ? "cell-second mono" : `cell-second mono flag-${next.tone}`}>{next.when}</span>
+          <span className={next.tone === undefined ? "cell-second mono" : `cell-second mono ink-${next.tone}`}>{next.when}</span>
         </>
       )}
     </td>

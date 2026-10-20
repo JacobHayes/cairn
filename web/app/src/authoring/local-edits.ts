@@ -10,13 +10,15 @@
 import type { Schema } from "@cairn/client";
 
 import { fieldWords } from "../status/words.ts";
-import { KIND_GONE } from "../ui/gone.ts";
+
 import { withoutDecisions, withoutPlaceholders } from "./cascade.ts";
 import { childrenOfClause, decisionOf, type Clause } from "./condition.ts";
 import { partsOf, ruleOf } from "./dates.ts";
 import type { DateRule } from "./fields.ts";
 import { childrenOf, descendantsOf, pathOf, titleIn, treeOf, type Graph, type GraphNode, type Mutation, type NodeField, type Tree } from "./graph.ts";
 import { mintKey, uniqueId } from "./keys.ts";
+import { OWNER_KIND } from "../detail/model.ts";
+import { kindNamed } from "../detail/sections.tsx";
 
 export type LocalEdit = Schema<"LocalEdit">;
 
@@ -32,7 +34,7 @@ export function editWords(edit: LocalEdit, tree: Tree): string {
     return `its requirement on "${titleIn(tree, edit.requires)}"`;
   }
   if ("participation" in edit) {
-    const kind = edit.participation === "k_owner" ? "owner" : ((tree.graph.participation_kinds ?? []).find((each) => each.key === edit.participation)?.title ?? KIND_GONE);
+    const kind = kindNamed(tree.graph.participation_kinds, edit.participation);
     return `its ${kind} participation`;
   }
   const title = [...tree.byKey.values()].flatMap((node) => node.resources ?? []).find((resource) => resource.key === edit.resource)?.title;
@@ -156,7 +158,7 @@ function mapRule(rule: DateRule | null | undefined, rename: (key: string) => str
 function restoredNode(node: GraphNode, keys: ReadonlyMap<string, string>, journey: Tree, parent: string | undefined, id: string): GraphNode {
   const rename = (key: string) => keys.get(key) ?? (journey.byKey.has(key) ? key : undefined);
   const roles = new Set((journey.graph.roles ?? []).map((role) => role.key));
-  const kinds = new Set(["k_owner", ...(journey.graph.participation_kinds ?? []).map((kind) => kind.key)]);
+  const kinds = new Set([OWNER_KIND, ...(journey.graph.participation_kinds ?? []).map((kind) => kind.key)]);
   const references: Record<string, unknown> = {
     parent,
     requires: (node.requires ?? []).flatMap((key) => rename(key) ?? []),

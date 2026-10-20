@@ -9,8 +9,8 @@ import { useMemo } from "react";
 import { useLocation, useNavigate } from "react-router";
 
 import { ruleFoot } from "../authoring/dates.ts";
-import { treeOf, type Tree } from "../authoring/graph.ts";
-import { depthFaded, journeyLayoutView, levelRequestOf, stepHides, badgesOf } from "../journeys/requests.ts";
+import { titleIn, type Tree, treeOf } from "../authoring/graph.ts";
+import { journeyLayoutView } from "../journeys/requests.ts";
 import { errorWords, valueOf } from "../data/keyed-read.ts";
 import { routePath } from "../routes/address.ts";
 import { useRouteLevel } from "../screens/route-views.ts";
@@ -20,14 +20,14 @@ import { useNodeAddresses } from "../journeys/address.ts";
 import { GraphCanvas } from "./GraphCanvas.tsx";
 import { useLaidOut } from "./hooks.ts";
 import { useRevealed } from "./JourneyCanvas.tsx";
-import { ancestorsOf, collapsedAt, drawnStep, stepOf, withExpanded } from "./ladder.ts";
+import { ancestorsOf, withExpanded } from "./ladder.ts";
 import { cardsOf, linesOf, type CanvasModel } from "./model.ts";
 import type { CardActions } from "./NodeCard.tsx";
 import { refitKey } from "./refit.ts";
 import { graphSearch, type GraphView } from "./settings.ts";
-import { NODE_GONE } from "../ui/gone.ts";
+import { Failed } from "../ui/Failed.tsx";
+import { useViewLevel } from "./viewLevel.ts";
 
-const NONE: ReadonlySet<string> = new Set();
 
 export interface RouteCanvasProps {
   shown: Shown;
@@ -46,13 +46,8 @@ function useGraph(shown: Shown, view: GraphView, selected: string | undefined, u
   const id = shown.route.header.id;
   const nodes = nodesOf(shown);
   const tree = useMemo(() => treeOf(shown.graph), [shown.graph]);
-  const depth = stepOf({ step: view.state.depth }, nodes);
-  const drawn = drawnStep(depth, view.state.fade);
-  const collapsed = useMemo(() => collapsedAt(drawn, nodes, NONE, view.open, view.shut), [drawn, nodes, view.open, view.shut]);
-  const hidden = useMemo(() => collapsedAt(depth, nodes, NONE, view.open, view.shut), [depth, nodes, view.open, view.shut]);
-  const request = useMemo(() => levelRequestOf(view.state, drawn, collapsed), [view.state, drawn, collapsed]);
   // The node the address names is always drawn (C7): the level reads it in when the view's own does not.
-  const { level, error } = useRouteLevel(shown, request, selected);
+  const { depth, level, error, faded, badges } = useViewLevel({ screen: "graph", state: view.state, nodes, selected, folds: view, read: (request, at) => useRouteLevel(shown, request, at) });
   const model = useMemo<CanvasModel | undefined>(() => {
     if (level === undefined) {
       return undefined;
@@ -64,8 +59,6 @@ function useGraph(shown: Shown, view: GraphView, selected: string | undefined, u
     return { cards, lines: linesOf(level, nodes) };
   }, [level, nodes, tree, unanchored]);
   const laid = useLaidOut(`route:${id}:${String(shown.of)}`, journeyLayoutView(view.state, depth), model);
-  const faded = useMemo(() => (level === undefined ? undefined : depthFaded(view.state, nodes, depth, hidden, new Set(level.nodes.map((node) => node.key)))), [view.state, level, nodes, depth, hidden]);
-  const badges = useMemo(() => badgesOf("graph", level?.hidden_by_class ?? {}, undefined, stepHides(nodes, depth, hidden), view.state.fade), [level, nodes, depth, hidden, view.state.fade]);
   return { laidOut: valueOf(laid), error: error ?? errorWords(laid), faded, badges, tree };
 }
 
@@ -93,7 +86,7 @@ function useActions(shown: Shown, view: GraphView, selected: string | undefined,
         void navigate(routePath(id, { version, node, screen: "graph" }, graphSearch(withExpanded(view, key, expanded), search)), { state: { reveal: { key, how: expanded ? "expanded" : "collapsed" } } });
       },
       trace: undefined,
-      title: (key) => tree.byKey.get(key)?.title ?? NODE_GONE,
+      title: (key) => titleIn(tree, key),
       menu: undefined,
     }),
     [navigate, addresses, id, version, view, search, selected, nodes, tree, editable, onPick],
@@ -110,7 +103,9 @@ export function RouteCanvas({ shown, view, selected, unanchored, editable, onPic
       <div className="stack">
         {controls}
         <p className="callout callout-bad row">
-          The canvas could not be drawn: {error} <ResetView />
+          <Failed what="The canvas" verb="drawn" error={error}>
+            <ResetView />
+          </Failed>
         </p>
       </div>
     );

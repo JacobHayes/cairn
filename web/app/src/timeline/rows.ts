@@ -19,7 +19,8 @@ import { isFinished } from "../status/state.ts";
 import { dateWords, daysWords, dueWords, originWord } from "../status/when.ts";
 import { upperFirst, type DisplayState } from "../status/words.ts";
 import { dayOf, dayWords, type DateOrigin, type Timeline, type TimelineEntry } from "./model.ts";
-import { NODE_GONE } from "../ui/gone.ts";
+
+import { nodeTitle } from "../ui/gone.ts";
 
 /** How a row is drawn. */
 export type Shape = "span" | "bar" | "tick" | "decision" | "milestone";
@@ -382,7 +383,7 @@ function routeRowOf(tree: Tree, schedule: RouteSchedule, options: ChartOptions, 
   const waiting = (entry?.waiting ?? []).map((decision) => titleIn(tree, decision));
   return {
     key,
-    title: node?.title ?? NODE_GONE,
+    title: nodeTitle(node?.title),
     kind: node?.kind ?? "action",
     depth,
     guides,

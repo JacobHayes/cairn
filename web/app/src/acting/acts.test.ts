@@ -129,6 +129,5 @@ it("an action is offered over a selection only when every member can take it, an
   expect(one).toContain("pick");
   expect(one).not.toContain("work");
   const two = reasonFor({ act: "done" }, [facts("n_pick"), facts("n_pick")], title) ?? "";
-  expect(two).toContain("pick");
-  expect(two).toContain("1 more");
+  expect(two).toContain("pick and pick");
 });

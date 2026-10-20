@@ -16,7 +16,7 @@
 .timeline-axis,
 .timeline-body {
   display: grid;
-  grid-template-columns: minmax(160px, 28%) minmax(0, 1fr);
+  grid-template-columns: minmax(240px, 36%) minmax(0, 1fr);
 }
 
 /* Sticks to the top of the workspace, under its padding, so rows never show above it. */
@@ -56,12 +56,6 @@
 .timeline-tracks {
   overflow: hidden;
   background: var(--ruling), var(--color-ground);
-}
-
-.timeline-labels {
-  list-style: none;
-  margin: 0;
-  padding: 0;
 }
 
 .timeline-label {

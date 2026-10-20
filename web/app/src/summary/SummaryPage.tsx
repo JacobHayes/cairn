@@ -34,7 +34,6 @@ import {
   isEmpty,
   lifecycleLine,
   milestoneLine,
-  ownersOf,
   recentlyFinished,
   shortfallWords,
   summaryModel,
@@ -45,6 +44,8 @@ import {
 import { EntriesPanel, type Entry } from "./Entries.tsx";
 import "./summary.css";
 import { Failed } from "../ui/Failed.tsx";
+import { ownersOf } from "../detail/sections.tsx";
+import { OWNER_KIND } from "../detail/model.ts";
 
 /** The date of a milestone line in words, where it comes from on hover, and its own shortfall as a sentence of its own. */
 function MilestoneWhen({ ready, line }: { ready: Ready; line: MilestoneLine }) {
@@ -73,7 +74,7 @@ function MilestoneWhen({ ready, line }: { ready: Ready; line: MilestoneLine }) {
         {whenWords(line.date, reached ? "actual" : line.origin, today)}
       </span>
       .
-      {line.shortfallDays === undefined ? null : <span className="flag-bad">{` ${shortfallWords(ready, line.key, line.shortfallDays)}.`}</span>}
+      {line.shortfallDays === undefined ? null : <span className="ink-bad">{` ${shortfallWords(ready, line.key, line.shortfallDays)}.`}</span>}
     </>
   );
 }
@@ -153,7 +154,7 @@ function Dates({ ready, model, skip }: { ready: Ready; model: SummaryModel; skip
             <span className={`summary-date-when ${inkClass(dateInk(each.date, today)) ?? "muted"}`} title={`This date is ${originWord(each.origin)}`}>
               {whenWords(each.date, each.origin, today)}
             </span>
-            {short === undefined ? null : <span className="flag-bad summary-date-short">{shortfallWords(ready, each.key, short)}</span>}
+            {short === undefined ? null : <span className="ink-bad summary-date-short">{shortfallWords(ready, each.key, short)}</span>}
           </li>
         );
       })}
@@ -313,7 +314,7 @@ export function SummaryPage({ ready, note }: { ready: Ready; note?: ReactNode })
     return <Waiting ready={ready} error={errorWords(read) ?? errorWords(next) ?? (mine.status === "failed" ? mine.message : undefined)} />;
   }
   // E4, C18: "yours" is the engine's "mine", the entries where the viewer's entities own it.
-  const owned = mine.entries.filter((entry) => entry.kinds.includes("k_owner"));
+  const owned = mine.entries.filter((entry) => entry.kinds.includes(OWNER_KIND));
   const model = summaryModel(ready, summary);
   const entries = entriesOf(ready, model, frontier, new Set(owned.map((entry) => entry.node)));
   return (

@@ -6,10 +6,10 @@
 import { Link, useLocation } from "react-router";
 
 import type { DecisionRow } from "../decisions/model.ts";
-import { nodeOf, type Ready } from "../detail/model.ts";
+import { nodeOf, type Ready, titleOf } from "../detail/model.ts";
 import { screenSwitched, useNodeAddresses } from "../journeys/address.ts";
 import { useJourneyTarget } from "../journeys/useJourneyTarget.ts";
-import { entityName } from "../detail/sections.tsx";
+import { ownerWords, UNASSIGNED } from "../detail/sections.tsx";
 import { snoozeWords } from "../status/snooze.ts";
 import { isOpen } from "../status/state.ts";
 import { statusTone, statusWord } from "../status/words.ts";
@@ -19,9 +19,11 @@ import { TreeFold, TreeGuides } from "../ui/Tree.tsx";
 import type { ListSettings } from "./address.ts";
 import type { Column, Line } from "./listModel.ts";
 import { firstParagraph } from "./listModel.ts";
-import { DetailLink } from "./Parts.tsx";
 import { factOf } from "./reasons.ts";
 import { RowActions } from "./RowActions.tsx";
+import { plural } from "../ui/words.ts";
+import { NodeLink } from "../detail/parts.tsx";
+import type { CSSProperties } from "react";
 
 export interface CellContext {
   view: Ready;
@@ -34,6 +36,8 @@ export interface CellContext {
   /** The acting frontier while Frontier is on: its rows say why they are there and carry their actions. */
   frontier: ReadonlySet<string> | undefined;
   sort: ListSettings["sort"];
+  /** The viewer's entities, so an owner column says "You". */
+  viewer: readonly string[];
   onFold: (container: string) => void;
 }
 
@@ -42,7 +46,7 @@ function Under({ view, line }: { view: Ready; line: Line }) {
   const ancestor = line.row?.ancestors?.at(-1);
   return ancestor === undefined ? null : (
     <span className="muted small" data-testid="breadcrumb">
-      in <DetailLink view={view} node={ancestor} />
+      in <NodeLink view={view} node={ancestor} />
     </span>
   );
 }
@@ -81,7 +85,7 @@ function Progress({ view, line }: { view: Ready; line: Line }) {
   return (
     <span className="muted small" data-testid="progress">
       {roll.done} of {roll.total} done
-      {attention === undefined ? null : <span className={roll.overdue > 0 ? "flag-bad" : ""}> · {attention}</span>}
+      {attention === undefined ? null : <span className={roll.overdue > 0 ? "ink-bad" : ""}> · {attention}</span>}
     </span>
   );
 }
@@ -90,7 +94,7 @@ function Progress({ view, line }: { view: Ready; line: Line }) {
 function Fact({ line, context }: { line: Line; context: CellContext }) {
   const fact = line.row === undefined ? undefined : factOf(context.view, line.row, context.sort ?? "rank");
   return fact === undefined ? null : (
-    <span className={fact.tone === undefined ? "muted small" : `small node-fact-${fact.tone}`} data-testid="fact">
+    <span className={fact.tone === undefined ? "muted small" : `small ink-${fact.tone}`} data-testid="fact">
       {fact.words}
     </span>
   );
@@ -111,15 +115,15 @@ function Title({ line, context }: { line: Line; context: CellContext }) {
   const { view, tree } = context;
   const acting = context.frontier?.has(line.key) === true;
   return (
-    <div className="list-title" style={{ paddingInlineStart: `calc(${String(line.depth)} * var(--space-5))` }}>
+    <div className="list-title" style={{ "--depth": line.depth } as CSSProperties}>
       {tree ? (
         <>
           <TreeGuides depth={line.depth} guides={line.guides} open={line.open} />
-          <TreeFold container={line.foldable} open={line.open} label={nodeOf(view, line.key)?.title ?? line.key} testId="list-fold" onFold={() => { context.onFold(line.key); }} />
+          <TreeFold container={line.foldable} open={line.open} label={titleOf(view, line.key)} testId="list-fold" onFold={() => { context.onFold(line.key); }} />
         </>
       ) : null}
       <div className="list-node">
-        <DetailLink view={view} node={line.key} />
+        <NodeLink view={view} node={line.key} />
         {acting ? <Acting line={line} context={context} /> : tree ? (line.container ? <Progress view={view} line={line} /> : null) : <Under view={view} line={line} />}
         <Return view={view} line={line} />
         <PhoneDue view={view} line={line} />
@@ -140,7 +144,7 @@ function Affects({ context, node }: { context: CellContext; node: string }) {
   const brought = decision.affects.length - out;
   const words =
     decision.answer === undefined
-      ? `Decides ${String(decision.affects.length)} ${decision.affects.length === 1 ? "item" : "items"}`
+      ? `Decides ${plural(decision.affects.length, "item")}`
       : [brought > 0 ? `brings in ${String(brought)}` : "", out > 0 ? `drops ${String(out)}` : ""].filter(Boolean).join(", ");
   const kind = nodeOf(context.view, node);
   // The graph draws the node whatever the view hides (C7), so the link only has to name it.
@@ -176,7 +180,7 @@ export function Cell({ column, line, context }: { column: Column; line: Line; co
   }
   switch (column) {
     case "owner":
-      return (row.owners ?? []).length > 0 ? (row.owners ?? []).map((key) => entityName(view, key)).join(", ") : row.unassigned === true ? <span className="list-unassigned">Unassigned</span> : null;
+      return (row.owners ?? []).length > 0 ? ownerWords(view, row.owners, context.viewer) : row.unassigned === true ? <span className="list-unassigned">{UNASSIGNED}</span> : null;
     case "due":
       return row.due == null || !open ? null : <span className={inkClass(dateInk(row.due, today))} data-testid="list-due">{dueWords(row.due, today, node.kind === "decision")}</span>;
     case "rank": {

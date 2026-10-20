@@ -172,7 +172,7 @@ export function AnnotationList({
   const body = (
     <>
       {annotations.length === 0 && showNone ? <span className="muted small">None yet.</span> : null}
-      <ul className="checklist stack">
+      <ul className="plain-list stack">
         {annotations.map((annotation) => (
           <Item key={annotation.body.key} annotation={annotation} today={view.derived.today} write={write} onEdit={() => { edit(annotation); }} readOnly={readOnly} />
         ))}

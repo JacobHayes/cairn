@@ -7,11 +7,33 @@ import { INITIAL_STATE, MOVES_FROM, TERMINAL_STATES, type Move as EngineMove, ty
 
 import type { JourneyView } from "../data/journeys.ts";
 import type { DisplayState } from "../status/words.ts";
-import { NODE_GONE } from "../ui/gone.ts";
+
+import { nodeTitle } from "../ui/gone.ts";
 
 export type Ready = Extract<JourneyView, { status: "ready" }>;
 export type GraphNode = Schema<"Node">;
 export type NodeKind = Schema<"NodeKind">;
+
+/** C2: every kind, in the order the toggles and pickers list them. */
+export const KINDS: NodeKind[] = ["group", "decision", "deliverable", "action", "milestone"];
+
+/** The kinds of work, the pieces a node is broken down into: actions and deliverables (B10). */
+export const PIECE_KINDS = ["action", "deliverable"] as const;
+
+/** Whether a node is work (an action or a deliverable): what a person does, where a decision or a milestone is not. */
+export function isWork(node: { kind: NodeKind }): boolean {
+  return node.kind === "action" || node.kind === "deliverable";
+}
+
+/** Whether `node` is a stage: a top-level group. */
+export function isStage(node: { kind: NodeKind; parent?: string | null | undefined }): boolean {
+  return node.kind === "group" && node.parent == null;
+}
+
+/** The kind as people say it: a stage is a stage, not a group. */
+export function kindWord(kind: NodeKind, stage: boolean): string {
+  return stage ? "stage" : kind;
+}
 export type State = Schema<"State">;
 export type NodeState = Schema<"NodeState">;
 export type NodeDerived = Schema<"NodeDerived">;
@@ -75,9 +97,12 @@ export function nodeOf(view: Ready, key: string): GraphNode | undefined {
   return index.get(key);
 }
 
+/** The participation kind every journey has: who owns a node (E2). */
+export const OWNER_KIND = "k_owner";
+
 /** A node's title, or words for a node the journey does not hold. */
 export function titleOf(view: Ready, key: string): string {
-  return nodeOf(view, key)?.title ?? NODE_GONE;
+  return nodeTitle(nodeOf(view, key)?.title);
 }
 
 /** A node's stored state, or its kind's initial state. */

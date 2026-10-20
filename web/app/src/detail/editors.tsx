@@ -9,7 +9,7 @@ import { snoozeEndWords } from "../status/snooze.ts";
 import { dateWords } from "../status/when.ts";
 import { Button, Field } from "../ui/kit.tsx";
 import { Saving, type Sending } from "../ui/Receipt.tsx";
-import { nodeOf, titleOf, transition, type Mutation, type NodeDetail, type Ready } from "./model.ts";
+import { type Mutation, type NodeDetail, nodeOf, OWNER_KIND, type Ready, titleOf, transition } from "./model.ts";
 import { NodeLink } from "./parts.tsx";
 import { Rejected } from "./Rejected.tsx";
 import { entityName } from "./sections.tsx";
@@ -304,7 +304,7 @@ export function ParticipationEditor({ view, detail }: { view: Ready; detail: Nod
   const write = useNodeWrite(view, `participation:${detail.node.key}`, detail.node.key);
   const key = detail.node.key;
   const form = useFormDraft<{ kind: string; chosen: string[] }>(write.journey, key, "participation");
-  const kinds = ["k_owner", ...(view.journey.graph.participation_kinds ?? []).map((each) => each.key)];
+  const kinds = [OWNER_KIND, ...(view.journey.graph.participation_kinds ?? []).map((each) => each.key)];
   const own = Object.keys(nodeOf(view, key)?.participations ?? {});
   const entities = view.inputs.deployment.entities ?? [];
   const draft = form.draft;

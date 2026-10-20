@@ -21,7 +21,7 @@ export function ShortfallView({
   onMove?: ((move: Mutation) => void) | undefined;
   disabled?: boolean;
 }) {
-  const names = namesOf([view.journey.graph], view.inputs.deployment.entities ?? [], view.derived.today);
+  const names = namesOf([view.journey.graph], view.inputs.deployment, view.derived.today);
   const moves = short.resolutions ?? [];
   return (
     <div className="callout callout-bad callout-short stack" data-testid="shortfall" data-days={short.shortfall_days}>

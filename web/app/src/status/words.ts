@@ -8,6 +8,7 @@ import type { Schema } from "@cairn/client";
 import type { NodeKind } from "../detail/model.ts";
 import type { SummaryModel } from "../summary/model.ts";
 import type { Tone } from "../ui/kit.tsx";
+import { plural } from "../ui/words.ts";
 
 export type DisplayState = Schema<"DisplayState">;
 
@@ -89,7 +90,7 @@ export const TROUBLES: readonly { flag: "overdue" | "shortfall" | "stale"; words
 ];
 
 function nodesWords(count: number): string {
-  return `${String(count)} ${count === 1 ? "node" : "nodes"}`;
+  return plural(count, "node");
 }
 
 /** A word or phrase as a sentence's first words: `the finish of X` becomes `The finish of X`. */

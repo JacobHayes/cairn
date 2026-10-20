@@ -5,8 +5,9 @@
 //
 // Cost: an index is one pass over the nodes; every walk is bounded by the graph's size.
 import type { Schema } from "@cairn/client";
-import { NODE_GONE } from "../ui/gone.ts";
+
 import { mintKey, slugOf, uniqueId } from "./keys.ts";
+import { nodeTitle } from "../ui/gone.ts";
 
 export type Graph = Schema<"Graph">;
 export type GraphNode = Schema<"Node">;
@@ -18,9 +19,6 @@ export type Role = Schema<"RoleResolved">;
 export type Kind = Schema<"ParticipationKindResolved">;
 export type Resource = Schema<"Resource">;
 export type Edge = Schema<"Edge">;
-
-/** The fixed set of kinds (PRD glossary), in the order a palette offers them. */
-export const KINDS: readonly NodeKind[] = ["group", "deliverable", "action", "decision", "milestone"];
 
 /** A kind as a picker offers it: its name in sentence case (DESIGN, Type), the kind as its value. */
 export function kindOption(kind: NodeKind): { value: NodeKind; label: string } {
@@ -101,9 +99,9 @@ export function pathOf(tree: Tree, key: string): string {
   return [...ancestorsOf(tree, key), node].map((each) => each.id).join("/");
 }
 
-/** A node's title, or its key when the graph does not hold it. */
+/** A node's title, or words for a node the graph does not hold. */
 export function titleIn(tree: Tree, key: string): string {
-  return tree.byKey.get(key)?.title ?? NODE_GONE;
+  return nodeTitle(tree.byKey.get(key)?.title);
 }
 
 /** Nodes of `kind` (every kind when none), in path order, for a picker. */

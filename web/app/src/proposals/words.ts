@@ -7,10 +7,13 @@ import { answerWords, choiceNamed, choiceLabel } from "../status/answer.ts";
 import { SNOOZE_NODE_TAIL } from "../status/snooze.ts";
 import { dateWords } from "../status/when.ts";
 import { fieldWords, upperFirst } from "../status/words.ts";
-import { ENTITY_GONE, KIND_GONE, NODE_GONE, ROLE_GONE } from "../ui/gone.ts";
+import { nodeTitle } from "../ui/gone.ts";
 import { removedChoices, type Conflict, type ResolutionKind, type ReviewItem } from "./model.ts";
+import { plural } from "../ui/words.ts";
+import { entityNamed, kindNamed, roleNamed, type Slot } from "../detail/sections.tsx";
+import type { Deployment } from "../data/host.ts";
 
-/** Names by key over the graphs a review shows (before and after), falling back to the key. */
+/** Names by key over the graphs a review shows (before and after), falling back to words for what is gone. */
 export interface Names {
   node: (key: string) => string;
   role: (key: string) => string;
@@ -24,33 +27,30 @@ export interface Names {
   date: (date: string) => string;
 }
 
-/** Names from `graphs` (the later one wins) and the deployment's entities. */
-export function namesOf(graphs: (Graph | null | undefined)[], entities: readonly { key: string; name: string }[], today?: string): Names {
-  const nodes = new Map<string, string>();
-  const decisions = new Map<string, GraphNode>();
-  const roles = new Map<string, string>();
-  const kinds = new Map<string, string>([["k_owner", "owner"]]);
+/** Names from `graphs` (the later one wins) and the deployment's entities, through its merges. */
+export function namesOf(graphs: (Graph | null | undefined)[], deployment: Deployment, today?: string): Names {
+  const nodes = new Map<string, GraphNode>();
+  const roles = new Map<string, Slot>();
+  const kinds = new Map<string, Slot>();
   for (const graph of graphs) {
     for (const node of graph?.nodes ?? []) {
-      nodes.set(node.key, node.title);
-      decisions.set(node.key, node);
+      nodes.set(node.key, node);
     }
     for (const role of graph?.roles ?? []) {
-      roles.set(role.key, role.title ?? role.id);
+      roles.set(role.key, role);
     }
     for (const kind of graph?.participation_kinds ?? []) {
-      kinds.set(kind.key, kind.title ?? kind.id);
+      kinds.set(kind.key, kind);
     }
   }
-  const people = new Map(entities.map((entity) => [entity.key, entity.name]));
-  const entity = (key: string) => people.get(key) ?? ENTITY_GONE;
+  const entity = (key: string) => entityNamed(deployment, key);
   return {
-    node: (key) => nodes.get(key) ?? NODE_GONE,
-    role: (key) => roles.get(key) ?? ROLE_GONE,
-    kind: (key) => kinds.get(key) ?? KIND_GONE,
+    node: (key) => nodeTitle(nodes.get(key)?.title),
+    role: (key) => roleNamed([...roles.values()], key),
+    kind: (key) => kindNamed([...kinds.values()], key),
     entity,
-    choice: (decision, id) => choiceNamed(decisions.get(decision)?.choices, id),
-    condition: conditionNames((decision) => decisions.get(decision), entity),
+    choice: (decision, id) => choiceNamed(nodes.get(decision)?.choices, id),
+    condition: conditionNames((decision) => nodes.get(decision), entity),
     date: (date) => dateWords(date, today),
   };
 }
@@ -164,7 +164,7 @@ export function mutationWords(mutation: Mutation, names: Names): string {
     case "insert_segment": {
       const parent = mutation.parent;
       const left = (mutation.omit ?? []).length;
-      return `Insert the segment ${mutation.segment.route} version ${String(mutation.segment.version)}${parent == null ? " at the top level" : ` under ${node(parent)}`}${left === 0 ? "" : `, leaving ${String(left)} ${left === 1 ? "step" : "steps"} out`}`;
+      return `Insert the segment ${mutation.segment.route} version ${String(mutation.segment.version)}${parent == null ? " at the top level" : ` under ${node(parent)}`}${left === 0 ? "" : `, leaving ${plural(left, "step")} out`}`;
     }
     default:
       return `${mutation.op.replaceAll("_", " ")}${"node" in mutation && typeof mutation.node === "string" ? ` on ${node(mutation.node)}` : ""}`;

@@ -10,7 +10,7 @@ import "./segments.css";
 import { useActorRef, useSelector } from "@xstate/react";
 import { useEffect, useMemo, useState } from "react";
 
-import { canHoldChildren, nodesByPath, pathOf, type Graph } from "../authoring/graph.ts";
+import { canHoldChildren, type Graph, nodesByPath, pathOf, titleIn } from "../authoring/graph.ts";
 import { Picker } from "../authoring/parts.tsx";
 import { domainOf, type Authored } from "../authoring/target.ts";
 import { readDraft, writeDraft } from "../data/drafts.ts";
@@ -21,7 +21,6 @@ import { heldOf, insertion, stepOf } from "./insertion.ts";
 import { insertionMembers, planInsertion, sizeWords, type Choices, type Mapping, type PeopleRow, type Plan } from "./model.ts";
 import { useCandidate, type Candidate } from "./preview.ts";
 import { useSegmentNames, useSegmentOffers, useSegmentVersion, type SegmentOffer, type SegmentVersion } from "./read.ts";
-import { NODE_GONE } from "../ui/gone.ts";
 
 /** What the canvas draws while a segment is being placed: the graph before and after, and how its new insertion is named. */
 export interface InsertPreview {
@@ -66,7 +65,7 @@ function ChooseStep({ authored, onChoose }: { authored: Authored; onChoose: (seg
       {loading ? <p className="muted small">Reading the segments...</p> : null}
       {!loading && offers.length === 0 ? <p className="muted small">{leftOut ? "No other segments are published yet." : "There are no published segments yet. Publish one from Routes first."}</p> : null}
       {!loading && offers.length > 0 && shown.length === 0 ? <p className="muted small">No segment is named like that.</p> : null}
-      <ul className="stack segment-offers">
+      <ul className="plain-list stack segment-offers">
         {shown.map((offer) => (
           <Offer key={offer.id} offer={offer} onChoose={(version) => { onChoose(offer.id, version); }} />
         ))}
@@ -85,8 +84,8 @@ function NodePicks({ label, authored, chosen, onChange }: { label: string; autho
       <span className="author-label">{label}</span>
       {chosen.map((key) => (
         <span key={key} className="row" data-testid="pick" data-node={key}>
-          <span>{authored.tree.byKey.get(key)?.title ?? NODE_GONE}</span>
-          <Button ghost aria-label={`Remove ${authored.tree.byKey.get(key)?.title ?? NODE_GONE} from ${label}`} title="Remove" onClick={() => { onChange(chosen.filter((each) => each !== key)); }}>
+          <span>{titleIn(authored.tree, key)}</span>
+          <Button ghost aria-label={`Remove ${titleIn(authored.tree, key)} from ${label}`} title="Remove" onClick={() => { onChange(chosen.filter((each) => each !== key)); }}>
             Remove
           </Button>
         </span>

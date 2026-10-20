@@ -5,7 +5,8 @@
 // the containers collapsed), so the engine does the roll-up (5.3). Pure, so a unit test reads
 // the rules without a canvas.
 import type { GraphNode, NodeKind } from "../detail/model.ts";
-import { KINDS, STEPS, type CanvasSettings, type Step } from "./model.ts";
+import { STEPS, type CanvasSettings, type Step } from "./model.ts";
+import { isStage, KINDS } from "../detail/model.ts";
 
 /** The kinds each step draws; Stages draws the Deliverables set inside the open stages, with its other stages collapsed. */
 const KINDS_AT: Record<Step, NodeKind[]> = {
@@ -75,11 +76,6 @@ export function stepOf(view: Pick<CanvasSettings, "step">, nodes: readonly Graph
     return picked;
   }
   return "actions";
-}
-
-/** Whether `node` is a stage: a top-level group. */
-export function isStage(node: GraphNode): boolean {
-  return node.kind === "group" && node.parent == null;
 }
 
 /**

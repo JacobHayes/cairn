@@ -44,7 +44,7 @@ describe("warningOf (D7)", () => {
   it("says one sentence per warning, nothing when there is none, and counts the rest", () => {
     expect(warningOf([], titleOf)).toBeUndefined();
     expect(warningOf([{ kind: "overdue", journey: "j_one", nodes: ["n_b"] }], titleOf)).toBe("Kickoff is now overdue.");
-    expect(warningOf([{ kind: "stale", journey: "j_one", nodes: ["n_a", "n_b", "n_c"] }], titleOf)).toBe("Draft the plan and 2 more are now stale.");
+    expect(warningOf([{ kind: "stale", journey: "j_one", nodes: ["n_a", "n_b", "n_c"] }], titleOf)).toBe("Draft the plan, Kickoff and n_c are now stale.");
   });
 });
 

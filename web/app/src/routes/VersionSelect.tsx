@@ -13,6 +13,7 @@ import { dateWords } from "../status/when.ts";
 import { routePath, spotOf } from "./address.ts";
 import { useRouteRead } from "./RouteCard.tsx";
 import { versionRows } from "./model.ts";
+import { plural } from "../ui/words.ts";
 
 /** "Draft (from version 3)", or "Draft (first version)" for a route with nothing published. */
 export function draftWords(route: Route): string {
@@ -22,7 +23,7 @@ export function draftWords(route: Route): string {
 
 /** `4 journeys`, `1 journey`, `no journeys`. */
 function journeyWords(count: number): string {
-  return count === 0 ? "no journeys" : `${String(count)} ${count === 1 ? "journey" : "journeys"}`;
+  return count === 0 ? "no journeys" : plural(count, "journey");
 }
 
 export function VersionSelect({ route, of }: { route: Route; of: "draft" | number }) {

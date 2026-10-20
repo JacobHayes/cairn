@@ -4,16 +4,14 @@
 // marks, the rank order, and the numbers the Signals lens shows. All read from the document and
 // its local derive; the words are words.ts's.
 import { conditionNames } from "../authoring/condition.ts";
-import { nodeOf, rankPlaces, type GraphNode, type NodeDerived, type Ready } from "../detail/model.ts";
-import { answerText, entityName } from "../detail/sections.tsx";
+import { type GraphNode, isStage, type NodeDerived, nodeOf, rankPlaces, type Ready, titleOf } from "../detail/model.ts";
+import { answerText, entityName, ownersOf, ownerWords, UNASSIGNED, YOU } from "../detail/sections.tsx";
 import { currentStagesOf } from "../journeys/requests.ts";
 import { isFinished, isOpen } from "../status/state.ts";
 import type { DisplayState } from "../status/words.ts";
-import { isStage } from "./ladder.ts";
 import type { CardBadge, CardBody, CardState, JourneyExtras, LevelNode, Looks, Signals } from "./model.ts";
 import { dependsWords, firstParagraph, footWords } from "./words.ts";
 import { snoozeWords } from "../status/snooze.ts";
-import { NODE_GONE } from "../ui/gone.ts";
 
 /** A node's display state (D8): the engine's one state, which the canvas shows as it is. */
 export function stateOf(view: Ready, node: GraphNode): DisplayState {
@@ -22,12 +20,6 @@ export function stateOf(view: Ready, node: GraphNode): DisplayState {
     throw new Error(`the derive has no node ${node.key}`);
   }
   return derived.display_state;
-}
-
-/** C1: a node's owners by name, or none. */
-function ownersOf(view: Ready, key: string): string[] {
-  const owners = view.derived.nodes[key]?.participations?.["k_owner"]?.entities ?? [];
-  return owners.map((entity) => entityName(view, entity));
 }
 
 /** C2: the one roll-up badge a container carries, in the fixed order: a decision to make, overdue, all blocked, ready to finish, needs breakdown. */
@@ -65,8 +57,8 @@ interface Context {
 function dependsBody(context: Context, node: GraphNode, derived: NodeDerived): CardBody | undefined {
   const { view } = context;
   const source = derived.relevance.condition_on == null ? node : (nodeOf(view, derived.relevance.condition_on) ?? node);
-  const pending = (derived.relevance.pending_on ?? []).map((key) => nodeOf(view, key)?.title ?? NODE_GONE);
-  const reads = (derived.relevance.decisions ?? []).map((key) => nodeOf(view, key)?.title ?? NODE_GONE);
+  const pending = (derived.relevance.pending_on ?? []).map((key) => titleOf(view, key));
+  const reads = (derived.relevance.decisions ?? []).map((key) => titleOf(view, key));
   const words = dependsWords(source, conditionNames((key) => nodeOf(view, key), (key) => entityName(view, key))) ?? (reads.length === 0 ? undefined : reads.join(" and "));
   if (words === undefined) {
     return undefined;
@@ -137,7 +129,7 @@ function cardState(context: Context, node: GraphNode, at: LevelNode): CardState 
   const state = stateOf(view, node);
   const finished = isFinished(state);
   const rank = context.places.get(node.key);
-  const names = ownersOf(view, node.key);
+  const owners = ownersOf(view, node.key);
   const mine = context.mine.has(node.key);
   const missing = derived.unassigned === true && !finished && state !== "not_relevant";
   return {
@@ -145,8 +137,8 @@ function cardState(context: Context, node: GraphNode, at: LevelNode): CardState 
     finished,
     relevance: derived.relevance.value,
     foot: state === "not_relevant" ? undefined : footOf(context, node, derived, state),
-    owner: context.owned.has(node.key) ? { words: "You", missing: false } : missing ? { words: "Unassigned", missing: true } : undefined,
-    owners: names.length === 0 ? "unassigned" : names.join(", "),
+    owner: context.owned.has(node.key) ? { words: YOU, missing: false } : missing ? { words: UNASSIGNED, missing: true } : undefined,
+    owners: ownerWords(view, owners),
     body: bodyOf(context, node, derived, at, state),
     here: {
       frontier: context.frontier.has(node.key),

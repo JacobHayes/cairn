@@ -5,13 +5,11 @@ import { dueWords } from "../status/when.ts";
 import { statusTone, statusWord } from "../status/words.ts";
 import { Badge } from "../ui/kit.tsx";
 import { foldKey } from "./folds.ts";
-import { isTerminal, transition, type Child, type NodeDetail, type Ready } from "./model.ts";
+import { type Child, isTerminal, isWork, type NodeDetail, type Ready, transition } from "./model.ts";
 import { NodeLink, Section } from "./parts.tsx";
 import { Rejected } from "./Rejected.tsx";
 import { ownerName } from "./sentence.ts";
 import { useNodeWrite, type NodeWrite } from "./write.ts";
-
-const work = (child: Child) => child.kind === "action" || child.kind === "deliverable";
 
 function Item({ view, child, write }: { view: Ready; child: Child; write: NodeWrite }) {
   const done = child.state === "done";
@@ -20,9 +18,9 @@ function Item({ view, child, write }: { view: Ready; child: Child; write: NodeWr
   const due = dueDate === undefined ? undefined : dueWords(dueDate, view.derived.today, child.kind === "decision");
   const fact = due ?? ownerName(view, child.key);
   return (
-    <li data-testid="child" data-node={child.key} data-status={child.state}>
+    <li data-testid="child" data-node={child.key} data-state={child.displayState}>
       <span className="checklist-mark">
-        {work(child) && child.state !== "skipped" ? (
+        {isWork(child) && child.state !== "skipped" ? (
           <input
             type="checkbox"
             aria-label={`${done ? "Reopen" : "Complete"} ${child.title}`}
@@ -46,7 +44,7 @@ export function Checklist({ view, detail }: { view: Ready; detail: NodeDetail })
   }
   return (
     <Section title="Contents" summary={String(children.length)} open fold={foldKey(detail.node.kind, "contents")} testId="checklist">
-      <ul className="checklist contents">
+      <ul className="plain-list contents">
         {children.map((child) => (
           <Item key={child.key} view={view} child={child} write={write} />
         ))}

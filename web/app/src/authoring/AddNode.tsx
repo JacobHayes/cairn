@@ -7,12 +7,13 @@ import { NODE_COUNT_MAX, TITLE_BYTES_MAX } from "@cairn/client";
 import { useDraft } from "../data/drafts.ts";
 import { wrapRoots } from "../segments/model.ts";
 import { Button, Field } from "../ui/kit.tsx";
-import { KINDS, canHoldChildren, childrenOf, kindOption, newNode, nodesByPath, pathOf, type GraphNode, type NodeKind } from "./graph.ts";
+import { canHoldChildren, childrenOf, kindOption, newNode, nodesByPath, pathOf, type GraphNode, type NodeKind } from "./graph.ts";
 import { overBytes } from "./limits.ts";
 import { Picker } from "./parts.tsx";
 import { Refusal } from "./StructureEditors.tsx";
 import { domainOf, type Authored } from "./target.ts";
 import { useAuthorWrite } from "./write.ts";
+import { KINDS } from "../detail/model.ts";
 
 export interface AddNodeProps {
   authored: Authored;

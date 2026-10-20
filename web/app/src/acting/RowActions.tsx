@@ -7,13 +7,14 @@
 import type { ReactNode } from "react";
 import { useNavigate } from "react-router";
 
+import { useViewer } from "../data/react.ts";
 import { ActButton, type Opens } from "../detail/ActButton.tsx";
 import { EvidenceForm, type Needs } from "../detail/DoneEvidence.tsx";
 import type { Ready } from "../detail/model.ts";
 import { offered } from "../detail/offers.ts";
 import { OwnerSelect } from "../detail/parts.tsx";
 import { Rejected } from "../detail/Rejected.tsx";
-import { entityName } from "../detail/sections.tsx";
+import { ownerWords, UNASSIGNED } from "../detail/sections.tsx";
 import { useFormDraft, useNodeWrite, type NodeWrite } from "../detail/write.ts";
 import { doneMutations, evidenceDraft, factsOf, missingEvidence, type EvidenceDraft } from "./acts.ts";
 import type { NodeRow } from "./why.ts";
@@ -25,7 +26,7 @@ import type { NodeRow } from "./why.ts";
 function AssignInline({ view, write, node }: { view: Ready; write: NodeWrite; node: string }) {
   return (
     <span className="row-assign-slot">
-      <span className="row-owner row-unassigned">Unassigned</span>
+      <span className="row-owner row-unassigned">{UNASSIGNED}</span>
       <OwnerSelect view={view} write={write} node={node} placeholder="Assign" className="row-assign" testId="assign" />
     </span>
   );
@@ -67,6 +68,7 @@ function RowEvidence({ write, node, needs, form }: { write: NodeWrite; node: str
  */
 export function RowActions({ view, row, to, owner = true, column = false, yours = false }: { view: Ready; row: NodeRow; to: string; owner?: boolean; column?: boolean; yours?: boolean }): ReactNode {
   const navigate = useNavigate();
+  const { viewer } = useViewer();
   const write = useNodeWrite(view, `acts:${row.key}`, row.key);
   const evidence = useFormDraft<EvidenceDraft | string>(write.journey, row.key, "done-artifact");
   const facts = factsOf(view, row.key);
@@ -86,16 +88,14 @@ export function RowActions({ view, row, to, owner = true, column = false, yours 
       void navigate(to, { state: { choice: { node: row.key, id: what } } });
     }
   };
-  const owners = (row.owners ?? []).map((key) => entityName(view, key)).join(", ");
+  const owners = ownerWords(view, row.owners, viewer?.entities);
   return (
     <>
       <div className="row-side">
         {column ? null : row.unassigned === true ? (
           <AssignInline view={view} write={write} node={row.key} />
-        ) : !owner ? null : yours ? (
-          <span className="row-owner">You</span>
-        ) : (
-          <span className="row-owner row-owner-other" title={owners === "" ? undefined : `Owned by ${owners}`}>
+        ) : !owner ? null : (
+          <span className={yours ? "row-owner" : "row-owner row-owner-other"} title={`Owned by ${owners}`}>
             {owners}
           </span>
         )}

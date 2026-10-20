@@ -16,6 +16,7 @@ import { reasonOf } from "../data/writes.ts";
 import { RejectionView, ViolationLines } from "../screens/RejectionView.tsx";
 import { WriteStatus } from "../screens/WriteStatus.tsx";
 import { useAuthorWrite, useDialogPreview, type Preview } from "./write.ts";
+import { plural } from "../ui/words.ts";
 
 export interface CascadeDialogProps {
   authored: Authored;
@@ -34,7 +35,7 @@ export interface CascadeDialogProps {
 
 function count(items: readonly unknown[] | undefined, one: string, many: string): string | undefined {
   const length = items?.length ?? 0;
-  return length === 0 ? undefined : `${String(length)} ${length === 1 ? one : many}`;
+  return length === 0 ? undefined : plural(length, one, many);
 }
 
 /** The subtree, its edges, and what hangs on it. */

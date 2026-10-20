@@ -1,16 +1,15 @@
 // C10, D5: when the acting frontier is empty, what the journey waits on, with the actions the
 // diagnostic offers where they are allowed: unsnooze a snoozed node (B6), or confirm an
 // `auto_reach` milestone reached before its date. Each is one patch.
-import { Link } from "react-router";
 
-import { titleOf, transition, type Ready } from "../detail/model.ts";
+import { transition, type Ready } from "../detail/model.ts";
 import { ACT_LABELS } from "../detail/offers.ts";
 import { Rejected } from "../detail/Rejected.tsx";
 import { useNodeWrite, type NodeWrite } from "../detail/write.ts";
 import { SNOOZE_NODE_TAIL, snoozeEndWords } from "../status/snooze.ts";
 import { dateInk, dateWords, inkClass, whenWords } from "../status/when.ts";
 import { Button } from "../ui/kit.tsx";
-import { DetailLink } from "./Parts.tsx";
+import { NodeLink } from "../detail/parts.tsx";
 
 /** Where a node's title leads when it is not the screen's own detail link, and whether the causes' actions are offered. */
 interface Reach {
@@ -18,16 +17,12 @@ interface Reach {
   readOnly: boolean;
 }
 
-function NodeTitle({ view, node, reach }: { view: Ready; node: string; reach: Reach }) {
-  return reach.nodeTo === undefined ? <DetailLink view={view} node={node} /> : <Link to={reach.nodeTo(node)} data-node={node}>{titleOf(view, node)}</Link>;
-}
-
 type Cause = NonNullable<Ready["derived"]["stalled"]>["waiting_on"][number];
 
 /** One cause as a row: the node's title, then what it waits on in plain words (a date the way the app says dates, not a verb that suits only some titles), then its action at the row's end. */
 function CauseLine({ view, write, cause, reach }: { view: Ready; write: NodeWrite; cause: Cause; reach: Reach }) {
   const { today } = view.derived;
-  const title = (node: string) => <NodeTitle view={view} node={node} reach={reach} />;
+  const title = (node: string) => <NodeLink view={view} node={node} {...(reach.nodeTo === undefined ? {} : { to: reach.nodeTo(node) })} />;
   const inkOf = (date: string) => inkClass(dateInk(date, today));
   if ("gate" in cause) {
     return (

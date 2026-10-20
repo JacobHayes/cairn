@@ -16,17 +16,17 @@ describe("waitingDecisions", () => {
   });
 
   it("names a decision's own requirement", () => {
-    expect(waiting.find((each) => each.decision === "n_later")?.unblockers).toEqual([{ node: "n_meet", kind: "milestone", via: "explicit" }]);
+    expect(waiting.find((each) => each.decision === "n_later")?.unblockers).toEqual([{ node: "n_meet", kind: "milestone", stage: false, via: "explicit" }]);
   });
 
   it("names the stage opening a decision waits on through its stage, not the stage's own children", () => {
     expect(waiting.find((each) => each.decision === "n_inner")?.unblockers).toEqual([
-      { node: "n_meet", kind: "milestone", via: { stage_opening: { group: "n_stage" } }, through: "n_stage" },
+      { node: "n_meet", kind: "milestone", stage: false, via: { stage_opening: { group: "n_stage" } }, through: "n_stage" },
     ]);
   });
 
   it("names a snooze's target", () => {
-    expect(waiting.find((each) => each.decision === "n_wait")?.unblockers).toEqual([{ node: "n_work", kind: "deliverable", via: "snooze" }]);
+    expect(waiting.find((each) => each.decision === "n_wait")?.unblockers).toEqual([{ node: "n_work", kind: "deliverable", stage: false, via: "snooze" }]);
   });
 });
 

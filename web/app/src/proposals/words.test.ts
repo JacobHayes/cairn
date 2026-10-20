@@ -14,7 +14,7 @@ const graph: Graph = {
   ],
 } as Graph;
 
-const names = namesOf([graph], [{ key: "e_ann", name: "Ann" }]);
+const names = namesOf([graph], { revision: 1, entities: [{ key: "e_ann", name: "Ann" }] });
 
 describe("mutationWords", () => {
   const cases: [string, Mutation, string[], string[]][] = [

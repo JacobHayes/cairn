@@ -12,8 +12,8 @@ import { upperFirst } from "../status/words.ts";
 import { dateWords, daysUntil, daysWords, relativeDays } from "../status/when.ts";
 import { guardFailureText, namer } from "./explain.ts";
 import { nodeOf, rankPlaces, titleOf, waitsOn, type Holding, type NodeDetail, type NodeDerived, type Ready } from "./model.ts";
-import { answerText, entityName } from "./sections.tsx";
-import { plural } from "./words.ts";
+import { answerText, entityName, ownersOf, ownerWords } from "./sections.tsx";
+import { listParts, plural } from "../ui/words.ts";
 
 /** A part of the sentence: text, a link to a node, or the Unsnooze action for the container whose snooze holds over the node. */
 export type Piece = string | { node: string };
@@ -30,29 +30,15 @@ export function positionOf(view: Ready, key: string): number | undefined {
   return rankPlaces(view).get(key);
 }
 
-/** The node's owner by name, when it has one. */
+/** The node's owners in words, when it has any. */
 export function ownerName(view: Ready, key: string): string | undefined {
-  const [owner] = view.derived.nodes[key]?.participations?.["k_owner"]?.entities ?? [];
-  return owner === undefined ? undefined : entityName(view, owner);
+  const owners = ownersOf(view, key);
+  return owners.length === 0 ? undefined : ownerWords(view, owners);
 }
 
-const SHOWN_MAX = 3;
-
-/** "A", "A and B", "A, B and C", "A, B, C and 2 more". */
+/** "A", "A and B", "A, B and C", "A, B and 2 more", as parts a sentence renders. */
 function listed(items: Piece[][]): Piece[] {
-  const shown = items.slice(0, SHOWN_MAX);
-  const more = items.length - shown.length;
-  const out: Piece[] = [];
-  shown.forEach((item, at) => {
-    if (at > 0) {
-      out.push(at === shown.length - 1 && more === 0 ? " and " : ", ");
-    }
-    out.push(...item);
-  });
-  if (more > 0) {
-    out.push(` and ${String(more)} more`);
-  }
-  return out;
+  return listParts(items).flat();
 }
 
 /** A node as a phrase, with its link and owner. */

@@ -348,11 +348,6 @@ export function intervening<P>(patches: readonly P[], expected: number, current:
   return count === 0 ? [] : patches.slice(-count);
 }
 
-/** B10: whether a node can be broken down: a non-group node that is not a leaf-only kind. */
-export function breakable(node: Pick<GraphNode, "kind">): boolean {
-  return node.kind === "deliverable" || node.kind === "action";
-}
-
 /** C14: how the canvas and the list mark one node a proposal touches: the kind of change as one word, and what more there is to say of it. */
 export interface DiffMark {
   tone: "good" | "warn" | "bad" | "plain" | "accent";

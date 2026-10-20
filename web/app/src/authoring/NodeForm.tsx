@@ -23,6 +23,7 @@ import { FieldBox, FormViolations, type FieldNotes } from "./parts.tsx";
 import { domainOf, type Authored } from "./target.ts";
 import { byPlace, type Place } from "./violations.ts";
 import { useAuthorWrite, useLivePreview, type AuthorWrite } from "./write.ts";
+import { plural } from "../ui/words.ts";
 
 interface Kept {
   /** Only the fields the author changed, so the rest follow the node live (H5). */
@@ -179,7 +180,7 @@ export function NodeForm({ authored, node }: NodeFormProps) {
       {kept === undefined && changes.length === 0 ? null : (
         <span className="row">
           <Button type="submit" primary disabled={write.disabled || !sendable} data-testid="node-form-save">
-            Save {changes.length === 0 ? "" : `(${String(changes.length)} ${changes.length === 1 ? "change" : "changes"})`}
+            Save {changes.length === 0 ? "" : `(${plural(changes.length, "change")})`}
           </Button>
           <Button disabled={kept === undefined} onClick={discard}>
             Discard changes

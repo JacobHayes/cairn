@@ -14,11 +14,11 @@ import { useEffect, useMemo, useRef, useState, type CSSProperties, type ReactNod
 import { useLocation, useNavigate } from "react-router";
 
 import { useFolds, useLevel, useProjected } from "../canvas/hooks.ts";
-import { collapsedAt, drawnStep, stepOf } from "../canvas/ladder.ts";
+
 import { titleOf, type Ready } from "../detail/model.ts";
 import { NodeLink } from "../detail/parts.tsx";
 import { useNodeAddresses, withParam } from "../journeys/address.ts";
-import { badgesOf, currentStagesOf, depthFaded, levelRequestOf, lightsUp, litOf, outOfFocus, stepHides } from "../journeys/requests.ts";
+
 import type { ViewState } from "../journeys/view.ts";
 import { EmptyPanel, journeySubject, NothingMatches, ViewBar } from "../screens/ViewControls.tsx";
 import { Button, Segmented } from "../ui/kit.tsx";
@@ -28,6 +28,7 @@ import { axisOf, calendarSpec, dateOf, dayWords, positionOf, rangeWindow, RANGES
 import { chartOf, type Chart, type ChartRow, type Dependency } from "./rows.ts";
 import "./timeline.css";
 import { Failed } from "../ui/Failed.tsx";
+import { useViewLevel } from "../canvas/viewLevel.ts";
 
 /** The height of one row's track, and of the axis above the rows (px). */
 const ROW_PX = 56;
@@ -442,7 +443,7 @@ export function TimelineChart({ chart, spec, viewKey, range, onFold, selected, t
             <AxisHead axis={axis} endTitle={endTitle} />
           </div>
           <div className="timeline-body">
-            <ol className="timeline-labels">
+            <ol className="plain-list timeline-labels">
               {chart.rows.map((row) => (
                 <Label key={row.key} axis={axis} row={row} selected={row.key === selected} onFold={onFold} title={title} />
               ))}
@@ -476,19 +477,11 @@ export function ProjectedTimeline({ ready, state, picks, selected }: { ready: Re
   const addresses = useNodeAddresses();
   const { range } = useMemo(() => timelineSettingsFrom(new URLSearchParams(search)), [search]);
   const nodes = ready.journey.graph.nodes ?? [];
-  const depth = stepOf({ step: state.depth }, nodes);
-  const step = drawnStep(depth, state.fade);
-  const request = useMemo(() => levelRequestOf(state, step, []), [state, step]);
-  const { level, drawn, error: levelError } = useLevel(ready, request, selected);
+  const { step, current, level, error: levelError, dimmed: faded, badges } = useViewLevel({ screen: "timeline", state, nodes, selected, ready, read: (request, at) => useLevel(ready, request, at) });
   const timelineRead = useProjected(ready, { projection: "timeline" });
   const timeline = valueOf(timelineRead);
   const navigate = useNavigate();
-  const current = useMemo(() => currentStagesOf(ready), [ready]);
   const { open, fold: onFold } = useFolds(nodes, current, state.depth, step, picks, selected, (key) => void navigate(addresses.open(key)));
-  const base = useMemo(() => litOf("timeline", state, ready), [state, ready]);
-  const lit = useMemo(() => (base === undefined ? undefined : lightsUp(nodes, base)), [nodes, base]);
-  const faded = useMemo(() => outOfFocus(lit, drawn === undefined ? new Set() : depthFaded(state, nodes, depth, collapsedAt(depth, nodes, current, [], []), drawn)), [state, nodes, depth, current, drawn, lit]);
-  const badges = useMemo(() => badgesOf("timeline", level?.hidden_by_class ?? {}, base, stepHides(nodes, depth, []), state.fade), [level, base, nodes, depth, state.fade]);
   const error = levelError ?? errorWords(timelineRead);
   const today = ready.derived.today;
   const spec = useMemo(() => (timeline === undefined ? undefined : calendarSpec(timeline, today)), [timeline, today]);

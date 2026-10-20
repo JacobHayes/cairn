@@ -4,8 +4,7 @@ import { Check } from "../acting/Controls.tsx";
 import type { RouteSummary } from "../data/reads.ts";
 import { FilterSelect } from "../ui/IndexHead.tsx";
 import { STATUSES, type IndexFilters } from "./address.ts";
-
-const STATUS_WORDS = { active: "Active", completed: "Completed", archived: "Archived", any: "Any status" } as const;
+import { STATUS_WORDS } from "./StatusBadge.tsx";
 
 /** The journey index's filters, as the toolbar's controls: every one holds at once; each change is a new address. */
 export function IndexFilterBar({ filters, routes, onChange }: { filters: IndexFilters; routes: readonly RouteSummary[]; onChange: (filters: IndexFilters) => void }) {
@@ -16,7 +15,7 @@ export function IndexFilterBar({ filters, routes, onChange }: { filters: IndexFi
       <FilterSelect
         label="Status"
         value={filters.status}
-        options={[...STATUSES, "any" as const].map((status) => ({ value: status, label: STATUS_WORDS[status] }))}
+        options={[...STATUSES, "any" as const].map((status) => ({ value: status, label: status === "any" ? "Any status" : STATUS_WORDS[status] }))}
         onChange={(value) => { onChange({ ...filters, status: [...STATUSES, "any" as const].find((each) => each === value) ?? "active" }); }}
       />
       <FilterSelect

@@ -9,16 +9,20 @@ import { RowsPanel } from "../acting/RowsPanel.tsx";
 import type { NodeRow } from "../acting/why.ts";
 import type { Ready } from "../detail/model.ts";
 import { nodeAddress } from "./links.ts";
+import { useViewer } from "../data/react.ts";
+import { ownerWords } from "../detail/sections.tsx";
 
-/** The owner as a row says it when it offers no actions: their names, or that nobody has it. */
-function OwnerText({ names }: { names: string[] | undefined }) {
-  if (names === undefined) {
+/** The owner as a row says it when it offers no actions: who has it, or that nobody does. */
+function OwnerText({ view, owners }: { view: Ready; owners: string[] | undefined }) {
+  const { viewer } = useViewer();
+  if (owners === undefined) {
     return null;
   }
+  const words = ownerWords(view, owners, viewer?.entities);
   return (
     <div className="row-side">
-      <span className="row-owner row-owner-static" title={names.length === 0 ? undefined : `Owned by ${names.join(", ")}`}>
-        {names.length === 0 ? "Unassigned" : names.join(", ")}
+      <span className="row-owner row-owner-static" title={owners.length === 0 ? undefined : `Owned by ${words}`}>
+        {words}
       </span>
     </div>
   );
@@ -32,7 +36,7 @@ export interface Entry {
   tone: FactTone | undefined;
   /** The row's actions, for a row that has them; read-only rows give its owner's names. */
   act: NodeRow | undefined;
-  /** The owners' names, none when the row says nothing of who has it (finished work). */
+  /** The owners' keys, none when the row says nothing of who has it (finished work). */
   owners: string[] | undefined;
   /** The row's work is the viewer's (C18: the acting-frontier items they own). */
   yours?: boolean;
@@ -62,7 +66,7 @@ export function EntriesPanel({ ready, entries, actions, owner = true, ...panel }
       const to = nodeAddress(journey, entry.key);
       return (
         <NodeItem view={ready} node={entry.key} to={to} fact={typeof entry.fact === "function" ? entry.fact() : entry.fact} factTone={entry.tone} testId="summary-item">
-          {actions && entry.act !== undefined && shown ? <RowActions view={ready} row={entry.act} to={to} owner={owner} yours={entry.yours === true} /> : <OwnerText names={entry.owners} />}
+          {actions && entry.act !== undefined && shown ? <RowActions view={ready} row={entry.act} to={to} owner={owner} yours={entry.yours === true} /> : <OwnerText view={ready} owners={entry.owners} />}
         </NodeItem>
       );
     },

@@ -11,8 +11,9 @@ import { SNOOZE_NODE_TAIL } from "../status/snooze.ts";
 import { dateWords } from "../status/when.ts";
 import { fieldWords } from "../status/words.ts";
 import { ENTITY_GONE, KIND_GONE, NODE_GONE, ROLE_GONE } from "../ui/gone.ts";
-import { titleOf, type Ready } from "./model.ts";
+import { isStage, kindWord, type Ready, titleOf } from "./model.ts";
 import { entityName, kindTitle, roleTitle } from "./sections.tsx";
+import { namedList } from "../ui/words.ts";
 
 type Event = Schema<"Event">;
 type EventType = Schema<"EventType">;
@@ -111,14 +112,6 @@ function it(c: Context, key: string | undefined = c.subject): string {
   return key === undefined || key === c.words.viewed ? "it" : quoted(c.words.node(key));
 }
 
-const NOUN: Record<string, string> = {
-  group: "group",
-  milestone: "milestone",
-  decision: "decision",
-  deliverable: "deliverable",
-  action: "action",
-};
-
 function stateRecord(c: Context): { node: string; state: Schema<"NodeState"> } | undefined {
   for (const record of c.records) {
     if ("node_state" in record) {
@@ -132,7 +125,6 @@ function fieldRecords(c: Context): { node: string; value: Schema<"NodeFieldValue
   return c.records.flatMap((record) => ("node_field" in record ? [{ node: record.node_field.node, value: record.node_field.value }] : []));
 }
 
-export const listed = (items: string[]): string => (items.length <= 1 ? (items[0] ?? "") : `${items.slice(0, -1).join(", ")} and ${items.at(-1) ?? ""}`);
 
 function entitiesOf(c: Context, keys: readonly string[]): string[] {
   return keys.map((key) => c.words.entity(key));
@@ -158,7 +150,7 @@ function changedNode(c: Context): Said {
   if (names.length === 0) {
     return { what: `edited ${it(c)}`, facts: { fields: [] } };
   }
-  return { what: `changed the ${listed(names.map(fieldWords))} of ${it(c)}`, facts: { fields: names } };
+  return { what: `changed the ${namedList(names.map(fieldWords), Infinity)} of ${it(c)}`, facts: { fields: names } };
 }
 
 function transitioned(c: Context): Said {
@@ -228,7 +220,7 @@ function participation(c: Context): Said {
         return { what: `made ${c.words.role(source)} the ${label} of ${it(c, record.participation.node)}` };
       }
       const names = entitiesOf(c, source);
-      return { what: names.length === 0 ? `set no ${label} on ${it(c, record.participation.node)}` : `set the ${label} of ${it(c, record.participation.node)} to ${listed(names)}`, facts: { entities: names } };
+      return { what: names.length === 0 ? `set no ${label} on ${it(c, record.participation.node)}` : `set the ${label} of ${it(c, record.participation.node)} to ${namedList(names, Infinity)}`, facts: { entities: names } };
     }
   }
   return { what: `cleared a participation on ${it(c)}` };
@@ -239,7 +231,7 @@ function roleFill(c: Context): Said {
     if ("role_fill" in record) {
       const names = entitiesOf(c, record.role_fill.entities);
       const role = c.words.role(record.role_fill.role);
-      return { what: names.length === 0 ? `cleared who fills ${role}` : `set who fills ${role} to ${listed(names)}`, facts: { entities: names } };
+      return { what: names.length === 0 ? `cleared who fills ${role}` : `set who fills ${role} to ${namedList(names, Infinity)}`, facts: { entities: names } };
     }
   }
   return { what: "cleared who fills a role" };
@@ -318,7 +310,7 @@ const SAY: Record<EventType, (c: Context) => Said> = {
     const node = c.records.flatMap((record) => ("node" in record ? [record.node] : []))[0];
     return node === undefined
       ? { what: `added ${thing(c)}` }
-      : { what: `added ${node.key === c.words.viewed ? `this ${NOUN[node.kind] ?? "item"}` : `the ${NOUN[node.kind] ?? "item"} ${quoted(node.title)}`}`, facts: { title: node.title } };
+      : { what: `added ${node.key === c.words.viewed ? `this ${kindWord(node.kind, isStage(node))}` : `the ${kindWord(node.kind, isStage(node))} ${quoted(node.title)}`}`, facts: { title: node.title } };
   },
   node_changed: changedNode,
   weight_changed: (c) => {

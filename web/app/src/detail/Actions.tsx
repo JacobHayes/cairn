@@ -39,6 +39,7 @@ import { snoozeStart } from "./snooze.ts";
 import { Saving, type Sending } from "../ui/Receipt.tsx";
 import { guardWords, keptWords } from "./words.ts";
 import { useNodeWrite, type NodeWrite } from "./write.ts";
+import { plural } from "../ui/words.ts";
 
 /**
  * D4: beside a finishing action on undecided work, that finishing it is accepted but may not
@@ -95,7 +96,7 @@ function LiftsSnooze({ view, node, moving }: { view: Ready; node: string; moving
   }
   return (
     <span className="muted" data-testid="lifts-snooze">
-      {moving} this lifts the snooze on {titleOf(view, node)} and its {held} open {held === 1 ? "item" : "items"}.
+      {moving} this lifts the snooze on {titleOf(view, node)} and its {plural(held, "open item")}.
     </span>
   );
 }
@@ -229,7 +230,7 @@ function Overflow({ groups, runners }: { groups: MenuItem[][]; runners: Record<M
     return null;
   }
   return (
-    <Menu label="More actions" testId="more-actions" align="end" trigger={<span aria-hidden="true">⋯</span>}>
+    <Menu label="More actions" title="More actions" testId="more-actions" align="end" trigger={<span aria-hidden="true">⋯</span>}>
       {(close) =>
         groups.map((group, at) => (
           <div key={at} className="menu-group">

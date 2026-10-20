@@ -9,6 +9,7 @@ import { Segmented } from "../ui/kit.tsx";
 import { STEP_WORDS } from "./ladder.ts";
 import { LENS_MEANING, LENS_WORDS } from "./lens.ts";
 import { LENSES, type Lens, type Step } from "./model.ts";
+import { plural } from "../ui/words.ts";
 
 /** C2: a route's Depth (Stages, Decisions, Deliverables, Actions: coarse to fine, as keys 1 to 4). A journey's is the Depth menu of its view controls. */
 export function Ladder({ steps, step, onStep }: { steps: readonly Step[]; step: Step; onStep: (step: Step) => void }) {
@@ -98,7 +99,7 @@ export function RevealBox({ linked, revealed, onReveal, onHide }: { linked: numb
         data-testid="trace-reveal"
         onClick={revealed ? onHide : onReveal}
       >
-        {revealed ? "Hide revealed nodes" : `Reveal ${String(linked)} linked ${linked === 1 ? "node" : "nodes"}`}
+        {revealed ? "Hide revealed nodes" : `Reveal ${plural(linked, "linked node")}`}
       </button>
     </Panel>
   );

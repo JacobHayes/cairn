@@ -3,9 +3,8 @@
 // applies, grouped by how often it is wanted. Pure, so the unit tests check each kind and state
 // without a page.
 import { missingEvidence } from "../acting/acts.ts";
-import { breakable } from "../proposals/model.ts";
 import { isOpen } from "../status/state.ts";
-import { failingGuards, isTerminal, movesFrom, nodeOf, recordOf, storedSnooze, titleOf, type NodeDetail, type Ready } from "./model.ts";
+import { failingGuards, isTerminal, isWork, movesFrom, nodeOf, recordOf, storedSnooze, titleOf, type NodeDetail, type Ready } from "./model.ts";
 
 /** The action beside a node, on any surface: what a person does to it in one move. */
 export type Act = "decide" | "done" | "done-with-evidence" | "start" | "reach" | "reach-now" | "break-down" | "mark-atomic" | "unsnooze";
@@ -157,12 +156,12 @@ export function menuOf(view: Ready, detail: NodeDetail): MenuItem[][] {
         state === "active" && "stop",
         kind === "decision" && blocked && "answer-anyway",
         kind === "milestone" && blocked && "reach-anyway",
-        (kind === "deliverable" || kind === "action") && guardFails && "done-anyway",
+        isWork(node) && guardFails && "done-anyway",
         keptUnder && "keep",
       ],
       branch ? { snooze: "Snooze branch…", skip: "Skip branch…" } : {},
     ),
-    items(["rename", "assign", kind !== "milestone" && "weight", "pin", breakable(node) && !container && derived.needs_breakdown !== true && "break-down", container && "insert-segment"], {
+    items(["rename", "assign", kind !== "milestone" && "weight", "pin", isWork(node) && !container && derived.needs_breakdown !== true && "break-down", container && "insert-segment"], {
       pin: kind === "decision" ? "Pin decide-by…" : kind === "milestone" ? "Pin date…" : "Pin a date…",
     }),
     where("edit-node"),

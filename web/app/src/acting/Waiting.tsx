@@ -6,16 +6,16 @@
 import { useProjected } from "../canvas/hooks.ts";
 import { valueOf } from "../data/keyed-read.ts";
 import { namer, viaText } from "../detail/explain.ts";
-import { titleOf, type Ready } from "../detail/model.ts";
+import { kindWord, type Ready, titleOf } from "../detail/model.ts";
 import { useNodeAddresses } from "../journeys/address.ts";
 import { useMineOf } from "../journeys/mine.ts";
 import { SNOOZE_NODE_TAIL, snoozeEndWords } from "../status/snooze.ts";
 import { dateWords } from "../status/when.ts";
 import { Badge, Button } from "../ui/kit.tsx";
-import { DetailLink } from "./Parts.tsx";
 import { RowActions } from "./RowActions.tsx";
 import { WAITING_SHOWN_MAX, waitingDecisions, type Unblocker } from "./waiting.ts";
 import type { NodeRow } from "./why.ts";
+import { NodeLink } from "../detail/parts.tsx";
 
 function UnblockerLine({ view, unblocker, row, yours }: { view: Ready; unblocker: Unblocker; row: NodeRow | undefined; yours: boolean }) {
   const addresses = useNodeAddresses();
@@ -23,7 +23,7 @@ function UnblockerLine({ view, unblocker, row, yours }: { view: Ready; unblocker
   return (
     <li className="stack unblocker" data-testid="unblocker" data-node={unblocker.node} data-kind={unblocker.kind}>
       <span>
-        <Badge tone={unblocker.kind === "milestone" ? "warn" : "plain"}>{unblocker.kind}</Badge> <DetailLink view={view} node={unblocker.node} />{" "}
+        <Badge tone={unblocker.kind === "milestone" ? "warn" : "plain"}>{kindWord(unblocker.kind, unblocker.stage)}</Badge> <NodeLink view={view} node={unblocker.node} />{" "}
         <span className="muted small">
           ({unblocker.via === "snooze" ? `it is snoozed until this${SNOOZE_NODE_TAIL}` : viaText(unblocker.via, name)}
           {unblocker.through === undefined ? "" : ` of ${titleOf(view, unblocker.through)}, which holds it`})
@@ -62,7 +62,7 @@ export function WaitingDecisions({ view, onContinue }: { view: Ready; onContinue
         {waiting.slice(0, WAITING_SHOWN_MAX).map((each) => (
           <li key={each.decision} className="stack" data-testid="waiting-decision" data-node={each.decision}>
             <span>
-              <DetailLink view={view} node={each.decision} />
+              <NodeLink view={view} node={each.decision} />
               <span className="muted small">
                 {each.earliest === undefined ? "" : `, can start ${dateWords(each.earliest, view.derived.today)}`}
                 {each.snoozedUntil === undefined ? "" : `, snoozed until ${snoozeEndWords(view, { date: each.snoozedUntil })}`}

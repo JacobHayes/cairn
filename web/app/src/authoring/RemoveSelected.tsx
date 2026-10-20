@@ -7,7 +7,7 @@ import { useState } from "react";
 import { Button } from "../ui/kit.tsx";
 import { CascadeDialog } from "./CascadeDialog.tsx";
 import { planRemoval, removalMutations } from "./cascade.ts";
-import { ancestorsOf } from "./graph.ts";
+import { ancestorsOf, titleIn } from "./graph.ts";
 import type { Authored } from "./target.ts";
 
 /** The selected nodes no other selected node contains, in the order selected: removing a node takes its subtree. */
@@ -31,7 +31,7 @@ export function RemoveSelected({ authored, keys }: { authored: Authored; keys: r
       key={first}
       authored={authored}
       scope="remove-selected"
-      title={`Remove ${authored.tree.byKey.get(first)?.title ?? first}`}
+      title={`Remove ${titleIn(authored.tree, first)}`}
       plan={plan}
       dangling={plan.dangling}
       mutations={removalMutations(plan)}

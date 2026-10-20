@@ -19,17 +19,15 @@ import { choiceId, choiceLabel } from "../status/answer.ts";
 import { Button, Field } from "../ui/kit.tsx";
 import { Markdown } from "../ui/markdown.tsx";
 import { effectOf, effectOfOption, outgoing, sameAnswer } from "./answer.ts";
-import { answerable, failingGuards, guardBypass, nodeOf, type AnswerValue, type GraphNode, type NodeDetail, type Ready } from "./model.ts";
+import { answerable, failingGuards, guardBypass, titleOf, type AnswerValue, type GraphNode, type NodeDetail, type Ready } from "./model.ts";
 import { EntityOptions, NodeLink, Rationale } from "./parts.tsx";
 import { useSavePreview } from "./preview.ts";
 import { bypassReady, Rejected } from "./Rejected.tsx";
 import { answerText, entityName, resolveEntity, roleTitle } from "./sections.tsx";
 import { effectWords, savingWords } from "./words.ts";
 import { useFormDraft, useNodeWrite, type NodeWrite } from "./write.ts";
-import { NODE_GONE } from "../ui/gone.ts";
 
 type ChoiceEffect = Schema<"ChoiceEffect">;
-
 
 /** The most choices a single-choice decision lists inline; more are one select. */
 const INLINE_SINGLE_MAX = 5;
@@ -413,7 +411,7 @@ function useAnswerForm(view: Ready, detail: NodeDetail, anyway: Anyway | undefin
     close,
     open,
     meanwhile,
-    preview: form.draft === undefined || !newAnswer ? undefined : savingWords(effectOf(effects, form.draft.value), caused, (key) => nodeOf(view, key)?.title ?? NODE_GONE),
+    preview: form.draft === undefined || !newAnswer ? undefined : savingWords(effectOf(effects, form.draft.value), caused, (key) => titleOf(view, key)),
     pick: (value: AnswerValue) => {
       if (form.draft === undefined) {
         form.open(value, write.seen);

@@ -14,13 +14,14 @@ import type { FactTone } from "../acting/reasons.ts";
 import type { NodeRow } from "../acting/why.ts";
 import { guardFailureText, namer } from "../detail/explain.ts";
 import { feedingDecision, milestonesFirst, nodeOf, recordOf, titleOf, type GraphNode, type Ready } from "../detail/model.ts";
-import { entityName } from "../detail/sections.tsx";
 import { snoozeEndWords } from "../status/snooze.ts";
 import { isOpen } from "../status/state.ts";
 import { dateWords, daysWords } from "../status/when.ts";
 import { DISPLAY_STATES, stateWord, type DisplayState } from "../status/words.ts";
 import { treeOf } from "../plan/tree.ts";
 import type { DateOrigin } from "../timeline/model.ts";
+import { plural } from "../ui/words.ts";
+import { ownersOf } from "../detail/sections.tsx";
 
 export type StatusSummary = Schema<"StatusSummary">;
 
@@ -51,17 +52,12 @@ export interface SummaryModel {
   stale: (Listed & { reasons: string[] })[];
   /** Milestones not yet reached with their effective dates (F1), earliest first. */
   upcoming: (Listed & { date: string; origin: DateOrigin; owners: string[] })[];
-  /** Open decisions with their owners by name, in rank order; no owner is unassigned. */
+  /** Open decisions with their owners (entity keys), in rank order; no owner is unassigned. */
   openDecisions: (Listed & { owners: string[] })[];
 }
 
 function listed(ready: Ready, key: string): Listed {
   return { key, title: titleOf(ready, key) };
-}
-
-/** A node's owners by name, from its effective participations (E2). */
-export function ownersOf(ready: Ready, key: string): string[] {
-  return (ready.derived.nodes[key]?.participations?.["k_owner"]?.entities ?? []).map((entity) => entityName(ready, entity));
 }
 
 function overdueOf(ready: Ready, key: string): SummaryModel["overdue"][number] {
@@ -92,7 +88,7 @@ export function summaryModel(ready: Ready, summary: StatusSummary): SummaryModel
     })),
     openDecisions: (summary.open_decisions ?? []).map((each) => ({
       ...listed(ready, each.node),
-      owners: (each.owners ?? []).map((owner) => entityName(ready, owner)),
+      owners: each.owners ?? [],
     })),
   };
 }
@@ -348,6 +344,6 @@ export function lifecycleLine(ready: Ready, model: SummaryModel): string | undef
     return undefined;
   }
   const left = model.remaining;
-  const unfinished = left === 0 ? "" : ` with ${String(left)} ${left === 1 ? "node" : "nodes"} left unfinished`;
+  const unfinished = left === 0 ? "" : ` with ${plural(left, "node")} left unfinished`;
   return status === "completed" ? `Completed${unfinished}.` : `Archived and read-only${unfinished}.`;
 }

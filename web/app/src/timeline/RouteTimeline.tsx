@@ -8,14 +8,14 @@
 // whose date rule waits on a date decision says so. A row's title opens the node's form on a
 // draft; a version's nodes open nothing.
 import { useMemo } from "react";
-import { Link, useNavigate } from "react-router";
+import { useNavigate } from "react-router";
 
-import { treeOf } from "../authoring/graph.ts";
+import { titleIn, treeOf } from "../authoring/graph.ts";
 import { useFolds } from "../canvas/hooks.ts";
-import { collapsedAt, drawnStep, stepOf } from "../canvas/ladder.ts";
+
 import { errorWords, valueOf } from "../data/keyed-read.ts";
 import { useNodeAddresses } from "../journeys/address.ts";
-import { badgesOf, depthFaded, levelRequestOf, outOfFocus, stepHides } from "../journeys/requests.ts";
+
 import type { ViewState } from "../journeys/view.ts";
 import { useRouteLevel, useRouteSchedule } from "../screens/route-views.ts";
 import { nodesOf, type Shown } from "../screens/route-reads.ts";
@@ -23,10 +23,10 @@ import { NothingMatches, routeSubject, ViewBar } from "../screens/ViewControls.t
 import { routeSpec } from "./model.ts";
 import { routeChartOf } from "./rows.ts";
 import { TimelineChart } from "./TimelineView.tsx";
-import { NODE_GONE } from "../ui/gone.ts";
-import { Failed } from "../ui/Failed.tsx";
 
-const NONE: ReadonlySet<string> = new Set();
+import { Failed } from "../ui/Failed.tsx";
+import { NodeLink } from "../detail/parts.tsx";
+import { useViewLevel } from "../canvas/viewLevel.ts";
 
 export interface RouteTimelineProps {
   shown: Shown;
@@ -43,19 +43,14 @@ export function RouteTimeline({ shown, state, picks, selected, onOpen }: RouteTi
   const navigate = useNavigate();
   const nodes = nodesOf(shown);
   const tree = useMemo(() => treeOf(shown.graph), [shown.graph]);
-  const depth = stepOf({ step: state.depth }, nodes);
-  const step = drawnStep(depth, state.fade);
-  const request = useMemo(() => levelRequestOf(state, step, []), [state, step]);
-  const { level, drawn, error: levelError } = useRouteLevel(shown, request, selected);
+  const { step, current, level, error: levelError, dimmed: faded, badges } = useViewLevel({ screen: "timeline", state, nodes, selected, read: (request, at) => useRouteLevel(shown, request, at) });
   const scheduleRead = useRouteSchedule(shown);
   const schedule = valueOf(scheduleRead);
-  const { open, fold: onFold } = useFolds(nodes, NONE, state.depth, step, picks, selected, (key) => void navigate(addresses.open(key)));
-  const faded = useMemo(() => outOfFocus(undefined, drawn === undefined ? NONE : depthFaded(state, nodes, depth, collapsedAt(depth, nodes, NONE, [], []), drawn)), [state, nodes, depth, drawn]);
-  const badges = useMemo(() => badgesOf("timeline", level?.hidden_by_class ?? {}, undefined, stepHides(nodes, depth, []), state.fade), [level, nodes, depth, state.fade]);
+  const { open, fold: onFold } = useFolds(nodes, current, state.depth, step, picks, selected, (key) => void navigate(addresses.open(key)));
   const error = levelError ?? errorWords(scheduleRead);
   const spec = useMemo(() => (schedule === undefined ? undefined : routeSpec(schedule)), [schedule]);
   const chart = useMemo(() => (schedule === undefined || level === undefined ? undefined : routeChartOf(tree, schedule, { drawn: level.nodes, open, selected, faded })), [tree, schedule, level, open, selected, faded]);
-  const titleOf = (key: string) => tree.byKey.get(key)?.title ?? NODE_GONE;
+  const titleOf = (key: string) => titleIn(tree, key);
   const end = schedule?.end;
   return (
     <>
@@ -72,7 +67,7 @@ export function RouteTimeline({ shown, state, picks, selected, onOpen }: RouteTi
           range={undefined}
           onFold={onFold}
           selected={selected}
-          title={(key) => (onOpen === undefined ? <span>{titleOf(key)}</span> : <Link to={addresses.open(key)} data-node={key} onClick={(event) => { event.preventDefault(); onOpen(key); }}>{titleOf(key)}</Link>)}
+          title={(key) => (onOpen === undefined ? <span>{titleOf(key)}</span> : <NodeLink node={key} title={titleOf(key)} onClick={(event) => { event.preventDefault(); onOpen(key); }} />)}
           endTitle={titleOf}
           activate={onOpen}
           anchorNote={

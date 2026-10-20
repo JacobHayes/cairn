@@ -7,6 +7,7 @@ import type { Schema } from "@cairn/client";
 
 import type { JourneySummary, RouteRead } from "../data/reads.ts";
 import type { Mutation } from "../data/writes.ts";
+import { plural } from "../ui/words.ts";
 
 /** One journey on a version, as route detail lists it. */
 export interface VersionJourney {
@@ -113,12 +114,12 @@ export type InUse = { kind: "journeys"; count: number } | { kind: "places"; plac
 /** The use in words: `2 active journeys`, `Used in 6 places`, `2 of 6 behind`, and what none says. */
 export function inUseWords(use: InUse): string {
   if (use.kind === "journeys") {
-    return use.count === 0 ? "No active journeys" : `${String(use.count)} active ${use.count === 1 ? "journey" : "journeys"}`;
+    return use.count === 0 ? "No active journeys" : plural(use.count, "active journey");
   }
   if (use.places === 0) {
     return "Not used yet";
   }
-  return use.behind > 0 ? `${String(use.behind)} of ${String(use.places)} behind` : `Used in ${String(use.places)} ${use.places === 1 ? "place" : "places"}`;
+  return use.behind > 0 ? `${String(use.behind)} of ${String(use.places)} behind` : `Used in ${plural(use.places, "place")}`;
 }
 
 /** The version a journey can be started from: the latest published, unless the route is retired (A19) or is a segment (A21); none otherwise. A draft being open does not stop it. */

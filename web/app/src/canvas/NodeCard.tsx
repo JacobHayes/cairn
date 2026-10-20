@@ -20,7 +20,10 @@ import { hereWords, nodeClasses } from "./look.ts";
 import { RANK_TAG_COUNT, type Card, type CardBody } from "./model.ts";
 import type { CanvasOverlay } from "./overlay.ts";
 import { progressWords } from "./words.ts";
-import { NODE_GONE } from "../ui/gone.ts";
+
+import { plural } from "../ui/words.ts";
+import { nodeTitle } from "../ui/gone.ts";
+import { kindWord } from "../detail/model.ts";
 
 /** What a card can ask of its canvas. */
 export interface CardActions {
@@ -61,11 +64,6 @@ export type CardData = {
 
 export type CardNode = Node<CardData, "card">;
 
-/** The kind as the card's label says it: a top-level group is a stage. */
-export function kindLabel(card: Card): string {
-  return card.kind === "group" && card.stage ? "stage" : card.kind;
-}
-
 /** The title: a button that selects the node as a click on the card does (the click reaches the canvas), or plain text where there is none. */
 function Title({ card }: { card: Card }) {
   const actions = useContext(CardActionsContext);
@@ -92,7 +90,7 @@ function Head({ card, collapsible }: { card: Card; collapsible: boolean }) {
   return (
     <div className="node-head">
       <span className="node-head-label">
-        <span className="node-kind">{kindLabel(card)}</span>
+        <span className="node-kind">{kindWord(card.kind, card.stage)}</span>
         {journey?.current === true ? (
           <span className="node-current" data-testid="card-current">
             current
@@ -203,7 +201,7 @@ function Foot({ card, owner = true }: { card: Card; owner?: boolean }) {
       )}
       <span className="spacer" />
       {!owner || journey.owner === undefined ? null : (
-        <span className={journey.owner.missing ? "node-owner warn" : "node-owner"} data-testid="card-owner" title={journey.owners}>
+        <span className={journey.owner.missing ? "node-owner ink-warn" : "node-owner"} data-testid="card-owner" title={journey.owners}>
           {journey.owner.words}
         </span>
       )}
@@ -217,8 +215,8 @@ function Marker({ card }: { card: Card }) {
   if (count === 0) {
     return null;
   }
-  const names = card.hiddenPrerequisites.map((key) => actions?.title(key) ?? NODE_GONE).join(", ");
-  const words = `Waits on ${String(count)} hidden ${count === 1 ? "prerequisite" : "prerequisites"}`;
+  const names = card.hiddenPrerequisites.map((key) => nodeTitle(actions?.title(key))).join(", ");
+  const words = `Waits on ${plural(count, "hidden prerequisite")}`;
   const trace = actions?.trace;
   const marker = { "data-testid": "hidden-prerequisites", "data-nodes": card.hiddenPrerequisites.join(" "), title: `Waits on ${names}` };
   return (

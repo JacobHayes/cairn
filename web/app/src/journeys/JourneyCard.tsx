@@ -3,7 +3,6 @@
 // milestone, with the open decisions, the description, the notes and links, and the lineage as
 // folds. The Summary (summary/SummaryPage.tsx) is the same journey at full width. Kept current
 // (H6): both read the journey's local derivation.
-import { DetailLink } from "../acting/Parts.tsx";
 import { useProjected } from "../canvas/hooks.ts";
 import { errorWords, valueOf } from "../data/keyed-read.ts";
 import { AnnotationList } from "../detail/Attachments.tsx";
@@ -19,6 +18,9 @@ import { useMineOf } from "./mine.ts";
 import { useMemo } from "react";
 import "./journeys.css";
 import { Failed } from "../ui/Failed.tsx";
+import { plural } from "../ui/words.ts";
+import { ownerWords } from "../detail/sections.tsx";
+import { useViewer } from "../data/react.ts";
 
 /** The most items "next up" lists on the card; the Summary lists the whole frontier. */
 const NEXT_UP_SHOWN = 3;
@@ -49,7 +51,7 @@ function Yours({ ready }: { ready: Ready }) {
   }
   return (
     <span className="muted small" data-testid="card-yours" data-open={open} data-ready={actionable}>
-      You have {open} open {open === 1 ? "item" : "items"} here{actionable === 0 ? "" : `, ${String(actionable)} ready`}
+      You have {plural(open, "open item")} here{actionable === 0 ? "" : `, ${String(actionable)} ready`}
     </span>
   );
 }
@@ -66,7 +68,7 @@ function NextUp({ ready }: { ready: Ready }) {
       <ul className="detail-list">
         {items.map((row) => (
           <li key={row.key} data-node={row.key}>
-            <DetailLink view={ready} node={row.key} />
+            <NodeLink view={ready} node={row.key} />
           </li>
         ))}
       </ul>
@@ -91,6 +93,7 @@ function NextMilestone({ ready, model }: { ready: Ready; model: SummaryModel }) 
 
 function Folds({ ready, model, selected }: { ready: Ready; model: SummaryModel; selected: string | undefined }) {
   const { header } = ready.journey;
+  const { viewer } = useViewer();
   const annotations = (ready.journey.graph.state?.annotations ?? []).filter((annotation) => annotation.body.node == null);
   return (
     <div className="detail-folds" data-testid="card-folds">
@@ -100,7 +103,7 @@ function Folds({ ready, model, selected }: { ready: Ready; model: SummaryModel; 
             {model.openDecisions.map((each) => (
               <li key={each.key} data-node={each.key} data-selected={each.key === selected}>
                 <NodeLink view={ready} node={each.key} />{" "}
-                <span className="muted small">{each.owners.length === 0 ? "unassigned" : each.owners.join(", ")}</span>
+                <span className="muted small">{ownerWords(ready, each.owners, viewer?.entities)}</span>
               </li>
             ))}
           </ul>

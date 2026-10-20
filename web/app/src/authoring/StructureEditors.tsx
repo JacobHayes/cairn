@@ -19,6 +19,7 @@ import { mintKey, slugOf, uniqueId } from "./keys.ts";
 import { Picker } from "./parts.tsx";
 import { domainOf, isJourney, named, type Authored } from "./target.ts";
 import { useAuthorWrite, type AuthorWrite } from "./write.ts";
+import { OWNER_KIND, PIECE_KINDS } from "../detail/model.ts";
 
 export interface NodeEditorProps {
   authored: Authored;
@@ -113,7 +114,7 @@ export function PlaceEditor({ authored, node }: NodeEditorProps) {
 export function ParticipationWiring({ authored, node }: NodeEditorProps) {
   const write = useAuthorWrite(authored, `participation:${node.key}`, node.title);
   const roles = authored.graph.roles ?? [];
-  const kinds = [{ key: "k_owner", id: "owner", title: "Owner", multi: false }, ...(authored.graph.participation_kinds ?? [])];
+  const kinds = [{ key: OWNER_KIND, id: "owner", title: "Owner", multi: false }, ...(authored.graph.participation_kinds ?? [])];
   return (
     <div className="stack" data-testid="participation-wiring">
       {kinds.map((kind) => {
@@ -166,7 +167,7 @@ export function PieceRows({ pieces, onChange }: { pieces: Piece[]; onChange: (ne
     <span key={at} className="row" data-testid="piece">
       <label className="field">
         <span className="label">Kind</span>
-        <Picker aria-label="Kind of piece" value={piece.kind} options={(["action", "deliverable"] as const).map(kindOption)} onChange={(event) => { set(at, { kind: event.target.value as NodeKind }); }} />
+        <Picker aria-label="Kind of piece" value={piece.kind} options={PIECE_KINDS.map(kindOption)} onChange={(event) => { set(at, { kind: event.target.value as NodeKind }); }} />
       </label>
       <label className="field">
         <span className="label">Title</span>

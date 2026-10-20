@@ -17,6 +17,7 @@ import { DEFAULT_FILTERS, indexPath, journeyPath, newJourneyPath } from "../jour
 import { dateWords } from "../status/when.ts";
 import { routePath } from "./address.ts";
 import { upgradable, versionRows, type VersionRow } from "./model.ts";
+import { plural } from "../ui/words.ts";
 
 type InsertionUse = Schema<"InsertionUse">;
 
@@ -41,7 +42,7 @@ export function RouteFacts({ read, children }: { read: RouteRead; children?: Rea
       {waiting === 0 || latest === undefined ? null : (
         <p className="small" data-testid="route-upgrades" data-count={waiting}>
           <Link to={indexPath({ ...DEFAULT_FILTERS, route: header.id, upgrade: true })}>
-            {waiting} {waiting === 1 ? "journey can" : "journeys can"} upgrade to version {latest}
+            {plural(waiting, "journey")} can upgrade to version {latest}
           </Link>
         </p>
       )}
@@ -76,7 +77,7 @@ function journeyRows(row: VersionRow): PanelRow[] {
             <Link to={journeyPath({ journey: journey.id })} className="node-title" data-row-title>
               {journey.name}
             </Link>
-            {journey.upgrade ? <span className="node-fact node-fact-warn" data-testid="upgrade" data-status="available">Upgrade available</span> : null}
+            {journey.upgrade ? <span className="node-fact ink-warn" data-testid="upgrade" data-status="available">Upgrade available</span> : null}
           </span>
         </div>
       </li>
@@ -98,7 +99,7 @@ function insertionRows(uses: readonly InsertionUse[], hostOf: ReturnType<typeof 
                 {host.name}
               </Link>
               <span className="node-fact muted">{use.title}</span>
-              {use.upgrade_available ? <span className="node-fact node-fact-warn" data-testid="upgrade" data-status="available">Upgrade available</span> : null}
+              {use.upgrade_available ? <span className="node-fact ink-warn" data-testid="upgrade" data-status="available">Upgrade available</span> : null}
             </span>
           </div>
         </li>

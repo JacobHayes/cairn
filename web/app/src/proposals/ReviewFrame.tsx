@@ -26,6 +26,7 @@ import {
   type ReviewFilter,
 } from "./model.ts";
 import { fieldValueWords, type Names } from "./words.ts";
+import { plural } from "../ui/words.ts";
 
 /** What each thing that stops an apply says, on Apply's hover and in the proposal card. */
 export const BLOCKER_WORDS: Record<Blocker, string> = {
@@ -130,11 +131,11 @@ export function ReviewHeader({ proposal, name, itemCount, conflictCount, blocker
           {proposal.status}
         </Badge>
         <span className="muted small" data-testid="review-count">
-          {itemCount} {itemCount === 1 ? "item" : "items"}
+          {plural(itemCount, "item")}
         </span>
         {conflictCount === 0 ? null : (
           <Badge tone="bad" data-testid="review-conflicts">
-            {conflictCount} {conflictCount === 1 ? "conflict" : "conflicts"}
+            {plural(conflictCount, "conflict")}
           </Badge>
         )}
         {proposal.status === "applied" && journey !== undefined ? (
@@ -201,7 +202,7 @@ export function ReviewList({ entries, diff, names, filter, selected, onPick }: {
     );
   }
   return (
-    <ul className="route-list" data-testid="diff-list">
+    <ul className="plain-list route-list" data-testid="diff-list">
       {shown.map((entry) => (
         <li
           key={entry.key}

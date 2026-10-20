@@ -7,6 +7,7 @@ import { OFFSET_DAYS_MAX } from "@cairn/client";
 import type { DateRule } from "./fields.ts";
 import { descendantsOf, nodesByPath, pathOf, titleIn, type GraphNode, type Tree } from "./graph.ts";
 import { outOfRange } from "./limits.ts";
+import { plural } from "../ui/words.ts";
 
 /** The journey's creation, a source every graph has (A8). */
 export const CREATED_AT = "journey.created_at";
@@ -63,7 +64,7 @@ export function ruleProblem(parts: RuleParts): string | undefined {
 export function ruleWords(rule: DateRule, label: (source: string) => string): string {
   const parts = partsOf(rule);
   const sources = parts.sources.map((source) => (source === CREATED_AT ? "the journey's start" : label(source))).join(" and ");
-  const days = parts.offset === 1 ? "1 day" : `${String(parts.offset)} days`;
+  const days = plural(parts.offset, "day");
   return parts.offset === 0 ? `${parts.direction === "before" ? "by" : "from"} ${sources}` : `${days} ${parts.direction} ${sources}`;
 }
 

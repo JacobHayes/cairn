@@ -19,13 +19,12 @@ import { useDraft } from "../data/drafts.ts";
 import { useSaves, useSession } from "../data/react.ts";
 import { NodeDetailPanel } from "../detail/NodeDetail.tsx";
 import type { Ready } from "../detail/model.ts";
-import { badgesOf, levelRequestOf, stepHides, walkQueryOf } from "../journeys/requests.ts";
+import { walkQueryOf } from "../journeys/requests.ts";
 import { useViewState, type ViewState } from "../journeys/view.ts";
 import { journeySubject, ResetView, ViewBar } from "../screens/ViewControls.tsx";
 import { COLUMN, Inspector, useMedia } from "../shell/frame.tsx";
 import { Button } from "../ui/kit.tsx";
 import { typing } from "../ui/typing.ts";
-import { DetailLink } from "./Parts.tsx";
 import { acted, begin, passedAll, passOn, passOrder, roundAgain, surfaced, unlockedBy, type Pass } from "./pass.ts";
 import { PassRail } from "./PassRail.tsx";
 import { StalledPanel } from "./Stalled.tsx";
@@ -35,6 +34,8 @@ import type { NodeRow } from "./why.ts";
 import { actingDecisions } from "./waiting.ts";
 import "./acting.css";
 import { Failed } from "../ui/Failed.tsx";
+import { NodeLink } from "../detail/parts.tsx";
+import { useViewLevel } from "../canvas/viewLevel.ts";
 
 /** What reached the acting frontier since the pass began, other than what the pass's own actions unlocked and its filters still show (the card's band and the rail name those). */
 function Surfaced({ view, keys }: { view: Ready; keys: string[] }) {
@@ -45,7 +46,7 @@ function Surfaced({ view, keys }: { view: Ready; keys: string[] }) {
     <p className="callout row" data-testid="surfaced">
       <span>New to act on since this pass began:</span>
       {keys.map((key) => (
-        <DetailLink key={key} view={view} node={key} />
+        <NodeLink key={key} view={view} node={key} />
       ))}
     </p>
   );
@@ -144,7 +145,7 @@ function PassCard({ view, card, place, by, onPass }: { view: Ready; card: NodeRo
           </span>
           {by === undefined ? null : (
             <span className="small unlocked-by" data-testid="unlocked-by">
-              <span className="label">↳ Unlocked by</span> <DetailLink view={view} node={by} />
+              <span className="label">↳ Unlocked by</span> <NodeLink view={view} node={by} />
             </span>
           )}
         </span>
@@ -165,12 +166,12 @@ function PassCard({ view, card, place, by, onPass }: { view: Ready; card: NodeRo
 function useCards(view: Ready, state: ViewState) {
   const nodes = view.journey.graph.nodes ?? [];
   const depth: Step = stepOf({ step: state.depth }, nodes);
-  const request = useMemo(() => levelRequestOf(state, depth, []), [state, depth]);
-  const { level, drawn, error: levelError } = useLevel(view, request);
   const query = useMemo(() => walkQueryOf(state, depth), [state, depth]);
   const { rows: candidates, error: rowsError } = useRows(view, query);
+  const lit = useMemo(() => new Set((candidates ?? []).map((row) => row.key)), [candidates]);
+  // The walk draws at the depth whatever Fade says, and counts its candidate cards, not the frontier, against it.
+  const { drawn, error: levelError, badges } = useViewLevel({ screen: "walk", state, nodes, selected: undefined, ready: view, fade: false, lit, read: (request, at) => useLevel(view, request, at) });
   const rows = useMemo(() => (candidates ?? []).filter((row) => drawn?.has(row.key) === true), [candidates, drawn]);
-  const badges = useMemo(() => badgesOf("walk", level?.hidden_by_class ?? {}, new Set((candidates ?? []).map((row) => row.key)), stepHides(nodes, depth, [])), [level, candidates, nodes, depth]);
   return { depth, rows, read: candidates !== undefined && drawn !== undefined, error: levelError ?? rowsError, badges };
 }
 

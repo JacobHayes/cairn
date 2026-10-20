@@ -28,7 +28,7 @@ export function ProposalRow({ item, context }: { item: ProposalSummary; context?
           </Link>
           <span className="node-fact muted" data-testid="fact">
             {context === undefined ? null : <>{context} &middot; </>}
-            {stale ? <span className="node-fact-warn" data-testid="needs-refresh">Needs a refresh</span> : who}
+            {stale ? <span className="ink-warn" data-testid="needs-refresh">Needs a refresh</span> : who}
           </span>
         </span>
       </div>

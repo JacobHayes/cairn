@@ -25,6 +25,7 @@ import { Badge, Button, Field } from "../ui/kit.tsx";
 import { MergeEntities } from "./MergeEntities.tsx";
 import { aliasesOf, byName, EMAIL_RULES, entityOf, mergeAsked, newEntityKey, type Entity } from "./model.ts";
 import { Failed } from "../ui/Failed.tsx";
+import { plural } from "../ui/words.ts";
 
 /** An entity's edit as typed, and the deployment revision its author saw when they opened it (H5). */
 interface EntityDraft {
@@ -96,7 +97,7 @@ function EntityRow({ entity, deployment, yours }: { entity: Entity; deployment: 
         <span className="row entity-title">
           <strong data-testid="entity-name">{entity.name}</strong>
           {yours ? <Badge tone="good" data-testid="yours">You</Badge> : null}
-          {aliases.length === 0 ? null : <span className="muted small" data-testid="aliases">merged from {aliases.length} other {aliases.length === 1 ? "entry" : "entries"}</span>}
+          {aliases.length === 0 ? null : <span className="muted small" data-testid="aliases">merged from {plural(aliases.length, "other entry", "other entries")}</span>}
         </span>
         {draft === undefined ? (
           <Button disabled={write.disabled} onClick={() => { setDraft({ name: entity.name, emails: [...(entity.emails ?? [])], emailText: "", base: deployment.revision }); }}>Edit</Button>

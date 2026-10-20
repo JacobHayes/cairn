@@ -10,7 +10,9 @@ import type { Schema } from "@cairn/client";
 
 import type { GraphNode, NodeKind } from "../detail/model.ts";
 import type { DisplayState } from "../status/words.ts";
-import { NODE_GONE } from "../ui/gone.ts";
+
+import { nodeTitle } from "../ui/gone.ts";
+import { isStage } from "../detail/model.ts";
 
 export type Level = Schema<"Level">;
 export type LevelNode = Schema<"LevelNode">;
@@ -18,9 +20,6 @@ export type LevelEdge = Schema<"LevelEdge">;
 export type Relevance = Schema<"Relevance">;
 export type LevelDisplay = Schema<"LevelDisplay">;
 export type Trace = Schema<"Trace">;
-
-/** C2: every kind, in the order the toggles list them; all shown by default. */
-export const KINDS: NodeKind[] = ["group", "decision", "deliverable", "action", "milestone"];
 
 /** C5: how many of the acting frontier's top-ranked items carry a rank tag on the canvas (the Signals lens shows the rest). */
 export const RANK_TAG_COUNT = 3;
@@ -183,7 +182,7 @@ function nodesOf(graph: GraphNode[]): Nodes {
 
 /** C1: what one edge says, in words: why the dependent waits on the requirement. */
 function sentenceOf(edge: Schema<"UnderlyingEdge">, nodes: Nodes): string {
-  const title = (key: string) => nodes.get(key)?.title ?? NODE_GONE;
+  const title = (key: string) => nodeTitle(nodes.get(key)?.title);
   if (!edge.gates) {
     return `Dated from ${title(edge.requirement)}; does not block`;
   }
@@ -295,7 +294,7 @@ export function cardsOf(level: Level, graph: GraphNode[], looks?: Looks): Card[]
         kind: node.kind,
         title: node.title,
         parent: at.parent ?? undefined,
-        stage: node.kind === "group" && node.parent == null,
+        stage: isStage(node),
         collapsed: level.collapsed?.includes(node.key) === true,
         // Work hidden by its kind is the card's checklist; a node of a shown kind that rolled up
         // was hidden for its relevance class or a collapsed container, not work to tick off.

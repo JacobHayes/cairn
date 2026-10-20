@@ -24,8 +24,9 @@ import { Badge, Button } from "../ui/kit.tsx";
 import { aboutWords, assistantOffered, becauseWords, endedWords, shown, toolWords, type Entry } from "./model.ts";
 import { conversationView, sendTurn, type ConversationRef } from "./conversation.ts";
 import "./assistant.css";
-import { NODE_GONE } from "../ui/gone.ts";
+import { nodeTitle } from "../ui/gone.ts";
 import { Failed, kindOf } from "../ui/Failed.tsx";
+import { NodeLink } from "../detail/parts.tsx";
 
 /** A node's title, when the screen knows it. */
 export type TitleOf = (key: string) => string | undefined;
@@ -36,12 +37,8 @@ export function journeyTitles(ready: Ready): TitleOf {
   return (key) => nodes.find((node) => node.key === key)?.title;
 }
 
-function NodeLink({ journey, node, titleOf }: { journey: string; node: string; titleOf: TitleOf | undefined }) {
-  return (
-    <Link to={journeyPath({ journey, node }, "graph")} data-testid="assistant-node" data-node={node}>
-      {titleOf?.(node) ?? NODE_GONE}
-    </Link>
-  );
+function AssistantNode({ journey, node, titleOf }: { journey: string; node: string; titleOf: TitleOf | undefined }) {
+  return <NodeLink node={node} title={nodeTitle(titleOf?.(node))} to={journeyPath({ journey, node }, "graph")} data-testid="assistant-node" />;
 }
 
 /** I5, D7: a direct change, with the nodes it wrote and what it newly caused. */
@@ -64,7 +61,7 @@ function Applied({ action, titleOf }: { action: Extract<AssistantAction, { outco
           {nodes.map((node, index) => (
             <span key={node}>
               {index === 0 ? null : ", "}
-              <NodeLink journey={journey} node={node} titleOf={titleOf} />
+              <AssistantNode journey={journey} node={node} titleOf={titleOf} />
             </span>
           ))}
         </span>
@@ -80,11 +77,11 @@ function Applied({ action, titleOf }: { action: Extract<AssistantAction, { outco
               `The journey is now stalled`
             ) : (
               <>
-                {line.kind === "undecided" ? mayNotApply(line.unanswered ?? [], (key) => titleOf?.(key) ?? NODE_GONE) : `Newly ${line.kind}`}:{" "}
+                {line.kind === "undecided" ? mayNotApply(line.unanswered ?? [], (key) => nodeTitle(titleOf?.(key))) : `Newly ${line.kind}`}:{" "}
                 {line.nodes.map((node, index) => (
                   <span key={node}>
                     {index === 0 ? null : ", "}
-                    <NodeLink journey={line.journey} node={node} titleOf={titleOf} />
+                    <AssistantNode journey={line.journey} node={node} titleOf={titleOf} />
                   </span>
                 ))}
               </>

@@ -8,11 +8,10 @@ import { dateWords, daysUntil, daysWords, dueWords, isSoon } from "../status/whe
 import { missingEvidence } from "./acts.ts";
 import type { SortBy } from "./address.ts";
 import { rankParts, type NodeRow, type RankPart } from "./why.ts";
+import { plural } from "../ui/words.ts";
 
 /** Within this share of the largest part, a date reason beats a bigger weight: it is the one to act on today. */
 const CLOSE = 0.9;
-
-const nodes = (count: number) => `${String(count)} ${count === 1 ? "node" : "nodes"}`;
 
 /** The date reason of a row with no pressing date: when it is due or must start, in words; none when it has no deadline. */
 function dateReason(view: Ready, row: NodeRow): string | undefined {
@@ -27,7 +26,7 @@ function dateReason(view: Ready, row: NodeRow): string | undefined {
 function gravityReason(view: Ready, row: NodeRow): string | undefined {
   const from = view.derived.nodes[row.key]?.gravity_from;
   const downstream = from === undefined ? 0 : from.total - (from.entries.some((entry) => entry.node === row.key) ? 1 : 0);
-  return downstream > 0 ? `Gates ${nodes(downstream)}` : undefined;
+  return downstream > 0 ? `Gates ${plural(downstream, "node")}` : undefined;
 }
 
 /** What finishing the row frees, naming others' work when some of it is. */
@@ -37,7 +36,7 @@ function unlocksReason(view: Ready, row: NodeRow): string | undefined {
   if (others > 0) {
     return `Unlocks ${String(others)} ${others === 1 ? "other's" : "others'"} work`;
   }
-  return from === undefined || from.total === 0 ? undefined : `Unlocks ${nodes(from.total)}`;
+  return from === undefined || from.total === 0 ? undefined : `Unlocks ${plural(from.total, "node")}`;
 }
 
 /** The reason a rank part gives, in words. */

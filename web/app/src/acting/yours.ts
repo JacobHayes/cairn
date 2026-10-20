@@ -6,6 +6,7 @@ import { milestonesFirst, nodeOf, titleOf, type Ready } from "../detail/model.ts
 import { snoozeEndWords } from "../status/snooze.ts";
 import { isOpen } from "../status/state.ts";
 import { unblockersOf } from "./waiting.ts";
+import { namedList } from "../ui/words.ts";
 
 /**
  * Whether node `key` is still the viewer's to do if it is in their "mine": in scope, not a
@@ -22,9 +23,6 @@ export function openForViewer(view: Ready, key: string): boolean {
     isOpen(derived)
   );
 }
-
-/** How many things the line names it waits on before it says "and N more". */
-const NAMED_MAX = 2;
 
 /** The viewer's earliest-starting open node, none of which is actionable now. */
 export interface NextForYou {
@@ -57,17 +55,10 @@ export function nextForYou(view: Ready, entries: readonly MineEntry[]): NextForY
   return { node: first.node.key, after, snoozedUntil };
 }
 
-/** "A", "A and B", "A, B and 2 more". */
-function named(titles: readonly string[]): string {
-  const shown = titles.slice(0, NAMED_MAX);
-  const more = titles.length - shown.length;
-  return more > 0 ? `${shown.join(", ")} and ${String(more)} more` : shown.join(" and ");
-}
-
 /** What the next item waits on, in words: `after A and B`, or `snoozed until Oct 20`; empty when it names nothing. */
 export function waitsOnWords(view: Ready, next: NextForYou): string {
   if (next.after.length > 0) {
-    return `after ${named(next.after)}`;
+    return `after ${namedList(next.after)}`;
   }
   return next.snoozedUntil === undefined ? "" : `snoozed until ${snoozeEndWords(view, { date: next.snoozedUntil })}`;
 }

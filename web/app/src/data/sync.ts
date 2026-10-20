@@ -14,6 +14,7 @@ import { assign, setup, type ActorRefFrom } from "xstate";
 
 import type { SaveEvent } from "./activity.ts";
 import type { Lag } from "./keyed-read.ts";
+import { plural } from "../ui/words.ts";
 
 /** A write has to take this long to show SAVING, and a refetch to show UPDATING (no flicker). */
 export const SYNC_SHOW_AFTER_MS = 300;
@@ -100,8 +101,6 @@ export interface SyncSummary {
   /** How a change to this state is announced, if it is. */
   announce: "polite" | "assertive" | undefined;
 }
-
-const plural = (count: number, word: string) => `${String(count)} ${word}${count === 1 ? "" : "s"}`;
 
 /** The state the chip is in, by the precedence of 9.1: the first that holds. */
 export function summarize(input: SyncInput): SyncCase {

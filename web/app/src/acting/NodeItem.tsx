@@ -5,11 +5,12 @@
 // the bordered panel the rows sit in, with an optional band header. Selecting the row (a click)
 // opens the inspector for the rest.
 import { useEffect, useRef, type MouseEvent, type ReactNode } from "react";
-import { Link, useNavigate } from "react-router";
+import { useNavigate } from "react-router";
 
-import { nodeOf, titleOf, type Ready } from "../detail/model.ts";
+import { nodeOf, type Ready } from "../detail/model.ts";
 import { statusTone, statusWord } from "../status/words.ts";
 import { Badge } from "../ui/kit.tsx";
+import { NodeLink } from "../detail/parts.tsx";
 
 /** A click on the row itself, not on a control inside it, selects it. */
 function onRow(event: MouseEvent): boolean {
@@ -29,13 +30,15 @@ export interface NodeItemProps {
   /** The ink a date or trouble fact is said in, beside its words: warning or error. */
   factTone?: "warn" | "bad" | undefined;
   testId?: string;
+  /** Called when the row or its title opens the node (a selection lets go of itself first). */
+  onOpen?: () => void;
   /** Another class for the row, for a list that styles its own. */
   className?: string;
   /** What the row offers at its right end, and the forms it opens under it. */
   children?: ReactNode;
 }
 
-export function NodeItem({ view, node, to, selected = false, fact, factTone, chip = true, testId = "node-row", className, children }: NodeItemProps) {
+export function NodeItem({ view, node, to, selected = false, fact, factTone, chip = true, testId = "node-row", className, onOpen, children }: NodeItemProps) {
   const navigate = useNavigate();
   const item = useRef<HTMLLIElement>(null);
   const state = view.derived.nodes[node]?.display_state;
@@ -57,6 +60,7 @@ export function NodeItem({ view, node, to, selected = false, fact, factTone, chi
       data-selected={selected}
       onClick={(event) => {
         if (onRow(event)) {
+          onOpen?.();
           void navigate(to);
         }
       }}
@@ -64,11 +68,9 @@ export function NodeItem({ view, node, to, selected = false, fact, factTone, chi
       <div className="node-row-main">
         {!chip || state === undefined || kind === undefined ? null : <Badge tone={statusTone(state)}>{statusWord(state, kind)}</Badge>}
         <span className="node-row-text">
-          <Link to={to} className="node-title" data-row-title data-node={node} aria-current={selected ? "true" : undefined}>
-            {titleOf(view, node)}
-          </Link>
+          <NodeLink view={view} node={node} to={to} className="node-title" data-row-title aria-current={selected ? "true" : undefined} onClick={onOpen} />
           {fact === undefined ? null : (
-            <span className={factTone === undefined ? "node-fact muted" : `node-fact node-fact-${factTone}`} data-testid="fact" {...(typeof fact === "string" ? { title: fact } : {})}>
+            <span className={factTone === undefined ? "node-fact muted" : `node-fact ink-${factTone}`} data-testid="fact" {...(typeof fact === "string" ? { title: fact } : {})}>
               {fact}
             </span>
           )}

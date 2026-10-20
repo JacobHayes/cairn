@@ -224,12 +224,33 @@ dl.kv dd {
   padding-left: var(--space-5);
 }
 
-/* A fold inside the dates keeps the browser's marker, so it reads as something that opens. */
+/* A fold inside a section opens as a section does (the same 44px row, the chevron at its right end), quieter: sentence-case steel text, indented under what it belongs to. */
 .date-more > summary,
 .date-row summary {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  min-height: 44px;
+  padding-inline-start: var(--space-3);
   cursor: pointer;
-  display: list-item;
-  list-style-position: inside;
+  list-style: none;
+}
+
+.date-more > summary::-webkit-details-marker,
+.date-row summary::-webkit-details-marker {
+  display: none;
+}
+
+.date-more > summary::after,
+.date-row summary::after {
+  content: "▸";
+  margin-left: auto;
+  color: var(--color-muted);
+}
+
+.date-more[open] > summary::after,
+.date-row details[open] > summary::after {
+  content: "▾";
 }
 
 .date-label {
@@ -242,12 +263,6 @@ dl.kv dd {
   border-left: 2px solid var(--color-border);
   padding-left: var(--space-3);
   margin: var(--space-2) 0;
-}
-
-.checklist {
-  list-style: none;
-  margin: 0;
-  padding: 0;
 }
 
 /* Contents: one row height, and a leading cell on every row so the titles line up with or without a box. */
@@ -264,9 +279,17 @@ dl.kv dd {
   justify-self: start;
 }
 
-/* A done child fades its content, not its checkbox: the status language (DESIGN, One status language). */
-.contents li[data-status="done"] > :not(.checklist-mark) {
+/* A done child fades its content, not its checkbox, and a snoozed one its title: the status language (DESIGN, One status language). */
+.contents li[data-state="done"] > :not(.checklist-mark) {
   opacity: 0.5;
+}
+
+.contents li[data-state="done"] > a {
+  color: var(--color-muted);
+}
+
+.contents li[data-state="snoozed"] > a {
+  opacity: var(--opacity-snoozed);
 }
 
 .checklist-mark {

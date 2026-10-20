@@ -7,7 +7,8 @@ import type { Schema } from "@cairn/client";
 import { feedingDecision, nodeOf, titleOf, type Ready } from "./model.ts";
 import { dateWords, originWord } from "../status/when.ts";
 import { fieldWords, upperFirst } from "../status/words.ts";
-import { ROLE_GONE } from "../ui/gone.ts";
+
+import { roleTitle } from "./sections.tsx";
 
 export type Bound = Schema<"Bound">;
 export type Chain = Schema<"Chain">;
@@ -193,12 +194,11 @@ export function originText(origin: Schema<"ParticipationOrigin">, view: Ready): 
   if (origin === "explicit") {
     return "set on this node";
   }
-  const roleTitle = (role: string) => (view.journey.graph.roles ?? []).find((each) => each.key === role)?.title ?? ROLE_GONE;
   if ("role" in origin) {
-    return `the role ${roleTitle(origin.role)}`;
+    return `the role ${roleTitle(view, origin.role)}`;
   }
   if ("ancestor" in origin) {
     return `from ${titleOf(view, origin.ancestor)}`;
   }
-  return `the default owner, ${roleTitle(origin.default_owner)}`;
+  return `the default owner, ${roleTitle(view, origin.default_owner)}`;
 }

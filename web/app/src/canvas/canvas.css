@@ -542,12 +542,11 @@
 }
 
 .node-owner {
-  color: var(--color-text);
   font-weight: 600;
 }
 
-.node-owner.warn {
-  color: var(--color-warning);
+.node-owner:not(.ink-warn) {
+  color: var(--color-text);
 }
 
 .node-marker {
@@ -681,13 +680,6 @@
 
 .node-done :is(.node-title, .node-kind, .node-foot, .node-owner, .node-body-line) {
   color: var(--color-muted);
-}
-
-/* The chip of done work is the green one: hollow, in the success colour, with the check. */
-.node-done .badge.done {
-  background: transparent;
-  border-color: var(--color-success);
-  color: var(--color-success);
 }
 
 /* Snoozed is "not now": the node is off the acting frontier but still blocks, so it stays, its title and owner (not the kind label, the chip or the foot date, which stay at the contrast floor) at --opacity-snoozed, as on a List row and a Timeline label. The content only, and not under an out-of-focus fade, so the lowest opacity wins and none multiplies. */

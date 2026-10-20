@@ -106,7 +106,7 @@ export function NewJourney() {
   const { view } = useLive("routes", routeIndex);
   const index = valueOf(view);
   if (index === undefined) {
-    return <p className="muted small">{view.status === "failed" ? <Failed what="The routes" error={view.error} /> : "Loading the routes..."}</p>;
+    return <p className="muted small">{view.status === "failed" ? <Failed what="The routes" error={view.error} /> : "Reading the routes..."}</p>;
   }
   const routes = startableRoutes(index);
   const asked = params.get("route") ?? "";

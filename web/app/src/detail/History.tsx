@@ -12,9 +12,10 @@ import { Button } from "../ui/kit.tsx";
 import { dateWords } from "../status/when.ts";
 import { Markdown } from "../ui/markdown.tsx";
 import { type AnswerValue, type GraphNode, type NodeDetail, type Ready } from "./model.ts";
-import { listed, recount, wordsOf, type Happened } from "./happened.ts";
+import { recount, wordsOf, type Happened } from "./happened.ts";
 import { answerText } from "./sections.tsx";
 import { Failed } from "../ui/Failed.tsx";
+import { namedList } from "../ui/words.ts";
 
 type PatchEvents = Schema<"PatchEvents">;
 
@@ -122,7 +123,7 @@ function PatchItem({ scope, patch, told, name }: { scope: PatchScope; patch: Pat
   const { view, decision } = scope;
   const answers = decision === undefined ? [] : answersWritten(patch, decision.key);
   const note = patch.events.find((event) => event.note != null)?.note;
-  const what = listed([...new Set(told.map((each) => each.what))]);
+  const what = namedList([...new Set(told.map((each) => each.what))], Infinity);
   return (
     <li data-testid="history-patch" data-actor={lead.actor}>
       <span className="muted small">{dateWords(first.at.slice(0, 10), scope.today)}</span>{" "}

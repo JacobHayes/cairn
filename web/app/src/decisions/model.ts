@@ -9,7 +9,7 @@ import type { Schema } from "@cairn/client";
 
 import type { Relevance } from "../canvas/model.ts";
 import { nodeOf, titleOf, type GraphNode, type NodeKind, type Ready, type State } from "../detail/model.ts";
-import { answerText, entityName, roleTitle } from "../detail/sections.tsx";
+import { answerText, roleTitle } from "../detail/sections.tsx";
 import type { DisplayState } from "../status/words.ts";
 
 export type DecisionView = Schema<"DecisionView">;
@@ -39,8 +39,6 @@ export interface DecisionRow {
   answer: string | undefined;
   /** B2: the markdown reason the answer in effect was given with. */
   rationale: string | undefined;
-  /** Its owners by name; empty when unassigned. */
-  owners: string[];
   /** The nodes whose relevance its answer decides, their descendants included. */
   affects: Affected[];
   /** The milestone its answer pins (E3), with that milestone's effective date. */
@@ -72,7 +70,6 @@ function rowOf(ready: Ready, entry: DecisionEntry, node: GraphNode | undefined):
     relevance: entry.relevance,
     answer: entry.answer == null ? undefined : answerText(ready, entry.answer, node),
     rationale: entry.rationale ?? undefined,
-    owners: (entry.owners ?? []).map((owner) => entityName(ready, owner)),
     affects: (entry.affects ?? []).map((key) => affectedOf(ready, key)),
     pins:
       pinned === undefined

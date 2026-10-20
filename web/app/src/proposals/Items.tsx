@@ -249,7 +249,7 @@ export function ItemList({ context, itemNode, only }: { context: ItemsContext; i
     return null;
   }
   return (
-    <ol className="stack proposal-items" data-testid="review-items">
+    <ol className="plain-list stack proposal-items" data-testid="review-items">
       {items.map((item, index) => {
         const reason = context.unresolved.get(index);
         const node = itemNode(item);

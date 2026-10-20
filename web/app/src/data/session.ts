@@ -33,7 +33,9 @@ import {
 } from "./session-root.ts";
 import { todayIn } from "./today.ts";
 import { saveEventOf, saveOf } from "./writes.ts";
-import { NODE_GONE } from "../ui/gone.ts";
+
+import { plural } from "../ui/words.ts";
+import { nodeTitle } from "../ui/gone.ts";
 
 /** The clock the session root's delays run on. */
 type Clock = NonNullable<ActorOptions<typeof sessionRoot>["clock"]>;
@@ -134,10 +136,10 @@ export class Session {
   /** Counts a write being sent, and returns its count. */
   readonly begin = (): number => ++this.#begun;
 
-  /** A node's title in a journey this tab holds, or its key. */
+  /** A node's title in a journey this tab holds, or words for one it does not. */
   readonly titleOf: TitleOf = (journey, node) => {
     const view = journeyView(this.journeys.getSnapshot(), journey);
-    return (view.status === "ready" ? view.journey.graph.nodes?.find((each) => each.key === node)?.title : undefined) ?? NODE_GONE;
+    return nodeTitle(view.status === "ready" ? view.journey.graph.nodes?.find((each) => each.key === node)?.title : undefined);
   };
 
   /** Whether the tab is in version skew, which never lifts until a reload. */
@@ -190,7 +192,7 @@ export class Session {
           },
           notes: {
             dropped: (count) => {
-              this.toasts.send({ type: "show", text: `${String(count)} unsent ${count === 1 ? "edit" : "edits"} from an earlier version of Cairn could not be kept.`, tone: "problem" });
+              this.toasts.send({ type: "show", text: `${plural(count, "unsent edit")} from an earlier version of Cairn could not be kept.`, tone: "problem" });
             },
             unstored: () => {
               this.toasts.send({ type: "show", text: "Your unsent edits are kept only until reload: this tab cannot store them.", tone: "problem" });

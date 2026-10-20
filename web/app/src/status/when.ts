@@ -3,6 +3,7 @@
 // "in 18 days (Nov 23)". A date more than two weeks off is a date: the distance is only worth a word
 // while it is near. Pure, so the unit tests check it without a page.
 import { dayOf } from "../timeline/model.ts";
+import { plural } from "../ui/words.ts";
 
 /** Days a date is called by its distance rather than by its name. */
 export const NEAR_DAYS = 14;
@@ -21,7 +22,7 @@ export function dateWords(date: string, today?: string): string {
 
 /** A count of days in words: "1 day", "3 days". */
 export function daysWords(days: number): string {
-  return days === 1 ? "1 day" : `${String(days)} days`;
+  return plural(days, "day");
 }
 
 /** Whole days from `today` to `date`; negative once it has passed. */
@@ -35,14 +36,14 @@ export function isSoon(date: string, today: string): boolean {
   return away >= 0 && away <= SOON_DAYS;
 }
 
-/** The ink a date is said in (DESIGN, Dates): error once it has gone by, warning while it is soon, none after; the class is `flag-bad` or `flag-warn`. */
+/** The ink a date is said in (DESIGN, Dates): error once it has gone by, warning while it is soon, none after; the class is `ink-bad` or `ink-warn`. */
 export function dateInk(date: string, today: string): "bad" | "warn" | undefined {
   return daysUntil(date, today) < 0 ? "bad" : isSoon(date, today) ? "warn" : undefined;
 }
 
 /** The class that says a date's ink, none when it has none. */
 export function inkClass(ink: "bad" | "warn" | undefined): string | undefined {
-  return ink === undefined ? undefined : `flag-${ink}`;
+  return ink === undefined ? undefined : `ink-${ink}`;
 }
 
 /** A moment in days, in words: "today", "tomorrow", "in 5 days", "yesterday", "3 days ago". */

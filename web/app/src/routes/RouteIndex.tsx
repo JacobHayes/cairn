@@ -19,6 +19,7 @@ import { newRoutePath, routePath } from "./address.ts";
 import { activeJourneyCounts, inUseWords, ofType, startableVersion, typeOf, type InUse, type RouteType } from "./model.ts";
 import "../journeys/journeys.css";
 import { Failed } from "../ui/Failed.tsx";
+import { RetiredBadge } from "./RetiredBadge.tsx";
 
 const TYPES = [
   { value: "all", label: "All types" },
@@ -43,7 +44,7 @@ function UseCell({ route, reading }: { route: RouteSummary; reading: UseReading 
   if (reading.kind === "failed") {
     return (
       <td data-column="use">
-        <span className="flag-bad">Could not be read</span>
+        <span className="ink-bad">Could not be read</span>
       </td>
     );
   }
@@ -55,7 +56,7 @@ function UseCell({ route, reading }: { route: RouteSummary; reading: UseReading 
       {reading.use.kind === "journeys" && !nothing ? (
         <Link to={indexPath({ ...ACTIVE, route: route.header.id })}>{words}</Link>
       ) : (
-        <span className={nothing ? "muted" : behind ? "flag-warn" : undefined}>{words}</span>
+        <span className={nothing ? "muted" : behind ? "ink-warn" : undefined}>{words}</span>
       )}
     </td>
   );
@@ -71,7 +72,7 @@ function RouteRow({ route, reading }: { route: RouteSummary; reading: UseReading
       <td data-column="name">
         <span className="cell-first">
           <Link to={routePath(header.id)}>{header.name}</Link>
-          {header.retired === true ? <Badge data-testid="retired">Retired</Badge> : route.draft_open ? <Badge tone="warn">Draft open</Badge> : null}
+          {header.retired === true ? <RetiredBadge kind={header.kind} /> : route.draft_open ? <Badge tone="warn">Draft open</Badge> : null}
         </span>
         {summary === undefined || summary === "" ? null : (
           <span className="cell-second cell-description" title={header.description ?? undefined}>

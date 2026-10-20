@@ -6,15 +6,16 @@
 // what Frontier lights at full strength with the rest faded, as is what Depth's Fade dims (the
 // level is then the Actions one, so nothing moves). A card opens the
 // node's detail (5.1) beside the canvas, or joins the selection; an edge opens the edge's card.
+import type { Schema } from "@cairn/client";
 import { Panel } from "@xyflow/react";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useLocation, useNavigate } from "react-router";
 
-import { nodeDetail, titleOf, type Ready } from "../detail/model.ts";
+import { KINDS, nodeDetail, OWNER_KIND, type Ready, titleOf } from "../detail/model.ts";
 import { contextMenuOf } from "../detail/offers.ts";
 import { screenSwitched } from "../journeys/address.ts";
 import { useJourneyTarget } from "../journeys/useJourneyTarget.ts";
-import { badgesOf, currentStagesOf, depthFaded, journeyLayoutView, levelRequestOf, litOf, stepHides, type LevelRequest } from "../journeys/requests.ts";
+import { journeyLayoutView, type LevelRequest } from "../journeys/requests.ts";
 import { EmptyPanel, journeySubject, NothingMatches, ResetView, ViewControls } from "../screens/ViewControls.tsx";
 import { useFrameActions } from "../shell/frame.tsx";
 import { overlayOpen, typing } from "../ui/typing.ts";
@@ -23,34 +24,21 @@ import { GraphCanvas, type Reveal } from "./GraphCanvas.tsx";
 import { errorWords, valueOf, type ReadView } from "../data/keyed-read.ts";
 import { useJoinedTrace, useLaidOut, useLevel, useProjected } from "./hooks.ts";
 import { journeyLooks } from "./journey.ts";
-import { ancestorsOf, collapsedAt, drawnStep, stepOf, withExpanded } from "./ladder.ts";
-import { KINDS, STRENGTH, cardsOf, linesOf, type CanvasModel, type JourneyExtras, type Level, type Line, type Step } from "./model.ts";
+import { ancestorsOf, withExpanded } from "./ladder.ts";
+import { STRENGTH, cardsOf, linesOf, type CanvasModel, type JourneyExtras, type Level, type Line } from "./model.ts";
 import type { CardActions } from "./NodeCard.tsx";
 import { standsFor, traceOverlay } from "./overlay.ts";
 import { refitKey } from "./refit.ts";
 import type { Selection } from "./selection.ts";
 import { graphPath, type GraphView } from "./settings.ts";
+import { Failed } from "../ui/Failed.tsx";
+import { useViewLevel } from "./viewLevel.ts";
 
 /** C1, C2, C5, C6: the journey's canvas model for one level. */
 export function journeyModel(ready: Ready, level: Level, extras: JourneyExtras): CanvasModel {
   const graph = ready.journey.graph.nodes ?? [];
   const looks = journeyLooks(ready, extras);
   return { cards: cardsOf(level, graph, looks), lines: linesOf(level, graph, (key) => looks.finished(key)) };
-}
-
-/**
- * What a canvas reads from the address and the page: the depth it is at, the step it draws (the
- * depth, or Actions under Fade) with the containers that draws collapses, and the containers
- * Hide at the depth would collapse (what Fade dims is measured against them).
- */
-function useLadder(ready: Ready, view: GraphView) {
-  return useMemo(() => {
-    const nodes = ready.journey.graph.nodes ?? [];
-    const depth: Step = stepOf({ step: view.state.depth }, nodes);
-    const drawn = drawnStep(depth, view.state.fade);
-    const current = currentStagesOf(ready);
-    return { nodes, depth, drawn, collapsed: collapsedAt(drawn, nodes, current, view.open, view.shut), hidden: collapsedAt(depth, nodes, current, view.open, view.shut) };
-  }, [ready, view.state.depth, view.state.fade, view.open, view.shut]);
 }
 
 /**
@@ -98,11 +86,8 @@ function onlyTraced(model: CanvasModel, traced: ReadonlySet<string>, drawn: Read
 const isPending = (read: ReadView<unknown>) => read.status === "idle" || read.status === "loading";
 
 /** The view's level (C2), and while Reveal is on, the whole journey's beside it under the same collapse, less what neither draws nor the trace reaches. */
-function useJourneyModel(ready: Ready, view: GraphView, collapsed: string[], drawn: Step, depth: Step, revealed: ReadonlySet<string> | undefined, selected: string | undefined) {
-  const request = useMemo(() => levelRequestOf(view.state, drawn, collapsed), [view.state, drawn, collapsed]);
+function useJourneyModel(ready: Ready, level: Schema<"Level"> | undefined, collapsed: string[], revealed: ReadonlySet<string> | undefined) {
   const everything = useMemo<LevelRequest | undefined>(() => (revealed === undefined ? undefined : { projection: "level", shown: KINDS, ...(collapsed.length === 0 ? {} : { collapsed }) }), [revealed, collapsed]);
-  // The node the address names is always drawn (C7): the level reads it in when the view's own does not.
-  const { level, error: levelError } = useLevel(ready, request, selected);
   const wholeRead = useProjected(ready, everything);
   const whole = valueOf(wholeRead);
   const mineRead = useProjected(ready, { projection: "mine" });
@@ -115,11 +100,10 @@ function useJourneyModel(ready: Ready, view: GraphView, collapsed: string[], dra
       return undefined;
     }
     const entries = mine ?? [];
-    const drawn = journeyModel(ready, shown, { mine: entries.map((entry) => entry.node), owned: entries.filter((entry) => entry.kinds.includes("k_owner")).map((entry) => entry.node) });
+    const drawn = journeyModel(ready, shown, { mine: entries.map((entry) => entry.node), owned: entries.filter((entry) => entry.kinds.includes(OWNER_KIND)).map((entry) => entry.node) });
     return revealed === undefined ? drawn : onlyTraced(drawn, revealed, new Set(level.nodes.map((node) => node.key)));
   }, [ready, level, whole, mine, answered, revealed]);
-  // Frontier, Fade's dimming and the viewer's expands and collapses keep the layout's positions; the step drawn, the Filter and the search lay it out afresh.
-  return { model, level, error: levelError ?? errorWords(wholeRead), layoutView: journeyLayoutView(view.state, depth) };
+  return { model, error: errorWords(wholeRead) };
 }
 
 export interface JourneyCanvasProps {
@@ -152,7 +136,7 @@ function useSelectionTrace(ready: Ready, selected: string | undefined) {
 /** What the canvas draws: the view's level laid out, the selected node's trace over it, what the highlights light, and what Reveal asks for. */
 function useGraph(ready: Ready, view: GraphView, selected: string | undefined, address: string | undefined) {
   const journey = ready.journey.header.id;
-  const { nodes, depth, drawn, collapsed, hidden } = useLadder(ready, view);
+  const nodes = ready.journey.graph.nodes ?? [];
   const { trace, learn } = useSelectionTrace(ready, selected);
   // Reveal (5.7) is a moment, not an address: it ends when something else is selected.
   const [revealedFor, setRevealedFor] = useState<{ node: string | undefined; linked: number } | undefined>(undefined);
@@ -160,9 +144,21 @@ function useGraph(ready: Ready, view: GraphView, selected: string | undefined, a
   const revealed = revealedFor !== undefined && revealedFor.node === selected ? revealedFor : undefined;
   const traceOnly = revealed === undefined ? undefined : traced;
   const open = useMemo(() => (traceOnly === undefined ? [] : [...traceOnly].flatMap((key) => ancestorsOf(nodes, key))), [traceOnly, nodes]);
-  const unfolded = useMemo(() => collapsed.filter((key) => !open.includes(key)), [collapsed, open]);
-  const { model, level, error, layoutView } = useJourneyModel(ready, view, unfolded, drawn, depth, traceOnly, address);
-  const laidRead = useLaidOut(journey, layoutView, model);
+  // The node the address names is always drawn (C7): the level reads it in when the view's own does not.
+  const { depth, collapsed, level, error: levelError, faded, base: lit, badges } = useViewLevel({
+    screen: "graph",
+    state: view.state,
+    nodes,
+    selected: address,
+    ready,
+    folds: view,
+    unfold: open,
+    alsoDrawn: traceOnly,
+    read: (request, at) => useLevel(ready, request, at),
+  });
+  const { model, error: wholeError } = useJourneyModel(ready, level, collapsed, traceOnly);
+  // Frontier, Fade's dimming and the viewer's expands and collapses keep the layout's positions; the step drawn, the Filter and the search lay it out afresh.
+  const laidRead = useLaidOut(journey, journeyLayoutView(view.state, depth), model);
   const laidOut = valueOf(laidRead);
   const layoutError = errorWords(laidRead);
   const rolledUp = laidOut?.model.cards.find((card) => card.key === selected)?.rolledUp;
@@ -175,14 +171,7 @@ function useGraph(ready: Ready, view: GraphView, selected: string | undefined, a
     () => (selected !== undefined && trace !== undefined && laidOut !== undefined ? traceOverlay(trace, laidOut.model, titleOf(ready, trace.node)) : undefined),
     [selected, trace, laidOut, ready],
   );
-  const lit = useMemo(() => litOf("graph", view.state, ready), [view.state, ready]);
-  // Revealed nodes are drawn beside the level's, and Depth's fade dims them as it does the rest.
-  const faded = useMemo(
-    () => (level === undefined ? undefined : depthFaded(view.state, nodes, depth, hidden, new Set([...level.nodes.map((node) => node.key), ...(traceOnly ?? [])]))),
-    [view.state, level, nodes, depth, hidden, traceOnly],
-  );
-  const badges = useMemo(() => badgesOf("graph", level?.hidden_by_class ?? {}, lit, stepHides(nodes, depth, hidden), view.state.fade), [level, lit, nodes, depth, hidden, view.state.fade]);
-  return { depth, trace, faded, laidOut, overlay, lit, badges, revealed: revealed?.linked, error: error ?? layoutError, reveal: (linked: number) => { setRevealedFor({ node: selected, linked }); }, hide: () => { setRevealedFor(undefined); } };
+  return { depth, trace, faded, laidOut, overlay, lit, badges, revealed: revealed?.linked, error: levelError ?? wholeError ?? layoutError, reveal: (linked: number) => { setRevealedFor({ node: selected, linked }); }, hide: () => { setRevealedFor(undefined); } };
 }
 
 /** What a card asks of the canvas: open its node, expand or collapse it (and refit to it, 5.1), trace it. */
@@ -293,7 +282,9 @@ export function JourneyCanvas({ ready, view, selected, edge, onPick, selection }
       <div className="stack">
         <ViewControls subject={journeySubject(ready)} screen="graph" badges={graph.badges} />
         <p className="callout callout-bad row">
-          The canvas could not be drawn: {graph.error} <ResetView />
+          <Failed what="The canvas" verb="drawn" error={graph.error}>
+            <ResetView />
+          </Failed>
         </p>
       </div>
     );

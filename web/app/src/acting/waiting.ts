@@ -5,12 +5,14 @@
 // and on a snooze's target when one holds.
 import type { Schema } from "@cairn/client";
 
-import { milestonesFirst, nodeOf, waitsOn, type GraphNode, type NodeKind, type Ready } from "../detail/model.ts";
+import { isStage, milestonesFirst, nodeOf, waitsOn, type GraphNode, type NodeKind, type Ready } from "../detail/model.ts";
 
 /** What one waiting decision waits on. */
 export interface Unblocker {
   node: string;
   kind: NodeKind;
+  /** Whether it is a stage (a top-level group). */
+  stage: boolean;
   /** How the dependency arose (Containment, Gating), or `snooze` for a snooze's target. */
   via: Schema<"DependencyVia"> | "snooze";
   /** The ancestor whose own dependency it is, when the decision waits on it through containment. */
@@ -35,9 +37,10 @@ export function unblockersOf(view: Ready, decision: GraphNode): { unblockers: Un
   const derived = view.derived.nodes[decision.key];
   const found = new Map<string, Unblocker>();
   const add = (node: string, via: Unblocker["via"], through?: string) => {
-    const kind = nodeOf(view, node)?.kind;
-    if (kind !== undefined && !found.has(node)) {
-      found.set(node, through === undefined ? { node, kind, via } : { node, kind, via, through });
+    const held = nodeOf(view, node);
+    if (held !== undefined && !found.has(node)) {
+      const base = { node, kind: held.kind, stage: isStage(held), via };
+      found.set(node, through === undefined ? base : { ...base, through });
     }
   };
   for (const held of waitsOn(view, decision.key)) {

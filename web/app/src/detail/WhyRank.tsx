@@ -14,7 +14,7 @@ import { gravityParts } from "./rank.ts";
 import { useStillWaiting } from "./reads.ts";
 import { holdingPhrase, rankClause } from "./sentence.ts";
 import { relativeDays } from "../status/when.ts";
-import { plural } from "./words.ts";
+import { plural } from "../ui/words.ts";
 
 const TERM_NAMES: Record<RankPart["signal"], string> = { urgency: "Urgency", late: "Running late", gravity: "Gravity", unlocks: "Unlocks" };
 

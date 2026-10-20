@@ -27,6 +27,7 @@ import { useJourneyReading, type JourneyReading } from "./reading.ts";
 import { listPath } from "./view.ts";
 import "./journeys.css";
 import { Failed } from "../ui/Failed.tsx";
+import { plural } from "../ui/words.ts";
 
 type Ready = Extract<JourneyReading, { status: "ready" }>;
 
@@ -86,7 +87,7 @@ function Group({ summary, reading }: { summary: JourneySummary; reading: Ready }
           held.count === 0 ? undefined : (
             <Link to={listPath(journey, { mine: true })} data-testid="home-held">
               {held.count} more of yours not ready yet
-              {held.late === 0 ? null : <span className="flag-bad">, {held.late} late</span>} &rsaquo;
+              {held.late === 0 ? null : <span className="ink-bad">, {held.late} late</span>} &rsaquo;
             </Link>
           )
         }
@@ -248,7 +249,7 @@ export function Home() {
       ) : null}
       {state === "ready" && reading > 0 ? (
         <p className="muted home-reading" data-testid="home-reading">
-          Reading {reading} more {reading === 1 ? "journey" : "journeys"}...
+          Reading {plural(reading, "more journey")}...
         </p>
       ) : null}
       {showTable ? <NotReady entries={waiting} folded={readyOnes.length > 0} /> : null}

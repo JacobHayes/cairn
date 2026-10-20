@@ -5,6 +5,7 @@ import type { Schema } from "@cairn/client";
 
 import type { FormCase } from "./actions-form.ts";
 import type { NodeKind } from "./model.ts";
+import { plural } from "../ui/words.ts";
 
 type ChoiceEffect = Schema<"ChoiceEffect">;
 type Consequences = Schema<"Consequences">;
@@ -44,25 +45,15 @@ export function keptWords(kind: FormCase, node: NodeKind): string {
   }
 }
 
-/** "1 node", "3 nodes". */
-export function plural(count: number, one: string, many = `${one}s`): string {
-  return `${String(count)} ${count === 1 ? one : many}`;
-}
-
-/** A node count with its word: "6 nodes". */
-function nodes(total: number): string {
-  return plural(total, "node");
-}
-
 /** What a choice's effect does to the scope, as phrases: "brings in 6 nodes", "drops 3 nodes (1 with recorded progress; it is kept)". */
 function scopeParts(effect: ChoiceEffect): string[] {
   const parts: string[] = [];
   if (effect.brings_in.total > 0) {
-    parts.push(`brings in ${nodes(effect.brings_in.total)}`);
+    parts.push(`brings in ${plural(effect.brings_in.total, "node")}`);
   }
   if (effect.drops.total > 0) {
     const progress = effect.drops_with_progress.total;
-    parts.push(`drops ${nodes(effect.drops.total)}${progress > 0 ? ` (${String(progress)} with recorded progress; ${progress === 1 ? "it is" : "they are"} kept)` : ""}`);
+    parts.push(`drops ${plural(effect.drops.total, "node")}${progress > 0 ? ` (${String(progress)} with recorded progress; ${progress === 1 ? "it is" : "they are"} kept)` : ""}`);
   }
   return parts;
 }
@@ -71,7 +62,7 @@ function scopeParts(effect: ChoiceEffect): string[] {
 export function effectWords(effect: ChoiceEffect): string {
   const found = scopeParts(effect);
   if (effect.opens_decisions.total > 0) {
-    found.push(`opens ${String(effect.opens_decisions.total)} more ${effect.opens_decisions.total === 1 ? "decision" : "decisions"}`);
+    found.push(`opens ${plural(effect.opens_decisions.total, "more decision")}`);
   }
   if (effect.decided_later.total > 0) {
     found.push(`${String(effect.decided_later.total)} decided later`);
@@ -86,7 +77,7 @@ export function effectWords(effect: ChoiceEffect): string {
 export function savingWords(effect: ChoiceEffect | undefined, caused: Consequences | undefined, name: (key: string) => string): { info: string | undefined; warning: string | undefined } {
   const info = effect === undefined ? [] : scopeParts(effect);
   if (caused?.unlocked !== undefined && caused.unlocked.length > 0) {
-    info.push(`frees ${nodes(caused.unlocked.length)} to start`);
+    info.push(`frees ${plural(caused.unlocked.length, "node")} to start`);
   }
   const warning: string[] = [];
   const titles = (keys: string[]) => keys.map(name).join(", ");

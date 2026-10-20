@@ -1,7 +1,7 @@
 // The small pieces every node detail section is built from: a collapsible section (C8 shows
 // everything, so most of it starts folded: progressive disclosure), a link to another node's
 // detail, and a list of contributing nodes.
-import { createContext, use, type ReactNode } from "react";
+import { createContext, use, type ComponentProps, type ReactNode } from "react";
 import { Link } from "react-router";
 
 import "./detail.css";
@@ -23,12 +23,19 @@ export function Rationale({ text }: { text: string | undefined }) {
   );
 }
 
-/** A link to another node's detail, by its title, keeping the view and what it shows (5.2). */
-export function NodeLink({ view, node }: { view: Ready; node: string }) {
+/**
+ * A link to a node, by its title (also its tooltip, for when a narrow place cuts it). It opens the
+ * node's detail beside the screen, keeping the view and what it shows, unless `to` says where
+ * else. The title comes from the journey `view`, or from `title` where there is no journey view
+ * (a route, an assistant reply); any other attribute goes to the link.
+ */
+export function NodeLink({ node, to, ...rest }: { node: string; to?: string } & ({ view: Ready; title?: undefined } | { view?: undefined; title: string }) & Omit<ComponentProps<typeof Link>, "to" | "title" | "children">) {
   const addresses = useNodeAddresses();
+  const { view, title, ...link } = rest;
+  const words = view === undefined ? title : titleOf(view, node);
   return (
-    <Link to={addresses.open(node)} data-node={node}>
-      {titleOf(view, node)}
+    <Link to={to ?? addresses.open(node)} data-node={node} title={words} {...link}>
+      {words}
     </Link>
   );
 }

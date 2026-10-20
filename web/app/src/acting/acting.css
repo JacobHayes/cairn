@@ -303,18 +303,23 @@ summary.node-panel-head {
 
 /* The decision's why gives way when the region cannot hold it: it is narrower than the window by
    the rail, and by the inspector's column while a node is open. The columns Columns adds stay and
-   the region scrolls to them, with Status and Title held at the left. A phone drops the owner, so
+   the region scrolls to them, with Status and Title held at the left. The owner goes with them (the inspector says it), so
    Status, Title and Due fit. */
 @container journey-scroll (max-width: 810px) {
-  .list-table [data-gives-way="true"] {
+  .list-table :is([data-gives-way="true"], [data-column="owner"]) {
     display: none;
   }
 }
 
 @container journey-scroll (max-width: 560px) {
-  .list-table [data-column="owner"] {
-    display: none;
+  /* Nesting stops indenting after two levels, so a deep title keeps its room; the guides stop with it. */
+  .list-table {
+    --tree-cap: 2;
   }
+}
+
+.list-title {
+  padding-inline-start: calc(min(var(--depth), var(--tree-cap, 99)) * var(--space-5));
 }
 
 /* A phone has no room for the Due column: it runs off the edge, and the title's cell says the due words instead. */
@@ -369,11 +374,11 @@ table.data.list-table tbody td {
 
 /* The owner and due columns keep their width whether rows fill the table or a search leaves none, so the header does not move; the title takes the rest. */
 .list-table th[data-column="owner"] {
-  width: 200px;
+  width: 160px;
 }
 
 .list-table th[data-column="due"] {
-  width: 168px;
+  width: 128px;
 }
 
 .list-table th,
@@ -478,13 +483,6 @@ table.data.list-table .badge {
 .node-row[data-state="done"] :is(.node-title, .node-fact),
 .list-table tr[data-state="done"] td:not(.list-check) {
   color: var(--color-muted);
-}
-
-.node-row[data-state="done"] .badge.done,
-.list-table tr[data-state="done"] .badge.done {
-  background: transparent;
-  border-color: var(--color-success);
-  color: var(--color-success);
 }
 
 .list-table td.list-pinned {
@@ -913,15 +911,6 @@ button.list-sort {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-}
-
-/* A fact in a tone: lateness in error ink and a near date in warning ink, always with its words (DESIGN, Dates). */
-.node-fact-bad {
-  color: var(--color-error);
-}
-
-.node-fact-warn {
-  color: var(--color-warning);
 }
 
 .node-panel-foot {

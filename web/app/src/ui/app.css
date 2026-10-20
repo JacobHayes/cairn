@@ -875,10 +875,10 @@ table.data {
   display: block;
   color: var(--color-secondary);
 }
-.index-table .cell-second.flag-warn {
+.index-table .cell-second.ink-warn {
   color: var(--color-warning);
 }
-.index-table .cell-second.flag-bad {
+.index-table .cell-second.ink-bad {
   color: var(--color-error);
 }
 .index-table td.num .meter {
@@ -1374,11 +1374,19 @@ button.tree-fold[aria-expanded="true"] .tree-chevron {
   transform: rotate(90deg);
 }
 
-/* The ink a date or a count is said in, on every screen: error once past, warning while soon (DESIGN, Dates). */
-.flag-bad {
+/* The chip of done work is the green one on every surface that lists a node (a card, a row, an inspector line): hollow, in the success colour, with the check (DESIGN, One status language). */
+.node-done .badge.done,
+[data-state="done"] .badge.done {
+  background: transparent;
+  border-color: var(--color-success);
+  color: var(--color-success);
+}
+
+/* The ink a date, a count or a fact is said in, on every screen: error once past, warning while soon, always with its words (DESIGN, Dates). */
+.ink-bad {
   color: var(--color-error);
 }
 
-.flag-warn {
+.ink-warn {
   color: var(--color-warning);
 }

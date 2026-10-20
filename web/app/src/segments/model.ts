@@ -9,6 +9,7 @@ import { decisionsIn } from "../authoring/condition.ts";
 import { childrenOf, type Graph, type GraphNode, type Kind, type Mutation, type Role, type Tree } from "../authoring/graph.ts";
 import { mintKey, slugOf, uniqueId } from "../authoring/keys.ts";
 import { DIFF_LABELS, type DiffMark } from "../proposals/model.ts";
+import { plural } from "../ui/words.ts";
 
 type Lineage = Schema<"Lineage">;
 type Insertion = Schema<"Insertion">;
@@ -56,7 +57,7 @@ export function wrapRoots(roots: readonly GraphNode[], name: string, joining: re
 /** "4 steps": how many nodes inserting it adds. */
 export function sizeWords(segment: Graph): string {
   const count = (segment.nodes ?? []).length;
-  return `${String(count)} ${count === 1 ? "step" : "steps"}`;
+  return plural(count, "step");
 }
 
 /** What fills a role in the graph: a decision whose answer does (E3), or a direct fill kept in a journey's state. */

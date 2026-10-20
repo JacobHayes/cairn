@@ -4,7 +4,8 @@
 // any node rejects it whole and names which (A15, D4).
 import type { Schema } from "@cairn/client";
 
-import { movesFrom, nodeOf, recordOf, storedSnooze, transition, type GraphNode, type Mutation, type NodeDerived, type Ready, type State } from "../detail/model.ts";
+import { type GraphNode, movesFrom, type Mutation, type NodeDerived, nodeOf, OWNER_KIND, type Ready, recordOf, type State, storedSnooze, transition } from "../detail/model.ts";
+import { namedList } from "../ui/words.ts";
 
 /** What the acting surfaces read about one node. */
 export interface Facts {
@@ -76,7 +77,7 @@ export function doneMutations(key: string, evidence: Evidence = {}): Mutation[] 
 
 /** D2, E2: make `entity` the owner of `key`, explicitly. */
 export function assignOwner(key: string, entity: string): Mutation {
-  return { op: "set_participation", node: key, kind: "k_owner", source: [entity] };
+  return { op: "set_participation", node: key, kind: OWNER_KIND, source: [entity] };
 }
 
 /** C9: an action over every selected node. */
@@ -131,8 +132,7 @@ export function reasonFor(action: BulkAction, selected: Facts[], title: (key: st
   if (!("unable" in plan)) {
     return undefined;
   }
-  const [first = "", ...rest] = plan.unable.map(title);
-  return `${first}${rest.length === 0 ? "" : ` and ${String(rest.length)} more`} cannot ${VERB[action.act]} in ${rest.length === 0 ? "its" : "their"} current state`;
+  return `${namedList(plan.unable.map(title))} cannot ${VERB[action.act]} in ${plan.unable.length === 1 ? "its" : "their"} current state`;
 }
 
 /**
