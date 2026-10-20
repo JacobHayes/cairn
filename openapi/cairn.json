@@ -3466,6 +3466,7 @@
           "identity_created",
           "identity_edited",
           "identities_merged",
+          "identity_deleted",
           "proposal_created",
           "proposal_edited",
           "proposal_applied",
@@ -4725,6 +4726,31 @@
         "minLength": 1,
         "pattern": "^who_[a-z0-9][a-z0-9_-]*$",
         "type": "string"
+      },
+      "IdentityReferences": {
+        "additionalProperties": false,
+        "description": "Everything that refers to an identity, directly or through an alias (E6): every journey,\nwhatever its status, and every route whose draft or published versions do. Authoritative:\nan identity with neither can be deleted.",
+        "properties": {
+          "journeys": {
+            "description": "The journeys, in id order.",
+            "items": {
+              "$ref": "#/components/schemas/JourneySummary"
+            },
+            "type": "array"
+          },
+          "routes": {
+            "description": "The routes, in id order.",
+            "items": {
+              "$ref": "#/components/schemas/RouteReference"
+            },
+            "type": "array"
+          }
+        },
+        "required": [
+          "journeys",
+          "routes"
+        ],
+        "type": "object"
       },
       "InsertedEdge": {
         "additionalProperties": false,
@@ -7217,11 +7243,11 @@
           },
           {
             "additionalProperties": false,
-            "description": "Merge one identity into another (deployment, E6).",
+            "description": "Merge identities into one that remains (deployment, E6): every merged identity's emails\nmove to the survivor and each merged key becomes an alias of it, all checked against one\nsnapshot.",
             "properties": {
               "journeys": {
                 "additionalProperties": false,
-                "description": "Every journey referencing either, at the revision the merge was checked against;\nat most `journey_count_per_merge_max`.",
+                "description": "Every journey referencing the survivor or any merged identity, at the revision the\nmerge was checked against; at most `journey_count_per_merge_max`.",
                 "maxProperties": 1000,
                 "patternProperties": {
                   "^j_[a-z0-9][a-z0-9_-]*$": {
@@ -7231,8 +7257,13 @@
                 "type": "object"
               },
               "merged": {
-                "$ref": "#/components/schemas/IdentityKey",
-                "description": "The identity merged into it, whose key becomes an alias."
+                "description": "The identities merged into it, whose keys become aliases; at least one, at most\n`identity_count_per_fill_max`.",
+                "items": {
+                  "$ref": "#/components/schemas/IdentityKey"
+                },
+                "maxItems": 100,
+                "type": "array",
+                "uniqueItems": true
               },
               "op": {
                 "const": "merge_identities",
@@ -7248,6 +7279,25 @@
               "survivor",
               "merged",
               "journeys"
+            ],
+            "type": "object"
+          },
+          {
+            "additionalProperties": false,
+            "description": "Delete an identity nothing refers to (deployment, E6): the identity, its emails, and\nevery alias resolving to it. Rejected while any journey, route draft, or route version\nrefers to it or to one of its aliases; the commit rechecks that none does.",
+            "properties": {
+              "identity": {
+                "$ref": "#/components/schemas/IdentityKey",
+                "description": "The identity."
+              },
+              "op": {
+                "const": "delete_identity",
+                "type": "string"
+              }
+            },
+            "required": [
+              "op",
+              "identity"
             ],
             "type": "object"
           },
@@ -11114,6 +11164,12 @@
             "minimum": 0,
             "type": "integer"
           },
+          "identities_deleted": {
+            "description": "Identities it deletes.",
+            "format": "uint32",
+            "minimum": 0,
+            "type": "integer"
+          },
           "identities_edited": {
             "description": "Identities it edits.",
             "format": "uint32",
@@ -13185,6 +13241,33 @@
         ],
         "type": "object"
       },
+      "RouteReference": {
+        "additionalProperties": false,
+        "description": "Where a route refers to an identity (E6): its draft, and the published versions.",
+        "properties": {
+          "draft": {
+            "description": "Whether its draft refers to the identity.",
+            "type": "boolean"
+          },
+          "header": {
+            "$ref": "#/components/schemas/RouteHeader",
+            "description": "The route's fields."
+          },
+          "versions": {
+            "description": "The published versions that refer to it, ascending.",
+            "items": {
+              "$ref": "#/components/schemas/VersionNumber"
+            },
+            "type": "array"
+          }
+        },
+        "required": [
+          "header",
+          "draft",
+          "versions"
+        ],
+        "type": "object"
+      },
       "RouteSummary": {
         "additionalProperties": false,
         "description": "A route in the route index (I2).",
@@ -14889,6 +14972,7 @@
           "email_taken",
           "alias_cycle",
           "merge_breaks_journey",
+          "identity_in_use",
           "proposal_not_open",
           "unresolved_review_item"
         ],
@@ -15130,6 +15214,100 @@
           }
         },
         "summary": "The deployment: identities and aliases (E6)."
+      }
+    },
+    "/api/deployment/identities/{key}/references": {
+      "get": {
+        "operationId": "getIdentityReferences",
+        "parameters": [
+          {
+            "description": "The identity.",
+            "in": "path",
+            "name": "key",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/IdentityKey"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/IdentityReferences"
+                }
+              }
+            },
+            "description": "Answered."
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "The request is malformed."
+          },
+          "401": {
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "description": "No credential, or one that is refused (the auth layer, in text)."
+          },
+          "403": {
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "description": "The auth layer refused the peer: a local-only provider and a remote peer, or login headers from a peer no proxy-mode provider trusts (in text)."
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "No such resource."
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "The server failed; the request id names it in the logs."
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              },
+              "text/plain": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "description": "A limit was reached or the request timed out; retry after `Retry-After`. Or: The auth layer could not ask a sign-in provider (in text, without `Retry-After`)."
+          }
+        },
+        "summary": "The journeys and routes referring to an identity, directly or through an alias: what a delete is checked against (E6)."
       }
     },
     "/api/deployment/patches": {

@@ -635,7 +635,7 @@ fn merge_group(service: &Service) -> Group {
         "identity create",
     );
     let merge: Patch = parsed(&format!(
-        "id: p_wasm_merge\ntarget: deployment\nbase_revision: {}\nmutations:\n- op: merge_identities\n  survivor: who_n4q6tx2vkc5jhsd7\n  merged: who_d4m6uk2eqf5rbhzs\n  journeys: {{{id}: {journey}}}\n",
+        "id: p_wasm_merge\ntarget: deployment\nbase_revision: {}\nmutations:\n- op: merge_identities\n  survivor: who_n4q6tx2vkc5jhsd7\n  merged: [who_d4m6uk2eqf5rbhzs]\n  journeys: {{{id}: {journey}}}\n",
         deployment.next()
     ));
     served(

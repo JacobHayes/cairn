@@ -4,8 +4,8 @@
 use std::collections::{BTreeMap, BTreeSet};
 
 use cairn_schema::{
-    Actor, Domain, Email, Event, Identity, IdentityKey, JourneyId, Mutation, ProposalOutline,
-    Revision, RevisionOf, RouteId, RouteKind,
+    Actor, Domain, Email, Event, GraphId, Identity, IdentityKey, JourneyId, Mutation,
+    ProposalOutline, RevisionOf, RouteId, RouteKind,
 };
 use cairn_store::backend;
 use cairn_store::{
@@ -16,7 +16,9 @@ use cairn_store::{
 use turso::{Connection, Value};
 
 use crate::load;
-use crate::sql::{corrupt, domain_columns, first, int, json_enum, parse, rows, text, time};
+use crate::sql::{
+    corrupt, domain_columns, first, graph_from, int, json_enum, parse, rows, text, time,
+};
 
 const JOURNEY_GRAPH: &str = "journey/";
 
@@ -29,7 +31,9 @@ pub(crate) async fn journeys(
     query: &JourneyQuery,
 ) -> Result<Page<JourneySummary, JourneyId>, StoreError> {
     let referencing = match &query.referencing {
-        Some(identities) => Some(referencing(connection, identities).await?),
+        Some(identities) => Some(backend::query::journeys_among(
+            &referencing(connection, identities).await?,
+        )),
         None => None,
     };
     let select = "SELECT j.id, j.name, j.status, j.lineage_route, j.lineage_version, j.revision, \
@@ -137,25 +141,11 @@ async fn latest_versions(
     Ok(latest)
 }
 
-/// E6: the journeys referring to any of `identities`, directly or through an alias, at their
-/// current revisions.
+/// E6: the graphs referring to any of `identities`, directly or through an alias.
 pub(crate) async fn referencing(
     connection: &Connection,
     identities: &BTreeSet<IdentityKey>,
-) -> Result<BTreeMap<JourneyId, Revision>, StoreError> {
-    let mut found = BTreeMap::new();
-    for journey in referencing_ids(connection, identities).await? {
-        let of = RevisionOf::Domain(Domain::Journey(journey.clone()));
-        found.insert(journey, load::revision_of(connection, &of).await?);
-    }
-    Ok(found)
-}
-
-/// E6: the ids of the journeys referring to any of `identities`, directly or through an alias.
-async fn referencing_ids(
-    connection: &Connection,
-    identities: &BTreeSet<IdentityKey>,
-) -> Result<BTreeSet<JourneyId>, StoreError> {
+) -> Result<BTreeSet<GraphId>, StoreError> {
     let mut aliases = BTreeMap::new();
     for row in rows(
         connection,
@@ -166,42 +156,31 @@ async fn referencing_ids(
     {
         aliases.insert(row.parse(0)?, row.parse(1)?);
     }
-    // A condition names an identity as a JSON string, so its quoted key is searched for.
     let selects = [
-        (
-            "SELECT graph_id FROM answer_identities WHERE identity = ?1",
-            false,
-        ),
-        (
-            "SELECT graph_id FROM role_fill_identities WHERE identity = ?1",
-            false,
-        ),
-        (
-            "SELECT graph_id FROM participation_identities WHERE identity = ?1",
-            false,
-        ),
-        (
-            "SELECT graph_id FROM nodes WHERE relevant_when IS NOT NULL \
-             AND instr(relevant_when, ?1) > 0",
-            true,
-        ),
+        "SELECT graph_id FROM answer_identities WHERE identity = ?1",
+        "SELECT graph_id FROM role_fill_identities WHERE identity = ?1",
+        "SELECT graph_id FROM participation_identities WHERE identity = ?1",
+        "SELECT graph_id FROM condition_identities WHERE identity = ?1",
     ];
     let mut found = BTreeSet::new();
     for key in backend::query::with_aliases(identities, &aliases) {
-        for (select, quoted) in selects {
-            let param = if quoted {
-                format!("\"{key}\"")
-            } else {
-                key.to_string()
-            };
-            for row in rows(connection, select, vec![text(&param)]).await? {
-                if let Some(journey) = journey_of_graph(&row.text(0)?)? {
-                    found.insert(journey);
-                }
+        for select in selects {
+            for row in rows(connection, select, vec![text(&key)]).await? {
+                found.insert(graph_from(&row.text(0)?)?);
             }
         }
     }
     Ok(found)
+}
+
+/// E6: the ids of the journeys referring to any of `identities`, directly or through an alias.
+async fn referencing_ids(
+    connection: &Connection,
+    identities: &BTreeSet<IdentityKey>,
+) -> Result<BTreeSet<JourneyId>, StoreError> {
+    Ok(backend::query::journeys_among(
+        &referencing(connection, identities).await?,
+    ))
 }
 
 /// A destination as it is now.

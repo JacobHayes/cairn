@@ -1,7 +1,7 @@
 //! The memory backend's index and history queries: scans over the records, the reference
 //! answers every backend's queries are held to.
 
-use std::collections::{BTreeMap, BTreeSet};
+use std::collections::BTreeSet;
 
 use cairn_schema::{
     Domain, Email, GraphId, Identity, IdentityKey, JourneyId, ProposalOutline, ProposalStatus,
@@ -30,10 +30,9 @@ impl State {
     }
 
     pub(super) fn journeys(&self, query: &JourneyQuery) -> Page<JourneySummary, JourneyId> {
-        let referencing = query
-            .referencing
-            .as_ref()
-            .map(|identities| self.domains.journeys_referencing(identities));
+        let referencing = query.referencing.as_ref().map(|identities| {
+            backend::query::journeys_among(&self.domains.graphs_referencing(identities))
+        });
         let mut items = Vec::new();
         for (id, (header, revision)) in &self.domains.journeys {
             let summary = JourneySummary {
@@ -99,12 +98,9 @@ impl State {
 
     pub(super) fn proposals(&self, query: &ProposalQuery) -> ProposalPage {
         let waiting = match &query.scope {
-            ProposalScope::Waiting { identities, .. } => Some(
-                self.domains
-                    .journeys_referencing(identities)
-                    .into_keys()
-                    .collect(),
-            ),
+            ProposalScope::Waiting { identities, .. } => Some(backend::query::journeys_among(
+                &self.domains.graphs_referencing(identities),
+            )),
             _ => None,
         };
         let candidates = self
@@ -288,12 +284,9 @@ fn graph_hits(graph: &cairn_schema::Graph, needle: &str) -> BTreeSet<SearchHit> 
     hits
 }
 
-/// The journeys referencing identities, for the trait's query.
-pub(super) fn referencing(
-    state: &State,
-    identities: &BTreeSet<IdentityKey>,
-) -> BTreeMap<JourneyId, cairn_schema::Revision> {
-    state.domains.journeys_referencing(identities)
+/// The graphs referencing identities, for the trait's query.
+pub(super) fn referencing(state: &State, identities: &BTreeSet<IdentityKey>) -> BTreeSet<GraphId> {
+    state.domains.graphs_referencing(identities)
 }
 
 /// C14, C16: whether an open proposal belongs in a listing's scope. `waiting` is the journeys

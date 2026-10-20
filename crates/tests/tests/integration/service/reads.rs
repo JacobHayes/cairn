@@ -295,7 +295,7 @@ async fn cached_and_uncached_reads_agree_across_an_identity_merge(store: Arc<dyn
         "deployment",
         2,
         &format!(
-            "- op: merge_identities\n  survivor: who_dup\n  merged: who_k3d7qm2xw5tn6pfa\n  journeys: {{j_vendor_eval: {revision}}}\n"
+            "- op: merge_identities\n  survivor: who_dup\n  merged: [who_k3d7qm2xw5tn6pfa]\n  journeys: {{j_vendor_eval: {revision}}}\n"
         ),
     );
     applied(cached.patch(&call("u_lead", AT), &domain(merge)).await);

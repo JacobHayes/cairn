@@ -3,14 +3,14 @@
 //! with the revisions that moved and what their events touched, and the client decides
 //! (H5).
 
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, BTreeSet};
 use std::fmt;
 use std::panic::{AssertUnwindSafe, catch_unwind};
 
 use cairn_engine::{Applied, ApplyInputs, Records, apply};
 use cairn_schema::{
-    Consequences, Domain, EventType, JourneyId, Location, Markdown, Mutation, Notice, Patch,
-    PatchReceipt, PatchTarget, ProposalId, Record, Rejection, Revision, RevisionOf, Subject,
+    Consequences, Domain, EventType, IdentityKey, JourneyId, Location, Markdown, Mutation, Notice,
+    Patch, PatchReceipt, PatchTarget, ProposalId, Record, Rejection, Revision, RevisionOf, Subject,
     Violation, ViolationCode, Violations, Write,
 };
 use cairn_store::{Commit, CommitError, Committed, EventQuery, PageSize};
@@ -226,11 +226,11 @@ impl Service {
     }
 
     /// H5, E6: whether `patch`, a lone identity merge whose id is committed, asks for the
-    /// merge that id committed. A merge names the journeys referencing either identity at
+    /// merge that id committed. A merge names the journeys referencing its identities at
     /// their revisions when it was drafted, which a client reads from the index, so a
     /// resubmission after any of them moved carries other content for the same merge; it is
     /// matched by what it merges (briefs/4.3-mcp.md, Decision log): the committed patch's
-    /// one event merged the same identity into the same survivor.
+    /// one event merged the same identities into the same survivor.
     async fn merged_as(&self, patch: &Patch) -> Result<bool, WriteError> {
         let [
             Mutation::MergeIdentities {
@@ -253,14 +253,29 @@ impl Service {
         let [logged] = events.as_slice() else {
             return Ok(false);
         };
-        let alias = Record::IdentityAlias {
-            alias: merged.clone(),
-            identity: survivor.clone(),
-        };
         let event = &logged.event;
+        // The identities the committed merge removed are exactly the ones asked for, each now
+        // an alias of the survivor: a subset or a superset is another merge.
+        let removed: BTreeSet<&IdentityKey> = event
+            .delta
+            .iter()
+            .filter_map(|write| match write {
+                Write::Remove(cairn_schema::RecordKey::Identity(key)) => Some(key),
+                _ => None,
+            })
+            .collect();
+        let asked: BTreeSet<&IdentityKey> = merged.iter().collect();
+        let aliased = |alias: &IdentityKey| {
+            let put = Record::IdentityAlias {
+                alias: alias.clone(),
+                identity: survivor.clone(),
+            };
+            event.delta.contains(&Write::Put(put))
+        };
         Ok(event.event_type == EventType::IdentitiesMerged
-            && event.subject == Subject::Identity(merged.clone())
-            && event.delta.contains(&Write::Put(alias)))
+            && event.subject == Subject::Identity(survivor.clone())
+            && removed == asked
+            && merged.iter().all(aliased))
     }
 
     /// Commits what `apply` accepted, rechecking every revision it read, and announces it.

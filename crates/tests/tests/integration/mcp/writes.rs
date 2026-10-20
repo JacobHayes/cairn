@@ -254,7 +254,7 @@ async fn a_merge_resubmitted_after_its_journeys_moved_is_answered_from_its_recei
     });
     world.ok(&ann, "answer_decision", informed).await;
     let merge = |survivor: &str, merged: &str| {
-        json!({ "change": { "merge": { "survivor": survivor, "merged": merged } },
+        json!({ "change": { "merge": { "survivor": survivor, "merged": [merged] } },
             "patch_id": "p_merge", "base_revision": 1 })
     };
     let merged = world

@@ -92,6 +92,7 @@ pub enum ViolationCode {
     EmailTaken,
     AliasCycle,
     MergeBreaksJourney,
+    IdentityInUse,
     // Proposals (I6, C14).
     ProposalNotOpen,
     UnresolvedReviewItem,

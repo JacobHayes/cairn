@@ -12,11 +12,13 @@ use crate::sql::{SqlError, execute, int, rows};
 pub(crate) enum Step {
     Sql(&'static str),
     Identities,
+    Conditions,
+    MergeLists,
 }
 
 /// Every migration, numbered from 1, in order. A migration is never edited once released;
 /// a change is a new one. It is a list of steps run in one transaction with its number.
-pub(crate) const MIGRATIONS: [(u32, &[Step]); 12] = [
+pub(crate) const MIGRATIONS: [(u32, &[Step]); 13] = [
     (1, &[Step::Sql(include_str!("migrations/0001_initial.sql"))]),
     (
         2,
@@ -81,6 +83,14 @@ pub(crate) const MIGRATIONS: [(u32, &[Step]); 12] = [
             "migrations/0012_sign_in_identities.sql"
         ))],
     ),
+    (
+        13,
+        &[
+            Step::Sql(include_str!("migrations/0013_condition_identities.sql")),
+            Step::Conditions,
+            Step::MergeLists,
+        ],
+    ),
 ];
 
 /// Puts the database in MVCC mode and applies the migrations it lacks.
@@ -118,6 +128,8 @@ pub(crate) async fn run(connection: &Connection) -> Result<(), StoreError> {
                         .await
                         .map_err(SqlError::from)?,
                     Step::Identities => crate::to_identities::run(connection).await?,
+                    Step::Conditions => crate::conditions::backfill(connection).await?,
+                    Step::MergeLists => crate::to_identities::list_merged(connection).await?,
                 }
             }
             execute(

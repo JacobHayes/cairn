@@ -99,21 +99,28 @@ impl Domains {
         .unwrap_or_default()
     }
 
-    /// E6: the journeys referring to any of `identities`, directly or through an alias, at
-    /// their current revisions.
-    pub fn journeys_referencing(
+    /// E6: the graphs referring to any of `identities`, directly or through an alias.
+    pub fn graphs_referencing(
         &self,
         identities: &BTreeSet<cairn_schema::IdentityKey>,
-    ) -> BTreeMap<JourneyId, Revision> {
+    ) -> BTreeSet<GraphId> {
         let keys = crate::backend::query::with_aliases(identities, &self.deployment.aliases);
-        self.journeys
+        self.graphs
             .iter()
-            .filter(|(id, _)| {
-                let graph = self.graph(&GraphId::Journey((*id).clone()));
-                !crate::backend::query::identity_references(&graph).is_disjoint(&keys)
-            })
-            .map(|(id, (_, revision))| (id.clone(), *revision))
+            .filter(|(_, graph)| !graph.identity_references().is_disjoint(&keys))
+            .map(|(id, _)| id.clone())
             .collect()
+    }
+
+    /// The revision of the domain a graph belongs to: its journey's, or its route's.
+    pub fn graph_revision(&self, graph: &GraphId) -> Revision {
+        let domain = match graph {
+            GraphId::Journey(journey) => Domain::Journey(journey.clone()),
+            GraphId::RouteDraft(route) | GraphId::RouteVersion { route, .. } => {
+                Domain::Route(route.clone())
+            }
+        };
+        self.revision(&cairn_schema::RevisionOf::Domain(domain))
     }
 
     /// J5: the nodes an event is about or wrote on, with the nodes whose edges a whole-node

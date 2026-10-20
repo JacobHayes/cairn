@@ -4,11 +4,11 @@
 //! trust boundary (H4), so reads take no call. Derived reads and projections, which depend on
 //! the caller's today and identities, are in `projections`.
 
-use std::collections::BTreeSet;
+use std::collections::{BTreeMap, BTreeSet};
 
 use cairn_schema::{
-    Deployment, Journey, JourneyId, Revision, Route, RouteHeader, RouteId, RouteKind, RouteVersion,
-    VersionNumber,
+    Deployment, GraphId, IdentityKey, Journey, JourneyId, Revision, Route, RouteHeader, RouteId,
+    RouteKind, RouteVersion, VersionNumber,
 };
 use cairn_store::{
     Document, EventQuery, JourneyMatches, JourneyQuery, JourneySummary, LoadTarget, LoggedEvent,
@@ -31,7 +31,93 @@ pub struct RouteSummary {
     pub draft_open: bool,
 }
 
+/// E6: where a route refers to an identity: which of its graphs do.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct RouteReference {
+    /// The route's fields.
+    pub header: RouteHeader,
+    /// Whether its draft refers to the identity.
+    pub draft: bool,
+    /// The published versions that refer to it.
+    pub versions: Vec<VersionNumber>,
+}
+
+/// E6: everything that refers to an identity, directly or through an alias: the journeys, and
+/// the routes whose draft or published versions do.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct IdentityReferences {
+    /// The journeys, in id order, whatever their status.
+    pub journeys: Vec<JourneySummary>,
+    /// The routes, in id order.
+    pub routes: Vec<RouteReference>,
+}
+
 impl Service {
+    /// E6: the journeys and routes referring to the identity `identity`, or none when the
+    /// deployment has no such identity. Authoritative: the store's exact references over every
+    /// graph (journeys, route drafts and published versions), the same set a delete is
+    /// checked against. Cost: one reference query, then a journey-index read per page of the
+    /// journeys and one route load per route.
+    ///
+    /// # Errors
+    ///
+    /// When the store fails.
+    pub async fn identity_references(
+        &self,
+        identity: &IdentityKey,
+    ) -> Result<Option<IdentityReferences>, ServiceError> {
+        if self.deployment().await?.identities.get(identity).is_none() {
+            return Ok(None);
+        }
+        let graphs = self
+            .store
+            .graphs_referencing(&BTreeSet::from([identity.clone()]))
+            .await?;
+        let mut journeys = Vec::new();
+        let mut query = JourneyQuery {
+            referencing: Some(BTreeSet::from([identity.clone()])),
+            size: PageSize::MAX,
+            ..JourneyQuery::default()
+        };
+        loop {
+            let page = self.store.journeys(&query).await?;
+            journeys.extend(page.items);
+            match page.next {
+                Some(after) => query.after = Some(after),
+                None => break,
+            }
+        }
+        let mut drafts = BTreeSet::new();
+        let mut versions: BTreeMap<RouteId, Vec<VersionNumber>> = BTreeMap::new();
+        for graph in &graphs {
+            match graph {
+                GraphId::Journey(_) => {}
+                GraphId::RouteDraft(route) => {
+                    drafts.insert(route.clone());
+                }
+                GraphId::RouteVersion { route, version } => {
+                    versions.entry(route.clone()).or_default().push(*version);
+                }
+            }
+        }
+        let routes: BTreeSet<&RouteId> = drafts.iter().chain(versions.keys()).collect();
+        let mut referring = Vec::with_capacity(routes.len());
+        for id in routes {
+            // A route the references name always loads: routes are never deleted (A19).
+            if let Some(route) = self.route(id).await? {
+                referring.push(RouteReference {
+                    header: route.header,
+                    draft: drafts.contains(id),
+                    versions: versions.get(id).cloned().unwrap_or_default(),
+                });
+            }
+        }
+        Ok(Some(IdentityReferences {
+            journeys,
+            routes: referring,
+        }))
+    }
+
     /// I2: the route index, in id order, paged: the routes of `kind` (every kind when none)
     /// after `after`, at most `size`. Cost: the store's revisions of every domain (a row each),
     /// then one route load per route passed over or on the page.

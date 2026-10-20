@@ -257,7 +257,7 @@ mod in_process {
             "p_merge",
             "deployment",
             1,
-            "- op: merge_identities\n  survivor: who_d4m6uk2eqf5rbhzs\n  merged: who_e7h2jv3nxc4yaw6t\n  journeys: {j_vendor_eval: 2}\n",
+            "- op: merge_identities\n  survivor: who_d4m6uk2eqf5rbhzs\n  merged: [who_e7h2jv3nxc4yaw6t]\n  journeys: {j_vendor_eval: 2}\n",
         );
         landed(view.client.patch(merge, None).await);
         let heard = view.follow().await;

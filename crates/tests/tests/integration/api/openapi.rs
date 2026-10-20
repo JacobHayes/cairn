@@ -45,6 +45,7 @@ mod in_process {
             ("route_version", vec![&at::ROUTE_VERSION]),
             ("route_detail", vec![&at::ROUTE_VERSIONS]),
             ("deployment", vec![&at::DEPLOYMENT]),
+            ("identity_references", vec![&at::IDENTITY_REFERENCES]),
             ("journeys", vec![&at::JOURNEYS]),
             ("search", vec![&at::SEARCH]),
             ("events", vec![&at::EVENTS]),
@@ -214,6 +215,10 @@ mod in_process {
                 "/api/routes/vendor-evaluation/versions/1",
             ),
             (&at::DEPLOYMENT, "/api/deployment"),
+            (
+                &at::IDENTITY_REFERENCES,
+                "/api/deployment/identities/who_d4m6uk2eqf5rbhzs/references",
+            ),
             (&at::SEARCH, "/api/search?text=vendor"),
             (&at::EVENTS, "/api/events?size=3"),
             (&at::CALLER, "/api/users/me"),

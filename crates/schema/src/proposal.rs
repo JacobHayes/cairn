@@ -609,6 +609,9 @@ pub struct ProposalOutline {
     /// Identities it merges into another.
     #[serde(default, skip_serializing_if = "crate::serde_util::is_zero")]
     pub identities_merged: u32,
+    /// Identities it deletes.
+    #[serde(default, skip_serializing_if = "crate::serde_util::is_zero")]
+    pub identities_deleted: u32,
     /// Roles, participation kinds, role fills, the default owner and annotations it changes.
     #[serde(default, skip_serializing_if = "crate::serde_util::is_zero")]
     pub other: u32,
@@ -716,7 +719,10 @@ fn tally_other(outline: &mut ProposalOutline, mutation: &Mutation) -> bool {
         Mutation::RemoveEdge { .. } => outline.requirements_removed += 1,
         Mutation::CreateIdentity { .. } => outline.identities_created += 1,
         Mutation::EditIdentity { .. } => outline.identities_edited += 1,
-        Mutation::MergeIdentities { .. } => outline.identities_merged += 1,
+        Mutation::MergeIdentities { merged, .. } => {
+            outline.identities_merged += u32::try_from(merged.len()).unwrap_or(u32::MAX);
+        }
+        Mutation::DeleteIdentity { .. } => outline.identities_deleted += 1,
         Mutation::AddRole { .. }
         | Mutation::EditRole { .. }
         | Mutation::RemoveRole { .. }

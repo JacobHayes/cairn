@@ -21,6 +21,7 @@ pub mod id;
 pub mod json_schema;
 pub mod limits;
 pub mod login;
+pub mod mention;
 pub mod node;
 mod node_schema;
 pub mod notice;
@@ -77,6 +78,7 @@ pub use jiff::Timestamp;
 pub use jiff::civil::Date;
 pub use limits::{Limit, LimitExceeded};
 pub use login::Login;
+pub use mention::{Mention, condition_identities};
 pub use node::{
     Action, AnswerSpec, AnswerType, Choice, Choices, DateRule, DateSource, Decision, Deliverable,
     Direction, Group, IdentitySet, KindField, LabeledChoice, Milestone, Node, NodeKind,

@@ -9,6 +9,7 @@
 //! runtime needs its time driver.
 
 mod commit;
+mod conditions;
 mod durable;
 mod graph;
 mod load;
@@ -24,13 +25,13 @@ mod to_identities;
 mod write;
 mod write_state;
 
-use std::collections::{BTreeMap, BTreeSet};
+use std::collections::BTreeSet;
 use std::path::Path;
 
 use async_trait::async_trait;
 use cairn_schema::{
-    ConversationId, Email, Identity, IdentityKey, JourneyId, PatchId, PatchReceipt, Proposal,
-    ProposalId, Revision, RevisionConflict, RouteId, Slug, Timestamp, Title, TouchedSet, UserId,
+    ConversationId, Email, GraphId, Identity, IdentityKey, JourneyId, PatchId, PatchReceipt,
+    Proposal, ProposalId, RevisionConflict, RouteId, Slug, Timestamp, Title, TouchedSet, UserId,
 };
 use cairn_store::{
     AgentTokenRecord, AuthLogEntry, AuthLogQuery, AuthStore, Commit, CommitError, Committed,
@@ -295,10 +296,10 @@ impl Store for TursoStore {
         read!(self, connection => queries::route_detail(connection, route))
     }
 
-    async fn journeys_referencing(
+    async fn graphs_referencing(
         &self,
         identities: &BTreeSet<IdentityKey>,
-    ) -> Result<BTreeMap<JourneyId, Revision>, StoreError> {
+    ) -> Result<BTreeSet<GraphId>, StoreError> {
         read!(self, connection => queries::referencing(connection, identities))
     }
 

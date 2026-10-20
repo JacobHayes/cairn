@@ -322,3 +322,44 @@ impl From<cairn_store::Page<cairn_store::JourneyMatches, JourneyId>> for SearchP
         }
     }
 }
+
+/// Where a route refers to an identity (E6): its draft, and the published versions.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+#[serde(deny_unknown_fields)]
+pub struct RouteReference {
+    /// The route's fields.
+    pub header: RouteHeader,
+    /// Whether its draft refers to the identity.
+    pub draft: bool,
+    /// The published versions that refer to it, ascending.
+    pub versions: Vec<VersionNumber>,
+}
+
+/// Everything that refers to an identity, directly or through an alias (E6): every journey,
+/// whatever its status, and every route whose draft or published versions do. Authoritative:
+/// an identity with neither can be deleted.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+#[serde(deny_unknown_fields)]
+pub struct IdentityReferences {
+    /// The journeys, in id order.
+    pub journeys: Vec<JourneySummary>,
+    /// The routes, in id order.
+    pub routes: Vec<RouteReference>,
+}
+
+impl From<cairn_service::IdentityReferences> for IdentityReferences {
+    fn from(references: cairn_service::IdentityReferences) -> Self {
+        Self {
+            journeys: references.journeys.into_iter().map(Into::into).collect(),
+            routes: references
+                .routes
+                .into_iter()
+                .map(|route| RouteReference {
+                    header: route.header,
+                    draft: route.draft,
+                    versions: route.versions,
+                })
+                .collect(),
+        }
+    }
+}

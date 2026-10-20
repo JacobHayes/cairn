@@ -46,8 +46,8 @@ pub use proposals::{
     UpgradeRequest,
 };
 pub use reads::{
-    Caller, JourneyIndexQuery, LinkedLogin, RouteDetail, RouteImport, RoutePage, RouteSummary,
-    VersionJourneys,
+    Caller, IdentityReferences, JourneyIndexQuery, LinkedLogin, RouteDetail, RouteImport,
+    RoutePage, RouteReference, RouteSummary, VersionJourneys,
 };
 pub use root::{
     BrowserRoot, HistoryAnswer, JourneyPage, JourneySummary, PatchAnswer, PatchRequest,

@@ -8,10 +8,12 @@
 //! journey, two derives and the consequences between them; for a route, one more validation
 //! and the notices pass (A20).
 
+use std::collections::BTreeSet;
+
 use cairn_schema::{
-    Deployment, DeriveInputs, DestinationAfter, Domain, DomainDocument, Lineage, Mutation,
-    Mutations, Patch, PatchTarget, ProposalDraft, ProposalOutline, ProposalPreview, Rejection,
-    UnresolvedItem, Violation,
+    Deployment, DeriveInputs, DestinationAfter, Domain, DomainDocument, Lineage, Location,
+    Mutation, Mutations, Patch, PatchTarget, ProposalDraft, ProposalOutline, ProposalPreview,
+    Rejection, RevisionOf, Subject, UnresolvedItem, Violation, ViolationCode,
 };
 
 use super::resolve_partial;
@@ -63,8 +65,29 @@ pub fn candidate(
             match apply(records, &patch, inputs) {
                 Ok(applied) => Ok(applied.records().clone()),
                 Err(Rejection::Invalid { violations }) => Err(violations.as_slice().to_vec()),
-                Err(Rejection::Stale { .. } | Rejection::PatchIdReused { .. }) => {
-                    unreachable!("a preview applies at the destination's current revision")
+                // A merge naming journeys other than the ones that refer to its identities now
+                // (E6): the preview shows it as the violation it is, naming the journeys.
+                Err(Rejection::Stale { conflicts, .. }) => Err(vec![Violation {
+                    code: ViolationCode::MergeBreaksJourney,
+                    at: Location::default(),
+                    message: "the journeys the merge names are not the ones that refer to its identities now (E6)".to_owned(),
+                    related: conflicts
+                        .iter()
+                        .filter_map(|conflict| match &conflict.of {
+                            RevisionOf::Domain(Domain::Journey(id)) => {
+                                Some(Subject::Journey(id.clone()))
+                            }
+                            _ => None,
+                        })
+                        .collect(),
+                    limit: None,
+                    bypassable: None,
+                    failures: BTreeSet::new(),
+                    chains: None,
+                    caused_by: BTreeSet::new(),
+                }]),
+                Err(Rejection::PatchIdReused { .. }) => {
+                    unreachable!("a preview's patch id is fresh")
                 }
             }
         }

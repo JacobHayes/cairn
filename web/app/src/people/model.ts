@@ -48,13 +48,13 @@ export function identityOf(key: string, name: string, emails: readonly string[])
 }
 
 
-/** E6: the merge of `merged` into `survivor`, naming each journey referring to either at the revision seen. */
-export function mergeMutation(survivor: string, merged: string, referencing: readonly JourneySummary[]): Mutation {
+/** E6: the merge of `merged` into `survivor`, naming each journey referring to any of them at the revision seen. */
+export function mergeMutation(survivor: string, merged: readonly string[], referencing: readonly JourneySummary[]): Mutation {
   const journeys: Record<string, number> = {};
   for (const summary of referencing) {
     journeys[summary.id] = summary.revision;
   }
-  return { op: "merge_identities", survivor, merged, journeys };
+  return { op: "merge_identities", survivor, merged: [...merged], journeys };
 }
 
 /** E6: the old keys that resolve to `key`: the identities merged into it. */

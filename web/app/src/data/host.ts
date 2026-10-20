@@ -40,6 +40,7 @@ export type RoutePage = Schema<"RoutePage">;
 export type RouteDetail = Schema<"RouteDetail">;
 export type RouteFile = Schema<"RouteFile">;
 export type RouteImport = Schema<"RouteImport">;
+export type IdentityReferences = Schema<"IdentityReferences">;
 export type Caller = Schema<"Caller">;
 export type UserName = Schema<"UserName">;
 export type { JourneyIndexQuery };
@@ -102,6 +103,8 @@ export interface Host {
   documentText(journey: string): Promise<string>;
   /** The deployment context (E6). */
   deployment(): Promise<Deployment>;
+  /** E6: the journeys and routes that refer to identity `identity`, directly or through a merged key, over every graph; `Missing` when there is no such identity. */
+  identityReferences(identity: string): Promise<IdentityReferences>;
   /** A route with its draft (A11); `Missing` when there is none. */
   route(route: string): Promise<Route>;
   /** One published version of a route (A11); `Missing` when there is none. */

@@ -27,7 +27,7 @@ export interface MergeInput {
 /** What a merge asks for. */
 export interface Merge {
   survivor: string;
-  merged: string;
+  merged: readonly string[];
   /** The deployment revision the merge is drafted against. */
   deployment: number;
 }
@@ -86,7 +86,7 @@ export const mergeFlow = setup({
       tags: ["busy"],
       invoke: {
         src: "readJourneys",
-        input: ({ context }) => ({ referencing: context.referencing, identities: [context.asked?.survivor ?? "", context.asked?.merged ?? ""] }),
+        input: ({ context }) => ({ referencing: context.referencing, identities: [context.asked?.survivor ?? "", ...(context.asked?.merged ?? [])] }),
         onDone: { target: "delivering", actions: assign({ journeys: ({ event }) => event.output }) },
         onError: { target: "idle", actions: assign({ failure: ({ event }) => (event.error instanceof Error ? event.error.message : String(event.error)) }) },
       },

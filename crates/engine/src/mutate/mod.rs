@@ -146,7 +146,9 @@ fn scope(mutation: &Mutation) -> Scope {
         | Mutation::EditResource { .. }
         | Mutation::RemoveResource { .. }
         | Mutation::InsertSegment { .. } => Scope::Graph,
-        Mutation::EditIdentity { .. } | Mutation::MergeIdentities { .. } => Scope::Deployment,
+        Mutation::EditIdentity { .. }
+        | Mutation::MergeIdentities { .. }
+        | Mutation::DeleteIdentity { .. } => Scope::Deployment,
         Mutation::CreateIdentity { .. } => Scope::AnyDomain,
         Mutation::ApplyProposal { .. } => Scope::Apply,
         Mutation::CreateProposal { .. }

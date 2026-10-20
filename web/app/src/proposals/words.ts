@@ -339,6 +339,7 @@ export function outlineWords(outline: Outline): string {
     ...(outline.identities_created ? [`creates ${counted(outline.identities_created, "identity", "identities")}`] : []),
     ...(outline.identities_edited ? [`edits ${counted(outline.identities_edited, "identity", "identities")}`] : []),
     ...(outline.identities_merged ? [`merges ${counted(outline.identities_merged, "identity", "identities")}`] : []),
+    ...(outline.identities_deleted ? [`deletes ${counted(outline.identities_deleted, "identity", "identities")}`] : []),
     ...(outline.other ? ["adjusts roles, kinds or defaults"] : []),
   ];
   if (phrases.length === 0) {

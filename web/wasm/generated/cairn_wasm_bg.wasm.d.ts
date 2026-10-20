@@ -16,6 +16,7 @@ export const browserroot_document: (a: number, b: number, c: number, d: number, 
 export const browserroot_editProposal: (a: number, b: number, c: number, d: number, e: number, f: number, g: number, h: number, i: number, j: number) => void;
 export const browserroot_exportFile: (a: number, b: number, c: number, d: number, e: number, f: number) => void;
 export const browserroot_history: (a: number, b: number, c: number, d: number, e: number, f: number, g: number) => void;
+export const browserroot_identityReferences: (a: number, b: number, c: number, d: number) => void;
 export const browserroot_importFile: (a: number, b: number, c: number, d: number, e: number, f: number) => void;
 export const browserroot_journeyIndex: (a: number, b: number, c: number, d: number) => void;
 export const browserroot_journeys: (a: number, b: number) => void;

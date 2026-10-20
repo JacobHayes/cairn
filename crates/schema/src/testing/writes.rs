@@ -298,7 +298,7 @@ fn arb_lineage_and_identity_mutation() -> BoxedStrategy<Mutation> {
         arb_identity().prop_map(|identity| Mutation::EditIdentity { identity }),
         (
             arb_identity_key(),
-            arb_identity_key(),
+            arb_identity_set(),
             prop::collection::btree_map(arb_journey_id(), arb_revision(), 0..2)
         )
             .prop_map(|(survivor, merged, journeys)| Mutation::MergeIdentities {
@@ -306,6 +306,7 @@ fn arb_lineage_and_identity_mutation() -> BoxedStrategy<Mutation> {
                 merged,
                 journeys
             }),
+        arb_identity_key().prop_map(|identity| Mutation::DeleteIdentity { identity }),
     ]
     .boxed()
 }

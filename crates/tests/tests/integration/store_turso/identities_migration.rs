@@ -205,6 +205,102 @@ mod identities {
         });
     }
 
+    /// Migration 0013 fills the typed condition rows from the nodes the earlier migration left:
+    /// a row for each identity an identity-typed comparison names, none for a text one.
+    #[test]
+    fn condition_rows_are_filled_from_the_migrated_nodes() {
+        run(async {
+            let (path, store, _) = migrated("condition-rows").await;
+            drop(store);
+            let rows = rows(
+                &path,
+                "SELECT graph_id, node, identity FROM condition_identities ORDER BY 1, 2, 3",
+            )
+            .await;
+            let expected = rows_by_hand(&path).await;
+            assert_eq!(rows, expected);
+            assert_ne!(rows, [] as [std::vec::Vec<std::string::String>; 0]);
+            for row in &rows {
+                assert!(is_key(&row[2]), "{row:?}");
+            }
+        });
+    }
+
+    /// What the condition rows should be: every node whose condition compares a decision of
+    /// the identity types with a key.
+    async fn rows_by_hand(path: &Path) -> Vec<Vec<String>> {
+        let nodes = rows(
+            path,
+            "SELECT n.graph_id, n.\"key\", n.relevant_when FROM nodes n WHERE n.relevant_when IS NOT NULL ORDER BY 1, 2",
+        )
+        .await;
+        let types = rows(
+            path,
+            "SELECT graph_id, \"key\", answer_type FROM nodes WHERE kind = 'decision'",
+        )
+        .await;
+        let mut found = Vec::new();
+        for node in nodes {
+            let condition: Value = serde_json::from_str(&node[2]).unwrap();
+            let mut clauses = vec![&condition];
+            while let Some(clause) = clauses.pop() {
+                for nested in ["all", "any"] {
+                    if let Some(list) = clause.get(nested).and_then(Value::as_array) {
+                        clauses.extend(list);
+                    }
+                }
+                if let Some(not) = clause.get("not") {
+                    clauses.push(not);
+                }
+                for comparison in ["equals", "not_equals", "contains", "in"] {
+                    let Some(clause) = clause.get(comparison) else {
+                        continue;
+                    };
+                    let decision = clause["decision"].as_str().unwrap();
+                    let identity_typed = types.iter().any(|row| {
+                        row[0] == node[0]
+                            && row[1] == decision
+                            && matches!(row[2].as_str(), "identity" | "identity_list")
+                    });
+                    if identity_typed {
+                        let values = match clause.get("values") {
+                            Some(values) => values.as_array().unwrap().clone(),
+                            None => vec![clause["value"].clone()],
+                        };
+                        for value in values {
+                            found.push(vec![
+                                node[0].clone(),
+                                node[1].clone(),
+                                value.as_str().unwrap().to_owned(),
+                            ]);
+                        }
+                    }
+                }
+            }
+        }
+        found.sort();
+        found.dedup();
+        found
+    }
+
+    /// The proposal records the events carry hold a merge as a list, so history reads.
+    #[test]
+    fn events_carry_merges_as_lists() {
+        run(async {
+            let (path, store, _) = migrated("event-merges").await;
+            drop(store);
+            let carried = rows(
+                &path,
+                "SELECT delta FROM events WHERE delta LIKE '%merge_identities%'",
+            )
+            .await;
+            assert_ne!(carried, [] as [std::vec::Vec<std::string::String>; 0]);
+            for row in &carried {
+                assert!(!row[0].contains("\"merged\":\"who_"), "{}", row[0]);
+            }
+        });
+    }
+
     #[test]
     fn proposals_load_with_migrated_tags_and_keys() {
         run(async {
@@ -227,7 +323,7 @@ mod identities {
             assert_eq!(mutations[1]["identity"]["key"], json!(by_name["Ben"]));
             assert_eq!(mutations[2]["op"], "merge_identities");
             assert_eq!(mutations[2]["survivor"], json!(by_name["Ben"]));
-            assert_eq!(mutations[2]["merged"], json!(by_name["Unused"]));
+            assert_eq!(mutations[2]["merged"], json!([by_name["Unused"]]));
 
             let journey_proposal = get("pr_journey").await;
             let rider = journey_proposal["draft"]["mutations"][0]["identity"]["key"]

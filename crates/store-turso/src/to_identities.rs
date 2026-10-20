@@ -30,7 +30,7 @@ use serde_json::Value;
 use sha2::{Digest, Sha256};
 use turso::Connection;
 
-use crate::sql::{SqlError, execute, rows, text};
+use crate::sql::{SqlError, execute, int, rows, text};
 
 const ALPHABET: &[u8; 32] = b"abcdefghijklmnopqrstuvwxyz234567";
 
@@ -759,6 +759,66 @@ async fn answers(
             vec![text(&new), text(&graph), text(&decision)],
         )
         .await?;
+    }
+    Ok(())
+}
+
+/// A merge names a set of merged identities: one key written as a bare string becomes a list.
+fn wrap_merged(object: &mut serde_json::Map<String, Value>) {
+    if let Some(merged) = object.get_mut("merged")
+        && merged.is_string()
+    {
+        *merged = Value::Array(vec![merged.take()]);
+    }
+}
+
+/// Rewrites, anywhere in `value`, a merge that names one merged identity as a bare key into the
+/// list the mutation now holds; whether it changed anything.
+fn wrap_merges(value: &mut Value) -> bool {
+    match value {
+        Value::Object(object) => {
+            let mut changed = false;
+            if object.get("op").and_then(Value::as_str) == Some("merge_identities")
+                && object.get("merged").is_some_and(Value::is_string)
+            {
+                wrap_merged(object);
+                changed = true;
+            }
+            for nested in object.values_mut() {
+                changed |= wrap_merges(nested);
+            }
+            changed
+        }
+        Value::Array(items) => {
+            let mut changed = false;
+            for item in items {
+                changed |= wrap_merges(item);
+            }
+            changed
+        }
+        _ => false,
+    }
+}
+
+/// Rewrites the single-key merges held in stored proposals and in the proposal records the
+/// events carry into the list form the mutation now holds. Idempotent: a list is left as it is.
+pub(crate) async fn list_merged(connection: &Connection) -> Result<(), SqlError> {
+    for (table, column, key) in [("proposals", "mutations", "id"), ("events", "delta", "seq")] {
+        let select = format!("SELECT {key}, {column} FROM {table}");
+        let update = format!("UPDATE {table} SET {column} = ?1 WHERE {key} = ?2");
+        for row in rows(connection, &select, Vec::new()).await? {
+            let stored = row.text(1).map_err(failed)?;
+            let mut value: Value =
+                serde_json::from_str(&stored).map_err(|e| SqlError::Other(e.to_string()))?;
+            if wrap_merges(&mut value) {
+                let at = if table == "events" {
+                    int(row.int(0).map_err(failed)?)
+                } else {
+                    text(&row.text(0).map_err(failed)?)
+                };
+                execute(connection, &update, vec![text(&value.to_string()), at]).await?;
+            }
+        }
     }
     Ok(())
 }

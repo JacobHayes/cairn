@@ -30,6 +30,12 @@ pub enum Precondition {
         /// The journeys it was checked against.
         journeys: BTreeSet<JourneyId>,
     },
+    /// E6: an identity delete's identities are referred to by no graph (a journey, a route
+    /// draft, or a published route version), directly or through an alias.
+    Unreferenced {
+        /// The identities the delete removes.
+        identities: BTreeSet<IdentityKey>,
+    },
 }
 
 /// One accepted patch to persist (A17: one transaction).

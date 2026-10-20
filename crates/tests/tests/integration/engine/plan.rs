@@ -276,9 +276,10 @@ fn a_merge_that_breaks_the_plan_carries_its_chains() {
     let records = prepared.records();
     let revision = records.journeys.values().next().unwrap().revision.get();
     let breaking = format!(
-        "- op: merge_identities\n  survivor: who_other\n  merged: who_k3d7qm2xw5tn6pfa\n  journeys: {{j_vendor_eval: {revision}}}\n"
+        "- op: merge_identities\n  survivor: who_other\n  merged: [who_k3d7qm2xw5tn6pfa]\n  journeys: {{j_vendor_eval: {revision}}}\n"
     );
-    let unrelated = "- op: merge_identities\n  survivor: who_x\n  merged: who_y\n  journeys: {}\n";
+    let unrelated =
+        "- op: merge_identities\n  survivor: who_x\n  merged: [who_y]\n  journeys: {}\n";
     for mutations in [
         breaking.clone(),
         format!("{breaking}{unrelated}"),

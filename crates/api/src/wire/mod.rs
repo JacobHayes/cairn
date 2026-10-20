@@ -19,8 +19,9 @@ pub use proposals::{
     RouteImport, SaveAsRouteRequest, StaleBase, UpgradeRequest,
 };
 pub use reads::{
-    EventPage, InsertionUse, JourneyMatches, JourneyPage, JourneySummary, LoggedEvent, RouteDetail,
-    RoutePage, RouteSummary, SearchHit, SearchPage, VersionJourneys,
+    EventPage, IdentityReferences, InsertionUse, JourneyMatches, JourneyPage, JourneySummary,
+    LoggedEvent, RouteDetail, RoutePage, RouteReference, RouteSummary, SearchHit, SearchPage,
+    VersionJourneys,
 };
 pub use users::{AgentToken, Caller, LinkedLogin, MintedToken, TokenRequest, UserName};
 

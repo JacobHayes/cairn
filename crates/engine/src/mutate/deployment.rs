@@ -1,10 +1,10 @@
-//! Identities (E6, H3): create in any patch, edit and merge in the deployment's.
+//! Identities (E6, H3): create in any patch; edit, merge and delete in the deployment's.
 
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, BTreeSet};
 
 use cairn_schema::{
-    Domain, Identity, IdentityKey, JourneyId, Limit, Mutation, Record, RecordKey, Revision,
-    RevisionConflict, RevisionOf, Subject, ViolationCode, Write,
+    Domain, GraphId, Identity, IdentityKey, IdentitySet, JourneyId, Limit, Mutation, Record,
+    RecordKey, Revision, RevisionConflict, RevisionOf, Subject, ViolationCode, Write,
 };
 
 use super::Session;
@@ -37,6 +37,7 @@ pub(super) fn apply(session: &mut Session<'_>, mutation: &Mutation) -> Vec<Write
             merged,
             journeys,
         } => merge(session, survivor, merged, journeys),
+        Mutation::DeleteIdentity { identity } => delete(session, identity),
         other => unreachable!("{other:?} is dispatched elsewhere"),
     }
 }
@@ -89,41 +90,31 @@ fn create(session: &mut Session<'_>, identity: &Identity) -> Vec<Write> {
     vec![Write::Put(Record::Identity(identity.clone()))]
 }
 
-/// E6, H3: the merged identity's key becomes an alias of the survivor, which takes its emails;
-/// aliases of the merged identity follow it, so every alias stays one step from an identity. The
-/// journeys referencing either must be exactly those the merge names, at their revisions,
-/// and each is validated against the merged deployment.
+/// E6, H3: each merged identity's key becomes an alias of the survivor, which takes its emails;
+/// aliases of a merged identity follow it, so every alias stays one step from an identity. The
+/// journeys referencing the survivor or any merged identity must be exactly those the merge
+/// names, at their revisions, and each is validated against the merged deployment: one group
+/// is one snapshot, so a merge of several is not a chain of pairs.
 fn merge(
     session: &mut Session<'_>,
     survivor: &IdentityKey,
-    merged: &IdentityKey,
+    merged: &IdentitySet,
     journeys: &BTreeMap<JourneyId, Revision>,
 ) -> Vec<Write> {
-    let deployment = &session.candidate.deployment;
-    let (Some(kept), Some(gone)) = (
-        deployment.identities.get(survivor),
-        deployment.identities.get(merged),
-    ) else {
-        reject_identity(
-            session,
-            ViolationCode::IdentityUnresolved,
-            merged,
-            "a merge joins two existing identities (E6)",
-        );
-        return Vec::new();
-    };
-    if survivor == merged {
-        reject_identity(
-            session,
-            ViolationCode::AliasCycle,
-            merged,
-            "an identity cannot merge into itself (E6)",
-        );
+    if merge_refused(session, survivor, merged) {
         return Vec::new();
     }
-    assert_ne!(survivor, merged);
+    let deployment = &session.candidate.deployment;
+    let Some(kept) = deployment.identities.get(survivor) else {
+        unreachable!("the survivor was found above")
+    };
     let mut joined = kept.clone();
-    joined.emails.extend(gone.emails.iter().cloned());
+    for key in merged.iter() {
+        let Some(gone) = deployment.identities.get(key) else {
+            unreachable!("every merged identity was found above")
+        };
+        joined.emails.extend(gone.emails.iter().cloned());
+    }
     // Every record an event carries reads back, so a merge that would put an identity past its
     // email limit, or name more journeys than a merge may, is refused here rather than only
     // by the final check, which a later edit in the patch could pass (PRACTICES, Explicit
@@ -143,52 +134,172 @@ fn merge(
         }
         return Vec::new();
     }
-    let mut writes = vec![
-        Write::Remove(RecordKey::Identity(merged.clone())),
-        Write::Put(Record::Identity(joined)),
+    let mut writes: Vec<Write> = merged
+        .iter()
+        .map(|key| Write::Remove(RecordKey::Identity(key.clone())))
+        .collect();
+    writes.push(Write::Put(Record::Identity(joined)));
+    writes.extend(merged.iter().map(|key| {
         Write::Put(Record::IdentityAlias {
-            alias: merged.clone(),
+            alias: key.clone(),
             identity: survivor.clone(),
-        }),
-    ];
+        })
+    }));
     for (alias, target) in &deployment.aliases {
-        if target == merged {
+        if merged.as_set().contains(target) {
             writes.push(Write::Put(Record::IdentityAlias {
                 alias: alias.clone(),
                 identity: survivor.clone(),
             }));
         }
     }
-    assert!(
-        joined_holds_both(&writes, gone),
-        "the survivor takes the merged identity's emails (H3)"
-    );
-    check_journeys(session, [survivor, merged], journeys);
+    let affected: BTreeSet<&IdentityKey> = std::iter::once(survivor).chain(merged.iter()).collect();
+    check_journeys(session, &affected, journeys);
     writes
 }
 
-/// The journeys loaded for a merge that reference either identity must be the ones it names,
-/// at the revisions it names (E6, H5); each is then validated with every merge of the patch
-/// applied.
+/// E6: whether a merge's identities are unfit to merge, with the violations that say why: none
+/// to merge, the survivor among them, or one that does not exist.
+fn merge_refused(session: &mut Session<'_>, survivor: &IdentityKey, merged: &IdentitySet) -> bool {
+    let deployment = &session.candidate.deployment;
+    if merged.is_empty() {
+        reject_identity(
+            session,
+            ViolationCode::IdentityUnresolved,
+            survivor,
+            "a merge names at least one identity to merge into the survivor (E6)",
+        );
+        return true;
+    }
+    if merged.as_set().contains(survivor) {
+        reject_identity(
+            session,
+            ViolationCode::AliasCycle,
+            survivor,
+            "an identity cannot merge into itself (E6)",
+        );
+        return true;
+    }
+    let missing: Vec<IdentityKey> = std::iter::once(survivor)
+        .chain(merged.iter())
+        .filter(|key| deployment.identities.get(key).is_none())
+        .cloned()
+        .collect();
+    if !missing.is_empty() {
+        for key in &missing {
+            reject_identity(
+                session,
+                ViolationCode::IdentityUnresolved,
+                key,
+                "a merge joins existing identities (E6)",
+            );
+        }
+        return true;
+    }
+    false
+}
+
+/// E6: an identity nothing refers to goes with its emails and every alias resolving to it. A
+/// journey, route draft, or route version naming it or one of its aliases keeps it: the
+/// graphs loaded for the patch (any one is enough to refuse) are listed, and the commit
+/// rechecks that none refers to it.
+fn delete(session: &mut Session<'_>, identity: &IdentityKey) -> Vec<Write> {
+    let deployment = &session.candidate.deployment;
+    if deployment.identities.get(identity).is_none() {
+        reject_identity(
+            session,
+            ViolationCode::IdentityUnresolved,
+            identity,
+            "no such identity to delete",
+        );
+        return Vec::new();
+    }
+    let aliases: Vec<IdentityKey> = deployment
+        .aliases
+        .iter()
+        .filter(|(_, target)| *target == identity)
+        .map(|(alias, _)| alias.clone())
+        .collect();
+    let named: BTreeSet<&IdentityKey> = std::iter::once(identity).chain(&aliases).collect();
+    let referring = referring_graphs(session, &named);
+    if !referring.is_empty() {
+        reject_identity(
+            session,
+            ViolationCode::IdentityInUse,
+            identity,
+            "journeys or routes still refer to the identity; merge it into another instead (E6)",
+        );
+        if let Some(found) = session.violations.last_mut() {
+            found.related.extend(referring);
+        }
+        return Vec::new();
+    }
+    let mut writes: Vec<Write> = aliases
+        .into_iter()
+        .map(|alias| Write::Remove(RecordKey::IdentityAlias(alias)))
+        .collect();
+    writes.push(Write::Remove(RecordKey::Identity(identity.clone())));
+    writes
+}
+
+/// The journeys, and the routes with a draft or version, among the records loaded that name
+/// any of `identities`.
+fn referring_graphs(session: &Session<'_>, identities: &BTreeSet<&IdentityKey>) -> Vec<Subject> {
+    let candidate = &session.candidate;
+    let deployment = &candidate.deployment;
+    let mut found = Vec::new();
+    let graphs = candidate
+        .journeys
+        .keys()
+        .map(|id| GraphId::Journey(id.clone()))
+        .chain(
+            candidate
+                .routes
+                .iter()
+                .filter(|(_, route)| route.draft.is_some())
+                .map(|(id, _)| GraphId::RouteDraft(id.clone())),
+        )
+        .chain(
+            candidate
+                .versions
+                .keys()
+                .map(|lineage| GraphId::RouteVersion {
+                    route: lineage.route.clone(),
+                    version: lineage.version,
+                }),
+        );
+    for id in graphs {
+        let Some(graph) = candidate.graph(&id) else {
+            continue;
+        };
+        if !identity::refers_to(graph, deployment, identities) {
+            continue;
+        }
+        let subject = match id {
+            GraphId::Journey(journey) => Subject::Journey(journey),
+            GraphId::RouteDraft(route) | GraphId::RouteVersion { route, .. } => {
+                Subject::Route(route)
+            }
+        };
+        if !found.contains(&subject) {
+            found.push(subject);
+        }
+    }
+    found
+}
+
+/// The journeys loaded for a merge that reference any of the identities must be the ones it
+/// names, at the revisions it names (E6, H5); each is then validated with every merge of the
+/// patch applied.
 fn check_journeys(
     session: &mut Session<'_>,
-    identities: [&IdentityKey; 2],
+    identities: &BTreeSet<&IdentityKey>,
     named: &BTreeMap<JourneyId, Revision>,
 ) {
     let deployment = &session.candidate.deployment;
     let mut referencing = Vec::new();
     for (id, journey) in &session.candidate.journeys {
-        let mentions = identity::mentions(&journey.graph);
-        let conditions = identity::condition_mentions(&journey.graph);
-        let keys = mentions
-            .iter()
-            .map(|(_, key)| *key)
-            .chain(conditions.iter().map(|(_, key)| key));
-        let refers = keys.into_iter().any(|key| {
-            let resolved = identity::resolve(deployment, key).unwrap_or(key);
-            identities.contains(&resolved)
-        });
-        if refers {
+        if identity::refers_to(&journey.graph, deployment, identities) {
             referencing.push((id.clone(), journey.revision));
         }
     }
@@ -220,11 +331,4 @@ fn check_journeys(
     session
         .merge_checked
         .extend(referencing.into_iter().map(|(id, _)| id));
-}
-
-fn joined_holds_both(writes: &[Write], gone: &Identity) -> bool {
-    writes.iter().any(|write| match write {
-        Write::Put(Record::Identity(joined)) => joined.emails.is_superset(&gone.emails),
-        Write::Put(_) | Write::Remove(_) | Write::CopyGraph { .. } => false,
-    })
 }

@@ -3,17 +3,17 @@
 //! or an alias of one. An identity merge is checked against every journey referencing either
 //! identity: each must still hold every invariant with the merge applied.
 
-use cairn_schema::{Deployment, Subject, Violation, ViolationCode};
+use cairn_schema::{Deployment, Mention, Subject, Violation, ViolationCode};
 
 use super::Check;
 use crate::graph::{Document, Tree};
-use crate::identity::{self, Mention};
+use crate::identity;
 use crate::validate::{GraphCheck, at_node, violation};
 
 /// Every identity mention in `document` that resolves to no identity.
 fn unresolved(document: &Document, tree: &Tree, deployment: &Deployment) -> Vec<Violation> {
     let mut found = Vec::new();
-    for (mention, key) in identity::mentions(document) {
+    for (mention, key) in document.identity_mentions() {
         if identity::resolve(deployment, key).is_some() {
             continue;
         }

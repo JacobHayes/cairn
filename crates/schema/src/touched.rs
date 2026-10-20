@@ -199,11 +199,17 @@ impl Mutation {
                     survivor, merged, ..
                 },
                 _,
-            ) => vec![
-                RecordKey::Identity(survivor.clone()),
-                RecordKey::Identity(merged.clone()),
-                RecordKey::IdentityAlias(merged.clone()),
-            ],
+            ) => std::iter::once(RecordKey::Identity(survivor.clone()))
+                .chain(merged.iter().flat_map(|key| {
+                    [
+                        RecordKey::Identity(key.clone()),
+                        RecordKey::IdentityAlias(key.clone()),
+                    ]
+                }))
+                .collect(),
+            (Mutation::DeleteIdentity { identity }, _) => {
+                vec![RecordKey::Identity(identity.clone())]
+            }
             (Mutation::ApplyProposal { proposal, .. }, _) => vec![
                 RecordKey::Domain(domain.clone()),
                 RecordKey::Proposal {

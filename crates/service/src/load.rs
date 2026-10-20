@@ -6,16 +6,17 @@
 //! its mutations read, as if the patch held them.
 //!
 //! Cost: one load for the deployment, one for the target, one per proposal the patch edits or
-//! applies, one per route version the patch reads, and for each identity merge one index query
-//! plus one load per journey referencing either identity (E6); every load is one graph within
-//! `graph_bytes_max`.
+//! applies, one per route version the patch reads, for each identity merge one index query
+//! plus one load per journey referencing any of its identities, and for each identity delete one
+//! index query plus at most `chain_count_per_rejection_max` loads of the graphs referring to it
+//! (E6); every load is one graph within `graph_bytes_max`.
 
 use std::collections::{BTreeMap, BTreeSet};
 
 use cairn_engine::Records;
 use cairn_schema::{
-    AnswerType, Domain, IdentityKey, JourneyId, Lineage, Mutation, Patch, PatchTarget, Payload,
-    ProposalId, Revision, RevisionOf, RouteId,
+    Domain, GraphId, IdentityKey, JourneyId, Lineage, Mutation, Patch, PatchTarget, ProposalId,
+    Revision, RevisionOf, RouteId, limits::CHAIN_COUNT_PER_REJECTION_MAX,
 };
 use cairn_store::{Document, LoadTarget, Precondition, Store, StoreError};
 
@@ -24,29 +25,50 @@ use cairn_store::{Document, LoadTarget, Precondition, Store, StoreError};
 pub(crate) struct Loaded {
     /// The records the patch reads.
     pub records: Records,
-    /// E6: each identity merge's two identities and the journeys it named, at their revisions.
+    /// E6: each identity merge's identities and the journeys it named, at their revisions.
     merges: Vec<(BTreeSet<IdentityKey>, BTreeMap<JourneyId, Revision>)>,
+    /// E6: the identities each identity delete removes, which no graph may refer to.
+    deletes: Vec<BTreeSet<IdentityKey>>,
 }
 
 impl Loaded {
     /// The revisions the commit rechecks besides the target's base (ARCHITECTURE, Store
     /// trait: `commit`): the deployment revision a journey or route patch was validated
-    /// against (E6, H5), and for each merge the journeys it was checked against and the set
-    /// referencing its identities (E6).
+    /// against (E6, H5), for each merge the journeys it was checked against and the set
+    /// referencing its identities, and for each delete that no graph refers to its identity
+    /// (E6).
     ///
-    /// A journey whose conditions compare an identity decision's answer is valid only under
-    /// the aliases it was checked with (E6: a merge can change what such a condition
-    /// evaluates to), so a patch leaving one is also held to the deployment revision it was
-    /// loaded at, whether or not it named one: a merge committed in between makes it stale
-    /// rather than letting it commit unchecked (F5, A15). `after` is what `apply` produced.
+    /// A journey that names an identity, or whose conditions compare an identity decision's
+    /// answer, is valid only under the identities and aliases it was checked with (E6: a merge
+    /// can change what such a condition evaluates to, a delete leaves a reference dangling), so
+    /// a patch leaving one is also held to the deployment revision it was loaded at, whether or
+    /// not it named one: a merge or delete committed in between makes it stale rather than
+    /// letting it commit unchecked (F5, A15). `after` is what `apply` produced.
     pub fn preconditions(&self, patch: &Patch, after: &Records) -> Vec<Precondition> {
         let mut found = Vec::new();
         let compared = match &patch.target {
-            PatchTarget::Journey(id) => after
-                .journeys
-                .get(id)
-                .is_some_and(|journey| compares_identities(&journey.graph)),
-            PatchTarget::Route(_) | PatchTarget::Deployment | PatchTarget::Proposal { .. } => false,
+            PatchTarget::Journey(id) => after.journeys.get(id).is_some_and(|journey| {
+                compares_identities(&journey.graph) || !journey.graph.identity_mentions().is_empty()
+            }),
+            // A route draft that names an identity (an assignment) was validated against the
+            // deployment as loaded: a delete committed in between must make it stale.
+            PatchTarget::Route(id) => {
+                let names = |graph: &cairn_schema::Graph| {
+                    !graph.identity_mentions().is_empty()
+                        || !graph.condition_identity_mentions().is_empty()
+                };
+                after
+                    .routes
+                    .get(id)
+                    .and_then(|route| route.draft.as_ref())
+                    .is_some_and(|draft| names(&draft.graph))
+                    // A draft published in the same patch is no longer a draft.
+                    || after
+                        .versions
+                        .iter()
+                        .any(|(lineage, version)| lineage.route == *id && names(&version.graph))
+            }
+            PatchTarget::Deployment | PatchTarget::Proposal { .. } => false,
         };
         let expected = patch
             .deployment_revision
@@ -84,6 +106,11 @@ impl Loaded {
                 journeys: named.keys().cloned().collect(),
             });
         }
+        for identities in &self.deletes {
+            found.push(Precondition::Unreferenced {
+                identities: identities.clone(),
+            });
+        }
         found
     }
 }
@@ -91,8 +118,9 @@ impl Loaded {
 /// Loads what `patch` reads: the deployment (always: identity references resolve through
 /// it), its target domain unless the patch creates it, the proposal it edits or applies, the
 /// published route versions it (or a proposal it applies) copies or moves from and to, and
-/// for an identity merge every journey referencing either identity as well as every journey it
-/// names, so the engine sees any difference between the two (E6).
+/// for an identity merge every journey referencing any of its identities as well as every
+/// journey it names, so the engine sees any difference between the two, and for an identity
+/// delete the graphs referring to it (E6).
 pub(crate) async fn records(store: &dyn Store, patch: &Patch) -> Result<Loaded, StoreError> {
     let mut records = Records::default();
     match store.load(&LoadTarget::Deployment).await? {
@@ -126,6 +154,7 @@ pub(crate) async fn records(store: &dyn Store, patch: &Patch) -> Result<Loaded, 
     let mutations = effective_mutations(&records, patch);
     let read = versions_read(&records, patch, &mutations);
     let merges = merges(&mutations);
+    let deletes = deletes(&mutations);
     for id in kinds_read(&mutations) {
         if !records.routes.contains_key(&id)
             && let Some(Document::Route(route)) = store.load(&LoadTarget::Route(id.clone())).await?
@@ -142,9 +171,32 @@ pub(crate) async fn records(store: &dyn Store, patch: &Patch) -> Result<Loaded, 
             records.versions.insert(lineage, version);
         }
     }
-    for (identities, named) in &merges {
-        let referencing = store.journeys_referencing(identities).await?;
-        for id in referencing.keys().chain(named.keys()) {
+    load_referencing(store, &mut records, &merges, &deletes).await?;
+    Ok(Loaded {
+        records,
+        merges,
+        deletes,
+    })
+}
+
+/// E6: the journeys a merge reads (those referencing its identities and those it names) and the
+/// graphs a delete is checked against, loaded into `records`.
+async fn load_referencing(
+    store: &dyn Store,
+    records: &mut Records,
+    merges: &[(BTreeSet<IdentityKey>, BTreeMap<JourneyId, Revision>)],
+    deletes: &[BTreeSet<IdentityKey>],
+) -> Result<(), StoreError> {
+    for (identities, named) in merges {
+        let referencing = store.graphs_referencing(identities).await?;
+        let journeys = referencing
+            .iter()
+            .filter_map(|graph| match graph {
+                GraphId::Journey(id) => Some(id),
+                GraphId::RouteDraft(_) | GraphId::RouteVersion { .. } => None,
+            })
+            .chain(named.keys());
+        for id in journeys {
             if !records.journeys.contains_key(id)
                 && let Some(journey) = journey(store, id).await?
             {
@@ -152,7 +204,16 @@ pub(crate) async fn records(store: &dyn Store, patch: &Patch) -> Result<Loaded, 
             }
         }
     }
-    Ok(Loaded { records, merges })
+    for identities in deletes {
+        let referring = store.graphs_referencing(identities).await?;
+        for graph in referring
+            .iter()
+            .take(CHAIN_COUNT_PER_REJECTION_MAX as usize)
+        {
+            load_graph(store, records, graph).await?;
+        }
+    }
+    Ok(())
 }
 
 /// I6: the proposals a domain patch applies, with the revision each reviewer saw.
@@ -330,7 +391,8 @@ fn kinds_read(mutations: &[&Mutation]) -> BTreeSet<RouteId> {
         .collect()
 }
 
-/// E6: each identity merge's two identities and the journeys it names.
+/// E6: each identity merge's identities (the survivor and every merged one) and the journeys it
+/// names.
 fn merges(mutations: &[&Mutation]) -> Vec<(BTreeSet<IdentityKey>, BTreeMap<JourneyId, Revision>)> {
     mutations
         .iter()
@@ -340,12 +402,83 @@ fn merges(mutations: &[&Mutation]) -> Vec<(BTreeSet<IdentityKey>, BTreeMap<Journ
                 merged,
                 journeys,
             } => Some((
-                [survivor.clone(), merged.clone()].into_iter().collect(),
+                std::iter::once(survivor.clone())
+                    .chain(merged.iter().cloned())
+                    .collect(),
                 journeys.clone(),
             )),
             _ => None,
         })
         .collect()
+}
+
+/// E6: the identities each identity delete removes: the identity, and the keys an earlier merge
+/// in the same patch folded into it, which graphs may still name though no alias says so yet.
+fn deletes(mutations: &[&Mutation]) -> Vec<BTreeSet<IdentityKey>> {
+    let mut folded: BTreeMap<IdentityKey, BTreeSet<IdentityKey>> = BTreeMap::new();
+    let mut found = Vec::new();
+    for mutation in mutations {
+        match mutation {
+            Mutation::MergeIdentities {
+                survivor, merged, ..
+            } => {
+                let mut keys: BTreeSet<IdentityKey> = merged.iter().cloned().collect();
+                for key in merged.iter() {
+                    keys.extend(folded.remove(key).unwrap_or_default());
+                }
+                folded.entry(survivor.clone()).or_default().extend(keys);
+            }
+            Mutation::DeleteIdentity { identity } => {
+                let mut keys = BTreeSet::from([identity.clone()]);
+                keys.extend(folded.get(identity).cloned().unwrap_or_default());
+                found.push(keys);
+            }
+            _ => {}
+        }
+    }
+    found
+}
+
+/// Loads the graph `graph` names, with the journey, route or version it belongs to, unless
+/// already loaded.
+async fn load_graph(
+    store: &dyn Store,
+    records: &mut Records,
+    graph: &GraphId,
+) -> Result<(), StoreError> {
+    match graph {
+        GraphId::Journey(id) => {
+            if !records.journeys.contains_key(id)
+                && let Some(found) = journey(store, id).await?
+            {
+                records.journeys.insert(id.clone(), found);
+            }
+        }
+        GraphId::RouteDraft(id) => {
+            if !records.routes.contains_key(id)
+                && let Some(Document::Route(route)) =
+                    store.load(&LoadTarget::Route(id.clone())).await?
+            {
+                records.routes.insert(id.clone(), route);
+            }
+        }
+        GraphId::RouteVersion { route, version } => {
+            let lineage = Lineage {
+                route: route.clone(),
+                version: *version,
+            };
+            if let std::collections::btree_map::Entry::Vacant(e) = records.versions.entry(lineage) {
+                let target = LoadTarget::RouteVersion {
+                    route: route.clone(),
+                    version: *version,
+                };
+                if let Some(Document::RouteVersion(found)) = store.load(&target).await? {
+                    e.insert(found);
+                }
+            }
+        }
+    }
+    Ok(())
 }
 
 /// E6: whether any condition in `graph` compares the answer of an identity decision, which
@@ -356,21 +489,7 @@ fn compares_identities(graph: &cairn_schema::Graph) -> bool {
         .values()
         .filter_map(|node| node.relevant_when.as_ref())
         .flat_map(|condition| condition.decisions())
-        .any(|decision| {
-            graph
-                .nodes
-                .get(decision)
-                .is_some_and(|node| match &node.payload {
-                    Payload::Decision(spec) => matches!(
-                        spec.answer.answer_type(),
-                        AnswerType::Identity | AnswerType::IdentityList
-                    ),
-                    Payload::Deliverable(_)
-                    | Payload::Action(_)
-                    | Payload::Milestone(_)
-                    | Payload::Group(_) => false,
-                })
-        })
+        .any(|decision| graph.is_identity_decision(decision))
 }
 
 #[cfg(test)]
@@ -417,6 +536,7 @@ mod tests {
             let loaded = Loaded {
                 records: records.clone(),
                 merges: Vec::new(),
+                deletes: Vec::new(),
             };
             assert_eq!(
                 loaded.preconditions(&note_patch(), &records),
@@ -424,5 +544,92 @@ mod tests {
                 "{nodes}"
             );
         }
+    }
+
+    /// E6: a route draft that assigns an identity was validated against the deployment as
+    /// loaded, so a delete committed in between makes it stale; one naming none is not held.
+    #[test]
+    fn a_route_draft_naming_an_identity_is_held_to_the_deployment_it_was_checked_with() {
+        let route = |nodes: &str| {
+            let graph: Graph = from_yaml(&format!("nodes:\n{nodes}")).unwrap();
+            let mut records = Records::default();
+            records.deployment.revision = Revision::NONE.next();
+            records.routes.insert(
+                "r_one".parse().unwrap(),
+                cairn_schema::Route {
+                    header: from_yaml("id: r_one\nname: One\n").unwrap(),
+                    revision: Revision::NONE.next(),
+                    versions: BTreeSet::default(),
+                    draft: Some(cairn_schema::RouteDraft {
+                        extends: None,
+                        graph,
+                    }),
+                },
+            );
+            records
+        };
+        let patch: Patch = from_yaml(
+            "id: p_route\ntarget: {route: r_one}\nbase_revision: 1\nmutations:\n- op: edit_route\n  name: Other\n",
+        )
+        .unwrap();
+        let decision = "- {key: n_who, id: who, kind: decision, title: Who, prompt: Who?, answer_type: identity}\n";
+        let held = format!(
+            "{decision}- {{key: n_do, id: do, kind: action, title: Do, relevant_when: {{equals: {{decision: n_who, value: who_a}}}}}}\n"
+        );
+        let free = format!("{decision}- {{key: n_do, id: do, kind: action, title: Do}}\n");
+        for (nodes, held_count) in [(held, 1), (free, 0)] {
+            let records = route(&nodes);
+            let loaded = Loaded {
+                records: records.clone(),
+                merges: Vec::new(),
+                deletes: Vec::new(),
+            };
+            assert_eq!(
+                loaded.preconditions(&patch, &records).len(),
+                held_count,
+                "{nodes}"
+            );
+        }
+    }
+
+    /// E6: a journey patch that leaves an identity named in an answer is held to the deployment
+    /// revision it was loaded at, named by the patch or not: a delete committed in between
+    /// makes it stale.
+    #[test]
+    fn a_journey_naming_an_identity_is_held_to_the_deployment_it_was_checked_with() {
+        let nodes = "- {key: n_who, id: who, kind: decision, title: Who, prompt: Who?, answer_type: identity}\n";
+        let mut records = journey_with(nodes);
+        let journey = records.journeys.values_mut().next().unwrap();
+        journey.graph.state.answers.insert(
+            "n_who".parse().unwrap(),
+            cairn_schema::AnswerValue::Identity("who_a".parse().unwrap()),
+        );
+        let loaded = Loaded {
+            records: records.clone(),
+            merges: Vec::new(),
+            deletes: Vec::new(),
+        };
+        assert_eq!(
+            loaded.preconditions(&note_patch(), &records),
+            vec![Precondition::Revision {
+                of: RevisionOf::Domain(Domain::Deployment),
+                expected: Revision::NONE.next(),
+            }]
+        );
+    }
+
+    /// E6: a delete that follows a merge in the same patch is checked against the keys the merge
+    /// folded into the identity as well, which no alias names yet.
+    #[test]
+    fn a_delete_after_a_merge_in_one_patch_checks_the_folded_keys() {
+        let patch: Patch = from_yaml(
+            "id: p_both\ntarget: deployment\nbase_revision: 1\nmutations:\n- op: merge_identities\n  survivor: who_b\n  merged: [who_a]\n  journeys: {}\n- op: delete_identity\n  identity: who_b\n",
+        )
+        .unwrap();
+        let mutations: Vec<&Mutation> = patch.mutations.as_slice().iter().collect();
+        let keys = |names: &[&str]| -> BTreeSet<IdentityKey> {
+            names.iter().map(|name| name.parse().unwrap()).collect()
+        };
+        assert_eq!(deletes(&mutations), vec![keys(&["who_a", "who_b"])]);
     }
 }

@@ -7,10 +7,10 @@
 use std::collections::BTreeMap;
 
 use cairn_schema::{
-    AnswerValue, Date, Identity, IdentityKey, JourneyId, KeyRefs, KindKey, Lineage, Markdown,
-    Mutation, Mutations, NodeKey, OverrideKind, ParticipationSource, Patch, PatchId, PatchTarget,
-    RecordedEnd, Revision, RouteFile, RouteId, SignedDays, SnoozeTarget, Title, Transition,
-    from_yaml,
+    AnswerValue, Date, Identity, IdentityKey, IdentitySet, JourneyId, KeyRefs, KindKey, Lineage,
+    Markdown, Mutation, Mutations, NodeKey, OverrideKind, ParticipationSource, Patch, PatchId,
+    PatchTarget, RecordedEnd, Revision, RouteFile, RouteId, SignedDays, SnoozeTarget, Title,
+    Transition, from_yaml,
 };
 use cairn_service::{Call, DomainPatch};
 use cairn_store::{JourneyQuery, PageSize};
@@ -161,8 +161,9 @@ pub(crate) const SPECS: &[Spec] = &[
     Spec {
         name: "manage_identity",
         description: "Creates an identity (a person or team journeys refer to), edits its name \
-            or emails (an email links it to the user who signs in with it, H3), or merges a \
-            duplicate into another (E6). A deployment patch.",
+            or emails (an email links it to the user who signs in with it, H3), merges \
+            duplicates into one that remains (E6), or deletes one nothing refers to. A \
+            deployment patch.",
         writes: true,
         destructive: true,
         schema: schema::<ManageIdentity>,
@@ -238,14 +239,16 @@ impl ToolSet {
         Ok(written.into())
     }
 
-    /// `manage_identity`: a merge names every journey referring to either identity at the
+    /// `manage_identity`: a merge names every journey referring to any of its identities at the
     /// revision it was checked against (E6), which the tool reads from the journey index.
     async fn identity_patch(&self, arguments: ManageIdentity) -> Result<DomainPatch, ToolError> {
         let mutation = match arguments.change {
             IdentityChange::Create { identity } => Mutation::CreateIdentity { identity },
             IdentityChange::Edit { identity } => Mutation::EditIdentity { identity },
             IdentityChange::Merge { survivor, merged } => {
-                let referencing = [survivor.clone(), merged.clone()].into();
+                let referencing = std::iter::once(survivor.clone())
+                    .chain(merged.iter().cloned())
+                    .collect();
                 let journeys = self.revisions_referencing(referencing).await?;
                 Mutation::MergeIdentities {
                     survivor,
@@ -253,6 +256,7 @@ impl ToolSet {
                     journeys,
                 }
             }
+            IdentityChange::Delete { identity } => Mutation::DeleteIdentity { identity },
         };
         let target = PatchTarget::Deployment;
         domain_patch(
@@ -906,11 +910,20 @@ pub(crate) enum IdentityChange {
         /// The identity as it should be.
         identity: Identity,
     },
-    /// Merge `merged` into `survivor`; `merged`'s key becomes an alias of it.
+    /// Merge the `merged` identities into `survivor` in one step; each merged key becomes an
+    /// alias of it and its emails move to it. Use it when an identity something refers to is a
+    /// duplicate.
     Merge {
         /// The identity that remains.
         survivor: IdentityKey,
-        /// The duplicate.
-        merged: IdentityKey,
+        /// The duplicates: at least one.
+        merged: IdentitySet,
+    },
+    /// Delete an identity nothing refers to (no journey, route draft or route version, directly
+    /// or through an alias), with its emails and aliases. One something refers to is refused,
+    /// naming where; merge it into the identity that remains instead.
+    Delete {
+        /// The identity.
+        identity: IdentityKey,
     },
 }

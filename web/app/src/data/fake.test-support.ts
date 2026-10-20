@@ -75,6 +75,10 @@ export class FakeHost implements Host {
     return this.deploymentFails ? Promise.reject(new ReadFailed({ status: 500, message: "the deployment could not be read" })) : Promise.resolve({ revision: this.deploymentRevision });
   }
 
+  identityReferences(identity: string): Promise<never> {
+    return Promise.reject(new Missing(identity));
+  }
+
   history() {
     return Promise.resolve({ patches: [] });
   }

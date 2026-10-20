@@ -236,8 +236,9 @@ export interface IdentityRow {
  */
 export function identityDiff(before: Deployment, after: Deployment | undefined): IdentityRow[] {
   const was = before.identities ?? [];
+  const byName = (left: IdentityRow, right: IdentityRow) => identityLabel(left.identity).localeCompare(identityLabel(right.identity)) || left.identity.key.localeCompare(right.identity.key);
   if (after === undefined) {
-    return was.map((identity) => ({ identity, mark: undefined }));
+    return was.map((identity): IdentityRow => ({ identity, mark: undefined })).sort(byName);
   }
   const now = after.identities ?? [];
   const aliases = after.aliases ?? {};
@@ -261,7 +262,7 @@ export function identityDiff(before: Deployment, after: Deployment | undefined):
   const known = new Set(was.map((identity) => identity.key));
   const created = now.filter((identity) => !known.has(identity.key)).map((identity): IdentityRow => ({ identity, mark: { kind: "added" } }));
   // The page's own order, by name, so a proposal's creations and renames sit where the directory lists them.
-  return [...rows, ...created].sort((left, right) => identityLabel(left.identity).localeCompare(identityLabel(right.identity)) || left.identity.key.localeCompare(right.identity.key));
+  return [...rows, ...created].sort(byName);
 }
 
 /** The nodes of a level that lists rows: the key, and the drawn node it is drawn under. */

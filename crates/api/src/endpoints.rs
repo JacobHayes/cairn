@@ -300,6 +300,13 @@ pub static ROUTE_VERSION: Endpoint = endpoint(
 );
 /// `GET /api/deployment`: identities and aliases at the deployment revision.
 pub static DEPLOYMENT: Endpoint = endpoint(Method::GET, "/api/deployment", "getDeployment");
+/// `GET /api/deployment/identities/{key}/references`: the journeys and routes referring to an
+/// identity (E6).
+pub static IDENTITY_REFERENCES: Endpoint = endpoint(
+    Method::GET,
+    "/api/deployment/identities/{key}/references",
+    "getIdentityReferences",
+);
 /// `GET /api/search`: text search across journeys.
 pub static SEARCH: Endpoint = endpoint(Method::GET, "/api/search", "searchJourneys");
 /// `GET /api/events`: the event history, filtered and paged (J5).
@@ -351,7 +358,7 @@ pub static ASSISTANT_ROUTE_DRAFT_CONVERSATION: Endpoint = endpoint(
 );
 
 /// Every endpoint, in the order the OpenAPI document lists them.
-pub static ALL: [&Endpoint; 68] = [
+pub static ALL: [&Endpoint; 69] = [
     &HEALTH,
     &CAPABILITIES,
     &PATCH_JOURNEY,
@@ -408,6 +415,7 @@ pub static ALL: [&Endpoint; 68] = [
     &ROUTE_VERSIONS,
     &ROUTE_VERSION,
     &DEPLOYMENT,
+    &IDENTITY_REFERENCES,
     &SEARCH,
     &EVENTS,
     &STREAM,

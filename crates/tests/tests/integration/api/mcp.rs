@@ -244,10 +244,18 @@ mod mcp_in_process {
             "patch_id": "p_contact", "base_revision": 1 });
         let created = agent.ok("manage_identity", create).await;
         let base = created["receipt"]["revision"].clone();
-        let merge = json!({ "change": { "merge": { "survivor": "who_d4m6uk2eqf5rbhzs", "merged": "who_e7h2jv3nxc4yaw6t" } },
+        let merge = json!({ "change": { "merge": { "survivor": "who_d4m6uk2eqf5rbhzs", "merged": ["who_e7h2jv3nxc4yaw6t"] } },
             "patch_id": "p_merge", "base_revision": base });
         let merged = agent.ok("manage_identity", merge).await;
         assert_eq!(merged["status"], "applied");
+        let found = agent
+            .ok("list_identities", json!({ "text": "vendor contact" }))
+            .await;
+        assert_eq!(found["identities"]["items"][0]["key"], "who_contact");
+        let delete = json!({ "change": { "delete": { "identity": "who_contact" } },
+            "patch_id": "p_delete", "base_revision": merged["receipt"]["revision"] });
+        let deleted = agent.ok("manage_identity", delete).await;
+        assert_eq!(deleted["status"], "applied");
     }
 
     /// A breakdown of the workload placeholder into two sub-deliverables (B10).

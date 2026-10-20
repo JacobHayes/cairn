@@ -164,7 +164,7 @@ fn structural_cases(draft: u64) -> Vec<Case> {
         ),
         (
             "manage_identity",
-            json!({ "change": { "merge": { "survivor": "who_k3d7qm2xw5tn6pfa", "merged": "who_analyst" } },
+            json!({ "change": { "merge": { "survivor": "who_k3d7qm2xw5tn6pfa", "merged": ["who_analyst"] } },
                 "patch_id": "p_merge", "base_revision": 1 }),
             structural.clone(),
         ),

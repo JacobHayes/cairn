@@ -7,10 +7,11 @@
 use std::collections::{BTreeMap, BTreeSet};
 
 use cairn_schema::{
-    ChangeSet, Deployment, Domain, EventType, Graph, GraphId, GraphRecord, IdentityKey, JourneyId,
-    JourneyState, Limit, Location, NodeKey, PatchReceipt, PatchTarget, ProposalId, Record,
-    RecordKey, Rejection, RetiredKey, RetiredKeys, Revision, RevisionConflict, RevisionOf, Slug,
-    Subject, TouchedSet, Violation, ViolationCode, Violations, Write, limits::GRAPH_BYTES_MAX,
+    ChangeSet, Deployment, Domain, EventType, Graph, GraphId, GraphKey, GraphRecord, IdentityKey,
+    JourneyId, JourneyState, Limit, Location, NodeField, NodeKey, PatchReceipt, PatchTarget,
+    ProposalId, Record, RecordKey, Rejection, RetiredKey, RetiredKeys, Revision, RevisionConflict,
+    RevisionOf, Slug, Subject, TouchedSet, Violation, ViolationCode, Violations, Write,
+    limits::GRAPH_BYTES_MAX,
 };
 
 use crate::commit::{Commit, CommitError, Committed, StoreError};
@@ -42,6 +43,9 @@ pub struct Shape {
     /// Whether it writes a graph record that names an identity (an answer, a role fill, a
     /// participation, a node): what an identity merge checks journeys for (E6).
     pub references_identities: bool,
+    /// The graphs whose nodes the change set writes, so the rows of the identities their
+    /// conditions compare are rebuilt (E6).
+    pub conditions_changed: BTreeSet<GraphId>,
 }
 
 impl Shape {
@@ -84,6 +88,7 @@ impl Shape {
             graphs: BTreeSet::new(),
             writes_deployment: false,
             references_identities: false,
+            conditions_changed: BTreeSet::new(),
         };
         for event in &change_set.events {
             for write in &event.delta {
@@ -122,8 +127,24 @@ impl Shape {
         if let RecordKey::Graph(graph) | RecordKey::InGraph { graph, .. } = &key {
             self.graphs.insert(graph.clone());
         }
+        if let RecordKey::Graph(graph)
+        | RecordKey::InGraph {
+            graph,
+            key:
+                GraphKey::Node(_)
+                | GraphKey::NodeField {
+                    field: NodeField::RelevantWhen,
+                    ..
+                },
+        } = &key
+        {
+            self.conditions_changed.insert(graph.clone());
+        }
+        // A put of an identity decision can add an identity reference without naming a key: retyping a decision
+        // to an identity type turns the conditions comparing it into references. It takes the
+        // deployment lock like a write that names one, so a delete cannot commit beside it.
         if let Write::Put(Record::Graph { record, .. }) = write
-            && names_an_identity(record)
+            && (names_an_identity(record) || is_identity_decision(record))
         {
             self.references_identities = true;
         }
@@ -153,6 +174,18 @@ impl Shape {
     }
 }
 
+/// Whether a graph record is a node put whose answer type is an identity type.
+fn is_identity_decision(record: &GraphRecord) -> bool {
+    matches!(record, GraphRecord::Node(_))
+        && serde_json::to_value(record).is_ok_and(|written| {
+            written
+                .pointer("/node/answer_type")
+                .or_else(|| written.get("answer_type"))
+                .and_then(serde_json::Value::as_str)
+                .is_some_and(|kind| matches!(kind, "identity" | "identity_list"))
+        })
+}
+
 /// Whether a graph record names an identity key anywhere in its written form.
 fn names_an_identity(record: &GraphRecord) -> bool {
     let named = matches!(
@@ -160,7 +193,6 @@ fn names_an_identity(record: &GraphRecord) -> bool {
         GraphRecord::Answer { .. }
             | GraphRecord::RoleFill { .. }
             | GraphRecord::Participation { .. }
-            | GraphRecord::Node(_)
     );
     named
         && serde_json::to_value(record).is_ok_and(|written| !identity_keys_in(&written).is_empty())

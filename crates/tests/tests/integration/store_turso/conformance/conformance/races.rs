@@ -499,6 +499,102 @@ pub async fn a_reference_and_a_merge_in_flight_do_not_both_commit(backend: &Turs
     assert!(rejected_as_stale(&again), "{again:?}");
 }
 
+fn delete(patch: &str) -> Commit {
+    cairn_store::build::deployment_patch(patch, 1)
+        .unreferenced(&["who_b"])
+        .event(
+            EventType::IdentityDeleted,
+            Subject::Identity(id("who_b")),
+            vec![Write::Remove(RecordKey::Identity(id("who_b")))],
+        )
+        .commit()
+}
+
+/// E6: a journey patch starting to reference an identity and the delete of that identity, in
+/// flight together, do not both commit: the delete would leave a dangling reference. The
+/// patch writing the reference holds the deployment's revision row, so the delete waits its
+/// turn and is then stale on the journey that now references its identity.
+pub async fn a_reference_and_a_delete_in_flight_do_not_both_commit(backend: &Turso) {
+    let faults = Faults::default();
+    let store = backend.open(faults.clone()).await;
+    let people = cairn_store::build::deployment_patch("p_people", 0).event(
+        EventType::IdentityCreated,
+        Subject::Identity(id("who_b")),
+        vec![Write::Put(Record::Identity(identity("who_b", "B", &[])))],
+    );
+    applied(&store, people.commit()).await;
+    let who = cairn_store::build::node(serde_json::json!({
+        "key": "n_who", "id": "who", "kind": "decision", "title": "Who",
+        "prompt": "Who?", "answer_type": "identity",
+    }));
+    applied(&store, create_journey("p_one", "j_one", vec![who]).commit()).await;
+    let gate = Gate::at(CommitPoint::BetweenStateAndEvents, &faults);
+    let meanwhile = promptly(store.commit(delete("p_delete")));
+    let (referenced, deleted) = beside_held(
+        &store,
+        &gate,
+        answer_with("p_answer", "j_one", 1, "who_b"),
+        meanwhile,
+    )
+    .await;
+    assert!(
+        matches!(referenced, Ok(Committed::Applied(_))),
+        "{referenced:?}"
+    );
+    assert!(rejected_as_stale(&deleted), "{deleted:?}");
+    assert!(
+        store
+            .resolve_identity(&id("who_b"))
+            .await
+            .unwrap()
+            .is_some()
+    );
+}
+
+/// E6: retyping a text decision to an identity decision turns the conditions that compare it
+/// into references without the patch naming a key; it and the delete of the compared
+/// identity, in flight together, do not both commit.
+pub async fn a_decision_retyped_and_a_delete_in_flight_do_not_both_commit(backend: &Turso) {
+    let faults = Faults::default();
+    let store = backend.open(faults.clone()).await;
+    let people = cairn_store::build::deployment_patch("p_people", 0).event(
+        EventType::IdentityCreated,
+        Subject::Identity(id("who_b")),
+        vec![Write::Put(Record::Identity(identity("who_b", "B", &[])))],
+    );
+    applied(&store, people.commit()).await;
+    let decision = |answer_type: &str| {
+        cairn_store::build::node(serde_json::json!({
+            "key": "n_who", "id": "who", "kind": "decision", "title": "Who",
+            "prompt": "Who?", "answer_type": answer_type,
+        }))
+    };
+    let after = cairn_store::build::node(serde_json::json!({
+        "key": "n_after", "id": "after", "kind": "action", "title": "After",
+        "relevant_when": {"equals": {"decision": "n_who", "value": "who_b"}},
+    }));
+    applied(
+        &store,
+        create_journey("p_one", "j_one", vec![decision("text"), after]).commit(),
+    )
+    .await;
+    let retype = cairn_store::build::journey_patch("p_retype", "j_one", 1)
+        .event(
+            EventType::NodeChanged,
+            Subject::Node(id("n_who")),
+            vec![put_in(
+                &journey_graph("j_one"),
+                GraphRecord::Node(decision("identity")),
+            )],
+        )
+        .commit();
+    let gate = Gate::at(CommitPoint::BetweenStateAndEvents, &faults);
+    let meanwhile = promptly(store.commit(delete("p_delete")));
+    let (retyped, deleted) = beside_held(&store, &gate, retype, meanwhile).await;
+    assert!(matches!(retyped, Ok(Committed::Applied(_))), "{retyped:?}");
+    assert!(rejected_as_stale(&deleted), "{deleted:?}");
+}
+
 /// A19: a proposal created while its journey is hard-deleted does not survive it: the
 /// delete waits its turn at the journey's revision row and takes the proposal with it.
 pub async fn a_proposal_and_its_journeys_deletion_in_flight_do_not_both_commit(backend: &Turso) {

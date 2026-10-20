@@ -60,7 +60,7 @@ fn removals_identities_and_upgrades_are_counted_apart() {
     assert_eq!(removed.nodes_removed, 2);
 
     let identities = outline(
-        "- op: create_identity\n  identity: {key: who_new, name: New}\n- op: merge_identities\n  survivor: who_new\n  merged: who_old\n  journeys: {}\n",
+        "- op: create_identity\n  identity: {key: who_new, name: New}\n- op: merge_identities\n  survivor: who_new\n  merged: [who_old]\n  journeys: {}\n",
     );
     assert_eq!(
         (

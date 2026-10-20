@@ -241,9 +241,12 @@ mutations:
     name: First Person
 - op: merge_identities
   survivor: who_one
-  merged: who_two
+  merged:
+  - who_two
   journeys:
     j_sample: 7
+- op: delete_identity
+  identity: who_two
 - op: create_proposal
   proposal:
     title: Add a review step

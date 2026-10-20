@@ -93,6 +93,7 @@ const CASES: Record<EventType, Case> = {
   identity_created: { event: event("identity_created", { identity: "who_ana" }, [{ put: { identity: { key: "who_ana", name: "Ana Reyes" } } }]) },
   identity_edited: { event: event("identity_edited", { identity: "who_ana" }, [{ put: { identity: { key: "who_ana", name: "Ana Reyes" } } }]) },
   identities_merged: { event: event("identities_merged", { identity: "who_ana" }, [{ put: { identity: { key: "who_ana", name: "Ana Reyes" } } }]) },
+  identity_deleted: { event: event("identity_deleted", { identity: "who_ana" }, [{ remove: { identity: "who_ana" } }]) },
   proposal_created: { event: event("proposal_created", { proposal: "pr_one" }) },
   proposal_edited: { event: event("proposal_edited", { proposal: "pr_one" }) },
   proposal_applied: { event: event("proposal_applied", { proposal: "pr_one" }, [], { confirming_user: "u_boss" }), facts: { confirmedBy: "u_boss" } },

@@ -50,6 +50,10 @@ on_both_stores!(
     a_merge_that_breaks_a_referencing_journey_is_rejected_naming_it,
     a_merge_moves_emails_and_an_email_stays_on_one_identity,
     a_merge_is_stale_once_a_journey_it_checked_moves_or_a_new_one_refers,
+    an_identity_is_deleted_only_once_nothing_refers_to_it,
+    an_unreferenced_identity_is_deleted_with_its_emails,
+    a_group_merge_folds_several_identities_into_one_survivor,
+    a_group_merge_resubmitted_with_other_identities_is_another_merge,
     publishing_a_route_never_touches_its_journeys,
     an_archived_journey_takes_only_unarchiving_or_deletion_and_its_id_never_returns,
     a_users_patch_and_their_agents_land_alike_but_for_the_stamp,
@@ -306,7 +310,7 @@ async fn a_merge_that_breaks_a_referencing_journey_is_rejected_naming_it(
         "p_merge",
         "deployment",
         2,
-        "- op: merge_identities\n  survivor: who_other\n  merged: who_k3d7qm2xw5tn6pfa\n  journeys: {j_vendor_eval: 3}\n",
+        "- op: merge_identities\n  survivor: who_other\n  merged: [who_k3d7qm2xw5tn6pfa]\n  journeys: {j_vendor_eval: 3}\n",
     );
     let refused = rejected(
         service
@@ -360,7 +364,7 @@ async fn a_merge_moves_emails_and_an_email_stays_on_one_identity(
         "p_merge",
         "deployment",
         2,
-        "- op: merge_identities\n  survivor: who_d4m6uk2eqf5rbhzs\n  merged: who_e7h2jv3nxc4yaw6t\n  journeys: {j_vendor_eval: 2}\n",
+        "- op: merge_identities\n  survivor: who_d4m6uk2eqf5rbhzs\n  merged: [who_e7h2jv3nxc4yaw6t]\n  journeys: {j_vendor_eval: 2}\n",
     );
     applied(service.patch(&call("u_lead", AT), &domain(merge)).await);
     let deployment = service.deployment().await.unwrap();
@@ -388,7 +392,7 @@ async fn a_merge_is_stale_once_a_journey_it_checked_moves_or_a_new_one_refers(
             id,
             "deployment",
             1,
-            "- op: merge_identities\n  survivor: who_d4m6uk2eqf5rbhzs\n  merged: who_e7h2jv3nxc4yaw6t\n  journeys: {j_vendor_eval: 2}\n",
+            "- op: merge_identities\n  survivor: who_d4m6uk2eqf5rbhzs\n  merged: [who_e7h2jv3nxc4yaw6t]\n  journeys: {j_vendor_eval: 2}\n",
         ))
     };
     let edit = patch(
@@ -426,7 +430,7 @@ async fn a_merge_is_stale_once_a_journey_it_checked_moves_or_a_new_one_refers(
         "p_merge_two",
         "deployment",
         1,
-        "- op: merge_identities\n  survivor: who_d4m6uk2eqf5rbhzs\n  merged: who_e7h2jv3nxc4yaw6t\n  journeys: {j_vendor_eval: 3}\n",
+        "- op: merge_identities\n  survivor: who_d4m6uk2eqf5rbhzs\n  merged: [who_e7h2jv3nxc4yaw6t]\n  journeys: {j_vendor_eval: 3}\n",
     ));
     let Rejection::Stale { conflicts, .. } =
         rejected(service.patch(&call("u_lead", AT), &fresh).await)
@@ -437,6 +441,210 @@ async fn a_merge_is_stale_once_a_journey_it_checked_moves_or_a_new_one_refers(
     assert!(
         conflicts.iter().any(|conflict| conflict.of == newcomer),
         "{conflicts:#?}"
+    );
+}
+
+/// E6, A19: the references read names the journeys that refer to an identity, directly or
+/// through an alias, and deleting an identity something refers to is rejected naming them.
+async fn an_identity_is_deleted_only_once_nothing_refers_to_it(
+    service: &Service,
+    _: &InProcessNotifier,
+) {
+    vendor_after(service, 2).await;
+    let eli = "who_e7h2jv3nxc4yaw6t".parse().unwrap();
+    let ana = "who_d4m6uk2eqf5rbhzs".parse().unwrap();
+    let journeys = |references: Option<cairn_service::IdentityReferences>| {
+        references
+            .unwrap()
+            .journeys
+            .into_iter()
+            .map(|journey| journey.id.to_string())
+            .collect::<Vec<_>>()
+    };
+    assert_eq!(
+        journeys(service.identity_references(&eli).await.unwrap()),
+        ["j_vendor_eval"]
+    );
+    assert!(
+        service
+            .identity_references(&"who_nobody".parse().unwrap())
+            .await
+            .unwrap()
+            .is_none()
+    );
+
+    let revision = service.deployment().await.unwrap().revision.get();
+    let refused = rejected(
+        service
+            .patch(
+                &call("u_lead", AT),
+                &domain(patch(
+                    "p_delete_eli",
+                    "deployment",
+                    revision,
+                    "- op: delete_identity\n  identity: who_e7h2jv3nxc4yaw6t\n",
+                )),
+            )
+            .await,
+    );
+    let Rejection::Invalid { violations } = &refused else {
+        panic!("{refused:#?}")
+    };
+    assert_eq!(violations.as_slice()[0].code, ViolationCode::IdentityInUse);
+    assert!(
+        violations.as_slice()[0]
+            .related
+            .contains(&Subject::Journey(journey_id("j_vendor_eval"))),
+        "the rejection names the journey"
+    );
+
+    let merge = patch(
+        "p_merge_eli",
+        "deployment",
+        revision,
+        "- op: merge_identities\n  survivor: who_d4m6uk2eqf5rbhzs\n  merged: [who_e7h2jv3nxc4yaw6t]\n  journeys: {j_vendor_eval: 2}\n",
+    );
+    applied(service.patch(&call("u_lead", AT), &domain(merge)).await);
+    assert!(
+        journeys(service.identity_references(&ana).await.unwrap())
+            .contains(&"j_vendor_eval".to_owned()),
+        "the survivor is referred to through the merged key's alias"
+    );
+}
+
+/// A19, E6: deleting an identity nothing refers to removes it with its emails, logs the delete,
+/// and frees the address.
+async fn an_unreferenced_identity_is_deleted_with_its_emails(
+    service: &Service,
+    _: &InProcessNotifier,
+) {
+    vendor_after(service, 2).await;
+    let revision = service.deployment().await.unwrap().revision.get();
+    let spare = patch(
+        "p_spare",
+        "deployment",
+        revision,
+        "- op: create_identity\n  identity: {key: who_u5k3mq7wd2fz6ncx, name: Spare, emails: [spare@example.org]}\n",
+    );
+    applied(service.patch(&call("u_lead", AT), &domain(spare)).await);
+    let revision = service.deployment().await.unwrap().revision.get();
+    let delete = patch(
+        "p_delete_spare",
+        "deployment",
+        revision,
+        "- op: delete_identity\n  identity: who_u5k3mq7wd2fz6ncx\n",
+    );
+    applied(service.patch(&call("u_lead", AT), &domain(delete)).await);
+    let query = EventQuery {
+        log: Some(Domain::Deployment),
+        ..EventQuery::default()
+    };
+    let logged = service.events(&query).await.unwrap().items;
+    assert!(
+        logged
+            .iter()
+            .any(|entry| entry.event.event_type == EventType::IdentityDeleted)
+    );
+    let deployment = service.deployment().await.unwrap();
+    assert!(
+        deployment
+            .identities
+            .get(&"who_u5k3mq7wd2fz6ncx".parse().unwrap())
+            .is_none()
+    );
+    let reuse = patch(
+        "p_reuse",
+        "deployment",
+        deployment.revision.get(),
+        "- op: create_identity\n  identity: {key: who_p4n7rk2xc6vh3dmf, name: Again, emails: [spare@example.org]}\n",
+    );
+    applied(service.patch(&call("u_lead", AT), &domain(reuse)).await);
+}
+
+/// E6: one merge folds several identities into a survivor; every journey that refers to any of
+/// them is named, and each merged key becomes an alias of the survivor.
+async fn a_group_merge_folds_several_identities_into_one_survivor(
+    service: &Service,
+    _: &InProcessNotifier,
+) {
+    vendor_after(service, 2).await;
+    let revision = service.deployment().await.unwrap().revision.get();
+    let spare = patch(
+        "p_spare",
+        "deployment",
+        revision,
+        "- op: create_identity\n  identity: {key: who_u5k3mq7wd2fz6ncx, name: Spare, emails: [spare@example.org]}\n",
+    );
+    applied(service.patch(&call("u_lead", AT), &domain(spare)).await);
+    let revision = service.deployment().await.unwrap().revision.get();
+    let merge = patch(
+        "p_group",
+        "deployment",
+        revision,
+        "- op: merge_identities\n  survivor: who_d4m6uk2eqf5rbhzs\n  merged: [who_e7h2jv3nxc4yaw6t, who_u5k3mq7wd2fz6ncx]\n  journeys: {j_vendor_eval: 2}\n",
+    );
+    applied(service.patch(&call("u_lead", AT), &domain(merge)).await);
+    let deployment = service.deployment().await.unwrap();
+    let survivor: cairn_schema::IdentityKey = "who_d4m6uk2eqf5rbhzs".parse().unwrap();
+    for merged in ["who_e7h2jv3nxc4yaw6t", "who_u5k3mq7wd2fz6ncx"] {
+        let merged = merged.parse().unwrap();
+        assert!(deployment.identities.get(&merged).is_none());
+        assert_eq!(deployment.aliases.get(&merged), Some(&survivor));
+    }
+    assert!(
+        deployment
+            .identities
+            .get(&survivor)
+            .unwrap()
+            .emails
+            .contains(&"spare@example.org".parse().unwrap())
+    );
+}
+
+/// H5, E6: a group merge resubmitted under its patch id with only some of its identities is not
+/// the merge that id committed.
+async fn a_group_merge_resubmitted_with_other_identities_is_another_merge(
+    service: &Service,
+    _: &InProcessNotifier,
+) {
+    vendor_after(service, 2).await;
+    let revision = service.deployment().await.unwrap().revision.get();
+    let spare = patch(
+        "p_spare",
+        "deployment",
+        revision,
+        "- op: create_identity\n  identity: {key: who_u5k3mq7wd2fz6ncx, name: Spare}\n",
+    );
+    applied(service.patch(&call("u_lead", AT), &domain(spare)).await);
+    let revision = service.deployment().await.unwrap().revision.get();
+    let merge = |merged: &str| {
+        domain(patch(
+            "p_group",
+            "deployment",
+            revision,
+            &format!(
+                "- op: merge_identities\n  survivor: who_d4m6uk2eqf5rbhzs\n  merged: [{merged}]\n  journeys: {{j_vendor_eval: 2}}\n"
+            ),
+        ))
+    };
+    let both = "who_e7h2jv3nxc4yaw6t, who_u5k3mq7wd2fz6ncx";
+    applied(service.patch(&call("u_lead", AT), &merge(both)).await);
+    let again = service
+        .patch(&call("u_lead", AT), &merge(both))
+        .await
+        .unwrap();
+    assert!(
+        matches!(again, cairn_service::Written::AlreadyApplied { .. }),
+        "{again:?}"
+    );
+    let fewer = rejected(
+        service
+            .patch(&call("u_lead", AT), &merge("who_e7h2jv3nxc4yaw6t"))
+            .await,
+    );
+    assert!(
+        matches!(fewer, Rejection::PatchIdReused { .. }),
+        "{fewer:?}"
     );
 }
 

@@ -702,17 +702,27 @@ pub enum Mutation {
         /// The identity as it should be.
         identity: Identity,
     },
-    /// Merge one identity into another (deployment, E6).
+    /// Merge identities into one that remains (deployment, E6): every merged identity's emails
+    /// move to the survivor and each merged key becomes an alias of it, all checked against one
+    /// snapshot.
     MergeIdentities {
         /// The identity that remains.
         survivor: IdentityKey,
-        /// The identity merged into it, whose key becomes an alias.
-        merged: IdentityKey,
-        /// Every journey referencing either, at the revision the merge was checked against;
-        /// at most `journey_count_per_merge_max`.
+        /// The identities merged into it, whose keys become aliases; at least one, at most
+        /// `identity_count_per_fill_max`.
+        merged: IdentitySet,
+        /// Every journey referencing the survivor or any merged identity, at the revision the
+        /// merge was checked against; at most `journey_count_per_merge_max`.
         #[serde(deserialize_with = "merge_journeys")]
         #[schemars(extend("maxProperties" = crate::limits::JOURNEY_COUNT_PER_MERGE_MAX))]
         journeys: BTreeMap<JourneyId, Revision>,
+    },
+    /// Delete an identity nothing refers to (deployment, E6): the identity, its emails, and
+    /// every alias resolving to it. Rejected while any journey, route draft, or route version
+    /// refers to it or to one of its aliases; the commit rechecks that none does.
+    DeleteIdentity {
+        /// The identity.
+        identity: IdentityKey,
     },
 
     // Proposals (I6).
@@ -795,6 +805,7 @@ impl Mutation {
             | Mutation::SetProvenance { .. }
             | Mutation::MarkLocalEdit { .. }
             | Mutation::MergeIdentities { .. }
+            | Mutation::DeleteIdentity { .. }
             | Mutation::ApplyProposal { .. } => ChangeClass::Structural,
             Mutation::SetNodeField { value, .. } => match value.field() {
                 // A journey weight override is state (B5); every other field is structure.

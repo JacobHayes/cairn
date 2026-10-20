@@ -381,7 +381,8 @@ const SAY: Record<EventType, (c: Context) => Said> = {
   local_edit_changed: (c) => ({ what: `changed what stays local on ${it(c)}` }),
   identity_created: (c) => ({ what: identityNamed(c) === undefined ? "added an identity" : `added ${quoted(identityNamed(c) ?? "")} to the identities` }),
   identity_edited: (c) => ({ what: identityNamed(c) === undefined ? "edited an identity" : `edited the identity ${quoted(identityNamed(c) ?? "")}` }),
-  identities_merged: (c) => ({ what: identityNamed(c) === undefined ? "merged two identities" : `merged identities into ${quoted(identityNamed(c) ?? "")}` }),
+  identities_merged: (c) => ({ what: identityNamed(c) === undefined ? "merged identities" : `merged identities into ${quoted(identityNamed(c) ?? "")}` }),
+  identity_deleted: () => ({ what: "deleted an identity" }),
   proposal_created: () => ({ what: "proposed a change" }),
   proposal_edited: () => ({ what: "edited a proposal" }),
   proposal_applied: (c) => {

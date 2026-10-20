@@ -20,8 +20,9 @@ use crate::sql::{
 };
 
 /// The tables holding one graph's records, children before parents.
-pub(crate) const GRAPH_TABLES: [&str; 20] = [
+pub(crate) const GRAPH_TABLES: [&str; 21] = [
     "participation_identities",
+    "condition_identities",
     "answer_identities",
     "role_fill_identities",
     "edges",

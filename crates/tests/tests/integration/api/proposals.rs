@@ -433,4 +433,49 @@ mod in_process {
             );
         }
     }
+    /// E6, I6: a deployment proposal that merges several identities into one and one that
+    /// deletes an identity are read, previewed with the engine's candidate deployment, and
+    /// applied.
+    #[tokio::test]
+    async fn identity_merges_and_deletes_are_proposed_previewed_and_applied() {
+        let world = World::start().await;
+        world.vendor_after(2).await;
+        let ann = world.signed_in("ann");
+        let deployment: cairn_schema::Deployment = get(&ann, "/api/deployment").await;
+        let spare = "who_u5k3mq7wd2fz6ncx";
+        let create = json!({"patch": {"id": "p_spare", "target": "deployment",
+            "base_revision": deployment.revision.get(),
+            "mutations": [{"op": "create_identity", "identity": {"key": spare, "name": "Spare"}}]}});
+        ok::<Value>(&post(&ann, "/api/deployment/patches", &create).await);
+        let revision = deployment.revision.get() + 1;
+        let merge = |journeys: Value| {
+            json!({"op": "merge_identities", "survivor": "who_d4m6uk2eqf5rbhzs",
+                "merged": ["who_e7h2jv3nxc4yaw6t", spare], "journeys": journeys})
+        };
+        // A merge that names none of the journeys referring to its identities is previewed as
+        // the violation it is; one that names them is clean, as is a delete.
+        let proposals = [
+            ("pr_unnamed", merge(json!({})), 1),
+            ("pr_merge", merge(json!({"j_vendor_eval": 2})), 0),
+            (
+                "pr_delete",
+                json!({"op": "delete_identity", "identity": spare}),
+                0,
+            ),
+        ];
+        for (id, mutation, violations) in proposals {
+            let body = json!({"patch_id": format!("p_{id}"), "id": id, "draft": {
+                "title": id, "destination_revision": revision, "mutations": [mutation]}});
+            ok::<ProposalAnswer>(&post(&ann, "/api/deployment/proposals", &body).await);
+            let held: Proposal = get(&ann, &format!("/api/deployment/proposals/{id}")).await;
+            assert_eq!(held.status, ProposalStatus::Open);
+            let review: ProposalReview = ok(&post(
+                &ann,
+                &format!("/api/deployment/proposals/{id}/preview"),
+                &json!({}),
+            )
+            .await);
+            assert_eq!(review.preview.violations.len(), violations, "{id}");
+        }
+    }
 }

@@ -93,6 +93,42 @@ mod in_process {
         );
     }
 
+    /// E6: the references read names the journeys that refer to an identity, as the service
+    /// reads them, and an identity the deployment lacks is not found.
+    #[tokio::test]
+    async fn the_references_read_names_the_journeys_that_refer_to_an_identity() {
+        let world = World::start().await;
+        let ann = world.vendor_after(2).await;
+        let eli = "who_e7h2jv3nxc4yaw6t";
+        let references: cairn_api::wire::IdentityReferences = get(
+            &ann,
+            &format!("/api/deployment/identities/{eli}/references"),
+        )
+        .await;
+        let held = world
+            .service
+            .identity_references(&eli.parse().unwrap())
+            .await
+            .unwrap()
+            .unwrap();
+        assert_eq!(references.journeys.len(), held.journeys.len());
+        let named: Vec<_> = references
+            .journeys
+            .iter()
+            .map(|journey| journey.id.as_str())
+            .collect();
+        assert_eq!(named, ["j_vendor_eval"]);
+        let unknown = ann
+            .send(
+                Method::GET,
+                "/api/deployment/identities/who_nobody/references",
+                None,
+            )
+            .await
+            .unwrap();
+        assert_eq!(unknown.status, StatusCode::NOT_FOUND);
+    }
+
     /// Every read answers what the service holds (C16, C17, E6, H3, J5), and capabilities
     /// what the host offers.
     #[tokio::test]
@@ -113,7 +149,6 @@ mod in_process {
         assert_eq!(detail.versions[0].journeys, [id.clone()].into());
         let deployment: Deployment = get(&ann, "/api/deployment").await;
         assert_eq!(deployment, service.deployment().await.unwrap());
-
         let index: JourneyPage = get(&ann, "/api/journeys?status=active&size=1").await;
         assert_eq!((index.items.len(), index.next), (1, None));
         assert!(!index.items[0].upgrade_available);

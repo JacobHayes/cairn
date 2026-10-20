@@ -147,7 +147,7 @@ fn the_owner_filter_follows_aliases_and_mine_reads_the_viewer() {
     assert_eq!(drawn("who_a"), a);
     let revision = records.journeys.values().next().unwrap().revision.get();
     let merge = format!(
-        "- op: merge_identities\n  survivor: who_a\n  merged: who_b\n  journeys: {{{}: {revision}}}\n",
+        "- op: merge_identities\n  survivor: who_a\n  merged: [who_b]\n  journeys: {{{}: {revision}}}\n",
         support::JOURNEY
     );
     let patch = support::patch_to(&records, "deployment", &merge);

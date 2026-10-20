@@ -1,12 +1,12 @@
 //! The [`Store`] trait (ARCHITECTURE, Store trait): small and whole-domain oriented; nothing
 //! in it walks the graph.
 
-use std::collections::{BTreeMap, BTreeSet};
+use std::collections::BTreeSet;
 
 use async_trait::async_trait;
 use cairn_schema::{
-    ConversationId, Email, Identity, IdentityKey, JourneyId, PatchId, PatchReceipt, Proposal,
-    ProposalId, Revision, RevisionConflict, RouteId, Slug, Timestamp, Title, TouchedSet, UserId,
+    ConversationId, Email, GraphId, Identity, IdentityKey, JourneyId, PatchId, PatchReceipt,
+    Proposal, ProposalId, RevisionConflict, RouteId, Slug, Timestamp, Title, TouchedSet, UserId,
 };
 
 use crate::commit::{Commit, CommitError, Committed, StoreError};
@@ -89,12 +89,14 @@ pub trait Store: AuthStore + ConversationStore + Send + Sync {
     /// C17: a route's published versions with the journeys on each.
     async fn route_detail(&self, route: &RouteId) -> Result<Option<RouteDetail>, StoreError>;
 
-    /// E6: the journeys referring to any of `identities`, directly or through an alias, at
-    /// their current revisions: what an identity merge is checked against.
-    async fn journeys_referencing(
+    /// E6: the graphs referring to any of `identities`, directly or through an alias: journeys,
+    /// route drafts and published route versions, in an answer, a role fill, an explicit
+    /// participation, or an identity-typed condition. What an identity merge and an identity
+    /// delete are checked against.
+    async fn graphs_referencing(
         &self,
         identities: &BTreeSet<IdentityKey>,
-    ) -> Result<BTreeMap<JourneyId, Revision>, StoreError>;
+    ) -> Result<BTreeSet<GraphId>, StoreError>;
 
     /// H3: the identities holding any of `emails`, each email being held by at most one. An
     /// indexed lookup that loads no deployment, so every request can ask it.

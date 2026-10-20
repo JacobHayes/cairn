@@ -4,8 +4,8 @@
 use axum::Json;
 use axum::extract::{Extension, RawQuery, State};
 use cairn_schema::{
-    Actor, Deployment, DomainDocument, Journey, JourneyId, Route, RouteId, RouteVersion,
-    VersionNumber,
+    Actor, Deployment, DomainDocument, IdentityKey, Journey, JourneyId, Route, RouteId,
+    RouteVersion, VersionNumber,
 };
 
 use super::Answer;
@@ -13,7 +13,7 @@ use crate::Api;
 use crate::error::ApiError;
 use crate::extract::{Path, segment};
 use crate::query::{self, Params};
-use crate::wire::{EventPage, JourneyPage, RouteDetail, RoutePage, SearchPage};
+use crate::wire::{EventPage, IdentityReferences, JourneyPage, RouteDetail, RoutePage, SearchPage};
 
 /// `GET /api/journeys` (C16).
 pub async fn journeys(State(api): State<Api>, RawQuery(raw): RawQuery) -> Answer<JourneyPage> {
@@ -92,6 +92,18 @@ pub async fn route_version(
 /// `GET /api/deployment`.
 pub async fn deployment(State(api): State<Api>) -> Answer<Deployment> {
     Ok(Json(api.service.deployment().await?))
+}
+
+/// `GET /api/deployment/identities/{key}/references` (E6).
+pub async fn identity_references(
+    State(api): State<Api>,
+    Path(key): Path<String>,
+) -> Answer<IdentityReferences> {
+    let key: IdentityKey = segment(&key, "identity")?;
+    let references = api.service.identity_references(&key).await?;
+    references
+        .map(|found| Json(found.into()))
+        .ok_or_else(|| ApiError::not_found(format_args!("identity {key}")))
 }
 
 /// `GET /api/search`.

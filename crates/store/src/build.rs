@@ -310,6 +310,15 @@ impl PatchBuilder {
         self
     }
 
+    /// Names an identity delete's identities, which no graph may refer to (E6).
+    #[must_use]
+    pub fn unreferenced(mut self, identities: &[&str]) -> Self {
+        self.preconditions.push(Precondition::Unreferenced {
+            identities: identities.iter().map(|key| id(key)).collect(),
+        });
+        self
+    }
+
     /// The commit: every event made by the patch's actor at its minute.
     #[must_use]
     pub fn commit(mut self) -> Commit {

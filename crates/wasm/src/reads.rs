@@ -62,6 +62,52 @@ impl JourneyIndexQuery {
     }
 }
 
+/// A journey of the store's index as the API's `JourneySummary`.
+fn summarized(summary: cairn_store::JourneySummary) -> JourneySummary {
+    let upgrade_available = summary.upgrade_available();
+    let cairn_store::JourneySummary {
+        id,
+        name,
+        status,
+        lineage,
+        revision,
+        created_at,
+        latest_version,
+    } = summary;
+    JourneySummary {
+        id,
+        name,
+        status,
+        lineage,
+        revision,
+        created_at,
+        latest_version,
+        upgrade_available,
+    }
+}
+
+/// Where a route refers to an identity, as the API's `RouteReference` (E6).
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct RouteReference {
+    /// The route's fields.
+    pub header: RouteHeader,
+    /// Whether its draft refers to the identity.
+    pub draft: bool,
+    /// The published versions that refer to it.
+    pub versions: Vec<VersionNumber>,
+}
+
+/// What refers to an identity, as the API's `IdentityReferences` (E6).
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct IdentityReferences {
+    /// The journeys, in id order.
+    pub journeys: Vec<JourneySummary>,
+    /// The routes, in id order.
+    pub routes: Vec<RouteReference>,
+}
+
 /// A route in the route index, as the API's `RouteSummary`.
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
@@ -194,31 +240,38 @@ impl BrowserRoot {
     /// When the store fails.
     pub fn journey_index(&self, query: &JourneyIndexQuery) -> Result<JourneyPage, HostError> {
         let page = now_or_never(self.service().journeys(&query.store_query())).map_err(failed)?;
-        let items = page.items.into_iter().map(|summary| {
-            let upgrade_available = summary.upgrade_available();
-            let cairn_store::JourneySummary {
-                id,
-                name,
-                status,
-                lineage,
-                revision,
-                created_at,
-                latest_version,
-            } = summary;
-            JourneySummary {
-                id,
-                name,
-                status,
-                lineage,
-                revision,
-                created_at,
-                latest_version,
-                upgrade_available,
-            }
-        });
+        let items = page.items.into_iter().map(summarized);
         Ok(JourneyPage {
             items: items.collect(),
             next: page.next,
+        })
+    }
+
+    /// E6: what refers to identity `identity`, as
+    /// `GET /api/deployment/identities/{key}/references` answers it.
+    ///
+    /// # Errors
+    ///
+    /// [`HostError::Missing`] when there is no such identity; when the store fails.
+    pub fn references_of(&self, identity: &IdentityKey) -> Result<IdentityReferences, HostError> {
+        let Some(found) =
+            now_or_never(self.service().identity_references(identity)).map_err(failed)?
+        else {
+            return Err(HostError::Missing {
+                message: format!("no identity {identity}"),
+            });
+        };
+        Ok(IdentityReferences {
+            journeys: found.journeys.into_iter().map(summarized).collect(),
+            routes: found
+                .routes
+                .into_iter()
+                .map(|route| RouteReference {
+                    header: route.header,
+                    draft: route.draft,
+                    versions: route.versions,
+                })
+                .collect(),
         })
     }
 
@@ -355,6 +408,20 @@ impl BrowserRoot {
     pub fn journey_index_json(&self, query: &str) -> Result<String, String> {
         let query: JourneyIndexQuery = read("journey query", query)?;
         Ok(json(&self.journey_index(&query)?))
+    }
+
+    /// E6: what refers to identity `identity`, as
+    /// `GET /api/deployment/identities/{key}/references` answers it.
+    ///
+    /// # Errors
+    ///
+    /// The JSON of a [`HostError`]: no such identity, or an unreadable input.
+    #[wasm_bindgen(js_name = identityReferences)]
+    pub fn identity_references(&self, identity: &str) -> Result<String, String> {
+        let key: IdentityKey = identity
+            .parse()
+            .map_err(|error| HostError::unreadable("identity", format!("{error:?}")))?;
+        Ok(json(&self.references_of(&key)?))
     }
 
     /// The route index from after `after` (empty for the first page), as `GET /api/routes`

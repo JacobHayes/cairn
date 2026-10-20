@@ -39,10 +39,10 @@ describe("identities as sent (E6, H3)", () => {
 describe("a merge (E6)", () => {
   it("names each referring journey at the revision it was read at", () => {
     const summary = (id: string, revision: number): Schema<"JourneySummary"> => ({ id, name: id, status: "archived", revision, created_at: "2026-10-01T00:00:00Z", upgrade_available: false });
-    expect(mergeMutation("who_keep", "who_old", [summary("j_one", 4), summary("j_two", 9)])).toEqual({
+    expect(mergeMutation("who_keep", ["who_old"], [summary("j_one", 4), summary("j_two", 9)])).toEqual({
       op: "merge_identities",
       survivor: "who_keep",
-      merged: "who_old",
+      merged: ["who_old"],
       journeys: { j_one: 4, j_two: 9 },
     });
   });

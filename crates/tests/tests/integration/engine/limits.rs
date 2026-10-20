@@ -98,7 +98,7 @@ fn merge_then(
     for (survivor, merged) in pairs {
         writeln!(
             merges,
-            "- op: merge_identities\n  survivor: {survivor}\n  merged: {merged}\n  journeys: {{}}"
+            "- op: merge_identities\n  survivor: {survivor}\n  merged: [{merged}]\n  journeys: {{}}"
         )
         .unwrap();
     }
@@ -179,11 +179,11 @@ fn a_merge_naming_too_many_journeys_is_refused() {
     let mut patch = support::patch_to(
         &created,
         "deployment",
-        "- op: merge_identities\n  survivor: who_kept\n  merged: who_gone\n  journeys: {}\n",
+        "- op: merge_identities\n  survivor: who_kept\n  merged: [who_gone]\n  journeys: {}\n",
     );
     patch.mutations = cairn_schema::Mutations::new(vec![cairn_schema::Mutation::MergeIdentities {
         survivor: "who_kept".parse().unwrap(),
-        merged: "who_gone".parse().unwrap(),
+        merged: cairn_schema::IdentitySet::new(["who_gone".parse().unwrap()]).unwrap(),
         journeys,
     }])
     .unwrap();

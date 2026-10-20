@@ -38,6 +38,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/deployment/identities/{key}/references": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** The journeys and routes referring to an identity, directly or through an alias: what a delete is checked against (E6). */
+        get: operations["getIdentityReferences"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/deployment/patches": {
         parameters: {
             query?: never;
@@ -2044,7 +2061,7 @@ export interface components {
          *     their content ([`Mutation::event_type`]).
          * @enum {string}
          */
-        EventType: "journey_created" | "journey_edited" | "journey_status_changed" | "journey_deleted" | "route_created" | "route_edited" | "route_retired" | "route_unretired" | "draft_opened" | "route_version_imported" | "saved_as_route" | "draft_discarded" | "route_published" | "node_added" | "node_changed" | "weight_changed" | "node_removed" | "edge_changed" | "role_changed" | "participation_kind_changed" | "default_owner_changed" | "participation_changed" | "resource_changed" | "segment_inserted" | "node_transitioned" | "milestone_reached" | "answer_set" | "recorded_date_changed" | "role_fill_changed" | "date_pinned" | "date_shifted" | "date_unpinned" | "snooze_set" | "unsnoozed" | "override_applied" | "guard_bypassed" | "override_removed" | "atomic_changed" | "annotation_added" | "annotation_edited" | "annotation_removed" | "journey_upgraded" | "relinked" | "provenance_changed" | "local_edit_changed" | "identity_created" | "identity_edited" | "identities_merged" | "proposal_created" | "proposal_edited" | "proposal_applied" | "proposal_discarded";
+        EventType: "journey_created" | "journey_edited" | "journey_status_changed" | "journey_deleted" | "route_created" | "route_edited" | "route_retired" | "route_unretired" | "draft_opened" | "route_version_imported" | "saved_as_route" | "draft_discarded" | "route_published" | "node_added" | "node_changed" | "weight_changed" | "node_removed" | "edge_changed" | "role_changed" | "participation_kind_changed" | "default_owner_changed" | "participation_changed" | "resource_changed" | "segment_inserted" | "node_transitioned" | "milestone_reached" | "answer_set" | "recorded_date_changed" | "role_fill_changed" | "date_pinned" | "date_shifted" | "date_unpinned" | "snooze_set" | "unsnoozed" | "override_applied" | "guard_bypassed" | "override_removed" | "atomic_changed" | "annotation_added" | "annotation_edited" | "annotation_removed" | "journey_upgraded" | "relinked" | "provenance_changed" | "local_edit_changed" | "identity_created" | "identity_edited" | "identities_merged" | "identity_deleted" | "proposal_created" | "proposal_edited" | "proposal_applied" | "proposal_discarded";
         /**
          * @description A list of explanation entries with its total (ARCHITECTURE, Read path): complete inside
          *     the engine and the browser; a server response keeps the largest entries up to
@@ -2382,6 +2399,17 @@ export interface components {
         };
         /** @description Starts with "who_"; at most id_bytes_max (64) bytes. */
         IdentityKey: string;
+        /**
+         * @description Everything that refers to an identity, directly or through an alias (E6): every journey,
+         *     whatever its status, and every route whose draft or published versions do. Authoritative:
+         *     an identity with neither can be deleted.
+         */
+        IdentityReferences: {
+            /** @description The journeys, in id order. */
+            journeys: components["schemas"]["JourneySummary"][];
+            /** @description The routes, in id order. */
+            routes: components["schemas"]["RouteReference"][];
+        };
         /**
          * @description An edge an insertion adds: `node` requires `requires`, one end in the segment and the
          *     other in the graph (B13).
@@ -3170,18 +3198,26 @@ export interface components {
             op: "edit_identity";
         } | {
             /**
-             * @description Every journey referencing either, at the revision the merge was checked against;
-             *     at most `journey_count_per_merge_max`.
+             * @description Every journey referencing the survivor or any merged identity, at the revision the
+             *     merge was checked against; at most `journey_count_per_merge_max`.
              */
             journeys: {
                 [key: string]: components["schemas"]["Revision"];
             };
-            /** @description The identity merged into it, whose key becomes an alias. */
-            merged: components["schemas"]["IdentityKey"];
+            /**
+             * @description The identities merged into it, whose keys become aliases; at least one, at most
+             *     `identity_count_per_fill_max`.
+             */
+            merged: components["schemas"]["IdentityKey"][];
             /** @constant */
             op: "merge_identities";
             /** @description The identity that remains. */
             survivor: components["schemas"]["IdentityKey"];
+        } | {
+            /** @description The identity. */
+            identity: components["schemas"]["IdentityKey"];
+            /** @constant */
+            op: "delete_identity";
         } | {
             /** @constant */
             op: "create_proposal";
@@ -4206,6 +4242,11 @@ export interface components {
             identities_created?: number;
             /**
              * Format: uint32
+             * @description Identities it deletes.
+             */
+            identities_deleted?: number;
+            /**
+             * Format: uint32
              * @description Identities it edits.
              */
             identities_edited?: number;
@@ -4843,6 +4884,15 @@ export interface components {
             /** @description Pass as `after` for the next page. */
             next?: components["schemas"]["RouteId"] | null;
         };
+        /** @description Where a route refers to an identity (E6): its draft, and the published versions. */
+        RouteReference: {
+            /** @description Whether its draft refers to the identity. */
+            draft: boolean;
+            /** @description The route's fields. */
+            header: components["schemas"]["RouteHeader"];
+            /** @description The published versions that refer to it, ascending. */
+            versions: components["schemas"]["VersionNumber"][];
+        };
         /** @description A route in the route index (I2). */
         RouteSummary: {
             /** @description Whether it has an open draft. */
@@ -5424,7 +5474,7 @@ export interface components {
          * @description What a violation breaks (PRD Invariants, D1, D4, A11, A18, A19, B6, E3, E6, H3).
          * @enum {string}
          */
-        ViolationCode: "duplicate_sibling_id" | "duplicate_key" | "retired_key_reused" | "unresolved_reference" | "wrong_reference_kind" | "containment_cycle" | "leaf_with_children" | "dependency_cycle" | "edge_to_ancestor_or_descendant" | "requires_duplicates_condition" | "contradictory_chain" | "condition_answer_type_mismatch" | "condition_on_own_subtree" | "stage_bound_not_milestone" | "undeclared_kind" | "single_kind_on_multi_role" | "fills_role_cardinality" | "several_filling_decisions" | "feeds_milestone_not_milestone" | "several_feeding_decisions" | "several_final_milestones" | "field_not_on_kind" | "state_not_on_kind" | "limit_exceeded" | "dangling_reference" | "removal_widened" | "still_referenced" | "answer_type_mismatch" | "identity_unresolved" | "illegal_transition" | "reason_required" | "guard_failed" | "not_relevant" | "snooze_on_self" | "snooze_cycle" | "snooze_not_actionable" | "snoozed_through_container" | "filled_through_decision" | "pinned_through_decision" | "mutation_not_for_target" | "lineage_invalid" | "archived_journey" | "target_exists" | "target_missing" | "deleted_journey_id" | "draft_exists" | "no_draft" | "version_in_use" | "segment_rule" | "insertion_invalid" | "insertion_key_taken" | "not_a_process_route" | "identity_key_taken" | "identity_empty" | "email_taken" | "alias_cycle" | "merge_breaks_journey" | "proposal_not_open" | "unresolved_review_item";
+        ViolationCode: "duplicate_sibling_id" | "duplicate_key" | "retired_key_reused" | "unresolved_reference" | "wrong_reference_kind" | "containment_cycle" | "leaf_with_children" | "dependency_cycle" | "edge_to_ancestor_or_descendant" | "requires_duplicates_condition" | "contradictory_chain" | "condition_answer_type_mismatch" | "condition_on_own_subtree" | "stage_bound_not_milestone" | "undeclared_kind" | "single_kind_on_multi_role" | "fills_role_cardinality" | "several_filling_decisions" | "feeds_milestone_not_milestone" | "several_feeding_decisions" | "several_final_milestones" | "field_not_on_kind" | "state_not_on_kind" | "limit_exceeded" | "dangling_reference" | "removal_widened" | "still_referenced" | "answer_type_mismatch" | "identity_unresolved" | "illegal_transition" | "reason_required" | "guard_failed" | "not_relevant" | "snooze_on_self" | "snooze_cycle" | "snooze_not_actionable" | "snoozed_through_container" | "filled_through_decision" | "pinned_through_decision" | "mutation_not_for_target" | "lineage_invalid" | "archived_journey" | "target_exists" | "target_missing" | "deleted_journey_id" | "draft_exists" | "no_draft" | "version_in_use" | "segment_rule" | "insertion_invalid" | "insertion_key_taken" | "not_a_process_route" | "identity_key_taken" | "identity_empty" | "email_taken" | "alias_cycle" | "merge_breaks_journey" | "identity_in_use" | "proposal_not_open" | "unresolved_review_item";
         /** @description A violation list with at least one entry (a rejection always says why). */
         Violations: components["schemas"]["Violation"][];
         /** @description What a stream watches: `deployment`, `journey:<id>`, `route:<id>`, `proposal:<id>`, `journeys`, `routes`, or `proposals`. */
@@ -5564,6 +5614,84 @@ export interface operations {
                 };
                 content: {
                     "text/plain": string;
+                };
+            };
+            /** @description The server failed; the request id names it in the logs. */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description A limit was reached or the request timed out; retry after `Retry-After`. Or: The auth layer could not ask a sign-in provider (in text, without `Retry-After`). */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Problem"];
+                    "text/plain": string;
+                };
+            };
+        };
+    };
+    getIdentityReferences: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The identity. */
+                key: components["schemas"]["IdentityKey"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Answered. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["IdentityReferences"];
+                };
+            };
+            /** @description The request is malformed. */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description No credential, or one that is refused (the auth layer, in text). */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "text/plain": string;
+                };
+            };
+            /** @description The auth layer refused the peer: a local-only provider and a remote peer, or login headers from a peer no proxy-mode provider trusts (in text). */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "text/plain": string;
+                };
+            };
+            /** @description No such resource. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Problem"];
                 };
             };
             /** @description The server failed; the request id names it in the logs. */

@@ -85,6 +85,7 @@ export function browserHost(root: InBrowserHost): Host {
     userNames: (users) => read("the users", () => root.userNames(users)),
     files: filesOf(engine),
     deployment: () => read("the deployment", () => root.deployment()),
+    identityReferences: (identity) => read(identity, () => root.identityReferences(identity)),
     documentText: (journey) => read(journey, () => root.documentText(journey)),
     route: (route) => read(route, () => root.route(route)),
     routeVersion: (route, version) => read(`${route} version ${String(version)}`, () => root.routeVersion(route, version)),

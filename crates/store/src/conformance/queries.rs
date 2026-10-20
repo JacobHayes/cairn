@@ -110,12 +110,12 @@ pub async fn aliases_resolve_to_their_identity<B: Backend>(backend: &B) {
     // Any key of an identity finds every journey holding any key of it.
     for asked in ["who_a", "who_old", "who_older"] {
         let referencing = store
-            .journeys_referencing(&BTreeSet::from([id(asked)]))
+            .graphs_referencing(&BTreeSet::from([id(asked)]))
             .await
             .unwrap();
         assert_eq!(
             referencing,
-            BTreeMap::from([(id("j_one"), revision(1)), (id("j_two"), revision(1))]),
+            BTreeSet::from([journey_graph("j_one"), journey_graph("j_two")]),
             "{asked}"
         );
     }
@@ -134,6 +134,129 @@ pub async fn aliases_resolve_to_their_identity<B: Backend>(backend: &B) {
     };
     let codes: Vec<_> = violations.as_slice().iter().map(|v| v.code).collect();
     assert_eq!(codes, vec![ViolationCode::IdentityUnresolved]);
+}
+
+/// E6: a node's condition refers to an identity when it compares an identity decision with
+/// the key, and not when it compares a text decision with the same characters.
+pub async fn a_condition_refers_to_an_identity_only_through_an_identity_decision<B: Backend>(
+    backend: &B,
+) {
+    let store = open(backend).await;
+    let people = deployment_patch("p_people", 0).event(
+        EventType::IdentityCreated,
+        Subject::Identity(id("who_a")),
+        vec![Write::Put(Record::Identity(identity("who_a", "A", &[])))],
+    );
+    applied(&store, people.commit()).await;
+    let by_identity = create_journey(
+        "p_one",
+        "j_one",
+        vec![
+            node(json!({
+                "key": "n_who", "id": "who", "kind": "decision", "title": "Who",
+                "prompt": "Who?", "answer_type": "identity",
+            })),
+            node(json!({
+                "key": "n_after", "id": "after", "kind": "action", "title": "After",
+                "relevant_when": {"equals": {"decision": "n_who", "value": "who_a"}},
+            })),
+        ],
+    );
+    applied(&store, by_identity.commit()).await;
+    let by_text = create_journey(
+        "p_two",
+        "j_two",
+        vec![
+            node(json!({
+                "key": "n_note", "id": "note", "kind": "decision", "title": "Note",
+                "prompt": "Note?", "answer_type": "text",
+            })),
+            node(json!({
+                "key": "n_after", "id": "after", "kind": "action", "title": "After",
+                "relevant_when": {"equals": {"decision": "n_note", "value": "who_a"}},
+            })),
+        ],
+    );
+    applied(&store, by_text.commit()).await;
+    assert_eq!(
+        store
+            .graphs_referencing(&BTreeSet::from([id("who_a")]))
+            .await
+            .unwrap(),
+        BTreeSet::from([journey_graph("j_one")])
+    );
+}
+
+/// E6: an identity delete commits only while no graph refers to the identity: it is stale once
+/// a journey does, and commits after the reference goes.
+pub async fn an_identity_delete_is_stale_while_any_graph_refers_to_it<B: Backend>(backend: &B) {
+    let store = open(backend).await;
+    let people = deployment_patch("p_people", 0).event(
+        EventType::IdentityCreated,
+        Subject::Identity(id("who_a")),
+        vec![Write::Put(Record::Identity(identity("who_a", "A", &[])))],
+    );
+    applied(&store, people.commit()).await;
+    let answer = create_journey(
+        "p_one",
+        "j_one",
+        vec![node(json!({
+            "key": "n_who", "id": "who", "kind": "decision", "title": "Who",
+            "prompt": "Who?", "answer_type": "identity",
+        }))],
+    )
+    .event(
+        EventType::AnswerSet,
+        Subject::Node(node_key("n_who")),
+        vec![put_in(
+            &journey_graph("j_one"),
+            GraphRecord::Answer {
+                decision: node_key("n_who"),
+                value: cairn_schema::AnswerValue::Identity(id("who_a")),
+                rationale: None,
+            },
+        )],
+    );
+    applied(&store, answer.commit()).await;
+    let delete = |patch: &str, base: u32| {
+        deployment_patch(patch, base)
+            .unreferenced(&["who_a"])
+            .event(
+                EventType::IdentityDeleted,
+                Subject::Identity(id("who_a")),
+                vec![Write::Remove(cairn_schema::RecordKey::Identity(id(
+                    "who_a",
+                )))],
+            )
+            .commit()
+    };
+    let error = failed(&store, delete("p_delete", 1)).await;
+    assert!(
+        matches!(
+            error,
+            CommitError::Rejected(cairn_schema::Rejection::Stale { .. })
+        ),
+        "{error:?}"
+    );
+    let gone = journey_patch("p_gone", "j_one", 1)
+        .event_in(
+            Domain::Deployment,
+            EventType::JourneyDeleted,
+            Subject::Journey(id("j_one")),
+            vec![
+                Write::Remove(cairn_schema::RecordKey::Domain(Domain::Journey(id(
+                    "j_one",
+                )))),
+                Write::Put(Record::DeletedJourney {
+                    journey: id("j_one"),
+                    deleted_at: build::at(30),
+                }),
+            ],
+        )
+        .commit();
+    applied(&store, gone).await;
+    applied(&store, delete("p_delete_again", 1)).await;
+    assert_eq!(store.resolve_identity(&id("who_a")).await.unwrap(), None);
 }
 
 /// H6: the current revisions list every journey, route, proposal, and the deployment.

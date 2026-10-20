@@ -219,6 +219,9 @@ async fn within(
     for write in commit.change_set.writes() {
         writer.apply(write).await?;
     }
+    for graph in &shape.conditions_changed {
+        crate::conditions::refresh(connection, &crate::sql::graph_id(graph)).await?;
+    }
     violations.extend(produced_violations(connection, shape).await?);
     backend::reject_violations(violations)?;
     let deployment = advance(connection, shape).await?;
@@ -402,19 +405,32 @@ async fn check_revisions(
         }
     }
     for precondition in &commit.preconditions {
-        if let Precondition::ReferencingJourneys {
-            identities,
-            journeys,
-        } = precondition
-        {
-            for (journey, now) in crate::queries::referencing(connection, identities).await? {
-                if !journeys.contains(&journey) {
-                    conflicts.push(RevisionConflict {
-                        of: RevisionOf::Domain(Domain::Journey(journey)),
-                        expected: Revision::NONE,
-                        current: now,
-                    });
+        let (identities, allowed) = match precondition {
+            Precondition::ReferencingJourneys {
+                identities,
+                journeys,
+            } => (identities, Some(journeys)),
+            Precondition::Unreferenced { identities } => (identities, None),
+            Precondition::Revision { .. } => continue,
+        };
+        for graph in crate::queries::referencing(connection, identities).await? {
+            let (domain, outside) = match (&graph, allowed) {
+                (GraphId::Journey(journey), Some(named)) => {
+                    (Domain::Journey(journey.clone()), !named.contains(journey))
                 }
+                (GraphId::Journey(journey), None) => (Domain::Journey(journey.clone()), true),
+                (GraphId::RouteDraft(route) | GraphId::RouteVersion { route, .. }, allowed) => {
+                    (Domain::Route(route.clone()), allowed.is_none())
+                }
+            };
+            if outside {
+                let of = RevisionOf::Domain(domain);
+                let now = load::revision_of(connection, &of).await?;
+                conflicts.push(RevisionConflict {
+                    of,
+                    expected: Revision::NONE,
+                    current: now,
+                });
             }
         }
     }

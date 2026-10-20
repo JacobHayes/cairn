@@ -84,7 +84,7 @@ export function MergeIdentities({ deployment, identities }: { deployment: Deploy
           disabled={!ready || working || write.busy || skew}
           onClick={() => {
             receipt.clear();
-            flow.send({ type: "merge", survivor, merged, deployment: deployment.revision });
+            flow.send({ type: "merge", survivor, merged: [merged], deployment: deployment.revision });
           }}
         >
           Merge

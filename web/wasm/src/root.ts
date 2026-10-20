@@ -69,6 +69,11 @@ export class InBrowserHost {
     return parsed<Schema<"RouteDetail">>(hosted(() => this.#root.routeDetail(route)));
   }
 
+  /** E6: what refers to identity `identity`, as `GET /api/deployment/identities/{key}/references` answers it. */
+  identityReferences(identity: string): Schema<"IdentityReferences"> {
+    return parsed<Schema<"IdentityReferences">>(hosted(() => this.#root.identityReferences(identity)));
+  }
+
   /** A13: a route version as its file, or its draft with no version, as `GET /api/routes/{id}/export` answers it. */
   exportFile(route: string, version?: number): Schema<"RouteFile"> {
     return parsed<Schema<"RouteFile">>(hosted(() => this.#root.exportFile(route, version === undefined ? "" : String(version))));

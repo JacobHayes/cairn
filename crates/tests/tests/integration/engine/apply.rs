@@ -719,7 +719,7 @@ fn a_merge_counts_a_journey_whose_conditions_compare_the_identities() {
     let records = prepared.records();
     let revision = records.journeys.values().next().unwrap().revision.get();
     let merge = format!(
-        "- op: merge_identities\n  survivor: who_two\n  merged: who_one\n  journeys: {{j_vendor_eval: {revision}}}\n"
+        "- op: merge_identities\n  survivor: who_two\n  merged: [who_one]\n  journeys: {{j_vendor_eval: {revision}}}\n"
     );
     let patch = support::patch_to(records, "deployment", &merge);
     assert!(
@@ -727,7 +727,7 @@ fn a_merge_counts_a_journey_whose_conditions_compare_the_identities() {
         "E6: the condition makes the journey a referencing one"
     );
     let unnamed =
-        "- op: merge_identities\n  survivor: who_two\n  merged: who_one\n  journeys: {}\n";
+        "- op: merge_identities\n  survivor: who_two\n  merged: [who_one]\n  journeys: {}\n";
     let patch = support::patch_to(records, "deployment", unnamed);
     assert!(
         matches!(

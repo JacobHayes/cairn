@@ -119,6 +119,8 @@ macro_rules! conformance_suite {
             every::a_cleared_overwrite_loads_back_equal_and_every_record_removes,
             every::every_auth_and_conversation_field_and_variant_loads_back_equal,
             queries::aliases_resolve_to_their_identity,
+            queries::a_condition_refers_to_an_identity_only_through_an_identity_decision,
+            queries::an_identity_delete_is_stale_while_any_graph_refers_to_it,
             queries::current_revisions_list_every_domain_and_proposal,
             queries::the_journey_index_filters_by_status_route_version_reference_and_upgrade,
             queries::the_journey_index_events_and_search_page,

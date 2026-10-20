@@ -83,6 +83,10 @@ fn served(assistant: bool) -> Served {
         (&at::ROUTE_VERSIONS, get(handle::reads::route_versions)),
         (&at::ROUTE_VERSION, get(handle::reads::route_version)),
         (&at::DEPLOYMENT, get(handle::reads::deployment)),
+        (
+            &at::IDENTITY_REFERENCES,
+            get(handle::reads::identity_references),
+        ),
         (&at::SEARCH, get(handle::reads::search)),
         (&at::EVENTS, get(handle::reads::events)),
         (&at::STREAM, get(stream::stream)),

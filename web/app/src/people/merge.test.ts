@@ -10,7 +10,7 @@ import { deferred, settled } from "../data/fake.test-support.ts";
 import type { JourneySummary } from "../data/reads.ts";
 import { mergeFlow, type Merge, type Merged } from "./merge.ts";
 
-const merge: Merge = { survivor: "who_keep", merged: "who_old", deployment: 7 };
+const merge: Merge = { survivor: "who_keep", merged: ["who_old"], deployment: 7 };
 const summary = (id: string, revision: number) => ({ id, revision }) as JourneySummary;
 const applied: Answered<HttpFailure> = { outcome: "answered", answer: { outcome: "applied", receipt: { patch_id: "p_x", domain: "deployment", content_hash: "h", revision: 8 }, consequences: {} } };
 const rejected: Answered<HttpFailure> = { outcome: "rejected", rejection: { rejection: "invalid", violations: [] } };
@@ -39,7 +39,7 @@ describe("a merge", () => {
     expect(host.sent[0]).toMatchObject({
       target: "deployment",
       base_revision: 7,
-      mutations: [{ op: "merge_identities", survivor: "who_keep", merged: "who_old", journeys: { j_one: 4, j_two: 9 } }],
+      mutations: [{ op: "merge_identities", survivor: "who_keep", merged: ["who_old"], journeys: { j_one: 4, j_two: 9 } }],
     });
     expect(merged).toHaveLength(1);
     expect(flow.getSnapshot().value).toBe("idle");
@@ -50,11 +50,11 @@ describe("a merge", () => {
     const { flow, host } = await started(() => reading.promise);
     host.answers = [applied, applied];
     flow.send({ type: "merge", ...merge });
-    flow.send({ type: "merge", ...merge, merged: "who_other" });
+    flow.send({ type: "merge", ...merge, merged: ["who_other"] });
     reading.resolve([]);
     await settled();
     expect(host.sent).toHaveLength(1);
-    expect(host.sent[0]?.mutations).toMatchObject([{ merged: "who_old" }]);
+    expect(host.sent[0]?.mutations).toMatchObject([{ merged: ["who_old"] }]);
   });
 
   it("sends nothing when the journeys cannot be read, and keeps why until the next start", async () => {

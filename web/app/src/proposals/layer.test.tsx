@@ -110,6 +110,19 @@ describe("identityDiff (C14)", () => {
     ]);
   });
 
+  it("marks a deleted identity removed with no one to go into, and a group merge's every key into the survivor", () => {
+    const rows = identityDiff(
+      deployment([identity("who_a", "Ana"), identity("who_b", "Bo"), identity("who_c", "Cy"), identity("who_d", "Di")]),
+      deployment([identity("who_a", "Ana")], { who_b: "who_a", who_c: "who_a" }),
+    );
+    expect(rows.map((each) => [each.identity.key, each.mark?.kind, each.mark?.into])).toEqual([
+      ["who_a", undefined, undefined],
+      ["who_b", "removed", "who_a"],
+      ["who_c", "removed", "who_a"],
+      ["who_d", "removed", undefined],
+    ]);
+  });
+
   it("lists the rows by name, a created identity among them rather than last", () => {
     const rows = identityDiff(deployment([identity("who_b", "Bea"), identity("who_d", "Dev")]), deployment([identity("who_b", "Bea"), identity("who_d", "Dev"), identity("who_a", "Ada")]));
     expect(rows.map((each) => [each.identity.key, each.mark?.kind])).toEqual([["who_a", "added"], ["who_b", undefined], ["who_d", undefined]]);
@@ -117,6 +130,11 @@ describe("identityDiff (C14)", () => {
 
   it("marks nothing while there is no deployment after", () => {
     expect(identityDiff(deployment([identity("who_a", "Ana")]), undefined).map((each) => each.mark)).toEqual([undefined]);
+  });
+
+  it("keeps the page's order by name while there is no deployment after", () => {
+    const rows = identityDiff(deployment([identity("who_c", "Cy"), identity("who_a", "Ana"), identity("who_b", "Bo")]), undefined);
+    expect(rows.map((each) => each.identity.key)).toEqual(["who_a", "who_b", "who_c"]);
   });
 });
 

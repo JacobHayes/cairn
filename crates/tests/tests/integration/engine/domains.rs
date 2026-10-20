@@ -286,11 +286,11 @@ fn walk_deployment(records: &Records, ops: &mut BTreeSet<String>) -> Records {
     let records = accept(records, "deployment", edit, ops);
     let journey = records.journeys.values().next().unwrap().revision;
     let merge = format!(
-        "- op: merge_identities\n  survivor: who_d4m6uk2eqf5rbhzs\n  merged: who_e7h2jv3nxc4yaw6t\n  journeys: {{j_vendor_eval: {}}}\n",
+        "- op: merge_identities\n  survivor: who_d4m6uk2eqf5rbhzs\n  merged: [who_e7h2jv3nxc4yaw6t]\n  journeys: {{j_vendor_eval: {}}}\n",
         journey.get()
     );
     let stale = format!(
-        "- op: merge_identities\n  survivor: who_d4m6uk2eqf5rbhzs\n  merged: who_e7h2jv3nxc4yaw6t\n  journeys: {{j_vendor_eval: {}}}\n",
+        "- op: merge_identities\n  survivor: who_d4m6uk2eqf5rbhzs\n  merged: [who_e7h2jv3nxc4yaw6t]\n  journeys: {{j_vendor_eval: {}}}\n",
         journey.get() - 1
     );
     let patch = support::patch_to(&records, "deployment", &stale);
@@ -325,7 +325,61 @@ fn walk_deployment(records: &Records, ops: &mut BTreeSet<String>) -> Records {
         deployment.aliases[&"who_e7h2jv3nxc4yaw6t".parse().unwrap()],
         "who_d4m6uk2eqf5rbhzs".parse().unwrap()
     );
+    let spare = "- op: create_identity\n  identity: {key: who_u5k3mq7wd2fz6ncx, name: Spare, emails: [spare@example.org]}\n";
+    let records = accept(&records, "deployment", spare, ops);
+    let gone = "- op: delete_identity\n  identity: who_u5k3mq7wd2fz6ncx\n";
+    let records = accept(&records, "deployment", gone, ops);
+    let spare: cairn_schema::IdentityKey = "who_u5k3mq7wd2fz6ncx".parse().unwrap();
+    assert!(records.deployment.identities.get(&spare).is_none());
+    assert!(!records.deployment.aliases.contains_key(&spare));
     records
+}
+
+/// E6: an identity a journey refers to, directly or through the alias of one merged into it,
+/// cannot be deleted, and the rejection names the journey.
+#[test]
+fn an_identity_something_refers_to_is_not_deleted() {
+    let mut ops = BTreeSet::new();
+    let records = support::finished("vendor-evaluation");
+    let records = walk_route(&records, &mut ops);
+    let records = walk_segment(&records, &mut ops);
+    let records = walk_journey(&records, &mut ops);
+    let reject = |records: &Records, key: &str| {
+        let patch = support::patch_to(
+            records,
+            "deployment",
+            &format!("- op: delete_identity\n  identity: {key}\n"),
+        );
+        match support::apply(records, &patch, &support::fixed_inputs()) {
+            Err(Rejection::Invalid { violations }) => violations,
+            other => panic!("expected a rejection, got {other:#?}"),
+        }
+    };
+    let violations = reject(&records, "who_e7h2jv3nxc4yaw6t");
+    let [violation] = violations.as_slice() else {
+        panic!("one violation: {violations:#?}")
+    };
+    assert_eq!(violation.code, ViolationCode::IdentityInUse);
+    assert!(
+        violation
+            .related
+            .iter()
+            .any(|subject| matches!(subject, cairn_schema::Subject::Journey(id) if id.as_str() == "j_vendor_eval")),
+        "{violation:#?}"
+    );
+
+    let journey = records.journeys.values().next().unwrap().revision;
+    let merge = format!(
+        "- op: merge_identities\n  survivor: who_d4m6uk2eqf5rbhzs\n  merged: [who_e7h2jv3nxc4yaw6t]\n  journeys: {{j_vendor_eval: {}}}\n",
+        journey.get()
+    );
+    let merged = accept(&records, "deployment", &merge, &mut BTreeSet::new());
+    let violations = reject(&merged, "who_d4m6uk2eqf5rbhzs");
+    assert_eq!(
+        violations.as_slice()[0].code,
+        ViolationCode::IdentityInUse,
+        "the journey names the merged key, which resolves to the survivor"
+    );
 }
 
 /// A proposal create or edit to the vendor journey adding one note.

@@ -109,6 +109,7 @@ export function serverHost(origin: string, engine: Engine, build: string | undef
     userNames: (users) => answered("the users", () => client.GET("/api/users", { params: { query: { id: [...users] } } })),
     files: filesOf(engine),
     deployment: () => answered("the deployment", () => client.GET("/api/deployment")),
+    identityReferences: (identity) => answered(identity, () => client.GET("/api/deployment/identities/{key}/references", { params: { path: { key: identity } } })),
     documentText: async (journey) => {
       const { data, response } = await replied(journey, () =>
         client.GET("/api/journeys/{id}/document", { params: { path: { id: journey } }, parseAs: "text" }),

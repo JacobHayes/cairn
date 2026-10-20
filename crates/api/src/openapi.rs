@@ -14,15 +14,16 @@ use crate::endpoints::{self, Endpoint};
 use crate::query::{self, ParamSpec, schema_of};
 use crate::wire::{
     AgentToken, AssistantRequest, Caller, Capabilities, Conversation, EventPage, Health, History,
-    JourneyPage, Mine, MintedToken, NodeDetail, PatchAnswer, PatchRequest, Problem, Projected,
-    ProposalAnswer, ProposalApply, ProposalCreate, ProposalEdit, ProposalList, ProposalReview,
-    ProposalStep, RelinkRequest, RouteDetail, RouteImport, RoutePage, SaveAsRouteRequest,
-    SearchPage, Tick, TokenRequest, TurnReply, UpgradeRequest, UserName,
+    IdentityReferences, JourneyPage, Mine, MintedToken, NodeDetail, PatchAnswer, PatchRequest,
+    Problem, Projected, ProposalAnswer, ProposalApply, ProposalCreate, ProposalEdit, ProposalList,
+    ProposalReview, ProposalStep, RelinkRequest, RouteDetail, RouteImport, RoutePage,
+    SaveAsRouteRequest, SearchPage, Tick, TokenRequest, TurnReply, UpgradeRequest, UserName,
 };
 use cairn_schema::{
     AgentId, DecisionView, Deployment, Derived, DomainDocument, ExplainedField, ExplanationPage,
-    Journey, JourneyId, Level, ListPage, Next, NodeKey, Proposal, ProposalId, Rejection, Route,
-    RouteFile, RouteId, RouteVersion, Snapshot, StatusSummary, Timeline, Trace, VersionNumber,
+    IdentityKey, Journey, JourneyId, Level, ListPage, Next, NodeKey, Proposal, ProposalId,
+    Rejection, Route, RouteFile, RouteId, RouteVersion, Snapshot, StatusSummary, Timeline, Trace,
+    VersionNumber,
 };
 
 type SchemaFn = fn(&mut SchemaGenerator) -> Schema;
@@ -474,6 +475,14 @@ fn reads() -> Vec<Operation> {
             &at::DEPLOYMENT,
             "The deployment: identities and aliases (E6).",
         ),
+        Operation {
+            path: &[("key", "The identity.", schema_of::<IdentityKey>)],
+            ..read::<IdentityReferences>(
+                &at::IDENTITY_REFERENCES,
+                "The journeys and routes referring to an identity, directly or through an \
+                 alias: what a delete is checked against (E6).",
+            )
+        },
         Operation {
             query: query::SEARCH_PARAMS,
             ..read::<SearchPage>(&at::SEARCH, "Text search across journeys, paged.")

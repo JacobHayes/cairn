@@ -4,10 +4,11 @@
 use std::collections::{BTreeMap, BTreeSet};
 
 use cairn_schema::{
-    AgentId, AttachmentKey, Consequences, Cursor, Domain, JourneyId, JourneyStatus, KeyRefs,
-    Lineage, Node, NodeKey, Notice, ParticipationKind, PatchEvents, Proposal, ProposalId,
-    ProposalPreview, Revision, RevisionConflict, Role, RoleKey, RouteHeader, RouteId, RouteKind,
-    Timestamp, Title, TouchedSet, UnresolvedItem, UserId, VersionNumber, Violation, to_yaml,
+    AgentId, AttachmentKey, Consequences, Cursor, Domain, Identity, IdentityKey, JourneyId,
+    JourneyStatus, KeyRefs, Lineage, Node, NodeKey, Notice, ParticipationKind, PatchEvents,
+    Proposal, ProposalId, ProposalPreview, Revision, RevisionConflict, Role, RoleKey, RouteHeader,
+    RouteId, RouteKind, Timestamp, Title, TouchedSet, UnresolvedItem, UserId, VersionNumber,
+    Violation, to_yaml,
 };
 use cairn_service::{Call, ProposalReview, StaleBase};
 use cairn_store::{JourneyQuery, PageSize, ProposalCursor, ProposalScope, SearchHit, SearchQuery};
@@ -25,11 +26,22 @@ pub(crate) const SPECS: &[Spec] = &[
         name: "list_journeys",
         description: "The journey index, in id order, a page at a time: each journey's name, \
             status, route version, revision, and whether an upgrade is available. Filter by \
-            status, route, upgrade available, or the caller's own.",
+            status, route, upgrade available, the caller's own, or the journeys that refer to \
+            given identities (directly or through a merged key).",
         writes: false,
         destructive: false,
         schema: schema::<ListJourneys>,
         output: schema::<JourneysOutput>,
+    },
+    Spec {
+        name: "list_identities",
+        description: "The deployment's identities (people and teams journeys refer to), in key \
+            order, a page at a time: each one's key, name, emails, and the keys merged into \
+            it. Pass text to list the ones whose name or an email contains it.",
+        writes: false,
+        destructive: false,
+        schema: schema::<ListIdentities>,
+        output: schema::<IdentitiesOutput>,
     },
     Spec {
         name: "list_routes",
@@ -116,6 +128,7 @@ impl ToolSet {
     ) -> Result<Value, ToolError> {
         match name {
             "list_journeys" => output(self.list_journeys(call, parse(arguments)?).await),
+            "list_identities" => output(self.list_identities(parse(arguments)?).await),
             "list_routes" => output(self.list_routes(parse(arguments)?).await),
             "get_route" => output(self.get_route(parse(arguments)?).await),
             "export_route" => output(self.export_route(parse(arguments)?).await),
@@ -128,6 +141,35 @@ impl ToolSet {
             }),
         }
     }
+}
+
+/// `list_identities`.
+#[derive(Debug, Deserialize, JsonSchema)]
+#[serde(deny_unknown_fields)]
+pub(crate) struct ListIdentities {
+    /// Only identities whose name or an email contains this text, ignoring case.
+    #[serde(default)]
+    text: Option<String>,
+    /// Where the page starts: the `next` of the page before.
+    #[serde(default)]
+    cursor: Cursor,
+}
+
+/// A page of the identities.
+#[derive(Debug, Serialize, JsonSchema)]
+struct IdentitiesOutput {
+    /// The deployment revision: the `base_revision` of a `manage_identity` write.
+    revision: Revision,
+    identities: Paged<IdentityRow>,
+}
+
+/// An identity in the list.
+#[derive(Debug, Serialize, JsonSchema)]
+struct IdentityRow {
+    #[serde(flatten)]
+    identity: Identity,
+    /// Keys merged into it: journeys that name one of these name this identity.
+    merged: Vec<IdentityKey>,
 }
 
 /// `list_routes`.
@@ -244,6 +286,11 @@ pub(crate) struct ListJourneys {
     /// Only journeys that refer to the caller's identities (H3).
     #[serde(default)]
     mine: bool,
+    /// Only journeys that refer to any of these identities, by an answer, a role fill, an
+    /// explicit participation or an identity condition, directly or through a merged key; with
+    /// `mine`, to any of these or the caller's.
+    #[serde(default)]
+    referencing: BTreeSet<IdentityKey>,
     /// The page starts after this journey: the `next` of the page before.
     #[serde(default)]
     after: Option<JourneyId>,
@@ -579,16 +626,51 @@ impl ToolSet {
         })
     }
 
+    async fn list_identities(
+        &self,
+        arguments: ListIdentities,
+    ) -> Result<IdentitiesOutput, ToolError> {
+        let deployment = self.service.deployment().await?;
+        let wanted = arguments.text.as_deref().map(str::to_lowercase);
+        let matches = |identity: &Identity| {
+            wanted.as_deref().is_none_or(|text| {
+                identity.display().to_lowercase().contains(text)
+                    || identity
+                        .emails
+                        .iter()
+                        .any(|email| email.as_str().to_lowercase().contains(text))
+            })
+        };
+        let rows: Vec<IdentityRow> = deployment
+            .identities
+            .values()
+            .filter(|identity| matches(identity))
+            .map(|identity| IdentityRow {
+                merged: deployment
+                    .aliases
+                    .iter()
+                    .filter(|(_, target)| **target == identity.key)
+                    .map(|(alias, _)| alias.clone())
+                    .collect(),
+                identity: identity.clone(),
+            })
+            .collect();
+        Ok(IdentitiesOutput {
+            revision: deployment.revision,
+            identities: page(rows, arguments.cursor),
+        })
+    }
+
     async fn list_journeys(
         &self,
         call: &Call,
         arguments: ListJourneys,
     ) -> Result<JourneysOutput, ToolError> {
-        let referencing = if arguments.mine {
-            Some(self.service.caller(call).await?.identities)
-        } else {
-            None
-        };
+        let mut referencing = arguments.referencing;
+        if arguments.mine {
+            referencing.extend(self.service.caller(call).await?.identities);
+        }
+        let referencing = (arguments.mine || !referencing.is_empty()).then_some(referencing);
         let query = JourneyQuery {
             statuses: arguments.statuses,
             route: arguments.route,

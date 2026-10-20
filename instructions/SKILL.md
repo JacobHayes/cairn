@@ -75,7 +75,11 @@ out, though its relevance reads `not_relevant` and counts for nothing until then
   path that did not match.
 - **Identities.** A write that names identities (an identity answer, explicit participants)
   carries the `deployment_revision` the snapshot reported. An identity has a name, emails,
-  or both; a person who only signed in has emails and no name.
+  or both; a person who only signed in has emails and no name. An identity that anything
+  refers to (an answer, a participant, an owner, a condition) cannot be deleted: merge it into
+  the identity that remains, naming the journeys that refer to it. `list_identities` finds an
+  identity by name or email; `list_journeys` with `referencing` finds the journeys that
+  refer to one.
 
 ## Direct writes or proposals
 
@@ -167,12 +171,12 @@ Each workflow is also served as an MCP prompt by its name.
 | Need | Tools |
 |---|---|
 | Where things stand | `get_snapshot`, `list_frontier`, `get_node`, `get_level`, `get_history` |
-| Find things | `list_journeys`, `list_routes`, `list_proposals`, `get_route`, `search` |
+| Find things | `list_identities`, `list_journeys`, `list_routes`, `list_proposals`, `get_route`, `search` |
 | Change state | `answer_decision`, `transition_node`, `assign`, `set_date`, `snooze`, `unsnooze`, `override`, `resolve_date_conflict` |
 | Change structure | `create_proposal`, `list_proposals`, `get_proposal`, `edit_proposal`, `apply_proposal`, `apply_patch` |
 | Journeys and routes | `create_journey`, `open_draft`, `publish_draft`, `import_route`, `export_route` |
 | Lineage | `upgrade`, `save_as_route`, `relink` |
-| People and teams | `manage_identity` |
+| People and teams | `manage_identity` (create, edit, merge, delete) |
 
 Lists that can grow come a page at a time: pass the `next` you were given back as the
 cursor the list names (`cursor` or `after`; a node's children and notes take

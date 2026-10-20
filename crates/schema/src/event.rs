@@ -79,6 +79,7 @@ pub enum EventType {
     IdentityCreated,
     IdentityEdited,
     IdentitiesMerged,
+    IdentityDeleted,
     ProposalCreated,
     ProposalEdited,
     ProposalApplied,
@@ -280,6 +281,7 @@ impl Mutation {
             Mutation::CreateIdentity { .. } => EventType::IdentityCreated,
             Mutation::EditIdentity { .. } => EventType::IdentityEdited,
             Mutation::MergeIdentities { .. } => EventType::IdentitiesMerged,
+            Mutation::DeleteIdentity { .. } => EventType::IdentityDeleted,
             Mutation::CreateProposal { .. } => EventType::ProposalCreated,
             Mutation::EditProposal { .. } => EventType::ProposalEdited,
             Mutation::ApplyProposal { .. } => EventType::ProposalApplied,
@@ -322,7 +324,8 @@ impl Mutation {
             Mutation::CreateIdentity { identity } | Mutation::EditIdentity { identity } => {
                 Subject::Identity(identity.key.clone())
             }
-            Mutation::MergeIdentities { merged, .. } => Subject::Identity(merged.clone()),
+            Mutation::MergeIdentities { survivor, .. } => Subject::Identity(survivor.clone()),
+            Mutation::DeleteIdentity { identity } => Subject::Identity(identity.clone()),
             Mutation::ApplyProposal { proposal, .. } => Subject::Proposal(proposal.clone()),
             Mutation::InsertSegment { insertion, .. } => Subject::Insertion(insertion.clone()),
             other => other

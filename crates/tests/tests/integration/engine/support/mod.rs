@@ -331,7 +331,7 @@ pub fn vendor_lead_merged() -> Records {
         .revision
         .get();
     let merge = format!(
-        "- op: merge_identities\n  survivor: who_other\n  merged: who_k3d7qm2xw5tn6pfa\n  journeys: {{j_vendor_eval: {revision}}}\n"
+        "- op: merge_identities\n  survivor: who_other\n  merged: [who_k3d7qm2xw5tn6pfa]\n  journeys: {{j_vendor_eval: {revision}}}\n"
     );
     let patch = patch_to(records, "deployment", &merge);
     match apply(records, &patch, &fixed_inputs()) {

@@ -259,7 +259,7 @@ fn a_map_key_written_twice_is_rejected_in_both_formats() {
     let answer = |key: &str, yes: bool| format!(r#""{key}":{{"boolean":{yes}}}"#);
     let journeys = |entries: &str| {
         format!(
-            r#"{{"op":"merge_identities","survivor":"who_a","merged":"who_b","journeys":{{{entries}}}}}"#
+            r#"{{"op":"merge_identities","survivor":"who_a","merged":["who_b"],"journeys":{{{entries}}}}}"#
         )
     };
     let aliases = |entries: &str| format!(r#"{{"revision":1,"aliases":{{{entries}}}}}"#);

@@ -16,9 +16,9 @@ use std::collections::{BTreeMap, BTreeSet};
 
 use async_trait::async_trait;
 use cairn_schema::{
-    ConversationId, Domain, Email, Identity, IdentityKey, JourneyId, PatchId, PatchReceipt,
-    Proposal, ProposalId, Revision, RevisionConflict, RevisionOf, Slug, Timestamp, Title,
-    TouchedSet, UserId,
+    ConversationId, Domain, Email, GraphId, Identity, IdentityKey, JourneyId, PatchId,
+    PatchReceipt, Proposal, ProposalId, Revision, RevisionConflict, RevisionOf, Slug, Timestamp,
+    Title, TouchedSet, UserId,
 };
 
 use crate::backend::{self, Shape, StoredReceipt};
@@ -210,19 +210,26 @@ impl State {
             }
         }
         for precondition in &commit.preconditions {
-            if let Precondition::ReferencingJourneys {
-                identities,
-                journeys,
-            } = precondition
-            {
-                for (journey, current) in self.domains.journeys_referencing(identities) {
-                    if !journeys.contains(&journey) {
-                        conflicts.push(RevisionConflict {
-                            of: RevisionOf::Domain(Domain::Journey(journey)),
-                            expected: Revision::NONE,
-                            current,
-                        });
-                    }
+            let (identities, allowed) = match precondition {
+                Precondition::ReferencingJourneys {
+                    identities,
+                    journeys,
+                } => (identities, Some(journeys)),
+                Precondition::Unreferenced { identities } => (identities, None),
+                Precondition::Revision { .. } => continue,
+            };
+            for graph in self.domains.graphs_referencing(identities) {
+                let outside = match (&graph, allowed) {
+                    (GraphId::Journey(journey), Some(named)) => !named.contains(journey),
+                    (_, Some(_)) => false,
+                    (_, None) => true,
+                };
+                if outside {
+                    conflicts.push(RevisionConflict {
+                        of: referencing_domain(&graph),
+                        expected: Revision::NONE,
+                        current: self.domains.graph_revision(&graph),
+                    });
                 }
             }
         }
@@ -387,10 +394,10 @@ impl Store for MemoryStore {
         Ok(self.state().route_detail(route))
     }
 
-    async fn journeys_referencing(
+    async fn graphs_referencing(
         &self,
         identities: &BTreeSet<IdentityKey>,
-    ) -> Result<BTreeMap<JourneyId, Revision>, StoreError> {
+    ) -> Result<BTreeSet<GraphId>, StoreError> {
         Ok(queries::referencing(&self.state(), identities))
     }
 
@@ -533,4 +540,14 @@ impl ConversationStore for MemoryStore {
     async fn remove_conversation(&self, id: &ConversationId) -> Result<bool, StoreError> {
         Ok(self.state().outside.remove_conversation(id))
     }
+}
+
+/// The domain a graph belongs to, as a revision's address.
+fn referencing_domain(graph: &GraphId) -> RevisionOf {
+    RevisionOf::Domain(match graph {
+        GraphId::Journey(journey) => Domain::Journey(journey.clone()),
+        GraphId::RouteDraft(route) | GraphId::RouteVersion { route, .. } => {
+            Domain::Route(route.clone())
+        }
+    })
 }

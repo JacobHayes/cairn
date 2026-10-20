@@ -1,51 +1,15 @@
-//! The read side of the commit rules, shared by the memory and Turso backends: which identities
-//! a graph refers to, which nodes an event is about, the text a search matches, which
+//! The read side of the commit rules, shared by the memory and Turso backends: which keys name
+//! the same identities, which nodes an event is about, the text a search matches, which
 //! journeys an index lists, and where a segment is inserted.
 
 use std::collections::{BTreeMap, BTreeSet};
 
 use cairn_schema::{
-    Domain, Graph, GraphId, IdentityKey, InsertionKey, JourneyId, NodeKey, RecordKey, Revision,
-    RouteId, Subject, VersionNumber, Write,
+    Domain, Graph, GraphId, IdentityKey, InsertionKey, JourneyId, NodeKey, RecordKey, RouteId,
+    Subject, VersionNumber, Write,
 };
 
 use crate::query::InsertionUse;
-
-/// E6: the identities a journey's graph refers to, by the key it holds (an identity or an
-/// alias): answers, direct role fills, explicit participations, and condition values that
-/// name an identity key. A condition value is text the decision's answer type gives meaning,
-/// so any value shaped like an identity key counts: a superset only costs a merge an extra
-/// journey to check.
-#[must_use]
-pub fn identity_references(graph: &Graph) -> BTreeSet<IdentityKey> {
-    use cairn_schema::{AnswerValue, ParticipationSource};
-    let mut keys = BTreeSet::new();
-    for answer in graph.state.answers.values() {
-        match answer {
-            AnswerValue::Identity(key) => {
-                keys.insert(key.clone());
-            }
-            AnswerValue::IdentityList(set) => keys.extend(set.iter().cloned()),
-            _ => {}
-        }
-    }
-    for fill in graph.state.role_fills.values() {
-        keys.extend(fill.iter().cloned());
-    }
-    for node in graph.nodes.values() {
-        for source in node.participations.as_map().values() {
-            if let ParticipationSource::Identities(set) = source {
-                keys.extend(set.iter().cloned());
-            }
-        }
-        if let Some(condition) = &node.relevant_when
-            && let Ok(value) = serde_json::to_value(condition)
-        {
-            keys.extend(identity_keys_in(&value));
-        }
-    }
-    keys
-}
 
 /// Every string in a JSON value that parses as an identity key, walked with an explicit stack
 /// (PRACTICES, No recursion).
@@ -153,13 +117,25 @@ fn written_text<T: serde::Serialize>(value: &T) -> String {
         .join("\n")
 }
 
+/// The journeys among `graphs`.
+#[must_use]
+pub fn journeys_among(graphs: &BTreeSet<GraphId>) -> BTreeSet<JourneyId> {
+    graphs
+        .iter()
+        .filter_map(|graph| match graph {
+            GraphId::Journey(journey) => Some(journey.clone()),
+            GraphId::RouteDraft(_) | GraphId::RouteVersion { .. } => None,
+        })
+        .collect()
+}
+
 /// C16: whether a journey belongs in the index `query` asks for. `referencing` is the
 /// journeys referring to the query's identities, when it names any.
 #[must_use]
 pub fn journey_listed(
     query: &crate::query::JourneyQuery,
     summary: &crate::query::JourneySummary,
-    referencing: Option<&BTreeMap<JourneyId, Revision>>,
+    referencing: Option<&BTreeSet<JourneyId>>,
 ) -> bool {
     let route = summary.lineage.as_ref().map(|lineage| &lineage.route);
     let version = summary.lineage.as_ref().map(|lineage| lineage.version);
@@ -170,7 +146,7 @@ pub fn journey_listed(
             .as_ref()
             .is_none_or(|wanted| route == Some(wanted))
         && query.version.is_none_or(|wanted| version == Some(wanted))
-        && referencing.is_none_or(|found| found.contains_key(&summary.id))
+        && referencing.is_none_or(|found| found.contains(&summary.id))
         && query
             .upgrade_available
             .is_none_or(|wanted| summary.upgrade_available() == wanted)
@@ -249,23 +225,6 @@ mod tests {
     use super::*;
     use crate::build::{self, id};
     use cairn_schema::EventType;
-
-    #[test]
-    fn identity_references_reach_conditions() {
-        let mut graph = Graph::default();
-        graph
-            .nodes
-            .put(build::node(serde_json::json!({
-                "key": "n_a", "id": "a", "kind": "action", "title": "A",
-                "relevant_when": {"equals": {"decision": "n_d", "value": "who_alice"}},
-                "participations": {"k_owner": ["who_bob"]},
-            })))
-            .unwrap();
-        assert_eq!(
-            identity_references(&graph),
-            BTreeSet::from([id("who_alice"), id("who_bob")])
-        );
-    }
 
     #[test]
     fn an_event_is_about_its_subject_and_the_nodes_it_wrote_on() {

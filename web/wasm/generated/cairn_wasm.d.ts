@@ -81,6 +81,15 @@ export class BrowserRoot {
      */
     history(journey: string, node: string, after: number): string;
     /**
+     * E6: what refers to identity `identity`, as
+     * `GET /api/deployment/identities/{key}/references` answers it.
+     *
+     * # Errors
+     *
+     * The JSON of a [`HostError`]: no such identity, or an unreadable input.
+     */
+    identityReferences(identity: string): string;
+    /**
      * A13: imports a route file as the local user at `now`: `request` is the JSON of a
      * [`RouteImport`]; the answer is the JSON of the patch answer, as
      * `POST /api/routes/{id}/import` answers it.
@@ -455,6 +464,7 @@ export interface InitOutput {
     readonly browserroot_editProposal: (a: number, b: number, c: number, d: number, e: number, f: number, g: number, h: number, i: number, j: number) => void;
     readonly browserroot_exportFile: (a: number, b: number, c: number, d: number, e: number, f: number) => void;
     readonly browserroot_history: (a: number, b: number, c: number, d: number, e: number, f: number, g: number) => void;
+    readonly browserroot_identityReferences: (a: number, b: number, c: number, d: number) => void;
     readonly browserroot_importFile: (a: number, b: number, c: number, d: number, e: number, f: number) => void;
     readonly browserroot_journeyIndex: (a: number, b: number, c: number, d: number) => void;
     readonly browserroot_journeys: (a: number, b: number) => void;
