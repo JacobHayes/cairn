@@ -19,15 +19,18 @@ import type { Selection } from "../canvas/selection.ts";
 import { decisionRows } from "../decisions/model.ts";
 import { rankPlaces, type Ready } from "../detail/model.ts";
 import { useMineOf } from "../journeys/mine.ts";
-import { tableQueryOf } from "../journeys/requests.ts";
+import { tableQueryOf, type LevelRequest } from "../journeys/requests.ts";
 import type { ViewState } from "../journeys/view.ts";
 import { containerKeys, planOrder } from "../plan/tree.ts";
 import { Menu } from "../screens/Menu.tsx";
 import { journeySubject, NothingMatches, ViewBar } from "../screens/ViewControls.tsx";
 import { useFrameActions } from "../shell/frame.tsx";
 import { useNodeAddresses } from "../journeys/address.ts";
+import { DIFF_LABELS, type DiffMark } from "../proposals/model.ts";
+import { useLayer, useReviewing, withRemovedRows } from "../proposals/layer.ts";
 import { withListSettings, type ListSettings } from "./address.ts";
 import { Checks } from "./Controls.tsx";
+import type { NodeRow } from "./why.ts";
 import { Cell, type CellContext } from "./ListCells.tsx";
 import { Folds } from "./Folds.tsx";
 import { NextForYou } from "./NextForYou.tsx";
@@ -42,7 +45,7 @@ import { useViewLevel } from "../canvas/viewLevel.ts";
 
 /** The columns held at the left while the table scrolls sideways. */
 function pinned(column: Column, columns: readonly Column[]): string | undefined {
-  return column === "status" || column === "title" || (column === "rank" && columns[0] === "rank") ? "list-pinned" : undefined;
+  return column === "change" || column === "status" || column === "title" || (column === "rank" && columns.find((each) => each !== "change") === "rank") ? "list-pinned" : undefined;
 }
 
 /** A click on the row itself, not on a control inside it, selects it. */
@@ -67,8 +70,24 @@ function Head({ column, columns, list, onSort }: { column: Column; columns: read
   );
 }
 
-function Row({ line, columns, context, selection, current, faded }: { line: Line; columns: Column[]; context: CellContext; selection: Selection; current: boolean; faded: boolean }) {
+/** C14: the change word of a marked row, and its open choice in accent ink. */
+function Change({ mark }: { mark: DiffMark | undefined }) {
+  if (mark === undefined) {
+    return null;
+  }
+  return (
+    <span className="layer-word" data-testid="row-diff" data-diff={mark.kind}>
+      {DIFF_LABELS[mark.kind]}
+      {mark.choice === true ? <span className="layer-choice"> · needs a choice</span> : null}
+    </span>
+  );
+}
+
+function Row({ line, columns, context: shared, selection, current, faded, mark }: { line: Line; columns: Column[]; context: CellContext; selection: Selection; current: boolean; faded: boolean; mark: DiffMark | undefined }) {
   const { row } = line;
+  // A removed row is read from the journey as it is: the one after has no such node.
+  const context = line.from === undefined ? shared : { ...shared, view: line.from };
+  const reviewing = useReviewing() !== undefined;
   const chosen = selection.members.length > 1 && selection.members.includes(line.key);
   const navigate = useNavigate();
   const frame = useFrameActions();
@@ -92,6 +111,8 @@ function Row({ line, columns, context, selection, current, faded }: { line: Line
       data-slack={row?.slack_days ?? ""}
       data-selected={chosen}
       data-faded={faded ? true : undefined}
+      data-diff={mark?.kind}
+      data-choice={mark?.choice === true ? true : undefined}
       data-frontier={context.frontier?.has(line.key) === true ? true : undefined}
       aria-selected={current}
       onClick={(event) => {
@@ -114,12 +135,12 @@ function Row({ line, columns, context, selection, current, faded }: { line: Line
       }}
     >
       <td className="list-check list-pinned">
-        {row === undefined ? null : <input type="checkbox" className="list-checkbox" aria-label={`Select ${row.title}`} checked={selection.members.includes(line.key)} onChange={() => { selection.toggle(line.key); }} />}
+        {row === undefined || reviewing ? null : <input type="checkbox" className="list-checkbox" aria-label={`Select ${row.title}`} checked={selection.members.includes(line.key)} onChange={() => { selection.toggle(line.key); }} />}
       </td>
       {columns.map((column) => (
         <td key={column} data-column={column} data-gives-way={givesWay(column)} className={[column === "title" ? "list-title-cell" : "list-cell", pinned(column, columns)].filter(Boolean).join(" ")}>
           <div className="list-content">
-            <Cell column={column} line={line} context={context} />
+            {column === "change" ? <Change mark={mark} /> : <Cell column={column} line={line} context={context} />}
           </div>
         </td>
       ))}
@@ -128,7 +149,8 @@ function Row({ line, columns, context, selection, current, faded }: { line: Line
 }
 
 /** The table: its header (the column labels) and its lines. */
-function Table({ list, lines, columns, context, selection, selected, everyLine, outOfFocus }: {
+function Table({ list, lines, columns, context, selection, selected, everyLine, outOfFocus, marks }: {
+  marks: Record<string, DiffMark> | undefined;
   list: ListSettings;
   lines: Line[];
   columns: Column[];
@@ -143,11 +165,12 @@ function Table({ list, lines, columns, context, selection, selected, everyLine, 
   const { pathname, search } = useLocation();
   const all = everyLine.length > 0 && everyLine.every((key) => selection.members.includes(key));
   return (
-    <table className="data list-table" data-selecting={selection.members.length > 1} data-ranked={columns[0] === "rank"} data-testid="list-table">
+    <table className="data list-table" data-selecting={selection.members.length > 1} data-ranked={columns.find((column) => column !== "change") === "rank"}
+      data-layered={marks !== undefined} data-testid="list-table">
       <thead>
         <tr>
           <th scope="col" className="list-check list-pinned">
-            <input type="checkbox" className="list-checkbox" disabled={everyLine.length === 0} aria-label="Select every row shown" checked={all} onChange={() => { selection.set(all ? [] : everyLine); }} />
+            {marks === undefined ? <input type="checkbox" className="list-checkbox" disabled={everyLine.length === 0} aria-label="Select every row shown" checked={all} onChange={() => { selection.set(all ? [] : everyLine); }} /> : null}
           </th>
           {columns.map((column) => (
             <Head key={column} column={column} columns={columns} list={list} onSort={(sort) => void navigate(`${pathname}${withListSettings(search, { ...list, sort })}`)} />
@@ -156,7 +179,7 @@ function Table({ list, lines, columns, context, selection, selected, everyLine, 
       </thead>
       <tbody>
         {lines.map((line) => (
-          <Row key={line.key} line={line} columns={columns} context={context} selection={selection} current={line.key === selected} faded={outOfFocus(line.key)} />
+          <Row key={line.key} line={line} columns={columns} context={context} selection={selection} current={line.key === selected} faded={outOfFocus(line.key)} mark={marks?.[line.key]} />
         ))}
       </tbody>
     </table>
@@ -212,12 +235,32 @@ function FrontierPanels({ view, drawn }: { view: Ready; drawn: ReadonlySet<strin
 }
 
 /**
+ * C14: under the layer, the rows the proposal removes put back where they were, read from the
+ * journey as it is: the level's entries and the rows with the removed ones added, their plan
+ * order, and the keys that come from before. Without a layer the level's own, unchanged.
+ */
+function useRemovedRows({ view, layer, request, query, level, kept, order }: { view: Ready; layer: ReturnType<typeof useLayer>; request: LevelRequest | undefined; query: ReturnType<typeof tableQueryOf>; level: ReturnType<typeof useLevel>["level"]; kept: NodeRow[] | undefined; order: ReadonlyMap<string, number> }) {
+  const was = layer?.mode === "reviewing" && layer.removed.size > 0 ? layer.before : undefined;
+  const wasRows = useRows(was, query);
+  const wasLevel = useLevel(was ?? view, request);
+  return useMemo(() => {
+    if (was === undefined || kept === undefined || level === undefined || wasRows.rows === undefined || wasLevel.level === undefined || layer === undefined) {
+      return { entries: level?.nodes, rows: kept, order, was: undefined, fromBefore: undefined };
+    }
+    const wasKept = wasRows.rows.filter((row) => wasLevel.drawn?.has(row.key) === true);
+    const merged = withRemovedRows({ entries: level.nodes, rows: kept, was: { entries: wasLevel.level.nodes, rows: wasKept }, removed: layer.removed, order: planOrder(view), wasOrder: planOrder(was) });
+    return { entries: merged.entries, rows: merged.rows, order: new Map(merged.order.map((key, at) => [key, at])), was, fromBefore: merged.fromBefore };
+  }, [was, kept, level, wasRows.rows, wasLevel.level, wasLevel.drawn, layer, view, order]);
+}
+
+/**
  * PLAN, LIST: the rows the level draws, in the tree or sorted; the tree keeps the viewer's folds
  * across a filter and an emphasis; the rows checked are the journey's one selection.
  */
 export function ListBody({ view, state, picks, list, selected, selection }: { view: Ready; state: ViewState; picks: number; list: ListSettings; selected?: string | undefined; selection: Selection }) {
   const nodes = view.journey.graph.nodes ?? [];
-  const { depth, step, current, level, drawn, error: levelError, base: frontier, dimmed, badges } = useViewLevel({ screen: "list", state, nodes, selected, ready: view, read: (request, at) => useLevel(view, request, at) });
+  const layer = useLayer();
+  const { depth, step, current, request, level, drawn, error: levelError, base: frontier, dimmed, badges } = useViewLevel({ screen: "list", state, nodes, selected, ready: view, read: (request, at) => useLevel(view, request, at) });
   const query = useMemo(() => tableQueryOf(list.sort), [list.sort]);
   const { rows, error: rowsError } = useRows(view, query);
   const decisionColumns = depth === "decisions";
@@ -226,19 +269,23 @@ export function ListBody({ view, state, picks, list, selected, selection }: { vi
   const decisions = useMemo(() => new Map((projected === undefined ? [] : decisionRows(view, projected)).map((decision) => [decision.key, decision])), [view, projected]);
   const ranks = rankPlaces(view);
   const order = useMemo(() => new Map(planOrder(view).map((key, at) => [key, at])), [view]);
-  const containers = useMemo(() => containerKeys(nodes), [nodes]);
+  const containers = useMemo(() => containerKeys([...nodes, ...(layer?.before?.journey.graph.nodes ?? [])]), [nodes, layer]);
   const tree = list.sort === undefined;
   const addresses = useNodeAddresses();
   const navigate = useNavigate();
   const { viewer } = useViewer();
   const folds = useFolds(nodes, current, state.depth, step, picks, selected, (key) => void navigate(addresses.open(key)));
   const kept = useMemo(() => (rows === undefined || drawn === undefined ? undefined : rows.filter((row) => drawn.has(row.key))), [rows, drawn]);
-  const lines = useMemo(
-    () => (kept === undefined || level === undefined ? [] : tree ? treeLines(level.nodes, new Map(kept.map((row) => [row.key, row])), folds.open, order, containers) : flatLines(view, kept, list.sort)),
-    [view, kept, level, tree, list.sort, folds.open, order, containers],
-  );
+  const { entries, rows: allRows, order: placed, was, fromBefore } = useRemovedRows({ view, layer, request, query, level, kept, order });
+  const lines = useMemo(() => {
+    if (allRows === undefined || entries === undefined) {
+      return [];
+    }
+    const made = tree ? treeLines(entries, new Map(allRows.map((row) => [row.key, row])), folds.open, placed, containers) : flatLines(view, allRows, list.sort);
+    return fromBefore === undefined ? made : made.map((line) => (fromBefore.has(line.key) ? { ...line, from: was } : line));
+  }, [view, allRows, entries, tree, list.sort, folds.open, placed, containers, fromBefore, was]);
   const everyLine = lines.flatMap((line) => (line.row === undefined ? [] : [line.row.key]));
-  const columns = columnsOf(list, decisionColumns);
+  const columns = columnsOf(list, decisionColumns, layer?.mode === "reviewing");
   const context: CellContext = { view, tree, decisions, ranks, frontier, sort: list.sort, viewer: viewer?.entities ?? [], onFold: folds.fold };
   const error = levelError ?? rowsError;
   return (
@@ -246,14 +293,14 @@ export function ListBody({ view, state, picks, list, selected, selection }: { vi
       <ViewBar subject={journeySubject(view)} screen="list" badges={badges} end={<RowEnd list={list} decisionColumns={decisionColumns} total={kept?.length} />} />
       {error === undefined ? null : <p className="callout callout-bad"><Failed what="The list" error={error} /></p>}
       <div className="node-panel list-panel" data-empty={lines.length === 0 ? true : undefined} data-testid="list-panel">
-        <Table list={list} lines={lines} columns={columns} context={context} selection={selection} selected={selected} everyLine={everyLine} outOfFocus={dimmed} />
+        <Table list={list} lines={lines} columns={columns} context={context} selection={selection} selected={selected} everyLine={everyLine} outOfFocus={dimmed} marks={layer?.mode === "reviewing" ? layer.model?.marks ?? {} : undefined} />
         {kept !== undefined && level !== undefined && lines.length === 0 ? (
           <div className="empty-row" data-testid="list-empty">
             <NothingMatches />
           </div>
         ) : null}
       </div>
-      {state.frontier ? <FrontierPanels view={view} drawn={drawn} /> : null}
+      {state.frontier && layer === undefined ? <FrontierPanels view={view} drawn={drawn} /> : null}
     </section>
   );
 }

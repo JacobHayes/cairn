@@ -5,8 +5,8 @@
 import { expect, test } from "./test.ts";
 
 import { openJourneyCard } from "./around.ts";
-import { blockers, confirmAndApply, editWhereVersionTwoChanges, pickNode, publishVersionTwo, resolve, reviewItem, reviewOpen, saveEdits, scrollsOnce } from "./proposals.ts";
-import { expectAddress, nodeCard, open, setDepth, syncChip } from "./shell.ts";
+import { apply, blockers, editWhereVersionTwoChanges, pickNode, publishVersionTwo, resolve, reviewItem, reviewOpen, saveEdits, scrollsOnce } from "./proposals.ts";
+import { expectAddress, goTo, nodeCard, open, setDepth, syncChip } from "./shell.ts";
 
 test("B7, C14: the scenario journey upgraded to version 2, each conflict resolved, then applied", async ({ page }) => {
   await editWhereVersionTwoChanges(page, "browser");
@@ -18,17 +18,21 @@ test("B7, C14: the scenario journey upgraded to version 2, each conflict resolve
   await flow.getByRole("button", { name: "Propose the upgrade" }).click();
   await page.setViewportSize({ width: 1440, height: 768 });
   await reviewOpen(page);
+  // The layer opens at the page's own depth; the changes the proposal makes inside the stages are reached at Actions.
+  await setDepth(page, "Actions");
   // The drafted proposal is also one click away in Recent, for when the screen that opened it is gone.
   await syncChip(page).click();
   await expect(page.getByTestId("sync-popover").getByTestId("sync-recent").filter({ hasText: "Drafted a proposal" }).getByRole("button", { name: "Review it" })).toBeVisible();
   await page.keyboard.press("Escape");
   await expect(page.getByTestId("sync-popover")).toHaveCount(0);
-  // Reviewed, and still a conflict to decide: Apply stays off, for that reason alone.
-  await page.getByTestId("reviewed").check();
+  // Still a conflict to decide: Apply is held, for that reason alone, and pressing it shows why.
   await expect.poll(() => blockers(page)).toEqual(["unresolved"]);
-  await expect(page.getByTestId("apply-proposal")).toBeDisabled();
-  await expect(page.getByTestId("review-conflicts")).toBeVisible();
-  await expect(page.getByTestId("node-card").and(page.locator('[data-node="n_signoff"]'))).toHaveAttribute("data-trace", "Add");
+  await expect(page.getByTestId("apply-proposal")).toHaveAttribute("aria-disabled", "true");
+  await expect(page.getByTestId("to-decide")).toBeVisible();
+  await expect(nodeCard(page, "n_signoff")).toHaveAttribute("data-diff", "added");
+  await expect(nodeCard(page, "n_signoff").getByTestId("card-diff")).toContainText("Added");
+  await page.getByTestId("apply-proposal").click({ force: true });
+  await expect(page.getByTestId("apply-waits")).toBeFocused();
   await pickNode(page, "n_access");
   await expect(reviewItem(page, "conflict", "n_access")).toHaveAttribute("data-about", "field");
   await scrollsOnce(page);
@@ -45,13 +49,12 @@ test("B7, C14: the scenario journey upgraded to version 2, each conflict resolve
   const orphan = reviewItem(page, "orphan", "n_workload");
   await orphan.getByTestId("orphan-remove").check();
   await expect(orphan.locator('[data-testid="removal-descendant"]')).toHaveCount(2);
-  await page.getByTestId("projection-list").click();
-  await expect(page.locator('[data-testid="diff-node"][data-node="n_workload"]')).toHaveAttribute("data-status", "remove");
-  await expect(page.locator('[data-testid="diff-node"][data-status="remove"]')).toHaveCount(3);
+  await goTo(page, "list");
+  await expect(page.locator('[data-testid="list-row"][data-node="n_workload"]')).toHaveAttribute("data-diff", "removed");
+  await expect(page.locator('[data-testid="list-row"][data-diff="removed"]')).toHaveCount(3);
   await saveEdits(page);
-  await confirmAndApply(page);
-
-  await page.getByTestId("applied-journey").click();
+  await apply(page);
+  await goTo(page, "graph");
   await setDepth(page, "Actions");
   await expect(nodeCard(page, "n_signoff")).toBeVisible();
   await expect(nodeCard(page, "n_access").getByTestId("title")).toHaveText("Access to the environment");
@@ -77,12 +80,40 @@ test("C14, C16: a drafted upgrade is listed in its journey's Proposals tab and o
   await open(page, "browser", "/journeys/j_vendor_eval/proposals");
   await expect(page.getByTestId("tab-proposals")).toHaveAttribute("aria-selected", "true");
   await expect(page.getByTestId("proposals-panel").getByTestId("proposal-row")).toHaveCount(1);
-  // Home waits on it too.
+  // Home waits on it too, in a fold after the journeys.
   await open(page, "browser", "/");
+  await page.getByTestId("home-proposals").locator("summary").click();
   await page.getByTestId("home-proposals").getByTestId("proposal-row").getByRole("link").click();
   await reviewOpen(page);
   await expectAddress(page, reviewed);
-  // The way back names the destination and its open proposals.
-  await page.getByTestId("review-trail").getByRole("link", { name: "Open proposals" }).click();
-  await expect(page.getByTestId("tab-proposals")).toHaveAttribute("aria-selected", "true");
+  // Close leaves the layer for the journey itself, the view kept.
+  await page.getByTestId("close-layer").click();
+  await expect(page.getByTestId("layer-band")).toHaveCount(0);
+  expect(new URL(page.url()).pathname).toBe("/journeys/j_vendor_eval");
+});
+
+test("C14, A11: saving a journey as a route is reviewed over the route's own page, in every view, and applied", async ({ page }) => {
+  await openJourneyCard(page, "browser", "j_vendor_eval");
+  await page.getByTestId("journey-menu").click();
+  await page.getByTestId("menu-save").click();
+  await page.getByTestId("save-as-route-flow").getByLabel("Route id").fill("r_saved");
+  await page.getByTestId("save-as-route-flow").getByRole("button", { name: "Propose saving it as a route" }).click();
+  await reviewOpen(page);
+  const layered = new URL(page.url()).pathname;
+  expect(layered).toMatch(/^\/routes\/r_saved\/proposals\/pr_[0-9a-f]+$/);
+  // The route's own views stay under the layer: a switch keeps the proposal in the address.
+  // Every node of the route it creates is marked added, in the list and on the timeline alike.
+  const added = { list: '[data-testid="route-row"][data-diff="added"]', timeline: '[data-diff="added"] [data-testid="timeline-words"]' };
+  for (const to of ["list", "timeline"] as const) {
+    await page.getByTestId("view-picker").click();
+    await page.getByTestId(`view-${to}`).click();
+    await expect(page.getByTestId("route-frame")).toHaveAttribute("data-screen", to);
+    await expect(page.locator(added[to]).first()).toBeVisible();
+    await expect(page.getByTestId("layer-band")).toHaveAttribute("data-mode", "reviewing");
+    expect(new URL(page.url()).pathname).toBe(layered);
+  }
+  await apply(page);
+  await page.getByTestId("close-layer").click();
+  await expect(page.getByTestId("layer-band")).toHaveCount(0);
+  expect(new URL(page.url()).pathname).toBe("/routes/r_saved");
 });

@@ -26,7 +26,6 @@ import { Shell } from "./shell/Shell.tsx";
 const NewJourney = lazy(() => import("./journeys/NewJourney.tsx").then((module) => ({ default: module.NewJourney })));
 const Entities = lazy(() => import("./people/Entities.tsx").then((module) => ({ default: module.Entities })));
 const Identity = lazy(() => import("./people/Identity.tsx").then((module) => ({ default: module.Identity })));
-const ProposalScreen = lazy(() => import("./proposals/ProposalScreen.tsx").then((module) => ({ default: module.ProposalScreen })));
 const NewRoutePage = lazy(() => import("./routes/NewRoute.tsx").then((module) => ({ default: module.NewRoutePage })));
 const RouteIndex = lazy(() => import("./routes/RouteIndex.tsx").then((module) => ({ default: module.RouteIndex })));
 const RoutePage = lazy(() => import("./screens/RoutePage.tsx").then((module) => ({ default: module.RoutePage })));
@@ -40,19 +39,18 @@ const SCREENS: Record<AddressName, ReactElement> = {
   journeyNode: <JourneyPage />,
   journeyEdge: <JourneyPage />,
   journeyProposals: <JourneyPage />,
-  journeyProposal: <ProposalScreen />,
-  journeyProposalNode: <ProposalScreen />,
+  journeyProposal: <JourneyPage />,
+  journeyProposalNode: <JourneyPage />,
   routes: <RouteIndex />,
   routeNew: <NewRoutePage />,
   route: <RoutePage />,
   routeNode: <RoutePage />,
   routeProposals: <RoutePage />,
-  routeProposal: <ProposalScreen />,
-  routeProposalNode: <ProposalScreen />,
+  routeProposal: <RoutePage />,
+  routeProposalNode: <RoutePage />,
   entities: <Entities />,
   deploymentProposals: <Entities />,
-  deploymentProposal: <ProposalScreen />,
-  deploymentProposalNode: <ProposalScreen />,
+  deploymentProposal: <Entities />,
   me: <Identity />,
 };
 

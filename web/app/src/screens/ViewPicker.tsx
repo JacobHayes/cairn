@@ -16,17 +16,25 @@ export interface ViewPickerProps {
   to: (to: Screen) => string;
   /** What the menu's tooltip says: which view of what, and its keys. */
   title: string;
+  /** Views that are listed but cannot be shown now, each with its reason (DESIGN: a view that cannot honour the state says so). */
+  unavailable?: Partial<Record<Screen, string>>;
 }
 
-export function ViewPicker({ screen, screens, to, title }: ViewPickerProps) {
+export function ViewPicker({ screen, screens, to, title, unavailable = {} }: ViewPickerProps) {
   return (
     <Menu label={`View: ${SCREEN_WORDS[screen]}`} title={title} testId="view-picker" align="end" className="no-print view-picker" trigger={<><span className="phone-hidden">View: </span>{SCREEN_WORDS[screen]} ▾</>}>
       {(close) =>
-        screens.map((each) => (
+        screens.map((each) =>
+          unavailable[each] !== undefined ? (
+            <span key={each} role="menuitem" className="menu-item" aria-disabled="true" title={unavailable[each]} data-testid={`view-${each}`}>
+              {SCREEN_WORDS[each]}
+            </span>
+          ) : (
           <Link key={each} role="menuitem" className="menu-item" aria-current={each === screen ? "page" : undefined} data-testid={`view-${each}`} to={to(each)} onClick={close}>
             {SCREEN_WORDS[each]}
           </Link>
-        ))
+          ),
+        )
       }
     </Menu>
   );

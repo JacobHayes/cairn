@@ -29,6 +29,8 @@ import { chartOf, type Chart, type ChartRow, type Dependency } from "./rows.ts";
 import "./timeline.css";
 import { Failed } from "../ui/Failed.tsx";
 import { useViewLevel } from "../canvas/viewLevel.ts";
+import { useLayer } from "../proposals/layer.ts";
+import { DIFF_LABELS, type DiffMark } from "../proposals/model.ts";
 
 /** The height of one row's track, and of the axis above the rows (px). */
 const ROW_PX = 56;
@@ -248,7 +250,7 @@ function Lines({ lines, axis, rows }: { lines: Dependency[]; axis: Axis; rows: C
   );
 }
 
-function Label({ axis, row, selected, onFold, title }: { axis: Axis; row: ChartRow; selected: boolean; onFold: (key: string) => void; title: (key: string) => ReactNode }) {
+function Label({ axis, row, selected, onFold, title, mark }: { axis: Axis; row: ChartRow; selected: boolean; onFold: (key: string) => void; title: (key: string) => ReactNode; mark: DiffMark | undefined }) {
   return (
     <li
       className="timeline-label"
@@ -265,6 +267,8 @@ function Label({ axis, row, selected, onFold, title }: { axis: Axis; row: ChartR
       data-faded={row.faded}
       data-selected={selected}
       data-container={row.shape === "span"}
+      data-diff={mark?.kind}
+      data-choice={mark?.choice === true ? true : undefined}
       style={{ height: ROW_PX }}
     >
       <div className="timeline-title" style={{ "--depth": row.depth } as CSSProperties}>
@@ -272,8 +276,15 @@ function Label({ axis, row, selected, onFold, title }: { axis: Axis; row: ChartR
         <TreeFold container={row.foldable} open={row.open} label={row.title} testId="timeline-fold" onFold={() => { onFold(row.key); }} />
         <div className="timeline-text" title={row.title}>
           {title(row.key)}
-          <span className={row.late > 0 || row.shortfallDays !== undefined ? "small timeline-words timeline-late" : "muted small timeline-words"} data-testid="timeline-words" title={row.words}>
-            {row.words}
+          <span className={row.late > 0 || row.shortfallDays !== undefined ? "small timeline-words timeline-late" : "muted small timeline-words"} data-testid="timeline-words" data-marked={mark === undefined ? undefined : true} title={row.words}>
+            {mark === undefined ? null : (
+              <span className="layer-word" data-testid="row-diff" data-diff={mark.kind}>
+                {DIFF_LABELS[mark.kind]}
+                {mark.choice === true ? <span className="layer-choice"> · needs a choice</span> : null}
+                {" · "}
+              </span>
+            )}
+            {mark === undefined ? row.words : <span className="timeline-words-rest">{row.words}</span>}
           </span>
         </div>
       </div>
@@ -326,13 +337,14 @@ function useReveal(chart: React.RefObject<HTMLElement | null>, selected: string 
 }
 
 /** The tracks: one drawing beside the labels, so every row's date falls where the axis says. */
-function Tracks({ chart, axis, selected, activate }: { chart: Chart; axis: Axis; selected: string | undefined; activate: ((key: string) => void) | undefined }) {
+function Tracks({ chart, axis, selected, activate, marks }: { chart: Chart; axis: Axis; selected: string | undefined; activate: ((key: string) => void) | undefined; marks: Record<string, DiffMark> | undefined }) {
   const height = chart.rows.length * ROW_PX;
   return (
     <div className="timeline-canvas">
       <svg className="timeline-tracks" width="100%" height={height} aria-hidden="true">
         <Defs />
         {chart.rows.map((row, at) => (row.shape === "span" ? <rect key={row.key} className="timeline-band" x={0} y={at * ROW_PX} width="100%" height={ROW_PX} /> : null))}
+        {chart.rows.map((row, at) => (marks?.[row.key] === undefined ? null : <rect key={`diff-${row.key}`} className="timeline-diff" data-diff={marks[row.key]?.kind} x={0} y={at * ROW_PX} width="100%" height={ROW_PX} />))}
         <Backdrop axis={axis} height={height} />
         {chart.rows.map((row, at) => {
           const y = at * ROW_PX + ROW_PX / 2;
@@ -423,10 +435,12 @@ export interface TimelineChartProps {
   undated: string;
   /** Whether the level drew anything with a day (else `empty.none` says why not). */
   anyScheduled: boolean;
+  /** C14: under the proposal layer, the mark on each row it changes, and the titles of what it removes (which have no row after). */
+  layer?: { marks: Record<string, DiffMark>; removed: { key: string; title: string }[] } | undefined;
 }
 
 /** C13: a timeline: the rows of `chart` on one axis, with the controls, the end anchor's note and the folded list of what has no day. */
-export function TimelineChart({ chart, spec, viewKey, range, onFold, selected, title, endTitle, activate, anchorNote, empty, undated, anyScheduled }: TimelineChartProps) {
+export function TimelineChart({ chart, spec, viewKey, range, onFold, selected, title, endTitle, activate, anchorNote, empty, undated, anyScheduled, layer }: TimelineChartProps) {
   const preset = range === undefined ? undefined : rangeWindow(range, dateOf(spec.now));
   const { axis, panned, window, move, reset } = useAxis(spec, chart.days, viewKey, preset);
   const chartRef = useRef<HTMLDivElement>(null);
@@ -456,12 +470,24 @@ export function TimelineChart({ chart, spec, viewKey, range, onFold, selected, t
           <div className="timeline-body">
             <ol className="plain-list timeline-labels">
               {chart.rows.map((row) => (
-                <Label key={row.key} axis={axis} row={row} selected={row.key === selected} onFold={onFold} title={title} />
+                <Label key={row.key} axis={axis} row={row} selected={row.key === selected} onFold={onFold} title={title} mark={layer?.marks[row.key]} />
               ))}
             </ol>
-            <Tracks chart={chart} axis={axis} selected={selected} activate={activate} />
+            <Tracks chart={chart} axis={axis} selected={selected} activate={activate} marks={layer?.marks} />
           </div>
         </div>
+      )}
+      {layer === undefined || layer.removed.length === 0 ? null : (
+        <details className="timeline-removed" data-testid="timeline-removed" open>
+          <summary>Removed by this proposal ({layer.removed.length})</summary>
+          <ul className="timeline-undated-list">
+            {layer.removed.map((each) => (
+              <li key={each.key} data-node={each.key} data-diff="removed">
+                <span className="layer-word">{DIFF_LABELS.removed}</span> · {each.title}
+              </li>
+            ))}
+          </ul>
+        </details>
       )}
       {chart.undated.length === 0 ? null : (
         <details className="timeline-undated" data-testid="timeline-undated" open={selected !== undefined && chart.undated.includes(selected) ? true : undefined}>
@@ -488,6 +514,7 @@ export function ProjectedTimeline({ ready, state, picks, selected }: { ready: Re
   const addresses = useNodeAddresses();
   const { range } = useMemo(() => timelineSettingsFrom(new URLSearchParams(search)), [search]);
   const nodes = ready.journey.graph.nodes ?? [];
+  const layered = useLayer();
   const { step, current, level, error: levelError, dimmed: faded, badges } = useViewLevel({ screen: "timeline", state, nodes, selected, ready, read: (request, at) => useLevel(ready, request, at) });
   const timelineRead = useProjected(ready, { projection: "timeline" });
   const timeline = valueOf(timelineRead);
@@ -496,6 +523,13 @@ export function ProjectedTimeline({ ready, state, picks, selected }: { ready: Re
   const error = levelError ?? errorWords(timelineRead);
   const today = ready.derived.today;
   const spec = useMemo(() => (timeline === undefined ? undefined : calendarSpec(timeline, today)), [timeline, today]);
+  const layer = useMemo(() => {
+    if (layered?.mode !== "reviewing" || layered.model === undefined) {
+      return undefined;
+    }
+    const was = layered.before?.journey.graph.nodes ?? [];
+    return { marks: layered.model.marks, removed: [...layered.removed].map((key) => ({ key, title: was.find((node) => node.key === key)?.title ?? key })) };
+  }, [layered]);
   const chart = useMemo(() => (timeline === undefined || level === undefined ? undefined : chartOf(ready, timeline, { drawn: level.nodes, open, selected, faded })), [ready, timeline, level, open, selected, faded]);
   return (
     <>
@@ -527,6 +561,7 @@ export function ProjectedTimeline({ ready, state, picks, selected }: { ready: Re
           empty={{ filtered: <NothingMatches />, none: "Nothing in scope has a date yet: no milestone date, pin, or due date." }}
           undated="No date yet"
           anyScheduled={timeline.entries.length > 0}
+          layer={layer}
         />
       )}
     </>

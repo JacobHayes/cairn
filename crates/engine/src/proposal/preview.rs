@@ -1,7 +1,6 @@
 //! Previewing a proposal (C14, I6; ARCHITECTURE, Write path: proposal previews): what its
-//! resolved mutations would do to its destination now, for the review screen's diff over a
-//! journey, a route's draft, the deployment, or a destination the proposal creates at
-//! revision 0. Items still unresolved are left out and listed; the candidate goes through the
+//! resolved mutations would do to its destination now, for the proposal layer over a
+//! journey, a route, the deployment, or a destination the proposal creates at revision 0. Items still unresolved are left out and listed; the candidate goes through the
 //! same apply as the real thing, so every violation strict validation finds is listed; for a
 //! journey, the frontier after and the consequences (D7) come from one derive on each side.
 //!
@@ -10,8 +9,9 @@
 //! and the notices pass (A20).
 
 use cairn_schema::{
-    Deployment, DeriveInputs, Domain, Mutations, Patch, PatchTarget, ProposalDraft,
-    ProposalPreview, Rejection,
+    Deployment, DeriveInputs, DestinationAfter, Domain, DomainDocument, Lineage, Mutation,
+    Mutations, Patch, PatchTarget, ProposalDraft, ProposalOutline, ProposalPreview, Rejection,
+    UnresolvedItem, Violation,
 };
 
 use super::resolve_partial;
@@ -21,29 +21,30 @@ use crate::notices::notices;
 use crate::pipeline::{ApplyInputs, apply};
 use crate::records::Records;
 
-/// C14: what `draft` would do to `destination` if applied now. `records` holds what the
-/// proposal's apply would load; `derive_inputs` give today and the deployment for the
-/// journey's two derives.
+/// C14: what a proposal's resolved mutations make of the records it was loaded with.
+pub struct Candidate {
+    /// The mutations the resolved proposal applies, in order.
+    pub mutations: Vec<Mutation>,
+    /// The items still needing a choice, whose effect the candidate leaves out.
+    pub unresolved: Vec<UnresolvedItem>,
+    /// The records after the same apply as the real thing, or every violation found.
+    pub after: Result<Records, Vec<Violation>>,
+}
+
+/// C14: `draft`'s resolved mutations applied to `records` through the same apply as the
+/// proposal's own, committing nothing.
 #[must_use]
-pub fn preview(
+pub fn candidate(
     records: &Records,
     destination: &Domain,
     draft: &ProposalDraft,
     inputs: &ApplyInputs,
-    derive_inputs: &DeriveInputs,
-) -> ProposalPreview {
+) -> Candidate {
     let resolved = resolve_partial(draft);
-    let mut preview = ProposalPreview {
-        unresolved: resolved.unresolved,
-        violations: Vec::new(),
-        graph: None,
-        frontier: Vec::new(),
-        consequences: None,
-        notices: Vec::new(),
-    };
+    let mutations = resolved.mutations.clone();
     let after = match Mutations::new(resolved.mutations) {
         // Nothing to apply: the destination as it stands.
-        Err(_) => records.clone(),
+        Err(_) => Ok(records.clone()),
         Ok(mutations) => {
             let patch = Patch {
                 id: match "p_preview".parse() {
@@ -60,28 +61,115 @@ pub fn preview(
                 mutations,
             };
             match apply(records, &patch, inputs) {
-                Ok(applied) => applied.records().clone(),
-                Err(Rejection::Invalid { violations }) => {
-                    preview.violations = violations.as_slice().to_vec();
-                    return preview;
-                }
+                Ok(applied) => Ok(applied.records().clone()),
+                Err(Rejection::Invalid { violations }) => Err(violations.as_slice().to_vec()),
                 Err(Rejection::Stale { .. } | Rejection::PatchIdReused { .. }) => {
                     unreachable!("a preview applies at the destination's current revision")
                 }
             }
         }
     };
+    Candidate {
+        mutations,
+        unresolved: resolved.unresolved,
+        after,
+    }
+}
+
+/// C14: the destination once the candidate `after` applies: a journey's document with the
+/// derive inputs its views use (over the deployment after), a route with its draft and
+/// the latest version when the candidate holds it, the deployment, or none when the
+/// destination no longer exists.
+#[must_use]
+pub fn destination_after(
+    after: &Records,
+    destination: &Domain,
+    derive_inputs: &DeriveInputs,
+) -> DestinationAfter {
     match destination {
-        Domain::Journey(id) => journey_after(&mut preview, records, &after, id, derive_inputs),
+        Domain::Journey(id) => after
+            .journeys
+            .get(id)
+            .map_or(DestinationAfter::Gone, |journey| {
+                let mut inputs = derive_inputs.clone();
+                inputs.deployment = after.deployment.clone();
+                DestinationAfter::Journey {
+                    document: DomainDocument {
+                        journey: journey.clone(),
+                        inputs,
+                    },
+                }
+            }),
+        Domain::Route(id) => after
+            .routes
+            .get(id)
+            .map_or(DestinationAfter::Gone, |route| {
+                let latest = route.versions.iter().max().and_then(|version| {
+                    after
+                        .versions
+                        .get(&Lineage {
+                            route: id.clone(),
+                            version: *version,
+                        })
+                        .cloned()
+                });
+                DestinationAfter::Route {
+                    route: route.clone(),
+                    latest,
+                }
+            }),
+        Domain::Deployment => DestinationAfter::Deployment {
+            deployment: after.deployment.clone(),
+        },
+    }
+}
+
+/// C14: what `draft` would do to `destination` if applied now. `records` holds what the
+/// proposal's apply would load; `derive_inputs` give today and the deployment for the
+/// journey's two derives.
+#[must_use]
+pub fn preview(
+    records: &Records,
+    destination: &Domain,
+    draft: &ProposalDraft,
+    inputs: &ApplyInputs,
+    derive_inputs: &DeriveInputs,
+) -> ProposalPreview {
+    let candidate = candidate(records, destination, draft, inputs);
+    preview_of(records, destination, &candidate, derive_inputs)
+}
+
+/// C14: the preview of an already-made `candidate`, so a host that also wants the destination
+/// after applies the proposal once.
+#[must_use]
+pub fn preview_of(
+    records: &Records,
+    destination: &Domain,
+    candidate: &Candidate,
+    derive_inputs: &DeriveInputs,
+) -> ProposalPreview {
+    let mut preview = ProposalPreview {
+        unresolved: candidate.unresolved.clone(),
+        violations: Vec::new(),
+        frontier: Vec::new(),
+        consequences: None,
+        notices: Vec::new(),
+        outline: ProposalOutline::of(&candidate.mutations),
+    };
+    let after = match &candidate.after {
+        Ok(after) => after,
+        Err(violations) => {
+            preview.violations.clone_from(violations);
+            return preview;
+        }
+    };
+    match destination {
+        Domain::Journey(id) => journey_after(&mut preview, records, after, id, derive_inputs),
         Domain::Route(id) => {
-            preview.graph = after
-                .routes
-                .get(id)
-                .and_then(|route| route.draft.as_ref())
-                .map(|draft| draft.graph.clone());
             // A20: a route has no answers, so no deployment changes what it means.
-            preview.notices = preview.graph.as_ref().map_or_else(Vec::new, |document| {
-                match Graph::new(document.clone(), &Deployment::default()) {
+            let draft = after.routes.get(id).and_then(|route| route.draft.as_ref());
+            preview.notices = draft.map_or_else(Vec::new, |draft| {
+                match Graph::new(draft.graph.clone(), &Deployment::default()) {
                     Ok(graph) => notices(&graph),
                     Err(_) => unreachable!("an applied route draft is valid"),
                 }
@@ -120,5 +208,4 @@ fn journey_after(
     if let Some((before_graph, before)) = before {
         preview.consequences = Some(consequences(&before_graph, &before, &graph, &derived));
     }
-    preview.graph = Some(journey.graph.clone());
 }

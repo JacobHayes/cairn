@@ -1,8 +1,9 @@
 // `CanvasOverlay`: a layer drawn over a canvas's cards and lines without changing them, for
-// what a screen wants to point at. Here it is the trace (C7), which selecting a node draws;
-// proposal review (5.7) draws its diff with it. A marked card shows its tag; when the overlay
-// dims, unmarked cards and the lines it does not light fade to the one fade level, so the marked
-// set stands out without anything moving.
+// what a screen wants to point at. Here it is the trace (C7), which selecting a node draws, and
+// the proposal layer's marks (C14), which the cards draw as a fill, an edge and a word in their
+// own kind line. A traced card shows its tag; when the overlay dims, unmarked cards and the lines
+// it does not light fade to the one fade level, so the marked set stands out without anything moving.
+import type { DiffKind, DiffMark } from "../proposals/model.ts";
 import type { CanvasModel, Card, Line, Trace } from "./model.ts";
 
 export type MarkTone = "ink" | "accent" | "good" | "warn" | "bad" | "plain";
@@ -32,6 +33,10 @@ export interface OverlayMark {
   quiet?: true;
   /** The card is going away: kept where it was, struck and ghosted (a proposal's removal). */
   ghost?: true;
+  /** The proposal layer's mark (C14): the card is added, changed or removed, drawn as a fill, an edge and the word in its kind line, never a tag. */
+  diff?: DiffKind;
+  /** The layer's mark: an unresolved choice is about the card. */
+  choice?: true;
 }
 
 /** How a line is lit: ink (upstream) or accent (downstream), lit for a card a diff marks, or add or remove for a requirement the diff adds or removes. */
@@ -48,8 +53,6 @@ export interface CanvasOverlay {
   dim: boolean;
   /** Nodes it marks that have no card on this canvas (outside the view, or with no stand-in). */
   outside: string[];
-  /** Its tags keep their size on screen at any zoom (a diff's words must be readable from far out). */
-  screenTags?: true;
 }
 
 /** C7: the trace's labels: the node traced, what it needs, what it unblocks. */
@@ -132,20 +135,35 @@ export function traceOverlay(trace: Trace, model: CanvasModel, title: string): C
   return { title, marks, lines, dim: true, outside };
 }
 
+/** The tone a kind of change takes on a line or a chip. */
+const TONES: Record<DiffKind, MarkTone> = { added: "good", changed: "warn", removed: "bad" };
+
+/** The words of each kind of change. */
+const WORDS: Record<DiffKind, string> = { added: "Added", changed: "Changed", removed: "Removed" };
+
+/** What the layer changes on a canvas that the marks alone do not say: the removed requirements' lines, and the kept cards that lost nodes rolled up into them. */
+export interface LayerDrawn {
+  removedLines?: ReadonlySet<string>;
+  shrunk?: ReadonlyMap<string, string[]>;
+}
+
 /**
- * C14: marks by node drawn over a canvas (proposal review's diff): each card shows the mark of
- * the node it stands for, or of one rolled up into it; lines into or out of a marked card are
- * lit; nothing dims unless `dim` (a filter is on), so what a change leaves alone stays readable.
- * A line that stands for a requirement in `edges` is drawn as added or removed instead.
- * A marked node with no card is listed as outside.
+ * C14: the proposal layer's marks over a canvas: each card shows the mark of the node it stands
+ * for, or of one rolled up into it (a kept card that lost nodes rolled up into it is changed);
+ * lines into or out of a marked card are lit, a requirement the proposal adds is drawn as added
+ * and one it removes as removed. Nothing dims, so what a change leaves alone stays readable. A
+ * marked node with no card is listed as outside.
  */
-export function marksOverlay(title: string, marks: Record<string, OverlayMark>, model: CanvasModel, dim = false, edges: EdgeChanges = { added: [], removed: [] }): CanvasOverlay {
+export function marksOverlay(title: string, marks: Record<string, DiffMark>, model: CanvasModel, edges: EdgeChanges = { added: [], removed: [] }, drawn: LayerDrawn = {}): CanvasOverlay {
   const shown: Record<string, OverlayMark> = {};
   for (const card of model.cards) {
     const key = standsFor(card).find((each) => marks[each] !== undefined);
     const mark = key === undefined ? undefined : marks[key];
+    const lost = drawn.shrunk?.get(card.key);
     if (mark !== undefined) {
-      shown[card.key] = mark;
+      shown[card.key] = { tone: TONES[mark.kind], label: WORDS[mark.kind], diff: mark.kind, ...(mark.choice === true ? { choice: true as const } : {}), ...(mark.note === undefined ? {} : { note: mark.note }), ...(mark.kind === "removed" ? { ghost: true as const } : {}) };
+    } else if (lost !== undefined) {
+      shown[card.key] = { tone: "warn", label: WORDS.changed, diff: "changed", note: `${String(lost.length)} inside it removed` };
     }
   }
   const cardOf = new Map(model.cards.map((card) => [card.key, card]));
@@ -153,9 +171,9 @@ export function marksOverlay(title: string, marks: Record<string, OverlayMark>, 
     const [from, to] = [line.from, line.to].map((key) => cardOf.get(key)).map((card) => (card === undefined ? [] : standsFor(card)));
     return (from?.includes(edge.node) === true && to?.includes(edge.requires) === true) || (from?.includes(edge.requires) === true && to?.includes(edge.node) === true);
   };
-  const toned = (line: Line): LineMark => (edges.added.some((edge) => stands(line, edge)) ? "add" : edges.removed.some((edge) => stands(line, edge)) ? "remove" : "lit");
+  const toned = (line: Line): LineMark => (drawn.removedLines?.has(line.id) === true ? "remove" : edges.added.some((edge) => stands(line, edge)) ? "add" : edges.removed.some((edge) => stands(line, edge)) ? "remove" : "lit");
   const lines = Object.fromEntries(model.lines.filter((line) => shown[line.from] !== undefined || shown[line.to] !== undefined || toned(line) !== "lit").map((line) => [line.id, toned(line)]));
-  const drawn = new Set(model.cards.flatMap(standsFor));
-  const outside = Object.keys(marks).filter((key) => !drawn.has(key)).sort();
-  return { title, marks: shown, lines, dim, outside, screenTags: true };
+  const present = new Set(model.cards.flatMap(standsFor));
+  const outside = Object.keys(marks).filter((key) => !present.has(key)).sort();
+  return { title, marks: shown, lines, dim: false, outside };
 }

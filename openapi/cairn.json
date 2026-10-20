@@ -2774,6 +2774,89 @@
         ],
         "type": "object"
       },
+      "DestinationAfter": {
+        "description": "What a destination is once a proposal applies (C14), as the engine works it out from the\ncandidate records: what the views draw in place of the destination.",
+        "oneOf": [
+          {
+            "description": "A journey as it would be, with the derive inputs its views are derived with.",
+            "properties": {
+              "destination": {
+                "const": "journey",
+                "type": "string"
+              },
+              "document": {
+                "$ref": "#/components/schemas/DomainDocument",
+                "description": "The document after."
+              }
+            },
+            "required": [
+              "destination",
+              "document"
+            ],
+            "type": "object"
+          },
+          {
+            "description": "A route as it would be: its header, its versions, its draft; and the latest version\nwhen the candidate holds its graph (one the proposal publishes).",
+            "properties": {
+              "destination": {
+                "const": "route",
+                "type": "string"
+              },
+              "latest": {
+                "anyOf": [
+                  {
+                    "$ref": "#/components/schemas/RouteVersion"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The latest version after, when the candidate holds it."
+              },
+              "route": {
+                "$ref": "#/components/schemas/Route",
+                "description": "The route after."
+              }
+            },
+            "required": [
+              "destination",
+              "route"
+            ],
+            "type": "object"
+          },
+          {
+            "description": "The deployment as it would be.",
+            "properties": {
+              "deployment": {
+                "$ref": "#/components/schemas/Deployment",
+                "description": "The deployment after."
+              },
+              "destination": {
+                "const": "deployment",
+                "type": "string"
+              }
+            },
+            "required": [
+              "destination",
+              "deployment"
+            ],
+            "type": "object"
+          },
+          {
+            "description": "The destination would no longer exist: a valid candidate with nothing to draw.",
+            "properties": {
+              "destination": {
+                "const": "gone",
+                "type": "string"
+              }
+            },
+            "required": [
+              "destination"
+            ],
+            "type": "object"
+          }
+        ]
+      },
       "DestinationKind": {
         "description": "What a proposal's destination is.",
         "oneOf": [
@@ -9286,6 +9369,203 @@
         ],
         "type": "object"
       },
+      "OutlineFact": {
+        "description": "One thing a proposal does to its destination's own header or lifecycle (C14), as a fact\nthe listing and the review word the same way.",
+        "oneOf": [
+          {
+            "description": "Creates the journey.",
+            "properties": {
+              "fact": {
+                "const": "creates_journey",
+                "type": "string"
+              }
+            },
+            "required": [
+              "fact"
+            ],
+            "type": "object"
+          },
+          {
+            "description": "Renames or redescribes the journey.",
+            "properties": {
+              "fact": {
+                "const": "edits_journey",
+                "type": "string"
+              }
+            },
+            "required": [
+              "fact"
+            ],
+            "type": "object"
+          },
+          {
+            "description": "Sets the journey's status.",
+            "properties": {
+              "fact": {
+                "const": "sets_journey_status",
+                "type": "string"
+              },
+              "status": {
+                "$ref": "#/components/schemas/JourneyStatus",
+                "description": "The status."
+              }
+            },
+            "required": [
+              "fact",
+              "status"
+            ],
+            "type": "object"
+          },
+          {
+            "description": "Deletes the journey.",
+            "properties": {
+              "fact": {
+                "const": "deletes_journey",
+                "type": "string"
+              }
+            },
+            "required": [
+              "fact"
+            ],
+            "type": "object"
+          },
+          {
+            "description": "Creates the route.",
+            "properties": {
+              "fact": {
+                "const": "creates_route",
+                "type": "string"
+              }
+            },
+            "required": [
+              "fact"
+            ],
+            "type": "object"
+          },
+          {
+            "description": "Renames or redescribes the route.",
+            "properties": {
+              "fact": {
+                "const": "edits_route",
+                "type": "string"
+              }
+            },
+            "required": [
+              "fact"
+            ],
+            "type": "object"
+          },
+          {
+            "description": "Retires the route.",
+            "properties": {
+              "fact": {
+                "const": "retires_route",
+                "type": "string"
+              }
+            },
+            "required": [
+              "fact"
+            ],
+            "type": "object"
+          },
+          {
+            "description": "Brings the route back.",
+            "properties": {
+              "fact": {
+                "const": "restores_route",
+                "type": "string"
+              }
+            },
+            "required": [
+              "fact"
+            ],
+            "type": "object"
+          },
+          {
+            "description": "Opens the route's draft.",
+            "properties": {
+              "fact": {
+                "const": "opens_draft",
+                "type": "string"
+              }
+            },
+            "required": [
+              "fact"
+            ],
+            "type": "object"
+          },
+          {
+            "description": "Discards the route's draft.",
+            "properties": {
+              "fact": {
+                "const": "discards_draft",
+                "type": "string"
+              }
+            },
+            "required": [
+              "fact"
+            ],
+            "type": "object"
+          },
+          {
+            "description": "Publishes the route's draft.",
+            "properties": {
+              "fact": {
+                "const": "publishes_draft",
+                "type": "string"
+              }
+            },
+            "required": [
+              "fact"
+            ],
+            "type": "object"
+          },
+          {
+            "description": "Moves the journey to a newer version of its route.",
+            "properties": {
+              "fact": {
+                "const": "upgrades",
+                "type": "string"
+              },
+              "to": {
+                "$ref": "#/components/schemas/VersionNumber",
+                "description": "The version."
+              }
+            },
+            "required": [
+              "fact",
+              "to"
+            ],
+            "type": "object"
+          },
+          {
+            "description": "Links the journey to the version its saved route published.",
+            "properties": {
+              "fact": {
+                "const": "relinks",
+                "type": "string"
+              }
+            },
+            "required": [
+              "fact"
+            ],
+            "type": "object"
+          },
+          {
+            "description": "Inserts a published segment.",
+            "properties": {
+              "fact": {
+                "const": "inserts_segment",
+                "type": "string"
+              }
+            },
+            "required": [
+              "fact"
+            ],
+            "type": "object"
+          }
+        ]
+      },
       "Override": {
         "description": "An override to apply (PRD glossary, Override; Gating; D1a; D4).",
         "oneOf": [
@@ -10758,6 +11038,74 @@
           }
         ]
       },
+      "ProposalOutline": {
+        "additionalProperties": false,
+        "description": "What a proposal does, as counts of the things it names (C14): the facts about its\ndestination's header first, then the nodes it adds, changes and removes (each node once,\nby the mutations that name it), the requirements, the entities, and everything else in one\ncount. Derived from the mutations alone on every read, never stored.",
+        "properties": {
+          "entities_created": {
+            "description": "Entities it creates.",
+            "format": "uint32",
+            "minimum": 0,
+            "type": "integer"
+          },
+          "entities_edited": {
+            "description": "Entities it edits.",
+            "format": "uint32",
+            "minimum": 0,
+            "type": "integer"
+          },
+          "entities_merged": {
+            "description": "Entities it merges into another.",
+            "format": "uint32",
+            "minimum": 0,
+            "type": "integer"
+          },
+          "facts": {
+            "description": "The header and lifecycle facts, in the order the mutations make them, each once.",
+            "items": {
+              "$ref": "#/components/schemas/OutlineFact"
+            },
+            "type": "array"
+          },
+          "nodes_added": {
+            "description": "Nodes it adds.",
+            "format": "uint32",
+            "minimum": 0,
+            "type": "integer"
+          },
+          "nodes_changed": {
+            "description": "Nodes it changes: definition or state; a node it adds and then changes counts as added.",
+            "format": "uint32",
+            "minimum": 0,
+            "type": "integer"
+          },
+          "nodes_removed": {
+            "description": "Nodes it removes, a removal's descendants included.",
+            "format": "uint32",
+            "minimum": 0,
+            "type": "integer"
+          },
+          "other": {
+            "description": "Roles, participation kinds, role fills, the default owner and annotations it changes.",
+            "format": "uint32",
+            "minimum": 0,
+            "type": "integer"
+          },
+          "requirements_added": {
+            "description": "Requirements it adds.",
+            "format": "uint32",
+            "minimum": 0,
+            "type": "integer"
+          },
+          "requirements_removed": {
+            "description": "Requirements it removes.",
+            "format": "uint32",
+            "minimum": 0,
+            "type": "integer"
+          }
+        },
+        "type": "object"
+      },
       "ProposalPreview": {
         "additionalProperties": false,
         "description": "What a proposal would do to its destination now (C14, I6), for review: the items still\nunresolved, and the candidate the resolved mutations produce, with every violation strict\nvalidation finds in it.",
@@ -10780,23 +11128,16 @@
             },
             "type": "array"
           },
-          "graph": {
-            "anyOf": [
-              {
-                "$ref": "#/components/schemas/Graph"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "description": "The destination's graph after: a journey's, or a route's draft. None when the\ncandidate is invalid, or for the deployment."
-          },
           "notices": {
             "description": "For a route's draft, the advisory notices of the graph after (A20); they never make\nthe proposal invalid.",
             "items": {
               "$ref": "#/components/schemas/Notice"
             },
             "type": "array"
+          },
+          "outline": {
+            "$ref": "#/components/schemas/ProposalOutline",
+            "description": "What the proposal as previewed (the reviewer's edits included) does, in facts."
           },
           "unresolved": {
             "description": "Items that still need a choice; the preview leaves their effect out.",
@@ -10813,12 +11154,26 @@
             "type": "array"
           }
         },
+        "required": [
+          "outline"
+        ],
         "type": "object"
       },
       "ProposalReview": {
         "additionalProperties": false,
         "description": "`POST /api/proposals/{id}/preview` (C14, D7, I6): what applying the proposal now would do, and,\nwhen its destination moved since it was drafted, what moved.",
         "properties": {
+          "after": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/DestinationAfter"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "What the destination would be once it applies: a route, the deployment, or a journey\nthe proposal creates; none when the candidate breaks a rule."
+          },
           "consequences": {
             "additionalProperties": false,
             "description": "D7, by journey: what applying it would newly cause; a journey with nothing new is left\nout.",
@@ -10831,7 +11186,7 @@
           },
           "preview": {
             "$ref": "#/components/schemas/ProposalPreview",
-            "description": "Its items still unresolved, the violations of its candidate, and for a journey the\ngraph and frontier after."
+            "description": "Its items still unresolved, the violations of its candidate, and for a journey the\nfrontier after."
           },
           "proposal": {
             "$ref": "#/components/schemas/Proposal",
@@ -10923,6 +11278,10 @@
             "$ref": "#/components/schemas/DestinationNow",
             "description": "Its destination as it is now."
           },
+          "outline": {
+            "$ref": "#/components/schemas/ProposalOutline",
+            "description": "What it does, in facts, worked out from its mutations."
+          },
           "proposing_agent": {
             "anyOf": [
               {
@@ -10951,6 +11310,7 @@
           "drafted_against",
           "created_by",
           "created_at",
+          "outline",
           "now"
         ],
         "type": "object"

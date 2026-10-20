@@ -74,7 +74,7 @@ function Upgrade({ ready, latest }: { ready: Ready; latest: number | undefined }
     <span className="row" data-testid="upgrade-flow">
       <Picker aria-label="Upgrade to version" value={String(chosen)} options={newer.map((version) => ({ value: String(version), label: `version ${String(version)}` }))} onChange={(event) => { setTo(event.target.value); }} />
       <Button primary disabled={write.disabled || chosen === undefined} onClick={() => { start((id) => ({ op: "upgrade", journey: ready.journey.header.id, request: { proposal: id, to: chosen ?? lineage.version } })); }}>
-        Propose the upgrade
+        Propose the upgrade to v{chosen ?? lineage.version}
       </Button>
       <Problem write={write} onRebase={write.dismiss} />
     </span>

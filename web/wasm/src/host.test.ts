@@ -140,6 +140,55 @@ it("a derivation is freed only by the load that made it", async () => {
   worker.terminate();
 });
 
+/** A proposal that adds `key` to the vendor evaluation, drafted against `revision`. */
+function adding(key: string, revision: number): Schema<"Proposal"> {
+  return {
+    id: "pr_slot",
+    destination: { journey: "j_vendor_eval" },
+    revision: 1,
+    status: "open",
+    created_by: "u_local",
+    created_at: NOW,
+    draft: { title: "Adds one", destination_revision: revision, mutations: [{ op: "add_node", node: { key, id: key, kind: "action", title: "Added by the proposal" } }] },
+  };
+}
+
+it("a proposal's journey after is held under its slot beside the journey, and released with it", async () => {
+  const started = await fresh();
+  const host = await started.host.InBrowserHost.start(wasmModule, () => NOW);
+  const worker = await started.worker();
+  const source = await worker.load(host.documentText("j_vendor_eval"));
+  const slot = "j_vendor_eval/proposals/pr_slot";
+  const request = { proposal: adding("n_added_by_slot", source.key.revision), at: NOW, actor: { user: "u_local" } };
+  const answered = await worker.preview(source.key, request, slot);
+  expect(answered.after?.destination).toBe("journey");
+  expect(answered.loaded?.key.journey).toBe(slot);
+  // The slot's derivation has the node the journey does not.
+  const derived = JSON.parse(await worker.derivedText(slot)) as { nodes: Record<string, unknown> };
+  const real = JSON.parse(await worker.derivedText("j_vendor_eval")) as { nodes: Record<string, unknown> };
+  expect([derived.nodes["n_added_by_slot"] !== undefined, real.nodes["n_added_by_slot"] !== undefined]).toEqual([true, false]);
+  // A second preview replaces the slot's load under a new generation, so nothing read from the first is read from the next.
+  const again = await worker.preview(source.key, request, slot);
+  expect(again.loaded?.key.generation).not.toBe(answered.loaded?.key.generation);
+  expect(again.loaded).toBeDefined();
+  await worker.release((again.loaded ?? { handle: { journey: slot, load: 0 } }).handle);
+  expect(await reasonOf(started, () => worker.derivedText(slot))).toMatchObject({ error: "missing" });
+  expect((await worker.derivedText("j_vendor_eval")).length).toBeGreaterThan(0);
+  worker.terminate();
+});
+
+it("a preview of a journey that has moved on is refused as superseded", async () => {
+  const started = await fresh();
+  const host = await started.host.InBrowserHost.start(wasmModule, () => NOW);
+  const worker = await started.worker();
+  const earlier = await worker.load(host.documentText("j_vendor_eval"));
+  host.patch(note("p_moves_on", earlier.key.revision, "a_moves_on"));
+  await worker.load(host.documentText("j_vendor_eval"));
+  const request = { proposal: adding("n_late", earlier.key.revision), at: NOW, actor: { user: "u_local" } };
+  expect(await reasonOf(started, () => worker.preview(earlier.key, request, "j_vendor_eval/proposals/pr_slot"))).toMatchObject({ error: "superseded", posted: { revision: earlier.key.revision } });
+  worker.terminate();
+});
+
 it("a derive worker that fails rejects what was asked of it", async () => {
   const started = await fresh();
   expect(await reasonOf(started, () => started.host.DeriveWorker.start(wasmModule, brokenWorker()))).toMatchObject({ error: "aborted" });

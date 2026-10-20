@@ -243,7 +243,7 @@ async fn journey(
 
 /// The published versions `mutations` read, in order: a journey created from one (B1), the
 /// version it follows and the one it is upgraded to (B7: the merge reads both), one it is
-/// re-linked to (B9), and for a draft opened or published (A11, A13, B8) the route's latest
+/// re-linked to (B9), and for a draft opened, discarded or published (A11, A13, B8) the route's latest
 /// version and the one its draft extends (an edit copies it, an import or a saved journey
 /// carries its retired keys, and a publish retires what the draft left out of it). A version
 /// that does not exist is simply not loaded, and the engine rejects the mutation naming it.
@@ -280,6 +280,19 @@ fn versions_read(records: &Records, patch: &Patch, mutations: &[&Mutation]) -> B
                     read.insert(current);
                     read.insert(target.clone());
                     follows = Some(target);
+                }
+            }
+            (Mutation::DiscardDraft {}, PatchTarget::Route(id)) => {
+                // C14: a proposal that discards the draft leaves the route's latest version on show.
+                if let Some(latest) = records
+                    .routes
+                    .get(id)
+                    .and_then(|route| route.versions.iter().next_back())
+                {
+                    read.insert(Lineage {
+                        route: id.clone(),
+                        version: *latest,
+                    });
                 }
             }
             (Mutation::OpenDraft { .. } | Mutation::PublishDraft {}, PatchTarget::Route(id)) => {

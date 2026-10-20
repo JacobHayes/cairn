@@ -70,12 +70,12 @@ test("a bare journey opens the Summary, a node or an edge opens the Graph, and t
 
 test("C14: a proposal that is not there links somewhere that is: its journey's open proposals, or the journeys when the journey is not there either", async ({ page }) => {
   await visit(page, "browser", "/journeys/j_vendor_eval/proposals/pr_gone");
-  await page.getByTestId("no-such-proposal").getByRole("link").click();
+  await expect(page.getByTestId("layer-band")).toHaveAttribute("data-mode", "missing");
+  await page.getByTestId("open-proposals").click();
   await expectAddress(page, "/journeys/j_vendor_eval/proposals");
   await expect(page.getByTestId("proposals-pane")).toBeVisible();
   await visit(page, "browser", "/journeys/j_gone/proposals/pr_gone");
-  await page.getByTestId("no-such-proposal").getByRole("link").click();
-  await expectAddress(page, "/journeys");
+  await expect(page.getByTestId("journey-missing")).toBeVisible();
   // An absent journey's open proposals fail closed like the journey: nothing would create it, so no tab.
   await visit(page, "browser", "/journeys/j_gone/proposals");
   await expect(page.getByTestId("journey-missing")).toBeVisible();

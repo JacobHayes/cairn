@@ -61,7 +61,7 @@ function engineRefuses(host: InBrowserHost, text: string, revision: number, conf
     created_at: at,
     draft: { title: "Offers", destination_revision: revision, items: [{ item: "conflict", conflict, resolution }] },
   };
-  const preview = host.engine.preview(text, { proposal, at, actor: { user: "u_local" } });
+  const { preview } = host.engine.preview(text, { proposal, at, actor: { user: "u_local" } });
   return (preview.unresolved ?? []).some((item) => item.item === 0 && item.reason === "not_offered");
 }
 

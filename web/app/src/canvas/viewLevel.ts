@@ -5,6 +5,7 @@
 import { useMemo } from "react";
 
 import type { GraphNode, Ready } from "../detail/model.ts";
+import { useLayer } from "../proposals/layer.ts";
 import type { Screen } from "../journeys/address.ts";
 import { badgesOf, currentStagesOf, depthFaded, levelRequestOf, lightsUp, litOf, outOfFocus, stepHides, type LevelRequest } from "../journeys/requests.ts";
 import type { ViewState } from "../journeys/view.ts";
@@ -45,6 +46,8 @@ export interface ViewLevel {
   current: ReadonlySet<string>;
   /** The containers the level request collapses. */
   collapsed: string[];
+  /** The level request the read was made with. */
+  request: LevelRequest;
   level: LevelRead["level"];
   drawn: LevelRead["drawn"];
   error: LevelRead["error"];
@@ -69,7 +72,9 @@ export function useViewLevel({ screen, state, nodes, selected, ready, read, fold
     [step, nodes, current, open, shut, unfold],
   );
   const hidden = useMemo(() => collapsedAt(depth, nodes, current, open ?? [], shut ?? []), [depth, nodes, current, open, shut]);
-  const request = useMemo(() => levelRequestOf(state, step, collapsed), [state, step, collapsed]);
+  // C14: under a proposal layer every display state is drawn, so what it changes is never filtered out.
+  const layered = useLayer() !== undefined;
+  const request = useMemo(() => levelRequestOf(state, step, collapsed, layered), [state, step, collapsed, layered]);
   const { level, drawn, error } = read(request, selected);
   const frontier = useMemo(() => (ready === undefined ? undefined : litOf(screen, state, ready)), [screen, state, ready]);
   const base = lit ?? frontier;
@@ -80,5 +85,5 @@ export function useViewLevel({ screen, state, nodes, selected, ready, read, fold
   );
   const dimmed = useMemo(() => outOfFocus(lightsHolders, faded ?? NONE), [lightsHolders, faded]);
   const badges = useMemo(() => badgesOf(screen, level?.hidden_by_class ?? {}, base, stepHides(nodes, depth, hidden), fade), [screen, level, base, nodes, depth, hidden, fade]);
-  return { depth, step, current, collapsed, level, drawn, error, base, faded, dimmed, badges };
+  return { depth, step, current, collapsed, request, level, drawn, error, base, faded, dimmed, badges };
 }

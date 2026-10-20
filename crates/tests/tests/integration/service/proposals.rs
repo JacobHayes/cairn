@@ -9,8 +9,8 @@ use std::sync::Arc;
 use std::time::Duration;
 
 use cairn_schema::{
-    Domain, JourneyId, PatchId, ProposalDraft, ProposalId, ProposalStatus, Rejection, Revision,
-    RevisionOf, ViolationCode, from_yaml,
+    DestinationAfter, Domain, JourneyId, PatchId, ProposalDraft, ProposalId, ProposalStatus,
+    Rejection, Revision, RevisionOf, ViolationCode, from_yaml,
 };
 use cairn_service::{ProposalWritten, Service, Written};
 use cairn_store::{EventQuery, Store, Take, Tick, Watch};
@@ -53,6 +53,7 @@ on_both_stores!(
     a_proposal_write_ticks_the_proposal_and_its_apply_ticks_both,
     an_upgrade_or_relink_submitted_directly_is_refused,
     another_destinations_proposal_is_missing_never_rejected,
+    a_proposal_discarding_a_draft_leaves_the_latest_version_on_show,
 );
 
 const AT: &str = "2026-10-06T12:00:00Z";
@@ -382,7 +383,10 @@ async fn a_proposal_creates_its_destination_at_revision_zero(store: Arc<dyn Stor
         .preview_proposal(&agent, &fresh, &pr_one())
         .await
         .unwrap();
-    let graph = review.preview.graph.expect("the journey it would create");
+    let Some(DestinationAfter::Journey { document }) = review.after else {
+        panic!("the journey it would create");
+    };
+    let graph = document.journey.graph;
     assert!(graph.nodes.get(&"n_first".parse().unwrap()).is_some());
     let reviewer = call("u_lead", AT);
     applied(
@@ -403,6 +407,55 @@ async fn a_proposal_creates_its_destination_at_revision_zero(store: Arc<dyn Stor
         .unwrap()
         .unwrap();
     assert_eq!(created.revision, revision(1));
+}
+
+/// C14, A11: a proposal that discards a route's draft shows the route as it would be left,
+/// the published version it falls back to, and not the draft it discards.
+async fn a_proposal_discarding_a_draft_leaves_the_latest_version_on_show(store: Arc<dyn Store>) {
+    let (service, _) = service_over(store);
+    let author = call("u_lead", AT);
+    let route = Domain::Route("r_one".parse().unwrap());
+    let made = patch(
+        "p_v1",
+        "{route: r_one}",
+        0,
+        "- op: create_route\n  name: One\n- op: open_draft\n  source: import\n- op: add_node\n  node: {key: n_a, id: a, kind: action, title: A}\n- op: publish_draft\n",
+    );
+    applied(service.patch(&author, &domain(made)).await);
+    let reopened = patch(
+        "p_v2",
+        "{route: r_one}",
+        1,
+        "- op: open_draft\n  source: edit\n",
+    );
+    applied(service.patch(&author, &domain(reopened)).await);
+    let at = service
+        .route(&"r_one".parse().unwrap())
+        .await
+        .unwrap()
+        .unwrap()
+        .revision
+        .get();
+    let draft: ProposalDraft = from_yaml(&format!(
+        "title: Drop the draft\ndestination_revision: {at}\nmutations:\n- op: discard_draft\n"
+    ))
+    .unwrap();
+    saved(
+        service
+            .create_proposal(&author, patch_id("p_pr"), &route, &pr_one(), draft)
+            .await
+            .unwrap(),
+    );
+    let review = service
+        .preview_proposal(&author, &route, &pr_one())
+        .await
+        .unwrap();
+    let Some(DestinationAfter::Route { route, latest }) = review.after else {
+        panic!("the route it would leave");
+    };
+    assert!(route.draft.is_none(), "the draft is gone");
+    let latest = latest.expect("the published version it falls back to");
+    assert!(latest.graph.nodes.get(&"n_a".parse().unwrap()).is_some());
 }
 
 /// I6: a discarded proposal stays discarded: applying it is refused.

@@ -4,15 +4,17 @@
 // survivor unchanged. Which entities are the caller's is marked. Kept current (H6). An edit
 // is drafted against the deployment revision its author saw, and forms survive a reload.
 import { useState } from "react";
-import { useLocation } from "react-router";
+import { useLocation, useParams } from "react-router";
 
 import type { Deployment } from "../data/host.ts";
 import { useDraft } from "../data/drafts.ts";
-import { valueOf } from "../data/keyed-read.ts";
-import { useDeployment, useLive, useViewer } from "../data/react.ts";
-import { RowsPanel } from "../acting/RowsPanel.tsx";
-import { proposalRows } from "../proposals/ProposalRows.tsx";
-import { listKey, proposalsUnder } from "../proposals/read.ts";
+import { useDeployment, useViewer } from "../data/react.ts";
+import { Band } from "../proposals/Band.tsx";
+import { DestinationProposals } from "../proposals/DestinationProposals.tsx";
+import { DeploymentLayerHost } from "../proposals/Hosts.tsx";
+import { entityDiff, useLayer, useReviewing, type EntityRow as DiffRow } from "../proposals/layer.ts";
+import { DIFF_LABELS } from "../proposals/model.ts";
+import { Rail } from "../proposals/Rail.tsx";
 import type { Rejection } from "../data/writes.ts";
 import { RejectionView } from "../screens/RejectionView.tsx";
 import { WriteStatus } from "../screens/WriteStatus.tsx";
@@ -24,7 +26,6 @@ import { IndexHead } from "../ui/IndexHead.tsx";
 import { Badge, Button, Field } from "../ui/kit.tsx";
 import { MergeEntities } from "./MergeEntities.tsx";
 import { aliasesOf, byName, EMAIL_RULES, entityOf, mergeAsked, newEntityKey, type Entity } from "./model.ts";
-import { Failed } from "../ui/Failed.tsx";
 import { plural } from "../ui/words.ts";
 
 /** An entity's edit as typed, and the deployment revision its author saw when they opened it (H5). */
@@ -85,30 +86,36 @@ function EntityEditor({ entity, deployment, draft, setDraft, write }: { entity: 
   );
 }
 
-function EntityRow({ entity, deployment, yours }: { entity: Entity; deployment: Deployment; yours: boolean }) {
+function EntityRow({ entity, deployment, yours, mark, intoName }: { entity: Entity; deployment: Deployment; yours: boolean; mark?: DiffRow["mark"]; intoName?: string | undefined }) {
+  const reviewing = useReviewing() !== undefined;
   const [draft, setDraft] = useDraft<EntityDraft>(`entity-edit:${entity.key}`);
   // The row holds the write, so a save in flight keeps Edit closed until it settles: its
   // landing closes the draft it sent, never one opened after it.
   const write = useScreenWrite(`entity:${entity.key}`, entity.name);
   const aliases = aliasesOf(deployment, entity.key);
   return (
-    <li className="entity-row" data-testid="entity" data-entity={entity.key}>
+    <li className="entity-row" data-testid="entity" data-entity={entity.key} data-diff={mark?.kind}>
       <span className="entity-head">
         <span className="row entity-title">
+          {mark === undefined ? null : (
+            <span className="layer-word" data-testid="row-diff" data-diff={mark.kind}>
+              {mark.into === undefined ? DIFF_LABELS[mark.kind] : `Merged into ${intoName ?? mark.into}`}
+            </span>
+          )}
           <strong data-testid="entity-name">{entity.name}</strong>
           {yours ? <Badge tone="good" data-testid="yours">You</Badge> : null}
           {aliases.length === 0 ? null : <span className="muted small" data-testid="aliases">merged from {plural(aliases.length, "other entry", "other entries")}</span>}
         </span>
-        {draft === undefined ? (
+        {draft === undefined && !reviewing ? (
           <Button disabled={write.disabled} onClick={() => { setDraft({ name: entity.name, emails: [...(entity.emails ?? [])], emailText: "", base: deployment.revision }); }}>Edit</Button>
         ) : null}
       </span>
-      {draft !== undefined ? null : (
+      {draft !== undefined && !reviewing ? null : (
         <span data-testid="entity-emails">
           {(entity.emails ?? []).length === 0 ? <span className="muted small">No emails</span> : <Chips>{(entity.emails ?? []).map((email) => <Chip key={email}>{email}</Chip>)}</Chips>}
         </span>
       )}
-      {draft === undefined ? null : <EntityEditor entity={entity} deployment={deployment} draft={draft} setDraft={setDraft} write={write} />}
+      {draft === undefined || reviewing ? null : <EntityEditor entity={entity} deployment={deployment} draft={draft} setDraft={setDraft} write={write} />}
     </li>
   );
 }
@@ -137,56 +144,67 @@ function CreateEntity({ deployment }: { deployment: Deployment }) {
   );
 }
 
-/** C14: the open proposals for the deployment (an entity edited or merged by an agent), above the entities; nothing when none is waiting. */
-function DeploymentProposals() {
-  const { view, refresh } = useLive(listKey("deployment"), proposalsUnder("deployment"));
-  const found = valueOf(view);
-  if (view.status === "failed") {
-    return (
-      <p className="callout callout-bad" role="alert" data-testid="proposals-failed">
-        <Failed what="The open proposals" error={view.error}>
-          <Button onClick={refresh}>Try again</Button>
-        </Failed>
-      </p>
-    );
-  }
-  if (found === undefined) {
-    return <p className="muted small" data-testid="proposals-reading">Reading the open proposals...</p>;
-  }
-  return found.items.length === 0 ? null : <RowsPanel title="Open proposals" testId="deployment-proposals" rows={proposalRows(found.items)} />;
-}
-
-export function Entities() {
-  const deployment = useDeployment();
+/** The entities page: the entities as they are, or, with a proposal's layer on, as it would leave them with every change marked. */
+function EntitiesList({ deployment, rows }: { deployment: Deployment; rows: DiffRow[] | undefined }) {
   const { viewer } = useViewer();
   const { search } = useLocation();
   const asked = mergeAsked(search);
   // Merging is closed until asked for, or until a link (the sign-in page's offer) names the two to merge.
   const [merge, setMerge] = useState<{ asked: string; open: boolean } | undefined>(undefined);
-  if (deployment === undefined) {
-    return <p className="muted small">Reading the entities...</p>;
-  }
-  const mergeOpen = merge?.asked === asked.join(",") ? merge.open : asked.length > 0;
+  const layer = useLayer();
+  const reviewing = useReviewing() !== undefined;
+  const mergeOpen = !reviewing && (merge?.asked === asked.join(",") ? merge.open : asked.length > 0);
   const yours = new Set(viewer?.entities ?? []);
-  const entities = byName(deployment.entities ?? []);
+  const listed: DiffRow[] = rows ?? byName(deployment.entities ?? []).map((entity) => ({ entity, mark: undefined }));
+  const names = new Map(listed.map((row) => [row.entity.key, row.entity.name]));
   return (
-    <section className="stack" aria-label="Entities" data-testid="entities" data-revision={deployment.revision} data-rows-page tabIndex={-1}>
+    <section className="stack" aria-label="Entities" data-testid="entities" data-revision={deployment.revision} data-layer={layer?.mode} data-rows-page tabIndex={-1}>
       <IndexHead title="Entities">
-        <Button aria-expanded={mergeOpen} aria-controls="merge-entities" onClick={() => { setMerge({ asked: asked.join(","), open: !mergeOpen }); }}>{mergeOpen ? "Close merge" : "Merge entities"}</Button>
+        {reviewing ? null : <Button aria-expanded={mergeOpen} aria-controls="merge-entities" onClick={() => { setMerge({ asked: asked.join(","), open: !mergeOpen }); }}>{mergeOpen ? "Close merge" : "Merge entities"}</Button>}
       </IndexHead>
+      <Band />
       <span className="muted small">People and teams journeys refer to, across every journey. They need not be users; an entity holding your verified email is you.</span>
-      <DeploymentProposals />
-      <CreateEntity deployment={deployment} />
-      {mergeOpen ? <MergeEntities key={asked.join(",")} deployment={deployment} entities={entities} asked={asked} /> : null}
-      {entities.length === 0 ? (
+      {reviewing ? null : <CreateEntity deployment={deployment} />}
+      {mergeOpen ? <MergeEntities key={asked.join(",")} deployment={deployment} entities={byName(deployment.entities ?? [])} asked={asked} /> : null}
+      {listed.length === 0 ? (
         <p className="muted small" data-testid="entities-empty">No entities yet.</p>
       ) : (
-        <NodePanel title="Entities" count={entities.length} testId="entity-list">
-          {entities.map((entity) => (
-            <EntityRow key={entity.key} entity={entity} deployment={deployment} yours={yours.has(entity.key)} />
+        <NodePanel title="Entities" count={listed.length} testId="entity-list">
+          {listed.map(({ entity, mark }) => (
+            <EntityRow key={entity.key} entity={entity} deployment={deployment} yours={yours.has(entity.key)} mark={mark} intoName={mark?.into === undefined ? undefined : names.get(mark.into)} />
           ))}
         </NodePanel>
       )}
     </section>
+  );
+}
+
+/** Under the layer, the rows diffed (in the order the page lists them) and the rail beside them. */
+function LayeredEntities() {
+  const layer = useLayer();
+  const deployment = layer?.deployment;
+  if (layer === undefined || deployment === undefined) {
+    return null;
+  }
+  const rows = layer.mode === "reviewing" ? entityDiff(deployment.before, deployment.after) : undefined;
+  return (
+    <>
+      <EntitiesList deployment={deployment.before} rows={rows} />
+      {layer.review === undefined ? null : <Rail selected={undefined} />}
+    </>
+  );
+}
+
+export function Entities() {
+  const deployment = useDeployment();
+  const proposal = useParams()["proposal"];
+  if (deployment === undefined) {
+    return <p className="muted small">Reading the entities...</p>;
+  }
+  return (
+    <>
+      {proposal === undefined ? <EntitiesList deployment={deployment} rows={undefined} /> : <DeploymentLayerHost proposal={proposal}>{() => <LayeredEntities />}</DeploymentLayerHost>}
+      <DestinationProposals destination="deployment" />
+    </>
   );
 }

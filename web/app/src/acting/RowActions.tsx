@@ -8,6 +8,7 @@ import type { ReactNode } from "react";
 import { useNavigate } from "react-router";
 
 import { useViewer } from "../data/react.ts";
+import { useReviewing } from "../proposals/layer.ts";
 import { ActButton, type Opens } from "../detail/ActButton.tsx";
 import { EvidenceForm, type Needs } from "../detail/DoneEvidence.tsx";
 import type { Ready } from "../detail/model.ts";
@@ -72,7 +73,9 @@ export function RowActions({ view, row, to, owner = true, column = false, yours 
   const write = useNodeWrite(view, `acts:${row.key}`, row.key);
   const evidence = useFormDraft<EvidenceDraft | string>(write.journey, row.key, "done-artifact");
   const facts = factsOf(view, row.key);
-  if (facts === undefined) {
+  const reviewing = useReviewing();
+  // Under a proposal's layer the rows are a picture of the future: no action, no assignment.
+  if (facts === undefined || reviewing !== undefined) {
     return null;
   }
   const offers = offered(view, row.key);

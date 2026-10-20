@@ -31,6 +31,7 @@ import {
   type DraftRequest,
   type ExportRequest,
   type ImportRequest,
+  type PreviewAnswer,
   type PreviewRequest,
   type ProjectionAnswer,
   type ProjectionRequest,
@@ -140,9 +141,9 @@ export class Engine {
     return hosted(() => preview(documentText, JSON.stringify(request)));
   }
 
-  /** Previews a proposal against the document's journey (C14). */
-  preview(documentText: string, request: PreviewRequest): Schema<"ProposalPreview"> {
-    return parsed<Schema<"ProposalPreview">>(this.previewText(documentText, request));
+  /** Previews a proposal against the document's journey (C14): the preview and the destination after. */
+  preview(documentText: string, request: PreviewRequest): PreviewAnswer {
+    return parsed<PreviewAnswer>(this.previewText(documentText, request));
   }
 
   /** H5: what a patch touches, as the module wrote it. */

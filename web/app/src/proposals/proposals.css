@@ -5,11 +5,6 @@
   padding: var(--space-2) 0;
 }
 
-.proposal-picked {
-  background: var(--color-tint);
-  box-shadow: inset 2px 0 0 var(--color-accent);
-}
-
 .proposal-item,
 .proposal-change {
   overflow-wrap: anywhere;
@@ -20,3 +15,168 @@
   border-top: 1px solid var(--color-border);
   padding-top: var(--space-4);
 }
+
+/* C14: the proposal layer. The band is the one line the layer adds under a destination's header. */
+.layer-band {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  min-width: 0;
+  padding: var(--space-2) var(--space-3);
+  border: 1px solid var(--color-border);
+  background: var(--color-surface);
+}
+
+.layer-band-text {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 15px;
+}
+
+.layer-band > .button,
+.layer-band > a {
+  flex: none;
+}
+
+/* The change word: the rail, the rows and the cards say it in the same words; ink carries no meaning alone. */
+.layer-word {
+  font: 500 12px / 1.4 var(--font-mono);
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--color-text);
+}
+
+/* What waits on a choice is said in ink, not in the accent: the accent on a change's fill is under the contrast floor. */
+.layer-choice {
+  color: var(--color-text);
+  font-weight: 600;
+}
+
+/* The key beside a fold's head wraps inside the room left of the chevron, so the head never breaks and the chevron stays on the head's line. */
+.detail-section > summary:has(.layer-key) {
+  padding-block: var(--space-2);
+}
+
+.detail-section > summary:has(.layer-key) > .detail-section-title {
+  white-space: nowrap;
+}
+
+.detail-section > summary:has(.layer-key) > .detail-section-title + span {
+  flex: 1 1 0;
+  min-width: 0;
+}
+
+.layer-key {
+  display: inline-flex;
+  flex-wrap: wrap;
+  gap: var(--space-3);
+  font-size: 13px;
+}
+
+.layer-key-item {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+}
+
+.layer-swatch {
+  display: inline-block;
+  width: 14px;
+  height: 14px;
+  border: 2px solid var(--color-text);
+  background-image: linear-gradient(var(--swatch), var(--swatch));
+}
+
+.layer-swatch-added {
+  --swatch: var(--color-add);
+  border-style: solid;
+}
+
+.layer-swatch-changed {
+  --swatch: var(--color-change);
+  border-style: dotted;
+}
+
+.layer-swatch-removed {
+  --swatch: var(--color-del);
+  border-style: dashed;
+}
+
+/* The title, who proposed it and what it does read as one block; the notes and the folds are the card's own steps. */
+/* C14: a route's List rows the proposal touches take the change's fill over the row's own paper and lead with its word; a removed one is struck. */
+.route-list-row[data-diff="added"] { --diff-fill: var(--color-add); }
+.route-list-row[data-diff="changed"] { --diff-fill: var(--color-change); }
+.route-list-row[data-diff="removed"] { --diff-fill: var(--color-del); }
+
+.route-tree > .route-list-row[data-diff] {
+  background: linear-gradient(var(--diff-fill), var(--diff-fill)), var(--color-surface);
+}
+
+.route-tree > .route-list-row[data-diff][data-container="true"] {
+  background: linear-gradient(var(--diff-fill), var(--diff-fill)), var(--color-band);
+}
+
+.route-list-row[data-diff="removed"] .route-list-title {
+  text-decoration: line-through;
+}
+
+.rail-lead {
+  gap: var(--space-2);
+}
+
+.rail-notes:empty {
+  display: none;
+}
+
+.rail-head {
+  align-items: stretch;
+  justify-content: flex-start;
+}
+
+.rail-head h2 {
+  overflow-wrap: anywhere;
+}
+
+.rail-holds {
+  margin: 0;
+  padding: var(--space-2) var(--space-3);
+  border: 1px solid var(--color-border);
+  background: var(--color-surface);
+}
+
+.rail-holds:focus-visible {
+  outline: 2px solid var(--color-accent);
+  outline-offset: 2px;
+}
+
+.rail-foot {
+  padding-top: var(--space-4);
+  border-top: 1px solid var(--color-border);
+}
+
+/* What follows a change word in a row's or the header's own fill. */
+[data-diff="added"] > .layer-word,
+[data-diff="changed"] > .layer-word,
+[data-diff="removed"] > .layer-word {
+  color: var(--color-text);
+}
+
+.journey-header [data-diff="changed"],
+.route-header [data-diff="changed"] {
+  background: var(--color-change);
+}
+
+.entity-row[data-diff="added"] { background: var(--color-add); }
+.entity-row[data-diff="changed"] { background: var(--color-change); }
+.entity-row[data-diff="removed"] { background: var(--color-del); }
+.entity-row[data-diff="removed"] [data-testid="entity-name"] { text-decoration: line-through; text-decoration-thickness: 1px; }
+
+.proposals-none {
+  margin: 0;
+  font-size: 15px;
+  line-height: 1.5;
+}
+

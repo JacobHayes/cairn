@@ -98,6 +98,21 @@
   white-space: nowrap;
 }
 
+/* C14: under the layer the change word keeps its room and the sentence after it gives way first. */
+.timeline-words[data-marked="true"] {
+  display: flex;
+}
+
+.timeline-words[data-marked="true"] > .layer-word {
+  flex: none;
+}
+
+.timeline-words-rest {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
 .timeline-late {
   color: var(--color-error);
 }
@@ -113,7 +128,7 @@
 }
 
 /* Done work is 0.5 in a tree row (DESIGN, status language): its content, so the surface, band and guides stay opaque; out of focus is 0.3 and the lowest wins, so a faded row is not faded twice. */
-.timeline-label[data-state="done"]:not([data-faded="true"]) .timeline-title {
+.timeline-label[data-state="done"]:not([data-faded="true"], [data-diff]) .timeline-title {
   opacity: 0.5;
 }
 
@@ -122,8 +137,9 @@
   opacity: var(--opacity-snoozed);
 }
 
-.timeline-label[data-faded="true"],
-.timeline-row[data-faded="true"] {
+/* C14: what a proposal marks is never faded for being out of focus. */
+.timeline-label[data-faded="true"]:not([data-diff]),
+.timeline-row[data-faded="true"]:not([data-diff]) {
   opacity: 0.3;
 }
 
@@ -314,3 +330,23 @@
     scroll-margin-bottom: calc(var(--sheet-covers) + var(--space-5));
   }
 }
+
+/* C14: a row the proposal touches is filled with the change's token behind its track and its label. */
+.timeline-diff[data-diff="added"] { fill: var(--color-add); }
+.timeline-diff[data-diff="changed"] { fill: var(--color-change); }
+.timeline-diff[data-diff="removed"] { fill: var(--color-del); }
+
+.timeline-label[data-diff="added"] { background: var(--color-add); }
+.timeline-label[data-diff="changed"] { background: var(--color-change); }
+.timeline-label[data-diff="removed"] { background: var(--color-del); }
+
+.timeline-removed {
+  margin-top: var(--space-3);
+}
+
+.timeline-removed li {
+  background: var(--color-del);
+  text-decoration: line-through;
+  text-decoration-thickness: 1px;
+}
+

@@ -16,6 +16,7 @@ import { graphPath, type GraphView } from "../canvas/settings.ts";
 import type { Selection } from "../canvas/selection.ts";
 import type { Ready } from "../detail/model.ts";
 import type { Screen } from "../journeys/address.ts";
+import { useReviewing } from "../proposals/layer.ts";
 import { useViewState } from "../journeys/view.ts";
 import { ProjectedTimeline } from "../timeline/TimelineView.tsx";
 
@@ -41,10 +42,12 @@ export interface ProjectionProps {
 /** The canvas's own bars, which stay with the head: the structure's tools (edit mode) and the stalled surface. */
 export function CanvasBars({ ready, view, authored, drawing }: Pick<ProjectionProps, "ready" | "view" | "authored" | "drawing">) {
   const { search } = useLocation();
+  // The stalled panel describes the journey with actions that would act on the present: not under a proposal's layer.
+  const reviewing = useReviewing() !== undefined;
   return (
     <>
       {authored === undefined ? null : <JourneyAuthoringBar ready={ready} authored={authored} view={view} drawing={drawing} />}
-      <StalledPanel view={ready} nodeTo={(node) => graphPath(ready.journey.header.id, view, { node }, search)} readOnly={ready.journey.header.status === "archived"} />
+      {reviewing ? null : <StalledPanel view={ready} nodeTo={(node) => graphPath(ready.journey.header.id, view, { node }, search)} readOnly={ready.journey.header.status === "archived"} />}
     </>
   );
 }

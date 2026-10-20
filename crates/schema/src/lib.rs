@@ -97,9 +97,9 @@ pub use projection::{
     Timeline, TimelineEntry, Trace, UndatedEntry, UnderlyingEdge, UpcomingMilestone,
 };
 pub use proposal::{
-    Conflict, ConflictResolution, Kept, ParticipationMapping, Proposal, ProposalDraft,
-    ProposalPreview, ProposalStatus, ReviewItem, RoleReference, UnresolvedItem, UnresolvedReason,
-    removed_choices,
+    Conflict, ConflictResolution, DestinationAfter, Kept, OutlineFact, ParticipationMapping,
+    Proposal, ProposalDraft, ProposalOutline, ProposalPreview, ProposalStatus, ReviewItem,
+    RoleReference, UnresolvedItem, UnresolvedReason, removed_choices,
 };
 pub use record::{GraphKey, GraphRecord, Record, RecordKey, RetiredKey, Write};
 pub use refs::{FileRefs, KeyRefs, KeySlot, Reference, References};

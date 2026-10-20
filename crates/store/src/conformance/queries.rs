@@ -898,6 +898,13 @@ pub async fn proposal_listings_hold_each_scope_newest_first_with_counts<B: Backe
     );
     assert_eq!(active.items[0].now, now);
     assert_eq!(active.items[0].drafted_against, revision(1));
+    // C14: a listing says what each proposal changes, worked out from its mutations by one rule.
+    let drafted = build::proposal("pr_any", &journey("j_active"), 1);
+    assert_eq!(
+        active.items[0].outline,
+        cairn_schema::ProposalOutline::of(drafted.draft.mutations.as_slice()),
+    );
+    assert_eq!(active.items[0].outline.nodes_added, 1);
     let gone = store
         .proposals(&page(ProposalScope::Destination(route("r_new"))))
         .await

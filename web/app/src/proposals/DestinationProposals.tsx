@@ -8,6 +8,7 @@
 import { Link, useLocation } from "react-router";
 
 import { proposalsAddress, usePage } from "../address.ts";
+import { useParams } from "react-router";
 import { RowsPanel } from "../acting/RowsPanel.tsx";
 import { valueOf } from "../data/keyed-read.ts";
 import { useLive } from "../data/react.ts";
@@ -21,7 +22,7 @@ import { Failed } from "../ui/Failed.tsx";
 /** Whether the page is at its destination's `/proposals` address. */
 function useAtProposals(): boolean {
   const name = usePage()?.name;
-  return name === "journeyProposals" || name === "routeProposals";
+  return name === "journeyProposals" || name === "routeProposals" || name === "deploymentProposals";
 }
 
 /** The open proposals under `destination`: the Proposals tab and what it holds. */
@@ -29,6 +30,7 @@ export function DestinationProposals({ destination }: { destination: Domain }) {
   const { view, refresh } = useLive(listKey(destination), proposalsUnder(destination));
   const found = valueOf(view);
   const reveal = useAtProposals();
+  const current = useParams()["proposal"];
   // Nothing open and not asked for, or nothing open under a destination that does not exist (its
   // page says so): no tab, and no column held open for one.
   const none = (found?.count ?? 0) === 0 && view.status !== "failed";
@@ -42,7 +44,7 @@ export function DestinationProposals({ destination }: { destination: Domain }) {
           found.items.length === 0 ? (
             <None />
           ) : (
-            <RowsPanel label="Open proposals" testId="proposals-panel" rows={proposalRows(found.items)} />
+            <RowsPanel label="Open proposals" testId="proposals-panel" rows={proposalRows(found.items, undefined, current)} />
           )
         ) : view.status === "failed" ? (
           <p className="callout callout-bad" role="alert">
@@ -67,7 +69,7 @@ export function DestinationProposals({ destination }: { destination: Domain }) {
 
 function None() {
   return (
-    <p className="muted small" data-testid="proposals-none">
+    <p className="proposals-none" data-testid="proposals-none">
       Nothing is waiting for review here. A proposal stays here from when it is drafted until it is applied or discarded.
     </p>
   );

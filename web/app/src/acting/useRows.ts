@@ -37,8 +37,8 @@ export function rowsKey(deriver: Deriver, view: Ready, query: ListQuery): ReadKe
   return { identity: [journey, JSON.stringify(query)], freshness: [JSON.stringify(view.key)], args: { deriver, journey, query } };
 }
 
-export function useRows(view: Ready, query: ListQuery): { rows: NodeRow[] | undefined; error: string | undefined } {
+export function useRows(view: Ready | undefined, query: ListQuery): { rows: NodeRow[] | undefined; error: string | undefined } {
   const { deriver } = useSession();
-  const { view: answer } = useKeyedRead(ROWS, rowsKey(deriver, view, query));
+  const { view: answer } = useKeyedRead(ROWS, view === undefined ? undefined : rowsKey(deriver, view, query));
   return { rows: valueOf(answer), error: errorWords(answer) };
 }

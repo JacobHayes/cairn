@@ -1,5 +1,7 @@
 // What a proposal's items and mutations say to a reviewer (C14): each in a line of plain
 // words, naming nodes, roles, and kinds by title where the graph holds them.
+import type { Schema } from "@cairn/client";
+
 import { conditionNames, conditionWords, type Clause, type ConditionNames } from "../authoring/condition.ts";
 import { ruleWords } from "../authoring/dates.ts";
 import type { Graph, GraphNode, Mutation } from "../authoring/graph.ts";
@@ -85,6 +87,39 @@ export function fieldValueWords(field: string, value: unknown, names: Names): st
       return Array.isArray(value) ? value.map((choice: Parameters<typeof choiceLabel>[0]) => quoted(choiceLabel(choice))).join(", ") : JSON.stringify(value);
     default:
       return typeof value === "boolean" ? (value ? "yes" : "no") : typeof value === "string" ? quoted(value) : typeof value === "number" ? String(value) : JSON.stringify(value);
+  }
+}
+
+/** What a journey's state holds of one node under `field` (nodes, answers, rationales, overrides, pins, snoozes), in a person's words: names and dates, never a key or the record's own shape. */
+export function stateValueWords(field: string, value: unknown, node: string, names: Names): string {
+  if (value === null || value === undefined) {
+    return "nothing";
+  }
+  const record = value as Record<string, unknown>;
+  switch (field) {
+    case "nodes": {
+      const own = record as { state?: string; started_on?: string; finished_on?: string; skip_reason?: string; atomic?: boolean };
+      const parts = [
+        own.state === undefined ? undefined : own.state.replaceAll("_", " "),
+        own.started_on === undefined ? undefined : `started ${names.date(own.started_on)}`,
+        own.finished_on === undefined ? undefined : `finished ${names.date(own.finished_on)}`,
+        own.skip_reason === undefined ? undefined : `skipped because ${quoted(briefly(own.skip_reason))}`,
+        own.atomic === true ? "atomic" : undefined,
+      ];
+      return parts.filter((part) => part !== undefined).join(", ");
+    }
+    case "answers":
+      return answerWords(value as Parameters<typeof answerWords>[0], { choice: (id) => names.choice(node, id), entity: (key) => names.entity(key), date: names.date });
+    case "rationales":
+      return typeof value === "string" ? quoted(briefly(value)) : "a reason";
+    case "pins":
+      return typeof value === "string" ? names.date(value) : "a date";
+    case "snoozes":
+      return "date" in record && typeof record["date"] === "string" ? `until ${names.date(record["date"])}` : typeof record["node"] === "string" ? `until ${quoted(names.node(record["node"]))}${SNOOZE_NODE_TAIL}` : "set aside";
+    case "overrides":
+      return [record["force_include"] == null ? undefined : "forced in", record["keep"] == null ? undefined : "kept", record["bypass"] == null ? undefined : "its guard bypassed"].filter((part) => part !== undefined).join(", ");
+    default:
+      return "changed";
   }
 }
 
@@ -176,10 +211,9 @@ export function conflictWords(conflict: Conflict, names: Names): string {
   const node = (key: string) => quoted(names.node(key));
   switch (conflict.about) {
     case "field": {
-      const [field, ours] = fieldOf(conflict.journey);
-      const [, theirs] = fieldOf(conflict.route);
+      const [field] = fieldOf(conflict.journey);
       const dangling = conflict.dangling === true ? " (it names a node this journey removed)" : "";
-      return `${node(conflict.node)}: its ${fieldWords(field)} differs. Here: ${fieldValueWords(field, ours, names)}. In the route: ${fieldValueWords(field, theirs, names)}${dangling}`;
+      return `${node(conflict.node)}: its ${fieldWords(field)} differs here and in the route${dangling}`;
     }
     case "edge":
       return `${node(conflict.edge.node)} requiring ${node(conflict.edge.requires)}: ${conflict.journey ? "added" : "removed"} here, ${conflict.route ? "kept" : "dropped"} by the route`;
@@ -216,6 +250,19 @@ export const RESOLUTION_WORDS: Record<ResolutionKind, string> = {
   map_choices: "Map each removed choice to one that remains",
 };
 
+/** What taking `resolution` leaves a field conflict's field as, said beside the option; none for the other conflicts, whose option says it all. */
+export function resolutionEffect(conflict: Conflict, resolution: ResolutionKind, names: Names): string | undefined {
+  if (conflict.about !== "field") {
+    return undefined;
+  }
+  const [field, ours] = fieldOf(conflict.journey);
+  const [, theirs] = fieldOf(conflict.route);
+  if (resolution === "keep_journey") {
+    return fieldValueWords(field, ours, names);
+  }
+  return resolution === "take_route" ? fieldValueWords(field, theirs, names) : undefined;
+}
+
 /** C14: a review item's heading. */
 export function itemHeading(item: ReviewItem, names: Names): string {
   switch (item.item) {
@@ -236,3 +283,68 @@ export function itemHeading(item: ReviewItem, names: Names): string {
   }
 }
 
+
+type Outline = Schema<"ProposalOutline">;
+type OutlineFact = Schema<"OutlineFact">;
+
+/** One header or lifecycle fact of a proposal's outline, as a phrase that follows "It". */
+function factWords(fact: OutlineFact): string {
+  switch (fact.fact) {
+    case "creates_journey":
+      return "creates the journey";
+    case "edits_journey":
+      return "edits the journey";
+    case "sets_journey_status":
+      return `sets the journey to ${fact.status}`;
+    case "deletes_journey":
+      return "deletes the journey";
+    case "creates_route":
+      return "creates the route";
+    case "edits_route":
+      return "edits the route";
+    case "retires_route":
+      return "retires the route";
+    case "restores_route":
+      return "restores the route";
+    case "opens_draft":
+      return "opens a draft";
+    case "discards_draft":
+      return "discards the draft";
+    case "publishes_draft":
+      return "publishes the draft";
+    case "upgrades":
+      return `upgrades to version ${String(fact.to)}`;
+    case "relinks":
+      return "re-links to the saved route";
+    case "inserts_segment":
+      return "inserts a segment";
+  }
+}
+
+const counted = (count: number, one: string, many: string) => `${String(count)} ${count === 1 ? one : many}`;
+
+/**
+ * C14: what a proposal changes, in one sentence, from the outline the engine worked out of its
+ * mutations (the listing's and the preview's are the same value): its header and lifecycle facts
+ * first, then the nodes, requirements and entities it names. "Upgrades to version 2 and adds 1 node."
+ */
+export function outlineWords(outline: Outline): string {
+  const phrases = [
+    ...(outline.facts ?? []).map(factWords),
+    ...(outline.nodes_added ? [`adds ${counted(outline.nodes_added, "node", "nodes")}`] : []),
+    ...(outline.nodes_changed ? [`changes ${counted(outline.nodes_changed, "node", "nodes")}`] : []),
+    ...(outline.nodes_removed ? [`removes ${counted(outline.nodes_removed, "node", "nodes")}`] : []),
+    ...(outline.requirements_added ? [`adds ${counted(outline.requirements_added, "requirement", "requirements")}`] : []),
+    ...(outline.requirements_removed ? [`removes ${counted(outline.requirements_removed, "requirement", "requirements")}`] : []),
+    ...(outline.entities_created ? [`creates ${counted(outline.entities_created, "entity", "entities")}`] : []),
+    ...(outline.entities_edited ? [`edits ${counted(outline.entities_edited, "entity", "entities")}`] : []),
+    ...(outline.entities_merged ? [`merges ${counted(outline.entities_merged, "entity", "entities")}`] : []),
+    ...(outline.other ? ["adjusts roles, kinds or defaults"] : []),
+  ];
+  if (phrases.length === 0) {
+    return "Changes nothing.";
+  }
+  const [last, ...rest] = [...phrases].reverse();
+  const joined = rest.length === 0 ? (last ?? "") : `${rest.reverse().join(", ")} and ${last ?? ""}`;
+  return `${joined.charAt(0).toUpperCase()}${joined.slice(1)}.`;
+}

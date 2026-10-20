@@ -12,9 +12,10 @@ import { ImportControl, useOnImported, type ImportFlow } from "../routes/ImportF
 import { useExport } from "../routes/exporting.ts";
 import { openDraft, retireMutation, routeMoves } from "../routes/model.ts";
 import { OpenProposalsItem } from "../proposals/DestinationProposals.tsx";
+import { useLayer } from "../proposals/layer.ts";
 import { ROUTE_SCREENS, routePath, routeSwitched } from "../routes/address.ts";
 import { RouteFacts, useRouteRead } from "../routes/RouteCard.tsx";
-import { VersionSelect } from "../routes/VersionSelect.tsx";
+import { draftWords, VersionSelect } from "../routes/VersionSelect.tsx";
 import type { Screen } from "../journeys/address.ts";
 import { ROUTE_VIEW_TITLE, ViewPicker } from "../screens/ViewPicker.tsx";
 import { Menu } from "../screens/Menu.tsx";
@@ -74,6 +75,10 @@ export function RouteHeader({ route, of, screen, node, write, blocked, onPublish
   const moves = routeMoves(route);
   const segment = route.header.kind === "segment";
   const navigate = useNavigate();
+  // C14: under the proposal layer the page offers no live write, and the version is the one the proposal leaves.
+  // The layer, in any mode: once it is applied or discarded the page stays until Close, and its header offers no write.
+  const proposal = useLayer()?.id;
+  const reviewing = proposal !== undefined;
   // Opening or discarding a draft changes which graph the bare address names: go to it.
   const send = (mutation: Schema<"Mutation">, bare = false) =>
     void write.run({ target: { route: id }, baseRevision: route.revision, mutations: [mutation] }, bare ? () => { void navigate(routePath(id)); } : undefined);
@@ -82,12 +87,12 @@ export function RouteHeader({ route, of, screen, node, write, blocked, onPublish
       <div className="row">
         {segment ? <span className="label" data-testid="route-kind">Segment</span> : null}
         <h1 data-testid="route-name" title={route.header.name}>{route.header.name}</h1>
-        {of === undefined ? null : <VersionSelect route={route} of={of} />}
+        {of === undefined ? null : reviewing ? <Badge data-testid="version-select" title="The proposal is shown over this graph">{of === "draft" ? draftWords(route) : `Version ${String(of)}`}</Badge> : <VersionSelect route={route} of={of} />}
         {route.header.retired === true ? <RetiredBadge kind={route.header.kind} /> : null}
         <span className="spacer" />
         <AssistantDock target={{ route: id }} titleOf={titleOf} />
-        {screen === undefined ? null : <ViewPicker screen={screen} screens={ROUTE_SCREENS} to={(to) => routeSwitched(id, search, to, node)} title={ROUTE_VIEW_TITLE} />}
-        {drafting ? (
+        {screen === undefined ? null : <ViewPicker screen={screen} screens={ROUTE_SCREENS} to={(to) => routeSwitched(id, search, to, node, proposal)} title={ROUTE_VIEW_TITLE} />}
+        {reviewing ? null : drafting ? (
           <Button primary disabled={write.disabled || blocked !== undefined} title={blocked} data-testid="publish-draft" onClick={onPublish}>
             Publish
           </Button>
@@ -104,17 +109,17 @@ export function RouteHeader({ route, of, screen, node, write, blocked, onPublish
                   {drafting ? "Export the draft" : "Export this version"}
                 </button>
               )}
-              <ImportItem flow={imports} edit={`import:draft:${id}`} close={close} />
+              {reviewing ? null : <ImportItem flow={imports} edit={`import:draft:${id}`} close={close} />}
               <OpenProposalsItem destination={{ route: id }} close={close} />
-              <hr />
-              {drafting ? (
+              {reviewing ? null : <hr />}
+              {reviewing ? null : drafting ? (
                 <button type="button" role="menuitem" className="menu-item" disabled={write.disabled} data-testid="discard-draft" onClick={() => { close(); send({ op: "discard_draft" }, true); }}>
                   Discard the draft
                 </button>
               ) : null}
-              <button type="button" role="menuitem" className="menu-item" disabled={write.disabled} data-testid="menu-retire" onClick={() => { close(); send(retireMutation(moves.retire)); }}>
+              {reviewing ? null : <button type="button" role="menuitem" className="menu-item" disabled={write.disabled} data-testid="menu-retire" onClick={() => { close(); send(retireMutation(moves.retire)); }}>
                 {moves.retire ? `Retire the ${segment ? "segment" : "route"}` : "Bring it back"}
-              </button>
+              </button>}
             </>
           )}
         </Menu>

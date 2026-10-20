@@ -12,9 +12,9 @@ const STATUS_MEANING: Record<Exclude<JourneyStatus, "active">, string> = {
 };
 
 /** B11: the status beside a journey's name, read-only, and only when it is not active. */
-export function JourneyStatusBadge({ status }: { status: JourneyStatus }) {
-  return status === "active" ? null : (
-    <Badge data-status={status} data-testid="journey-status" title={STATUS_MEANING[status]}>
+export function JourneyStatusBadge({ status, changed = false }: { status: JourneyStatus; changed?: boolean }) {
+  return status === "active" && !changed ? null : (
+    <Badge data-status={status} {...(changed ? { "data-diff": "changed" } : {})} data-testid="journey-status" title={status === "active" ? STATUS_WORDS.active : STATUS_MEANING[status]}>
       {STATUS_WORDS[status]}
     </Badge>
   );

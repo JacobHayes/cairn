@@ -27,7 +27,7 @@ import {
   type ReviewItem,
   type UnresolvedReason,
 } from "./model.ts";
-import { RESOLUTION_WORDS, conflictWords, itemHeading, type Names } from "./words.ts";
+import { RESOLUTION_WORDS, conflictWords, itemHeading, resolutionEffect, type Names } from "./words.ts";
 
 /** What the item controls read and change. */
 export interface ItemsContext {
@@ -40,7 +40,6 @@ export interface ItemsContext {
   unresolved: ReadonlyMap<number, UnresolvedReason>;
   /** The proposal is open and the tab may write. */
   editable: boolean;
-  selected: string | undefined;
 }
 
 const UNRESOLVED_WORDS: Record<UnresolvedReason, string> = {
@@ -93,13 +92,12 @@ function ConflictControls({ index, conflict, resolution, context }: { index: num
   const otherRoles = context.roles.filter((each) => conflict.about !== "role" || each.key !== conflict.role);
   const otherKinds = context.kinds.filter((each) => conflict.about !== "kind" || each.key !== conflict.kind);
   return (
-    <div className="stack" role="radiogroup" aria-label="Resolution">
+    <div className="opts" role="radiogroup" aria-label="Resolution">
       {offered(conflict).map((option) => (
-        <span key={option} className="row">
-          <label className="row">
-            <input type="radio" name={`resolution-${String(index)}`} disabled={!context.editable} checked={chosen === option} onChange={() => { choose(option); }} data-testid="resolution" data-resolution={option} />
-            {RESOLUTION_WORDS[option]}
-          </label>
+        <label key={option} className="opt">
+          <input type="radio" name={`resolution-${String(index)}`} disabled={!context.editable} checked={chosen === option} onChange={() => { choose(option); }} data-testid="resolution" data-resolution={option} />
+          {RESOLUTION_WORDS[option]}
+          {resolutionEffect(conflict, option, context.names) === undefined ? null : <span className="eff">{resolutionEffect(conflict, option, context.names)}</span>}
           {option === "remap_role" ? (
             <Picker aria-label="Move its uses to" disabled={!context.editable} value={role} none="Choose a role" options={otherRoles.map((each) => ({ value: each.key, label: each.title ?? each.id }))} onChange={(event) => { setRole(event.target.value); choose("remap_role", { role: event.target.value, kind, map }); }} />
           ) : null}
@@ -109,7 +107,7 @@ function ConflictControls({ index, conflict, resolution, context }: { index: num
           {option === "map_choices" && conflict.about === "answer" ? (
             <ChoiceMap conflict={conflict} value={map} disabled={!context.editable} onChange={(next) => { setMap(next); choose("map_choices", { role, kind, map: next }); }} />
           ) : null}
-        </span>
+        </label>
       ))}
     </div>
   );
@@ -258,7 +256,7 @@ export function ItemList({ context, itemNode, only }: { context: ItemsContext; i
         }
         const about = item.item === "conflict" ? item.conflict.about : undefined;
         return (
-          <li key={index} className={node !== undefined && node === context.selected ? "panel stack proposal-item proposal-picked" : "panel stack proposal-item"} data-testid="review-item" data-item={item.item} data-about={about} data-node={node}>
+          <li key={index} className="panel stack proposal-item" data-testid="review-item" data-item={item.item} data-about={about} data-node={node}>
             <span className="row">
               <strong>{itemHeading(item, context.names)}</strong>
               {reason === undefined ? null : (

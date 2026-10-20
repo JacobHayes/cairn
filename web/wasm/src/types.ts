@@ -102,10 +102,13 @@ export type Derived = Schema<"Derived">;
 
 /** What a derivation was derived from, as a query cache keys it (ARCHITECTURE, Web UI). */
 export interface DerivationKey {
-  journey: Schema<"JourneyId">;
+  /** The held derivation's name: the journey's id, or a proposal's slot (`<journey>/proposals/<proposal>`) for the journey as it would be after. */
+  journey: string;
   revision: Schema<"Revision">;
   deployment_revision: Schema<"Revision">;
   today: string;
+  /** A slot's derivation is numbered by its load, so two previews of one slot never share a key. */
+  generation?: number;
 }
 
 /**
@@ -212,6 +215,17 @@ export interface PreviewRequest {
   segments?: Schema<"Route">[];
   at: string;
   actor: Schema<"Actor">;
+}
+
+/** `crates/wasm` `PreviewAnswer`: the preview, and the destination as it would be (C14). */
+export interface PreviewAnswer {
+  preview: Schema<"ProposalPreview">;
+  after?: Schema<"DestinationAfter">;
+}
+
+/** A preview made in the worker: the answer, and, for a journey that would exist, the derivation the worker holds for it under the slot. */
+export interface LocalPreview extends PreviewAnswer {
+  loaded?: Loaded;
 }
 
 /** `crates/wasm` `ExportRequest`: a route version (or its draft) to export. */

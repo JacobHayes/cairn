@@ -4,7 +4,7 @@ import { describe, expect, it } from "vitest";
 
 import { conditionWords } from "../authoring/condition.ts";
 import type { Graph, Mutation } from "../authoring/graph.ts";
-import { mutationWords, namesOf } from "./words.ts";
+import { conflictWords, mutationWords, namesOf, outlineWords, resolutionEffect, stateValueWords } from "./words.ts";
 
 const graph: Graph = {
   nodes: [
@@ -55,5 +55,58 @@ describe("conditionWords", () => {
     expect(words).toContain("is not no");
     expect(words).not.toContain("partner_team");
     expect(words).not.toContain("false");
+  });
+});
+
+describe("outlineWords (C14)", () => {
+  it("names each count the outline holds and none it does not", () => {
+    const words = outlineWords({ nodes_added: 3, requirements_removed: 1 });
+    expect(words).toContain("3");
+    expect(words).toContain("1");
+    expect(words).not.toContain("changes");
+  });
+
+  it("says a proposal with nothing in it changes nothing, whatever it is asked for twice", () => {
+    expect(outlineWords({})).toBe(outlineWords({ nodes_added: 0 }));
+    expect(outlineWords({})).not.toBe(outlineWords({ nodes_added: 1 }));
+  });
+
+  it("puts a lifecycle fact first, before the nodes", () => {
+    const words = outlineWords({ facts: [{ fact: "upgrades", to: 2 }], nodes_added: 1 });
+    expect(words.indexOf("2")).toBeLessThan(words.indexOf("1"));
+  });
+});
+
+describe("stateValueWords (C14)", () => {
+  const cases: [string, string, unknown, string[], string[]][] = [
+    ["an entity answer by the entity's name", "answers", { entity: "e_ann" }, ["Ann"], ["e_ann", "{"]],
+    ["a choice answer by its label", "answers", { single_choice: "partner_team" }, ["Partner"], ["partner_team", "{"]],
+    ["a snooze on a node by its title", "snoozes", { node: "n_test" }, ["Run the tests"], ["n_test", "{"]],
+    ["a snooze on a date in words", "snoozes", { date: "2026-11-25" }, ["Nov 25"], ["2026-11-25", "{"]],
+    ["a pin as a date in words", "pins", "2026-11-25", ["Nov 25"], ["2026-11-25"]],
+    ["a node's stored state as what it is", "nodes", { state: "in_progress", provenance: "route", started_on: "2026-11-25" }, ["in progress", "started"], ["{", "provenance", "2026-11-25"]],
+  ];
+  it.each(cases)("says %s", (_, field, value, shown, hidden) => {
+    const words = stateValueWords(field, value, "n_who", names);
+    for (const part of shown) {
+      expect(words).toContain(part);
+    }
+    for (const part of hidden) {
+      expect(words).not.toContain(part);
+    }
+  });
+});
+
+describe("a field conflict (B7)", () => {
+  const conflict = { about: "field", node: "n_test", journey: { title: "Run it ourselves" }, route: { title: "Run it with the partner" } } as Parameters<typeof conflictWords>[0];
+
+  it("says what each option leaves the field as, beside the option, and the sentence names only what differs", () => {
+    expect(resolutionEffect(conflict, "keep_journey", names)).toContain("Run it ourselves");
+    expect(resolutionEffect(conflict, "take_route", names)).toContain("Run it with the partner");
+    expect(conflictWords(conflict, names)).not.toContain("Run it ourselves");
+  });
+
+  it("says nothing of an effect for a conflict whose option says it all", () => {
+    expect(resolutionEffect({ about: "role", role: "r_x", journey: null, route: null } as unknown as Parameters<typeof conflictWords>[0], "remove", names)).toBeUndefined();
   });
 });

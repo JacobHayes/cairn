@@ -7,6 +7,7 @@
 //   /routes/<id>?version=<n>          published version n
 //   /routes/<id>/nodes/<key>          a node of the draft, open in its form
 //   /routes/<id>?view=list|timeline   the view (the Graph when none; written only off the default)
+//   /routes/<id>/proposals/<pid>[/nodes/<key>]   the route with a proposal's layer on (C14); it reads no `version`
 //
 // `version` absent names "the route as it currently stands" and follows it as drafts open and
 // versions publish; a version a link names is always written, the latest included, because a
@@ -32,11 +33,12 @@ export function newRoutePath(kind?: "segment"): string {
 /** The views of a route, in the order its View picker lists them and `v` cycles them. */
 export const ROUTE_SCREENS: readonly Screen[] = ["graph", "list", "timeline"];
 
-/** Where on a route's page an address points: a published version (none is the route as it stands), a draft node, and the view. */
+/** Where on a route's page an address points: a published version (none is the route as it stands), a draft node, the view, and a proposal whose layer is on (which reviews the route as it stands, so names no version). */
 export interface RouteSpot {
   version?: number | undefined;
   node?: string | undefined;
   screen?: Screen | undefined;
+  proposal?: string | undefined;
 }
 
 /** The version `version=` names: a whole number from 1, else none. */
@@ -78,6 +80,13 @@ export function routePath(route: string, spot: RouteSpot = {}, search = ""): str
     params.append(name, value);
   }
   const query = params.toString();
+  if (spot.proposal !== undefined) {
+    params.delete("version");
+    const proposal = spot.proposal;
+    const path = spot.node === undefined ? pathTo("routeProposal", { route, proposal }) : pathTo("routeProposalNode", { route, proposal, key: spot.node });
+    const text = params.toString();
+    return `${path}${text === "" ? "" : `?${text}`}`;
+  }
   const path = spot.node === undefined || spot.version !== undefined ? pathTo("route", { route }) : pathTo("routeNode", { route, key: spot.node });
   return `${path}${query === "" ? "" : `?${query}`}`;
 }
@@ -86,8 +95,20 @@ export function routePath(route: string, spot: RouteSpot = {}, search = ""): str
  * View `to` from the route page at `search`: the whole query, so every view's own settings stay
  * for the way back, and the version and the node stay.
  */
-export function routeSwitched(route: string, search: string, to: Screen, node: string | undefined): string {
+export function routeSwitched(route: string, search: string, to: Screen, node: string | undefined, proposal?: string): string {
   const params = new URLSearchParams(search);
   const { version } = spotOf(params);
-  return routePath(route, { version, node, screen: to }, params.toString());
+  return routePath(route, { version, node, screen: to, proposal }, params.toString());
+}
+
+/** C14: the layer of `proposal` over the route's page at `search`, the view on screen kept. */
+export function routeLayerEntry(route: string, search: string, proposal: string): string {
+  const params = new URLSearchParams(search);
+  return routePath(route, { screen: routeScreenOf(params), proposal }, search);
+}
+
+/** C14: the route's page without the layer at `search`: the view stays; the version is the route as it stands. */
+export function routeLayerExit(route: string, search: string): string {
+  const params = new URLSearchParams(search);
+  return routePath(route, { screen: routeScreenOf(params) }, search);
 }

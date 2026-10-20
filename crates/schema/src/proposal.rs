@@ -10,17 +10,17 @@ use serde::{Deserialize, Serialize};
 
 use crate::attachment::Resource;
 use crate::collections::{BoundedVec, ByDocumentSize, MutationCountPerPatch};
-use crate::derived::Consequences;
-use crate::domain::Domain;
+use crate::derived::{Consequences, DomainDocument};
+use crate::domain::{Deployment, Domain, JourneyStatus, Route, RouteVersion};
 use crate::field::NodeFieldValue;
-use crate::graph::{Edge, Graph, ParticipationKind, Role};
+use crate::graph::{Edge, ParticipationKind, Role};
 use crate::id::{
     AgentId, AttachmentKey, EntityKey, InsertionKey, KindKey, NodeKey, ProposalId, RoleKey, Slug,
     UserId,
 };
 use crate::node::{Choices, EntitySet, Node, ParticipationSource};
 use crate::notice::Notice;
-use crate::number::Revision;
+use crate::number::{Revision, VersionNumber};
 use crate::patch::{Mutation, ParticipationRef, Removal};
 use crate::refs::KeyRefs;
 use crate::rejection::Violation;
@@ -520,10 +520,6 @@ pub struct ProposalPreview {
     /// Every violation of the candidate; empty when the resolved proposal would apply.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub violations: Vec<Violation>,
-    /// The destination's graph after: a journey's, or a route's draft. None when the
-    /// candidate is invalid, or for the deployment.
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub graph: Option<Graph>,
     /// For a journey, its frontier after, in rank order.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub frontier: Vec<NodeKey>,
@@ -534,6 +530,253 @@ pub struct ProposalPreview {
     /// the proposal invalid.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub notices: Vec<Notice>,
+    /// What the proposal as previewed (the reviewer's edits included) does, in facts.
+    pub outline: ProposalOutline,
+}
+
+/// One thing a proposal does to its destination's own header or lifecycle (C14), as a fact
+/// the listing and the review word the same way.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+#[serde(tag = "fact", rename_all = "snake_case")]
+pub enum OutlineFact {
+    /// Creates the journey.
+    CreatesJourney,
+    /// Renames or redescribes the journey.
+    EditsJourney,
+    /// Sets the journey's status.
+    SetsJourneyStatus {
+        /// The status.
+        status: JourneyStatus,
+    },
+    /// Deletes the journey.
+    DeletesJourney,
+    /// Creates the route.
+    CreatesRoute,
+    /// Renames or redescribes the route.
+    EditsRoute,
+    /// Retires the route.
+    RetiresRoute,
+    /// Brings the route back.
+    RestoresRoute,
+    /// Opens the route's draft.
+    OpensDraft,
+    /// Discards the route's draft.
+    DiscardsDraft,
+    /// Publishes the route's draft.
+    PublishesDraft,
+    /// Moves the journey to a newer version of its route.
+    Upgrades {
+        /// The version.
+        to: VersionNumber,
+    },
+    /// Links the journey to the version its saved route published.
+    Relinks,
+    /// Inserts a published segment.
+    InsertsSegment,
+}
+
+/// What a proposal does, as counts of the things it names (C14): the facts about its
+/// destination's header first, then the nodes it adds, changes and removes (each node once,
+/// by the mutations that name it), the requirements, the entities, and everything else in one
+/// count. Derived from the mutations alone on every read, never stored.
+#[derive(Clone, Debug, Default, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+#[serde(deny_unknown_fields)]
+pub struct ProposalOutline {
+    /// The header and lifecycle facts, in the order the mutations make them, each once.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub facts: Vec<OutlineFact>,
+    /// Nodes it adds.
+    #[serde(default, skip_serializing_if = "crate::serde_util::is_zero")]
+    pub nodes_added: u32,
+    /// Nodes it changes: definition or state; a node it adds and then changes counts as added.
+    #[serde(default, skip_serializing_if = "crate::serde_util::is_zero")]
+    pub nodes_changed: u32,
+    /// Nodes it removes, a removal's descendants included.
+    #[serde(default, skip_serializing_if = "crate::serde_util::is_zero")]
+    pub nodes_removed: u32,
+    /// Requirements it adds.
+    #[serde(default, skip_serializing_if = "crate::serde_util::is_zero")]
+    pub requirements_added: u32,
+    /// Requirements it removes.
+    #[serde(default, skip_serializing_if = "crate::serde_util::is_zero")]
+    pub requirements_removed: u32,
+    /// Entities it creates.
+    #[serde(default, skip_serializing_if = "crate::serde_util::is_zero")]
+    pub entities_created: u32,
+    /// Entities it edits.
+    #[serde(default, skip_serializing_if = "crate::serde_util::is_zero")]
+    pub entities_edited: u32,
+    /// Entities it merges into another.
+    #[serde(default, skip_serializing_if = "crate::serde_util::is_zero")]
+    pub entities_merged: u32,
+    /// Roles, participation kinds, role fills, the default owner and annotations it changes.
+    #[serde(default, skip_serializing_if = "crate::serde_util::is_zero")]
+    pub other: u32,
+}
+
+impl ProposalOutline {
+    /// C14: the facts `mutations` make, in order, and the nodes, requirements, entities and
+    /// other things they name. A node is counted once, by the first thing that happened to it:
+    /// a node added and then changed is added, one added and then removed is not counted at
+    /// all; state mutations (pins, answers, transitions, snoozes, overrides) count as changes
+    /// to their node. An upgrade or a segment insertion is a fact of its own: the nodes it adds
+    /// or changes are the preview's, not the mutations'.
+    #[must_use]
+    pub fn of(mutations: &[Mutation]) -> Self {
+        let mut outline = Self::default();
+        let mut added: BTreeSet<&NodeKey> = BTreeSet::new();
+        let mut changed: BTreeSet<&NodeKey> = BTreeSet::new();
+        let mut removed: BTreeSet<&NodeKey> = BTreeSet::new();
+        for mutation in mutations {
+            if tally_other(&mut outline, mutation) {
+                continue;
+            }
+            match mutation {
+                Mutation::AddNode { node } => {
+                    removed.remove(&node.key);
+                    added.insert(&node.key);
+                }
+                Mutation::RemoveNode { removal } => {
+                    for key in removal.nodes() {
+                        // Added by this proposal and removed again: nothing is left to name.
+                        if !added.remove(key) {
+                            changed.remove(key);
+                            removed.insert(key);
+                        }
+                    }
+                }
+                Mutation::SetNodeField { node, .. }
+                | Mutation::ReplaceNode {
+                    node: Node { key: node, .. },
+                }
+                | Mutation::SetParticipation { node, .. }
+                | Mutation::ClearParticipation { node, .. }
+                | Mutation::AddResource { node, .. }
+                | Mutation::EditResource { node, .. }
+                | Mutation::RemoveResource { node, .. }
+                | Mutation::Transition { node, .. }
+                | Mutation::SetRecordedDate { node, .. }
+                | Mutation::SetPin { node, .. }
+                | Mutation::ShiftPin { node, .. }
+                | Mutation::ClearPin { node }
+                | Mutation::Snooze { node, .. }
+                | Mutation::Unsnooze { node }
+                | Mutation::ApplyOverride { node, .. }
+                | Mutation::RemoveOverride { node, .. }
+                | Mutation::SetAtomic { node, .. }
+                | Mutation::SetProvenance { node, .. }
+                | Mutation::MarkLocalEdit { node, .. }
+                | Mutation::Answer { decision: node, .. }
+                    if !added.contains(node) && !removed.contains(node) =>
+                {
+                    changed.insert(node);
+                }
+                // Everything else was tallied by `tally_other`.
+                _ => {}
+            }
+        }
+        outline.nodes_added = count(added.len());
+        outline.nodes_changed = count(changed.len());
+        outline.nodes_removed = count(removed.len());
+        outline
+    }
+}
+
+/// The lifecycle fact `mutation` makes, if it makes one.
+fn lifecycle_fact(mutation: &Mutation) -> Option<OutlineFact> {
+    Some(match mutation {
+        Mutation::CreateJourney { .. } => OutlineFact::CreatesJourney,
+        Mutation::EditJourney { .. } => OutlineFact::EditsJourney,
+        Mutation::SetJourneyStatus { status } => OutlineFact::SetsJourneyStatus { status: *status },
+        Mutation::DeleteJourney {} => OutlineFact::DeletesJourney,
+        Mutation::CreateRoute { .. } => OutlineFact::CreatesRoute,
+        Mutation::EditRoute { .. } => OutlineFact::EditsRoute,
+        Mutation::SetRouteRetired { retired: true } => OutlineFact::RetiresRoute,
+        Mutation::SetRouteRetired { retired: false } => OutlineFact::RestoresRoute,
+        Mutation::OpenDraft { .. } => OutlineFact::OpensDraft,
+        Mutation::DiscardDraft {} => OutlineFact::DiscardsDraft,
+        Mutation::PublishDraft {} => OutlineFact::PublishesDraft,
+        Mutation::Upgrade { to } => OutlineFact::Upgrades { to: *to },
+        Mutation::Relink { .. } => OutlineFact::Relinks,
+        Mutation::InsertSegment { .. } => OutlineFact::InsertsSegment,
+        _ => return None,
+    })
+}
+
+/// Tallies the mutations that name no node of their own (a lifecycle fact, a requirement, an
+/// entity, a role or the like), and says whether `mutation` was one of them. The node mutations
+/// are left to the caller, which tallies them against each other.
+fn tally_other(outline: &mut ProposalOutline, mutation: &Mutation) -> bool {
+    if let Some(next) = lifecycle_fact(mutation) {
+        fact(outline, next);
+        return true;
+    }
+    match mutation {
+        Mutation::AddEdge { .. } => outline.requirements_added += 1,
+        Mutation::RemoveEdge { .. } => outline.requirements_removed += 1,
+        Mutation::CreateEntity { .. } => outline.entities_created += 1,
+        Mutation::EditEntity { .. } => outline.entities_edited += 1,
+        Mutation::MergeEntities { .. } => outline.entities_merged += 1,
+        Mutation::AddRole { .. }
+        | Mutation::EditRole { .. }
+        | Mutation::RemoveRole { .. }
+        | Mutation::AddParticipationKind { .. }
+        | Mutation::EditParticipationKind { .. }
+        | Mutation::RemoveParticipationKind { .. }
+        | Mutation::SetDefaultOwner { .. }
+        | Mutation::FillRole { .. }
+        | Mutation::ClearRoleFill { .. }
+        | Mutation::AddAnnotation { .. }
+        | Mutation::EditAnnotation { .. }
+        | Mutation::RemoveAnnotation { .. } => outline.other += 1,
+        // A proposal's own content never edits a proposal.
+        Mutation::CreateProposal { .. }
+        | Mutation::EditProposal { .. }
+        | Mutation::ApplyProposal { .. }
+        | Mutation::DiscardProposal {} => {}
+        _ => return false,
+    }
+    true
+}
+
+fn count(len: usize) -> u32 {
+    u32::try_from(len).unwrap_or(u32::MAX)
+}
+
+/// Records `next` once, in the order the mutations make their facts.
+fn fact(outline: &mut ProposalOutline, next: OutlineFact) {
+    if !outline.facts.contains(&next) {
+        outline.facts.push(next);
+    }
+}
+
+/// What a destination is once a proposal applies (C14), as the engine works it out from the
+/// candidate records: what the views draw in place of the destination.
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize, JsonSchema)]
+#[serde(tag = "destination", rename_all = "snake_case")]
+#[allow(clippy::large_enum_variant)]
+pub enum DestinationAfter {
+    /// A journey as it would be, with the derive inputs its views are derived with.
+    Journey {
+        /// The document after.
+        document: DomainDocument,
+    },
+    /// A route as it would be: its header, its versions, its draft; and the latest version
+    /// when the candidate holds its graph (one the proposal publishes).
+    Route {
+        /// The route after.
+        route: Route,
+        /// The latest version after, when the candidate holds it.
+        #[serde(skip_serializing_if = "Option::is_none")]
+        latest: Option<RouteVersion>,
+    },
+    /// The deployment as it would be.
+    Deployment {
+        /// The deployment after.
+        deployment: Deployment,
+    },
+    /// The destination would no longer exist: a valid candidate with nothing to draw.
+    Gone,
 }
 
 /// A proposal's content: what creating or editing it carries.

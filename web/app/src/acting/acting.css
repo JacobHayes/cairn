@@ -412,7 +412,7 @@ table.data.list-table .badge {
 
 /* Done rows (done, decided, reached) follow the done card: the neutral row fill, muted text, the hollow green chip, and the content at 0.5. The fade is on the content, not the cell or row, so the held cells stay opaque and the hover, selection and focus marks keep full strength; the checkbox column is left out so the checkbox stays at full strength. The lowest opacity wins: no row has a second fade, so none multiplies. */
 .node-row[data-state="done"] > *,
-.list-table tr[data-state="done"] td:not(.list-check) > .list-content {
+.list-table tr[data-state="done"]:not([data-diff]) td:not(.list-check) > .list-content {
   opacity: 0.5;
 }
 
@@ -426,13 +426,13 @@ table.data.list-table .badge {
 /* Out of focus (the row not lit by Frontier, or dimmed by Depth's Fade) is 0.3 on the content, as an
    unlit card is, whatever the row's state: later at equal weight, so the lowest wins, and a row out
    of both is 0.3 too. */
-.list-table tr[data-faded="true"] td:not(.list-check) > .list-content {
+.list-table tr[data-faded="true"]:not([data-diff]) td:not(.list-check) > .list-content {
   opacity: 0.3;
 }
 
 /* Keyboard focus lifts the fade so the focus ring and the focused row read at full strength. */
 .node-row[data-state="done"] > :has(:focus-visible),
-.list-table tr:is([data-state="done"], [data-faded="true"]) td:not(.list-check) > .list-content:has(:focus-visible) {
+.list-table tr:is([data-state="done"], [data-faded="true"]):not([data-diff]) td:not(.list-check) > .list-content:has(:focus-visible) {
   opacity: 1;
 }
 
@@ -519,6 +519,18 @@ table.data.list-table .badge {
 .list-table {
   --rank-width: 0px;
   --status-width: 112px;
+  --change-width: 0px;
+}
+
+/* C14: under the proposal layer the Change column leads and is held with the others. */
+.list-table[data-layered="true"] {
+  --change-width: 92px;
+}
+
+.list-table [data-column="change"].list-pinned {
+  left: var(--space-6);
+  width: var(--change-width);
+  min-width: var(--change-width);
 }
 
 /* A phone gives the status chip a narrower column: the chip is tightened and wraps a two-word state onto two lines, so the longest single word ("conditional", 95px) sets the width, and the title's pin follows it. */
@@ -551,7 +563,7 @@ table.data.list-table .badge {
 }
 
 .list-table [data-column="rank"].list-pinned {
-  left: var(--space-6);
+  left: calc(var(--space-6) + var(--change-width));
   width: var(--rank-width);
   min-width: var(--rank-width);
 }
@@ -569,11 +581,11 @@ table.data.list-table .badge {
 }
 
 .list-table [data-column="status"].list-pinned {
-  left: calc(var(--space-6) + var(--rank-width));
+  left: calc(var(--space-6) + var(--change-width) + var(--rank-width));
 }
 
 .list-table [data-column="title"].list-pinned {
-  left: calc(var(--space-6) + var(--rank-width) + var(--status-width));
+  left: calc(var(--space-6) + var(--change-width) + var(--rank-width) + var(--status-width));
 }
 
 /* The owner and the primary action of a frontier row sit in its owner column. */
@@ -971,3 +983,35 @@ button.list-sort {
 .stall-snoozed {
   opacity: var(--opacity-snoozed);
 }
+
+/* C14: a row the proposal touches is filled with the change's token over the row's own paper; the word in the Change column says which. */
+.list-table tr[data-diff="added"] { --diff-fill: var(--color-add); }
+.list-table tr[data-diff="changed"] { --diff-fill: var(--color-change); }
+.list-table tr[data-diff="removed"] { --diff-fill: var(--color-del); }
+
+.list-table tr[data-diff] td.list-pinned {
+  background: linear-gradient(var(--diff-fill), var(--diff-fill)), var(--row-paper, var(--color-surface));
+}
+
+.list-table tr[data-diff] td:not(.list-pinned) {
+  background-image: linear-gradient(var(--diff-fill), var(--diff-fill));
+}
+
+.list-table tr[data-diff][data-container="true"] td.list-pinned {
+  background: linear-gradient(var(--diff-fill), var(--diff-fill)), var(--row-paper, var(--color-band));
+}
+
+.list-table tr[data-diff="removed"] td:not([data-column="change"]) .list-content {
+  text-decoration: line-through;
+  text-decoration-thickness: 1px;
+}
+
+.list-table tr[data-diff="removed"] {
+  opacity: 0.8;
+}
+
+.list-table [data-column="change"] .layer-word {
+  font-size: var(--text-small, 13px);
+  font-weight: 600;
+}
+

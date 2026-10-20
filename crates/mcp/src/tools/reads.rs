@@ -409,16 +409,17 @@ impl From<ProposalReview> for Review {
         let ProposalReview {
             proposal: _,
             preview,
+            after: _,
             consequences,
             stale,
         } = review;
         let ProposalPreview {
             unresolved,
             violations,
-            graph: _,
             frontier,
             consequences: _,
             notices,
+            outline: _,
         } = preview;
         Self {
             unresolved,

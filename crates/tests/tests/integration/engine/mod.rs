@@ -41,6 +41,7 @@ mod property_derive;
 mod property_priority;
 mod property_projections;
 mod property_upgrade;
+mod proposal_layer;
 mod proposals;
 mod rank;
 mod rationale;

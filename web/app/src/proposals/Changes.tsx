@@ -38,7 +38,8 @@ export interface ChangesContext {
   /** The journey the proposal is for, derived, when it is one: answers read it. */
   ready: Ready | undefined;
   editable: boolean;
-  selected: string | undefined;
+  /** The destination has a graph to add nodes and edges to (the deployment's entities have none). */
+  hasGraph: boolean;
   /** Where a new node goes unless another is picked (a breakdown's placeholder). */
   defaultParent: string | undefined;
   /** Tells the review an editor holds a value with a problem (or no longer does), so nothing is saved or applied meanwhile. */
@@ -229,9 +230,8 @@ function editable(mutation: Mutation, context: ChangesContext): boolean {
 function MutationRow({ index, editor, mutation, context }: { index: number; editor: string; mutation: Mutation; context: ChangesContext }) {
   const [open, setOpen] = useState(false);
   const node = subjectOf(mutation);
-  const picked = node !== undefined && node === context.selected;
   return (
-    <li className={picked ? "stack proposal-change proposal-picked" : "stack proposal-change"} data-testid="change" data-op={mutation.op} data-node={node}>
+    <li className="stack proposal-change" data-testid="change" data-op={mutation.op} data-node={node}>
       <span className="row">
         <span data-testid="change-words">{mutationWords(mutation, context.names)}</span>
         {context.editable && editable(mutation, context) ? (
@@ -340,7 +340,7 @@ export function ChangeList({ context, only }: { context: ChangesContext; only?: 
           only !== undefined && !only(subjectOf(mutation)) ? null : <MutationRow key={ids[index]} editor={ids[index] ?? String(index)} index={index} mutation={mutation} context={context} />,
         )}
       </ol>
-      {context.editable && only === undefined ? (
+      {context.editable && context.hasGraph && only === undefined ? (
         <div className="stack" data-testid="proposal-additions">
           <AddNode context={context} />
           <RemoveNode context={context} />

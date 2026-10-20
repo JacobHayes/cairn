@@ -249,12 +249,12 @@ export class FakeDeriver implements Deriver {
   holdLoad: Promise<void> | undefined;
   #loads = 0;
 
-  async load(document: string): Promise<Loaded> {
+  async load(document: string, slot?: string): Promise<Loaded> {
     const parsed = JSON.parse(document) as {
       inputs: { deployment: { revision: number }; today: string };
       journey: { header: { id: string }; revision: number };
     };
-    const journey = parsed.journey.header.id;
+    const journey = slot ?? parsed.journey.header.id;
     this.#loads += 1;
     const handle = { journey, load: this.#loads };
     this.held.set(journey, handle.load);

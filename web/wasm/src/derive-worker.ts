@@ -10,9 +10,11 @@ import {
   type AppliedLocally,
   type ApplyRequest,
   type DerivationHandle,
+  type DerivationKey,
   type Derived,
   type DraftRequest,
   type Loaded,
+  type LocalPreview,
   type PreviewRequest,
   type ProjectionAnswer,
   type ProjectionRequest,
@@ -96,11 +98,11 @@ export class DeriveWorker {
   }
 
   /**
-   * Derives a domain document's text and holds it for its journey: what it was derived from,
-   * and the handle of this load, which `release` takes.
+   * Derives a domain document's text and holds it for its journey, or for `slot` when one is
+   * given: what it was derived from, and the handle of this load, which `release` takes.
    */
-  async load(document: string): Promise<Loaded> {
-    return parsed<Loaded>(await this.#ask({ op: "load", document }));
+  async load(document: string, slot?: string): Promise<Loaded> {
+    return parsed<Loaded>(await this.#ask({ op: "load", document, ...(slot === undefined ? {} : { slot }) }));
   }
 
   /** The held journey's derive, as the module wrote it. */
@@ -128,14 +130,13 @@ export class DeriveWorker {
     return parsed<RenderedDraft>(await this.#ask({ op: "render_draft", journey, request }));
   }
 
-  /** A proposal previewed against the held journey (C14), as the module wrote it. */
-  previewText(journey: string, request: PreviewRequest): Promise<string> {
-    return this.#ask({ op: "preview", journey, request });
-  }
-
-  /** A proposal previewed against the held journey (C14). */
-  async preview(journey: string, request: PreviewRequest): Promise<Schema<"ProposalPreview">> {
-    return parsed<Schema<"ProposalPreview">>(await this.previewText(journey, request));
+  /**
+   * A proposal previewed against the journey held under `source` (C14), refused as stale when
+   * that is no longer the derivation held. A journey the proposal leaves is derived and held
+   * under `slot`, and answered with its load.
+   */
+  async preview(source: DerivationKey, request: PreviewRequest, slot: string): Promise<LocalPreview> {
+    return parsed<LocalPreview>(await this.#ask({ op: "preview", journey: source.journey, key: source, request, slot }));
   }
 
   /** A draft patch applied to the held journey locally, as the module wrote it. */

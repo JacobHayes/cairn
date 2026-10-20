@@ -5,16 +5,16 @@
 // and local applies over it as the module's JSON text, which the page parses. A route's graph,
 // which has no state, is answered its canvas level, or a draft patch applied to it, in
 // passing, holding nothing.
-import type { ApplyRequest, DerivationHandle, DraftRequest, HostError, PreviewRequest, ProjectionRequest, RouteApplyRequest, RouteLevelRequest, RouteNoticesRequest, RouteScheduleRequest } from "./types.ts";
+import type { ApplyRequest, DerivationHandle, DerivationKey, DraftRequest, HostError, PreviewRequest, ProjectionRequest, RouteApplyRequest, RouteLevelRequest, RouteNoticesRequest, RouteScheduleRequest } from "./types.ts";
 
 /** What the page asks the worker. */
 export type WorkerRequest =
   | { op: "init"; wasm: WebAssembly.Module }
-  | { op: "load"; document: string }
+  | { op: "load"; document: string; slot?: string }
   | { op: "derived"; journey: string }
   | { op: "project"; journey: string; request: ProjectionRequest }
   | { op: "render_draft"; journey: string; request: DraftRequest }
-  | { op: "preview"; journey: string; request: PreviewRequest }
+  | { op: "preview"; journey: string; key: DerivationKey; request: PreviewRequest; slot: string }
   | { op: "apply"; journey: string; request: ApplyRequest }
   | { op: "release"; handle: DerivationHandle }
   | { op: "route_level"; request: RouteLevelRequest }

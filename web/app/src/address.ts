@@ -3,7 +3,9 @@
 // is built with `pathTo` or one of the helpers below, and the rail asks `sectionOf`. Nothing
 // else in the app writes or splits a path by hand. A proposal lives under its destination, so a proposal has
 // no address of its own: `/journeys/<journey>/proposals/<proposal>`, `/routes/<route>/proposals/<proposal>`,
-// or `/entities/proposals/<proposal>` for the deployment; each has the same `/nodes/<key>` below it.
+// or `/entities/proposals/<proposal>` for the deployment. Each is the destination's own page with the
+// proposal layer on (proposals/layer.ts); a journey's and a route's have `/nodes/<key>` below them, the
+// deployment has no nodes.
 import { createContext, useContext, useMemo } from "react";
 import { generatePath, matchPath, useParams } from "react-router";
 
@@ -33,7 +35,6 @@ export const ADDRESSES = [
   { name: "entities", path: "/entities", section: "entities" },
   { name: "deploymentProposals", path: "/entities/proposals", section: "entities" },
   { name: "deploymentProposal", path: "/entities/proposals/:proposal", section: "entities" },
-  { name: "deploymentProposalNode", path: "/entities/proposals/:proposal/nodes/:key", section: "entities" },
   { name: "me", path: "/me", section: "me" },
 ] as const;
 
@@ -95,10 +96,10 @@ export function proposalsAddress(destination: Domain): string {
   return "journey" in destination ? pathTo("journeyProposals", { journey: destination.journey }) : pathTo("routeProposals", { route: destination.route });
 }
 
-/** A proposal's review, under its destination, with a node of it open when `key` is given. */
+/** A proposal's layer over its destination's page, with a node of it picked when `key` is given (the deployment has no nodes). */
 export function proposalAddress(destination: Domain, proposal: string, key?: string): string {
   if (destination === "deployment") {
-    return key === undefined ? pathTo("deploymentProposal", { proposal }) : pathTo("deploymentProposalNode", { proposal, key });
+    return pathTo("deploymentProposal", { proposal });
   }
   if ("journey" in destination) {
     const { journey } = destination;

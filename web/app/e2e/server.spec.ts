@@ -225,8 +225,11 @@ test("C14: the deployment's open proposals are a panel on Entities, found at its
     },
   });
   expect(drafted.ok(), await drafted.text()).toBe(true);
-  await expect(page.getByTestId("deployment-proposals").getByTestId("proposal-row")).toContainText("Add a reviewer");
-  await page.getByTestId("deployment-proposals").getByRole("link", { name: "Add a reviewer" }).click();
+  await page.getByTestId("tab-proposals").click();
+  await expect(page.getByTestId("proposals-pane").getByTestId("proposal-row")).toContainText("Add a reviewer");
+  await page.getByTestId("proposals-pane").getByRole("link", { name: "Add a reviewer" }).click();
   await expect(page).toHaveURL(/\/entities\/proposals\/pr_[0-9a-f]+$/);
-  await expect(page.getByTestId("review-trail")).toContainText("Entities");
+  // The entities page, with the new entity marked as added in place.
+  await expect(page.getByTestId("layer-band")).toHaveAttribute("data-mode", "reviewing");
+  await expect(page.locator('[data-testid="entity"][data-diff="added"]')).toContainText("Reviewer");
 });

@@ -75,6 +75,19 @@ pub struct PreviewRequest {
     pub actor: Actor,
 }
 
+/// A proposal previewed locally: the preview, and the journey as it would be, derivable in
+/// the tab (none when the candidate breaks a rule).
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct PreviewAnswer {
+    /// The preview, as the server's `ProposalReview` carries it.
+    pub preview: cairn_schema::ProposalPreview,
+    /// The journey document after, produced by the engine's candidate and never assembled by
+    /// the page (C14).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub after: Option<cairn_schema::DestinationAfter>,
+}
+
 /// A draft patch to apply locally to a route (A11, A12: authoring a route's draft by hand),
 /// with what it reads and the clock and actor its events would carry.
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
@@ -253,7 +266,8 @@ pub fn apply_locally(
 }
 
 /// C14 locally: what applying `request`'s proposal to the document's journey would do now,
-/// as the server's preview derives it (no viewer, the document's today).
+/// as the server's preview derives it (no viewer, the document's today), with the journey as
+/// it would be, over the viewer's own derive inputs.
 ///
 /// # Errors
 ///
@@ -261,7 +275,7 @@ pub fn apply_locally(
 pub fn preview_locally(
     document: &DomainDocument,
     request: &PreviewRequest,
-) -> Result<cairn_schema::ProposalPreview, HostError> {
+) -> Result<PreviewAnswer, HostError> {
     let proposal = &request.proposal;
     own_journey(document, &proposal.destination)?;
     let mut records = records_of(document);
@@ -277,13 +291,15 @@ pub fn preview_locally(
     };
     let mut derive_inputs = document.inputs.clone();
     derive_inputs.viewer = BTreeSet::new();
-    Ok(cairn_engine::preview(
-        &records,
-        &proposal.destination,
-        &proposal.draft,
-        &inputs,
-        &derive_inputs,
-    ))
+    let candidate =
+        cairn_engine::candidate(&records, &proposal.destination, &proposal.draft, &inputs);
+    let preview =
+        cairn_engine::preview_of(&records, &proposal.destination, &candidate, &derive_inputs);
+    // The views derive the journey after as its viewer sees it, like the journey itself.
+    let after = candidate.after.as_ref().ok().map(|after| {
+        cairn_engine::destination_after(after, &proposal.destination, &document.inputs)
+    });
+    Ok(PreviewAnswer { preview, after })
 }
 
 /// Applies a draft patch to `document`'s journey without committing it: `request` is the JSON

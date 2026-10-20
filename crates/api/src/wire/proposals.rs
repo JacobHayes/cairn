@@ -8,9 +8,10 @@
 use std::collections::BTreeMap;
 
 use cairn_schema::{
-    AgentId, Consequences, Domain, JourneyId, JourneyStatus, Lineage, Markdown, PatchId,
-    PatchReceipt, Proposal, ProposalDraft, ProposalId, ProposalPreview, Revision, RevisionConflict,
-    RouteFile, RouteId, Timestamp, Title, TouchedSet, UserId, VersionNumber,
+    AgentId, Consequences, DestinationAfter, Domain, JourneyId, JourneyStatus, Lineage, Markdown,
+    PatchId, PatchReceipt, Proposal, ProposalDraft, ProposalId, ProposalOutline, ProposalPreview,
+    Revision, RevisionConflict, RouteFile, RouteId, Timestamp, Title, TouchedSet, UserId,
+    VersionNumber,
 };
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
@@ -123,14 +124,18 @@ impl ProposalAnswer {
 
 /// `POST /api/proposals/{id}/preview` (C14, D7, I6): what applying the proposal now would do, and,
 /// when its destination moved since it was drafted, what moved.
-#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize, JsonSchema)]
 #[serde(deny_unknown_fields)]
 pub struct ProposalReview {
     /// The proposal, at the editing revision a reviewer applies.
     pub proposal: Proposal,
     /// Its items still unresolved, the violations of its candidate, and for a journey the
-    /// graph and frontier after.
+    /// frontier after.
     pub preview: ProposalPreview,
+    /// What the destination would be once it applies: a route, the deployment, or a journey
+    /// the proposal creates; none when the candidate breaks a rule.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub after: Option<DestinationAfter>,
     /// D7, by journey: what applying it would newly cause; a journey with nothing new is left
     /// out.
     #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
@@ -156,12 +161,14 @@ impl From<cairn_service::ProposalReview> for ProposalReview {
         let cairn_service::ProposalReview {
             proposal,
             preview,
+            after,
             consequences,
             stale,
         } = review;
         Self {
             proposal,
             preview,
+            after,
             consequences,
             stale: stale.map(|stale| StaleBase {
                 conflict: stale.conflict,
@@ -278,6 +285,8 @@ pub struct ProposalSummary {
     pub proposing_agent: Option<AgentId>,
     /// When it was created.
     pub created_at: Timestamp,
+    /// What it does, in facts, worked out from its mutations.
+    pub outline: ProposalOutline,
     /// Its destination as it is now.
     pub now: DestinationNow,
 }
@@ -350,6 +359,7 @@ impl From<cairn_store::ProposalSummary> for ProposalSummary {
             created_by,
             proposing_agent,
             created_at,
+            outline,
             now,
         } = summary;
         Self {
@@ -361,6 +371,7 @@ impl From<cairn_store::ProposalSummary> for ProposalSummary {
             created_by,
             proposing_agent,
             created_at,
+            outline,
             now: now.into(),
         }
     }

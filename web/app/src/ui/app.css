@@ -665,9 +665,18 @@ body {
 }
 
 .callout {
+  position: relative;
   padding: var(--space-3);
   border: 1px solid var(--color-border);
   background: var(--color-surface);
+  box-shadow: var(--shadow-sm);
+}
+.callout::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background: var(--corner-ticks);
 }
 .callout-bad {
   border-color: var(--color-error);
@@ -1022,6 +1031,9 @@ table.data {
 .entity-head > button {
   grid-column: 2;
   grid-row: 1 / span 2;
+}
+.entity-row > [data-testid="entity-emails"] {
+  grid-column: 1;
 }
 .entity-row > :not(.entity-head, [data-testid="entity-emails"]) {
   grid-column: 1 / -1;

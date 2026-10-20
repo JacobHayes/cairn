@@ -11,7 +11,7 @@ import { LIST_COLUMNS, type ListColumn, type ListSettings, type SortBy } from ".
 import type { NodeRow } from "./why.ts";
 
 /** Everything a column can be: the ones every list has, then the ones Columns adds. */
-export type Column = "status" | "title" | "owner" | "due" | ListColumn;
+export type Column = "change" | "status" | "title" | "owner" | "due" | ListColumn;
 
 /** What Columns can add: the decision columns are already there at Decisions depth, and the rows are mixed, so Kind stays. */
 export function addableColumns(decisionColumns: boolean): readonly ListColumn[] {
@@ -24,10 +24,10 @@ export function ranked(list: ListSettings): boolean {
 }
 
 /** C9, C12: the columns shown, left to right; at Decisions depth (`decisionColumns`) the decision columns after Title. */
-export function columnsOf(list: ListSettings, decisionColumns: boolean): Column[] {
+export function columnsOf(list: ListSettings, decisionColumns: boolean, layered = false): Column[] {
   const chosen = addableColumns(decisionColumns).filter((column) => list.columns.includes(column) && !(column === "rank" && ranked(list)));
   const own: Column[] = decisionColumns ? ["status", "title", "answer", "why", "affects", "owner", "due"] : ["status", "title", "owner", "due"];
-  return [...(ranked(list) ? (["rank"] as const) : []), ...own, ...chosen];
+  return [...(layered ? (["change"] as const) : []), ...(ranked(list) ? (["rank"] as const) : []), ...own, ...chosen];
 }
 
 /** The column words. */
@@ -35,6 +35,8 @@ export function columnWords(column: Column): string {
   switch (column) {
     case "start_by":
       return "Start by";
+    case "change":
+      return "Change";
     default:
       return column.charAt(0).toUpperCase() + column.slice(1);
   }
@@ -71,6 +73,8 @@ export interface Line {
    * before it each ancestor's line. True while that level's parent has more children below.
    */
   guides: boolean[];
+  /** A row the proposal removes: its cells are read from the journey as it is, not the one after. */
+  from?: Ready | undefined;
 }
 
 /**

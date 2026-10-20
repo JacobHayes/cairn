@@ -216,7 +216,16 @@ function fieldsDiffering(before: GraphNode, after: GraphNode): string[] {
   return [...fields].filter((field) => field !== "key" && value(before, field) !== value(after, field)).sort();
 }
 
-/** C14: the diff from `before` to `after`, each list in key order. */
+/** The journey state kept per node, which a proposal's pins, answers, transitions and snoozes change without touching the node's definition. */
+const STATE_FIELDS = ["nodes", "answers", "rationales", "overrides", "pins", "snoozes"] as const;
+
+/** What a journey's graph holds of node `key` in its state, as one comparable text; none for a graph with no state. */
+export function stateOf(graph: Graph | null | undefined, key: string): Record<string, unknown> {
+  const state = graph?.state as Record<string, Record<string, unknown> | undefined> | undefined;
+  return Object.fromEntries(STATE_FIELDS.flatMap((field) => (state?.[field]?.[key] === undefined ? [] : [[field, state[field][key]]])));
+}
+
+/** C14: the diff from `before` to `after`, each list in key order. A node whose journey state differs (not its definition) lists the field `state`. */
 export function graphDiff(before: Graph | null | undefined, after: Graph | null | undefined): GraphDiff {
   const [was, now] = [byKey(before), byKey(after)];
   const added = [...now.keys()].filter((key) => !was.has(key)).sort();
@@ -225,6 +234,9 @@ export function graphDiff(before: Graph | null | undefined, after: Graph | null 
   for (const [key, node] of now) {
     const old = was.get(key);
     const fields = old === undefined ? [] : fieldsDiffering(old, node);
+    if (old !== undefined && JSON.stringify(stateOf(before, key)) !== JSON.stringify(stateOf(after, key))) {
+      fields.push("state");
+    }
     if (fields.length > 0) {
       changed[key] = fields;
     }
@@ -247,34 +259,12 @@ export function unchanged(diff: GraphDiff): boolean {
   return diff.added.length + diff.removed.length + Object.keys(diff.changed).length + diff.edgesAdded.length + diff.edgesRemoved.length === 0;
 }
 
-/**
- * C14: the graph a diff is drawn over: the graph after, with every node it removed put back
- * where it was, its removed edges with it, so a removal is seen in place rather than missing.
- * It carries no state: the canvas draws structure, and the frontier after is listed beside it.
- */
-export function unionGraph(before: Graph | null | undefined, after: Graph | null | undefined): Graph {
-  const now = byKey(after);
-  const was = byKey(before);
-  const kept = [...now.values()];
-  const removed = [...was.values()].filter((node) => !now.has(node.key));
-  const drawn = new Set([...kept, ...removed].map((node) => node.key));
-  // A removed node's parent is drawn: kept, or removed and put back with it.
-  const back = removed.map((node) => ({ ...node, requires: (node.requires ?? []).filter((key) => drawn.has(key)) }));
-  // Drawn without state, and without the keys retired by the removals it puts back.
-  const structure: Graph = { ...(after ?? before ?? {}), nodes: [...kept, ...back] };
-  delete structure.state;
-  delete structure.retired_keys;
-  return structure;
-}
-
 /** I6: why a proposal cannot be applied now, each a reason the screen names. */
-export type Blocker = "not_open" | "editing" | "unsaved" | "stale" | "unresolved" | "invalid" | "unreviewed" | "no_preview";
+export type Blocker = "not_open" | "editing" | "unsaved" | "stale" | "unresolved" | "invalid" | "no_preview";
 
 /** What the apply gate reads. */
 export interface GateInput {
   proposal: Pick<Proposal, "status" | "revision">;
-  /** The proposal revision the reviewer last confirmed reviewing, if any. */
-  reviewed: number | undefined;
   /** The reviewer has edits the proposal does not hold yet. */
   dirty: boolean;
   /** An editor holds a value with a problem, which the proposal cannot take until it is fixed. */
@@ -288,8 +278,8 @@ export interface GateInput {
 /**
  * C14, I6: what stops applying the proposal now, in the order to fix them: it must be open,
  * have no editor holding a value with a problem, hold every edit, stand on its destination as it is (a stale one is refreshed first), have a
- * choice for every item and no violation, and have been reviewed at the revision it is at,
- * so a refresh or anyone's edit asks for a renewed review. None means it may be applied.
+ * choice for every item and no violation. None means it may be applied (the revision the reviewer
+ * saw is the one sent, layer.ts `applyRevision`).
  */
 export function applyBlockers(input: GateInput): Blocker[] {
   const blockers: Blocker[] = [];
@@ -315,31 +305,7 @@ export function applyBlockers(input: GateInput): Blocker[] {
       blockers.push("invalid");
     }
   }
-  if (input.reviewed !== input.proposal.revision) {
-    blockers.push("unreviewed");
-  }
   return blockers;
-}
-
-/** What moves a reviewer's confirmation. */
-export type ReviewEvent =
-  | { event: "marked"; revision: number }
-  | { event: "refreshed"; proposal: Pick<Proposal, "revision"> }
-  | { event: "saved"; proposal: Pick<Proposal, "revision"> };
-
-/**
- * I6: the revision a reviewer has confirmed after `event`. Marking confirms the revision
- * reviewed. A refresh drafts the proposal again on a new base and a save changes it, each at a
- * new revision, so neither carries the confirmation over: the reviewer reviews again.
- */
-export function reviewedAfter(reviewed: number | undefined, event: ReviewEvent): number | undefined {
-  switch (event.event) {
-    case "marked":
-      return event.revision;
-    case "refreshed":
-    case "saved":
-      return reviewed;
-  }
 }
 
 /** I6: the patches that moved the destination from `expected` to `current`: the last ones of its history. */
@@ -348,94 +314,66 @@ export function intervening<P>(patches: readonly P[], expected: number, current:
   return count === 0 ? [] : patches.slice(-count);
 }
 
-/** C14: how the canvas and the list mark one node a proposal touches: the kind of change as one word, and what more there is to say of it. */
+/** The kinds of change a proposal makes to a node. */
+export type DiffKind = "added" | "changed" | "removed";
+
+/** C14: how the layer marks one node a proposal touches: the kind of change, whether it needs a choice, and what more there is to say of it. */
 export interface DiffMark {
-  tone: "good" | "warn" | "bad" | "plain" | "accent";
-  /** Add, Change or Remove: the same word on the card's tag and the list's chip. */
-  label: string;
-  /** What else holds of it (a conflict, an orphan), for the list's foot and the tag's hover. */
+  kind: DiffKind;
+  /** An unresolved choice is about it: it counts under Needs a choice. */
+  choice?: true;
+  /** What else holds of it (a conflict, an orphan), for the hover and the list's foot. */
   note?: string;
-  /** The node needs a choice: it counts under Conflicts. */
-  conflict?: true;
-  /** The node is going: its card is kept, struck and ghosted, where it was. */
-  ghost?: true;
 }
 
-/** The words of each kind of change, so the canvas, its legend, and the list say the same. */
-export const DIFF_LABELS = {
-  added: "Add",
-  removed: "Remove",
-  changed: "Change",
-} as const;
+/** The words of each kind of change, so the canvas, the list, the timeline and the rail say the same. */
+export const DIFF_LABELS: Record<DiffKind, string> = {
+  added: "Added",
+  changed: "Changed",
+  removed: "Removed",
+};
 
 /** What a mark adds to its kind of change. */
 export const DIFF_NOTES = {
-  conflict: "Conflict: needs a choice",
+  conflict: "Needs a choice",
   orphan: "Orphaned, kept",
   orphanRemoved: "Orphaned, removed",
   excluded: "Left out",
 } as const;
 
-/** The review's filter chips: everything, what needs a decision, and each kind of change. */
-export const REVIEW_FILTERS = ["all", "conflicts", "add", "change", "remove"] as const;
-export type ReviewFilter = (typeof REVIEW_FILTERS)[number];
-
-/** The chip a mark counts under: a conflict, or the kind of change it is (a kept orphan is a change; one removed or left out is a removal). */
-export function filterOf(mark: DiffMark): Exclude<ReviewFilter, "all"> {
-  if (mark.conflict === true) {
-    return "conflicts";
-  }
-  switch (mark.label) {
-    case DIFF_LABELS.added:
-      return "add";
-    case DIFF_LABELS.removed:
-      return "remove";
-    default:
-      return "change";
-  }
-}
-
-/** How many items each chip holds: the marked nodes by kind, and the diff's edges as additions and removals (an edge is never a change). */
-export function filterCounts(marks: Record<string, DiffMark>, diff: GraphDiff): Record<ReviewFilter, number> {
-  const counts: Record<ReviewFilter, number> = { all: 0, conflicts: 0, add: 0, change: 0, remove: 0 };
-  for (const mark of Object.values(marks)) {
-    counts[filterOf(mark)] += 1;
-    counts.all += 1;
-  }
-  counts.add += diff.edgesAdded.length;
-  counts.remove += diff.edgesRemoved.length;
-  counts.all += diff.edgesAdded.length + diff.edgesRemoved.length;
-  return counts;
-}
-
 /**
- * C14: the canvas's mark for each node the proposal touches: added, removed, or changed by the
- * diff; a conflict, an orphan, or a node left out of a saved route by its items, which say
- * more than the diff and so win over it.
+ * C14: the layer's mark for each node the proposal touches: added, removed, or changed by the
+ * diff or by a state mutation the graph does not show (`stateful`: a pin, an answer, a
+ * transition); an orphan or a node left out of a saved route, which the items say more of than
+ * the diff; and, when an unresolved conflict (`open`, the indexes of the items still needing a
+ * choice) is about it, a choice besides its kind. A resolved conflict leaves only its kind.
  */
-export function diffMarks(diff: GraphDiff, reviewItems: readonly ReviewItem[]): Record<string, DiffMark> {
+export function diffMarks(diff: GraphDiff, reviewItems: readonly ReviewItem[], open: ReadonlySet<number>, stateful: readonly string[] = []): Record<string, DiffMark> {
   const marks: Record<string, DiffMark> = {};
+  for (const key of stateful) {
+    marks[key] = { kind: "changed" };
+  }
   for (const key of diff.added) {
-    marks[key] = { tone: "good", label: DIFF_LABELS.added };
+    marks[key] = { kind: "added" };
   }
   for (const key of Object.keys(diff.changed)) {
-    marks[key] = { tone: "warn", label: DIFF_LABELS.changed };
+    marks[key] = { kind: "changed" };
   }
   for (const key of diff.removed) {
-    marks[key] = { tone: "bad", label: DIFF_LABELS.removed, ghost: true };
+    marks[key] = { kind: "removed" };
   }
-  for (const item of reviewItems) {
+  reviewItems.forEach((item, index) => {
     if (item.item === "orphan") {
-      marks[item.node] = item.keep ? { tone: "warn", label: DIFF_LABELS.changed, note: DIFF_NOTES.orphan } : { tone: "bad", label: DIFF_LABELS.removed, note: DIFF_NOTES.orphanRemoved, ghost: true };
+      marks[item.node] = item.keep ? { kind: "changed", note: DIFF_NOTES.orphan } : { kind: "removed", note: DIFF_NOTES.orphanRemoved };
     } else if (item.item === "exclusion" && item.excluded) {
-      marks[item.node] = { tone: "plain", label: DIFF_LABELS.removed, note: DIFF_NOTES.excluded };
-    } else if (item.item === "conflict") {
+      marks[item.node] = { kind: "removed", note: DIFF_NOTES.excluded };
+    } else if (item.item === "conflict" && open.has(index)) {
       const node = conflictNode(item.conflict);
       if (node !== undefined) {
-        marks[node] = { tone: "bad", label: DIFF_LABELS.changed, note: DIFF_NOTES.conflict, conflict: true };
+        marks[node] = { kind: marks[node]?.kind ?? "changed", choice: true, note: DIFF_NOTES.conflict };
       }
     }
-  }
+  });
   return marks;
 }
 
@@ -450,8 +388,8 @@ export interface ReviewEntry {
 }
 
 /**
- * C14: the marked nodes as the list shows them, in the order a reviewer reads them (conflicts, then
- * adds, changes, and removals), each removal that cascades from a removed container listed
+ * C14: the marked nodes as the list shows them, in the order a reviewer reads them (adds, changes, and
+ * removals), each removal that cascades from a removed container listed
  * under that container and not beside it.
  */
 export function reviewEntries(diff: GraphDiff, marks: Record<string, DiffMark>, before: Graph | null | undefined): ReviewEntry[] {
@@ -460,13 +398,13 @@ export function reviewEntries(diff: GraphDiff, marks: Record<string, DiffMark>, 
   const causeOf = (key: string): string | undefined => {
     let cause: string | undefined;
     for (let at = parents.get(key), steps = 0; at !== undefined && steps < parents.size; at = parents.get(at), steps += 1) {
-      cause = marks[at]?.ghost === true ? at : cause;
+      cause = marks[at]?.kind === "removed" ? at : cause;
     }
     return cause;
   };
-  const entries = Object.entries(marks).map(([key, mark]): ReviewEntry => ({ key, mark, fields: diff.changed[key] ?? [], cause: mark.ghost === true ? causeOf(key) : undefined }));
-  const order = ["conflicts", "add", "change", "remove"] as const;
-  const roots = entries.filter((entry) => entry.cause === undefined).sort((left, right) => order.indexOf(filterOf(left.mark)) - order.indexOf(filterOf(right.mark)) || left.key.localeCompare(right.key));
+  const entries = Object.entries(marks).map(([key, mark]): ReviewEntry => ({ key, mark, fields: diff.changed[key] ?? [], cause: mark.kind === "removed" ? causeOf(key) : undefined }));
+  const order: DiffKind[] = ["added", "changed", "removed"];
+  const roots = entries.filter((entry) => entry.cause === undefined).sort((left, right) => order.indexOf(left.mark.kind) - order.indexOf(right.mark.kind) || left.key.localeCompare(right.key));
   return roots.flatMap((root) => [root, ...entries.filter((entry) => entry.cause === root.key).sort((left, right) => left.key.localeCompare(right.key))]);
 }
 

@@ -4,8 +4,8 @@
 use std::collections::{BTreeMap, BTreeSet};
 
 use cairn_schema::{
-    Domain, Entity, EntityKey, GraphId, JourneyId, ProposalStatus, RouteId, RouteKind,
-    VersionNumber,
+    Domain, Entity, EntityKey, GraphId, JourneyId, ProposalOutline, ProposalStatus, RouteId,
+    RouteKind, VersionNumber,
 };
 
 use super::State;
@@ -121,6 +121,7 @@ impl State {
                 created_by: proposal.created_by.clone(),
                 proposing_agent: proposal.proposing_agent.clone(),
                 created_at: proposal.created_at,
+                outline: ProposalOutline::of(proposal.draft.mutations.as_slice()),
                 now: self.destination_now(&proposal.destination),
             })
             .collect();

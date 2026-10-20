@@ -5,21 +5,14 @@
 // and the wiring edge before anything applies, and a member's Origin names the segment and
 // version. A second insertion's id, where a segment is used and its newer versions are the
 // service's tests (insertion.rs).
-import type { Page } from "@playwright/test";
 
 import { expect, test } from "./test.ts";
 
-import { menuItem, openJourney } from "./shell.ts";
+import { goTo, menuItem, openJourney } from "./shell.ts";
+import { apply } from "./proposals.ts";
 import { publishSegment, startInsert, stepper } from "./segments.ts";
 
 const JOURNEY = "j_vendor_eval";
-
-/** Confirms the review and applies the proposal. */
-async function apply(page: Page): Promise<void> {
-  await page.getByTestId("reviewed").check();
-  await page.getByTestId("apply-proposal").click();
-  await expect(page.getByTestId("proposal-status")).toHaveAttribute("data-status", "applied");
-}
 
 test("C19, C14: a segment inserted from a container, reviewed, applied, and shown in Origin", async ({ page }) => {
   await publishSegment(page, "browser");
@@ -29,15 +22,15 @@ test("C19, C14: a segment inserted from a container, reviewed, applied, and show
   await expect(stepper(page).getByLabel("Under")).toHaveValue("n_testing");
   await stepper(page).getByLabel("Add to Starts after").selectOption("n_access");
   // The incoming root is drawn on the graph as review will draw it.
-  await expect(page.getByTestId("card-mark").filter({ hasText: "Add" }).first()).toBeVisible();
+  await expect(page.locator('[data-testid="node-card"][data-diff="added"]').first()).toBeVisible();
   await stepper(page).getByTestId("insert-next").click();
   await stepper(page).getByLabel("Reviewer becomes").selectOption("r_findings_reviewer");
   await stepper(page).getByTestId("insert-review").click();
-  await expect(page.getByTestId("proposal")).toBeVisible();
-  await page.getByTestId("projection-list").click();
-  // Three nodes come in (Who reviews? is left out), outlined as the segment's version 1, wired after the access deliverable.
-  await expect(page.getByTestId("diff-node").filter({ hasText: "⧉ Security review v1" })).toHaveCount(3);
-  await expect(page.getByTestId("diff-edge")).toContainText("now requires Environment access");
+  await expect(page.getByTestId("proposal-rail")).toBeVisible();
+  await goTo(page, "list");
+  // Three nodes come in (Who reviews? is left out), marked as added, wired after the access deliverable.
+  await expect(page.locator('[data-testid="list-row"][data-diff="added"]')).toHaveCount(3);
+  await expect(page.getByTestId("changes-fold")).toContainText("Environment access");
   await apply(page);
 
   // A member's Details name the segment and version.

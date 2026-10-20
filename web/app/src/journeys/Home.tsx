@@ -170,7 +170,7 @@ function ProposalsToReview({ reading }: { reading: ReturnType<typeof useLive<Pro
           </Failed>
         </p>
       ) : null}
-      {rows.length === 0 ? null : <RowsPanel title="Proposals to review" testId="home-proposals" rows={rows} />}
+      {rows.length === 0 ? null : <RowsPanel title="Proposals to review" testId="home-proposals" rows={rows} folded />}
     </>
   );
 }
@@ -224,7 +224,6 @@ export function Home() {
           <span className="mono">{line.rows}</span> ready for you in <span className="mono">{line.journeys}</span> {line.journeys === 1 ? "journey" : "journeys"}
         </p>
       )}
-      <ProposalsToReview reading={proposals} />
       {failed === undefined ? null : <p className="callout callout-bad"><Failed what="Who you are" error={failed} /></p>}
       {view.status === "failed" ? (
         <p className="callout callout-bad">
@@ -252,6 +251,7 @@ export function Home() {
           Reading {plural(reading, "more journey")}...
         </p>
       ) : null}
+      <ProposalsToReview reading={proposals} />
       {showTable ? <NotReady entries={waiting} folded={readyOnes.length > 0} /> : null}
       {showTable ? (
         <Link to={indexPath()} className="home-all" data-testid="home-all-journeys">

@@ -13,6 +13,8 @@ import {
   filtersFrom,
   indexPath,
   journeyPath,
+  layerEntry,
+  layerExit,
   newJourneyPath,
   nextProjection,
   nodeAddress,
@@ -144,7 +146,7 @@ describe("opening and closing a node keeps the view", () => {
   it("takes a node off a proposal under any destination and adds one", () => {
     expect(nodeAddress(page("journeyProposalNode", { ...J, proposal: "p_1", key: "n_x" }), "", "n_y")).toBe("/journeys/j_a/proposals/p_1/nodes/n_y");
     expect(nodeAddress(page("routeProposal", { route: "r", proposal: "p_1" }), "?view=list", "n_y")).toBe("/routes/r/proposals/p_1/nodes/n_y?view=list");
-    expect(nodeAddress(page("deploymentProposalNode", { proposal: "p_1", key: "n_x" }), "", undefined)).toBe("/entities/proposals/p_1");
+    expect(nodeAddress(page("deploymentProposal", { proposal: "p_1" }), "", "n_x")).toBe("/entities/proposals/p_1");
   });
 
   it.each([
@@ -182,5 +184,27 @@ describe("switching views", () => {
     expect(screenSwitched(EDGE, "", "list")).toBe("/journeys/j_a?view=list");
     expect(screenSwitched(EDGE, "?view=list", "graph")).toBe("/journeys/j_a/edges/n_x~n_y");
     expect(screenSwitched(JOURNEY, search, "summary")).toBe(`/journeys/j_a${search}`);
+  });
+});
+
+describe("the proposal layer's addresses (C14)", () => {
+  const J = { journey: "j_a" };
+
+  it("opens on the Graph, and the Summary and the Walkthrough resolve to it under a layer", () => {
+    expect(defaultScreen({ ...J, proposal: "p_1" })).toBe("graph");
+    expect(screenOf({ ...J, proposal: "p_1" }, new URLSearchParams("view=summary"))).toBe("graph");
+    expect(screenOf({ ...J, proposal: "p_1" }, new URLSearchParams("view=walk"))).toBe("graph");
+    expect(screenOf({ ...J, proposal: "p_1" }, new URLSearchParams("view=timeline"))).toBe("timeline");
+    expect(screenOf(J, new URLSearchParams("view=summary"))).toBe("summary");
+  });
+
+  it("enters the layer with the view on screen kept, and leaves it with the same view", () => {
+    expect(layerEntry(J, "?view=list&depth=actions", "p_1")).toBe("/journeys/j_a/proposals/p_1?view=list&depth=actions");
+    expect(layerExit(J, "?view=list&depth=actions")).toBe("/journeys/j_a?view=list&depth=actions");
+  });
+
+  it("enters from the Summary on the layer's Graph, and leaves to the journey's own front page", () => {
+    expect(layerEntry(J, "", "p_1")).toBe("/journeys/j_a/proposals/p_1");
+    expect(layerExit(J, "")).toBe("/journeys/j_a");
   });
 });

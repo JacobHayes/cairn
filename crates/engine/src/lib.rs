@@ -31,7 +31,9 @@ pub use graph::{Document, Graph, Tree};
 pub use notices::notices;
 pub use pipeline::{Applied, ApplyInputs, apply};
 pub use project::{DerivedJourney, DraftContext, ProjectionError, history};
-pub use proposal::{preview, resolve, resolve_partial};
+pub use proposal::{
+    Candidate, candidate, destination_after, preview, preview_of, resolve, resolve_partial,
+};
 pub use records::Records;
 pub use replay::replay;
 pub use upgrade::{DraftError, relink, save_as_route, upgrade};

@@ -9,9 +9,9 @@ use std::collections::BTreeMap;
 
 use cairn_engine::DraftError;
 use cairn_schema::{
-    Consequences, Domain, JourneyId, Lineage, Markdown, PatchId, PatchReceipt, Proposal,
-    ProposalDraft, ProposalId, ProposalPreview, Revision, RevisionConflict, RouteId, Title,
-    TouchedSet, VersionNumber,
+    Consequences, DestinationAfter, Domain, JourneyId, Lineage, Markdown, PatchId, PatchReceipt,
+    Proposal, ProposalDraft, ProposalId, ProposalPreview, Revision, RevisionConflict, RouteId,
+    Title, TouchedSet, VersionNumber,
 };
 use cairn_service::{ProposalWritten, ProposeError, ReadError, WriteError};
 use cairn_store::{PageSize, ProposalCursor, ProposalPage, ProposalScope};
@@ -180,14 +180,17 @@ pub struct StaleBase {
 }
 
 /// `POST /api/{destination}/proposals/{proposal}/preview`'s answer (C14, D7, I6), as the API's `ProposalReview`.
-#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct ProposalReview {
     /// The proposal, at the editing revision a reviewer applies.
     pub proposal: Proposal,
-    /// Its unresolved items, the violations of its candidate, and for a journey the graph
-    /// and frontier after.
+    /// Its unresolved items, the violations of its candidate, and for a journey the frontier
+    /// after.
     pub preview: ProposalPreview,
+    /// What the destination would be once it applies (none when the candidate breaks a rule).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub after: Option<DestinationAfter>,
     /// D7, by journey: what applying it would newly cause.
     #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
     pub consequences: BTreeMap<JourneyId, Consequences>,
@@ -410,6 +413,7 @@ impl BrowserRoot {
         Ok(ProposalReview {
             proposal: review.proposal,
             preview: review.preview,
+            after: review.after,
             consequences: review.consequences,
             stale: review.stale.map(|stale| StaleBase {
                 conflict: stale.conflict,

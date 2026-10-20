@@ -66,6 +66,12 @@ pub(crate) fn is_false(flag: &bool) -> bool {
     !flag
 }
 
+/// `skip_serializing_if` for counts that default to zero. Serde passes fields by reference.
+#[allow(clippy::trivially_copy_pass_by_ref)]
+pub(crate) fn is_zero(count: &u32) -> bool {
+    *count == 0
+}
+
 /// `deserialize_with` for an optional field that, when present, must hold a value: an
 /// explicit `null` is an error rather than an absent field, so a field a node kind may not
 /// carry is rejected however it is written (A1a).

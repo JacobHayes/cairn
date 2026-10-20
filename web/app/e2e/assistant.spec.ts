@@ -10,8 +10,8 @@ import { expect, test } from "./test.ts";
 import { startVendorJourney } from "./acting.ts";
 import { ask, openPanel, patchId, script } from "./assistant.ts";
 import { state } from "./detail.ts";
-import { confirmAndApply, reviewOpen } from "./proposals.ts";
-import { nodePanel, open, openJourney } from "./shell.ts";
+import { apply, reviewOpen } from "./proposals.ts";
+import { goTo, nodePanel, open, openJourney } from "./shell.ts";
 
 test("I5, I7: a direct change reported with its node, and a breakdown proposed, reviewed, and applied", { tag: "@server" }, async ({ page }) => {
   const journey = await startVendorJourney(page);
@@ -49,10 +49,10 @@ test("I5, I7: a direct change reported with its node, and a breakdown proposed, 
 
   await proposed.getByTestId("review-proposal").click();
   await reviewOpen(page);
-  await page.getByTestId("projection-list").click();
-  await expect(page.locator('[data-testid="diff-node"][data-status="add"]')).toHaveCount(2);
-  await confirmAndApply(page);
-  await page.getByTestId("applied-journey").click();
+  await goTo(page, "list");
+  await expect(page.locator('[data-testid="list-row"][data-diff="added"]')).toHaveCount(2);
+  await apply(page);
+  await goTo(page, "graph");
   for (const title of ["Ingest workload", "Query workload"]) {
     await expect(page.locator('[data-testid="node-card"][data-parent="n_workload"]').filter({ hasText: title })).toHaveCount(1);
   }

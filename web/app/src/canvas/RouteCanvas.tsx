@@ -19,13 +19,15 @@ import { EmptyPanel, NothingMatches, ResetView, routeSubject, ViewControls } fro
 import { useNodeAddresses } from "../journeys/address.ts";
 import { GraphCanvas } from "./GraphCanvas.tsx";
 import { useLaidOut } from "./hooks.ts";
-import { useRevealed } from "./JourneyCanvas.tsx";
+import { changedKeys, useRevealed } from "./JourneyCanvas.tsx";
 import { ancestorsOf, withExpanded } from "./ladder.ts";
 import { cardsOf, linesOf, type CanvasModel } from "./model.ts";
 import type { CardActions } from "./NodeCard.tsx";
 import { refitKey } from "./refit.ts";
 import { graphSearch, type GraphView } from "./settings.ts";
 import { Failed } from "../ui/Failed.tsx";
+import { useReviewing, withRemoved, type Composed } from "../proposals/layer.ts";
+import { marksOverlay } from "./overlay.ts";
 import { useViewLevel } from "./viewLevel.ts";
 
 
@@ -46,24 +48,44 @@ function useGraph(shown: Shown, view: GraphView, selected: string | undefined, u
   const id = shown.route.header.id;
   const nodes = nodesOf(shown);
   const tree = useMemo(() => treeOf(shown.graph), [shown.graph]);
+  const layer = useReviewing();
   // The node the address names is always drawn (C7): the level reads it in when the view's own does not.
-  const { depth, level, error, faded, badges } = useViewLevel({ screen: "graph", state: view.state, nodes, selected, folds: view, read: (request, at) => useRouteLevel(shown, request, at) });
-  const model = useMemo<CanvasModel | undefined>(() => {
+  // Under a proposal's layer the route as it is, at the same level, supplies what the proposal removes, put back where it was.
+  const was = layer?.removed.size === 0 ? undefined : layer?.beforeShown;
+  const asked = selected !== undefined && was !== undefined && !nodes.some((node) => node.key === selected) ? undefined : selected;
+  const { depth, request, level, error, faded, badges } = useViewLevel({ screen: "graph", state: view.state, nodes, selected: asked, folds: view, read: (request, at) => useRouteLevel(shown, request, at) });
+  const wasRead = useRouteLevel(was ?? shown, request);
+  const wasTree = useMemo(() => (was === undefined ? undefined : treeOf(was.graph)), [was]);
+  const composed = useMemo<Composed | undefined>(() => {
     if (level === undefined) {
       return undefined;
     }
-    const cards = cardsOf(level, nodes).map((card) => {
-      const node = tree.byKey.get(card.key);
-      return { ...card, route: { foot: node === undefined ? undefined : ruleFoot(node, tree), unanchored: unanchored.has(card.key) } };
-    });
-    return { cards, lines: linesOf(level, nodes) };
-  }, [level, nodes, tree, unanchored]);
-  const laid = useLaidOut(`route:${id}:${String(shown.of)}`, journeyLayoutView(view.state, depth), model);
-  return { laidOut: valueOf(laid), error: error ?? errorWords(laid), faded, badges, tree };
+    const cardsFor = (from: typeof level, within: typeof nodes, by: Tree) =>
+      cardsOf(from, within).map((card) => {
+        const node = by.byKey.get(card.key);
+        return { ...card, route: { foot: node === undefined ? undefined : ruleFoot(node, by), unanchored: unanchored.has(card.key) } };
+      });
+    const kept: CanvasModel = { cards: cardsFor(level, nodes, tree), lines: linesOf(level, nodes) };
+    if (layer?.model === undefined || was === undefined || wasTree === undefined || wasRead.level === undefined) {
+      return { model: kept, removedLines: new Set(), shrunk: new Map() };
+    }
+    const gone: CanvasModel = { cards: cardsFor(wasRead.level, nodesOf(was), wasTree), lines: linesOf(wasRead.level, nodesOf(was)) };
+    return withRemoved(kept, gone, layer.removed, layer.model.diff.edgesRemoved);
+  }, [level, nodes, tree, unanchored, layer, was, wasTree, wasRead.level]);
+  const model = composed?.model;
+  const laid = useLaidOut(layer === undefined ? `route:${id}:${String(shown.of)}` : `route:${id}/proposals/${layer.id}`, journeyLayoutView(view.state, depth), model);
+  const laidOut = valueOf(laid);
+  const overlay = useMemo(() => {
+    if (layer?.model === undefined || laidOut === undefined) {
+      return undefined;
+    }
+    return marksOverlay("What the proposal changes", layer.model.marks, laidOut.model, { added: layer.model.diff.edgesAdded, removed: layer.model.diff.edgesRemoved }, composed);
+  }, [layer, laidOut, composed]);
+  return { laidOut, overlay, layer, error: error ?? errorWords(laid), faded, badges, tree };
 }
 
 /** What a card asks of the canvas: open its node (a draft's), expand or collapse it in place (and refit to it, 5.1). */
-function useActions(shown: Shown, view: GraphView, selected: string | undefined, editable: boolean, onPick: RouteCanvasProps["onPick"], tree: Tree): CardActions {
+function useActions(shown: Shown, view: GraphView, selected: string | undefined, editable: boolean, onPick: RouteCanvasProps["onPick"], tree: Tree, proposal: string | undefined): CardActions {
   const navigate = useNavigate();
   const { search } = useLocation();
   const addresses = useNodeAddresses();
@@ -83,19 +105,19 @@ function useActions(shown: Shown, view: GraphView, selected: string | undefined,
       expand: (key, expanded) => {
         const holding = !expanded && selected !== undefined && ancestorsOf(nodes, selected).includes(key);
         const node = editable ? (holding ? key : selected) : undefined;
-        void navigate(routePath(id, { version, node, screen: "graph" }, graphSearch(withExpanded(view, key, expanded), search)), { state: { reveal: { key, how: expanded ? "expanded" : "collapsed" } } });
+        void navigate(routePath(id, { version, node, screen: "graph", proposal }, graphSearch(withExpanded(view, key, expanded), search)), { state: { reveal: { key, how: expanded ? "expanded" : "collapsed" } } });
       },
       trace: undefined,
       title: (key) => titleIn(tree, key),
       menu: undefined,
     }),
-    [navigate, addresses, id, version, view, search, selected, nodes, tree, editable, onPick],
+    [navigate, addresses, id, version, view, search, selected, nodes, tree, editable, onPick, proposal],
   );
 }
 
 export function RouteCanvas({ shown, view, selected, unanchored, editable, onPick }: RouteCanvasProps) {
-  const { laidOut, error, faded, badges, tree } = useGraph(shown, view, selected, unanchored);
-  const actions = useActions(shown, view, selected, editable, onPick, tree);
+  const { laidOut, overlay, layer, error, faded, badges, tree } = useGraph(shown, view, selected, unanchored);
+  const actions = useActions(shown, view, selected, editable, onPick, tree, layer?.id);
   const reveal = useRevealed(selected);
   const controls = <ViewControls subject={routeSubject(nodesOf(shown))} screen="graph" badges={badges} />;
   if (error !== undefined) {
@@ -117,7 +139,8 @@ export function RouteCanvas({ shown, view, selected, unanchored, editable, onPic
     <GraphCanvas
       model={laidOut.model}
       layout={laidOut.layout}
-      overlay={undefined}
+      overlay={overlay}
+      firstFit={layer === undefined ? undefined : changedKeys(layer)}
       lens={undefined}
       faded={faded}
       selected={selected}

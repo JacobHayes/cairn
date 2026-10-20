@@ -109,7 +109,7 @@ pub fn run(document: Option<&str>, call: &CaseCall) -> Result<String, HostError>
             Ok(derivation.derived())
         }
         CaseCall::Project { request } => Derivation::of(document()?)?.projected(request),
-        CaseCall::Preview { request } => Ok(json(&preview_locally(&document()?, request)?)),
+        CaseCall::Preview { request } => Ok(json(&preview_locally(&document()?, request)?.preview)),
         CaseCall::Apply { request } => Ok(json(&apply_locally(&document()?, request)?)),
         CaseCall::Export { request } => Ok(json(&exported(request)?)),
         CaseCall::Import { request } => Ok(json(&imported(request)?)),

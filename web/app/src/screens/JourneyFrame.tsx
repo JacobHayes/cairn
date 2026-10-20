@@ -25,7 +25,11 @@ import { indexPath, useNodeAddresses, type Screen } from "../journeys/address.ts
 import { JourneyCard } from "../journeys/JourneyCard.tsx";
 import { SummaryPage } from "../summary/SummaryPage.tsx";
 import { isStock, useViewState, ViewStateContext } from "../journeys/view.ts";
+import { Band } from "../proposals/Band.tsx";
 import { DestinationProposals } from "../proposals/DestinationProposals.tsx";
+import { JourneyLayerHost } from "../proposals/Hosts.tsx";
+import { useLayer, useReviewing } from "../proposals/layer.ts";
+import { Rail } from "../proposals/Rail.tsx";
 import { COLUMN, Inspector, PHONE_WIDTH, useMedia } from "../shell/frame.tsx";
 import { InsertEntryContext, useInserting } from "../segments/entry.ts";
 import { InsertStepper, type InsertPreview } from "../segments/Stepper.tsx";
@@ -46,6 +50,8 @@ export interface FrameProps {
   selected: string | undefined;
   /** The link whose card is open, `<from>~<to>`, when no node is. */
   edge?: string | undefined;
+  /** The proposal whose layer is on (C14). */
+  proposal?: string | undefined;
 }
 
 /**
@@ -106,7 +112,12 @@ function InspectorSlot({
   authored: ProjectionProps["authored"];
 }) {
   const journey = ready.journey.header.id;
+  const layer = useLayer();
   const insertable = useMemo(() => (inserting.at === undefined ? undefined : journeyAuthored(ready)), [ready, inserting.at]);
+  // The layer: the proposal is what is being inspected while it is under review; one that is over shows its rail until a node is opened.
+  if (layer?.review !== undefined && (layer.mode === "reviewing" || selected === undefined)) {
+    return <Rail selected={selected} />;
+  }
   if (inserting.at !== undefined && insertable !== undefined) {
     return (
       <Inspector focus="insert-segment">
@@ -183,14 +194,17 @@ function ReadyFrame({ ready, screen, selected, edge }: { ready: Ready } & Omit<F
   const viewState = useViewStateValue(view.state);
   const { onState } = viewState;
   const steps = useMemo(() => stepsFor(ready.journey.graph.nodes ?? []), [ready]);
+  const layer = useLayer();
+  // Acting on a picture of the future would be wrong: under a proposal's layer nothing is authored, acted on or selected in several.
+  const reviewing = useReviewing() !== undefined;
   const planned = screen === "graph";
-  const authored = useMemo(() => (planned && view.edit ? journeyAuthored(ready) : undefined), [ready, planned, view.edit]);
+  const authored = useMemo(() => (planned && view.edit && !reviewing ? journeyAuthored(ready) : undefined), [ready, planned, view.edit, reviewing]);
   const drawing = useEdgeDrawing(authored);
   // The set is the frame's, so it survives a switch between the graph and the list; each opens a node on its own screen.
   const selection = useSelection(selected, (node) => void navigate(node === undefined ? addresses.close() : addresses.open(node)));
   const inserting = useInserting(`journey:${journey}`);
   const [sheetOpen, setSheetOpen] = useState(false);
-  useJourneyKeys({ screen, selected, sheetOpen, setSheetOpen, state: view.state, steps, onState });
+  useJourneyKeys({ screen, selected: reviewing ? undefined : selected, sheetOpen, setSheetOpen, state: view.state, steps, onState });
   const node = authored === undefined || selected === undefined ? undefined : authored.tree.byKey.get(selected);
   const structure = authored === undefined || node === undefined ? undefined : <AuthoringPanel authored={authored} node={node} onRemoved={() => void navigate(addresses.close())} />;
   // The graph is a gesture surface that fills the workspace under the head; the rest scroll.
@@ -200,14 +214,15 @@ function ReadyFrame({ ready, screen, selected, edge }: { ready: Ready } & Omit<F
   // projection, and a graph that fills the page has no room for it: a sheet would cover the canvas unasked.
   const wide = useMedia(COLUMN);
   const phone = useMedia(PHONE_WIDTH);
-  const card = selected !== undefined || edge !== undefined || screen === "summary" || screen === "walk" ? "none" : wide || phone ? "column" : fills ? "none" : "inline";
+  const card = reviewing || selected !== undefined || edge !== undefined || screen === "summary" || screen === "walk" ? "none" : wide || phone ? "column" : fills ? "none" : "inline";
   return (
     <ViewStateContext value={viewState}>
     <ConnectContext value={authored === undefined ? undefined : drawing}>
       <InsertEntryContext value={inserting.start}>
-      <div className="ws-fill journey-frame" data-testid="journey-frame" data-screen={screen}>
+      <div className="ws-fill journey-frame" data-testid="journey-frame" data-screen={screen} data-layer={layer?.mode}>
         <div className="ws-head stack journey-head">
-          <JourneyHeader ready={ready} view={planned ? view : { ...view, edit: false }} screen={screen} selected={selected} />
+          <JourneyHeader ready={ready} view={planned && !reviewing ? view : { ...view, edit: false }} screen={screen} selected={selected} />
+          <Band />
           {planned ? <CanvasBars ready={ready} view={view} authored={authored} drawing={drawing} /> : null}
         </div>
         <div className={fills ? "ws-canvas journey-body" : "journey-body journey-scroll stack"}>
@@ -224,11 +239,34 @@ function ReadyFrame({ ready, screen, selected, edge }: { ready: Ready } & Omit<F
   );
 }
 
-/** A journey's page, and its open proposals in the inspector's Proposals tab (C14), also while it is read or before a proposal creates it. */
-export function JourneyFrame({ id, screen, selected, edge }: FrameProps) {
+/** C14: a proposal that creates the journey and breaks a rule leaves nothing to draw: the band and the rail lead with what is wrong. */
+function NothingToDraw({ selected }: { selected: string | undefined }) {
   return (
     <>
-      <JourneyGate id={id}>{(ready) => <ReadyFrame ready={ready} screen={screen} selected={selected} edge={edge} />}</JourneyGate>
+      <div className="ws-fill journey-frame" data-testid="journey-frame" data-layer="reviewing">
+        <div className="ws-head stack journey-head">
+          <Band />
+        </div>
+        <div className="journey-body journey-scroll stack">
+          <p className="callout" data-testid="nothing-to-draw">Nothing to draw until the proposal is valid.</p>
+        </div>
+      </div>
+      <Rail selected={selected} />
+    </>
+  );
+}
+
+/** A journey's page, and its open proposals in the inspector's Proposals tab (C14), also while it is read or before a proposal creates it. */
+export function JourneyFrame({ id, screen, selected, edge, proposal }: FrameProps) {
+  return (
+    <>
+      {proposal === undefined ? (
+        <JourneyGate id={id}>{(ready) => <ReadyFrame ready={ready} screen={screen} selected={selected} edge={edge} />}</JourneyGate>
+      ) : (
+        <JourneyLayerHost id={id} proposal={proposal}>
+          {(ready) => (ready === undefined ? <NothingToDraw selected={selected} /> : <ReadyFrame ready={ready} screen={screen} selected={selected} edge={edge} />)}
+        </JourneyLayerHost>
+      )}
       <DestinationProposals destination={{ journey: id }} />
     </>
   );

@@ -16,6 +16,7 @@ import { useJourneyTarget } from "../journeys/useJourneyTarget.ts";
 import { useInsertEntry } from "../segments/entry.ts";
 import { useSuggested } from "../journeys/suggested.ts";
 import { OpenProposalsItem } from "../proposals/DestinationProposals.tsx";
+import { useLayer, useReviewing } from "../proposals/layer.ts";
 import { JourneyFlow, type JourneyFlowName } from "../proposals/Entries.tsx";
 import { Button } from "../ui/kit.tsx";
 import { Receipt } from "../ui/Receipt.tsx";
@@ -95,6 +96,8 @@ function JourneyMenu({ ready, view, screen, selected, write, onPanel }: { ready:
   const { header } = ready.journey;
   const { search } = useLocation();
   const insert = useInsertEntry();
+  // Under a proposal's layer the menu keeps what reads: acting on a picture of the future would be wrong.
+  const reviewing = useReviewing() !== undefined;
   const archived = header.status === "archived";
   return (
     <Menu label="Journey actions" testId="journey-menu" align="end" className="no-print" trigger={<span aria-hidden="true">⋯</span>}>
@@ -106,19 +109,19 @@ function JourneyMenu({ ready, view, screen, selected, write, onPanel }: { ready:
         );
         return (
           <>
-            {archived ? null : (
+            {archived || reviewing ? null : (
               <Link role="menuitem" className="menu-item" data-testid="menu-edit" to={graphPath(header.id, { ...view, edit: !view.edit }, { node: selected }, search)} onClick={close}>
                 {view.edit ? "Done editing" : "Edit"}
               </Link>
             )}
-            {insert === undefined || archived ? null : (
+            {insert === undefined || archived || reviewing ? null : (
               <button type="button" role="menuitem" className="menu-item" data-testid="menu-insert-segment" onClick={() => { close(); insert(); }}>
                 Insert segment...
               </button>
             )}
-            {item("menu-save", "Save as route...", "save")}
-            {item("menu-relink", "Re-link...", "relink")}
-            <hr />
+            {reviewing ? null : item("menu-save", "Save as route...", "save")}
+            {reviewing ? null : item("menu-relink", "Re-link...", "relink")}
+            {reviewing ? null : <hr />}
             <OpenProposalsItem destination={{ journey: header.id }} close={close} />
             {screen !== "summary" ? null : (
               <button type="button" role="menuitem" className="menu-item" data-testid="menu-print" onClick={() => { close(); globalThis.print(); }}>
@@ -128,8 +131,12 @@ function JourneyMenu({ ready, view, screen, selected, write, onPanel }: { ready:
             <button type="button" role="menuitem" className="menu-item" data-testid="menu-copy-link" onClick={() => { close(); copyLink(); }}>
               Copy link
             </button>
-            <hr />
-            <StatusItems ready={ready} write={write} onDelete={() => { onPanel("delete"); }} close={close} />
+            {reviewing ? null : (
+              <>
+                <hr />
+                <StatusItems ready={ready} write={write} onDelete={() => { onPanel("delete"); }} close={close} />
+              </>
+            )}
           </>
         );
       }}
@@ -172,26 +179,32 @@ export function JourneyHeader({ ready, view, screen, selected }: { ready: Ready;
   const [nameOpen, setNameOpen] = useState(false);
   const nameButton = useRef<HTMLButtonElement>(null);
   const clamped = useClamped(nameButton, header.name, nameOpen);
+  const layer = useLayer();
+  const reviewing = layer?.mode === "reviewing";
+  // The header changes show in place: a renamed journey shows the new name over the change fill, and its old one in the title.
+  const was = reviewing ? layer.before?.journey.header : undefined;
+  const renamed = was !== undefined && was.name !== header.name;
+  const unavailable = reviewing ? { summary: "Close the proposal to see the summary", walk: "Close the proposal to walk through the journey" } : undefined;
   return (
     <section className="stack journey-header" aria-label={header.name} data-testid="journey-header">
       <div className="row">
         <div className="journey-header-title">
-          <h1 data-testid="journey-name" data-expanded={nameOpen} title={header.name}>
+          <h1 data-testid="journey-name" data-expanded={nameOpen} data-diff={renamed ? "changed" : undefined} title={renamed ? `Was: ${was.name}` : header.name}>
             {/* A long name is clamped to two lines; a tap or click reads it whole, where a tooltip cannot be reached. */}
             <button ref={nameButton} type="button" className="journey-name-toggle" aria-expanded={nameOpen} onClick={() => { setNameOpen(!nameOpen); }}>
               {header.name}
             </button>
             {clamped ? <span className="journey-name-cue" aria-hidden="true" data-testid="journey-name-cue">{nameOpen ? "\u25b4" : "\u25be"}</span> : null}
           </h1>
-          <JourneyStatusBadge status={header.status} />
+          <JourneyStatusBadge status={header.status} changed={was !== undefined && was.status !== header.status} />
         </div>
         <AssistantDock target={{ journey: header.id }} titleOf={journeyTitles(ready)} />
         <div className="journey-header-actions">
-          <ViewPicker screen={screen} screens={SCREENS} to={(to) => screenSwitched(target, search, to)} title={JOURNEY_VIEW_TITLE} />
+          <ViewPicker screen={screen} screens={SCREENS} to={(to) => screenSwitched(target, search, to)} title={JOURNEY_VIEW_TITLE} {...(unavailable === undefined ? {} : { unavailable })} />
           <JourneyMenu ready={ready} view={view} screen={screen} selected={selected} write={write} onPanel={setPanel} />
         </div>
       </div>
-      {header.status === "active" && suggested ? (
+      {header.status === "active" && suggested && !reviewing ? (
         <div className="callout row" data-testid="completion-suggested">
           <span>Everything in scope is done.</span>
           <Button

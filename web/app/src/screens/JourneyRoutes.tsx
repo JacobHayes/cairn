@@ -13,7 +13,7 @@ export function JourneyPage() {
   const target = useJourneyTarget();
   const { search } = useLocation();
   const screen = useMemo(() => screenOf(target, new URLSearchParams(search)), [target, search]);
-  return <JourneyFrame key={target.journey} id={target.journey} screen={screen} selected={target.node} edge={target.edge} />;
+  return <JourneyFrame key={`${target.journey}/${target.proposal ?? ""}`} id={target.journey} screen={screen} selected={target.node} edge={target.edge} proposal={target.proposal} />;
 }
 
 /** An address that is none of the app's: the shell's "no such page". */

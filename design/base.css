@@ -224,7 +224,8 @@ button.primary:hover {
 button.ghost {
   background: transparent;
 }
-button:disabled {
+button:disabled,
+button[aria-disabled="true"] {
   opacity: 0.45;
   cursor: default;
 }

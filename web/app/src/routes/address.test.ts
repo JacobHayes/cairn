@@ -60,4 +60,9 @@ describe("switching a route's view", () => {
     expect(routeSwitched("r", "?view=list", "timeline", "n_x")).toBe("/routes/r/nodes/n_x?view=timeline");
     expect(routeSwitched("r", "?version=2", "list", "n_x")).toBe("/routes/r?version=2&view=list");
   });
+
+  it("stays under a proposal's layer, the layer's own address and the picked node kept", () => {
+    expect(routeSwitched("r", "?view=list", "timeline", undefined, "pr_1")).toBe("/routes/r/proposals/pr_1?view=timeline");
+    expect(routeSwitched("r", "", "list", "n_x", "pr_1")).toBe("/routes/r/proposals/pr_1/nodes/n_x?view=list");
+  });
 });

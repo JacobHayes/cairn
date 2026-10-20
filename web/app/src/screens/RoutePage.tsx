@@ -30,7 +30,11 @@ import { valueOf } from "../data/keyed-read.ts";
 import { useDeployment, useKeyedRead, useSession, useToday } from "../data/react.ts";
 import { useNodeAddresses, type Screen } from "../journeys/address.ts";
 import { ROUTE_OFFERS, useViewState, ViewStateContext, viewStateFrom } from "../journeys/view.ts";
+import { Band } from "../proposals/Band.tsx";
 import { DestinationProposals } from "../proposals/DestinationProposals.tsx";
+import { RouteLayerHost } from "../proposals/Hosts.tsx";
+import { useLayer } from "../proposals/layer.ts";
+import { Rail } from "../proposals/Rail.tsx";
 import { useImportFlow, useOnImported, type ImportFlow } from "../routes/ImportFile.tsx";
 import { ROUTES_PATH, routePath, routeScreenOf, routeSwitched, versionIn } from "../routes/address.ts";
 import { openDraft } from "../routes/model.ts";
@@ -71,7 +75,9 @@ function RouteBody({ shown, screen, selected, unanchored, onPick }: { shown: Sho
   const addresses = useNodeAddresses();
   const navigate = useNavigate();
   const { state, picks } = useViewState();
-  const editable = shown.of === "draft";
+  const layered = useLayer() !== undefined;
+  // Under the proposal layer a card opens its node in the rail; nothing is drawn or edited.
+  const editable = shown.of === "draft" || layered;
   const view = graphViewFrom(new URLSearchParams(useLocation().search), ROUTE_OFFERS);
   const onOpen = editable
     ? (key: string) => {
@@ -285,6 +291,84 @@ function EmptyRoute({ route, write, imports }: { route: Route; write: ScreenWrit
   );
 }
 
+/** C14: the route with a proposal's layer on: the header, the band, the views over the graph after, and the rail in the inspector. No write, no edge drawn, no palette. */
+function LayerFrame({ shown, route, selected, imports, write }: { shown: Shown; route: Route; selected: string | undefined; imports: ImportFlow; write: ScreenWrite }) {
+  const layer = useLayer();
+  const { search } = useLocation();
+  const { screen } = useScreen();
+  const id = route.header.id;
+  const head = (
+    <>
+      <RouteHeader route={route} of={shown.of} screen={screen} node={selected} write={write} blocked={undefined} onPublish={undefined} titleOf={() => undefined} imports={imports} />
+      <Band />
+    </>
+  );
+  const exit = layer?.exit ?? routePath(id);
+  useEscapeTo(selected === undefined ? undefined : routePath(id, { screen, proposal: layer?.id }, search));
+  const fills = screen === "graph";
+  const body = <RouteBody shown={shown} screen={screen} selected={selected} unanchored={NONE} onPick={undefined} />;
+  return (
+    <div className="ws-fill journey-frame route-frame" data-testid="route-frame" data-screen={screen} data-layer={layer?.mode} data-exit={exit}>
+      <div className="ws-head stack journey-head">{head}</div>
+      <div className={fills ? "ws-canvas journey-body" : "journey-body journey-scroll stack"}>{body}</div>
+    </div>
+  );
+}
+
+/** The page with the layer on: its host reads the proposal and the route, and gives the views the graph after. */
+function LayerPage({ id, proposal, selected, write, imports }: { id: string; proposal: string; selected: string | undefined; write: ScreenWrite; imports: ImportFlow }) {
+  const { search } = useLocation();
+  const params = useMemo(() => new URLSearchParams(search), [search]);
+  const viewState = useMemo(() => viewStateFrom(params, ROUTE_OFFERS), [params]);
+  const value = useViewStateValue(viewState);
+  const [sheetOpen, setSheetOpen] = useState(false);
+  const screen = routeScreenOf(params);
+  return (
+    <RouteLayerHost id={id} proposal={proposal}>
+      {(shown, route) => (
+        <ViewStateContext value={value}>
+          <LayerViewKeys id={id} proposal={proposal} shown={shown} screen={screen} state={viewState} onState={value.onState} sheetOpen={sheetOpen} setSheetOpen={setSheetOpen} />
+          <LayerBody shown={shown} route={route} selected={selected} write={write} imports={imports} />
+          {sheetOpen ? <KeySheet onClose={() => { setSheetOpen(false); }} /> : null}
+        </ViewStateContext>
+      )}
+    </RouteLayerHost>
+  );
+}
+
+function LayerViewKeys({ id, proposal, shown, screen, state, onState, sheetOpen, setSheetOpen }: { id: string; proposal: string; shown: Shown | undefined; screen: Screen; state: ReturnType<typeof viewStateFrom>; onState: ReturnType<typeof useViewStateValue>["onState"]; sheetOpen: boolean; setSheetOpen: (open: boolean) => void }) {
+  const { search } = useLocation();
+  const steps = useMemo(() => (shown === undefined ? [] : stepsFor(nodesOf(shown))), [shown?.graph]);
+  useViewKeys({ screen, selected: undefined, sheetOpen, setSheetOpen, state, steps, onState, offers: ROUTE_OFFERS, walk: false, viewAddress: (to) => routeSwitched(id, search, to, undefined, proposal) });
+  return null;
+}
+
+/** What the layer's page draws under the host: the frame and the rail, or the band alone when there is nothing to draw. */
+function LayerBody({ shown, route, selected, write, imports }: { shown: Shown | undefined; route: Route | undefined; selected: string | undefined; write: ScreenWrite; imports: ImportFlow }) {
+  const layer = useLayer();
+  if (shown === undefined || route === undefined) {
+    return (
+      <>
+        <div className="ws-fill journey-frame route-frame" data-testid="route-frame" data-screen="layer" data-layer={layer?.mode}>
+          <div className="ws-head stack journey-head">
+            <Band />
+          </div>
+          <div className="journey-body journey-scroll stack">
+            {layer?.mode === "reviewing" ? <p className="callout" data-testid="nothing-to-draw">Nothing to draw until the proposal is valid.</p> : null}
+          </div>
+        </div>
+        {layer?.review === undefined ? null : <Rail selected={selected} />}
+      </>
+    );
+  }
+  return (
+    <>
+      <LayerFrame shown={shown} route={route} selected={selected} write={write} imports={imports} />
+      {layer?.review === undefined ? null : <Rail selected={selected} />}
+    </>
+  );
+}
+
 /** What the page is once the route is read: its frame, the keys and the view state every view shares. */
 function Loaded({ shown, selected, write, imports, result, setResult }: { shown: Shown; selected: string | undefined; write: ScreenWrite; imports: ImportFlow; result: Result | undefined; setResult: (result: Result | undefined) => void }) {
   const id = shown.route.header.id;
@@ -357,6 +441,7 @@ export function RoutePage() {
 function RouteContent({ result: kept, setResult }: { result: Result | undefined; setResult: (result: Result | undefined) => void }) {
   const at = useParams();
   const id = required(at, "route");
+  const proposal = at["proposal"];
   const { search } = useLocation();
   const version = versionIn(new URLSearchParams(search));
   const { host } = useSession();
@@ -381,7 +466,9 @@ function RouteContent({ result: kept, setResult }: { result: Result | undefined;
     ),
   );
   let body: ReactNode;
-  if (found === undefined) {
+  if (proposal !== undefined) {
+    body = <LayerPage id={id} proposal={proposal} selected={at.key} write={write} imports={imports} />;
+  } else if (found === undefined) {
     if (read.status === "gone") {
       body = <p className="callout">This route does not exist. <Link to={ROUTES_PATH}>All routes</Link></p>;
     } else {

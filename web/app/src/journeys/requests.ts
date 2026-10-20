@@ -35,9 +35,10 @@ function flagsOf(state: ViewState): NonNullable<LevelRequest["flags"]> {
  * stage or milestone), the containers collapsed, the relevance classes shown, and the Filter and
  * search, which keep a node that matches or holds a match. Parts at their default are left out.
  */
-export function levelRequestOf(state: ViewState, step: Step, collapsed: readonly string[]): LevelRequest {
+export function levelRequestOf(state: ViewState, step: Step, collapsed: readonly string[], layered = false): LevelRequest {
   const { filter } = state;
-  const display: LevelDisplay[] = ["relevant", ...(filter.conditional ? (["conditional"] as const) : []), ...(filter.notRelevant ? (["not_relevant"] as const) : [])];
+  // C14: under the proposal layer every display state is drawn, so a change to a conditional or ruled-out node is never hidden by the page's filter.
+  const display: LevelDisplay[] = layered ? ["relevant", "conditional", "not_relevant"] : ["relevant", ...(filter.conditional ? (["conditional"] as const) : []), ...(filter.notRelevant ? (["not_relevant"] as const) : [])];
   const flags = flagsOf(state);
   const text = state.text.trim();
   return {

@@ -27,6 +27,8 @@ import { TimelineChart } from "./TimelineView.tsx";
 import { Failed } from "../ui/Failed.tsx";
 import { NodeLink } from "../detail/parts.tsx";
 import { useViewLevel } from "../canvas/viewLevel.ts";
+import { useLayer } from "../proposals/layer.ts";
+
 
 export interface RouteTimelineProps {
   shown: Shown;
@@ -44,12 +46,20 @@ export function RouteTimeline({ shown, state, picks, selected, onOpen }: RouteTi
   const nodes = nodesOf(shown);
   const tree = useMemo(() => treeOf(shown.graph), [shown.graph]);
   const { step, current, level, error: levelError, dimmed: faded, badges } = useViewLevel({ screen: "timeline", state, nodes, selected, read: (request, at) => useRouteLevel(shown, request, at) });
+  const layered = useLayer();
   const scheduleRead = useRouteSchedule(shown);
   const schedule = valueOf(scheduleRead);
   const { open, fold: onFold } = useFolds(nodes, current, state.depth, step, picks, selected, (key) => void navigate(addresses.open(key)));
   const error = levelError ?? errorWords(scheduleRead);
   const spec = useMemo(() => (schedule === undefined ? undefined : routeSpec(schedule)), [schedule]);
   const chart = useMemo(() => (schedule === undefined || level === undefined ? undefined : routeChartOf(tree, schedule, { drawn: level.nodes, open, selected, faded })), [tree, schedule, level, open, selected, faded]);
+  const layer = useMemo(() => {
+    if (layered?.mode !== "reviewing" || layered.model === undefined) {
+      return undefined;
+    }
+    const was = layered.beforeShown === undefined ? [] : nodesOf(layered.beforeShown);
+    return { marks: layered.model.marks, removed: [...layered.removed].map((key) => ({ key, title: was.find((node) => node.key === key)?.title ?? key })) };
+  }, [layered]);
   const titleOf = (key: string) => titleIn(tree, key);
   const end = schedule?.end;
   return (
@@ -78,6 +88,7 @@ export function RouteTimeline({ shown, state, picks, selected, onOpen }: RouteTi
           empty={{ filtered: <NothingMatches />, none: "Nothing in this route has an earliest day yet." }}
           undated="No day yet"
           anyScheduled={schedule.entries.length > 0}
+          layer={layer}
         />
       )}
     </>

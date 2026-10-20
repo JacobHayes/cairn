@@ -6,19 +6,14 @@ import { describe, expect, it } from "vitest";
 import type { Graph, Mutation } from "../authoring/graph.ts";
 import {
   applyBlockers,
-  DIFF_LABELS,
   DIFF_NOTES,
   diffMarks,
-  filterCounts,
-  filterOf,
   reviewEntries,
   graphDiff,
   intervening,
   carryIds,
   withFieldValue,
   removedChoices,
-  reviewedAfter,
-  unionGraph,
   unresolvedHere,
   withExclusion,
   withMapping,
@@ -29,7 +24,6 @@ import {
   withoutMutation,
   type GateInput,
   type ProposalDraft,
-  type ReviewEvent,
 } from "./model.ts";
 
 const before: Graph = {
@@ -71,29 +65,8 @@ describe("graphDiff (C14)", () => {
   });
 });
 
-describe("filterCounts (C14)", () => {
-  it("counts an edge as an addition or a removal, never as a change", () => {
-    const diff = graphDiff(before, after);
-    expect(filterCounts(diffMarks(diff, []), diff)).toEqual({ all: 6, conflicts: 0, add: 2, change: 2, remove: 2 });
-  });
-});
-
-describe("unionGraph (C14)", () => {
-  it("draws a removed node back in place, without the keys its removal retired or any state", () => {
-    const union = unionGraph(before, { ...after, state: { nodes: {} } });
-    expect(union.nodes?.map((node) => [node.key, node.parent ?? null])).toEqual([
-      ["n_a", null],
-      ["n_c", null],
-      ["n_d", "n_a"],
-      ["n_b", "n_a"],
-    ]);
-    expect([union.retired_keys, union.state]).toEqual([undefined, undefined]);
-  });
-});
-
 const open: GateInput = {
   proposal: { status: "open", revision: 3 },
-  reviewed: 3,
   dirty: false,
   editing: false,
   stale: false,
@@ -102,43 +75,17 @@ const open: GateInput = {
 
 describe("applyBlockers (C14, I6)", () => {
   const cases: [string, Partial<GateInput>, string[]][] = [
-    ["nothing, once reviewed at its revision", {}, []],
+    ["nothing", {}, []],
     ["an unsaved edit", { dirty: true }, ["unsaved"]],
     ["an editor holding a value with a problem", { editing: true }, ["editing"]],
     ["a destination that moved", { stale: true }, ["stale"]],
     ["an item still needing a choice", { preview: { unresolved: [{ item: 0, reason: "no_choice" }], violations: [] } }, ["unresolved"]],
     ["a violation of the candidate", { preview: { unresolved: [], violations: [{ code: "containment_cycle", at: {}, message: "" }] } }, ["invalid"]],
     ["no preview yet", { preview: undefined }, ["no_preview"]],
-    ["a review of an older revision", { reviewed: 2 }, ["unreviewed"]],
     ["a proposal no longer open, whatever else", { proposal: { status: "applied", revision: 3 }, dirty: true }, ["not_open"]],
   ];
   it.each(cases)("blocks on %s", (_, change, blockers) => {
     expect(applyBlockers({ ...open, ...change })).toEqual(blockers);
-  });
-});
-
-describe("reviewedAfter (I6)", () => {
-  const confirm = (events: ReviewEvent[]) => events.reduce<number | undefined>(reviewedAfter, undefined);
-
-  it("confirms the revision a reviewer marks", () => {
-    expect(confirm([{ event: "marked", revision: 3 }])).toBe(3);
-  });
-
-  it("asks for a renewed review after a refresh: the refreshed proposal does not apply until marked again", () => {
-    const reviewed = confirm([
-      { event: "marked", revision: 3 },
-      { event: "refreshed", proposal: { revision: 4 } },
-    ]);
-    expect(applyBlockers({ ...open, proposal: { status: "open", revision: 4 }, reviewed })).toEqual(["unreviewed"]);
-    expect(applyBlockers({ ...open, proposal: { status: "open", revision: 4 }, reviewed: reviewedAfter(reviewed, { event: "marked", revision: 4 }) })).toEqual([]);
-  });
-
-  it("asks for a renewed review after the proposal is saved changed", () => {
-    const reviewed = confirm([
-      { event: "marked", revision: 3 },
-      { event: "saved", proposal: { revision: 4 } },
-    ]);
-    expect(applyBlockers({ ...open, proposal: { status: "open", revision: 4 }, reviewed })).toEqual(["unreviewed"]);
   });
 });
 
@@ -193,18 +140,30 @@ describe("a reviewer's edits (C14)", () => {
 });
 
 describe("diffMarks (C14)", () => {
-  it("marks the diff, and lets the items' conflicts, orphans, and exclusions say more", () => {
-    const diff = graphDiff(before, after);
-    const marks = diffMarks(diff, [
-      { item: "conflict", conflict: { about: "field", node: "n_c", journey: { title: "C" }, route: { title: "See" } } },
-      { item: "orphan", node: "n_b", keep: true, removal: { node: "n_b" } },
-    ]);
-    expect(Object.fromEntries(Object.entries(marks).map(([key, mark]) => [key, [mark.label, mark.note, filterOf(mark)]]))).toEqual({
-      n_a: [DIFF_LABELS.changed, undefined, "change"],
-      n_b: [DIFF_LABELS.changed, DIFF_NOTES.orphan, "change"],
-      n_c: [DIFF_LABELS.changed, DIFF_NOTES.conflict, "conflicts"],
-      n_d: [DIFF_LABELS.added, undefined, "add"],
+  const items = [
+    { item: "conflict" as const, conflict: { about: "field" as const, node: "n_c", journey: { title: "C" }, route: { title: "See" } } },
+    { item: "orphan" as const, node: "n_b", keep: true, removal: { node: "n_b" } },
+  ];
+
+  it("marks the diff by kind, and lets the items' orphans say more", () => {
+    const marks = diffMarks(graphDiff(before, after), items, new Set());
+    expect(Object.fromEntries(Object.entries(marks).map(([key, mark]) => [key, [mark.kind, mark.note, mark.choice]]))).toEqual({
+      n_a: ["changed", undefined, undefined],
+      n_b: ["changed", DIFF_NOTES.orphan, undefined],
+      n_c: ["changed", undefined, undefined],
+      n_d: ["added", undefined, undefined],
     });
+  });
+
+  it("asks for a choice only while its conflict is unresolved", () => {
+    const diff = graphDiff(before, after);
+    expect(diffMarks(diff, items, new Set([0]))["n_c"]).toMatchObject({ kind: "changed", choice: true });
+    expect(diffMarks(diff, items, new Set())["n_c"]?.choice).toBeUndefined();
+  });
+
+  it("marks a node whose state a proposal changes though its definition is the same", () => {
+    const diff = graphDiff({ ...before, state: { nodes: { n_a: { state: "todo", provenance: "local" } } } }, { ...before, state: { nodes: { n_a: { state: "done", provenance: "local" } } } });
+    expect(diffMarks(diff, [], new Set())["n_a"]).toMatchObject({ kind: "changed" });
   });
 });
 
@@ -214,7 +173,7 @@ describe("reviewEntries (C14)", () => {
     const was = nodes([["a"], ["b", "a"], ["c", "b"], ["d"], ["e"]]);
     const now = nodes([["d"], ["e"], ["f"]]);
     const diff = graphDiff(was, now);
-    const entries = reviewEntries(diff, diffMarks(diff, []), was);
+    const entries = reviewEntries(diff, diffMarks(diff, [], new Set()), was);
     expect(entries.map((entry) => [entry.key, entry.cause])).toEqual([
       ["f", undefined],
       ["a", undefined],

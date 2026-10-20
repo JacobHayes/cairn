@@ -613,12 +613,6 @@
   line-height: 20px;
 }
 
-/* A diff's tag keeps its size on screen however far out the view is, so the word is always readable. */
-.node-mark-screen {
-  transform: scale(max(1, calc(1 / var(--z, 1))));
-  transform-origin: right bottom;
-}
-
 .node-mark-ink {
   color: var(--color-text);
   border-color: var(--color-text);
@@ -662,6 +656,80 @@
 
 .node-marked-bad {
   border-color: var(--color-error);
+}
+
+/* The proposal layer's marks (C14). No badge: a fill (area, so it reads at any zoom), an edge 2px on screen at any zoom whose style is the kind's own cue (solid added, dotted changed, dashed removed), and the change's word leading the card's kind line, inside the card, so it scales with it and can never outgrow or overlap anything. The edge is an outline drawn inside the border, so it takes no room and moves nothing. A choice is an accent ring outside the card, so it never hides the change edge. */
+.node-diff {
+  --diff-ink: var(--color-text);
+  --diff-fill: transparent;
+  --diff-style: solid;
+  --paper: linear-gradient(var(--diff-fill), var(--diff-fill)), var(--color-surface);
+  border-color: var(--diff-ink);
+  outline: calc(2px / var(--z, 1)) var(--diff-style) var(--diff-ink);
+  outline-offset: calc(-2px / var(--z, 1));
+}
+
+.node-diff-added {
+  --diff-ink: var(--color-success);
+  --diff-fill: var(--color-add);
+  --diff-style: solid;
+}
+
+.node-diff-changed {
+  --diff-ink: var(--color-warning);
+  --diff-fill: var(--color-change);
+  --diff-style: dotted;
+}
+
+.node-diff-removed {
+  --diff-ink: var(--color-error);
+  --diff-fill: var(--color-del);
+  --diff-style: dashed;
+}
+
+/* A container carries the fill on its head band only, so what is inside it stays readable; the edge is on its outline. */
+.node-container.node-diff {
+  --paper: var(--container-paper);
+}
+
+.node-container.node-diff > .node-inner {
+  background: linear-gradient(var(--diff-fill), var(--diff-fill));
+}
+
+.node-diff-choice {
+  box-shadow:
+    0 0 0 calc(2px / var(--z, 1)) var(--color-surface),
+    0 0 0 calc(4px / var(--z, 1)) var(--color-accent),
+    var(--shadow-sm);
+}
+
+.node-kind-line {
+  display: flex;
+  flex: 0 1 auto;
+  column-gap: var(--space-2);
+  min-width: 0;
+  max-width: 100%;
+}
+
+.node-kind-line > .node-kind {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.node-diff-word {
+  flex: none;
+  font: 600 12px / 24px var(--font-mono);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--diff-ink);
+}
+
+.node-diff-word::after {
+  content: "\00b7";
+  margin-left: var(--space-2);
+  color: var(--color-secondary);
 }
 
 /* A proposal's removal: the card stays where it was, ghosted, its title struck. */
@@ -902,4 +970,16 @@
 /* A faded line stays readable (a thin line loses more to the fade than a card does), but subordinate. */
 .line-faded {
   opacity: 0.5;
+}
+
+/* C14: what a proposal changes is the subject of the review, so a card it marks is never faded for being done or out of focus (a removed one stays ghosted). */
+.node-diff:not(.node-ghost):is(.node-done, .node-faded) {
+  opacity: 1;
+}
+
+/* C14: a card whose own state paints its background still shows the change's fill over it. */
+.node-diff.node-conditional,
+.node-diff.node-skipped,
+.node-diff.node-not-relevant {
+  background: var(--paper);
 }

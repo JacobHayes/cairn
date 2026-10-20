@@ -4,7 +4,8 @@
 use std::collections::{BTreeMap, BTreeSet};
 
 use cairn_schema::{
-    Actor, Domain, Entity, EntityKey, Event, JourneyId, Revision, RevisionOf, RouteId, RouteKind,
+    Actor, Domain, Entity, EntityKey, Event, JourneyId, Mutation, ProposalOutline, Revision,
+    RevisionOf, RouteId, RouteKind,
 };
 use cairn_store::backend;
 use cairn_store::{
@@ -315,6 +316,7 @@ async fn proposal_summary(
         created_by: row.parse(6)?,
         proposing_agent: row.opt_parse(7)?,
         created_at: row.timestamp(8)?,
+        outline: ProposalOutline::of(&row.json::<Vec<Mutation>>(9)?),
     })
 }
 
@@ -349,7 +351,7 @@ pub(crate) async fn proposals(
     };
     let select = format!(
         "SELECT id, destination_kind, destination_id, title, revision, destination_revision, \
-         created_by, proposing_agent, created_at FROM proposals \
+         created_by, proposing_agent, created_at, mutations FROM proposals \
          WHERE status = 'open' AND {scope}{after} ORDER BY created_at DESC, id DESC LIMIT {}",
         query.size.get() + 1
     );

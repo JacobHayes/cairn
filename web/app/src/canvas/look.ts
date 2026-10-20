@@ -69,7 +69,16 @@ export function nodeClasses(card: Card, options: { overlay?: CanvasOverlay | und
     classes.push("node-here");
   }
   const mark = overlay?.marks[card.key];
-  if (mark !== undefined) {
+  if (mark?.diff !== undefined) {
+    // The proposal layer's mark (C14): a fill, an edge whose style is the kind's, and a ring for a choice.
+    classes.push("node-diff", `node-diff-${mark.diff}`);
+    if (mark.choice === true) {
+      classes.push("node-diff-choice");
+    }
+    if (mark.ghost === true) {
+      classes.push("node-ghost");
+    }
+  } else if (mark !== undefined) {
     classes.push("node-marked", `node-marked-${mark.tone}`);
     if (mark.ghost === true) {
       classes.push("node-ghost");

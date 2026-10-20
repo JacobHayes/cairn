@@ -8,8 +8,8 @@ use serde::{Deserialize, Serialize};
 
 use cairn_schema::{
     AgentId, AttachmentKey, Domain, EntityKey, Event, EventType, GraphId, InsertionKey, JourneyId,
-    JourneyStatus, Lineage, NodeKey, PatchId, ProposalId, Revision, RouteHeader, RouteId,
-    Timestamp, Title, UserId, VersionNumber,
+    JourneyStatus, Lineage, NodeKey, PatchId, ProposalId, ProposalOutline, Revision, RouteHeader,
+    RouteId, Timestamp, Title, UserId, VersionNumber,
 };
 
 use crate::limits::PAGE_ITEM_COUNT_MAX;
@@ -270,6 +270,8 @@ pub struct ProposalSummary {
     pub proposing_agent: Option<AgentId>,
     /// When it was created.
     pub created_at: Timestamp,
+    /// What it does, in facts, worked out from its mutations (C14).
+    pub outline: ProposalOutline,
     /// Its destination as it is now.
     pub now: DestinationNow,
 }

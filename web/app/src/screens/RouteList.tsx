@@ -15,12 +15,15 @@ import { useNodeAddresses } from "../journeys/address.ts";
 
 import type { ViewState } from "../journeys/view.ts";
 import { containerKeys } from "../plan/tree.ts";
+import type { LevelRequest } from "../journeys/requests.ts";
 import { nodesOf, type Shown } from "./route-reads.ts";
 import { useRouteLevel } from "./route-views.ts";
 import { TreeFold, TreeGuides } from "../ui/Tree.tsx";
 import { NothingMatches, routeSubject, ViewBar } from "./ViewControls.tsx";
 import { Failed } from "../ui/Failed.tsx";
 import { useViewLevel } from "../canvas/viewLevel.ts";
+import { useReviewing } from "../proposals/layer.ts";
+import { DIFF_LABELS } from "../proposals/model.ts";
 
 export interface RouteListProps {
   shown: Shown;
@@ -61,13 +64,30 @@ function useListRows(tree: Tree, level: Schema<"Level"> | undefined, open: (key:
   }, [level, tree, open]);
 }
 
+/** C14: under a proposal's layer the route as it is, at the same level, supplies the rows the proposal removes, put back where they were; otherwise the route's own tree and level. */
+function useWithRemoved(shown: Shown, own: Tree, ownLevel: Schema<"Level"> | undefined, request: LevelRequest) {
+  const layer = useReviewing();
+  const was = layer?.removed.size === 0 ? undefined : layer?.beforeShown;
+  const wasRead = useRouteLevel(was ?? shown, request);
+  return useMemo(() => {
+    if (layer === undefined || was === undefined || wasRead.level === undefined || ownLevel === undefined) {
+      return { tree: own, level: ownLevel };
+    }
+    const gone = wasRead.level.nodes.filter((entry) => layer.removed.has(entry.key) && !ownLevel.nodes.some((each) => each.key === entry.key));
+    const goneNodes = nodesOf(was).filter((node) => gone.some((entry) => entry.key === node.key));
+    return { tree: treeOf({ ...shown.graph, nodes: [...(shown.graph.nodes ?? []), ...goneNodes] }), level: { ...ownLevel, nodes: [...ownLevel.nodes, ...gone] } };
+  }, [layer, was, wasRead.level, ownLevel, own, shown.graph]);
+}
+
 export function RouteList({ shown, state, picks, selected, unanchored, onOpen }: RouteListProps) {
   const addresses = useNodeAddresses();
   const navigate = useNavigate();
   const nodes = nodesOf(shown);
-  const tree = useMemo(() => treeOf(shown.graph), [shown.graph]);
-  const { step, current, level, error, dimmed: faded, badges } = useViewLevel({ screen: "list", state, nodes, selected, read: (request, at) => useRouteLevel(shown, request, at) });
+  const layer = useReviewing();
+  const own = useMemo(() => treeOf(shown.graph), [shown.graph]);
+  const { step, current, request, level: ownLevel, error, dimmed: faded, badges } = useViewLevel({ screen: "list", state, nodes, selected, read: (request, at) => useRouteLevel(shown, request, at) });
   const { open, fold } = useFolds(nodes, current, state.depth, step, picks, selected, (key) => void navigate(addresses.open(key)));
+  const { tree, level } = useWithRemoved(shown, own, ownLevel, request);
   const rows = useListRows(tree, level, open);
   const containers = useMemo(() => containerKeys(nodes), [nodes]);
   return (
@@ -78,6 +98,7 @@ export function RouteList({ shown, state, picks, selected, unanchored, onOpen }:
         <ul className="plain-list route-list route-tree" data-testid="route-list">
           {(rows ?? []).map(({ node, depth: indent, holds, guides }) => {
             const foot = ruleFoot(node, tree);
+            const diff = layer?.model?.marks[node.key];
             return (
               <li
                 key={node.key}
@@ -86,6 +107,8 @@ export function RouteList({ shown, state, picks, selected, unanchored, onOpen }:
                 data-node={node.key}
                 data-kind={node.kind}
                 data-container={containers.has(node.key)}
+                data-diff={diff?.kind}
+                data-choice={diff?.choice === true ? true : undefined}
                 data-faded={faded(node.key) ? true : undefined}
                 data-navigable={onOpen === undefined ? undefined : true}
                 aria-current={node.key === selected ? "true" : undefined}
@@ -93,6 +116,12 @@ export function RouteList({ shown, state, picks, selected, unanchored, onOpen }:
               >
                 <TreeGuides depth={indent} guides={guides} open={holds && open(node.key)} />
                 <TreeFold container={holds} open={open(node.key)} label={node.title} testId="row-fold" onFold={() => { fold(node.key); }} />
+                {diff === undefined ? null : (
+                  <span className="layer-word" data-testid="row-diff" data-diff={diff.kind}>
+                    {DIFF_LABELS[diff.kind]}
+                    {diff.choice === true ? <span className="layer-choice"> · needs a choice</span> : null}
+                  </span>
+                )}
                 {onOpen === undefined ? (
                   <span className="route-list-title">{node.title}</span>
                 ) : (

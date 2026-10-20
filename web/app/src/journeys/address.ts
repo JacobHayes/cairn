@@ -8,10 +8,11 @@
 //   /journeys/<id>                          a journey
 //   /journeys/<id>/nodes/<key>              a node selected in it
 //   /journeys/<id>/edges/<from>~<to>        an edge's card (the graph)
+//   /journeys/<id>/proposals/<pid>[/nodes/<key>]   the journey with a proposal's layer on (C14)
 //
 // `view=graph|list|timeline|summary|walk` says how a journey is looked at, and is written only
 // when it differs from the address's default (`defaultScreen`): the Summary for a bare journey,
-// the Graph for a node or an edge, so one state has one address. Beside it the view state every view
+// the Graph for a node, an edge or a proposal's layer, so one state has one address. Beside it the view state every view
 // shares (view.ts: `depth`, `fade`, `frontier`, `mine`, `owner`, `flag`, `show`, `q`) and each view's
 // own settings (the graph's `open`, `shut`, `lens`, `edit`, `map`; the list's `sort`, `cols`; the
 // timeline's `range`), which stay in the query when the view changes, so switching back restores
@@ -21,7 +22,7 @@ import { useLocation } from "react-router";
 
 import type { Schema } from "@cairn/client";
 
-import { destinationIn, pathTo, proposalAddress, required, usePage, type Page } from "../address.ts";
+import { pathTo, proposalAddress, required, usePage, type Page } from "../address.ts";
 import type { JourneyIndexQuery } from "../data/host.ts";
 import { routePath, routeScreenOf, spotOf } from "../routes/address.ts";
 
@@ -176,25 +177,41 @@ export interface JourneyTarget {
   journey: string;
   node?: string | undefined;
   edge?: string | undefined;
+  /** The proposal whose layer is on (C14); the page is the journey's own, with the proposal drawn over it. */
+  proposal?: string | undefined;
 }
 
 /**
  * The view an address opens when its query names none: the Summary for a bare journey, the Graph
- * for a node or an edge (a node's place and neighbourhood is what a node link is for). The one
- * place that says so.
+ * for a node, an edge or a proposal's layer (a node's place and neighbourhood is what a node link
+ * is for, and the layer has the Summary and the Walkthrough nothing to say). The one place that
+ * says so.
  */
 export function defaultScreen(target: JourneyTarget): Screen {
-  return target.node === undefined && target.edge === undefined ? "summary" : "graph";
+  return target.node === undefined && target.edge === undefined && target.proposal === undefined ? "summary" : "graph";
 }
 
-/** The view `params` names for `target` (`view=`), or its default; an unknown value is the default. */
+/** The screens a proposal's layer can be drawn over: the projections; the Summary and the Walkthrough describe the journey as it is. */
+export function layerScreen(screen: Screen): Projection {
+  return screen === "summary" || screen === "walk" ? "graph" : screen;
+}
+
+/**
+ * The view `params` names for `target` (`view=`), or its default; an unknown value is the default.
+ * Under a proposal's layer the Summary and the Walkthrough resolve to the Graph.
+ */
 export function screenOf(target: JourneyTarget, params: URLSearchParams): Screen {
   const view = params.get("view");
-  return SCREENS.find((each) => each === view) ?? defaultScreen(target);
+  const named = SCREENS.find((each) => each === view) ?? defaultScreen(target);
+  return target.proposal === undefined ? named : layerScreen(named);
 }
 
-/** The path of `target` alone: a journey, a node in it, or an edge (`<from>~<to>`). */
+/** The path of `target` alone: a journey, a node in it, an edge (`<from>~<to>`), or a proposal's layer over either. */
 function targetPath(target: JourneyTarget): string {
+  if (target.proposal !== undefined) {
+    const [journey, proposal] = [target.journey, target.proposal];
+    return target.node === undefined ? pathTo("journeyProposal", { journey, proposal }) : pathTo("journeyProposalNode", { journey, proposal, key: target.node });
+  }
   if (target.node !== undefined) {
     return pathTo("journeyNode", { journey: target.journey, key: target.node });
   }
@@ -226,6 +243,7 @@ export function journeyPath(target: JourneyTarget, screen: Screen = defaultScree
  * has no node to open, so closing keeps the version. A journey's or route's open proposals
  * have no node to close; a node opened from them opens on the journey, or in the route's
  * draft. Any other page, the deployment's open proposals among them, is unchanged.
+ * A proposal's layer is the page's own with the proposal on, so a node picked or closed keeps it.
  */
 export function nodeAddress(page: Page, search: string, key: string | undefined): string {
   const { name, params } = page;
@@ -251,12 +269,15 @@ export function nodeAddress(page: Page, search: string, key: string | undefined)
       return key === undefined ? `${pathTo("routeProposals", { route })}${query}` : routePath(route, { node: key, screen: routeScreenOf(new URLSearchParams(search)) }, search);
     }
     case "journeyProposal":
-    case "journeyProposalNode":
+    case "journeyProposalNode": {
+      const target = { journey: required(params, "journey"), proposal: required(params, "proposal") };
+      return journeyPath({ ...target, node: key }, screenOf(target, new URLSearchParams(search)), search);
+    }
     case "routeProposal":
     case "routeProposalNode":
+      return routePath(required(params, "route"), { proposal: required(params, "proposal"), node: key, screen: routeScreenOf(new URLSearchParams(search)) }, search);
     case "deploymentProposal":
-    case "deploymentProposalNode":
-      return `${proposalAddress(destinationIn(params), required(params, "proposal"), key)}${query}`;
+      return `${proposalAddress("deployment", required(params, "proposal"))}${query}`;
     default:
       return `${pathTo(name)}${query}`;
   }
@@ -289,7 +310,23 @@ export function screenSwitched(target: JourneyTarget, search: string, to: Screen
   const params = new URLSearchParams(search);
   const keeps = node ?? (to === "walk" && from !== "walk" ? undefined : target.node);
   const edge = to === "graph" && node === undefined && keeps === undefined ? target.edge : undefined;
-  return journeyPath({ journey: target.journey, node: keeps, edge }, to, params.toString());
+  return journeyPath({ journey: target.journey, node: keeps, edge, proposal: target.proposal }, to, params.toString());
+}
+
+/**
+ * C14: the layer of `proposal` over the page at `target` + `search`, keeping the view on screen: the
+ * Summary and the Walkthrough have no layer, so entering from them opens the layer's Graph; the
+ * Graph, the List and the Timeline keep their query, so a proposal opened from the List is the List with
+ * the layer on.
+ */
+export function layerEntry(target: JourneyTarget, search: string, proposal: string): string {
+  const screen = layerScreen(screenOf({ journey: target.journey }, new URLSearchParams(search)));
+  return journeyPath({ journey: target.journey, proposal }, screen, search);
+}
+
+/** C14: the page under the layer at `target` + `search` without it: the view on screen stays, written off the bare journey's own default. */
+export function layerExit(target: JourneyTarget, search: string): string {
+  return journeyPath({ journey: target.journey, node: target.node }, screenOf(target, new URLSearchParams(search)), search);
 }
 
 /**

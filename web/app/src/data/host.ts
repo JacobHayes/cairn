@@ -18,7 +18,9 @@ import type {
   RouteNoticesRequest,
   RouteSchedule,
   RouteScheduleRequest,
+  DerivationKey,
   Loaded,
+  LocalPreview,
   PreviewRequest,
 } from "@cairn/wasm";
 
@@ -129,7 +131,8 @@ export interface RouteFiles {
  * is owned by the load that made it: `load` answers the handle that `release` takes.
  */
 export interface Deriver {
-  load(document: string): Promise<Loaded>;
+  /** Derives and holds a document under its journey, or under `slot` (a proposal's journey as it would be after). */
+  load(document: string, slot?: string): Promise<Loaded>;
   derived(journey: string): Promise<Derived>;
   project<R extends ProjectionRequest>(journey: string, request: R): Promise<ProjectionAnswer<R>>;
   /** A10, G3: a message draft rendered with the held journey's context. */
@@ -142,8 +145,12 @@ export interface Deriver {
   routeNotices(request: RouteNoticesRequest): Promise<Schema<"Notice">[]>;
   /** A draft patch applied to the held journey, committing nothing (ARCHITECTURE, Web UI: previews). */
   apply(journey: string, request: ApplyRequest): Promise<AppliedLocally>;
-  /** C14: a proposal previewed against the held journey, committing nothing (ARCHITECTURE, Web UI: previews). */
-  preview(journey: string, request: PreviewRequest): Promise<Schema<"ProposalPreview">>;
+  /**
+   * C14: a proposal previewed against the journey held under `source`'s key, committing nothing
+   * (ARCHITECTURE, Web UI: previews); refused as stale when that is no longer the derivation held.
+   * A journey the proposal leaves is derived and held under `slot`.
+   */
+  preview(source: DerivationKey, request: PreviewRequest, slot: string): Promise<LocalPreview>;
   /** A draft patch applied to a route, committing nothing: the route as it would leave it. */
   applyRoute(request: RouteApplyRequest): Promise<Route>;
   /** Frees the derivation `handle`'s load made, unless a later load of the journey replaced it. */

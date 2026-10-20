@@ -6,10 +6,13 @@
 
 use crate::engine::support;
 
-use cairn_engine::{Records, preview, relink, save_as_route, upgrade};
+use cairn_engine::{
+    Records, candidate, destination_after, preview, relink, save_as_route, upgrade,
+};
 use cairn_schema::{
-    ConflictResolution, Domain, Lineage, LocalEdit, NodeField, ParticipationMapping,
-    ParticipationSource, ProposalDraft, Provenance, ReviewItem, VersionNumber,
+    ConflictResolution, DestinationAfter, Domain, Graph, Lineage, LocalEdit, NodeField,
+    ParticipationMapping, ParticipationSource, ProposalDraft, Provenance, ReviewItem,
+    VersionNumber,
 };
 
 const SAVED: &str = "vendor-saved";
@@ -191,6 +194,17 @@ fn a_difference_is_kept_unless_the_route_value_is_taken() {
     assert!(graph.state.local_edits.is_empty());
 }
 
+/// The graph the proposal's candidate leaves in its destination: a journey's, or a route's draft.
+fn graph_after(records: &Records, destination: &Domain, draft: &ProposalDraft) -> Graph {
+    let candidate = candidate(records, destination, draft, &support::fixed_inputs());
+    let after = candidate.after.expect("a valid candidate");
+    match destination_after(&after, destination, &support::derive_inputs_of(records)) {
+        DestinationAfter::Journey { document } => document.journey.graph,
+        DestinationAfter::Route { route, .. } => route.draft.expect("the draft it leaves").graph,
+        other => panic!("a graph destination, not {other:?}"),
+    }
+}
+
 /// B8: each mapping choice for an explicit entity, as the preview of the saved route's draft
 /// shows it: dropped, mapped to a role, to a new role, or to the default owner's role.
 #[test]
@@ -239,7 +253,11 @@ fn each_participation_mapping() {
             shown.unresolved.is_empty() && shown.violations.is_empty(),
             "{mapping:?}: {shown:#?}"
         );
-        let graph = shown.graph.unwrap();
+        let graph = graph_after(
+            &records,
+            &Domain::Route(SAVED.parse().unwrap()),
+            &mapped(&draft, &mapping),
+        );
         let owner = graph
             .nodes
             .get(&support::key("n_local"))
@@ -283,7 +301,7 @@ fn an_upgrade_preview_shows_the_journey_after() {
     );
     assert_eq!(shown.unresolved.len(), 1);
     assert_eq!(shown.violations.len(), 0);
-    let graph = shown.graph.unwrap();
+    let graph = graph_after(&records, &Domain::Journey(journey_id()), &draft);
     assert_eq!(
         graph
             .nodes

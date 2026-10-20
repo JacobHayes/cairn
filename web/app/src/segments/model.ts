@@ -8,7 +8,7 @@ import type { Schema } from "@cairn/client";
 import { decisionsIn } from "../authoring/condition.ts";
 import { childrenOf, type Graph, type GraphNode, type Kind, type Mutation, type Role, type Tree } from "../authoring/graph.ts";
 import { mintKey, slugOf, uniqueId } from "../authoring/keys.ts";
-import { DIFF_LABELS, type DiffMark } from "../proposals/model.ts";
+import { type DiffMark } from "../proposals/model.ts";
 import { plural } from "../ui/words.ts";
 
 type Lineage = Schema<"Lineage">;
@@ -210,7 +210,7 @@ export function insertionMembers(before: Graph | null | undefined, after: Graph 
 
 /** The marks of a diff with each added member saying which insertion it belongs to, on the tag's hover and in the list's foot. */
 export function noteOrigins(marks: Record<string, DiffMark>, members: Record<string, string>): Record<string, DiffMark> {
-  return Object.fromEntries(Object.entries(marks).map(([key, mark]) => [key, members[key] !== undefined && mark.label === DIFF_LABELS.added ? { ...mark, note: members[key] } : mark]));
+  return Object.fromEntries(Object.entries(marks).map(([key, mark]) => [key, members[key] !== undefined && mark.kind === "added" ? { ...mark, note: members[key] } : mark]));
 }
 
 /** The roles `after` has that `before` does not: what an insertion adds besides nodes. */

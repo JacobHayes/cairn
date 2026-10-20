@@ -1849,6 +1849,31 @@ export interface components {
              */
             today: string;
         };
+        /**
+         * @description What a destination is once a proposal applies (C14), as the engine works it out from the
+         *     candidate records: what the views draw in place of the destination.
+         */
+        DestinationAfter: {
+            /** @constant */
+            destination: "journey";
+            /** @description The document after. */
+            document: components["schemas"]["DomainDocument"];
+        } | {
+            /** @constant */
+            destination: "route";
+            /** @description The latest version after, when the candidate holds it. */
+            latest?: components["schemas"]["RouteVersion"] | null;
+            /** @description The route after. */
+            route: components["schemas"]["Route"];
+        } | {
+            /** @description The deployment after. */
+            deployment: components["schemas"]["Deployment"];
+            /** @constant */
+            destination: "deployment";
+        } | {
+            /** @constant */
+            destination: "gone";
+        };
         /** @description What a proposal's destination is. */
         DestinationKind: "journey" | "route" | "segment" | "deployment";
         /** @description A proposal's destination as it is now (C14). */
@@ -3587,6 +3612,57 @@ export interface components {
             /** @description Its owners; empty when unassigned. */
             owners?: components["schemas"]["EntityKey"][];
         };
+        /**
+         * @description One thing a proposal does to its destination's own header or lifecycle (C14), as a fact
+         *     the listing and the review word the same way.
+         */
+        OutlineFact: {
+            /** @constant */
+            fact: "creates_journey";
+        } | {
+            /** @constant */
+            fact: "edits_journey";
+        } | {
+            /** @constant */
+            fact: "sets_journey_status";
+            /** @description The status. */
+            status: components["schemas"]["JourneyStatus"];
+        } | {
+            /** @constant */
+            fact: "deletes_journey";
+        } | {
+            /** @constant */
+            fact: "creates_route";
+        } | {
+            /** @constant */
+            fact: "edits_route";
+        } | {
+            /** @constant */
+            fact: "retires_route";
+        } | {
+            /** @constant */
+            fact: "restores_route";
+        } | {
+            /** @constant */
+            fact: "opens_draft";
+        } | {
+            /** @constant */
+            fact: "discards_draft";
+        } | {
+            /** @constant */
+            fact: "publishes_draft";
+        } | {
+            /** @constant */
+            fact: "upgrades";
+            /** @description The version. */
+            to: components["schemas"]["VersionNumber"];
+        } | {
+            /** @constant */
+            fact: "relinks";
+        } | {
+            /** @constant */
+            fact: "inserts_segment";
+        };
         /** @description An override to apply (PRD glossary, Override; Gating; D1a; D4). */
         Override: {
             force_include: {
@@ -4098,6 +4174,61 @@ export interface components {
         /** @description Which open proposals `GET /api/proposals` lists: those no one destination holds. */
         ProposalListing: "waiting" | "new_journeys" | "new_routes";
         /**
+         * @description What a proposal does, as counts of the things it names (C14): the facts about its
+         *     destination's header first, then the nodes it adds, changes and removes (each node once,
+         *     by the mutations that name it), the requirements, the entities, and everything else in one
+         *     count. Derived from the mutations alone on every read, never stored.
+         */
+        ProposalOutline: {
+            /**
+             * Format: uint32
+             * @description Entities it creates.
+             */
+            entities_created?: number;
+            /**
+             * Format: uint32
+             * @description Entities it edits.
+             */
+            entities_edited?: number;
+            /**
+             * Format: uint32
+             * @description Entities it merges into another.
+             */
+            entities_merged?: number;
+            /** @description The header and lifecycle facts, in the order the mutations make them, each once. */
+            facts?: components["schemas"]["OutlineFact"][];
+            /**
+             * Format: uint32
+             * @description Nodes it adds.
+             */
+            nodes_added?: number;
+            /**
+             * Format: uint32
+             * @description Nodes it changes: definition or state; a node it adds and then changes counts as added.
+             */
+            nodes_changed?: number;
+            /**
+             * Format: uint32
+             * @description Nodes it removes, a removal's descendants included.
+             */
+            nodes_removed?: number;
+            /**
+             * Format: uint32
+             * @description Roles, participation kinds, role fills, the default owner and annotations it changes.
+             */
+            other?: number;
+            /**
+             * Format: uint32
+             * @description Requirements it adds.
+             */
+            requirements_added?: number;
+            /**
+             * Format: uint32
+             * @description Requirements it removes.
+             */
+            requirements_removed?: number;
+        };
+        /**
          * @description What a proposal would do to its destination now (C14, I6), for review: the items still
          *     unresolved, and the candidate the resolved mutations produce, with every violation strict
          *     validation finds in it.
@@ -4108,15 +4239,12 @@ export interface components {
             /** @description For a journey, its frontier after, in rank order. */
             frontier?: components["schemas"]["NodeKey"][];
             /**
-             * @description The destination's graph after: a journey's, or a route's draft. None when the
-             *     candidate is invalid, or for the deployment.
-             */
-            graph?: components["schemas"]["Graph"] | null;
-            /**
              * @description For a route's draft, the advisory notices of the graph after (A20); they never make
              *     the proposal invalid.
              */
             notices?: components["schemas"]["Notice"][];
+            /** @description What the proposal as previewed (the reviewer's edits included) does, in facts. */
+            outline: components["schemas"]["ProposalOutline"];
             /** @description Items that still need a choice; the preview leaves their effect out. */
             unresolved?: components["schemas"]["UnresolvedItem"][];
             /** @description Every violation of the candidate; empty when the resolved proposal would apply. */
@@ -4128,6 +4256,11 @@ export interface components {
          */
         ProposalReview: {
             /**
+             * @description What the destination would be once it applies: a route, the deployment, or a journey
+             *     the proposal creates; none when the candidate breaks a rule.
+             */
+            after?: components["schemas"]["DestinationAfter"] | null;
+            /**
              * @description D7, by journey: what applying it would newly cause; a journey with nothing new is left
              *     out.
              */
@@ -4136,7 +4269,7 @@ export interface components {
             };
             /**
              * @description Its items still unresolved, the violations of its candidate, and for a journey the
-             *     graph and frontier after.
+             *     frontier after.
              */
             preview: components["schemas"]["ProposalPreview"];
             /** @description The proposal, at the editing revision a reviewer applies. */
@@ -4176,6 +4309,8 @@ export interface components {
             id: components["schemas"]["ProposalId"];
             /** @description Its destination as it is now. */
             now: components["schemas"]["DestinationNow"];
+            /** @description What it does, in facts, worked out from its mutations. */
+            outline: components["schemas"]["ProposalOutline"];
             /** @description The agent that drafted it, if any. */
             proposing_agent?: components["schemas"]["AgentId"] | null;
             /** @description Its editing revision. */

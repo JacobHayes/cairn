@@ -50,6 +50,8 @@ export function Badge({
   children: ReactNode;
   "data-testid"?: string;
   "data-status"?: string;
+  /** The kind of change a proposal's layer makes to what this chip says (proposals/layer.ts). */
+  "data-diff"?: string;
   title?: string;
 }) {
   return (

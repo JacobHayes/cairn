@@ -11,7 +11,7 @@
 // its release, whenever it arrives, names a load no longer held.
 import { loadEngine, type DerivedDocument, type Engine } from "./engine.ts";
 import type { Envelope, Reply, WorkerRequest } from "./protocol.ts";
-import { HostFailure, failureOf, stoppedBy, type DerivationHandle, type DerivationKey } from "./types.ts";
+import { HostFailure, failureOf, stoppedBy, type DerivationHandle, type DerivationKey, type Loaded, type PreviewRequest } from "./types.ts";
 
 /** The parts of a dedicated worker's global scope this script uses. */
 interface WorkerScope {
@@ -59,20 +59,43 @@ function older(posted: DerivationKey, held: DerivationKey): boolean {
  * number; one older than what is held is refused, so a late reply to an earlier fetch never
  * replaces a newer view.
  */
-function load(document: string): string {
+function load(document: string, slot?: string): string {
   const derivation = ready().derive(document);
-  const journey = derivation.key.journey;
-  const current = held.get(journey);
-  if (current !== undefined && older(derivation.key, current.derivation.key)) {
+  const name = slot ?? derivation.key.journey;
+  const current = held.get(name);
+  // A slot is replaced by its next load whatever its revision: it holds a preview, not a revision.
+  if (slot === undefined && current !== undefined && older(derivation.key, current.derivation.key)) {
     derivation.free();
     throw new HostFailure({ error: "superseded", held: current.derivation.key, posted: derivation.key });
   }
   current?.derivation.free();
   loads += 1;
-  held.set(journey, { document, derivation, load: loads });
-  const handle: DerivationHandle = { journey, load: loads };
-  return JSON.stringify({ key: derivation.key, handle });
+  held.set(name, { document, derivation, load: loads });
+  const handle: DerivationHandle = { journey: name, load: loads };
+  // A slot's key names the slot and its load, so what is read from one preview is never read from the next.
+  const key: DerivationKey = slot === undefined ? derivation.key : { ...derivation.key, journey: slot, generation: loads };
+  return JSON.stringify({ key, handle });
 }
+
+/**
+ * A proposal previewed against the journey held under `journey`, which must still be the
+ * derivation `posted` was read from; the journey it would leave is derived and held under `slot`.
+ */
+function preview(journey: string, posted: DerivationKey, request: PreviewRequest, slot: string): string {
+  const source = holding(journey);
+  const now = source.derivation.key;
+  if (now.revision !== posted.revision || now.deployment_revision !== posted.deployment_revision || now.today !== posted.today) {
+    throw new HostFailure({ error: "superseded", held: now, posted });
+  }
+  const answer = ready().preview(source.document, request);
+  if (answer.after?.destination !== "journey") {
+    // Nothing to derive; what the slot held stays until its owner releases it.
+    return JSON.stringify(answer);
+  }
+  const loaded = JSON.parse(load(JSON.stringify(answer.after.document), slot)) as Loaded;
+  return JSON.stringify({ ...answer, loaded });
+}
+
 
 /** Frees the derivation `handle` owns, if its load is still the one held. */
 function release(handle: DerivationHandle): void {
@@ -97,7 +120,7 @@ async function answer(request: WorkerRequest): Promise<string> {
       engine = await loadEngine(request.wasm);
       return "";
     case "load":
-      return load(request.document);
+      return load(request.document, request.slot);
     case "derived":
       return holding(request.journey).derivation.derivedText();
     case "project":
@@ -105,7 +128,7 @@ async function answer(request: WorkerRequest): Promise<string> {
     case "render_draft":
       return holding(request.journey).derivation.renderDraftText(request.request);
     case "preview":
-      return ready().previewText(holding(request.journey).document, request.request);
+      return preview(request.journey, request.key, request.request, request.slot);
     case "apply":
       return ready().applyText(holding(request.journey).document, request.request);
     case "release":

@@ -1,4 +1,4 @@
-// What proposal review's browser tests share (brief 5.7): the vendor evaluation's
+// What proposal review's browser tests share : the vendor evaluation's
 // version 2 published from its file, the journey's local edits that meet it, a proposal's
 // review items and controls, and confirming and applying it, each the way a person does it.
 import { fileURLToPath } from "node:url";
@@ -39,15 +39,16 @@ export async function editWhereVersionTwoChanges(page: Page, host: HostKind): Pr
   await saveForm(page);
 }
 
-/** The review screen, once its proposal is read and previewed. */
+/** The review rail, once the proposal's layer is on its destination's page and the proposal is read and previewed. */
 export async function reviewOpen(page: Page): Promise<Locator> {
-  const proposal = page.getByTestId("proposal");
-  await expect(proposal).toBeVisible();
+  await expect(page.getByTestId("layer-band")).toHaveAttribute("data-mode", "reviewing");
+  const rail = page.getByTestId("proposal-rail");
+  await expect(rail).toBeAttached();
   await expect(page.getByTestId("canvas")).toBeVisible();
-  return proposal;
+  return rail;
 }
 
-/** Picks `node`'s card on the diff, which puts its item editor in the inspector. The diff opens on its first change, so the card may be off screen: the click is sent to the card itself, as panning to it would. */
+/** Picks `node`'s card on the layer, which puts its item editor in the inspector. The layer opens on its first change, so the card may be off screen: the click is sent to the card itself, as panning to it would. */
 export async function pickNode(page: Page, node: string): Promise<void> {
   await nodeCard(page, node).getByTestId("card-open").dispatchEvent("click");
   await expect(page.getByTestId("item-editor")).toHaveAttribute("aria-label", await nodeCard(page, node).getByTestId("title").innerText());
@@ -88,16 +89,15 @@ export async function blockers(page: Page): Promise<string[]> {
 
 /** Saves the reviewer's edits and waits for the proposal's new revision. */
 export async function saveEdits(page: Page): Promise<void> {
-  const revision = Number(await page.getByTestId("proposal").getAttribute("data-revision"));
+  const revision = Number(await page.getByTestId("proposal-rail").getAttribute("data-revision"));
   await page.getByTestId("save-proposal").click();
   await expect(page.getByTestId("unsaved")).toHaveCount(0);
-  await expect.poll(async () => Number(await page.getByTestId("proposal").getAttribute("data-revision"))).toBeGreaterThan(revision);
+  await expect.poll(async () => Number(await page.getByTestId("proposal-rail").getAttribute("data-revision"))).toBeGreaterThan(revision);
 }
 
-/** Confirms the review and applies, waiting for the proposal to be applied. */
-export async function confirmAndApply(page: Page): Promise<void> {
-  await page.getByTestId("reviewed").check();
+/** Applies in one click, waiting for the page to say so: the destination as the proposal left it, its band saying the proposal was applied. */
+export async function apply(page: Page): Promise<void> {
   await expect.poll(() => blockers(page)).toEqual([]);
   await page.getByTestId("apply-proposal").click();
-  await expect(page.getByTestId("proposal-status")).toHaveAttribute("data-status", "applied");
+  await expect(page.getByTestId("layer-band")).toHaveAttribute("data-mode", "applied");
 }

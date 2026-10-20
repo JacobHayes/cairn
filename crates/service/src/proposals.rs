@@ -13,10 +13,10 @@ use std::collections::{BTreeMap, BTreeSet};
 
 use cairn_engine::{ApplyInputs, Records, apply, resolve_partial};
 use cairn_schema::{
-    Consequences, Domain, EventType, JourneyId, Markdown, Mutation, Mutations, Patch, PatchId,
-    PatchReceipt, PatchTarget, Proposal, ProposalDraft, ProposalId, ProposalPreview,
-    ProposalStatus, Record, Rejection, Revision, RevisionConflict, RevisionOf, Subject, TouchedSet,
-    Write,
+    Consequences, DestinationAfter, Domain, EventType, JourneyId, Markdown, Mutation, Mutations,
+    Patch, PatchId, PatchReceipt, PatchTarget, Proposal, ProposalDraft, ProposalId,
+    ProposalPreview, ProposalStatus, Record, Rejection, Revision, RevisionConflict, RevisionOf,
+    Subject, TouchedSet, Write,
 };
 use cairn_store::{
     Document, EventQuery, LoadTarget, PageSize, ProposalCursor, ProposalPage, ProposalQuery,
@@ -54,13 +54,17 @@ pub enum ProposalWritten {
 
 /// C14, D7, I6: a proposal under review: what applying it now would do, and, when its
 /// destination moved since it was drafted, what moved.
-#[derive(Clone, Debug, PartialEq, Eq)]
+#[derive(Clone, Debug, PartialEq)]
 pub struct ProposalReview {
     /// The proposal, at the editing revision a reviewer applies.
     pub proposal: Proposal,
     /// Its items still unresolved, the violations of its candidate, and for a journey the
-    /// graph and frontier after.
+    /// frontier after.
     pub preview: ProposalPreview,
+    /// What the destination would be once it applies: a route, the deployment, or a journey the
+    /// proposal creates (an existing journey's is previewed where it is held). None when the
+    /// candidate breaks a rule.
+    pub after: Option<DestinationAfter>,
     /// D7, by journey: what applying it would newly cause in each journey it changes, or
     /// whose meaning an entity merge in it changes; a journey with nothing new is left out.
     pub consequences: BTreeMap<JourneyId, Consequences>,
@@ -308,14 +312,16 @@ impl Service {
         let derive_inputs =
             self.settings
                 .derive_inputs(today, BTreeSet::new(), records.deployment.clone());
-        let (preview, consequences) = engine(destination, || {
-            let preview = cairn_engine::preview(
-                records,
-                destination,
-                &proposal.draft,
-                &inputs,
-                &derive_inputs,
-            );
+        let (preview, after, consequences) = engine(destination, || {
+            let candidate = cairn_engine::candidate(records, destination, &proposal.draft, &inputs);
+            let preview =
+                cairn_engine::preview_of(records, destination, &candidate, &derive_inputs);
+            let creating = proposal.draft.destination_revision == Revision::NONE;
+            let after = candidate.after.as_ref().ok().and_then(|after| {
+                let shown = cairn_engine::destination_after(after, destination, &derive_inputs);
+                // An existing journey is previewed where it is held, over the reviewer's edits.
+                (creating || !matches!(shown, DestinationAfter::Journey { .. })).then_some(shown)
+            });
             let consequences = match &destination {
                 Domain::Journey(journey) => preview
                     .consequences
@@ -328,11 +334,12 @@ impl Service {
                 }
                 Domain::Deployment | Domain::Route(_) => BTreeMap::new(),
             };
-            (preview, consequences)
+            (preview, after, consequences)
         })?;
         Ok(ProposalReview {
             proposal,
             preview,
+            after,
             consequences,
             stale,
         })

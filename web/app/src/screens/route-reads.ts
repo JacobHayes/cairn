@@ -56,9 +56,9 @@ export const ROUTE_GRAPH: ReadSource<{ host: Host; id: string; version: number |
   }),
 };
 
-/** The key of a route's graph: the same read for the same route and version. */
-export function routeGraphKey(host: Host, id: string, version: number | undefined): ReadKey<{ host: Host; id: string; version: number | undefined }> {
-  return { identity: [id, version], freshness: [], args: { host, id, version } };
+/** The key of a route's graph: the same read for the same route and version; `freshness` is whatever else says it is to be read again (a proposal that created the route applying). */
+export function routeGraphKey(host: Host, id: string, version: number | undefined, freshness: readonly unknown[] = []): ReadKey<{ host: Host; id: string; version: number | undefined }> {
+  return { identity: [id, version], freshness, args: { host, id, version } };
 }
 
 /** What a route's level is derived from. */

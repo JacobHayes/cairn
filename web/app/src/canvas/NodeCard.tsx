@@ -18,7 +18,7 @@ import { NEAR_ZOOM } from "./gestures.ts";
 import type { LensChip } from "./lens.ts";
 import { hereWords, nodeClasses } from "./look.ts";
 import { RANK_TAG_COUNT, type Card, type CardBody } from "./model.ts";
-import type { CanvasOverlay } from "./overlay.ts";
+import type { CanvasOverlay, OverlayMark } from "./overlay.ts";
 import { progressWords } from "./words.ts";
 
 import { plural } from "../ui/words.ts";
@@ -40,6 +40,7 @@ export interface CardActions {
 }
 
 export const CardActionsContext = createContext<CardActions | undefined>(undefined);
+
 
 /** What the canvas hands each card. */
 export type CardData = {
@@ -85,12 +86,21 @@ function Title({ card }: { card: Card }) {
   );
 }
 
-function Head({ card, collapsible }: { card: Card; collapsible: boolean }) {
+/** The head: the kind at the left, led by the word of a proposal's mark when the card has one (C14), and the display-state chip at the right. */
+function Head({ card, collapsible, mark }: { card: Card; collapsible: boolean; mark: OverlayMark | undefined }) {
   const journey = card.journey;
   return (
     <div className="node-head">
       <span className="node-head-label">
-        <span className="node-kind">{kindWord(card.kind, card.stage)}</span>
+        <span className="node-kind-line">
+          {mark?.diff === undefined ? null : (
+            <span className="node-diff-word" data-testid="card-diff" data-diff={mark.diff}>
+              {mark.label}
+              {mark.choice === true ? " \u00b7 needs a choice" : ""}
+            </span>
+          )}
+          <span className="node-kind">{kindWord(card.kind, card.stage)}</span>
+        </span>
         {journey?.current === true ? (
           <span className="node-current" data-testid="card-current">
             current
@@ -255,8 +265,8 @@ function Hanging({ data }: { data: CardData }) {
           {rank}
         </span>
       )}
-      {mark === undefined || mark.quiet === true ? null : (
-        <span className={`node-mark hang-tag top node-mark-${mark.tone}${overlay?.screenTags === true ? " node-mark-screen" : ""}`} data-overhang="" data-testid="card-mark" data-status={mark.label} title={mark.note}>
+      {mark === undefined || mark.quiet === true || mark.diff !== undefined ? null : (
+        <span className={`node-mark hang-tag top node-mark-${mark.tone}`} data-overhang="" data-testid="card-mark" data-status={mark.label} title={mark.note}>
           {mark.label}
         </span>
       )}
@@ -320,16 +330,18 @@ export function NodeCard({ data, width, height }: NodeProps<CardNode>) {
       data-state={journey?.state}
       data-relevance={journey?.relevance}
       data-here={here.join(", ") || undefined}
-      data-trace={mark?.label}
+      data-trace={mark?.diff === undefined ? mark?.label : undefined}
+      data-diff={mark?.diff}
+      data-choice={mark?.choice === true ? "" : undefined}
       data-parent={card.parent}
       data-x={data.place.x}
       data-y={data.place.y}
-      title={here.length === 0 ? undefined : `I am here: ${here.join(", ")}`}
+      title={mark?.diff === undefined ? (here.length === 0 ? undefined : `I am here: ${here.join(", ")}`) : `${mark.label}: ${card.title}${mark.choice === true ? ", needs a choice" : ""}${mark.note === undefined ? "" : `. ${mark.note}`}`}
     >
       <Handle type="target" position={Position.Left} isConnectable={false} className="node-handle" data-overhang="" />
       {header === undefined ? (
         <div className="node-inner" style={{ height: "100%" }}>
-          <Head card={card} collapsible={data.collapsible} />
+          <Head card={card} collapsible={data.collapsible} mark={mark} />
           <TitleRow card={card} rows={rows} />
           {journey?.body === undefined ? null : <Body body={journey.body} card={card} />}
           <Foot card={card} />
@@ -339,7 +351,7 @@ export function NodeCard({ data, width, height }: NodeProps<CardNode>) {
         // An open container: its head (kind, title, progress), a rule under it, then the hidden-prerequisites marker and the children.
         <>
           <div className="node-inner" style={{ height: header - BORDER_PX - (rows.marker ? MARKER_ROW_PX : 0) }}>
-            <Head card={card} collapsible={data.collapsible} />
+            <Head card={card} collapsible={data.collapsible} mark={mark} />
             <TitleRow card={card} rows={rows} head={{ box: headTitleBox(width ?? 0, header, rows.marker), chip: card.stage && journey !== undefined }} />
             {journey?.body === undefined ? null : <Body body={journey.body} card={card} />}
             <Foot card={card} owner={false} />

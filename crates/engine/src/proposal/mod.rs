@@ -4,7 +4,7 @@
 mod preview;
 mod resolve;
 
-pub use preview::preview;
+pub use preview::{Candidate, candidate, destination_after, preview, preview_of};
 
 pub(crate) use resolve::item_node;
 pub use resolve::{Resolved, resolve, resolve_partial};

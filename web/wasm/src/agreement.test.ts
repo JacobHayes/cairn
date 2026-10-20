@@ -23,14 +23,15 @@ function fresh() {
 const index = JSON.parse(readFileSync(join(cases, "index.json"), "utf8")) as IndexEntry[];
 
 /** The answer a case's call gets here: the worker for what reads its held document, the page's engine for the rest. */
-function answer(worker: DeriveWorker, engine: Engine, journey: string, call: Case["call"]): Promise<string> | string {
+function answer(worker: DeriveWorker, engine: Engine, journey: string, document: string | undefined, call: Case["call"]): Promise<string> | string {
   switch (call.kind) {
     case "derive":
       return worker.derivedText(journey);
     case "project":
       return worker.projectText(journey, call.request);
     case "preview":
-      return worker.previewText(journey, call.request);
+      // The server's preview is the preview alone; the browser's also carries the journey it would leave.
+      return JSON.stringify((JSON.parse(engine.previewText(document ?? "", call.request)) as { preview: unknown }).preview);
     case "apply":
       return worker.applyText(journey, call.request);
     case "export":
@@ -50,7 +51,7 @@ it.each(index)("the browser host agrees with the server: $label", async (entry) 
   const journey = group.document === undefined ? "" : (await worker.load(group.document)).key.journey;
   const differing: string[] = [];
   for (const found of group.cases) {
-    const answered = await Promise.resolve(answer(worker, engine, journey, found.call)).catch((thrown: unknown) => `error: ${String(thrown)}`);
+    const answered = await Promise.resolve(answer(worker, engine, journey, group.document, found.call)).catch((thrown: unknown) => `error: ${String(thrown)}`);
     if (answered !== found.expected) {
       let at = 0;
       while (at < answered.length && answered[at] === found.expected[at]) {
