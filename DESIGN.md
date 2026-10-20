@@ -145,7 +145,7 @@ For ordered values, use `--ramp-1` to `--ramp-4`, four steps of the neutral ramp
 | Section title (h2) | Space Grotesk | 1.25rem / 700 | uppercase |
 | Sub-label (h3), module label, column header, key | IBM Plex Mono | 12-13px / 500 | uppercase, letter-spacing .06-.08em, steel |
 | Prose and card text | IBM Plex Sans | 17px / 400 | line-height 1.5, letter-spacing .01em |
-| Rows, controls, inspector text | IBM Plex Sans | 15px | sentence case; generous line height; inspector section headings are 15px / 600, and its meta lines 13px mono |
+| Rows, body and inspector text (a control's own label is the Buttons entry's 14px) | IBM Plex Sans | 15px | sentence case; generous line height; inspector section headings are 15px / 600, and its meta lines 13px mono |
 | Node title in the inspector | Space Grotesk | 1.25rem / 700 | the h2 face and size in **sentence case**: a node title is the author's prose, often a full question |
 | Graph node card | IBM Plex Sans title, Plex Mono kind and dates | title 15px / 600, at most 2 lines; kind as the 12px label; dates 12.5px mono | a card is a dense instrument read at varying zoom, so its title sits below the 17px card text |
 | Numbers, hashes, ids, paths, emails, code | IBM Plex Mono | 12.5-13px | `font-variant-numeric: tabular-nums`; keep their case |
@@ -221,7 +221,7 @@ Mono uppercase is kept for labels, column headers, keys and status chips; button
 ## Accessibility
 
 - Ink on paper and text on chrome both meet WCAG AA: 4.5:1 for small text, including muted text on the header band (held by the contrast test).
-- Prose is at least 17px, and rows, controls and inspector text at least 15px.
+- Prose is at least 17px, and row, body and inspector text at least 15px. A control's own label (a button, a select) is the 14px of the Buttons entry, at the control height; the text a control sits among stays at the floor.
 - Every interactive element shows a visible 2px focus ring.
 - State is never shown by colour alone: status has a label, and selection has a line as well as the tint.
 - Motion is additive and fully off under `prefers-reduced-motion`.

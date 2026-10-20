@@ -29,6 +29,13 @@ Journeys: the same two positions, with its own filters in the toolbar.
 ![Entities on a phone](after-entities-phone.png)
 Entities: the title row has the same slot for its action (empty until its own rework), and Merge entities, its one tool, sits in the toolbar row.
 
+![Journeys on a phone](after-journeys-phone.png)
+A phone's journey row reads name, route and version (and an upgrade notice first when there is one), progress and next milestone, then the attention line.
+
+![Home on a phone, dark](after-home-phone-dark.png)
+![Journeys with no match, dark](after-journeys-empty-phone-dark.png)
+Dark theme and the empty answer keep the same head and toolbar positions.
+
 ## Phone top bar
 
 The phone's top bar already has no "You" tab or "?" key hint: who you are is one tap away in the sync dot's popover, and the keyboard help is for widths with a keyboard. No change was needed.
@@ -36,4 +43,4 @@ The phone's top bar already has no "You" tab or "?" key hint: who you are is one
 ## Known limits
 
 - Entities has no primary action yet; its add form still sits open under the toolbar.
-- Journeys on a phone show the worst warning and the ready count together when both exist; a row with neither draws neither.
+- Failed reads cannot be induced in the browser host, so their look is not shown here.

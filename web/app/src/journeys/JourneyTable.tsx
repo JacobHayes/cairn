@@ -50,7 +50,7 @@ export function JourneyCell({ summary, routes }: { summary: JourneySummary; rout
         </span>
         {upgrade === undefined ? null : (
           <>
-            <span className="cell-lineage">{" · "}</span>
+            <span className="cell-sep">{" · "}</span>
             <span className="flag-warn" data-testid="upgrade" data-status="available">
               {upgrade}
             </span>

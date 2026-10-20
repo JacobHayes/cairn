@@ -678,6 +678,9 @@ table.data {
 .index-state p {
   margin: 0;
 }
+.index-state-empty {
+  position: relative;
+}
 .index-state-loading {
   border-style: dashed;
   color: var(--color-muted);
@@ -707,7 +710,8 @@ table.data {
   background: var(--color-surface);
   box-shadow: var(--shadow-sm);
 }
-.index-table::after {
+.index-table::after,
+.index-state-empty::after {
   --tick: linear-gradient(var(--color-tick), var(--color-tick));
   content: "";
   position: absolute;
@@ -798,9 +802,14 @@ table.data {
   text-decoration: underline;
 }
 
+/* A row's name is its title: heavier than the context under it. */
+.index-table td:first-child .cell-first > a {
+  font-weight: 600;
+}
+
 /* On a phone each row is a block with an edge hairline, no inner cell borders. The header row stays
-   in the document for screen readers. Line 1 is the name; then the upgrade notice when there is one
-   (the route and version it came from are for wider screens); then the context, a wrapping steel
+   in the document for screen readers. Line 1 is the name; then the upgrade notice when there is one;
+   then the route and version it came from; then the context, a wrapping steel
    line (progress and next milestone) whose pieces flow as one; then one
    attention line, each fact in its own ink: what needs a look and what is yours, both, since they
    are independent. A fact that says nothing ("None", "Nothing yours") is left out. */
@@ -840,6 +849,10 @@ table.data {
     flex: 1 1 100%;
     color: var(--color-text);
   }
+  /* What a row offers is a link in ink, not muted context. */
+  .index-table table.data td:is([data-column="for-you"], [data-column="use"], [data-column="act"]) a {
+    color: var(--color-text);
+  }
   .index-table table.data td:is([data-column="progress"], [data-column="milestone"]) {
     display: contents;
   }
@@ -849,32 +862,35 @@ table.data {
   .index-table table.data td[data-column="milestone"] > .cell-first {
     margin-left: var(--space-2);
   }
-  .index-table table.data td[data-column="milestone"] > .cell-second {
-    flex: 1 1 100%;
-  }
   .index-table table.data td:is([data-column="use"], [data-column="act"], [data-column="reading"]) {
     flex: 1 1 100%;
     order: 0;
   }
   .index-table table.data td:is([data-column="trouble"], [data-column="for-you"]) {
-    order: 0;
+    order: 2;
     margin-right: var(--space-3);
   }
-  /* The attention line ends here: what follows (the context) starts a line of its own. */
+  /* The context ends here: the attention line that follows starts a line of its own. */
   .index-table tr::after {
     content: "";
     flex: 1 1 100%;
     height: 0;
+    order: 1;
   }
+  /* Under the name: the upgrade notice first, then where the journey came from. */
+  .index-table td[data-column="journey"] > .cell-second {
+    display: flex;
+    flex-direction: column-reverse;
+    align-items: flex-start;
+  }
+  .index-table .cell-sep,
   .index-table table.data td.num .cell-first {
     justify-content: flex-start;
   }
-  .index-table .cell-lineage,
   .index-table td.num .meter,
   .index-table table.data td[data-column="act"]:empty {
     display: none;
   }
-  .index-table td[data-column="journey"] > .cell-second:not(:has(> [data-testid="upgrade"])),
   .index-table td[data-column="trouble"][data-kind="none"],
   .index-table td[data-for-you="nothing"] {
     display: none;
