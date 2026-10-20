@@ -133,6 +133,30 @@ mod layer {
         assert_eq!(basic, Err(StatusCode::UNAUTHORIZED));
     }
 
+    /// A blank `Authorization`, as IAP passes on once it has taken a Google ID token from
+    /// it, carries nothing: the next provider signs the request in as if it were absent. A
+    /// wrong token beside a blank value is still refused.
+    #[tokio::test]
+    async fn a_blank_authorization_counts_as_absent() {
+        let world = World::new();
+        let providers = vec![
+            provider(dev("token", Some("let-me-in")), loopback()),
+            provider(dev("ambient", None), loopback()),
+        ];
+        let router = app(&world.auth(loopback(), providers));
+        let ambient = whoami(&router, get("/whoami", LOCAL)).await.unwrap();
+        for blank in ["", "  "] {
+            let request = request("/whoami", LOCAL).header(AUTHORIZATION, blank);
+            let actor = whoami(&router, request.body(Body::empty()).unwrap()).await;
+            assert_eq!(actor.unwrap().user, ambient.user, "{blank:?}");
+        }
+        let beside = request("/whoami", LOCAL)
+            .header(AUTHORIZATION, "")
+            .header(AUTHORIZATION, "Bearer let-me-out");
+        let beside = whoami(&router, beside.body(Body::empty()).unwrap()).await;
+        assert_eq!(beside, Err(StatusCode::UNAUTHORIZED));
+    }
+
     /// A session cookie signs the browser in until it lapses or is ended; a lapsed, ended,
     /// or forged one is refused and cleared rather than ignored.
     #[tokio::test]

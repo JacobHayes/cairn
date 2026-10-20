@@ -5,9 +5,9 @@
 //! The fake IAP behaves as IAP was observed to: a request with no credential gets a bare
 //! 401 with no `WWW-Authenticate`; a Google ID token in `Proxy-Authorization` or
 //! `Authorization` passes only if Google signed it for the allowlisted client and it has
-//! not expired; `Authorization` is passed on to Cairn, `Proxy-Authorization` is not; a
-//! browser passes with its IAP session cookie; and every request let through carries a
-//! fresh assertion. The OAuth paths a deployment routes around IAP pass with none.
+//! not expired; `Proxy-Authorization` is removed, and an `Authorization` that carried the
+//! token is passed on to Cairn blank; a browser passes with its IAP session cookie; and
+//! every request let through carries a fresh assertion. The OAuth paths a deployment routes around IAP pass with none.
 
 use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::{Arc, Mutex};
@@ -15,7 +15,7 @@ use std::sync::{Arc, Mutex};
 use axum::Router;
 use axum::extract::{Request, State};
 use axum::http::header::{AUTHORIZATION, PROXY_AUTHORIZATION};
-use axum::http::{HeaderMap, StatusCode};
+use axum::http::{HeaderMap, HeaderName, HeaderValue, StatusCode};
 use axum::middleware::{self, Next};
 use axum::response::{IntoResponse, Response};
 use axum::routing::get;
@@ -168,21 +168,39 @@ impl FakeIap {
         router.layer(middleware::from_fn_with_state(iap, pass))
     }
 
-    /// Who a request is, as IAP decides: by a Google ID token if it carries one, else by
-    /// its browser session; `None` is refused.
-    fn person(&self, headers: &HeaderMap) -> Option<(String, String)> {
-        let bearer = |name| {
-            let value = headers.get(name)?.to_str().ok()?;
-            value.strip_prefix("Bearer ").map(str::to_owned)
+    /// Who a request is, as IAP decides: by a Google ID token if it carries one (with the
+    /// header that carried it), else by its browser session; `None` is refused.
+    fn person(&self, headers: &HeaderMap) -> Option<Person> {
+        let bearer = |name: HeaderName| {
+            let value = headers.get(&name)?.to_str().ok()?;
+            let token = value.strip_prefix("Bearer ")?.to_owned();
+            Some((name, token))
         };
-        if let Some(token) = bearer(PROXY_AUTHORIZATION).or_else(|| bearer(AUTHORIZATION)) {
+        if let Some((carrier, token)) =
+            bearer(PROXY_AUTHORIZATION).or_else(|| bearer(AUTHORIZATION))
+        {
             let signed = self.google.verified(&token, &self.allowlisted)?;
-            return Some((signed.subject, signed.email));
+            return Some(Person {
+                subject: signed.subject,
+                email: signed.email,
+                carrier: Some(carrier),
+            });
         }
         let subject = cairn_auth::cookies::read(headers, BROWSER_COOKIE)?;
         let email = format!("{subject}@example.org");
-        Some((subject, email))
+        Some(Person {
+            subject,
+            email,
+            carrier: None,
+        })
     }
+}
+
+/// Who IAP let through, and the header whose Google ID token said so, if any.
+struct Person {
+    subject: String,
+    email: String,
+    carrier: Option<HeaderName>,
 }
 
 async fn pass(State(iap): State<Arc<FakeIap>>, mut request: Request, next: Next) -> Response {
@@ -190,14 +208,18 @@ async fn pass(State(iap): State<Arc<FakeIap>>, mut request: Request, next: Next)
     if is_public(request.uri().path()) {
         return next.run(request).await;
     }
-    let Some((subject, email)) = iap.person(request.headers()) else {
+    let Some(person) = iap.person(request.headers()) else {
         return StatusCode::UNAUTHORIZED.into_response();
     };
     let now = iap.clock.now().as_second();
-    let claims = claims_of(&format!("accounts.google.com:{subject}"), &email, now);
+    let subject = format!("accounts.google.com:{}", person.subject);
+    let claims = claims_of(&subject, &person.email, now);
     let assertion = sign(&claims, &iap.key);
     let headers = request.headers_mut();
     headers.remove(PROXY_AUTHORIZATION);
+    if person.carrier == Some(AUTHORIZATION) {
+        headers.insert(AUTHORIZATION, HeaderValue::from_static(""));
+    }
     headers.insert(ASSERTION_HEADER, assertion.parse().unwrap());
     next.run(request).await
 }
