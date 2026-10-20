@@ -23,7 +23,7 @@ export function ChainView({ view, chain }: { view: Ready; chain: Chain }) {
       <ul className="detail-list">
         {(chain.fixed ?? []).map((fixed, at) => (
           <li key={at} data-testid="chain-fixed">
-            {fixedText(fixed, name)}
+            {fixedText(fixed, name, view.derived.today)}
           </li>
         ))}
       </ul>

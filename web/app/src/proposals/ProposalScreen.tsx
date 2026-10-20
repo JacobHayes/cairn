@@ -19,7 +19,7 @@ import { useDraft } from "../data/drafts.ts";
 import type { Answer } from "../data/edit-record.ts";
 import type { Domain, ProposalReview } from "../data/proposals.ts";
 import { useDeployment, useJourney, useKeyedRead, useLive, useSession, useToday, useViewer } from "../data/react.ts";
-import { isPatchAnswer } from "../data/writes.ts";
+import { isPatchAnswer, subjectOf, violationNode, violationWords } from "../data/writes.ts";
 import type { Ready } from "../detail/model.ts";
 import { Section } from "../detail/parts.tsx";
 import { indexPath } from "../journeys/address.ts";
@@ -59,7 +59,7 @@ import { ProposalCanvas } from "./ProposalCanvas.tsx";
 import { listKey, proposalReview, proposalsUnder, reviewKey } from "./read.ts";
 import { BeforeAfter, BLOCKER_WORDS, FilterChips, ItemEditor, ProposalOrigin, ReviewHeader, ReviewList } from "./ReviewFrame.tsx";
 import { StalePanel } from "./Stale.tsx";
-import { itemHeading, mutationNode, namesOf, type Names } from "./words.ts";
+import { itemHeading, namesOf, type Names } from "./words.ts";
 import { useProposalWrite, type ProposalWrite } from "./write.ts";
 import "./proposals.css";
 import { Failed } from "../ui/Failed.tsx";
@@ -178,12 +178,11 @@ function Violations({ preview, ready, names, onMove }: { preview: ProposalPrevie
       <strong>As it stands, applying it would be refused:</strong>
       <ul className="detail-list">
         {violations.map((violation, at) => {
-          const subject = violation.at.subject;
-          const node = subject != null && typeof subject === "object" && "node" in subject ? subject.node : undefined;
+          const node = violationNode(violation);
           return (
             <li key={at} data-testid="violation" data-code={violation.code} data-node={node}>
               {node === undefined ? null : <strong>{names.node(node)}: </strong>}
-              {violation.message}
+              {violationWords(violation)}
             </li>
           );
         })}
@@ -352,7 +351,7 @@ function useReviewModel({ review, ready, before, deployment }: BodyProps, draft:
     entries: useMemo(() => reviewEntries(diff, marks, before), [diff, marks, before]),
     counts: useMemo(() => filterCounts(marks, diff), [marks, diff]),
     graphs: useMemo(() => (known ? [unionGraph(before, after), after, ...(before === undefined ? [] : [before])] : before === undefined ? [] : [before]), [known, before, after]),
-    names: useMemo(() => namesOf([added, before, after], deployment.entities ?? []), [added, before, after, deployment]),
+    names: useMemo(() => namesOf([added, before, after], deployment.entities ?? [], ready?.key.today ?? sessionToday), [added, before, after, deployment, ready?.key.today, sessionToday]),
     tree: useMemo(() => treeOf(structure), [structure]),
     structure,
     today: ready?.key.today ?? sessionToday,
@@ -452,7 +451,7 @@ function NodeEditor(props: InspectorProps & { node: string }) {
   const own = (key: string | undefined) => key === node;
   const items = (model.draft.items ?? []).some((item) => itemNode(item) === node);
   const mark = model.marks[node];
-  const changes = (model.draft.mutations ?? []).some((mutation) => mutationNode(mutation) === node);
+  const changes = (model.draft.mutations ?? []).some((mutation) => subjectOf(mutation) === node);
   return (
     <ItemEditor title={model.names.node(node)} mark={mark} back={back} footer={<Confirm proposal={props.proposal} reviewing={props.reviewing} />}>
       <Section title="What changes" open testId="item-before-after">

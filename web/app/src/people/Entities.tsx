@@ -14,7 +14,7 @@ import { RowsPanel } from "../acting/RowsPanel.tsx";
 import { proposalRows } from "../proposals/ProposalRows.tsx";
 import { listKey, proposalsUnder } from "../proposals/read.ts";
 import type { Rejection } from "../data/writes.ts";
-import { Refused } from "../screens/Refused.tsx";
+import { RejectionView } from "../screens/RejectionView.tsx";
 import { WriteStatus } from "../screens/WriteStatus.tsx";
 import { useScreenWrite, type ScreenWrite } from "../screens/write.ts";
 import { NodePanel } from "../acting/NodeItem.tsx";
@@ -68,12 +68,17 @@ function EntityEditor({ entity, deployment, draft, setDraft, write }: { entity: 
         </span>
       </form>
       <WriteStatus view={write.status} />
-      {write.rejected === undefined ? null : (
-        <Refused rejection={write.rejected} onDismiss={write.dismiss}>
-          {write.rejected.rejection === "stale" ? (
-            <Button onClick={() => { if (write.rejected !== undefined) { setDraft({ ...draft, base: deploymentRebase(write.rejected, deployment.revision) }); } write.dismiss(); }}>Keep my edit on the current version</Button>
-          ) : null}
-        </Refused>
+      {write.rejection === undefined ? null : (
+        <RejectionView
+          rejection={write.rejection}
+          onDismiss={write.dismiss}
+          onRebase={() => {
+            if (write.rejection !== undefined) {
+              setDraft({ ...draft, base: deploymentRebase(write.rejection, deployment.revision) });
+            }
+            write.dismiss();
+          }}
+        />
       )}
     </>
   );
@@ -125,7 +130,7 @@ function CreateEntity({ deployment }: { deployment: Deployment }) {
       </span>
       <span className="row">
         <Button primary type="submit" disabled={write.disabled || name.trim() === "" || emailText.trim() !== ""}>Add an entity</Button>
-        {write.rejected === undefined ? <WriteStatus view={write.status} /> : <Refused rejection={write.rejected} onDismiss={write.dismiss} />}
+        {write.rejection === undefined ? <WriteStatus view={write.status} /> : <RejectionView rejection={write.rejection} onDismiss={write.dismiss} />}
       </span>
     </form>
   );

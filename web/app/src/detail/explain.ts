@@ -4,9 +4,9 @@
 // screen that explains a value (5.2's trace, 5.4's timeline) says it the same way.
 import type { Schema } from "@cairn/client";
 
-import { feedingDecision, nodeOf, titleOf, type Mutation, type Ready } from "./model.ts";
+import { feedingDecision, nodeOf, titleOf, type Ready } from "./model.ts";
 import { dateWords, originWord } from "../status/when.ts";
-import { upperFirst } from "../status/words.ts";
+import { fieldWords, upperFirst } from "../status/words.ts";
 import { ROLE_GONE } from "../ui/gone.ts";
 
 export type Bound = Schema<"Bound">;
@@ -88,9 +88,9 @@ export function constraintText(constraint: Constraint, name: Namer): string {
 }
 
 /** What fixes a date on a chain, in words. */
-export function fixedText(fixed: FixedDate, name: Namer): string {
+export function fixedText(fixed: FixedDate, name: Namer, today?: string): string {
   const by = { pin: originWord("pin"), actual: originWord("actual"), answer: "answered", today: "today" }[fixed.fixed_by];
-  return `${upperFirst(instantText(fixed.instant, name))}: ${dateWords(fixed.date)} (${by})`;
+  return `${upperFirst(instantText(fixed.instant, name))}: ${dateWords(fixed.date, today)} (${by})`;
 }
 
 /** F7: a pin or rule whose edit changes a bound. Actuals and today are facts, not edits. */
@@ -166,7 +166,7 @@ export function targetText(target: EditTarget, name: Namer): string {
     case "due_by":
     case "not_before":
     case "estimate":
-      return `the ${target.edit} of ${name(target.node)}`;
+      return `the ${fieldWords(target.edit)} of ${name(target.node)}`;
     case "requirement":
       return `${name(target.node)}'s requirement on ${name(target.requires)}`;
     case "stage_close":
@@ -174,18 +174,18 @@ export function targetText(target: EditTarget, name: Namer): string {
   }
 }
 
-/** A guard failure (D4) as `stale` lists it. */
+/** Why finished work is stale (D4), as the clause after the node's name: "needs a note", "Kickoff was reopened". */
 export function guardFailureText(failure: Schema<"GuardFailure">, name: Namer): string {
   if (failure === "missing_artifact") {
-    return "missing artifact";
+    return "needs a link";
   }
   if (failure === "missing_note") {
-    return "missing note";
+    return "needs a note";
   }
   if (failure === "not_broken_down") {
-    return "not broken down";
+    return "was not broken down";
   }
-  return `open dependency: ${name(failure.open_dependency)}`;
+  return `${name(failure.open_dependency)} was reopened`;
 }
 
 /** Where a participation comes from (E2), in words. */
@@ -201,53 +201,4 @@ export function originText(origin: Schema<"ParticipationOrigin">, view: Ready): 
     return `from ${titleOf(view, origin.ancestor)}`;
   }
   return `the default owner, ${roleTitle(origin.default_owner)}`;
-}
-
-/** F5: a resolution move (one ordinary mutation) in words. */
-export function moveText(move: Mutation, name: Namer): string {
-  switch (move.op) {
-    case "shift_pin": {
-      const days = move.offset_days;
-      return `Move the pin on ${name(move.node)} ${String(Math.abs(days))} days ${days < 0 ? "earlier" : "later"}`;
-    }
-    case "set_pin":
-      return `Pin ${name(move.node)} to ${dateWords(move.date)}`;
-    case "clear_pin":
-      return `Unpin ${name(move.node)}`;
-    case "answer":
-      return `Answer ${name(move.decision)} with ${answerWords(move.value)}`;
-    case "remove_edge":
-      return `Drop ${name(move.edge.node)}'s requirement on ${name(move.edge.requires)}`;
-    case "set_node_field":
-      return fieldMoveText(move.node, move.value, name);
-    default:
-      return move.op.replaceAll("_", " ");
-  }
-}
-
-/** An answer's value, in words (choices by id; entities by key). */
-export function answerWords(value: Schema<"AnswerValue">): string {
-  const [kind, answer] = (Object.entries(value) as [string, unknown][])[0] ?? ["", undefined];
-  if (Array.isArray(answer)) {
-    return answer.length === 0 ? "none" : answer.join(", ");
-  }
-  if (kind === "date" && typeof answer === "string") {
-    return dateWords(answer);
-  }
-  return kind === "boolean" ? (answer === true ? "yes" : "no") : typeof answer === "string" ? answer : JSON.stringify(answer);
-}
-
-/** F5: a rule, estimate, or stage close loosened, in words. */
-function fieldMoveText(node: string, value: Schema<"NodeFieldValueResolved">, name: Namer): string {
-  if ("closes" in value) {
-    return `Let the stage ${name(node)} run past its close`;
-  }
-  if ("estimate" in value) {
-    return `Shorten the estimate of ${name(node)} to ${String(value.estimate)} days`;
-  }
-  if ("due_by" in value || "not_before" in value) {
-    const [field, rule] = "due_by" in value ? ["due_by", value.due_by] : ["not_before", value.not_before];
-    return `Change the ${field} rule of ${name(node)} to an offset of ${String(rule?.offset ?? 0)} days`;
-  }
-  return `Change ${Object.keys(value).join(", ")} of ${name(node)}`;
 }

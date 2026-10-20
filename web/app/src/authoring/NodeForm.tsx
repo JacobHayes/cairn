@@ -17,9 +17,11 @@ import { changesOf, draftOf, draftProblems, type FormField, type NodeDraft } fro
 import { Section } from "../detail/parts.tsx";
 import type { GraphNode } from "./graph.ts";
 import { BasicsFields, CompletionFields, DecisionFields, StageFields, WeightFields, has, type FieldsProps } from "./NodeFields.tsx";
-import { FieldBox, FormViolations, StaleRejection, type FieldNotes } from "./parts.tsx";
+import type { Violation } from "../data/writes.ts";
+import { RejectionView } from "../screens/RejectionView.tsx";
+import { FieldBox, FormViolations, type FieldNotes } from "./parts.tsx";
 import { domainOf, type Authored } from "./target.ts";
-import { byPlace, type Place, type Violation } from "./violations.ts";
+import { byPlace, type Place } from "./violations.ts";
 import { useAuthorWrite, useLivePreview, type AuthorWrite } from "./write.ts";
 
 interface Kept {
@@ -173,7 +175,7 @@ export function NodeForm({ authored, node }: NodeFormProps) {
       <Fields props={props} />
       <FormViolations places={places} />
       <WriteStatus view={write.status} />
-      {write.failed === undefined ? <Receipt receipt={write.receipt} /> : <StaleRejection rejection={write.failed.rejection} onRetry={() => void save(authored.revision)} onDismiss={discard} />}
+      {write.failed === undefined ? <Receipt receipt={write.receipt} /> : write.failed.rejection.rejection === "invalid" ? null : <RejectionView rejection={write.failed.rejection} onRebase={() => void save(authored.revision)} onDismiss={discard} />}
       {kept === undefined && changes.length === 0 ? null : (
         <span className="row">
           <Button type="submit" primary disabled={write.disabled || !sendable} data-testid="node-form-save">

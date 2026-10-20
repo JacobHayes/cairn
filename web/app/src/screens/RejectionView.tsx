@@ -1,9 +1,12 @@
-// A rejected write, shown whole (A15): a stale one with what intervened (H5: "otherwise the
-// intervening changes are shown and the user retries"), an invalid one with its violations.
+// A refused write in words (A15), the one place every screen says it: what intervened, each
+// rule broken without its code, and what can be done about it. Also the words for a record a
+// stale refusal names.
 import type { Schema } from "@cairn/client";
+import type { ReactNode } from "react";
 
-import type { Rejection } from "../data/writes.ts";
+import { violationNode, violationWords, type Rejection, type Violation } from "../data/writes.ts";
 import { useSession } from "../data/react.ts";
+import { fieldWords } from "../status/words.ts";
 import { Button } from "../ui/kit.tsx";
 
 type RecordKey = Schema<"RecordKey">;
@@ -28,11 +31,11 @@ export function describeRecord(key: RecordKey, titleOf: (journey: string, node: 
     return `"${node(inner.node)}"`;
   }
   if ("node_field" in inner) {
-    return `${inner.node_field.field.replaceAll("_", " ")} of "${node(inner.node_field.node)}"`;
+    return `${fieldWords(inner.node_field.field)} of "${node(inner.node_field.node)}"`;
   }
   if ("local_edit" in inner) {
     const field = fieldOf(inner.local_edit.edit);
-    return field === undefined ? `"${node(inner.local_edit.node)}"` : `${field.replaceAll("_", " ")} of "${node(inner.local_edit.node)}"`;
+    return field === undefined ? `"${node(inner.local_edit.node)}"` : `${fieldWords(field)} of "${node(inner.local_edit.node)}"`;
   }
   const [name, value] = Object.entries(inner as Record<string, unknown>)[0] ?? ["record", undefined];
   return typeof value === "string" && value.startsWith("n_") ? `${name.replaceAll("_", " ")} of "${node(value)}"` : name.replaceAll("_", " ");
@@ -44,46 +47,73 @@ export function useRecordWords(): (key: RecordKey) => string {
   return (key) => describeRecord(key, titleOf);
 }
 
-type Violations = Extract<Rejection, { rejection: "invalid" }>["violations"];
-
-/** Every rule an invalid change breaks (A15), one line each, in the engine's words. */
-export function ViolationLines({ violations }: { violations: Violations }) {
-  return violations.map((violation, at) => (
-    <span key={at} className="author-problem" role="alert" data-testid="violation" data-code={violation.code}>
-      {violation.message}
+/** One rule an invalid change breaks (A15), in words: the engine's message without its rule code, led by the node's title when it is about one. */
+export function ViolationLine({ violation, titleOf }: { violation: Violation; titleOf?: ((node: string) => string) | undefined }) {
+  const node = violationNode(violation);
+  return (
+    <span className="author-problem" role="alert" data-testid="violation" data-code={violation.code} data-node={node}>
+      {node === undefined || titleOf === undefined ? null : <strong>{titleOf(node)}: </strong>}
+      {violationWords(violation)}
     </span>
-  ));
+  );
 }
 
-export function RejectionView({ rejection, onRebase }: { rejection: Rejection; onRebase: () => void }) {
+/** Every rule an invalid change breaks (A15), one line each. */
+export function ViolationLines({ violations, titleOf }: { violations: readonly Violation[]; titleOf?: ((node: string) => string) | undefined }) {
+  return violations.map((violation, at) => <ViolationLine key={at} violation={violation} titleOf={titleOf} />);
+}
+
+interface RejectionProps {
+  rejection: Rejection;
+  /** Offers to keep the edit on the current version, after a stale refusal. */
+  onRebase?: (() => void) | undefined;
+  /** Offers to drop the refused change. */
+  onDismiss?: (() => void) | undefined;
+  /** Names the node a violation is about, in front of it. */
+  titleOf?: ((node: string) => string) | undefined;
+  /** Violations another part of the screen shows (a contradictory chain's moves), left out of the list. */
+  omit?: ((violation: Violation) => boolean) | undefined;
+  /** What the screen offers against the refusal beneath its words (a resolution, a bypass). */
+  extras?: ReactNode;
+  /** What the screen offers beside Dismiss (A11: discard the existing draft). */
+  children?: ReactNode;
+}
+
+/**
+ * A refused write, shown whole (A15) wherever it is refused: a stale one with what intervened
+ * (H5: "otherwise the intervening changes are shown and the user retries"), an invalid one with
+ * each rule it breaks, and a change sent twice.
+ */
+export function RejectionView({ rejection, onRebase, onDismiss, titleOf, omit, extras, children }: RejectionProps) {
   const words = useRecordWords();
+  let body: ReactNode;
   if (rejection.rejection === "stale") {
     const records = [...new Set(rejection.intervening.map(words))];
-    return (
-      <div className="callout callout-bad stack" role="alert" data-testid="conflict">
-        <strong>Someone changed this since you started editing.</strong>
-        <span>What they changed: {records.join(", ")}</span>
-        <span className="row">
-          <Button onClick={onRebase}>Keep my edit on the current version</Button>
-        </span>
-      </div>
+    body = (
+      <>
+        <strong>Not saved: someone changed this since you started editing.</strong>
+        {records.length === 0 ? null : <span>What they changed: {records.join(", ")}</span>}
+      </>
     );
-  }
-  if (rejection.rejection === "invalid") {
-    return (
-      <div className="callout callout-bad stack" role="alert" data-testid="invalid">
+  } else if (rejection.rejection === "invalid") {
+    body = (
+      <>
         <strong>Not saved: the change breaks a rule.</strong>
-        <ul>
-          {rejection.violations.map((violation, at) => (
-            <li key={at}>{violation.message}</li>
-          ))}
-        </ul>
-      </div>
+        <ViolationLines violations={omit === undefined ? rejection.violations : rejection.violations.filter((violation) => !omit(violation))} titleOf={titleOf} />
+      </>
     );
+  } else {
+    body = <strong>Not saved: that change was already sent once, so it was not sent again.</strong>;
   }
   return (
-    <div className="callout callout-bad" role="alert">
-      That change was already sent once, so it was not sent again.
+    <div className="callout callout-bad stack" role="alert" data-testid="refused" data-rejection={rejection.rejection}>
+      {body}
+      {extras}
+      <span className="row">
+        {onRebase === undefined || rejection.rejection !== "stale" ? null : <Button onClick={onRebase}>Keep my edit on the current version</Button>}
+        {children}
+        {onDismiss === undefined ? null : <Button onClick={onDismiss}>Dismiss</Button>}
+      </span>
     </div>
   );
 }

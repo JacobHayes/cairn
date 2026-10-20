@@ -15,12 +15,14 @@ import { BasicsFields, ChoicesEditor, CompletionFields, DecisionFields, StageFie
 import { problemsOf } from "../authoring/NodeForm.tsx";
 import { FieldBox, Picker } from "../authoring/parts.tsx";
 import type { Deployment } from "../data/host.ts";
+import { subjectOf } from "../data/writes.ts";
 import { Input as AnswerInput } from "../detail/AnswerEditor.tsx";
 import type { Ready } from "../detail/model.ts";
 import { Section } from "../detail/parts.tsx";
+import { fieldWords } from "../status/words.ts";
 import { Button, Field } from "../ui/kit.tsx";
 import { carryIds, withFieldValue, withMutation, withMutationsAdded, withoutMutation, type ProposalDraft } from "./model.ts";
-import { fieldName, mutationNode, mutationWords, type Names } from "./words.ts";
+import { mutationWords, type Names } from "./words.ts";
 
 /** What the change editors read and change. */
 export interface ChangesContext {
@@ -162,13 +164,13 @@ function FieldValue({ editor, mutation, onChange, context }: { editor: string; m
   const props = { kind: node.kind, nodeKey: node.key, draft, change, notes: () => ({ problem }), tree: context.tree, roles: context.roles };
   const milestones = nodesByPath(context.tree, "milestone").map((each) => ({ value: each.key, label: each.title }));
   return (
-    <FieldBox label={fieldName(field)} place={field} notes={{ problem }}>
-      {includes(LINE_FIELDS, field) ? <Field aria-label={fieldName(field)} value={draft[field]} onChange={(event) => { change({ [field]: event.target.value }); }} /> : null}
-      {includes(MARKDOWN_FIELDS, field) ? <textarea aria-label={fieldName(field)} value={draft[field]} onChange={(event) => { change({ [field]: event.target.value }); }} /> : null}
-      {includes(NUMBER_FIELDS, field) ? <Field type="number" min={0} aria-label={fieldName(field)} value={draft[field]} onChange={(event) => { change({ [field]: event.target.value }); }} /> : null}
-      {includes(FLAG_FIELDS, field) ? <input type="checkbox" aria-label={fieldName(field)} checked={draft[field]} onChange={(event) => { change({ [field]: event.target.checked }); }} /> : null}
-      {includes(MILESTONE_FIELDS, field) ? <Picker aria-label={fieldName(field)} value={draft[field]} none="None" options={milestones} onChange={(event) => { change({ [field]: event.target.value }); }} /> : null}
-      {field === "fills_role" ? <Picker aria-label={fieldName(field)} value={draft.fills_role} none="No role" options={context.roles.map((role) => ({ value: role.key, label: role.title ?? role.id }))} onChange={(event) => { change({ fills_role: event.target.value }); }} /> : null}
+    <FieldBox label={fieldWords(field)} place={field} notes={{ problem }}>
+      {includes(LINE_FIELDS, field) ? <Field aria-label={fieldWords(field)} value={draft[field]} onChange={(event) => { change({ [field]: event.target.value }); }} /> : null}
+      {includes(MARKDOWN_FIELDS, field) ? <textarea aria-label={fieldWords(field)} value={draft[field]} onChange={(event) => { change({ [field]: event.target.value }); }} /> : null}
+      {includes(NUMBER_FIELDS, field) ? <Field type="number" min={0} aria-label={fieldWords(field)} value={draft[field]} onChange={(event) => { change({ [field]: event.target.value }); }} /> : null}
+      {includes(FLAG_FIELDS, field) ? <input type="checkbox" aria-label={fieldWords(field)} checked={draft[field]} onChange={(event) => { change({ [field]: event.target.checked }); }} /> : null}
+      {includes(MILESTONE_FIELDS, field) ? <Picker aria-label={fieldWords(field)} value={draft[field]} none="None" options={milestones} onChange={(event) => { change({ [field]: event.target.value }); }} /> : null}
+      {field === "fills_role" ? <Picker aria-label={fieldWords(field)} value={draft.fills_role} none="No role" options={context.roles.map((role) => ({ value: role.key, label: role.title ?? role.id }))} onChange={(event) => { change({ fills_role: event.target.value }); }} /> : null}
       {field === "parent" ? <ParentValue mutation={mutation} onChange={onChange} context={context} /> : null}
       {field === "choices" ? <ChoicesEditor props={props} /> : null}
       {field === "relevant_when" ? <ConditionEditor value={draft.relevant_when} onChange={(next) => { change({ relevant_when: next }); }} tree={context.tree} node={mutation.node} entities={context.deployment.entities ?? []} today={context.today} /> : null}
@@ -225,7 +227,7 @@ function editable(mutation: Mutation, context: ChangesContext): boolean {
 
 function MutationRow({ index, editor, mutation, context }: { index: number; editor: string; mutation: Mutation; context: ChangesContext }) {
   const [open, setOpen] = useState(false);
-  const node = mutationNode(mutation);
+  const node = subjectOf(mutation);
   const picked = node !== undefined && node === context.selected;
   return (
     <li className={picked ? "stack proposal-change proposal-picked" : "stack proposal-change"} data-testid="change" data-op={mutation.op} data-node={node}>
@@ -325,7 +327,7 @@ function useCarriedIds(mutations: readonly Mutation[]): string[] {
 export function ChangeList({ context, only }: { context: ChangesContext; only?: (node: string | undefined) => boolean }) {
   const mutations = context.draft.mutations ?? [];
   const ids = useCarriedIds(mutations);
-  const kept = mutations.filter((mutation) => only === undefined || only(mutationNode(mutation)));
+  const kept = mutations.filter((mutation) => only === undefined || only(subjectOf(mutation)));
   if (only !== undefined && kept.length === 0) {
     return null;
   }
@@ -334,7 +336,7 @@ export function ChangeList({ context, only }: { context: ChangesContext; only?: 
       {mutations.length === 0 ? <p className="muted small">No changes yet.</p> : null}
       <ol className="stack proposal-changes" data-testid="changes">
         {mutations.map((mutation, index) =>
-          only !== undefined && !only(mutationNode(mutation)) ? null : <MutationRow key={ids[index]} editor={ids[index] ?? String(index)} index={index} mutation={mutation} context={context} />,
+          only !== undefined && !only(subjectOf(mutation)) ? null : <MutationRow key={ids[index]} editor={ids[index] ?? String(index)} index={index} mutation={mutation} context={context} />,
         )}
       </ol>
       {context.editable && only === undefined ? (

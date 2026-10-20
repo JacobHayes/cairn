@@ -9,7 +9,7 @@ import { useDraft } from "../data/drafts.ts";
 import { routeIndex } from "../data/reads.ts";
 import { valueOf } from "../data/keyed-read.ts";
 import { useLive } from "../data/react.ts";
-import { Refused } from "../screens/Refused.tsx";
+import { RejectionView } from "../screens/RejectionView.tsx";
 import { WriteStatus } from "../screens/WriteStatus.tsx";
 import { useScreenWrite } from "../screens/write.ts";
 import { Button, Field, Panel } from "../ui/kit.tsx";
@@ -95,7 +95,7 @@ function NewJourneyForm({ routes, initial, asked }: { routes: RouteSummary[]; in
       <span className="row">
         <Button primary type="submit" disabled={write.disabled || unavailable || form.name.trim() === ""}>Start the journey</Button>
       </span>
-      {write.rejected === undefined ? <WriteStatus view={write.status} /> : <Refused rejection={write.rejected} onDismiss={write.dismiss} />}
+      {write.rejection === undefined ? <WriteStatus view={write.status} /> : <RejectionView rejection={write.rejection} onDismiss={write.dismiss} />}
     </form>
   );
 }

@@ -4,6 +4,8 @@
 // host commits it. Strict validation stays the engine's, at preview and at apply.
 import type { Schema } from "@cairn/client";
 
+import { choiceId, type Choice } from "../status/answer.ts";
+import { violationNode } from "../data/writes.ts";
 import type { Edge, Graph, GraphNode, Mutation } from "../authoring/graph.ts";
 
 export type Proposal = Schema<"Proposal">;
@@ -14,7 +16,6 @@ export type Conflict = Schema<"Conflict">;
 export type Resolution = Schema<"ConflictResolution">;
 export type Mapping = Schema<"ParticipationMapping">;
 export type AnswerValue = Schema<"AnswerValue">;
-export type Choice = Schema<"Choice">;
 export type UnresolvedReason = Schema<"UnresolvedReason">;
 
 /** The kinds of resolution a conflict can offer (B7). */
@@ -30,8 +31,6 @@ export function kindOf(resolution: Resolution): ResolutionKind {
   }
   return "remap_kind" in resolution ? "remap_kind" : "map_choices";
 }
-
-const choiceId = (choice: Choice): string => (typeof choice === "string" ? choice : choice.id);
 
 /** B7: the choices an answer names that `choices` no longer has. */
 export function removedChoices(answer: AnswerValue, choices: readonly Choice[]): string[] {
@@ -136,10 +135,8 @@ export function itemNode(item: ReviewItem): string | undefined {
       return item.removal.node;
     case "participation":
       return item.uses[0]?.node;
-    case "violation": {
-      const subject = item.violation.at.subject;
-      return subject != null && typeof subject === "object" && "node" in subject ? subject.node : undefined;
-    }
+    case "violation":
+      return violationNode(item.violation);
   }
 }
 

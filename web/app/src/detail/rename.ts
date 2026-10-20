@@ -5,9 +5,10 @@
 // discarded. Text typed after a rejection is a newer draft beside the write, and Keep my edit
 // takes that, else what the write sent.
 import { useDraft } from "../data/drafts.ts";
-import { useEdit, useSkew } from "../data/react.ts";
+import { useWrite } from "../data/react.ts";
 import type { WriteView } from "../data/write-machine.ts";
 import { patchOf } from "../data/writes.ts";
+import type { ReceiptState } from "../ui/receipt.ts";
 import type { Ready } from "./model.ts";
 
 interface TitleDraft {
@@ -37,6 +38,8 @@ export interface Rename {
   /** Closes the form, and discards a write that needs the person. */
   cancel: () => void;
   save: () => void;
+  /** What the last landed rename leaves under the title, for a few seconds. */
+  receipt: ReceiptState | undefined;
 }
 
 /** The patch a rename write sent. */
@@ -52,11 +55,10 @@ function sentTitle(write: WriteView | undefined): string | undefined {
 
 /** The node's rename: its draft and the write the edit manager holds for it. */
 export function useRename(view: Ready, node: string, title: string): Rename {
-  const skew = useSkew();
   const journey = view.journey.header.id;
   const key = `title:${journey}:${node}`;
   const [draft, setDraft] = useDraft<TitleDraft>(key);
-  const edit = useEdit(key);
+  const edit = useWrite(key, title);
   const { write, busy } = edit;
   const open = draft !== undefined || write !== undefined;
   const text = draft?.text ?? sentTitle(write) ?? "";
@@ -66,7 +68,7 @@ export function useRename(view: Ready, node: string, title: string): Rename {
     text,
     base: draft?.base,
     busy,
-    canSave: draft !== undefined && draft.text.trim() !== "" && !busy && !skew,
+    canSave: draft !== undefined && draft.text.trim() !== "" && !edit.disabled,
     start: () => {
       if (!open) {
         setDraft({ text: title, base: view.journey.revision });
@@ -86,12 +88,13 @@ export function useRename(view: Ready, node: string, title: string): Rename {
       }
     },
     save: () => {
-      if (draft === undefined || draft.text.trim() === "" || busy || skew) {
+      if (draft === undefined || draft.text.trim() === "" || edit.disabled) {
         return;
       }
       const patch = patchOf({ target: { journey }, baseRevision: draft.base, mutations: [{ op: "set_node_field", node, value: { title: draft.text } }] });
-      void edit.submit({ kind: "patch", patch }, { label: title });
+      void edit.submit({ kind: "patch", patch });
       setDraft(undefined);
     },
+    receipt: edit.receipt,
   };
 }

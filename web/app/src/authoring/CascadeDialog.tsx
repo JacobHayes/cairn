@@ -12,6 +12,8 @@ import type { Dangling, RemovalPlan } from "./cascade.ts";
 import type { Mutation } from "./graph.ts";
 import { titleIn } from "./graph.ts";
 import type { Authored } from "./target.ts";
+import { reasonOf } from "../data/writes.ts";
+import { RejectionView, ViolationLines } from "../screens/RejectionView.tsx";
 import { WriteStatus } from "../screens/WriteStatus.tsx";
 import { useAuthorWrite, useDialogPreview, type Preview } from "./write.ts";
 
@@ -74,15 +76,11 @@ function PreviewLine({ preview }: { preview: Preview | undefined }) {
     return <span className="muted small"><Failed what="The preview" verb="made" error={preview.message} /></span>;
   }
   if (preview.outcome === "rejected") {
-    const violations = preview.rejection.rejection === "invalid" ? preview.rejection.violations : [];
+    const { rejection } = preview;
     return (
-      <ul className="detail-list callout callout-bad" role="alert" data-testid="cascade-preview" data-status="rejected">
-        {violations.map((violation, at) => (
-          <li key={at} data-testid="violation" data-code={violation.code}>
-            {violation.message}
-          </li>
-        ))}
-      </ul>
+      <div className="stack callout callout-bad" data-testid="cascade-preview" data-status="rejected">
+        {rejection.rejection === "invalid" ? <ViolationLines violations={rejection.violations} /> : <span className="author-problem">{reasonOf(rejection)}</span>}
+      </div>
     );
   }
   const caused = preview.consequences;
@@ -127,11 +125,7 @@ export function CascadeDialog({ authored, scope, title, plan, dangling, mutation
         <Button onClick={onCancel}>Cancel</Button>
       </span>
       <WriteStatus view={write.status} />
-      {write.failed === undefined ? null : (
-        <span className="callout callout-bad" role="alert" data-testid="cascade-refused">
-          Not removed: {write.failed.rejection.rejection === "invalid" ? write.failed.rejection.violations.map((violation) => violation.message).join("; ") : "the graph changed since; review it again."}
-        </span>
-      )}
+      {write.failed === undefined ? null : <RejectionView rejection={write.failed.rejection} onDismiss={write.dismiss} />}
     </div>
   );
 }

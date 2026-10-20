@@ -8,10 +8,9 @@ import type { Host } from "../data/host.ts";
 import { HOST_READ, type ReadSource } from "../data/keyed-read.ts";
 import { allPages } from "../data/live.ts";
 import type { ProposalReview } from "../data/proposals.ts";
-import { useJourney, useKeyedRead, useSession, useToday, useUserWords } from "../data/react.ts";
-import { listed, recount, wordsOf } from "../detail/happened.ts";
+import { useJourney, useKeyedRead, useSession, useToday } from "../data/react.ts";
+import { joinPatches, PatchList } from "../detail/History.tsx";
 import { useRecordWords } from "../screens/RejectionView.tsx";
-import { dateWords } from "../status/when.ts";
 import { Button } from "../ui/kit.tsx";
 import { intervening } from "./model.ts";
 import { Failed } from "../ui/Failed.tsx";
@@ -33,7 +32,7 @@ const INTERVENING: ReadSource<InterveningArgs, PatchEvents[]> = {
       const page = await host.history(journey, undefined, after);
       return { items: page.patches, next: page.next ?? null };
     });
-    return intervening(joined(patches), expected, current);
+    return intervening(joinPatches(patches), expected, current);
   },
 };
 
@@ -47,46 +46,12 @@ function useIntervening(journey: string | undefined, expected: number, current: 
   return view.status === "failed" || view.status === "behind" ? { failed: view.error.message } : undefined;
 }
 
-/** Pages joined back into whole patches: one split across two pages is one patch. */
-function joined(patches: PatchEvents[]): PatchEvents[] {
-  const whole: PatchEvents[] = [];
-  for (const patch of patches) {
-    const last = whole.at(-1);
-    if (last?.patch_id === patch.patch_id) {
-      whole[whole.length - 1] = { ...last, events: [...last.events, ...patch.events] };
-    } else {
-      whole.push(patch);
-    }
-  }
-  return whole;
-}
-
 /** The patches that came between, each as who did what, in order. */
 function InterveningPatches({ journey, patches }: { journey: string; patches: PatchEvents[] }) {
   const view = useJourney(journey);
-  const name = useUserWords();
   const sessionToday = useToday();
-  const today = view.status === "ready" ? view.key.today : sessionToday;
-  const told = recount(
-    patches.flatMap((patch) => patch.events),
-    wordsOf(view.status === "ready" ? view : undefined, "", name),
-  );
-  let at = 0;
-  return (
-    <ol className="detail-list" data-testid="intervening">
-      {patches.map((patch) => {
-        const mine = told.slice(at, at + patch.events.length);
-        at += patch.events.length;
-        const [first] = patch.events;
-        const [lead] = mine;
-        return first === undefined || lead === undefined ? null : (
-          <li key={patch.patch_id} data-testid="intervening-patch">
-            <span className="muted small">{dateWords(first.at.slice(0, 10), today)}</span> {name(lead.actor)} {listed([...new Set(mine.map((each) => each.what))])}
-          </li>
-        );
-      })}
-    </ol>
-  );
+  const ready = view.status === "ready" ? view : undefined;
+  return <PatchList scope={{ view: ready, node: "", today: ready?.key.today ?? sessionToday }} patches={patches} testId="intervening" />;
 }
 
 export interface StaleProps {
@@ -107,9 +72,8 @@ export function StalePanel({ review, disabled, onRefresh }: StaleProps) {
   }
   return (
     <section className="callout stack" role="alert" data-testid="stale" data-expected={stale.conflict.expected} data-current={stale.conflict.current}>
-      <strong>
-        This proposal was drafted before its {journey === undefined ? "destination" : "journey"} last changed. Refresh it, then review it again before applying.
-      </strong>
+      <strong>This proposal is out of date.</strong>
+      <span>It was drafted before its {journey === undefined ? "destination" : "journey"} last changed. Refresh it, then review it again before applying.</span>
       {journey === undefined ? (
         <ul className="detail-list" data-testid="intervening">
           {[...new Set(stale.intervening.map(words))].map((record) => (

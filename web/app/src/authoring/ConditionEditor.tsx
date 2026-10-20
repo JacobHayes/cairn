@@ -13,6 +13,7 @@ import {
   appendAt,
   childrenOfClause,
   combinator,
+  conditionNames,
   conditionWords,
   decisionOf,
   firstValue,
@@ -30,8 +31,8 @@ import {
   type Value,
   type ValueInput,
 } from "./condition.ts";
-import { choiceLabel, choiceId } from "./fields.ts";
 import type { GraphNode, Tree } from "./graph.ts";
+import { ENTITY_GONE } from "../ui/gone.ts";
 import { Picker } from "./parts.tsx";
 
 type Entity = Schema<"Entity">;
@@ -58,18 +59,9 @@ function newLeaf(decision: GraphNode, context: Pick<Context, "today" | "entities
   return leaf(operator, decision.key, [firstValue(valueInput(decision), context.today, context.entities[0]?.key)]);
 }
 
-/** A value's words: a choice's label, yes or no, an entity's name. */
-export function valueName(tree: Tree, entities: readonly Entity[]) {
-  return (value: Value, decision: string): string => {
-    if (typeof value === "boolean") {
-      return value ? "yes" : "no";
-    }
-    const choice = (tree.byKey.get(decision)?.choices ?? []).find((each) => choiceId(each) === value);
-    if (choice !== undefined) {
-      return choiceLabel(choice);
-    }
-    return entities.find((entity) => entity.key === value)?.name ?? `"${value}"`;
-  };
+/** The names the editor's sentence reads with: decisions of the tree, entities by name. */
+function namesOf(tree: Tree, entities: readonly Entity[]) {
+  return conditionNames((decision) => tree.byKey.get(decision), (key) => entities.find((entity) => entity.key === key)?.name ?? ENTITY_GONE);
 }
 
 /** One value of a leaf, picked as the decision's type allows. */
@@ -222,7 +214,7 @@ export function ConditionEditor(props: ConditionEditorProps) {
   return (
     <div className="stack" data-testid="condition-editor">
       <span className="muted small" data-testid="condition-words">
-        Relevant when {conditionWords(props.value, props.tree, valueName(props.tree, props.entities))}
+        Relevant when {conditionWords(props.value, namesOf(props.tree, props.entities))}
       </span>
       <ClauseView context={context} clause={props.value} path={[]} />
     </div>

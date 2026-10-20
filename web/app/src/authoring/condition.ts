@@ -6,9 +6,12 @@
 // what that type holds (a choice, yes or no, a date, an entity), so a type mismatch cannot be
 // entered. A condition cannot name a decision in its own node's subtree (Invariants), so the
 // editor never offers one. Rendering to a sentence is for display and never parsed back.
+import { choiceId, choiceLabel, choiceNamed } from "../status/answer.ts";
+import { dateWords } from "../status/when.ts";
+import { NODE_GONE } from "../ui/gone.ts";
 import type { AnswerType, GraphNode, Tree } from "./graph.ts";
-import { descendantsOf, nodesByPath, titleIn } from "./graph.ts";
-import { choiceId, choiceLabel, type Condition } from "./fields.ts";
+import { descendantsOf, nodesByPath } from "./graph.ts";
+import type { Condition } from "./fields.ts";
 import { CONDITION_CLAUSE_COUNT_MAX, CONDITION_DEPTH_MAX } from "./limits.ts";
 
 export type Clause = Condition;
@@ -254,16 +257,52 @@ export function decisionsIn(clause: Clause): string[] {
   return [...(own === undefined ? [] : [own]), ...childrenOfClause(clause).flatMap(decisionsIn)];
 }
 
-/** A condition as a sentence, for display only (ARCHITECTURE: rendered, never parsed back). */
-export function conditionWords(clause: Clause, tree: Tree, name: (value: Value, decision: string) => string): string {
+/** What a condition's decisions and compared values are called. */
+export interface ConditionNames {
+  title: (decision: string) => string;
+  value: (decision: string, value: Value) => string;
+}
+
+/**
+ * The names a condition is read with, over the decisions `lookup` finds: a decision by its
+ * title, a compared value as its decision's type says (a choice by its label, yes or no, a date
+ * in words, an entity by name), never an id.
+ */
+export function conditionNames(lookup: (decision: string) => GraphNode | undefined, entity: (key: string) => string): ConditionNames {
+  return {
+    title: (decision) => lookup(decision)?.title ?? NODE_GONE,
+    value: (decision, value) => {
+      if (typeof value === "boolean") {
+        return value ? "yes" : "no";
+      }
+      const node = lookup(decision);
+      const input = node === undefined ? undefined : valueInput(node);
+      switch (input?.input) {
+        case "choice":
+          return `"${choiceNamed(node?.choices, value)}"`;
+        case "entity":
+          return entity(value);
+        case "date":
+          return dateWords(value);
+        default:
+          return `"${value}"`;
+      }
+    },
+  };
+}
+
+const LEAF_WORDS: Record<Leaf, string> = { equals: "is", not_equals: "is not", in: "is", contains: "includes", answered: "is answered" };
+
+/** A condition as a sentence, for display only (ARCHITECTURE: rendered, never parsed back): the one place every surface says one. */
+export function conditionWords(clause: Clause, names: ConditionNames): string {
   const operator = operatorOf(clause);
   const decision = decisionOf(clause);
   if (decision !== undefined) {
-    const values = valuesOf(clause).map((value) => name(value, decision));
-    const subject = `"${titleIn(tree, decision)}"`;
-    return operator === "answered" ? `${subject} is answered` : `${subject} ${OPERATOR_WORDS[operator]} ${values.join(", ")}`;
+    const subject = `"${names.title(decision)}"`;
+    const values = valuesOf(clause).map((value) => names.value(decision, value));
+    return operator === "answered" ? `${subject} ${LEAF_WORDS.answered}` : `${subject} ${LEAF_WORDS[operator as Leaf]} ${values.join(" or ")}`;
   }
-  const parts = childrenOfClause(clause).map((child) => conditionWords(child, tree, name));
+  const parts = childrenOfClause(clause).map((child) => conditionWords(child, names));
   if (operator === "not") {
     return `not (${parts.join("")})`;
   }

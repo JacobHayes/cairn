@@ -15,8 +15,8 @@ import type { Schema } from "@cairn/client";
 import type { RouteFile } from "../data/host.ts";
 import { noticesOf } from "../data/activity.ts";
 import { useEdit, useSession, useSkew } from "../data/react.ts";
-import { isPatchAnswer } from "../data/writes.ts";
-import { Refused, violates } from "../screens/Refused.tsx";
+import { isPatchAnswer, violates } from "../data/writes.ts";
+import { RejectionView } from "../screens/RejectionView.tsx";
 import { WriteStatus } from "../screens/WriteStatus.tsx";
 import { Button } from "../ui/kit.tsx";
 import { routePath } from "./address.ts";
@@ -108,15 +108,15 @@ export function ImportControl({ flow, edit, label = "Import a route file" }: { f
       {importing.rejection === undefined ? (
         <WriteStatus view={importing.status} />
       ) : (
-        <Refused rejection={importing.rejection} onDismiss={importing.dismiss}>
+        <RejectionView rejection={importing.rejection} onDismiss={importing.dismiss}>
           {violates(importing.rejection, "draft_exists") && refused !== undefined ? (
             <Button disabled={working || discarding.busy || skew} onClick={() => { flow.send({ type: "replace", file: refused }); }}>
               Discard the open draft and import
             </Button>
           ) : null}
-        </Refused>
+        </RejectionView>
       )}
-      {discarding.rejection === undefined ? <WriteStatus view={discarding.status} /> : <Refused rejection={discarding.rejection} onDismiss={discarding.dismiss} />}
+      {discarding.rejection === undefined ? <WriteStatus view={discarding.status} /> : <RejectionView rejection={discarding.rejection} onDismiss={discarding.dismiss} />}
     </div>
   );
 }

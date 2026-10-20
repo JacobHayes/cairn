@@ -9,6 +9,8 @@
 // (decisions/2026-10-07-restoring-a-tombstone-adds-a-local-copy-under-fresh-keys.md).
 import type { Schema } from "@cairn/client";
 
+import { fieldWords } from "../status/words.ts";
+import { KIND_GONE } from "../ui/gone.ts";
 import { withoutDecisions, withoutPlaceholders } from "./cascade.ts";
 import { childrenOfClause, decisionOf, type Clause } from "./condition.ts";
 import { partsOf, ruleOf } from "./dates.ts";
@@ -24,15 +26,17 @@ export function editWords(edit: LocalEdit, tree: Tree): string {
     return "its kind or answer type";
   }
   if ("field" in edit) {
-    return edit.field.replace("_", " ");
+    return fieldWords(edit.field);
   }
   if ("requires" in edit) {
     return `its requirement on "${titleIn(tree, edit.requires)}"`;
   }
   if ("participation" in edit) {
-    return `its ${edit.participation === "k_owner" ? "owner" : edit.participation} participation`;
+    const kind = edit.participation === "k_owner" ? "owner" : ((tree.graph.participation_kinds ?? []).find((each) => each.key === edit.participation)?.title ?? KIND_GONE);
+    return `its ${kind} participation`;
   }
-  return `the resource ${edit.resource}`;
+  const title = [...tree.byKey.values()].flatMap((node) => node.resources ?? []).find((resource) => resource.key === edit.resource)?.title;
+  return title == null ? "a resource" : `the resource "${title}"`;
 }
 
 /** Defaults a field reads as when a node leaves it out (A1a). */

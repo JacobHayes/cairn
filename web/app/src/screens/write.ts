@@ -7,10 +7,9 @@ import type { Schema } from "@cairn/client";
 
 import { noticesOf } from "../data/activity.ts";
 import type { Command } from "../data/edit-record.ts";
-import { useEdit, useSession, useSkew } from "../data/react.ts";
+import { useWrite } from "../data/react.ts";
 import type { WriteView } from "../data/write-machine.ts";
-import { isPatchAnswer, landedWarning, newPatchId, patchOf, type Rejection, type WriteIntent } from "../data/writes.ts";
-import { useReceipt } from "../ui/Receipt.tsx";
+import { isPatchAnswer, newPatchId, patchOf, type Rejection, type WriteIntent } from "../data/writes.ts";
 import type { ReceiptState } from "../ui/receipt.ts";
 
 export interface ScreenWrite {
@@ -20,7 +19,7 @@ export interface ScreenWrite {
   /** Version skew or a write in flight: no new write starts. */
   disabled: boolean;
   /** The last attempt's rejection, until dismissed or a later attempt. */
-  rejected: Rejection | undefined;
+  rejection: Rejection | undefined;
   /** What the write is doing when it is not rejected: still resending, not sent, or its subject gone. */
   status: WriteView | undefined;
   dismiss: () => void;
@@ -36,26 +35,20 @@ export function screenCommand(intent: WriteIntent, id: string = newPatchId()): C
 
 /** The screen's write path as the edit `edit` (a key stable for the control), named `label` on the chip. */
 export function useScreenWrite(edit: string, label?: string): ScreenWrite {
-  const session = useSession();
-  const skew = useSkew();
-  const held = useEdit(edit);
-  const receipt = useReceipt();
-  const run = async (intent: WriteIntent, onLanded?: (notices: Schema<"Notice">[]) => void): Promise<boolean> => {
-    receipt.clear();
-    const answer = await held.submit(screenCommand(intent), { label });
-    if (answer !== undefined) {
-      receipt.show(landedWarning(answer, session.titleOf));
-      onLanded?.(isPatchAnswer(answer) ? noticesOf(answer) : []);
-    }
-    return answer !== undefined;
-  };
+  const write = useWrite(edit, label);
   return {
-    run,
-    pending: held.busy,
-    disabled: held.busy || skew,
-    rejected: held.rejection,
-    status: held.status,
-    dismiss: held.dismiss,
-    receipt: receipt.receipt,
+    run: async (intent, onLanded) => {
+      const answer = await write.submit(screenCommand(intent));
+      if (answer !== undefined) {
+        onLanded?.(isPatchAnswer(answer) ? noticesOf(answer) : []);
+      }
+      return answer !== undefined;
+    },
+    pending: write.busy,
+    disabled: write.disabled,
+    rejection: write.rejection,
+    status: write.status,
+    dismiss: write.dismiss,
+    receipt: write.receipt,
   };
 }

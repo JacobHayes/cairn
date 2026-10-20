@@ -1,8 +1,8 @@
-// F7: every bound's chain said in the journey's terms, with the pin or rule to edit; F5's
-// moves and D4's stale reasons in words naming the nodes they are about.
+// F7: every bound's chain said in the journey's terms, with the pin or rule to edit; D4's
+// stale reasons in words naming the nodes they are about.
 import { describe, expect, it } from "vitest";
 
-import { constraintText, editTargets, guardFailureText, moveText, namer, sourceText, type Chain } from "./explain.ts";
+import { constraintText, editTargets, guardFailureText, namer, sourceText, type Chain } from "./explain.ts";
 import { testView } from "./view.test-support.ts";
 
 const view = testView();
@@ -46,11 +46,7 @@ describe("explanation words", () => {
     expect(estimate && sourceText(estimate.source, name)).toContain("Report");
   });
 
-  it("names the moves of a resolution and the reasons a node is stale", () => {
-    const shift = moveText({ op: "shift_pin", node: "n_report", offset_days: -5 }, name);
-    expect(shift).toContain("Report");
-    expect(shift).toContain("5");
-    expect(moveText({ op: "answer", decision: "n_when", value: { date: "2026-11-25" } }, name)).toContain("Nov 25");
+  it("names the reasons a node is stale", () => {
     expect(guardFailureText({ open_dependency: "n_findings" }, name)).toContain("Findings");
   });
 });

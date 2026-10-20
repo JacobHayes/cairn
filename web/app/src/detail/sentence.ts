@@ -4,6 +4,7 @@
 // page; the pieces carry links, which the component draws.
 import type { Schema } from "@cairn/client";
 
+import { conditionNames, conditionWords } from "../authoring/condition.ts";
 import { rankParts, type NodeRow } from "../acting/why.ts";
 import { rollups } from "../plan/tree.ts";
 import { SNOOZE_NODE_TAIL } from "../status/snooze.ts";
@@ -12,7 +13,7 @@ import { dateWords, daysUntil, daysWords, relativeDays } from "../status/when.ts
 import { guardFailureText, namer } from "./explain.ts";
 import { INITIAL_STATE, isTerminal, nodeOf, titleOf, unansweredOf, type NodeDetail, type NodeDerived, type Ready } from "./model.ts";
 import { answerText, entityName } from "./sections.tsx";
-import { conditionPhrase, plural } from "./words.ts";
+import { plural } from "./words.ts";
 
 /** A part of the sentence: text, a link to a node, or the Unsnooze action for the container whose snooze holds over the node. */
 export type Piece = string | { node: string };
@@ -120,19 +121,14 @@ export function appliesIf(view: Ready, detail: NodeDetail): string | undefined {
   if (clause == null) {
     return undefined;
   }
-  const say = (decision: string, value: boolean | string) => {
-    const choices = nodeOf(view, decision)?.choices ?? [];
-    const choice = choices.find((each) => (typeof each === "string" ? each : each.id) === value);
-    return typeof value === "boolean" ? (value ? "yes" : "no") : choice === undefined || typeof choice === "string" ? value : choice.title;
-  };
-  return conditionPhrase(clause, say, (decision) => titleOf(view, decision));
+  return conditionWords(clause, conditionNames((decision) => nodeOf(view, decision), (key) => entityName(view, key)));
 }
 
 /** D4: why a finished node is stale, in words. */
 function staleWords(view: Ready, failures: Schema<"GuardFailure">[]): Piece[] {
   const name = namer(view);
   return failures.flatMap((failure): Piece[] =>
-    typeof failure === "object" ? [" Stale: ", { node: failure.open_dependency }, " reopened."] : [` Stale: ${guardFailureText(failure, name)}.`],
+    typeof failure === "object" ? [" Stale: ", { node: failure.open_dependency }, " was reopened."] : [` Stale: ${guardFailureText(failure, name)}.`],
   );
 }
 

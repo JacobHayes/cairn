@@ -42,14 +42,14 @@ test("edits to different nodes both land, and edits to one field surface a confl
   await expect(title(two, "n_offer")).toHaveText(offer);
   await save(two, "n_screen");
   await expect(title(two, "n_screen")).toHaveText(screen);
-  await expect(two.getByTestId("conflict")).toHaveCount(0);
+  await expect(two.locator('[data-testid="refused"][data-rejection="stale"]')).toHaveCount(0);
   await expect(title(one, "n_screen")).toHaveText(screen);
   // One to the same field is not: it is shown beside the other's, and kept on the current version when asked.
   const [theirs, mine] = [fresh("Theirs"), fresh("Mine")];
   await startRename(two, "n_onsite", mine);
   await rename(one, "n_onsite", theirs);
   await save(two, "n_onsite");
-  await expect(two.getByTestId("conflict")).toContainText(theirs);
+  await expect(two.locator('[data-testid="refused"][data-rejection="stale"]')).toContainText(theirs);
   await expect(syncChip(two)).toHaveAttribute("aria-label", /^CONFLICT · 1\./);
   await expect(renameOf(two, "n_onsite").getByRole("textbox")).toHaveValue(mine);
   await expect(title(one, "n_onsite")).toHaveText(theirs);

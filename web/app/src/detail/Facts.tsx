@@ -1,6 +1,8 @@
 // C8, E2, B4 (design 6.9): who takes part in the node, and where it came from (held by the
 // Details section): they explain rather than ask for anything. The origin says whether the
 // node is the route's, edited here, or the journey's own.
+import { treeOf } from "../authoring/graph.ts";
+import { editWords } from "../authoring/local-edits.ts";
 import { memberOrigin, originLines } from "../segments/model.ts";
 import { useLatestVersions, useSegmentNames } from "../segments/read.ts";
 import { originText } from "./explain.ts";
@@ -56,7 +58,8 @@ function SegmentOrigin({ view, node }: { view: Ready; node: string }) {
 /** B4, B7, B13: where the node came from, and what was changed here. */
 export function Origin({ view, detail }: { view: Ready; detail: NodeDetail }) {
   const { record, localEdits } = detail;
-  const edits = localEdits.map((edit) => (typeof edit === "string" ? edit : Object.values(edit)[0])).join(", ");
+  const tree = treeOf(view.journey.graph);
+  const edits = localEdits.map((edit) => editWords(edit, tree)).join(", ");
   return record.provenance === "from_segment" ? (
     <span className="stack" data-testid="provenance" data-status={record.provenance}>
       <SegmentOrigin view={view} node={detail.node.key} />

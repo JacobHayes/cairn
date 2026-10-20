@@ -2,7 +2,7 @@
 // kept across reloads until it is sent (ARCHITECTURE, Web UI).
 import type { Ready } from "../detail/model.ts";
 import { useFormDraft } from "../detail/write.ts";
-import { Refused } from "../screens/Refused.tsx";
+import { RejectionView } from "../screens/RejectionView.tsx";
 import { WriteStatus } from "../screens/WriteStatus.tsx";
 import { useScreenWrite } from "../screens/write.ts";
 import { Button, Field } from "../ui/kit.tsx";
@@ -45,10 +45,10 @@ export function HeaderEditor({ ready }: { ready: Ready }) {
         <Button primary disabled={write.disabled || value.name.trim() === ""} onClick={() => void save()}>Save</Button>
         <Button onClick={() => { form.close(); write.dismiss(); }}>Cancel</Button>
       </span>
-      {write.rejected === undefined ? (
+      {write.rejection === undefined ? (
         <WriteStatus view={write.status} />
       ) : (
-        <Refused rejection={write.rejected} onDismiss={() => { form.open(value, seen); write.dismiss(); }} />
+        <RejectionView rejection={write.rejection} onDismiss={() => { form.open(value, seen); write.dismiss(); }} />
       )}
     </div>
   );

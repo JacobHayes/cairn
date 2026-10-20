@@ -9,7 +9,7 @@ import { Link, useNavigate, useSearchParams } from "react-router";
 import { isSlug, slugOf } from "../authoring/keys.ts";
 import { useDraft, writeDraft } from "../data/drafts.ts";
 import { TITLE_BYTES_MAX, overBytes } from "../authoring/limits.ts";
-import { Refused } from "../screens/Refused.tsx";
+import { RejectionView } from "../screens/RejectionView.tsx";
 import { WriteStatus } from "../screens/WriteStatus.tsx";
 import { useScreenWrite } from "../screens/write.ts";
 import { Button, Field } from "../ui/kit.tsx";
@@ -79,7 +79,7 @@ export function NewRoutePage() {
       </div>
       <KindChips kind={kind} />
       <NewForm kind={kind} disabled={write.disabled} onStart={(name, id) => { void start(name, id); }} />
-      {write.rejected === undefined ? <WriteStatus view={write.status} /> : <Refused rejection={write.rejected} onDismiss={write.dismiss} />}
+      {write.rejection === undefined ? <WriteStatus view={write.status} /> : <RejectionView rejection={write.rejection} onDismiss={write.dismiss} />}
       <h2>Or import a route file</h2>
       <ImportFile edit="import:new-route" label="Import a file…" />
     </section>

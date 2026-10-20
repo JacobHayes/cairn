@@ -21,7 +21,7 @@ import { Badge, Button } from "../ui/kit.tsx";
 import { Receipt } from "../ui/Receipt.tsx";
 import { Menu } from "./Menu.tsx";
 import { JOURNEY_VIEW_TITLE, ViewPicker } from "./ViewPicker.tsx";
-import { Refused } from "./Refused.tsx";
+import { RejectionView } from "./RejectionView.tsx";
 import { WriteStatus } from "./WriteStatus.tsx";
 import { useScreenWrite, type ScreenWrite } from "./write.ts";
 
@@ -222,7 +222,7 @@ export function JourneyHeader({ ready, view, screen, selected }: { ready: Ready;
         </div>
       ) : null}
       <WriteStatus view={write.status} />
-      {write.rejected === undefined ? <Receipt receipt={write.receipt} /> : <Refused rejection={write.rejected} onDismiss={write.dismiss} />}
+      {write.rejection === undefined ? <Receipt receipt={write.receipt} /> : <RejectionView rejection={write.rejection} onDismiss={write.dismiss} />}
       {panel === "delete" ? <DeleteJourney ready={ready} onCancel={() => { setPanel(undefined); }} /> : null}
       {panel === "save" || panel === "relink" ? (
         <JourneyFlow ready={ready} flow={panel} onClose={() => { setPanel(undefined); }} />

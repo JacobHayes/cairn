@@ -58,10 +58,10 @@ export function ruleProblem(parts: RuleParts): string | undefined {
   return outOfRange(parts.offset, OFFSET_DAYS_MAX, "An offset in days");
 }
 
-/** A rule as people read it. */
+/** A rule as people read it; `label` names a node by its title, and the journey's start is named here. */
 export function ruleWords(rule: DateRule, label: (source: string) => string): string {
   const parts = partsOf(rule);
-  const sources = parts.sources.map(label).join(", ");
+  const sources = parts.sources.map((source) => (source === CREATED_AT ? "the journey's start" : label(source))).join(" and ");
   const days = parts.offset === 1 ? "1 day" : `${String(parts.offset)} days`;
   return parts.offset === 0 ? `${parts.direction === "before" ? "by" : "from"} ${sources}` : `${days} ${parts.direction} ${sources}`;
 }
@@ -75,10 +75,7 @@ export function ruleFoot(node: GraphNode, tree: Tree): string | undefined {
   if (rule === undefined) {
     return undefined;
   }
-  const { direction, sources, offset } = partsOf(rule);
-  const named = sources.map((source) => (source === CREATED_AT ? "the journey's start" : titleIn(tree, source))).join(" and ");
-  const days = offset === 1 ? "1 day" : `${String(offset)} days`;
-  return offset === 0 ? `${lead} at ${named}` : `${lead} ${days} ${direction} ${named}`;
+  return `${lead} ${ruleWords(rule, (source) => titleIn(tree, source))}`;
 }
 
 /**

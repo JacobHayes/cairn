@@ -5,10 +5,9 @@
 // so its rejection survives leaving the screen and a reload. A stale proposal is never rebased
 // behind a person's back: it is rejected, and refreshed and reviewed again by them.
 import type { Answer, ProposalCall, ProposalCommand } from "../data/edit-record.ts";
-import { useEdit, useSession, useSkew } from "../data/react.ts";
+import { useWrite } from "../data/react.ts";
 import type { WriteView } from "../data/write-machine.ts";
-import { isPatchAnswer, landedWarning, newPatchId, type Rejection } from "../data/writes.ts";
-import { useReceipt } from "../ui/Receipt.tsx";
+import { newPatchId, type Rejection } from "../data/writes.ts";
 import type { ReceiptState } from "../ui/receipt.ts";
 
 /** A proposal call before it has a patch id: what a control asks for. */
@@ -38,26 +37,15 @@ export interface ProposalWrite {
 
 /** The proposal writes of the control `edit` names (a key stable for it), under the chip label `label`. */
 export function useProposalWrite(edit: string, label?: string): ProposalWrite {
-  const session = useSession();
-  const skew = useSkew();
-  const held = useEdit(edit);
-  const receipt = useReceipt();
-  const run = async (ask: ProposalAsk): Promise<Answer | undefined> => {
-    receipt.clear();
-    const answer = await held.submit(proposalCommand(ask), { label });
-    if (answer !== undefined && isPatchAnswer(answer)) {
-      receipt.show(landedWarning(answer, session.titleOf));
-    }
-    return answer;
-  };
+  const write = useWrite(edit, label);
   return {
-    run,
-    pending: held.busy,
-    disabled: held.busy || skew,
-    rejection: held.rejection,
-    status: held.status,
-    dismiss: held.dismiss,
-    mounted: held.mounted,
-    receipt: receipt.receipt,
+    run: (ask) => write.submit(proposalCommand(ask)),
+    pending: write.busy,
+    disabled: write.disabled,
+    rejection: write.rejection,
+    status: write.status,
+    dismiss: write.dismiss,
+    mounted: write.mounted,
+    receipt: write.receipt,
   };
 }

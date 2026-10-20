@@ -7,6 +7,7 @@
 // a shape change).
 import type { Schema } from "@cairn/client";
 
+import { choiceId, type Choice } from "../status/answer.ts";
 import type { AnswerType, GraphNode, Mutation, NodeField, NodeKind } from "./graph.ts";
 import {
   BODY_BYTES_MAX,
@@ -19,7 +20,6 @@ import {
 } from "./limits.ts";
 import { isSlug } from "./keys.ts";
 
-export type Choice = Schema<"Choice">;
 export type Condition = Schema<"ConditionResolved">;
 export type DateRule = Schema<"DateRule">;
 
@@ -115,16 +115,6 @@ export function draftOf(node: GraphNode): NodeDraft {
     due_by: node.due_by ?? null,
     not_before: node.not_before ?? null,
   };
-}
-
-/** A choice's id. */
-export function choiceId(choice: Choice): string {
-  return typeof choice === "string" ? choice : choice.id;
-}
-
-/** A choice as a person reads it: its label, or its id. */
-export function choiceLabel(choice: Choice): string {
-  return typeof choice === "string" ? choice : choice.title;
 }
 
 const text = (value: string): string | null => (value.trim() === "" ? null : value);

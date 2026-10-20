@@ -4,8 +4,9 @@
 // what the engine said about it, at the field (A15).
 import { useState } from "react";
 
+import { choiceId, choiceLabel, type Choice } from "../status/answer.ts";
 import { Button, Field } from "../ui/kit.tsx";
-import { choiceId, choiceLabel, fieldsOf, type Choice, type FormField, type NodeDraft } from "./fields.ts";
+import { fieldsOf, type FormField, type NodeDraft } from "./fields.ts";
 import { nodesByPath, type AnswerType, type NodeKind, type Role, type Tree } from "./graph.ts";
 import { slugOf, uniqueId } from "./keys.ts";
 import { FieldBox, Picker, type FieldNotes } from "./parts.tsx";

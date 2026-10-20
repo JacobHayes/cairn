@@ -2,7 +2,7 @@
 import type { Schema } from "@cairn/client";
 import { describe, expect, it } from "vitest";
 
-import { answersWritten } from "./History.tsx";
+import { answersWritten, joinPatches } from "./History.tsx";
 
 type PatchEvents = Schema<"PatchEvents">;
 
@@ -32,5 +32,15 @@ describe("answersWritten", () => {
       { value: { boolean: true }, rationale: "- cheaper" },
       { value: { boolean: false }, rationale: undefined },
     ]);
+  });
+});
+
+describe("joinPatches", () => {
+  it("joins a patch split across pages back into one, in order, and leaves distinct patches alone", () => {
+    const first = answered("n_a", { boolean: true });
+    const second = answered("n_b", { boolean: true });
+    const other = { ...answered("n_c", { boolean: true }), patch_id: "p_two" };
+    const joined = joinPatches([first, second, other]);
+    expect(joined.map((patch) => [patch.patch_id, patch.events.length])).toEqual([["p_one", 2], ["p_two", 1]]);
   });
 });

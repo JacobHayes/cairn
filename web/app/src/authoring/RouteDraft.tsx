@@ -18,13 +18,13 @@ import { VersionSelect } from "../routes/VersionSelect.tsx";
 import type { Screen } from "../journeys/address.ts";
 import { ROUTE_VIEW_TITLE, ViewPicker } from "../screens/ViewPicker.tsx";
 import { Menu } from "../screens/Menu.tsx";
-import { Refused } from "../screens/Refused.tsx";
+import { violationNode, violationWords, type Violation } from "../data/writes.ts";
+import { RejectionView } from "../screens/RejectionView.tsx";
 import { WriteStatus } from "../screens/WriteStatus.tsx";
 import type { ScreenWrite } from "../screens/write.ts";
 import { Badge, Button } from "../ui/kit.tsx";
 import { NoticeList } from "./RouteNotices.tsx";
 import type { Authored } from "./target.ts";
-import { subjectNode, type Violation } from "./violations.ts";
 import { usePublishPreviewRead } from "./write.ts";
 
 type Notice = Schema<"Notice">;
@@ -123,7 +123,7 @@ export function RouteHeader({ route, of, screen, node, write, blocked, onPublish
           )}
         </Menu>
       </div>
-      {write.rejected === undefined ? <WriteStatus view={write.status} /> : <Refused rejection={write.rejected} onDismiss={write.dismiss} />}
+      {write.rejection === undefined ? <WriteStatus view={write.status} /> : <RejectionView rejection={write.rejection} onDismiss={write.dismiss} />}
     </section>
   );
 }
@@ -177,11 +177,11 @@ export function DraftCard({ route, violations, notices, hrefOf, write, blocked, 
           <Badge tone="bad">Blocks publishing {violations.length}</Badge>
           <ul className="stack">
             {violations.map((violation, at) => {
-              const node = subjectNode(violation);
+              const node = violationNode(violation);
               return (
                 <li key={at} data-testid="violation" data-code={violation.code} data-node={node}>
                   {node === undefined ? null : <strong>{titleOf(node)}: </strong>}
-                  {violation.message}
+                  {violationWords(violation)}
                   {node === undefined ? null : (
                     <>
                       {" "}

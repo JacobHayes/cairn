@@ -14,6 +14,7 @@ test("a later pin is rejected with its chain, kept across a reload and counted a
   await pin(panel, "2026-11-25");
   let conflict = panel.getByTestId("date-conflict");
   await expect(conflict).toBeVisible();
+  await conflict.getByText("Why it is short").click();
   await expect(conflict.getByTestId("chain")).toBeVisible();
   await expect(syncChip(page)).toHaveAttribute("data-state", "not-saved");
   await expect(panel.getByTestId("pin-date")).toHaveText("Nov 2");

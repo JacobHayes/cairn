@@ -12,6 +12,7 @@ import { proposalAddress } from "../address.ts";
 
 export type Mutation = Schema<"Mutation">;
 export type Rejection = Schema<"Rejection">;
+export type Violation = Schema<"Violation">;
 
 /** A write as a screen asks for it: what `patchOf` makes a patch of. */
 export interface WriteIntent {
@@ -39,6 +40,22 @@ export function patchOf(intent: WriteIntent, id: string = newPatchId()): Patch {
   return intent.deploymentRevision === undefined ? patch : { ...patch, deployment_revision: intent.deploymentRevision };
 }
 
+/** A violation in words: the engine's message without the rule's code it ends with ("(F5)"), which is for the docs, not for people. */
+export function violationWords(violation: Violation): string {
+  return violation.message.replace(/\s*\([A-Z]\d+[a-z]?\)$/, "");
+}
+
+/** The node a violation is about, when its subject is one: a patch over several nodes names which (C9). */
+export function violationNode(violation: Violation): string | undefined {
+  const subject = violation.at.subject;
+  return subject != null && typeof subject === "object" && "node" in subject ? subject.node : undefined;
+}
+
+/** Whether `rejection` is invalid with a violation of `code`. */
+export function violates(rejection: Rejection | undefined, code: string): boolean {
+  return rejection?.rejection === "invalid" && rejection.violations.some((violation) => violation.code === code);
+}
+
 /** Why a write was rejected, in a sentence for the chip's popover. */
 export function reasonOf(rejection: Rejection): string {
   switch (rejection.rejection) {
@@ -47,8 +64,7 @@ export function reasonOf(rejection: Rejection): string {
     case "invalid": {
       const [first] = rejection.violations;
       const more = rejection.violations.length - 1;
-      // The engine ends a message with the rule's code, "(F5)": for the docs, not for people.
-      return first === undefined ? "The change breaks a rule." : `${first.message.replace(/\s*\([A-Z]\d+\)$/, "")}${more > 0 ? ` (and ${String(more)} more)` : ""}`;
+      return first === undefined ? "The change breaks a rule." : `${violationWords(first)}${more > 0 ? ` (and ${String(more)} more)` : ""}`;
     }
     case "patch_id_reused":
       return "That change was already sent with different content.";
@@ -60,7 +76,7 @@ function journeyOf(intent: Pick<WriteIntent, "target">): string | undefined {
   return typeof intent.target === "object" && "journey" in intent.target ? intent.target.journey : undefined;
 }
 
-/** The node a mutation is about: the decision it answers, the node it acts on, or the one its annotation is on. */
+/** The node a mutation is about: the decision it answers, the node it acts on or adds, the edge's node, or the one its annotation is on. */
 export function subjectOf(mutation: Mutation): string | undefined {
   if ("decision" in mutation) {
     return mutation.decision;
@@ -68,7 +84,16 @@ export function subjectOf(mutation: Mutation): string | undefined {
   if ("annotation" in mutation && typeof mutation.annotation === "object") {
     return mutation.annotation.node ?? undefined;
   }
-  return "node" in mutation && typeof mutation.node === "string" ? mutation.node : undefined;
+  if ("removal" in mutation) {
+    return mutation.removal.node;
+  }
+  if ("edge" in mutation) {
+    return mutation.edge.node;
+  }
+  if ("node" in mutation) {
+    return typeof mutation.node === "string" ? mutation.node : mutation.node.key;
+  }
+  return undefined;
 }
 
 /**

@@ -3,6 +3,7 @@
 // container's progress and roll-up badge, what a conditional node depends on, the "I am here"
 // marks, the rank order, and the numbers the Signals lens shows. All read from the document and
 // its local derive; the words are words.ts's.
+import { conditionNames } from "../authoring/condition.ts";
 import { nodeOf, recordOf, startedEarly, type GraphNode, type NodeDerived, type Ready } from "../detail/model.ts";
 import { answerText, entityName } from "../detail/sections.tsx";
 import { rollups } from "../plan/tree.ts";
@@ -67,11 +68,10 @@ interface Context {
 /** What a conditional node depends on, as one sentence: `If Who runs testing? = Partner, once Budget is answered`. */
 function dependsBody(context: Context, node: GraphNode, derived: NodeDerived): CardBody | undefined {
   const { view } = context;
-  const nodes = view.journey.graph.nodes ?? [];
   const source = derived.relevance.condition_on == null ? node : (nodeOf(view, derived.relevance.condition_on) ?? node);
   const pending = (derived.relevance.pending_on ?? []).map((key) => nodeOf(view, key)?.title ?? NODE_GONE);
   const reads = (derived.relevance.decisions ?? []).map((key) => nodeOf(view, key)?.title ?? NODE_GONE);
-  const words = dependsWords(nodes, source) ?? (reads.length === 0 ? undefined : reads.join(" and "));
+  const words = dependsWords(source, conditionNames((key) => nodeOf(view, key), (key) => entityName(view, key))) ?? (reads.length === 0 ? undefined : reads.join(" and "));
   if (words === undefined) {
     return undefined;
   }

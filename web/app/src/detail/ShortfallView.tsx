@@ -3,9 +3,11 @@
 // is applied on its own.
 import type { Schema } from "@cairn/client";
 
+import { mutationWords, namesOf } from "../proposals/words.ts";
+import { daysWords } from "../status/when.ts";
 import { Button } from "../ui/kit.tsx";
 import { ChainView } from "./ChainView.tsx";
-import { moveText, namer } from "./explain.ts";
+
 import type { Mutation, Ready } from "./model.ts";
 
 export function ShortfallView({
@@ -19,12 +21,11 @@ export function ShortfallView({
   onMove?: ((move: Mutation) => void) | undefined;
   disabled?: boolean;
 }) {
-  const name = namer(view);
+  const names = namesOf([view.journey.graph], view.inputs.deployment.entities ?? [], view.derived.today);
   const moves = short.resolutions ?? [];
   return (
-    <div className="callout callout-bad stack" data-testid="shortfall" data-days={short.shortfall_days}>
-      <strong>{short.shortfall_days} days short</strong>
-      <ChainView view={view} chain={short.chain} />
+    <div className="callout callout-bad callout-short stack" data-testid="shortfall" data-days={short.shortfall_days}>
+      <strong>Needs {daysWords(short.shortfall_days)} more than it has</strong>
       {moves.length === 0 ? (
         <span className="muted small">No single move resolves it; restructure the work.</span>
       ) : (
@@ -32,16 +33,21 @@ export function ShortfallView({
           <span className="muted small">Each of these resolves it on its own:</span>
           {moves.map((move, at) => (
             <span key={at} className="row" data-testid="resolution" data-op={move.op}>
-              <span>{moveText(move, name)}</span>
-              {onMove === undefined ? null : (
+              {onMove === undefined ? (
+                mutationWords(move, names)
+              ) : (
                 <Button disabled={disabled} onClick={() => { onMove(move); }}>
-                  Use this
+                  {mutationWords(move, names)}
                 </Button>
               )}
             </span>
           ))}
         </div>
       )}
+      <details open={onMove === undefined}>
+        <summary>Why it is short</summary>
+        <ChainView view={view} chain={short.chain} />
+      </details>
     </div>
   );
 }

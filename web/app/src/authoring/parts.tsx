@@ -3,10 +3,9 @@
 // (A15: each at its field); a select over options; and a rejection that no field owns.
 import type { ReactNode, SelectHTMLAttributes } from "react";
 
-import type { Rejection } from "../data/writes.ts";
-import { RejectionView } from "../screens/RejectionView.tsx";
-import { Button } from "../ui/kit.tsx";
-import type { Place, Violation } from "./violations.ts";
+import type { Violation } from "../data/writes.ts";
+import { ViolationLines } from "../screens/RejectionView.tsx";
+import type { Place } from "./violations.ts";
 
 /** What a field shows beside its control. */
 export interface FieldNotes {
@@ -38,11 +37,7 @@ export function FieldBox({ label, place, notes = {}, children }: { label: string
           {notes.problem}
         </span>
       )}
-      {violations.map((violation, at) => (
-        <span key={at} className="author-problem" role="alert" data-testid="violation" data-code={violation.code}>
-          {violation.message}
-        </span>
-      ))}
+      <ViolationLines violations={violations} />
     </div>
   );
 }
@@ -72,27 +67,8 @@ export function FormViolations({ places }: { places: ReadonlyMap<Place, Violatio
     return null;
   }
   return (
-    <ul className="detail-list callout callout-bad" role="alert" data-testid="form-violations">
-      {loose.map((violation, at) => (
-        <li key={at} data-testid="violation" data-code={violation.code}>
-          {violation.message}
-        </li>
-      ))}
-    </ul>
-  );
-}
-
-/** A write's rejection that is not about fields: a stale base (H5), shown with a retry on the current version. */
-export function StaleRejection({ rejection, onRetry, onDismiss }: { rejection: Rejection; onRetry: () => void; onDismiss: () => void }) {
-  if (rejection.rejection === "invalid") {
-    return null;
-  }
-  return (
-    <div className="stack">
-      <RejectionView rejection={rejection} onRebase={onRetry} />
-      <span className="row">
-        <Button onClick={onDismiss}>Drop this change</Button>
-      </span>
+    <div className="stack callout callout-bad" data-testid="form-violations">
+      <ViolationLines violations={loose} />
     </div>
   );
 }

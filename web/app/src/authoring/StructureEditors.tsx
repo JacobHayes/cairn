@@ -6,6 +6,7 @@
 import { useState } from "react";
 
 import { useDraft } from "../data/drafts.ts";
+import { RejectionView } from "../screens/RejectionView.tsx";
 import { WriteStatus } from "../screens/WriteStatus.tsx";
 import { Button, Field } from "../ui/kit.tsx";
 import { CascadeDialog } from "./CascadeDialog.tsx";
@@ -32,18 +33,7 @@ export function Refusal({ write, onRetry }: { write: AuthorWrite; onRetry?: (() 
   if (failed === undefined) {
     return <WriteStatus view={write.status} />;
   }
-  const lines = failed.rejection.rejection === "invalid" ? failed.rejection.violations.map((violation) => violation.message) : ["The graph changed since; try again."];
-  return (
-    <span className="stack callout callout-bad" role="alert" data-testid="refused">
-      {lines.map((line, at) => (
-        <span key={at}>{line}</span>
-      ))}
-      <span className="row">
-        {failed.rejection.rejection === "stale" && onRetry !== undefined ? <Button onClick={onRetry}>Keep my edit on the current version</Button> : null}
-        <Button onClick={write.dismiss}>Dismiss</Button>
-      </span>
-    </span>
-  );
+  return <RejectionView rejection={failed.rejection} onRebase={onRetry} onDismiss={write.dismiss} />;
 }
 
 /** How many explicit edges touch `key`, in and out (the per-node limit). */

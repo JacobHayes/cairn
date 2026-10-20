@@ -10,7 +10,7 @@ import { allPages } from "../data/live.ts";
 import type { JourneySummary } from "../data/reads.ts";
 import { useEdit, useSession, useSkew } from "../data/react.ts";
 import { landedWarning } from "../data/writes.ts";
-import { Refused } from "../screens/Refused.tsx";
+import { RejectionView } from "../screens/RejectionView.tsx";
 import { WriteStatus } from "../screens/WriteStatus.tsx";
 import { Failed } from "../ui/Failed.tsx";
 import { Button } from "../ui/kit.tsx";
@@ -96,7 +96,7 @@ export function MergeEntities({ deployment, entities, asked }: { deployment: Dep
           <Receipt receipt={receipt.receipt} />
         </>
       ) : (
-        <Refused rejection={write.rejection} onDismiss={write.dismiss} />
+        <RejectionView rejection={write.rejection} onDismiss={write.dismiss} />
       )}
       </div>
     </section>

@@ -9,6 +9,7 @@ import type { Schema } from "@cairn/client";
 
 import { SNOOZE_NODE_TAIL } from "../status/snooze.ts";
 import { dateWords } from "../status/when.ts";
+import { fieldWords } from "../status/words.ts";
 import { ENTITY_GONE, KIND_GONE, NODE_GONE, ROLE_GONE } from "../ui/gone.ts";
 import { titleOf, type Ready } from "./model.ts";
 import { entityName, kindTitle, roleTitle } from "./sections.tsx";
@@ -131,36 +132,15 @@ function fieldRecords(c: Context): { node: string; value: Schema<"NodeFieldValue
   return c.records.flatMap((record) => ("node_field" in record ? [{ node: record.node_field.node, value: record.node_field.value }] : []));
 }
 
-const FIELD_WORDS: Record<string, string> = {
-  id: "id",
-  parent: "place",
-  title: "title",
-  description: "description",
-  weight: "weight",
-  relevant_when: "condition",
-  due_by: "due date rule",
-  not_before: "earliest start rule",
-  estimate: "estimate",
-  placeholder: "placeholder setting",
-  requires_artifact: "artifact requirement",
-  requires_note: "note requirement",
-  final: "final setting",
-  auto_reach: "reached-by-itself setting",
-  opens_at: "opening date",
-  closes_at: "closing date",
-  gates: "gates",
-  closes: "closing stage",
-  prompt: "question",
-  help: "help text",
-  choices: "choices",
-  fills_role: "role it fills",
-  feeds_milestone: "milestone it feeds",
-};
-
 export const listed = (items: string[]): string => (items.length <= 1 ? (items[0] ?? "") : `${items.slice(0, -1).join(", ")} and ${items.at(-1) ?? ""}`);
 
 function entitiesOf(c: Context, keys: readonly string[]): string[] {
   return keys.map((key) => c.words.entity(key));
+}
+
+/** A rename whose old title is not known: the node is named by what it is called now, which is the new title unless it was renamed again, so it is not named at all. */
+function renamedTo(c: Context, node: string, to: string): string {
+  return it(c, node) === "it" ? `renamed it to ${quoted(to)}` : `renamed a node to ${quoted(to)}`;
 }
 
 function changedNode(c: Context): Said {
@@ -170,7 +150,7 @@ function changedNode(c: Context): Said {
   if (title !== undefined && names.length === 1) {
     const to = title.to;
     const from = c.prior.titles.get(title.node);
-    return { what: from === undefined ? `renamed ${it(c, title.node)} to ${quoted(to)}` : `renamed ${it(c, title.node)} from ${quoted(from)}`, facts: { title: to, ...(from === undefined ? {} : { renamedFrom: from }), fields: names } };
+    return { what: from === undefined ? renamedTo(c, title.node, to) : `renamed ${it(c, title.node)} from ${quoted(from)}`, facts: { title: to, ...(from === undefined ? {} : { renamedFrom: from }), fields: names } };
   }
   if (names.length === 1 && names[0] === "parent") {
     return { what: `moved ${it(c)}`, facts: { fields: names } };
@@ -178,7 +158,7 @@ function changedNode(c: Context): Said {
   if (names.length === 0) {
     return { what: `edited ${it(c)}`, facts: { fields: [] } };
   }
-  return { what: `changed the ${listed(names.map((name) => FIELD_WORDS[name] ?? name.replaceAll("_", " ")))} of ${it(c)}`, facts: { fields: names } };
+  return { what: `changed the ${listed(names.map(fieldWords))} of ${it(c)}`, facts: { fields: names } };
 }
 
 function transitioned(c: Context): Said {

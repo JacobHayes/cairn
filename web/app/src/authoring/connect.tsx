@@ -3,11 +3,11 @@
 // (edge-drawing.ts); this is its React side: the hook the page calls, the key it listens
 // to while drawing, and the banner that says what is being drawn and why a pick was refused or
 // did not land. The write a pick makes is the edit manager's; the banner reads it through
-// `useWrite`, and the sync chip shows it too.
+// `useWriteById`, and the sync chip shows it too.
 import { useActorRef, useSelector } from "@xstate/react";
 import { createContext, useContext, useEffect, useMemo } from "react";
 
-import { useSession, useViewer, useWrite } from "../data/react.ts";
+import { useSession, useViewer, useWriteById } from "../data/react.ts";
 import { currentAddress } from "../data/session.ts";
 import { reasonOf } from "../data/writes.ts";
 import { ViolationLines } from "../screens/RejectionView.tsx";
@@ -120,7 +120,7 @@ function RefusalLines({ refused }: { refused: Refusal }) {
 /** The banner while an edge is drawn: what to pick, what is being sent, and why a pick was refused or did not land. */
 export function DrawingBanner({ drawing }: { drawing: EdgeDrawing }) {
   const { view, tree, stop } = drawing;
-  const write = useWrite(view.state === "choosing" || view.state === "saving" ? view.sent?.id : undefined);
+  const write = useWriteById(view.state === "choosing" || view.state === "saving" ? view.sent?.id : undefined);
   if (view.state === "inactive" || tree === undefined) {
     return null;
   }

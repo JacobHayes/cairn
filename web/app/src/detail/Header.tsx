@@ -13,6 +13,7 @@ import { WriteStatus } from "../screens/WriteStatus.tsx";
 import { dateInk, dueWords, inkClass } from "../status/when.ts";
 import { statusTone, statusWord } from "../status/words.ts";
 import { Badge, Button, Field } from "../ui/kit.tsx";
+import { Receipt } from "../ui/Receipt.tsx";
 import { flagsOf, isTerminal, type NodeDetail, type Ready } from "./model.ts";
 import { NodeLink } from "./parts.tsx";
 import { entityName } from "./sections.tsx";
@@ -131,6 +132,7 @@ export function Header({ view, detail, position, rename, removeTo }: { view: Rea
         </Badge>
       </div>
       {rename.open ? <RenameForm view={view} title={node.title} rename={rename} /> : <h2 data-testid="detail-title">{node.title}</h2>}
+      <Receipt receipt={rename.receipt} />
       <Meta view={view} detail={detail} position={position} />
       {flags.length === 0 ? null : (
         <div className="row" data-testid="flags">

@@ -10,7 +10,6 @@ import type { Schema } from "@cairn/client";
 
 import type { GraphNode, NodeKind } from "../detail/model.ts";
 import type { DisplayState } from "../status/words.ts";
-import { dependsWords } from "./words.ts";
 import { NODE_GONE } from "../ui/gone.ts";
 
 export type Level = Schema<"Level">;
@@ -185,7 +184,7 @@ function nodesOf(graph: GraphNode[]): Nodes {
 }
 
 /** C1: what one edge says, in words: why the dependent waits on the requirement. */
-function sentenceOf(edge: Schema<"UnderlyingEdge">, nodes: Nodes, graph: GraphNode[]): string {
+function sentenceOf(edge: Schema<"UnderlyingEdge">, nodes: Nodes): string {
   const title = (key: string) => nodes.get(key)?.title ?? NODE_GONE;
   if (!edge.gates) {
     return `Dated from ${title(edge.requirement)}; does not block`;
@@ -193,11 +192,8 @@ function sentenceOf(edge: Schema<"UnderlyingEdge">, nodes: Nodes, graph: GraphNo
   switch (edge.origin) {
     case "explicit":
       return `${title(edge.dependent)} needs ${title(edge.requirement)}`;
-    case "condition": {
-      const dependent = nodes.get(edge.dependent);
-      const depends = dependent === undefined ? undefined : dependsWords(graph, dependent);
-      return depends === undefined ? `Applies only depending on ${title(edge.requirement)}` : `Applies only if ${depends}`;
-    }
+    case "condition":
+      return `Applies only depending on ${title(edge.requirement)}`;
     case "stage_opening":
       return `${title(edge.dependent)} waits for ${title(edge.requirement)}, where it opens`;
   }
@@ -266,7 +262,7 @@ export function linesOf(level: Level, graph: GraphNode[], finished?: (key: strin
   }
   return [...joined.entries()].map(([id, line]) => {
     const kind = line.underlying.map(kindOf).reduce<LineKind>((best, each) => (STRENGTH[each] > STRENGTH[best] ? each : best), "dates");
-    const strongest = line.underlying.filter((each) => kindOf(each) === kind).map((each) => sentenceOf(each, nodes, graph));
+    const strongest = line.underlying.filter((each) => kindOf(each) === kind).map((each) => sentenceOf(each, nodes));
     return {
       id,
       from: line.from,

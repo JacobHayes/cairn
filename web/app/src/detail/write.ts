@@ -6,10 +6,9 @@
 import { useDraft } from "../data/drafts.ts";
 import type { Command, OperationId } from "../data/edit-record.ts";
 import { held } from "../data/edit-manager.ts";
-import { useEdit, useSession, useSkew } from "../data/react.ts";
+import { useSession, useWrite } from "../data/react.ts";
 import type { WriteView } from "../data/write-machine.ts";
-import { landedWarning, newPatchId, patchOf, type Rejection } from "../data/writes.ts";
-import { useReceipt } from "../ui/Receipt.tsx";
+import { newPatchId, patchOf, type Rejection } from "../data/writes.ts";
 import type { ReceiptState } from "../ui/receipt.ts";
 import { titleOf, type Mutation, type Ready } from "./model.ts";
 
@@ -101,40 +100,26 @@ export function attemptOf(command: Command, deployment: number): Attempt | undef
  * `node`'s title (the one the section is about), wherever the person is.
  */
 export function useNodeWrite(view: Ready, scope: string, node?: string): NodeWrite {
-  const session = useSession();
-  const { edits } = session;
-  const skew = useSkew();
+  const { edits } = useSession();
   const journey = view.journey.header.id;
-  const edit = useEdit(nodeEdit(journey, scope));
+  const label = node === undefined ? view.journey.header.name : titleOf(view, node);
+  const write = useWrite(nodeEdit(journey, scope), label);
   const revision = view.journey.revision;
   const deployment = view.key.deployment_revision;
   const current: Seen = { base: revision, deployment };
-  const label = node === undefined ? view.journey.header.name : titleOf(view, node);
-  const receipt = useReceipt();
-  const run = async (mutations: Mutation[], seen: Seen = current, id: OperationId = newPatchId()): Promise<boolean> => {
-    if (skew) {
-      return false;
-    }
-    receipt.clear();
-    const answer = await edit.submit(nodeCommand(journey, mutations, seen, id), { label });
-    if (answer !== undefined) {
-      receipt.show(landedWarning(answer, session.titleOf));
-    }
-    return answer !== undefined;
-  };
-  const attempt = edit.write === undefined ? undefined : attemptOf(edit.write.command, deployment);
+  const attempt = write.write === undefined ? undefined : attemptOf(write.write.command, deployment);
   return {
     journey,
     revision,
     seen: current,
-    run,
+    run: async (mutations, seen = current, id = newPatchId()) => (await write.submit(nodeCommand(journey, mutations, seen, id))) !== undefined,
     holds: (id) => held(edits, id),
-    status: edit.status,
-    pending: edit.busy,
-    disabled: edit.busy || skew,
-    failed: edit.write?.state === "rejected" && attempt !== undefined ? { id: edit.write.id, attempt, rejection: edit.write.rejection } : undefined,
-    dismiss: edit.dismiss,
-    receipt: receipt.receipt,
+    status: write.status,
+    pending: write.busy,
+    disabled: write.disabled,
+    failed: write.write?.state === "rejected" && attempt !== undefined ? { id: write.write.id, attempt, rejection: write.write.rejection } : undefined,
+    dismiss: write.dismiss,
+    receipt: write.receipt,
   };
 }
 

@@ -8,7 +8,6 @@ import type { NodeKind } from "./model.ts";
 
 type ChoiceEffect = Schema<"ChoiceEffect">;
 type Consequences = Schema<"Consequences">;
-type Condition = Schema<"ConditionResolved">;
 
 /** What a guard waits on, in words: the thing a bypass passes the node without. */
 export function guardWords(guard: Schema<"Guard">): string {
@@ -55,23 +54,29 @@ function nodes(total: number): string {
   return plural(total, "node");
 }
 
-/** One choice's effect, beside it: "brings in 6 · drops 3 (1 has progress)", or "no change". */
-export function effectWords(effect: ChoiceEffect): string {
-  const found: string[] = [];
+/** What a choice's effect does to the scope, as phrases: "brings in 6 nodes", "drops 3 nodes (1 with recorded progress; it is kept)". */
+function scopeParts(effect: ChoiceEffect): string[] {
+  const parts: string[] = [];
   if (effect.brings_in.total > 0) {
-    found.push(`brings in ${String(effect.brings_in.total)}`);
+    parts.push(`brings in ${nodes(effect.brings_in.total)}`);
   }
   if (effect.drops.total > 0) {
     const progress = effect.drops_with_progress.total;
-    found.push(`drops ${String(effect.drops.total)}${progress > 0 ? ` (${String(progress)} ${progress === 1 ? "has" : "have"} progress)` : ""}`);
+    parts.push(`drops ${nodes(effect.drops.total)}${progress > 0 ? ` (${String(progress)} with recorded progress; ${progress === 1 ? "it is" : "they are"} kept)` : ""}`);
   }
+  return parts;
+}
+
+/** One choice's effect, beside it: "brings in 6 nodes · drops 3 nodes", or "changes nothing else". */
+export function effectWords(effect: ChoiceEffect): string {
+  const found = scopeParts(effect);
   if (effect.opens_decisions.total > 0) {
     found.push(`opens ${String(effect.opens_decisions.total)} more ${effect.opens_decisions.total === 1 ? "decision" : "decisions"}`);
   }
   if (effect.decided_later.total > 0) {
     found.push(`${String(effect.decided_later.total)} decided later`);
   }
-  return found.length === 0 ? "no change" : found.join(" · ");
+  return found.length === 0 ? "changes nothing else" : found.join(" · ");
 }
 
 /**
@@ -79,14 +84,7 @@ export function effectWords(effect: ChoiceEffect): string {
  * would newly cause. `name` titles a node. The warning half (D7) is its own sentence.
  */
 export function savingWords(effect: ChoiceEffect | undefined, caused: Consequences | undefined, name: (key: string) => string): { info: string | undefined; warning: string | undefined } {
-  const info: string[] = [];
-  if (effect !== undefined && effect.brings_in.total > 0) {
-    info.push(`brings in ${nodes(effect.brings_in.total)}`);
-  }
-  if (effect !== undefined && effect.drops.total > 0) {
-    const progress = effect.drops_with_progress.total;
-    info.push(`drops ${nodes(effect.drops.total)}${progress > 0 ? ` (${String(progress)} with recorded progress; ${progress === 1 ? "it is" : "they are"} kept)` : ""}`);
-  }
+  const info = effect === undefined ? [] : scopeParts(effect);
   if (caused?.unlocked !== undefined && caused.unlocked.length > 0) {
     info.push(`frees ${nodes(caused.unlocked.length)} to start`);
   }
@@ -111,54 +109,4 @@ export function savingWords(effect: ChoiceEffect | undefined, caused: Consequenc
     info: info.length === 0 ? undefined : `Saving ${info.join(" and ")}.`,
     warning: warning.length === 0 ? undefined : `${info.length === 0 ? "Saving " : "It "}${warning.join(" and ")}.`,
   };
-}
-
-/** The decisions a condition reads, in the order it names them. */
-export function conditionDecisions(clause: Condition): string[] {
-  if ("equals" in clause) {
-    return [clause.equals.decision];
-  }
-  if ("not_equals" in clause) {
-    return [clause.not_equals.decision];
-  }
-  if ("contains" in clause) {
-    return [clause.contains.decision];
-  }
-  if ("in" in clause) {
-    return [clause.in.decision];
-  }
-  if ("answered" in clause) {
-    return [clause.answered];
-  }
-  if ("not" in clause) {
-    return conditionDecisions(clause.not);
-  }
-  return ("all" in clause ? clause.all : clause.any).flatMap(conditionDecisions);
-}
-
-/** What a condition value is called: `value` is a choice id, a boolean, or a plain text. */
-type Say = (decision: string, value: boolean | string) => string;
-
-/** A condition as a phrase after "applies if": "Partner", "not Our team", "Partner or Both". */
-export function conditionPhrase(clause: Condition, say: Say, title: (decision: string) => string): string {
-  if ("equals" in clause) {
-    return say(clause.equals.decision, clause.equals.value);
-  }
-  if ("not_equals" in clause) {
-    return `not ${say(clause.not_equals.decision, clause.not_equals.value)}`;
-  }
-  if ("contains" in clause) {
-    return `${title(clause.contains.decision)} includes ${say(clause.contains.decision, clause.contains.value)}`;
-  }
-  if ("in" in clause) {
-    return clause.in.values.map((value) => say(clause.in.decision, value)).join(" or ");
-  }
-  if ("answered" in clause) {
-    return `${title(clause.answered)} is answered`;
-  }
-  if ("not" in clause) {
-    return `not (${conditionPhrase(clause.not, say, title)})`;
-  }
-  const [joiner, parts] = "all" in clause ? [" and ", clause.all] : [" or ", clause.any];
-  return parts.map((part) => conditionPhrase(part, say, title)).join(joiner);
 }

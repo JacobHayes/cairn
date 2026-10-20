@@ -88,7 +88,7 @@ test("A12, A1a: a route authored by hand from an empty draft, published, exporte
   await (await section(page, "author-edges")).getByRole("button", { name: "Draw it on the canvas" }).click();
   await expect(banner).toHaveAttribute("data-from", handbook);
   await nodeCard(page, setup).getByTestId("card-open").click();
-  await expect(page.getByTestId("edge-refused")).toContainText("A3");
+  await expect(page.getByTestId("edge-refused")).toBeVisible();
   await nodeCard(page, accounts).getByTestId("card-open").click();
   await expect(page.getByTestId("drawing-edge")).toHaveCount(0);
   await expect(structure(page).locator(`[data-testid="requirement"][data-node="${accounts}"]`)).toBeVisible();

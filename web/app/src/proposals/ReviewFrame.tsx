@@ -9,6 +9,7 @@ import { Link } from "react-router";
 import { pathTo, proposalsAddress } from "../address.ts";
 import { useUserWords } from "../data/react.ts";
 import { Menu } from "../screens/Menu.tsx";
+import { fieldWords } from "../status/words.ts";
 import { Badge, Button } from "../ui/kit.tsx";
 import type { Graph } from "../authoring/graph.ts";
 import { indexPath, journeyPath } from "../journeys/address.ts";
@@ -24,7 +25,7 @@ import {
   type ReviewEntry,
   type ReviewFilter,
 } from "./model.ts";
-import { fieldName, fieldValueWords, type Names } from "./words.ts";
+import { fieldValueWords, type Names } from "./words.ts";
 
 /** What each thing that stops an apply says, on Apply's hover and in the proposal card. */
 export const BLOCKER_WORDS: Record<Blocker, string> = {
@@ -184,7 +185,7 @@ function MarkWord({ mark }: { mark: DiffMark }) {
 
 /** The muted foot of a list row: what more there is to say of the change, and what it goes with. */
 function foot(entry: ReviewEntry, names: Names): string {
-  const parts = [entry.mark.note, entry.cause === undefined ? undefined : `with ${names.node(entry.cause)}`, entry.fields.length === 0 ? undefined : entry.fields.map(fieldName).join(", ")];
+  const parts = [entry.mark.note, entry.cause === undefined ? undefined : `with ${names.node(entry.cause)}`, entry.fields.length === 0 ? undefined : entry.fields.map(fieldWords).join(", ")];
   return parts.filter((part) => part !== undefined).join(" · ");
 }
 
@@ -245,13 +246,13 @@ export function BeforeAfter({ node, mark, before, after, names }: { node: string
   }
   const fields = Object.keys({ ...was, ...now }).filter((field) => field !== "key" && JSON.stringify((was as Record<string, unknown>)[field] ?? null) !== JSON.stringify((now as Record<string, unknown>)[field] ?? null));
   if (fields.length === 0) {
-    return <p className="muted small">Nothing in the graph differs; the choice below is about what the journey keeps.</p>;
+    return <p className="muted small">Nothing here changes until you choose, below, what the journey keeps.</p>;
   }
   return (
     <dl className="stack" data-testid="before-after">
       {fields.map((field) => (
         <div key={field} className="stack" data-testid="changed-field" data-field={field}>
-          <dt className="muted small">{fieldName(field)}</dt>
+          <dt className="muted small">{fieldWords(field)}</dt>
           <dd>
             <s>{fieldValueWords(field, (was as Record<string, unknown>)[field], names)}</s> {"→"} {fieldValueWords(field, (now as Record<string, unknown>)[field], names)}
           </dd>

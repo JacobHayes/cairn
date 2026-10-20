@@ -15,6 +15,7 @@ import { useDraft } from "../data/drafts.ts";
 import type { OperationId } from "../data/edit-record.ts";
 import { newPatchId, type Mutation } from "../data/writes.ts";
 import { newEntityKey } from "../people/model.ts";
+import { choiceId, choiceLabel } from "../status/answer.ts";
 import { Button, Field } from "../ui/kit.tsx";
 import { Markdown } from "../ui/markdown.tsx";
 import { effectOf, effectOfOption, outgoing, sameAnswer } from "./answer.ts";
@@ -27,11 +28,8 @@ import { effectWords, savingWords } from "./words.ts";
 import { useFormDraft, useNodeWrite, type NodeWrite } from "./write.ts";
 import { NODE_GONE } from "../ui/gone.ts";
 
-type Choice = Schema<"Choice">;
 type ChoiceEffect = Schema<"ChoiceEffect">;
 
-const choiceId = (choice: Choice) => (typeof choice === "string" ? choice : choice.id);
-const choiceTitle = (choice: Choice) => (typeof choice === "string" ? choice : choice.title);
 
 /** The most choices a single-choice decision lists inline; more are one select. */
 const INLINE_SINGLE_MAX = 5;
@@ -69,7 +67,7 @@ function Checks({ options, chosen, onChange }: { options: [string, string][]; ch
 
 /** An answer of the decision's type, as typed (the proposal editor's input, 5.7; the inspector draws its own). */
 export function Input({ view, node, value, onChange }: { view: Ready; node: GraphNode; value: AnswerValue; onChange: (value: AnswerValue) => void }) {
-  const choices: [string, string][] = (node.choices ?? []).map((choice) => [choiceId(choice), choiceTitle(choice)]);
+  const choices: [string, string][] = (node.choices ?? []).map((choice) => [choiceId(choice), choiceLabel(choice)]);
   const entities: [string, string][] = (view.inputs.deployment.entities ?? []).map((entity) => [entity.key, entityName(view, entity.key)]);
   const select = (options: [string, string][], chosen: string, wrap: (id: string) => AnswerValue) => (
     <select aria-label="Answer" value={chosen} onChange={(event) => { onChange(wrap(event.target.value)); }}>
@@ -141,7 +139,7 @@ interface InputProps {
   onNamed: (text: string) => void;
 }
 
-const optionsOf = (node: GraphNode): [string, string][] => (node.choices ?? []).map((choice) => [choiceId(choice), choiceTitle(choice)]);
+const optionsOf = (node: GraphNode): [string, string][] => (node.choices ?? []).map((choice) => [choiceId(choice), choiceLabel(choice)]);
 
 function BooleanInput({ value, pick, effects }: InputProps) {
   // Each form's radios are a group of their own: two decisions on one page never share one.

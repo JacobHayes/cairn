@@ -6,10 +6,10 @@
 // subject or, for a rule two nodes break together, one of its related nodes.
 import type { Schema } from "@cairn/client";
 
+import { violationNode, type Violation } from "../data/writes.ts";
 import type { FormField } from "./fields.ts";
 import type { Mutation } from "./graph.ts";
 
-export type Violation = Schema<"Violation">;
 
 /** Where in a form a violation shows: a field, the node's requirements, or the form as a whole. */
 export type Place = FormField | "requires" | "form";
@@ -32,15 +32,9 @@ const BY_CODE: Partial<Record<Schema<"ViolationCode">, Place>> = {
   answer_type_mismatch: "answer_type",
 };
 
-/** The node a violation is about: its subject, if a node. */
-export function subjectNode(violation: Violation): string | undefined {
-  const subject = violation.at.subject;
-  return subject != null && typeof subject === "object" && "node" in subject ? subject.node : undefined;
-}
-
 /** Whether `violation` is about `node`: its subject, or one of the nodes it relates for a rule broken together. */
 export function isAbout(violation: Violation, node: string): boolean {
-  if (subjectNode(violation) === node) {
+  if (violationNode(violation) === node) {
     return true;
   }
   const together = ["duplicate_sibling_id", "several_final_milestones", "several_filling_decisions", "several_feeding_decisions"];

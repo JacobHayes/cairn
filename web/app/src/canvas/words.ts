@@ -1,11 +1,11 @@
 // What a card says in plain words (5.5, the density call): the one date in its foot, a
 // condition's "if" sentence, a snooze's target, a container's progress. Pure and apart from the
 // components, so the unit tests read the same sentences the canvas draws.
+import { conditionWords, decisionOf, decisionsIn, type ConditionNames } from "../authoring/condition.ts";
 import type { GraphNode, NodeKind } from "../detail/model.ts";
 import { dateWords, daysUntil, dueWords, isSoon, NEAR_DAYS, SOON_DAYS } from "../status/when.ts";
 import type { DisplayState } from "../status/words.ts";
 import type { Tone } from "./model.ts";
-import { NODE_GONE } from "../ui/gone.ts";
 
 /** What a card's foot knows about its node. */
 export interface FootFacts {
@@ -52,64 +52,17 @@ export function progressWords(done: number, total: number): string {
   return `${String(done)} of ${String(total)} done`;
 }
 
-type Condition = NonNullable<GraphNode["relevant_when"]>;
-
-/** The decisions a condition reads, in order, once each. */
-function decisionsOf(condition: Condition): string[] {
-  const keys: string[] = [];
-  const walk = (each: Condition) => {
-    if ("equals" in each) {
-      keys.push(each.equals.decision);
-    } else if ("not_equals" in each) {
-      keys.push(each.not_equals.decision);
-    } else if ("contains" in each) {
-      keys.push(each.contains.decision);
-    } else if ("in" in each) {
-      keys.push(each.in.decision);
-    } else if ("answered" in each) {
-      keys.push(each.answered);
-    } else if ("all" in each) {
-      each.all.forEach(walk);
-    } else if ("any" in each) {
-      each.any.forEach(walk);
-    } else {
-      walk(each.not);
-    }
-  };
-  walk(condition);
-  return [...new Set(keys)];
-}
-
-/** A compared value as people read it: a choice by its label, a boolean as yes or no. */
-function valueWords(nodes: readonly GraphNode[], decision: string, value: boolean | string): string {
-  if (typeof value === "boolean") {
-    return value ? "yes" : "no";
-  }
-  const choices = nodes.find((node) => node.key === decision)?.choices ?? [];
-  const found = choices.find((choice) => (typeof choice === "string" ? choice : choice.id) === value);
-  return found === undefined || typeof found === "string" ? value : found.title;
-}
-
 /**
- * What a conditional node depends on, as the words after "If": `Who runs testing? = Partner`
- * for a plain comparison, else the decisions it reads (`Who runs testing? and Budget`).
+ * What a conditional node depends on, as the words after "If": the comparison
+ * (`"Who runs testing?" is Partner`) when it is a plain one, else the decisions it reads
+ * (`Who runs testing? and Budget`).
  */
-export function dependsWords(nodes: readonly GraphNode[], node: GraphNode): string | undefined {
+export function dependsWords(node: GraphNode, names: ConditionNames): string | undefined {
   const condition = node.relevant_when;
-  const title = (key: string) => nodes.find((each) => each.key === key)?.title ?? NODE_GONE;
   if (condition == null) {
     return undefined;
   }
-  if ("equals" in condition) {
-    return `${title(condition.equals.decision)} = ${valueWords(nodes, condition.equals.decision, condition.equals.value)}`;
-  }
-  if ("not_equals" in condition) {
-    return `${title(condition.not_equals.decision)} is not ${valueWords(nodes, condition.not_equals.decision, condition.not_equals.value)}`;
-  }
-  if ("in" in condition) {
-    return `${title(condition.in.decision)} = ${condition.in.values.map((value) => valueWords(nodes, condition.in.decision, value)).join(" or ")}`;
-  }
-  return decisionsOf(condition).map(title).join(" and ");
+  return decisionOf(condition) === undefined ? decisionsIn(condition).map((decision) => names.title(decision)).join(" and ") : conditionWords(condition, names);
 }
 
 /** The first paragraph of a markdown rationale as plain text, for a hover. */

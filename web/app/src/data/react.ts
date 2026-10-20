@@ -13,7 +13,9 @@ import { idOf, type Answer, type Command, type OperationId } from "./edit-record
 import { currentAddress, type Session } from "./session.ts";
 import { savedAnnouncement, syncInputOf, syncSummary, type Problem, type SyncSummary } from "./sync.ts";
 import { writeView, type Check, type WriteSnapshot, type WriteView } from "./write-machine.ts";
-import type { Rejection } from "./writes.ts";
+import { isPatchAnswer, landedWarning, type Rejection } from "./writes.ts";
+import { useReceipt } from "../ui/Receipt.tsx";
+import type { ReceiptState } from "../ui/receipt.ts";
 
 export const SessionContext = createContext<Session | undefined>(undefined);
 
@@ -163,7 +165,7 @@ function useWriteOf(edit: string): WriteView | undefined {
 }
 
 /** The write with this id, if the edit manager holds one. */
-export function useWrite(id: OperationId | undefined): WriteView | undefined {
+export function useWriteById(id: OperationId | undefined): WriteView | undefined {
   const { edits } = useSession();
   const snapshot = useSelector(edits, (held) => (id === undefined ? undefined : held.context.writes[id]?.snapshot));
   return useMemo(() => shownView(snapshot), [snapshot]);
@@ -238,6 +240,45 @@ export function useEdit(edit: string): Edit {
       }
     },
     mounted: () => present.current,
+  };
+}
+
+/** An edit's write as a control sends it: the edit, the receipt a landed write leaves under the control, and the refusal to start while the app is out of date. */
+export interface Write extends Omit<Edit, "submit"> {
+  /**
+   * Sends `command` as this edit's write: the receipt is cleared first and shows the landed
+   * write's warning (D7) once it answers. Answers the write's answer once it lands. Under
+   * version skew the manager records it as not sent.
+   */
+  submit(command: Command, check?: Check): Promise<Answer | undefined>;
+  /** Version skew or a write in flight: no new write starts. */
+  disabled: boolean;
+  /** What the last landed write leaves under the control, for a few seconds. */
+  receipt: ReceiptState | undefined;
+}
+
+/**
+ * The one write path every control uses (H5's safe retry, D7's receipt, nothing sent under
+ * version skew): the edit named `edit` (a key stable for the control) under the chip label
+ * `label`. Each kind of control wraps it to make its command.
+ */
+export function useWrite(edit: string, label?: string): Write {
+  const { titleOf } = useSession();
+  const skew = useSkew();
+  const held = useEdit(edit);
+  const receipt = useReceipt();
+  return {
+    ...held,
+    submit: async (command, check) => {
+      receipt.clear();
+      const answer = await held.submit(command, { label }, check);
+      if (answer !== undefined && isPatchAnswer(answer)) {
+        receipt.show(landedWarning(answer, titleOf));
+      }
+      return answer;
+    },
+    disabled: held.busy || skew,
+    receipt: receipt.receipt,
   };
 }
 

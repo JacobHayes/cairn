@@ -55,7 +55,7 @@ test("a rename rejected after its screen was left stays until discarded, across 
   await syncChip(two).click();
   await expect(problems(two)).toHaveAttribute("data-kind", "conflict");
   await problems(two).getByRole("button", { name: "Go to it" }).click();
-  await expect(two.getByTestId("conflict")).toBeVisible();
+  await expect(two.locator('[data-testid="refused"][data-rejection="stale"]')).toBeVisible();
   await expect(renameOf(two, "n_onsite").getByRole("textbox")).toHaveValue(mine);
   // Discard clears it from the chip and closes the form.
   await syncChip(two).click();
@@ -68,11 +68,11 @@ test("a rename rejected after its screen was left stays until discarded, across 
 test("Keep my edit keeps what was typed after the conflict, across a reload", { tag: "@server" }, async ({ context }) => {
   const { two } = await conflicting(context, "n_screen");
   await save(two, "n_screen");
-  await expect(two.getByTestId("conflict")).toBeVisible();
+  await expect(two.locator('[data-testid="refused"][data-rejection="stale"]')).toBeVisible();
   const later = fresh("Later");
   await renameOf(two, "n_screen").getByRole("textbox").fill(later);
   await two.reload();
-  await expect(two.getByTestId("conflict")).toBeVisible();
+  await expect(two.locator('[data-testid="refused"][data-rejection="stale"]')).toBeVisible();
   await expect(renameOf(two, "n_screen").getByRole("textbox")).toHaveValue(later);
   await two.getByRole("button", { name: "Keep my edit on the current version" }).click();
   await save(two, "n_screen");
@@ -224,7 +224,7 @@ test("a node action rejected after its screen was left waits under its form, acr
   // The form is back with what was typed, and the refusal under it.
   const restored = nodePanel(two, "n_launch");
   await expect(restored.getByTestId("skip-form").getByLabel("Why skip it")).toHaveValue(mine);
-  await expect(restored.locator('[data-testid="conflict"], [data-testid="invalid"]')).toBeVisible();
+  await expect(restored.getByTestId("refused")).toBeVisible();
 });
 
 test("a new route refused for an id in use stays under its control and on the chip, across a reload, until discarded", async ({ page }) => {

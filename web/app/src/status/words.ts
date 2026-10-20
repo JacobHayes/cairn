@@ -96,3 +96,34 @@ function nodesWords(count: number): string {
 export function upperFirst(text: string): string {
   return `${text.slice(0, 1).toUpperCase()}${text.slice(1)}`;
 }
+
+/** What a node's field is called, for every surface that says it changed or what it was set to. */
+const FIELD_NAMES: Record<string, string> = {
+  id: "id",
+  parent: "place",
+  title: "title",
+  description: "description",
+  weight: "weight",
+  relevant_when: "condition",
+  due_by: "due date rule",
+  not_before: "earliest start rule",
+  estimate: "estimate",
+  placeholder: "placeholder setting",
+  requires_artifact: "artifact requirement",
+  requires_note: "note requirement",
+  final: "final setting",
+  auto_reach: "reached-by-itself setting",
+  opens_at: "opening date",
+  closes_at: "closing date",
+  gates: "gates",
+  closes: "closing stage",
+  prompt: "question",
+  help: "help text",
+  choices: "choices",
+  fills_role: "role it fills",
+  feeds_milestone: "milestone it feeds",
+};
+
+export function fieldWords(field: string): string {
+  return FIELD_NAMES[field] ?? field.replaceAll("_", " ");
+}

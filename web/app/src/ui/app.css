@@ -620,6 +620,10 @@ body {
   text-transform: uppercase;
   color: var(--color-error);
 }
+/* A chain short of days is a plan problem, not a failure: it says so in its own word. */
+.callout-short::before {
+  content: "Short of days";
+}
 
 /* ---- tables and forms ------------------------------------------------------------------------- */
 /* A table sits in the region's own scroller, so its sticky band header sticks to the right box. */

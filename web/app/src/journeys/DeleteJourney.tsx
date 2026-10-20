@@ -6,7 +6,7 @@ import { useState } from "react";
 import { useNavigate } from "react-router";
 
 import type { Ready } from "../detail/model.ts";
-import { Refused } from "../screens/Refused.tsx";
+import { RejectionView } from "../screens/RejectionView.tsx";
 import { WriteStatus } from "../screens/WriteStatus.tsx";
 import { useScreenWrite } from "../screens/write.ts";
 import { Button, Field } from "../ui/kit.tsx";
@@ -34,7 +34,7 @@ export function DeleteJourney({ ready, onCancel }: { ready: Ready; onCancel: () 
         </Button>
         <Button onClick={onCancel}>Cancel</Button>
       </span>
-      {write.rejected === undefined ? <WriteStatus view={write.status} /> : <Refused rejection={write.rejected} onDismiss={write.dismiss} />}
+      {write.rejection === undefined ? <WriteStatus view={write.status} /> : <RejectionView rejection={write.rejection} onDismiss={write.dismiss} />}
     </div>
   );
 }

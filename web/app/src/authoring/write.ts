@@ -14,11 +14,10 @@ import { unansweredOf } from "../data/edit-manager.ts";
 import type { Deriver, Host } from "../data/host.ts";
 import { Skewed } from "../data/host.ts";
 import { beforeWork, DERIVE, previewPolicy, type ReadAt, type ReadKey, type ReadPolicy, type ReadSource } from "../data/keyed-read.ts";
-import { useEdit, useKeyedRead, useSession, useSkew, useViewer } from "../data/react.ts";
+import { useKeyedRead, useSession, useViewer, useWrite } from "../data/react.ts";
 import type { WriteView } from "../data/write-machine.ts";
-import { useReceipt } from "../ui/Receipt.tsx";
 import type { ReceiptState } from "../ui/receipt.ts";
-import { landedWarning, newPatchId, type Rejection } from "../data/writes.ts";
+import { newPatchId, type Rejection } from "../data/writes.ts";
 import { writesEntities } from "../detail/write.ts";
 import type { Mutation } from "./graph.ts";
 import { domainOf, type Authored } from "./target.ts";
@@ -171,30 +170,22 @@ async function checkOf(args: PreviewArgs): Promise<Rejection | undefined> {
  * and its status from the manager, so one view answers for both.
  */
 export function useAuthorWrite(authored: Authored, scope: string, label?: string): AuthorWrite {
-  const { deriver, titleOf } = useSession();
-  const skew = useSkew();
+  const { deriver } = useSession();
   const { viewer } = useViewer();
-  const edit = useEdit(authorEdit(authored, scope));
-  const receipt = useReceipt();
-  const run = async (mutations: Mutation[], base = authored.revision): Promise<boolean> => {
-    receipt.clear();
-    const check = () => checkOf({ deriver, user: viewer?.user ?? LOCAL_USER, authored, mutations });
-    const answer = await edit.submit(authorCommand(authored, mutations, base), { label }, check);
-    if (answer !== undefined) {
-      receipt.show(landedWarning(answer, titleOf));
-    }
-    return answer !== undefined;
-  };
-  const sent = edit.write?.command.kind === "patch" ? edit.write.command.patch.mutations : undefined;
+  const write = useWrite(authorEdit(authored, scope), label);
+  const sent = write.write?.command.kind === "patch" ? write.write.command.patch.mutations : undefined;
   return {
-    run,
-    pending: edit.busy,
-    disabled: edit.busy || skew,
-    failed: edit.rejection === undefined || sent === undefined ? undefined : { sent: { mutations: sent, places: placesOf(sent) }, rejection: edit.rejection },
-    unanswered: unansweredOf(edit.write),
-    status: edit.status,
-    dismiss: edit.dismiss,
-    receipt: receipt.receipt,
+    run: async (mutations, base = authored.revision) => {
+      const check = () => checkOf({ deriver, user: viewer?.user ?? LOCAL_USER, authored, mutations });
+      return (await write.submit(authorCommand(authored, mutations, base), check)) !== undefined;
+    },
+    pending: write.busy,
+    disabled: write.disabled,
+    failed: write.rejection === undefined || sent === undefined ? undefined : { sent: { mutations: sent, places: placesOf(sent) }, rejection: write.rejection },
+    unanswered: unansweredOf(write.write),
+    status: write.status,
+    dismiss: write.dismiss,
+    receipt: write.receipt,
   };
 }
 

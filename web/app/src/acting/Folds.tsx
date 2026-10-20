@@ -11,12 +11,13 @@ import { Link } from "react-router";
 
 import { ActButton } from "../detail/ActButton.tsx";
 import { newAttachmentKey } from "../detail/Attachments.tsx";
-import { namer } from "../detail/explain.ts";
+import { guardFailureText, namer } from "../detail/explain.ts";
 import { titleOf, type Ready, type Mutation } from "../detail/model.ts";
 import { Rejected } from "../detail/Rejected.tsx";
 import { useFormDraft, useNodeWrite, type NodeWrite } from "../detail/write.ts";
 import { snoozeEndWords } from "../status/snooze.ts";
 import { daysUntil, daysWords } from "../status/when.ts";
+import { upperFirst } from "../status/words.ts";
 import { Button } from "../ui/kit.tsx";
 import type { ListFlag } from "./address.ts";
 import { NodeItem } from "./NodeItem.tsx";
@@ -86,16 +87,7 @@ function AddNote({ write, node }: { write: NodeWrite; node: string }) {
 
 /** D4: a guard failure that makes finished work stale, as a sentence. */
 function staleWords(view: Ready, failure: NonNullable<ReturnType<typeof firstStale>>): string {
-  if (failure === "missing_note") {
-    return "Needs a note";
-  }
-  if (failure === "missing_artifact") {
-    return "Needs a link";
-  }
-  if (failure === "not_broken_down") {
-    return "Was not broken down";
-  }
-  return `${namer(view)(failure.open_dependency)} was reopened`;
+  return upperFirst(guardFailureText(failure, namer(view)));
 }
 
 function firstStale(view: Ready, key: string) {

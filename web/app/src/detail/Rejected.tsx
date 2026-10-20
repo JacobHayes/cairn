@@ -6,7 +6,7 @@ import type { Schema } from "@cairn/client";
 
 import { useDraft } from "../data/drafts.ts";
 import type { OperationId } from "../data/edit-record.ts";
-import { newPatchId } from "../data/writes.ts";
+import { newPatchId, violationNode, type Rejection, type Violation } from "../data/writes.ts";
 import { RejectionView } from "../screens/RejectionView.tsx";
 import { WriteStatus } from "../screens/WriteStatus.tsx";
 import { Button, Field } from "../ui/kit.tsx";
@@ -16,7 +16,6 @@ import { ShortfallView } from "./ShortfallView.tsx";
 import { guardWords } from "./words.ts";
 import { rebasedOnto, type Attempt, type Failed, type NodeWrite, type Seen } from "./write.ts";
 
-type Violation = Schema<"Violation">;
 type Guard = Schema<"Guard">;
 
 interface Resolving {
@@ -51,12 +50,6 @@ export function withMove(attempt: Attempt, move: Mutation): Mutation[] {
   return [...attempt.mutations, move];
 }
 
-/** The node a violation is on, when it is on one: a patch over several nodes names which (C9). */
-export function violatingNode(violation: Violation): string | undefined {
-  const subject = violation.at.subject;
-  return subject != null && typeof subject === "object" && "node" in subject ? subject.node : undefined;
-}
-
 /** D4: finishing past a guard takes a reason, so the bypass waits until one is typed. */
 export function bypassReady(reason: string): boolean {
   return reason.trim() !== "";
@@ -66,7 +59,7 @@ export function bypassReady(reason: string): boolean {
 export function bypassable(violations: Violation[]): { node: string; guards: Guard[] }[] {
   const byNode = new Map<string, Guard[]>();
   for (const violation of violations) {
-    const node = violatingNode(violation);
+    const node = violationNode(violation);
     if (violation.bypassable == null || node === undefined) {
       continue;
     }
@@ -134,32 +127,23 @@ function Bypass({ write, node, guards, onResolved, onResent }: Omit<Resolving, "
   );
 }
 
-function Invalid({ view, write, violations, onResolved, onResent }: Resolving & { violations: Violation[] }) {
+function Invalid({ view, write, rejection, violations, onResolved, onResent }: Resolving & { rejection: Rejection; violations: Violation[] }) {
   const chains = violations.filter((violation) => violation.code === "contradictory_chain");
-  const others = violations.filter((violation) => violation.code !== "contradictory_chain");
   return (
-    <div className="callout callout-bad stack" role="alert" data-testid="invalid">
-      {others.length === 0 ? null : (
-        <ul className="detail-list">
-          {others.map((violation, at) => {
-            const node = violatingNode(violation);
-            return (
-              <li key={at} data-testid="violation" data-code={violation.code} data-node={node}>
-                {node === undefined ? null : <strong>{titleOf(view, node)}: </strong>}
-                {violation.message}
-              </li>
-            );
-          })}
-        </ul>
-      )}
-      <DateConflictResolver view={view} write={write} violations={chains} onResolved={onResolved} onResent={onResent} />
-      {bypassable(violations).map(({ node, guards }) => (
-        <Bypass key={node} write={write} node={node} guards={guards} onResolved={onResolved} onResent={onResent} />
-      ))}
-      <span className="row">
-        <Button onClick={write.dismiss}>Drop this change</Button>
-      </span>
-    </div>
+    <RejectionView
+      rejection={rejection}
+      titleOf={(node) => titleOf(view, node)}
+      omit={(violation) => violation.code === "contradictory_chain"}
+      onDismiss={write.dismiss}
+      extras={
+        <>
+          <DateConflictResolver view={view} write={write} violations={chains} onResolved={onResolved} onResent={onResent} />
+          {bypassable(violations).map(({ node, guards }) => (
+            <Bypass key={node} write={write} node={node} guards={guards} onResolved={onResolved} onResent={onResent} />
+          ))}
+        </>
+      }
+    />
   );
 }
 
@@ -180,7 +164,7 @@ export function Rejected({ view, write, onResolved, onResent }: Resolving) {
   }
   const { rejection, attempt } = failed;
   if (rejection.rejection === "invalid") {
-    return <Invalid view={view} write={write} violations={rejection.violations} onResolved={onResolved} onResent={onResent} />;
+    return <Invalid view={view} write={write} rejection={rejection} violations={rejection.violations} onResolved={onResolved} onResent={onResent} />;
   }
   return (
     <RejectionView

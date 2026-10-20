@@ -1,28 +1,39 @@
 // What a proposal's items and mutations say to a reviewer (C14): each in a line of plain
 // words, naming nodes, roles, and kinds by title where the graph holds them.
-import { childrenOfClause, decisionOf, operatorOf, valuesOf, type Clause } from "../authoring/condition.ts";
+import { conditionNames, conditionWords, type Clause, type ConditionNames } from "../authoring/condition.ts";
 import { ruleWords } from "../authoring/dates.ts";
-import type { Graph, Mutation } from "../authoring/graph.ts";
-import { removedChoices, type Conflict, type ResolutionKind, type ReviewItem } from "./model.ts";
+import type { Graph, GraphNode, Mutation } from "../authoring/graph.ts";
+import { answerWords, choiceNamed, choiceLabel } from "../status/answer.ts";
+import { SNOOZE_NODE_TAIL } from "../status/snooze.ts";
 import { dateWords } from "../status/when.ts";
+import { fieldWords, upperFirst } from "../status/words.ts";
 import { ENTITY_GONE, KIND_GONE, NODE_GONE, ROLE_GONE } from "../ui/gone.ts";
+import { removedChoices, type Conflict, type ResolutionKind, type ReviewItem } from "./model.ts";
 
 /** Names by key over the graphs a review shows (before and after), falling back to the key. */
 export interface Names {
-  node(key: string): string;
-  role(key: string): string;
-  kind(key: string): string;
-  entity(key: string): string;
+  node: (key: string) => string;
+  role: (key: string) => string;
+  kind: (key: string) => string;
+  entity: (key: string) => string;
+  /** What an answer to `decision` calls its choice `id`. */
+  choice: (decision: string, id: string) => string;
+  /** What a condition calls its decisions and the values it compares. */
+  condition: ConditionNames;
+  /** A date in words, in the year of today when it is known. */
+  date: (date: string) => string;
 }
 
 /** Names from `graphs` (the later one wins) and the deployment's entities. */
-export function namesOf(graphs: (Graph | null | undefined)[], entities: readonly { key: string; name: string }[]): Names {
+export function namesOf(graphs: (Graph | null | undefined)[], entities: readonly { key: string; name: string }[], today?: string): Names {
   const nodes = new Map<string, string>();
+  const decisions = new Map<string, GraphNode>();
   const roles = new Map<string, string>();
   const kinds = new Map<string, string>([["k_owner", "owner"]]);
   for (const graph of graphs) {
     for (const node of graph?.nodes ?? []) {
       nodes.set(node.key, node.title);
+      decisions.set(node.key, node);
     }
     for (const role of graph?.roles ?? []) {
       roles.set(role.key, role.title ?? role.id);
@@ -32,11 +43,15 @@ export function namesOf(graphs: (Graph | null | undefined)[], entities: readonly
     }
   }
   const people = new Map(entities.map((entity) => [entity.key, entity.name]));
+  const entity = (key: string) => people.get(key) ?? ENTITY_GONE;
   return {
     node: (key) => nodes.get(key) ?? NODE_GONE,
     role: (key) => roles.get(key) ?? ROLE_GONE,
     kind: (key) => kinds.get(key) ?? KIND_GONE,
-    entity: (key) => people.get(key) ?? ENTITY_GONE,
+    entity,
+    choice: (decision, id) => choiceNamed(decisions.get(decision)?.choices, id),
+    condition: conditionNames((decision) => decisions.get(decision), entity),
+    date: (date) => dateWords(date, today),
   };
 }
 
@@ -48,58 +63,47 @@ const briefly = (text: string) => {
   return line.length > 80 ? `${line.slice(0, 80)}...` : line;
 };
 
-function valueWords(value: unknown): string {
-  if (value === null || value === undefined) {
-    return "nothing";
-  }
-  if (typeof value === "string" || typeof value === "number" || typeof value === "boolean") {
-    return String(value);
-  }
-  return JSON.stringify(value);
-}
-
-/** An answer's value as people read it: a date in words, anything else as it is. */
-function answerValueWords(value: Record<string, unknown>): string {
-  const [kind, answer] = Object.entries(value)[0] ?? ["", undefined];
-  return kind === "date" && typeof answer === "string" ? dateWords(answer) : valueWords(answer);
-}
-
-/** A5: a condition as people read it. */
-export function clauseWords(clause: Clause, names: Names): string {
-  const operator = operatorOf(clause);
-  const decision = decisionOf(clause);
-  if (decision === undefined) {
-    const parts = childrenOfClause(clause).map((child) => clauseWords(child, names));
-    return operator === "not" ? `not (${parts.join("")})` : `${operator === "all" ? "all" : "any"} of (${parts.join("; ")})`;
-  }
-  const values = valuesOf(clause).map(String).join(" or ");
-  const words: Record<string, string> = { equals: "is", not_equals: "is not", in: "is one of", contains: "contains", answered: "is answered" };
-  return `${quoted(names.node(decision))} ${words[operator] ?? operator}${values === "" ? "" : ` ${values}`}`;
-}
-
-/** A field's value as people read it: a condition or a date rule in words, anything else as written. */
+/** A field's value as people read it: a condition, a date rule, a node, a role or the choices in words, anything else as written. */
 export function fieldValueWords(field: string, value: unknown, names: Names): string {
   if (value === null || value === undefined) {
     return "nothing";
   }
-  if (field === "relevant_when") {
-    return clauseWords(value as Clause, names);
+  switch (field) {
+    case "relevant_when":
+      return conditionWords(value as Clause, names.condition);
+    case "due_by":
+    case "not_before":
+      return ruleWords(value, (source) => names.node(source));
+    case "parent":
+    case "opens_at":
+    case "closes_at":
+    case "feeds_milestone":
+      return typeof value === "string" ? quoted(names.node(value)) : JSON.stringify(value);
+    case "fills_role":
+      return typeof value === "string" ? quoted(names.role(value)) : JSON.stringify(value);
+    case "choices":
+      return Array.isArray(value) ? value.map((choice: Parameters<typeof choiceLabel>[0]) => quoted(choiceLabel(choice))).join(", ") : JSON.stringify(value);
+    default:
+      return typeof value === "boolean" ? (value ? "yes" : "no") : typeof value === "string" ? quoted(value) : typeof value === "number" ? String(value) : JSON.stringify(value);
   }
-  if (field === "due_by" || field === "not_before") {
-    return ruleWords(value, (source) => names.node(source));
-  }
-  return typeof value === "string" ? quoted(value) : valueWords(value);
-}
-
-/** A field's name as people read it. */
-export function fieldName(field: string): string {
-  return field === "relevant_when" ? "condition" : field.replaceAll("_", " ");
 }
 
 /** The one field a field value sets, and the value. */
 function fieldOf(value: Record<string, unknown>): [string, unknown] {
   const [entry] = Object.entries(value);
   return entry ?? ["field", undefined];
+}
+
+/** A node's field set to a value, in words. */
+function fieldSetWords(node: string, set: Record<string, unknown>, names: Names): string {
+  const [field, value] = fieldOf(set);
+  if (field === "closes" && value === false) {
+    return `Let the stage ${node} run past its close`;
+  }
+  if (field === "estimate" && typeof value === "number") {
+    return `Set the estimate of ${node} to ${String(value)} days`;
+  }
+  return `Set the ${fieldWords(field)} of ${node} to ${fieldValueWords(field, value, names)}`;
 }
 
 /** C14: one mutation in words. */
@@ -110,10 +114,8 @@ export function mutationWords(mutation: Mutation, names: Names): string {
       const parent = mutation.node.parent;
       return `Add the ${mutation.node.kind} ${quoted(mutation.node.title)}${parent == null ? " at the top level" : ` under ${node(parent)}`}`;
     }
-    case "set_node_field": {
-      const [field, value] = fieldOf(mutation.value);
-      return `Set the ${fieldName(field)} of ${node(mutation.node)} to ${fieldValueWords(field, value, names)}`;
-    }
+    case "set_node_field":
+      return fieldSetWords(node(mutation.node), mutation.value, names);
     case "replace_node":
       return `Replace ${node(mutation.node.key)} whole`;
     case "remove_node": {
@@ -123,17 +125,27 @@ export function mutationWords(mutation: Mutation, names: Names): string {
     case "add_edge":
       return `${node(mutation.edge.node)} requires ${node(mutation.edge.requires)}`;
     case "remove_edge":
-      return `${node(mutation.edge.node)} no longer requires ${node(mutation.edge.requires)}`;
-    case "answer":
-      return `Answer ${node(mutation.decision)}: ${answerValueWords(mutation.value)}${mutation.rationale == null ? "" : `, because ${quoted(briefly(mutation.rationale))}`}`;
+      return `Drop the requirement of ${node(mutation.edge.node)} on ${node(mutation.edge.requires)}`;
+    case "answer": {
+      const value = answerWords(mutation.value, { choice: (id) => names.choice(mutation.decision, id), entity: (key) => names.entity(key), date: names.date });
+      return `Answer ${node(mutation.decision)}: ${value}${mutation.rationale == null ? "" : `, because ${quoted(briefly(mutation.rationale))}`}`;
+    }
     case "set_pin":
-      return `Pin ${node(mutation.node)} to ${dateWords(mutation.date)}`;
-    case "shift_pin":
-      return `Shift the pin of ${node(mutation.node)} by ${String(mutation.offset_days)} days`;
+      return `Pin ${node(mutation.node)} to ${names.date(mutation.date)}`;
+    case "shift_pin": {
+      const days = mutation.offset_days;
+      return `Move the pin on ${node(mutation.node)} ${String(Math.abs(days))} days ${days < 0 ? "earlier" : "later"}`;
+    }
     case "clear_pin":
       return `Unpin ${node(mutation.node)}`;
-    case "transition":
-      return `${typeof mutation.transition === "string" ? mutation.transition : "skip"} ${node(mutation.node)}`;
+    case "transition": {
+      const move = typeof mutation.transition === "string" ? mutation.transition : "skip";
+      return `${move === "reach" ? "Mark reached" : upperFirst(move)} ${node(mutation.node)}`;
+    }
+    case "snooze":
+      return `Snooze ${node(mutation.node)} until ${"date" in mutation.until ? names.date(mutation.until.date) : `${node(mutation.until.node)}${SNOOZE_NODE_TAIL}`}`;
+    case "unsnooze":
+      return `Wake ${node(mutation.node)}`;
     case "upgrade":
       return `Upgrade to version ${String(mutation.to)}, with every change the merge applies cleanly`;
     case "relink":
@@ -159,24 +171,6 @@ export function mutationWords(mutation: Mutation, names: Names): string {
   }
 }
 
-/** The node a mutation is about, when it is about one. */
-export function mutationNode(mutation: Mutation): string | undefined {
-  switch (mutation.op) {
-    case "add_node":
-    case "replace_node":
-      return mutation.node.key;
-    case "remove_node":
-      return mutation.removal.node;
-    case "add_edge":
-    case "remove_edge":
-      return mutation.edge.node;
-    case "answer":
-      return mutation.decision;
-    default:
-      return "node" in mutation && typeof mutation.node === "string" ? mutation.node : undefined;
-  }
-}
-
 /** B7: what a conflict is about, in words. */
 export function conflictWords(conflict: Conflict, names: Names): string {
   const node = (key: string) => quoted(names.node(key));
@@ -185,7 +179,7 @@ export function conflictWords(conflict: Conflict, names: Names): string {
       const [field, ours] = fieldOf(conflict.journey);
       const [, theirs] = fieldOf(conflict.route);
       const dangling = conflict.dangling === true ? " (it names a node this journey removed)" : "";
-      return `${node(conflict.node)}: its ${fieldName(field)} is ${fieldValueWords(field, ours, names)} here and ${fieldValueWords(field, theirs, names)} in the route${dangling}`;
+      return `${node(conflict.node)}: its ${fieldWords(field)} differs. Here: ${fieldValueWords(field, ours, names)}. In the route: ${fieldValueWords(field, theirs, names)}${dangling}`;
     }
     case "edge":
       return `${node(conflict.edge.node)} requiring ${node(conflict.edge.requires)}: ${conflict.journey ? "added" : "removed"} here, ${conflict.route ? "kept" : "dropped"} by the route`;

@@ -9,6 +9,7 @@ import { useState } from "react";
 import type { Kind, Role } from "../authoring/graph.ts";
 import { mintKey, slugOf } from "../authoring/keys.ts";
 import { Picker } from "../authoring/parts.tsx";
+import { choiceId, choiceLabel } from "../status/answer.ts";
 import { Badge, Button, Field } from "../ui/kit.tsx";
 import {
   kindOf,
@@ -49,17 +50,15 @@ const UNRESOLVED_WORDS: Record<UnresolvedReason, string> = {
   no_default_owner: "The graph has no default owner to map to",
 };
 
-const choiceId = (choice: string | { id: string }) => (typeof choice === "string" ? choice : choice.id);
-
 /** B7: an answer's removed choices, each mapped to one that remains. */
 function ChoiceMap({ conflict, value, onChange, disabled }: { conflict: Extract<Conflict, { about: "answer" }>; value: Record<string, string>; onChange: (map: Record<string, string>) => void; disabled: boolean }) {
-  const remaining = conflict.choices.map(choiceId);
+  const remaining = conflict.choices;
   return (
     <span className="stack">
       {removedChoices(conflict.answer, conflict.choices).map((removed) => (
         <span key={removed} className="row">
           {removed} becomes
-          <Picker aria-label={`Map ${removed} to`} disabled={disabled} value={value[removed] ?? ""} none="Choose" options={remaining.map((choice) => ({ value: choice, label: choice }))} onChange={(event) => { onChange({ ...value, [removed]: event.target.value }); }} />
+          <Picker aria-label={`Map ${removed} to`} disabled={disabled} value={value[removed] ?? ""} none="Choose" options={remaining.map((choice) => ({ value: choiceId(choice), label: choiceLabel(choice) }))} onChange={(event) => { onChange({ ...value, [removed]: event.target.value }); }} />
         </span>
       ))}
     </span>

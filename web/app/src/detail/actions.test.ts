@@ -3,11 +3,12 @@
 import type { Schema } from "@cairn/client";
 import { describe, expect, it } from "vitest";
 
+import { violationNode } from "../data/writes.ts";
 import { resolvedAnswer } from "./AnswerEditor.tsx";
 import { isComplete } from "./contributions.ts";
 import { answerInEffect } from "./editors.tsx";
 import type { Mutation } from "./model.ts";
-import { bypassable, bypassReady, violatingNode, withMove } from "./Rejected.tsx";
+import { bypassable, bypassReady, withMove } from "./Rejected.tsx";
 import { entityName } from "./sections.tsx";
 import { testView } from "./view.test-support.ts";
 import { writesEntities } from "./write.ts";
@@ -27,8 +28,8 @@ describe("resolving a rejection", () => {
   });
 
   it("names the node each violation of a patch over several nodes is on (C9)", () => {
-    expect(violatingNode(violation("n_final_report"))).toBe("n_final_report");
-    expect(violatingNode({ code: "duplicate_key", at: {}, message: "no subject" })).toBeUndefined();
+    expect(violationNode(violation("n_final_report"))).toBe("n_final_report");
+    expect(violationNode({ code: "duplicate_key", at: {}, message: "no subject" })).toBeUndefined();
   });
 
   it("takes a reason before finishing past a guard (D4)", () => {

@@ -151,6 +151,11 @@ describe("happened", () => {
     expect(happened(gone, words).what).not.toMatch(KEY);
   });
 
+  it("does not name a renamed node by its new title when the old one is not known", () => {
+    const renamed = event("node_changed", { node: "n_review" }, [field("n_review", { title: "Review the plan" })]);
+    expect(happened(renamed, words).what.match(/Review the plan/g)).toHaveLength(1);
+  });
+
   it("notes when an agent acted for the user", () => {
     expect(happened(event("unsnoozed", plan, [], { actor: { user: "u_ana", agent: "a_one" } }), words).byAgent).toBe(true);
     expect(happened(event("unsnoozed", plan), words).byAgent).toBe(false);
