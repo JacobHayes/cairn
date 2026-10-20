@@ -334,6 +334,26 @@ ladder_suite "TypeScript typecheck" "$typed" files
 linted=$(node -e 'console.log(JSON.parse(require("fs").readFileSync(process.argv[1], "utf8")).length);' "$typescript/eslint.json")
 ladder_suite eslint "$linted" files
 
+# Type-aware eslint reads the typecheck's project, so a file it lints that the typecheck did
+# not read is a file the types never covered. The usual cause: tsc keeps one of two sources
+# that share a module name (layer.test.ts and layer.test.tsx) and drops the other. eslint
+# reports a cached file too, so this holds with or without the cache, which would otherwise
+# keep a pass from before the twin existed.
+# shellcheck disable=SC2016 # the backticks are a JavaScript template literal
+outside=$(node -e '
+  const fs = require("fs");
+  const read = fs.readFileSync;
+  const typed = new Set(read(process.argv[1], "utf8").split("\n"));
+  const linted = JSON.parse(read(process.argv[2], "utf8")).map((file) => file.filePath);
+  for (const file of linted) {
+    if (!typed.has(file)) console.log(file);
+  }
+' "$typescript/tsc.out" "$typescript/eslint.json")
+[ -z "$outside" ] || {
+  printf '%s\n' "$outside" | ladder_show
+  ladder_fail "eslint lints files outside the TypeScript project (a twin sharing a module name, like x.ts and x.tsx, hides the other)"
+}
+
 # DESIGN, Layout (the frame): one scroller per region, and tokens for colour and radius, in the app's
 # CSS (`mise run lint:css`; its rules are web/app/src/lint/css.ts). It prints the files it checked.
 css_files=$(mise-tasks/lint/css 2>"$typescript/css.err") || {
