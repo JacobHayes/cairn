@@ -4,6 +4,7 @@
 // manager and kept across screens and reloads, and the form shows it until it lands or is
 // discarded. Text typed after a rejection is a newer draft beside the write, and Keep my edit
 // takes that, else what the write sent.
+import { overBytes, TITLE_BYTES_MAX } from "../authoring/limits.ts";
 import { useDraft } from "../data/drafts.ts";
 import { useWrite } from "../data/react.ts";
 import type { WriteView } from "../data/write-machine.ts";
@@ -29,6 +30,8 @@ export interface Rename {
   base: number | undefined;
   /** A write is out or may have committed: the field and Save wait for its answer. */
   busy: boolean;
+  /** Why the typed title cannot be sent: past the title limit (PRACTICES). */
+  problem: string | undefined;
   /** Whether Save would send something now. */
   canSave: boolean;
   start: () => void;
@@ -62,13 +65,15 @@ export function useRename(view: Ready, node: string, title: string): Rename {
   const { write, busy } = edit;
   const open = draft !== undefined || write !== undefined;
   const text = draft?.text ?? sentTitle(write) ?? "";
+  const problem = draft === undefined ? undefined : overBytes(draft.text, TITLE_BYTES_MAX, "The title");
   return {
     write,
     open,
     text,
+    problem,
     base: draft?.base,
     busy,
-    canSave: draft !== undefined && draft.text.trim() !== "" && !edit.disabled,
+    canSave: draft !== undefined && draft.text.trim() !== "" && problem === undefined && !edit.disabled,
     start: () => {
       if (!open) {
         setDraft({ text: title, base: view.journey.revision });
@@ -88,7 +93,7 @@ export function useRename(view: Ready, node: string, title: string): Rename {
       }
     },
     save: () => {
-      if (draft === undefined || draft.text.trim() === "" || edit.disabled) {
+      if (draft === undefined || draft.text.trim() === "" || problem !== undefined || edit.disabled) {
         return;
       }
       const patch = patchOf({ target: { journey }, baseRevision: draft.base, mutations: [{ op: "set_node_field", node, value: { title: draft.text } }] });

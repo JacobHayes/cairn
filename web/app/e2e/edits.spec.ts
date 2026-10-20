@@ -302,3 +302,13 @@ test("an authoring edit the engine refuses stays at its field across a reload, u
   await problems(page).getByRole("button", { name: "Discard" }).click();
   await expect(syncChip(page)).not.toHaveAttribute("data-state", "not-saved");
 });
+
+test("a title past the limit is stopped in the rename form, with the reason, and sends nothing", async ({ page }) => {
+  await openJourney(page, "browser", "j_vendor_eval");
+  await startRename(page, "n_kickoff", "x".repeat(300));
+  await expect(renameOf(page, "n_kickoff").getByTestId("problem")).toBeVisible();
+  await expect(renameOf(page, "n_kickoff").getByRole("button", { name: "Save" })).toBeDisabled();
+  await renameOf(page, "n_kickoff").getByRole("textbox").fill("Kickoff meeting");
+  await expect(renameOf(page, "n_kickoff").getByTestId("problem")).toHaveCount(0);
+  await expect(renameOf(page, "n_kickoff").getByRole("button", { name: "Save" })).toBeEnabled();
+});

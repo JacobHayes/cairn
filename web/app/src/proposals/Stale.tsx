@@ -76,7 +76,7 @@ export function StalePanel({ review, disabled, onRefresh }: StaleProps) {
       <span>It was drafted before its {journey === undefined ? "destination" : "journey"} last changed. Refresh it, then review it again before applying.</span>
       {journey === undefined ? (
         <ul className="detail-list" data-testid="intervening">
-          {[...new Set(stale.intervening.map(words))].map((record) => (
+          {words(stale.intervening).map((record) => (
             <li key={record} data-testid="intervening-record">
               {record}
             </li>

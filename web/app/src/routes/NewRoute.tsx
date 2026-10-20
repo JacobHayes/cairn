@@ -23,7 +23,7 @@ type Kind = Schema<"RouteKind">;
 const RESERVED_ID = "new";
 
 /** The form a kind opens: its name, and its id (a slug from the name) folded away until it needs changing. */
-function NewForm({ kind, disabled, onStart }: { kind: Kind; disabled: boolean; onStart: (name: string, id: string) => void }) {
+function NewForm({ kind, disabled, refused, onStart }: { kind: Kind; disabled: boolean; refused: boolean; onStart: (name: string, id: string) => void }) {
   const [kept, setKept] = useDraft<{ name: string; id?: string }>("new-route");
   const name = kept?.name ?? "";
   const routeId = kept?.id ?? slugOf(name, "route");
@@ -32,7 +32,7 @@ function NewForm({ kind, disabled, onStart }: { kind: Kind; disabled: boolean; o
   return (
     <form className="stack" onSubmit={(event) => { event.preventDefault(); onStart(name.trim(), routeId); }}>
       <Field aria-label="New route name" placeholder={`Name of the ${word}`} autoFocus value={name} onChange={(event) => { setKept({ ...kept, name: event.target.value }); }} />
-      <details className="small">
+      <details key={String(refused)} className="small" open={refused}>
         <summary className="muted">Change id</summary>
         <Field aria-label="New route id" value={routeId} onChange={(event) => { setKept({ name, id: event.target.value }); }} />
       </details>
@@ -78,8 +78,8 @@ export function NewRoutePage() {
         <Link to={ROUTES_INDEX_PATH}>All routes</Link>
       </div>
       <KindChips kind={kind} />
-      <NewForm kind={kind} disabled={write.disabled} onStart={(name, id) => { void start(name, id); }} />
-      {write.rejection === undefined ? <WriteStatus view={write.status} /> : <RejectionView rejection={write.rejection} onDismiss={write.dismiss} />}
+      <NewForm kind={kind} disabled={write.disabled} refused={write.rejection?.rejection === "stale"} onStart={(name, id) => { void start(name, id); }} />
+      {write.rejection === undefined ? <WriteStatus view={write.status} /> : <RejectionView rejection={write.rejection} onDismiss={write.dismiss} staleHeading="Not saved: a route with this id already exists. Pick another id." />}
       <h2>Or import a route file</h2>
       <ImportFile edit="import:new-route" label="Import a file…" />
     </section>
