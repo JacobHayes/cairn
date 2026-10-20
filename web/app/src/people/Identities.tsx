@@ -1,185 +1,227 @@
-// E6, B3, H3: the deployment's identities. Each with its name, its emails (each held by one
-// identity), and the old keys merged into it; made with a name alone and enriched later; edited;
-// and merged, the merged key kept as an alias so journeys and their history resolve to the
-// survivor unchanged. Which identities are the caller's is marked. Kept current (H6). An edit
-// is drafted against the deployment revision its author saw, and forms survive a reload.
-import { useState } from "react";
-import { useParams } from "react-router";
+// E6, B3, H3: the deployment's identities, as a table in the index shape (the title with Add at
+// its right end, one toolbar row under it). A row opens that identity alone in the inspector
+// (`/identities/<key>`); the row checkboxes, and Shift- or Cmd-click, add and remove from one set
+// (canvas/selection.ts, the same set a journey's List keeps) and several are merged or deleted
+// from the inspector (IdentityPanels.tsx). Add opens its form in the inspector (`/identities/new`).
+// Under a proposal's layer the table draws the identities after it, each change marked, and
+// nothing can be selected or written. The deployment's open proposals are the inspector's
+// Proposals tab. Kept current (H6).
+import { useState, type MouseEvent, type ReactNode } from "react";
+import { Link, useNavigate, useParams } from "react-router";
 
+import { pathTo, usePage } from "../address.ts";
+import { useSelection, type Selection } from "../canvas/selection.ts";
 import type { Deployment } from "../data/host.ts";
-import { useDraft } from "../data/drafts.ts";
 import { useCaller, useDeployment } from "../data/react.ts";
 import { Band } from "../proposals/Band.tsx";
 import { DestinationProposals } from "../proposals/DestinationProposals.tsx";
 import { DeploymentLayerHost } from "../proposals/Hosts.tsx";
-import { identityDiff, useLayer, useReviewing, type IdentityRow as DiffRow } from "../proposals/layer.ts";
+import { identityDiff, useLayer, useReviewing, type IdentityRow } from "../proposals/layer.ts";
 import { DIFF_LABELS } from "../proposals/model.ts";
 import { Rail } from "../proposals/Rail.tsx";
-import type { Rejection } from "../data/writes.ts";
-import { RejectionView } from "../screens/RejectionView.tsx";
-import { WriteStatus } from "../screens/WriteStatus.tsx";
-import { useScreenWrite, type ScreenWrite } from "../screens/write.ts";
-import { NodePanel } from "../acting/NodeItem.tsx";
-import { Chip, Chips } from "../ui/Chip.tsx";
-import { ChipsInput } from "../ui/ChipsInput.tsx";
-import { IndexHead } from "../ui/IndexHead.tsx";
-import { Badge, Button, Field } from "../ui/kit.tsx";
-import { identityLabel } from "./label.ts";
-import { MergeIdentities } from "./MergeIdentities.tsx";
-import { aliasesOf, byName, EMAIL_RULES, identityOf, nameProblem, newIdentityKey, type Identity } from "./model.ts";
+import { Inspector } from "../shell/frame.tsx";
+import { useEscapeTo } from "../shell/useEscapeTo.ts";
+import { FilterSearch, IndexHead } from "../ui/IndexHead.tsx";
+import { Badge, IndexState } from "../ui/kit.tsx";
+import { Receipt, useReceipt } from "../ui/Receipt.tsx";
 import { plural } from "../ui/words.ts";
+import { NewIdentity } from "./IdentityForm.tsx";
+import { Emails, NoSuchIdentity, OneIdentity, SeveralIdentities, useMerge } from "./IdentityPanels.tsx";
+import { identityLabel } from "./label.ts";
+import { byName, type Identity } from "./model.ts";
+import { useReferences } from "./references.ts";
 
-/** An identity's edit as typed, and the deployment revision its author saw when they opened it (H5). */
-interface IdentityDraft {
-  name: string;
-  emails: string[];
-  /** The email typed and not yet taken as a chip. */
-  emailText: string;
-  base: number;
+/** Whether `identity` matches the search: its name or any of its emails contains the text, without regard to case. */
+export function matches(identity: Identity, search: string): boolean {
+  const wanted = search.trim().toLowerCase();
+  return wanted === "" || [identity.name ?? "", ...(identity.emails ?? [])].some((text) => text.toLowerCase().includes(wanted));
 }
 
-/**
- * The deployment revision an author who keeps their edit after a conflict drafts it against:
- * the one the rejection reports (H5: only that was compared), or the one the tab holds if it
- * has moved further, so the retry works before the tick arrives.
- */
-export function deploymentRebase(rejection: Rejection, held: number): number {
-  if (rejection.rejection !== "stale") {
-    return held;
+/** The count line: the identities now, and under a proposal also how many it leaves; a search says how many of them it keeps. */
+export function countWords(args: { total: number; shown: number; after: number | undefined }): string {
+  const { total, shown, after } = args;
+  const now = plural(total, "identity", "identities");
+  if (after !== undefined) {
+    return `${now} now, ${String(after)} after`;
   }
-  const reported = rejection.conflicts.map((conflict) => ("domain" in conflict.of && conflict.of.domain === "deployment" ? conflict.current : 0));
-  return Math.max(held, ...reported);
+  return shown === total ? now : `${String(shown)} of ${now}`;
 }
 
-function IdentityEditor({ identity, deployment, draft, setDraft, write }: { identity: Identity; deployment: Deployment; draft: IdentityDraft; setDraft: (draft: IdentityDraft | undefined) => void; write: ScreenWrite }) {
-  const problem = nameProblem(draft.name);
-  const save = async () => {
-    const mutation = { op: "edit_identity" as const, identity: identityOf(identity.key, draft.name, draft.emails) };
-    if (await write.run({ target: "deployment", baseRevision: draft.base, mutations: [mutation] })) {
-      setDraft(undefined);
-    }
-  };
-  return (
-    <>
-      <form className="stack" onSubmit={(event) => { event.preventDefault(); void save(); }}>
-        <span className="row">
-          <Field label="Name" value={draft.name} onChange={(event) => { setDraft({ ...draft, name: event.target.value }); }} />
-          <ChipsInput label="Emails" placeholder="Add an email" inputMode="email" rules={EMAIL_RULES} values={draft.emails} text={draft.emailText} onChange={(emails, emailText) => { setDraft({ ...draft, emails, emailText }); }} />
-        </span>
-        {problem === undefined ? null : <span className="ink-bad" role="alert">{problem}</span>}
-        <span className="row">
-          <Button primary type="submit" disabled={write.disabled || (draft.name.trim() === "" && draft.emails.length === 0) || draft.emailText.trim() !== "" || problem !== undefined}>Save</Button>
-          <Button onClick={() => { setDraft(undefined); write.dismiss(); }}>Cancel</Button>
-        </span>
-      </form>
-      <WriteStatus view={write.status} />
-      {write.rejection === undefined ? null : (
-        <RejectionView
-          rejection={write.rejection}
-          onDismiss={write.dismiss}
-          onRebase={() => {
-            if (write.rejection !== undefined) {
-              setDraft({ ...draft, base: deploymentRebase(write.rejection, deployment.revision) });
-            }
-            write.dismiss();
-          }}
-        />
-      )}
-    </>
-  );
+/** A click on the row itself, not on a control or link inside it. */
+function onRow(event: MouseEvent): boolean {
+  return !(event.target instanceof Element && event.target.closest("a, button, select, input, textarea, label"));
 }
 
-function IdentityRow({ identity, deployment, yours, mark, intoName }: { identity: Identity; deployment: Deployment; yours: boolean; mark?: DiffRow["mark"]; intoName?: string | undefined }) {
-  const reviewing = useReviewing() !== undefined;
-  const [draft, setDraft] = useDraft<IdentityDraft>(`identity-edit:${identity.key}`);
-  // The row holds the write, so a save in flight keeps Edit closed until it settles: its
-  // landing closes the draft it sent, never one opened after it.
-  const write = useScreenWrite(`identity:${identity.key}`, identityLabel(identity));
-  const aliases = aliasesOf(deployment, identity.key);
-  // An unnamed identity is titled by its first email, so that one is not listed again.
+function Row({ row, yours, chosen, intoName, selection, selectable }: { row: IdentityRow; yours: boolean; chosen: boolean; intoName: string | undefined; selection: Selection; selectable: boolean }) {
+  const { identity, mark } = row;
+  const label = identityLabel(identity);
   const named = identity.name !== undefined && identity.name !== null;
-  const shown = named ? (identity.emails ?? []) : (identity.emails ?? []).slice(1);
+  const modified = (event: MouseEvent) => event.shiftKey || event.metaKey || event.ctrlKey;
   return (
-    <li className="identity-row" data-testid="identity" data-identity={identity.key} data-diff={mark?.kind}>
-      <span className="identity-head">
-        <span className="row identity-title">
+    <tr
+      data-testid="identity"
+      data-identity={identity.key}
+      data-selected={chosen}
+      data-diff={mark?.kind}
+      onClick={(event) => {
+        if (!selectable || !onRow(event)) {
+          return;
+        }
+        if (modified(event)) {
+          selection.toggle(identity.key);
+        } else {
+          selection.pick(identity.key);
+        }
+      }}
+    >
+      <td className="pick">
+        {selectable ? <input type="checkbox" className="pick-box" aria-label={`Select ${label}`} checked={chosen} onChange={() => { selection.toggle(identity.key); }} /> : null}
+      </td>
+      <td data-column="name">
+        <span className="cell-first">
           {mark === undefined ? null : (
             <span className="layer-word" data-testid="row-diff" data-diff={mark.kind}>
-              {mark.into === undefined ? DIFF_LABELS[mark.kind] : `Merged into ${intoName ?? mark.into}`}
+              {mark.into === undefined ? DIFF_LABELS[mark.kind] : "Merged"}
             </span>
           )}
-          <strong data-testid="identity-name" className={identity.name === undefined || identity.name === null ? "mono" : undefined}>{identityLabel(identity)}</strong>
+          {selectable ? (
+            <Link
+              to={pathTo("identity", { key: identity.key })}
+              data-testid="identity-name"
+              className={named ? undefined : "mono"}
+              onClick={(event) => {
+                // A modified click adds to the set, a plain one opens this identity alone; neither is left to the address, which may be this one already.
+                event.preventDefault();
+                event.stopPropagation();
+                if (modified(event)) {
+                  selection.toggle(identity.key);
+                } else {
+                  selection.pick(identity.key);
+                }
+              }}
+            >
+              {label}
+            </Link>
+          ) : (
+            <strong data-testid="identity-name" className={named ? undefined : "mono"}>{label}</strong>
+          )}
           {yours ? <Badge tone="good" data-testid="yours">You</Badge> : null}
-          {aliases.length === 0 ? null : <span className="muted small" data-testid="aliases">merged from {plural(aliases.length, "other entry", "other entries")}</span>}
         </span>
-        {draft === undefined && !reviewing ? (
-          <Button disabled={write.disabled} onClick={() => { setDraft({ name: identity.name ?? "", emails: [...(identity.emails ?? [])], emailText: "", base: deployment.revision }); }}>Edit</Button>
-        ) : null}
-      </span>
-      {draft !== undefined && !reviewing ? null : (
-        <span data-testid="identity-emails">
-          {(identity.emails ?? []).length === 0 ? <span className="muted small">No emails</span> : shown.length === 0 ? null : <Chips>{shown.map((email) => <Chip key={email}>{email}</Chip>)}</Chips>}
-        </span>
-      )}
-      {draft === undefined || reviewing ? null : <IdentityEditor identity={identity} deployment={deployment} draft={draft} setDraft={setDraft} write={write} />}
-    </li>
+        {mark?.into === undefined ? null : <span className="cell-second" data-testid="merged-into">Into {intoName ?? "another identity"}</span>}
+      </td>
+      <td data-column="emails">
+        <Emails identity={identity} />
+      </td>
+    </tr>
   );
 }
 
-function CreateIdentity({ deployment }: { deployment: Deployment }) {
-  const write = useScreenWrite("new-identity");
-  const [draft, setDraft] = useDraft<{ name: string; emails: string[]; emailText: string }>("identity-new");
-  const { name, emails, emailText } = draft ?? { name: "", emails: [], emailText: "" };
-  const problem = nameProblem(name);
-  const create = async () => {
-    const mutation = { op: "create_identity" as const, identity: identityOf(newIdentityKey(), name, emails) };
-    if (await write.run({ target: "deployment", baseRevision: deployment.revision, mutations: [mutation] })) {
-      setDraft(undefined);
-    }
-  };
+/** What the inspector holds: Add's form, the one identity open, the several selected, or that the address names no identity. Nothing under a proposal's layer, whose rail is the inspector's. */
+function InspectorOf({ deployment, selection, reviewing, adding, address }: { deployment: Deployment; selection: Selection; reviewing: boolean; adding: boolean; address: string | undefined }) {
+  const { caller } = useCaller();
+  const receipt = useReceipt();
+  const merging = useMerge(receipt, selection);
+  const yours = new Set(caller?.identities ?? []);
+  const held = new Map((deployment.identities ?? []).map((identity) => [identity.key, identity]));
+  const members = selection.members.map((key) => held.get(key)).filter((identity): identity is Identity => identity !== undefined);
+  const references = useReferences(reviewing || adding ? [] : members.map((member) => member.key));
+  const one = members.length === 1 ? members[0] : undefined;
+  if (reviewing) {
+    return null;
+  }
+  let focus = address;
+  let panel: ReactNode = <NoSuchIdentity />;
+  if (adding) {
+    focus = "new-identity";
+    panel = <NewIdentity deployment={deployment} />;
+  } else if (one !== undefined) {
+    focus = one.key;
+    panel = <OneIdentity identity={one} deployment={deployment} yours={yours.has(one.key)} reading={references.reading} held={references.held?.[one.key]} refresh={references.refresh} selection={selection} />;
+  } else if (members.length > 1) {
+    focus = members.map((member) => member.key).join(" ");
+    panel = <SeveralIdentities members={members} deployment={deployment} yours={yours} reading={references.reading} refresh={references.refresh} selection={selection} receipt={receipt} merging={merging} />;
+  }
+  // The receipt is held here, not in the panel, so a merge's warnings outlive the panel it replaces.
+  return focus === undefined ? null : (
+    <Inspector focus={focus}>
+      {panel}
+      <Receipt receipt={receipt.receipt} />
+    </Inspector>
+  );
+}
+
+/** The table of `shown`, the identities the search keeps; under a layer its rows are marked and none can be selected. */
+function IdentityTable({ shown, names, selection, reviewing }: { shown: IdentityRow[]; names: ReadonlyMap<string, string>; selection: Selection; reviewing: boolean }) {
+  const { caller } = useCaller();
+  const yours = new Set(caller?.identities ?? []);
   return (
-    <form className="stack" data-testid="create-identity" onSubmit={(event) => { event.preventDefault(); void create(); }}>
-      <span className="row">
-        <Field label="Name (optional)" value={name} onChange={(event) => { setDraft({ name: event.target.value, emails, emailText }); }} />
-        <ChipsInput label="Emails (optional)" placeholder="Add an email" inputMode="email" rules={EMAIL_RULES} values={emails} text={emailText} onChange={(next, nextText) => { setDraft({ name, emails: next, emailText: nextText }); }} />
-      </span>
-      {problem === undefined ? null : <span className="ink-bad" role="alert">{problem}</span>}
-      <span className="row">
-        <Button primary type="submit" disabled={write.disabled || (name.trim() === "" && emails.length === 0) || emailText.trim() !== "" || problem !== undefined}>Add an identity</Button>
-        {write.rejection === undefined ? <WriteStatus view={write.status} /> : <RejectionView rejection={write.rejection} onDismiss={write.dismiss} />}
-      </span>
-    </form>
+    <div className="index-table identities-table" data-testid="identity-list" data-selecting={selection.members.length > 0}>
+      <table className="data" aria-label="Identities">
+        <thead>
+          <tr>
+            <th scope="col" className="pick">
+              <span className="visually-hidden">Select</span>
+            </th>
+            <th scope="col">Name</th>
+            <th scope="col">Emails</th>
+          </tr>
+        </thead>
+        <tbody>
+          {shown.map((row) => (
+            <Row
+              key={row.identity.key}
+              row={row}
+              yours={yours.has(row.identity.key)}
+              chosen={selection.members.includes(row.identity.key)}
+              intoName={row.mark?.into === undefined ? undefined : names.get(row.mark.into)}
+              selection={selection}
+              selectable={!reviewing}
+            />
+          ))}
+        </tbody>
+      </table>
+    </div>
   );
 }
 
 /** The identities page: the identities as they are, or, with a proposal's layer on, as it would leave them with every change marked. */
-function IdentitiesList({ deployment, rows }: { deployment: Deployment; rows: DiffRow[] | undefined }) {
-  const { caller } = useCaller();
-  // Merging is closed until asked for.
-  const [mergeOpen, setMergeOpen] = useState(false);
+function IdentitiesPage({ deployment, rows }: { deployment: Deployment; rows: IdentityRow[] | undefined }) {
   const layer = useLayer();
   const reviewing = useReviewing() !== undefined;
-  const yours = new Set(caller?.identities ?? []);
-  const listed: DiffRow[] = rows ?? byName(deployment.identities ?? []).map((identity) => ({ identity, mark: undefined }));
-  const names = new Map(listed.map((row) => [row.identity.key, identityLabel(row.identity)]));
+  const navigate = useNavigate();
+  const adding = usePage()?.name === "newIdentity";
+  const address = useParams()["key"];
+  const selection = useSelection(reviewing ? undefined : address, (key) => void navigate(key === undefined ? pathTo("identities") : pathTo("identity", { key })));
+  const [search, setSearch] = useState("");
+  useEscapeTo(reviewing || (address === undefined && !adding) ? undefined : pathTo("identities"));
+  const listed: IdentityRow[] = rows ?? byName(deployment.identities ?? []).map((identity) => ({ identity, mark: undefined }));
+  const shown = listed.filter((row) => matches(row.identity, search));
+  const after = reviewing ? listed.filter((row) => row.mark?.kind !== "removed").length : undefined;
+  const add = (
+    <Link className="button" to={pathTo("newIdentity")} data-testid="new-identity">
+      Add
+    </Link>
+  );
   return (
-    <section className="stack" aria-label="Identities" data-testid="identities" data-revision={deployment.revision} data-layer={layer?.mode} data-rows-page tabIndex={-1}>
-      <IndexHead title="Identities">
-        {reviewing ? null : <Button aria-expanded={mergeOpen} aria-controls="merge-identities" onClick={() => { setMergeOpen(!mergeOpen); }}>{mergeOpen ? "Close merge" : "Merge identities"}</Button>}
+    <section className="stack index-page" aria-label="Identities" data-testid="identities" data-revision={deployment.revision} data-layer={layer?.mode} data-rows-page tabIndex={-1}>
+      <IndexHead title="Identities" action={reviewing ? undefined : add}>
+        <FilterSearch label="Search" placeholder="Name or email" value={search} onChange={setSearch} />
+        <span className="muted" data-testid="identities-count">{countWords({ total: (deployment.identities ?? []).length, shown: shown.length, after })}</span>
       </IndexHead>
       <Band />
-      <span className="muted small">People and teams journeys refer to, across every journey. They need not be users; an identity holding your verified email is you. Each needs a name or at least one email.</span>
-      {reviewing ? null : <CreateIdentity deployment={deployment} />}
-      {mergeOpen && !reviewing ? <MergeIdentities deployment={deployment} identities={byName(deployment.identities ?? [])} /> : null}
+      {reviewing ? null : <p className="muted index-intro">People and teams. What each does in a journey is the role it fills there.</p>}
       {listed.length === 0 ? (
-        <p className="muted small" data-testid="identities-empty">No identities yet.</p>
+        <IndexState kind="empty" action={reviewing ? undefined : <Link to={pathTo("newIdentity")}>Add an identity &rsaquo;</Link>} data-testid="identities-empty">
+          No identities yet.
+        </IndexState>
+      ) : shown.length === 0 ? (
+        <IndexState kind="empty" data-testid="identities-none-match">
+          No identity matches that search.
+        </IndexState>
       ) : (
-        <NodePanel title="Identities" count={listed.length} testId="identity-list">
-          {listed.map(({ identity, mark }) => (
-            <IdentityRow key={identity.key} identity={identity} deployment={deployment} yours={yours.has(identity.key)} mark={mark} intoName={mark?.into === undefined ? undefined : names.get(mark.into)} />
-          ))}
-        </NodePanel>
+        <IdentityTable shown={shown} names={new Map(listed.map((row) => [row.identity.key, identityLabel(row.identity)]))} selection={selection} reviewing={reviewing} />
       )}
+      <InspectorOf deployment={deployment} selection={selection} reviewing={reviewing} adding={adding} address={address} />
     </section>
   );
 }
@@ -194,7 +236,7 @@ function LayeredIdentities() {
   const rows = layer.mode === "reviewing" ? identityDiff(deployment.before, deployment.after) : undefined;
   return (
     <>
-      <IdentitiesList deployment={deployment.before} rows={rows} />
+      <IdentitiesPage deployment={deployment.before} rows={rows} />
       {layer.review === undefined ? null : <Rail selected={undefined} />}
     </>
   );
@@ -204,11 +246,11 @@ export function Identities() {
   const deployment = useDeployment();
   const proposal = useParams()["proposal"];
   if (deployment === undefined) {
-    return <p className="muted small">Reading the identities...</p>;
+    return <p className="muted">Reading the identities...</p>;
   }
   return (
     <>
-      {proposal === undefined ? <IdentitiesList deployment={deployment} rows={undefined} /> : <DeploymentLayerHost proposal={proposal}>{() => <LayeredIdentities />}</DeploymentLayerHost>}
+      {proposal === undefined ? <IdentitiesPage deployment={deployment} rows={undefined} /> : <DeploymentLayerHost proposal={proposal}>{() => <LayeredIdentities />}</DeploymentLayerHost>}
       <DestinationProposals destination="deployment" />
     </>
   );

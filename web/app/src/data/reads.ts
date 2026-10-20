@@ -39,6 +39,28 @@ export function journeyIndex(query: JourneyIndexQuery | undefined) {
   });
 }
 
+/** The references of each identity asked about, by identity key. */
+export type ReferencesByIdentity = Readonly<Record<string, Schema<"IdentityReferences">>>;
+
+/** The key a references read is made afresh for. */
+export function referencesKey(identities: readonly string[]): string {
+  return `identity-references:${identities.join(",")}`;
+}
+
+/**
+ * E6: what refers to each of `identities` (the journeys, route drafts and route versions naming
+ * it, directly or through a merged key), kept current: a journey ticking past what is held, a
+ * route moving, or the deployment moving (a merge or delete) reads it again.
+ */
+export function referencesOf(identities: readonly string[]) {
+  return (session: Session): LiveSpec<ReferencesByIdentity> => ({
+    watching: ["journeys", "routes", "deployment"],
+    about: (of) => isJourney(of) || isRoute(of) || ("domain" in of && of.domain === "deployment"),
+    fetch: async () => Object.fromEntries(await Promise.all(identities.map(async (identity) => [identity, await session.host.identityReferences(identity)] as const))),
+    holds: (by) => Object.values(by).flatMap((each) => each.journeys.map((journey) => ({ of: journeyOf(journey.id), revision: journey.revision }))),
+  });
+}
+
 /** A21: whether the route is a segment, which is inserted and never started or followed. */
 export const isSegment = (route: RouteSummary): boolean => route.header.kind === "segment";
 

@@ -31,7 +31,7 @@ function Logins({ caller }: { caller: Caller }) {
       {caller.logins.map((login) => {
         const linked = login.linked_at.slice(0, 10);
         return (
-          <li key={`${login.provider}:${login.subject}`} className="identity-row" data-testid="login" data-provider={login.provider}>
+          <li key={`${login.provider}:${login.subject}`} className="you-row" data-testid="login" data-provider={login.provider}>
             <span className="row">
               <strong>{login.provider}</strong>
               <span className="mono">{login.subject}</span>
@@ -57,9 +57,9 @@ function YourIdentities({ caller }: { caller: Caller }) {
     <section className="stack" aria-label="Your identity" data-testid="your-identities">
       <NodePanel title={several ? "Your identities" : "Your identity"} count={identities.length}>
         {identities.map((identity, at) => (
-          <li key={identity.key} className="identity-row" data-testid="your-identity" data-identity={identity.key}>
+          <li key={identity.key} className="you-row" data-testid="your-identity" data-identity={identity.key}>
             <span className="row">
-              <strong className={identity.name === undefined || identity.name === null ? "mono" : undefined}>{identityLabel(identity)}</strong>
+              <Link to={pathTo("identity", { key: identity.key })} className={identity.name === undefined || identity.name === null ? "mono" : undefined}><strong>{identityLabel(identity)}</strong></Link>
               {several && at === 0 ? <Badge tone="good">Shown as</Badge> : null}
             </span>
             <span className="mono muted small">{(identity.name === undefined || identity.name === null ? (identity.emails ?? []).slice(1) : (identity.emails ?? [])).join(", ")}</span>
@@ -67,7 +67,6 @@ function YourIdentities({ caller }: { caller: Caller }) {
         ))}
       </NodePanel>
       {several ? <span className="muted">Each holds a verified email of yours, so all of them are yours. You are shown as the first.</span> : null}
-      <Link to={pathTo("identities")}>Edit on the identities page</Link>
     </section>
   );
 }

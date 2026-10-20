@@ -899,6 +899,13 @@ table.data {
     white-space: nowrap;
   }
 }
+/* The name column takes the room the other columns leave, and its description is cut with an ellipsis rather than pushing them off the table. */
+@media (min-width: 720px) {
+  .index-table td[data-column="name"]:has(.cell-description) {
+    width: 100%;
+    max-width: 0;
+  }
+}
 .index-table .cell-description {
   overflow: hidden;
   text-overflow: ellipsis;
@@ -1020,46 +1027,128 @@ table.data {
     grid-template-columns: minmax(0, 1fr);
   }
 }
-/* An identity's row in its Panel: paper, a hairline under each, as the node rows. */
-/* DESIGN's Table: a row 8px high-padded, its two lines close, in two columns: the name block and its emails, and Edit, which keeps its column at every width. The head's left inset is the Panel head's, so both share an edge. */
-.identity-row {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) auto;
-  align-items: start;
-  gap: var(--space-1) var(--space-2);
+/* A row in the You page's panels (a sign-in method, your identity): paper, a hairline under each, its lines close. */
+.you-row {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
   padding: var(--space-2) var(--space-4);
   border-bottom: 1px solid var(--color-edge);
   background: var(--color-surface);
 }
-.identity-head {
-  display: contents;
-}
-.identity-head > button {
-  grid-column: 2;
-  grid-row: 1 / span 2;
-}
-.identity-row > [data-testid="identity-emails"] {
-  grid-column: 1;
-}
-.identity-row > :not(.identity-head, [data-testid="identity-emails"]) {
-  grid-column: 1 / -1;
-}
-.identity-title {
-  min-width: 0;
-}
-.identity-title > strong {
-  min-width: 0;
-  overflow-wrap: anywhere;
-}
-.node-rows > .identity-row:last-child {
+.node-rows > .you-row:last-child {
   border-bottom: 0;
+}
+/* The Identities table (DESIGN, Table; Multi-select): a row is one line, the name and then its emails as plain mono text, and a checkbox that waits for hover, a checked row or a selection under way (on touch it is always there). */
+.identities-table table.data tbody tr {
+  height: auto;
+}
+.identities-table th.pick,
+.identities-table td.pick {
+  width: var(--space-6);
+  min-width: var(--space-6);
+  padding-inline-end: 0;
+}
+.identities-table .pick-box {
+  opacity: 0;
+}
+.identities-table tbody tr:hover .pick-box,
+.identities-table .pick-box:focus-visible,
+.identities-table .pick-box:checked,
+.identities-table[data-selecting="true"] .pick-box {
+  opacity: 1;
+}
+@media (hover: none) {
+  .identities-table .pick-box {
+    opacity: 1;
+  }
+}
+.identities-table tbody tr[data-selected="true"] td {
+  background: var(--color-tint);
+}
+/* DESIGN, Selection: the 2px accent line on the row's left edge. */
+.identities-table tbody tr[data-selected="true"] td.pick {
+  box-shadow: inset 2px 0 0 var(--color-accent);
+}
+.identities-table tbody tr[data-diff="added"] td {
+  background: var(--color-add);
+}
+.identities-table tbody tr[data-diff="changed"] td {
+  background: var(--color-change);
+}
+.identities-table tbody tr[data-diff="removed"] td {
+  background: var(--color-del);
+}
+.identities-table tbody tr[data-diff="removed"] [data-testid="identity-name"] {
+  text-decoration: line-through;
+  text-decoration-thickness: 1px;
+}
+.identities-table table.data td[data-column="name"] a,
+.identities-table table.data td[data-column="name"] strong {
+  font-weight: 600;
+  color: var(--color-text);
+}
+.identities-table .cell-first {
+  align-items: center;
+}
+/* DESIGN, Identities: a row is one line, 8px 12px of padding. */
+.identities-table table.data td {
+  padding: var(--space-2) var(--space-3);
+}
+.index-intro {
+  margin: 0;
+}
+.identities-table tbody tr {
+  cursor: pointer;
+}
+/* An identity's emails: plain mono text, each address whole, wrapping between addresses. */
+.emails {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0 var(--space-3);
+  min-width: 0;
+}
+.index-table table.data td .emails > .mono {
+  font-size: 13px;
+  overflow-wrap: anywhere;
+  color: var(--color-secondary);
+}
+@media (max-width: 719px) {
+  /* A phone's row: the checkbox beside the name, the emails under the name in the same column. */
+  .index-table.identities-table tr {
+    display: grid;
+    grid-template-columns: auto minmax(0, 1fr);
+    align-items: center;
+    gap: 0 var(--space-3);
+    padding: var(--space-2) var(--space-4);
+  }
+  .index-table.identities-table table.data td.pick {
+    grid-column: 1;
+    grid-row: 1;
+    width: auto;
+    min-width: 0;
+    padding: 0;
+  }
+  .index-table.identities-table table.data td[data-column="name"] {
+    grid-column: 2;
+    grid-row: 1;
+  }
+  .index-table.identities-table table.data td[data-column="emails"] {
+    grid-column: 2;
+    grid-row: 2;
+  }
+  .index-table.identities-table table.data td[data-column="emails"]:not(:has(*)) {
+    display: none;
+  }
+  .identities-table .pick-box {
+    opacity: 1;
+  }
 }
 /* Multi-value input (DESIGN): an input's box holding a chip per value and the input that takes the next. */
 .chips-field {
   display: flex;
   flex-direction: column;
   gap: var(--space-1);
-  flex: 2 1 18rem;
   min-width: 0;
 }
 /* The label is the plain field's, so a name and an email field sit on one line. */
@@ -1068,9 +1157,6 @@ table.data {
   letter-spacing: 0.08em;
   text-transform: uppercase;
   color: var(--color-secondary);
-}
-.merge-fields {
-  align-items: flex-end;
 }
 /* Details sits under the action that leads: plain secondary text, underlined, still a button for focus. */
 button.failed-details {
@@ -1081,9 +1167,6 @@ button.failed-details {
   font-size: 14px;
   color: var(--color-secondary);
   text-decoration: underline;
-}
-.merge-body {
-  padding: var(--space-4);
 }
 .chips-input {
   display: flex;

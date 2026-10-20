@@ -49,6 +49,8 @@ const SCREENS: Record<AddressName, ReactElement> = {
   routeProposal: <RoutePage />,
   routeProposalNode: <RoutePage />,
   identities: <Identities />,
+  newIdentity: <Identities />,
+  identity: <Identities />,
   deploymentProposals: <Identities />,
   deploymentProposal: <Identities />,
   me: <You />,

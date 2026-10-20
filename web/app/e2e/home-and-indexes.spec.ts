@@ -76,14 +76,14 @@ test("C16: Home ends with a link to every journey, not a second journey table, a
 test("C16, C17, E6: the three indexes put the primary action and the toolbar in the same places", async ({ page }) => {
   await page.setViewportSize({ width: 1280, height: 800 });
   const places = [];
-  for (const [path, action, toolbar] of [["/journeys", "new-journey", "index-filters"], ["/routes", "new-route-link", "index-filters"], ["/identities", undefined, "index-filters"]] as const) {
+  for (const [path, action, toolbar] of [["/journeys", "new-journey", "index-filters"], ["/routes", "new-route-link", "index-filters"], ["/identities", "new-identity", "index-filters"]] as const) {
     await open(page, "browser", path);
     const bar = page.getByTestId(toolbar);
     await expect(bar).toBeVisible();
     const title = await page.locator("h1").boundingBox();
     const tool = await bar.boundingBox();
-    const act = action === undefined ? undefined : (await page.getByTestId(action).boundingBox()) ?? undefined;
-    places.push({ titleTop: title?.y, toolLeft: tool?.x, toolTop: tool?.y, actionRight: act === undefined ? undefined : act.x + act.width });
+    const act = await page.getByTestId(action).boundingBox();
+    places.push({ titleTop: title?.y, toolLeft: tool?.x, toolTop: tool?.y, actionRight: act === null ? undefined : act.x + act.width });
   }
   for (const each of places) {
     expect(each.titleTop).toBe(places[0]?.titleTop);
@@ -91,4 +91,5 @@ test("C16, C17, E6: the three indexes put the primary action and the toolbar in 
     expect(each.toolTop).toBe(places[0]?.toolTop);
   }
   expect(places[1]?.actionRight).toBe(places[0]?.actionRight);
+  expect(places[2]?.actionRight).toBe(places[0]?.actionRight);
 });

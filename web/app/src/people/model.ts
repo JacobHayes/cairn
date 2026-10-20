@@ -1,18 +1,18 @@
 // Identities as the screens manage them (E6, B3, H3): made ad hoc with a name and enriched
-// later with emails, edited, and merged, each a deployment patch. A merge names every journey
-// referring to either identity at the revision it was checked against, so the host can recheck
-// the set when it commits; reads resolve the merged key through its alias afterwards.
+// later with emails, edited, merged and deleted, each a deployment patch. A merge names every
+// journey referring to any of the identities at the revision it was checked against, so the host
+// can recheck the set when it commits; reads resolve the merged key through its alias afterwards.
 import type { Schema } from "@cairn/client";
 import { EMAIL_BYTES_MAX, EMAIL_COUNT_PER_IDENTITY_MAX, TITLE_BYTES_MAX } from "@cairn/client";
 
 import { overBytes } from "../authoring/limits.ts";
+import type { IdentityReferences } from "../data/host.ts";
 import type { Mutation } from "../data/writes.ts";
 import type { ChipRules } from "../ui/chips.ts";
 import { identityLabel } from "./label.ts";
 
 export type Identity = Schema<"Identity">;
 export type Deployment = Schema<"Deployment">;
-type JourneySummary = Schema<"JourneySummary">;
 
 const BASE32 = "abcdefghijklmnopqrstuvwxyz234567";
 
@@ -48,11 +48,17 @@ export function identityOf(key: string, name: string, emails: readonly string[])
 }
 
 
-/** E6: the merge of `merged` into `survivor`, naming each journey referring to any of them at the revision seen. */
-export function mergeMutation(survivor: string, merged: readonly string[], referencing: readonly JourneySummary[]): Mutation {
+/**
+ * E6: the merge of `merged` into `survivor`, naming each journey that refers to any of them at the
+ * revision seen. A journey two of them share is named once, at the lower revision read, so a
+ * change between the reads makes the merge stale rather than unchecked.
+ */
+export function mergeMutation(survivor: string, merged: readonly string[], references: readonly IdentityReferences[]): Mutation {
   const journeys: Record<string, number> = {};
-  for (const summary of referencing) {
-    journeys[summary.id] = summary.revision;
+  for (const { journeys: referring } of references) {
+    for (const summary of referring) {
+      journeys[summary.id] = Math.min(journeys[summary.id] ?? summary.revision, summary.revision);
+    }
   }
   return { op: "merge_identities", survivor, merged: [...merged], journeys };
 }

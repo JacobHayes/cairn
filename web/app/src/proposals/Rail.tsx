@@ -21,7 +21,7 @@ import { Receipt } from "../ui/Receipt.tsx";
 import { ChangeList } from "./Changes.tsx";
 import { Problem } from "./Entries.tsx";
 import { ItemList } from "./Items.tsx";
-import { useLayer, type Layer, type LayerModel } from "./layer.ts";
+import { identityDiff, useLayer, type Layer, type LayerModel } from "./layer.ts";
 import { DIFF_LABELS, itemNode, withMutationsAdded, type DiffKind, type DiffMark, type Proposal } from "./model.ts";
 import { rolesAddedBy } from "./review.ts";
 import { StalePanel } from "./Stale.tsx";
@@ -247,6 +247,13 @@ function ChangesFold({ model, onPick }: { model: LayerModel; onPick: (key: strin
   const counts = { added: 0, changed: 0, removed: 0 };
   for (const mark of Object.values(model.marks)) {
     counts[mark.kind] += 1;
+  }
+  // A deployment proposal marks identities, not nodes; the key counts those the same way.
+  const deployment = useLayer()?.deployment;
+  for (const row of deployment === undefined ? [] : identityDiff(deployment.before, deployment.after)) {
+    if (row.mark !== undefined) {
+      counts[row.mark.kind] += 1;
+    }
   }
   const { diff, entries, names } = model;
   const others = (model.draft.mutations ?? []).filter((mutation) => subjectOf(mutation) === undefined);

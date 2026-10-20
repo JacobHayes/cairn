@@ -84,7 +84,7 @@ const paths: Path[] = [
   {
     name: "a merge",
     edit: "merge-identities",
-    command: (id) => mergeCommand({ survivor: "who_keep", merged: ["who_old"], deployment: 7 }, [{ id: "j_one", revision: 4 } as never], id),
+    command: (id) => mergeCommand({ survivor: "who_keep", merged: ["who_old"], deployment: 7 }, [{ journeys: [{ id: "j_one", revision: 4 } as never], routes: [] }], id),
     refuse: patchRefused,
   },
   {

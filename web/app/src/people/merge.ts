@@ -1,7 +1,7 @@
-// E6: merging one identity into another, as a workflow over the edit manager's writes: every
-// journey referring to either (any status, archived among them) is read first, then the
-// deployment patch names each at the revision seen, so the host checks each as it would derive
-// after the merge and rechecks the set when it commits.
+// E6: merging several identities into one, as a workflow over the edit manager's writes: what
+// refers to each of them (the references read, any journey status, archived among them) is read
+// first, then the deployment patch names each journey at the revision seen, so the host checks
+// each as it would derive after the merge and rechecks the set when it commits.
 //
 //   idle -> reading -> delivering -> idle        merge { survivor, merged, deployment }
 //
@@ -12,16 +12,16 @@ import { assign, enqueueActions, fromPromise, setup, type ActorRefFrom } from "x
 
 import { aboutOf, deliverWrite, type EditsRef } from "../data/edit-manager.ts";
 import type { Answer, Command } from "../data/edit-record.ts";
-import type { JourneySummary } from "../data/reads.ts";
+import type { IdentityReferences } from "../data/host.ts";
 import { currentAddress } from "../data/session.ts";
 import { newPatchId, patchOf } from "../data/writes.ts";
 import { mergeMutation } from "./model.ts";
 
-/** What the flow is started with: the manager, its write's edit key, and how to find the journeys referring to the identities. */
+/** What the flow is started with: the manager, its write's edit key, and the references read of one identity. */
 export interface MergeInput {
   edits: EditsRef;
   key: string;
-  referencing: (identities: readonly string[]) => Promise<JourneySummary[]>;
+  references: (identity: string) => Promise<IdentityReferences>;
 }
 
 /** What a merge asks for. */
@@ -34,11 +34,11 @@ export interface Merge {
 
 interface MergeContext extends MergeInput {
   asked: Merge | undefined;
-  /** The journeys read, to be named in the patch. */
-  journeys: JourneySummary[];
+  /** What refers to each of them, as read, for the patch to name. */
+  read: IdentityReferences[];
   /** The patch id of the write now being delivered. */
   id: string;
-  /** Why the journeys could not be read, until the next start. */
+  /** Why the references could not be read, until the next start. */
   failure: string | undefined;
 }
 
@@ -50,19 +50,19 @@ export interface Merged {
   answer: Answer;
 }
 
-/** E6: the deployment patch merging `merged` into `survivor`, naming `referencing` at the revisions seen. */
-export function mergeCommand(merge: Merge, referencing: readonly JourneySummary[], id: string = newPatchId()): Command {
+/** E6: the deployment patch merging `merged` into `survivor`, naming the journeys `referencing` lists at the revisions seen. */
+export function mergeCommand(merge: Merge, referencing: readonly IdentityReferences[], id: string = newPatchId()): Command {
   return {
     kind: "patch",
     patch: patchOf({ target: "deployment", baseRevision: merge.deployment, mutations: [mergeMutation(merge.survivor, merge.merged, referencing)] }, id),
   };
 }
 
-const readJourneys = fromPromise<JourneySummary[], { referencing: MergeInput["referencing"]; identities: string[] }>(({ input }) => input.referencing(input.identities));
+const readReferences = fromPromise<IdentityReferences[], { references: MergeInput["references"]; identities: string[] }>(({ input }) => Promise.all(input.identities.map(input.references)));
 
 export const mergeFlow = setup({
   types: { context: {} as MergeContext, events: {} as MergeEvent, input: {} as MergeInput, emitted: {} as Merged },
-  actors: { readJourneys, deliver: deliverWrite },
+  actors: { readReferences, deliver: deliverWrite },
   guards: {
     answered: (_, answer: Answer | undefined) => answer !== undefined,
   },
@@ -71,7 +71,7 @@ export const mergeFlow = setup({
   },
 }).createMachine({
   id: "merge",
-  context: ({ input }) => ({ ...input, asked: undefined, journeys: [], id: "", failure: undefined }),
+  context: ({ input }) => ({ ...input, asked: undefined, read: [], id: "", failure: undefined }),
   initial: "idle",
   states: {
     idle: {
@@ -85,9 +85,9 @@ export const mergeFlow = setup({
     reading: {
       tags: ["busy"],
       invoke: {
-        src: "readJourneys",
-        input: ({ context }) => ({ referencing: context.referencing, identities: [context.asked?.survivor ?? "", ...(context.asked?.merged ?? [])] }),
-        onDone: { target: "delivering", actions: assign({ journeys: ({ event }) => event.output }) },
+        src: "readReferences",
+        input: ({ context }) => ({ references: context.references, identities: [context.asked?.survivor ?? "", ...(context.asked?.merged ?? [])] }),
+        onDone: { target: "delivering", actions: assign({ read: ({ event }) => event.output }) },
         onError: { target: "idle", actions: assign({ failure: ({ event }) => (event.error instanceof Error ? event.error.message : String(event.error)) }) },
       },
     },
@@ -102,7 +102,7 @@ export const mergeFlow = setup({
           }
           return {
             edits: context.edits,
-            sent: { id: context.id, command: mergeCommand(context.asked, context.journeys, context.id), about: aboutOf(context.key, undefined, currentAddress()) },
+            sent: { id: context.id, command: mergeCommand(context.asked, context.read, context.id), about: aboutOf(context.key, undefined, currentAddress()) },
           };
         },
         onDone: {

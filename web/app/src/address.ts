@@ -14,7 +14,7 @@ import type { Schema } from "@cairn/client";
 /** The rail entry a page belongs to. */
 export type Section = "home" | "journeys" | "routes" | "identities" | "me";
 
-/** Each pattern; the router ranks the static `new` pages above the ones with a parameter in their place. */
+/** Each pattern; the router ranks the static pages (`new`, `proposals`) above the ones with a parameter in their place: no identity key is `new` or `proposals`, for keys start `who_`. */
 export const ADDRESSES = [
   { name: "home", path: "/", section: "home" },
   { name: "journeys", path: "/journeys", section: "journeys" },
@@ -33,6 +33,8 @@ export const ADDRESSES = [
   { name: "routeProposal", path: "/routes/:route/proposals/:proposal", section: "routes" },
   { name: "routeProposalNode", path: "/routes/:route/proposals/:proposal/nodes/:key", section: "routes" },
   { name: "identities", path: "/identities", section: "identities" },
+  { name: "newIdentity", path: "/identities/new", section: "identities" },
+  { name: "identity", path: "/identities/:key", section: "identities" },
   { name: "deploymentProposals", path: "/identities/proposals", section: "identities" },
   { name: "deploymentProposal", path: "/identities/proposals/:proposal", section: "identities" },
   { name: "me", path: "/me", section: "me" },

@@ -9,7 +9,7 @@ import type { APIRequestContext } from "@playwright/test";
 import { expect, test } from "./test.ts";
 
 import { startVendorJourney } from "./acting.ts";
-import { addIdentity, mergeIdentities } from "./around.ts";
+import { addIdentity, identityRow, mergeIdentities } from "./around.ts";
 import { addNode, newRoute, routeName } from "./authoring.ts";
 import { section } from "./detail.ts";
 import {
@@ -122,7 +122,7 @@ test("a deployment tick refetches the deployment context and re-derives: a merge
   const journey = await journeyOwnedBy(one.request, first);
   await openJourney(two, "server", journey);
   await live(two);
-  const survivor = (await one.locator(`[data-testid="identity"][data-identity="${second}"]`).getByTestId("identity-name").textContent()) ?? "";
+  const survivor = (await identityRow(one, second).getByTestId("identity-name").textContent()) ?? "";
   // The card names an owner only when it is the viewer or missing: the node's detail names this one.
   const owners = await section(await openFromCanvas(two, "n_task"), "participations");
   await expect(owners).not.toContainText(survivor);
@@ -136,16 +136,16 @@ test("a deployment tick refetches the deployment context and re-derives: a merge
 });
 
 test("H3: an identity with no name is asked for its name on load, and Save names it everywhere it shows", { tag: "@server" }, async ({ page }) => {
-  await open(page, "server", "/identities");
   // Ana's: the dev user's, before the sign-in test below gives the user a second identity.
   const key = "who_k3d7qm2xw5tn6pfa";
-  const yours = page.locator(`[data-testid="identity"][data-identity="${key}"]`);
-  await expect(yours.getByTestId("yours")).toBeVisible();
-  const name = (await yours.getByTestId("identity-name").textContent()) ?? "";
-  await yours.getByRole("button", { name: "Edit" }).click();
-  await yours.getByLabel("Name").fill("");
-  await yours.getByRole("button", { name: "Save" }).click();
-  await expect(yours.getByTestId("identity-name")).toContainText("@");
+  await open(page, "server", `/identities/${key}`);
+  const detail = page.getByTestId("identity-detail");
+  await expect(detail.getByTestId("yours")).toBeVisible();
+  const name = (await detail.getByTestId("detail-title").textContent()) ?? "";
+  await detail.getByRole("button", { name: "Edit" }).click();
+  await detail.getByLabel("Name").fill("");
+  await detail.getByRole("button", { name: "Save" }).click();
+  await expect(detail.getByTestId("detail-title")).toContainText("@");
   await page.reload();
   const prompt = page.getByTestId("name-prompt");
   await expect(prompt).toBeVisible();
@@ -155,6 +155,7 @@ test("H3: an identity with no name is asked for its name on load, and Save names
   await prompt.getByLabel("Name").fill(name);
   await prompt.getByRole("button", { name: "Save" }).click();
   await expect(prompt).toHaveCount(0);
+  await expect(page.getByTestId("identity-detail").getByTestId("detail-title")).toHaveText(name);
   await expect(page.locator(`[data-testid="identity"][data-identity="${key}"]`).getByTestId("identity-name")).toHaveText(name);
   await page.getByRole("navigation", { name: "Screens", exact: true }).getByRole("link", { name: "You" }).click();
   await expect(page.getByTestId("your-identity").first()).toContainText(name);
@@ -239,7 +240,7 @@ test("C14: a proposal drafted in another page appears in a journey's Proposals t
   await expect(two.getByTestId("proposal-row")).toContainText("Add a follow-up");
 });
 
-test("C14: the deployment's open proposals are a panel on Identities, found at its own address", { tag: "@server" }, async ({ page }) => {
+test("C14: the deployment's open proposals are the Identities inspector's Proposals tab, found at its own address", { tag: "@server" }, async ({ page }) => {
   await open(page, "server", "/identities");
   const deployment = (await (await page.request.get("/api/deployment")).json()) as { revision: number };
   const drafted = await page.request.post("/api/deployment/proposals", {

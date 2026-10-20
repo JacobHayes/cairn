@@ -6,7 +6,7 @@ import { fileURLToPath } from "node:url";
 
 import { expect, type Locator, type Page } from "@playwright/test";
 
-import { expectAddress, fresh, open, type HostKind } from "./shell.ts";
+import { expectAddress, fresh, open, openSheet, type HostKind } from "./shell.ts";
 
 /** A fixture's route file as it is kept on disk. */
 export function fixtureRoute(fixture: string): string {
@@ -102,29 +102,45 @@ export async function savedText(page: Page, click: () => Promise<void>): Promise
   return readFile(path, "utf8");
 }
 
-/** Merges `merged` into `survivor` on the identities screen and waits for the alias to show. */
-export async function mergeIdentities(page: Page, survivor: string, merged: string): Promise<void> {
-  const form = page.getByTestId("merge-identities");
-  if ((await form.count()) === 0) {
-    await page.getByRole("button", { name: "Merge identities" }).click();
-  }
-  await form.getByLabel("Keep").selectOption(survivor);
-  await form.getByLabel("Merge this identity into it").selectOption(merged);
-  await form.getByRole("button", { name: "Merge", exact: true }).click();
-  await expect(page.locator(`[data-testid="identity"][data-identity="${survivor}"]`).getByTestId("aliases")).toBeVisible();
+/** The identity's row in the table. */
+export function identityRow(page: Page, key: string): Locator {
+  return page.locator(`[data-testid="identity"][data-identity="${key}"]`);
 }
 
-/** Adds an identity on the identities screen; its key, once listed. */
+/** Selects the identities `keys` with their row checkboxes: one opens alone, two or more are a set. */
+export async function selectIdentities(page: Page, ...keys: string[]): Promise<void> {
+  for (const key of keys) {
+    await identityRow(page, key).getByRole("checkbox").check();
+  }
+  await expect(page.getByTestId(keys.length > 1 ? "selection-panel" : "identity-detail")).toBeAttached();
+  await openSheet(page);
+}
+
+/** Merges `merged` into `survivor` from the selection's panel, and waits for the survivor to show the alias. */
+export async function mergeIdentities(page: Page, survivor: string, merged: string): Promise<void> {
+  await selectIdentities(page, survivor, merged);
+  const panel = page.getByTestId("merge-identities");
+  await panel.locator(`input[data-identity="${survivor}"]`).check();
+  await panel.getByRole("button", { name: "Merge", exact: true }).click();
+  await expect(page.getByTestId("identity-detail").getByTestId("aliases")).toBeVisible();
+  await expect(page).toHaveURL(new RegExp(`/identities/${survivor}$`));
+}
+
+/** Adds an identity with Add, and returns its key once it is open in the inspector. */
 export async function addIdentity(page: Page, name: string, emails: readonly string[] = []): Promise<string> {
+  await page.getByTestId("new-identity").click();
   const form = page.getByTestId("create-identity");
+  // The sheet is opened once the form is in it: before that there is no handle to open.
+  await expect(form).toBeAttached();
+  await openSheet(page);
   await form.getByLabel("Name").fill(name);
   const field = form.getByLabel("Emails");
   for (const email of emails) {
     await field.fill(email);
     await field.press("Enter");
   }
-  await form.getByRole("button", { name: "Add an identity" }).click();
-  const row = page.getByTestId("identity").filter({ has: page.getByTestId("identity-name").getByText(name, { exact: true }) });
-  await expect(row).toHaveCount(1);
-  return (await row.getAttribute("data-identity")) ?? "";
+  await form.getByRole("button", { name: "Add identity" }).click();
+  await expect(page).toHaveURL(/\/identities\/who_[a-z2-7]{16}$/);
+  await expect(page.getByTestId("identity-detail").getByTestId("detail-title")).toHaveText(name);
+  return new URL(page.url()).pathname.split("/").pop() ?? "";
 }

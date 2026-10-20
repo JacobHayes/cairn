@@ -276,6 +276,9 @@ export function nodeAddress(page: Page, search: string, key: string | undefined)
     case "routeProposal":
     case "routeProposalNode":
       return routePath(required(params, "route"), { proposal: required(params, "proposal"), node: key, screen: routeScreenOf(new URLSearchParams(search)) }, search);
+    case "identity":
+    case "newIdentity":
+      return `${pathTo("identities")}${query}`;
     case "deploymentProposal":
       return `${proposalAddress("deployment", required(params, "proposal"))}${query}`;
     default:

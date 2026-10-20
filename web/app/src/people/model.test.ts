@@ -37,13 +37,15 @@ describe("identities as sent (E6, H3)", () => {
 });
 
 describe("a merge (E6)", () => {
-  it("names each referring journey at the revision it was read at", () => {
-    const summary = (id: string, revision: number): Schema<"JourneySummary"> => ({ id, name: id, status: "archived", revision, created_at: "2026-10-01T00:00:00Z", upgrade_available: false });
-    expect(mergeMutation("who_keep", ["who_old"], [summary("j_one", 4), summary("j_two", 9)])).toEqual({
+  const summary = (id: string, revision: number): Schema<"JourneySummary"> => ({ id, name: id, status: "archived", revision, created_at: "2026-10-01T00:00:00Z", upgrade_available: false });
+  const referencing = (...journeys: Schema<"JourneySummary">[]) => ({ journeys, routes: [] });
+
+  it("names each referring journey at the revision it was read at, once when several identities share it, at the lower revision", () => {
+    expect(mergeMutation("who_keep", ["who_old", "who_older"], [referencing(summary("j_one", 4), summary("j_two", 9)), referencing(summary("j_two", 8)), referencing()])).toEqual({
       op: "merge_identities",
       survivor: "who_keep",
-      merged: ["who_old"],
-      journeys: { j_one: 4, j_two: 9 },
+      merged: ["who_old", "who_older"],
+      journeys: { j_one: 4, j_two: 8 },
     });
   });
 
