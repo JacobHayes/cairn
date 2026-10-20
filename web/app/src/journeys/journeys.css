@@ -1,6 +1,8 @@
 /* The index pages' head and filter bar, and Home. The tables are `.index-table` (ui/app.css). */
+/* The head is as tall as its action, with or without one, so the toolbar under it sits in one place on every index. */
 .index-head {
-  align-items: baseline;
+  align-items: center;
+  min-height: var(--control-h);
 }
 
 .index-head h1 {
@@ -18,6 +20,17 @@
   gap: var(--space-2);
 }
 
+/* On a phone each select has a line of its own, then the checkboxes follow together. */
+@media (max-width: 719px) {
+  .index-filters > label.row:has(select) {
+    flex: 1 1 100%;
+  }
+
+  .index-filters > label.row:has(select) select {
+    flex: 1;
+  }
+}
+
 .filter-label {
   font-size: 15px;
   color: var(--color-secondary);
@@ -30,6 +43,10 @@
 /* Home: one bounded panel for each journey, a group apart (DESIGN: groups sit 24px apart). */
 .home-list {
   gap: var(--space-5);
+}
+
+.home > h1 {
+  margin-bottom: 0;
 }
 
 .home-count {
@@ -85,11 +102,6 @@
   font-weight: 600;
 }
 
-.home-table-head {
-  align-items: baseline;
-  margin-top: var(--space-2);
-}
-
-.home-table-head h2 {
-  margin: 0;
+.home-all {
+  align-self: flex-start;
 }

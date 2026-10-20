@@ -21,14 +21,14 @@ import type { NodeRow } from "./why.ts";
 import { ownedBy } from "./yours.ts";
 
 /**
- * E1: pick an owner for an unowned row, in the owner's slot: choosing sends it. The slot says
- * "Unassigned" quietly until the row is hovered, focused or selected, which swaps in the picker.
+ * E1: pick an owner for an unowned row, in the owner's slot: choosing sends it. The picker is
+ * always there (a touch or keyboard user never has to find it); on paper the slot says "Unassigned".
  */
 function AssignInline({ view, write, node }: { view: Ready; write: NodeWrite; node: string }) {
   return (
     <span className="row-assign-slot">
       <span className="row-owner row-unassigned">Unassigned</span>
-      <select className="row-assign row-owner-other" aria-label="Assign owner" data-testid="assign" disabled={write.disabled} value="" onChange={(event) => { void write.run([assignOwner(node, event.target.value)]); }}>
+      <select className="row-assign" aria-label="Assign owner" data-testid="assign" disabled={write.disabled} value="" onChange={(event) => { void write.run([assignOwner(node, event.target.value)]); }}>
         <option value="">Assign</option>
         <EntityOptions view={view} />
       </select>

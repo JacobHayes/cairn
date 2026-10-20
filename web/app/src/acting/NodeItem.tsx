@@ -22,6 +22,8 @@ export interface NodeItemProps {
   /** Where the inspector for this row opens. */
   to: string;
   selected?: boolean;
+  /** Whether the row's status chip is drawn; a list whose heading already says the status (Home's "ready for you") leaves it out. */
+  chip?: boolean;
   /** The one fact the row says under its title, in words. */
   fact?: ReactNode;
   /** The ink a date or trouble fact is said in, beside its words: warning or error. */
@@ -33,7 +35,7 @@ export interface NodeItemProps {
   children?: ReactNode;
 }
 
-export function NodeItem({ view, node, to, selected = false, fact, factTone, testId = "node-row", className, children }: NodeItemProps) {
+export function NodeItem({ view, node, to, selected = false, fact, factTone, chip = true, testId = "node-row", className, children }: NodeItemProps) {
   const navigate = useNavigate();
   const item = useRef<HTMLLIElement>(null);
   const state = view.derived.nodes[node]?.display_state;
@@ -60,7 +62,7 @@ export function NodeItem({ view, node, to, selected = false, fact, factTone, tes
       }}
     >
       <div className="node-row-main">
-        {state === undefined || kind === undefined ? null : <Badge tone={statusTone(state)}>{statusWord(state, kind)}</Badge>}
+        {!chip || state === undefined || kind === undefined ? null : <Badge tone={statusTone(state)}>{statusWord(state, kind)}</Badge>}
         <span className="node-row-text">
           <Link to={to} className="node-title" data-row-title data-node={node} aria-current={selected ? "true" : undefined}>
             {titleOf(view, node)}

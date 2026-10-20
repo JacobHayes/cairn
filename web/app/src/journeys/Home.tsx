@@ -1,8 +1,7 @@
 // Home (`/`; C16, E4): what the viewer can move now, journey by journey (alphabetical; no ranking
 // across journeys), each in that journey's own rank and bounded to five rows with the rest one
-// click away; then the journeys where their work is not ready yet, then their active journeys as
-// the index's table. It renders in the first paint: the title is there and the reading line sits
-// under it, and a journey's group appears as it is read. A row opens the node's own address; its
+// click away; then the journeys where their work is not ready yet, then a link to every journey. It renders in the first paint: the title is there and the reading
+// line sits under it, and a journey's group appears as it is read. A row opens the node's own address; its
 // actions (Start, Done, Mark reached, Assign) act in place, and Decide opens the node's answer
 // form, which is the inspector's. The candidates are the active journeys referring to the
 // caller's entities (the host's filter, a superset); each is read in the tab and its own "mine"
@@ -19,12 +18,11 @@ import { nextForYou, waitsOnWords } from "../acting/yours.ts";
 import "../acting/acting.css";
 import { valueOf } from "../data/keyed-read.ts";
 import { useLive, useRetryJourney, useViewer } from "../data/react.ts";
-import { indexKey, journeyIndex, routeIndex, type JourneySummary } from "../data/reads.ts";
+import { indexKey, journeyIndex, type JourneySummary } from "../data/reads.ts";
 import { destinationWords, ProposalRow } from "../proposals/ProposalRows.tsx";
 import { listKey, proposalsListed, type Proposals } from "../proposals/read.ts";
 import { DEFAULT_FILTERS, indexPath, journeyPath, newJourneyPath, queryOf } from "./address.ts";
 import { heldBack, homeState, readyLine, type HomeJourney, type HomeState } from "./home-model.ts";
-import { JourneyTable } from "./JourneyTable.tsx";
 import { useJourneyReading, type JourneyReading } from "./reading.ts";
 import { listPath } from "./view.ts";
 import "./journeys.css";
@@ -69,7 +67,7 @@ function Group({ summary, reading }: { summary: JourneySummary; reading: Ready }
       const to = journeyPath({ journey, node: row.key }, "graph");
       const said = factOf(view, row);
       return (
-        <NodeItem view={view} node={row.key} to={to} fact={said?.words} factTone={said?.tone} testId="home-item">
+        <NodeItem view={view} node={row.key} to={to} chip={false} fact={said?.words} factTone={said?.tone} testId="home-item">
           {shown ? <RowActions view={view} row={row} to={to} owner={false} /> : null}
         </NodeItem>
       );
@@ -132,7 +130,6 @@ function useHome() {
   const { viewer, failed } = useViewer();
   const query = viewer === undefined ? undefined : queryOf({ ...DEFAULT_FILTERS, mine: true }, viewer.entities);
   const { view, refresh } = useLive(indexKey(query), journeyIndex(query));
-  const routes = valueOf(useLive("routes", routeIndex).view) ?? [];
   const found = valueOf(view);
   const proposals = useLive(listKey("waiting"), proposalsListed("waiting"));
   const waitingProposals = valueOf(proposals.view);
@@ -153,7 +150,7 @@ function useHome() {
     journeys,
     proposals: proposals.view.status === "failed" ? "failed" : waitingProposals === undefined ? "loading" : { waiting: waitingProposals.count },
   });
-  return { proposals, failed, view, refresh, routes, found, items, report, known, journeys, state };
+  return { proposals, failed, view, refresh, found, items, report, known, journeys, state };
 }
 
 /** C14, C16: the open proposals waiting on the viewer, with the destination each is for; its own read, so the rest of Home does not wait on it, and rows stay through a failed refresh. */
@@ -211,7 +208,7 @@ function Said({ state }: { state: HomeState }) {
 }
 
 export function Home() {
-  const { proposals, failed, view, refresh, routes, found, items, report, known, journeys, state } = useHome();
+  const { proposals, failed, view, refresh, found, items, report, known, journeys, state } = useHome();
   const readyOnes = known.flatMap((each) => (each.reading.status === "ready" && each.reading.ready.length > 0 ? [{ summary: each.summary, reading: each.reading }] : []));
   const waiting = known.flatMap((each) => (each.reading.status === "ready" && each.reading.ready.length === 0 ? [{ summary: each.summary, reading: each.reading }] : []));
   const reading = known.filter((each) => each.reading.status === "loading").length;
@@ -256,14 +253,9 @@ export function Home() {
       ) : null}
       {showTable ? <NotReady entries={waiting} folded={readyOnes.length > 0} /> : null}
       {showTable ? (
-        <>
-          <div className="row home-table-head">
-            <h2>Your active journeys</h2>
-            <span className="spacer" />
-            <Link to={indexPath()}>All journeys &rsaquo;</Link>
-          </div>
-          <JourneyTable items={items} routes={routes} mine none={null} />
-        </>
+        <Link to={indexPath()} className="home-all" data-testid="home-all-journeys">
+          All journeys &rsaquo;
+        </Link>
       ) : null}
     </section>
   );

@@ -2,71 +2,39 @@
 // "upgrade available". Every filter holds at once; each change is a new address.
 import { Check } from "../acting/Controls.tsx";
 import type { RouteSummary } from "../data/reads.ts";
+import { FilterSelect } from "../ui/IndexHead.tsx";
 import { STATUSES, type IndexFilters } from "./address.ts";
 
 const STATUS_WORDS = { active: "Active", completed: "Completed", archived: "Archived", any: "Any status" } as const;
 
-function RouteFilter({ filters, routes, onChange }: { filters: IndexFilters; routes: readonly RouteSummary[]; onChange: (filters: IndexFilters) => void }) {
+/** The journey index's filters, as the toolbar's controls: every one holds at once; each change is a new address. */
+export function IndexFilterBar({ filters, routes, onChange }: { filters: IndexFilters; routes: readonly RouteSummary[]; onChange: (filters: IndexFilters) => void }) {
   const route = routes.find((each) => each.header.id === filters.route);
   const versions = Array.from({ length: route?.latest_version ?? 0 }, (_, at) => at + 1);
   return (
     <>
-      <label className="row">
-        <span className="filter-label">Route</span>
-        <select
-          aria-label="Route"
-          value={filters.route ?? ""}
-          onChange={(event) => { onChange({ ...filters, route: event.target.value === "" ? undefined : event.target.value, version: undefined }); }}
-        >
-          <option value="">Any route</option>
-          {routes.map((each) => (
-            <option key={each.header.id} value={each.header.id}>
-              {each.header.name}
-            </option>
-          ))}
-        </select>
-      </label>
+      <FilterSelect
+        label="Status"
+        value={filters.status}
+        options={[...STATUSES, "any" as const].map((status) => ({ value: status, label: STATUS_WORDS[status] }))}
+        onChange={(value) => { onChange({ ...filters, status: [...STATUSES, "any" as const].find((each) => each === value) ?? "active" }); }}
+      />
+      <FilterSelect
+        label="Route"
+        value={filters.route ?? ""}
+        options={[{ value: "", label: "Any route" }, ...routes.map((each) => ({ value: each.header.id, label: each.header.name }))]}
+        onChange={(value) => { onChange({ ...filters, route: value === "" ? undefined : value, version: undefined }); }}
+      />
       {filters.route === undefined ? null : (
-        <label className="row">
-          <span className="filter-label">Version</span>
-          <select
-            aria-label="Version"
-            value={filters.version ?? ""}
-            onChange={(event) => { onChange({ ...filters, version: event.target.value === "" ? undefined : Number(event.target.value) }); }}
-          >
-            <option value="">Any version</option>
-            {versions.map((version) => (
-              <option key={version} value={version}>
-                {version}
-              </option>
-            ))}
-          </select>
-        </label>
+        <FilterSelect
+          label="Version"
+          value={filters.version === undefined ? "" : String(filters.version)}
+          options={[{ value: "", label: "Any version" }, ...versions.map((version) => ({ value: String(version), label: String(version) }))]}
+          onChange={(value) => { onChange({ ...filters, version: value === "" ? undefined : Number(value) }); }}
+        />
       )}
-    </>
-  );
-}
-
-export function IndexFilterBar({ filters, routes, onChange }: { filters: IndexFilters; routes: readonly RouteSummary[]; onChange: (filters: IndexFilters) => void }) {
-  return (
-    <div className="row index-filters" data-testid="index-filters">
-      <label className="row">
-        <span className="filter-label">Status</span>
-        <select
-          aria-label="Status"
-          value={filters.status}
-          onChange={(event) => { onChange({ ...filters, status: [...STATUSES, "any" as const].find((each) => each === event.target.value) ?? "active" }); }}
-        >
-          {[...STATUSES, "any" as const].map((status) => (
-            <option key={status} value={status}>
-              {STATUS_WORDS[status]}
-            </option>
-          ))}
-        </select>
-      </label>
-      <RouteFilter filters={filters} routes={routes} onChange={onChange} />
       <Check label="Mine" checked={filters.mine} testId="filter-mine" onChange={(mine) => { onChange({ ...filters, mine }); }} />
       <Check label="Upgrade available" checked={filters.upgrade} testId="filter-upgrade" onChange={(upgrade) => { onChange({ ...filters, upgrade }); }} />
-    </div>
+    </>
   );
 }

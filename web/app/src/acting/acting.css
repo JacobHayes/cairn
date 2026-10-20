@@ -206,24 +206,6 @@ summary.node-panel-head {
   text-align: right;
 }
 
-.row-owner-other,
-.row-act {
-  opacity: 0;
-}
-
-:is(.node-row, .unblocker, .list-table tbody tr):hover :is(.row-owner-other, .row-act),
-:is(.node-row, .unblocker, .list-table tbody tr):focus-within :is(.row-owner-other, .row-act),
-:is(.node-row[data-selected="true"], .list-table tr[aria-selected="true"]) :is(.row-owner-other, .row-act) {
-  opacity: 1;
-}
-
-@media (hover: none) {
-  .row-owner-other,
-  .row-act {
-    opacity: 1;
-  }
-}
-
 /* Room for both Start and Done, so the owner and the buttons keep their place from row to row. */
 .row-act {
   display: flex;
@@ -238,31 +220,13 @@ summary.node-panel-head {
   white-space: nowrap;
 }
 
-/* An unowned row says "Unassigned" quietly; the picker takes its place when the row is reached. */
-.row-assign-slot {
-  display: grid;
-  align-items: center;
-  justify-items: end;
-}
-
-.row-assign-slot > * {
-  grid-area: 1 / 1;
-}
-
+/* An unowned row offers the picker; its "Unassigned" words are for paper. */
 .row-assign {
   width: 128px;
 }
 
-:is(.node-row, .unblocker, .list-table tbody tr):hover .row-unassigned,
-:is(.node-row, .unblocker, .list-table tbody tr):focus-within .row-unassigned,
-:is(.node-row[data-selected="true"], .list-table tr[aria-selected="true"]) .row-unassigned {
-  opacity: 0;
-}
-
-@media (hover: none) {
-  .row-unassigned {
-    opacity: 0;
-  }
+.row-unassigned {
+  display: none;
 }
 
 /* Where the region cannot hold the owner and the buttons beside the title, they take a line of
@@ -794,7 +758,7 @@ button.list-sort {
     grid-column: 2;
   }
 
-  /* Who has it is a line of its own, as wide as the title; what can be done is under it on a touch screen and over the row's corner where a hover reveals it, so neither squeezes the name nor holds a gap open while hidden. */
+  /* Who has it is a line of its own, as wide as the title; what can be done is under it on a touch screen and over the row's corner with a pointer, so neither squeezes the name. */
   .rows-page .node-row > .row-side {
     grid-column: 2;
     flex-wrap: wrap;
@@ -836,11 +800,6 @@ button.list-sort {
     .rows-page .node-row:has(.row-act) .row-owner {
       padding-right: 190px;
     }
-  }
-
-  /* The quiet "Unassigned" (and the picker that replaces it) starts at the title's edge too. */
-  .rows-page .row-assign-slot {
-    justify-items: start;
   }
 }
 

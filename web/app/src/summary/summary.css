@@ -88,11 +88,6 @@
   margin: 0;
 }
 
-/* Who has it is the point here, so the owner is always readable (elsewhere it waits for a hover); the buttons keep the shared reveal. */
-.summary .row-owner-other:not(.row-assign) {
-  opacity: 1;
-}
-
 /* The dates and flags of the Summary's own lines are row text too: 15px (DESIGN, Typography). */
 .summary :is(.summary-date-when, .summary-date-short, .summary-flags) {
   font-size: 15px;
@@ -222,7 +217,7 @@
   }
 
   .summary .row-unassigned {
-    opacity: 1;
+    display: block;
   }
 
   .summary .panel {

@@ -12,8 +12,6 @@ test("E4, C16: Home lists what is waiting on the viewer by journey; a row opens 
   const journey = page.getByTestId("home-journey").first();
   await expect(journey).toBeVisible();
   const id = (await journey.getAttribute("data-journey")) ?? "";
-  // The journey is also in the table of the viewer's active journeys below.
-  await expect(page.locator(`[data-testid="journey-row"][data-journey="${id}"]`)).toBeVisible();
   const item = journey.getByTestId("home-item").first();
   const node = (await item.getAttribute("data-node")) ?? "";
   await item.locator(".node-row-main").first().click();

@@ -784,7 +784,6 @@ table.data {
   margin-top: var(--space-1);
 }
 .index-table .cell-description {
-  max-width: 48ch;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -802,7 +801,7 @@ table.data {
 /* On a phone each row is a block with an edge hairline, no inner cell borders. The header row stays
    in the document for screen readers. Line 1 is the name; then the upgrade notice when there is one
    (the route and version it came from are for wider screens); then the context, a wrapping steel
-   line (progress and next milestone, or type and version) whose pieces flow as one; then one
+   line (progress and next milestone) whose pieces flow as one; then one
    attention line, each fact in its own ink: what needs a look and what is yours, both, since they
    are independent. A fact that says nothing ("None", "Nothing yours") is left out. */
 @media (max-width: 719px) {
@@ -841,15 +840,11 @@ table.data {
     flex: 1 1 100%;
     color: var(--color-text);
   }
-  .index-table table.data td:is([data-column="progress"], [data-column="milestone"], [data-column="type"], [data-column="latest"]) {
+  .index-table table.data td:is([data-column="progress"], [data-column="milestone"]) {
     display: contents;
   }
   .index-table table.data td:is([data-column="progress"], [data-column="milestone"]) > * {
     order: 1;
-  }
-  .index-table table.data td[data-column="latest"]::before {
-    content: "\00b7";
-    margin-right: var(--space-2);
   }
   .index-table table.data td[data-column="milestone"] > .cell-first {
     margin-left: var(--space-2);
@@ -898,9 +893,6 @@ table.data {
   }
 }
 /* An entity's row in its Panel: paper, a hairline under each, as the node rows. */
-.entities-page {
-  gap: var(--space-5);
-}
 /* DESIGN's Table: a row 8px high-padded, its two lines close, in two columns: the name block and its emails, and Edit, which keeps its column at every width. The head's left inset is the Panel head's, so both share an edge. */
 .entity-row {
   display: grid;

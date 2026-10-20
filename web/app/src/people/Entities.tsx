@@ -20,6 +20,7 @@ import { useScreenWrite, type ScreenWrite } from "../screens/write.ts";
 import { NodePanel } from "../acting/NodeItem.tsx";
 import { Chip, Chips } from "../ui/Chip.tsx";
 import { ChipsInput } from "../ui/ChipsInput.tsx";
+import { IndexHead } from "../ui/IndexHead.tsx";
 import { Badge, Button, Field } from "../ui/kit.tsx";
 import { MergeEntities } from "./MergeEntities.tsx";
 import { aliasesOf, byName, EMAIL_RULES, entityOf, mergeAsked, newEntityKey, type Entity } from "./model.ts";
@@ -149,36 +150,28 @@ function DeploymentProposals() {
   return found.items.length === 0 ? null : <RowsPanel title="Open proposals" testId="deployment-proposals" rows={proposalRows(found.items)} />;
 }
 
-/** Merging is folded away until asked for, or until a link (the sign-in page's offer) names the two to merge. */
-function MergeFold({ deployment, entities, asked }: { deployment: Deployment; entities: readonly Entity[]; asked: string[] }) {
-  const [open, setOpen] = useState(asked.length > 0);
-  return (
-    <>
-      <span className="row">
-        <Button aria-expanded={open} aria-controls="merge-entities" onClick={() => { setOpen(!open); }}>{open ? "Close merge" : "Merge entities"}</Button>
-      </span>
-      {open ? <MergeEntities deployment={deployment} entities={entities} asked={asked} /> : null}
-    </>
-  );
-}
-
 export function Entities() {
   const deployment = useDeployment();
   const { viewer } = useViewer();
   const { search } = useLocation();
   const asked = mergeAsked(search);
+  // Merging is closed until asked for, or until a link (the sign-in page's offer) names the two to merge.
+  const [merge, setMerge] = useState<{ asked: string; open: boolean } | undefined>(undefined);
   if (deployment === undefined) {
     return <p className="muted small">Reading the entities...</p>;
   }
+  const mergeOpen = merge?.asked === asked.join(",") ? merge.open : asked.length > 0;
   const yours = new Set(viewer?.entities ?? []);
   const entities = byName(deployment.entities ?? []);
   return (
-    <section className="stack entities-page" aria-label="Entities" data-testid="entities" data-revision={deployment.revision} data-rows-page tabIndex={-1}>
-      <h1>Entities</h1>
+    <section className="stack" aria-label="Entities" data-testid="entities" data-revision={deployment.revision} data-rows-page tabIndex={-1}>
+      <IndexHead title="Entities">
+        <Button aria-expanded={mergeOpen} aria-controls="merge-entities" onClick={() => { setMerge({ asked: asked.join(","), open: !mergeOpen }); }}>{mergeOpen ? "Close merge" : "Merge entities"}</Button>
+      </IndexHead>
       <span className="muted small">People and teams journeys refer to, across every journey. They need not be users; an entity holding your verified email is you.</span>
       <DeploymentProposals />
       <CreateEntity deployment={deployment} />
-      <MergeFold key={asked.join(",")} deployment={deployment} entities={entities} asked={asked} />
+      {mergeOpen ? <MergeEntities key={asked.join(",")} deployment={deployment} entities={entities} asked={asked} /> : null}
       {entities.length === 0 ? (
         <p className="muted small" data-testid="entities-empty">No entities yet.</p>
       ) : (

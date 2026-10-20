@@ -11,7 +11,8 @@ test("C16: a Home row opens its node's address, and Done on a row acts in place"
   await expect(group).toBeVisible();
   const row = page.getByTestId("home-item").filter({ has: page.getByRole("button", { name: "Mark done", exact: true }) }).first();
   const node = (await row.getAttribute("data-node")) ?? "";
-  await row.hover();
+  // A row's actions are there without a hover (touch and keyboard users never hover).
+  await expect(row.getByRole("button", { name: "Mark done", exact: true })).toBeVisible();
   await row.getByRole("button", { name: "Mark done", exact: true }).click();
   await expect(page.locator(`[data-testid="home-item"][data-node="${node}"]`)).toHaveCount(0);
   await page.getByTestId("home-item").first().locator("a.node-title").click();
@@ -46,15 +47,48 @@ test("C16, C17: the Journeys index at 390px shows both of each row's facts and n
   expect(shown).toBeGreaterThan(0);
 });
 
-test("C17: the Routes type control writes ?type= and keeps only that type's rows", async ({ page }) => {
+test("C17: the Routes Type filter writes ?type= and keeps only that type's rows", async ({ page }) => {
   await open(page, "browser", "/routes");
   await expect(page.getByTestId("route-row").first()).toBeVisible();
   const all = await page.getByTestId("route-row").count();
-  await page.getByTestId("routes-types").getByText("Segments", { exact: true }).click();
+  await page.getByLabel("Type").selectOption("segments");
   await expect(page).toHaveURL(/[?&]type=segments/);
   await expect(page.getByTestId("route-use")).toHaveCount(0);
-  await page.getByTestId("routes-types").getByText("Routes", { exact: true }).click();
+  await page.getByLabel("Type").selectOption("routes");
   await expect(page).toHaveURL(/[?&]type=routes/);
   await expect(page.getByTestId("segment-use")).toHaveCount(0);
   expect(await page.getByTestId("route-row").count()).toBeLessThanOrEqual(all);
+  // The table no longer repeats the type or the version: the filter and the route's page say them.
+  await expect(page.locator('td[data-column="type"], td[data-column="latest"]')).toHaveCount(0);
+});
+
+test("C16: Home ends with a link to every journey, not a second journey table, and its ready rows carry no status chip", async ({ page }) => {
+  await open(page, "browser", "/");
+  await expect(page.getByTestId("home-journey").first()).toBeVisible();
+  await expect(page.getByTestId("journey-table")).toHaveCount(0);
+  await page.getByTestId("home-all-journeys").click();
+  await expect(page).toHaveURL(/\/journeys$/);
+  await open(page, "browser", "/");
+  await expect(page.getByTestId("home-item").first()).toBeVisible();
+  await expect(page.getByTestId("home-item").locator(".badge")).toHaveCount(0);
+});
+
+test("C16, C17, E6: the three indexes put the primary action and the toolbar in the same places", async ({ page }) => {
+  await page.setViewportSize({ width: 1280, height: 800 });
+  const places = [];
+  for (const [path, action, toolbar] of [["/journeys", "new-journey", "index-filters"], ["/routes", "new-route-link", "index-filters"], ["/entities", undefined, "index-filters"]] as const) {
+    await open(page, "browser", path);
+    const bar = page.getByTestId(toolbar);
+    await expect(bar).toBeVisible();
+    const title = await page.locator("h1").boundingBox();
+    const tool = await bar.boundingBox();
+    const act = action === undefined ? undefined : (await page.getByTestId(action).boundingBox()) ?? undefined;
+    places.push({ titleTop: title?.y, toolLeft: tool?.x, toolTop: tool?.y, actionRight: act === undefined ? undefined : act.x + act.width });
+  }
+  for (const each of places) {
+    expect(each.titleTop).toBe(places[0]?.titleTop);
+    expect(each.toolLeft).toBe(places[0]?.toolLeft);
+    expect(each.toolTop).toBe(places[0]?.toolTop);
+  }
+  expect(places[1]?.actionRight).toBe(places[0]?.actionRight);
 });

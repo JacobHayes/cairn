@@ -1,4 +1,4 @@
-// The journeys as a table (C16), shared by the journey index and Home: each journey with where it
+// The journeys as a table (C16), the journey index's: each journey with where it
 // came from, what needs a look, what is the viewer's, how far along it is and its next milestone.
 // The index holds only summaries, so each row reads its journey in the tab (reading.ts) and says
 // "Reading..." or why it could not until it has. With `mine` only the journeys where the viewer

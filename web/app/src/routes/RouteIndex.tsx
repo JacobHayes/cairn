@@ -1,9 +1,9 @@
 // The routes index (`/routes`): routes and segments in one table (C17, C19), each linking to its
-// detail with its latest version and how much it is used: a route its active journeys (counted
+// detail with how much it is used: a route its active journeys (counted
 // from their own lineage), a segment its places ("Used in 6 places", or "2 of 6 behind"), and a
 // route with a published version the way to start a journey from it. A retired route (A19:
 // hidden from new-journey creation, its journeys still upgrading) or one with a draft open says so
-// in one chip. The `All | Routes | Segments` control keeps it to one type; `New route` opens the
+// in one chip. The Type filter keeps it to one type; `New route` opens the
 // form that starts a route or segment empty, to author by hand (A12), or imports a route file as
 // a new route or draft (A13). Each read says whether it is still going or failed. Kept current (H6).
 import { NewDestinations } from "../proposals/NewDestinations.tsx";
@@ -13,14 +13,15 @@ import { valueOf, type ReadView } from "../data/keyed-read.ts";
 import { useLive } from "../data/react.ts";
 import { indexKey, journeyIndex, routeIndex, segmentUses, type RouteSummary } from "../data/reads.ts";
 import { DEFAULT_FILTERS, indexPath, newJourneyPath } from "../journeys/address.ts";
-import { Badge, IndexState, Segmented } from "../ui/kit.tsx";
+import { IndexHead, FilterSelect } from "../ui/IndexHead.tsx";
+import { Badge, IndexState } from "../ui/kit.tsx";
 import { newRoutePath, routePath } from "./address.ts";
 import { activeJourneyCounts, inUseWords, ofType, startableVersion, typeOf, type InUse, type RouteType } from "./model.ts";
 import "../journeys/journeys.css";
 import { Failed } from "../ui/Failed.tsx";
 
 const TYPES = [
-  { value: "all", label: "All" },
+  { value: "all", label: "All types" },
   { value: "routes", label: "Routes" },
   { value: "segments", label: "Segments" },
 ] as const satisfies readonly { value: RouteType; label: string }[];
@@ -78,10 +79,6 @@ function RouteRow({ route, reading }: { route: RouteSummary; reading: UseReading
           </span>
         )}
       </td>
-      <td data-column="type">{segment ? "Segment" : "Route"}</td>
-      <td data-column="latest" className="mono">
-        {route.latest_version == null ? <span className="muted">No version yet</span> : `Version ${String(route.latest_version)}`}
-      </td>
       <UseCell route={route} reading={reading} />
       <td data-column="act">{start === undefined ? null : <Link to={newJourneyPath(header.id, start)}>Start a journey</Link>}</td>
     </tr>
@@ -105,8 +102,6 @@ function RouteTable({ routes, useOf }: { routes: RouteSummary[]; useOf: (route: 
         <thead>
           <tr>
             <th scope="col">Name</th>
-            <th scope="col">Type</th>
-            <th scope="col">Latest</th>
             <th scope="col">In use</th>
             <th scope="col">
               <span className="visually-hidden">Start a journey</span>
@@ -140,21 +135,22 @@ export function RouteIndex() {
   const newWords = type === "segments" ? "New segment" : "New route";
   return (
     <section className="stack index-page" aria-label="Routes" data-testid="routes" data-rows-page tabIndex={-1}>
-      <div className="row index-head">
-        <h1>Routes</h1>
-        <span className="spacer" />
-        <Link className="button" to={newRoutePath(type === "segments" ? "segment" : undefined)} data-testid="new-route-link">
-          {newWords}
-        </Link>
-      </div>
+      <IndexHead
+        title="Routes"
+        action={
+          <Link className="button" to={newRoutePath(type === "segments" ? "segment" : undefined)} data-testid="new-route-link">
+            {newWords}
+          </Link>
+        }
+      >
+        <FilterSelect
+          label="Type"
+          value={type}
+          options={TYPES}
+          onChange={(next) => { setParams(next === "all" ? {} : { type: typeOf(next) }, { replace: true }); }}
+        />
+      </IndexHead>
       <NewDestinations scope="new_routes" segments={type === "all" ? undefined : type === "segments"} />
-      <Segmented
-        label="Show"
-        value={type}
-        options={TYPES}
-        onChange={(next) => { setParams(next === "all" ? {} : { type: next }, { replace: true }); }}
-        data-testid="routes-types"
-      />
       {view.status === "idle" || view.status === "loading" ? <IndexState kind="loading">Reading the routes...</IndexState> : null}
       {view.status === "failed" ? (
         <IndexState
