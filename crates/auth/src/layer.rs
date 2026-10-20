@@ -200,8 +200,11 @@ impl Auth {
 
     /// An `Authorization` header must hold a bearer token some provider claims: anything
     /// else is a credential that cannot be checked, so it is refused rather than ignored.
+    /// Blank values hold no credential and count as absent: IAP passes on the header it took
+    /// a Google ID token from, emptied.
     fn check_authorization(&self, request: Presented<'_>) -> Result<(), Refusal> {
-        if !request.headers.contains_key(AUTHORIZATION) {
+        let mut values = request.headers.get_all(AUTHORIZATION).iter();
+        if values.all(|value| value.as_bytes().trim_ascii().is_empty()) {
             return Ok(());
         }
         let claimed = request.bearer().is_some_and(|token| {
