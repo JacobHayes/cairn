@@ -309,3 +309,47 @@ test.describe("a phone's inspector sheet: the graph above it", () => {
     await expect(page.locator(".frame")).toHaveAttribute("data-inspector", "on");
   });
 });
+
+test.describe("a landscape phone's inspector sheet", () => {
+  test.use({ viewport: { width: 844, height: 390 }, hasTouch: true, isMobile: true });
+
+  test("its peek is a small share of a short window, so the graph keeps most of it", async ({ page }) => {
+    await openAt(page, "browser", "j_hiring", "graph?depth=decisions");
+    await page.locator('[data-testid="canvas"] [data-testid="node-card"][data-node="n_make_offer"]').getByTestId("card-open").dispatchEvent("click");
+    await expect(page.locator(".frame")).toHaveAttribute("data-inspector", "on");
+    const canvas = await page.getByTestId("canvas").boundingBox();
+    const sheet = await page.locator(".inspector").boundingBox();
+    expect(sheet?.height).toBeLessThan(390 * 0.3);
+    // The graph above the sheet is a usable share of the window.
+    const visible = Math.min((canvas?.y ?? 0) + (canvas?.height ?? 0), sheet?.y ?? 0) - (canvas?.y ?? 0);
+    expect(visible).toBeGreaterThan(390 * 0.5);
+    await expect(page.locator(".inspector-head")).toBeInViewport();
+  });
+});
+
+test.describe("a phone's graph framing", () => {
+  test.use({ viewport: { width: 390, height: 844 }, hasTouch: true, isMobile: true });
+
+  /** Every drawn card lies whole inside the canvas's own box. */
+  async function expectCardsInside(page: Page): Promise<void> {
+    const canvas = await page.getByTestId("canvas").boundingBox();
+    const cards = await page.getByTestId("node-card").evaluateAll((all) => all.map((each) => each.getBoundingClientRect().toJSON() as { x: number; y: number; right: number; bottom: number }));
+    expect(cards.length).toBeGreaterThan(0);
+    for (const card of cards) {
+      expect(card.x).toBeGreaterThanOrEqual((canvas?.x ?? 0) - 1);
+      expect(card.right).toBeLessThanOrEqual((canvas?.x ?? 0) + (canvas?.width ?? 0) + 1);
+      expect(card.y).toBeGreaterThanOrEqual((canvas?.y ?? 0) - 1);
+      expect(card.bottom).toBeLessThanOrEqual((canvas?.y ?? 0) + (canvas?.height ?? 0) + 1);
+    }
+  }
+
+  test("the first view shows every card whole, and picking a node keeps them in view above the peek", async ({ page }) => {
+    await openAt(page, "browser", "j_hiring", "graph?depth=decisions");
+    await expectCardsInside(page);
+    await page.locator('[data-testid="canvas"] [data-testid="node-card"][data-node="n_make_offer"]').getByTestId("card-open").click();
+    await expect(page.locator(".frame")).toHaveAttribute("data-inspector", "on");
+    await expectCardsInside(page);
+    const picked = await nodeCard(page, "n_make_offer").boundingBox();
+    expect((picked?.y ?? 0) + (picked?.height ?? 0)).toBeLessThanOrEqual((await page.locator(".inspector").boundingBox())?.y ?? 0);
+  });
+});

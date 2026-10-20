@@ -6,7 +6,7 @@ import { useNavigate } from "react-router";
 
 import type { SheetSnap } from "./InspectorColumn.tsx";
 import { overlayOpen, typing } from "../ui/typing.ts";
-import { PHONE_WIDTH, SHEET, type AssistantDock, type FrameActions, type FrameState, type InspectorTab } from "./frame.tsx";
+import { PEEK_FIRST, SHEET, type AssistantDock, type FrameActions, type FrameState, type InspectorTab } from "./frame.tsx";
 
 export interface Frame {
   state: FrameState;
@@ -135,14 +135,14 @@ export function useFrame(): Frame {
   const [counts, setCounts] = useState<Counts>({ inspector: 0, assistant: 0, proposals: 0 });
   const [tab, setTab] = useState<InspectorTab>("inspector");
   const [dock, setDock] = useState<AssistantDock | undefined>(undefined);
-  const [sheet, setSheet] = useState<{ hidden: boolean; snap: SheetSnap }>(() => ({ hidden: false, snap: globalThis.matchMedia(PHONE_WIDTH).matches ? "peek" : "half" }));
+  const [sheet, setSheet] = useState<{ hidden: boolean; snap: SheetSnap }>(() => ({ hidden: false, snap: globalThis.matchMedia(PEEK_FIRST).matches ? "peek" : "half" }));
   const { hidden, snap } = sheet;
   const setSnap = useCallback((next: SheetSnap) => {
     setSheet((now) => ({ ...now, snap: next }));
   }, []);
-  // A phone's sheet opens at its peek, whatever height it was closed at: picking a node shows its tabs and leaves the graph usable.
+  // A phone's (or a short window's) sheet opens at its peek, whatever height it was closed at: picking a node shows its tabs and leaves the graph usable.
   const setHidden = useCallback((next: boolean) => {
-    setSheet((now) => (now.hidden === next ? now : { hidden: next, snap: !next && globalThis.matchMedia(PHONE_WIDTH).matches ? "peek" : now.snap }));
+    setSheet((now) => (now.hidden === next ? now : { hidden: next, snap: !next && globalThis.matchMedia(PEEK_FIRST).matches ? "peek" : now.snap }));
   }, []);
   const [closeTo, setCloseTo] = useState<string | undefined>(undefined);
   const actions = useActions({ setCounts, setTab, setHidden, setDock, setProposalsCount, setCloseTo });
@@ -152,7 +152,7 @@ export function useFrame(): Frame {
   // An offered assistant keeps the column, and so its tabs, on screen: they are its only way in.
   const present = counts.inspector > 0 || counts.assistant > 0 || counts.proposals > 0 || dock !== undefined;
   const toggleFolded = useCallback(() => {
-    setSheet((now) => ({ hidden: !now.hidden, snap: now.hidden && globalThis.matchMedia(PHONE_WIDTH).matches ? "peek" : now.snap }));
+    setSheet((now) => ({ hidden: !now.hidden, snap: now.hidden && globalThis.matchMedia(PEEK_FIRST).matches ? "peek" : now.snap }));
   }, []);
   useFrameKeys({ tab: shown, dock, closeTo, open: present && !hidden }, toggleFolded);
   const openAssistant = useOpenAssistant(dock, actions);

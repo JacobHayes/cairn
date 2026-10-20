@@ -10,8 +10,8 @@
   --inspector-w: 400px;
   --fold-w: 32px; /* the hidden inspector's rail */
   --inspector-pad: 20px; /* where the inspector's cards and the assistant start their content (DESIGN, More air) */
-  /* The sheet's three heights (below 1100px): the peek is the grip, the tabs and the top of the pane, and sits clear of the home indicator; the tall one leaves room above it for a notice: a window's worth, less a notice. The pill is the closed sheet's one control. */
-  --sheet-peek: calc(164px + env(safe-area-inset-bottom, 0px));
+  /* The sheet's three heights (below 1100px): the peek is the grip, the tabs and the top of the pane (a short window gets just the grip and tabs: a quarter of its height, at most 164px), and sits clear of the home indicator; the tall one leaves room above it for a notice: a window's worth, less a notice. The pill is the closed sheet's one control. */
+  --sheet-peek: calc(max(76px, min(164px, 24dvh)) + env(safe-area-inset-bottom, 0px));
   --sheet-half: 40dvh;
   --sheet-full: min(85dvh, calc(100dvh - 160px));
   --sheet-pill: calc(56px + env(safe-area-inset-bottom, 0px));
@@ -162,7 +162,7 @@ body {
 }
 .ws-canvas {
   flex: 1 1 0;
-  min-height: 360px;
+  min-height: min(360px, 50dvh);
   display: flex;
   flex-direction: column;
 }

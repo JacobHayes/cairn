@@ -24,6 +24,12 @@ Dragged down below the peek (or the hide button, or Esc) it closes: one labelled
 
 `sheet.webm` is the main flow: pick a node, drag the sheet to half and full, close it, open it from the pill, pan the graph.
 
+![A journey's first view at 390px](10-trip-fit.png)
+The first view frames every card whole inside what the sheet leaves; picking a node moves the view only as far as needed to keep it above the peek.
+
+![Landscape phone, 844x390](11-landscape.png)
+On a short window the peek is a quarter of its height (just the grip and tabs) and the sheet opens there.
+
 Known limits:
 - A node opened by address (a link) or a tap lands at the peek, so its form is one drag or tab tap away; that is the design's choice for keeping the graph usable.
-- A landscape phone has little room above a 160px peek; the sheet still works but the graph gets short.
+- A landscape phone's graph is still short (the view controls take a row of it).

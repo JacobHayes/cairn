@@ -23,6 +23,9 @@ export const COLUMN = "(min-width: 1100px)";
 /** A phone's width: the top bar replaces the rail and the sheet opens at its peek. */
 export const PHONE_WIDTH = "(max-width: 719px)";
 
+/** Windows where the sheet opens at its peek: a phone's width, or any window too short to give up half its height to it. */
+export const PEEK_FIRST = `${PHONE_WIDTH}, (max-height: 599px)`;
+
 /** Whether the window matches `query` now, and as it changes. */
 export function useMedia(query: string): boolean {
   return useSyncExternalStore(

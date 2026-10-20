@@ -189,7 +189,12 @@ function isSheet(column: HTMLElement | null | undefined): column is HTMLElement 
 
 /** The height (px) the inspector's sheet or its pill lies over the canvas's lower part: none where the canvas ends above it (a phone's, at the peek). */
 function coveredBy(column: HTMLElement | null | undefined, canvas: HTMLElement | null | undefined): number {
-  return isSheet(column) && canvas !== null && canvas !== undefined ? Math.max(0, canvas.getBoundingClientRect().bottom - column.getBoundingClientRect().top) : 0;
+  if (!isSheet(column) || canvas === null || canvas === undefined) {
+    return 0;
+  }
+  const sheet = column.getBoundingClientRect();
+  // A sheet with nothing in it is not drawn: it covers nothing.
+  return sheet.height === 0 ? 0 : Math.max(0, canvas.getBoundingClientRect().bottom - sheet.top);
 }
 
 /** The padding a manual fit keeps, read when it runs: FIT_PADDING, and more at the bottom under the sheet or rail. */
@@ -201,8 +206,8 @@ function useFitPadding(): () => typeof FIT_PADDING {
 
 /**
  * Below 1100px the inspector is a sheet over the page, and over the canvas's lower
- * part where the canvas reaches it: a node picked is centred in the band the sheet leaves, less the zones the floating controls
- * keep (PAD), so the selection is never under the sheet and its neighbours clear the controls.
+ * part where the canvas reaches it: a node picked is brought into the band the sheet leaves, less the zones the floating controls
+ * keep (PAD), by the least move (none if it is already whole in it), so the selection is never under the sheet and the view keeps its neighbours.
  */
 function useCenterAboveSheet(selected: string | undefined): void {
   const flow = useReactFlow();
@@ -226,8 +231,15 @@ function useCenterAboveSheet(selected: string | undefined): void {
       const zoom = flow.getZoom();
       const { width, height, domNode } = store.getState();
       const covered = coveredBy(sheet, domNode);
-      const at = { x: (PAD.left + width - PAD.right) / 2, y: (PAD.top + height - covered - PAD.bottom) / 2 };
-      void flow.setViewport({ zoom, x: at.x - (x + (card.measured.width ?? 0) / 2) * zoom, y: at.y - (y + (card.measured.height ?? 0) / 2) * zoom });
+      // The room the sheet and the controls leave. A card already whole inside it stays where it is, so its neighbours stay in view; one outside is moved by the least that brings it in (centred if it is larger than the room).
+      const room = { left: PAD.left, right: width - PAD.right, top: PAD.top, bottom: height - covered - PAD.bottom };
+      const view = flow.getViewport();
+      const box = { left: view.x + x * zoom, top: view.y + y * zoom, width: (card.measured.width ?? 0) * zoom, height: (card.measured.height ?? 0) * zoom };
+      const shift = (from: number, size: number, low: number, high: number) => (size >= high - low ? (low + high) / 2 - (from + size / 2) : from < low ? low - from : from + size > high ? high - (from + size) : 0);
+      const [dx, dy] = [shift(box.left, box.width, room.left, room.right), shift(box.top, box.height, room.top, room.bottom)];
+      if (dx !== 0 || dy !== 0) {
+        void flow.setViewport({ zoom, x: view.x + dx, y: view.y + dy });
+      }
     });
     return () => {
       cancelAnimationFrame(frame);
