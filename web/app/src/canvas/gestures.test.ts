@@ -2,7 +2,7 @@
 // wheel arrives too (xyflow already zoomed that one).
 import { expect, test } from "vitest";
 
-import { listenPinch, type Viewport } from "./gestures.ts";
+import { LEGIBLE_ZOOM, firstFrame, listenPinch, roomOf, shiftInto, type Viewport } from "./gestures.ts";
 
 test("a Safari pinch zooms once, and is left to the wheel when a ctrl-key wheel arrived since it began", () => {
   const root = Object.assign(new EventTarget(), { getBoundingClientRect: () => ({ left: 0, top: 0, width: 800, height: 600 }) }) as unknown as HTMLElement;
@@ -25,4 +25,40 @@ test("a Safari pinch zooms once, and is left to the wheel when a ctrl-key wheel 
   send("wheel", { ctrlKey: true });
   send("gesturechange", { scale: 2 });
   expect(sets).toBe(1);
+});
+
+const PAD = { top: 10, left: 10, right: 10, bottom: 10 };
+
+test("the first frame holds every changed card when they fit at a legible zoom, centred in the room", () => {
+  const room = roomOf({ width: 420, height: 320 }, PAD, 100);
+  const view = firstFrame([{ x: 0, y: 0, width: 100, height: 50 }, { x: 200, y: 100, width: 100, height: 50 }], room);
+  expect(view?.zoom).toBeGreaterThanOrEqual(LEGIBLE_ZOOM);
+  // Both ends are inside the room, with the same margin on each side.
+  const [left, right] = [(view?.x ?? 0), (view?.x ?? 0) + 300 * (view?.zoom ?? 1)];
+  expect(left).toBeGreaterThanOrEqual(room.left);
+  expect(right).toBeLessThanOrEqual(room.right);
+  expect(left - room.left).toBeCloseTo(room.right - right, 5);
+});
+
+test("when the changes do not fit at a legible zoom the first is framed alone, at the largest zoom the room holds it", () => {
+  const room = roomOf({ width: 420, height: 320 }, PAD, 0);
+  const view = firstFrame([{ x: 1000, y: 800, width: 100, height: 50 }, { x: 0, y: 0, width: 100, height: 50 }], room);
+  expect(view?.zoom).toBe(1);
+  const first = { left: 1000 * (view?.zoom ?? 0) + (view?.x ?? 0), top: 800 * (view?.zoom ?? 0) + (view?.y ?? 0) };
+  expect(first.left).toBeGreaterThanOrEqual(room.left);
+  expect(first.left + 100 * (view?.zoom ?? 0)).toBeLessThanOrEqual(room.right);
+  expect(first.top).toBeGreaterThanOrEqual(room.top);
+  expect(first.top + 50 * (view?.zoom ?? 0)).toBeLessThanOrEqual(room.bottom);
+});
+
+test("a span is moved into a room by the least move, and one longer than it starts at its start", () => {
+  expect([shiftInto(20, 50, 10, 200), shiftInto(-5, 50, 10, 200), shiftInto(180, 50, 10, 200)]).toEqual([0, 15, -30]);
+  expect(shiftInto(80, 500, 10, 200)).toBe(-70);
+});
+
+test("a first change taller than the room is framed at the legible zoom, from its top", () => {
+  const room = roomOf({ width: 420, height: 320 }, PAD, 0);
+  const view = firstFrame([{ x: 50, y: 100, width: 100, height: 2000 }, { x: 0, y: 0, width: 100, height: 50 }], room);
+  expect(view?.zoom).toBe(LEGIBLE_ZOOM);
+  expect(100 * LEGIBLE_ZOOM + (view?.y ?? 0)).toBe(room.top);
 });

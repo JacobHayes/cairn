@@ -96,7 +96,7 @@ function Head({ card, collapsible, mark }: { card: Card; collapsible: boolean; m
           {mark?.diff === undefined ? null : (
             <span className="node-diff-word" data-testid="card-diff" data-diff={mark.diff}>
               {mark.label}
-              {mark.choice === true ? " \u00b7 needs a choice" : ""}
+              {mark.choice === true ? " \u00b7 choice" : ""}
             </span>
           )}
           <span className="node-kind">{kindWord(card.kind, card.stage)}</span>

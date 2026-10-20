@@ -2,7 +2,7 @@
 
 Open a proposal and you are on the journey (or route, or Entities) page itself, with a one-line band under the header: what you are reviewing, Apply, Close. Every view the destination has (Graph, List, Timeline) draws the proposal's changes in place, and the inspector holds one review rail.
 
-The graph: added, changed and removed nodes carry a fill and a constant edge (solid, dotted, dashed); two conflicts wait for a choice in the rail.
+The graph opens on the first change, centred and readable; added, changed and removed nodes carry a fill and a constant edge (solid, dotted, dashed); two conflicts wait for a choice in the rail.
 
 ![Graph under the layer](graph.png)
 
@@ -33,6 +33,6 @@ The main flow: switch views, resolve both conflicts, save, Apply; the band then 
 Also in this change: the old review screen is gone; Home folds a "Proposals to review" line; the Proposals tab rows say what each proposal changes; Apply is one click at the revision on screen.
 
 Known limits:
-- The graph opens fitted to the whole journey, so the changed region can be small until you zoom.
+- The graph opens framed on the first change in the rail's order, at 75% or more; when the changes lie too far apart to read together, the rail's rows move the view to each of the others.
 - The list's Frontier panels are hidden under the layer so no live write can start there; no browser test covers that.
 - Apply binds to the revision whose preview finished deriving; the views' layout may trail it by a moment, and the server's revision check is the backstop.

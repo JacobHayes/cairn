@@ -89,3 +89,58 @@ export function minZoomOf(fit: number): number {
 
 /** Below this zoom a container's head is simplified (5.4): its title, and a stage's state chip. */
 export const NEAR_ZOOM = 0.6;
+
+/** The zoom a card's title stays readable at (about 10px of its 14px): a first fit never goes below it. */
+export const LEGIBLE_ZOOM = 0.75;
+
+/** A box on the canvas (flow coordinates, or px on screen where said). */
+export interface Box {
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+}
+
+/** The part of the canvas a view may use: the lines `low` and `high` on each axis. */
+export interface Room {
+  left: number;
+  right: number;
+  top: number;
+  bottom: number;
+}
+
+/** The room a canvas of `size` leaves once `pad` is kept clear for the floating controls and `covered` px of its lower part lie under a sheet. */
+export function roomOf(size: { width: number; height: number }, pad: { top: number; right: number; bottom: number; left: number }, covered: number): Room {
+  return { left: pad.left, right: size.width - pad.right, top: pad.top, bottom: size.height - covered - pad.bottom };
+}
+
+/**
+ * How far to move a span `size` long starting at `from` so it lies in `low..high`: by the least move (none when it is already whole in it), and a span longer than the room has its start at the room's start, so its head is read.
+ */
+export function shiftInto(from: number, size: number, low: number, high: number): number {
+  if (size >= high - low) {
+    return low - from;
+  }
+  return from < low ? low - from : from + size > high ? high - (from + size) : 0;
+}
+
+/** The viewport that puts `box` (flow coordinates) at `zoom` in the middle of `room`, or, where it is longer than the room on an axis, at its start. */
+export function viewportAround(box: Box, zoom: number, room: Room): { x: number; y: number; zoom: number } {
+  const place = (from: number, size: number, low: number, high: number) => (size >= high - low ? low : (low + high) / 2 - size / 2) - from;
+  return { zoom, x: place(box.x * zoom, box.width * zoom, room.left, room.right), y: place(box.y * zoom, box.height * zoom, room.top, room.bottom) };
+}
+
+/**
+ * C14: the view a proposal's layer opens on. The boxes are the changed cards in the rail's order. All of them are framed when they fit `room` at or above LEGIBLE_ZOOM (never zoomed in past 1); when they do not, the first is framed alone, as large as the room holds it up to 100% and not below LEGIBLE_ZOOM, and the rail's rows bring each of the others into view.
+ */
+export function firstFrame(boxes: readonly Box[], room: Room): { x: number; y: number; zoom: number } | undefined {
+  const first = boxes[0];
+  if (first === undefined) {
+    return undefined;
+  }
+  const left = Math.min(...boxes.map((box) => box.x));
+  const top = Math.min(...boxes.map((box) => box.y));
+  const all: Box = { x: left, y: top, width: Math.max(...boxes.map((box) => box.x + box.width)) - left, height: Math.max(...boxes.map((box) => box.y + box.height)) - top };
+  const fitting = Math.min((room.right - room.left) / Math.max(1, all.width), (room.bottom - room.top) / Math.max(1, all.height));
+  return fitting >= LEGIBLE_ZOOM ? viewportAround(all, Math.min(1, fitting), room) : viewportAround(first, Math.max(LEGIBLE_ZOOM, Math.min(1, Math.min((room.right - room.left) / Math.max(1, first.width), (room.bottom - room.top) / Math.max(1, first.height)))), room);
+}

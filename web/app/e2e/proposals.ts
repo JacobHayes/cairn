@@ -101,3 +101,24 @@ export async function apply(page: Page): Promise<void> {
   await page.getByTestId("apply-proposal").click();
   await expect(page.getByTestId("layer-band")).toHaveAttribute("data-mode", "applied");
 }
+
+/** The room the graph's view has on the page: the canvas, less what the inspector's sheet covers of its lower part (a column beside it covers none), and the zoom the view is at. */
+export async function graphRoom(page: Page): Promise<{ left: number; top: number; right: number; bottom: number; zoom: number }> {
+  const canvas = await page.getByTestId("canvas").boundingBox();
+  const sheet = await page.locator(".inspector").locator("xpath=..").boundingBox();
+  const zoom = await page.locator(".react-flow__viewport").evaluate((element) => new DOMMatrix(getComputedStyle(element).transform).a);
+  if (canvas === null) {
+    throw new Error("the canvas has no box");
+  }
+  const sheeted = sheet !== null && (await page.locator(".inspector").locator("xpath=..").evaluate((element) => getComputedStyle(element).position)) === "fixed";
+  return { left: canvas.x, top: canvas.y, right: canvas.x + canvas.width, bottom: sheeted ? Math.min(canvas.y + canvas.height, sheet.y) : canvas.y + canvas.height, zoom };
+}
+
+/** How far card `node` lies inside `room` on its tightest side (px): negative when it is clipped or under the sheet. */
+export async function marginIn(page: Page, node: string, room: { left: number; top: number; right: number; bottom: number }): Promise<number> {
+  const box = await nodeCard(page, node).boundingBox();
+  if (box === null) {
+    throw new Error(`${node} has no box`);
+  }
+  return Math.min(box.x - room.left, box.y - room.top, room.right - (box.x + box.width), room.bottom - (box.y + box.height));
+}

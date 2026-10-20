@@ -5,7 +5,7 @@
 import { expect, test } from "./test.ts";
 
 import { openJourneyCard } from "./around.ts";
-import { apply, blockers, editWhereVersionTwoChanges, pickNode, publishVersionTwo, resolve, reviewItem, reviewOpen, saveEdits, scrollsOnce } from "./proposals.ts";
+import { apply, blockers, editWhereVersionTwoChanges, graphRoom, marginIn, pickNode, publishVersionTwo, resolve, reviewItem, reviewOpen, saveEdits, scrollsOnce } from "./proposals.ts";
 import { expectAddress, goTo, nodeCard, open, setDepth, syncChip } from "./shell.ts";
 
 test("B7, C14: the scenario journey upgraded to version 2, each conflict resolved, then applied", async ({ page }) => {
@@ -116,4 +116,67 @@ test("C14, A11: saving a journey as a route is reviewed over the route's own pag
   await page.getByTestId("close-layer").click();
   await expect(page.getByTestId("layer-band")).toHaveCount(0);
   expect(new URL(page.url()).pathname).toBe("/routes/r_saved");
+});
+
+// C14: the layer opens the graph framed on what the proposal changes, whole in the room the sheet leaves, and never so far out that a card's title cannot be read.
+const LEGIBLE = 0.75;
+for (const [name, size] of [["a desktop", { width: 1440, height: 768 }], ["a phone", { width: 390, height: 844 }]] as const) {
+  test(`C14: on ${name} the layer opens the graph on its first change, framed with a margin and legible`, async ({ page }) => {
+    await editWhereVersionTwoChanges(page, "browser");
+    await publishVersionTwo(page, "browser");
+    await openJourneyCard(page, "browser", "j_vendor_eval");
+    await page.getByTestId("journey-upgrade").click();
+    await page.getByTestId("upgrade-flow").getByRole("button", { name: "Propose the upgrade" }).click();
+    await reviewOpen(page);
+    const layered = new URL(page.url()).pathname;
+    // Away and back, so the canvas opens afresh at this size.
+    await page.setViewportSize(size);
+    await open(page, "browser", "/journeys/j_vendor_eval");
+    await open(page, "browser", `${layered}?depth=actions`);
+    await reviewOpen(page);
+    // The first change in the rail's order is the first conflict waiting on a choice.
+    const first = await page.getByTestId("to-decide-item").first().evaluate((row) => row.querySelector("button")?.textContent ?? "");
+    const card = page.locator('[data-testid="node-card"][data-diff]').filter({ has: page.getByTestId("title").filter({ hasText: first }) });
+    await expect(card.first()).toBeVisible();
+    const node = (await card.first().getAttribute("data-node")) ?? "";
+    await expect.poll(async () => (await marginIn(page, node, await graphRoom(page))) >= 8).toBe(true);
+    expect((await graphRoom(page)).zoom).toBeGreaterThanOrEqual(LEGIBLE - 0.001);
+    // What the layer's first view shows reads: the change's word whole on the card and its title in full ink, though the node is done.
+    const word = nodeCard(page, node).getByTestId("card-diff");
+    expect(await word.evaluate((element) => element.scrollWidth <= element.clientWidth + 1 && element.parentElement !== null && element.getBoundingClientRect().right <= element.parentElement.getBoundingClientRect().right + 1)).toBe(true);
+    expect(await nodeCard(page, node).getByTestId("title").evaluate((element) => {
+      const probe = Object.assign(document.createElement("span"), { textContent: "x" });
+      probe.style.color = "var(--color-text)";
+      element.append(probe);
+      const ink = getComputedStyle(probe).color;
+      probe.remove();
+      return getComputedStyle(element).color === ink;
+    })).toBe(true);
+    if (size.width < 720) {
+      // At the sheet's peek the rail already says what holds Apply.
+      const [holds, sheet] = [await page.getByTestId("apply-waits").boundingBox(), await page.locator(".inspector").locator("xpath=..").boundingBox()];
+      expect((holds?.y ?? 0) + (holds?.height ?? 0)).toBeLessThanOrEqual((sheet?.y ?? 0) + (sheet?.height ?? 0));
+    } else {
+      // The sync dot stays at the right edge of the brand row.
+      const [chip, rail] = [await syncChip(page).boundingBox(), await page.locator(".rail-head").boundingBox()];
+      expect((rail?.x ?? 0) + (rail?.width ?? 0) - ((chip?.x ?? 0) + (chip?.width ?? 0))).toBeLessThanOrEqual(24);
+    }
+  });
+}
+
+test("C14: a change the first fit leaves out is brought into view from the rail, at the zoom it was at", async ({ page }) => {
+  await editWhereVersionTwoChanges(page, "browser");
+  await publishVersionTwo(page, "browser");
+  await openJourneyCard(page, "browser", "j_vendor_eval");
+  await page.getByTestId("journey-upgrade").click();
+  await page.getByTestId("upgrade-flow").getByRole("button", { name: "Propose the upgrade" }).click();
+  await reviewOpen(page);
+  await page.setViewportSize({ width: 1440, height: 768 });
+  await setDepth(page, "Actions");
+  const zoom = (await graphRoom(page)).zoom;
+  await page.getByTestId("changes-fold").locator("summary").click();
+  await page.locator('[data-testid="diff-node"][data-node="n_signoff"] button').click();
+  await expect(page.getByTestId("item-editor")).toBeVisible();
+  await expect.poll(async () => (await marginIn(page, "n_signoff", await graphRoom(page))) >= 0).toBe(true);
+  expect((await graphRoom(page)).zoom).toBeCloseTo(zoom, 2);
 });

@@ -10,8 +10,8 @@ export function refitKey(laidOut: { view: string; model: { cards: readonly unkno
   return authoring ? `${laidOut.view}:${String(laidOut.model.cards.length)}` : laidOut.view;
 }
 
-/** The cards a first fit to these nodes frames (each card stands for its rolled-up nodes too), or none when no such card is drawn, so the whole graph is fitted. */
+/** The cards a first fit to these nodes frames, in the order of the nodes (each card stands for its rolled-up nodes too), or none when no such card is drawn, so the whole graph is fitted. */
 export function firstFitCards(keys: readonly string[] | undefined, cards: readonly Card[]): string[] | undefined {
-  const ids = cards.filter((card) => standsFor(card).some((key) => keys?.includes(key))).map((card) => card.key);
-  return ids.length === 0 ? undefined : ids;
+  const ids = new Set((keys ?? []).flatMap((key) => cards.filter((card) => standsFor(card).includes(key)).map((card) => card.key)));
+  return ids.size === 0 ? undefined : [...ids];
 }

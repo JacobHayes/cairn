@@ -380,10 +380,10 @@ function ProposalBody({ layer, model, onPick }: { layer: Layer; model: LayerMode
   );
 }
 
-/** The head: the proposal's title, a chip only when it is not open, then who proposed it. */
-function Head({ proposal }: { proposal: Proposal }) {
+/** The head: the proposal's title, a chip only when it is not open, then `notes` (what holds Apply comes before the attribution, so a sheet at its peek says what is to be done), then who proposed it. */
+function Head({ proposal, notes }: { proposal: Proposal; notes?: ReactNode }) {
   return (
-    <header className="stack rail-head detail-head" data-testid="rail-head">
+    <header className="stack layer-head detail-head" data-testid="rail-head">
       <span className="row">
         <h2 data-testid="proposal-title">{proposal.draft.title}</h2>
         {proposal.status === "open" ? null : (
@@ -392,6 +392,7 @@ function Head({ proposal }: { proposal: Proposal }) {
           </Badge>
         )}
       </span>
+      {notes}
       <Origin proposal={proposal} />
     </header>
   );
@@ -437,25 +438,30 @@ export function Rail({ selected }: { selected: string | undefined }) {
     <Inspector focus={`proposal:${layer.id}:${selected ?? ""}`} reveal={selected !== undefined}>
       <aside className="detail-panel panel stack rail" aria-label="The proposal" data-testid="proposal-rail" data-mode={layer.mode} data-revision={proposal.revision}>
         <div className="stack rail-lead">
-          <Head proposal={proposal} />
+          <Head
+            proposal={proposal}
+            notes={
+              <div className="stack rail-notes" data-testid="rail-notes">
+                {holds === undefined ? null : (
+                  <p tabIndex={-1} className="rail-holds" role="status" data-testid="apply-waits" data-blockers={reviewing.blockers.join(" ")}>
+                    {holds}
+                    {reviewing.blockers.includes("unresolved") ? <span className="rail-holds-more"> Tap to decide.</span> : null}
+                  </p>
+                )}
+                <StalePanel review={review} disabled={!model.editable} onRefresh={reviewing.refresh} />
+                <Problem write={reviewing.write} onRebase={reviewing.rebase} />
+                <Receipt receipt={reviewing.write.receipt} />
+                <PreviewNotes layer={layer} model={model} />
+                <Unsaved layer={layer} />
+                <Violations layer={layer} model={model} />
+              </div>
+            }
+          />
           <p data-testid="rail-outline">{outlineWords(model.outline)}</p>
-        </div>
-        <div className="stack rail-notes" data-testid="rail-notes">
-          {holds === undefined ? null : (
-            <p tabIndex={-1} className="rail-holds" role="status" data-testid="apply-waits" data-blockers={reviewing.blockers.join(" ")}>
-              {holds}
-            </p>
-          )}
-          <StalePanel review={review} disabled={!model.editable} onRefresh={reviewing.refresh} />
-          <Problem write={reviewing.write} onRebase={reviewing.rebase} />
-          <Receipt receipt={reviewing.write.receipt} />
-          <PreviewNotes layer={layer} model={model} />
-          <Unsaved layer={layer} />
-          <Violations layer={layer} model={model} />
         </div>
         {body}
         {proposal.status !== "open" ? null : (
-          <footer className="rail-foot">
+          <footer className="layer-foot">
             <Button disabled={reviewing.write.disabled} onClick={reviewing.discard} data-testid="discard-proposal">
               Discard the proposal
             </Button>

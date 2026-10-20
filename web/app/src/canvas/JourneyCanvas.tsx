@@ -16,6 +16,7 @@ import { contextMenuOf } from "../detail/offers.ts";
 import { screenSwitched } from "../journeys/address.ts";
 import { useJourneyTarget } from "../journeys/useJourneyTarget.ts";
 import { useReviewing, withRemoved, type Composed, type Layer } from "../proposals/layer.ts";
+import { itemNode } from "../proposals/model.ts";
 import { journeyLayoutView, type LevelRequest } from "../journeys/requests.ts";
 import { EmptyPanel, journeySubject, NothingMatches, ResetView, ViewControls } from "../screens/ViewControls.tsx";
 import { useFrameActions } from "../shell/frame.tsx";
@@ -264,14 +265,21 @@ function useEscapeEdit(on: boolean, leave: () => void): void {
   }, [on, leave]);
 }
 
-/** The nodes a first fit frames under the layer: every one the proposal marks, and the ends of the requirements it changes. */
+/**
+ * The nodes a first fit frames under the layer, in the order the rail lists them: those waiting on a choice, then the other nodes the proposal marks, then the ends of the requirements it changes. Empty while the destination after is still being derived (a preview that finished without one, an invalid proposal's, is not waited for): the canvas waits for it, as what it draws changes then.
+ */
 export function changedKeys(layer: Layer): string[] | undefined {
   const model = layer.model;
   if (model === undefined) {
     return undefined;
   }
-  const keys = [...Object.keys(model.marks), ...[...model.diff.edgesAdded, ...model.diff.edgesRemoved].flatMap((edge) => [edge.node, edge.requires])];
-  return keys.length === 0 ? undefined : keys;
+  if (!model.known && !model.previewed && layer.mode === "reviewing" && model.previewError === undefined) {
+    return [];
+  }
+  // The rail's own order: the items waiting on a choice as its fold lists them, then its changes.
+  const waiting = (model.draft.items ?? []).flatMap((item, index) => (model.unresolved.has(index) ? [itemNode(item)] : [])).filter((key): key is string => key !== undefined);
+  const keys = [...waiting, ...model.entries.map((entry) => entry.key), ...[...model.diff.edgesAdded, ...model.diff.edgesRemoved].flatMap((edge) => [edge.node, edge.requires])];
+  return keys.length === 0 ? undefined : [...new Set(keys)];
 }
 
 /** What the trace reaches that has no card of its own (outside the step, folded into a container, or left out). */

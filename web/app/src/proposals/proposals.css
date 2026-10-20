@@ -86,22 +86,25 @@
   display: inline-block;
   width: 14px;
   height: 14px;
-  border: 2px solid var(--color-text);
+  border: 2px solid var(--swatch-ink);
   background-image: linear-gradient(var(--swatch), var(--swatch));
 }
 
 .layer-swatch-added {
   --swatch: var(--color-add);
+  --swatch-ink: var(--color-success);
   border-style: solid;
 }
 
 .layer-swatch-changed {
   --swatch: var(--color-change);
+  --swatch-ink: var(--color-warning);
   border-style: dotted;
 }
 
 .layer-swatch-removed {
   --swatch: var(--color-del);
+  --swatch-ink: var(--color-error);
   border-style: dashed;
 }
 
@@ -131,13 +134,20 @@
   display: none;
 }
 
-.rail-head {
+.layer-head {
   align-items: stretch;
   justify-content: flex-start;
 }
 
-.rail-head h2 {
+.layer-head h2 {
   overflow-wrap: anywhere;
+}
+
+/* On a phone the sheet opens at its peek, which shows only the top of the rail: what holds Apply comes first there, so the first thing read is what is to be done. */
+@media (max-width: 719px) {
+  .layer-head > .rail-notes {
+    order: -1;
+  }
 }
 
 .rail-holds {
@@ -147,12 +157,27 @@
   background: var(--color-surface);
 }
 
+.rail-holds-more {
+  display: none;
+}
+
+/* The sheet at its peek says what to do next: a tap opens it to the choices. */
+@media (max-width: 719px) {
+  .rail-holds-more {
+    display: inline;
+  }
+
+  .rail-holds {
+    padding-block: var(--space-1);
+  }
+}
+
 .rail-holds:focus-visible {
   outline: 2px solid var(--color-accent);
   outline-offset: 2px;
 }
 
-.rail-foot {
+.layer-foot {
   padding-top: var(--space-4);
   border-top: 1px solid var(--color-border);
 }

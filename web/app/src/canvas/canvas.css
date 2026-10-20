@@ -726,12 +726,6 @@
   color: var(--diff-ink);
 }
 
-.node-diff-word::after {
-  content: "\00b7";
-  margin-left: var(--space-2);
-  color: var(--color-secondary);
-}
-
 /* A proposal's removal: the card stays where it was, ghosted, its title struck. */
 .node-ghost {
   opacity: 0.65;
@@ -975,6 +969,11 @@
 /* C14: what a proposal changes is the subject of the review, so a card it marks is never faded for being done or out of focus (a removed one stays ghosted). */
 .node-diff:not(.node-ghost):is(.node-done, .node-faded) {
   opacity: 1;
+}
+
+/* A card the proposal changes is what is being reviewed: its words stay at full ink however finished it is (the Done chip says that). */
+.node-diff:not(.node-ghost) :is(.node-title, .node-foot, .node-owner, .node-body-line) {
+  color: var(--color-text);
 }
 
 /* C14: a card whose own state paints its background still shows the change's fill over it. */

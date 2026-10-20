@@ -20,7 +20,7 @@ import { ContextMenu } from "../ui/ContextMenu.tsx";
 import { typing } from "../ui/typing.ts";
 import { headHeight } from "./cards.ts";
 import { EdgeLine, type LineEdge } from "./EdgeLine.tsx";
-import { NEAR_ZOOM, fitZoom, listenPinch, minZoomOf } from "./gestures.ts";
+import { NEAR_ZOOM, firstFrame, fitZoom, listenPinch, minZoomOf, roomOf, shiftInto } from "./gestures.ts";
 import { lensChips, lensTiers } from "./lens.ts";
 import type { Layout } from "./layout.ts";
 import { fadedCards } from "./look.ts";
@@ -79,7 +79,7 @@ export interface GraphCanvasProps {
    */
   selection?: { picked: ReadonlySet<string>; members: readonly string[]; toggle: (key: string) => void; set: (keys: string[]) => void } | undefined;
   reveal?: Reveal | undefined;
-  /** The nodes the view first opens fitted to (a proposal's changes), with the whole graph when none is drawn; Fit still fits all. */
+  /** The nodes the view first opens framed on (a proposal's changes, in the rail's order: see `firstFrame`), with the whole graph when none is drawn; none yet (an empty list) holds the first fit back. Fit still fits all. */
   firstFit?: readonly string[] | undefined;
   /** The ladder's steps, for keys 1 to 4. */
   steps?: readonly Step[];
@@ -210,19 +210,17 @@ function useFitPadding(): () => typeof FIT_PADDING {
  * part where the canvas reaches it: a node picked is brought into the band the sheet leaves, less the zones the floating controls
  * keep (PAD), by the least move (none if it is already whole in it), so the selection is never under the sheet and the view keeps its neighbours.
  */
-function useCenterAboveSheet(selected: string | undefined): void {
+function useCenterAboveSheet(selected: string | undefined, layered: boolean): void {
   const flow = useReactFlow();
   const store = useStoreApi();
   const sheet = useFrameState()?.inspector?.parentElement;
   useEffect(() => {
-    if (selected === undefined || sheet === null || sheet === undefined) {
+    // Under a proposal's layer the rail's rows pick nodes the view may not show, in a column as on a sheet.
+    if (selected === undefined || ((sheet === null || sheet === undefined || !isSheet(sheet)) && !layered)) {
       return undefined;
     }
     // After the commit that shows the sheet, so its height is there to read.
     const frame = requestAnimationFrame(() => {
-      if (!isSheet(sheet)) {
-        return;
-      }
       // A card inside a container is placed relative to it: the flow knows where it is on the canvas.
       const card = flow.getInternalNode(selected);
       if (card === undefined) {
@@ -233,11 +231,10 @@ function useCenterAboveSheet(selected: string | undefined): void {
       const { width, height, domNode } = store.getState();
       const covered = coveredBy(sheet, domNode);
       // The room the sheet and the controls leave. A card already whole inside it stays where it is, so its neighbours stay in view; one outside is moved by the least that brings it in (centred if it is larger than the room).
-      const room = { left: PAD.left, right: width - PAD.right, top: PAD.top, bottom: height - covered - PAD.bottom };
+      const room = roomOf({ width, height }, PAD, covered);
       const view = flow.getViewport();
       const box = { left: view.x + x * zoom, top: view.y + y * zoom, width: (card.measured.width ?? 0) * zoom, height: (card.measured.height ?? 0) * zoom };
-      const shift = (from: number, size: number, low: number, high: number) => (size >= high - low ? (low + high) / 2 - (from + size / 2) : from < low ? low - from : from + size > high ? high - (from + size) : 0);
-      const [dx, dy] = [shift(box.left, box.width, room.left, room.right), shift(box.top, box.height, room.top, room.bottom)];
+      const [dx, dy] = [shiftInto(box.left, box.width, room.left, room.right), shiftInto(box.top, box.height, room.top, room.bottom)];
       if (dx !== 0 || dy !== 0) {
         void flow.setViewport({ zoom, x: view.x + dx, y: view.y + dy });
       }
@@ -366,24 +363,36 @@ function useZoomRange(props: GraphCanvasProps, root: RefObject<HTMLDivElement | 
   return { minZoom, fit };
 }
 
-/** The first fit, once the canvas has a size and its cards are in: the `firstFit` nodes when any is drawn, else the whole drawn graph. */
+/**
+ * The first fit, once the canvas has a size and its cards are in: the whole drawn graph, or under a proposal's layer the changed cards (`firstFit`, in the rail's order) in the room the sheet or rail leaves (see `firstFrame`).
+ */
 function useFirstFit(props: GraphCanvasProps, fit: number): void {
   const flow = useReactFlow();
   const [initialized, sized] = [useNodesInitialized(), useStore((state) => state.width > 0 && state.height > 0)];
   const sheet = useFrameState()?.inspector?.parentElement;
   const store = useStoreApi();
   const done = useRef(false);
+  const target = firstFitCards(props.firstFit, props.model.cards);
   useEffect(() => {
-    if (!initialized || !sized || done.current) {
+    // The layer's rail is what the room is measured against, and its changes are what is framed: wait for both (an empty `firstFit` is the changes not yet known), so the cards are not framed under a sheet that is not there yet or before they are drawn.
+    if (!initialized || !sized || done.current || (target !== undefined && sheet === undefined) || props.firstFit?.length === 0) {
       return;
     }
     done.current = true;
+    const { width, height, domNode } = store.getState();
     // Where the inspector's sheet lies over the canvas's lower part, fit into what it leaves.
-    const covered = coveredBy(sheet, store.getState().domNode);
-    const padding = { ...FIT_PADDING, bottom: px(PAD.bottom + covered) };
-    const target = firstFitCards(props.firstFit, props.model.cards);
-    void flow.fitView({ ...FIT, padding, minZoom: minZoomOf(fit), ...(target === undefined ? {} : { nodes: target.map((id) => ({ id })) }) });
-  }, [initialized, sized, flow, fit, props.firstFit, props.model.cards]);
+    const covered = coveredBy(sheet, domNode);
+    const boxes = (target ?? []).flatMap((id) => {
+      const card = flow.getInternalNode(id);
+      return card === undefined ? [] : [{ ...card.internals.positionAbsolute, width: card.measured.width ?? 0, height: card.measured.height ?? 0 }];
+    });
+    const frame = firstFrame(boxes, roomOf({ width, height }, PAD, covered));
+    if (frame !== undefined) {
+      void flow.setViewport(frame);
+      return;
+    }
+    void flow.fitView({ ...FIT, padding: { ...FIT_PADDING, bottom: px(PAD.bottom + covered) }, minZoom: minZoomOf(fit) });
+  }, [initialized, sized, flow, fit, target, sheet, store]);
 }
 
 /** The zoom, as `--z` on the canvas root, so a zoomed-out head can set its title to a readable size on screen without the cards re-rendering. */
@@ -549,7 +558,7 @@ function Flow(props: GraphCanvasProps) {
   const { minZoom, fit } = useZoomRange(props, root);
   useFirstFit(props, fit);
   useZoomVariable(root);
-  useCenterAboveSheet(props.selected);
+  useCenterAboveSheet(props.selected, props.firstFit !== undefined);
   useReveal(props.reveal, props.model);
   useCanvasKeys(props);
   const changes = useChanges(props);
