@@ -141,8 +141,10 @@ Hard-coded named constants; validation rejects a patch that would exceed one, an
 | assistant turn | 10 min | The iteration limit at typical provider latency, with room. |
 | store connection acquire | 5 s | Commits take milliseconds; five seconds of waiting is contention, which at this scale is a bug. |
 | outbound sign-in provider call (OIDC, Tailscale whois, IAP key set, Google token exchange), and a whole request to the IAP relay's endpoints | 10 s | A sign-in provider that slow is down; the login fails. |
-| IAP key set refetch on an unknown key id | once per 60 s | Google rotates IAP's keys rarely; a stream of forged key ids must not fetch on every request. |
+| IAP key set fetch tries, failed or not | once per 60 s | Google rotates IAP's keys rarely; neither a stream of forged key ids nor an outage at Google may fetch on every request. |
+| IAP key set age | 1 h | A key Google withdraws stops verifying within the hour, at one fetch an hour; past it the set is fetched again, and refused as unavailable if that fails. |
 | IAP assertion clock skew | 30 s | IAP's assertions last ten minutes and NTP keeps clocks well inside this. |
+| IAP assertion lifetime, issue to expiry | 10 min, plus the skew at either end | IAP's own last ten minutes; a longer one was not issued as IAP issues them. |
 | SSE coalescing interval | 250 ms | Feels live; at most four ticks a second per domain. |
 | SSE write stall | 15 s | A subscriber holds the latest revision per domain, not a queue, so a slow one never accumulates ticks; one that cannot take a write this long is disconnected and reconnects with current revisions (H6). |
 | requests in flight per process | 128 | Tens of users with a few tabs and agents; past this a client is looping. Overflow is a 503 with `Retry-After`. |

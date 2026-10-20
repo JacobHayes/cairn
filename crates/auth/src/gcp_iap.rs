@@ -7,12 +7,18 @@
 //!
 //! An assertion has the shape of an ID token (`iss`, `aud`, `sub`, `exp`, `iat`, `email`),
 //! so `openidconnect`'s verifier checks it, as it checks the OIDC provider's ID tokens;
-//! nothing here validates a token by hand. IAP signs with ES256 only.
+//! nothing here validates a token by hand. IAP signs with ES256 only. Beyond what the
+//! verifier checks, an assertion may last no longer than IAP's own do, with the skew at
+//! either end.
 //!
-//! The key set is fetched on first use and kept. A token naming a key the kept set lacks
-//! (Google rotated its keys) fetches it again, at most once per
-//! `IAP_KEY_SET_REFETCH_INTERVAL_MIN`, so a stream of forged key ids cannot make Cairn
-//! fetch on every request.
+//! The key set is fetched on first use and kept for at most `IAP_KEY_SET_AGE_MAX`, so a key
+//! Google withdraws stops being trusted at the next fetch. A token naming a key the kept set
+//! lacks (Google rotated its keys) fetches it again too. Any try, failed or not, holds off
+//! the next for `IAP_KEY_SET_REFETCH_INTERVAL_MIN`, so neither a stream of forged key ids
+//! nor an outage at Google makes Cairn fetch on every request. One fetch runs at a time, on
+//! its own task so a request dropped meanwhile cannot cut it short, and the requests that
+//! need it wait for it, at most an outbound call; a request whose key the kept set holds,
+//! while the set is within its age, never waits, and no lock is held across the call.
 //!
 //! Given the Google OAuth client IAP's programmatic access allows, the provider also relays
 //! an MCP client's sign-in to Google (`relay`), so the bearer the client ends up holding is
@@ -22,7 +28,7 @@
 
 mod relay;
 
-use std::sync::Arc;
+use std::sync::{Arc, Mutex, MutexGuard, PoisonError};
 
 use async_trait::async_trait;
 use axum::Router;
@@ -34,13 +40,15 @@ use openidconnect::{
     ClaimsVerificationError, ClientId, IssuerUrl, JsonWebKeySetUrl, Nonce,
     SignatureVerificationError,
 };
-use tokio::sync::Mutex;
 use url::Url;
 
 use crate::clock::Clock;
 use crate::error::{ConfigError, Refusal};
 use crate::layer::Authenticate;
-use crate::limits::{IAP_ASSERTION_CLOCK_SKEW_MAX, IAP_KEY_SET_REFETCH_INTERVAL_MIN};
+use crate::limits::{
+    IAP_ASSERTION_CLOCK_SKEW_MAX, IAP_ASSERTION_LIFETIME_MAX, IAP_KEY_SET_AGE_MAX,
+    IAP_KEY_SET_REFETCH_INTERVAL_MIN,
+};
 use crate::oidc::chrono_time;
 use crate::outbound::{Outbound, is_trusted_origin};
 use crate::provider::{AuthProvider, Presented, Verdict};
@@ -131,13 +139,22 @@ pub struct GcpIapProvider {
     clock: Clock,
     http: Outbound,
     key_set_url: JsonWebKeySetUrl,
-    keys: Mutex<Option<Kept>>,
+    keys: Arc<Mutex<Keys>>,
+    /// Held across a fetch of the key set, so one runs at a time.
+    fetching: Arc<tokio::sync::Mutex<()>>,
     relay: Option<Arc<relay::Relay>>,
+}
+
+/// The key set as last fetched, and when a fetch was last tried.
+#[derive(Default)]
+struct Keys {
+    kept: Option<Kept>,
+    tried_at: Option<Timestamp>,
 }
 
 /// The key set as last fetched.
 struct Kept {
-    set: CoreJsonWebKeySet,
+    set: Arc<CoreJsonWebKeySet>,
     fetched_at: Timestamp,
 }
 
@@ -197,7 +214,8 @@ impl GcpIapProvider {
             clock,
             http,
             key_set_url: JsonWebKeySetUrl::from_url(endpoints.iap_key_set),
-            keys: Mutex::new(None),
+            keys: Arc::new(Mutex::new(Keys::default())),
+            fetching: Arc::new(tokio::sync::Mutex::new(())),
             relay,
             config,
         })
@@ -208,40 +226,95 @@ impl GcpIapProvider {
         let Ok(token) = assertion.parse::<CoreIdToken>() else {
             return Verdict::Refused(Refusal::Credential);
         };
-        let mut kept = self.keys.lock().await;
-        if kept.is_none() {
-            match self.fetch().await {
-                Ok(fetched) => *kept = Some(fetched),
-                Err(refusal) => return Verdict::Refused(refusal),
+        if let Some(set) = self.current_keys() {
+            let checked = self.check(&token, &set);
+            let unknown_key = matches!(
+                checked,
+                Err(ClaimsVerificationError::SignatureVerification(
+                    SignatureVerificationError::NoMatchingKey
+                ))
+            );
+            if !unknown_key {
+                return self.verdict(checked);
             }
         }
-        let Some(current) = kept.as_ref() else {
-            return Verdict::Refused(Refusal::Unavailable("no IAP key set".to_owned()));
-        };
-        let checked = self.check(&token, &current.set);
-        let unknown_key = matches!(
-            checked,
-            Err(ClaimsVerificationError::SignatureVerification(
-                SignatureVerificationError::NoMatchingKey
-            ))
-        );
-        let checked = if unknown_key && self.may_refetch(current.fetched_at) {
-            match self.fetch().await {
-                Ok(fetched) => {
-                    let checked = self.check(&token, &fetched.set);
-                    *kept = Some(fetched);
-                    checked
-                }
-                Err(refusal) => return Verdict::Refused(refusal),
-            }
-        } else {
-            checked
-        };
-        drop(kept);
+        match self.refresh().await {
+            Ok(set) => self.verdict(self.check(&token, &set)),
+            Err(refusal) => Verdict::Refused(refusal),
+        }
+    }
+
+    /// The verdict on checked claims.
+    fn verdict(&self, checked: Result<CoreIdTokenClaims, ClaimsVerificationError>) -> Verdict {
         match checked {
             Ok(claims) => self.login(&claims),
             Err(_) => Verdict::Refused(Refusal::Credential),
         }
+    }
+
+    /// The kept key set, unless it is missing or older than `IAP_KEY_SET_AGE_MAX`.
+    fn current_keys(&self) -> Option<Arc<CoreJsonWebKeySet>> {
+        let keys = lock(&self.keys);
+        let kept = keys.kept.as_ref()?;
+        self.within(kept.fetched_at, IAP_KEY_SET_AGE_MAX)
+            .then(|| Arc::clone(&kept.set))
+    }
+
+    /// The key set fetched now. When a fetch was tried within the refetch interval (most
+    /// often the one this request waited behind), none is made: the answer is the current
+    /// kept set, or unavailable without one. The try is recorded before the call, so a
+    /// failed one holds off the next as a good one does.
+    async fn refresh(&self) -> Result<Arc<CoreJsonWebKeySet>, Refusal> {
+        let fetching = Arc::clone(&self.fetching).lock_owned().await;
+        let now = self.clock.now();
+        let tried_lately = {
+            let mut keys = lock(&self.keys);
+            let lately = keys
+                .tried_at
+                .is_some_and(|tried| self.within(tried, IAP_KEY_SET_REFETCH_INTERVAL_MIN));
+            if !lately {
+                keys.tried_at = Some(now);
+            }
+            lately
+        };
+        if tried_lately {
+            return self.current_keys().ok_or_else(|| {
+                Refusal::Unavailable("the IAP key set: the last fetch failed".to_owned())
+            });
+        }
+        // The fetch keeps what it gets and lets the next one start itself, so a request
+        // dropped mid-fetch cannot leave the try recorded and nothing kept.
+        let (keys, url, http) = (
+            Arc::clone(&self.keys),
+            self.key_set_url.clone(),
+            self.http.clone(),
+        );
+        let fetch = tokio::spawn(async move {
+            let fetched = CoreJsonWebKeySet::fetch_async(&url, &http).await;
+            let set = Arc::new(fetched.map_err(|error| error.to_string())?);
+            lock(&keys).kept = Some(Kept {
+                set: Arc::clone(&set),
+                fetched_at: now,
+            });
+            drop(fetching);
+            Ok::<_, String>(set)
+        });
+        match fetch.await {
+            Ok(Ok(set)) => Ok(set),
+            Ok(Err(error)) => Err(format!("the IAP key set: {error}")),
+            Err(error) => Err(format!("the IAP key set fetch: {error}")),
+        }
+        .map_err(Refusal::Unavailable)
+    }
+
+    /// Whether `since` is less than `interval` ago. A `since` ahead of now (the clock
+    /// stepped back) is not within, so a step back neither holds off fetches nor keeps a
+    /// set trusted for as long as the step.
+    fn within(&self, since: Timestamp, interval: std::time::Duration) -> bool {
+        let interval =
+            jiff::SignedDuration::try_from(interval).unwrap_or(jiff::SignedDuration::MAX);
+        let elapsed = self.clock.now().duration_since(since);
+        !elapsed.is_negative() && elapsed < interval
     }
 
     /// The assertion's claims, if `keys` verify it and it is for this audience and current.
@@ -274,27 +347,18 @@ impl GcpIapProvider {
             }
         });
         let no_nonce = |_: Option<&Nonce>| Ok(());
-        token.claims(&verifier, no_nonce).cloned()
-    }
-
-    /// Whether a token naming an unknown key may fetch the key set again: the last fetch
-    /// was at least the refetch interval ago.
-    fn may_refetch(&self, fetched_at: Timestamp) -> bool {
-        let interval = jiff::SignedDuration::try_from(IAP_KEY_SET_REFETCH_INTERVAL_MIN)
-            .unwrap_or(jiff::SignedDuration::MAX);
-        let since = self.clock.now().duration_since(fetched_at);
-        since >= interval
-    }
-
-    /// Google's key set, now.
-    async fn fetch(&self) -> Result<Kept, Refusal> {
-        let set = CoreJsonWebKeySet::fetch_async(&self.key_set_url, &self.http)
-            .await
-            .map_err(|error| Refusal::Unavailable(format!("the IAP key set: {error}")))?;
-        Ok(Kept {
-            set,
-            fetched_at: self.clock.now(),
-        })
+        let claims = token.claims(&verifier, no_nonce).cloned()?;
+        let lifetime = claims.expiration() - claims.issue_time();
+        let lifetime_max = IAP_ASSERTION_LIFETIME_MAX + 2 * IAP_ASSERTION_CLOCK_SKEW_MAX;
+        if lifetime
+            .to_std()
+            .map_or(true, |lifetime| lifetime > lifetime_max)
+        {
+            return Err(ClaimsVerificationError::Expired(format!(
+                "lasts {lifetime}, past IAP's {lifetime_max:?}"
+            )));
+        }
+        Ok(claims)
     }
 
     /// The login verified claims name: the subject is IAP's stable account id, and the
@@ -357,6 +421,11 @@ impl AuthProvider for GcpIapProvider {
         let _ = authenticator;
         self.relay.as_ref().map(relay::router)
     }
+}
+
+/// The key state; a panic elsewhere while holding it leaves nothing half-written.
+fn lock(keys: &Mutex<Keys>) -> MutexGuard<'_, Keys> {
+    keys.lock().unwrap_or_else(PoisonError::into_inner)
 }
 
 impl std::fmt::Debug for GcpIapProvider {

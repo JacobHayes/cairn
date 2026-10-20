@@ -1,13 +1,17 @@
 //! The Google Cloud IAP provider (H1), offline: assertions signed with ES256 keys generated
 //! for the test, verified against a stub of Google's key set on loopback. A good assertion
-//! names its user on any listener and from any peer; every spoiled one is refused; a
-//! rotated key is fetched, and forged key ids do not fetch on every request (3.2, Security).
+//! names its user on any listener and from any peer; every spoiled one is refused, one
+//! lasting longer than IAP's do included; a rotated key is fetched, a withdrawn one stops
+//! verifying once the kept set ages out, and neither forged key ids nor failed fetches
+//! fetch on every request, nor does a slow fetch hold up requests whose key is kept
+//! (3.2, Security).
 //! With the relay on, a Google ID token as the bearer counts only beside a valid assertion
 //! (I2); without it, the provider is as it was.
 
 #[cfg(test)]
 mod gcp_iap {
     use std::sync::Arc;
+    use std::time::Duration;
 
     use axum::body::Body;
     use axum::http::StatusCode;
@@ -134,9 +138,15 @@ mod gcp_iap {
         };
         let skew =
             i64::try_from(cairn_auth::limits::IAP_ASSERTION_CLOCK_SKEW_MAX.as_secs()).unwrap();
-        let within_skew = sign(&with("exp", json!(at - skew + 1)), &signer);
-        let within_skew = verdict(&iap, Some(&within_skew)).await;
+        let lifetime_max =
+            i64::try_from(cairn_auth::limits::IAP_ASSERTION_LIFETIME_MAX.as_secs()).unwrap();
+        let mut within_skew = with("exp", json!(at - skew + 1));
+        within_skew["iat"] = json!(at - skew + 1 - lifetime_max);
+        let within_skew = verdict(&iap, Some(&sign(&within_skew, &signer))).await;
         assert!(matches!(within_skew, Verdict::Login(_)), "{within_skew:?}");
+        let longest = sign(&with("exp", json!(at + lifetime_max + 2 * skew)), &signer);
+        let longest = verdict(&iap, Some(&longest)).await;
+        assert!(matches!(longest, Verdict::Login(_)), "{longest:?}");
         let mut tampered = sign(&claims(at), &signer);
         tampered.replace_range(tampered.len() - 4.., "AAAA");
         let cases = [
@@ -152,6 +162,17 @@ mod gcp_iap {
                 sign(&with("iss", json!("https://accounts.google.com")), &signer),
             ),
             ("expired", sign(&with("exp", json!(at - skew - 1)), &signer)),
+            (
+                "expires before issue",
+                sign(&with("exp", json!(at - 1)), &signer),
+            ),
+            (
+                "lasts too long",
+                sign(
+                    &with("exp", json!(at + lifetime_max + 2 * skew + 1)),
+                    &signer,
+                ),
+            ),
             (
                 "issued later",
                 sign(&with("iat", json!(at + skew + 60)), &signer),
@@ -186,7 +207,7 @@ mod gcp_iap {
         assert_eq!(keys.fetches(), 1);
 
         keys.publish(&[&old, &new]);
-        world.clock.advance(61);
+        world.clock.advance(refetch_interval() + 1);
         let rotated = verdict(&iap, Some(&sign(&claims(now(&world)), &new))).await;
         assert!(matches!(rotated, Verdict::Login(_)), "{rotated:?}");
         assert_eq!(keys.fetches(), 2);
@@ -197,10 +218,168 @@ mod gcp_iap {
             assert_eq!(refused, Verdict::Refused(Refusal::Credential));
         }
         assert_eq!(keys.fetches(), 2, "within the interval, no fetch");
-        world.clock.advance(61);
+        world.clock.advance(refetch_interval() + 1);
         let refused = verdict(&iap, Some(&sign(&claims(now(&world)), &forged))).await;
         assert_eq!(refused, Verdict::Refused(Refusal::Credential));
         assert_eq!(keys.fetches(), 3, "past the interval, one fetch");
+    }
+
+    /// Google withdraws a key: the kept set is trusted until it ages out, then fetched
+    /// again, and the withdrawn key no longer verifies while the one still published does.
+    #[tokio::test]
+    async fn a_withdrawn_key_stops_verifying_once_the_kept_set_ages_out() {
+        let old = key("old", 7);
+        let new = key("new", 9);
+        let keys = KeySet::start(&[&old, &new]).await;
+        let world = World::new();
+        let iap = provider(&world, &keys);
+        let good = verdict(&iap, Some(&sign(&claims(now(&world)), &old))).await;
+        assert!(matches!(good, Verdict::Login(_)), "{good:?}");
+
+        keys.publish(&[&new]);
+        let age_max = i64::try_from(cairn_auth::limits::IAP_KEY_SET_AGE_MAX.as_secs()).unwrap();
+        world.clock.advance(age_max - 1);
+        let kept = verdict(&iap, Some(&sign(&claims(now(&world)), &old))).await;
+        assert!(matches!(kept, Verdict::Login(_)), "{kept:?}");
+        assert_eq!(keys.fetches(), 1, "within the age, the kept set verifies");
+        world.clock.advance(1);
+        let withdrawn = verdict(&iap, Some(&sign(&claims(now(&world)), &old))).await;
+        assert_eq!(withdrawn, Verdict::Refused(Refusal::Credential));
+        assert_eq!(keys.fetches(), 2, "past the age, one fetch");
+        let published = verdict(&iap, Some(&sign(&claims(now(&world)), &new))).await;
+        assert!(matches!(published, Verdict::Login(_)), "{published:?}");
+        assert_eq!(keys.fetches(), 2);
+    }
+
+    /// A failed fetch holds off the next as a good one does, both before any set is kept
+    /// and when the kept set has aged out: while Google is down, Cairn fetches once per
+    /// interval, not once per request, and refuses as unavailable rather than trusting an
+    /// aged set.
+    #[tokio::test]
+    async fn failed_fetches_hold_off_the_next_as_good_ones_do() {
+        let signer = key("one", 7);
+        let keys = KeySet::start(&[&signer]).await;
+        let world = World::new();
+        let iap = provider(&world, &keys);
+        let unavailable = async |iap: &GcpIapProvider, world: &World| {
+            for _ in 0..3 {
+                let refused = verdict(iap, Some(&sign(&claims(now(world)), &signer))).await;
+                assert!(
+                    matches!(refused, Verdict::Refused(Refusal::Unavailable(_))),
+                    "{refused:?}"
+                );
+            }
+        };
+        keys.fail(true);
+        unavailable(&iap, &world).await;
+        assert_eq!(keys.fetches(), 1, "first fetches: one try per interval");
+
+        keys.fail(false);
+        world.clock.advance(refetch_interval() + 1);
+        let good = verdict(&iap, Some(&sign(&claims(now(&world)), &signer))).await;
+        assert!(matches!(good, Verdict::Login(_)), "{good:?}");
+        assert_eq!(keys.fetches(), 2);
+
+        keys.fail(true);
+        let age_max = i64::try_from(cairn_auth::limits::IAP_KEY_SET_AGE_MAX.as_secs()).unwrap();
+        world.clock.advance(age_max);
+        unavailable(&iap, &world).await;
+        assert_eq!(keys.fetches(), 3, "refreshes: one try per interval");
+    }
+
+    /// A slow fetch, set off by an unknown key id, holds up only the requests that need a
+    /// fetch, and they share it: a request whose key the kept set holds answers at once,
+    /// and one under a key Google published meanwhile waits and passes on the shared fetch.
+    #[tokio::test]
+    async fn a_slow_fetch_holds_up_only_the_requests_that_need_it() {
+        let signer = key("one", 7);
+        let rotated = key("rotated", 9);
+        let keys = KeySet::start(&[&signer]).await;
+        let world = World::new();
+        let iap = Arc::new(provider(&world, &keys));
+        let good = verdict(&iap, Some(&sign(&claims(now(&world)), &signer))).await;
+        assert!(matches!(good, Verdict::Login(_)), "{good:?}");
+
+        keys.hold(true);
+        world.clock.advance(refetch_interval() + 1);
+        let forged = spawn_verdict(&iap, sign(&claims(now(&world)), &key("forged", 11)));
+        fetched(&keys, 2).await;
+        keys.publish(&[&signer, &rotated]);
+        let waiting = spawn_verdict(&iap, sign(&claims(now(&world)), &rotated));
+        let good = sign(&claims(now(&world)), &signer);
+        let at_once = tokio::time::timeout(Duration::from_secs(5), verdict(&iap, Some(&good)));
+        let at_once = at_once.await.expect("a kept key does not wait on a fetch");
+        assert!(matches!(at_once, Verdict::Login(_)), "{at_once:?}");
+
+        tokio::time::sleep(Duration::from_millis(50)).await;
+        keys.hold(false);
+        let refused = forged.await.unwrap();
+        assert_eq!(refused, Verdict::Refused(Refusal::Credential));
+        let passed = waiting.await.unwrap();
+        assert!(matches!(passed, Verdict::Login(_)), "{passed:?}");
+        assert_eq!(keys.fetches(), 2, "the requests waiting share one fetch");
+    }
+
+    /// A request dropped mid-fetch does not cut the fetch short: the set it was fetching is
+    /// kept, and the next request uses it without a fetch of its own.
+    #[tokio::test]
+    async fn a_request_dropped_mid_fetch_still_keeps_the_set() {
+        let signer = key("one", 7);
+        let keys = KeySet::start(&[&signer]).await;
+        let world = World::new();
+        let iap = Arc::new(provider(&world, &keys));
+        keys.hold(true);
+        let dropped = spawn_verdict(&iap, sign(&claims(now(&world)), &signer));
+        fetched(&keys, 1).await;
+        dropped.abort();
+        assert!(dropped.await.unwrap_err().is_cancelled());
+        keys.hold(false);
+        let next = verdict(&iap, Some(&sign(&claims(now(&world)), &signer))).await;
+        assert!(matches!(next, Verdict::Login(_)), "{next:?}");
+        assert_eq!(keys.fetches(), 1);
+    }
+
+    /// The clock steps back after a failed fetch (a host booted fast, then corrected): the
+    /// try recorded ahead of now does not hold off the next fetch for as long as the step.
+    #[tokio::test]
+    async fn a_clock_stepped_back_does_not_hold_off_fetches() {
+        let signer = key("one", 7);
+        let keys = KeySet::start(&[&signer]).await;
+        let world = World::new();
+        let iap = provider(&world, &keys);
+        keys.fail(true);
+        let refused = verdict(&iap, Some(&sign(&claims(now(&world)), &signer))).await;
+        assert!(matches!(refused, Verdict::Refused(Refusal::Unavailable(_))));
+        keys.fail(false);
+        world.clock.advance(-24 * 3600);
+        let good = verdict(&iap, Some(&sign(&claims(now(&world)), &signer))).await;
+        assert!(matches!(good, Verdict::Login(_)), "{good:?}");
+        assert_eq!(keys.fetches(), 2);
+    }
+
+    /// The refetch interval, in seconds.
+    fn refetch_interval() -> i64 {
+        i64::try_from(cairn_auth::limits::IAP_KEY_SET_REFETCH_INTERVAL_MIN.as_secs()).unwrap()
+    }
+
+    /// The verdict on `assertion`, on a task of its own.
+    fn spawn_verdict(
+        iap: &Arc<GcpIapProvider>,
+        assertion: String,
+    ) -> tokio::task::JoinHandle<Verdict> {
+        let iap = Arc::clone(iap);
+        tokio::spawn(async move { verdict(&iap, Some(&assertion)).await })
+    }
+
+    /// Waits until the key set stub has been asked `count` times.
+    async fn fetched(keys: &KeySet, count: usize) {
+        let asked = async {
+            while keys.fetches() < count {
+                tokio::time::sleep(Duration::from_millis(10)).await;
+            }
+        };
+        let asked = tokio::time::timeout(Duration::from_secs(5), asked).await;
+        asked.expect("the key set is fetched");
     }
 
     /// When the key set cannot be fetched, the assertion cannot be checked: refused as

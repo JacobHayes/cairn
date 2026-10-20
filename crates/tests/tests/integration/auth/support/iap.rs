@@ -9,7 +9,7 @@
 //! token is passed on to Cairn blank; a browser passes with its IAP session cookie; and
 //! every request let through carries a fresh assertion. The OAuth paths a deployment routes around IAP pass with none.
 
-use std::sync::atomic::{AtomicUsize, Ordering};
+use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
 use std::sync::{Arc, Mutex};
 
 use axum::Router;
@@ -64,22 +64,29 @@ impl Key {
     }
 }
 
-/// A stub of Google's IAP key set, counting fetches.
+/// A stub of Google's IAP key set, counting fetches. It can fail every fetch, as Google
+/// down does, or hold each until released, as a slow Google does.
 pub struct KeySet {
     pub url: Url,
-    keys: Arc<Mutex<Vec<Value>>>,
-    fetches: Arc<AtomicUsize>,
+    served: Served,
 }
 
 #[derive(Clone)]
 struct Served {
     keys: Arc<Mutex<Vec<Value>>>,
     fetches: Arc<AtomicUsize>,
+    failing: Arc<AtomicBool>,
+    held: tokio::sync::watch::Sender<bool>,
 }
 
-async fn serve_keys(State(served): State<Served>) -> axum::Json<Value> {
+async fn serve_keys(State(served): State<Served>) -> Response {
     served.fetches.fetch_add(1, Ordering::SeqCst);
-    axum::Json(json!({ "keys": served.keys.lock().unwrap().clone() }))
+    let mut held = served.held.subscribe();
+    held.wait_for(|held| !held).await.unwrap();
+    if served.failing.load(Ordering::SeqCst) {
+        return StatusCode::SERVICE_UNAVAILABLE.into_response();
+    }
+    axum::Json(json!({ "keys": served.keys.lock().unwrap().clone() })).into_response()
 }
 
 impl KeySet {
@@ -89,6 +96,8 @@ impl KeySet {
         let served = Served {
             keys: Arc::new(Mutex::new(keys.iter().map(|key| key.jwk()).collect())),
             fetches: Arc::new(AtomicUsize::new(0)),
+            failing: Arc::new(AtomicBool::new(false)),
+            held: tokio::sync::watch::Sender::new(false),
         };
         let router = Router::new()
             .route("/keys", get(serve_keys))
@@ -96,17 +105,26 @@ impl KeySet {
         tokio::spawn(async move { axum::serve(listener, router).await.unwrap() });
         Self {
             url: url.parse().unwrap(),
-            keys: served.keys,
-            fetches: served.fetches,
+            served,
         }
     }
 
     pub fn publish(&self, keys: &[&Key]) {
-        *self.keys.lock().unwrap() = keys.iter().map(|key| key.jwk()).collect();
+        *self.served.keys.lock().unwrap() = keys.iter().map(|key| key.jwk()).collect();
     }
 
     pub fn fetches(&self) -> usize {
-        self.fetches.load(Ordering::SeqCst)
+        self.served.fetches.load(Ordering::SeqCst)
+    }
+
+    /// Whether every fetch fails.
+    pub fn fail(&self, failing: bool) {
+        self.served.failing.store(failing, Ordering::SeqCst);
+    }
+
+    /// Whether fetches are held, unanswered, until released.
+    pub fn hold(&self, held: bool) {
+        self.served.held.send_replace(held);
     }
 }
 

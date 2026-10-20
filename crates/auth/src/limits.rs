@@ -7,9 +7,16 @@ use std::time::Duration;
 /// endpoints, its body read included: a sign-in provider this slow is down, and the
 /// sign-in fails.
 pub const PROVIDER_CALL_DURATION_MAX: Duration = Duration::from_secs(10);
-/// How soon an IAP assertion naming a key Cairn has not seen may fetch Google's key set
-/// again: rotation is rare, and a stream of forged key ids must not fetch on every request.
+/// How soon after a try at fetching Google's IAP key set, failed or not, another may be
+/// made: rotation is rare, and neither a stream of forged key ids nor an outage at Google
+/// may fetch on every request.
 pub const IAP_KEY_SET_REFETCH_INTERVAL_MIN: Duration = Duration::from_secs(60);
+/// How long a fetched IAP key set is trusted before it is fetched again: a key Google
+/// withdraws stops verifying within this, at one fetch an hour.
+pub const IAP_KEY_SET_AGE_MAX: Duration = Duration::from_hours(1);
+/// The longest an IAP assertion may last, issue to expiry, before the clock skew at either
+/// end: IAP's own last ten minutes, so a longer one was not issued as IAP issues them.
+pub const IAP_ASSERTION_LIFETIME_MAX: Duration = Duration::from_mins(10);
 /// The clock skew allowed between IAP and this machine when reading an assertion's issue
 /// and expiry times: IAP's assertions last ten minutes, and NTP keeps clocks well inside this.
 pub const IAP_ASSERTION_CLOCK_SKEW_MAX: Duration = Duration::from_secs(30);
