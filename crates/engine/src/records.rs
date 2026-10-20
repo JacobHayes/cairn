@@ -12,9 +12,9 @@
 use std::collections::{BTreeMap, BTreeSet};
 
 use cairn_schema::{
-    Deployment, Domain, EventType, Graph, GraphId, GraphKey, GraphRecord, Journey, JourneyId,
-    KeyRefs, Lineage, Node, NodeKey, Proposal, ProposalId, Record, RecordKey, RetiredKey, Route,
-    RouteDraft, RouteId, RouteVersion, Timestamp, Write,
+    Deployment, Domain, EventType, Graph, GraphId, GraphKey, GraphRecord, IdentityKey, Journey,
+    JourneyId, KeyRefs, Lineage, Node, NodeKey, Proposal, ProposalId, Record, RecordKey,
+    RetiredKey, Route, RouteDraft, RouteId, RouteVersion, Timestamp, Write,
 };
 
 use crate::edit;
@@ -37,6 +37,9 @@ pub struct Records {
     pub proposals: BTreeMap<ProposalId, Proposal>,
     /// Hard-deleted journey ids and when they were deleted (A19).
     pub deleted_journeys: BTreeMap<JourneyId, Timestamp>,
+    /// E6: for an identity a patch deletes, how many graphs refer to it beyond those loaded, so
+    /// a rejection can say how many it does not list.
+    pub unlisted_references: BTreeMap<IdentityKey, u32>,
 }
 
 impl Records {

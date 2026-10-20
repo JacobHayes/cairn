@@ -5,6 +5,7 @@ use std::collections::{BTreeMap, BTreeSet};
 use cairn_schema::{
     Domain, GraphId, Identity, IdentityKey, IdentitySet, JourneyId, Limit, Mutation, Record,
     RecordKey, Revision, RevisionConflict, RevisionOf, Subject, ViolationCode, Write,
+    limits::CHAIN_COUNT_PER_REJECTION_MAX,
 };
 
 use super::Session;
@@ -223,14 +224,31 @@ fn delete(session: &mut Session<'_>, identity: &IdentityKey) -> Vec<Write> {
     let named: BTreeSet<&IdentityKey> = std::iter::once(identity).chain(&aliases).collect();
     let referring = referring_graphs(session, &named);
     if !referring.is_empty() {
+        // The rejection lists what refers to the identity, up to the limit, and says how many
+        // more there are: those beyond the loaded graphs are counted by the host.
+        let listed = referring.len().min(CHAIN_COUNT_PER_REJECTION_MAX as usize);
+        let unlisted = u32::try_from(referring.len() - listed).unwrap_or(u32::MAX)
+            + session
+                .candidate
+                .unlisted_references
+                .get(identity)
+                .copied()
+                .unwrap_or_default();
+        let more = if unlisted == 0 {
+            String::new()
+        } else {
+            format!(", and {unlisted} more not listed")
+        };
         reject_identity(
             session,
             ViolationCode::IdentityInUse,
             identity,
-            "journeys or routes still refer to the identity; merge it into another instead (E6)",
+            &format!(
+                "journeys or routes still refer to the identity{more}; merge it into another instead (E6)"
+            ),
         );
         if let Some(found) = session.violations.last_mut() {
-            found.related.extend(referring);
+            found.related.extend(referring.into_iter().take(listed));
         }
         return Vec::new();
     }

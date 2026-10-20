@@ -90,6 +90,7 @@ mod conformance {
         a_crash_mid_commit_keeps_every_earlier_commit_and_nothing_of_its_own,
         a_reference_and_a_merge_in_flight_do_not_both_commit,
         a_reference_and_a_delete_in_flight_do_not_both_commit,
+        a_journey_copied_from_a_route_and_a_merge_in_flight_do_not_both_commit,
         a_decision_retyped_and_a_delete_in_flight_do_not_both_commit,
         a_proposal_and_its_journeys_deletion_in_flight_do_not_both_commit,
         history_paging_never_skips_an_event_committed_late,

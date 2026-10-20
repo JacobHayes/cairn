@@ -595,6 +595,79 @@ pub async fn a_decision_retyped_and_a_delete_in_flight_do_not_both_commit(backen
     assert!(rejected_as_stale(&deleted), "{deleted:?}");
 }
 
+/// E6: a journey created from a route version that names an identity (a copy of its graph, so
+/// no write names the key) and the merge of that identity, in flight together, do not both
+/// commit: the merge would miss the new journey. The copy holds the deployment's revision row,
+/// so the merge waits its turn and is then stale on the journey that now refers to its identity.
+pub async fn a_journey_copied_from_a_route_and_a_merge_in_flight_do_not_both_commit(
+    backend: &Turso,
+) {
+    let faults = Faults::default();
+    let store = backend.open(faults.clone()).await;
+    let people = cairn_store::build::deployment_patch("p_people", 0).event(
+        EventType::IdentityCreated,
+        Subject::Identity(id("who_a")),
+        vec![
+            Write::Put(Record::Identity(identity("who_a", "A", &[]))),
+            Write::Put(Record::Identity(identity("who_b", "B", &[]))),
+        ],
+    );
+    applied(&store, people.commit()).await;
+    let draft = cairn_schema::GraphId::RouteDraft(id("r"));
+    let nodes = [
+        cairn_store::build::node(serde_json::json!({
+            "key": "n_who", "id": "who", "kind": "decision", "title": "Who",
+            "prompt": "Who?", "answer_type": "identity",
+        })),
+        cairn_store::build::node(serde_json::json!({
+            "key": "n_after", "id": "after", "kind": "action", "title": "After",
+            "relevant_when": {"equals": {"decision": "n_who", "value": "who_b"}},
+        })),
+    ];
+    let route = cairn_store::build::create_route("p_route", "r").event(
+        EventType::NodeAdded,
+        Subject::Node(id("n_who")),
+        nodes
+            .into_iter()
+            .map(|node| put_in(&draft, GraphRecord::Node(node)))
+            .collect(),
+    );
+    applied(&store, route.commit()).await;
+    let published = cairn_store::build::publish(
+        cairn_store::build::route_patch("p_publish", "r", 1),
+        "r",
+        1,
+        2,
+    );
+    applied(&store, published.commit()).await;
+
+    let from_route = journey_patch("p_new", "j_new", 0)
+        .event(
+            EventType::JourneyCreated,
+            Subject::Journey(id("j_new")),
+            vec![
+                Write::Put(Record::JourneyHeader(cairn_store::build::journey_header(
+                    "j_new",
+                    "New",
+                    Some(("r", 1)),
+                ))),
+                Write::CopyGraph {
+                    from: cairn_schema::GraphId::RouteVersion {
+                        route: id("r"),
+                        version: cairn_store::build::version(1),
+                    },
+                    to: journey_graph("j_new"),
+                },
+            ],
+        )
+        .commit();
+    let gate = Gate::at(CommitPoint::BetweenStateAndEvents, &faults);
+    let meanwhile = promptly(store.commit(merge("p_merge")));
+    let (created, merged) = beside_held(&store, &gate, from_route, meanwhile).await;
+    assert!(matches!(created, Ok(Committed::Applied(_))), "{created:?}");
+    assert!(rejected_as_stale(&merged), "{merged:?}");
+}
+
 /// A19: a proposal created while its journey is hard-deleted does not survive it: the
 /// delete waits its turn at the journey's revision row and takes the proposal with it.
 pub async fn a_proposal_and_its_journeys_deletion_in_flight_do_not_both_commit(backend: &Turso) {

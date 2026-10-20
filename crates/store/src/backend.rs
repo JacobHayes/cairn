@@ -122,7 +122,14 @@ impl Shape {
                 }
                 key.clone()
             }
-            Write::CopyGraph { to, .. } => RecordKey::Graph(to.clone()),
+            Write::CopyGraph { to, .. } => {
+                // A copy (a journey from a route, a publish, an upgrade) carries whatever
+                // identities its source names without a write naming them, so it takes the
+                // deployment lock like one that does: a merge or delete cannot commit beside it
+                // unseen.
+                self.references_identities = true;
+                RecordKey::Graph(to.clone())
+            }
         };
         if let RecordKey::Graph(graph) | RecordKey::InGraph { graph, .. } = &key {
             self.graphs.insert(graph.clone());

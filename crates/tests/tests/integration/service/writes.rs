@@ -5,6 +5,7 @@
 use crate::service::support;
 
 use std::collections::BTreeSet;
+use std::fmt::Write as _;
 
 use cairn_engine::Records;
 use cairn_schema::{Domain, EventType, JourneyId, Rejection, RevisionOf, Subject, ViolationCode};
@@ -53,6 +54,12 @@ on_both_stores!(
     an_identity_is_deleted_only_once_nothing_refers_to_it,
     an_unreferenced_identity_is_deleted_with_its_emails,
     a_group_merge_folds_several_identities_into_one_survivor,
+    a_route_naming_an_identity_follows_its_merge_and_keeps_the_survivor_from_deletion,
+    a_delete_rejection_lists_what_refers_up_to_its_limit_and_counts_the_rest,
+    a_merge_then_delete_rejection_counts_each_omitted_reference_once,
+    deletes_sharing_their_references_each_count_the_remainder_once,
+    a_route_with_many_versions_naming_an_identity_is_one_reference,
+    deletes_naming_different_graphs_of_one_route_each_name_the_route,
     a_group_merge_resubmitted_with_other_identities_is_another_merge,
     publishing_a_route_never_touches_its_journeys,
     an_archived_journey_takes_only_unarchiving_or_deletion_and_its_id_never_returns,
@@ -645,6 +652,335 @@ async fn a_group_merge_resubmitted_with_other_identities_is_another_merge(
     assert!(
         matches!(fewer, Rejection::PatchIdReused { .. }),
         "{fewer:?}"
+    );
+}
+
+/// Creates `count` journeys that each fill a role with the identities `who_e7h2jv3nxc4yaw6t` and
+/// `who_d4m6uk2eqf5rbhzs`, and
+/// answers the deployment revision they were created against.
+async fn refer_to_e7h2(service: &Service, count: usize) -> cairn_schema::Revision {
+    let deployment = service.deployment().await.unwrap().revision;
+    for at in 0..count {
+        let refer = patch(
+            &format!("p_refer_{at}"),
+            &format!("{{journey: j_ref_{at}}}"),
+            0,
+            "\
+- op: create_journey\n  name: Refers\n\
+- op: add_role\n  role: {key: r_lead, id: lead, title: Lead}\n\
+- op: fill_role\n  role: r_lead\n  identities: [who_e7h2jv3nxc4yaw6t]\n\
+- op: add_role\n  role: {key: r_alt, id: alt, title: Alt}\n\
+- op: fill_role\n  role: r_alt\n  identities: [who_d4m6uk2eqf5rbhzs]\n",
+        );
+        let refer = cairn_schema::Patch {
+            deployment_revision: Some(deployment),
+            ..refer
+        };
+        applied(service.patch(&call("u_lead", AT), &domain(refer)).await);
+    }
+    deployment
+}
+
+/// E6: a patch that merges an identity and then deletes its survivor counts what a rejection
+/// leaves out once: the journeys the merge loaded are not counted again as unlisted.
+async fn a_merge_then_delete_rejection_counts_each_omitted_reference_once(
+    service: &Service,
+    _: &InProcessNotifier,
+) {
+    let limit = cairn_schema::limits::CHAIN_COUNT_PER_REJECTION_MAX as usize;
+    let extra = 3;
+    vendor_after(service, 2).await;
+    let deployment = refer_to_e7h2(service, limit + extra).await;
+    let mut named = String::new();
+    for at in 0..limit + extra {
+        write!(named, "j_ref_{at}: 1, ").unwrap();
+    }
+    let patch = patch(
+        "p_merge_then_delete",
+        "deployment",
+        deployment.get(),
+        &format!(
+            "- op: merge_identities\n  survivor: who_d4m6uk2eqf5rbhzs\n  merged: [who_e7h2jv3nxc4yaw6t]\n  journeys: {{{named}j_vendor_eval: 2}}\n\
+- op: delete_identity\n  identity: who_d4m6uk2eqf5rbhzs\n"
+        ),
+    );
+    let Rejection::Invalid { violations } =
+        rejected(service.patch(&call("u_lead", AT), &domain(patch)).await)
+    else {
+        panic!("the delete is refused")
+    };
+    let refused = &violations.as_slice()[0];
+    assert_eq!(refused.code, ViolationCode::IdentityInUse);
+    assert_eq!(refused.related.len(), limit);
+    let more = format!("{} more", extra + 1);
+    assert!(refused.message.contains(&more), "{}", refused.message);
+}
+
+/// E6: two identities deleted in one patch that the same journeys refer to each get their own
+/// remainder: journeys loaded for the second are not added to the first's count of unlisted.
+async fn deletes_sharing_their_references_each_count_the_remainder_once(
+    service: &Service,
+    _: &InProcessNotifier,
+) {
+    let limit = cairn_schema::limits::CHAIN_COUNT_PER_REJECTION_MAX as usize;
+    let extra = 3;
+    vendor_after(service, 2).await;
+    let deployment = refer_to_e7h2(service, limit + extra).await;
+    let delete = patch(
+        "p_delete_both",
+        "deployment",
+        deployment.get(),
+        "- op: delete_identity\n  identity: who_e7h2jv3nxc4yaw6t\n\
+- op: delete_identity\n  identity: who_d4m6uk2eqf5rbhzs\n",
+    );
+    let Rejection::Invalid { violations } =
+        rejected(service.patch(&call("u_lead", AT), &domain(delete)).await)
+    else {
+        panic!("the deletes are refused")
+    };
+    let more = format!("{} more", extra + 1);
+    assert_eq!(violations.as_slice().len(), 2, "{violations:#?}");
+    for refused in violations.as_slice() {
+        assert!(refused.message.contains(&more), "{}", refused.message);
+    }
+}
+
+/// E6: a route that many published versions name is one reference, not one per version: the
+/// rejection names the route once and counts nothing as left out.
+async fn a_route_with_many_versions_naming_an_identity_is_one_reference(
+    service: &Service,
+    _: &InProcessNotifier,
+) {
+    vendor_after(service, 1).await;
+    let route = "{route: vendor-evaluation}";
+    let first = "- op: open_draft\n  source: edit\n- op: set_participation\n  node: n_purpose\n  kind: k_informed\n  source: [who_d4m6uk2eqf5rbhzs]\n";
+    applied(
+        service
+            .patch(
+                &call("u_author", AT),
+                &domain(patch("p_v_0", route, 1, first)),
+            )
+            .await,
+    );
+    let mut revision = 2;
+    for at in 0..cairn_schema::limits::CHAIN_COUNT_PER_REJECTION_MAX {
+        let publish = patch(
+            &format!("p_pub_{at}"),
+            route,
+            revision,
+            "- op: publish_draft\n",
+        );
+        applied(service.patch(&call("u_author", AT), &domain(publish)).await);
+        let open = patch(
+            &format!("p_open_{at}"),
+            route,
+            revision + 1,
+            "- op: open_draft\n  source: edit\n",
+        );
+        applied(service.patch(&call("u_author", AT), &domain(open)).await);
+        revision += 2;
+    }
+    let Rejection::Invalid { violations } = rejected(
+        deployment_patch(
+            service,
+            "p_delete_dara",
+            "- op: delete_identity\n  identity: who_d4m6uk2eqf5rbhzs\n",
+        )
+        .await,
+    ) else {
+        panic!("the delete is refused")
+    };
+    let refused = &violations.as_slice()[0];
+    let routes = refused
+        .related
+        .iter()
+        .filter(|s| matches!(s, Subject::Route(_)))
+        .count();
+    assert_eq!(routes, 1, "{refused:#?}");
+    assert!(
+        !refused.message.contains("not listed"),
+        "{}",
+        refused.message
+    );
+}
+
+/// E6: two identities deleted in one patch that different graphs of one route name are each
+/// refused with the route: loading the route for the first does not hide the second's graph.
+async fn deletes_naming_different_graphs_of_one_route_each_name_the_route(
+    service: &Service,
+    _: &InProcessNotifier,
+) {
+    vendor_after(service, 1).await;
+    let route = "{route: vendor-evaluation}";
+    let participation = |who: &str| {
+        format!(
+            "- op: set_participation\n  node: n_purpose\n  kind: k_informed\n  source: [{who}]\n"
+        )
+    };
+    let steps = [
+        (
+            "p_open_a",
+            format!(
+                "- op: open_draft\n  source: edit\n{}",
+                participation("who_e7h2jv3nxc4yaw6t")
+            ),
+        ),
+        ("p_pub_a", "- op: publish_draft\n".to_string()),
+        (
+            "p_open_b",
+            format!(
+                "- op: open_draft\n  source: edit\n{}",
+                participation("who_d4m6uk2eqf5rbhzs")
+            ),
+        ),
+    ];
+    for (revision, (id, ops)) in (1..).zip(&steps) {
+        let step = patch(id, route, revision, ops);
+        applied(service.patch(&call("u_author", AT), &domain(step)).await);
+    }
+    let Rejection::Invalid { violations } = rejected(
+        deployment_patch(
+            service,
+            "p_delete_two",
+            "- op: delete_identity\n  identity: who_e7h2jv3nxc4yaw6t\n\
+- op: delete_identity\n  identity: who_d4m6uk2eqf5rbhzs\n",
+        )
+        .await,
+    ) else {
+        panic!("the deletes are refused")
+    };
+    assert_eq!(violations.as_slice().len(), 2);
+    for refused in violations.as_slice() {
+        assert!(
+            refused
+                .related
+                .iter()
+                .any(|s| matches!(s, Subject::Route(_))),
+            "{refused:#?}"
+        );
+    }
+}
+
+/// E6: a delete refused because more graphs refer to the identity than a rejection lists names
+/// that many, and says how many it leaves out.
+async fn a_delete_rejection_lists_what_refers_up_to_its_limit_and_counts_the_rest(
+    service: &Service,
+    _: &InProcessNotifier,
+) {
+    let limit = cairn_schema::limits::CHAIN_COUNT_PER_REJECTION_MAX as usize;
+    let extra = 3;
+    vendor_after(service, 2).await;
+    let deployment = refer_to_e7h2(service, limit + extra).await;
+    let delete = patch(
+        "p_delete_many",
+        "deployment",
+        deployment.get(),
+        "- op: delete_identity\n  identity: who_e7h2jv3nxc4yaw6t\n",
+    );
+    let Rejection::Invalid { violations } =
+        rejected(service.patch(&call("u_lead", AT), &domain(delete)).await)
+    else {
+        panic!("the delete is refused")
+    };
+    let refused = &violations.as_slice()[0];
+    assert_eq!(refused.code, ViolationCode::IdentityInUse);
+    assert_eq!(refused.related.len(), limit, "what refers, up to the limit");
+    // The journey the vendor scenario made also refers: everything beyond the limit is counted.
+    let more = (limit + extra + 1 - limit).to_string();
+    assert!(refused.message.contains(&more), "{}", refused.message);
+}
+
+/// Patches the deployment as the lead at its current revision.
+async fn deployment_patch(
+    service: &Service,
+    id: &str,
+    ops: &str,
+) -> Result<Written, cairn_service::WriteError> {
+    let revision = service.deployment().await.unwrap().revision.get();
+    service
+        .patch(
+            &call("u_lead", AT),
+            &domain(patch(id, "deployment", revision, ops)),
+        )
+        .await
+}
+
+/// The reference a route holds to an identity, if any.
+async fn route_reference(
+    service: &Service,
+    route_id: &cairn_schema::RouteId,
+    key: &cairn_schema::IdentityKey,
+) -> Option<cairn_service::RouteReference> {
+    service
+        .identity_references(key)
+        .await
+        .unwrap()
+        .unwrap()
+        .routes
+        .into_iter()
+        .find(|reference| &reference.header.id == route_id)
+}
+
+/// E6: a route's draft and published versions can name an identity (a participation); a merge
+/// needs neither a rewrite nor a check of them, since a route graph holds no answers and its
+/// stored key resolves through the alias, and the survivor stays referred to by them: the
+/// references read lists the route, and the survivor cannot be deleted while a version does.
+async fn a_route_naming_an_identity_follows_its_merge_and_keeps_the_survivor_from_deletion(
+    service: &Service,
+    _: &InProcessNotifier,
+) {
+    vendor_after(service, 1).await;
+    let route_id: cairn_schema::RouteId = "vendor-evaluation".parse().unwrap();
+    let dara = "who_d4m6uk2eqf5rbhzs".parse().unwrap();
+    let spare = "who_u5k3mq7wd2fz6ncx";
+    let create =
+        format!("- op: create_identity\n  identity: {{key: {spare}, name: Route Owner}}\n");
+    applied(deployment_patch(service, "p_spare", &create).await);
+    let route = "{route: vendor-evaluation}";
+    let draft = patch(
+        "p_draft",
+        route,
+        1,
+        &format!(
+            "- op: open_draft\n  source: edit\n- op: set_participation\n  node: n_purpose\n  kind: k_informed\n  source: [{spare}]\n"
+        ),
+    );
+    applied(service.patch(&call("u_author", AT), &domain(draft)).await);
+    let held = route_reference(service, &route_id, &spare.parse().unwrap())
+        .await
+        .expect("the draft refers");
+    assert!(held.draft);
+
+    let merge = format!(
+        "- op: merge_identities\n  survivor: who_d4m6uk2eqf5rbhzs\n  merged: [{spare}]\n  journeys: {{}}\n"
+    );
+    applied(deployment_patch(service, "p_merge_route", &merge).await);
+    let followed = route_reference(service, &route_id, &dara)
+        .await
+        .expect("the survivor is referred to by the route");
+    assert!(
+        followed.draft,
+        "the draft's stored key resolves through the alias"
+    );
+
+    let publish = patch("p_publish_route", route, 2, "- op: publish_draft\n");
+    applied(service.patch(&call("u_author", AT), &domain(publish)).await);
+    let published = route_reference(service, &route_id, &dara).await.unwrap();
+    assert!(
+        !published.versions.is_empty(),
+        "a published version names the merged key"
+    );
+    let delete = "- op: delete_identity\n  identity: who_d4m6uk2eqf5rbhzs\n";
+    let Rejection::Invalid { violations } =
+        rejected(deployment_patch(service, "p_delete_survivor", delete).await)
+    else {
+        panic!("the survivor is still referred to")
+    };
+    assert!(
+        violations.as_slice()[0]
+            .related
+            .contains(&Subject::Route(route_id.clone())),
+        "{violations:#?}"
     );
 }
 

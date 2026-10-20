@@ -35,6 +35,23 @@ name them too, and a merge leaves aliases.
 - Turso's lock on the deployment revision row, taken by a patch that writes an identity
   reference, now also covers node-field edits (conditions), which can add a reference.
 
+- A merge treats routes by leaving them alone. A route draft or published version can refer
+  to an identity (a participation naming it, a condition comparing an identity decision with
+  its key), but a route graph holds no answers, so nothing a merge changes (what a condition
+  evaluates to, a derived plan) can break one; the stored key keeps resolving through the
+  alias and published versions stay immutable. Aliases stay as long as the survivor does, and
+  the survivor cannot be deleted while a draft or version names it or any key merged into it,
+  so no route is left dangling.
+- A rejected delete lists the graphs that refer to the identity up to the limit above and
+  counts the rest: the host loads up to that many and reports how many more it found.
+- A graph copy (a journey made from a route, a publish, an upgrade) takes the deployment lock
+  like a write that names an identity, since the copy carries whatever its source names with
+  no write naming it; without it a merge could commit beside a journey created from a route
+  naming the merged identity and miss it.
+- A patch that deletes an identity right after merging others into it checks the keys the
+  merge folded in as well, and a route patch is held to the deployment revision when its
+  draft, or a version it publishes, names an identity.
+
 ## Alternatives
 
 - Delete anything and dangle the references: the engine could not resolve the key, and
