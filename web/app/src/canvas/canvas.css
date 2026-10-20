@@ -664,7 +664,8 @@
   --diff-fill: transparent;
   --diff-style: solid;
   --paper: linear-gradient(var(--diff-fill), var(--diff-fill)), var(--color-surface);
-  border-color: var(--diff-ink);
+  /* The edge is the outline below; the card's own border keeps its room and draws nothing, so the two never sit side by side. */
+  border-color: transparent;
   outline: calc(2px / var(--z, 1)) var(--diff-style) var(--diff-ink);
   outline-offset: calc(-2px / var(--z, 1));
 }
@@ -694,17 +695,23 @@
 
 .node-container.node-diff > .node-inner {
   background: linear-gradient(var(--diff-fill), var(--diff-fill));
+  /* The head's rule is the frame's stroke, which the card's own (transparent) border no longer lends it. */
+  border-bottom-color: var(--color-frame);
 }
 
 .node-diff-choice {
   box-shadow:
-    0 0 0 calc(2px / var(--z, 1)) var(--color-surface),
-    0 0 0 calc(4px / var(--z, 1)) var(--color-accent),
+    0 0 0 calc(3px / var(--z, 1)) var(--color-surface),
+    0 0 0 calc(5px / var(--z, 1)) var(--color-accent),
     var(--shadow-sm);
 }
 
 .node-kind-line {
   display: flex;
+  /* A kind with no room beside the word for a letter and its ellipsis wraps out of the one-line head, so it is gone whole rather than cut bare. */
+  flex-wrap: wrap;
+  height: 24px;
+  overflow: hidden;
   flex: 0 1 auto;
   column-gap: var(--space-2);
   min-width: 0;
@@ -712,7 +719,10 @@
 }
 
 .node-kind-line > .node-kind {
-  min-width: 0;
+  /* Room for at least a letter and the ellipsis that says the kind is cut. */
+  min-width: 4ch;
+  /* Its basis is that minimum: it wraps out only when even that does not fit, and otherwise takes what is left and ellipsises. */
+  flex: 1 1 4ch;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;

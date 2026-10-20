@@ -157,14 +157,28 @@
   background: var(--color-surface);
 }
 
-.rail-holds-more {
+.rail-holds-peek {
   display: none;
 }
 
-/* The sheet at its peek says what to do next: a tap opens it to the choices. */
+/* The sheet at its peek shows one line of the rail: what is to be done, and the tap that opens it. */
 @media (max-width: 719px) {
-  .rail-holds-more {
+  .rail-holds-peek {
     display: inline;
+  }
+
+  /* Kept for assistive technology, which hears the whole hold where the eye reads the short one. */
+  .rail-holds-full {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
+  }
+
+  .rail-holds {
+    position: relative;
   }
 
   .rail-holds {

@@ -144,6 +144,10 @@ for (const [name, size] of [["a desktop", { width: 1440, height: 768 }], ["a pho
     // What the layer's first view shows reads: the change's word whole on the card and its title in full ink, though the node is done.
     const word = nodeCard(page, node).getByTestId("card-diff");
     expect(await word.evaluate((element) => element.scrollWidth <= element.clientWidth + 1 && element.parentElement !== null && element.getBoundingClientRect().right <= element.parentElement.getBoundingClientRect().right + 1)).toBe(true);
+    // The kind either shows whole or keeps room for the ellipsis that says it is cut (never a bare letter).
+    const kind = nodeCard(page, node).locator(".node-kind").first();
+    expect(await kind.evaluate((element) => element.scrollWidth <= element.clientWidth + 1 || element.clientWidth >= 3 * parseFloat(getComputedStyle(element).fontSize) * 0.6)).toBe(true);
+    expect(await kind.evaluate((element) => element.getBoundingClientRect().right <= (element.closest(".node-head-label")?.getBoundingClientRect().right ?? 0) + 1)).toBe(true);
     expect(await nodeCard(page, node).getByTestId("title").evaluate((element) => {
       const probe = Object.assign(document.createElement("span"), { textContent: "x" });
       probe.style.color = "var(--color-text)";

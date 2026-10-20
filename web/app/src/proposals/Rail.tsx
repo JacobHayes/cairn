@@ -37,12 +37,12 @@ export const BLOCKER_WORDS: Record<Blocker, string> = {
   editing: "an edit with a problem to be fixed or dropped",
   unsaved: "your unsaved edits",
   stale: "a refresh",
-  unresolved: "a choice below",
+  unresolved: "the choices below",
   invalid: "the proposal to be valid",
   no_preview: "its preview",
 };
 
-/** "Apply waits for a refresh and a choice below": the holds in words, without counts; none when nothing holds. */
+/** "Apply waits for a refresh and the choices below": the holds in words, without counts; none when nothing holds. */
 export function holdsWords(blockers: readonly Blocker[]): string | undefined {
   const words = blockers.filter((blocker) => blocker !== "not_open").map((blocker) => BLOCKER_WORDS[blocker]);
   if (words.length === 0) {
@@ -444,8 +444,14 @@ export function Rail({ selected }: { selected: string | undefined }) {
               <div className="stack rail-notes" data-testid="rail-notes">
                 {holds === undefined ? null : (
                   <p tabIndex={-1} className="rail-holds" role="status" data-testid="apply-waits" data-blockers={reviewing.blockers.join(" ")}>
-                    {holds}
-                    {reviewing.blockers.includes("unresolved") ? <span className="rail-holds-more"> Tap to decide.</span> : null}
+                    {reviewing.blockers.includes("unresolved") ? (
+                      <>
+                        <span className="rail-holds-full">{holds}</span>
+                        <span className="rail-holds-peek" aria-hidden="true">Choices needed. Tap to review.</span>
+                      </>
+                    ) : (
+                      holds
+                    )}
                   </p>
                 )}
                 <StalePanel review={review} disabled={!model.editable} onRefresh={reviewing.refresh} />

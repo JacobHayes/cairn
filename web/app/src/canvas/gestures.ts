@@ -130,17 +130,25 @@ export function viewportAround(box: Box, zoom: number, room: Room): { x: number;
   return { zoom, x: place(box.x * zoom, box.width * zoom, room.left, room.right), y: place(box.y * zoom, box.height * zoom, room.top, room.bottom) };
 }
 
+/** The zoom at which `box` fits `room`, at most 1. */
+function zoomFitting(box: Box, room: Room): number {
+  return Math.min(1, (room.right - room.left) / Math.max(1, box.width), (room.bottom - room.top) / Math.max(1, box.height));
+}
+
+/** The smallest box holding both. */
+function unionOf(left: Box, right: Box): Box {
+  const [x, y] = [Math.min(left.x, right.x), Math.min(left.y, right.y)];
+  return { x, y, width: Math.max(left.x + left.width, right.x + right.width) - x, height: Math.max(left.y + left.height, right.y + right.height) - y };
+}
+
 /**
- * C14: the view a proposal's layer opens on. The boxes are the changed cards in the rail's order. All of them are framed when they fit `room` at or above LEGIBLE_ZOOM (never zoomed in past 1); when they do not, the first is framed alone, as large as the room holds it up to 100% and not below LEGIBLE_ZOOM, and the rail's rows bring each of the others into view.
+ * C14: the view a proposal's layer opens on. The boxes are the changed cards in the rail's order. The first is always framed; each later one is framed with it when all of them still fit `room` at or above LEGIBLE_ZOOM (never zoomed in past 1), so a change next to the first is in view with it, and the others, too far off to read together, are reached from the rail's rows. A first change alone is as large as the room holds it, never below LEGIBLE_ZOOM.
  */
 export function firstFrame(boxes: readonly Box[], room: Room): { x: number; y: number; zoom: number } | undefined {
   const first = boxes[0];
   if (first === undefined) {
     return undefined;
   }
-  const left = Math.min(...boxes.map((box) => box.x));
-  const top = Math.min(...boxes.map((box) => box.y));
-  const all: Box = { x: left, y: top, width: Math.max(...boxes.map((box) => box.x + box.width)) - left, height: Math.max(...boxes.map((box) => box.y + box.height)) - top };
-  const fitting = Math.min((room.right - room.left) / Math.max(1, all.width), (room.bottom - room.top) / Math.max(1, all.height));
-  return fitting >= LEGIBLE_ZOOM ? viewportAround(all, Math.min(1, fitting), room) : viewportAround(first, Math.max(LEGIBLE_ZOOM, Math.min(1, Math.min((room.right - room.left) / Math.max(1, first.width), (room.bottom - room.top) / Math.max(1, first.height)))), room);
+  const framed = boxes.slice(1).reduce((held, box) => (zoomFitting(unionOf(held, box), room) >= LEGIBLE_ZOOM ? unionOf(held, box) : held), first);
+  return viewportAround(framed, Math.max(LEGIBLE_ZOOM, zoomFitting(framed, room)), room);
 }

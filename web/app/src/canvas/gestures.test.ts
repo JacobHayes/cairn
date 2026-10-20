@@ -62,3 +62,17 @@ test("a first change taller than the room is framed at the legible zoom, from it
   expect(view?.zoom).toBe(LEGIBLE_ZOOM);
   expect(100 * LEGIBLE_ZOOM + (view?.y ?? 0)).toBe(room.top);
 });
+
+test("a later change that fits with the first at a legible zoom is framed with it, and one too far off is left to the rail", () => {
+  const room = roomOf({ width: 420, height: 320 }, PAD, 0);
+  const first = { x: 0, y: 0, width: 100, height: 50 };
+  const near = { x: 150, y: 80, width: 100, height: 50 };
+  const far = { x: 5000, y: 0, width: 100, height: 50 };
+  const view = firstFrame([first, far, near], room);
+  const zoom = view?.zoom ?? 0;
+  expect(zoom).toBeGreaterThanOrEqual(LEGIBLE_ZOOM);
+  // The near change's far corner is inside the room beside the first's near one.
+  expect(250 * zoom + (view?.x ?? 0)).toBeLessThanOrEqual(room.right);
+  expect(130 * zoom + (view?.y ?? 0)).toBeLessThanOrEqual(room.bottom);
+  expect(0 * zoom + (view?.x ?? 0)).toBeGreaterThanOrEqual(room.left);
+});
