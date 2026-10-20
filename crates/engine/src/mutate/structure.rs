@@ -156,7 +156,7 @@ fn set_field(
         session.reject(
             ViolationCode::FieldNotOnKind,
             Some(key),
-            format!("a {} has no {field:?} field (A1a)", kind.name()),
+            format!("a {} has no {field:?} field", kind.name()),
         );
         if let Some(found) = session.violations.last_mut() {
             found.at.field = Some(field);

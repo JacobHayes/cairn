@@ -67,7 +67,7 @@ fn create(session: &mut Session<'_>, identity: &Identity) -> Vec<Write> {
             session,
             ViolationCode::IdentityKeyTaken,
             &identity.key,
-            "the key is already an identity or an alias (E6)",
+            "the key is already an identity or an alias",
         );
         return Vec::new();
     }
@@ -168,7 +168,7 @@ fn merge_refused(session: &mut Session<'_>, survivor: &IdentityKey, merged: &Ide
             session,
             ViolationCode::IdentityUnresolved,
             survivor,
-            "a merge names at least one identity to merge into the survivor (E6)",
+            "a merge names at least one identity to merge into the survivor",
         );
         return true;
     }
@@ -177,7 +177,7 @@ fn merge_refused(session: &mut Session<'_>, survivor: &IdentityKey, merged: &Ide
             session,
             ViolationCode::AliasCycle,
             survivor,
-            "an identity cannot merge into itself (E6)",
+            "an identity cannot merge into itself",
         );
         return true;
     }
@@ -192,7 +192,7 @@ fn merge_refused(session: &mut Session<'_>, survivor: &IdentityKey, merged: &Ide
                 session,
                 ViolationCode::IdentityUnresolved,
                 key,
-                "a merge joins existing identities (E6)",
+                "a merge joins existing identities",
             );
         }
         return true;
@@ -244,7 +244,7 @@ fn delete(session: &mut Session<'_>, identity: &IdentityKey) -> Vec<Write> {
             ViolationCode::IdentityInUse,
             identity,
             &format!(
-                "journeys or routes still refer to the identity{more}; merge it into another instead (E6)"
+                "journeys or routes still refer to the identity{more}; merge it into another instead"
             ),
         );
         if let Some(found) = session.violations.last_mut() {

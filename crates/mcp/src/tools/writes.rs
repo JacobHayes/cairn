@@ -29,7 +29,7 @@ use crate::{ToolError, ToolSet};
 pub(crate) const SPECS: &[Spec] = &[
     Spec {
         name: "answer_decision",
-        description: "Records a decision's answer (A8): a choice, choices, a boolean, text, a \
+        description: "Records a decision's answer: a choice, choices, a boolean, text, a \
             date, an identity, or identities, matching the decision's answer type. Answering \
             changes what is relevant, fills roles, and pins dates; the result lists the \
             consequences: warnings, and what the answer unlocked, took out of scope, or \
@@ -52,7 +52,7 @@ pub(crate) const SPECS: &[Spec] = &[
         name: "assign",
         description: "Sets who holds a participation kind (owner, or one of the graph's own) on \
             a node: a role, or explicit identities (an empty list is an explicit none). Omit \
-            `source` to clear it, so the node inherits again (E2).",
+            `source` to clear it, so the node inherits again.",
         writes: true,
         destructive: true,
         schema: schema::<Assign>,
@@ -61,7 +61,7 @@ pub(crate) const SPECS: &[Spec] = &[
     Spec {
         name: "snooze",
         description: "Hides a node from the frontier until a date, or until another node is \
-            done (B6). A container (a group, or work with children) with open work beneath it \
+            done. A container (a group, or work with children) with open work beneath it \
             sets its whole subtree aside, each descendant naming it as `snoozed_via`; a \
             target inside the subtree, or depending on anything in it, is rejected.",
         writes: true,
@@ -80,8 +80,8 @@ pub(crate) const SPECS: &[Spec] = &[
     },
     Spec {
         name: "set_date",
-        description: "Pins a node to a date, shifts or clears its pin (F2), or records an \
-            actual start or finish date (F6).",
+        description: "Pins a node to a date, shifts or clears its pin, or records an \
+            actual start or finish date.",
         writes: true,
         destructive: true,
         schema: schema::<SetDate>,
@@ -89,7 +89,7 @@ pub(crate) const SPECS: &[Spec] = &[
     },
     Spec {
         name: "override",
-        description: "Applies an override to a node with a reason (D4): force include it \
+        description: "Applies an override to a node with a reason: force include it \
             despite its conditions, keep it under a skipped ancestor, or bypass named guards. \
             Or removes one.",
         writes: true,
@@ -99,7 +99,7 @@ pub(crate) const SPECS: &[Spec] = &[
     },
     Spec {
         name: "resolve_date_conflict",
-        description: "Resolves a contradictory date chain or a shortfall (F5, F6) by applying \
+        description: "Resolves a contradictory date chain or a shortfall by applying \
             one of the resolution moves a rejection or a node's dates listed (shift, repin, or \
             unpin a pin; revise a date answer; loosen a rule's offset; shrink an estimate; drop \
             a requirement), then, in the same patch, the mutations that were refused.",
@@ -110,7 +110,7 @@ pub(crate) const SPECS: &[Spec] = &[
     },
     Spec {
         name: "create_journey",
-        description: "Creates a journey, empty or from a published route version (B1), as the \
+        description: "Creates a journey, empty or from a published route version, as the \
             first patch against its new id (base revision 0).",
         writes: true,
         destructive: false,
@@ -120,7 +120,7 @@ pub(crate) const SPECS: &[Spec] = &[
     Spec {
         name: "apply_patch",
         description: "Applies any patch to a journey, a route (its draft included), or the \
-            deployment (A17): ordered mutations against a base revision, all or nothing. \
+            deployment: ordered mutations against a base revision, all or nothing. \
             Structure (nodes, edges, roles, kinds, resources), notes, and bulk changes go \
             here; a proposal is better when someone should review first.",
         writes: true,
@@ -130,7 +130,7 @@ pub(crate) const SPECS: &[Spec] = &[
     },
     Spec {
         name: "open_draft",
-        description: "Opens a route's draft for editing (A11), creating the route first when \
+        description: "Opens a route's draft for editing, creating the route first when \
             `create` is given (base revision 0). Edit the draft with `apply_patch` or a \
             proposal on the route, then publish it.",
         writes: true,
@@ -140,8 +140,8 @@ pub(crate) const SPECS: &[Spec] = &[
     },
     Spec {
         name: "publish_draft",
-        description: "Publishes a route's draft as its next version (A11); journeys on older \
-            versions can then upgrade. The result lists notices (A20): work with no chain to or \
+        description: "Publishes a route's draft as its next version; journeys on older \
+            versions can then upgrade. The result lists notices: work with no chain to or \
             from the final milestone, advisory only.",
         writes: true,
         destructive: false,
@@ -151,8 +151,8 @@ pub(crate) const SPECS: &[Spec] = &[
     Spec {
         name: "import_route",
         description: "Imports a route file (YAML) as a new route, or as a new draft of an \
-            existing one matched by key or path (A13). Every violation in the file is listed; the \
-            result lists notices (A20), advisory only.",
+            existing one matched by key or path. Every violation in the file is listed; the \
+            result lists notices, advisory only.",
         writes: true,
         destructive: false,
         schema: schema::<ImportRoute>,
@@ -161,8 +161,8 @@ pub(crate) const SPECS: &[Spec] = &[
     Spec {
         name: "manage_identity",
         description: "Creates an identity (a person or team journeys refer to), edits its name \
-            or emails (an email links it to the user who signs in with it, H3), merges \
-            duplicates into one that remains (E6), or deletes one nothing refers to. A \
+            or emails (an email links it to the user who signs in with it), merges \
+            duplicates into one that remains, or deletes one nothing refers to. A \
             deployment patch.",
         writes: true,
         destructive: true,
@@ -218,7 +218,8 @@ impl ToolSet {
         Ok(Some(drafted))
     }
 
-    /// `import_route`: one route patch (A13).
+    // PRD: A13.
+    /// `import_route`: one route patch.
     async fn import_route(
         &self,
         call: &Call,
@@ -239,8 +240,9 @@ impl ToolSet {
         Ok(written.into())
     }
 
+    // PRD: E6.
     /// `manage_identity`: a merge names every journey referring to any of its identities at the
-    /// revision it was checked against (E6), which the tool reads from the journey index.
+    /// revision it was checked against, which the tool reads from the journey index.
     async fn identity_patch(&self, arguments: ManageIdentity) -> Result<DomainPatch, ToolError> {
         let mutation = match arguments.change {
             IdentityChange::Create { identity } => Mutation::CreateIdentity { identity },
@@ -572,7 +574,8 @@ pub(crate) struct SetDate {
 #[derive(Debug, Deserialize, JsonSchema)]
 #[serde(rename_all = "snake_case", deny_unknown_fields)]
 pub(crate) enum DateChange {
-    /// Pin it to a date (F2).
+    // PRD: F2.
+    /// Pin it to a date.
     Pin {
         /// The date.
         date: Date,
@@ -584,7 +587,8 @@ pub(crate) enum DateChange {
     },
     /// Clear its pin.
     Unpin,
-    /// Record when it actually started or finished (F6).
+    // PRD: F6.
+    /// Record when it actually started or finished.
     Actual {
         /// Its start or its finish.
         end: RecordedEnd,
@@ -895,7 +899,8 @@ pub(crate) struct ManageIdentity {
     note: Option<Markdown>,
 }
 
-/// A change to the deployment's identities (E6).
+// PRD: E6.
+/// A change to the deployment's identities.
 #[derive(Debug, Deserialize, JsonSchema)]
 #[serde(rename_all = "snake_case", deny_unknown_fields)]
 pub(crate) enum IdentityChange {

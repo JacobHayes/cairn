@@ -55,7 +55,7 @@ pub(crate) fn solve(network: &Network, seeds: &Seeds) -> Solved {
     ) {
         Outcome::Settled(pass) => pass,
         Outcome::Contradiction(_) => {
-            panic!("derive runs on a graph whose plan holds no contradictory chain (F5)")
+            panic!("derive runs on a graph whose plan holds no contradictory chain")
         }
     };
     let earliest = pass(Direction::Forward, &lower);

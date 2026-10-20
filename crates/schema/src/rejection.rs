@@ -19,7 +19,7 @@ use crate::number::Revision;
 use crate::state::{Guard, GuardFailure};
 use crate::touched::TouchedSet;
 
-/// What a violation breaks (PRD Invariants, D1, D4, A11, A18, A19, B6, E3, E6, H3).
+/// What a violation breaks.
 #[derive(
     Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize, JsonSchema,
 )]
@@ -98,7 +98,8 @@ pub enum ViolationCode {
     UnresolvedReviewItem,
 }
 
-/// Where a violation is (A15: listed by path; PRD Non-functional, Config-first: specific
+// PRD: A15.
+/// Where a violation is (listed by path; PRD Non-functional, Config-first: specific
 /// enough to fix without reading source).
 #[derive(Clone, Debug, Default, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
 #[serde(deny_unknown_fields)]
@@ -125,7 +126,8 @@ pub struct Violation {
     pub code: ViolationCode,
     /// Where.
     pub at: Location,
-    /// A sentence for people, generated for display.
+    /// A sentence for people, generated for display: the rule in words, with no requirement
+    /// id.
     pub message: String,
     /// Other keys involved: a cycle's members, the other holder of a duplicate.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
@@ -133,17 +135,21 @@ pub struct Violation {
     /// The limit exceeded, for `limit_exceeded`.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub limit: Option<Limit>,
+    // PRD: D4.
     /// The guard a bypass would accept this past, when it is a bypassable guard failure
-    /// (D4: `deps_done`, `has_artifact`, `broken_down`).
+    /// (`deps_done`, `has_artifact`, `broken_down`).
     #[serde(skip_serializing_if = "Option::is_none")]
     pub bypassable: Option<Guard>,
-    /// The specific guard failures present (D4).
+    // PRD: D4.
+    /// The specific guard failures present.
     #[serde(default, skip_serializing_if = "BTreeSet::is_empty")]
     pub failures: BTreeSet<GuardFailure>,
-    /// The contradictory chains, for `contradictory_chain` (F5).
+    // PRD: F5.
+    /// The contradictory chains, for `contradictory_chain`.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub chains: Option<ChainList>,
-    /// The patch's other mutations that brought it about, beside `at.mutation` (D4: a
+    // PRD: D4.
+    /// The patch's other mutations that brought it about, beside `at.mutation` (a
     /// completion and the mutation that gave it an unfinished dependency in the same patch).
     #[serde(default, skip_serializing_if = "BTreeSet::is_empty")]
     pub caused_by: BTreeSet<u32>,
@@ -194,7 +200,8 @@ impl From<Violations> for BoundedVec<Violation, ByDocumentSize> {
     }
 }
 
-/// Which revision a stale patch named wrongly (H5).
+// PRD: H5.
+/// Which revision a stale patch named wrongly.
 #[derive(
     Clone, Debug, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize, JsonSchema,
 )]
@@ -222,7 +229,8 @@ pub struct RevisionConflict {
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
 #[serde(tag = "rejection", rename_all = "snake_case", deny_unknown_fields)]
 pub enum Rejection {
-    /// A revision the patch named has advanced (H5). The touched set of the intervening
+    // PRD: H5.
+    /// A revision the patch named has advanced. The touched set of the intervening
     /// events lets the client retry on its own when it does not overlap the patch's.
     Stale {
         /// The revisions that moved on.
@@ -230,12 +238,14 @@ pub enum Rejection {
         /// What the intervening events touched.
         intervening: TouchedSet,
     },
-    /// The patch id was committed before with different content (H5).
+    // PRD: H5.
+    /// The patch id was committed before with different content.
     PatchIdReused {
         /// The patch id.
         patch_id: PatchId,
     },
-    /// The patch would break invariants or guards: every violation (A15).
+    // PRD: A15.
+    /// The patch would break invariants or guards: every violation.
     Invalid {
         /// The violations.
         violations: Violations,

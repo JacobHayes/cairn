@@ -129,7 +129,7 @@ pub(super) fn remove(session: &mut Session<'_>, removal: &Removal) -> Vec<Write>
         session.reject(
             ViolationCode::RemovalWidened,
             Some(&removal.node),
-            "the subtree holds things this removal does not name (A18): fetch it again and name them",
+            "the subtree holds things this removal does not name: fetch it again and name them",
         );
         if let Some(found) = session.violations.last_mut() {
             found.related = extra;

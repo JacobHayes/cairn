@@ -39,7 +39,8 @@ use crate::state::{AnswerValue, Guard, LocalEdit, OverrideKind, Provenance, Snoo
 use crate::text::{Markdown, Reason, Title};
 use jiff::civil::Date;
 
-/// What a patch targets (A17): a domain, or a proposal within its destination domain.
+// PRD: A17.
+/// What a patch targets: a domain, or a proposal within its destination domain.
 #[derive(
     Clone, Debug, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize, JsonSchema,
 )]
@@ -51,7 +52,8 @@ pub enum PatchTarget {
     Route(RouteId),
     /// The deployment.
     Deployment,
-    /// A proposal, by id, within its destination domain (I6).
+    // PRD: I6.
+    /// A proposal, by id, within its destination domain.
     Proposal {
         /// The proposal.
         id: ProposalId,
@@ -131,25 +133,30 @@ impl From<Mutations> for BoundedVec<Mutation, MutationCountPerPatch> {
     }
 }
 
-/// A patch (A17, H5).
+// PRD: A17, H5.
+/// A patch.
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
 #[serde(deny_unknown_fields)]
 pub struct Patch {
-    /// The client-generated id that makes a resubmission safe (H5).
+    // PRD: H5.
+    /// The client-generated id that makes a resubmission safe.
     pub id: PatchId,
     /// The domain or proposal it targets.
     pub target: PatchTarget,
-    /// The target's revision the patch was drafted against; 0 creates the target (A17).
+    // PRD: A17.
+    /// The target's revision the patch was drafted against; 0 creates the target.
     pub base_revision: Revision,
+    // PRD: E6, H5.
     /// The deployment revision a journey patch that writes an identity reference was validated
-    /// against (E6, H5).
+    /// against.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub deployment_revision: Option<Revision>,
     /// The mutations, in order.
     pub mutations: Mutations,
 }
 
-/// Where a route draft comes from (A11, A13, B8).
+// PRD: A11, A13, B8.
+/// Where a route draft comes from.
 #[derive(
     Clone, Debug, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize, JsonSchema,
 )]
@@ -159,14 +166,16 @@ pub enum DraftSource {
     Edit,
     /// Importing a route file; the import's content follows as ordinary mutations.
     Import,
-    /// Saving a journey as a route (B8); its structure follows as ordinary mutations.
+    // PRD: B8.
+    /// Saving a journey as a route; its structure follows as ordinary mutations.
     SaveAsRoute {
         /// The journey saved.
         journey: JourneyId,
     },
 }
 
-/// What a segment role becomes in the graph it is inserted into (B13).
+// PRD: B13.
+/// What a segment role becomes in the graph it is inserted into.
 #[derive(
     Clone, Debug, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize, JsonSchema,
 )]
@@ -178,7 +187,8 @@ pub enum RoleChoice {
     Add,
 }
 
-/// What a segment participation kind becomes in the graph it is inserted into (B13).
+// PRD: B13.
+/// What a segment participation kind becomes in the graph it is inserted into.
 #[derive(
     Clone, Debug, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize, JsonSchema,
 )]
@@ -202,8 +212,9 @@ pub enum EdgeEnd {
     Host(NodeKey),
 }
 
+// PRD: B13.
 /// An edge an insertion adds: `node` requires `requires`, one end in the segment and the
-/// other in the graph (B13).
+/// other in the graph.
 #[derive(
     Clone, Debug, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize, JsonSchema,
 )]
@@ -215,7 +226,8 @@ pub struct InsertedEdge {
     pub requires: EdgeEnd,
 }
 
-/// A state-machine transition (D1). Answering a decision is [`Mutation::Answer`]; the dates a
+// PRD: D1.
+/// A state-machine transition. Answering a decision is [`Mutation::Answer`]; the dates a
 /// start or reach records default to today and are edited with
 /// [`Mutation::SetRecordedDate`].
 #[derive(
@@ -229,18 +241,21 @@ pub enum Transition {
     Stop,
     /// To `done` (deliverable, action).
     Complete,
-    /// To `skipped`, with the reason D1 requires.
+    /// To `skipped`, with the reason a skip requires.
     Skip {
         /// Why.
         reason: Reason,
     },
-    /// Back to the initial state (D1: always allowed).
+    // PRD: D1.
+    /// Back to the initial state (always allowed).
     Reopen,
-    /// `pending` to `reached` (milestone), including confirming an auto-reach (F1).
+    // PRD: F1.
+    /// `pending` to `reached` (milestone), including confirming an auto-reach.
     Reach,
 }
 
-/// Which recorded date a [`Mutation::SetRecordedDate`] edits (F1, F2).
+// PRD: F1, F2.
+/// Which recorded date a [`Mutation::SetRecordedDate`] edits.
 #[derive(
     Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize, JsonSchema,
 )]
@@ -252,7 +267,7 @@ pub enum RecordedEnd {
     Finish,
 }
 
-/// An override to apply (PRD glossary, Override; Gating; D1a; D4).
+/// An override to apply (see the glossary entry Override).
 #[derive(
     Clone, Debug, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize, JsonSchema,
 )]
@@ -302,7 +317,8 @@ pub struct ParticipationRef {
     pub kind: KindKey,
 }
 
-/// Everything a node removal removes, as its author saw it (A18): the subtree, every edge
+// PRD: A18.
+/// Everything a node removal removes, as its author saw it: the subtree, every edge
 /// incident to it, and everything attached to those nodes. If anything else is attached
 /// when the patch applies, the patch is rejected rather than widening the removal.
 #[derive(
@@ -336,7 +352,8 @@ impl Removal {
     }
 }
 
-/// One change within a patch (PRD glossary, Mutation), each emitting one event (J2). The
+// PRD: J2.
+/// One change within a patch (PRD glossary, Mutation), each emitting one event. The
 /// set covers every change the PRD defines; [`Mutation::change_class`] sorts each into
 /// structural or state (PRD glossary, Structural change).
 //
@@ -348,7 +365,8 @@ impl Removal {
 #[serde(tag = "op", rename_all = "snake_case", deny_unknown_fields)]
 pub enum Mutation {
     // Journey lifecycle (A17, B1, B11, A19).
-    /// Create the target journey, empty or from a route version (B1).
+    // PRD: B1.
+    /// Create the target journey, empty or from a route version.
     CreateJourney {
         /// The name.
         name: Title,
@@ -367,12 +385,14 @@ pub enum Mutation {
         #[serde(skip_serializing_if = "Option::is_none")]
         description: Option<Markdown>,
     },
-    /// Change the journey's status (B11).
+    // PRD: B11.
+    /// Change the journey's status.
     SetJourneyStatus {
         /// The new status.
         status: JourneyStatus,
     },
-    /// Hard-delete the journey and its events (A19).
+    // PRD: A19.
+    /// Hard-delete the journey and its events.
     DeleteJourney {},
 
     // Route lifecycle (A11, A13, A19).
@@ -383,7 +403,8 @@ pub enum Mutation {
         /// The description.
         #[serde(skip_serializing_if = "Option::is_none")]
         description: Option<Markdown>,
-        /// Process (the default) or segment; fixed from here on (A21).
+        // PRD: A21.
+        /// Process (the default) or segment; fixed from here on.
         #[serde(default, skip_serializing_if = "RouteKind::is_process")]
         kind: RouteKind,
     },
@@ -400,14 +421,16 @@ pub enum Mutation {
         /// Retired or not.
         retired: bool,
     },
-    /// Open the route's draft (A11).
+    // PRD: A11.
+    /// Open the route's draft.
     OpenDraft {
         /// Where it comes from.
         source: DraftSource,
     },
     /// Discard the route's draft.
     DiscardDraft {},
-    /// Publish the draft as the next version and clear it (A11).
+    // PRD: A11.
+    /// Publish the draft as the next version and clear it.
     PublishDraft {},
 
     // Graph structure (A1, B4, A18).
@@ -423,12 +446,14 @@ pub enum Mutation {
         /// The field and its new value.
         value: NodeFieldValue<KeyRefs>,
     },
-    /// Replace a node whole, as a kind or answer-type change does (B7).
+    // PRD: B7.
+    /// Replace a node whole, as a kind or answer-type change does.
     ReplaceNode {
         /// The node, with its key.
         node: Node<KeyRefs>,
     },
-    /// Remove a node and everything its removal names (A18).
+    // PRD: A18.
+    /// Remove a node and everything its removal names.
     RemoveNode {
         /// What it removes.
         removal: Removal,
@@ -443,7 +468,8 @@ pub enum Mutation {
         /// The edge.
         edge: Edge,
     },
-    /// Add a role (A6).
+    // PRD: A6.
+    /// Add a role.
     AddRole {
         /// The role.
         role: Role<KeyRefs>,
@@ -453,12 +479,14 @@ pub enum Mutation {
         /// The role as it should be.
         role: Role<KeyRefs>,
     },
-    /// Remove a role no participation or `fills_role` references (A18).
+    // PRD: A18.
+    /// Remove a role no participation or `fills_role` references.
     RemoveRole {
         /// The role.
         role: RoleKey,
     },
-    /// Declare a participation kind (A7).
+    // PRD: A7.
+    /// Declare a participation kind.
     AddParticipationKind {
         /// The kind.
         kind: ParticipationKind<KeyRefs>,
@@ -473,13 +501,15 @@ pub enum Mutation {
         /// The kind.
         kind: KindKey,
     },
-    /// Set or clear the graph's `default_owner` role (A6).
+    // PRD: A6.
+    /// Set or clear the graph's `default_owner` role.
     SetDefaultOwner {
         /// The role, or none.
         #[serde(skip_serializing_if = "Option::is_none")]
         role: Option<RoleKey>,
     },
-    /// Set a node's participation of one kind (E2, B5).
+    // PRD: E2, B5.
+    /// Set a node's participation of one kind.
     SetParticipation {
         /// The node.
         node: NodeKey,
@@ -488,14 +518,16 @@ pub enum Mutation {
         /// Its source.
         source: ParticipationSource<KeyRefs>,
     },
-    /// Remove a node's participation of one kind, restoring inheritance (E2).
+    // PRD: E2.
+    /// Remove a node's participation of one kind, restoring inheritance.
     ClearParticipation {
         /// The node.
         node: NodeKey,
         /// The kind.
         kind: KindKey,
     },
-    /// Add a resource to a node (A10).
+    // PRD: A10.
+    /// Add a resource to a node.
     AddResource {
         /// The node.
         node: NodeKey,
@@ -516,8 +548,9 @@ pub enum Mutation {
         /// The resource.
         resource: AttachmentKey,
     },
+    // PRD: B13.
     /// Insert a published segment version under a parent, wired to the graph's own nodes and
-    /// with its roles and kinds mapped, in one event (B13).
+    /// with its roles and kinds mapped, in one event.
     InsertSegment {
         /// The insertion's key, new in the graph.
         insertion: InsertionKey,
@@ -555,18 +588,21 @@ pub enum Mutation {
         /// The transition.
         transition: Transition,
     },
-    /// Answer or revise a decision (B2). The rationale belongs to this answer alone: a
+    // PRD: B2.
+    /// Answer or revise a decision. The rationale belongs to this answer alone: a
     /// revision that gives none leaves the decision without one.
     Answer {
         /// The decision.
         decision: NodeKey,
         /// The answer.
         value: AnswerValue,
-        /// Why it was given: markdown, free text under the body limit (B2).
+        // PRD: B2.
+        /// Why it was given: markdown, free text under the body limit.
         #[serde(default, skip_serializing_if = "Option::is_none")]
         rationale: Option<Markdown>,
     },
-    /// Edit a recorded start or finish date (F1, F2).
+    // PRD: F1, F2.
+    /// Edit a recorded start or finish date.
     SetRecordedDate {
         /// The node.
         node: NodeKey,
@@ -575,7 +611,8 @@ pub enum Mutation {
         /// The date.
         date: Date,
     },
-    /// Fill a role without a filling decision (E3).
+    // PRD: E3.
+    /// Fill a role without a filling decision.
     FillRole {
         /// The role.
         role: RoleKey,
@@ -587,40 +624,43 @@ pub enum Mutation {
         /// The role.
         role: RoleKey,
     },
-    /// Pin a node's date (PRD glossary, Pin; F5 `repin`).
+    /// Pin a node's date (`repin`).
     SetPin {
         /// The node.
         node: NodeKey,
         /// The date.
         date: Date,
     },
-    /// Move a pin by a number of days (F5 `shift`).
+    /// Move a pin by a number of days (`shift`).
     ShiftPin {
         /// The node.
         node: NodeKey,
         /// Days later (positive) or earlier (negative).
         offset_days: SignedDays,
     },
-    /// Remove a pin (F5 `unpin`).
+    /// Remove a pin (`unpin`).
     ClearPin {
         /// The node.
         node: NodeKey,
     },
+    // PRD: B6.
     /// Snooze an actionable node, or a container (a group, or work with children) that has
-    /// work left beneath it, which holds every descendant off the acting frontier (B6).
+    /// work left beneath it, which holds every descendant off the acting frontier.
     Snooze {
         /// The node.
         node: NodeKey,
         /// Until a date or a node.
         until: SnoozeTarget,
     },
-    /// Lift a snooze (B6). A node held only through a container's snooze is refused, naming
+    // PRD: B6.
+    /// Lift a snooze. A node held only through a container's snooze is refused, naming
     /// the container to unsnooze instead.
     Unsnooze {
         /// The node.
         node: NodeKey,
     },
-    /// Apply an override (B5, D1a, D4).
+    // PRD: B5, D1a, D4.
+    /// Apply an override.
     ApplyOverride {
         /// The node.
         node: NodeKey,
@@ -635,14 +675,16 @@ pub enum Mutation {
         /// Its kind.
         kind: OverrideKind,
     },
-    /// Mark a placeholder atomic, or not (B10).
+    // PRD: B10.
+    /// Mark a placeholder atomic, or not.
     SetAtomic {
         /// The node.
         node: NodeKey,
         /// Atomic or not.
         atomic: bool,
     },
-    /// Add a note or link (G1).
+    // PRD: G1.
+    /// Add a note or link.
     AddAnnotation {
         /// What its author wrote.
         annotation: AnnotationBody,
@@ -659,29 +701,32 @@ pub enum Mutation {
     },
 
     // Lineage (B4, B7, B9).
+    // PRD: B7.
     /// Move the journey to a newer version of its route, taking every clean outcome of the
     /// three-way merge (route changes it did not edit, new nodes, orphans); conflict
-    /// resolutions and orphan removals ride after it in the same patch as ordinary mutations
-    /// (B7).
+    /// resolutions and orphan removals ride after it in the same patch as ordinary mutations.
     Upgrade {
         /// The version upgraded to.
         to: VersionNumber,
     },
-    /// Link the journey to the version its saved route published (B9), in one event: the
+    // PRD: B9.
+    /// Link the journey to the version its saved route published, in one event: the
     /// lineage, each node the version holds route-copied and marked exactly where it differs,
     /// every other node local, and the version's roles and kinds the journey lacks.
     Relink {
         /// The new lineage.
         lineage: Lineage,
     },
-    /// Change a node's provenance, as an upgrade orphaning it does (B7).
+    // PRD: B7.
+    /// Change a node's provenance, as an upgrade orphaning it does.
     SetProvenance {
         /// The node.
         node: NodeKey,
         /// The provenance.
         provenance: Provenance,
     },
-    /// Set or clear a local-edit marker (B4: reset to route clears it).
+    // PRD: B4.
+    /// Set or clear a local-edit marker (reset to route clears it).
     MarkLocalEdit {
         /// The node.
         node: NodeKey,
@@ -702,7 +747,7 @@ pub enum Mutation {
         /// The identity as it should be.
         identity: Identity,
     },
-    /// Merge identities into one that remains (deployment, E6): every merged identity's emails
+    /// Merge identities into one that remains (deployment): every merged identity's emails
     /// move to the survivor and each merged key becomes an alias of it, all checked against one
     /// snapshot.
     MergeIdentities {
@@ -717,7 +762,7 @@ pub enum Mutation {
         #[schemars(extend("maxProperties" = crate::limits::JOURNEY_COUNT_PER_MERGE_MAX))]
         journeys: BTreeMap<JourneyId, Revision>,
     },
-    /// Delete an identity nothing refers to (deployment, E6): the identity, its emails, and
+    /// Delete an identity nothing refers to (deployment): the identity, its emails, and
     /// every alias resolving to it. Rejected while any journey, route draft, or route version
     /// refers to it or to one of its aliases; the commit rechecks that none does.
     DeleteIdentity {

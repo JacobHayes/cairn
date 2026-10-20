@@ -20,7 +20,8 @@ use crate::refs::{FileRefs, KeyRefs, References, key_absent};
 use crate::state::JourneyState;
 use crate::text::{Markdown, Title};
 
-/// A role (A6): a named slot, single or multi valued, filled per journey with identities.
+// PRD: A6.
+/// A role: a named slot, single or multi valued, filled per journey with identities.
 #[derive(
     Clone, Debug, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize, JsonSchema,
 )]
@@ -40,7 +41,8 @@ pub struct Role<R: References> {
     pub multi: bool,
 }
 
-/// A participation kind a graph declares beyond the built-in `owner` (A7).
+// PRD: A7.
+/// A participation kind a graph declares beyond the built-in `owner`.
 #[derive(
     Clone, Debug, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize, JsonSchema,
 )]
@@ -111,7 +113,8 @@ impl From<FormatVersion> for u32 {
     }
 }
 
-/// The file document (A13, A14; ARCHITECTURE, File format): a route version or draft as
+// PRD: A13, A14.
+/// The file document (ARCHITECTURE, File format): a route version or draft as
 /// written, unresolved. Nodes refer to each other by path and to roles and kinds by id;
 /// keys may be left out for import to match by path against the version extended, or mint.
 /// The JSON Schema in `schema/` describes this type.
@@ -127,13 +130,15 @@ pub struct RouteFile {
     /// What the route is for.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub description: Option<Markdown>,
-    /// Process or segment (A21); a file that leaves it out is a process.
+    // PRD: A21.
+    /// Process or segment; a file that leaves it out is a process.
     #[serde(default, skip_serializing_if = "RouteKind::is_process")]
     pub kind: RouteKind,
     /// The published version this one extends, or none for a new route.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub extends: Option<VersionNumber>,
-    /// The role that owns nodes no ancestor gives an owner (A6).
+    // PRD: A6.
+    /// The role that owns nodes no ancestor gives an owner.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub default_owner: Option<Slug>,
     /// The roles.
@@ -176,7 +181,8 @@ impl RetiredKeys {
 #[derive(Clone, Debug, Default, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
 #[serde(deny_unknown_fields)]
 pub struct Graph {
-    /// The role that owns nodes no ancestor gives an owner (A6).
+    // PRD: A6.
+    /// The role that owns nodes no ancestor gives an owner.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub default_owner: Option<RoleKey>,
     /// The roles.
@@ -191,7 +197,8 @@ pub struct Graph {
     /// Every key the graph has retired.
     #[serde(default, skip_serializing_if = "RetiredKeys::is_empty")]
     pub retired_keys: RetiredKeys,
-    /// The segment insertions the graph holds (B13).
+    // PRD: B13.
+    /// The segment insertions the graph holds.
     #[serde(default, skip_serializing_if = "Keyed::is_empty")]
     pub insertions: Keyed<Insertion, InsertionCount>,
     /// Journey state; empty for a route version or draft.
@@ -199,7 +206,7 @@ pub struct Graph {
     pub state: JourneyState,
 }
 
-/// One placement of a segment version in a graph (PRD glossary, Insertion; B13). Its local
+/// One placement of a segment version in a graph (see the glossary entry Insertion). Its local
 /// edits are not stored: they are its members' differences from the version it is on.
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
 #[serde(deny_unknown_fields)]
@@ -239,7 +246,8 @@ impl HasKey for Insertion {
     }
 }
 
-/// An explicit `requires` edge (A3), identified by its two ends: `node` requires `requires`.
+// PRD: A3.
+/// An explicit `requires` edge, identified by its two ends: `node` requires `requires`.
 /// The graph document holds edges on the dependent node's `requires` list; changes and
 /// removals name them this way.
 #[derive(

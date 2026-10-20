@@ -110,7 +110,7 @@ fn relevance(check: &mut Check<'_, '_>, graph: &Graph, derived: &Derived, key: &
         key,
         ViolationCode::NotRelevant,
         "the node is not relevant on the graph this patch produces, and a node out of scope \
-         does not take this transition (D4); force include it to go ahead",
+         does not take this transition; force include it to go ahead",
     );
     violation.at.mutation = Some(at);
     violation.caused_by = causes(check.events, at, &involved);
@@ -178,7 +178,7 @@ fn deps_done(check: &mut Check<'_, '_>, graph: &Graph, derived: &Derived, key: &
         ViolationCode::GuardFailed,
         format!(
             "this transition needs every hard dependency satisfied, and {} are open on the graph \
-             this patch produces (D4); bypass deps_done with a reason to go ahead anyway",
+             this patch produces; bypass deps_done with a reason to go ahead anyway",
             open.len()
         ),
     );
@@ -208,9 +208,9 @@ fn snoozes(check: &mut Check<'_, '_>, graph: &Graph, derived: &Derived) {
             continue;
         }
         let message = if nothing_beneath {
-            "a group is snoozed only while work in scope is left beneath it (B6)"
+            "a group is snoozed only while work in scope is left beneath it"
         } else {
-            "only a node in scope with something left to do is snoozed (B6)"
+            "only a node in scope with something left to do is snoozed"
         };
         let mut violation = at_node(tree, key, ViolationCode::SnoozeNotActionable, message);
         violation.at.mutation = Some(*at);
@@ -241,7 +241,7 @@ fn unsnoozes_through(check: &mut Check<'_, '_>, tree: &Tree, derived: &Derived) 
         let (code, message) = match held {
             Some(container) => (
                 ViolationCode::SnoozedThroughContainer,
-                format!("{key} is snoozed through {container}; unsnooze {container} instead (B6)"),
+                format!("{key} is snoozed through {container}; unsnooze {container} instead"),
             ),
             None => (
                 ViolationCode::UnresolvedReference,

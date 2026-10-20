@@ -79,7 +79,7 @@ fn requires(check: &GraphCheck<'_>, node: &GraphNode, out: &mut Vec<Violation>) 
         {
             (
                 ViolationCode::EdgeToAncestorOrDescendant,
-                "an explicit edge cannot join a node to its ancestor or descendant (A3)",
+                "an explicit edge cannot join a node to its ancestor or descendant",
             )
         } else if gated_on.contains(&requirement) {
             (
@@ -247,7 +247,7 @@ fn date_rules(check: &GraphCheck<'_>, node: &GraphNode, out: &mut Vec<Violation>
                     check.tree,
                     &node.key,
                     ViolationCode::WrongReferenceKind,
-                    "a date rule measures from a milestone or a date decision (A8)",
+                    "a date rule measures from a milestone or a date decision",
                 );
                 out.push(related_to(found, Some(field), source));
             }
@@ -274,12 +274,12 @@ fn stage_bounds(check: &GraphCheck<'_>, node: &GraphNode, out: &mut Vec<Violatio
         let problem = if target.kind() != NodeKind::Milestone {
             Some((
                 ViolationCode::StageBoundNotMilestone,
-                "a stage bound is a milestone (F4)",
+                "a stage bound is a milestone",
             ))
         } else if check.tree.is_ancestor(&node.key, bound) {
             Some((
                 ViolationCode::EdgeToAncestorOrDescendant,
-                "a stage bound sits outside the stage (F4)",
+                "a stage bound sits outside the stage",
             ))
         } else {
             None
@@ -316,7 +316,7 @@ fn answer_spec(check: &GraphCheck<'_>, node: &GraphNode, out: &mut Vec<Violation
                     check.tree,
                     &node.key,
                     ViolationCode::FeedsMilestoneNotMilestone,
-                    "a date decision feeds a milestone (E3)",
+                    "a date decision feeds a milestone",
                 );
                 out.push(related_to(found, field, milestone));
             }
@@ -347,7 +347,7 @@ fn fills_role(
         ),
         Some(found) if found.multi != list => (
             ViolationCode::FillsRoleCardinality,
-            "an identity decision fills a single role, an identity-list decision a multi role (A6)",
+            "an identity decision fills a single role, an identity-list decision a multi role",
         ),
         Some(_) => return,
     };
@@ -370,7 +370,7 @@ fn participations(check: &GraphCheck<'_>, node: &GraphNode, out: &mut Vec<Violat
                 check.tree,
                 &node.key,
                 missing_kind_code(document, kind),
-                format!("the participation kind {kind} is not declared (A7)"),
+                format!("the participation kind {kind} is not declared"),
             );
             found.related.push(Subject::Kind(kind.clone()));
             out.push(found);
@@ -385,14 +385,14 @@ fn participations(check: &GraphCheck<'_>, node: &GraphNode, out: &mut Vec<Violat
                 ),
                 Some(found) if found.multi && !multi_kind => (
                     ViolationCode::SingleKindOnMultiRole,
-                    "a single-valued kind cannot take a multi-valued role (A7)",
+                    "a single-valued kind cannot take a multi-valued role",
                     Subject::Role(role.clone()),
                 ),
                 Some(_) => continue,
             },
             ParticipationSource::Identities(identities) if identities.len() > 1 && !multi_kind => (
                 ViolationCode::SingleKindOnMultiRole,
-                "a single-valued kind holds at most one identity (A7)",
+                "a single-valued kind holds at most one identity",
                 Subject::Kind(kind.clone()),
             ),
             ParticipationSource::Identities(_) => continue,
@@ -523,7 +523,7 @@ fn default_owner(check: &GraphCheck<'_>, out: &mut Vec<Violation>) {
         ),
         Some(found) if found.multi => (
             ViolationCode::SingleKindOnMultiRole,
-            "the default owner is single-valued and cannot take a multi-valued role (A6, A7)",
+            "the default owner is single-valued and cannot take a multi-valued role",
         ),
         Some(_) => return,
     };

@@ -210,7 +210,7 @@ fn names_an_identity(record: &GraphRecord) -> bool {
 fn check_events(change_set: &ChangeSet, domain: &Domain) -> Result<(), StoreError> {
     let receipt = &change_set.receipt;
     if change_set.events.is_empty() {
-        return malformed("a change set has at least one event (J2)".to_owned());
+        return malformed("a change set has at least one event".to_owned());
     }
     for (position, event) in change_set.events.iter().enumerate() {
         if event.patch_id != receipt.patch_id {

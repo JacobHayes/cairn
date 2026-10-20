@@ -42,7 +42,8 @@ pub enum ProposalStatus {
     Discarded,
 }
 
-/// How a reviewer resolves a conflict (B7, B9). Which resolutions a conflict offers depends
+// PRD: B7, B9.
+/// How a reviewer resolves a conflict. Which resolutions a conflict offers depends
 /// on what it is about ([`Conflict::offers`]); each becomes ordinary mutations when the
 /// proposal is resolved.
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
@@ -52,8 +53,9 @@ pub enum ConflictResolution {
     KeepJourney,
     /// Take the route's value.
     TakeRoute,
+    // PRD: B7.
     /// Take the route's choices and map each removed choice the answer names to one that
-    /// remains (B7: map old to new).
+    /// remains (map old to new).
     MapChoices {
         /// Removed choice to remaining choice.
         #[serde(deserialize_with = "crate::serde_util::unique_map")]
@@ -63,27 +65,31 @@ pub enum ConflictResolution {
     ClearState,
     /// Take the route's value and reopen the node.
     Reopen,
+    // PRD: B13.
     /// Point every reference to a role the route removed at another role, then remove it.
-    /// Not offered while an insertion maps a segment role onto it (B13).
+    /// Not offered while an insertion maps a segment role onto it.
     RemapRole {
         /// The role the references move to.
         role: RoleKey,
     },
+    // PRD: B13.
     /// Move every participation of a kind the route removed to another kind, then remove it.
-    /// Not offered while an insertion maps a segment kind onto it (B13).
+    /// Not offered while an insertion maps a segment kind onto it.
     RemapKind {
         /// The kind the participations move to.
         kind: KindKey,
     },
+    // PRD: B13.
     /// Clear every reference to a role or kind the route removed, then remove it. Where an
     /// insertion maps a segment role onto a removed role, the segment's nodes keep what the
     /// role held: whoever filled it now fills their participations directly, and the
-    /// insertion's mapping goes with the role (B13).
+    /// insertion's mapping goes with the role.
     Remove,
 }
 
-/// Something in a journey that refers to a role (A6, E3): what remapping or removing the
-/// role rewrites (B7).
+// PRD: A6, E3, B7.
+/// Something in a journey that refers to a role: what remapping or removing the
+/// role rewrites.
 #[derive(
     Clone, Debug, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize, JsonSchema,
 )]
@@ -108,8 +114,9 @@ pub enum RoleReference {
     },
     /// The role is the graph's `default_owner`.
     DefaultOwner,
+    // PRD: B13.
     /// A participation of a kind on a node an insertion copied in, whose segment role the
-    /// insertion mapped onto the role (B13): removing the role hands the node the role's fill
+    /// insertion mapped onto the role: removing the role hands the node the role's fill
     /// directly.
     SegmentParticipation {
         /// The node.
@@ -117,7 +124,8 @@ pub enum RoleReference {
         /// The kind.
         kind: KindKey,
     },
-    /// A node's message draft names the role (A10).
+    // PRD: A10.
+    /// A node's message draft names the role.
     Draft {
         /// The node.
         node: NodeKey,
@@ -126,7 +134,8 @@ pub enum RoleReference {
     },
 }
 
-/// What a conflict is about, with the journey's side and the route's (B7, B9). A side that
+// PRD: B7, B9.
+/// What a conflict is about, with the journey's side and the route's. A side that
 /// is absent is `None` (an absent edge is `false`).
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
 #[serde(tag = "about", rename_all = "snake_case", deny_unknown_fields)]
@@ -139,8 +148,9 @@ pub enum Conflict {
         journey: NodeFieldValue<KeyRefs>,
         /// The route's value.
         route: NodeFieldValue<KeyRefs>,
+        // PRD: B4.
         /// The route's value names a node the journey does not hold, so it cannot be taken
-        /// (B4: a removed node's tombstone covers its subtree); only the journey's side is
+        /// (a removed node's tombstone covers its subtree); only the journey's side is
         /// offered.
         #[serde(default, skip_serializing_if = "crate::serde_util::is_false")]
         dangling: bool,
@@ -179,8 +189,9 @@ pub enum Conflict {
         /// The route's resource.
         #[serde(skip_serializing_if = "Option::is_none")]
         route: Option<Resource<KeyRefs>>,
+        // PRD: B4.
         /// The route's value names a node the journey does not hold, so it cannot be taken
-        /// (B4: a removed node's tombstone covers its subtree); only the journey's side is
+        /// (a removed node's tombstone covers its subtree); only the journey's side is
         /// offered.
         #[serde(default, skip_serializing_if = "crate::serde_util::is_false")]
         dangling: bool,
@@ -195,8 +206,9 @@ pub enum Conflict {
         /// The journey has answered it, so taking an answer-type change reopens it.
         #[serde(default, skip_serializing_if = "crate::serde_util::is_false")]
         answered: bool,
+        // PRD: B4.
         /// The route's value names a node the journey does not hold, so it cannot be taken
-        /// (B4: a removed node's tombstone covers its subtree); only the journey's side is
+        /// (a removed node's tombstone covers its subtree); only the journey's side is
         /// offered.
         #[serde(default, skip_serializing_if = "crate::serde_util::is_false")]
         dangling: bool,
@@ -207,8 +219,9 @@ pub enum Conflict {
         decision: NodeKey,
         /// The journey's answer.
         answer: AnswerValue,
+        // PRD: B2.
         /// The rationale the journey's answer was given with, kept when the answer is
-        /// mapped onto the route's choices (B2).
+        /// mapped onto the route's choices.
         #[serde(default, skip_serializing_if = "Option::is_none")]
         rationale: Option<Markdown>,
         /// The route's choices.
@@ -228,11 +241,13 @@ pub enum Conflict {
         /// What in the journey refers to it.
         #[serde(default, skip_serializing_if = "BTreeSet::is_empty")]
         references: BTreeSet<RoleReference>,
-        /// The insertions that map a segment role onto it, when the route removed it (B13):
+        // PRD: B13.
+        /// The insertions that map a segment role onto it, when the route removed it:
         /// the role can then be kept or removed, not remapped.
         #[serde(default, skip_serializing_if = "BTreeSet::is_empty")]
         insertions: BTreeSet<InsertionKey>,
-        /// Who fills the role now (E3), when insertions map onto it: removing it hands
+        // PRD: E3.
+        /// Who fills the role now, when insertions map onto it: removing it hands
         /// these to the segment's nodes directly.
         #[serde(default, skip_serializing_if = "IdentitySet::is_empty")]
         members: IdentitySet,
@@ -255,7 +270,8 @@ pub enum Conflict {
             deserialize_with = "crate::serde_util::unique_map"
         )]
         references: BTreeMap<NodeKey, ParticipationSource<KeyRefs>>,
-        /// The insertions that map a segment kind onto it, when the route removed it (B13):
+        // PRD: B13.
+        /// The insertions that map a segment kind onto it, when the route removed it:
         /// the kind can then be kept or removed, not remapped.
         #[serde(default, skip_serializing_if = "BTreeSet::is_empty")]
         insertions: BTreeSet<InsertionKey>,
@@ -385,7 +401,8 @@ fn maps_every_removed_choice(
         })
 }
 
-/// A journey's deviation from its route that an upgrade keeps, listed for the reviewer (B7:
+// PRD: B7.
+/// A journey's deviation from its route that an upgrade keeps, listed for the reviewer (
 /// locally edited and unchanged in the route).
 #[derive(
     Clone, Debug, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize, JsonSchema,
@@ -407,8 +424,8 @@ pub enum Kept {
     DefaultOwner,
 }
 
-/// What becomes of an explicit identity's participations when a journey is saved as a route
-/// (B8).
+// PRD: B8.
+/// What becomes of an explicit identity's participations when a journey is saved as a route.
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "snake_case", deny_unknown_fields)]
 pub enum ParticipationMapping {
@@ -422,13 +439,15 @@ pub enum ParticipationMapping {
     DefaultOwner,
 }
 
-/// One thing a reviewer looks at, and resolves where it needs a choice (C14). Resolving a
+// PRD: C14.
+/// One thing a reviewer looks at, and resolves where it needs a choice. Resolving a
 /// proposal turns each choice into mutations; an item that still needs one blocks apply.
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
 #[serde(tag = "item", rename_all = "snake_case", deny_unknown_fields)]
 pub enum ReviewItem {
+    // PRD: B7, B9.
     /// Something the journey and the route both changed, or a route change that invalidates
-    /// the journey's state (B7); a difference a re-link keeps by default (B9).
+    /// the journey's state; a difference a re-link keeps by default.
     Conflict {
         /// What it is about.
         conflict: Conflict,
@@ -436,21 +455,25 @@ pub enum ReviewItem {
         #[serde(skip_serializing_if = "Option::is_none")]
         resolution: Option<ConflictResolution>,
     },
-    /// Something the journey edited and the route left alone: kept, listed (B7).
+    // PRD: B7.
+    /// Something the journey edited and the route left alone: kept, listed.
     KeptLocalEdit {
         /// What is kept.
         kept: Kept,
     },
-    /// A node the new version removed (B7): kept as orphaned by default.
+    // PRD: B7.
+    /// A node the new version removed: kept as orphaned by default.
     Orphan {
         /// The node.
         node: NodeKey,
         /// Keep it (the default) or remove it with its descendants.
         keep: bool,
-        /// What removing it removes, shown in review (A18).
+        // PRD: A18.
+        /// What removing it removes, shown in review.
         removal: Removal,
     },
-    /// An explicit identity on nodes being saved as a route (B8).
+    // PRD: B8.
+    /// An explicit identity on nodes being saved as a route.
     Participation {
         /// The identity.
         identity: IdentityKey,
@@ -460,19 +483,22 @@ pub enum ReviewItem {
         #[serde(skip_serializing_if = "Option::is_none")]
         mapping: Option<ParticipationMapping>,
     },
-    /// A node the reviewer may leave out of a saved route, with its subtree (B8).
+    // PRD: B8.
+    /// A node the reviewer may leave out of a saved route, with its subtree.
     Exclusion {
         /// The node.
         node: NodeKey,
         /// Left out.
         excluded: bool,
     },
-    /// Everything a removal in the proposal cascades to (A18).
+    // PRD: A18.
+    /// Everything a removal in the proposal cascades to.
     Cascade {
         /// The removal.
         removal: Removal,
     },
-    /// An invariant the proposal's candidate broke when it was drafted (B7): shown, never
+    // PRD: B7.
+    /// An invariant the proposal's candidate broke when it was drafted: shown, never
     /// applied silently, since apply validates strictly.
     Violation {
         /// The violation.
@@ -490,9 +516,11 @@ pub enum UnresolvedReason {
     NoChoice,
     /// Its choice is not one the item offers.
     NotOffered,
-    /// Its identity shares a participation with identities mapped to other roles (B8).
+    // PRD: B8.
+    /// Its identity shares a participation with identities mapped to other roles.
     MixedMapping,
-    /// It maps to the graph's `default_owner`, and the graph has none (B8).
+    // PRD: B8.
+    /// It maps to the graph's `default_owner`, and the graph has none.
     NoDefaultOwner,
 }
 
@@ -508,7 +536,8 @@ pub struct UnresolvedItem {
     pub reason: UnresolvedReason,
 }
 
-/// What a proposal would do to its destination now (C14, I6), for review: the items still
+// PRD: C14, I6.
+/// What a proposal would do to its destination now, for review: the items still
 /// unresolved, and the candidate the resolved mutations produce, with every violation strict
 /// validation finds in it.
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
@@ -523,10 +552,12 @@ pub struct ProposalPreview {
     /// For a journey, its frontier after, in rank order.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub frontier: Vec<NodeKey>,
-    /// For a journey, what the change does to derived state (D7).
+    // PRD: D7.
+    /// For a journey, what the change does to derived state.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub consequences: Option<Consequences>,
-    /// For a route's draft, the advisory notices of the graph after (A20); they never make
+    // PRD: A20.
+    /// For a route's draft, the advisory notices of the graph after; they never make
     /// the proposal invalid.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub notices: Vec<Notice>,
@@ -534,7 +565,8 @@ pub struct ProposalPreview {
     pub outline: ProposalOutline,
 }
 
-/// One thing a proposal does to its destination's own header or lifecycle (C14), as a fact
+// PRD: C14.
+/// One thing a proposal does to its destination's own header or lifecycle, as a fact
 /// the listing and the review word the same way.
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
 #[serde(tag = "fact", rename_all = "snake_case")]
@@ -575,7 +607,8 @@ pub enum OutlineFact {
     InsertsSegment,
 }
 
-/// What a proposal does, as counts of the things it names (C14): the facts about its
+// PRD: C14.
+/// What a proposal does, as counts of the things it names: the facts about its
 /// destination's header first, then the nodes it adds, changes and removes (each node once,
 /// by the mutations that name it), the requirements, the identities, and everything else in one
 /// count. Derived from the mutations alone on every read, never stored.
@@ -756,7 +789,8 @@ fn fact(outline: &mut ProposalOutline, next: OutlineFact) {
     }
 }
 
-/// What a destination is once a proposal applies (C14), as the engine works it out from the
+// PRD: C14.
+/// What a destination is once a proposal applies, as the engine works it out from the
 /// candidate records: what the views draw in place of the destination.
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize, JsonSchema)]
 #[serde(tag = "destination", rename_all = "snake_case")]
@@ -868,17 +902,20 @@ impl From<ProposalDraft> for ProposalDraftWire {
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
 #[serde(deny_unknown_fields)]
 pub struct Proposal {
-    /// The client-generated id (I6).
+    // PRD: I6.
+    /// The client-generated id.
     pub id: ProposalId,
     /// The domain it applies to, which may not exist yet.
     pub destination: Domain,
-    /// Its editing revision, separate from the destination's (H5).
+    // PRD: H5.
+    /// Its editing revision, separate from the destination's.
     pub revision: Revision,
     /// Its status.
     pub status: ProposalStatus,
     /// Its content.
     pub draft: ProposalDraft,
-    /// The agent that drafted it, if any (I6).
+    // PRD: I6.
+    /// The agent that drafted it, if any.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub proposing_agent: Option<AgentId>,
     /// The user it was created by or for.

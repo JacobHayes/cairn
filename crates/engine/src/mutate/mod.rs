@@ -292,7 +292,7 @@ impl Session<'_> {
                     (Some(route), false) if scope == Scope::Graph && route.draft.is_none() => {
                         Err((
                             ViolationCode::NoDraft,
-                            format!("route {id} has no open draft (A11)"),
+                            format!("route {id} has no open draft"),
                         ))
                     }
                     (Some(_) | None, true | false) => Ok(()),
@@ -327,8 +327,7 @@ impl Session<'_> {
         if archived && !unarchiving && !rides {
             return Err((
                 ViolationCode::ArchivedJourney,
-                "an archived journey accepts only un-archiving or hard deletion (B11, A19)"
-                    .to_owned(),
+                "an archived journey accepts only un-archiving or hard deletion".to_owned(),
             ));
         }
         if rides {
@@ -345,7 +344,7 @@ impl Session<'_> {
             if self.candidate.deleted_journeys.contains_key(id) {
                 return Err((
                     ViolationCode::DeletedJourneyId,
-                    format!("journey {id} was deleted and its id is never reused (A19)"),
+                    format!("journey {id} was deleted and its id is never reused"),
                 ));
             }
             return Ok(());

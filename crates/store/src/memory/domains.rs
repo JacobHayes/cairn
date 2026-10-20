@@ -262,7 +262,7 @@ impl Domains {
             | RecordKey::RouteHeader(_)
             | RecordKey::RouteVersion { .. }
             | RecordKey::DeletedJourney(_) => {
-                return malformed(format!("{key:?} is never removed (A11, A19)"));
+                return malformed(format!("{key:?} is never removed"));
             }
         }
         Ok(())

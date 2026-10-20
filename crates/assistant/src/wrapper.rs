@@ -80,14 +80,16 @@ pub enum Policy {
 pub enum Because {
     /// It changes structure, or writes a route or its draft (PRD glossary, Structural change).
     Structural,
-    /// It touches more nodes than one direct write may (I5).
+    // PRD: I5.
+    /// It touches more nodes than one direct write may.
     TooManyNodes {
         /// The nodes it writes; absent when it may write every node of its domain.
         #[serde(default, skip_serializing_if = "Option::is_none")]
         count: Option<u32>,
     },
+    // PRD: I5.
     /// It would carry the nodes the turn's direct writes touch past the limit one change
-    /// may (I5): with every later such write in the turn, one proposal.
+    /// may: with every later such write in the turn, one proposal.
     TooManyNodesThisTurn {
         /// The nodes the turn's direct writes and this one would touch together.
         count: u32,
@@ -96,7 +98,8 @@ pub enum Because {
     Asked,
 }
 
-/// A write the assistant made, as the turn reports it (I5: every direct write is reported
+// PRD: I5.
+/// A write the assistant made, as the turn reports it (every direct write is reported
 /// with its consequences).
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
 #[serde(tag = "outcome", rename_all = "snake_case")]
@@ -107,11 +110,13 @@ pub enum Action {
         tool: String,
         /// The patch's receipt.
         receipt: PatchReceipt,
-        /// The nodes it wrote, in key order (I5: a direct change is reported with the nodes
+        // PRD: I5.
+        /// The nodes it wrote, in key order (a direct change is reported with the nodes
         /// it affected, which the panel links to); none for a write to no journey's nodes.
         #[serde(default, skip_serializing_if = "Vec::is_empty")]
         nodes: Vec<NodeKey>,
-        /// What it newly caused in each journey it changed (D7).
+        // PRD: D7.
+        /// What it newly caused in each journey it changed.
         #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
         consequences: BTreeMap<JourneyId, Consequences>,
     },
@@ -121,7 +126,8 @@ pub enum Action {
         tool: String,
         /// The proposal.
         proposal: ProposalId,
-        /// Its destination, under which it is addressed (I6).
+        // PRD: I6.
+        /// Its destination, under which it is addressed.
         destination: Domain,
         /// Why it is a proposal.
         because: Because,

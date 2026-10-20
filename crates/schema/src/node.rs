@@ -92,7 +92,8 @@ impl NodeKind {
     }
 }
 
-/// A decision's answer type (A4).
+// PRD: A4.
+/// A decision's answer type.
 #[derive(
     Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize, JsonSchema,
 )]
@@ -459,7 +460,8 @@ pub enum Direction {
     After,
 }
 
-/// A date rule (A8): `{before|after: <source(s)>, offset: <days>}`. Several sources are
+// PRD: A8.
+/// A date rule: `{before|after: <source(s)>, offset: <days>}`. Several sources are
 /// several constraints; the offset defaults to 0.
 #[derive(
     Clone, Debug, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize, JsonSchema,
@@ -559,7 +561,8 @@ impl<R: References> From<DateRule<R>> for DateRuleWire<R> {
 /// stops inheritance), at most `identity_count_per_fill_max`.
 pub type IdentitySet = BoundedSet<IdentityKey, IdentityCountPerFill>;
 
-/// Where a participation comes from (E2): a role reference, written as the role, or
+// PRD: E2.
+/// Where a participation comes from: a role reference, written as the role, or
 /// explicit identities, written as a list.
 //
 // Read by hand rather than as an untagged enum, whose only error is "did not match any
@@ -685,7 +688,8 @@ impl<R: References> From<Participations<R>> for BTreeMap<R::Kind, ParticipationS
 /// total is a graph-level check).
 pub type Requires<R> = BoundedSet<<R as References>::Node, EdgeCountPerNode>;
 
-/// A node (A1a).
+// PRD: A1a.
+/// A node.
 #[derive(
     Clone, Debug, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize, JsonSchema,
 )]
@@ -898,7 +902,7 @@ impl fmt::Display for NodeShapeError {
                 answer: None,
             } => write!(
                 formatter,
-                "field `{}` is not allowed on a {} node (A1a)",
+                "field `{}` is not allowed on a {} node",
                 field.name(),
                 kind.name()
             ),
@@ -908,7 +912,7 @@ impl fmt::Display for NodeShapeError {
                 answer: Some(answer),
             } => write!(
                 formatter,
-                "field `{}` is not allowed on a {} node with answer_type {} (A1a)",
+                "field `{}` is not allowed on a {} node with answer_type {}",
                 field.name(),
                 kind.name(),
                 answer.name()
@@ -916,7 +920,7 @@ impl fmt::Display for NodeShapeError {
             NodeShapeError::Missing { field, kind } => {
                 write!(
                     formatter,
-                    "a {} node requires field `{}` (A1a)",
+                    "a {} node requires field `{}`",
                     kind.name(),
                     field.name()
                 )

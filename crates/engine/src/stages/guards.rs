@@ -53,7 +53,7 @@ pub(super) fn check(check: &mut Check<'_, '_>) {
                 key,
                 ViolationCode::GuardFailed,
                 format!(
-                    "completing this node fails {:?} (D4); bypass it with a reason to complete anyway",
+                    "completing this node fails {:?}; bypass it with a reason to complete anyway",
                     failure.guard()
                 ),
             );
@@ -72,7 +72,7 @@ pub(super) fn check(check: &mut Check<'_, '_>) {
             &tree,
             key,
             ViolationCode::IllegalTransition,
-            "a guard bypass covers a guarded transition of its node in the same patch (D4)",
+            "a guard bypass covers a guarded transition of its node in the same patch",
         );
         found.at.mutation = Some(*ordinal);
         check.violations.push(found);

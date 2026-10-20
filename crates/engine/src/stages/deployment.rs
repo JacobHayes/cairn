@@ -26,7 +26,7 @@ pub(super) fn check(check: &mut Check<'_, '_>) {
         {
             let mut found = violation(
                 ViolationCode::AliasCycle,
-                "an alias resolves to one existing identity and is not an identity itself (E6)",
+                "an alias resolves to one existing identity and is not an identity itself",
             );
             found.at.subject = Some(Subject::Identity(alias.clone()));
             found.related.push(Subject::Identity(target.clone()));
@@ -53,7 +53,7 @@ pub(super) fn check(check: &mut Check<'_, '_>) {
         if identity.name.is_none() && identity.emails.is_empty() {
             let mut found = violation(
                 ViolationCode::IdentityEmpty,
-                "an identity has a name, an email, or both (H3)",
+                "an identity has a name, an email, or both",
             );
             found.at.subject = Some(Subject::Identity(identity.key.clone()));
             check.violations.push(found);
@@ -62,7 +62,7 @@ pub(super) fn check(check: &mut Check<'_, '_>) {
             if let Some(first) = holders.insert(email, &identity.key) {
                 let mut found = violation(
                     ViolationCode::EmailTaken,
-                    format!("{} is held by two identities (H3)", email.as_str()),
+                    format!("{} is held by two identities", email.as_str()),
                 );
                 found.at.subject = Some(Subject::Identity(identity.key.clone()));
                 found.related.push(Subject::Identity(first.clone()));

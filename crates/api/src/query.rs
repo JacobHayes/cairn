@@ -81,7 +81,7 @@ pub const JOURNEY_PARAMS: &[ParamSpec] = &[
     ParamSpec::one::<VersionNumber>("version", "Journeys on this version of their route."),
     ParamSpec::many::<IdentityKey>(
         "referencing",
-        "Journeys referring to any of these identities, directly or through an alias (E6).",
+        "Journeys referring to any of these identities, directly or through an alias.",
     ),
     ParamSpec::one::<bool>(
         "upgrade_available",
@@ -122,8 +122,9 @@ pub const PROPOSAL_SCOPE_PARAMS: &[ParamSpec] = &[
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "snake_case")]
 pub enum ProposalListing {
+    // PRD: C16.
     /// Waiting on the caller: created by them, or drafted by an agent for an active journey
-    /// referring to one of their identities (C16).
+    /// referring to one of their identities.
     Waiting,
     /// Those whose destination is a journey that does not exist yet.
     NewJourneys,
@@ -277,7 +278,7 @@ pub const LEVEL_PARAMS: &[ParamSpec] = &[
 /// `GET /api/journeys/{id}/next` (C10).
 pub const NEXT_PARAMS: &[ParamSpec] = &[
     SORT,
-    ParamSpec::one::<bool>("mine", "Only nodes the caller participates in (E4)."),
+    ParamSpec::one::<bool>("mine", "Only nodes the caller participates in."),
     KINDS,
     ParamSpec::one::<NodeKey>("within", "Only this node and the nodes beneath it."),
     ParamSpec::one::<bool>(

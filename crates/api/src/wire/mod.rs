@@ -33,8 +33,9 @@ use cairn_schema::{
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
+// PRD: J1.
 /// `POST /api/{domain}/patches`: a patch to the domain the path names, and the note each of its
-/// events carries (J1).
+/// events carries.
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
 #[serde(deny_unknown_fields)]
 pub struct PatchRequest {
@@ -45,7 +46,8 @@ pub struct PatchRequest {
     pub note: Option<Markdown>,
 }
 
-/// What an accepted patch answers (A17, H5, D7).
+// PRD: A17, H5, D7.
+/// What an accepted patch answers.
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
 #[serde(tag = "outcome", rename_all = "snake_case", deny_unknown_fields)]
 pub enum PatchAnswer {
@@ -53,15 +55,18 @@ pub enum PatchAnswer {
     Applied {
         /// The receipt: patch id, domain, content hash, and the revision produced.
         receipt: PatchReceipt,
-        /// D7: what it newly caused, by journey; a journey with nothing new is left out.
+        // PRD: D7.
+        /// What it newly caused, by journey; a journey with nothing new is left out.
         #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
         consequences: BTreeMap<JourneyId, Consequences>,
-        /// A20: advisory notices about the route graph an import or publish leaves; never a
+        // PRD: A20.
+        /// Advisory notices about the route graph an import or publish leaves; never a
         /// rejection, and absent for any other patch.
         #[serde(default, skip_serializing_if = "Vec::is_empty")]
         notices: Vec<Notice>,
     },
-    /// The patch id was committed before with the same content (H5): its receipt, and no
+    // PRD: H5.
+    /// The patch id was committed before with the same content: its receipt, and no
     /// consequences, which are reported only the first time.
     AlreadyApplied {
         /// The original receipt.
@@ -125,15 +130,19 @@ pub enum HealthStatus {
 pub struct Capabilities {
     /// How people sign in, in the order the host asks.
     pub auth: Vec<AuthMethod>,
-    /// Whether the in-app assistant is available (I5).
+    // PRD: I5.
+    /// Whether the in-app assistant is available.
     pub assistant: bool,
-    /// Whether the host serves MCP at `/api/mcp` (I2).
+    // PRD: I2.
+    /// Whether the host serves MCP at `/api/mcp`.
     pub mcp: bool,
-    /// Whether the host streams revision ticks over SSE (H6).
+    // PRD: H6.
+    /// Whether the host streams revision ticks over SSE.
     pub sse: bool,
 }
 
-/// One way to sign in (H1).
+// PRD: H1.
+/// One way to sign in.
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
 #[serde(deny_unknown_fields)]
 pub struct AuthMethod {
@@ -147,11 +156,13 @@ pub struct AuthMethod {
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "snake_case")]
 pub enum AuthKind {
-    /// A static token or named dev user (H1).
+    // PRD: H1.
+    /// A static token or named dev user.
     Dev,
     /// OAuth or OIDC against a registered provider.
     Oidc,
-    /// The built-in OAuth server for MCP clients (I2).
+    // PRD: I2.
+    /// The built-in OAuth server for MCP clients.
     BuiltinOauth,
     /// Tailscale login.
     Tailscale,
@@ -189,7 +200,8 @@ impl From<&cairn_service::Capabilities> for Capabilities {
     }
 }
 
-/// One SSE `tick` event (H6): `of` is now at `revision`. A view refetches only when it is
+// PRD: H6.
+/// One SSE `tick` event: `of` is now at `revision`. A view refetches only when it is
 /// newer than the revision it holds.
 #[derive(Clone, Debug, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize, JsonSchema)]
 #[serde(deny_unknown_fields)]
@@ -237,9 +249,9 @@ pub enum ProblemCode {
     PayloadTooLarge,
     /// The patch's target is not the domain the path names, or is a proposal.
     TargetMismatch,
+    // PRD: B7, B8.
     /// Cairn cannot draft the upgrade, save as route, or re-link asked for: the journey follows
-    /// no route, the version is not newer, or the draft is past a proposal's limits (B7, B8,
-    /// B9).
+    /// no route, the version is not newer, or the draft is past a proposal's limits.
     CannotDraft,
     /// No such resource.
     NotFound,
@@ -250,7 +262,8 @@ pub enum ProblemCode {
     NoSuchEndpoint,
     /// The endpoint takes another method.
     MethodNotAllowed,
-    /// Only a user may do this, not an agent acting for one (H2).
+    // PRD: H2.
+    /// Only a user may do this, not an agent acting for one.
     UserOnly,
     /// The process is at its in-flight request limit; retry after the `Retry-After` delay.
     Overloaded,
@@ -258,8 +271,9 @@ pub enum ProblemCode {
     SubscriberLimit,
     /// No store connection came free in time; retry after the `Retry-After` delay.
     StoreBusy,
+    // PRD: H5.
     /// The request ran past the request duration limit. A patch may have committed:
-    /// resubmit it with the same patch id (H5).
+    /// resubmit it with the same patch id.
     TimedOut,
     /// The engine panicked: a bug. Nothing was committed.
     EnginePanic,

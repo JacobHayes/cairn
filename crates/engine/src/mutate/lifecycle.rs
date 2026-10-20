@@ -141,7 +141,7 @@ pub(super) fn refuse_segment(session: &mut Session<'_>, route: &RouteId) -> bool
         session.reject(
             ViolationCode::NotAProcessRoute,
             None,
-            format!("route {route} is a segment: a journey is never started from one, follows one, or is saved as one (A21)"),
+            format!("route {route} is a segment: a journey is never started from one, follows one, or is saved as one"),
         );
     }
     segment
@@ -180,7 +180,7 @@ fn set_status(session: &mut Session<'_>, status: JourneyStatus) -> Vec<Write> {
         session.reject(
             ViolationCode::IllegalTransition,
             None,
-            format!("a journey cannot move from {from:?} to {status:?} (B11)"),
+            format!("a journey cannot move from {from:?} to {status:?}"),
         );
         return Vec::new();
     }
@@ -209,7 +209,7 @@ fn upgrade(session: &mut Session<'_>, to: VersionNumber) -> Vec<Write> {
         session.reject(
             ViolationCode::LineageInvalid,
             None,
-            format!("the journey cannot upgrade to version {to}: it needs lineage and a newer existing version (B7)"),
+            format!("the journey cannot upgrade to version {to}: it needs lineage and a newer existing version"),
         );
         return Vec::new();
     };
@@ -315,10 +315,7 @@ fn relink(session: &mut Session<'_>, lineage: &Lineage) -> Vec<Write> {
         session.reject(
             ViolationCode::LineageInvalid,
             None,
-            format!(
-                "route {} has no version {} (B9)",
-                lineage.route, lineage.version
-            ),
+            format!("route {} has no version {}", lineage.route, lineage.version),
         );
         return Vec::new();
     };
@@ -451,10 +448,10 @@ fn route(session: &mut Session<'_>, id: &RouteId, mutation: &Mutation) -> Vec<Wr
             let (code, message) = if route.draft.is_some() {
                 (
                     ViolationCode::DraftExists,
-                    "the route has a draft open; discard it first (A11)",
+                    "the route has a draft open; discard it first",
                 )
             } else {
-                (ViolationCode::NoDraft, "the route has no open draft (A11)")
+                (ViolationCode::NoDraft, "the route has no open draft")
             };
             session.reject(code, None, message);
             Vec::new()
@@ -575,9 +572,7 @@ fn publish(
             session.reject(
                 ViolationCode::SegmentRule,
                 None,
-                format!(
-                    "a segment version has exactly one root node and the draft has {roots} (A21)"
-                ),
+                format!("a segment version has exactly one root node and the draft has {roots}"),
             );
             return Vec::new();
         }

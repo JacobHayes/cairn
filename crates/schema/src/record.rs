@@ -78,7 +78,8 @@ pub enum GraphRecord {
     },
     /// A retired key.
     RetiredKey(RetiredKey),
-    /// A segment insertion (B13).
+    // PRD: B13.
+    /// A segment insertion.
     Insertion(Insertion),
     /// A node's stored state.
     NodeState {
@@ -94,7 +95,8 @@ pub enum GraphRecord {
         /// The marker.
         edit: LocalEdit,
     },
-    /// An answer, with the rationale it was given with (B2).
+    // PRD: B2.
+    /// An answer, with the rationale it was given with.
     Answer {
         /// The decision.
         decision: NodeKey,
@@ -171,7 +173,8 @@ pub enum Record {
         /// When it was published.
         published_at: Timestamp,
     },
-    /// A hard-deleted journey's id, never reused (A19).
+    // PRD: A19.
+    /// A hard-deleted journey's id, never reused.
     DeletedJourney {
         /// The journey.
         journey: JourneyId,
@@ -180,7 +183,8 @@ pub enum Record {
     },
     /// An identity.
     Identity(Identity),
-    /// A merged identity's old key and the identity it resolves to (E6).
+    // PRD: E6.
+    /// A merged identity's old key and the identity it resolves to.
     IdentityAlias {
         /// The old key.
         alias: IdentityKey,

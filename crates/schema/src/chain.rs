@@ -11,7 +11,8 @@ use crate::id::NodeKey;
 use crate::patch::Mutation;
 use jiff::civil::Date;
 
-/// Which instant of a node (F2): work has a start and a finish; a decision or milestone has
+// PRD: F2.
+/// Which instant of a node: work has a start and a finish; a decision or milestone has
 /// one instant, which is both.
 #[derive(
     Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize, JsonSchema,
@@ -40,8 +41,9 @@ pub enum Instant {
     },
     /// The journey's `created_at`.
     CreatedAt,
-    /// A date decision's answer, a date rule's source (A8). It is the answered date, apart
-    /// from the decision's own instant, which is when it was decided (F2).
+    // PRD: A8, F2.
+    /// A date decision's answer, a date rule's source. It is the answered date, apart
+    /// from the decision's own instant, which is when it was decided.
     Answer {
         /// The decision.
         decision: NodeKey,
@@ -68,14 +70,16 @@ pub enum DependencyVia {
         /// The node whose condition creates the gate.
         condition_on: NodeKey,
     },
-    /// A stage's opening milestone (F4).
+    // PRD: F4.
+    /// A stage's opening milestone.
     StageOpening {
         /// The stage.
         group: NodeKey,
     },
 }
 
-/// Where a constraint comes from (F2): what to edit to change it (F7).
+// PRD: F2, F7.
+/// Where a constraint comes from: what to edit to change it.
 #[derive(
     Clone, Debug, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize, JsonSchema,
 )]
@@ -112,7 +116,8 @@ pub enum ConstraintSource {
         /// The child.
         child: NodeKey,
     },
-    /// A stage's closing milestone bounding the group's finish (F4).
+    // PRD: F4.
+    /// A stage's closing milestone bounding the group's finish.
     StageClose {
         /// The stage.
         group: NodeKey,
@@ -132,26 +137,31 @@ pub struct Constraint {
     pub offset_days: i32,
     /// Where it comes from.
     pub source: ConstraintSource,
-    /// It passes through an undecided node, so it may not apply (F2).
+    // PRD: F2.
+    /// It passes through an undecided node, so it may not apply.
     #[serde(default, skip_serializing_if = "crate::serde_util::is_false")]
     pub conditional: bool,
 }
 
-/// What fixes an instant on a chain: a pin, an actual date, a date answer, or today (F1, F3,
-/// F6). A chain always ends at one of these.
+// PRD: F1, F3.
+/// What fixes an instant on a chain: a pin, an actual date, a date answer, or today. A chain always ends at one of these.
 #[derive(
     Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize, JsonSchema,
 )]
 #[serde(rename_all = "snake_case")]
 pub enum FixedBy {
-    /// A pin, which a resolution may move (F5).
+    // PRD: F5.
+    /// A pin, which a resolution may move.
     Pin,
-    /// An actual date, a fact that is never moved (F6): a recorded start or finish, or the
+    // PRD: F6.
+    /// An actual date, a fact that is never moved: a recorded start or finish, or the
     /// journey's `created_at`.
     Actual,
-    /// A date decision's answer, which a revised answer moves (A8).
+    // PRD: A8.
+    /// A date decision's answer, which a revised answer moves.
     Answer,
-    /// Today, which holds unfinished work back: it starts, or finishes, no earlier (F3).
+    // PRD: F3.
+    /// Today, which holds unfinished work back: it starts, or finishes, no earlier.
     Today,
 }
 
@@ -178,8 +188,9 @@ pub struct Chain {
     pub fixed: Vec<FixedDate>,
 }
 
-/// A chain that requires a date to precede itself (F5), or a plan reality can no longer
-/// meet (F6), with how many days it is short and the moves that would resolve it.
+// PRD: F5, F6.
+/// A chain that requires a date to precede itself, or a plan reality can no longer
+/// meet, with how many days it is short and the moves that would resolve it.
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
 #[serde(deny_unknown_fields)]
 pub struct ShortChain {
@@ -187,7 +198,8 @@ pub struct ShortChain {
     pub chain: Chain,
     /// Days short.
     pub shortfall_days: u32,
-    /// The resolution moves (F5, F6): each an ordinary mutation that, applied alone, gives
+    // PRD: F5, F6.
+    /// The resolution moves: each an ordinary mutation that, applied alone, gives
     /// this chain the days it lacks (shift, repin, or unpin a pin on it; revise the answer
     /// behind a pin; adjust a rule's offset; revise an estimate; drop an explicit
     /// requirement or a stage's close). Nothing applies them automatically.
@@ -195,7 +207,8 @@ pub struct ShortChain {
     pub resolutions: Vec<Mutation>,
 }
 
-/// The contradictory chains a rejection lists (F5): at most
+// PRD: F5.
+/// The contradictory chains a rejection lists: at most
 /// `chain_count_per_rejection_max`, and whether there were more.
 #[derive(Clone, Debug, Default, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
 #[serde(deny_unknown_fields)]

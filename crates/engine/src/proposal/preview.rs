@@ -70,7 +70,7 @@ pub fn candidate(
                 Err(Rejection::Stale { conflicts, .. }) => Err(vec![Violation {
                     code: ViolationCode::MergeBreaksJourney,
                     at: Location::default(),
-                    message: "the journeys the merge names are not the ones that refer to its identities now (E6)".to_owned(),
+                    message: "the journeys the merge names are not the ones that refer to its identities now".to_owned(),
                     related: conflicts
                         .iter()
                         .filter_map(|conflict| match &conflict.of {

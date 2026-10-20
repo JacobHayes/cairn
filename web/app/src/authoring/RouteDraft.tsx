@@ -19,7 +19,7 @@ import { draftWords, VersionSelect } from "../routes/VersionSelect.tsx";
 import type { Screen } from "../journeys/address.ts";
 import { ROUTE_VIEW_TITLE, ViewPicker } from "../screens/ViewPicker.tsx";
 import { Menu } from "../screens/Menu.tsx";
-import { violationNode, violationWords, type Violation } from "../data/writes.ts";
+import { violationNode, type Violation } from "../data/writes.ts";
 import { RejectionView } from "../screens/RejectionView.tsx";
 import { WriteStatus } from "../screens/WriteStatus.tsx";
 import type { ScreenWrite } from "../screens/write.ts";
@@ -182,7 +182,7 @@ export function DraftCard({ route, violations, notices, hrefOf, write, blocked, 
               return (
                 <li key={at} data-testid="violation" data-code={violation.code} data-node={node}>
                   {node === undefined ? null : <strong>{titleOf(node)}: </strong>}
-                  {violationWords(violation)}
+                  {violation.message}
                   {node === undefined ? null : (
                     <>
                       {" "}

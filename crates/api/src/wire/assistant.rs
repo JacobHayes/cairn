@@ -18,8 +18,9 @@ pub struct AssistantRequest {
     pub message: Markdown,
 }
 
+// PRD: I5.
 /// `GET /api/journeys/{id}/assistant` and `GET /api/routes/{id}/draft/assistant`: the caller's
-/// conversation about that journey or draft (I5: one per target per user), as kept: its
+/// conversation about that journey or draft (one per target per user), as kept: its
 /// newest messages, oldest first. A conversation not started yet has none.
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
 #[serde(deny_unknown_fields)]

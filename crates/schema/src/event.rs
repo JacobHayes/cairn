@@ -23,7 +23,7 @@ use crate::text::Markdown;
 use crate::touched::TouchedSet;
 use jiff::Timestamp;
 
-/// An event's type (J1's list). Most mutations have one type; a few take theirs from
+/// An event's type. Most mutations have one type; a few take theirs from
 /// their content ([`Mutation::event_type`]).
 #[derive(
     Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize, JsonSchema,
@@ -86,7 +86,8 @@ pub enum EventType {
     ProposalDiscarded,
 }
 
-/// What an event is about: its subject key (J1).
+// PRD: J1.
+/// What an event is about: its subject key.
 #[derive(
     Clone, Debug, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize, JsonSchema,
 )]
@@ -116,7 +117,8 @@ pub enum Subject {
     Deployment,
 }
 
-/// Who made a change (H2): a user, or an agent acting for one.
+// PRD: H2.
+/// Who made a change: a user, or an agent acting for one.
 #[derive(
     Clone, Debug, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize, JsonSchema,
 )]
@@ -129,7 +131,8 @@ pub struct Actor {
     pub agent: Option<AgentId>,
 }
 
-/// An append-only audit record of one mutation (J1). The delta is the after-state of every
+// PRD: J1.
+/// An append-only audit record of one mutation. The delta is the after-state of every
 /// record the mutation wrote or removed, in order, so replay applies it with nothing
 /// re-derived; events never hold derived values.
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
@@ -139,14 +142,16 @@ pub struct Event {
     pub patch_id: PatchId,
     /// Its position in the patch, from 0.
     pub ordinal: u32,
+    // PRD: A19.
     /// The log it belongs to: its patch's domain, except a journey's deletion, which the
-    /// deployment log keeps (A19).
+    /// deployment log keeps.
     pub log: Domain,
     /// Its type.
     pub event_type: EventType,
     /// Who made it.
     pub actor: Actor,
-    /// Who confirmed it, when a proposal was applied (H2).
+    // PRD: H2.
+    /// Who confirmed it, when a proposal was applied.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub confirming_user: Option<UserId>,
     /// What it is about.
@@ -427,7 +432,8 @@ impl Patch {
     }
 }
 
-/// What a committed patch id is answered from on resubmission (H5; ARCHITECTURE, Schema
+// PRD: H5.
+/// What a committed patch id is answered from on resubmission (ARCHITECTURE, Schema
 /// outline: `patch_receipts`).
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
 #[serde(deny_unknown_fields)]

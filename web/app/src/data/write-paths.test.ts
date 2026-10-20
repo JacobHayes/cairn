@@ -21,7 +21,7 @@ import type { RouteFile } from "./host.ts";
 import type { WriteSnapshot } from "./write-machine.ts";
 import { idOf } from "./edit-record.ts";
 
-const invalid: Rejection = { rejection: "invalid", violations: [{ at: {}, code: "limit_exceeded", message: "Too long (F5)" }] };
+const invalid: Rejection = { rejection: "invalid", violations: [{ at: {}, code: "limit_exceeded", message: "Too long" }] };
 const refusal: Answered<HttpFailure> = { outcome: "rejected", rejection: invalid };
 const rejected = { outcome: "rejected" as const, rejection: invalid };
 const file = { format: 1, route: "r_one", name: "One", nodes: [] } as unknown as RouteFile;

@@ -19,7 +19,8 @@ use crate::text::{Email, Markdown, Title};
 use jiff::Timestamp;
 use jiff::civil::Date;
 
-/// A patch domain (A17).
+// PRD: A17.
+/// A patch domain.
 #[derive(
     Clone, Debug, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize, JsonSchema,
 )]
@@ -75,7 +76,8 @@ pub struct Lineage {
     pub version: VersionNumber,
 }
 
-/// A journey's status (B11).
+// PRD: B11.
+/// A journey's status.
 #[derive(
     Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize, JsonSchema,
 )]
@@ -107,8 +109,9 @@ pub struct JourneyHeader {
     pub lineage: Option<Lineage>,
     /// When it was created.
     pub created_at: Timestamp,
+    // PRD: A8, A9.
     /// The deployment-local calendar day it was created, the `created_at` date rules
-    /// measure from (A8, A9). Stored beside the timestamp so the engine never converts time
+    /// measure from. Stored beside the timestamp so the engine never converts time
     /// zones.
     pub created_on: Date,
 }
@@ -119,7 +122,8 @@ pub struct JourneyHeader {
 pub struct Journey {
     /// The journey's own fields.
     pub header: JourneyHeader,
-    /// The journey revision (H5).
+    // PRD: H5.
+    /// The journey revision.
     pub revision: Revision,
     /// The graph and its state.
     pub graph: Graph,
@@ -145,7 +149,8 @@ pub enum RouteKind {
     /// A process template: journeys start from it.
     #[default]
     Process,
-    /// A reusable piece of a process: it is only inserted, never started (A21).
+    // PRD: A21.
+    /// A reusable piece of a process: it is only inserted, never started.
     Segment,
 }
 
@@ -168,15 +173,18 @@ pub struct RouteHeader {
     /// What it is for.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub description: Option<Markdown>,
-    /// Hidden from new-journey creation (A19); its journeys still see upgrades.
+    // PRD: A19.
+    /// Hidden from new-journey creation; its journeys still see upgrades.
     #[serde(default, skip_serializing_if = "crate::serde_util::is_false")]
     pub retired: bool,
-    /// Process or segment (A21); routes stored before segments existed are processes.
+    // PRD: A21.
+    /// Process or segment; routes stored before segments existed are processes.
     #[serde(default, skip_serializing_if = "RouteKind::is_process")]
     pub kind: RouteKind,
 }
 
-/// A route's single mutable draft (A11).
+// PRD: A11.
+/// A route's single mutable draft.
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
 #[serde(deny_unknown_fields)]
 pub struct RouteDraft {
@@ -194,7 +202,8 @@ pub struct RouteDraft {
 pub struct Route {
     /// The route's own fields.
     pub header: RouteHeader,
-    /// The route revision (H5), covering the draft.
+    // PRD: H5.
+    /// The route revision, covering the draft.
     pub revision: Revision,
     /// The published versions.
     #[serde(default, skip_serializing_if = "BTreeSet::is_empty")]
@@ -204,7 +213,8 @@ pub struct Route {
     pub draft: Option<RouteDraft>,
 }
 
-/// An immutable published route version (A11).
+// PRD: A11.
+/// An immutable published route version.
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
 #[serde(deny_unknown_fields)]
 pub struct RouteVersion {
@@ -224,12 +234,14 @@ pub struct RouteVersion {
 pub struct Identity {
     /// The identity's key.
     pub key: IdentityKey,
-    /// Its name, if it has one. An identity has a name, an email, or both (H3), so one a
+    // PRD: H3.
+    /// Its name, if it has one. An identity has a name, an email, or both, so one a
     /// sign-in created from an account that gave no name is shown by its first email until
     /// its person is asked for one.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub name: Option<Title>,
-    /// Its emails, each held by at most one identity (H3), at most
+    // PRD: H3.
+    /// Its emails, each held by at most one identity, at most
     /// `email_count_per_identity_max`. A merge joins two identities' emails, so the engine checks
     /// the joined set too.
     #[serde(
@@ -256,7 +268,7 @@ impl Identity {
         match (&self.name, self.emails.first()) {
             (Some(name), _) => name.as_str(),
             (None, Some(email)) => email.as_str(),
-            (None, None) => unreachable!("an identity has a name, an email, or both (H3)"),
+            (None, None) => unreachable!("an identity has a name, an email, or both"),
         }
     }
 }
@@ -269,16 +281,19 @@ impl HasKey for Identity {
     }
 }
 
-/// The deployment domain (E6; ARCHITECTURE, Engine > Model: `Deployment`).
+// PRD: E6.
+/// The deployment domain (ARCHITECTURE, Engine > Model: `Deployment`).
 #[derive(Clone, Debug, Default, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
 #[serde(deny_unknown_fields)]
 pub struct Deployment {
-    /// The deployment revision (H5).
+    // PRD: H5.
+    /// The deployment revision.
     pub revision: Revision,
     /// The identities, at most `identity_count_per_deployment_max`.
     #[serde(default, skip_serializing_if = "Keyed::is_empty")]
     pub identities: Keyed<Identity, IdentityCountPerDeployment>,
-    /// Merged identities' old keys, each resolving to the identity it was merged into (E6), at
+    // PRD: E6.
+    /// Merged identities' old keys, each resolving to the identity it was merged into, at
     /// most `alias_count_per_identity_max` resolving to one identity.
     #[serde(
         default,

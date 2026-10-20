@@ -10,7 +10,8 @@ use cairn_schema::{
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
-/// A journey in the index (C16).
+// PRD: C16.
+/// A journey in the index.
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
 #[serde(deny_unknown_fields)]
 pub struct JourneySummary {
@@ -30,7 +31,8 @@ pub struct JourneySummary {
     /// The latest version its route has published.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub latest_version: Option<VersionNumber>,
-    /// Whether its route has published a version newer than its own (C16).
+    // PRD: C16.
+    /// Whether its route has published a version newer than its own.
     pub upgrade_available: bool,
 }
 
@@ -70,7 +72,8 @@ pub struct JourneyPage {
     pub next: Option<JourneyId>,
 }
 
-/// A route in the route index (I2).
+// PRD: I2.
+/// A route in the route index.
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
 #[serde(deny_unknown_fields)]
 pub struct RouteSummary {
@@ -113,7 +116,8 @@ pub struct RoutePage {
     pub next: Option<RouteId>,
 }
 
-/// C17: a route's published versions with the journeys on each.
+// PRD: C17.
+/// A route's published versions with the journeys on each.
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
 #[serde(deny_unknown_fields)]
 pub struct RouteDetail {
@@ -135,12 +139,14 @@ pub struct VersionJourneys {
     pub published_at: Timestamp,
     /// The journeys whose lineage is this version.
     pub journeys: BTreeSet<JourneyId>,
-    /// Where this version of a segment is inserted (C19).
+    // PRD: C19.
+    /// Where this version of a segment is inserted.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub insertions: Vec<InsertionUse>,
 }
 
-/// One insertion of a segment version (C19).
+// PRD: C19.
+/// One insertion of a segment version.
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
 #[serde(deny_unknown_fields)]
 pub struct InsertionUse {
@@ -203,7 +209,8 @@ impl From<cairn_store::RouteDetail> for RouteDetail {
     }
 }
 
-/// An event and its position in the log, which orders history and pages it (J5).
+// PRD: J5.
+/// An event and its position in the log, which orders history and pages it.
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
 #[serde(deny_unknown_fields)]
 pub struct LoggedEvent {
@@ -323,7 +330,8 @@ impl From<cairn_store::Page<cairn_store::JourneyMatches, JourneyId>> for SearchP
     }
 }
 
-/// Where a route refers to an identity (E6): its draft, and the published versions.
+// PRD: E6.
+/// Where a route refers to an identity: its draft, and the published versions.
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
 #[serde(deny_unknown_fields)]
 pub struct RouteReference {
@@ -335,7 +343,8 @@ pub struct RouteReference {
     pub versions: Vec<VersionNumber>,
 }
 
-/// Everything that refers to an identity, directly or through an alias (E6): every journey,
+// PRD: E6.
+/// Everything that refers to an identity, directly or through an alias: every journey,
 /// whatever its status, and every route whose draft or published versions do. Authoritative:
 /// an identity with neither can be deleted.
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]

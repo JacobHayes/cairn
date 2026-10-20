@@ -240,7 +240,7 @@ impl Records {
             | RecordKey::RouteHeader(_)
             | RecordKey::RouteVersion { .. }
             | RecordKey::DeletedJourney(_) => {
-                panic!("{key:?} is never removed on its own (A11, A19)")
+                panic!("{key:?} is never removed on its own")
             }
         }
     }

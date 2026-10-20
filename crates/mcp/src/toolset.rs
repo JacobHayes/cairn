@@ -164,7 +164,8 @@ impl ToolSet {
             .collect()
     }
 
-    /// Runs the tool `name` with `arguments` as `actor` (H2, I7): an agent acts as its user,
+    // PRD: H2, I7.
+    /// Runs the tool `name` with `arguments` as `actor`: an agent acts as its user,
     /// with the user's capabilities, and its writes record both.
     ///
     /// # Errors
@@ -192,10 +193,11 @@ impl ToolSet {
         }
     }
 
+    // PRD: I5.
     /// The domain patch the direct-write tool `name` would submit for `arguments`, worked
     /// out as [`call`](Self::call) would, without writing anything: what the assistant's
-    /// write wrapper reads to decide whether a write applies directly or becomes a proposal
-    /// (I5). `None` for a tool that submits no domain patch of its own drafting: the reads,
+    /// write wrapper reads to decide whether a write applies directly or becomes a proposal.
+    /// `None` for a tool that submits no domain patch of its own drafting: the reads,
     /// the proposal tools, and `import_route` (the service builds its patch from the file).
     ///
     /// # Errors

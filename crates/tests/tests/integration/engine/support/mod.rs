@@ -102,7 +102,8 @@ fn published(mut records: Records, file: &RouteFile, graph: cairn_schema::Graph)
     records
 }
 
-/// `cairn_engine::apply`, and for an accepted patch the replay check (J3): the records its
+/// `cairn_engine::apply`; every violation of a rejected patch is held to saying its rule
+/// in words (no requirement id), and for an accepted patch the replay check (J3): the records its
 /// events rebuild from `records` equal the records apply produced. Every engine test that
 /// applies a patch goes through here, so every accepted step of every scenario replays.
 pub fn apply(
@@ -111,6 +112,16 @@ pub fn apply(
     inputs: &ApplyInputs,
 ) -> Result<Applied, Rejection> {
     let result = cairn_engine::apply(records, patch, inputs);
+    if let Err(Rejection::Invalid { violations }) = &result {
+        for violation in violations.as_slice() {
+            let ids = crate::served_text::requirement_ids(&violation.message);
+            assert!(
+                ids.is_empty(),
+                "a violation message says its rule in words, not {ids:?}: {}",
+                violation.message
+            );
+        }
+    }
     if let Ok(applied) = &result {
         assert_eq!(
             replay(records, applied.events()),

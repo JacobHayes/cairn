@@ -70,9 +70,9 @@ fn provenance(
         let member = holders.contains_key(key);
         if segment != member && check.document.nodes.get(key).is_some() {
             let message = if segment {
-                "a node copied in from a segment is a member of an insertion (B13)"
+                "a node copied in from a segment is a member of an insertion"
             } else {
-                "a member of an insertion has from_segment provenance (B13)"
+                "a member of an insertion has from_segment provenance"
             };
             out.push(at_node(
                 check.tree,

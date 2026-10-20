@@ -27,7 +27,8 @@ pub enum NodeField {
     Title,
     /// The description.
     Description,
-    /// The weight; in a journey, a weight override (B5).
+    // PRD: B5.
+    /// The weight; in a journey, a weight override.
     Weight,
     /// The `relevant_when` condition.
     RelevantWhen,

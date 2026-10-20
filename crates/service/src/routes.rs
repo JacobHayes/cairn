@@ -268,7 +268,7 @@ fn kind_matches(kind: cairn_schema::RouteKind, file: &RouteFile) -> Result<(), W
         ViolationCode::SegmentRule,
         None,
         format!(
-            "route {} is a {kind:?} and a file of kind {:?} cannot be imported into it (A21)",
+            "route {} is a {kind:?} and a file of kind {:?} cannot be imported into it",
             file.route, file.kind
         ),
     )))

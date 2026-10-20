@@ -15,7 +15,7 @@ import { actionsDraftKey, actionsForm, formView, isDrafted, opening, readOpened,
 const receipt = { patch_id: "p_x", domain: { journey: "j_one" }, content_hash: "h", revision: 4 };
 const applied: Answered<HttpFailure> = { outcome: "answered", answer: { outcome: "applied", receipt, consequences: {} } };
 const lost: Answered<HttpFailure> = { outcome: "failed", error: { status: 0, message: "network down" } };
-const invalid: Rejection = { rejection: "invalid", violations: [{ at: {}, code: "limit_exceeded", message: "The reason is too long (F5)" }] };
+const invalid: Rejection = { rejection: "invalid", violations: [{ at: {}, code: "limit_exceeded", message: "The reason is too long" }] };
 const refusal: Answered<HttpFailure> = { outcome: "rejected", rejection: invalid };
 
 const SEEN = { base: 3, deployment: 1 };

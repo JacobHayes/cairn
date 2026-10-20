@@ -13,16 +13,20 @@ use cairn_schema::{
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
-/// A projection with what it was derived from (D3: computed per read, never stored).
+// PRD: D3.
+/// A projection with what it was derived from (computed per read, never stored).
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize, JsonSchema)]
 #[serde(deny_unknown_fields)]
 #[schemars(rename = "Projected{T}")]
 pub struct Projected<T> {
-    /// The journey's revision it was derived from: a tick newer than this means refetch (H6).
+    // PRD: H6.
+    /// The journey's revision it was derived from: a tick newer than this means refetch.
     pub revision: Revision,
-    /// The deployment revision it was derived over (E6).
+    // PRD: E6.
+    /// The deployment revision it was derived over.
     pub deployment_revision: Revision,
-    /// The today it was derived for, in the deployment's zone (A9).
+    // PRD: A9.
+    /// The today it was derived for, in the deployment's zone.
     pub today: Date,
     /// The projection.
     pub value: T,
@@ -46,7 +50,8 @@ impl<T> Projected<T> {
     }
 }
 
-/// E4: the nodes the caller participates in.
+// PRD: E4.
+/// The nodes the caller participates in.
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
 #[serde(deny_unknown_fields)]
 pub struct Mine {
@@ -60,7 +65,8 @@ impl From<Vec<MineEntry>> for Mine {
     }
 }
 
-/// C8: one node in full. Its explanation lists (`derived.gravity_from`, `unlocks_from`)
+// PRD: C8.
+/// One node in full. Its explanation lists (`derived.gravity_from`, `unlocks_from`)
 /// carry their largest entries up to `explanation_entry_count_max` with their totals; the rest
 /// page through the node's explanations endpoint.
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize, JsonSchema)]
@@ -78,31 +84,39 @@ pub struct NodeDetail {
     pub children: Vec<ChildEntry>,
     /// Its stored state, provenance, and actual dates.
     pub record: NodeState,
-    /// What the journey edited on it, for a route-copied node (B4).
+    // PRD: B4.
+    /// What the journey edited on it, for a route-copied node.
     #[serde(default, skip_serializing_if = "BTreeSet::is_empty")]
     pub local_edits: BTreeSet<LocalEdit>,
     /// A decision's answer, as recorded.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub answer: Option<AnswerValue>,
-    /// The rationale the recorded answer was given with, markdown (B2).
+    // PRD: B2.
+    /// The rationale the recorded answer was given with, markdown.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub rationale: Option<Markdown>,
-    /// Its pin (F2).
+    // PRD: F2.
+    /// Its pin.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub pin: Option<Date>,
-    /// Its overrides (D4).
+    // PRD: D4.
+    /// Its overrides.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub overrides: Option<Overrides>,
-    /// The notes and links on it (G1), in key order.
+    // PRD: G1.
+    /// The notes and links on it, in key order.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub annotations: Vec<Annotation>,
-    /// Every derived value (D3) with what explains it.
+    // PRD: D3.
+    /// Every derived value with what explains it.
     pub derived: NodeDerived,
+    // PRD: C8.
     /// The direct dependents completing it would not yet free, each with what else it waits
-    /// on (C8, Priority: Unlocks): the largest entries with the total; page the rest with
+    /// on (Priority: Unlocks): the largest entries with the total; page the rest with
     /// the explanations endpoint, field `still_waiting`.
     pub still_waiting: StillWaiting,
-    /// A decision's effects per choice (C12): what each answer brings in, drops, and leaves
+    // PRD: C12.
+    /// A decision's effects per choice: what each answer brings in, drops, and leaves
     /// to be decided later, with the role it fills and the milestone it pins.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub answer_effects: Option<AnswerEffects>,
@@ -120,7 +134,8 @@ pub struct ChildEntry {
     pub kind: NodeKind,
     /// Its stored state.
     pub state: State,
-    /// D8: the state every surface shows for it.
+    // PRD: D8.
+    /// The state every surface shows for it.
     pub display_state: DisplayState,
 }
 
@@ -177,7 +192,8 @@ impl From<cairn_service::NodeDetail> for NodeDetail {
     }
 }
 
-/// J4: a page of a journey's history, or of one node's, grouped by patch.
+// PRD: J4.
+/// A page of a journey's history, or of one node's, grouped by patch.
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
 #[serde(deny_unknown_fields)]
 pub struct History {

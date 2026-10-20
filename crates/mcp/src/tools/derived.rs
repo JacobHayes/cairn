@@ -25,7 +25,7 @@ use crate::{ToolError, ToolSet};
 pub(crate) const SPECS: &[Spec] = &[
     Spec {
         name: "get_snapshot",
-        description: "Call this first. The bounded state of a journey (I3): the answers in \
+        description: "Call this first. The bounded state of a journey: the answers in \
             effect, a page of in-scope nodes with their display state (what to say about \
             them) beside the stored state (which transition applies), owners, blocking, and \
             dates, the ranked acting frontier's top items with the rest as keys, open decisions \
@@ -68,7 +68,7 @@ pub(crate) const SPECS: &[Spec] = &[
     },
     Spec {
         name: "get_level",
-        description: "One aggregation level of the journey's graph (C2): the nodes of the \
+        description: "One aggregation level of the journey's graph: the nodes of the \
             shown kinds at the top or inside a container, hidden work rolled up into them, \
             and the edges between them. `collapsed` rolls containers into their own cards; \
             `display` limits the relevance classes shown. Nodes are paged; edges are those \
@@ -80,7 +80,8 @@ pub(crate) const SPECS: &[Spec] = &[
     },
 ];
 
-/// `get_snapshot` (I3).
+// PRD: I3.
+/// `get_snapshot`.
 #[derive(Debug, Deserialize, JsonSchema)]
 #[serde(deny_unknown_fields)]
 pub(crate) struct GetSnapshot {
@@ -107,7 +108,8 @@ pub(crate) struct SnapshotOutput {
     snapshot: Snapshot,
 }
 
-/// `get_level` (C2).
+// PRD: C2.
+/// `get_level`.
 #[derive(Debug, Deserialize, JsonSchema)]
 #[serde(deny_unknown_fields)]
 pub(crate) struct GetLevel {
@@ -151,13 +153,15 @@ pub(crate) struct LevelOutput {
     nodes: Paged<LevelNode>,
     /// The level's edges with an end among this page's nodes.
     edges: Vec<LevelEdge>,
-    /// Per relevance class left out, how many nodes it alone hides (C1); none when every
+    // PRD: C1.
+    /// Per relevance class left out, how many nodes it alone hides; none when every
     /// class is shown.
     #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
     hidden_by_class: BTreeMap<LevelDisplay, u32>,
 }
 
-/// `get_node` (C8).
+// PRD: C8.
+/// `get_node`.
 #[derive(Debug, Deserialize, JsonSchema)]
 #[serde(deny_unknown_fields)]
 pub(crate) struct GetNode {
@@ -198,7 +202,8 @@ pub(crate) struct NodeOutput {
     explanations: Option<ExplanationPage>,
 }
 
-/// C8: what a node is, its stored state and records, and every derived value with what
+// PRD: C8.
+/// What a node is, its stored state and records, and every derived value with what
 /// explains it (gravity and unlocks contributions cut to the largest, with totals).
 #[derive(Debug, Serialize, JsonSchema)]
 pub(crate) struct Detail {
@@ -215,32 +220,39 @@ pub(crate) struct Detail {
     children: Paged<Child>,
     /// Its stored state, provenance, and actual dates.
     record: NodeState,
-    /// What the journey edited on it (B4).
+    // PRD: B4.
+    /// What the journey edited on it.
     #[serde(default, skip_serializing_if = "BTreeSet::is_empty")]
     local_edits: BTreeSet<LocalEdit>,
     /// A decision's answer.
     #[serde(skip_serializing_if = "Option::is_none")]
     answer: Option<AnswerValue>,
-    /// The rationale the answer was given with, markdown (B2).
+    // PRD: B2.
+    /// The rationale the answer was given with, markdown.
     #[serde(skip_serializing_if = "Option::is_none")]
     rationale: Option<Markdown>,
-    /// Its pin (F2).
+    // PRD: F2.
+    /// Its pin.
     #[serde(skip_serializing_if = "Option::is_none")]
     pin: Option<Date>,
-    /// Its overrides (D4).
+    // PRD: D4.
+    /// Its overrides.
     #[serde(skip_serializing_if = "Option::is_none")]
     overrides: Option<Overrides>,
     /// A page of its notes and links, in key order; pass `next` as `annotations_cursor` for
     /// the next page.
     annotations: Paged<Annotation>,
-    /// Every derived value (D3) with its explanation: relevance, blocking, dates, gravity,
+    // PRD: D3.
+    /// Every derived value with its explanation: relevance, blocking, dates, gravity,
     /// unlocks, and rank.
     derived: NodeDerived,
+    // PRD: C8.
     /// The direct dependents completing it would not yet free, each with what else it waits
-    /// on (C8, Priority: Unlocks): the largest entries with the total; pass `explanations`
+    /// on (Priority: Unlocks): the largest entries with the total; pass `explanations`
     /// with field `still_waiting` for the rest.
     still_waiting: StillWaiting,
-    /// A decision's effects per choice (C12): what each answer brings in, drops, and leaves
+    // PRD: C12.
+    /// A decision's effects per choice: what each answer brings in, drops, and leaves
     /// to be decided later, the role it fills, and the milestone it pins. Saying "answering
     /// Partner brings in 6 and opens 2 more decisions" uses these numbers.
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -313,7 +325,8 @@ impl Detail {
     }
 }
 
-/// `list_frontier` (C9, C10, I2).
+// PRD: C9, C10, I2.
+/// `list_frontier`.
 #[derive(Debug, Deserialize, JsonSchema)]
 #[serde(deny_unknown_fields)]
 pub(crate) struct ListFrontier {
@@ -323,7 +336,8 @@ pub(crate) struct ListFrontier {
     /// nodes every filter holds for, in rank order.
     #[serde(default)]
     filters: BTreeSet<FrontierFilter>,
-    /// Only nodes the caller participates in (E4).
+    // PRD: E4.
+    /// Only nodes the caller participates in.
     #[serde(default)]
     mine: bool,
     /// Only these node kinds; every kind when empty.
@@ -340,13 +354,15 @@ pub(crate) struct ListFrontier {
     cursor: Cursor,
 }
 
-/// What `list_frontier` filters by (I2's lists).
+// PRD: I2.
+/// What `list_frontier` filters by.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Deserialize, JsonSchema)]
 #[serde(rename_all = "snake_case")]
 pub(crate) enum FrontierFilter {
     /// Actionable decisions.
     DecisionsNeeded,
-    /// Placeholders to break down (B10).
+    // PRD: B10.
+    /// Placeholders to break down.
     NeedsBreakdown,
     /// No owner.
     Unassigned,
@@ -354,11 +370,13 @@ pub(crate) enum FrontierFilter {
     Active,
     /// Waiting on something unfinished.
     Blocked,
-    /// Done, but a completing guard would now fail (D4).
+    // PRD: D4.
+    /// Done, but a completing guard would now fail.
     Stale,
     /// Due before today.
     Overdue,
-    /// A plan that can no longer be met (F6).
+    // PRD: F6.
+    /// A plan that can no longer be met.
     Shortfall,
 }
 
@@ -383,7 +401,8 @@ pub(crate) struct FrontierOutput {
     /// The page: each node with its breadcrumb, signals, and rank terms.
     #[serde(flatten)]
     rows: Paged<NodeRow>,
-    /// When the frontier is empty and work remains, what the journey waits on (C5, D5).
+    // PRD: C5, D5.
+    /// When the frontier is empty and work remains, what the journey waits on.
     #[serde(skip_serializing_if = "Option::is_none")]
     stalled: Option<Stalled>,
 }
@@ -407,7 +426,8 @@ impl ToolSet {
         }
     }
 
-    /// I3: `get_snapshot`.
+    // PRD: I3.
+    /// `get_snapshot`.
     async fn get_snapshot(
         &self,
         call: &Call,
@@ -425,7 +445,8 @@ impl ToolSet {
         Ok(At::of(projected, |snapshot| SnapshotOutput { snapshot }))
     }
 
-    /// C2: `get_level`, its nodes paged and its edges those touching the page.
+    // PRD: C2.
+    /// `get_level`, its nodes paged and its edges those touching the page.
     async fn get_level(
         &self,
         call: &Call,
@@ -467,7 +488,8 @@ impl ToolSet {
         }))
     }
 
-    /// C8: `get_node`, or a page of one of its explanation lists.
+    // PRD: C8.
+    /// `get_node`, or a page of one of its explanation lists.
     async fn get_node(&self, call: &Call, arguments: GetNode) -> Result<At<NodeOutput>, ToolError> {
         let (journey, node) = (&arguments.journey, &arguments.node);
         let Some(more) = arguments.explanations else {
@@ -488,7 +510,8 @@ impl ToolSet {
         }))
     }
 
-    /// C10, C9: `list_frontier`: the acting frontier ranked, or the nodes the filters hold
+    // PRD: C10, C9.
+    /// `list_frontier`: the acting frontier ranked, or the nodes the filters hold
     /// for, a page at a time.
     async fn list_frontier(
         &self,

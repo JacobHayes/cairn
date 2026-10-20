@@ -393,7 +393,7 @@ fn unconfirmed(patch: &Patch) -> Option<Rejection> {
             violation(
                 ViolationCode::MutationNotForTarget,
                 Some(u32::try_from(position).unwrap_or(u32::MAX)),
-                "an upgrade or re-link is applied by confirming its proposal (B7, B9)".to_owned(),
+                "an upgrade or re-link is applied by confirming its proposal".to_owned(),
             )
         })
         .collect();

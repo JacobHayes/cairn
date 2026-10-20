@@ -229,7 +229,8 @@ pub enum ResourceContent<R: References> {
     MessageDraft(MessageTemplate<R>),
 }
 
-/// Route-authored guidance on a node (A10), keyed so upgrades diff it (B7).
+// PRD: A10, B7.
+/// Route-authored guidance on a node, keyed so upgrades diff it.
 #[derive(
     Clone, Debug, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize, JsonSchema,
 )]
@@ -407,7 +408,8 @@ impl AnnotationContent {
     }
 }
 
-/// A note or link as its author writes it (G1): the part an add or edit carries.
+// PRD: G1.
+/// A note or link as its author writes it: the part an add or edit carries.
 #[derive(
     Clone, Debug, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize, JsonSchema,
 )]
@@ -507,7 +509,8 @@ impl From<AnnotationBody> for AnnotationWire {
     }
 }
 
-/// A journey-authored note or link on a node or on the journey itself (G1), attributed and
+// PRD: G1.
+/// A journey-authored note or link on a node or on the journey itself, attributed and
 /// timestamped from the patch that added it.
 #[derive(
     Clone, Debug, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize, JsonSchema,

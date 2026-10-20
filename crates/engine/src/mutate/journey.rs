@@ -141,11 +141,7 @@ fn move_node(session: &mut Session<'_>, node: &NodeKey, transition: &Transition)
     };
     let step = Move::of(transition);
     let Some(to) = transition::next(kind, stored.state, step) else {
-        let message = format!(
-            "a {} in {:?} cannot {step:?} (D1)",
-            kind.name(),
-            stored.state
-        );
+        let message = format!("a {} in {:?} cannot {step:?}", kind.name(), stored.state);
         session.reject(ViolationCode::IllegalTransition, Some(node), message);
         return Vec::new();
     };
@@ -252,7 +248,7 @@ fn answer(
     }
     let Some(to) = transition::answered(stored.state) else {
         let message = format!(
-            "a decision in {:?} cannot be answered; reopen it first (D1)",
+            "a decision in {:?} cannot be answered; reopen it first",
             stored.state
         );
         session.reject(ViolationCode::IllegalTransition, Some(decision), message);
@@ -328,7 +324,7 @@ fn direct_fill(session: &mut Session<'_>, role: &RoleKey) -> bool {
         filling_decisions(graph).get(role).map(|decision| {
             (
                 ViolationCode::FilledThroughDecision,
-                format!("the role is filled by answering {decision} (E3)"),
+                format!("the role is filled by answering {decision}"),
             )
         })
     };
@@ -377,7 +373,7 @@ fn direct_pin(
         unreachable!("a journey patch has a graph")
     };
     if let Some(decision) = feeding_decisions(graph).get(node) {
-        let message = format!("the milestone is pinned by answering {decision} (E3, F5)");
+        let message = format!("the milestone is pinned by answering {decision}");
         session.reject(ViolationCode::PinnedThroughDecision, Some(node), message);
         return Err(Rejected);
     }
@@ -431,12 +427,12 @@ fn snooze(
     let (code, message) = if stored.state.is_terminal() {
         (
             ViolationCode::SnoozeNotActionable,
-            "only an actionable node, or a container with work left beneath it, is snoozed (B6)",
+            "only an actionable node, or a container with work left beneath it, is snoozed",
         )
     } else if *until == cairn_schema::SnoozeTarget::Node(node.clone()) {
         (
             ViolationCode::SnoozeOnSelf,
-            "a node cannot be snoozed until itself (B6)",
+            "a node cannot be snoozed until itself",
         )
     } else {
         // B6: whether the node is relevant is checked on the graph the patch produces.
@@ -533,7 +529,7 @@ fn set_atomic(session: &mut Session<'_>, node: &NodeKey, atomic: bool) -> Vec<Wr
         session.reject(
             ViolationCode::FieldNotOnKind,
             Some(node),
-            "only a placeholder is marked atomic (B10)",
+            "only a placeholder is marked atomic",
         );
         return Vec::new();
     }

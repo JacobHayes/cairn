@@ -132,43 +132,43 @@ fn projections() -> Vec<Operation> {
     vec![
         projection::<Snapshot>(
             &at::SNAPSHOT,
-            "The bounded agent snapshot, scoped to a subtree and depth, its nodes paged (I3).",
+            "The bounded agent snapshot, scoped to a subtree and depth, its nodes paged.",
             query::SNAPSHOT_PARAMS,
         ),
         projection::<Level>(
             &at::LEVEL,
-            "One canvas level: the kinds shown, at the top or within a container (C2).",
+            "One canvas level: the kinds shown, at the top or within a container.",
             query::LEVEL_PARAMS,
         ),
         Operation {
             path: &[JOURNEY_ID, NODE_KEY],
             ..projection::<Trace>(
                 &at::TRACE,
-                "What is upstream and downstream of a node, gravity contributors marked (C7).",
+                "What is upstream and downstream of a node, gravity contributors marked.",
                 &[],
             )
         },
         projection::<Derived>(
             &at::DERIVED,
-            "Every derived value with its explanation inputs, as the browser derives the document (D3).",
+            "Every derived value with its explanation inputs, as the browser derives the document.",
             &[],
         ),
-        projection::<DecisionView>(&at::DECISIONS, "The decision view (C12).", &[]),
-        projection::<Timeline>(&at::TIMELINE, "The timeline (C13).", &[]),
-        projection::<StatusSummary>(&at::SUMMARY, "The status summary (C18).", &[]),
+        projection::<DecisionView>(&at::DECISIONS, "The decision view.", &[]),
+        projection::<Timeline>(&at::TIMELINE, "The timeline.", &[]),
+        projection::<StatusSummary>(&at::SUMMARY, "The status summary.", &[]),
         projection::<Next>(
             &at::NEXT,
-            "The acting frontier ranked, globally or for the caller, filtered (C10).",
+            "The acting frontier ranked, globally or for the caller, filtered.",
             query::NEXT_PARAMS,
         ),
         projection::<ListPage>(
             &at::NODES,
-            "The nodes a list query matches, sorted and paged (C9).",
+            "The nodes a list query matches, sorted and paged.",
             query::LIST_PARAMS,
         ),
         projection::<Mine>(
             &at::MINE,
-            "The nodes the caller participates in, by participation kind (E4).",
+            "The nodes the caller participates in, by participation kind.",
             query::MINE_PARAMS,
         ),
     ]
@@ -183,7 +183,7 @@ fn node_reads() -> Vec<Operation> {
             ..projection::<NodeDetail>(
                 &at::NODE,
                 "One node in full; each explanation list carries its largest entries up to \
-                 the response limit and its total (C8).",
+                 the response limit and its total.",
                 &[],
             )
         },
@@ -199,7 +199,7 @@ fn node_reads() -> Vec<Operation> {
             ],
             ..projection::<ExplanationPage>(
                 &at::EXPLANATIONS,
-                "A page of a node's explanation list, largest first (C8).",
+                "A page of a node's explanation list, largest first.",
                 query::EXPLANATION_PARAMS,
             )
         },
@@ -208,7 +208,7 @@ fn node_reads() -> Vec<Operation> {
             query: query::HISTORY_PARAMS,
             ..read::<History>(
                 &at::HISTORY,
-                "The journey's events, or a node's, grouped by patch and paged (J4).",
+                "The journey's events, or a node's, grouped by patch and paged.",
             )
         },
     ]
@@ -237,19 +237,19 @@ fn writes() -> Vec<Operation> {
             path: &[JOURNEY_ID],
             ..patch(
                 &at::PATCH_JOURNEY,
-                "Applies a journey patch; base revision 0 creates it (A17).",
+                "Applies a journey patch; base revision 0 creates it.",
             )
         },
         Operation {
             path: &[ROUTE_ID],
             ..patch(
                 &at::PATCH_ROUTE,
-                "Applies a route patch, its draft included (A17).",
+                "Applies a route patch, its draft included.",
             )
         },
         patch(
             &at::PATCH_DEPLOYMENT,
-            "Applies a deployment patch: identities and merges (E6).",
+            "Applies a deployment patch: identities and merges.",
         ),
     ]
 }
@@ -268,8 +268,7 @@ fn proposal_write<T: JsonSchema>(endpoint: &'static Endpoint, summary: &'static 
 fn proposals() -> Vec<Operation> {
     use crate::endpoints as at;
     let create = "Creates a proposal for this domain, which may not exist yet, under a \
-                  client-generated id; a create resubmitted under that id answers the proposal \
-                  (I6).";
+                  client-generated id; a create resubmitted under that id answers the proposal.";
     let mut all = vec![
         Operation {
             path: &[JOURNEY_ID],
@@ -301,7 +300,7 @@ fn proposals() -> Vec<Operation> {
         ..read::<ProposalList>(
             &at::PROPOSALS,
             "The open proposals no one destination holds: those waiting on the caller, and those \
-             that would create a journey or a route, newest first with their count (C14, C16).",
+             that would create a journey or a route, newest first with their count.",
         )
     });
     all
@@ -321,15 +320,14 @@ fn proposals_under(
             ..read::<ProposalList>(
                 &set.list,
                 "The destination's open proposals, newest first, with their count and the \
-                 destination as it is now (C14).",
+                 destination as it is now.",
             )
         },
         Operation {
             path: under,
             ..read::<Proposal>(
                 &set.get,
-                "A proposal under this destination: its editing revision, status, and content \
-                 (I6).",
+                "A proposal under this destination: its editing revision, status, and content.",
             )
         },
         Operation {
@@ -337,7 +335,7 @@ fn proposals_under(
             ..proposal_write::<ProposalEdit>(
                 &set.edit,
                 "Replaces its content against its editing revision; its destination does not \
-                 move (H5).",
+                 move.",
             )
         },
         Operation {
@@ -345,7 +343,7 @@ fn proposals_under(
             ..read::<ProposalReview>(
                 &set.preview,
                 "What applying it now would do: unresolved items, violations, the graph and \
-                 frontier after, consequences, and what moved since drafting (C14, D7, I6).",
+                 frontier after, consequences, and what moved since drafting.",
             )
         },
         Operation {
@@ -355,13 +353,13 @@ fn proposals_under(
             patch: true,
             ..operation(
                 &set.apply,
-                "Applies it at the reviewed editing revision, the caller confirming (H2); \
-                 stale with what intervened when either revision moved (I6).",
+                "Applies it at the reviewed editing revision, the caller confirming; \
+                 stale with what intervened when either revision moved.",
             )
         },
         Operation {
             path: under,
-            ..proposal_write::<ProposalStep>(&set.discard, "Discards it (I6).")
+            ..proposal_write::<ProposalStep>(&set.discard, "Discards it.")
         },
         Operation {
             path: under,
@@ -369,7 +367,7 @@ fn proposals_under(
             ..proposal_write::<ProposalStep>(
                 &set.refresh,
                 "Drafts it again on its destination as it stands, the reviewer's choices \
-                 carried over; review it again before applying (I6).",
+                 carried over; review it again before applying.",
             )
         },
     ]
@@ -391,17 +389,17 @@ fn bulk() -> Vec<Operation> {
         drafted::<UpgradeRequest>(
             &at::UPGRADE,
             "Proposes upgrading the journey to a newer version of its route: the merge's \
-             conflicts, kept edits, and orphans are its review items (B7).",
+             conflicts, kept edits, and orphans are its review items.",
         ),
         drafted::<SaveAsRouteRequest>(
             &at::SAVE_AS_ROUTE,
             "Proposes saving the journey's structure as a route draft, with a participation \
-             mapping per explicit identity and an exclusion per node (B8).",
+             mapping per explicit identity and an exclusion per node.",
         ),
         drafted::<RelinkRequest>(
             &at::RELINK,
             "Proposes re-linking the journey to a published version, differences kept as \
-             local edits unless the reviewer takes the route's (B9).",
+             local edits unless the reviewer takes the route's.",
         ),
         Operation {
             path: &[ROUTE_ID],
@@ -411,7 +409,7 @@ fn bulk() -> Vec<Operation> {
             ..operation(
                 &at::IMPORT_ROUTE,
                 "Imports a route file as a new route or a new draft extending a published \
-                 version, matched by key or path; one route patch (A13).",
+                 version, matched by key or path; one route patch.",
             )
         },
         Operation {
@@ -420,7 +418,7 @@ fn bulk() -> Vec<Operation> {
             ..read::<RouteFile>(
                 &at::EXPORT_ROUTE,
                 "A published version, or the draft, as a route file: every key kept, in one \
-                 sorted order, naming the version it extends (A13).",
+                 sorted order, naming the version it extends.",
             )
         },
     ]
@@ -432,10 +430,7 @@ fn reads() -> Vec<Operation> {
     vec![
         Operation {
             query: query::JOURNEY_PARAMS,
-            ..read::<JourneyPage>(
-                &at::JOURNEYS,
-                "The journey index, filtered and paged (C16).",
-            )
+            ..read::<JourneyPage>(&at::JOURNEYS, "The journey index, filtered and paged.")
         },
         Operation {
             path: &[JOURNEY_ID],
@@ -451,7 +446,7 @@ fn reads() -> Vec<Operation> {
         },
         Operation {
             query: query::ROUTE_PARAMS,
-            ..read::<RoutePage>(&at::ROUTES, "The route index, paged (I2).")
+            ..read::<RoutePage>(&at::ROUTES, "The route index, paged.")
         },
         Operation {
             path: &[ROUTE_ID],
@@ -461,7 +456,7 @@ fn reads() -> Vec<Operation> {
             path: &[ROUTE_ID],
             ..read::<RouteDetail>(
                 &at::ROUTE_VERSIONS,
-                "A route's versions and their journeys (C17).",
+                "A route's versions and their journeys.",
             )
         },
         Operation {
@@ -471,16 +466,13 @@ fn reads() -> Vec<Operation> {
             ],
             ..read::<RouteVersion>(&at::ROUTE_VERSION, "One published route version.")
         },
-        read::<Deployment>(
-            &at::DEPLOYMENT,
-            "The deployment: identities and aliases (E6).",
-        ),
+        read::<Deployment>(&at::DEPLOYMENT, "The deployment: identities and aliases."),
         Operation {
             path: &[("key", "The identity.", schema_of::<IdentityKey>)],
             ..read::<IdentityReferences>(
                 &at::IDENTITY_REFERENCES,
                 "The journeys and routes referring to an identity, directly or through an \
-                 alias: what a delete is checked against (E6).",
+                 alias: what a delete is checked against.",
             )
         },
         Operation {
@@ -489,10 +481,7 @@ fn reads() -> Vec<Operation> {
         },
         Operation {
             query: query::EVENT_PARAMS,
-            ..read::<EventPage>(
-                &at::EVENTS,
-                "Events, filtered and paged in commit order (J5).",
-            )
+            ..read::<EventPage>(&at::EVENTS, "Events, filtered and paged in commit order.")
         },
     ]
 }
@@ -506,26 +495,23 @@ fn users() -> Vec<Operation> {
             success: Success::Events,
             ..operation(
                 &at::STREAM,
-                "Revision ticks as server-sent `tick` events, current revisions first (H6).",
+                "Revision ticks as server-sent `tick` events, current revisions first.",
             )
         },
-        read::<Caller>(&at::CALLER, "The caller and their identities (H2, H3)."),
+        read::<Caller>(&at::CALLER, "The caller and their identities."),
         Operation {
             query: query::USER_NAME_PARAMS,
             ..read::<Vec<UserName>>(
                 &at::USER_NAMES,
                 "The names people see for the users asked for: the identity their verified emails \
-                 name, else the name their sign-in gave (H3).",
+                 name, else the name their sign-in gave.",
             )
         },
         read::<Vec<AgentToken>>(&at::TOKENS, "The caller's agent tokens."),
         Operation {
             body: Some(schema_of::<TokenRequest>),
             success: Success::Json(201, schema_of::<MintedToken>),
-            ..operation(
-                &at::MINT_TOKEN,
-                "Mints an agent token, shown this once (H2).",
-            )
+            ..operation(&at::MINT_TOKEN, "Mints an agent token, shown this once.")
         },
         Operation {
             path: &[("agent", "The token's agent.", schema_of::<AgentId>)],
@@ -551,13 +537,13 @@ fn assistant() -> Vec<Operation> {
             &at::ASSISTANT_JOURNEY,
             &[JOURNEY_ID],
             "One assistant turn about a journey, when the capabilities offer the assistant \
-             (I5): its direct writes with their consequences, and its proposals for review.",
+: its direct writes with their consequences, and its proposals for review.",
         ),
         turn(
             &at::ASSISTANT_ROUTE_DRAFT,
             &[ROUTE_ID],
             "One assistant turn about a route's draft, when the capabilities offer the \
-             assistant (I5, A12): what it drafts arrives as proposals on the draft.",
+             assistant: what it drafts arrives as proposals on the draft.",
         ),
         Operation {
             path: &[JOURNEY_ID],
@@ -565,7 +551,7 @@ fn assistant() -> Vec<Operation> {
             ..operation(
                 &at::ASSISTANT_JOURNEY_CONVERSATION,
                 "The caller's conversation with the assistant about a journey, as kept, when \
-                 the capabilities offer the assistant (I5).",
+                 the capabilities offer the assistant.",
             )
         },
         Operation {
@@ -574,7 +560,7 @@ fn assistant() -> Vec<Operation> {
             ..operation(
                 &at::ASSISTANT_ROUTE_DRAFT_CONVERSATION,
                 "The caller's conversation with the assistant about a route's draft, as \
-                 kept, when the capabilities offer the assistant (I5).",
+                 kept, when the capabilities offer the assistant.",
             )
         },
     ]
@@ -622,7 +608,7 @@ pub fn document() -> Value {
         "info": {
             "title": "Cairn",
             "version": DOCUMENT_VERSION,
-            "description": "The Cairn HTTP API. Every request but the health check is authenticated (a session cookie or a bearer token). A rejected patch answers its rejection unchanged, every violation by path (A15); other errors answer a Problem with the request id.",
+            "description": "The Cairn HTTP API. Every request but the health check is authenticated (a session cookie or a bearer token). A rejected patch answers its rejection unchanged, every violation by path; other errors answer a Problem with the request id.",
         },
         "paths": paths,
         "components": {
@@ -784,15 +770,15 @@ fn responses(
         auth_refusals(&mut answers);
     }
     if operation.patch {
-        let stale = "Stale (with what intervened) or a reused patch id (H5).";
+        let stale = "Stale (with what intervened) or a reused patch id.";
         answers.insert("409".to_owned(), json_of(rejection.as_value(), stale));
-        let invalid = "Invalid: every violation, by path (A15).";
+        let invalid = "Invalid: every violation, by path.";
         answers.insert("422".to_owned(), json_of(rejection.as_value(), invalid));
     }
     if operation.drafts {
         let either = json!({"oneOf": [rejection, problem]});
-        let invalid = "Invalid: every violation, by path (A15); or a problem when it cannot be \
-                       drafted (B7, B8, B9).";
+        let invalid = "Invalid: every violation, by path; or a problem when it cannot be \
+                       drafted.";
         answers.insert("422".to_owned(), json_of(&either, invalid));
     }
     Value::Object(answers)

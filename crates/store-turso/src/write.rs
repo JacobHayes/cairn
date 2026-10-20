@@ -628,7 +628,7 @@ impl<'connection> Writer<'connection> {
             | RecordKey::RouteHeader(_)
             | RecordKey::RouteVersion { .. }
             | RecordKey::DeletedJourney(_) => {
-                return Err(malformed(format!("{key:?} is never removed (A11, A19)")));
+                return Err(malformed(format!("{key:?} is never removed")));
             }
         }
         Ok(())

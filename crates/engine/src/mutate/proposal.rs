@@ -150,7 +150,7 @@ pub(super) fn apply_to_destination(
             session,
             ViolationCode::ArchivedJourney,
             id,
-            "an archived journey accepts only un-archiving or hard deletion (B11, A19)",
+            "an archived journey accepts only un-archiving or hard deletion",
         );
         return Vec::new();
     }

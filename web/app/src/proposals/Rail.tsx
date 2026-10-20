@@ -25,7 +25,7 @@ import { identityDiff, useLayer, type Layer, type LayerModel } from "./layer.ts"
 import { DIFF_LABELS, itemNode, withMutationsAdded, type DiffKind, type DiffMark, type Proposal } from "./model.ts";
 import { rolesAddedBy } from "./review.ts";
 import { StalePanel } from "./Stale.tsx";
-import { subjectOf, violationNode, violationWords } from "../data/writes.ts";
+import { subjectOf, violationNode } from "../data/writes.ts";
 import { fieldValueWords, itemHeading, mutationWords, outlineWords, stateValueWords } from "./words.ts";
 import { fieldWords } from "../status/words.ts";
 import { stateOf, type Blocker } from "./model.ts";
@@ -120,7 +120,7 @@ function Violations({ layer, model }: { layer: Layer; model: LayerModel }) {
           return (
             <li key={at} data-testid="violation" data-code={violation.code} data-node={node}>
               {node === undefined ? null : <strong>{model.names.node(node)}: </strong>}
-              {violationWords(violation)}
+              {violation.message}
             </li>
           );
         })}

@@ -22,7 +22,7 @@ pub(crate) const SPECS: &[Spec] = &[
     Spec {
         name: "create_proposal",
         description: "Drafts a proposal against a journey, a route (its draft), or the \
-            deployment, under an id you choose (I6): ordered mutations for someone to review \
+            deployment, under an id you choose: ordered mutations for someone to review \
             and apply, as one patch. A destination that does not exist yet is created at \
             destination revision 0. Use it for structure, breakdowns, and any change a person \
             should see whole before it lands. Resubmitting the same id answers the proposal \
@@ -50,7 +50,7 @@ pub(crate) const SPECS: &[Spec] = &[
         name: "apply_proposal",
         description: "Applies a reviewed proposal: both its editing revision and its \
             destination's are checked, its mutations validated and committed with its \
-            applied status, and the caller recorded as confirming it (H2, I6). Rejected with \
+            applied status, and the caller recorded as confirming it. Rejected with \
             every violation, or as stale with what moved (then refresh it).",
         writes: true,
         destructive: true,
@@ -60,7 +60,7 @@ pub(crate) const SPECS: &[Spec] = &[
     Spec {
         name: "upgrade",
         description: "Drafts upgrading a journey to a newer version of its route as a \
-            proposal (B7): route changes it did not edit are taken, its local edits kept, and \
+            proposal: route changes it did not edit are taken, its local edits kept, and \
             conflicts become review items. Nothing changes until it is applied.",
         writes: true,
         destructive: false,
@@ -70,7 +70,7 @@ pub(crate) const SPECS: &[Spec] = &[
     Spec {
         name: "save_as_route",
         description: "Drafts saving a journey's structure as a new route's draft, as a \
-            proposal on that route (B8), with review items for participations and nodes to \
+            proposal on that route, with review items for participations and nodes to \
             leave out.",
         writes: true,
         destructive: false,
@@ -80,7 +80,7 @@ pub(crate) const SPECS: &[Spec] = &[
     Spec {
         name: "relink",
         description: "Drafts linking a journey to a published route version as a proposal \
-            (B9): where it differs from the version is kept as its own edit unless the \
+: where it differs from the version is kept as its own edit unless the \
             reviewer takes the route's.",
         writes: true,
         destructive: false,
@@ -321,7 +321,8 @@ pub(crate) enum ProposalChange {
     },
     /// Discard it.
     Discard,
-    /// Draft it again against its destination as it stands (I6), keeping the reviewer's
+    // PRD: I6.
+    /// Draft it again against its destination as it stands, keeping the reviewer's
     /// choices; it must be reviewed again.
     Refresh,
 }

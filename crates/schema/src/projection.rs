@@ -20,7 +20,8 @@ use crate::node::NodeKind;
 use crate::state::{AnswerValue, SnoozeTarget, State};
 use crate::text::{Markdown, Title};
 
-/// A position in a projection's order: where the next page starts (I3, J4). Valid for the
+// PRD: I3, J4.
+/// A position in a projection's order: where the next page starts. Valid for the
 /// same journey revision and derive inputs; a page read at another revision starts over.
 #[derive(
     Clone,
@@ -56,17 +57,21 @@ impl Cursor {
     }
 }
 
-/// C2: how an edge on the canvas arose (C1: implicit gates are drawn dotted).
+// PRD: C1.
+// PRD: C2.
+/// How an edge on the canvas arose (implicit gates are drawn dotted).
 #[derive(
     Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize, JsonSchema,
 )]
 #[serde(rename_all = "snake_case")]
 pub enum EdgeOrigin {
-    /// An explicit `requires` edge (A3).
+    // PRD: A3.
+    /// An explicit `requires` edge.
     Explicit,
     /// A condition gate: the dependent's condition reads the decision (Gating).
     Condition,
-    /// A stage's opening milestone (F4).
+    // PRD: F4.
+    /// A stage's opening milestone.
     StageOpening,
 }
 
@@ -82,11 +87,13 @@ pub struct UnderlyingEdge {
     pub dependent: NodeKey,
     /// How it arose.
     pub origin: EdgeOrigin,
-    /// It blocks (D1); false for a stage opening with `gates: false`, which holds dates only.
+    // PRD: D1.
+    /// It blocks; false for a stage opening with `gates: false`, which holds dates only.
     pub gates: bool,
 }
 
-/// C2: an edge drawn at a level, between the nearest visible stand-ins of its ends, with the
+// PRD: C2.
+/// An edge drawn at a level, between the nearest visible stand-ins of its ends, with the
 /// edges it collapses.
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
 #[serde(deny_unknown_fields)]
@@ -95,7 +102,7 @@ pub struct LevelEdge {
     pub from: NodeKey,
     /// The stand-in of the dependent side.
     pub to: NodeKey,
-    /// Every underlying edge is implicit (drawn dotted, C1).
+    /// Every underlying edge is implicit (drawn dotted).
     #[serde(default, skip_serializing_if = "crate::serde_util::is_false")]
     pub implicit: bool,
     /// Some underlying edge blocks.
@@ -104,17 +111,21 @@ pub struct LevelEdge {
     pub underlying: Vec<UnderlyingEdge>,
 }
 
-/// D1, C2: a group's display state, derived from its children and dependencies. Deprecated:
-/// [`DisplayState`] (D8) is the state of every node, groups included; this stays, equal in
+// PRD: D8.
+// PRD: D1, C2.
+/// A group's display state, derived from its children and dependencies. Deprecated:
+/// [`DisplayState`] is the state of every node, groups included; this stays, equal in
 /// meaning on groups, until a later breaking release.
 #[derive(
     Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize, JsonSchema,
 )]
 #[serde(rename_all = "snake_case")]
 pub enum GroupState {
-    /// Not relevant (Gating): drawn grayed (C1).
+    // PRD: C1.
+    /// Not relevant (Gating): drawn grayed.
     NotRelevant,
-    /// Explicitly or effectively skipped (D1a).
+    // PRD: D1a.
+    /// Explicitly or effectively skipped.
     Skipped,
     /// It satisfies dependencies: its children and gates are done.
     Done,
@@ -126,7 +137,8 @@ pub enum GroupState {
     NotStarted,
 }
 
-/// C2: what a container shows of its children.
+// PRD: C2.
+/// What a container shows of its children.
 #[allow(clippy::struct_excessive_bools)]
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
 #[serde(deny_unknown_fields)]
@@ -141,7 +153,8 @@ pub struct RollUp {
     /// Every relevant child that is not done is blocked (`all_blocked`), and there is one.
     #[serde(default, skip_serializing_if = "crate::serde_util::is_false")]
     pub all_blocked: bool,
-    /// C2, C4: the container's progress over the work beneath it, whole subtree; "decision
+    // PRD: C2, C4.
+    /// The container's progress over the work beneath it, whole subtree; "decision
     /// needed" is `progress.decisions_needed > 0`.
     pub progress: Progress,
     /// A child needs breakdown.
@@ -165,7 +178,8 @@ pub struct RollUp {
     pub owners: BTreeSet<IdentityKey>,
 }
 
-/// C2: one visible node at a level.
+// PRD: C2.
+/// One visible node at a level.
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
 #[serde(deny_unknown_fields)]
 pub struct LevelNode {
@@ -176,18 +190,20 @@ pub struct LevelNode {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub parent: Option<NodeKey>,
     /// The hidden nodes that roll up into it (a hidden action is a checklist item on its
-    /// deliverable, C4), in tree order.
+    /// deliverable), in tree order.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub rolled_up: Vec<NodeKey>,
+    // PRD: C7.
     /// Its hidden, unsatisfied prerequisites that no visible edge stands for: the "hidden
-    /// prerequisites" marker, which opens the trace (C7). Empty when it has none.
+    /// prerequisites" marker, which opens the trace. Empty when it has none.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub hidden_prerequisites: Vec<NodeKey>,
-    /// A skipped container whose kept work is not yet done: "skipped, kept work pending"
-    /// (D1a).
+    // PRD: D1a.
+    /// A skipped container whose kept work is not yet done: "skipped, kept work pending".
     #[serde(default, skip_serializing_if = "crate::serde_util::is_false")]
     pub kept_work_pending: bool,
-    /// D8: the state every surface shows for the node.
+    // PRD: D8.
+    /// The state every surface shows for the node.
     pub display_state: DisplayState,
     /// A group's display state. Deprecated: read `display_state`, which every node carries.
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -198,7 +214,8 @@ pub struct LevelNode {
     pub roll_up: Option<RollUp>,
 }
 
-/// C2: which nodes a level shows by how their relevance reads to a person. A node is
+// PRD: C2.
+/// Which nodes a level shows by how their relevance reads to a person. A node is
 /// `relevant` when it applies; `conditional` when it may apply (its relevance is undecided,
 /// or it is not relevant only because the decision it reads cannot be answered yet); and
 /// `not_relevant` when it is settled as not applying (ruled out by an answer, a skip, or a
@@ -339,7 +356,8 @@ impl LevelQuery {
     }
 }
 
-/// C2: one aggregation level of the canvas: the visible nodes for the shown kinds within the
+// PRD: C2.
+/// One aggregation level of the canvas: the visible nodes for the shown kinds within the
 /// drilled-in container, the edges re-targeted to visible stand-ins with duplicates collapsed,
 /// and each container's roll-ups. Display only: stored state stays on each node.
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
@@ -363,7 +381,7 @@ pub struct Level {
     pub nodes: Vec<LevelNode>,
     /// The edges, sorted by their ends.
     pub edges: Vec<LevelEdge>,
-    /// C1's count, per relevance class left out: the nodes hidden only for their class (of a
+    /// The count, per relevance class left out: the nodes hidden only for their class (of a
     /// kind shown, within the level, under no collapse, not left out by `top`, and kept by the
     /// filters), so showing a class draws exactly that many more. Empty when every class is
     /// shown.
@@ -383,7 +401,8 @@ pub struct AffectedNodes {
     pub nodes: Vec<NodeKey>,
 }
 
-/// C12: what one answer to a decision does to the journey's scope, from a three-valued
+// PRD: C12.
+/// What one answer to a decision does to the journey's scope, from a three-valued
 /// re-evaluation of relevance under that answer: never a full derive.
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
 #[serde(deny_unknown_fields)]
@@ -413,17 +432,20 @@ pub struct ChoiceEffect {
     pub decided_later: AffectedNodes,
 }
 
-/// C12, E3: what answering a decision does, per choice, and the static lines every answer
+// PRD: C12, E3.
+/// What answering a decision does, per choice, and the static lines every answer
 /// of a date or identity decision carries.
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
 #[serde(deny_unknown_fields)]
 pub struct AnswerEffects {
     /// The decision.
     pub decision: NodeKey,
-    /// The role its answer fills (E3), for an identity or identity-list decision.
+    // PRD: E3.
+    /// The role its answer fills, for an identity or identity-list decision.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub fills_role: Option<RoleKey>,
-    /// The milestone its answer pins (E3), for a date decision.
+    // PRD: E3.
+    /// The milestone its answer pins, for a date decision.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub pins: Option<NodeKey>,
     /// Whether the decision's answer is in effect: it is relevant, and not skipped. When not,
@@ -435,7 +457,8 @@ pub struct AnswerEffects {
     pub choices: Vec<ChoiceEffect>,
 }
 
-/// C7: what a node depends on and what depends on it, across levels, over the full structural
+// PRD: C7.
+/// What a node depends on and what depends on it, across levels, over the full structural
 /// graph: terminal and not-relevant nodes included.
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
 #[serde(deny_unknown_fields)]
@@ -452,7 +475,8 @@ pub struct Trace {
     pub gravity_contributors: Vec<NodeKey>,
 }
 
-/// C9, C10: the single signal a list is sorted by; ties fall back to rank order.
+// PRD: C9, C10.
+/// The single signal a list is sorted by; ties fall back to rank order.
 #[derive(
     Clone,
     Copy,
@@ -484,7 +508,8 @@ pub enum SortBy {
     Effort,
 }
 
-/// C8, C10: why a node ranks where it does: its rank and the terms it blends.
+// PRD: C8, C10.
+/// Why a node ranks where it does: its rank and the terms it blends.
 #[derive(Clone, Copy, Debug, PartialEq, Serialize, Deserialize, JsonSchema)]
 #[serde(deny_unknown_fields)]
 pub struct RankTerms {
@@ -500,7 +525,8 @@ pub struct RankTerms {
     pub rank: Real,
 }
 
-/// One node as a row of the list, the next list, or the snapshot (C9, C10, I3): what it is,
+// PRD: C9, C10, I3.
+/// One node as a row of the list, the next list, or the snapshot: what it is,
 /// where it sits, and its derived signals.
 #[allow(clippy::struct_excessive_bools)]
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize, JsonSchema)]
@@ -517,44 +543,54 @@ pub struct NodeRow {
     /// Its stored state: what transitions act on. Prefer `display_state` for "what is its
     /// status".
     pub state: State,
-    /// D8: the state every surface shows for the node.
+    // PRD: D8.
+    /// The state every surface shows for the node.
     pub display_state: DisplayState,
-    /// Its ancestors, root first: the breadcrumb (C10).
+    // PRD: C10.
+    /// Its ancestors, root first: the breadcrumb.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub ancestors: Vec<NodeKey>,
     /// Its relevance.
     pub relevance: Relevance,
-    /// D2.
+    /// Whether work can be started on it now: relevant, not blocked, and not finished.
     #[serde(default, skip_serializing_if = "crate::serde_util::is_false")]
     pub actionable: bool,
     /// Gating, Blocked.
     #[serde(default, skip_serializing_if = "crate::serde_util::is_false")]
     pub blocked: bool,
-    /// Skipped through an ancestor (D1a).
+    // PRD: D1a.
+    /// Skipped through an ancestor.
     #[serde(default, skip_serializing_if = "crate::serde_util::is_false")]
     pub effectively_skipped: bool,
-    /// Its owners (E2).
+    // PRD: E2.
+    /// Its owners.
     #[serde(default, skip_serializing_if = "BTreeSet::is_empty")]
     pub owners: BTreeSet<IdentityKey>,
-    /// No owner (E1).
+    // PRD: E1.
+    /// No owner.
     #[serde(default, skip_serializing_if = "crate::serde_util::is_false")]
     pub unassigned: bool,
-    /// A snooze that holds over the node (B6): its own, else its container's.
+    // PRD: B6.
+    /// A snooze that holds over the node: its own, else its container's.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub snoozed: Option<SnoozeTarget>,
-    /// The container whose snooze holds over the node (B6).
+    // PRD: B6.
+    /// The container whose snooze holds over the node.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub snoozed_via: Option<NodeKey>,
-    /// Non-terminal with its due before today (D3).
+    // PRD: D3.
+    /// Non-terminal with its due before today.
     #[serde(default, skip_serializing_if = "crate::serde_util::is_false")]
     pub overdue: bool,
-    /// A terminal node whose completing guards would now fail (D4).
+    // PRD: D4.
+    /// A terminal node whose completing guards would now fail.
     #[serde(default, skip_serializing_if = "crate::serde_util::is_false")]
     pub stale: bool,
-    /// B10.
+    /// Whether it is a placeholder that still needs to be broken down into children.
     #[serde(default, skip_serializing_if = "crate::serde_util::is_false")]
     pub needs_breakdown: bool,
-    /// Days the plan can no longer be met by (F6).
+    // PRD: F6.
+    /// Days the plan can no longer be met by.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub shortfall_days: Option<u32>,
     /// Latest start minus today; none is no deadline.
@@ -593,8 +629,10 @@ pub struct NextQuery {
     pub for_viewer: bool,
 }
 
-/// C10: the acting frontier ordered, each item with its breadcrumb and why it ranks where it
-/// does; when it is empty, what the journey waits on (C5, D5).
+// PRD: C5, D5.
+// PRD: C10.
+/// The acting frontier ordered, each item with its breadcrumb and why it ranks where it
+/// does; when it is empty, what the journey waits on.
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize, JsonSchema)]
 #[serde(deny_unknown_fields)]
 pub struct Next {
@@ -605,13 +643,15 @@ pub struct Next {
     pub stalled: Option<Stalled>,
 }
 
-/// C9: a list filter that needs no argument.
+// PRD: C9.
+/// A list filter that needs no argument.
 #[derive(
     Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize, JsonSchema,
 )]
 #[serde(rename_all = "snake_case")]
 pub enum ListFlag {
-    /// The viewer participates (E4).
+    // PRD: E4.
+    /// The viewer participates.
     Mine,
     /// No owner.
     Unassigned,
@@ -619,7 +659,7 @@ pub enum ListFlag {
     NextUp,
     /// An actionable decision.
     DecisionsNeeded,
-    /// B10.
+    /// Placeholders that still need to be broken down.
     NeedsBreakdown,
     /// Stored `active`.
     Active,
@@ -653,7 +693,8 @@ pub struct ListQuery {
     /// Only nodes in these stored states; any when empty.
     #[serde(default, skip_serializing_if = "BTreeSet::is_empty")]
     pub states: BTreeSet<State>,
-    /// Only nodes showing these display states (D8); any when empty.
+    // PRD: D8.
+    /// Only nodes showing these display states; any when empty.
     #[serde(default, skip_serializing_if = "BTreeSet::is_empty")]
     pub display_states: BTreeSet<DisplayState>,
     /// Only these node kinds; any when empty.
@@ -670,7 +711,8 @@ pub struct ListQuery {
     pub cursor: Cursor,
 }
 
-/// C9: a page of the list.
+// PRD: C9.
+/// A page of the list.
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize, JsonSchema)]
 #[serde(deny_unknown_fields)]
 pub struct ListPage {
@@ -683,7 +725,8 @@ pub struct ListPage {
     pub total: u32,
 }
 
-/// E4: a node the viewer participates in, with the kinds they hold.
+// PRD: E4.
+/// A node the viewer participates in, with the kinds they hold.
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
 #[serde(deny_unknown_fields)]
 pub struct MineEntry {
@@ -693,7 +736,8 @@ pub struct MineEntry {
     pub kinds: BTreeSet<KindKey>,
 }
 
-/// I3: which part of the journey a snapshot covers and which page of its nodes.
+// PRD: I3.
+/// Which part of the journey a snapshot covers and which page of its nodes.
 #[derive(Clone, Debug, Default, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
 #[serde(deny_unknown_fields)]
 pub struct SnapshotScope {
@@ -709,7 +753,8 @@ pub struct SnapshotScope {
     pub cursor: Cursor,
 }
 
-/// I3: one in-scope node in the snapshot, with its participations, blocking, and dates.
+// PRD: I3.
+/// One in-scope node in the snapshot, with its participations, blocking, and dates.
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize, JsonSchema)]
 #[serde(deny_unknown_fields)]
 pub struct SnapshotNode {
@@ -732,7 +777,8 @@ pub struct SnapshotNode {
     pub latest_start: Option<Date>,
 }
 
-/// I3: what a snapshot counts in its subtree, whatever its depth and page.
+// PRD: I3.
+/// What a snapshot counts in its subtree, whatever its depth and page.
 #[derive(Clone, Debug, Default, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
 #[serde(deny_unknown_fields)]
 pub struct SnapshotCounts {
@@ -742,7 +788,8 @@ pub struct SnapshotCounts {
     pub not_relevant: u32,
     /// In-scope nodes by stored state; they add up to `in_scope`.
     pub by_state: BTreeMap<State, u32>,
-    /// D8: the same in-scope nodes by display state; they add up to `in_scope`, and none is
+    // PRD: D8.
+    /// The same in-scope nodes by display state; they add up to `in_scope`, and none is
     /// `not_relevant`. A not-relevant node pending on an undecided decision is out of scope
     /// and so not counted here until its decision is answered.
     pub by_display_state: BTreeMap<DisplayState, u32>,
@@ -756,7 +803,8 @@ pub struct SnapshotCounts {
     pub blocked: u32,
 }
 
-/// I3: the bounded agent view of a journey: answers, a page of in-scope nodes, the ranked
+// PRD: I3.
+/// The bounded agent view of a journey: answers, a page of in-scope nodes, the ranked
 /// acting frontier's top N with the rest as keys, open decisions by rank, placeholders needing
 /// breakdown, unassigned items, shortfalls, and counts, scoped to a subtree and depth.
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize, JsonSchema)]
@@ -769,7 +817,8 @@ pub struct Snapshot {
     /// The answers in effect in the subtree.
     #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
     pub answers: BTreeMap<NodeKey, AnswerValue>,
-    /// The rationales those answers were given with, for the answers that have one (B2).
+    // PRD: B2.
+    /// The rationales those answers were given with, for the answers that have one.
     #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
     pub rationales: BTreeMap<NodeKey, Markdown>,
     /// A page of in-scope nodes within the depth, in tree order.
@@ -785,7 +834,8 @@ pub struct Snapshot {
     /// Open, in-scope decisions, in rank order.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub open_decisions: Vec<NodeKey>,
-    /// Placeholders needing breakdown (B10).
+    // PRD: B10.
+    /// Placeholders needing breakdown.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub needs_breakdown: Vec<NodeKey>,
     /// Open, in-scope nodes no one owns.
@@ -797,7 +847,8 @@ pub struct Snapshot {
     /// The stalled diagnostic, when the journey is stalled.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub stalled: Option<Stalled>,
-    /// B11: completing the journey is suggested (see `StatusSummary`); completing it is the
+    // PRD: B11.
+    /// Completing the journey is suggested (see `StatusSummary`); completing it is the
     /// person's call.
     #[serde(default, skip_serializing_if = "crate::serde_util::is_false")]
     pub completion_suggested: bool,
@@ -841,7 +892,8 @@ pub struct ExplanationPage {
     pub total: u32,
 }
 
-/// J4: one patch's events, in order.
+// PRD: J4.
+/// One patch's events, in order.
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
 #[serde(deny_unknown_fields)]
 pub struct PatchEvents {
@@ -865,7 +917,8 @@ pub struct HistoryPage {
     pub total: u32,
 }
 
-/// C12: one decision in the decision view: its answer and which nodes the answer affects.
+// PRD: C12.
+/// One decision in the decision view: its answer and which nodes the answer affects.
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
 #[serde(deny_unknown_fields)]
 pub struct DecisionEntry {
@@ -873,14 +926,17 @@ pub struct DecisionEntry {
     pub node: NodeKey,
     /// Its stored state.
     pub state: State,
-    /// D8: the state every surface shows for it.
+    // PRD: D8.
+    /// The state every surface shows for it.
     pub display_state: DisplayState,
     /// Its relevance.
     pub relevance: Relevance,
-    /// Its answer, while in effect (decided and in scope, E3).
+    // PRD: E3.
+    /// Its answer, while in effect (decided and in scope).
     #[serde(skip_serializing_if = "Option::is_none")]
     pub answer: Option<AnswerValue>,
-    /// The rationale its answer was given with, while the answer is in effect (B2, C12).
+    // PRD: B2, C12.
+    /// The rationale its answer was given with, while the answer is in effect.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub rationale: Option<Markdown>,
     /// Its owners.
@@ -889,18 +945,21 @@ pub struct DecisionEntry {
     /// The nodes whose relevance a condition reading it decides, their descendants included.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub affects: Vec<NodeKey>,
-    /// The milestone its answer pins (E3, `feeds_milestone`).
+    // PRD: E3.
+    /// The milestone its answer pins (`feeds_milestone`).
     #[serde(skip_serializing_if = "Option::is_none")]
     pub pins: Option<NodeKey>,
-    /// The role its answer fills (E3, `fills_role`).
+    // PRD: E3.
+    /// The role its answer fills (`fills_role`).
     #[serde(skip_serializing_if = "Option::is_none")]
     pub fills: Option<RoleKey>,
-    /// Its unsatisfied prerequisites that no drawn edge stands for (C2's marker).
+    /// Its unsatisfied prerequisites that no drawn edge stands for (the marker on the card).
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub hidden_prerequisites: Vec<NodeKey>,
 }
 
-/// C12: the graph filtered to decisions and their gating edges, with answers and what each
+// PRD: C12.
+/// The graph filtered to decisions and their gating edges, with answers and what each
 /// answer affected. A projection of the level with only decisions shown, not a separate
 /// structure.
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
@@ -912,7 +971,8 @@ pub struct DecisionView {
     pub edges: Vec<LevelEdge>,
 }
 
-/// C13: one date on the timeline.
+// PRD: C13.
+/// One date on the timeline.
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
 #[serde(deny_unknown_fields)]
 pub struct TimelineEntry {
@@ -927,7 +987,8 @@ pub struct TimelineEntry {
     /// Non-terminal with its due before today.
     #[serde(default, skip_serializing_if = "crate::serde_util::is_false")]
     pub overdue: bool,
-    /// Days the plan can no longer be met by (F6).
+    // PRD: F6.
+    /// Days the plan can no longer be met by.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub shortfall_days: Option<u32>,
     /// The journey's `final` milestone: the end anchor.
@@ -939,7 +1000,8 @@ pub struct TimelineEntry {
     pub is_final: bool,
 }
 
-/// C13: milestones, pinned dates, and the derived due dates of open work on a time axis, with
+// PRD: C13.
+/// Milestones, pinned dates, and the derived due dates of open work on a time axis, with
 /// overdue and shortfall marked and the `final` milestone as the end anchor. In scope only.
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
 #[serde(deny_unknown_fields)]
@@ -1007,7 +1069,8 @@ pub struct UndatedEntry {
     pub waiting: Vec<NodeKey>,
 }
 
-/// C18: an open decision and who owns it.
+// PRD: C18.
+/// An open decision and who owns it.
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
 #[serde(deny_unknown_fields)]
 pub struct OpenDecision {
@@ -1018,23 +1081,27 @@ pub struct OpenDecision {
     pub owners: BTreeSet<IdentityKey>,
 }
 
-/// C18: a milestone not yet reached and its effective date.
+// PRD: C18.
+/// A milestone not yet reached and its effective date.
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
 #[serde(deny_unknown_fields)]
 pub struct UpcomingMilestone {
     /// The milestone.
     pub node: NodeKey,
-    /// Its effective date (F1).
+    // PRD: F1.
+    /// Its effective date.
     pub date: EffectiveDate,
 }
 
-/// C18: the journey status summary for observers and reporting.
+// PRD: C18.
+/// The journey status summary for observers and reporting.
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
 #[serde(deny_unknown_fields)]
 pub struct StatusSummary {
     /// In-scope nodes by stored state.
     pub by_state: BTreeMap<State, u32>,
-    /// D8: the same in-scope nodes by display state; they add up to the same total, and none
+    // PRD: D8.
+    /// The same in-scope nodes by display state; they add up to the same total, and none
     /// is `not_relevant`. Prefer it to `by_state` for "how is the journey doing".
     pub by_display_state: BTreeMap<DisplayState, u32>,
     /// In-scope nodes with work left on them.
@@ -1054,7 +1121,8 @@ pub struct StatusSummary {
     /// Open, in-scope decisions with their owners, in rank order.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub open_decisions: Vec<OpenDecision>,
-    /// B11: the journey has a node and none in scope is left open, or its final milestone
+    // PRD: B11.
+    /// The journey has a node and none in scope is left open, or its final milestone
     /// is reached (stored or auto-reached).
     #[serde(default, skip_serializing_if = "crate::serde_util::is_false")]
     pub completion_suggested: bool,

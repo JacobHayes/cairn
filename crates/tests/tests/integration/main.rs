@@ -18,6 +18,7 @@ mod auth;
 mod engine;
 mod mcp;
 mod people;
+mod served_text;
 mod service;
 mod store;
 mod store_turso;

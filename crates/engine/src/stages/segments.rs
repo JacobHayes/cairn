@@ -28,7 +28,7 @@ pub(super) fn check(check: &mut Check<'_, '_>) {
         if document.default_owner.is_some() {
             check.violations.push(violation(
                 ViolationCode::SegmentRule,
-                "a segment declares no default_owner: the graph it is inserted into has one (A21)",
+                "a segment declares no default_owner: the graph it is inserted into has one",
             ));
         }
         for node in document.nodes.values() {
@@ -37,7 +37,7 @@ pub(super) fn check(check: &mut Check<'_, '_>) {
                     &tree,
                     &node.key,
                     ViolationCode::SegmentRule,
-                    "a segment declares no final milestone: the graph it is inserted into has one (A21)",
+                    "a segment declares no final milestone: the graph it is inserted into has one",
                 ));
             }
         }
@@ -46,7 +46,7 @@ pub(super) fn check(check: &mut Check<'_, '_>) {
                 &tree,
                 root,
                 ViolationCode::SegmentRule,
-                "a segment has one root node; put the others under it (A21)",
+                "a segment has one root node; put the others under it",
             ));
         }
     }
@@ -74,7 +74,7 @@ fn mapped_cardinality(check: &mut Check<'_, '_>) {
             for subject in mapped.filter(|s| check.session.cardinality_changed.contains(s)) {
                 let mut found = violation(
                     ViolationCode::InsertionInvalid,
-                    "a role or kind an insertion maps onto keeps its cardinality while the insertion is there (B13)",
+                    "a role or kind an insertion maps onto keeps its cardinality while the insertion is there",
                 );
                 found.at.subject = Some(subject);
                 check.violations.push(found);

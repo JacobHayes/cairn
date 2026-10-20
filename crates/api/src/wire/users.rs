@@ -6,7 +6,8 @@ use cairn_schema::{AgentId, Email, IdentityKey, Slug, Timestamp, Title, UserId};
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
-/// The caller (H2) and the identities their verified emails name (H3).
+// PRD: H2, H3.
+/// The caller and the identities their verified emails name.
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
 #[serde(deny_unknown_fields)]
 pub struct Caller {
@@ -32,7 +33,8 @@ pub struct LinkedLogin {
     /// The name the provider gave the account at the last sign-in, if it gave one.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub name: Option<Title>,
-    /// H3: the emails the provider marked verified at the last sign-in; only these match an
+    // PRD: H3.
+    /// The emails the provider marked verified at the last sign-in; only these match an
     /// identity.
     pub verified_emails: BTreeSet<Email>,
     /// When it was linked.
@@ -51,7 +53,8 @@ impl From<cairn_store::LoginRecord> for LinkedLogin {
     }
 }
 
-/// A user and the name people see for them (H3).
+// PRD: H3.
+/// A user and the name people see for them.
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
 #[serde(deny_unknown_fields)]
 pub struct UserName {
@@ -79,7 +82,8 @@ pub struct TokenRequest {
     pub name: Title,
 }
 
-/// A token just minted: the one time its secret is seen (H2).
+// PRD: H2.
+/// A token just minted: the one time its secret is seen.
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
 #[serde(deny_unknown_fields)]
 pub struct MintedToken {

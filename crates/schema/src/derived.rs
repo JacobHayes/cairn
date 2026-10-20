@@ -31,7 +31,8 @@ pub enum Relevance {
     Undecided,
 }
 
-/// A relevance value and what produced it (C8: node detail names the ancestor or decision).
+// PRD: C8.
+/// A relevance value and what produced it (node detail names the ancestor or decision).
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
 #[serde(deny_unknown_fields)]
 pub struct RelevanceExplanation {
@@ -47,23 +48,25 @@ pub struct RelevanceExplanation {
     /// A force include made it relevant.
     #[serde(default, skip_serializing_if = "crate::serde_util::is_false")]
     pub forced: bool,
-    /// D8: when the value is `not_relevant` only because a decision it reads is itself
+    // PRD: D8.
+    /// When the value is `not_relevant` only because a decision it reads is itself
     /// undecided (so unanswered, and every value operator on it false), the undecided
     /// decisions it rests on: reading them as still to come would leave the node undecided.
     /// Empty when the value is settled. The value itself is unchanged, so gravity, unlocks
     /// and blocking follow Gating exactly; display state shows such a node as `conditional`.
     #[serde(default, skip_serializing_if = "BTreeSet::is_empty")]
     pub pending_on: BTreeSet<NodeKey>,
-    /// D4, Gating: for an undecided value, the decisions that make it undecided and can be
+    /// For an undecided value, the decisions that make it undecided and can be
     /// answered now: open, relevant, and not under a skip, read by a condition leaving it
     /// undecided, its own or an ancestor's, up to a force include. Empty for any other
-    /// value (not the same as Gating's wider "unanswered").
+    /// value (narrower than every decision still unanswered).
     #[serde(default, skip_serializing_if = "BTreeSet::is_empty")]
     pub unanswered: BTreeSet<NodeKey>,
 }
 
-/// D8: the one state every surface shows for a node, composed from relevance, stored state,
-/// effective skip, auto-reach, blocking and snooze, and from the D3 flags, which it leaves in
+// PRD: D8.
+/// The one state every surface shows for a node, composed from relevance, stored state,
+/// effective skip, auto-reach, blocking and snooze, and from the derived flags, which it leaves in
 /// place. Stored state is what transitions act on; this is what people and agents read. The
 /// first matching value in this order wins: `not_relevant`, `skipped`, `done`, `snoozed`,
 /// `active`, `conditional`, `blocked`, `scheduled`, `ready`.
@@ -90,13 +93,15 @@ pub enum DisplayState {
     Snoozed,
     /// `done`, `decided`, `reached`, auto-reached, or a group that satisfies dependencies.
     Done,
-    /// Stored `skipped`, or effectively skipped (D1a).
+    // PRD: D1a.
+    /// Stored `skipped`, or effectively skipped.
     Skipped,
     /// Does not apply, and settled (Gating): the recorded state survives beneath it.
     NotRelevant,
 }
 
-/// A dependency that blocks a node (D1, Gating: Blocked).
+// PRD: D1.
+/// A dependency that blocks a node (Gating: Blocked).
 #[derive(
     Clone, Debug, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize, JsonSchema,
 )]
@@ -377,7 +382,8 @@ pub struct Contribution {
     pub other_owner: bool,
 }
 
-/// A derived date bound and the chain that produced it (F3, F7).
+// PRD: F3, F7.
+/// A derived date bound and the chain that produced it.
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
 #[serde(deny_unknown_fields)]
 pub struct Bound {
@@ -387,7 +393,8 @@ pub struct Bound {
     pub chain: Chain,
 }
 
-/// Where a milestone's effective date comes from (F1, F7: pin, actual, and derived dates are
+// PRD: F1, F7.
+/// Where a milestone's effective date comes from (pin, actual, and derived dates are
 /// told apart).
 #[derive(
     Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize, JsonSchema,
@@ -396,13 +403,16 @@ pub struct Bound {
 pub enum DateOrigin {
     /// The date it was reached.
     Actual,
-    /// Its pin, set directly or by answering its feeding decision (E3).
+    // PRD: E3.
+    /// Its pin, set directly or by answering its feeding decision.
     Pin,
-    /// Its derived due date (F3).
+    // PRD: F3.
+    /// Its derived due date.
     Due,
 }
 
-/// A milestone's effective date (F1): its actual date if reached, else its pin, else its
+// PRD: F1.
+/// A milestone's effective date: its actual date if reached, else its pin, else its
 /// derived due. What other constraints see when they reference it.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
 #[serde(deny_unknown_fields)]
@@ -413,7 +423,8 @@ pub struct EffectiveDate {
     pub origin: DateOrigin,
 }
 
-/// A node's derived dates (F3, F6). Every bound is null when nothing reaches it.
+// PRD: F3, F6.
+/// A node's derived dates. Every bound is null when nothing reaches it.
 #[derive(Clone, Debug, Default, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
 #[serde(deny_unknown_fields)]
 pub struct NodeDates {
@@ -429,19 +440,22 @@ pub struct NodeDates {
     /// Latest start minus today; null is "no deadline".
     #[serde(skip_serializing_if = "Option::is_none")]
     pub slack_days: Option<i32>,
-    /// F6, D3: how many days its due is before today, for an overdue node; none when it is
+    // PRD: F6, D3.
+    /// How many days its due is before today, for an overdue node; none when it is
     /// not overdue.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub overdue_days: Option<u32>,
-    /// The plan can no longer be met (F6).
+    // PRD: F6.
+    /// The plan can no longer be met.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub shortfall: Option<ShortChain>,
-    /// A milestone's effective date (F1); none for other kinds, or when nothing gives one.
+    // PRD: F1.
+    /// A milestone's effective date; none for other kinds, or when nothing gives one.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub effective_date: Option<EffectiveDate>,
 }
 
-/// Where a node's effective participation of one kind comes from (E2's order).
+/// Where a node's effective participation of one kind comes from (in order: explicit identities, then the role, then inherited).
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "snake_case", deny_unknown_fields)]
 pub enum ParticipationOrigin {
@@ -455,7 +469,8 @@ pub enum ParticipationOrigin {
     DefaultOwner(RoleKey),
 }
 
-/// A node's effective participation of one kind (E2).
+// PRD: E2.
+/// A node's effective participation of one kind.
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
 #[serde(deny_unknown_fields)]
 pub struct EffectiveParticipation {
@@ -465,7 +480,8 @@ pub struct EffectiveParticipation {
     pub origin: ParticipationOrigin,
 }
 
-/// C2, C4: a container's progress over the work beneath it, counted over every proper
+// PRD: C2, C4.
+/// A container's progress over the work beneath it, counted over every proper
 /// descendant that is an item: not a group, in scope (relevant or undecided), and neither
 /// skipped nor skipped through a container. A kept node under a skipped container, and a
 /// force-included node under a not-relevant one, count on their own terms. Derived on every
@@ -477,13 +493,15 @@ pub struct Progress {
     pub done: u32,
     /// Items.
     pub total: u32,
-    /// Items that are overdue (D3).
+    // PRD: D3.
+    /// Items that are overdue.
     pub overdue: u32,
-    /// Decisions among the items that are actionable now (D2), snoozed ones included.
+    // PRD: D2.
+    /// Decisions among the items that are actionable now, snoozed ones included.
     pub decisions_needed: u32,
 }
 
-/// Every D3 value for one node, with the inputs that explain it. The flags are D3's own,
+/// Every derived value for one node, with the inputs that explain it. The flags are its own,
 /// each independent of the others, so they stay booleans rather than a state enum.
 #[allow(clippy::struct_excessive_bools)]
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize, JsonSchema)]
@@ -491,7 +509,8 @@ pub struct Progress {
 pub struct NodeDerived {
     /// Relevance and what produced it.
     pub relevance: RelevanceExplanation,
-    /// Skipped through an ancestor's skip (D1a).
+    // PRD: D1a.
+    /// Skipped through an ancestor's skip.
     #[serde(default, skip_serializing_if = "crate::serde_util::is_false")]
     pub effectively_skipped: bool,
     /// What blocks it itself: its own explicit requirements, condition gates, and stage
@@ -505,22 +524,27 @@ pub struct NodeDerived {
     /// conditions block it through containment; each lists them in its own `blocked_by`.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub blocked_through: Vec<NodeKey>,
-    /// D8: the state every surface shows for the node, composed from relevance, stored state
+    // PRD: D8.
+    /// The state every surface shows for the node, composed from relevance, stored state
     /// and the flags beside it, which stay as they are.
     pub display_state: DisplayState,
-    /// Relevant, not blocked, and non-terminal (D2).
+    // PRD: D2.
+    /// Relevant, not blocked, and non-terminal.
     pub actionable: bool,
-    /// No owner (E1), for a non-group node that is in scope and unfinished; a not-relevant or
+    // PRD: E1.
+    /// No owner, for a non-group node that is in scope and unfinished; a not-relevant or
     /// finished node, or a group, never is.
     #[serde(default, skip_serializing_if = "crate::serde_util::is_false")]
     pub unassigned: bool,
     /// Effective participations by kind.
     #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
     pub participations: BTreeMap<KindKey, EffectiveParticipation>,
-    /// Its seeding identity left the role it was broken down by (B10).
+    // PRD: B10.
+    /// Its seeding identity left the role it was broken down by.
     #[serde(default, skip_serializing_if = "crate::serde_util::is_false")]
     pub membership_lost: bool,
-    /// Why a terminal node's completing guards would now fail (D4).
+    // PRD: D4.
+    /// Why a terminal node's completing guards would now fail.
     #[serde(default, skip_serializing_if = "BTreeSet::is_empty")]
     pub stale: BTreeSet<GuardFailure>,
     /// Non-terminal with its due before today.
@@ -528,40 +552,47 @@ pub struct NodeDerived {
     pub overdue: bool,
     /// Dates.
     pub dates: NodeDates,
-    /// C2, C4: a container's progress over the work beneath it; none for a node with no
+    // PRD: C2, C4.
+    /// A container's progress over the work beneath it; none for a node with no
     /// children.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub progress: Option<Progress>,
-    /// D4: the bypassable guards its completing transition (complete a deliverable or
+    // PRD: D4.
+    /// The bypassable guards its completing transition (complete a deliverable or
     /// action, answer an open decision, reach a pending milestone) would fail if attempted
     /// now with no bypass in the patch. Empty for every node with no such transition left:
     /// finished, not relevant, or a group.
     #[serde(default, skip_serializing_if = "BTreeSet::is_empty")]
     pub failing_guards: BTreeSet<Guard>,
-    /// D8: stored `active` while its own or an inherited gate is unsatisfied; a container's
+    // PRD: D8.
+    /// Stored `active` while its own or an inherited gate is unsatisfied; a container's
     /// children are not a gate.
     #[serde(default, skip_serializing_if = "crate::serde_util::is_false")]
     pub started_early: bool,
-    /// Gating, D8: the unsatisfied gate dependencies that hold the node now, its own and
+    /// The unsatisfied gate dependencies that hold the node now, its own and
     /// those it inherits through its ancestors (requirements, conditions, openings), its
     /// children aside; one entry per dependency, its nearest holder's; empty when nothing
     /// holds it. `blocked_by` and `blocked_through` explain the structure; this answers
     /// "what does it wait on".
     #[serde(default)]
     pub waits_on: Explained<Blocker>,
-    /// A pending auto-reach milestone that reads as reached (F1).
+    // PRD: F1.
+    /// A pending auto-reach milestone that reads as reached.
     #[serde(default, skip_serializing_if = "crate::serde_util::is_false")]
     pub auto_reached: bool,
-    /// A snooze that holds over the node (B6): its own, else the one of the container it is
+    // PRD: B6.
+    /// A snooze that holds over the node: its own, else the one of the container it is
     /// held through (`snoozed_via`).
     #[serde(skip_serializing_if = "Option::is_none")]
     pub snoozed: Option<SnoozeTarget>,
-    /// The container whose snooze holds over the node (B6), the reason a descendant names.
+    // PRD: B6.
+    /// The container whose snooze holds over the node, the reason a descendant names.
     /// Set even when the node's own snooze holds as well, so a node snoozed twice names its
     /// container and shows its own target in `snoozed`.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub snoozed_via: Option<NodeKey>,
-    /// A placeholder with no children that is not atomic (B10).
+    // PRD: B10.
+    /// A placeholder with no children that is not atomic.
     #[serde(default, skip_serializing_if = "crate::serde_util::is_false")]
     pub needs_breakdown: bool,
     /// Gravity and its contributors (Priority).
@@ -590,7 +621,8 @@ pub struct NodeDerived {
     pub rank: Option<Real>,
 }
 
-/// A dependent that completing a node would not yet free, and what else it waits on (C8,
+// PRD: C8.
+/// A dependent that completing a node would not yet free, and what else it waits on (
 /// Priority: Unlocks): one entry of node detail's `still_waiting`.
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
 #[serde(deny_unknown_fields)]
@@ -602,7 +634,8 @@ pub struct HeldDependent {
     pub also_waits_on: Vec<Blocker>,
 }
 
-/// The dependents completing a node would not yet free (C8, Priority: Unlocks): node
+// PRD: C8.
+/// The dependents completing a node would not yet free (Priority: Unlocks): node
 /// detail's `still_waiting`, its largest entries up to `explanation_entry_count_max` with the
 /// total; the rest page through the explanations of `ExplainedField::StillWaiting`.
 #[derive(Clone, Debug, Default, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
@@ -628,7 +661,8 @@ impl StillWaiting {
     }
 }
 
-/// What a stalled journey waits on (D5).
+// PRD: D5.
+/// What a stalled journey waits on.
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "snake_case", deny_unknown_fields)]
 pub enum StallCause {
@@ -650,7 +684,8 @@ pub enum StallCause {
     },
 }
 
-/// The journey-level stalled diagnostic (D5).
+// PRD: D5.
+/// The journey-level stalled diagnostic.
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
 #[serde(deny_unknown_fields)]
 pub struct Stalled {
@@ -688,7 +723,8 @@ pub struct StaleConsequence {
     pub reasons: BTreeSet<GuardFailure>,
 }
 
-/// Finished work newly undecided (D4, D7): a node completed, answered, or reached while
+// PRD: D4, D7.
+/// Finished work newly undecided: a node completed, answered, or reached while
 /// a decision its relevance reads is unanswered, so it may not apply. A warning, never a
 /// rejection: the node stays undecided and is not forced into scope.
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
@@ -710,7 +746,8 @@ pub struct ShortfallConsequence {
     pub shortfall: ShortChain,
 }
 
-/// What an accepted patch or a proposal preview newly caused in derived state (D7),
+// PRD: D7.
+/// What an accepted patch or a proposal preview newly caused in derived state,
 /// reported with the result and never stored.
 #[derive(Clone, Debug, Default, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
 #[serde(deny_unknown_fields)]
@@ -867,10 +904,12 @@ pub struct DeriveInputs {
     pub timezone: TimeZoneName,
     /// The rank constants.
     pub rank: RankConstants,
-    /// The viewer's identities, resolved from verified emails (H3); usually one.
+    // PRD: H3.
+    /// The viewer's identities, resolved from verified emails; usually one.
     #[serde(default, skip_serializing_if = "BTreeSet::is_empty")]
     pub viewer: BTreeSet<IdentityKey>,
-    /// The deployment context: identities, emails, and aliases at a revision (E4, E6).
+    // PRD: E4, E6.
+    /// The deployment context: identities, emails, and aliases at a revision.
     pub deployment: Deployment,
 }
 

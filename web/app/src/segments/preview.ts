@@ -8,7 +8,7 @@ import type { Authored } from "../authoring/target.ts";
 import { Skewed, type Deriver } from "../data/host.ts";
 import { beforeWork, previewPolicy, type ReadSource } from "../data/keyed-read.ts";
 import { useKeyedRead, useSession, useCaller } from "../data/react.ts";
-import { newPatchId, reasonOf, violationWords } from "../data/writes.ts";
+import { newPatchId, reasonOf } from "../data/writes.ts";
 import type { SegmentVersion } from "./read.ts";
 
 /** How long the choices must hold still before they are previewed (ms). */
@@ -20,7 +20,7 @@ export type Candidate = { status: "pending" } | { status: "refused"; reasons: st
 function reasonsOf(thrown: unknown): string[] {
   if (thrown instanceof HostFailure && thrown.reason.error === "rejected") {
     const rejection = thrown.reason.rejection;
-    return rejection.rejection === "invalid" && rejection.violations.length > 0 ? rejection.violations.map(violationWords) : [reasonOf(rejection)];
+    return rejection.rejection === "invalid" && rejection.violations.length > 0 ? rejection.violations.map((violation) => violation.message) : [reasonOf(rejection)];
   }
   return [thrown instanceof Error ? thrown.message : String(thrown)];
 }

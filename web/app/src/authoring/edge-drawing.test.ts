@@ -45,7 +45,7 @@ const receipt = { patch_id: "p_x", domain: { route: "r_one" }, content_hash: "h"
 const applied: Answered<HttpFailure> = { outcome: "answered", answer: { outcome: "applied", receipt, consequences: {} } };
 const lost: Answered<HttpFailure> = { outcome: "failed", error: { status: 0, message: "network down" } };
 const refusedByHost: Answered<HttpFailure> = { outcome: "failed", error: { status: 400, message: "not acceptable" } };
-const invalid: Rejection = { rejection: "invalid", violations: [{ at: {}, code: "dependency_cycle", message: "That would make a cycle (D3)" }] };
+const invalid: Rejection = { rejection: "invalid", violations: [{ at: {}, code: "dependency_cycle", message: "That would make a cycle" }] };
 const accepted: Preview = { outcome: "accepted", consequences: undefined };
 const rejected: Preview = { outcome: "rejected", rejection: invalid };
 

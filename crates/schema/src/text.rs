@@ -167,7 +167,7 @@ impl FromStr for Email {
 string_serde!(
     Email,
     "Email",
-    "An email address, at most email_bytes_max (254) bytes; stored trimmed and lower-cased (H3).",
+    "An email address, at most email_bytes_max (254) bytes; stored trimmed and lower-cased.",
     None::<&str>,
     Some(Limit::EmailBytes)
 );

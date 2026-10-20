@@ -40,11 +40,6 @@ export function patchOf(intent: WriteIntent, id: string = newPatchId()): Patch {
   return intent.deploymentRevision === undefined ? patch : { ...patch, deployment_revision: intent.deploymentRevision };
 }
 
-/** A violation in words: the engine's message without the rule's code it ends with ("(F5)"), which is for the docs, not for people. */
-export function violationWords(violation: Violation): string {
-  return violation.message.replace(/\s*\([A-Z]\d+[a-z]?\)$/, "");
-}
-
 /** The node a violation is about, when its subject is one: a patch over several nodes names which (C9). */
 export function violationNode(violation: Violation): string | undefined {
   const subject = violation.at.subject;
@@ -64,7 +59,7 @@ export function reasonOf(rejection: Rejection): string {
     case "invalid": {
       const [first] = rejection.violations;
       const more = rejection.violations.length - 1;
-      return first === undefined ? "The change breaks a rule." : `${violationWords(first)}${more > 0 ? ` (and ${String(more)} more)` : ""}`;
+      return first === undefined ? "The change breaks a rule." : `${first.message}${more > 0 ? ` (and ${String(more)} more)` : ""}`;
     }
     case "patch_id_reused":
       return "That change was already sent with different content.";

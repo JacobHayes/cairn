@@ -28,7 +28,7 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** The deployment: identities and aliases (E6). */
+        /** The deployment: identities and aliases. */
         get: operations["getDeployment"];
         put?: never;
         post?: never;
@@ -45,7 +45,7 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** The journeys and routes referring to an identity, directly or through an alias: what a delete is checked against (E6). */
+        /** The journeys and routes referring to an identity, directly or through an alias: what a delete is checked against. */
         get: operations["getIdentityReferences"];
         put?: never;
         post?: never;
@@ -64,7 +64,7 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** Applies a deployment patch: identities and merges (E6). */
+        /** Applies a deployment patch: identities and merges. */
         post: operations["patchDeployment"];
         delete?: never;
         options?: never;
@@ -79,10 +79,10 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** The destination's open proposals, newest first, with their count and the destination as it is now (C14). */
+        /** The destination's open proposals, newest first, with their count and the destination as it is now. */
         get: operations["listDeploymentProposals"];
         put?: never;
-        /** Creates a proposal for this domain, which may not exist yet, under a client-generated id; a create resubmitted under that id answers the proposal (I6). */
+        /** Creates a proposal for this domain, which may not exist yet, under a client-generated id; a create resubmitted under that id answers the proposal. */
         post: operations["proposeToDeployment"];
         delete?: never;
         options?: never;
@@ -97,14 +97,14 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** A proposal under this destination: its editing revision, status, and content (I6). */
+        /** A proposal under this destination: its editing revision, status, and content. */
         get: operations["getDeploymentProposal"];
         put?: never;
         post?: never;
         delete?: never;
         options?: never;
         head?: never;
-        /** Replaces its content against its editing revision; its destination does not move (H5). */
+        /** Replaces its content against its editing revision; its destination does not move. */
         patch: operations["editDeploymentProposal"];
         trace?: never;
     };
@@ -117,7 +117,7 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** Applies it at the reviewed editing revision, the caller confirming (H2); stale with what intervened when either revision moved (I6). */
+        /** Applies it at the reviewed editing revision, the caller confirming; stale with what intervened when either revision moved. */
         post: operations["applyDeploymentProposal"];
         delete?: never;
         options?: never;
@@ -134,7 +134,7 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** Discards it (I6). */
+        /** Discards it. */
         post: operations["discardDeploymentProposal"];
         delete?: never;
         options?: never;
@@ -151,7 +151,7 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** What applying it now would do: unresolved items, violations, the graph and frontier after, consequences, and what moved since drafting (C14, D7, I6). */
+        /** What applying it now would do: unresolved items, violations, the graph and frontier after, consequences, and what moved since drafting. */
         post: operations["previewDeploymentProposal"];
         delete?: never;
         options?: never;
@@ -168,7 +168,7 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** Drafts it again on its destination as it stands, the reviewer's choices carried over; review it again before applying (I6). */
+        /** Drafts it again on its destination as it stands, the reviewer's choices carried over; review it again before applying. */
         post: operations["refreshDeploymentProposal"];
         delete?: never;
         options?: never;
@@ -183,7 +183,7 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** Events, filtered and paged in commit order (J5). */
+        /** Events, filtered and paged in commit order. */
         get: operations["listEvents"];
         put?: never;
         post?: never;
@@ -200,7 +200,7 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** Revision ticks as server-sent `tick` events, current revisions first (H6). */
+        /** Revision ticks as server-sent `tick` events, current revisions first. */
         get: operations["streamRevisions"];
         put?: never;
         post?: never;
@@ -217,7 +217,7 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** The journey index, filtered and paged (C16). */
+        /** The journey index, filtered and paged. */
         get: operations["listJourneys"];
         put?: never;
         post?: never;
@@ -251,10 +251,10 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** The caller's conversation with the assistant about a journey, as kept, when the capabilities offer the assistant (I5). */
+        /** The caller's conversation with the assistant about a journey, as kept, when the capabilities offer the assistant. */
         get: operations["conversationAboutJourney"];
         put?: never;
-        /** One assistant turn about a journey, when the capabilities offer the assistant (I5): its direct writes with their consequences, and its proposals for review. */
+        /** One assistant turn about a journey, when the capabilities offer the assistant : its direct writes with their consequences, and its proposals for review. */
         post: operations["converseAboutJourney"];
         delete?: never;
         options?: never;
@@ -269,7 +269,7 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** The decision view (C12). */
+        /** The decision view. */
         get: operations["getDecisionView"];
         put?: never;
         post?: never;
@@ -286,7 +286,7 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** Every derived value with its explanation inputs, as the browser derives the document (D3). */
+        /** Every derived value with its explanation inputs, as the browser derives the document. */
         get: operations["getJourneyDerived"];
         put?: never;
         post?: never;
@@ -320,7 +320,7 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** The journey's events, or a node's, grouped by patch and paged (J4). */
+        /** The journey's events, or a node's, grouped by patch and paged. */
         get: operations["getHistory"];
         put?: never;
         post?: never;
@@ -337,7 +337,7 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** One canvas level: the kinds shown, at the top or within a container (C2). */
+        /** One canvas level: the kinds shown, at the top or within a container. */
         get: operations["getJourneyLevel"];
         put?: never;
         post?: never;
@@ -354,7 +354,7 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** The nodes the caller participates in, by participation kind (E4). */
+        /** The nodes the caller participates in, by participation kind. */
         get: operations["getMine"];
         put?: never;
         post?: never;
@@ -371,7 +371,7 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** The acting frontier ranked, globally or for the caller, filtered (C10). */
+        /** The acting frontier ranked, globally or for the caller, filtered. */
         get: operations["getNext"];
         put?: never;
         post?: never;
@@ -388,7 +388,7 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** The nodes a list query matches, sorted and paged (C9). */
+        /** The nodes a list query matches, sorted and paged. */
         get: operations["listNodes"];
         put?: never;
         post?: never;
@@ -405,7 +405,7 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** One node in full; each explanation list carries its largest entries up to the response limit and its total (C8). */
+        /** One node in full; each explanation list carries its largest entries up to the response limit and its total. */
         get: operations["getNode"];
         put?: never;
         post?: never;
@@ -422,7 +422,7 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** A page of a node's explanation list, largest first (C8). */
+        /** A page of a node's explanation list, largest first. */
         get: operations["listExplanations"];
         put?: never;
         post?: never;
@@ -441,7 +441,7 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** Applies a journey patch; base revision 0 creates it (A17). */
+        /** Applies a journey patch; base revision 0 creates it. */
         post: operations["patchJourney"];
         delete?: never;
         options?: never;
@@ -456,10 +456,10 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** The destination's open proposals, newest first, with their count and the destination as it is now (C14). */
+        /** The destination's open proposals, newest first, with their count and the destination as it is now. */
         get: operations["listJourneyProposals"];
         put?: never;
-        /** Creates a proposal for this domain, which may not exist yet, under a client-generated id; a create resubmitted under that id answers the proposal (I6). */
+        /** Creates a proposal for this domain, which may not exist yet, under a client-generated id; a create resubmitted under that id answers the proposal. */
         post: operations["proposeToJourney"];
         delete?: never;
         options?: never;
@@ -474,14 +474,14 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** A proposal under this destination: its editing revision, status, and content (I6). */
+        /** A proposal under this destination: its editing revision, status, and content. */
         get: operations["getJourneyProposal"];
         put?: never;
         post?: never;
         delete?: never;
         options?: never;
         head?: never;
-        /** Replaces its content against its editing revision; its destination does not move (H5). */
+        /** Replaces its content against its editing revision; its destination does not move. */
         patch: operations["editJourneyProposal"];
         trace?: never;
     };
@@ -494,7 +494,7 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** Applies it at the reviewed editing revision, the caller confirming (H2); stale with what intervened when either revision moved (I6). */
+        /** Applies it at the reviewed editing revision, the caller confirming; stale with what intervened when either revision moved. */
         post: operations["applyJourneyProposal"];
         delete?: never;
         options?: never;
@@ -511,7 +511,7 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** Discards it (I6). */
+        /** Discards it. */
         post: operations["discardJourneyProposal"];
         delete?: never;
         options?: never;
@@ -528,7 +528,7 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** What applying it now would do: unresolved items, violations, the graph and frontier after, consequences, and what moved since drafting (C14, D7, I6). */
+        /** What applying it now would do: unresolved items, violations, the graph and frontier after, consequences, and what moved since drafting. */
         post: operations["previewJourneyProposal"];
         delete?: never;
         options?: never;
@@ -545,7 +545,7 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** Drafts it again on its destination as it stands, the reviewer's choices carried over; review it again before applying (I6). */
+        /** Drafts it again on its destination as it stands, the reviewer's choices carried over; review it again before applying. */
         post: operations["refreshJourneyProposal"];
         delete?: never;
         options?: never;
@@ -562,7 +562,7 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** Proposes re-linking the journey to a published version, differences kept as local edits unless the reviewer takes the route's (B9). */
+        /** Proposes re-linking the journey to a published version, differences kept as local edits unless the reviewer takes the route's. */
         post: operations["proposeRelink"];
         delete?: never;
         options?: never;
@@ -579,7 +579,7 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** Proposes saving the journey's structure as a route draft, with a participation mapping per explicit identity and an exclusion per node (B8). */
+        /** Proposes saving the journey's structure as a route draft, with a participation mapping per explicit identity and an exclusion per node. */
         post: operations["proposeSaveAsRoute"];
         delete?: never;
         options?: never;
@@ -594,7 +594,7 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** The bounded agent snapshot, scoped to a subtree and depth, its nodes paged (I3). */
+        /** The bounded agent snapshot, scoped to a subtree and depth, its nodes paged. */
         get: operations["getJourneySnapshot"];
         put?: never;
         post?: never;
@@ -611,7 +611,7 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** The status summary (C18). */
+        /** The status summary. */
         get: operations["getStatusSummary"];
         put?: never;
         post?: never;
@@ -628,7 +628,7 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** The timeline (C13). */
+        /** The timeline. */
         get: operations["getTimeline"];
         put?: never;
         post?: never;
@@ -645,7 +645,7 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** What is upstream and downstream of a node, gravity contributors marked (C7). */
+        /** What is upstream and downstream of a node, gravity contributors marked. */
         get: operations["traceNode"];
         put?: never;
         post?: never;
@@ -664,7 +664,7 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** Proposes upgrading the journey to a newer version of its route: the merge's conflicts, kept edits, and orphans are its review items (B7). */
+        /** Proposes upgrading the journey to a newer version of its route: the merge's conflicts, kept edits, and orphans are its review items. */
         post: operations["proposeUpgrade"];
         delete?: never;
         options?: never;
@@ -679,7 +679,7 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** The open proposals no one destination holds: those waiting on the caller, and those that would create a journey or a route, newest first with their count (C14, C16). */
+        /** The open proposals no one destination holds: those waiting on the caller, and those that would create a journey or a route, newest first with their count. */
         get: operations["listProposals"];
         put?: never;
         post?: never;
@@ -696,7 +696,7 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** The route index, paged (I2). */
+        /** The route index, paged. */
         get: operations["listRoutes"];
         put?: never;
         post?: never;
@@ -730,10 +730,10 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** The caller's conversation with the assistant about a route's draft, as kept, when the capabilities offer the assistant (I5). */
+        /** The caller's conversation with the assistant about a route's draft, as kept, when the capabilities offer the assistant. */
         get: operations["conversationAboutRouteDraft"];
         put?: never;
-        /** One assistant turn about a route's draft, when the capabilities offer the assistant (I5, A12): what it drafts arrives as proposals on the draft. */
+        /** One assistant turn about a route's draft, when the capabilities offer the assistant: what it drafts arrives as proposals on the draft. */
         post: operations["converseAboutRouteDraft"];
         delete?: never;
         options?: never;
@@ -748,7 +748,7 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** A published version, or the draft, as a route file: every key kept, in one sorted order, naming the version it extends (A13). */
+        /** A published version, or the draft, as a route file: every key kept, in one sorted order, naming the version it extends. */
         get: operations["exportRoute"];
         put?: never;
         post?: never;
@@ -767,7 +767,7 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** Imports a route file as a new route or a new draft extending a published version, matched by key or path; one route patch (A13). */
+        /** Imports a route file as a new route or a new draft extending a published version, matched by key or path; one route patch. */
         post: operations["importRoute"];
         delete?: never;
         options?: never;
@@ -784,7 +784,7 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** Applies a route patch, its draft included (A17). */
+        /** Applies a route patch, its draft included. */
         post: operations["patchRoute"];
         delete?: never;
         options?: never;
@@ -799,10 +799,10 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** The destination's open proposals, newest first, with their count and the destination as it is now (C14). */
+        /** The destination's open proposals, newest first, with their count and the destination as it is now. */
         get: operations["listRouteProposals"];
         put?: never;
-        /** Creates a proposal for this domain, which may not exist yet, under a client-generated id; a create resubmitted under that id answers the proposal (I6). */
+        /** Creates a proposal for this domain, which may not exist yet, under a client-generated id; a create resubmitted under that id answers the proposal. */
         post: operations["proposeToRoute"];
         delete?: never;
         options?: never;
@@ -817,14 +817,14 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** A proposal under this destination: its editing revision, status, and content (I6). */
+        /** A proposal under this destination: its editing revision, status, and content. */
         get: operations["getRouteProposal"];
         put?: never;
         post?: never;
         delete?: never;
         options?: never;
         head?: never;
-        /** Replaces its content against its editing revision; its destination does not move (H5). */
+        /** Replaces its content against its editing revision; its destination does not move. */
         patch: operations["editRouteProposal"];
         trace?: never;
     };
@@ -837,7 +837,7 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** Applies it at the reviewed editing revision, the caller confirming (H2); stale with what intervened when either revision moved (I6). */
+        /** Applies it at the reviewed editing revision, the caller confirming; stale with what intervened when either revision moved. */
         post: operations["applyRouteProposal"];
         delete?: never;
         options?: never;
@@ -854,7 +854,7 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** Discards it (I6). */
+        /** Discards it. */
         post: operations["discardRouteProposal"];
         delete?: never;
         options?: never;
@@ -871,7 +871,7 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** What applying it now would do: unresolved items, violations, the graph and frontier after, consequences, and what moved since drafting (C14, D7, I6). */
+        /** What applying it now would do: unresolved items, violations, the graph and frontier after, consequences, and what moved since drafting. */
         post: operations["previewRouteProposal"];
         delete?: never;
         options?: never;
@@ -888,7 +888,7 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** Drafts it again on its destination as it stands, the reviewer's choices carried over; review it again before applying (I6). */
+        /** Drafts it again on its destination as it stands, the reviewer's choices carried over; review it again before applying. */
         post: operations["refreshRouteProposal"];
         delete?: never;
         options?: never;
@@ -903,7 +903,7 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** A route's versions and their journeys (C17). */
+        /** A route's versions and their journeys. */
         get: operations["getRouteDetail"];
         put?: never;
         post?: never;
@@ -954,7 +954,7 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** The names people see for the users asked for: the identity their verified emails name, else the name their sign-in gave (H3). */
+        /** The names people see for the users asked for: the identity their verified emails name, else the name their sign-in gave. */
         get: operations["listUserNames"];
         put?: never;
         post?: never;
@@ -971,7 +971,7 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** The caller and their identities (H2, H3). */
+        /** The caller and their identities. */
         get: operations["getCaller"];
         put?: never;
         post?: never;
@@ -991,7 +991,7 @@ export interface paths {
         /** The caller's agent tokens. */
         get: operations["listAgentTokens"];
         put?: never;
-        /** Mints an agent token, shown this once (H2). */
+        /** Mints an agent token, shown this once. */
         post: operations["mintAgentToken"];
         delete?: never;
         options?: never;
@@ -1038,16 +1038,16 @@ export type webhooks = Record<string, never>;
 export interface components {
     schemas: {
         /**
-         * @description A write the assistant made, as the turn reports it (I5: every direct write is reported
+         * @description A write the assistant made, as the turn reports it (every direct write is reported
          *     with its consequences).
          */
         Action: {
-            /** @description What it newly caused in each journey it changed (D7). */
+            /** @description What it newly caused in each journey it changed. */
             consequences?: {
                 [key: string]: components["schemas"]["Consequences"];
             };
             /**
-             * @description The nodes it wrote, in key order (I5: a direct change is reported with the nodes
+             * @description The nodes it wrote, in key order (a direct change is reported with the nodes
              *     it affected, which the panel links to); none for a write to no journey's nodes.
              */
             nodes?: components["schemas"]["NodeKey"][];
@@ -1060,7 +1060,7 @@ export interface components {
         } | {
             /** @description Why it is a proposal. */
             because: components["schemas"]["Because"];
-            /** @description Its destination, under which it is addressed (I6). */
+            /** @description Its destination, under which it is addressed. */
             destination: components["schemas"]["Domain"];
             /** @constant */
             outcome: "proposed";
@@ -1076,7 +1076,7 @@ export interface components {
             /** @description The tool. */
             tool: string;
         };
-        /** @description Who made a change (H2): a user, or an agent acting for one. */
+        /** @description Who made a change: a user, or an agent acting for one. */
         Actor: {
             /** @description The agent acting for the user, if any. */
             agent?: components["schemas"]["AgentId"] | null;
@@ -1116,7 +1116,7 @@ export interface components {
             revoked_at?: string | null;
         };
         /**
-         * @description A journey-authored note or link on a node or on the journey itself (G1), attributed and
+         * @description A journey-authored note or link on a node or on the journey itself, attributed and
          *     timestamped from the patch that added it.
          */
         Annotation: {
@@ -1135,7 +1135,7 @@ export interface components {
              */
             edited_at?: string | null;
         };
-        /** @description A note or link as its author writes it (G1): the part an add or edit carries. */
+        /** @description A note or link as its author writes it: the part an add or edit carries. */
         AnnotationBody: {
             artifact?: components["schemas"]["Url"];
             conversation?: components["schemas"]["Url"];
@@ -1146,7 +1146,7 @@ export interface components {
             title?: components["schemas"]["Title"] | null;
         } & (unknown | unknown | unknown | unknown);
         /**
-         * @description C12, E3: what answering a decision does, per choice, and the static lines every answer
+         * @description What answering a decision does, per choice, and the static lines every answer
          *     of a date or identity decision carries.
          */
         AnswerEffects: {
@@ -1162,9 +1162,9 @@ export interface components {
             choices?: components["schemas"]["ChoiceEffect"][];
             /** @description The decision. */
             decision: components["schemas"]["NodeKey"];
-            /** @description The role its answer fills (E3), for an identity or identity-list decision. */
+            /** @description The role its answer fills, for an identity or identity-list decision. */
             fills_role?: components["schemas"]["RoleKey"] | null;
-            /** @description The milestone its answer pins (E3), for a date decision. */
+            /** @description The milestone its answer pins, for a date decision. */
             pins?: components["schemas"]["NodeKey"] | null;
         };
         /**
@@ -1172,10 +1172,10 @@ export interface components {
          *     answer).
          */
         AnswerText: string;
-        /** @description A decision's answer type (A4). */
+        /** @description A decision's answer type. */
         AnswerType: "boolean" | "single_choice" | "multi_choice" | "text" | "date" | "identity" | "identity_list";
         /**
-         * @description A decision's submitted answer (A4; PRD glossary, Answer). Submitted empty text or an
+         * @description A decision's submitted answer (PRD glossary, Answer). Submitted empty text or an
          *     empty list is answered.
          */
         AnswerValue: {
@@ -1206,7 +1206,7 @@ export interface components {
         AttachmentKey: string;
         /** @description The kinds of sign-in a host can offer. */
         AuthKind: "dev" | "oidc" | "builtin_oauth" | "tailscale" | "gcp_iap" | "local";
-        /** @description One way to sign in (H1). */
+        /** @description One way to sign in. */
         AuthMethod: {
             /** @description What kind of provider it is. */
             kind: components["schemas"]["AuthKind"];
@@ -1237,14 +1237,14 @@ export interface components {
             /** @constant */
             reason: "asked";
         };
-        /** @description A dependency that blocks a node (D1, Gating: Blocked). */
+        /** @description A dependency that blocks a node (Gating: Blocked). */
         Blocker: {
             /** @description The unsatisfied dependency. */
             node: components["schemas"]["NodeKey"];
             /** @description How the dependency arose. */
             via: components["schemas"]["DependencyVia"];
         };
-        /** @description A derived date bound and the chain that produced it (F3, F7). */
+        /** @description A derived date bound and the chain that produced it. */
         Bound: {
             /** @description The chain from a pin, actual, or today that produced it. */
             chain: components["schemas"]["Chain"];
@@ -1255,7 +1255,7 @@ export interface components {
             date: string;
         };
         /**
-         * @description A guard bypass as stored (D4): the guards bypassed, why, and the specific failures
+         * @description A guard bypass as stored: the guards bypassed, why, and the specific failures
          *     present when it was applied.
          */
         Bypass: {
@@ -1266,7 +1266,7 @@ export interface components {
             /** @description Why. */
             reason: components["schemas"]["Reason"];
         };
-        /** @description The caller (H2) and the identities their verified emails name (H3). */
+        /** @description The caller and the identities their verified emails name. */
         Caller: {
             /** @description The agent acting for them, when the request carries an agent token. */
             agent?: components["schemas"]["AgentId"] | null;
@@ -1279,13 +1279,13 @@ export interface components {
         };
         /** @description The capabilities document (`GET /api/capabilities`): what this host offers. */
         Capabilities: {
-            /** @description Whether the in-app assistant is available (I5). */
+            /** @description Whether the in-app assistant is available. */
             assistant: boolean;
             /** @description How people sign in, in the order the host asks. */
             auth: components["schemas"]["AuthMethod"][];
-            /** @description Whether the host serves MCP at `/api/mcp` (I2). */
+            /** @description Whether the host serves MCP at `/api/mcp`. */
             mcp: boolean;
-            /** @description Whether the host streams revision ticks over SSE (H6). */
+            /** @description Whether the host streams revision ticks over SSE. */
             sse: boolean;
         };
         /** @description A chain of constraints, with the dates fixed on it. */
@@ -1296,7 +1296,7 @@ export interface components {
             fixed?: components["schemas"]["FixedDate"][];
         };
         /**
-         * @description The contradictory chains a rejection lists (F5): at most
+         * @description The contradictory chains a rejection lists: at most
          *     `chain_count_per_rejection_max`, and whether there were more.
          */
         ChainList: {
@@ -1307,7 +1307,7 @@ export interface components {
         };
         /** @description One child in a node's detail. */
         ChildEntry: {
-            /** @description D8: the state every surface shows for it. */
+            /** @description The state every surface shows for it. */
             display_state: components["schemas"]["DisplayState"];
             /** @description The child. */
             key: components["schemas"]["NodeKey"];
@@ -1324,7 +1324,7 @@ export interface components {
          */
         Choice: components["schemas"]["Slug"] | components["schemas"]["LabeledChoice"];
         /**
-         * @description C12: what one answer to a decision does to the journey's scope, from a three-valued
+         * @description What one answer to a decision does to the journey's scope, from a three-valued
          *     re-evaluation of relevance under that answer: never a full derive.
          */
         ChoiceEffect: {
@@ -1461,7 +1461,7 @@ export interface components {
          */
         ConditionValue: boolean | components["schemas"]["ConditionText"];
         /**
-         * @description What a conflict is about, with the journey's side and the route's (B7, B9). A side that
+         * @description What a conflict is about, with the journey's side and the route's. A side that
          *     is absent is `None` (an absent edge is `false`).
          */
         Conflict: {
@@ -1469,7 +1469,7 @@ export interface components {
             about: "field";
             /**
              * @description The route's value names a node the journey does not hold, so it cannot be taken
-             *     (B4: a removed node's tombstone covers its subtree); only the journey's side is
+             *     (a removed node's tombstone covers its subtree); only the journey's side is
              *     offered.
              */
             dangling?: boolean;
@@ -1504,7 +1504,7 @@ export interface components {
             about: "resource";
             /**
              * @description The route's value names a node the journey does not hold, so it cannot be taken
-             *     (B4: a removed node's tombstone covers its subtree); only the journey's side is
+             *     (a removed node's tombstone covers its subtree); only the journey's side is
              *     offered.
              */
             dangling?: boolean;
@@ -1523,7 +1523,7 @@ export interface components {
             answered?: boolean;
             /**
              * @description The route's value names a node the journey does not hold, so it cannot be taken
-             *     (B4: a removed node's tombstone covers its subtree); only the journey's side is
+             *     (a removed node's tombstone covers its subtree); only the journey's side is
              *     offered.
              */
             dangling?: boolean;
@@ -1542,21 +1542,21 @@ export interface components {
             decision: components["schemas"]["NodeKey"];
             /**
              * @description The rationale the journey's answer was given with, kept when the answer is
-             *     mapped onto the route's choices (B2).
+             *     mapped onto the route's choices.
              */
             rationale?: components["schemas"]["Markdown"] | null;
         } | {
             /** @constant */
             about: "role";
             /**
-             * @description The insertions that map a segment role onto it, when the route removed it (B13):
+             * @description The insertions that map a segment role onto it, when the route removed it:
              *     the role can then be kept or removed, not remapped.
              */
             insertions?: components["schemas"]["InsertionKey"][];
             /** @description The journey's role. */
             journey?: components["schemas"]["RoleResolved"] | null;
             /**
-             * @description Who fills the role now (E3), when insertions map onto it: removing it hands
+             * @description Who fills the role now, when insertions map onto it: removing it hands
              *     these to the segment's nodes directly.
              */
             members?: components["schemas"]["IdentityKey"][];
@@ -1570,7 +1570,7 @@ export interface components {
             /** @constant */
             about: "kind";
             /**
-             * @description The insertions that map a segment kind onto it, when the route removed it (B13):
+             * @description The insertions that map a segment kind onto it, when the route removed it:
              *     the kind can then be kept or removed, not remapped.
              */
             insertions?: components["schemas"]["InsertionKey"][];
@@ -1593,7 +1593,7 @@ export interface components {
             route?: components["schemas"]["RoleKey"] | null;
         };
         /**
-         * @description How a reviewer resolves a conflict (B7, B9). Which resolutions a conflict offers depends
+         * @description How a reviewer resolves a conflict. Which resolutions a conflict offers depends
          *     on what it is about ([`Conflict::offers`]); each becomes ordinary mutations when the
          *     proposal is resolved.
          */
@@ -1616,7 +1616,7 @@ export interface components {
             };
         } | "remove";
         /**
-         * @description What an accepted patch or a proposal preview newly caused in derived state (D7),
+         * @description What an accepted patch or a proposal preview newly caused in derived state,
          *     reported with the result and never stored.
          */
         Consequences: {
@@ -1652,7 +1652,7 @@ export interface components {
             after: components["schemas"]["Instant"];
             /** @description The earlier instant. */
             before: components["schemas"]["Instant"];
-            /** @description It passes through an undecided node, so it may not apply (F2). */
+            /** @description It passes through an undecided node, so it may not apply. */
             conditional?: boolean;
             /**
              * Format: int32
@@ -1662,7 +1662,7 @@ export interface components {
             /** @description Where it comes from. */
             source: components["schemas"]["ConstraintSource"];
         };
-        /** @description Where a constraint comes from (F2): what to edit to change it (F7). */
+        /** @description Where a constraint comes from: what to edit to change it. */
         ConstraintSource: {
             due_by: {
                 /** @description The node. */
@@ -1713,7 +1713,7 @@ export interface components {
         };
         /**
          * @description `GET /api/journeys/{id}/assistant` and `GET /api/routes/{id}/draft/assistant`: the caller's
-         *     conversation about that journey or draft (I5: one per target per user), as kept: its
+         *     conversation about that journey or draft (one per target per user), as kept: its
          *     newest messages, oldest first. A conversation not started yet has none.
          */
         Conversation: {
@@ -1743,17 +1743,17 @@ export interface components {
         ConversationId: string;
         /**
          * Format: uint32
-         * @description A position in a projection's order: where the next page starts (I3, J4). Valid for the
+         * @description A position in a projection's order: where the next page starts. Valid for the
          *     same journey revision and derive inputs; a page read at another revision starts over.
          */
         Cursor: number;
         /**
-         * @description Where a milestone's effective date comes from (F1, F7: pin, actual, and derived dates are
+         * @description Where a milestone's effective date comes from (pin, actual, and derived dates are
          *     told apart).
          */
         DateOrigin: "actual" | "pin" | "due";
         /**
-         * @description A date rule (A8): `{before|after: <source(s)>, offset: <days>}`. Several sources are
+         * @description A date rule: `{before|after: <source(s)>, offset: <days>}`. Several sources are
          *     several constraints; the offset defaults to 0.
          */
         DateRule: {
@@ -1762,7 +1762,7 @@ export interface components {
             offset?: components["schemas"]["Days"];
         } & (unknown | unknown);
         /**
-         * @description A date rule (A8): `{before|after: <source(s)>, offset: <days>}`. Several sources are
+         * @description A date rule: `{before|after: <source(s)>, offset: <days>}`. Several sources are
          *     several constraints; the offset defaults to 0.
          */
         DateRule2: {
@@ -1773,25 +1773,25 @@ export interface components {
         DateSource: "journey.created_at" | components["schemas"]["Path"];
         DateSourceResolved: "journey.created_at" | components["schemas"]["NodeKey"];
         Days: number;
-        /** @description C12: one decision in the decision view: its answer and which nodes the answer affects. */
+        /** @description One decision in the decision view: its answer and which nodes the answer affects. */
         DecisionEntry: {
             /** @description The nodes whose relevance a condition reading it decides, their descendants included. */
             affects?: components["schemas"]["NodeKey"][];
-            /** @description Its answer, while in effect (decided and in scope, E3). */
+            /** @description Its answer, while in effect (decided and in scope). */
             answer?: components["schemas"]["AnswerValue"] | null;
-            /** @description D8: the state every surface shows for it. */
+            /** @description The state every surface shows for it. */
             display_state: components["schemas"]["DisplayState"];
-            /** @description The role its answer fills (E3, `fills_role`). */
+            /** @description The role its answer fills (`fills_role`). */
             fills?: components["schemas"]["RoleKey"] | null;
-            /** @description Its unsatisfied prerequisites that no drawn edge stands for (C2's marker). */
+            /** @description Its unsatisfied prerequisites that no drawn edge stands for (the marker on the card). */
             hidden_prerequisites?: components["schemas"]["NodeKey"][];
             /** @description The decision. */
             node: components["schemas"]["NodeKey"];
             /** @description Its owners. */
             owners?: components["schemas"]["IdentityKey"][];
-            /** @description The milestone its answer pins (E3, `feeds_milestone`). */
+            /** @description The milestone its answer pins (`feeds_milestone`). */
             pins?: components["schemas"]["NodeKey"] | null;
-            /** @description The rationale its answer was given with, while the answer is in effect (B2, C12). */
+            /** @description The rationale its answer was given with, while the answer is in effect. */
             rationale?: components["schemas"]["Markdown"] | null;
             /** @description Its relevance. */
             relevance: components["schemas"]["Relevance"];
@@ -1799,7 +1799,7 @@ export interface components {
             state: components["schemas"]["State"];
         };
         /**
-         * @description C12: the graph filtered to decisions and their gating edges, with answers and what each
+         * @description The graph filtered to decisions and their gating edges, with answers and what each
          *     answer affected. A projection of the level with only decisions shown, not a separate
          *     structure.
          */
@@ -1826,10 +1826,10 @@ export interface components {
                 group: components["schemas"]["NodeKey"];
             };
         };
-        /** @description The deployment domain (E6; ARCHITECTURE, Engine > Model: `Deployment`). */
+        /** @description The deployment domain (ARCHITECTURE, Engine > Model: `Deployment`). */
         Deployment: {
             /**
-             * @description Merged identities' old keys, each resolving to the identity it was merged into (E6), at
+             * @description Merged identities' old keys, each resolving to the identity it was merged into, at
              *     most `alias_count_per_identity_max` resolving to one identity.
              */
             aliases?: {
@@ -1837,7 +1837,7 @@ export interface components {
             };
             /** @description The identities, at most `identity_count_per_deployment_max`. */
             identities?: components["schemas"]["Identity"][];
-            /** @description The deployment revision (H5). */
+            /** @description The deployment revision. */
             revision: components["schemas"]["Revision"];
         };
         /**
@@ -1845,7 +1845,7 @@ export interface components {
          *     supplied by the host and never read by the engine.
          */
         DeriveInputs: {
-            /** @description The deployment context: identities, emails, and aliases at a revision (E4, E6). */
+            /** @description The deployment context: identities, emails, and aliases at a revision. */
             deployment: components["schemas"]["Deployment"];
             /** @description The rank constants. */
             rank: components["schemas"]["RankConstants"];
@@ -1856,7 +1856,7 @@ export interface components {
              * @description Today, in the deployment's time zone.
              */
             today: string;
-            /** @description The viewer's identities, resolved from verified emails (H3); usually one. */
+            /** @description The viewer's identities, resolved from verified emails; usually one. */
             viewer?: components["schemas"]["IdentityKey"][];
         };
         /** @description A derived journey (ARCHITECTURE, Read path: `Derived`). */
@@ -1878,7 +1878,7 @@ export interface components {
             today: string;
         };
         /**
-         * @description What a destination is once a proposal applies (C14), as the engine works it out from the
+         * @description What a destination is once a proposal applies, as the engine works it out from the
          *     candidate records: what the views draw in place of the destination.
          */
         DestinationAfter: {
@@ -1904,7 +1904,7 @@ export interface components {
         };
         /** @description What a proposal's destination is. */
         DestinationKind: "journey" | "route" | "segment" | "deployment";
-        /** @description A proposal's destination as it is now (C14). */
+        /** @description A proposal's destination as it is now. */
         DestinationNow: {
             /** @description Whether it exists. */
             exists: boolean;
@@ -1918,14 +1918,14 @@ export interface components {
             status?: components["schemas"]["JourneyStatus"] | null;
         };
         /**
-         * @description D8: the one state every surface shows for a node, composed from relevance, stored state,
-         *     effective skip, auto-reach, blocking and snooze, and from the D3 flags, which it leaves in
+         * @description The one state every surface shows for a node, composed from relevance, stored state,
+         *     effective skip, auto-reach, blocking and snooze, and from the derived flags, which it leaves in
          *     place. Stored state is what transitions act on; this is what people and agents read. The
          *     first matching value in this order wins: `not_relevant`, `skipped`, `done`, `snoozed`,
          *     `active`, `conditional`, `blocked`, `scheduled`, `ready`.
          */
         DisplayState: "ready" | "active" | "blocked" | "conditional" | "scheduled" | "snoozed" | "done" | "skipped" | "not_relevant";
-        /** @description A patch domain (A17). */
+        /** @description A patch domain. */
         Domain: {
             journey: components["schemas"]["JourneyId"];
         } | {
@@ -1943,7 +1943,7 @@ export interface components {
         };
         /** @description A domain: `deployment`, `journey:<id>`, or `route:<id>`. */
         DomainName: string;
-        /** @description Where a route draft comes from (A11, A13, B8). */
+        /** @description Where a route draft comes from. */
         DraftSource: "edit" | "import" | {
             save_as_route: {
                 /** @description The journey saved. */
@@ -1951,7 +1951,7 @@ export interface components {
             };
         };
         /**
-         * @description An explicit `requires` edge (A3), identified by its two ends: `node` requires `requires`.
+         * @description An explicit `requires` edge, identified by its two ends: `node` requires `requires`.
          *     The graph document holds edges on the dependent node's `requires` list; changes and
          *     removals name them this way.
          */
@@ -1967,10 +1967,10 @@ export interface components {
         } | {
             host: components["schemas"]["NodeKey"];
         };
-        /** @description C2: how an edge on the canvas arose (C1: implicit gates are drawn dotted). */
+        /** @description How an edge on the canvas arose (implicit gates are drawn dotted). */
         EdgeOrigin: "explicit" | "condition" | "stage_opening";
         /**
-         * @description A milestone's effective date (F1): its actual date if reached, else its pin, else its
+         * @description A milestone's effective date: its actual date if reached, else its pin, else its
          *     derived due. What other constraints see when they reference it.
          */
         EffectiveDate: {
@@ -1982,14 +1982,14 @@ export interface components {
             /** @description Where it comes from. */
             origin: components["schemas"]["DateOrigin"];
         };
-        /** @description A node's effective participation of one kind (E2). */
+        /** @description A node's effective participation of one kind. */
         EffectiveParticipation: {
             /** @description The identities, resolved through aliases. */
             identities: components["schemas"]["IdentityKey"][];
             /** @description Where it comes from. */
             origin: components["schemas"]["ParticipationOrigin"];
         };
-        /** @description An email address, at most email_bytes_max (254) bytes; stored trimmed and lower-cased (H3). */
+        /** @description An email address, at most email_bytes_max (254) bytes; stored trimmed and lower-cased. */
         Email: string;
         /** @description How a turn ended. The writes before any ending stand and are reported. */
         Ended: {
@@ -2011,7 +2011,7 @@ export interface components {
             status: "turn_timed_out";
         };
         /**
-         * @description An append-only audit record of one mutation (J1). The delta is the after-state of every
+         * @description An append-only audit record of one mutation. The delta is the after-state of every
          *     record the mutation wrote or removed, in order, so replay applies it with nothing
          *     re-derived; events never hold derived values.
          */
@@ -2023,7 +2023,7 @@ export interface components {
              * @description When it was committed.
              */
             at: string;
-            /** @description Who confirmed it, when a proposal was applied (H2). */
+            /** @description Who confirmed it, when a proposal was applied. */
             confirming_user?: components["schemas"]["UserId"] | null;
             /** @description What it wrote, as after-state. */
             delta: components["schemas"]["Write"][];
@@ -2031,7 +2031,7 @@ export interface components {
             event_type: components["schemas"]["EventType"];
             /**
              * @description The log it belongs to: its patch's domain, except a journey's deletion, which the
-             *     deployment log keeps (A19).
+             *     deployment log keeps.
              */
             log: components["schemas"]["Domain"];
             /** @description An optional note. */
@@ -2057,7 +2057,7 @@ export interface components {
             next?: number | null;
         };
         /**
-         * @description An event's type (J1's list). Most mutations have one type; a few take theirs from
+         * @description An event's type. Most mutations have one type; a few take theirs from
          *     their content ([`Mutation::event_type`]).
          * @enum {string}
          */
@@ -2116,10 +2116,7 @@ export interface components {
              */
             total: number;
         };
-        /**
-         * @description What fixes an instant on a chain: a pin, an actual date, a date answer, or today (F1, F3,
-         *     F6). A chain always ends at one of these.
-         */
+        /** @description What fixes an instant on a chain: a pin, an actual date, a date answer, or today. A chain always ends at one of these. */
         FixedBy: "pin" | "actual" | "answer" | "today";
         /** @description A date fixed on a chain. */
         FixedDate: {
@@ -2144,9 +2141,9 @@ export interface components {
          *     sorted by key, so a graph has one serialization.
          */
         Graph: {
-            /** @description The role that owns nodes no ancestor gives an owner (A6). */
+            /** @description The role that owns nodes no ancestor gives an owner. */
             default_owner?: components["schemas"]["RoleKey"] | null;
-            /** @description The segment insertions the graph holds (B13). */
+            /** @description The segment insertions the graph holds. */
             insertions?: components["schemas"]["Insertion"][];
             /** @description The nodes. */
             nodes?: components["schemas"]["Node"][];
@@ -2333,15 +2330,15 @@ export interface components {
             annotation: components["schemas"]["Annotation"];
         };
         /**
-         * @description D1, C2: a group's display state, derived from its children and dependencies. Deprecated:
-         *     [`DisplayState`] (D8) is the state of every node, groups included; this stays, equal in
+         * @description A group's display state, derived from its children and dependencies. Deprecated:
+         *     [`DisplayState`] is the state of every node, groups included; this stays, equal in
          *     meaning on groups, until a later breaking release.
          */
         GroupState: "not_relevant" | "skipped" | "done" | "waiting" | "active" | "not_started";
-        /** @description A transition guard (D4). */
+        /** @description A transition guard. */
         Guard: "deps_done" | "has_artifact" | "has_note" | "broken_down";
         /**
-         * @description One specific guard failure (D4): what a bypass records, so a later distinct failure
+         * @description One specific guard failure: what a bypass records, so a later distinct failure
          *     still produces `stale`, and what `stale` lists.
          */
         GuardFailure: {
@@ -2358,7 +2355,7 @@ export interface components {
         /** @description Whether the server is serving. */
         HealthStatus: "ok" | "store_failed_closed";
         /**
-         * @description A dependent that completing a node would not yet free, and what else it waits on (C8,
+         * @description A dependent that completing a node would not yet free, and what else it waits on (
          *     Priority: Unlocks): one entry of node detail's `still_waiting`.
          */
         HeldDependent: {
@@ -2370,7 +2367,7 @@ export interface components {
             /** @description The direct dependent that stays held. */
             node: components["schemas"]["NodeKey"];
         };
-        /** @description J4: a page of a journey's history, or of one node's, grouped by patch. */
+        /** @description A page of a journey's history, or of one node's, grouped by patch. */
         History: {
             /**
              * Format: uint64
@@ -2383,7 +2380,7 @@ export interface components {
         /** @description A person or team journeys refer to (PRD glossary, Identity), deployment-scoped. */
         Identity: {
             /**
-             * @description Its emails, each held by at most one identity (H3), at most
+             * @description Its emails, each held by at most one identity, at most
              *     `email_count_per_identity_max`. A merge joins two identities' emails, so the engine checks
              *     the joined set too.
              */
@@ -2391,7 +2388,7 @@ export interface components {
             /** @description The identity's key. */
             key: components["schemas"]["IdentityKey"];
             /**
-             * @description Its name, if it has one. An identity has a name, an email, or both (H3), so one a
+             * @description Its name, if it has one. An identity has a name, an email, or both, so one a
              *     sign-in created from an account that gave no name is shown by its first email until
              *     its person is asked for one.
              */
@@ -2400,7 +2397,7 @@ export interface components {
         /** @description Starts with "who_"; at most id_bytes_max (64) bytes. */
         IdentityKey: string;
         /**
-         * @description Everything that refers to an identity, directly or through an alias (E6): every journey,
+         * @description Everything that refers to an identity, directly or through an alias: every journey,
          *     whatever its status, and every route whose draft or published versions do. Authoritative:
          *     an identity with neither can be deleted.
          */
@@ -2412,7 +2409,7 @@ export interface components {
         };
         /**
          * @description An edge an insertion adds: `node` requires `requires`, one end in the segment and the
-         *     other in the graph (B13).
+         *     other in the graph.
          */
         InsertedEdge: {
             /** @description The dependent. */
@@ -2421,7 +2418,7 @@ export interface components {
             requires: components["schemas"]["EdgeEnd"];
         };
         /**
-         * @description One placement of a segment version in a graph (PRD glossary, Insertion; B13). Its local
+         * @description One placement of a segment version in a graph (see the glossary entry Insertion). Its local
          *     edits are not stored: they are its members' differences from the version it is on.
          */
         Insertion: {
@@ -2449,7 +2446,7 @@ export interface components {
         };
         /** @description Starts with "i_"; at most id_bytes_max (64) bytes. */
         InsertionKey: string;
-        /** @description One insertion of a segment version (C19). */
+        /** @description One insertion of a segment version. */
         InsertionUse: {
             /** @description The graph holding it. */
             graph: components["schemas"]["GraphId"];
@@ -2480,7 +2477,7 @@ export interface components {
             };
         };
         /**
-         * @description Which instant of a node (F2): work has a start and a finish; a decision or milestone has
+         * @description Which instant of a node: work has a start and a finish; a decision or milestone has
          *     one instant, which is both.
          */
         InstantPoint: "start" | "finish";
@@ -2490,7 +2487,7 @@ export interface components {
             graph: components["schemas"]["Graph"];
             /** @description The journey's own fields. */
             header: components["schemas"]["JourneyHeader"];
-            /** @description The journey revision (H5). */
+            /** @description The journey revision. */
             revision: components["schemas"]["Revision"];
         };
         /** @description A journey's own fields, apart from its graph. */
@@ -2503,7 +2500,7 @@ export interface components {
             /**
              * Format: date
              * @description The deployment-local calendar day it was created, the `created_at` date rules
-             *     measure from (A8, A9). Stored beside the timestamp so the engine never converts time
+             *     measure from. Stored beside the timestamp so the engine never converts time
              *     zones.
              */
             created_on: string;
@@ -2542,7 +2539,7 @@ export interface components {
          */
         JourneyState: {
             /**
-             * @description Notes and links (G1): on each node, and on the journey itself, at most
+             * @description Notes and links: on each node, and on the journey itself, at most
              *     `note_count_per_node_max` notes and `link_count_per_node_max` links.
              */
             annotations?: components["schemas"]["Annotation"][];
@@ -2551,8 +2548,8 @@ export interface components {
                 [key: string]: components["schemas"]["AnswerValue"];
             };
             /**
-             * @description Each route-copied node's local edits (B4), apart from its state so that an edit and
-             *     a transition on one node touch different records (H5).
+             * @description Each route-copied node's local edits, apart from its state so that an edit and
+             *     a transition on one node touch different records.
              */
             local_edits?: {
                 [key: string]: components["schemas"]["LocalEdit"][];
@@ -2567,35 +2564,35 @@ export interface components {
             };
             /**
              * @description Pins: explicit journey-level dates on nodes (PRD glossary, Pin). A pin from a
-             *     `feeds_milestone` answer is derived from the answer, not stored here (E3).
+             *     `feeds_milestone` answer is derived from the answer, not stored here.
              */
             pins?: {
                 [key: string]: string;
             };
             /**
-             * @description The rationale each answer was given with, by decision (B2). A key here has an answer
+             * @description The rationale each answer was given with, by decision. A key here has an answer
              *     beside it; an answer given without a reason has no entry, and reopening removes both.
              */
             rationales?: {
                 [key: string]: components["schemas"]["Markdown"];
             };
             /**
-             * @description Direct role fills, for roles without a filling decision (E3). A role with a filling
+             * @description Direct role fills, for roles without a filling decision. A role with a filling
              *     decision is filled from that decision's answer, which is derived, not stored here.
              */
             role_fills?: {
                 [key: string]: components["schemas"]["IdentityKey"][];
             };
-            /** @description Snoozes by node (B6). */
+            /** @description Snoozes by node. */
             snoozes?: {
                 [key: string]: components["schemas"]["SnoozeTarget"];
             };
-            /** @description Route-copied nodes the journey removed, so an upgrade does not re-add them (B4). */
+            /** @description Route-copied nodes the journey removed, so an upgrade does not re-add them. */
             tombstones?: components["schemas"]["NodeKey"][];
         };
-        /** @description A journey's status (B11). */
+        /** @description A journey's status. */
         JourneyStatus: "active" | "completed" | "archived";
-        /** @description A journey in the index (C16). */
+        /** @description A journey in the index. */
         JourneySummary: {
             /**
              * Format: date-time
@@ -2614,11 +2611,11 @@ export interface components {
             revision: components["schemas"]["Revision"];
             /** @description Its status. */
             status: components["schemas"]["JourneyStatus"];
-            /** @description Whether its route has published a version newer than its own (C16). */
+            /** @description Whether its route has published a version newer than its own. */
             upgrade_available: boolean;
         };
         /**
-         * @description A journey's deviation from its route that an upgrade keeps, listed for the reviewer (B7:
+         * @description A journey's deviation from its route that an upgrade keeps, listed for the reviewer (
          *     locally edited and unchanged in the route).
          */
         Kept: {
@@ -2633,7 +2630,7 @@ export interface components {
         } | {
             kind: components["schemas"]["KindKey"];
         } | "default_owner";
-        /** @description What a segment participation kind becomes in the graph it is inserted into (B13). */
+        /** @description What a segment participation kind becomes in the graph it is inserted into. */
         KindChoice: {
             existing: components["schemas"]["KindKey"];
         } | "add";
@@ -2650,7 +2647,7 @@ export interface components {
             title: components["schemas"]["Title"];
         };
         /**
-         * @description C2: one aggregation level of the canvas: the visible nodes for the shown kinds within the
+         * @description One aggregation level of the canvas: the visible nodes for the shown kinds within the
          *     drilled-in container, the edges re-targeted to visible stand-ins with duplicates collapsed,
          *     and each container's roll-ups. Display only: stored state stays on each node.
          */
@@ -2664,7 +2661,7 @@ export interface components {
             /** @description The edges, sorted by their ends. */
             edges: components["schemas"]["LevelEdge"][];
             /**
-             * @description C1's count, per relevance class left out: the nodes hidden only for their class (of a
+             * @description The count, per relevance class left out: the nodes hidden only for their class (of a
              *     kind shown, within the level, under no collapse, not left out by `top`, and kept by the
              *     filters), so showing a class draws exactly that many more. Empty when every class is
              *     shown.
@@ -2678,7 +2675,7 @@ export interface components {
             shown: components["schemas"]["NodeKind"][];
         };
         /**
-         * @description C2: which nodes a level shows by how their relevance reads to a person. A node is
+         * @description Which nodes a level shows by how their relevance reads to a person. A node is
          *     `relevant` when it applies; `conditional` when it may apply (its relevance is undecided,
          *     or it is not relevant only because the decision it reads cannot be answered yet); and
          *     `not_relevant` when it is settled as not applying (ruled out by an answer, a skip, or a
@@ -2686,7 +2683,7 @@ export interface components {
          */
         LevelDisplay: "relevant" | "conditional" | "not_relevant";
         /**
-         * @description C2: an edge drawn at a level, between the nearest visible stand-ins of its ends, with the
+         * @description An edge drawn at a level, between the nearest visible stand-ins of its ends, with the
          *     edges it collapses.
          */
         LevelEdge: {
@@ -2694,16 +2691,16 @@ export interface components {
             from: components["schemas"]["NodeKey"];
             /** @description Some underlying edge blocks. */
             gates: boolean;
-            /** @description Every underlying edge is implicit (drawn dotted, C1). */
+            /** @description Every underlying edge is implicit (drawn dotted). */
             implicit?: boolean;
             /** @description The stand-in of the dependent side. */
             to: components["schemas"]["NodeKey"];
             /** @description The edges it stands for, sorted; never empty. */
             underlying: components["schemas"]["UnderlyingEdge"][];
         };
-        /** @description C2: one visible node at a level. */
+        /** @description One visible node at a level. */
         LevelNode: {
-            /** @description D8: the state every surface shows for the node. */
+            /** @description The state every surface shows for the node. */
             display_state: components["schemas"]["DisplayState"];
             /**
              * @deprecated
@@ -2712,13 +2709,10 @@ export interface components {
             group_state?: components["schemas"]["GroupState"] | null;
             /**
              * @description Its hidden, unsatisfied prerequisites that no visible edge stands for: the "hidden
-             *     prerequisites" marker, which opens the trace (C7). Empty when it has none.
+             *     prerequisites" marker, which opens the trace. Empty when it has none.
              */
             hidden_prerequisites?: components["schemas"]["NodeKey"][];
-            /**
-             * @description A skipped container whose kept work is not yet done: "skipped, kept work pending"
-             *     (D1a).
-             */
+            /** @description A skipped container whose kept work is not yet done: "skipped, kept work pending". */
             kept_work_pending?: boolean;
             /** @description The node. */
             key: components["schemas"]["NodeKey"];
@@ -2731,7 +2725,7 @@ export interface components {
             roll_up?: components["schemas"]["RollUp"] | null;
             /**
              * @description The hidden nodes that roll up into it (a hidden action is a checklist item on its
-             *     deliverable, C4), in tree order.
+             *     deliverable), in tree order.
              */
             rolled_up?: components["schemas"]["NodeKey"][];
         };
@@ -2761,14 +2755,14 @@ export interface components {
             /** @description The provider's subject for the account. */
             subject: components["schemas"]["Title"];
             /**
-             * @description H3: the emails the provider marked verified at the last sign-in; only these match an
+             * @description The emails the provider marked verified at the last sign-in; only these match an
              *     identity.
              */
             verified_emails: components["schemas"]["Email"][];
         };
-        /** @description C9: a list filter that needs no argument. */
+        /** @description A list filter that needs no argument. */
         ListFlag: "mine" | "unassigned" | "next_up" | "decisions_needed" | "needs_breakdown" | "active" | "blocked" | "overdue" | "stale" | "snoozed" | "snoozed_and_overdue" | "shortfall";
-        /** @description C9: a page of the list. */
+        /** @description A page of the list. */
         ListPage: {
             /** @description Where the next page starts, when there is one. */
             next?: components["schemas"]["Cursor"] | null;
@@ -2781,7 +2775,7 @@ export interface components {
             total: number;
         };
         /**
-         * @description What a journey changed on a route-copied node (B4), so an upgrade leaves it alone. A
+         * @description What a journey changed on a route-copied node, so an upgrade leaves it alone. A
          *     marker carries no reason (PRD glossary, Local edit).
          */
         LocalEdit: {
@@ -2794,7 +2788,7 @@ export interface components {
             resource: components["schemas"]["AttachmentKey"];
         } | "shape";
         /**
-         * @description Where a violation is (A15: listed by path; PRD Non-functional, Config-first: specific
+         * @description Where a violation is (listed by path; PRD Non-functional, Config-first: specific
          *     enough to fix without reading source).
          */
         Location: {
@@ -2810,7 +2804,7 @@ export interface components {
             /** @description The key it is about. */
             subject?: components["schemas"]["Subject"] | null;
         };
-        /** @description An event and its position in the log, which orders history and pages it (J5). */
+        /** @description An event and its position in the log, which orders history and pages it. */
         LoggedEvent: {
             /** @description The event. */
             event: components["schemas"]["Event"];
@@ -2838,19 +2832,19 @@ export interface components {
         };
         /** @description A message draft with placeholders: {{journey.<name|description|created_at|url|status>}}, {{roles.<role>.name}}, {{answers.<decision>}}. */
         MessageTemplate: string;
-        /** @description E4: the nodes the caller participates in. */
+        /** @description The nodes the caller participates in. */
         Mine: {
             /** @description The nodes, in key order, each with the participation kinds the caller holds on it. */
             entries: components["schemas"]["MineEntry"][];
         };
-        /** @description E4: a node the viewer participates in, with the kinds they hold. */
+        /** @description A node the viewer participates in, with the kinds they hold. */
         MineEntry: {
             /** @description The participation kinds the viewer holds on it. */
             kinds: components["schemas"]["KindKey"][];
             /** @description The node. */
             node: components["schemas"]["NodeKey"];
         };
-        /** @description A token just minted: the one time its secret is seen (H2). */
+        /** @description A token just minted: the one time its secret is seen. */
         MintedToken: {
             /** @description The agent the token acts as. */
             agent: components["schemas"]["AgentId"];
@@ -2858,7 +2852,7 @@ export interface components {
             token: string;
         };
         /**
-         * @description One change within a patch (PRD glossary, Mutation), each emitting one event (J2). The
+         * @description One change within a patch (PRD glossary, Mutation), each emitting one event. The
          *     set covers every change the PRD defines; [`Mutation::change_class`] sorts each into
          *     structural or state (PRD glossary, Structural change).
          */
@@ -2889,7 +2883,7 @@ export interface components {
         } | {
             /** @description The description. */
             description?: components["schemas"]["Markdown"] | null;
-            /** @description Process (the default) or segment; fixed from here on (A21). */
+            /** @description Process (the default) or segment; fixed from here on. */
             kind?: components["schemas"]["RouteKind"];
             /** @description The name. */
             name: components["schemas"]["Title"];
@@ -3062,7 +3056,7 @@ export interface components {
             decision: components["schemas"]["NodeKey"];
             /** @constant */
             op: "answer";
-            /** @description Why it was given: markdown, free text under the body limit (B2). */
+            /** @description Why it was given: markdown, free text under the body limit. */
             rationale?: components["schemas"]["Markdown"] | null;
             /** @description The answer. */
             value: components["schemas"]["AnswerValue"];
@@ -3245,8 +3239,8 @@ export interface components {
          */
         Mutations: components["schemas"]["Mutation"][];
         /**
-         * @description C10: the acting frontier ordered, each item with its breadcrumb and why it ranks where it
-         *     does; when it is empty, what the journey waits on (C5, D5).
+         * @description The acting frontier ordered, each item with its breadcrumb and why it ranks where it
+         *     does; when it is empty, what the journey waits on.
          */
         Next: {
             /** @description The items, in order. */
@@ -3254,7 +3248,7 @@ export interface components {
             /** @description The stalled diagnostic, when the journey is stalled. */
             stalled?: components["schemas"]["Stalled"] | null;
         };
-        /** @description A node (A1a). */
+        /** @description A node. */
         Node: {
             answer_type?: components["schemas"]["AnswerType"];
             auto_reach?: boolean;
@@ -3286,7 +3280,7 @@ export interface components {
             title: components["schemas"]["Title"];
             weight?: components["schemas"]["Weight"] | null;
         } & (unknown & unknown & unknown & unknown & unknown & unknown & unknown & unknown & unknown & unknown & unknown & unknown & unknown);
-        /** @description A node (A1a). */
+        /** @description A node. */
         Node2: {
             answer_type?: components["schemas"]["AnswerType"];
             auto_reach?: boolean;
@@ -3318,23 +3312,23 @@ export interface components {
             title: components["schemas"]["Title"];
             weight?: components["schemas"]["Weight"] | null;
         } & (unknown & unknown & unknown & unknown & unknown & unknown & unknown & unknown & unknown & unknown & unknown & unknown & unknown);
-        /** @description A node's derived dates (F3, F6). Every bound is null when nothing reaches it. */
+        /** @description A node's derived dates. Every bound is null when nothing reaches it. */
         NodeDates: {
             /** @description The latest it can finish. */
             due?: components["schemas"]["Bound"] | null;
             /** @description The earliest it can start. */
             earliest_start?: components["schemas"]["Bound"] | null;
-            /** @description A milestone's effective date (F1); none for other kinds, or when nothing gives one. */
+            /** @description A milestone's effective date; none for other kinds, or when nothing gives one. */
             effective_date?: components["schemas"]["EffectiveDate"] | null;
             /** @description The latest it can start. */
             latest_start?: components["schemas"]["Bound"] | null;
             /**
              * Format: uint32
-             * @description F6, D3: how many days its due is before today, for an overdue node; none when it is
+             * @description How many days its due is before today, for an overdue node; none when it is
              *     not overdue.
              */
             overdue_days?: number | null;
-            /** @description The plan can no longer be met (F6). */
+            /** @description The plan can no longer be met. */
             shortfall?: components["schemas"]["ShortChain"] | null;
             /**
              * Format: int32
@@ -3343,13 +3337,13 @@ export interface components {
             slack_days?: number | null;
         };
         /**
-         * @description Every D3 value for one node, with the inputs that explain it. The flags are D3's own,
+         * @description Every derived value for one node, with the inputs that explain it. The flags are its own,
          *     each independent of the others, so they stay booleans rather than a state enum.
          */
         NodeDerived: {
-            /** @description Relevant, not blocked, and non-terminal (D2). */
+            /** @description Relevant, not blocked, and non-terminal. */
             actionable: boolean;
-            /** @description A pending auto-reach milestone that reads as reached (F1). */
+            /** @description A pending auto-reach milestone that reads as reached. */
             auto_reached?: boolean;
             /**
              * @description What blocks it itself: its own explicit requirements, condition gates, and stage
@@ -3367,14 +3361,14 @@ export interface components {
             /** @description Dates. */
             dates: components["schemas"]["NodeDates"];
             /**
-             * @description D8: the state every surface shows for the node, composed from relevance, stored state
+             * @description The state every surface shows for the node, composed from relevance, stored state
              *     and the flags beside it, which stay as they are.
              */
             display_state: components["schemas"]["DisplayState"];
-            /** @description Skipped through an ancestor's skip (D1a). */
+            /** @description Skipped through an ancestor's skip. */
             effectively_skipped?: boolean;
             /**
-             * @description D4: the bypassable guards its completing transition (complete a deliverable or
+             * @description The bypassable guards its completing transition (complete a deliverable or
              *     action, answer an open decision, reach a pending milestone) would fail if attempted
              *     now with no bypass in the patch. Empty for every node with no such transition left:
              *     finished, not relevant, or a group.
@@ -3392,9 +3386,9 @@ export interface components {
              *     existing clients keep reading it.
              */
             max_child_gravity?: components["schemas"]["Score"] | null;
-            /** @description Its seeding identity left the role it was broken down by (B10). */
+            /** @description Its seeding identity left the role it was broken down by. */
             membership_lost?: boolean;
-            /** @description A placeholder with no children that is not atomic (B10). */
+            /** @description A placeholder with no children that is not atomic. */
             needs_breakdown?: boolean;
             /** @description Non-terminal with its due before today. */
             overdue?: boolean;
@@ -3403,7 +3397,7 @@ export interface components {
                 [key: string]: components["schemas"]["EffectiveParticipation"];
             };
             /**
-             * @description C2, C4: a container's progress over the work beneath it; none for a node with no
+             * @description A container's progress over the work beneath it; none for a node with no
              *     children.
              */
             progress?: components["schemas"]["Progress"] | null;
@@ -3412,20 +3406,20 @@ export interface components {
             /** @description Relevance and what produced it. */
             relevance: components["schemas"]["RelevanceExplanation"];
             /**
-             * @description A snooze that holds over the node (B6): its own, else the one of the container it is
+             * @description A snooze that holds over the node: its own, else the one of the container it is
              *     held through (`snoozed_via`).
              */
             snoozed?: components["schemas"]["SnoozeTarget"] | null;
             /**
-             * @description The container whose snooze holds over the node (B6), the reason a descendant names.
+             * @description The container whose snooze holds over the node, the reason a descendant names.
              *     Set even when the node's own snooze holds as well, so a node snoozed twice names its
              *     container and shows its own target in `snoozed`.
              */
             snoozed_via?: components["schemas"]["NodeKey"] | null;
-            /** @description Why a terminal node's completing guards would now fail (D4). */
+            /** @description Why a terminal node's completing guards would now fail. */
             stale?: components["schemas"]["GuardFailure"][];
             /**
-             * @description D8: stored `active` while its own or an inherited gate is unsatisfied; a container's
+             * @description Stored `active` while its own or an inherited gate is unsatisfied; a container's
              *     children are not a gate.
              */
             started_early?: boolean;
@@ -3437,7 +3431,7 @@ export interface components {
              */
             subtree_gravity?: components["schemas"]["Score"] | null;
             /**
-             * @description No owner (E1), for a non-group node that is in scope and unfinished; a not-relevant or
+             * @description No owner, for a non-group node that is in scope and unfinished; a not-relevant or
              *     finished node, or a group, never is.
              */
             unassigned?: boolean;
@@ -3446,7 +3440,7 @@ export interface components {
             /** @description The nodes completing this would unblock. */
             unlocks_from: components["schemas"]["ExplainedContribution"];
             /**
-             * @description Gating, D8: the unsatisfied gate dependencies that hold the node now, its own and
+             * @description The unsatisfied gate dependencies that hold the node now, its own and
              *     those it inherits through its ancestors (requirements, conditions, openings), its
              *     children aside; one entry per dependency, its nearest holder's; empty when nothing
              *     holds it. `blocked_by` and `blocked_through` explain the structure; this answers
@@ -3459,29 +3453,29 @@ export interface components {
             waits_on: components["schemas"]["ExplainedBlocker"];
         };
         /**
-         * @description C8: one node in full. Its explanation lists (`derived.gravity_from`, `unlocks_from`)
+         * @description One node in full. Its explanation lists (`derived.gravity_from`, `unlocks_from`)
          *     carry their largest entries up to `explanation_entry_count_max` with their totals; the rest
          *     page through the node's explanations endpoint.
          */
         NodeDetail: {
-            /** @description The notes and links on it (G1), in key order. */
+            /** @description The notes and links on it, in key order. */
             annotations?: components["schemas"]["Annotation"][];
             /** @description A decision's answer, as recorded. */
             answer?: components["schemas"]["AnswerValue"] | null;
             /**
-             * @description A decision's effects per choice (C12): what each answer brings in, drops, and leaves
+             * @description A decision's effects per choice: what each answer brings in, drops, and leaves
              *     to be decided later, with the role it fills and the milestone it pins.
              */
             answer_effects?: components["schemas"]["AnswerEffects"] | null;
             /** @description Its children in key order, each with its state. */
             children?: components["schemas"]["ChildEntry"][];
-            /** @description Every derived value (D3) with what explains it. */
+            /** @description Every derived value with what explains it. */
             derived: components["schemas"]["NodeDerived"];
-            /** @description What the journey edited on it, for a route-copied node (B4). */
+            /** @description What the journey edited on it, for a route-copied node. */
             local_edits?: components["schemas"]["LocalEdit"][];
             /** @description The node: description, resources, participations as written, and its kind's payload. */
             node: components["schemas"]["Node"];
-            /** @description Its overrides (D4). */
+            /** @description Its overrides. */
             overrides?: components["schemas"]["Overrides"] | null;
             /** @description Its parent, if any. */
             parent?: components["schemas"]["NodeKey"] | null;
@@ -3489,16 +3483,16 @@ export interface components {
             path: components["schemas"]["Path"];
             /**
              * Format: date
-             * @description Its pin (F2).
+             * @description Its pin.
              */
             pin?: string | null;
-            /** @description The rationale the recorded answer was given with, markdown (B2). */
+            /** @description The rationale the recorded answer was given with, markdown. */
             rationale?: components["schemas"]["Markdown"] | null;
             /** @description Its stored state, provenance, and actual dates. */
             record: components["schemas"]["NodeState"];
             /**
              * @description The direct dependents completing it would not yet free, each with what else it waits
-             *     on (C8, Priority: Unlocks): the largest entries with the total; page the rest with
+             *     on (Priority: Unlocks): the largest entries with the total; page the rest with
              *     the explanations endpoint, field `still_waiting`.
              */
             still_waiting: components["schemas"]["StillWaiting"];
@@ -3558,24 +3552,24 @@ export interface components {
         /** @description A node kind (PRD glossary: a fixed set). */
         NodeKind: "decision" | "deliverable" | "action" | "milestone" | "group";
         /**
-         * @description One node as a row of the list, the next list, or the snapshot (C9, C10, I3): what it is,
+         * @description One node as a row of the list, the next list, or the snapshot: what it is,
          *     where it sits, and its derived signals.
          */
         NodeRow: {
-            /** @description D2. */
+            /** @description Whether work can be started on it now: relevant, not blocked, and not finished. */
             actionable?: boolean;
-            /** @description Its ancestors, root first: the breadcrumb (C10). */
+            /** @description Its ancestors, root first: the breadcrumb. */
             ancestors?: components["schemas"]["NodeKey"][];
             /** @description Gating, Blocked. */
             blocked?: boolean;
-            /** @description D8: the state every surface shows for the node. */
+            /** @description The state every surface shows for the node. */
             display_state: components["schemas"]["DisplayState"];
             /**
              * Format: date
              * @description The latest it can finish.
              */
             due?: string | null;
-            /** @description Skipped through an ancestor (D1a). */
+            /** @description Skipped through an ancestor. */
             effectively_skipped?: boolean;
             /** @description Gravity. */
             gravity: components["schemas"]["Score"];
@@ -3583,11 +3577,11 @@ export interface components {
             key: components["schemas"]["NodeKey"];
             /** @description Its kind. */
             kind: components["schemas"]["NodeKind"];
-            /** @description B10. */
+            /** @description Whether it is a placeholder that still needs to be broken down into children. */
             needs_breakdown?: boolean;
-            /** @description Non-terminal with its due before today (D3). */
+            /** @description Non-terminal with its due before today. */
             overdue?: boolean;
-            /** @description Its owners (E2). */
+            /** @description Its owners. */
             owners?: components["schemas"]["IdentityKey"][];
             /** @description Its path. */
             path: components["schemas"]["Path"];
@@ -3597,7 +3591,7 @@ export interface components {
             relevance: components["schemas"]["Relevance"];
             /**
              * Format: uint32
-             * @description Days the plan can no longer be met by (F6).
+             * @description Days the plan can no longer be met by.
              */
             shortfall_days?: number | null;
             /**
@@ -3605,11 +3599,11 @@ export interface components {
              * @description Latest start minus today; none is no deadline.
              */
             slack_days?: number | null;
-            /** @description A snooze that holds over the node (B6): its own, else its container's. */
+            /** @description A snooze that holds over the node: its own, else its container's. */
             snoozed?: components["schemas"]["SnoozeTarget"] | null;
-            /** @description The container whose snooze holds over the node (B6). */
+            /** @description The container whose snooze holds over the node. */
             snoozed_via?: components["schemas"]["NodeKey"] | null;
-            /** @description A terminal node whose completing guards would now fail (D4). */
+            /** @description A terminal node whose completing guards would now fail. */
             stale?: boolean;
             /**
              * @description Its stored state: what transitions act on. Prefer `display_state` for "what is its
@@ -3618,34 +3612,34 @@ export interface components {
             state: components["schemas"]["State"];
             /** @description Its title. */
             title: components["schemas"]["Title"];
-            /** @description No owner (E1). */
+            /** @description No owner. */
             unassigned?: boolean;
             /** @description Unlocks: the viewer's, in a ranking for them. */
             unlocks: components["schemas"]["Score"];
         };
         /** @description One node's stored state in a journey. */
         NodeState: {
-            /** @description A placeholder marked atomic, so it can complete without children (B10). */
+            /** @description A placeholder marked atomic, so it can complete without children. */
             atomic?: boolean;
             /**
              * Format: date
-             * @description When the node finished: the actual date a milestone was reached (F1), the day a
-             *     decision was decided or work was done (F2).
+             * @description When the node finished: the actual date a milestone was reached, the day a
+             *     decision was decided or work was done.
              */
             finished_on?: string | null;
             /** @description Where the node came from. */
             provenance: components["schemas"]["Provenance"];
-            /** @description Why the node was skipped, while it is (D1: a skip requires a reason). */
+            /** @description Why the node was skipped, while it is (a skip requires a reason). */
             skip_reason?: components["schemas"]["Reason"] | null;
             /**
              * Format: date
-             * @description When a deliverable or action was started (F2); editable like an actual date.
+             * @description When a deliverable or action was started; editable like an actual date.
              */
             started_on?: string | null;
-            /** @description The machine state (D1). */
+            /** @description The machine state. */
             state: components["schemas"]["State"];
         };
-        /** @description One advisory finding about a node of a route graph (A20). */
+        /** @description One advisory finding about a node of a route graph. */
         Notice: {
             /** @description What it is about. */
             code: components["schemas"]["NoticeCode"];
@@ -3658,7 +3652,7 @@ export interface components {
         };
         /** @description What a notice is about. One exists today; each later advisory finding adds a code. */
         NoticeCode: "unanchored";
-        /** @description C18: an open decision and who owns it. */
+        /** @description An open decision and who owns it. */
         OpenDecision: {
             /** @description The decision. */
             node: components["schemas"]["NodeKey"];
@@ -3666,7 +3660,7 @@ export interface components {
             owners?: components["schemas"]["IdentityKey"][];
         };
         /**
-         * @description One thing a proposal does to its destination's own header or lifecycle (C14), as a fact
+         * @description One thing a proposal does to its destination's own header or lifecycle, as a fact
          *     the listing and the review word the same way.
          */
         OutlineFact: {
@@ -3716,7 +3710,7 @@ export interface components {
             /** @constant */
             fact: "inserts_segment";
         };
-        /** @description An override to apply (PRD glossary, Override; Gating; D1a; D4). */
+        /** @description An override to apply (see the glossary entry Override). */
         Override: {
             force_include: {
                 /** @description Why. */
@@ -3739,14 +3733,14 @@ export interface components {
         OverrideKind: "force_include" | "keep" | "guard_bypass";
         /** @description A node's overrides (PRD glossary, Override): reasoned, logged departures. */
         Overrides: {
-            /** @description A guard bypass on the node's transition (D4). */
+            /** @description A guard bypass on the node's transition. */
             bypass?: components["schemas"]["Bypass"] | null;
             /** @description Treat the node as relevant despite conditions (Gating, Force include). */
             force_include?: components["schemas"]["Reason"] | null;
-            /** @description Exempt the node and its subtree from an ancestor's skip (D1a). */
+            /** @description Exempt the node and its subtree from an ancestor's skip. */
             keep?: components["schemas"]["Reason"] | null;
         };
-        /** @description A participation kind a graph declares beyond the built-in `owner` (A7). */
+        /** @description A participation kind a graph declares beyond the built-in `owner`. */
         ParticipationKind: {
             /** @description The id, unique in the graph. */
             id: components["schemas"]["Slug"];
@@ -3757,7 +3751,7 @@ export interface components {
             /** @description A label. */
             title?: components["schemas"]["Title"] | null;
         };
-        /** @description A participation kind a graph declares beyond the built-in `owner` (A7). */
+        /** @description A participation kind a graph declares beyond the built-in `owner`. */
         ParticipationKindResolved: {
             /** @description The id, unique in the graph. */
             id: components["schemas"]["Slug"];
@@ -3768,16 +3762,13 @@ export interface components {
             /** @description A label. */
             title?: components["schemas"]["Title"] | null;
         };
-        /**
-         * @description What becomes of an explicit identity's participations when a journey is saved as a route
-         *     (B8).
-         */
+        /** @description What becomes of an explicit identity's participations when a journey is saved as a route. */
         ParticipationMapping: "drop" | {
             role: components["schemas"]["RoleKey"];
         } | {
             new_role: components["schemas"]["RoleResolved"];
         } | "default_owner";
-        /** @description Where a node's effective participation of one kind comes from (E2's order). */
+        /** @description Where a node's effective participation of one kind comes from (in order: explicit identities, then the role, then inherited). */
         ParticipationOrigin: "explicit" | {
             role: components["schemas"]["RoleKey"];
         } | {
@@ -3793,12 +3784,12 @@ export interface components {
             node: components["schemas"]["NodeKey"];
         };
         /**
-         * @description Where a participation comes from (E2): a role reference, written as the role, or
+         * @description Where a participation comes from: a role reference, written as the role, or
          *     explicit identities, written as a list.
          */
         ParticipationSource: components["schemas"]["Slug"] | components["schemas"]["IdentityKey"][];
         /**
-         * @description Where a participation comes from (E2): a role reference, written as the role, or
+         * @description Where a participation comes from: a role reference, written as the role, or
          *     explicit identities, written as a list.
          */
         ParticipationSourceResolved: components["schemas"]["RoleKey"] | components["schemas"]["IdentityKey"][];
@@ -3808,30 +3799,30 @@ export interface components {
         ParticipationsResolved: {
             [key: string]: components["schemas"]["ParticipationSourceResolved"];
         };
-        /** @description A patch (A17, H5). */
+        /** @description A patch. */
         Patch: {
-            /** @description The target's revision the patch was drafted against; 0 creates the target (A17). */
+            /** @description The target's revision the patch was drafted against; 0 creates the target. */
             base_revision: components["schemas"]["Revision"];
             /**
              * @description The deployment revision a journey patch that writes an identity reference was validated
-             *     against (E6, H5).
+             *     against.
              */
             deployment_revision?: components["schemas"]["Revision"] | null;
-            /** @description The client-generated id that makes a resubmission safe (H5). */
+            /** @description The client-generated id that makes a resubmission safe. */
             id: components["schemas"]["PatchId"];
             /** @description The mutations, in order. */
             mutations: components["schemas"]["Mutations"];
             /** @description The domain or proposal it targets. */
             target: components["schemas"]["PatchTarget"];
         };
-        /** @description What an accepted patch answers (A17, H5, D7). */
+        /** @description What an accepted patch answers. */
         PatchAnswer: {
-            /** @description D7: what it newly caused, by journey; a journey with nothing new is left out. */
+            /** @description What it newly caused, by journey; a journey with nothing new is left out. */
             consequences?: {
                 [key: string]: components["schemas"]["Consequences"];
             };
             /**
-             * @description A20: advisory notices about the route graph an import or publish leaves; never a
+             * @description Advisory notices about the route graph an import or publish leaves; never a
              *     rejection, and absent for any other patch.
              */
             notices?: components["schemas"]["Notice"][];
@@ -3845,7 +3836,7 @@ export interface components {
             /** @description The original receipt. */
             receipt: components["schemas"]["PatchReceipt"];
         };
-        /** @description J4: one patch's events, in order. */
+        /** @description One patch's events, in order. */
         PatchEvents: {
             /** @description Its events on this page. */
             events: components["schemas"]["Event"][];
@@ -3855,7 +3846,7 @@ export interface components {
         /** @description Starts with "p_"; at most id_bytes_max (64) bytes. */
         PatchId: string;
         /**
-         * @description What a committed patch id is answered from on resubmission (H5; ARCHITECTURE, Schema
+         * @description What a committed patch id is answered from on resubmission (ARCHITECTURE, Schema
          *     outline: `patch_receipts`).
          */
         PatchReceipt: {
@@ -3870,7 +3861,7 @@ export interface components {
         };
         /**
          * @description `POST /api/{domain}/patches`: a patch to the domain the path names, and the note each of its
-         *     events carries (J1).
+         *     events carries.
          */
         PatchRequest: {
             /** @description A note for each of its events. */
@@ -3878,7 +3869,7 @@ export interface components {
             /** @description The patch; its target must be the path's domain. */
             patch: components["schemas"]["Patch"];
         };
-        /** @description What a patch targets (A17): a domain, or a proposal within its destination domain. */
+        /** @description What a patch targets: a domain, or a proposal within its destination domain. */
         PatchTarget: {
             journey: components["schemas"]["JourneyId"];
         } | {
@@ -3911,7 +3902,7 @@ export interface components {
          */
         ProblemCode: "bad_request" | "unsupported_media_type" | "payload_too_large" | "target_mismatch" | "cannot_draft" | "not_found" | "page_moved" | "no_such_endpoint" | "method_not_allowed" | "user_only" | "overloaded" | "subscriber_limit" | "store_busy" | "timed_out" | "engine_panic" | "internal";
         /**
-         * @description C2, C4: a container's progress over the work beneath it, counted over every proper
+         * @description A container's progress over the work beneath it, counted over every proper
          *     descendant that is an item: not a group, in scope (relevant or undecided), and neither
          *     skipped nor skipped through a container. A kept node under a skipped container, and a
          *     force-included node under a not-relevant one, count on their own terms. Derived on every
@@ -3920,7 +3911,7 @@ export interface components {
         Progress: {
             /**
              * Format: uint32
-             * @description Decisions among the items that are actionable now (D2), snoozed ones included.
+             * @description Decisions among the items that are actionable now, snoozed ones included.
              */
             decisions_needed: number;
             /**
@@ -3930,7 +3921,7 @@ export interface components {
             done: number;
             /**
              * Format: uint32
-             * @description Items that are overdue (D3).
+             * @description Items that are overdue.
              */
             overdue: number;
             /**
@@ -3939,169 +3930,169 @@ export interface components {
              */
             total: number;
         };
-        /** @description A projection with what it was derived from (D3: computed per read, never stored). */
+        /** @description A projection with what it was derived from (computed per read, never stored). */
         ProjectedDecisionView: {
-            /** @description The deployment revision it was derived over (E6). */
+            /** @description The deployment revision it was derived over. */
             deployment_revision: components["schemas"]["Revision"];
-            /** @description The journey's revision it was derived from: a tick newer than this means refetch (H6). */
+            /** @description The journey's revision it was derived from: a tick newer than this means refetch. */
             revision: components["schemas"]["Revision"];
             /**
              * Format: date
-             * @description The today it was derived for, in the deployment's zone (A9).
+             * @description The today it was derived for, in the deployment's zone.
              */
             today: string;
             /** @description The projection. */
             value: components["schemas"]["DecisionView"];
         };
-        /** @description A projection with what it was derived from (D3: computed per read, never stored). */
+        /** @description A projection with what it was derived from (computed per read, never stored). */
         ProjectedDerived: {
-            /** @description The deployment revision it was derived over (E6). */
+            /** @description The deployment revision it was derived over. */
             deployment_revision: components["schemas"]["Revision"];
-            /** @description The journey's revision it was derived from: a tick newer than this means refetch (H6). */
+            /** @description The journey's revision it was derived from: a tick newer than this means refetch. */
             revision: components["schemas"]["Revision"];
             /**
              * Format: date
-             * @description The today it was derived for, in the deployment's zone (A9).
+             * @description The today it was derived for, in the deployment's zone.
              */
             today: string;
             /** @description The projection. */
             value: components["schemas"]["Derived"];
         };
-        /** @description A projection with what it was derived from (D3: computed per read, never stored). */
+        /** @description A projection with what it was derived from (computed per read, never stored). */
         ProjectedExplanationPage: {
-            /** @description The deployment revision it was derived over (E6). */
+            /** @description The deployment revision it was derived over. */
             deployment_revision: components["schemas"]["Revision"];
-            /** @description The journey's revision it was derived from: a tick newer than this means refetch (H6). */
+            /** @description The journey's revision it was derived from: a tick newer than this means refetch. */
             revision: components["schemas"]["Revision"];
             /**
              * Format: date
-             * @description The today it was derived for, in the deployment's zone (A9).
+             * @description The today it was derived for, in the deployment's zone.
              */
             today: string;
             /** @description The projection. */
             value: components["schemas"]["ExplanationPage"];
         };
-        /** @description A projection with what it was derived from (D3: computed per read, never stored). */
+        /** @description A projection with what it was derived from (computed per read, never stored). */
         ProjectedLevel: {
-            /** @description The deployment revision it was derived over (E6). */
+            /** @description The deployment revision it was derived over. */
             deployment_revision: components["schemas"]["Revision"];
-            /** @description The journey's revision it was derived from: a tick newer than this means refetch (H6). */
+            /** @description The journey's revision it was derived from: a tick newer than this means refetch. */
             revision: components["schemas"]["Revision"];
             /**
              * Format: date
-             * @description The today it was derived for, in the deployment's zone (A9).
+             * @description The today it was derived for, in the deployment's zone.
              */
             today: string;
             /** @description The projection. */
             value: components["schemas"]["Level"];
         };
-        /** @description A projection with what it was derived from (D3: computed per read, never stored). */
+        /** @description A projection with what it was derived from (computed per read, never stored). */
         ProjectedListPage: {
-            /** @description The deployment revision it was derived over (E6). */
+            /** @description The deployment revision it was derived over. */
             deployment_revision: components["schemas"]["Revision"];
-            /** @description The journey's revision it was derived from: a tick newer than this means refetch (H6). */
+            /** @description The journey's revision it was derived from: a tick newer than this means refetch. */
             revision: components["schemas"]["Revision"];
             /**
              * Format: date
-             * @description The today it was derived for, in the deployment's zone (A9).
+             * @description The today it was derived for, in the deployment's zone.
              */
             today: string;
             /** @description The projection. */
             value: components["schemas"]["ListPage"];
         };
-        /** @description A projection with what it was derived from (D3: computed per read, never stored). */
+        /** @description A projection with what it was derived from (computed per read, never stored). */
         ProjectedMine: {
-            /** @description The deployment revision it was derived over (E6). */
+            /** @description The deployment revision it was derived over. */
             deployment_revision: components["schemas"]["Revision"];
-            /** @description The journey's revision it was derived from: a tick newer than this means refetch (H6). */
+            /** @description The journey's revision it was derived from: a tick newer than this means refetch. */
             revision: components["schemas"]["Revision"];
             /**
              * Format: date
-             * @description The today it was derived for, in the deployment's zone (A9).
+             * @description The today it was derived for, in the deployment's zone.
              */
             today: string;
             /** @description The projection. */
             value: components["schemas"]["Mine"];
         };
-        /** @description A projection with what it was derived from (D3: computed per read, never stored). */
+        /** @description A projection with what it was derived from (computed per read, never stored). */
         ProjectedNext: {
-            /** @description The deployment revision it was derived over (E6). */
+            /** @description The deployment revision it was derived over. */
             deployment_revision: components["schemas"]["Revision"];
-            /** @description The journey's revision it was derived from: a tick newer than this means refetch (H6). */
+            /** @description The journey's revision it was derived from: a tick newer than this means refetch. */
             revision: components["schemas"]["Revision"];
             /**
              * Format: date
-             * @description The today it was derived for, in the deployment's zone (A9).
+             * @description The today it was derived for, in the deployment's zone.
              */
             today: string;
             /** @description The projection. */
             value: components["schemas"]["Next"];
         };
-        /** @description A projection with what it was derived from (D3: computed per read, never stored). */
+        /** @description A projection with what it was derived from (computed per read, never stored). */
         ProjectedNodeDetail: {
-            /** @description The deployment revision it was derived over (E6). */
+            /** @description The deployment revision it was derived over. */
             deployment_revision: components["schemas"]["Revision"];
-            /** @description The journey's revision it was derived from: a tick newer than this means refetch (H6). */
+            /** @description The journey's revision it was derived from: a tick newer than this means refetch. */
             revision: components["schemas"]["Revision"];
             /**
              * Format: date
-             * @description The today it was derived for, in the deployment's zone (A9).
+             * @description The today it was derived for, in the deployment's zone.
              */
             today: string;
             /** @description The projection. */
             value: components["schemas"]["NodeDetail"];
         };
-        /** @description A projection with what it was derived from (D3: computed per read, never stored). */
+        /** @description A projection with what it was derived from (computed per read, never stored). */
         ProjectedSnapshot: {
-            /** @description The deployment revision it was derived over (E6). */
+            /** @description The deployment revision it was derived over. */
             deployment_revision: components["schemas"]["Revision"];
-            /** @description The journey's revision it was derived from: a tick newer than this means refetch (H6). */
+            /** @description The journey's revision it was derived from: a tick newer than this means refetch. */
             revision: components["schemas"]["Revision"];
             /**
              * Format: date
-             * @description The today it was derived for, in the deployment's zone (A9).
+             * @description The today it was derived for, in the deployment's zone.
              */
             today: string;
             /** @description The projection. */
             value: components["schemas"]["Snapshot"];
         };
-        /** @description A projection with what it was derived from (D3: computed per read, never stored). */
+        /** @description A projection with what it was derived from (computed per read, never stored). */
         ProjectedStatusSummary: {
-            /** @description The deployment revision it was derived over (E6). */
+            /** @description The deployment revision it was derived over. */
             deployment_revision: components["schemas"]["Revision"];
-            /** @description The journey's revision it was derived from: a tick newer than this means refetch (H6). */
+            /** @description The journey's revision it was derived from: a tick newer than this means refetch. */
             revision: components["schemas"]["Revision"];
             /**
              * Format: date
-             * @description The today it was derived for, in the deployment's zone (A9).
+             * @description The today it was derived for, in the deployment's zone.
              */
             today: string;
             /** @description The projection. */
             value: components["schemas"]["StatusSummary"];
         };
-        /** @description A projection with what it was derived from (D3: computed per read, never stored). */
+        /** @description A projection with what it was derived from (computed per read, never stored). */
         ProjectedTimeline: {
-            /** @description The deployment revision it was derived over (E6). */
+            /** @description The deployment revision it was derived over. */
             deployment_revision: components["schemas"]["Revision"];
-            /** @description The journey's revision it was derived from: a tick newer than this means refetch (H6). */
+            /** @description The journey's revision it was derived from: a tick newer than this means refetch. */
             revision: components["schemas"]["Revision"];
             /**
              * Format: date
-             * @description The today it was derived for, in the deployment's zone (A9).
+             * @description The today it was derived for, in the deployment's zone.
              */
             today: string;
             /** @description The projection. */
             value: components["schemas"]["Timeline"];
         };
-        /** @description A projection with what it was derived from (D3: computed per read, never stored). */
+        /** @description A projection with what it was derived from (computed per read, never stored). */
         ProjectedTrace: {
-            /** @description The deployment revision it was derived over (E6). */
+            /** @description The deployment revision it was derived over. */
             deployment_revision: components["schemas"]["Revision"];
-            /** @description The journey's revision it was derived from: a tick newer than this means refetch (H6). */
+            /** @description The journey's revision it was derived from: a tick newer than this means refetch. */
             revision: components["schemas"]["Revision"];
             /**
              * Format: date
-             * @description The today it was derived for, in the deployment's zone (A9).
+             * @description The today it was derived for, in the deployment's zone.
              */
             today: string;
             /** @description The projection. */
@@ -4120,16 +4111,16 @@ export interface components {
             destination: components["schemas"]["Domain"];
             /** @description Its content. */
             draft: components["schemas"]["ProposalDraft"];
-            /** @description The client-generated id (I6). */
+            /** @description The client-generated id. */
             id: components["schemas"]["ProposalId"];
-            /** @description The agent that drafted it, if any (I6). */
+            /** @description The agent that drafted it, if any. */
             proposing_agent?: components["schemas"]["AgentId"] | null;
-            /** @description Its editing revision, separate from the destination's (H5). */
+            /** @description Its editing revision, separate from the destination's. */
             revision: components["schemas"]["Revision"];
             /** @description Its status. */
             status: components["schemas"]["ProposalStatus"];
         };
-        /** @description What a write to a proposal answers (I6). */
+        /** @description What a write to a proposal answers. */
         ProposalAnswer: {
             /** @constant */
             outcome: "saved";
@@ -4149,13 +4140,13 @@ export interface components {
             proposal: components["schemas"]["Proposal"];
         };
         /**
-         * @description `POST /api/proposals/{id}/apply`: applies the proposal as the caller, its confirming user
-         *     (H2), at the editing revision they reviewed.
+         * @description `POST /api/proposals/{id}/apply`: applies the proposal as the caller, its confirming user,
+         *     at the editing revision they reviewed.
          */
         ProposalApply: {
-            /** @description A note for each of the apply's events (J1). */
+            /** @description A note for each of the apply's events. */
             note?: components["schemas"]["Markdown"] | null;
-            /** @description The apply's patch id (H5). */
+            /** @description The apply's patch id. */
             patch_id: components["schemas"]["PatchId"];
             /** @description The proposal's editing revision the reviewer previewed. */
             reviewed_revision: components["schemas"]["Revision"];
@@ -4168,11 +4159,11 @@ export interface components {
             /** @description Its content. */
             draft: components["schemas"]["ProposalDraft"];
             /**
-             * @description The proposal's id, generated by the client (I6): a create resubmitted under it answers
+             * @description The proposal's id, generated by the client: a create resubmitted under it answers
              *     the proposal its caller already holds rather than a second one.
              */
             id: components["schemas"]["ProposalId"];
-            /** @description The write's patch id (H5). */
+            /** @description The write's patch id. */
             patch_id: components["schemas"]["PatchId"];
         };
         /** @description Where a proposal listing resumes: pass its two fields as `after_at` and `after`. */
@@ -4195,19 +4186,19 @@ export interface components {
         };
         /**
          * @description `PATCH /api/proposals/{id}`: the proposal's new content, against the editing revision the
-         *     editor saw (H5). Its destination's revision does not move.
+         *     editor saw. Its destination's revision does not move.
          */
         ProposalEdit: {
             /** @description The proposal's editing revision the editor saw. */
             base_revision: components["schemas"]["Revision"];
             /** @description Its content. */
             draft: components["schemas"]["ProposalDraft"];
-            /** @description The write's patch id (H5). */
+            /** @description The write's patch id. */
             patch_id: components["schemas"]["PatchId"];
         };
         /** @description Starts with "pr_"; at most id_bytes_max (64) bytes. */
         ProposalId: string;
-        /** @description A page of open proposals, newest first (C14, C16). */
+        /** @description A page of open proposals, newest first. */
         ProposalList: {
             /**
              * Format: uint32
@@ -4227,7 +4218,7 @@ export interface components {
         /** @description Which open proposals `GET /api/proposals` lists: those no one destination holds. */
         ProposalListing: "waiting" | "new_journeys" | "new_routes";
         /**
-         * @description What a proposal does, as counts of the things it names (C14): the facts about its
+         * @description What a proposal does, as counts of the things it names: the facts about its
          *     destination's header first, then the nodes it adds, changes and removes (each node once,
          *     by the mutations that name it), the requirements, the identities, and everything else in one
          *     count. Derived from the mutations alone on every read, never stored.
@@ -4287,17 +4278,17 @@ export interface components {
             requirements_removed?: number;
         };
         /**
-         * @description What a proposal would do to its destination now (C14, I6), for review: the items still
+         * @description What a proposal would do to its destination now, for review: the items still
          *     unresolved, and the candidate the resolved mutations produce, with every violation strict
          *     validation finds in it.
          */
         ProposalPreview: {
-            /** @description For a journey, what the change does to derived state (D7). */
+            /** @description For a journey, what the change does to derived state. */
             consequences?: components["schemas"]["Consequences"] | null;
             /** @description For a journey, its frontier after, in rank order. */
             frontier?: components["schemas"]["NodeKey"][];
             /**
-             * @description For a route's draft, the advisory notices of the graph after (A20); they never make
+             * @description For a route's draft, the advisory notices of the graph after; they never make
              *     the proposal invalid.
              */
             notices?: components["schemas"]["Notice"][];
@@ -4309,7 +4300,7 @@ export interface components {
             violations?: components["schemas"]["Violation"][];
         };
         /**
-         * @description `POST /api/proposals/{id}/preview` (C14, D7, I6): what applying the proposal now would do, and,
+         * @description `POST /api/proposals/{id}/preview`: what applying the proposal now would do, and,
          *     when its destination moved since it was drafted, what moved.
          */
         ProposalReview: {
@@ -4319,7 +4310,7 @@ export interface components {
              */
             after?: components["schemas"]["DestinationAfter"] | null;
             /**
-             * @description D7, by journey: what applying it would newly cause; a journey with nothing new is left
+             * @description By journey: what applying it would newly cause; a journey with nothing new is left
              *     out.
              */
             consequences?: {
@@ -4333,7 +4324,7 @@ export interface components {
             /** @description The proposal, at the editing revision a reviewer applies. */
             proposal: components["schemas"]["Proposal"];
             /**
-             * @description I6: present when the destination moved since drafting: applying it is stale until it
+             * @description Present when the destination moved since drafting: applying it is stale until it
              *     is refreshed and reviewed again.
              */
             stale?: components["schemas"]["StaleBase"] | null;
@@ -4347,10 +4338,10 @@ export interface components {
         ProposalStep: {
             /** @description The proposal's editing revision the caller saw. */
             base_revision: components["schemas"]["Revision"];
-            /** @description The write's patch id (H5). */
+            /** @description The write's patch id. */
             patch_id: components["schemas"]["PatchId"];
         };
-        /** @description An open proposal in a listing (C14). */
+        /** @description An open proposal in a listing. */
         ProposalSummary: {
             /**
              * Format: date-time
@@ -4392,7 +4383,7 @@ export interface components {
             unlocks: components["schemas"]["Real"];
             urgency: components["schemas"]["Real"];
         };
-        /** @description C8, C10: why a node ranks where it does: its rank and the terms it blends. */
+        /** @description Why a node ranks where it does: its rank and the terms it blends. */
         RankTerms: {
             /** @description Gravity over the largest in the normalization set. */
             gravity_norm: components["schemas"]["Real"];
@@ -4500,7 +4491,7 @@ export interface components {
                 id: components["schemas"]["ProposalId"];
             };
         };
-        /** @description Which recorded date a [`Mutation::SetRecordedDate`] edits (F1, F2). */
+        /** @description Which recorded date a [`Mutation::SetRecordedDate`] edits. */
         RecordedEnd: "start" | "finish";
         /** @description Why a patch was not applied. */
         Rejection: {
@@ -4523,7 +4514,7 @@ export interface components {
         };
         /** @description A node's relevance (Gating): three-valued. */
         Relevance: "relevant" | "not_relevant" | "undecided";
-        /** @description A relevance value and what produced it (C8: node detail names the ancestor or decision). */
+        /** @description A relevance value and what produced it (node detail names the ancestor or decision). */
         RelevanceExplanation: {
             /**
              * @description The node whose condition decided it, when not the node itself; none when no
@@ -4535,7 +4526,7 @@ export interface components {
             /** @description A force include made it relevant. */
             forced?: boolean;
             /**
-             * @description D8: when the value is `not_relevant` only because a decision it reads is itself
+             * @description When the value is `not_relevant` only because a decision it reads is itself
              *     undecided (so unanswered, and every value operator on it false), the undecided
              *     decisions it rests on: reading them as still to come would leave the node undecided.
              *     Empty when the value is settled. The value itself is unchanged, so gravity, unlocks
@@ -4543,26 +4534,26 @@ export interface components {
              */
             pending_on?: components["schemas"]["NodeKey"][];
             /**
-             * @description D4, Gating: for an undecided value, the decisions that make it undecided and can be
+             * @description For an undecided value, the decisions that make it undecided and can be
              *     answered now: open, relevant, and not under a skip, read by a condition leaving it
              *     undecided, its own or an ancestor's, up to a force include. Empty for any other
-             *     value (not the same as Gating's wider "unanswered").
+             *     value (narrower than every decision still unanswered).
              */
             unanswered?: components["schemas"]["NodeKey"][];
             /** @description The value. */
             value: components["schemas"]["Relevance"];
         };
-        /** @description `POST /api/journeys/{id}/relink` (B9): proposes re-linking the journey to a published version. */
+        /** @description `POST /api/journeys/{id}/relink`: proposes re-linking the journey to a published version. */
         RelinkRequest: {
             /** @description The route version to follow once it is applied. */
             lineage: components["schemas"]["Lineage"];
-            /** @description The proposal write's patch id (H5). */
+            /** @description The proposal write's patch id. */
             patch_id: components["schemas"]["PatchId"];
-            /** @description The proposal's id, generated by the client (I6). */
+            /** @description The proposal's id, generated by the client. */
             proposal: components["schemas"]["ProposalId"];
         };
         /**
-         * @description Everything a node removal removes, as its author saw it (A18): the subtree, every edge
+         * @description Everything a node removal removes, as its author saw it: the subtree, every edge
          *     incident to it, and everything attached to those nodes. If anything else is attached
          *     when the patch applies, the patch is rejected rather than widening the removal.
          */
@@ -4580,7 +4571,7 @@ export interface components {
             /** @description Their resources. */
             resources?: components["schemas"]["AttachmentKey"][];
         };
-        /** @description Route-authored guidance on a node (A10), keyed so upgrades diff it (B7). */
+        /** @description Route-authored guidance on a node, keyed so upgrades diff it. */
         Resource: {
             example?: components["schemas"]["Url"];
             key: components["schemas"]["AttachmentKey"];
@@ -4590,7 +4581,7 @@ export interface components {
             tip?: components["schemas"]["Markdown"];
             title?: components["schemas"]["Title"] | null;
         } & (unknown | unknown | unknown | unknown | unknown);
-        /** @description Route-authored guidance on a node (A10), keyed so upgrades diff it (B7). */
+        /** @description Route-authored guidance on a node, keyed so upgrades diff it. */
         Resource2: {
             example?: components["schemas"]["Url"];
             key?: components["schemas"]["AttachmentKey"] | null;
@@ -4621,7 +4612,7 @@ export interface components {
             roles?: components["schemas"]["RoleKey"][];
         };
         /**
-         * @description One thing a reviewer looks at, and resolves where it needs a choice (C14). Resolving a
+         * @description One thing a reviewer looks at, and resolves where it needs a choice. Resolving a
          *     proposal turns each choice into mutations; an item that still needs one blocks apply.
          */
         ReviewItem: {
@@ -4643,7 +4634,7 @@ export interface components {
             keep: boolean;
             /** @description The node. */
             node: components["schemas"]["NodeKey"];
-            /** @description What removing it removes, shown in review (A18). */
+            /** @description What removing it removes, shown in review. */
             removal: components["schemas"]["Removal"];
         } | {
             /** @description The identity. */
@@ -4682,13 +4673,13 @@ export interface components {
             /** @description Whose revision. */
             of: components["schemas"]["RevisionOf"];
         };
-        /** @description Which revision a stale patch named wrongly (H5). */
+        /** @description Which revision a stale patch named wrongly. */
         RevisionOf: {
             domain: components["schemas"]["Domain"];
         } | {
             proposal: components["schemas"]["ProposalId"];
         };
-        /** @description A role (A6): a named slot, single or multi valued, filled per journey with identities. */
+        /** @description A role: a named slot, single or multi valued, filled per journey with identities. */
         Role: {
             /** @description The id, unique in the graph. */
             id: components["schemas"]["Slug"];
@@ -4699,15 +4690,15 @@ export interface components {
             /** @description A label. */
             title?: components["schemas"]["Title"] | null;
         };
-        /** @description What a segment role becomes in the graph it is inserted into (B13). */
+        /** @description What a segment role becomes in the graph it is inserted into. */
         RoleChoice: {
             existing: components["schemas"]["RoleKey"];
         } | "add";
         /** @description Starts with "r_"; at most id_bytes_max (64) bytes. */
         RoleKey: string;
         /**
-         * @description Something in a journey that refers to a role (A6, E3): what remapping or removing the
-         *     role rewrites (B7).
+         * @description Something in a journey that refers to a role: what remapping or removing the
+         *     role rewrites.
          */
         RoleReference: {
             participation: {
@@ -4741,7 +4732,7 @@ export interface components {
                 resource: components["schemas"]["Resource"];
             };
         };
-        /** @description A role (A6): a named slot, single or multi valued, filled per journey with identities. */
+        /** @description A role: a named slot, single or multi valued, filled per journey with identities. */
         RoleResolved: {
             /** @description The id, unique in the graph. */
             id: components["schemas"]["Slug"];
@@ -4752,7 +4743,7 @@ export interface components {
             /** @description A label. */
             title?: components["schemas"]["Title"] | null;
         };
-        /** @description C2: what a container shows of its children. */
+        /** @description What a container shows of its children. */
         RollUp: {
             /** @description Every relevant child that is not done is blocked (`all_blocked`), and there is one. */
             all_blocked?: boolean;
@@ -4775,7 +4766,7 @@ export interface components {
             /** @description The distinct owners of its children. */
             owners?: components["schemas"]["IdentityKey"][];
             /**
-             * @description C2, C4: the container's progress over the work beneath it, whole subtree; "decision
+             * @description The container's progress over the work beneath it, whole subtree; "decision
              *     needed" is `progress.decisions_needed > 0`.
              */
             progress: components["schemas"]["Progress"];
@@ -4799,12 +4790,12 @@ export interface components {
             draft?: components["schemas"]["RouteDraft"] | null;
             /** @description The route's own fields. */
             header: components["schemas"]["RouteHeader"];
-            /** @description The route revision (H5), covering the draft. */
+            /** @description The route revision, covering the draft. */
             revision: components["schemas"]["Revision"];
             /** @description The published versions. */
             versions?: components["schemas"]["VersionNumber"][];
         };
-        /** @description C17: a route's published versions with the journeys on each. */
+        /** @description A route's published versions with the journeys on each. */
         RouteDetail: {
             /** @description The route's fields. */
             header: components["schemas"]["RouteHeader"];
@@ -4813,7 +4804,7 @@ export interface components {
             /** @description Its versions, oldest first. */
             versions: components["schemas"]["VersionJourneys"][];
         };
-        /** @description A route's single mutable draft (A11). */
+        /** @description A route's single mutable draft. */
         RouteDraft: {
             /** @description The latest published version when the draft was opened, if any. */
             extends?: components["schemas"]["VersionNumber"] | null;
@@ -4821,13 +4812,13 @@ export interface components {
             graph: components["schemas"]["Graph"];
         };
         /**
-         * @description The file document (A13, A14; ARCHITECTURE, File format): a route version or draft as
+         * @description The file document (ARCHITECTURE, File format): a route version or draft as
          *     written, unresolved. Nodes refer to each other by path and to roles and kinds by id;
          *     keys may be left out for import to match by path against the version extended, or mint.
          *     The JSON Schema in `schema/` describes this type.
          */
         RouteFile: {
-            /** @description The role that owns nodes no ancestor gives an owner (A6). */
+            /** @description The role that owns nodes no ancestor gives an owner. */
             default_owner?: components["schemas"]["Slug"] | null;
             /** @description What the route is for. */
             description?: components["schemas"]["Markdown"] | null;
@@ -4835,7 +4826,7 @@ export interface components {
             extends?: components["schemas"]["VersionNumber"] | null;
             /** @description The file format version. */
             format: components["schemas"]["FormatVersion"];
-            /** @description Process or segment (A21); a file that leaves it out is a process. */
+            /** @description Process or segment; a file that leaves it out is a process. */
             kind?: components["schemas"]["RouteKind"];
             /** @description The route's name. */
             name: components["schemas"]["Title"];
@@ -4854,25 +4845,25 @@ export interface components {
             description?: components["schemas"]["Markdown"] | null;
             /** @description The route's id. */
             id: components["schemas"]["RouteId"];
-            /** @description Process or segment (A21); routes stored before segments existed are processes. */
+            /** @description Process or segment; routes stored before segments existed are processes. */
             kind?: components["schemas"]["RouteKind"];
             /** @description Its name. */
             name: components["schemas"]["Title"];
-            /** @description Hidden from new-journey creation (A19); its journeys still see upgrades. */
+            /** @description Hidden from new-journey creation; its journeys still see upgrades. */
             retired?: boolean;
         };
         /** @description A route id: a slug, unique in the deployment. */
         RouteId: string;
         /**
-         * @description `POST /api/routes/{id}/import` (A13): a route file, imported as a new route or a new draft of
+         * @description `POST /api/routes/{id}/import`: a route file, imported as a new route or a new draft of
          *     the path's route, matched against the version it extends.
          */
         RouteImport: {
             /** @description The file, as JSON (ARCHITECTURE, File format); its route must be the path's. */
             file: components["schemas"]["RouteFile"];
-            /** @description A note for each of its events (J1). */
+            /** @description A note for each of its events. */
             note?: components["schemas"]["Markdown"] | null;
-            /** @description The import's patch id (H5): the same file under the same id is the same patch. */
+            /** @description The import's patch id: the same file under the same id is the same patch. */
             patch_id: components["schemas"]["PatchId"];
         };
         /** @description What a route is for (PRD glossary, Route): fixed when it is created. */
@@ -4884,7 +4875,7 @@ export interface components {
             /** @description Pass as `after` for the next page. */
             next?: components["schemas"]["RouteId"] | null;
         };
-        /** @description Where a route refers to an identity (E6): its draft, and the published versions. */
+        /** @description Where a route refers to an identity: its draft, and the published versions. */
         RouteReference: {
             /** @description Whether its draft refers to the identity. */
             draft: boolean;
@@ -4893,7 +4884,7 @@ export interface components {
             /** @description The published versions that refer to it, ascending. */
             versions: components["schemas"]["VersionNumber"][];
         };
-        /** @description A route in the route index (I2). */
+        /** @description A route in the route index. */
         RouteSummary: {
             /** @description Whether it has an open draft. */
             draft_open: boolean;
@@ -4904,7 +4895,7 @@ export interface components {
             /** @description Its revision. */
             revision: components["schemas"]["Revision"];
         };
-        /** @description An immutable published route version (A11). */
+        /** @description An immutable published route version. */
         RouteVersion: {
             /** @description The graph (no state). */
             graph: components["schemas"]["Graph"];
@@ -4919,15 +4910,15 @@ export interface components {
             version: components["schemas"]["VersionNumber"];
         };
         /**
-         * @description `POST /api/journeys/{id}/save-as-route` (B8): proposes saving the journey's structure as a
+         * @description `POST /api/journeys/{id}/save-as-route`: proposes saving the journey's structure as a
          *     draft of a route, created when it does not exist.
          */
         SaveAsRouteRequest: {
             /** @description The route's name, when it is created. */
             name: components["schemas"]["Title"];
-            /** @description The proposal write's patch id (H5). */
+            /** @description The proposal write's patch id. */
             patch_id: components["schemas"]["PatchId"];
-            /** @description The proposal's id, generated by the client (I6). */
+            /** @description The proposal's id, generated by the client. */
             proposal: components["schemas"]["ProposalId"];
             /** @description The route the draft is of. */
             route: components["schemas"]["RouteId"];
@@ -4971,14 +4962,14 @@ export interface components {
             next?: components["schemas"]["JourneyId"] | null;
         };
         /**
-         * @description A chain that requires a date to precede itself (F5), or a plan reality can no longer
-         *     meet (F6), with how many days it is short and the moves that would resolve it.
+         * @description A chain that requires a date to precede itself, or a plan reality can no longer
+         *     meet, with how many days it is short and the moves that would resolve it.
          */
         ShortChain: {
             /** @description The chain. */
             chain: components["schemas"]["Chain"];
             /**
-             * @description The resolution moves (F5, F6): each an ordinary mutation that, applied alone, gives
+             * @description The resolution moves: each an ordinary mutation that, applied alone, gives
              *     this chain the days it lacks (shift, repin, or unpin a pin on it; revise the answer
              *     behind a pin; adjust a rule's offset; revise an estimate; drop an explicit
              *     requirement or a stage's close). Nothing applies them automatically.
@@ -5001,7 +4992,7 @@ export interface components {
         /** @description An id: lowercase letters, digits, '_' and '-', at most id_bytes_max (64) bytes. */
         Slug: string;
         /**
-         * @description I3: the bounded agent view of a journey: answers, a page of in-scope nodes, the ranked
+         * @description The bounded agent view of a journey: answers, a page of in-scope nodes, the ranked
          *     acting frontier's top N with the rest as keys, open decisions by rank, placeholders needing
          *     breakdown, unassigned items, shortfalls, and counts, scoped to a subtree and depth.
          */
@@ -5015,13 +5006,13 @@ export interface components {
                 [key: string]: components["schemas"]["AnswerValue"];
             };
             /**
-             * @description B11: completing the journey is suggested (see `StatusSummary`); completing it is the
+             * @description Completing the journey is suggested (see `StatusSummary`); completing it is the
              *     person's call.
              */
             completion_suggested?: boolean;
             /** @description The counts. */
             counts: components["schemas"]["SnapshotCounts"];
-            /** @description Placeholders needing breakdown (B10). */
+            /** @description Placeholders needing breakdown. */
             needs_breakdown?: components["schemas"]["NodeKey"][];
             /** @description Where the next page of nodes starts, when there is one. */
             next?: components["schemas"]["Cursor"] | null;
@@ -5029,7 +5020,7 @@ export interface components {
             nodes: components["schemas"]["SnapshotNode"][];
             /** @description Open, in-scope decisions, in rank order. */
             open_decisions?: components["schemas"]["NodeKey"][];
-            /** @description The rationales those answers were given with, for the answers that have one (B2). */
+            /** @description The rationales those answers were given with, for the answers that have one. */
             rationales?: {
                 [key: string]: components["schemas"]["Markdown"];
             };
@@ -5047,7 +5038,7 @@ export interface components {
             /** @description Open, in-scope nodes no one owns. */
             unassigned?: components["schemas"]["NodeKey"][];
         };
-        /** @description I3: what a snapshot counts in its subtree, whatever its depth and page. */
+        /** @description What a snapshot counts in its subtree, whatever its depth and page. */
         SnapshotCounts: {
             /**
              * Format: uint32
@@ -5060,7 +5051,7 @@ export interface components {
              */
             blocked: number;
             /**
-             * @description D8: the same in-scope nodes by display state; they add up to `in_scope`, and none is
+             * @description The same in-scope nodes by display state; they add up to `in_scope`, and none is
              *     `not_relevant`. A not-relevant node pending on an undecided decision is out of scope
              *     and so not counted here until its decision is answered.
              */
@@ -5092,7 +5083,7 @@ export interface components {
              */
             not_relevant: number;
         };
-        /** @description I3: one in-scope node in the snapshot, with its participations, blocking, and dates. */
+        /** @description One in-scope node in the snapshot, with its participations, blocking, and dates. */
         SnapshotNode: {
             /** @description What blocks it itself (Gating, Blocked). */
             blocked_by?: components["schemas"]["Blocker"][];
@@ -5115,7 +5106,7 @@ export interface components {
             /** @description What it is and its signals. */
             row: components["schemas"]["NodeRow"];
         };
-        /** @description I3: which part of the journey a snapshot covers and which page of its nodes. */
+        /** @description Which part of the journey a snapshot covers and which page of its nodes. */
         SnapshotScope: {
             /**
              * @description Where the node list's page starts.
@@ -5131,20 +5122,20 @@ export interface components {
             /** @description The subtree: this node and everything beneath it; the whole journey when none. */
             subtree?: components["schemas"]["NodeKey"] | null;
         };
-        /** @description What a snooze waits for (B6): exactly one of a date or a node. */
+        /** @description What a snooze waits for: exactly one of a date or a node. */
         SnoozeTarget: {
             /** Format: date */
             date: string;
         } | {
             node: components["schemas"]["NodeKey"];
         };
-        /** @description C9, C10: the single signal a list is sorted by; ties fall back to rank order. */
+        /** @description The single signal a list is sorted by; ties fall back to rank order. */
         SortBy: "rank" | "slack" | "gravity" | "unlocks" | "due" | "effort";
-        /** @description I6: a proposal's destination moved past the revision it was drafted against. */
+        /** @description A proposal's destination moved past the revision it was drafted against. */
         StaleBase: {
             /** @description The destination's revision the proposal names, and its current one. */
             conflict: components["schemas"]["RevisionConflict"];
-            /** @description What the intervening events touched (H5). */
+            /** @description What the intervening events touched. */
             intervening: components["schemas"]["TouchedSet"];
         };
         /** @description A node's newly stale reasons. */
@@ -5154,7 +5145,7 @@ export interface components {
             /** @description The reasons it gained. */
             reasons: components["schemas"]["GuardFailure"][];
         };
-        /** @description What a stalled journey waits on (D5). */
+        /** @description What a stalled journey waits on. */
         StallCause: {
             gate: components["schemas"]["NodeKey"];
         } | {
@@ -5175,7 +5166,7 @@ export interface components {
                 node: components["schemas"]["NodeKey"];
             };
         };
-        /** @description The journey-level stalled diagnostic (D5). */
+        /** @description The journey-level stalled diagnostic. */
         Stalled: {
             /** @description Every in-scope non-terminal node is blocked: shown as "blocked". */
             all_blocked?: boolean;
@@ -5183,15 +5174,15 @@ export interface components {
             waiting_on: components["schemas"]["StallCause"][];
         };
         /**
-         * @description A node's stored state (D1). Each kind has its own machine; [`State::legal_for`] says
+         * @description A node's stored state. Each kind has its own machine; [`State::legal_for`] says
          *     which values belong to which kind. A group has no performed state: it is `derived`
          *     unless explicitly `skipped`.
          */
         State: "todo" | "active" | "done" | "skipped" | "open" | "decided" | "pending" | "reached" | "derived";
-        /** @description C18: the journey status summary for observers and reporting. */
+        /** @description The journey status summary for observers and reporting. */
         StatusSummary: {
             /**
-             * @description D8: the same in-scope nodes by display state; they add up to the same total, and none
+             * @description The same in-scope nodes by display state; they add up to the same total, and none
              *     is `not_relevant`. Prefer it to `by_state` for "how is the journey doing".
              */
             by_display_state: {
@@ -5202,7 +5193,7 @@ export interface components {
                 [key: string]: number;
             };
             /**
-             * @description B11: the journey has a node and none in scope is left open, or its final milestone
+             * @description The journey has a node and none in scope is left open, or its final milestone
              *     is reached (stored or auto-reached).
              */
             completion_suggested?: boolean;
@@ -5223,7 +5214,7 @@ export interface components {
             upcoming_milestones?: components["schemas"]["UpcomingMilestone"][];
         };
         /**
-         * @description The dependents completing a node would not yet free (C8, Priority: Unlocks): node
+         * @description The dependents completing a node would not yet free (Priority: Unlocks): node
          *     detail's `still_waiting`, its largest entries up to `explanation_entry_count_max` with the
          *     total; the rest page through the explanations of `ExplainedField::StillWaiting`.
          */
@@ -5236,7 +5227,7 @@ export interface components {
              */
             total: number;
         };
-        /** @description What an event is about: its subject key (J1). */
+        /** @description What an event is about: its subject key. */
         Subject: {
             node: components["schemas"]["NodeKey"];
         } | {
@@ -5261,7 +5252,7 @@ export interface components {
         Thousandths0To1000: number;
         Thousandths1000To1000000: number;
         /**
-         * @description One SSE `tick` event (H6): `of` is now at `revision`. A view refetches only when it is
+         * @description One SSE `tick` event: `of` is now at `revision`. A view refetches only when it is
          *     newer than the revision it holds.
          */
         Tick: {
@@ -5273,7 +5264,7 @@ export interface components {
         /** @description An IANA time zone name. */
         TimeZoneName: string;
         /**
-         * @description C13: milestones, pinned dates, and the derived due dates of open work on a time axis, with
+         * @description Milestones, pinned dates, and the derived due dates of open work on a time axis, with
          *     overdue and shortfall marked and the `final` milestone as the end anchor. In scope only.
          */
         Timeline: {
@@ -5284,7 +5275,7 @@ export interface components {
             /** @description In-scope milestones with no date yet. */
             undated?: components["schemas"]["NodeKey"][];
         };
-        /** @description C13: one date on the timeline. */
+        /** @description One date on the timeline. */
         TimelineEntry: {
             /**
              * Format: date
@@ -5303,7 +5294,7 @@ export interface components {
             overdue?: boolean;
             /**
              * Format: uint32
-             * @description Days the plan can no longer be met by (F6).
+             * @description Days the plan can no longer be met by.
              */
             shortfall_days?: number | null;
         };
@@ -5317,7 +5308,7 @@ export interface components {
         /** @description A set of record addresses. */
         TouchedSet: components["schemas"]["RecordKey"][];
         /**
-         * @description C7: what a node depends on and what depends on it, across levels, over the full structural
+         * @description What a node depends on and what depends on it, across levels, over the full structural
          *     graph: terminal and not-relevant nodes included.
          */
         Trace: {
@@ -5337,7 +5328,7 @@ export interface components {
             upstream: components["schemas"]["NodeKey"][];
         };
         /**
-         * @description A state-machine transition (D1). Answering a decision is [`Mutation::Answer`]; the dates a
+         * @description A state-machine transition. Answering a decision is [`Mutation::Answer`]; the dates a
          *     start or reach records default to today and are edited with
          *     [`Mutation::SetRecordedDate`].
          */
@@ -5351,7 +5342,7 @@ export interface components {
         TurnReply: {
             /**
              * @description Every write the assistant made, in order: applied with its consequences, or drafted
-             *     as a proposal for review (I5).
+             *     as a proposal for review.
              */
             actions?: components["schemas"]["Action"][];
             /** @description The conversation the turn was added to: the user's, about its target. */
@@ -5362,7 +5353,7 @@ export interface components {
             reply?: components["schemas"]["Markdown"] | null;
         };
         /**
-         * @description Finished work newly undecided (D4, D7): a node completed, answered, or reached while
+         * @description Finished work newly undecided: a node completed, answered, or reached while
          *     a decision its relevance reads is unanswered, so it may not apply. A warning, never a
          *     rejection: the node stays undecided and is not forced into scope.
          */
@@ -5376,7 +5367,7 @@ export interface components {
         UnderlyingEdge: {
             /** @description The node whose `requires`, condition, or opening it is. */
             dependent: components["schemas"]["NodeKey"];
-            /** @description It blocks (D1); false for a stage opening with `gates: false`, which holds dates only. */
+            /** @description It blocks; false for a stage opening with `gates: false`, which holds dates only. */
             gates: boolean;
             /** @description How it arose. */
             origin: components["schemas"]["EdgeOrigin"];
@@ -5395,21 +5386,21 @@ export interface components {
         };
         /** @description Why a review item blocks resolving its proposal. */
         UnresolvedReason: "no_choice" | "not_offered" | "mixed_mapping" | "no_default_owner";
-        /** @description C18: a milestone not yet reached and its effective date. */
+        /** @description A milestone not yet reached and its effective date. */
         UpcomingMilestone: {
-            /** @description Its effective date (F1). */
+            /** @description Its effective date. */
             date: components["schemas"]["EffectiveDate"];
             /** @description The milestone. */
             node: components["schemas"]["NodeKey"];
         };
         /**
-         * @description `POST /api/journeys/{id}/upgrade` (B7): proposes upgrading the journey to a newer version of
+         * @description `POST /api/journeys/{id}/upgrade`: proposes upgrading the journey to a newer version of
          *     the route it follows.
          */
         UpgradeRequest: {
-            /** @description The proposal write's patch id (H5). */
+            /** @description The proposal write's patch id. */
             patch_id: components["schemas"]["PatchId"];
-            /** @description The proposal's id, generated by the client (I6). */
+            /** @description The proposal's id, generated by the client. */
             proposal: components["schemas"]["ProposalId"];
             /** @description The version to upgrade to. */
             to: components["schemas"]["VersionNumber"];
@@ -5418,7 +5409,7 @@ export interface components {
         Url: string;
         /** @description Starts with "u_"; at most id_bytes_max (64) bytes. */
         UserId: string;
-        /** @description A user and the name people see for them (H3). */
+        /** @description A user and the name people see for them. */
         UserName: {
             /**
              * @description Their name: their identity's name, else its first email; with no identity, the name
@@ -5430,7 +5421,7 @@ export interface components {
         };
         /** @description One published version and the journeys on it. */
         VersionJourneys: {
-            /** @description Where this version of a segment is inserted (C19). */
+            /** @description Where this version of a segment is inserted. */
             insertions?: components["schemas"]["InsertionUse"][];
             /** @description The journeys whose lineage is this version. */
             journeys: components["schemas"]["JourneyId"][];
@@ -5449,29 +5440,32 @@ export interface components {
             at: components["schemas"]["Location"];
             /**
              * @description The guard a bypass would accept this past, when it is a bypassable guard failure
-             *     (D4: `deps_done`, `has_artifact`, `broken_down`).
+             *     (`deps_done`, `has_artifact`, `broken_down`).
              */
             bypassable?: components["schemas"]["Guard"] | null;
             /**
-             * @description The patch's other mutations that brought it about, beside `at.mutation` (D4: a
+             * @description The patch's other mutations that brought it about, beside `at.mutation` (a
              *     completion and the mutation that gave it an unfinished dependency in the same patch).
              */
             caused_by?: number[];
-            /** @description The contradictory chains, for `contradictory_chain` (F5). */
+            /** @description The contradictory chains, for `contradictory_chain`. */
             chains?: components["schemas"]["ChainList"] | null;
             /** @description What it breaks. */
             code: components["schemas"]["ViolationCode"];
-            /** @description The specific guard failures present (D4). */
+            /** @description The specific guard failures present. */
             failures?: components["schemas"]["GuardFailure"][];
             /** @description The limit exceeded, for `limit_exceeded`. */
             limit?: components["schemas"]["Limit"] | null;
-            /** @description A sentence for people, generated for display. */
+            /**
+             * @description A sentence for people, generated for display: the rule in words, with no requirement
+             *     id.
+             */
             message: string;
             /** @description Other keys involved: a cycle's members, the other holder of a duplicate. */
             related?: components["schemas"]["Subject"][];
         };
         /**
-         * @description What a violation breaks (PRD Invariants, D1, D4, A11, A18, A19, B6, E3, E6, H3).
+         * @description What a violation breaks.
          * @enum {string}
          */
         ViolationCode: "duplicate_sibling_id" | "duplicate_key" | "retired_key_reused" | "unresolved_reference" | "wrong_reference_kind" | "containment_cycle" | "leaf_with_children" | "dependency_cycle" | "edge_to_ancestor_or_descendant" | "requires_duplicates_condition" | "contradictory_chain" | "condition_answer_type_mismatch" | "condition_on_own_subtree" | "stage_bound_not_milestone" | "undeclared_kind" | "single_kind_on_multi_role" | "fills_role_cardinality" | "several_filling_decisions" | "feeds_milestone_not_milestone" | "several_feeding_decisions" | "several_final_milestones" | "field_not_on_kind" | "state_not_on_kind" | "limit_exceeded" | "dangling_reference" | "removal_widened" | "still_referenced" | "answer_type_mismatch" | "identity_unresolved" | "illegal_transition" | "reason_required" | "guard_failed" | "not_relevant" | "snooze_on_self" | "snooze_cycle" | "snooze_not_actionable" | "snoozed_through_container" | "filled_through_decision" | "pinned_through_decision" | "mutation_not_for_target" | "lineage_invalid" | "archived_journey" | "target_exists" | "target_missing" | "deleted_journey_id" | "draft_exists" | "no_draft" | "version_in_use" | "segment_rule" | "insertion_invalid" | "insertion_key_taken" | "not_a_process_route" | "identity_key_taken" | "identity_empty" | "email_taken" | "alias_cycle" | "merge_breaks_journey" | "identity_in_use" | "proposal_not_open" | "unresolved_review_item";
@@ -5764,7 +5758,7 @@ export interface operations {
                     "text/plain": string;
                 };
             };
-            /** @description Stale (with what intervened) or a reused patch id (H5). */
+            /** @description Stale (with what intervened) or a reused patch id. */
             409: {
                 headers: {
                     [name: string]: unknown;
@@ -5791,7 +5785,7 @@ export interface operations {
                     "application/json": components["schemas"]["Problem"];
                 };
             };
-            /** @description Invalid: every violation, by path (A15). */
+            /** @description Invalid: every violation, by path. */
             422: {
                 headers: {
                     [name: string]: unknown;
@@ -5943,7 +5937,7 @@ export interface operations {
                     "text/plain": string;
                 };
             };
-            /** @description Stale (with what intervened) or a reused patch id (H5). */
+            /** @description Stale (with what intervened) or a reused patch id. */
             409: {
                 headers: {
                     [name: string]: unknown;
@@ -5970,7 +5964,7 @@ export interface operations {
                     "application/json": components["schemas"]["Problem"];
                 };
             };
-            /** @description Invalid: every violation, by path (A15). */
+            /** @description Invalid: every violation, by path. */
             422: {
                 headers: {
                     [name: string]: unknown;
@@ -6139,7 +6133,7 @@ export interface operations {
                     "application/json": components["schemas"]["Problem"];
                 };
             };
-            /** @description Stale (with what intervened) or a reused patch id (H5). */
+            /** @description Stale (with what intervened) or a reused patch id. */
             409: {
                 headers: {
                     [name: string]: unknown;
@@ -6166,7 +6160,7 @@ export interface operations {
                     "application/json": components["schemas"]["Problem"];
                 };
             };
-            /** @description Invalid: every violation, by path (A15). */
+            /** @description Invalid: every violation, by path. */
             422: {
                 headers: {
                     [name: string]: unknown;
@@ -6257,7 +6251,7 @@ export interface operations {
                     "application/json": components["schemas"]["Problem"];
                 };
             };
-            /** @description Stale (with what intervened) or a reused patch id (H5). */
+            /** @description Stale (with what intervened) or a reused patch id. */
             409: {
                 headers: {
                     [name: string]: unknown;
@@ -6284,7 +6278,7 @@ export interface operations {
                     "application/json": components["schemas"]["Problem"];
                 };
             };
-            /** @description Invalid: every violation, by path (A15). */
+            /** @description Invalid: every violation, by path. */
             422: {
                 headers: {
                     [name: string]: unknown;
@@ -6375,7 +6369,7 @@ export interface operations {
                     "application/json": components["schemas"]["Problem"];
                 };
             };
-            /** @description Stale (with what intervened) or a reused patch id (H5). */
+            /** @description Stale (with what intervened) or a reused patch id. */
             409: {
                 headers: {
                     [name: string]: unknown;
@@ -6402,7 +6396,7 @@ export interface operations {
                     "application/json": components["schemas"]["Problem"];
                 };
             };
-            /** @description Invalid: every violation, by path (A15). */
+            /** @description Invalid: every violation, by path. */
             422: {
                 headers: {
                     [name: string]: unknown;
@@ -6571,7 +6565,7 @@ export interface operations {
                     "application/json": components["schemas"]["Problem"];
                 };
             };
-            /** @description Stale (with what intervened) or a reused patch id (H5). */
+            /** @description Stale (with what intervened) or a reused patch id. */
             409: {
                 headers: {
                     [name: string]: unknown;
@@ -6598,7 +6592,7 @@ export interface operations {
                     "application/json": components["schemas"]["Problem"];
                 };
             };
-            /** @description Invalid: every violation, by path (A15); or a problem when it cannot be drafted (B7, B8, B9). */
+            /** @description Invalid: every violation, by path; or a problem when it cannot be drafted. */
             422: {
                 headers: {
                     [name: string]: unknown;
@@ -6791,7 +6785,7 @@ export interface operations {
                 route?: components["schemas"]["RouteId"];
                 /** @description Journeys on this version of their route. */
                 version?: components["schemas"]["VersionNumber"];
-                /** @description Journeys referring to any of these identities, directly or through an alias (E6). */
+                /** @description Journeys referring to any of these identities, directly or through an alias. */
                 referencing?: components["schemas"]["IdentityKey"][];
                 /** @description Journeys whose route has, or has not, published a newer version. */
                 upgrade_available?: boolean;
@@ -7621,7 +7615,7 @@ export interface operations {
             query?: {
                 /** @description The signal to sort by; rank when none. */
                 sort?: components["schemas"]["SortBy"];
-                /** @description Only nodes the caller participates in (E4). */
+                /** @description Only nodes the caller participates in. */
                 mine?: boolean;
                 /** @description Only nodes of these kinds; every kind when none. */
                 kind?: components["schemas"]["NodeKind"][];
@@ -8050,7 +8044,7 @@ export interface operations {
                     "application/json": components["schemas"]["Problem"];
                 };
             };
-            /** @description Stale (with what intervened) or a reused patch id (H5). */
+            /** @description Stale (with what intervened) or a reused patch id. */
             409: {
                 headers: {
                     [name: string]: unknown;
@@ -8077,7 +8071,7 @@ export interface operations {
                     "application/json": components["schemas"]["Problem"];
                 };
             };
-            /** @description Invalid: every violation, by path (A15). */
+            /** @description Invalid: every violation, by path. */
             422: {
                 headers: {
                     [name: string]: unknown;
@@ -8253,7 +8247,7 @@ export interface operations {
                     "application/json": components["schemas"]["Problem"];
                 };
             };
-            /** @description Stale (with what intervened) or a reused patch id (H5). */
+            /** @description Stale (with what intervened) or a reused patch id. */
             409: {
                 headers: {
                     [name: string]: unknown;
@@ -8280,7 +8274,7 @@ export interface operations {
                     "application/json": components["schemas"]["Problem"];
                 };
             };
-            /** @description Invalid: every violation, by path (A15). */
+            /** @description Invalid: every violation, by path. */
             422: {
                 headers: {
                     [name: string]: unknown;
@@ -8453,7 +8447,7 @@ export interface operations {
                     "application/json": components["schemas"]["Problem"];
                 };
             };
-            /** @description Stale (with what intervened) or a reused patch id (H5). */
+            /** @description Stale (with what intervened) or a reused patch id. */
             409: {
                 headers: {
                     [name: string]: unknown;
@@ -8480,7 +8474,7 @@ export interface operations {
                     "application/json": components["schemas"]["Problem"];
                 };
             };
-            /** @description Invalid: every violation, by path (A15). */
+            /** @description Invalid: every violation, by path. */
             422: {
                 headers: {
                     [name: string]: unknown;
@@ -8573,7 +8567,7 @@ export interface operations {
                     "application/json": components["schemas"]["Problem"];
                 };
             };
-            /** @description Stale (with what intervened) or a reused patch id (H5). */
+            /** @description Stale (with what intervened) or a reused patch id. */
             409: {
                 headers: {
                     [name: string]: unknown;
@@ -8600,7 +8594,7 @@ export interface operations {
                     "application/json": components["schemas"]["Problem"];
                 };
             };
-            /** @description Invalid: every violation, by path (A15). */
+            /** @description Invalid: every violation, by path. */
             422: {
                 headers: {
                     [name: string]: unknown;
@@ -8693,7 +8687,7 @@ export interface operations {
                     "application/json": components["schemas"]["Problem"];
                 };
             };
-            /** @description Stale (with what intervened) or a reused patch id (H5). */
+            /** @description Stale (with what intervened) or a reused patch id. */
             409: {
                 headers: {
                     [name: string]: unknown;
@@ -8720,7 +8714,7 @@ export interface operations {
                     "application/json": components["schemas"]["Problem"];
                 };
             };
-            /** @description Invalid: every violation, by path (A15). */
+            /** @description Invalid: every violation, by path. */
             422: {
                 headers: {
                     [name: string]: unknown;
@@ -8893,7 +8887,7 @@ export interface operations {
                     "application/json": components["schemas"]["Problem"];
                 };
             };
-            /** @description Stale (with what intervened) or a reused patch id (H5). */
+            /** @description Stale (with what intervened) or a reused patch id. */
             409: {
                 headers: {
                     [name: string]: unknown;
@@ -8920,7 +8914,7 @@ export interface operations {
                     "application/json": components["schemas"]["Problem"];
                 };
             };
-            /** @description Invalid: every violation, by path (A15); or a problem when it cannot be drafted (B7, B8, B9). */
+            /** @description Invalid: every violation, by path; or a problem when it cannot be drafted. */
             422: {
                 headers: {
                     [name: string]: unknown;
@@ -9011,7 +9005,7 @@ export interface operations {
                     "application/json": components["schemas"]["Problem"];
                 };
             };
-            /** @description Stale (with what intervened) or a reused patch id (H5). */
+            /** @description Stale (with what intervened) or a reused patch id. */
             409: {
                 headers: {
                     [name: string]: unknown;
@@ -9038,7 +9032,7 @@ export interface operations {
                     "application/json": components["schemas"]["Problem"];
                 };
             };
-            /** @description Invalid: every violation, by path (A15); or a problem when it cannot be drafted (B7, B8, B9). */
+            /** @description Invalid: every violation, by path; or a problem when it cannot be drafted. */
             422: {
                 headers: {
                     [name: string]: unknown;
@@ -9129,7 +9123,7 @@ export interface operations {
                     "application/json": components["schemas"]["Problem"];
                 };
             };
-            /** @description Stale (with what intervened) or a reused patch id (H5). */
+            /** @description Stale (with what intervened) or a reused patch id. */
             409: {
                 headers: {
                     [name: string]: unknown;
@@ -9156,7 +9150,7 @@ export interface operations {
                     "application/json": components["schemas"]["Problem"];
                 };
             };
-            /** @description Invalid: every violation, by path (A15); or a problem when it cannot be drafted (B7, B8, B9). */
+            /** @description Invalid: every violation, by path; or a problem when it cannot be drafted. */
             422: {
                 headers: {
                     [name: string]: unknown;
@@ -9579,7 +9573,7 @@ export interface operations {
                     "application/json": components["schemas"]["Problem"];
                 };
             };
-            /** @description Stale (with what intervened) or a reused patch id (H5). */
+            /** @description Stale (with what intervened) or a reused patch id. */
             409: {
                 headers: {
                     [name: string]: unknown;
@@ -9606,7 +9600,7 @@ export interface operations {
                     "application/json": components["schemas"]["Problem"];
                 };
             };
-            /** @description Invalid: every violation, by path (A15); or a problem when it cannot be drafted (B7, B8, B9). */
+            /** @description Invalid: every violation, by path; or a problem when it cannot be drafted. */
             422: {
                 headers: {
                     [name: string]: unknown;
@@ -10184,7 +10178,7 @@ export interface operations {
                     "application/json": components["schemas"]["Problem"];
                 };
             };
-            /** @description Stale (with what intervened) or a reused patch id (H5). */
+            /** @description Stale (with what intervened) or a reused patch id. */
             409: {
                 headers: {
                     [name: string]: unknown;
@@ -10211,7 +10205,7 @@ export interface operations {
                     "application/json": components["schemas"]["Problem"];
                 };
             };
-            /** @description Invalid: every violation, by path (A15). */
+            /** @description Invalid: every violation, by path. */
             422: {
                 headers: {
                     [name: string]: unknown;
@@ -10302,7 +10296,7 @@ export interface operations {
                     "application/json": components["schemas"]["Problem"];
                 };
             };
-            /** @description Stale (with what intervened) or a reused patch id (H5). */
+            /** @description Stale (with what intervened) or a reused patch id. */
             409: {
                 headers: {
                     [name: string]: unknown;
@@ -10329,7 +10323,7 @@ export interface operations {
                     "application/json": components["schemas"]["Problem"];
                 };
             };
-            /** @description Invalid: every violation, by path (A15). */
+            /** @description Invalid: every violation, by path. */
             422: {
                 headers: {
                     [name: string]: unknown;
@@ -10505,7 +10499,7 @@ export interface operations {
                     "application/json": components["schemas"]["Problem"];
                 };
             };
-            /** @description Stale (with what intervened) or a reused patch id (H5). */
+            /** @description Stale (with what intervened) or a reused patch id. */
             409: {
                 headers: {
                     [name: string]: unknown;
@@ -10532,7 +10526,7 @@ export interface operations {
                     "application/json": components["schemas"]["Problem"];
                 };
             };
-            /** @description Invalid: every violation, by path (A15). */
+            /** @description Invalid: every violation, by path. */
             422: {
                 headers: {
                     [name: string]: unknown;
@@ -10705,7 +10699,7 @@ export interface operations {
                     "application/json": components["schemas"]["Problem"];
                 };
             };
-            /** @description Stale (with what intervened) or a reused patch id (H5). */
+            /** @description Stale (with what intervened) or a reused patch id. */
             409: {
                 headers: {
                     [name: string]: unknown;
@@ -10732,7 +10726,7 @@ export interface operations {
                     "application/json": components["schemas"]["Problem"];
                 };
             };
-            /** @description Invalid: every violation, by path (A15). */
+            /** @description Invalid: every violation, by path. */
             422: {
                 headers: {
                     [name: string]: unknown;
@@ -10825,7 +10819,7 @@ export interface operations {
                     "application/json": components["schemas"]["Problem"];
                 };
             };
-            /** @description Stale (with what intervened) or a reused patch id (H5). */
+            /** @description Stale (with what intervened) or a reused patch id. */
             409: {
                 headers: {
                     [name: string]: unknown;
@@ -10852,7 +10846,7 @@ export interface operations {
                     "application/json": components["schemas"]["Problem"];
                 };
             };
-            /** @description Invalid: every violation, by path (A15). */
+            /** @description Invalid: every violation, by path. */
             422: {
                 headers: {
                     [name: string]: unknown;
@@ -10945,7 +10939,7 @@ export interface operations {
                     "application/json": components["schemas"]["Problem"];
                 };
             };
-            /** @description Stale (with what intervened) or a reused patch id (H5). */
+            /** @description Stale (with what intervened) or a reused patch id. */
             409: {
                 headers: {
                     [name: string]: unknown;
@@ -10972,7 +10966,7 @@ export interface operations {
                     "application/json": components["schemas"]["Problem"];
                 };
             };
-            /** @description Invalid: every violation, by path (A15). */
+            /** @description Invalid: every violation, by path. */
             422: {
                 headers: {
                     [name: string]: unknown;
@@ -11145,7 +11139,7 @@ export interface operations {
                     "application/json": components["schemas"]["Problem"];
                 };
             };
-            /** @description Stale (with what intervened) or a reused patch id (H5). */
+            /** @description Stale (with what intervened) or a reused patch id. */
             409: {
                 headers: {
                     [name: string]: unknown;
@@ -11172,7 +11166,7 @@ export interface operations {
                     "application/json": components["schemas"]["Problem"];
                 };
             };
-            /** @description Invalid: every violation, by path (A15); or a problem when it cannot be drafted (B7, B8, B9). */
+            /** @description Invalid: every violation, by path; or a problem when it cannot be drafted. */
             422: {
                 headers: {
                     [name: string]: unknown;

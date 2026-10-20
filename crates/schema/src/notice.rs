@@ -17,7 +17,8 @@ pub enum NoticeCode {
     Unanchored,
 }
 
-/// One advisory finding about a node of a route graph (A20).
+// PRD: A20.
+/// One advisory finding about a node of a route graph.
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
 #[serde(deny_unknown_fields)]
 pub struct Notice {

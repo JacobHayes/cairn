@@ -4,7 +4,7 @@ import { describe, expect, it } from "vitest";
 
 import { consequenceLines, warningOf } from "./activity.ts";
 import type { Command } from "./edit-record.ts";
-import { landedWarning, newPatchId, patchOf, reasonOf, saveOf, subjectOf, unlockedOf, violationWords, type Mutation, type WriteIntent } from "./writes.ts";
+import { landedWarning, newPatchId, patchOf, saveOf, subjectOf, unlockedOf, type Mutation, type WriteIntent } from "./writes.ts";
 
 const intent: WriteIntent = {
   target: { journey: "j_one" },
@@ -138,17 +138,6 @@ describe("landedWarning", () => {
   it("is the warning of a patch's consequences, and none for a proposal's answer", () => {
     expect(landedWarning({ outcome: "applied", receipt, consequences: { j_one: { overdue: ["n_b"] } } }, titleOf)).toBe("Kickoff is now overdue.");
     expect(landedWarning({ outcome: "already_saved" } as never, titleOf)).toBeUndefined();
-  });
-});
-
-describe("violationWords", () => {
-  it("drops the rule code the engine ends a message with, wherever the message is shown", () => {
-    for (const code of ["F5", "A1a", "D12"]) {
-      const violation = { code: "limit_exceeded" as const, at: {}, message: `The title is too long (${code})` };
-      expect(violationWords(violation)).toBe("The title is too long");
-      expect(reasonOf({ rejection: "invalid", violations: [violation] })).toBe("The title is too long");
-    }
-    expect(violationWords({ code: "limit_exceeded", at: {}, message: "Keep (all) of it" })).toBe("Keep (all) of it");
   });
 });
 

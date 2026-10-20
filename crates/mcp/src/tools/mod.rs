@@ -20,13 +20,15 @@ use crate::toolset::Spec;
 /// The tool groups, each dispatched by its own module.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub(crate) enum Group {
-    /// Derived reads (I3, C2, C8, C10): computed at the caller's today, as the viewer.
+    // PRD: I3, C2, C8, C10.
+    /// Derived reads: computed at the caller's today, as the viewer.
     Derive,
     /// Store-backed reads.
     Read,
     /// Direct writes: each call is one patch.
     Write,
-    /// Proposals: drafted, edited, and applied by id (I6).
+    // PRD: I6.
+    /// Proposals: drafted, edited, and applied by id.
     Propose,
 }
 
@@ -58,7 +60,8 @@ pub(crate) fn group_of(name: &str) -> Option<Group> {
         .map(|(group, _)| group)
 }
 
-/// A derived read with what it was derived from (D3, H6): the journey revision a later write
+// PRD: D3, H6.
+/// A derived read with what it was derived from: the journey revision a later write
 /// names as its base, the deployment revision, and the today it was derived for.
 #[derive(Clone, Debug, Serialize, JsonSchema)]
 pub(crate) struct At<T> {
@@ -66,7 +69,8 @@ pub(crate) struct At<T> {
     revision: Revision,
     /// The deployment revision it was derived over.
     deployment_revision: Revision,
-    /// The today it was derived for, in the deployment's time zone (A9).
+    // PRD: A9.
+    /// The today it was derived for, in the deployment's time zone.
     today: Date,
     #[serde(flatten)]
     value: T,
@@ -138,20 +142,24 @@ impl<T> Cut<T> {
     }
 }
 
-/// What a direct write answers: its receipt and what it newly caused (D7).
+// PRD: D7.
+/// What a direct write answers: its receipt and what it newly caused.
 #[derive(Clone, Debug, Serialize, JsonSchema)]
 pub(crate) struct WriteOutput {
+    // PRD: H5.
     /// `applied` now, or `already_applied`: the patch id was committed before with the same
-    /// content and is answered from its receipt (H5), with no consequences.
+    /// content and is answered from its receipt, with no consequences.
     status: WriteStatus,
     /// The receipt: the revision the patch produced is the base of the next write.
     receipt: PatchReceipt,
-    /// What it caused in each journey it changed (D7): newly stale nodes, shortfalls,
-    /// finished work that may not apply while a decision is unanswered (D4), relevance
+    // PRD: D7, D4.
+    /// What it caused in each journey it changed: newly stale nodes, shortfalls,
+    /// finished work that may not apply while a decision is unanswered, relevance
     /// changes, and the frontier's movement.
     #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
     consequences: BTreeMap<JourneyId, Consequences>,
-    /// Advisory notices about the route graph an import or publish leaves (A20): work with no
+    // PRD: A20.
+    /// Advisory notices about the route graph an import or publish leaves: work with no
     /// chain to or from the final milestone, which neither its priority nor its dates feel.
     /// The write was accepted; add the missing edge or date rule, or leave it.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]

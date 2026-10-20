@@ -408,7 +408,7 @@ pub(crate) fn plan_violation(graph: &Graph, deployment: &Deployment) -> Option<V
         .map(|short| short.shortfall_days.to_string())
         .collect();
     let message = format!(
-        "the plan holds {} contradictory chain{}{} short by {} days (F5)",
+        "the plan holds {} contradictory chain{}{} short by {} days",
         days.len(),
         if days.len() == 1 { "" } else { "s" },
         if chains.more { " and more," } else { "," },

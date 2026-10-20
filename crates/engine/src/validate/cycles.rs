@@ -89,7 +89,7 @@ fn snooze_cycles(check: &GraphCheck<'_>, graph: &Dependencies, out: &mut Vec<Vio
             snoozed,
             ViolationCode::SnoozeCycle,
             format!(
-                "{snoozed} is snoozed until {target}, which cannot finish before {snoozed} (or work beneath it) does (B6)"
+                "{snoozed} is snoozed until {target}, which cannot finish before {snoozed} (or work beneath it) does"
             ),
         );
         found.related.push(Subject::Node(target));

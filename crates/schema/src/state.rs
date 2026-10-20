@@ -16,7 +16,8 @@ use crate::node::{AnswerType, IdentitySet, NodeKind};
 use crate::text::{Markdown, Reason};
 use jiff::civil::Date;
 
-/// A node's stored state (D1). Each kind has its own machine; [`State::legal_for`] says
+// PRD: D1.
+/// A node's stored state. Each kind has its own machine; [`State::legal_for`] says
 /// which values belong to which kind. A group has no performed state: it is `derived`
 /// unless explicitly `skipped`.
 #[derive(
@@ -103,13 +104,16 @@ pub enum Provenance {
     FromRoute,
     /// Created in the journey.
     Local,
-    /// Copied from a route version that no longer has it (B7).
+    // PRD: B7.
+    /// Copied from a route version that no longer has it.
     Orphaned,
-    /// Copied in from a segment version: a member of an insertion (B13).
+    // PRD: B13.
+    /// Copied in from a segment version: a member of an insertion.
     FromSegment,
 }
 
-/// What a journey changed on a route-copied node (B4), so an upgrade leaves it alone. A
+// PRD: B4.
+/// What a journey changed on a route-copied node, so an upgrade leaves it alone. A
 /// marker carries no reason (PRD glossary, Local edit).
 #[derive(
     Clone, Debug, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize, JsonSchema,
@@ -124,8 +128,9 @@ pub enum LocalEdit {
     Participation(KindKey),
     /// One of the node's resources.
     Resource(AttachmentKey),
+    // PRD: B7.
     /// The node's kind or, for a decision, its answer type: what a replacement changes that
-    /// no single field edit can (B7).
+    /// no single field edit can.
     Shape,
 }
 
@@ -133,21 +138,26 @@ pub enum LocalEdit {
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
 #[serde(deny_unknown_fields)]
 pub struct NodeState {
-    /// The machine state (D1).
+    // PRD: D1.
+    /// The machine state.
     pub state: State,
     /// Where the node came from.
     pub provenance: Provenance,
-    /// A placeholder marked atomic, so it can complete without children (B10).
+    // PRD: B10.
+    /// A placeholder marked atomic, so it can complete without children.
     #[serde(default, skip_serializing_if = "crate::serde_util::is_false")]
     pub atomic: bool,
-    /// When a deliverable or action was started (F2); editable like an actual date.
+    // PRD: F2.
+    /// When a deliverable or action was started; editable like an actual date.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub started_on: Option<Date>,
-    /// When the node finished: the actual date a milestone was reached (F1), the day a
-    /// decision was decided or work was done (F2).
+    // PRD: F1, F2.
+    /// When the node finished: the actual date a milestone was reached, the day a
+    /// decision was decided or work was done.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub finished_on: Option<Date>,
-    /// Why the node was skipped, while it is (D1: a skip requires a reason).
+    // PRD: D1.
+    /// Why the node was skipped, while it is (a skip requires a reason).
     #[serde(skip_serializing_if = "Option::is_none")]
     pub skip_reason: Option<Reason>,
 }
@@ -167,7 +177,8 @@ impl NodeState {
     }
 }
 
-/// A decision's submitted answer (A4; PRD glossary, Answer). Submitted empty text or an
+// PRD: A4.
+/// A decision's submitted answer (PRD glossary, Answer). Submitted empty text or an
 /// empty list is answered.
 #[derive(
     Clone, Debug, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize, JsonSchema,
@@ -239,7 +250,8 @@ impl From<AnswerText> for String {
     }
 }
 
-/// What a snooze waits for (B6): exactly one of a date or a node.
+// PRD: B6.
+/// What a snooze waits for: exactly one of a date or a node.
 #[derive(
     Clone, Debug, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize, JsonSchema,
 )]
@@ -251,7 +263,8 @@ pub enum SnoozeTarget {
     Node(NodeKey),
 }
 
-/// A transition guard (D4).
+// PRD: D4.
+/// A transition guard.
 #[derive(
     Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize, JsonSchema,
 )]
@@ -261,13 +274,15 @@ pub enum Guard {
     DepsDone,
     /// A `requires_artifact` deliverable has an artifact link.
     HasArtifact,
-    /// A `requires_note` deliverable or action has a note of its own (G4).
+    // PRD: G4.
+    /// A `requires_note` deliverable or action has a note of its own.
     HasNote,
     /// A placeholder has children or is atomic.
     BrokenDown,
 }
 
-/// One specific guard failure (D4): what a bypass records, so a later distinct failure
+// PRD: D4.
+/// One specific guard failure: what a bypass records, so a later distinct failure
 /// still produces `stale`, and what `stale` lists.
 #[derive(
     Clone, Debug, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize, JsonSchema,
@@ -278,7 +293,8 @@ pub enum GuardFailure {
     OpenDependency(NodeKey),
     /// No artifact link on a `requires_artifact` deliverable.
     MissingArtifact,
-    /// No note on a `requires_note` deliverable or action (G4).
+    // PRD: G4.
+    /// No note on a `requires_note` deliverable or action.
     MissingNote,
     /// A placeholder with no children that is not atomic.
     NotBrokenDown,
@@ -297,7 +313,8 @@ impl GuardFailure {
     }
 }
 
-/// A guard bypass as stored (D4): the guards bypassed, why, and the specific failures
+// PRD: D4.
+/// A guard bypass as stored: the guards bypassed, why, and the specific failures
 /// present when it was applied.
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
 #[serde(deny_unknown_fields)]
@@ -318,10 +335,12 @@ pub struct Overrides {
     /// Treat the node as relevant despite conditions (Gating, Force include).
     #[serde(skip_serializing_if = "Option::is_none")]
     pub force_include: Option<Reason>,
-    /// Exempt the node and its subtree from an ancestor's skip (D1a).
+    // PRD: D1a.
+    /// Exempt the node and its subtree from an ancestor's skip.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub keep: Option<Reason>,
-    /// A guard bypass on the node's transition (D4).
+    // PRD: D4.
+    /// A guard bypass on the node's transition.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub bypass: Option<Bypass>,
 }
@@ -361,8 +380,9 @@ pub struct JourneyState {
     )]
     #[schemars(extend("maxProperties" = crate::limits::NODE_COUNT_MAX))]
     pub nodes: BTreeMap<NodeKey, NodeState>,
-    /// Each route-copied node's local edits (B4), apart from its state so that an edit and
-    /// a transition on one node touch different records (H5).
+    // PRD: B4, H5.
+    /// Each route-copied node's local edits, apart from its state so that an edit and
+    /// a transition on one node touch different records.
     #[serde(
         default,
         skip_serializing_if = "BTreeMap::is_empty",
@@ -378,7 +398,8 @@ pub struct JourneyState {
     )]
     #[schemars(extend("maxProperties" = crate::limits::NODE_COUNT_MAX))]
     pub answers: BTreeMap<NodeKey, AnswerValue>,
-    /// The rationale each answer was given with, by decision (B2). A key here has an answer
+    // PRD: B2.
+    /// The rationale each answer was given with, by decision. A key here has an answer
     /// beside it; an answer given without a reason has no entry, and reopening removes both.
     #[serde(
         default,
@@ -387,7 +408,8 @@ pub struct JourneyState {
     )]
     #[schemars(extend("maxProperties" = crate::limits::NODE_COUNT_MAX))]
     pub rationales: BTreeMap<NodeKey, Markdown>,
-    /// Direct role fills, for roles without a filling decision (E3). A role with a filling
+    // PRD: E3.
+    /// Direct role fills, for roles without a filling decision. A role with a filling
     /// decision is filled from that decision's answer, which is derived, not stored here.
     #[serde(
         default,
@@ -396,8 +418,9 @@ pub struct JourneyState {
     )]
     #[schemars(extend("maxProperties" = crate::limits::ROLE_COUNT_MAX))]
     pub role_fills: BTreeMap<RoleKey, IdentitySet>,
+    // PRD: E3.
     /// Pins: explicit journey-level dates on nodes (PRD glossary, Pin). A pin from a
-    /// `feeds_milestone` answer is derived from the answer, not stored here (E3).
+    /// `feeds_milestone` answer is derived from the answer, not stored here.
     #[serde(
         default,
         skip_serializing_if = "BTreeMap::is_empty",
@@ -405,7 +428,8 @@ pub struct JourneyState {
     )]
     #[schemars(extend("maxProperties" = crate::limits::NODE_COUNT_MAX))]
     pub pins: BTreeMap<NodeKey, Date>,
-    /// Snoozes by node (B6).
+    // PRD: B6.
+    /// Snoozes by node.
     #[serde(
         default,
         skip_serializing_if = "BTreeMap::is_empty",
@@ -421,10 +445,12 @@ pub struct JourneyState {
     )]
     #[schemars(extend("maxProperties" = crate::limits::NODE_COUNT_MAX))]
     pub overrides: BTreeMap<NodeKey, Overrides>,
-    /// Route-copied nodes the journey removed, so an upgrade does not re-add them (B4).
+    // PRD: B4.
+    /// Route-copied nodes the journey removed, so an upgrade does not re-add them.
     #[serde(default, skip_serializing_if = "BTreeSet::is_empty")]
     pub tombstones: BTreeSet<NodeKey>,
-    /// Notes and links (G1): on each node, and on the journey itself, at most
+    // PRD: G1.
+    /// Notes and links: on each node, and on the journey itself, at most
     /// `note_count_per_node_max` notes and `link_count_per_node_max` links.
     #[serde(
         default,

@@ -46,10 +46,10 @@ impl fmt::Display for DraftError {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             DraftError::JourneyMissing(id) => write!(formatter, "journey {id} was not loaded"),
-            DraftError::NoLineage(id) => write!(formatter, "journey {id} follows no route (B7)"),
+            DraftError::NoLineage(id) => write!(formatter, "journey {id} follows no route"),
             DraftError::NotNewer { current, to } => write!(
                 formatter,
-                "version {to} is not newer than version {current}, which the journey follows (B7)"
+                "version {to} is not newer than version {current}, which the journey follows"
             ),
             DraftError::VersionMissing(lineage) => write!(
                 formatter,

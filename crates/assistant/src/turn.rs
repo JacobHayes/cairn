@@ -50,8 +50,9 @@ pub struct TurnReply {
     /// What the assistant said last, if anything.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub reply: Option<Markdown>,
+    // PRD: I5.
     /// Every write the assistant made, in order: applied with its consequences, or drafted
-    /// as a proposal for review (I5).
+    /// as a proposal for review.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub actions: Vec<Action>,
     /// How the turn ended.
@@ -465,7 +466,7 @@ fn tool_specs() -> Vec<ToolSpec> {
 fn system(user: &Actor, target: &Target, context: &Value) -> String {
     let mut prompt = format!(
         "You are Cairn's in-app assistant, working for user {user} on {target}. You have the \
-         same tools as any agent acting for them (I7), and every write you make is recorded \
+         same tools as any agent acting for them, and every write you make is recorded \
          as yours, on their behalf.\n\n\
          How your writes land: a state change (a transition, an answer, a note, an \
          assignment, a pin, a snooze, a journey weight override) applies directly when it \

@@ -66,7 +66,7 @@ pub(crate) const SPECS: &[Spec] = &[
     Spec {
         name: "export_route",
         description: "A published version, or the draft, as a route file in YAML, every key \
-            kept (A13).",
+            kept.",
         writes: false,
         destructive: false,
         schema: schema::<ExportRoute>,
@@ -89,7 +89,7 @@ pub(crate) const SPECS: &[Spec] = &[
         name: "get_proposal",
         description: "A proposal by id: its destination, editing revision, status, and \
             content. With `review`, also what applying it now would do: unresolved items, \
-            every violation, the frontier after, consequences, a route draft's notices (A20), and \
+            every violation, the frontier after, consequences, a route draft's notices, and \
             whether its destination moved since it was drafted (then refresh it with \
             `edit_proposal`).",
         writes: false,
@@ -283,7 +283,8 @@ pub(crate) struct ListJourneys {
     /// Journeys whose route has (or has not) published a version newer than theirs.
     #[serde(default)]
     upgrade_available: Option<bool>,
-    /// Only journeys that refer to the caller's identities (H3).
+    // PRD: H3.
+    /// Only journeys that refer to the caller's identities.
     #[serde(default)]
     mine: bool,
     /// Only journeys that refer to any of these identities, by an answer, a role fill, an
@@ -419,7 +420,8 @@ struct ProposalOutput {
     review: Option<Review>,
 }
 
-/// C14, D7: what applying a proposal now would do.
+// PRD: C14, D7.
+/// What applying a proposal now would do.
 #[derive(Debug, Serialize, JsonSchema)]
 struct Review {
     /// Review items that still need a choice before it can be applied.
@@ -431,10 +433,12 @@ struct Review {
     /// For a journey, the start of its frontier after, in rank order; once it is applied,
     /// `list_frontier` pages the whole of it.
     frontier: Cut<NodeKey>,
-    /// What it would cause, by journey (D7).
+    // PRD: D7.
+    /// What it would cause, by journey.
     #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
     consequences: BTreeMap<JourneyId, Consequences>,
-    /// For a route's draft, advisory notices about the graph it would leave (A20): work with
+    // PRD: A20.
+    /// For a route's draft, advisory notices about the graph it would leave: work with
     /// no chain to or from the final milestone. They never block applying or publishing.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     notices: Vec<Notice>,

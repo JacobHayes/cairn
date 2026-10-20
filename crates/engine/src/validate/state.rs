@@ -40,15 +40,15 @@ fn node_states(check: &GraphCheck<'_>, out: &mut Vec<Violation>) {
     let document = check.document;
     for node in document.nodes.values() {
         let message = match document.state.nodes.get(&node.key) {
-            None => "the node has no stored state (B1)",
+            None => "the node has no stored state",
             Some(stored) if !stored.state.legal_for(node.kind()) => {
-                "the stored state is not one the node's kind has (D1)"
+                "the stored state is not one the node's kind has"
             }
             Some(stored) if stored.atomic && !is_placeholder(node) => {
-                "only a placeholder is marked atomic (B10)"
+                "only a placeholder is marked atomic"
             }
             Some(stored) if stored.skip_reason.is_some() != (stored.state == State::Skipped) => {
-                "a skipped node keeps the reason it was skipped for, and only a skipped node has one (D1)"
+                "a skipped node keeps the reason it was skipped for, and only a skipped node has one"
             }
             Some(_) => continue,
         };
@@ -117,7 +117,7 @@ fn answers(check: &GraphCheck<'_>, out: &mut Vec<Violation>) {
                 check.tree,
                 key,
                 ViolationCode::StateNotOnKind,
-                "a rationale belongs to an answer, and this decision holds none (B2)",
+                "a rationale belongs to an answer, and this decision holds none",
             ));
         }
     }
@@ -132,7 +132,7 @@ fn answers(check: &GraphCheck<'_>, out: &mut Vec<Violation>) {
                 check.tree,
                 &node.key,
                 ViolationCode::StateNotOnKind,
-                "a decision is decided exactly when it holds an answer (D1)",
+                "a decision is decided exactly when it holds an answer",
             ));
         }
     }
@@ -216,11 +216,11 @@ fn role_fills(check: &GraphCheck<'_>, out: &mut Vec<Violation>) {
             ),
             Some(_) if fillers.contains_key(role) => (
                 ViolationCode::FilledThroughDecision,
-                "the role has a filling decision and is filled only through it (E3)",
+                "the role has a filling decision and is filled only through it",
             ),
             Some(found) if !found.multi && identities.len() > 1 => (
                 ViolationCode::FillsRoleCardinality,
-                "a single-valued role is filled by one identity (A6)",
+                "a single-valued role is filled by one identity",
             ),
             Some(_) => continue,
         };
@@ -244,7 +244,7 @@ fn pins_and_snoozes(check: &GraphCheck<'_>, out: &mut Vec<Violation>) {
                 check.tree,
                 key,
                 ViolationCode::PinnedThroughDecision,
-                "the milestone is pinned through its feeding decision (E3)",
+                "the milestone is pinned through its feeding decision",
             );
             found.related.push(Subject::Node((*decision).clone()));
             out.push(found);
@@ -265,7 +265,7 @@ fn pins_and_snoozes(check: &GraphCheck<'_>, out: &mut Vec<Violation>) {
         } else {
             continue;
         };
-        let mut found = at_node(check.tree, key, code, "a snooze waits on another node (B6)");
+        let mut found = at_node(check.tree, key, code, "a snooze waits on another node");
         found.related.push(Subject::Node(target.clone()));
         out.push(found);
     }
@@ -292,7 +292,7 @@ fn attached_records(check: &GraphCheck<'_>, out: &mut Vec<Violation>) {
                 check.tree,
                 key,
                 ViolationCode::RetiredKeyReused,
-                "a tombstoned node cannot come back (B4)",
+                "a tombstoned node cannot come back",
             ));
         }
     }

@@ -41,7 +41,7 @@ fn tree_issues(check: &GraphCheck<'_>, out: &mut Vec<Violation>) {
                     tree,
                     parent,
                     ViolationCode::LeafWithChildren,
-                    "a decision or milestone has no children (A2)",
+                    "a decision or milestone has no children",
                 );
                 found.related.push(Subject::Node(node.clone()));
                 found

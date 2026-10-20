@@ -17,7 +17,7 @@ fn unresolved(document: &Document, tree: &Tree, deployment: &Deployment) -> Vec<
         if identity::resolve(deployment, key).is_some() {
             continue;
         }
-        let message = format!("{key} is not an identity of this deployment (E6)");
+        let message = format!("{key} is not an identity of this deployment");
         let mut missing = match &mention {
             Mention::Answer(node) | Mention::Participation(node) => {
                 at_node(tree, node, ViolationCode::IdentityUnresolved, message)

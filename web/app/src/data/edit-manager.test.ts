@@ -14,7 +14,7 @@ import { patchOf } from "./writes.ts";
 const receipt = { patch_id: "p_x", domain: { journey: "j_one" }, content_hash: "h", revision: 4 };
 const applied: Answered<HttpFailure> = { outcome: "answered", answer: { outcome: "applied", receipt, consequences: {} } };
 const lost: Answered<HttpFailure> = { outcome: "failed", error: { status: 0, message: "network down" } };
-const invalid: Rejection = { rejection: "invalid", violations: [{ at: {}, code: "limit_exceeded", message: "The title is too long (F5)" }] };
+const invalid: Rejection = { rejection: "invalid", violations: [{ at: {}, code: "limit_exceeded", message: "The title is too long" }] };
 const refusal = (rejection: Rejection): Answered<HttpFailure> => ({ outcome: "rejected", rejection });
 
 describe("one busy write per edit", () => {

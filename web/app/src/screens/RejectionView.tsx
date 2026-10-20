@@ -1,10 +1,10 @@
 // A refused write in words (A15), the one place every screen says it: what intervened, each
-// rule broken without its code, and what can be done about it. Also the words for a record a
+// rule broken, and what can be done about it. Also the words for a record a
 // stale refusal names.
 import type { Schema } from "@cairn/client";
 import type { ReactNode } from "react";
 
-import { violationNode, violationWords, type Rejection, type Violation } from "../data/writes.ts";
+import { violationNode, type Rejection, type Violation } from "../data/writes.ts";
 import { useSession } from "../data/react.ts";
 import { fieldWords } from "../status/words.ts";
 import { Button } from "../ui/kit.tsx";
@@ -50,13 +50,13 @@ export function useRecordWords(): (keys: readonly RecordKey[]) => string[] {
   return (keys) => [...new Set(keys.flatMap((key) => describeRecord(key, titleOf) ?? []))];
 }
 
-/** One rule an invalid change breaks (A15), in words: the engine's message without its rule code, led by the node's title when it is about one. */
+/** One rule an invalid change breaks (A15), in words: the engine's message, led by the node's title when it is about one. */
 export function ViolationLine({ violation, titleOf }: { violation: Violation; titleOf?: ((node: string) => string) | undefined }) {
   const node = violationNode(violation);
   return (
     <span className="author-problem" role="alert" data-testid="violation" data-code={violation.code} data-node={node}>
       {node === undefined || titleOf === undefined ? null : <strong>{titleOf(node)}: </strong>}
-      {violationWords(violation)}
+      {violation.message}
     </span>
   );
 }

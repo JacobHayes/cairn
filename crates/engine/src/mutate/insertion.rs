@@ -155,7 +155,7 @@ fn plan(session: &Session<'_>, request: &Request<'_>) -> Result<Plan, Vec<Proble
         [root] => root.clone(),
         roots => {
             return Err(vec![Problem::invalid(format!(
-                "the segment version has {} root nodes and an insertion needs exactly one (A21)",
+                "the segment version has {} root nodes and an insertion needs exactly one",
                 roots.len()
             ))]);
         }
@@ -334,12 +334,12 @@ fn admit_segment<'a>(
         None => problems.push(Problem::invalid(format!("route {route} does not exist"))),
         Some(held) if held.header.kind != cairn_schema::RouteKind::Segment => {
             problems.push(Problem::invalid(format!(
-                "route {route} is not a segment: only a segment is inserted (A21)"
+                "route {route} is not a segment: only a segment is inserted"
             )));
         }
         Some(held) if held.header.retired => {
             problems.push(Problem::invalid(format!(
-                "segment {route} is retired and cannot be inserted (A19)"
+                "segment {route} is retired and cannot be inserted"
             )));
         }
         Some(_) => {}
@@ -476,7 +476,7 @@ fn map_roles(
         match existing {
             Some(Some(held)) if held.multi != role.multi => {
                 problems.push(Problem::invalid(format!(
-                    "role {} is {} in the segment and {} in the graph (A6)",
+                    "role {} is {} in the segment and {} in the graph",
                     role.id,
                     cardinality(role.multi),
                     cardinality(held.multi)
@@ -544,7 +544,7 @@ fn map_kinds(
         match existing {
             Some(Some(held)) if held.multi != kind.multi => {
                 problems.push(Problem::invalid(format!(
-                    "participation kind {} is {} in the segment and {} in the graph (A7)",
+                    "participation kind {} is {} in the segment and {} in the graph",
                     kind.id,
                     cardinality(kind.multi),
                     cardinality(held.multi)
