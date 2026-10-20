@@ -26,5 +26,11 @@ pub const SSE_WRITE_STALL: Duration = Duration::from_secs(15);
 /// Not a limit: well inside the write stall, so a stalled peer is caught within one.
 pub const SSE_HEARTBEAT_INTERVAL: Duration = Duration::from_secs(10);
 
+// A flood of the IAP relay's endpoints, which are reachable without IAP, leaves most of the
+// process's request slots to signed-in requests.
+const _: () = assert!(
+    cairn_auth::limits::RELAY_REQUEST_IN_FLIGHT_COUNT_MAX * 4 <= REQUEST_IN_FLIGHT_COUNT_MAX
+);
+
 // A heartbeat is a write: a subscriber that takes none for the stall is gone.
 const _: () = assert!(SSE_HEARTBEAT_INTERVAL.as_secs() < SSE_WRITE_STALL.as_secs());

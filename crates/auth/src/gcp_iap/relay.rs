@@ -23,13 +23,16 @@
 //!
 //! `resource` (RFC 8707) is checked here against the deployment and never sent to Google.
 //! Every request to these endpoints ends within `PROVIDER_CALL_DURATION_MAX`, its body
-//! read included.
+//! read included, and at most `RELAY_REQUEST_IN_FLIGHT_COUNT_MAX` are in flight: the token
+//! endpoint, registration and the metadata are reachable without IAP, so a flood of them
+//! holds only those of the process's request slots and signed-in requests keep the rest.
 
 use std::sync::Arc;
 
 use axum::Router;
 use axum::extract::{DefaultBodyLimit, Form, Query, Request, State};
-use axum::http::{HeaderMap, StatusCode};
+use axum::http::header::RETRY_AFTER;
+use axum::http::{HeaderMap, HeaderValue, StatusCode};
 use axum::middleware::{self, Next};
 use axum::response::{IntoResponse, Json, Response};
 use axum::routing::{get, post};
@@ -46,12 +49,13 @@ use openidconnect::{
 };
 use serde::{Deserialize, Serialize};
 use serde_json::json;
+use tokio::sync::Semaphore;
 use url::Url;
 
 use super::{GoogleEndpoints, RelayClient};
 use crate::cookies;
 use crate::lifetimes::BROWSER_STEP_LIFETIME;
-use crate::limits::PROVIDER_CALL_DURATION_MAX;
+use crate::limits::{PROVIDER_CALL_DURATION_MAX, RELAY_REQUEST_IN_FLIGHT_COUNT_MAX};
 use crate::oauth::client::{Client, RELAY, Registration};
 use crate::oauth::metadata::{AUTHORIZE, Metadata, REGISTER, TOKEN};
 use crate::oauth::pkce::{is_challenge, is_verifier};
@@ -83,6 +87,8 @@ pub(super) struct Relay {
     http: Outbound,
     cookie: String,
     secure: bool,
+    /// The relay's requests in flight.
+    in_flight: Arc<Semaphore>,
 }
 
 impl Relay {
@@ -125,6 +131,7 @@ impl Relay {
             http,
             cookie: format!("cairn_relay_{name}"),
             secure: base.scheme() == "https",
+            in_flight: Arc::new(Semaphore::new(RELAY_REQUEST_IN_FLIGHT_COUNT_MAX as usize)),
         })
     }
 
@@ -163,7 +170,8 @@ pub(super) fn is_id_token(token: &str) -> bool {
 
 /// The relay's routes: the metadata, registration, authorize, the callback, and the token
 /// endpoint, each request ending within `PROVIDER_CALL_DURATION_MAX` and its body within
-/// `BODY_BYTES_MAX` (these public endpoints take only small forms and JSON).
+/// `BODY_BYTES_MAX` (these public endpoints take only small forms and JSON), and at most
+/// `RELAY_REQUEST_IN_FLIGHT_COUNT_MAX` in flight, the body read included.
 pub(super) fn router(relay: &Arc<Relay>) -> Router {
     let endpoints = Router::new()
         .route(REGISTER, post(register))
@@ -177,6 +185,28 @@ pub(super) fn router(relay: &Arc<Relay>) -> Router {
     endpoints
         .merge(relay.metadata.router())
         .layer(middleware::from_fn(deadline))
+        .layer(middleware::from_fn_with_state(
+            Arc::clone(&relay.in_flight),
+            admit,
+        ))
+}
+
+/// Admits a relay request while fewer than `RELAY_REQUEST_IN_FLIGHT_COUNT_MAX` are in
+/// flight, holding its slot until its response is ready; past that, 503 with
+/// `Retry-After`, at once.
+async fn admit(State(in_flight): State<Arc<Semaphore>>, request: Request, next: Next) -> Response {
+    let Ok(_slot) = in_flight.try_acquire() else {
+        let description = "too many sign-in requests are in flight";
+        let mut refused = oauth_error(
+            StatusCode::SERVICE_UNAVAILABLE,
+            "temporarily_unavailable",
+            description,
+        );
+        let wait = HeaderValue::from_static("1");
+        refused.headers_mut().insert(RETRY_AFTER, wait);
+        return refused;
+    };
+    next.run(request).await
 }
 
 /// Auth's routes sit outside the API's request duration, and a body that trickles in or a

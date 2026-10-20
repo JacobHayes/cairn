@@ -69,6 +69,8 @@ IAP-protected backend service as `/projects/<number>/global/backendServices/<id>
 through). Behind Google Cloud Identity-Aware Proxy, `gcp_iap` verifies the signed
 assertion IAP adds to every request (`x-goog-iap-jwt-assertion`) against Google's keys, so
 each person is signed in as their Google account with no sign-in step of Cairn's own.
+Only Google accounts sign in: an Identity Platform (external) identity's email is its own
+provider's, not verified by Google, so Cairn refuses it rather than match it by email.
 
 The environment overrides `database`, `listen`, `public_url`, and `timezone` with
 `CAIRN_DATABASE`, `CAIRN_LISTEN`, `CAIRN_PUBLIC_URL`, and `CAIRN_TIMEZONE`, and supplies

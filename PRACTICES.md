@@ -141,6 +141,7 @@ Hard-coded named constants; validation rejects a patch that would exceed one, an
 | assistant turn | 10 min | The iteration limit at typical provider latency, with room. |
 | store connection acquire | 5 s | Commits take milliseconds; five seconds of waiting is contention, which at this scale is a bug. |
 | outbound sign-in provider call (OIDC, Tailscale whois, IAP key set, Google token exchange), and a whole request to the IAP relay's endpoints | 10 s | A sign-in provider that slow is down; the login fails. |
+| requests in flight at the IAP relay's endpoints, per process | 16 | Each sign-in or refresh is one short request; the token endpoint, registration and the metadata are reachable without IAP, so a flood of them holds at most this many of the 128 and signed-in requests keep the rest. |
 | IAP key set fetch tries, failed or not | once per 60 s | Google rotates IAP's keys rarely; neither a stream of forged key ids nor an outage at Google may fetch on every request. |
 | IAP key set age | 1 h | A key Google withdraws stops verifying within the hour, at one fetch an hour; past it the set is fetched again, and refused as unavailable if that fails. |
 | IAP assertion clock skew | 30 s | IAP's assertions last ten minutes and NTP keeps clocks well inside this. |

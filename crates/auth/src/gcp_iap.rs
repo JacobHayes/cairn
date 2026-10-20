@@ -57,6 +57,10 @@ use crate::provider::{AuthProvider, Presented, Verdict};
 pub const ASSERTION_HEADER: &str = "x-goog-iap-jwt-assertion";
 /// The issuer of every IAP assertion.
 const ISSUER: &str = "https://cloud.google.com/iap";
+/// How IAP's subject for a Google account begins. An Identity Platform (external) identity's
+/// begins with its token issuer and tenant instead, and its email is that provider's,
+/// which Google has not verified.
+const GOOGLE_ACCOUNT_SUBJECT_PREFIX: &str = "accounts.google.com:";
 /// Where Google publishes the keys IAP signs with, as a JSON Web Key set.
 pub const GOOGLE_KEY_SET_URL: &str = "https://www.gstatic.com/iap/verify/public_key-jwk";
 /// Google's authorization endpoint, where the relay sends a browser to sign in.
@@ -361,13 +365,19 @@ impl GcpIapProvider {
         Ok(claims)
     }
 
-    /// The login verified claims name: the subject is IAP's stable account id, and the
-    /// email is Google's, verified by Google (H3).
+    /// The login verified claims name: the subject is IAP's stable account id, and a
+    /// Google account's email is Google's, verified by Google (H3). An external identity's
+    /// email is not listed as verified, so it never matches a user by email and, with no
+    /// verified email, the login is refused.
     fn login(&self, claims: &CoreIdTokenClaims) -> Verdict {
         let Ok(subject) = claims.subject().as_str().parse::<Title>() else {
             return Verdict::Refused(Refusal::Credential);
         };
-        let email = claims.email().map(|email| email.as_str());
+        let google_account = subject.as_str().starts_with(GOOGLE_ACCOUNT_SUBJECT_PREFIX);
+        let email = claims
+            .email()
+            .map(|email| email.as_str())
+            .filter(|_| google_account);
         let verified_emails = email
             .and_then(|email| email.parse::<Email>().ok())
             .into_iter()
@@ -391,14 +401,15 @@ impl AuthProvider for GcpIapProvider {
     /// (the relay's) counts only beside a valid assertion: alone, it is refused rather than
     /// left for another provider, and it is never read for who the user is.
     async fn authenticate(&self, request: Presented<'_>) -> Verdict {
-        let assertion = request
-            .headers
-            .get(ASSERTION_HEADER)
-            .map(|value| value.to_str().map(str::trim));
+        let mut assertions = request.headers.get_all(ASSERTION_HEADER).iter();
+        let assertion = assertions.next().map(|value| value.to_str().map(str::trim));
+        let repeated = assertions.next().is_some();
         let google_bearer = request
             .bearer()
             .is_some_and(|token| self.claims_bearer(token));
         match assertion {
+            // IAP sends one; which of several to believe is not Cairn's to guess.
+            _ if repeated => Verdict::Refused(Refusal::Credential),
             None if google_bearer => Verdict::Refused(Refusal::Credential),
             None => Verdict::Absent,
             Some(Ok(assertion)) if !assertion.is_empty() => self.verify(assertion).await,

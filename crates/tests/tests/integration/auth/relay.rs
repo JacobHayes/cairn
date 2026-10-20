@@ -584,6 +584,43 @@ mod relay {
         assert!(json_of(answered).await.get("access_token").is_none());
     }
 
+    /// The relay's endpoints are reachable without IAP: once its requests in flight are all
+    /// held (by bodies that never arrive), the next is answered 503 at once with
+    /// `Retry-After`, and a slot freed is a request served again.
+    #[tokio::test]
+    async fn past_the_relays_in_flight_limit_a_request_is_answered_503() {
+        let setup = setup().await;
+        let held: Vec<_> = (0..cairn_auth::limits::RELAY_REQUEST_IN_FLIGHT_COUNT_MAX)
+            .map(|_| {
+                let stalled = request("/api/oauth/token", REMOTE)
+                    .method("POST")
+                    .header(CONTENT_TYPE, "application/x-www-form-urlencoded")
+                    .header("content-length", "100")
+                    .body(Body::from_stream(Stalled))
+                    .unwrap();
+                let router = setup.router.clone();
+                tokio::spawn(async move { send(&router, stalled).await })
+            })
+            .collect();
+        let metadata = "/.well-known/oauth-authorization-server";
+        let refused = tokio::time::timeout(Duration::from_secs(5), async {
+            loop {
+                let answered = get(&setup, metadata, "").await;
+                if answered.status() == StatusCode::SERVICE_UNAVAILABLE {
+                    return answered;
+                }
+                tokio::time::sleep(Duration::from_millis(10)).await;
+            }
+        });
+        let refused = refused.await.expect("past the limit, a request is refused");
+        assert_eq!(refused.headers()["retry-after"], "1");
+        assert_eq!(json_of(refused).await["error"], "temporarily_unavailable");
+        let freed = held.into_iter().next().unwrap();
+        freed.abort();
+        let _ = freed.await;
+        assert_eq!(get(&setup, metadata, "").await.status(), StatusCode::OK);
+    }
+
     /// A Google that never answers ends the request at the deadline, with a server error
     /// and no token.
     #[tokio::test]

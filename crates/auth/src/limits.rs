@@ -7,6 +7,11 @@ use std::time::Duration;
 /// endpoints, its body read included: a sign-in provider this slow is down, and the
 /// sign-in fails.
 pub const PROVIDER_CALL_DURATION_MAX: Duration = Duration::from_secs(10);
+/// Requests in flight at the IAP relay's endpoints, per process: each sign-in or refresh is
+/// one short request, so tens of users' clients stay far below this; since the token
+/// endpoint, registration and the metadata are reachable without IAP, a flood of them holds
+/// at most this many of the process's requests in flight.
+pub const RELAY_REQUEST_IN_FLIGHT_COUNT_MAX: u32 = 16;
 /// How soon after a try at fetching Google's IAP key set, failed or not, another may be
 /// made: rotation is rare, and neither a stream of forged key ids nor an outage at Google
 /// may fetch on every request.

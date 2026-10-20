@@ -6,7 +6,9 @@
 //! fetch on every request, nor does a slow fetch hold up requests whose key is kept
 //! (3.2, Security).
 //! With the relay on, a Google ID token as the bearer counts only beside a valid assertion
-//! (I2); without it, the provider is as it was.
+//! (I2); without it, the provider is as it was. Only a Google account's email counts as
+//! verified, so an external identity is refused, and so is a request with several
+//! assertions.
 
 #[cfg(test)]
 mod gcp_iap {
@@ -190,6 +192,55 @@ mod gcp_iap {
                 "{case}"
             );
         }
+    }
+
+    /// IAP sends one assertion; a request carrying several is refused, even when the first
+    /// is good, rather than believing one of them.
+    #[tokio::test]
+    async fn a_repeated_assertion_header_is_refused() {
+        let signer = key("one", 7);
+        let keys = KeySet::start(&[&signer]).await;
+        let world = World::new();
+        let iap = provider(&world, &keys);
+        let good = sign(&claims(now(&world)), &signer);
+        let other = sign(
+            &claims_of("accounts.google.com:2", "bob@example.org", now(&world)),
+            &signer,
+        );
+        let mut headers = axum::http::HeaderMap::new();
+        headers.append(ASSERTION_HEADER, good.parse().unwrap());
+        headers.append(ASSERTION_HEADER, other.parse().unwrap());
+        let presented = Presented {
+            headers: &headers,
+            peer: Peer::Unknown,
+        };
+        let refused = iap.authenticate(presented).await;
+        assert_eq!(refused, Verdict::Refused(Refusal::Credential));
+    }
+
+    /// H3: a Google account's email is verified by Google; an Identity Platform (external)
+    /// identity's is vouched for by its own provider, so it is not listed as verified, and
+    /// with no verified email the identity is refused rather than matched to the user who
+    /// signed in with that email through Google.
+    #[tokio::test]
+    async fn an_external_identity_is_refused_not_matched_by_email() {
+        let signer = key("one", 7);
+        let keys = KeySet::start(&[&signer]).await;
+        let world = World::new();
+        let iap: Arc<dyn AuthProvider> = Arc::new(provider(&world, &keys));
+        let router = app(&world.auth(public(), vec![iap]));
+        let call = |subject: &str| {
+            let assertion = sign(&claims_of(subject, EMAIL, now(&world)), &signer);
+            let call = request("/whoami", REMOTE).header(ASSERTION_HEADER, assertion);
+            call.body(Body::empty()).unwrap()
+        };
+        assert!(
+            whoami(&router, call(SUBJECT)).await.is_ok(),
+            "Ann, through Google"
+        );
+        let external = "securetoken.google.com/project-1/tenant-1:gZG0yELPypZElTmAT9I55prjHg63";
+        let refused = whoami(&router, call(external)).await;
+        assert_eq!(refused, Err(StatusCode::FORBIDDEN));
     }
 
     /// Google rotates its keys: an assertion under a new key id fetches the set again and
