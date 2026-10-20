@@ -2,16 +2,10 @@
 // the one line that answers them: what is theirs next, and what it waits on. The unranked
 // "mine" projection says what they hold (E4); the date network says which starts first.
 import type { MineEntry } from "../journeys/mine.ts";
-import { isTerminal, nodeOf, recordOf, titleOf, type Ready } from "../detail/model.ts";
-import { resolveEntity } from "../detail/sections.tsx";
+import { milestonesFirst, nodeOf, titleOf, type Ready } from "../detail/model.ts";
 import { snoozeEndWords } from "../status/snooze.ts";
+import { isOpen } from "../status/state.ts";
 import { unblockersOf } from "./waiting.ts";
-
-/** E1, E2: whether one of the viewer's `entities`, through any merge, owns the node whose owners are `owners`. */
-export function ownedBy(view: Ready, owners: readonly string[] | undefined, entities: readonly string[]): boolean {
-  const mine = new Set(entities.map((key) => resolveEntity(view, key)));
-  return (owners ?? []).some((key) => mine.has(resolveEntity(view, key)));
-}
 
 /**
  * Whether node `key` is still the viewer's to do if it is in their "mine": in scope, not a
@@ -25,10 +19,7 @@ export function openForViewer(view: Ready, key: string): boolean {
     node !== undefined &&
     derived !== undefined &&
     node.kind !== "group" &&
-    derived.relevance.value !== "not_relevant" &&
-    derived.effectively_skipped !== true &&
-    derived.auto_reached !== true &&
-    !isTerminal(recordOf(view, node).state)
+    isOpen(derived)
   );
 }
 
@@ -60,10 +51,9 @@ export function nextForYou(view: Ready, entries: readonly MineEntry[]): NextForY
     return undefined;
   }
   const { unblockers, snoozedUntil } = unblockersOf(view, first.node);
-  const milestonesFirst = [...unblockers].sort((left, right) => Number(right.kind === "milestone") - Number(left.kind === "milestone"));
   // A container waits on its unfinished children, which `unblockersOf` leaves out for decisions.
   const children = (view.derived.nodes[first.node.key]?.blocked_by ?? []).filter((each) => each.via === "containment").map((each) => each.node);
-  const after = [...new Set([...milestonesFirst.map((each) => each.node), ...children])].map((key) => titleOf(view, key));
+  const after = [...new Set([...milestonesFirst(view, unblockers, (each) => each.node).map((each) => each.node), ...children])].map((key) => titleOf(view, key));
   return { node: first.node.key, after, snoozedUntil };
 }
 

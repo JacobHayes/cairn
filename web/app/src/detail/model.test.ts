@@ -1,7 +1,7 @@
 // C8's node detail composed in the tab from the document and its derive, and D1's moves.
 import { describe, expect, it } from "vitest";
 
-import { flagsOf, isBlocked, movesFrom, nodeDetail, transition, unansweredOf, type Move, type NodeDerived, type NodeKind, type State } from "./model.ts";
+import { failingGuards, flagsOf, milestonesFirst, movesFrom, nodeDetail, rankPlaces, transition, waitsMore, waitsOn, type Move, type NodeKind, type State } from "./model.ts";
 import { testView } from "./view.test-support.ts";
 
 describe("nodeDetail", () => {
@@ -60,59 +60,56 @@ describe("movesFrom (D1)", () => {
 });
 
 describe("flags (D3)", () => {
-  it("flags only real attention: work started before its gates are met, not what the display state says", () => {
+  it("flags only real attention: work the engine says started before its gates were met", () => {
     const view = testView();
-    const flags = (key: string, state: State) => {
+    const flags = (key: string) => {
       const derived = view.derived.nodes[key];
       if (derived === undefined) {
         throw new Error(`no ${key}`);
       }
-      return flagsOf(derived, state).map((each) => each.flag);
+      return flagsOf(derived).map((each) => each.flag);
     };
-    expect(flags("n_report", "active")).toEqual(["started early"]);
-    expect(flags("n_report", "todo")).toEqual([]);
-    expect(flags("n_findings", "todo")).toEqual([]);
-    expect(flags("n_stage", "active")).toEqual([]);
-  });
-
-  it("does not call a finished node blocked by what it still holds back", () => {
-    const derived = testView().derived.nodes["n_report"];
-    expect(derived && isBlocked({ ...derived, display_state: "done" })).toBe(false);
-    expect(derived && isBlocked({ ...derived, relevance: { value: "not_relevant" }, display_state: "not_relevant" })).toBe(false);
+    expect(flags("n_report")).toEqual(["started early"]);
+    expect(flags("n_findings")).toEqual([]);
+    expect(flags("n_stage")).toEqual([]);
   });
 });
 
-describe("unansweredOf (Gating, D4)", () => {
-  /** The test view with `relevance` on some nodes and `states` stored. */
-  const viewWith = (relevance: Record<string, NodeDerived["relevance"]>, states: Record<string, State> = {}) => {
+describe("what the engine derived, read as it is", () => {
+  it("waitsOn names each dependency with the ancestor holding it, and nothing for a node that waits on none", () => {
     const view = testView();
-    for (const [key, value] of Object.entries(relevance)) {
-      const found = view.derived.nodes[key];
-      if (found !== undefined) {
-        view.derived.nodes[key] = { ...found, relevance: value };
-      }
+    expect(waitsOn(view, "n_report")).toEqual([{ node: "n_findings", via: "explicit", holder: undefined }]);
+    expect(waitsOn(view, "n_meeting")).toEqual([]);
+  });
+
+  it("waitsMore counts what the engine cut from the list and says nothing when it listed everything", () => {
+    const view = testView();
+    const derived = view.derived.nodes["n_report"];
+    if (derived === undefined) {
+      throw new Error("the test journey has n_report");
     }
-    const stored = Object.fromEntries(Object.entries(states).map(([key, state]) => [key, { state, provenance: "local" as const }]));
-    view.journey.graph.state = { ...view.journey.graph.state, nodes: stored };
-    return view;
-  };
-
-  it("names the open, relevant decisions an undecided node waits on", () => {
-    const view = viewWith({ n_findings: { value: "undecided", decisions: ["n_when"] } });
-    expect(unansweredOf(view, "n_findings")).toEqual(["n_when"]);
+    view.derived.nodes["n_report"] = { ...derived, waits_on: { entries: derived.waits_on.entries, total: derived.waits_on.entries.length + 3 } };
+    expect(waitsMore(view, "n_report")).toBe(3);
+    expect(waitsMore(view, "n_meeting")).toBe(0);
   });
 
-  it("names an undecided ancestor's decisions too", () => {
-    const view = viewWith({
-      n_stage: { value: "undecided", decisions: ["n_when"] },
-      n_findings: { value: "undecided", condition_on: "n_stage", decisions: ["n_when"] },
-    });
-    expect(unansweredOf(view, "n_findings")).toEqual(["n_when"]);
+  it("failingGuards is the engine's list, empty when it names none", () => {
+    const view = testView();
+    const derived = view.derived.nodes["n_report"];
+    expect(derived && failingGuards({ ...derived, failing_guards: ["has_note"] })).toEqual(["has_note"]);
+    expect(derived && failingGuards({ ...derived, failing_guards: [] })).toEqual([]);
   });
 
-  it("names nothing for a decided decision or a node that is not undecided", () => {
-    const decided = viewWith({ n_findings: { value: "undecided", decisions: ["n_when"] } }, { n_when: "decided" });
-    expect(unansweredOf(decided, "n_findings")).toEqual([]);
-    expect(unansweredOf(testView(), "n_findings")).toEqual([]);
+  it("rankPlaces numbers the acting frontier in the engine's order from one, and leaves other nodes out", () => {
+    const view = testView();
+    view.derived.acting_frontier = ["n_meeting", "n_findings"];
+    expect([...rankPlaces(view)]).toEqual([["n_meeting", 1], ["n_findings", 2]]);
+    const reordered = { ...view, derived: { ...view.derived, acting_frontier: ["n_findings", "n_meeting"] } };
+    expect([...rankPlaces(reordered)]).toEqual([["n_findings", 1], ["n_meeting", 2]]);
+  });
+
+  it("milestonesFirst puts milestones ahead, then orders by key", () => {
+    const view = testView();
+    expect(milestonesFirst(view, ["n_report", "n_meeting", "n_findings"], (key) => key)).toEqual(["n_meeting", "n_findings", "n_report"]);
   });
 });

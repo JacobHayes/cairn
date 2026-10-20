@@ -8,9 +8,6 @@ import type { Mutation } from "../data/writes.ts";
 import type { JourneyStatus } from "./address.ts";
 
 export type RouteSummary = Schema<"RouteSummary">;
-type Graph = Schema<"Graph">;
-type Derived = Schema<"Derived">;
-type StatusSummary = Schema<"StatusSummary">;
 
 /** The longest slug a new journey's id takes from its name, leaving room for the suffix. */
 const NAME_SLUG_BYTES_MAX = 40;
@@ -70,25 +67,4 @@ export function statusActions(status: JourneyStatus): StatusAction[] {
 /** A19: hard deletion is offered once a journey is archived, and only for its name typed back. */
 export function deleteConfirmed(status: JourneyStatus, name: string, typed: string): boolean {
   return status === "archived" && typed.trim() === name.trim();
-}
-
-/**
- * B11: completion is suggested when every relevant or undecided node satisfies dependencies
- * (the status summary's remaining count is the engine's count of those that do not) or the
- * graph's `final` milestone is reached, stored or auto-reached (F1). A journey with no node
- * has nothing to complete, so it is never suggested.
- */
-export function completionSuggested(graph: Graph, derived: Derived, summary: StatusSummary): boolean {
-  if ((graph.nodes ?? []).length === 0) {
-    return false;
-  }
-  if (summary.remaining === 0) {
-    return true;
-  }
-  const final = (graph.nodes ?? []).find((node) => node.final === true);
-  if (final === undefined) {
-    return false;
-  }
-  const state = graph.state?.nodes?.[final.key]?.state;
-  return state === "reached" || derived.nodes[final.key]?.auto_reached === true;
 }

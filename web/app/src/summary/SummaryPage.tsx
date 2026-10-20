@@ -16,12 +16,11 @@ import type { NodeRow } from "../acting/why.ts";
 import { nextForYou } from "../acting/yours.ts";
 import { useProjected } from "../canvas/hooks.ts";
 import { errorWords, valueOf } from "../data/keyed-read.ts";
-import { useViewer } from "../data/react.ts";
 import { AnnotationList } from "../detail/Attachments.tsx";
 import type { Ready } from "../detail/model.ts";
 import { LineageBlock, Flags, useLineage } from "../journeys/JourneyFacts.tsx";
 import { progressOf } from "../journeys/figures-model.ts";
-import { useMineOf } from "../journeys/mine.ts";
+import { useMineOf, type MineEntry } from "../journeys/mine.ts";
 import { useAssistantAsk } from "../assistant/ask.ts";
 import { dateInk, dateWords, inkClass, originWord, whenWords } from "../status/when.ts";
 import { Button, Meter } from "../ui/kit.tsx";
@@ -204,9 +203,7 @@ function Unplanned({ ready, readOnly }: { ready: Ready; readOnly: boolean }) {
 }
 
 /** The viewer's own work: their owned items, or the one line saying what is theirs next. */
-function Yours({ ready, entries, actions }: { ready: Ready; entries: Entry[]; actions: boolean }) {
-  const mine = useMineOf(ready.journey.header.id);
-  const owned = mine.status === "ready" ? mine.entries.filter((entry) => entry.kinds.includes("k_owner")) : [];
+function Yours({ ready, entries, owned, actions }: { ready: Ready; entries: Entry[]; owned: MineEntry[]; actions: boolean }) {
   if (entries.length > 0) {
     return <EntriesPanel ready={ready} title="Waiting on you" testId="summary-yours" entries={entries} actions={actions} />;
   }
@@ -214,14 +211,14 @@ function Yours({ ready, entries, actions }: { ready: Ready; entries: Entry[]; ac
 }
 
 /** The rows each section lists, claimed so a node is in one action section only (model.ts `claimActions`). */
-function entriesOf(ready: Ready, model: SummaryModel, frontier: NodeRow[], viewer: readonly string[]) {
-  const claimed = claimActions(ready, model, frontier, ready.journey.header.status === "active" ? viewer : []);
+function entriesOf(ready: Ready, model: SummaryModel, frontier: NodeRow[], owned: ReadonlySet<string>) {
+  const claimed = claimActions(ready, model, frontier, ready.journey.header.status === "active" ? owned : new Set());
   const line = milestoneLine(ready, model);
   const sets = line?.feeder;
   const rowEntry = (row: NodeRow): Entry => {
     const said = factOf(ready, row);
     const says = said?.tone === undefined && sets?.key === row.key ? `Sets the date of ${line?.title ?? "the final milestone"}` : said?.words;
-    return { key: row.key, fact: says, tone: said?.tone, act: row, owners: ownersOf(ready, row.key) };
+    return { key: row.key, fact: says, tone: said?.tone, act: row, owners: ownersOf(ready, row.key), yours: owned.has(row.key) };
   };
   const plain = { tone: undefined, act: undefined } as const;
   const held = (each: { key: string; owners: string[]; fact: () => string | undefined }): Entry => ({ ...plain, key: each.key, fact: each.fact, owners: each.owners });
@@ -283,7 +280,7 @@ function Waiting({ ready, error }: { ready: Ready; error: string | undefined }) 
 type Entries = ReturnType<typeof entriesOf>;
 
 /** The action sections, in reading order: what waits on the viewer, the decisions to make, the rest of what is next, the work under way, then what waits (folded). */
-function Actions({ ready, entries, model }: { ready: Ready; entries: Entries; model: SummaryModel }) {
+function Actions({ ready, entries, model, owned }: { ready: Ready; entries: Entries; model: SummaryModel; owned: MineEntry[] }) {
   const status = ready.journey.header.status;
   const actions = status !== "archived";
   // A completed or archived journey lists what it left, not what to do next.
@@ -293,7 +290,7 @@ function Actions({ ready, entries, model }: { ready: Ready; entries: Entries; mo
     rows.length === 0 ? null : <EntriesPanel ready={ready} title={title} testId={testId} entries={rows} actions={more.acts === true && actions} folded={more.fold === true} open={open} />;
   return (
     <div className="summary-main stack">
-      {status === "active" ? <Yours ready={ready} entries={entries.yours} actions={actions} /> : null}
+      {status === "active" ? <Yours ready={ready} entries={entries.yours} owned={owned} actions={actions} /> : null}
       {panel(closed ? "Open decisions" : "Decide now", "summary-decide", entries.decide, { acts: true })}
       {panel(closed ? "Ready or active" : "Next up", "summary-next", entries.nextUp, { acts: true })}
       {panel("In progress", "summary-underway", entries.underWay)}
@@ -308,15 +305,17 @@ function Actions({ ready, entries, model }: { ready: Ready; entries: Entries; mo
 export function SummaryPage({ ready, note }: { ready: Ready; note?: ReactNode }) {
   const read = useProjected(ready, { projection: "status_summary" });
   const next = useProjected(ready, { projection: "next" });
-  const { viewer } = useViewer();
+  const mine = useMineOf(ready.journey.header.id);
   const status = ready.journey.header.status;
   const summary = valueOf(read);
   const frontier = valueOf(next)?.items;
-  if (isEmpty(ready) || summary === undefined || frontier === undefined) {
-    return <Waiting ready={ready} error={errorWords(read) ?? errorWords(next)} />;
+  if (isEmpty(ready) || summary === undefined || frontier === undefined || mine.status !== "ready") {
+    return <Waiting ready={ready} error={errorWords(read) ?? errorWords(next) ?? (mine.status === "failed" ? mine.message : undefined)} />;
   }
+  // E4, C18: "yours" is the engine's "mine", the entries where the viewer's entities own it.
+  const owned = mine.entries.filter((entry) => entry.kinds.includes("k_owner"));
   const model = summaryModel(ready, summary);
-  const entries = entriesOf(ready, model, frontier, viewer?.entities ?? []);
+  const entries = entriesOf(ready, model, frontier, new Set(owned.map((entry) => entry.node)));
   return (
     <div className="summary rows-page" data-testid="summary" data-status={status} data-rows-page tabIndex={-1}>
       <div className="summary-body stack">
@@ -325,7 +324,7 @@ export function SummaryPage({ ready, note }: { ready: Ready; note?: ReactNode })
           <EntriesPanel ready={ready} title="Needs attention" testId="summary-attention" entries={entries.attention} actions={false} bright foot={<NeedsLook ready={ready} model={model} />} />
         )}
         <div className="summary-grid">
-          <Actions ready={ready} entries={entries} model={model} />
+          <Actions ready={ready} entries={entries} model={model} owned={owned} />
           <Context ready={ready} entries={entries} model={model} archived={status === "archived"} />
         </div>
       </div>

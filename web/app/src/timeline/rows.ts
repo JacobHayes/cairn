@@ -12,10 +12,11 @@
 import type { RouteSchedule, ScheduleEntry } from "@cairn/wasm";
 
 import { childrenOf, nodesByPath, titleIn, type Tree } from "../authoring/graph.ts";
-import { nodeOf, recordOf, type GraphNode, type NodeKind, type Ready } from "../detail/model.ts";
+import { nodeOf, recordOf, waitsOn, type GraphNode, type NodeKind, type Ready } from "../detail/model.ts";
 import { snoozeWords } from "../status/snooze.ts";
-import { ancestorsOf, planOrder, rollups, treeOf } from "../plan/tree.ts";
-import { dateWords, daysUntil, daysWords, dueWords, originWord } from "../status/when.ts";
+import { ancestorsOf, planOrder, treeOf } from "../plan/tree.ts";
+import { isFinished } from "../status/state.ts";
+import { dateWords, daysWords, dueWords, originWord } from "../status/when.ts";
 import { upperFirst, type DisplayState } from "../status/words.ts";
 import { dayOf, dayWords, type DateOrigin, type Timeline, type TimelineEntry } from "./model.ts";
 import { NODE_GONE } from "../ui/gone.ts";
@@ -122,7 +123,7 @@ function wordsOf(view: Ready, node: GraphNode, own: Own | undefined, progress: C
   const finished = recordOf(view, node).finished_on ?? undefined;
   switch (own.shape) {
     case "milestone":
-      return late > 0 ? `${daysWords(late)} late` : own.origin === "actual" ? `Reached ${dateWords(own.to, today)}` : `${upperFirst(originWord(own.origin ?? "due"))} ${dateWords(own.to, today)}`;
+      return late > 0 ? `${daysWords(late)} late` : view.derived.nodes[node.key]?.display_state === "done" ? `Reached ${dateWords(own.to, today)}` : `${upperFirst(originWord(own.origin ?? "due"))} ${dateWords(own.to, today)}`;
     case "decision":
       return finished !== undefined && own.entry === undefined ? `Decided ${dateWords(finished, today)}` : dueWords(own.to, today, true);
     default:
@@ -208,8 +209,6 @@ function treeOfRows(view: Ready, dated: Dated, drawn: ChartOptions["drawn"]): Ma
 /** The rows the level draws, a folded or step-limited container as one bar. */
 function rowsOf(view: Ready, dated: Dated, options: ChartOptions): ChartRow[] {
   const { entries, owns, spans, scopedChildren } = dated;
-  const rolls = rollups(view);
-  const today = view.derived.today;
   const children = treeOfRows(view, dated, options.drawn);
   const rows: ChartRow[] = [];
   const visit = (key: string, depth: number, guides: boolean[]) => {
@@ -223,8 +222,9 @@ function rowsOf(view: Ready, dated: Dated, options: ChartOptions): ChartRow[] {
     const container = scopedChildren(key).length > 0;
     const open = kids.length > 0 && options.open(key);
     const own = container ? undefined : owns.get(key);
-    const progress = container ? rolls.get(key) : undefined;
-    const late = entries.get(key)?.overdue === true && own !== undefined ? Math.max(0, -daysUntil(own.to, today)) : 0;
+    const progress = container ? (derived.progress ?? undefined) : undefined;
+    // A container's span is not coloured late, only its own dated item.
+    const late = own === undefined ? 0 : (derived.dates.overdue_days ?? 0);
     const shortfallDays = entries.get(key)?.shortfall_days ?? undefined;
     const snoozed = snoozeWords(view, derived);
     rows.push({
@@ -286,11 +286,12 @@ function selectionOf(view: Ready, rows: ChartRow[], selected: string): { row: st
   }
   // What a node needs: the requirements it names, and what still holds it (inherited, condition gates).
   const nodes = view.journey.graph.nodes ?? [];
+  // What a node holds directly: the requirements it names and its own non-containment gates.
   const holds = (key: string): string[] => [
     ...(nodes.find((each) => each.key === key)?.requires ?? []),
     ...(view.derived.nodes[key]?.blocked_by ?? []).filter((blocker) => blocker.via !== "containment").map((blocker) => blocker.node),
   ];
-  for (const need of holds(selected)) {
+  for (const need of [...(nodes.find((each) => each.key === selected)?.requires ?? []), ...waitsOn(view, selected).map((held) => held.node)]) {
     draw(rowFor(need), row, "needs");
   }
   for (const { key } of nodes) {
@@ -331,7 +332,7 @@ export function chartOf(view: Ready, timeline: Timeline, options: ChartOptions):
     if (key === options.selected && !rows.some((row) => row.key === key)) {
       return true;
     }
-    return drawn.has(key) && dated.inScope(key) && dateless && state !== "done" && state !== "skipped";
+    return drawn.has(key) && dated.inScope(key) && dateless && (state === undefined || !isFinished(state));
   });
   return {
     rows,

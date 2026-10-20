@@ -6,6 +6,7 @@
 // unit tests check it without a page.
 import type { Ready } from "../detail/model.ts";
 import { planOrder, treeOf } from "../plan/tree.ts";
+import { isOpen } from "../status/state.ts";
 import { LIST_COLUMNS, type ListColumn, type ListSettings, type SortBy } from "./address.ts";
 import type { NodeRow } from "./why.ts";
 
@@ -122,22 +123,8 @@ export function flatLines(view: Ready, rows: readonly NodeRow[], sort: SortBy | 
   const snoozed = (row: NodeRow) => sort !== undefined && row.display_state === "snoozed";
   const planned = sort === undefined ? [...rows].sort((left, right) => (order.get(left.key) ?? 0) - (order.get(right.key) ?? 0)) : rows;
   const ordered = [...planned.filter((row) => !snoozed(row)), ...planned.filter(snoozed)];
-  const over = (row: NodeRow) => (sort === "due" || sort === "slack") && ["done", "skipped", "not_relevant"].includes(row.display_state);
+  const over = (row: NodeRow) => (sort === "due" || sort === "slack") && !isOpen(view.derived.nodes[row.key]);
   return [...ordered.filter((row) => !over(row)), ...ordered.filter(over)].map((row) => ({ key: row.key, depth: 0, row, container: false, foldable: false, open: false, guides: [] }));
-}
-
-/**
- * C10: each ranked node's place in the journey's order, best first (`#1`). With `frontier` on it
- * is the acting frontier's own order, which the engine ties by slack, gravity and key; otherwise
- * every ranked node by rank, then key.
- */
-export function rankPositions(view: Ready, frontier = false): Map<string, number> {
-  if (frontier) {
-    return new Map(view.derived.acting_frontier.map((key, at) => [key, at + 1]));
-  }
-  const ranked = Object.entries(view.derived.nodes).flatMap(([key, derived]) => (derived.rank == null ? [] : [{ key, rank: derived.rank }]));
-  ranked.sort((left, right) => right.rank - left.rank || (left.key < right.key ? -1 : 1));
-  return new Map(ranked.map(({ key }, at) => [key, at + 1]));
 }
 
 /** Whether node `key` holds other nodes. */

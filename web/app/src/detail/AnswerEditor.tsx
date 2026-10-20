@@ -19,7 +19,7 @@ import { choiceId, choiceLabel } from "../status/answer.ts";
 import { Button, Field } from "../ui/kit.tsx";
 import { Markdown } from "../ui/markdown.tsx";
 import { effectOf, effectOfOption, outgoing, sameAnswer } from "./answer.ts";
-import { answerable, guardBypass, isBlocked, nodeOf, type AnswerValue, type GraphNode, type NodeDetail, type Ready } from "./model.ts";
+import { answerable, failingGuards, guardBypass, nodeOf, type AnswerValue, type GraphNode, type NodeDetail, type Ready } from "./model.ts";
 import { EntityOptions, NodeLink, Rationale } from "./parts.tsx";
 import { useSavePreview } from "./preview.ts";
 import { bypassReady, Rejected } from "./Rejected.tsx";
@@ -390,7 +390,7 @@ function useAnswerForm(view: Ready, detail: NodeDetail, anyway: Anyway | undefin
   const caused = useSavePreview(view, mutations);
   const bypass = anyway?.reason;
   const newAnswer = form.draft !== undefined && !sameAnswer(form.draft.value, stored);
-  const blocked = isBlocked(detail.derived, view);
+  const blocked = failingGuards(detail.derived).includes("deps_done");
   const canSave = sending !== undefined && !write.disabled && (!blocked || (bypass !== undefined && bypassReady(bypass)));
   const close = () => {
     setNamed(undefined);

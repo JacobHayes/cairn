@@ -9,17 +9,22 @@
 //! Cost at `node_count_max`: per node, its gravity contributors are listed from its downstream
 //! set (at most 2,000) and cut to 50, its blockers off its entry chains (about 1,300 edges at
 //! most), and its dates' chains; so about 2,000 x 3,300 steps, and 2,000 x 100 explanation
-//! entries kept.
+//! entries kept; plus one pass over the tree for container progress (O(nodes)), and per node
+//! its waits (the same entry-chain walk) and failing guards (a lookup, or one walk of the
+//! entry chains for a node whose `deps_done` fails).
 
 use std::collections::{BTreeMap, BTreeSet};
 
 use cairn_schema::{
-    Contribution, EffectiveParticipation, Explained, KindKey, NodeDerived, NodeKey, Real,
-    RelevanceExplanation,
+    Blocker, Contribution, DependencyVia, EffectiveParticipation, Explained, Guard, GuardFailure,
+    KindKey, NodeDerived, NodeKey, NodeKind, Progress, Real, Relevance, RelevanceExplanation,
+    State,
 };
 
-use super::Derived;
+use super::dependencies::EdgeSet;
 use super::relevance::Producer;
+use super::stale::{Annotated, annotated_nodes, static_failures};
+use super::{Derived, held_by, stored_state};
 use crate::graph::Graph;
 
 impl Derived {
@@ -33,12 +38,20 @@ impl Derived {
     /// When `graph` is not the one derived.
     #[must_use]
     pub fn to_schema(&self, graph: &Graph) -> cairn_schema::Derived {
+        let mut progress = self.progress(graph);
+        let annotated = annotated_nodes(graph.document());
         let nodes: BTreeMap<NodeKey, NodeDerived> = graph
             .document()
             .nodes
             .as_map()
             .keys()
-            .map(|key| (key.clone(), self.node_derived(graph, key)))
+            .map(|key| {
+                let progress = progress.remove(key);
+                (
+                    key.clone(),
+                    self.node_with(graph, key, progress, &annotated),
+                )
+            })
             .collect();
         assert_eq!(
             nodes.len(),
@@ -63,10 +76,28 @@ impl Derived {
     /// When `graph` is not the one derived, or does not hold `key`.
     #[must_use]
     pub fn node_derived(&self, graph: &Graph, key: &NodeKey) -> NodeDerived {
+        let progress = self.progress(graph).remove(key);
+        self.node_with(graph, key, progress, &annotated_nodes(graph.document()))
+    }
+
+    /// [`Derived::node_derived`] with the shared reads done once by the caller.
+    fn node_with(
+        &self,
+        graph: &Graph,
+        key: &NodeKey,
+        progress: Option<Progress>,
+        annotated: &Annotated<'_>,
+    ) -> NodeDerived {
         let blocking = &self.blocking;
         let priority = &self.priority;
+        let waits_on = self.waits_on(graph, key);
+        let waits_total = waits_on.len();
+        let waits_on = Explained::complete(waits_on)
+            .unwrap_or_else(|error| panic!("{error}"))
+            .for_response();
+        assert_eq!(usize::try_from(waits_on.total).ok(), Some(waits_total));
         NodeDerived {
-            relevance: self.relevance_explanation(key),
+            relevance: self.relevance_explanation(graph, key),
             display_state: self.display_state(graph, key),
             effectively_skipped: self.skips.skipped_by(key).is_some(),
             blocked_by: self.blocked_by(key),
@@ -78,6 +109,10 @@ impl Derived {
             stale: self.stale(graph, key),
             overdue: self.dates.overdue(key),
             dates: self.dates.node(graph, key),
+            progress,
+            failing_guards: self.failing_guards(graph, key, annotated),
+            started_early: self.started_early(graph, key),
+            waits_on,
             auto_reached: blocking.auto_reached(key),
             snoozed: blocking.snoozed(key).cloned(),
             snoozed_via: blocking.snoozed_via(key).cloned(),
@@ -98,7 +133,7 @@ impl Derived {
     /// C8: the relevance value and what produced it: the node whose condition or force
     /// include decided it, when not the node itself, and the decisions a condition read; D8:
     /// the undecided decisions a `not_relevant` value is pending on.
-    fn relevance_explanation(&self, key: &NodeKey) -> RelevanceExplanation {
+    fn relevance_explanation(&self, graph: &Graph, key: &NodeKey) -> RelevanceExplanation {
         let Some(found) = self.relevance.get(key) else {
             panic!("the graph derived holds {key}");
         };
@@ -114,7 +149,104 @@ impl Derived {
             decisions,
             forced,
             pending_on: found.pending_on.clone(),
+            unanswered: if found.value == Relevance::Undecided {
+                self.unanswered(graph, key)
+            } else {
+                BTreeSet::new()
+            },
         }
+    }
+
+    /// D8: stored `active` while its own or an inherited gate is unsatisfied (a container's
+    /// children are not a gate); an undecided node held only by its own condition gate counts,
+    /// since an undecided gate blocks like an open one.
+    fn started_early(&self, graph: &Graph, key: &NodeKey) -> bool {
+        let Some(node) = graph.node(key) else {
+            panic!("the graph holds {key}");
+        };
+        stored_state(graph.document(), node) == State::Active
+            && self.relevance.in_scope(key)
+            && !self.blocking.closed(key)
+            && self.waiting(graph, key)
+    }
+
+    /// D4: the bypassable guards the node's completing transition would fail if attempted
+    /// now with no bypass in the patch: completing a deliverable or action, answering an open
+    /// decision, reaching a pending milestone. Empty for any other node, and for one out of
+    /// scope or closed. A bypass recorded by an earlier patch removes nothing: apply accepts
+    /// only a bypass in the same patch. `annotated` is [`annotated_nodes`] of `graph`.
+    fn failing_guards(
+        &self,
+        graph: &Graph,
+        key: &NodeKey,
+        annotated: &Annotated<'_>,
+    ) -> BTreeSet<Guard> {
+        let document = graph.document();
+        let Some(node) = graph.node(key) else {
+            panic!("the graph holds {key}");
+        };
+        let completes = matches!(
+            (node.kind(), stored_state(document, node)),
+            (
+                NodeKind::Deliverable | NodeKind::Action,
+                State::Todo | State::Active
+            ) | (NodeKind::Decision, State::Open)
+                | (NodeKind::Milestone, State::Pending)
+        );
+        let mut guards = BTreeSet::new();
+        if !completes || !self.relevance.in_scope(key) || self.blocking.closed(key) {
+            return guards;
+        }
+        if !self.blocking.deps_done(key) && !self.guard_open_dependencies(key).is_empty() {
+            guards.insert(Guard::DepsDone);
+        }
+        guards.extend(
+            static_failures(document, graph.tree(), node, annotated)
+                .iter()
+                .map(GuardFailure::guard),
+        );
+        guards
+    }
+
+    /// Gating, D8: the unsatisfied gate dependencies holding the node now, its own and those
+    /// it inherits (its children aside), one per dependency node, with how the nearest holder
+    /// makes it: its own first, then the nearest ancestor's, then by key. Empty when the node
+    /// is not blocked.
+    fn waits_on(&self, graph: &Graph, key: &NodeKey) -> Vec<Blocker> {
+        if !self.blocking.blocked(key) {
+            return Vec::new();
+        }
+        let mut distance: BTreeMap<&NodeKey, u32> = BTreeMap::new();
+        let mut ancestor = graph.tree().parent(key);
+        let mut steps = 1u32;
+        while let Some(above) = ancestor {
+            distance.insert(above, steps);
+            steps += 1;
+            ancestor = graph.tree().parent(above);
+        }
+        // Own dependencies are nearest (0); an ancestor's, by how far up it is.
+        let nearness = |blocker: &Blocker| {
+            held_by(&blocker.via).map_or(0, |holder| {
+                if holder == key {
+                    0
+                } else {
+                    distance.get(holder).copied().unwrap_or(u32::MAX)
+                }
+            })
+        };
+        let mut held: Vec<(u32, Blocker)> = self
+            .unsatisfied(self.dependencies.of(key, EdgeSet::Pruned))
+            .filter(|blocker| blocker.via != DependencyVia::Containment)
+            .map(|blocker| (nearness(&blocker), blocker))
+            .collect();
+        held.sort_by(|left, right| {
+            (left.0, &left.1.node, &left.1.via).cmp(&(right.0, &right.1.node, &right.1.via))
+        });
+        // The nearest holder keeps a dependency that several of them hold.
+        let mut seen = BTreeSet::new();
+        held.into_iter()
+            .filter_map(|(_, blocker)| seen.insert(blocker.node.clone()).then_some(blocker))
+            .collect()
     }
 
     /// E2: the node's effective participation of each kind that resolves to something.

@@ -3,11 +3,10 @@
 import { describe, expect, it } from "vitest";
 
 import { actingView } from "./acting.test-support.ts";
-import { containerKeys, rollups } from "../plan/tree.ts";
-import type { DisplayState } from "../status/words.ts";
+import { containerKeys } from "../plan/tree.ts";
 import { planOrder } from "../plan/tree.ts";
 import type { ListSettings } from "./address.ts";
-import { addableColumns, columnsOf, firstParagraph, flatLines, rankPositions, treeLines } from "./listModel.ts";
+import { addableColumns, columnsOf, firstParagraph, flatLines, treeLines } from "./listModel.ts";
 import type { NodeRow } from "./why.ts";
 
 const view = actingView();
@@ -32,16 +31,6 @@ const containers = containerKeys(view.journey.graph.nodes ?? []);
 /** The fixture's level at All: every node drawn under its parent. */
 const level = [{ key: "n_stage" }, { key: "n_inner", parent: "n_stage" }, { key: "n_work" }];
 const STOCK: ListSettings = { sort: undefined, columns: [] };
-
-describe("rank positions", () => {
-  it("follow the engine's own order of the acting frontier when Frontier is on, whatever the keys and the scores say", () => {
-    const frontier = actingView();
-    frontier.derived.acting_frontier = ["n_work", "n_inner"];
-    expect([...rankPositions(frontier, true)]).toEqual([["n_work", 1], ["n_inner", 2]]);
-    frontier.derived.acting_frontier = ["n_inner", "n_work"];
-    expect([...rankPositions(frontier, true)]).toEqual([["n_inner", 1], ["n_work", 2]]);
-  });
-});
 
 describe("the columns", () => {
   it("put Rank first only for a sort by rank, once, wherever Columns added it", () => {
@@ -110,19 +99,6 @@ describe("the lines", () => {
     const over = [{ ...row("n_done"), display_state: "done" as const }, row("n_work")];
     expect(keysOf(flatLines(view, over, "due"))).toEqual(["n_work", "n_done"]);
     expect(keysOf(flatLines(view, [row("n_work"), row("n_later"), row("n_inner", ["n_stage"]), row("n_wait")], undefined))).toEqual(["n_inner", "n_later", "n_wait", "n_work"]);
-  });
-
-  it("roll a container up over the leaves that count: a decision still to answer is one to decide, a finished leaf done", () => {
-    const showing = (state: DisplayState) => {
-      const copy = structuredClone(view);
-      const node = copy.derived.nodes["n_inner"];
-      if (node !== undefined) {
-        node.display_state = state;
-      }
-      return rollups(copy).get("n_stage");
-    };
-    expect(showing("ready")).toEqual({ done: 0, total: 1, overdue: 0, toDecide: 1 });
-    expect(showing("done")).toEqual({ done: 1, total: 1, overdue: 0, toDecide: 0 });
   });
 });
 

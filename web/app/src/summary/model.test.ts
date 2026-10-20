@@ -20,7 +20,7 @@ function summaryJourney(): Ready {
     throw new Error("the test journey lost a node");
   }
   findings.overdue = true;
-  findings.dates = { due: { date: "2026-10-01", chain: { constraints: [] } } };
+  findings.dates = { due: { date: "2026-10-01", chain: { constraints: [] } }, overdue_days: 5 };
   report.stale = ["missing_artifact", { open_dependency: "n_findings" }];
   report.dates.shortfall = { chain: { constraints: [] }, shortfall_days: 3 };
   meeting.participations = { k_owner: { entities: ["e_two"], origin: "explicit" } };

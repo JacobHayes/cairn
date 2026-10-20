@@ -5,10 +5,11 @@
 import { describe, expect, it } from "vitest";
 
 import { actingView } from "../acting/acting.test-support.ts";
+import { canvasView } from "../canvas/canvas.test-support.ts";
 import { collapsedAt, drawnStep, kindsAt } from "../canvas/ladder.ts";
 import { STEPS, type Level, type Step } from "../canvas/model.ts";
 import type { GraphNode } from "../detail/model.ts";
-import { badgesOf, depthFaded, journeyLayoutView, levelRequestOf, lightsUp, litOf, outOfFocus, selectedRequest, stepHides, tableQueryOf, walkQueryOf } from "./requests.ts";
+import { badgesOf, currentStagesOf, depthFaded, journeyLayoutView, levelRequestOf, lightsUp, litOf, outOfFocus, selectedRequest, stepHides, tableQueryOf, walkQueryOf } from "./requests.ts";
 import { DEFAULT_FILTER, DEFAULT_VIEW_STATE, type ViewState } from "./view.ts";
 
 const view = actingView();
@@ -242,5 +243,21 @@ describe("the badges", () => {
     // At Stages a top-level decision is left out with what is beneath it.
     expect(stepHides(nodes, "stages", [])("n_pick")).toBe(true);
     expect(stepHides(nodes, "stages", [])("n_inner")).toBe(false);
+  });
+});
+
+describe("the current stages (C2)", () => {
+  it("count the work the engine shows active, so work skipped through its container does not make a stage current", () => {
+    const ready = canvasView();
+    ready.derived.acting_frontier = [];
+    expect(currentStagesOf(ready).has("n_stage")).toBe(true);
+    // The engine shows a skipped container's whole subtree skipped, whatever each node stored.
+    for (const key of ["n_stage", "n_build", "n_check"]) {
+      const found = ready.derived.nodes[key];
+      if (found !== undefined) {
+        ready.derived.nodes[key] = { ...found, display_state: "skipped" };
+      }
+    }
+    expect(currentStagesOf(ready).has("n_stage")).toBe(false);
   });
 });

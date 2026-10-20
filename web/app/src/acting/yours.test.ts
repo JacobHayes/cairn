@@ -31,7 +31,7 @@ describe("what is open for the viewer", () => {
         found[key] = { ...was, ...change };
       }
     };
-    set("n_later", { auto_reached: true });
+    set("n_later", { auto_reached: true, display_state: "done" });
     const entries = holds("n_stage", "n_gone", "n_done", "n_later", "n_inner");
     expect(["n_stage", "n_gone", "n_done", "n_later", "n_inner"].filter((key) => openForViewer(view, key))).toEqual(["n_inner"]);
     // The line for work that is all waiting names what is open, never one of the others.

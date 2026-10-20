@@ -11,8 +11,8 @@ use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
 use crate::derived::{
-    Blocker, Contribution, DateOrigin, DisplayState, EffectiveDate, HeldDependent, Real, Relevance,
-    Score, Stalled,
+    Blocker, Contribution, DateOrigin, DisplayState, EffectiveDate, HeldDependent, Progress, Real,
+    Relevance, Score, Stalled,
 };
 use crate::event::Event;
 use crate::id::{EntityKey, KindKey, NodeKey, PatchId, Path, RoleKey, Slug};
@@ -141,9 +141,9 @@ pub struct RollUp {
     /// Every relevant child that is not done is blocked (`all_blocked`), and there is one.
     #[serde(default, skip_serializing_if = "crate::serde_util::is_false")]
     pub all_blocked: bool,
-    /// A child decision is actionable: "decision needed".
-    #[serde(default, skip_serializing_if = "crate::serde_util::is_false")]
-    pub decision_needed: bool,
+    /// C2, C4: the container's progress over the work beneath it, whole subtree; "decision
+    /// needed" is `progress.decisions_needed > 0`.
+    pub progress: Progress,
     /// A child needs breakdown.
     #[serde(default, skip_serializing_if = "crate::serde_util::is_false")]
     pub needs_breakdown: bool,
@@ -797,6 +797,10 @@ pub struct Snapshot {
     /// The stalled diagnostic, when the journey is stalled.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub stalled: Option<Stalled>,
+    /// B11: completing the journey is suggested (see `StatusSummary`); completing it is the
+    /// person's call.
+    #[serde(default, skip_serializing_if = "crate::serde_util::is_false")]
+    pub completion_suggested: bool,
     /// The counts.
     pub counts: SnapshotCounts,
 }
@@ -1050,6 +1054,10 @@ pub struct StatusSummary {
     /// Open, in-scope decisions with their owners, in rank order.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub open_decisions: Vec<OpenDecision>,
+    /// B11: the journey has a node and none in scope is left open, or its final milestone
+    /// is reached (stored or auto-reached).
+    #[serde(default, skip_serializing_if = "crate::serde_util::is_false")]
+    pub completion_suggested: bool,
 }
 
 /// A10, G3: one piece of a rendered message draft.

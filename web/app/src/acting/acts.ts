@@ -33,22 +33,10 @@ export function selectionOf(view: Ready, keys: Iterable<string>): Facts[] {
   });
 }
 
-/** G2: whether a node has a link designated as its artifact. */
-export function hasArtifact(view: Ready, key: string): boolean {
-  return (view.journey.graph.state?.annotations ?? []).some((annotation) => annotation.body.node === key && "artifact" in annotation.body);
-}
-
-/** G4: whether a node has a note of its own: not a link, and not one on a child or the journey. */
-export function hasNote(view: Ready, key: string): boolean {
-  return (view.journey.graph.state?.annotations ?? []).some((annotation) => annotation.body.node === key && "note" in annotation.body);
-}
-
-/** What done needs added first: an artifact link (G2) and a note (G4), each only when the node requires it and has none. */
+/** What done needs added first, as the engine derived it: an artifact link (G2) and a note (G4), each only when the node requires it and has none. */
 export function missingEvidence(view: Ready, node: GraphNode): { artifact: boolean; note: boolean } {
-  return {
-    artifact: node.requires_artifact === true && !hasArtifact(view, node.key),
-    note: node.requires_note === true && !hasNote(view, node.key),
-  };
+  const guards = view.derived.nodes[node.key]?.failing_guards ?? [];
+  return { artifact: guards.includes("has_artifact"), note: guards.includes("has_note") };
 }
 
 /** What done adds before completing: an artifact link and a note, each with its new key. */

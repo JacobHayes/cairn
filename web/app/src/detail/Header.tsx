@@ -87,7 +87,7 @@ export function Header({ view, detail, rename, removeTo }: { view: Ready; detail
   const { node, record } = detail;
   const shown = detail.derived.display_state;
   // An unassigned node says so with the Assign control beside its meta line, not with a flag as well.
-  const flags = flagsOf(detail.derived, record.state).filter(({ flag }) => flag !== "unassigned");
+  const flags = flagsOf(detail.derived).filter(({ flag }) => flag !== "unassigned");
   return (
     <div className="stack detail-head" data-testid="detail-header">
       <div className="row detail-band">

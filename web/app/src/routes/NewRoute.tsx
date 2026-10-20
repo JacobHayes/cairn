@@ -3,12 +3,13 @@
 // first draft, then its draft's canvas), or a route file imported. A new one's id is a slug from
 // its name, editable (folded) before it is made, and unique in the deployment (the engine refuses
 // one in use) and not `new`, which the form's own address shadows.
+import { TITLE_BYTES_MAX } from "@cairn/client";
 import type { Schema } from "@cairn/client";
 import { Link, useNavigate, useSearchParams } from "react-router";
 
 import { isSlug, slugOf } from "../authoring/keys.ts";
 import { useDraft, writeDraft } from "../data/drafts.ts";
-import { TITLE_BYTES_MAX, overBytes } from "../authoring/limits.ts";
+import { overBytes } from "../authoring/limits.ts";
 import { RejectionView } from "../screens/RejectionView.tsx";
 import { WriteStatus } from "../screens/WriteStatus.tsx";
 import { useScreenWrite } from "../screens/write.ts";

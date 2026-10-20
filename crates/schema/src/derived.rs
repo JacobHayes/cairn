@@ -14,7 +14,7 @@ use crate::collections::{BoundedVec, ByDocumentSize, CollectionError};
 use crate::domain::{Deployment, Journey};
 use crate::id::{EntityKey, KindKey, NodeKey, RoleKey};
 use crate::limits::{EXPLANATION_ENTRY_COUNT_MAX, Limit, WEIGHT_MAX};
-use crate::state::{GuardFailure, SnoozeTarget};
+use crate::state::{Guard, GuardFailure, SnoozeTarget};
 use jiff::civil::Date;
 
 /// A node's relevance (Gating): three-valued.
@@ -54,6 +54,12 @@ pub struct RelevanceExplanation {
     /// and blocking follow Gating exactly; display state shows such a node as `conditional`.
     #[serde(default, skip_serializing_if = "BTreeSet::is_empty")]
     pub pending_on: BTreeSet<NodeKey>,
+    /// D4, Gating: for an undecided value, the decisions that make it undecided and can be
+    /// answered now: open, relevant, and not under a skip, read by a condition leaving it
+    /// undecided, its own or an ancestor's, up to a force include. Empty for any other
+    /// value (not the same as Gating's wider "unanswered").
+    #[serde(default, skip_serializing_if = "BTreeSet::is_empty")]
+    pub unanswered: BTreeSet<NodeKey>,
 }
 
 /// D8: the one state every surface shows for a node, composed from relevance, stored state,
@@ -261,11 +267,21 @@ impl<const MIN: u32, const MAX: u32> JsonSchema for Thousandths<MIN, MAX> {
     deny_unknown_fields,
     bound(serialize = "T: Serialize", deserialize = "T: Deserialize<'de>")
 )]
+#[schemars(rename = "Explained{T}")]
 pub struct Explained<T> {
     /// The entries, largest first.
     pub entries: BoundedVec<T, ByDocumentSize>,
     /// How many there are in all.
     pub total: u32,
+}
+
+impl<T> Default for Explained<T> {
+    fn default() -> Self {
+        Self {
+            entries: BoundedVec::default(),
+            total: 0,
+        }
+    }
 }
 
 impl<T> Explained<T> {
@@ -413,6 +429,10 @@ pub struct NodeDates {
     /// Latest start minus today; null is "no deadline".
     #[serde(skip_serializing_if = "Option::is_none")]
     pub slack_days: Option<i32>,
+    /// F6, D3: how many days its due is before today, for an overdue node; none when it is
+    /// not overdue.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub overdue_days: Option<u32>,
     /// The plan can no longer be met (F6).
     #[serde(skip_serializing_if = "Option::is_none")]
     pub shortfall: Option<ShortChain>,
@@ -443,6 +463,24 @@ pub struct EffectiveParticipation {
     pub entities: BTreeSet<EntityKey>,
     /// Where it comes from.
     pub origin: ParticipationOrigin,
+}
+
+/// C2, C4: a container's progress over the work beneath it, counted over every proper
+/// descendant that is an item: not a group, in scope (relevant or undecided), and neither
+/// skipped nor skipped through a container. A kept node under a skipped container, and a
+/// force-included node under a not-relevant one, count on their own terms. Derived on every
+/// read in one pass over the tree, O(nodes).
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+#[serde(deny_unknown_fields)]
+pub struct Progress {
+    /// Items whose display state is `done` (finished, decided, reached, or auto-reached).
+    pub done: u32,
+    /// Items.
+    pub total: u32,
+    /// Items that are overdue (D3).
+    pub overdue: u32,
+    /// Decisions among the items that are actionable now (D2), snoozed ones included.
+    pub decisions_needed: u32,
 }
 
 /// Every D3 value for one node, with the inputs that explain it. The flags are D3's own,
@@ -490,6 +528,27 @@ pub struct NodeDerived {
     pub overdue: bool,
     /// Dates.
     pub dates: NodeDates,
+    /// C2, C4: a container's progress over the work beneath it; none for a node with no
+    /// children.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub progress: Option<Progress>,
+    /// D4: the bypassable guards its completing transition (complete a deliverable or
+    /// action, answer an open decision, reach a pending milestone) would fail if attempted
+    /// now with no bypass in the patch. Empty for every node with no such transition left:
+    /// finished, not relevant, or a group.
+    #[serde(default, skip_serializing_if = "BTreeSet::is_empty")]
+    pub failing_guards: BTreeSet<Guard>,
+    /// D8: stored `active` while its own or an inherited gate is unsatisfied; a container's
+    /// children are not a gate.
+    #[serde(default, skip_serializing_if = "crate::serde_util::is_false")]
+    pub started_early: bool,
+    /// Gating, D8: the unsatisfied gate dependencies that hold the node now, its own and
+    /// those it inherits through its ancestors (requirements, conditions, openings), its
+    /// children aside; one entry per dependency, its nearest holder's; empty when nothing
+    /// holds it. `blocked_by` and `blocked_through` explain the structure; this answers
+    /// "what does it wait on".
+    #[serde(default)]
+    pub waits_on: Explained<Blocker>,
     /// A pending auto-reach milestone that reads as reached (F1).
     #[serde(default, skip_serializing_if = "crate::serde_util::is_false")]
     pub auto_reached: bool,

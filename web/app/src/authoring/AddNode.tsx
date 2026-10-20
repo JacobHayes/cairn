@@ -3,11 +3,12 @@
 // unique among its siblings (Identity and references). A new decision asks its title as a
 // yes-or-no question until its form changes the answer type. In a journey it is local (B4).
 // The new node opens in its form once it lands.
+import { NODE_COUNT_MAX, TITLE_BYTES_MAX } from "@cairn/client";
 import { useDraft } from "../data/drafts.ts";
 import { wrapRoots } from "../segments/model.ts";
 import { Button, Field } from "../ui/kit.tsx";
 import { KINDS, canHoldChildren, childrenOf, kindOption, newNode, nodesByPath, pathOf, type GraphNode, type NodeKind } from "./graph.ts";
-import { NODE_COUNT_MAX, TITLE_BYTES_MAX, overBytes } from "./limits.ts";
+import { overBytes } from "./limits.ts";
 import { Picker } from "./parts.tsx";
 import { Refusal } from "./StructureEditors.tsx";
 import { domainOf, type Authored } from "./target.ts";

@@ -12,11 +12,12 @@
 // in its title or, inside the Filter, under it. State shows as a fixed-size badge on the control,
 // with the words in its tooltip, so no control changes width; a Filter off its stock settings is
 // pressed.
+import { TITLE_BYTES_MAX } from "@cairn/client";
 import { useState, type ReactNode } from "react";
 import { useLocation } from "react-router";
 
 import { Check, FlagChecks } from "../acting/Controls.tsx";
-import { overBytes, TITLE_BYTES_MAX } from "../authoring/limits.ts";
+import { overBytes } from "../authoring/limits.ts";
 import { STEP_WORDS, stepOf, stepsFor } from "../canvas/ladder.ts";
 import type { Step } from "../canvas/model.ts";
 import type { GraphNode, Ready } from "../detail/model.ts";

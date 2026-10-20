@@ -3,7 +3,7 @@
 // nothing is fetched for it). It mirrors the server's node detail (crates/service
 // projections, `detail`) field for field, plus the decisions that drive the node's values
 // (E3), which the panel routes edits through.
-import type { Schema } from "@cairn/client";
+import { INITIAL_STATE, MOVES_FROM, TERMINAL_STATES, type Move as EngineMove, type Schema } from "@cairn/client";
 
 import type { JourneyView } from "../data/journeys.ts";
 import type { DisplayState } from "../status/words.ts";
@@ -18,6 +18,7 @@ export type NodeDerived = Schema<"NodeDerived">;
 export type Annotation = Schema<"Annotation">;
 export type AnswerValue = Schema<"AnswerValue">;
 export type Mutation = Schema<"Mutation">;
+export type Guard = Schema<"Guard">;
 
 /** One child in a node's checklist. */
 export interface Child {
@@ -53,15 +54,6 @@ export interface NodeDetail {
   /** E3: the `feeds_milestone` decision that pins this milestone, if any. */
   fedBy: GraphNode | undefined;
 }
-
-/** D1: each kind's initial state, which a node with no stored state is in. */
-export const INITIAL_STATE: Record<NodeKind, State> = {
-  deliverable: "todo",
-  action: "todo",
-  decision: "open",
-  milestone: "pending",
-  group: "derived",
-};
 
 /**
  * Each journey's nodes by key, built once per document's node list (a document is never
@@ -158,28 +150,7 @@ export function guardBypass(node: string, guards: Schema<"Guard">[], reason: str
 }
 
 /** A transition by name (D1); answering a decision is its own mutation. */
-export type Move = "start" | "stop" | "complete" | "skip" | "reopen" | "reach";
-
-/** D1: the states each kind's moves leave from (crates/engine `transition::rows`). */
-const MOVES_FROM: Record<NodeKind, Partial<Record<Move, State[]>>> = {
-  deliverable: {
-    start: ["todo"],
-    stop: ["active"],
-    complete: ["todo", "active"],
-    skip: ["todo", "active"],
-    reopen: ["done", "skipped"],
-  },
-  action: {
-    start: ["todo"],
-    stop: ["active"],
-    complete: ["todo", "active"],
-    skip: ["todo", "active"],
-    reopen: ["done", "skipped"],
-  },
-  decision: { skip: ["open"], reopen: ["decided", "skipped"] },
-  milestone: { reach: ["pending"], skip: ["pending"], reopen: ["reached", "skipped"] },
-  group: { skip: ["derived"], reopen: ["skipped"] },
-};
+export type Move = Exclude<EngineMove, "answer">;
 
 const MOVE_ORDER: Move[] = ["start", "stop", "complete", "reach", "skip", "reopen"];
 
@@ -190,7 +161,7 @@ export function movesFrom(kind: NodeKind, state: State): Move[] {
 
 /** D1: whether a decision in `state` can be answered (a first answer or a revision). */
 export function answerable(kind: NodeKind, state: State): boolean {
-  return kind === "decision" && (state === "open" || state === "decided");
+  return MOVES_FROM[kind].answer?.includes(state) === true;
 }
 
 /** The transition mutation for `move` on `node`; a skip carries its reason (D1). */
@@ -201,94 +172,81 @@ export function transition(node: string, move: Move, reason = ""): Mutation {
   return { op: "transition", node, transition: move };
 }
 
-/** D1: the states a node is finished in; a group's `derived` is not one. */
-const TERMINAL: State[] = ["done", "skipped", "decided", "reached"];
-
 /** D1: whether a node in `state` is finished (done, skipped, decided, reached). */
 export function isTerminal(state: State): boolean {
-  return TERMINAL.includes(state);
+  return TERMINAL_STATES.includes(state);
+}
+
+/** D4: the guards the node's completing transition would fail now, as the engine derived them. */
+export function failingGuards(derived: NodeDerived): Guard[] {
+  return derived.failing_guards ?? [];
 }
 
 /**
- * Gating, Blocked: a node in scope and not finished with an unsatisfied dependency of its own
- * or through an ancestor. A finished or not-relevant node's `blocked_by` lists what it still
- * holds back beneath it, which does not block it. It names the gates held, not the state a
- * person reads: that is the node's display state (D8), where a container is never blocked by
- * its own children. An undecided node's condition gates, its own and its ancestors', are not
- * ones a transition waits on: finishing undecided work is accepted with a warning (D4); every
- * other gate still holds it. Without the view, an ancestor's gates are taken as held.
+ * Gating, D8: a dependency the node waits on: what it is, how it arose, and the ancestor holding
+ * it for the node, if one does.
  */
-export function isBlocked(derived: NodeDerived, view?: Ready): boolean {
-  const inScope = derived.relevance.value !== "not_relevant";
-  const finished = derived.display_state === "done" || derived.display_state === "skipped";
-  const undecided = derived.relevance.value === "undecided";
-  const holds = (blockers: NodeDerived["blocked_by"]) => (blockers ?? []).some((blocker) => !undecided || typeof blocker.via !== "object" || !("condition" in blocker.via));
-  // An ancestor's own gates hold what is beneath it; what it waits on for its children does not.
-  const through = (derived.blocked_through ?? []).some((ancestor) => {
-    const found = view?.derived.nodes[ancestor];
-    return found === undefined || holds(found.blocked_by?.filter((blocker) => blocker.via !== "containment"));
+export interface Holding {
+  node: string;
+  via: Schema<"DependencyVia">;
+  holder: string | undefined;
+}
+
+/**
+ * Gating, D8: what the node waits on, as the engine derived it: its own unsatisfied requirements,
+ * condition gates and stage opening, then those its ancestors hold for it, nearest first, each
+ * once. What it contains does not hold it.
+ */
+export function waitsOn(view: Ready, key: string): Holding[] {
+  return (view.derived.nodes[key]?.waits_on.entries ?? []).map((blocker) => {
+    const via = blocker.via;
+    const holder = typeof via !== "object" ? undefined : "inherited" in via ? via.inherited.ancestor : "condition" in via ? via.condition.condition_on : "stage_opening" in via ? via.stage_opening.group : undefined;
+    return { node: blocker.node, via, holder: holder === key ? undefined : holder };
   });
-  const held = holds(derived.blocked_by) || through;
-  return inScope && !finished && held;
+}
+
+/** Gating, D8: how many more the node waits on than `waitsOn` lists (the engine cuts the list at its explanation limit and says the total). */
+export function waitsMore(view: Ready, key: string): number {
+  const waits = view.derived.nodes[key]?.waits_on;
+  return waits === undefined ? 0 : Math.max(0, waits.total - waits.entries.length);
+}
+
+/** Milestones first, then by node key: the order a list of things a node waits on is shown in. */
+export function milestonesFirst<Item>(view: Ready, items: readonly Item[], keyOf: (item: Item) => string): Item[] {
+  const milestone = (item: Item) => Number(nodeOf(view, keyOf(item))?.kind === "milestone");
+  return [...items].sort((left, right) => milestone(right) - milestone(left) || keyOf(left).localeCompare(keyOf(right)));
 }
 
 /**
- * Work started before its own gates are met: stored `active` while a requirement of its own
- * or an ancestor's is unsatisfied. A container's unfinished children are not a gate (D8).
+ * C5, C6, C10: a node's place on the acting frontier, one-based, in the engine's order (rank,
+ * slack, gravity, key); a ranked node off the frontier has none. One meaning of "#N" everywhere.
  */
-export function startedEarly(derived: NodeDerived, state: State): boolean {
-  const gates = (derived.blocked_by ?? []).some((blocker) => blocker.via !== "containment") || (derived.blocked_through ?? []).length > 0;
-  return state === "active" && gates && isBlocked(derived);
-}
-
-/**
- * Gating, D4: the open decisions an undecided node's relevance waits on: those still to be
- * answered (open, relevant, and not under a skip) that each condition leaving it undecided
- * reads, its own and its ancestors', up to a force include; empty when the node is not
- * undecided. Finishing it is accepted, with the warning that it may not apply.
- */
-export function unansweredOf(view: Ready, key: string): string[] {
-  const open = (decision: string) => {
-    const node = nodeOf(view, decision);
-    const found = view.derived.nodes[decision];
-    return (
-      node !== undefined &&
-      found !== undefined &&
-      found.relevance.value === "relevant" &&
-      found.effectively_skipped !== true &&
-      recordOf(view, node).state === "open"
-    );
-  };
-  const waiting = new Set<string>();
-  // Up the tree while undecided: a relevant node has nothing undecided above it.
-  let current: string | undefined = key;
-  let relevance = view.derived.nodes[key]?.relevance;
-  while (current !== undefined && relevance?.value === "undecided") {
-    // The node's own condition is undecided exactly when it produced the value.
-    if (relevance.condition_on === undefined) {
-      (relevance.decisions ?? []).filter(open).forEach((decision) => waiting.add(decision));
-    }
-    current = nodeOf(view, current)?.parent ?? undefined;
-    relevance = current === undefined ? undefined : view.derived.nodes[current]?.relevance;
+export function rankPlaces(view: Ready): Map<string, number> {
+  let found = PLACES.get(view.derived);
+  if (found === undefined) {
+    found = new Map(view.derived.acting_frontier.map((key, at) => [key, at + 1]));
+    PLACES.set(view.derived, found);
   }
-  return [...waiting].sort();
+  return found;
 }
+
+const PLACES = new WeakMap<Ready["derived"], Map<string, number>>();
 
 export type FlagTone = "good" | "warn" | "bad" | "plain";
 
 /**
  * D3: the derived flags a node carries (C8) that are real attention, those that are set. The one list every surface (inspector, rows, cards) renders. What
  * its display state already says (blocked, snoozed, skipped, actionable, auto-reached) is not
- * a flag (D8); `state` is the stored one, for work started before its gates are met.
+ * a flag (D8); started early is the engine's.
  */
-export function flagsOf(derived: NodeDerived, state: State): { flag: string; tone: FlagTone }[] {
+export function flagsOf(derived: NodeDerived): { flag: string; tone: FlagTone }[] {
   const flags: { flag: string; tone: FlagTone }[] = [];
   const add = (set: boolean | undefined, flag: string, tone: FlagTone) => {
     if (set === true) {
       flags.push({ flag, tone });
     }
   };
-  add(startedEarly(derived, state), "started early", "plain");
+  add(derived.started_early, "started early", "plain");
   add(derived.unassigned, "unassigned", "warn");
   add(derived.overdue, "overdue", "bad");
   add(derived.dates.shortfall != null, "short of days", "bad");

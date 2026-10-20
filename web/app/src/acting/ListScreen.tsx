@@ -17,7 +17,7 @@ import { valueOf } from "../data/keyed-read.ts";
 import { collapsedAt, drawnStep, stepOf } from "../canvas/ladder.ts";
 import type { Selection } from "../canvas/selection.ts";
 import { decisionRows } from "../decisions/model.ts";
-import type { Ready } from "../detail/model.ts";
+import { rankPlaces, type Ready } from "../detail/model.ts";
 import { useMineOf } from "../journeys/mine.ts";
 import { badgesOf, currentStagesOf, depthFaded, levelRequestOf, lightsUp, litOf, outOfFocus, stepHides, tableQueryOf } from "../journeys/requests.ts";
 import type { ViewState } from "../journeys/view.ts";
@@ -32,7 +32,7 @@ import { Cell, type CellContext } from "./ListCells.tsx";
 import { Folds } from "./Folds.tsx";
 import { NextForYou } from "./NextForYou.tsx";
 import { StalledPanel } from "./Stalled.tsx";
-import { addableColumns, columnsOf, columnWords, flatLines, givesWay, rankPositions, SORT_OF, treeLines, type Column, type Line } from "./listModel.ts";
+import { addableColumns, columnsOf, columnWords, flatLines, givesWay, SORT_OF, treeLines, type Column, type Line } from "./listModel.ts";
 import { useRows } from "./useRows.ts";
 import "./acting.css";
 import { Failed } from "../ui/Failed.tsx";
@@ -47,6 +47,9 @@ function onRow(event: MouseEvent): boolean {
   return !(event.target instanceof Element && event.target.closest("a, button, select, input, textarea, label"));
 }
 
+/** What a column's heading says about its cells, where a cell's absence needs saying. */
+const HELP: Partial<Record<Column, string>> = { rank: "The place on the acting frontier; blank for work that cannot be acted on yet" };
+
 function Head({ column, columns, list, onSort }: { column: Column; columns: readonly Column[]; list: ListSettings; onSort: (sort: ListSettings["sort"]) => void }) {
   const sort = SORT_OF[column];
   const words = columnWords(column);
@@ -56,7 +59,7 @@ function Head({ column, columns, list, onSort }: { column: Column; columns: read
   const active = list.sort === sort;
   return (
     <th scope="col" aria-sort={active ? "descending" : "none"} data-column={column} data-gives-way={givesWay(column)} className={pinned(column, columns)} data-testid={`sort-${column}`}>
-      <button type="button" className="list-sort" aria-label={`Sort by ${words.toLowerCase()}`} onClick={() => { onSort(active ? undefined : sort); }}>
+      <button type="button" className="list-sort" aria-label={`Sort by ${words.toLowerCase()}`} title={HELP[column]} onClick={() => { onSort(active ? undefined : sort); }}>
         {words}
         {active ? <span aria-hidden="true"> ▾</span> : null}
       </button>
@@ -224,7 +227,7 @@ export function ListBody({ view, state, picks, list, selected, selection }: { vi
   const needsDecisions = decisionColumns || list.columns.some((column) => ["answer", "why", "affects"].includes(column));
   const projected = valueOf(useProjected(view, needsDecisions ? { projection: "decision_view" as const } : undefined));
   const decisions = useMemo(() => new Map((projected === undefined ? [] : decisionRows(view, projected)).map((decision) => [decision.key, decision])), [view, projected]);
-  const ranks = useMemo(() => rankPositions(view, state.frontier), [view, state.frontier]);
+  const ranks = rankPlaces(view);
   const order = useMemo(() => new Map(planOrder(view).map((key, at) => [key, at])), [view]);
   const containers = useMemo(() => containerKeys(nodes), [nodes]);
   const tree = list.sort === undefined;

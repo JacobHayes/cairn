@@ -17,6 +17,7 @@ pub mod project;
 pub mod proposal;
 pub mod records;
 pub mod replay;
+pub mod rules;
 mod stages;
 #[cfg(feature = "testing")]
 pub mod testing;

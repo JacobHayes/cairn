@@ -1,11 +1,10 @@
 // B1, B11, A19: what starting a journey sends, which routes it can start from, the status
 // changes each status accepts, the typed confirmation before a hard delete, and when
 // completion is suggested.
-import type { Schema } from "@cairn/client";
 import { describe, expect, it } from "vitest";
 
 import { STATUSES } from "./address.ts";
-import { completionSuggested, createMutation, deleteConfirmed, newJourneyId, startableRoutes, statusActions, type RouteSummary } from "./lifecycle.ts";
+import { createMutation, deleteConfirmed, newJourneyId, startableRoutes, statusActions, type RouteSummary } from "./lifecycle.ts";
 
 const JOURNEY_ID = /^j_[a-z0-9][a-z0-9_-]*$/;
 
@@ -41,29 +40,5 @@ describe("a journey's status (B11, A19)", () => {
     expect(deleteConfirmed("archived", "Launch", " Launch ")).toBe(true);
     expect(deleteConfirmed("archived", "Launch", "launch")).toBe(false);
     expect(deleteConfirmed("completed", "Launch", "Launch")).toBe(false);
-  });
-});
-
-describe("completion suggested (B11)", () => {
-  const summary = (remaining: number): Schema<"StatusSummary"> => ({ by_state: {}, by_display_state: {}, remaining });
-  const derived = (autoReached: boolean): Schema<"Derived"> => ({
-    today: "2026-10-06",
-    frontier: [],
-    acting_frontier: [],
-    nodes: autoReached ? ({ n_end: { auto_reached: true } } as unknown as Schema<"Derived">["nodes"]) : {},
-  });
-  const graph = (state: string | undefined): Schema<"Graph"> =>
-    ({
-      nodes: [{ key: "n_end", id: "end", kind: "milestone", title: "End", final: true }],
-      state: state === undefined ? {} : { nodes: { n_end: { state, provenance: "from_route" } } },
-    }) as unknown as Schema<"Graph">;
-
-  it.each([
-    ["nothing in scope is left", graph(undefined), derived(false), summary(0), true],
-    ["work is left and the final milestone is pending", graph("pending"), derived(false), summary(2), false],
-    ["the final milestone is reached", graph("reached"), derived(false), summary(2), true],
-    ["the final milestone reads as reached", graph("pending"), derived(true), summary(2), true],
-  ])("when %s", (_, held, derive, counted, expected) => {
-    expect(completionSuggested(held, derive, counted)).toBe(expected);
   });
 });

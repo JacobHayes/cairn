@@ -21,10 +21,12 @@ and that user.
 1. **Read state first.** Call `get_snapshot` before anything else on a journey. It answers
    the answers in effect, a page of in-scope nodes, the ranked acting frontier, open
    decisions by rank, placeholders needing breakdown, unassigned items, shortfalls, and
-   counts. Scope it with `subtree` and `depth` on a large journey.
+   counts. Scope it with `subtree` and `depth` on a large journey. It also says when
+   completing the journey is suggested (nothing left in scope, or the final milestone
+   reached); completing it is the person's call.
 2. **Look closer only where needed.** `list_frontier` pages the ranked frontier or, with
    `filters`, the nodes that need something (`decisions_needed`, `needs_breakdown`,
-   `unassigned`, `active`, `blocked`, `stale`, `overdue`, `shortfall`). `get_node` explains
+   `unassigned`, `active`, `blocked` (display state blocked), `stale`, `overdue`, `shortfall`). `get_node` explains
    one node: why it is relevant or blocked, its dates, and why it ranks where it does.
    `get_level` shows the graph at one level of containment.
 3. **Write in small, named steps.** Each write is one patch. Give it a new `patch_id` you

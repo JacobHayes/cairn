@@ -1,12 +1,11 @@
 // C11: when the decision walkthrough has no decision to act on, it shows what would unblock
 // the earliest ones: the open decisions still in scope, earliest start first, each with the
-// milestones and other dependencies it waits on. A decision waits on its own unsatisfied
-// dependencies (explicit requirements, condition gates, a stage opening: `blocked_by`), on
-// those its ancestors hold for it (`blocked_through`, each listing its own), and on a snooze's
-// target when one holds.
+// milestones and other dependencies it waits on. A decision waits on what the engine derived it
+// waits on (`waits_on`: its own unsatisfied dependencies and those its ancestors hold for it)
+// and on a snooze's target when one holds.
 import type { Schema } from "@cairn/client";
 
-import { isTerminal, nodeOf, recordOf, type GraphNode, type NodeKind, type Ready } from "../detail/model.ts";
+import { milestonesFirst, nodeOf, waitsOn, type GraphNode, type NodeKind, type Ready } from "../detail/model.ts";
 
 /** What one waiting decision waits on. */
 export interface Unblocker {
@@ -41,15 +40,8 @@ export function unblockersOf(view: Ready, decision: GraphNode): { unblockers: Un
       found.set(node, through === undefined ? { node, kind, via } : { node, kind, via, through });
     }
   };
-  // An ancestor's own list also names its unfinished children (containment), which hold the
-  // ancestor, not the decision beneath it.
-  const holders = [decision.key, ...(derived?.blocked_through ?? [])];
-  for (const holder of holders) {
-    for (const blocker of view.derived.nodes[holder]?.blocked_by ?? []) {
-      if (blocker.via !== "containment") {
-        add(blocker.node, blocker.via, holder === decision.key ? undefined : holder);
-      }
-    }
+  for (const held of waitsOn(view, decision.key)) {
+    add(held.node, held.via, held.holder);
   }
   const snooze = derived?.snoozed;
   let snoozedUntil: string | undefined;
@@ -69,24 +61,20 @@ export function actingDecisions(view: Ready): string[] {
 }
 
 /**
- * C11: the open, in-scope decisions off the acting frontier, earliest start first (none last),
- * then by key; each with what it waits on, milestones first.
+ * C11: the summary's open, in-scope decisions that are off the acting frontier, earliest start
+ * first (none last), then by key; each with what it waits on, milestones first.
  */
-export function waitingDecisions(view: Ready): Waiting[] {
+export function waitingDecisions(view: Ready, summary: Schema<"StatusSummary">): Waiting[] {
   const acting = new Set(view.derived.acting_frontier);
   const waiting: Waiting[] = [];
-  for (const node of view.journey.graph.nodes ?? []) {
-    const derived = view.derived.nodes[node.key];
-    if (node.kind !== "decision" || derived === undefined || acting.has(node.key)) {
-      continue;
-    }
-    const inScope = derived.relevance.value !== "not_relevant" && derived.effectively_skipped !== true;
-    if (!inScope || isTerminal(recordOf(view, node).state)) {
+  for (const { node: key } of summary.open_decisions ?? []) {
+    const node = nodeOf(view, key);
+    const derived = view.derived.nodes[key];
+    if (node === undefined || derived === undefined || acting.has(key)) {
       continue;
     }
     const { unblockers, snoozedUntil } = unblockersOf(view, node);
-    unblockers.sort((left, right) => Number(right.kind === "milestone") - Number(left.kind === "milestone") || left.node.localeCompare(right.node));
-    waiting.push({ decision: node.key, earliest: derived.dates.earliest_start?.date, unblockers, snoozedUntil });
+    waiting.push({ decision: key, earliest: derived.dates.earliest_start?.date, unblockers: milestonesFirst(view, unblockers, (each) => each.node), snoozedUntil });
   }
   return waiting.sort(
     (left, right) =>

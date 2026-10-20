@@ -6,13 +6,13 @@
 // what that type holds (a choice, yes or no, a date, an entity), so a type mismatch cannot be
 // entered. A condition cannot name a decision in its own node's subtree (Invariants), so the
 // editor never offers one. Rendering to a sentence is for display and never parsed back.
+import { CONDITION_CLAUSE_COUNT_MAX, CONDITION_DEPTH_MAX } from "@cairn/client";
 import { choiceId, choiceLabel, choiceNamed } from "../status/answer.ts";
 import { dateWords } from "../status/when.ts";
 import { NODE_GONE } from "../ui/gone.ts";
 import type { AnswerType, GraphNode, Tree } from "./graph.ts";
 import { descendantsOf, nodesByPath } from "./graph.ts";
 import type { Condition } from "./fields.ts";
-import { CONDITION_CLAUSE_COUNT_MAX, CONDITION_DEPTH_MAX } from "./limits.ts";
 
 export type Clause = Condition;
 export type Value = boolean | string;

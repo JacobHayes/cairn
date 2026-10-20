@@ -185,6 +185,30 @@ fn each_state_filter_keeps_what_it_names() {
     assert!(blocked.contains(&"n_access".to_owned()) && !blocked.contains(&"n_kickoff".to_owned()));
 }
 
+/// C9, D8: the blocked filter matches the display state, so a group waiting only on its own
+/// children is not listed, while a group behind an unsatisfied requirement is.
+#[test]
+fn blocked_filter_lists_gated_containers_and_not_those_waiting_on_children() {
+    let records = support::accepted_on(
+        &support::vendor_after(1),
+        VENDOR,
+        &(support::add_nodes(&[
+            "{key: n_free, id: free, kind: group, title: Free}",
+            "{key: n_free_work, id: free_work, parent: n_free, kind: action, title: Free work}",
+            "{key: n_gated, id: gated, kind: group, title: Gated}",
+            "{key: n_gated_work, id: gated_work, parent: n_gated, kind: action, title: Gated work}",
+        ]) + "- op: add_edge\n  edge: {node: n_gated, requires: n_access}\n"),
+    );
+    let derive = Derive::on(&records, VENDOR, "2026-10-06");
+    assert_eq!(
+        derive.derived.display_state(&derive.graph, &key("n_free")),
+        DisplayState::Ready
+    );
+    let blocked = derive.listed(&flag(ListFlag::Blocked), &[]);
+    assert!(!blocked.contains(&"n_free".to_owned()), "{blocked:?}");
+    assert!(blocked.contains(&"n_gated".to_owned()), "{blocked:?}");
+}
+
 /// The vendor evaluation with a dependency inserted after its findings were done.
 fn stale_findings() -> Derive {
     let records = support::accepted_on(

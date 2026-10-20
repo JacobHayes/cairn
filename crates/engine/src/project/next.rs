@@ -14,8 +14,8 @@ use std::collections::{BTreeMap, BTreeSet};
 
 use cairn_schema::limits::PAGE_ITEM_COUNT_MAX;
 use cairn_schema::{
-    Annotation, AnnotationContent, EntityKey, KindKey, ListFlag, ListPage, ListQuery, MineEntry,
-    Next, NextQuery, NodeKey, NodeKind, ResourceContent, State, Title,
+    Annotation, AnnotationContent, DisplayState, EntityKey, KindKey, ListFlag, ListPage, ListQuery,
+    MineEntry, Next, NextQuery, NodeKey, NodeKind, ResourceContent, State, Title,
 };
 
 use super::rows::{count, page};
@@ -225,7 +225,7 @@ impl<'a> DerivedJourney<'a> {
             }
             ListFlag::NeedsBreakdown => blocking.needs_breakdown(key),
             ListFlag::Active => self.state(key) == State::Active,
-            ListFlag::Blocked => blocking.blocked(key),
+            ListFlag::Blocked => derived.display_state(self.graph, key) == DisplayState::Blocked,
             ListFlag::Overdue => dates.overdue(key),
             ListFlag::Stale => derived.is_stale(key),
             ListFlag::Snoozed => blocking.snoozed(key).is_some(),

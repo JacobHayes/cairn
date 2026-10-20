@@ -8,6 +8,7 @@ import { valueOf } from "../data/keyed-read.ts";
 import { namer, viaText } from "../detail/explain.ts";
 import { titleOf, type Ready } from "../detail/model.ts";
 import { useNodeAddresses } from "../journeys/address.ts";
+import { useMineOf } from "../journeys/mine.ts";
 import { SNOOZE_NODE_TAIL, snoozeEndWords } from "../status/snooze.ts";
 import { dateWords } from "../status/when.ts";
 import { Badge, Button } from "../ui/kit.tsx";
@@ -16,7 +17,7 @@ import { RowActions } from "./RowActions.tsx";
 import { WAITING_SHOWN_MAX, waitingDecisions, type Unblocker } from "./waiting.ts";
 import type { NodeRow } from "./why.ts";
 
-function UnblockerLine({ view, unblocker, row }: { view: Ready; unblocker: Unblocker; row: NodeRow | undefined }) {
+function UnblockerLine({ view, unblocker, row, yours }: { view: Ready; unblocker: Unblocker; row: NodeRow | undefined; yours: boolean }) {
   const addresses = useNodeAddresses();
   const name = namer(view);
   return (
@@ -28,16 +29,22 @@ function UnblockerLine({ view, unblocker, row }: { view: Ready; unblocker: Unblo
           {unblocker.through === undefined ? "" : ` of ${titleOf(view, unblocker.through)}, which holds it`})
         </span>
       </span>
-      {row === undefined ? null : <RowActions view={view} row={row} to={addresses.open(unblocker.node)} />}
+      {row === undefined ? null : <RowActions view={view} row={row} to={addresses.open(unblocker.node)} yours={yours} />}
     </li>
   );
 }
 
 export function WaitingDecisions({ view, onContinue }: { view: Ready; onContinue: () => void }) {
-  const waiting = waitingDecisions(view);
+  const summary = valueOf(useProjected(view, { projection: "status_summary" }));
+  const mine = useMineOf(view.journey.header.id);
   const next = valueOf(useProjected(view, { projection: "next" }));
   const rows = new Map((next?.items ?? []).map((row) => [row.key, row]));
   const proceed = <Button onClick={onContinue}>Continue with everything →</Button>;
+  if (summary === undefined || mine.status !== "ready") {
+    return null;
+  }
+  const waiting = waitingDecisions(view, summary);
+  const owned = new Set(mine.entries.filter((entry) => entry.kinds.includes("k_owner")).map((entry) => entry.node));
   if (waiting.length === 0) {
     return (
       <div className="callout stack" data-testid="no-decisions">
@@ -63,7 +70,7 @@ export function WaitingDecisions({ view, onContinue }: { view: Ready; onContinue
             </span>
             <ul className="detail-list stack">
               {each.unblockers.map((unblocker) => (
-                <UnblockerLine key={unblocker.node} view={view} unblocker={unblocker} row={rows.get(unblocker.node)} />
+                <UnblockerLine key={unblocker.node} view={view} unblocker={unblocker} row={rows.get(unblocker.node)} yours={owned.has(unblocker.node)} />
               ))}
             </ul>
           </li>

@@ -55,7 +55,7 @@ use std::collections::{BTreeMap, BTreeSet};
 use cairn_schema::limits::CONTAINMENT_DEPTH_MAX;
 use cairn_schema::{
     DependencyVia, Deployment, EdgeOrigin, EntityKey, Level, LevelDisplay, LevelEdge, LevelNode,
-    LevelQuery, NodeKey, NodeKind, Relevance, RollUp, State, UnderlyingEdge,
+    LevelQuery, NodeKey, NodeKind, Progress, Relevance, RollUp, State, UnderlyingEdge,
 };
 
 use super::{DerivedJourney, ProjectionError};
@@ -138,6 +138,7 @@ impl<'a> DerivedJourney<'a> {
             }
         }
         let tree = self.graph.tree();
+        let progress = self.derived.progress(self.graph);
         let nodes = stand_ins
             .within
             .iter()
@@ -156,7 +157,9 @@ impl<'a> DerivedJourney<'a> {
                     display_state: self.derived.display_state(self.graph, key),
                     group_state: (self.node(key).kind() == NodeKind::Group)
                         .then(|| self.derived.group_state(self.graph, key)),
-                    roll_up: tree.is_container(key).then(|| self.roll_up(key)),
+                    roll_up: progress
+                        .get(key)
+                        .map(|progress| self.roll_up(key, *progress)),
                 }
             })
             .collect();
@@ -415,8 +418,9 @@ impl<'a> DerivedJourney<'a> {
         skipped && self.derived.relevance().in_scope(key) && !self.derived.blocking().satisfies(key)
     }
 
-    /// C2: a container's badges, from its children.
-    fn roll_up(&self, key: &NodeKey) -> RollUp {
+    /// C2: a container's badges, from its children, and its `progress` over the whole
+    /// subtree beneath it.
+    fn roll_up(&self, key: &NodeKey, progress: Progress) -> RollUp {
         let derived = self.derived;
         let blocking = derived.blocking();
         let relevance = derived.relevance();
@@ -437,9 +441,7 @@ impl<'a> DerivedJourney<'a> {
                 .any(|child| self.state(child) == State::Active),
             all_blocked: !relevant_open.is_empty()
                 && relevant_open.iter().all(|child| blocking.blocked(child)),
-            decision_needed: children.iter().any(|child| {
-                self.node(child).kind() == NodeKind::Decision && blocking.actionable(child)
-            }),
+            progress,
             needs_breakdown: children.iter().any(|child| blocking.needs_breakdown(child)),
             max_child_gravity: derived.priority().max_child_gravity(key),
             subtree_gravity: derived.priority().subtree_gravity(key),

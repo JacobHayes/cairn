@@ -3,9 +3,10 @@
 // is a milestone, a date decision's answer, or the journey's `created_at`; several sources
 // are several constraints. F4: a stage's bounds are milestones outside it. The editors offer
 // only what a rule may measure from, so a source of the wrong kind cannot be entered.
+import { OFFSET_DAYS_MAX } from "@cairn/client";
 import type { DateRule } from "./fields.ts";
 import { descendantsOf, nodesByPath, pathOf, titleIn, type GraphNode, type Tree } from "./graph.ts";
-import { OFFSET_DAYS_MAX, outOfRange } from "./limits.ts";
+import { outOfRange } from "./limits.ts";
 
 /** The journey's creation, a source every graph has (A8). */
 export const CREATED_AT = "journey.created_at";

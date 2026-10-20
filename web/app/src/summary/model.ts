@@ -12,12 +12,12 @@ import type { Schema } from "@cairn/client";
 import { unblockersOf } from "../acting/waiting.ts";
 import type { FactTone } from "../acting/reasons.ts";
 import type { NodeRow } from "../acting/why.ts";
-import { ownedBy } from "../acting/yours.ts";
 import { guardFailureText, namer } from "../detail/explain.ts";
-import { feedingDecision, nodeOf, recordOf, titleOf, type GraphNode, type Ready } from "../detail/model.ts";
+import { feedingDecision, milestonesFirst, nodeOf, recordOf, titleOf, type GraphNode, type Ready } from "../detail/model.ts";
 import { entityName } from "../detail/sections.tsx";
 import { snoozeEndWords } from "../status/snooze.ts";
-import { dateWords, daysUntil, daysWords } from "../status/when.ts";
+import { isOpen } from "../status/state.ts";
+import { dateWords, daysWords } from "../status/when.ts";
 import { DISPLAY_STATES, stateWord, type DisplayState } from "../status/words.ts";
 import { treeOf } from "../plan/tree.ts";
 import type { DateOrigin } from "../timeline/model.ts";
@@ -65,8 +65,8 @@ export function ownersOf(ready: Ready, key: string): string[] {
 }
 
 function overdueOf(ready: Ready, key: string): SummaryModel["overdue"][number] {
-  const due = ready.derived.nodes[key]?.dates.due?.date;
-  return { ...listed(ready, key), due, lateDays: due === undefined ? undefined : -daysUntil(due, ready.derived.today) };
+  const dates = ready.derived.nodes[key]?.dates;
+  return { ...listed(ready, key), due: dates?.due?.date, lateDays: dates?.overdue_days ?? undefined };
 }
 
 function staleOf(ready: Ready, key: string): SummaryModel["stale"][number] {
@@ -97,12 +97,6 @@ export function summaryModel(ready: Ready, summary: StatusSummary): SummaryModel
   };
 }
 
-/** Whether `node` counts in the journey's scope: relevant or undecided, and not skipped through a container (D1a). */
-function inScope(ready: Ready, key: string): boolean {
-  const derived = ready.derived.nodes[key];
-  return derived !== undefined && derived.relevance.value !== "not_relevant" && derived.effectively_skipped !== true;
-}
-
 /** The milestone the lead names: the journey's final one, or with none the next one (C13). */
 export interface MilestoneLine {
   /** `final` is the end (A1a); `next` is only the earliest milestone ahead. */
@@ -112,7 +106,7 @@ export interface MilestoneLine {
   /** Its effective date (F1) and where it comes from; none while nothing gives it one. */
   date: string | undefined;
   origin: DateOrigin | undefined;
-  /** Whether it is reached: by an actual date, or by `auto_reach` once its date has passed (F1). */
+  /** Whether it is reached, as its display state says: by an actual date, or by `auto_reach` once its date has passed (F1). */
   reached: boolean;
   /** Its own shortfall in days (F6), never another node's. */
   shortfallDays: number | undefined;
@@ -126,7 +120,11 @@ export interface MilestoneLine {
  * the next, and with none the line is left out.
  */
 export function milestoneLine(ready: Ready, model: SummaryModel): MilestoneLine | undefined {
-  const final = (ready.journey.graph.nodes ?? []).find((node) => node.final === true && inScope(ready, node.key));
+  // In scope and not skipped (D1a): still to do, or finished.
+  const final = (ready.journey.graph.nodes ?? []).find((node) => {
+    const derived = ready.derived.nodes[node.key];
+    return node.final === true && (isOpen(derived) || derived?.display_state === "done");
+  });
   if (final !== undefined) {
     const dates = ready.derived.nodes[final.key]?.dates;
     const feeder = dates?.effective_date === undefined ? feedingDecision(ready, final.key) : undefined;
@@ -136,7 +134,7 @@ export function milestoneLine(ready: Ready, model: SummaryModel): MilestoneLine 
       title: final.title,
       date: dates?.effective_date?.date,
       origin: dates?.effective_date?.origin,
-      reached: dates?.effective_date?.origin === "actual" || ready.derived.nodes[final.key]?.auto_reached === true,
+      reached: ready.derived.nodes[final.key]?.display_state === "done",
       shortfallDays: dates?.shortfall?.shortfall_days,
       feeder: feeder === undefined ? undefined : { key: feeder.key, title: feeder.title },
     };
@@ -151,7 +149,7 @@ export function milestoneLine(ready: Ready, model: SummaryModel): MilestoneLine 
     title: next.title,
     date: next.date,
     origin: next.origin,
-    reached: next.origin === "actual",
+    reached: ready.derived.nodes[next.key]?.display_state === "done",
     shortfallDays: ready.derived.nodes[next.key]?.dates.shortfall?.shortfall_days,
     feeder: undefined,
   };
@@ -170,13 +168,12 @@ export function shortfallWords(ready: Ready, key: string, count: number | undefi
   if (count === undefined) {
     return "Cannot be met as planned";
   }
-  const node = nodeOf(ready, key);
-  const state = node === undefined ? undefined : recordOf(ready, node).state;
+  const finished = ready.derived.nodes[key]?.display_state === "done";
   // A recorded date can break a chain by being too late or too early, so a finished node's shortfall says only how far off it is.
-  if (state === "reached") {
+  if (finished && nodeOf(ready, key)?.kind === "milestone") {
     return `Reached ${daysWords(count)} off what its chain allows`;
   }
-  return state === "done" || state === "decided" ? `Finished ${daysWords(count)} off what its chain allows` : `Needs ${daysWords(count)} more than its chain allows`;
+  return finished ? `Finished ${daysWords(count)} off what its chain allows` : `Needs ${daysWords(count)} more than its chain allows`;
 }
 
 /**
@@ -218,7 +215,7 @@ export function waitingFact(ready: Ready, node: GraphNode): string | undefined {
     return "May not apply";
   }
   const { unblockers, snoozedUntil } = unblockersOf(ready, node);
-  const [first, ...rest] = [...unblockers].sort((left, right) => Number(right.kind === "milestone") - Number(left.kind === "milestone") || left.node.localeCompare(right.node));
+  const [first, ...rest] = milestonesFirst(ready, unblockers, (each) => each.node);
   if (first === undefined) {
     return snoozedUntil === undefined ? undefined : `Snoozed until ${snoozeEndWords(ready, { date: snoozedUntil })}`;
   }
@@ -242,12 +239,12 @@ export interface Actions {
  * then the decisions that can be made now, then the rest of the frontier, so a count is its
  * set's whole size whatever the page shows of it. A decision off the frontier waits.
  */
-export function claimActions(ready: Ready, model: SummaryModel, frontier: readonly NodeRow[], viewerEntities: readonly string[]): Actions {
+export function claimActions(ready: Ready, model: SummaryModel, frontier: readonly NodeRow[], owned: ReadonlySet<string>): Actions {
   const yours: NodeRow[] = [];
   const decide: NodeRow[] = [];
   const nextUp: NodeRow[] = [];
   for (const row of frontier) {
-    if (ownedBy(ready, row.owners, viewerEntities)) {
+    if (owned.has(row.key)) {
       yours.push(row);
     } else if (row.kind === "decision") {
       decide.push(row);
@@ -287,7 +284,7 @@ export function recentlyFinished(ready: Ready): Finished[] {
   const finished = (ready.journey.graph.nodes ?? []).flatMap((node) => {
     const record = recordOf(ready, node);
     const word = FINISHED_WORDS[record.state];
-    return word === undefined || record.finished_on == null || !inScope(ready, node.key) ? [] : [{ key: node.key, on: record.finished_on, word }];
+    return word === undefined || record.finished_on == null || ready.derived.nodes[node.key]?.display_state !== "done" ? [] : [{ key: node.key, on: record.finished_on, word }];
   });
   return finished
     .sort((left, right) => right.on.localeCompare(left.on) || left.key.localeCompare(right.key))
@@ -312,28 +309,6 @@ export function claimedKeys(actions: Actions): Set<string> {
   return new Set([...actions.yours, ...actions.decide, ...actions.nextUp].map((row) => row.key).concat(actions.waiting.map((each) => each.key)));
 }
 
-/** How many of the nodes inside container `key` are not finished yet, and how many count at all (D8). */
-function insideOf(ready: Ready, key: string): { open: number; total: number } {
-  const children = treeOf(ready).children;
-  let open = 0;
-  let total = 0;
-  const walk = (parent: string) => {
-    for (const child of children.get(parent) ?? []) {
-      if ((children.get(child) ?? []).length > 0) {
-        walk(child);
-        continue;
-      }
-      const state = ready.derived.nodes[child]?.display_state;
-      if (state !== undefined && state !== "not_relevant" && state !== "skipped") {
-        total += 1;
-        open += state === "done" ? 0 : 1;
-      }
-    }
-  };
-  walk(key);
-  return { open, total };
-}
-
 /**
  * C18, D8: the nodes that are active but not on an action list, in graph order: the work under
  * way that nothing is asked of. A container says how much inside it is still open.
@@ -345,8 +320,8 @@ export function underWay(ready: Ready, claimed: ReadonlySet<string>): Held[] {
       key: node.key,
       owners: ownersOf(ready, node.key),
       fact: () => {
-        const { open, total } = insideOf(ready, node.key);
-        return total === 0 ? undefined : `${String(open)} of ${String(total)} inside still open`;
+        const progress = ready.derived.nodes[node.key]?.progress;
+        return progress == null || progress.total === 0 ? undefined : `${String(progress.total - progress.done)} of ${String(progress.total)} inside still open`;
       },
     }));
 }

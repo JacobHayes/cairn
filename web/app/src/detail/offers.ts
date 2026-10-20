@@ -4,7 +4,8 @@
 // without a page.
 import { missingEvidence } from "../acting/acts.ts";
 import { breakable } from "../proposals/model.ts";
-import { isBlocked, isTerminal, movesFrom, nodeOf, recordOf, storedSnooze, titleOf, type NodeDetail, type Ready } from "./model.ts";
+import { isOpen } from "../status/state.ts";
+import { failingGuards, isTerminal, movesFrom, nodeOf, recordOf, storedSnooze, titleOf, type NodeDetail, type Ready } from "./model.ts";
 
 /** The action beside a node, on any surface: what a person does to it in one move. */
 export type Act = "decide" | "done" | "done-with-evidence" | "start" | "reach" | "reach-now" | "break-down" | "mark-atomic" | "unsnooze";
@@ -36,14 +37,14 @@ export function offered(view: Ready, key: string): Offered {
   const record = recordOf(view, node);
   const shown = derived.display_state;
   const snooze: Act[] = unsnoozeOf(view, key) === undefined ? [] : ["unsnooze"];
-  if (shown === "done" || shown === "skipped" || shown === "not_relevant" || isTerminal(record.state)) {
+  if (!isOpen(derived)) {
     return { primary: undefined, secondary: [], waiting: false };
   }
   if (node.kind === "group") {
     return { primary: undefined, secondary: snooze, waiting: false };
   }
   const moves = movesFrom(node.kind, record.state);
-  const waiting = isBlocked(derived, view);
+  const waiting = failingGuards(derived).includes("deps_done");
   if (derived.needs_breakdown === true) {
     return { primary: "break-down", secondary: ["mark-atomic", ...snooze], waiting: false };
   }
@@ -131,9 +132,8 @@ export function menuOf(view: Ready, detail: NodeDetail): MenuItem[][] {
   const state = record.state;
   const kind = node.kind;
   const container = detail.children.length > 0 || kind === "group";
-  const blocked = isBlocked(derived, view);
-  const needs = missingEvidence(view, node);
-  const guardFails = blocked || needs.artifact || needs.note || derived.needs_breakdown === true;
+  const blocked = failingGuards(derived).includes("deps_done");
+  const guardFails = failingGuards(derived).length > 0 || derived.needs_breakdown === true;
   const keptUnder = derived.effectively_skipped === true && state !== "skipped";
   const member = (view.journey.graph.insertions ?? []).some((insertion) => node.key in insertion.nodes);
   const where = (...extra: (MenuId | false)[]): MenuItem[] => items(["show-in-graph", member && "show-insertion", ...extra, "copy-link"]);

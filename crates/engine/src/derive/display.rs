@@ -77,12 +77,7 @@ impl Derived {
         if relevance.value != Relevance::Relevant {
             return DisplayState::Conditional;
         }
-        let waiting = if container {
-            !self.entered(key)
-        } else {
-            blocking.blocked(key)
-        };
-        if waiting {
+        if self.waiting(graph, key) {
             return DisplayState::Blocked;
         }
         if self.reach_is_ahead(graph, key) {
@@ -133,6 +128,16 @@ impl Derived {
             GroupState::Active
         } else {
             GroupState::NotStarted
+        }
+    }
+
+    /// D8: the node waits on a gate of its own or one it inherits: a container, on its
+    /// entries (its children are not a gate); anything else, on being blocked.
+    pub(super) fn waiting(&self, graph: &Graph, key: &NodeKey) -> bool {
+        if graph.tree().is_container(key) {
+            !self.entered(key)
+        } else {
+            self.blocking.blocked(key)
         }
     }
 

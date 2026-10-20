@@ -11,7 +11,7 @@ import type { ListQuery, ProjectionRequest } from "@cairn/wasm";
 import type { SortBy } from "../acting/address.ts";
 import { currentStages, drawnStep, kindsAt, leftOutAt, STAGES_TOP } from "../canvas/ladder.ts";
 import type { Level, LevelDisplay, Step } from "../canvas/model.ts";
-import { recordOf, type GraphNode, type Ready } from "../detail/model.ts";
+import type { GraphNode, Ready } from "../detail/model.ts";
 import type { Badge } from "../screens/badge.ts";
 import type { Screen } from "./address.ts";
 import { FILTER_FLAGS, type ViewState } from "./view.ts";
@@ -113,7 +113,7 @@ export function litOf(screen: Screen, state: ViewState, ready: Ready): ReadonlyS
 /** C2, 5.1: the stages that are current in `ready`: those holding an acting-frontier or active node. */
 export function currentStagesOf(ready: Ready): Set<string> {
   const nodes = ready.journey.graph.nodes ?? [];
-  const active = nodes.filter((node) => recordOf(ready, node).state === "active").map((node) => node.key);
+  const active = nodes.filter((node) => ready.derived.nodes[node.key]?.display_state === "active").map((node) => node.key);
   return currentStages(nodes, ready.derived.acting_frontier, active);
 }
 

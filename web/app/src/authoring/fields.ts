@@ -5,19 +5,12 @@
 // `feeds_milestone` on a date). A saved draft is the one-field mutations of what changed;
 // an answer-type change replaces the node whole, the only way the engine takes one (B7:
 // a shape change).
+import { BODY_BYTES_MAX, CHOICE_COUNT_PER_DECISION_MAX, OFFSET_DAYS_MAX, TITLE_BYTES_MAX, WEIGHT_MAX } from "@cairn/client";
 import type { Schema } from "@cairn/client";
 
 import { choiceId, type Choice } from "../status/answer.ts";
 import type { AnswerType, GraphNode, Mutation, NodeField, NodeKind } from "./graph.ts";
-import {
-  BODY_BYTES_MAX,
-  CHOICE_COUNT_PER_DECISION_MAX,
-  OFFSET_DAYS_MAX,
-  TITLE_BYTES_MAX,
-  WEIGHT_MAX,
-  outOfRange,
-  overBytes,
-} from "./limits.ts";
+import { outOfRange, overBytes } from "./limits.ts";
 import { isSlug } from "./keys.ts";
 
 export type Condition = Schema<"ConditionResolved">;

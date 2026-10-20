@@ -2,16 +2,16 @@
 // node's display state and what its derive already holds: what its state means for this node
 // and, where it helps, what to do about it. Pure, so the unit tests check the wording without a
 // page; the pieces carry links, which the component draws.
-import type { Schema } from "@cairn/client";
+import { INITIAL_STATE, type Schema } from "@cairn/client";
 
 import { conditionNames, conditionWords } from "../authoring/condition.ts";
 import { rankParts, type NodeRow } from "../acting/why.ts";
-import { rollups } from "../plan/tree.ts";
 import { SNOOZE_NODE_TAIL } from "../status/snooze.ts";
+import { isOpen } from "../status/state.ts";
 import { upperFirst } from "../status/words.ts";
 import { dateWords, daysUntil, daysWords, relativeDays } from "../status/when.ts";
 import { guardFailureText, namer } from "./explain.ts";
-import { INITIAL_STATE, isTerminal, nodeOf, titleOf, unansweredOf, type NodeDetail, type NodeDerived, type Ready } from "./model.ts";
+import { nodeOf, rankPlaces, titleOf, waitsOn, type Holding, type NodeDetail, type NodeDerived, type Ready } from "./model.ts";
 import { answerText, entityName } from "./sections.tsx";
 import { plural } from "./words.ts";
 
@@ -27,36 +27,7 @@ export interface RankFacts {
 
 /** The place of `key` on the ranked acting frontier, one-based. */
 export function positionOf(view: Ready, key: string): number | undefined {
-  const at = view.derived.acting_frontier.indexOf(key);
-  return at === -1 ? undefined : at + 1;
-}
-
-/** A dependency the node waits on: what it is, how it arose, and the ancestor holding it for the node, if one does. */
-export interface Holding {
-  node: string;
-  via: Schema<"DependencyVia">;
-  holder: string | undefined;
-}
-
-/**
- * Gating, D1: what the node waits on: its own unsatisfied requirements, condition gates and
- * stage opening, then those its ancestors hold for it. What it contains does not hold it (D8).
- */
-export function waitingOn(view: Ready, key: string): Holding[] {
-  const derived = view.derived.nodes[key];
-  const found: Holding[] = [];
-  const add = (holder: string, own: boolean) => {
-    for (const blocker of view.derived.nodes[holder]?.blocked_by ?? []) {
-      if (blocker.via !== "containment" && !found.some((held) => held.node === blocker.node && JSON.stringify(held.via) === JSON.stringify(blocker.via))) {
-        found.push({ node: blocker.node, via: blocker.via, holder: own ? undefined : holder });
-      }
-    }
-  };
-  add(key, true);
-  for (const ancestor of derived?.blocked_through ?? []) {
-    add(ancestor, false);
-  }
-  return found;
+  return rankPlaces(view).get(key);
 }
 
 /** The node's owner by name, when it has one. */
@@ -100,7 +71,7 @@ export function holdingPhrase(view: Ready, held: Holding): Piece[] {
 
 /** The things the node waits on, as a phrase: "A (Ben) and the B stage opening". */
 export function waitingPhrase(view: Ready, key: string): Piece[] {
-  const held = waitingOn(view, key);
+  const held = waitsOn(view, key);
   // A stage's own opening is what holds it: name the milestone, not the stage itself.
   const own = (each: Holding) => each.holder === undefined && typeof each.via === "object" && "stage_opening" in each.via && each.via.stage_opening.group === key;
   return held.length === 0 ? ["earlier work"] : listed(held.map((each) => (own(each) ? namedWithOwner(view, each.node) : holdingPhrase(view, each))));
@@ -109,7 +80,7 @@ export function waitingPhrase(view: Ready, key: string): Piece[] {
 
 /** The decisions to name when a node waits on answers: those its relevance reads that are still open. */
 function undecidedNames(view: Ready, key: string): Piece[] {
-  const open = unansweredOf(view, key);
+  const open = view.derived.nodes[key]?.relevance.unanswered ?? [];
   const named = open.length > 0 ? open : (view.derived.nodes[key]?.relevance.decisions ?? []);
   return listed(named.map((decision) => [{ node: decision }, " (unanswered)"]));
 }
@@ -172,13 +143,13 @@ export function rankClause(view: Ready, derived: NodeDerived, facts: RankFacts):
 
 /** A container's roll-up: how much of it is done (the plan's one rule, plan/tree.ts), the decisions still to make, and the open child with the least slack. */
 function rollUp(view: Ready, detail: NodeDetail): Piece[] {
-  const { done, total, toDecide } = rollups(view).get(detail.node.key) ?? { done: 0, total: 0, toDecide: 0 };
-  if (total === 0) {
+  const progress = detail.derived.progress;
+  if (progress == null || progress.total === 0) {
     return [];
   }
-  const counted = detail.children.filter((child) => child.displayState !== "not_relevant" && child.displayState !== "skipped");
-  const tightest = counted
-    .filter((child) => !isTerminal(child.state))
+  const { done, total, decisions_needed: toDecide } = progress;
+  const tightest = detail.children
+    .filter((child) => isOpen(view.derived.nodes[child.key]))
     .flatMap((child) => {
       const slack = view.derived.nodes[child.key]?.dates.slack_days;
       return slack == null ? [] : [{ key: child.key, slack }];
@@ -208,7 +179,7 @@ function stateSentence(view: Ready, detail: NodeDetail, rank: RankFacts): Piece[
       return [`${node.kind === "decision" ? "Ready to decide." : "Ready."}${rankClause(view, derived, rank)}`];
     case "active": {
       const since = `${record.started_on == null ? "In progress." : `In progress since ${on(record.started_on)}.`}${rankClause(view, derived, rank)}`;
-      return derived.blocked_by?.some((blocker) => blocker.via !== "containment") === true || (derived.blocked_through ?? []).length > 0
+      return derived.started_early === true
         ? [`${since} Started early: still waits on `, ...waitingPhrase(view, node.key), "."]
         : [since];
     }

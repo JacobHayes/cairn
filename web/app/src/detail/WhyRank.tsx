@@ -5,6 +5,7 @@
 // whole area. Folded by default, and read on demand for the open node only.
 import { rankParts, type NodeRow, type RankPart } from "../acting/why.ts";
 import { useContributions } from "./contributions.ts";
+import { isOpen } from "../status/state.ts";
 import { foldKey, useFold } from "./folds.ts";
 import type { NodeDetail, Ready } from "./model.ts";
 import { NodeLink, Contributions, Section } from "./parts.tsx";
@@ -134,7 +135,7 @@ function Unlocks({ view, detail, open }: { view: Ready; detail: NodeDetail; open
 
 export function WhyRank({ view, detail, position, row }: { view: Ready; detail: NodeDetail; position: number | undefined; row: NodeRow | undefined }) {
   const { node, derived } = detail;
-  const gone = derived.display_state === "done" || derived.display_state === "skipped" || derived.display_state === "not_relevant";
+  const gone = !isOpen(derived);
   const fold = foldKey(node.kind, "rank");
   const open = useFold(fold, false);
   if (gone) {

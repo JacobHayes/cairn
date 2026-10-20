@@ -4,7 +4,7 @@
 import type { Schema } from "@cairn/client";
 
 import { dateOf, dayOf } from "../timeline/model.ts";
-import { isTerminal, nodeOf, recordOf, type NodeDetail, type Ready } from "./model.ts";
+import { nodeOf, type NodeDetail, type Ready } from "./model.ts";
 
 /** Something a snooze can set aside. */
 export interface SetAside {
@@ -30,10 +30,8 @@ function beneath(view: Ready, key: string, ancestor: string): boolean {
 
 /** The unfinished, in-scope work beneath a container: what its snooze would hold back. */
 export function openUnder(view: Ready, container: string): number {
-  return (view.journey.graph.nodes ?? []).filter((node) => {
-    const derived = view.derived.nodes[node.key];
-    return node.kind !== "group" && beneath(view, node.key, container) && derived?.relevance.value !== "not_relevant" && !isTerminal(recordOf(view, node).state);
-  }).length;
+  const progress = view.derived.nodes[container]?.progress;
+  return progress == null ? 0 : progress.total - progress.done;
 }
 
 /** The node, then each ancestor container with unfinished in-scope work, nearest first, with its open count. */

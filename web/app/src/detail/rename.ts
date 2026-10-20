@@ -4,7 +4,8 @@
 // manager and kept across screens and reloads, and the form shows it until it lands or is
 // discarded. Text typed after a rejection is a newer draft beside the write, and Keep my edit
 // takes that, else what the write sent.
-import { overBytes, TITLE_BYTES_MAX } from "../authoring/limits.ts";
+import { TITLE_BYTES_MAX } from "@cairn/client";
+import { overBytes } from "../authoring/limits.ts";
 import { useDraft } from "../data/drafts.ts";
 import { useWrite } from "../data/react.ts";
 import type { WriteView } from "../data/write-machine.ts";

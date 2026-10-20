@@ -23,7 +23,6 @@ use cairn_schema::{
 };
 
 use super::DerivedJourney;
-use super::rows::count;
 use crate::derive::forced;
 
 impl DerivedJourney<'_> {
@@ -270,6 +269,36 @@ impl DerivedJourney<'_> {
             })
     }
 
+    /// C18: in-scope nodes with work left on them.
+    fn remaining(&self) -> u32 {
+        let derived = self.derived;
+        let count = self
+            .graph
+            .document()
+            .nodes
+            .as_map()
+            .keys()
+            .filter(|key| derived.relevance().in_scope(key) && !derived.blocking().closed(key))
+            .count();
+        u32::try_from(count).unwrap_or(u32::MAX)
+    }
+
+    /// B11: the journey has a node and none in scope is left open, or its final milestone
+    /// is reached (stored or auto-reached, F1). Completing is the person's call.
+    #[must_use]
+    pub fn completion_suggested(&self) -> bool {
+        let document = self.graph.document();
+        if document.nodes.is_empty() {
+            return false;
+        }
+        self.remaining() == 0
+            || document.nodes.values().any(|node| {
+                matches!(&node.payload, Payload::Milestone(milestone) if milestone.is_final)
+                    && (self.state(&node.key) == State::Reached
+                        || self.derived.blocking().auto_reached(&node.key))
+            })
+    }
+
     /// C18: counts by state, what remains, the overdue, shortfall, and stale nodes, upcoming
     /// milestones with their effective dates, and open decisions with their owners.
     #[must_use]
@@ -323,7 +352,7 @@ impl DerivedJourney<'_> {
         StatusSummary {
             by_state,
             by_display_state,
-            remaining: count(in_scope.iter().filter(|key| open(key)).count()),
+            remaining: self.remaining(),
             overdue: keep(&|key| derived.dates().overdue(key)),
             shortfalls: keep(&|key| derived.dates().shortfall_days(key).is_some()),
             stale: keep(&|key| derived.is_stale(key)),
@@ -337,6 +366,7 @@ impl DerivedJourney<'_> {
                     node,
                 })
                 .collect(),
+            completion_suggested: self.completion_suggested(),
         }
     }
 }

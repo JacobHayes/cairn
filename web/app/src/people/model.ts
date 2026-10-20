@@ -5,7 +5,8 @@
 import type { Schema } from "@cairn/client";
 
 import { pathTo } from "../address.ts";
-import { EMAIL_BYTES_MAX, EMAIL_COUNT_PER_ENTITY_MAX, overBytes } from "../authoring/limits.ts";
+import { EMAIL_BYTES_MAX, EMAIL_COUNT_PER_ENTITY_MAX } from "@cairn/client";
+import { overBytes } from "../authoring/limits.ts";
 import type { Mutation } from "../data/writes.ts";
 import type { ChipRules } from "../ui/chips.ts";
 

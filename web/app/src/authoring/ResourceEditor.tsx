@@ -4,13 +4,14 @@
 // answer) and written as a route file writes them, then stored with keys (Identity and
 // references), so renaming a role or moving a decision breaks nothing. Limits and a link's
 // form are checked before sending.
+import { BODY_BYTES_MAX, RESOURCE_COUNT_PER_NODE_MAX, TITLE_BYTES_MAX } from "@cairn/client";
 import type { Schema } from "@cairn/client";
 import { useDraft } from "../data/drafts.ts";
 
 import { Button, Field } from "../ui/kit.tsx";
 import type { Resource } from "./graph.ts";
 import { mintKey } from "./keys.ts";
-import { BODY_BYTES_MAX, RESOURCE_COUNT_PER_NODE_MAX, TITLE_BYTES_MAX, overBytes, urlProblem } from "./limits.ts";
+import { overBytes, urlProblem } from "./limits.ts";
 import { Picker } from "./parts.tsx";
 import { placeholderOptions, toStored, toWritten } from "./placeholders.ts";
 import { Refusal, type NodeEditorProps } from "./StructureEditors.tsx";

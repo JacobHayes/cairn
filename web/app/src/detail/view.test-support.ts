@@ -49,6 +49,48 @@ const meetingDue: Bound = {
 const relevant = { relevance: { value: "relevant" as const }, gravity: 1, unlocks: 0 };
 const none = { entries: [], total: 0 };
 
+/** The derive's per-node values. */
+function derivedNodes(): Ready["derived"]["nodes"] {
+  return {
+    n_stage: {
+      ...relevant,
+      display_state: "active",
+      actionable: false,
+      dates: {},
+      gravity_from: none,
+      unlocks_from: none,
+      waits_on: none,
+      blocked_by: [{ node: "n_findings", via: "containment" }],
+      progress: { done: 0, total: 2, overdue: 0, decisions_needed: 0 },
+    },
+    n_report: {
+      ...relevant,
+      display_state: "active",
+      actionable: false,
+      blocked_by: [{ node: "n_findings", via: "explicit" }],
+      waits_on: { entries: [{ node: "n_findings", via: "explicit" }], total: 1 },
+      started_early: true,
+      failing_guards: ["deps_done", "has_artifact"],
+      dates: { due: pinnedDue, slack_days: 24 },
+      gravity: 5,
+      gravity_from: { entries: [{ node: "n_meeting", score: 4 }], total: 1 },
+      unlocks_from: none,
+    },
+    n_findings: {
+      ...relevant,
+      display_state: "ready",
+      actionable: true,
+      dates: { due: derivedDue },
+      waits_on: none,
+      gravity_from: none,
+      unlocks: 2,
+      unlocks_from: { entries: [{ node: "n_report", score: 1.5, other_owner: true }], total: 1 },
+    },
+    n_meeting: { ...relevant, display_state: "ready", actionable: false, waits_on: none, dates: { due: meetingDue, effective_date: { date: "2026-11-20", origin: "pin" } }, gravity_from: none, unlocks_from: none },
+    n_when: { ...relevant, display_state: "ready", actionable: false, waits_on: none, dates: {}, gravity_from: none, unlocks_from: none },
+  };
+}
+
 export function testView(): Ready {
   const view: Ready = {
     status: "ready",
@@ -86,30 +128,7 @@ export function testView(): Ready {
       today,
       frontier: ["n_findings"],
       acting_frontier: ["n_findings"],
-      nodes: {
-        n_stage: { ...relevant, display_state: "active", actionable: false, dates: {}, gravity_from: none, unlocks_from: none, blocked_by: [{ node: "n_findings", via: "containment" }] },
-        n_report: {
-          ...relevant,
-          display_state: "active",
-          actionable: false,
-          blocked_by: [{ node: "n_findings", via: "explicit" }],
-          dates: { due: pinnedDue, slack_days: 24 },
-          gravity: 5,
-          gravity_from: { entries: [{ node: "n_meeting", score: 4 }], total: 1 },
-          unlocks_from: none,
-        },
-        n_findings: {
-          ...relevant,
-          display_state: "ready",
-          actionable: true,
-          dates: { due: derivedDue },
-          gravity_from: none,
-          unlocks: 2,
-          unlocks_from: { entries: [{ node: "n_report", score: 1.5, other_owner: true }], total: 1 },
-        },
-        n_meeting: { ...relevant, display_state: "ready", actionable: false, dates: { due: meetingDue, effective_date: { date: "2026-11-20", origin: "pin" } }, gravity_from: none, unlocks_from: none },
-        n_when: { ...relevant, display_state: "ready", actionable: false, dates: {}, gravity_from: none, unlocks_from: none },
-      },
+      nodes: derivedNodes(),
     },
   };
   return view;

@@ -36,6 +36,7 @@ mod display;
 pub mod participation;
 pub mod pending;
 pub mod priority;
+mod progress;
 mod project;
 pub mod rank;
 pub mod relevance;

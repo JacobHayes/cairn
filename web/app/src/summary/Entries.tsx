@@ -34,6 +34,8 @@ export interface Entry {
   act: NodeRow | undefined;
   /** The owners' names, none when the row says nothing of who has it (finished work). */
   owners: string[] | undefined;
+  /** The row's work is the viewer's (C18: the acting-frontier items they own). */
+  yours?: boolean;
 }
 
 interface Props {
@@ -60,7 +62,7 @@ export function EntriesPanel({ ready, entries, actions, owner = true, ...panel }
       const to = nodeAddress(journey, entry.key);
       return (
         <NodeItem view={ready} node={entry.key} to={to} fact={typeof entry.fact === "function" ? entry.fact() : entry.fact} factTone={entry.tone} testId="summary-item">
-          {actions && entry.act !== undefined && shown ? <RowActions view={ready} row={entry.act} to={to} owner={owner} /> : <OwnerText names={entry.owners} />}
+          {actions && entry.act !== undefined && shown ? <RowActions view={ready} row={entry.act} to={to} owner={owner} yours={entry.yours === true} /> : <OwnerText names={entry.owners} />}
         </NodeItem>
       );
     },

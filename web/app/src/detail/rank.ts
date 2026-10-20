@@ -4,7 +4,7 @@
 // the unit tests check the sums without a page.
 import type { Schema } from "@cairn/client";
 
-import { unansweredOf, type Ready } from "./model.ts";
+import type { Ready } from "./model.ts";
 
 type Contribution = Schema<"Contribution">;
 
@@ -37,7 +37,7 @@ export function gravityParts(view: Ready, gravity: number, entries: readonly Con
       applies.adds += entry.score;
       continue;
     }
-    const decision = unansweredOf(view, entry.node)[0] ?? relevance.decisions?.[0] ?? "";
+    const decision = relevance.unanswered?.[0] ?? relevance.decisions?.[0] ?? "";
     const share = waiting.get(decision) ?? { nodes: 0, adds: 0 };
     waiting.set(decision, { nodes: share.nodes + 1, adds: share.adds + entry.score });
   }

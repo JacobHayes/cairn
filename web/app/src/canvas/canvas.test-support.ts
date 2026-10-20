@@ -8,7 +8,10 @@ import type { Level, LevelEdge, LevelNode } from "./model.ts";
 
 const today = "2026-10-06";
 const none = { entries: [], total: 0 };
-const base = { gravity_from: none, unlocks_from: none, actionable: false, gravity: 1, unlocks: 0, dates: {} };
+const base = { gravity_from: none, unlocks_from: none, waits_on: none, actionable: false, gravity: 1, unlocks: 0, dates: {} };
+/** The build stage holds the build and its check, the build is overdue; the build holds the check. */
+const stageProgress = { done: 0, total: 2, overdue: 1, decisions_needed: 0 };
+const buildProgress = { done: 0, total: 1, overdue: 0, decisions_needed: 0 };
 const relevant = { relevance: { value: "relevant" as const } };
 const owned = { participations: { k_owner: { entities: ["e_one"], origin: "explicit" as const } } };
 const bound = (date: string) => ({ date, chain: { constraints: [], fixed: [] } });
@@ -52,10 +55,30 @@ export function canvasView(): Ready {
       nodes: {
         n_kick: { ...base, display_state: "done", ...relevant, gravity: 9 },
         n_choose: { ...base, display_state: "ready", ...relevant, ...owned, actionable: true, gravity: 8, unlocks: 1, dates: { due: bound("2026-10-09"), latest_start: bound("2026-10-08"), slack_days: 2 } },
-        n_stage: { ...base, display_state: "active", ...relevant, gravity: 4 },
-        n_build: { ...base, display_state: "active", ...relevant, ...owned, gravity: 4, overdue: true, blocked_by: [{ node: "n_option", via: "explicit" }], dates: { due: bound("2026-10-01") } },
+        n_stage: { ...base, display_state: "active", ...relevant, gravity: 4, progress: stageProgress },
+        n_build: {
+          ...base,
+          display_state: "active",
+          ...relevant,
+          ...owned,
+          gravity: 4,
+          overdue: true,
+          blocked_by: [{ node: "n_option", via: "explicit" }],
+          waits_on: { entries: [{ node: "n_option", via: "explicit" }], total: 1 },
+          started_early: true,
+          failing_guards: ["deps_done"],
+          progress: buildProgress,
+          dates: { due: bound("2026-10-01"), overdue_days: 5 },
+        },
         n_check: { ...base, display_state: "ready", ...relevant, ...owned, actionable: true, gravity: 5, dates: { due: bound("2026-11-30") } },
-        n_option: { ...base, display_state: "conditional", relevance: { value: "undecided", decisions: ["n_choose"] }, gravity: 4.5, blocked_by: [{ node: "n_choose", via: { condition: { condition_on: "n_option" } } }] },
+        n_option: {
+          ...base,
+          display_state: "conditional",
+          relevance: { value: "undecided", decisions: ["n_choose"], unanswered: ["n_choose"] },
+          gravity: 4.5,
+          blocked_by: [{ node: "n_choose", via: { condition: { condition_on: "n_option" } } }],
+          waits_on: { entries: [{ node: "n_choose", via: { condition: { condition_on: "n_option" } } }], total: 1 },
+        },
         n_old: { ...base, display_state: "not_relevant", relevance: { value: "not_relevant" }, gravity: 0 },
       },
     },
@@ -94,8 +117,8 @@ export function wholeLevel(): Level {
     nodes: [
       node("n_kick"),
       node("n_choose"),
-      node("n_stage", { roll_up: { children_active: true } }),
-      node("n_build", { parent: "n_stage", roll_up: { owners: ["e_one"], subtree_gravity: 9, min_child_slack_days: 40 } }),
+      node("n_stage", { roll_up: { children_active: true, progress: stageProgress } }),
+      node("n_build", { parent: "n_stage", roll_up: { owners: ["e_one"], subtree_gravity: 9, min_child_slack_days: 40, progress: buildProgress } }),
       node("n_check", { parent: "n_build" }),
       node("n_option"),
       node("n_old"),
@@ -110,8 +133,8 @@ export function actionsAndDecisionsHidden(): Level {
     shown: ["group", "deliverable", "milestone"],
     nodes: [
       node("n_kick"),
-      node("n_stage", { roll_up: { children_active: true } }),
-      node("n_build", { parent: "n_stage", rolled_up: ["n_check"], roll_up: { owners: ["e_one"] } }),
+      node("n_stage", { roll_up: { children_active: true, progress: stageProgress } }),
+      node("n_build", { parent: "n_stage", rolled_up: ["n_check"], roll_up: { owners: ["e_one"], progress: buildProgress } }),
       node("n_option", { hidden_prerequisites: ["n_choose"] }),
     ],
     edges: [implicit("n_kick", "n_stage", "stage_opening"), explicit("n_option", "n_build")],

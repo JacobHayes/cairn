@@ -40,7 +40,7 @@ export function Flags({ view, row }: { view: Ready; row: NodeRow }) {
   const derived = view.derived.nodes[row.key];
   return (
     <span className="row">
-      {(derived === undefined ? [] : flagsOf(derived, row.state)).map(({ flag, tone }) => (
+      {(derived === undefined ? [] : flagsOf(derived)).map(({ flag, tone }) => (
         <Badge key={flag} tone={tone} data-testid="flag" data-status={flag}>
           {flag}
         </Badge>

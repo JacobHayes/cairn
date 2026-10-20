@@ -18,7 +18,7 @@ export interface Contributions {
 }
 
 /** Whether a capped list holds every entry. */
-export function isComplete(explained: Schema<"Explained">): boolean {
+export function isComplete(explained: Schema<"ExplainedContribution">): boolean {
   return explained.entries.length >= explained.total;
 }
 
@@ -46,7 +46,7 @@ const PAGED: ReadSource<PagedArgs, Contribution[]> = {
 };
 
 /** Node `key`'s `field` list in full, paged from the worker when the derive capped it. */
-export function useContributions(view: Ready, key: string, field: Schema<"ExplainedField">, explained: Schema<"Explained">): Contributions {
+export function useContributions(view: Ready, key: string, field: Schema<"ExplainedField">, explained: Schema<"ExplainedContribution">): Contributions {
   const { deriver } = useSession();
   const journey = view.journey.header.id;
   const capped = !isComplete(explained);

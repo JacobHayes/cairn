@@ -11,7 +11,8 @@
 import { createContext, useContext } from "react";
 
 import type { ListFlag } from "../acting/address.ts";
-import { overBytes, TITLE_BYTES_MAX } from "../authoring/limits.ts";
+import { TITLE_BYTES_MAX } from "@cairn/client";
+import { overBytes } from "../authoring/limits.ts";
 import { STEPS, type Step } from "../canvas/model.ts";
 import { journeyPath } from "./address.ts";
 

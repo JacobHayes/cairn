@@ -2029,7 +2029,21 @@ export interface components {
          *     the engine and the browser; a server response keeps the largest entries up to
          *     `explanation_entry_count_max` and the total.
          */
-        Explained: {
+        ExplainedBlocker: {
+            /** @description The entries, largest first. */
+            entries: components["schemas"]["Blocker"][];
+            /**
+             * Format: uint32
+             * @description How many there are in all.
+             */
+            total: number;
+        };
+        /**
+         * @description A list of explanation entries with its total (ARCHITECTURE, Read path): complete inside
+         *     the engine and the browser; a server response keeps the largest entries up to
+         *     `explanation_entry_count_max` and the total.
+         */
+        ExplainedContribution: {
             /** @description The entries, largest first. */
             entries: components["schemas"]["Contribution"][];
             /**
@@ -3236,6 +3250,12 @@ export interface components {
             effective_date?: components["schemas"]["EffectiveDate"] | null;
             /** @description The latest it can start. */
             latest_start?: components["schemas"]["Bound"] | null;
+            /**
+             * Format: uint32
+             * @description F6, D3: how many days its due is before today, for an overdue node; none when it is
+             *     not overdue.
+             */
+            overdue_days?: number | null;
             /** @description The plan can no longer be met (F6). */
             shortfall?: components["schemas"]["ShortChain"] | null;
             /**
@@ -3275,10 +3295,17 @@ export interface components {
             display_state: components["schemas"]["DisplayState"];
             /** @description Skipped through an ancestor's skip (D1a). */
             effectively_skipped?: boolean;
+            /**
+             * @description D4: the bypassable guards its completing transition (complete a deliverable or
+             *     action, answer an open decision, reach a pending milestone) would fail if attempted
+             *     now with no bypass in the patch. Empty for every node with no such transition left:
+             *     finished, not relevant, or a group.
+             */
+            failing_guards?: components["schemas"]["Guard"][];
             /** @description Gravity and its contributors (Priority). */
             gravity: components["schemas"]["Score"];
             /** @description The contributors to gravity. */
-            gravity_from: components["schemas"]["Explained"];
+            gravity_from: components["schemas"]["ExplainedContribution"];
             /**
              * @deprecated
              * @description A container's largest child gravity, one level down.
@@ -3297,6 +3324,11 @@ export interface components {
             participations?: {
                 [key: string]: components["schemas"]["EffectiveParticipation"];
             };
+            /**
+             * @description C2, C4: a container's progress over the work beneath it; none for a node with no
+             *     children.
+             */
+            progress?: components["schemas"]["Progress"] | null;
             /** @description Rank, for nodes in the normalization set. */
             rank?: components["schemas"]["Real"] | null;
             /** @description Relevance and what produced it. */
@@ -3315,6 +3347,11 @@ export interface components {
             /** @description Why a terminal node's completing guards would now fail (D4). */
             stale?: components["schemas"]["GuardFailure"][];
             /**
+             * @description D8: stored `active` while its own or an inherited gate is unsatisfied; a container's
+             *     children are not a gate.
+             */
+            started_early?: boolean;
+            /**
              * @description A container's subtree gravity (Priority): what rides on its whole area, the counted
              *     weight of the container and its open descendants and everything downstream of any of
              *     them, each once. Never less than any member's `gravity`; none for a node with no
@@ -3329,7 +3366,19 @@ export interface components {
             /** @description Unlocks (Priority). */
             unlocks: components["schemas"]["Score"];
             /** @description The nodes completing this would unblock. */
-            unlocks_from: components["schemas"]["Explained"];
+            unlocks_from: components["schemas"]["ExplainedContribution"];
+            /**
+             * @description Gating, D8: the unsatisfied gate dependencies that hold the node now, its own and
+             *     those it inherits through its ancestors (requirements, conditions, openings), its
+             *     children aside; one entry per dependency, its nearest holder's; empty when nothing
+             *     holds it. `blocked_by` and `blocked_through` explain the structure; this answers
+             *     "what does it wait on".
+             * @default {
+             *       "entries": [],
+             *       "total": 0
+             *     }
+             */
+            waits_on: components["schemas"]["ExplainedBlocker"];
         };
         /**
          * @description C8: one node in full. Its explanation lists (`derived.gravity_from`, `unlocks_from`)
@@ -3732,6 +3781,35 @@ export interface components {
          *     rejections). A rejected patch answers its `Rejection` instead.
          */
         ProblemCode: "bad_request" | "unsupported_media_type" | "payload_too_large" | "target_mismatch" | "cannot_draft" | "not_found" | "page_moved" | "no_such_endpoint" | "method_not_allowed" | "user_only" | "overloaded" | "subscriber_limit" | "store_busy" | "timed_out" | "engine_panic" | "internal";
+        /**
+         * @description C2, C4: a container's progress over the work beneath it, counted over every proper
+         *     descendant that is an item: not a group, in scope (relevant or undecided), and neither
+         *     skipped nor skipped through a container. A kept node under a skipped container, and a
+         *     force-included node under a not-relevant one, count on their own terms. Derived on every
+         *     read in one pass over the tree, O(nodes).
+         */
+        Progress: {
+            /**
+             * Format: uint32
+             * @description Decisions among the items that are actionable now (D2), snoozed ones included.
+             */
+            decisions_needed: number;
+            /**
+             * Format: uint32
+             * @description Items whose display state is `done` (finished, decided, reached, or auto-reached).
+             */
+            done: number;
+            /**
+             * Format: uint32
+             * @description Items that are overdue (D3).
+             */
+            overdue: number;
+            /**
+             * Format: uint32
+             * @description Items.
+             */
+            total: number;
+        };
         /** @description A projection with what it was derived from (D3: computed per read, never stored). */
         ProjectedDecisionView: {
             /** @description The deployment revision it was derived over (E6). */
@@ -4271,6 +4349,13 @@ export interface components {
              *     and blocking follow Gating exactly; display state shows such a node as `conditional`.
              */
             pending_on?: components["schemas"]["NodeKey"][];
+            /**
+             * @description D4, Gating: for an undecided value, the decisions that make it undecided and can be
+             *     answered now: open, relevant, and not under a skip, read by a condition leaving it
+             *     undecided, its own or an ancestor's, up to a force include. Empty for any other
+             *     value (not the same as Gating's wider "unanswered").
+             */
+            unanswered?: components["schemas"]["NodeKey"][];
             /** @description The value. */
             value: components["schemas"]["Relevance"];
         };
@@ -4480,8 +4565,6 @@ export interface components {
             all_blocked?: boolean;
             /** @description A child is `active`. */
             children_active?: boolean;
-            /** @description A child decision is actionable: "decision needed". */
-            decision_needed?: boolean;
             /**
              * @deprecated
              * @description The largest in-scope child gravity (Priority), one level down.
@@ -4498,6 +4581,11 @@ export interface components {
             needs_breakdown?: boolean;
             /** @description The distinct owners of its children. */
             owners?: components["schemas"]["EntityKey"][];
+            /**
+             * @description C2, C4: the container's progress over the work beneath it, whole subtree; "decision
+             *     needed" is `progress.decisions_needed > 0`.
+             */
+            progress: components["schemas"]["Progress"];
             /**
              * @description A deliverable or action whose children and other dependencies are satisfied but which
              *     is not terminal: "children complete, ready to finish".
@@ -4724,6 +4812,11 @@ export interface components {
             answers?: {
                 [key: string]: components["schemas"]["AnswerValue"];
             };
+            /**
+             * @description B11: completing the journey is suggested (see `StatusSummary`); completing it is the
+             *     person's call.
+             */
+            completion_suggested?: boolean;
             /** @description The counts. */
             counts: components["schemas"]["SnapshotCounts"];
             /** @description Placeholders needing breakdown (B10). */
@@ -4906,6 +4999,11 @@ export interface components {
             by_state: {
                 [key: string]: number;
             };
+            /**
+             * @description B11: the journey has a node and none in scope is left open, or its final milestone
+             *     is reached (stored or auto-reached).
+             */
+            completion_suggested?: boolean;
             /** @description Open, in-scope decisions with their owners, in rank order. */
             open_decisions?: components["schemas"]["OpenDecision"][];
             /** @description Overdue nodes, by key. */

@@ -105,22 +105,19 @@ function useJourneyModel(ready: Ready, view: GraphView, collapsed: string[], dra
   const { level, error: levelError } = useLevel(ready, request, selected);
   const wholeRead = useProjected(ready, everything);
   const whole = valueOf(wholeRead);
-  const nextRead = useProjected(ready, { projection: "next" });
   const mineRead = useProjected(ready, { projection: "mine" });
-  const next = valueOf(nextRead);
   const mine = valueOf(mineRead);
-  // The cards say what is next and what is the viewer's, so the first canvas waits for both: a layout made without them would be laid out again, and fitted before it.
-  const answered = !isPending(nextRead) && !isPending(mineRead);
+  // The cards say what is the viewer's, so the first canvas waits for it: a layout made without it would be laid out again, and fitted before it.
+  const answered = !isPending(mineRead);
   const model = useMemo(() => {
     const shown = revealed === undefined ? level : whole;
     if (level === undefined || shown === undefined || !answered) {
       return undefined;
     }
-    const ranked = (next?.items ?? []).map((item) => item.key);
     const entries = mine ?? [];
-    const drawn = journeyModel(ready, shown, { ranked, mine: entries.map((entry) => entry.node), owned: entries.filter((entry) => entry.kinds.includes("k_owner")).map((entry) => entry.node) });
+    const drawn = journeyModel(ready, shown, { mine: entries.map((entry) => entry.node), owned: entries.filter((entry) => entry.kinds.includes("k_owner")).map((entry) => entry.node) });
     return revealed === undefined ? drawn : onlyTraced(drawn, revealed, new Set(level.nodes.map((node) => node.key)));
-  }, [ready, level, whole, next, mine, answered, revealed]);
+  }, [ready, level, whole, mine, answered, revealed]);
   // Frontier, Fade's dimming and the viewer's expands and collapses keep the layout's positions; the step drawn, the Filter and the search lay it out afresh.
   return { model, level, error: levelError ?? errorWords(wholeRead), layoutView: journeyLayoutView(view.state, depth) };
 }

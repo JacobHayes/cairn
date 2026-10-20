@@ -18,7 +18,7 @@ describe("what is still the viewer's to do (2.4)", () => {
   it("leaves out a container, work not in scope, finished work, and a milestone reached on its own", () => {
     const view = testView();
     const found = view.derived.nodes;
-    for (const [key, change] of [["n_findings", { relevance: { value: "not_relevant" as const } }], ["n_meeting", { auto_reached: true }]] as const) {
+    for (const [key, change] of [["n_findings", { relevance: { value: "not_relevant" as const } }], ["n_meeting", { auto_reached: true, display_state: "done" as const }], ["n_report", { display_state: "done" as const }]] as const) {
       const was = found[key];
       if (was !== undefined) {
         found[key] = { ...was, ...change };

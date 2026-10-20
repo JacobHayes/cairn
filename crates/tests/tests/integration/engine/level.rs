@@ -378,7 +378,9 @@ fn a_container_rolls_up_its_childrens_badges() {
     let fresh = level(&records, support::JOURNEY, &NodeKind::ALL, None);
     let group = node(&fresh, "n_group");
     let badges = group.roll_up.as_ref().unwrap();
-    assert!(badges.decision_needed && badges.needs_breakdown && !badges.children_active);
+    assert!(
+        badges.progress.decisions_needed > 0 && badges.needs_breakdown && !badges.children_active
+    );
     let owners: Vec<&str> = badges
         .owners
         .iter()

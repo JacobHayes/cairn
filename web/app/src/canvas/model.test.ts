@@ -15,7 +15,8 @@ const view = canvasView();
 const graph = view.journey.graph.nodes ?? [];
 
 function model(level: Level, ranked = ["n_choose", "n_check"], mine: string[] = [], ready = view): CanvasModel {
-  const looks = journeyLooks(ready, { ranked, mine, owned: mine });
+  const ranking = { ...ready, derived: { ...ready.derived, acting_frontier: ranked } };
+  const looks = journeyLooks(ranking, { mine, owned: mine });
   return { cards: cardsOf(level, graph, looks), lines: linesOf(level, graph, (key) => looks.finished(key)) };
 }
 
@@ -90,9 +91,14 @@ describe("C1: what a card says", () => {
 
   test("a container carries one roll-up badge, the most urgent", () => {
     const level = wholeLevel();
-    level.nodes = level.nodes.map((node) => (node.key === "n_stage" ? { ...node, roll_up: { all_blocked: true, decision_needed: true } } : node));
-    expect(card(model(level), "n_stage").journey?.body).toMatchObject({ badge: { flag: "decision to make" } });
+    level.nodes = level.nodes.map((node) => (node.key === "n_stage" ? { ...node, roll_up: { all_blocked: true, progress: { done: 0, total: 1, overdue: 0, decisions_needed: 0 } } } : node));
+    expect(card(model(level), "n_stage").journey?.body).toMatchObject({ badge: { flag: "all blocked" } });
+    const deciding = changed((each) => {
+      derivedOf(each, "n_stage").progress = { done: 0, total: 1, overdue: 0, decisions_needed: 1 };
+    });
+    expect(card(model(level, undefined, [], deciding), "n_stage").journey?.body).toMatchObject({ badge: { flag: "decision to make" } });
   });
+
 });
 
 describe("a route's canvas (8.11)", () => {
@@ -165,6 +171,7 @@ describe("C2, C4: roll-ups", () => {
   test("a card shows the engine's display state (D8): a skipped node is finished, and checks off in its container's checklist", () => {
     const skipped = changed((each) => {
       derivedOf(each, "n_build").display_state = "skipped";
+      derivedOf(each, "n_build").started_early = false;
       derivedOf(each, "n_check").display_state = "skipped";
     });
     const build = card(model(wholeLevel(), [], [], skipped), "n_build");

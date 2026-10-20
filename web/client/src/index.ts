@@ -35,6 +35,7 @@ export function appliedNow(answer: Schema<"PatchAnswer">): boolean {
   return answer.outcome === "applied";
 }
 
+export * from "../generated/rules.ts";
 export * from "./http.ts";
 export * from "./retry.ts";
 export * from "./subscription.ts";

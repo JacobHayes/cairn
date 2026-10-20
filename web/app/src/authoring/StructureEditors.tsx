@@ -3,6 +3,7 @@
 // the reason; removed), where it sits (A2: moved into another container), who participates
 // by role (A6, A7, E2), its breakdown by hand (B10: children added; a journey's placeholder
 // marked atomic), and its removal with the cascade shown first (A18).
+import { EDGE_COUNT_PER_NODE_MAX, TITLE_BYTES_MAX } from "@cairn/client";
 import { useState } from "react";
 
 import { useDraft } from "../data/drafts.ts";
@@ -12,7 +13,7 @@ import { Button, Field } from "../ui/kit.tsx";
 import { CascadeDialog } from "./CascadeDialog.tsx";
 import { planRemoval, removalMutations } from "./cascade.ts";
 import { useConnecting } from "./connect.tsx";
-import { EDGE_COUNT_PER_NODE_MAX, TITLE_BYTES_MAX, overBytes } from "./limits.ts";
+import { overBytes } from "./limits.ts";
 import { canHoldChildren, childrenOf, edgeRefusal, kindOption, moveTargets, nodesByPath, pathOf, titleIn, type GraphNode, type Mutation, type NodeKind } from "./graph.ts";
 import { mintKey, slugOf, uniqueId } from "./keys.ts";
 import { Picker } from "./parts.tsx";

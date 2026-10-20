@@ -14,6 +14,7 @@ mod cost_removal;
 mod cost_upgrade;
 mod dates;
 mod dependencies;
+mod derived_values;
 mod display_state;
 mod document;
 mod domains;

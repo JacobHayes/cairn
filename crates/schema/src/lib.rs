@@ -52,7 +52,7 @@ pub use condition::{Clause, Comparison, Condition, ConditionValue, Membership};
 pub use derived::{
     Blocker, Bound, Consequences, Contribution, DateOrigin, DeriveInputs, Derived, DisplayState,
     DomainDocument, EffectiveDate, EffectiveParticipation, Explained, HeldDependent, NodeDates,
-    NodeDerived, OwnerFactor, ParticipationOrigin, RankConstants, Real, Relevance,
+    NodeDerived, OwnerFactor, ParticipationOrigin, Progress, RankConstants, Real, Relevance,
     RelevanceExplanation, Score, ShortfallConsequence, StaleConsequence, StallCause, Stalled,
     StillWaiting, Thousandths, TimeZoneName, UndecidedConsequence, UndecidedDiscount,
 };

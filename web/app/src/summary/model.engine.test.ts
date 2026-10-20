@@ -42,10 +42,26 @@ function openFresh(mutations: Mutation[] = []): DerivedJourney {
   return derived;
 }
 
-function pageOf(journey: DerivedJourney, viewer?: readonly string[]) {
-  const model = summaryModel(journey.ready, journey.project({ projection: "status_summary" }));
-  const frontier = journey.project({ projection: "next" }).items;
-  return { model, frontier, actions: claimActions(journey.ready, model, frontier, viewer ?? [...(journey.ready.inputs.viewer ?? [])]) };
+/** `journey` derived again with `viewer` as the caller's entities, and `aliases` (old key to survivor) merged in the deployment. */
+function asViewer(journey: DerivedJourney, viewer: readonly string[], aliases?: Record<string, string>): DerivedJourney {
+  const { inputs } = journey.ready;
+  // A merged entity's key no longer names an entity: it resolves through the alias.
+  const deployment = aliases === undefined ? inputs.deployment : { ...inputs.deployment, aliases, entities: (inputs.deployment.entities ?? []).filter((entity) => !(entity.key in aliases)) };
+  const derived = derivedJourney(host, JSON.stringify({ journey: journey.ready.journey, inputs: { ...inputs, deployment, viewer: [...viewer] } }));
+  held.push(derived);
+  return derived;
+}
+
+/**
+ * The front page's values for `journey`: the viewer's owned nodes are the engine's "mine" (the
+ * journey re-derived with `viewer` as the caller's entities, when one is given).
+ */
+function pageOf(journey: DerivedJourney, viewer?: readonly string[], aliases?: Record<string, string>) {
+  const seen = viewer === undefined && aliases === undefined ? journey : asViewer(journey, viewer ?? journey.ready.inputs.viewer ?? [], aliases);
+  const model = summaryModel(seen.ready, seen.project({ projection: "status_summary" }));
+  const frontier = seen.project({ projection: "next" }).items;
+  const owned = new Set(seen.project({ projection: "mine" }).filter((entry) => entry.kinds.includes("k_owner")).map((entry) => entry.node));
+  return { model, frontier, owned, actions: claimActions(seen.ready, model, frontier, owned) };
 }
 
 const keys = (rows: { key: string }[]) => rows.map((row) => row.key);
@@ -162,9 +178,8 @@ describe("C10, C11, E1, E4: one action row per node", () => {
 
   it("claims an item owned through a merged entity", () => {
     const journey = open("j_bakeoff", [owner("n_trial_a", "e_writer")]);
-    const aliased = { ...journey.ready, inputs: { ...journey.ready.inputs, deployment: { ...journey.ready.inputs.deployment, aliases: { e_writer: "e_owner" } } } };
-    const { model, frontier } = pageOf(journey);
-    expect(keys(claimActions(aliased, model, frontier, ["e_owner"]).yours)).toEqual(["n_trial_a"]);
+    const { actions } = pageOf(journey, ["e_owner"], { e_writer: "e_owner" });
+    expect(keys(actions.yours)).toEqual(["n_trial_a"]);
   });
 
   it("claims a viewer's six decisions all in Waiting on you, none in Decide now", () => {

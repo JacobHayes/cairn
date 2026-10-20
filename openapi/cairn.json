@@ -3383,7 +3383,32 @@
         ],
         "type": "string"
       },
-      "Explained": {
+      "ExplainedBlocker": {
+        "additionalProperties": false,
+        "description": "A list of explanation entries with its total (ARCHITECTURE, Read path): complete inside\nthe engine and the browser; a server response keeps the largest entries up to\n`explanation_entry_count_max` and the total.",
+        "properties": {
+          "entries": {
+            "description": "The entries, largest first.",
+            "items": {
+              "$ref": "#/components/schemas/Blocker"
+            },
+            "maxItems": 16777216,
+            "type": "array"
+          },
+          "total": {
+            "description": "How many there are in all.",
+            "format": "uint32",
+            "minimum": 0,
+            "type": "integer"
+          }
+        },
+        "required": [
+          "entries",
+          "total"
+        ],
+        "type": "object"
+      },
+      "ExplainedContribution": {
         "additionalProperties": false,
         "description": "A list of explanation entries with its total (ARCHITECTURE, Read path): complete inside\nthe engine and the browser; a server response keeps the largest entries up to\n`explanation_entry_count_max` and the total.",
         "properties": {
@@ -8108,6 +8133,15 @@
             ],
             "description": "The latest it can start."
           },
+          "overdue_days": {
+            "description": "F6, D3: how many days its due is before today, for an overdue node; none when it is\nnot overdue.",
+            "format": "uint32",
+            "minimum": 0,
+            "type": [
+              "integer",
+              "null"
+            ]
+          },
           "shortfall": {
             "anyOf": [
               {
@@ -8168,12 +8202,20 @@
             "description": "Skipped through an ancestor's skip (D1a).",
             "type": "boolean"
           },
+          "failing_guards": {
+            "description": "D4: the bypassable guards its completing transition (complete a deliverable or\naction, answer an open decision, reach a pending milestone) would fail if attempted\nnow with no bypass in the patch. Empty for every node with no such transition left:\nfinished, not relevant, or a group.",
+            "items": {
+              "$ref": "#/components/schemas/Guard"
+            },
+            "type": "array",
+            "uniqueItems": true
+          },
           "gravity": {
             "$ref": "#/components/schemas/Score",
             "description": "Gravity and its contributors (Priority)."
           },
           "gravity_from": {
-            "$ref": "#/components/schemas/Explained",
+            "$ref": "#/components/schemas/ExplainedContribution",
             "description": "The contributors to gravity."
           },
           "max_child_gravity": {
@@ -8209,6 +8251,17 @@
               }
             },
             "type": "object"
+          },
+          "progress": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Progress"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "C2, C4: a container's progress over the work beneath it; none for a node with no\nchildren."
           },
           "rank": {
             "anyOf": [
@@ -8255,6 +8308,10 @@
             "type": "array",
             "uniqueItems": true
           },
+          "started_early": {
+            "description": "D8: stored `active` while its own or an inherited gate is unsatisfied; a container's\nchildren are not a gate.",
+            "type": "boolean"
+          },
           "subtree_gravity": {
             "anyOf": [
               {
@@ -8275,8 +8332,16 @@
             "description": "Unlocks (Priority)."
           },
           "unlocks_from": {
-            "$ref": "#/components/schemas/Explained",
+            "$ref": "#/components/schemas/ExplainedContribution",
             "description": "The nodes completing this would unblock."
+          },
+          "waits_on": {
+            "$ref": "#/components/schemas/ExplainedBlocker",
+            "default": {
+              "entries": [],
+              "total": 0
+            },
+            "description": "Gating, D8: the unsatisfied gate dependencies that hold the node now, its own and\nthose it inherits through its ancestors (requirements, conditions, openings), its\nchildren aside; one entry per dependency, its nearest holder's; empty when nothing\nholds it. `blocked_by` and `blocked_through` explain the structure; this answers\n\"what does it wait on\"."
           }
         },
         "required": [
@@ -9961,6 +10026,43 @@
           }
         ]
       },
+      "Progress": {
+        "additionalProperties": false,
+        "description": "C2, C4: a container's progress over the work beneath it, counted over every proper\ndescendant that is an item: not a group, in scope (relevant or undecided), and neither\nskipped nor skipped through a container. A kept node under a skipped container, and a\nforce-included node under a not-relevant one, count on their own terms. Derived on every\nread in one pass over the tree, O(nodes).",
+        "properties": {
+          "decisions_needed": {
+            "description": "Decisions among the items that are actionable now (D2), snoozed ones included.",
+            "format": "uint32",
+            "minimum": 0,
+            "type": "integer"
+          },
+          "done": {
+            "description": "Items whose display state is `done` (finished, decided, reached, or auto-reached).",
+            "format": "uint32",
+            "minimum": 0,
+            "type": "integer"
+          },
+          "overdue": {
+            "description": "Items that are overdue (D3).",
+            "format": "uint32",
+            "minimum": 0,
+            "type": "integer"
+          },
+          "total": {
+            "description": "Items.",
+            "format": "uint32",
+            "minimum": 0,
+            "type": "integer"
+          }
+        },
+        "required": [
+          "done",
+          "total",
+          "overdue",
+          "decisions_needed"
+        ],
+        "type": "object"
+      },
       "ProjectedDecisionView": {
         "additionalProperties": false,
         "description": "A projection with what it was derived from (D3: computed per read, never stored).",
@@ -11504,6 +11606,14 @@
             "type": "array",
             "uniqueItems": true
           },
+          "unanswered": {
+            "description": "D4, Gating: for an undecided value, the decisions that make it undecided and can be\nanswered now: open, relevant, and not under a skip, read by a condition leaving it\nundecided, its own or an ancestor's, up to a force include. Empty for any other\nvalue (not the same as Gating's wider \"unanswered\").",
+            "items": {
+              "$ref": "#/components/schemas/NodeKey"
+            },
+            "type": "array",
+            "uniqueItems": true
+          },
           "value": {
             "$ref": "#/components/schemas/Relevance",
             "description": "The value."
@@ -12305,10 +12415,6 @@
             "description": "A child is `active`.",
             "type": "boolean"
           },
-          "decision_needed": {
-            "description": "A child decision is actionable: \"decision needed\".",
-            "type": "boolean"
-          },
           "max_child_gravity": {
             "anyOf": [
               {
@@ -12341,6 +12447,10 @@
             "type": "array",
             "uniqueItems": true
           },
+          "progress": {
+            "$ref": "#/components/schemas/Progress",
+            "description": "C2, C4: the container's progress over the work beneath it, whole subtree; \"decision\nneeded\" is `progress.decisions_needed > 0`."
+          },
           "ready_to_finish": {
             "description": "A deliverable or action whose children and other dependencies are satisfied but which\nis not terminal: \"children complete, ready to finish\".",
             "type": "boolean"
@@ -12357,6 +12467,9 @@
             "description": "The gravity of the container's whole area (Priority): its counted weight and its open\ndescendants', and everything downstream of any of them, each once."
           }
         },
+        "required": [
+          "progress"
+        ],
         "type": "object"
       },
       "Route": {
@@ -12980,6 +13093,10 @@
             },
             "type": "object"
           },
+          "completion_suggested": {
+            "description": "B11: completing the journey is suggested (see `StatusSummary`); completing it is the\nperson's call.",
+            "type": "boolean"
+          },
           "counts": {
             "$ref": "#/components/schemas/SnapshotCounts",
             "description": "The counts."
@@ -13507,6 +13624,10 @@
             },
             "description": "In-scope nodes by stored state.",
             "type": "object"
+          },
+          "completion_suggested": {
+            "description": "B11: the journey has a node and none in scope is left open, or its final milestone\nis reached (stored or auto-reached).",
+            "type": "boolean"
           },
           "open_decisions": {
             "description": "Open, in-scope decisions with their owners, in rank order.",

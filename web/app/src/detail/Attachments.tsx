@@ -203,7 +203,6 @@ export function AnnotationList({
 /** G1, G2: the node's notes and links, with the form that adds or edits one; open once there are any. */
 export function AttachmentList({ view, detail }: { view: Ready; detail: NodeDetail }) {
   const { annotations } = detail;
-  const requirements = [detail.node.requires_artifact === true ? "a link is required" : undefined, detail.node.requires_note === true ? "a note is required" : undefined].filter((part) => part !== undefined);
-  const summary = [annotations.length === 0 ? undefined : String(annotations.length), ...requirements].filter((part) => part !== undefined).join(", ");
+  const summary = annotations.length === 0 ? "" : String(annotations.length);
   return <AnnotationList view={view} node={detail.node.key} annotations={annotations} summary={summary} open={annotations.length > 0} fold={foldKey(detail.node.kind, "notes")} />;
 }

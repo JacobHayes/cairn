@@ -589,12 +589,20 @@ impl Dates {
     /// F6: unfinished work in scope whose due date is before today.
     #[must_use]
     pub fn overdue(&self, key: &NodeKey) -> bool {
-        let Some(at) = self.index(key) else {
-            return false;
-        };
-        let unfinished = self.unfinished.get(at.get()).copied().unwrap_or(false);
-        let due = self.solved.latest(self.network.finish(at));
-        unfinished && due.is_some_and(|due| due < self.today)
+        self.overdue_days(key).is_some()
+    }
+
+    /// F6, D3: how many days the due date of unfinished work in scope is before today; none
+    /// when it is not overdue, so the flag ([`Dates::overdue`]) and the number cannot differ.
+    #[must_use]
+    pub fn overdue_days(&self, key: &NodeKey) -> Option<u32> {
+        let at = self.index(key)?;
+        if !self.unfinished.get(at.get()).copied().unwrap_or(false) {
+            return None;
+        }
+        let due = self.solved.latest(self.network.finish(at))?;
+        let days = self.today.checked_sub(due).filter(|days| *days > 0)?;
+        Some(u32::try_from(days).unwrap_or(u32::MAX))
     }
 
     /// F1: a milestone's effective date: its actual date if reached, else its pin, else its
@@ -697,6 +705,7 @@ impl Dates {
                 self.solved.latest_chain(&self.network, finish),
             ),
             slack_days: self.slack_days(key),
+            overdue_days: self.overdue_days(key),
             shortfall,
             effective_date: self.effective_date(key),
         }

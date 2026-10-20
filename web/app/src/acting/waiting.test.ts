@@ -1,11 +1,14 @@
 // C11: with no decision to act on, the walkthrough shows the open decisions in scope, earliest
 // first, each with the milestones and dependencies that would unblock it.
+import type { Schema } from "@cairn/client";
 import { describe, expect, it } from "vitest";
 
 import { actingView } from "./acting.test-support.ts";
 import { actingDecisions, waitingDecisions } from "./waiting.ts";
 
-const waiting = waitingDecisions(actingView());
+/** The summary's open decisions: the acting one (n_pick) is on the frontier, so it is not waiting. */
+const summary = { open_decisions: ["n_pick", "n_later", "n_wait", "n_inner"].map((node) => ({ node, owners: [] })) } as unknown as Schema<"StatusSummary">;
+const waiting = waitingDecisions(actingView(), summary);
 
 describe("waitingDecisions", () => {
   it("lists the open decisions in scope off the acting frontier, earliest start first", () => {

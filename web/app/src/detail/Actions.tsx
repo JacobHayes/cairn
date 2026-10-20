@@ -31,7 +31,7 @@ import { ActButton, actMutation, type Opens } from "./ActButton.tsx";
 import { EvidenceForm } from "./DoneEvidence.tsx";
 import { SnoozePanel, snoozeWords, WeightEditor } from "./editors.tsx";
 import { foldKey, setFold } from "./folds.ts";
-import { answerable, guardBypass, isBlocked, movesFrom, storedSnooze, titleOf, transition, unansweredOf, type GraphNode, type Mutation, type NodeDetail, type Ready } from "./model.ts";
+import { answerable, failingGuards, guardBypass, movesFrom, storedSnooze, titleOf, transition, type Guard, type GraphNode, type Mutation, type NodeDetail, type Ready } from "./model.ts";
 import { menuOf, offered, type Act, type ContextId, type MenuId, type MenuItem } from "./offers.ts";
 import { OwnerSelect } from "./parts.tsx";
 import { Rejected } from "./Rejected.tsx";
@@ -45,7 +45,7 @@ import { useNodeWrite, type NodeWrite } from "./write.ts";
  * apply, naming the decisions it waits on; nothing when the node is not undecided.
  */
 export function MayNotApply({ view, node }: { view: Ready; node: string }) {
-  const unanswered = unansweredOf(view, node);
+  const unanswered = view.derived.nodes[node]?.relevance.unanswered ?? [];
   if (unanswered.length === 0) {
     return null;
   }
@@ -100,19 +100,10 @@ function LiftsSnooze({ view, node, moving }: { view: Ready; node: string; moving
   );
 }
 
-type Guard = "deps_done" | "has_artifact" | "has_note" | "broken_down";
-
 /** The guards a bypass would pass, with what the node is missing in words. */
-function guardsOf(view: Ready, detail: NodeDetail): { guards: Guard[]; words: string } {
-  const needs = missingEvidence(view, detail.node);
-  const missing: [boolean, Guard][] = [
-    [isBlocked(detail.derived, view), "deps_done"],
-    [needs.artifact, "has_artifact"],
-    [needs.note, "has_note"],
-    [detail.derived.needs_breakdown === true, "broken_down"],
-  ];
-  const found = missing.filter(([lacks]) => lacks).map(([, guard]) => guard);
-  return { guards: found, words: found.map(guardWords).join(" and ") };
+function guardsOf(detail: NodeDetail): { guards: Guard[]; words: string } {
+  const guards = failingGuards(detail.derived);
+  return { guards, words: guards.map(guardWords).join(" and ") };
 }
 
 /** F2: a reached milestone's actual date, edited. */
@@ -340,9 +331,9 @@ function reasonWords(kind: ReasonKind, node: GraphNode, without: string): { labe
 }
 
 /** The forms that take a reason. */
-function ReasonCase({ view, detail, form, write, sending, submit, opened }: OpenProps & { opened: Extract<Drafted, { case: ReasonKind }> }) {
+function ReasonCase({ detail, form, write, sending, submit, opened }: OpenProps & { opened: Extract<Drafted, { case: ReasonKind }> }) {
   const { node } = detail;
-  const guards = guardsOf(view, detail);
+  const guards = guardsOf(detail);
   return (
     <ReasonForm
       {...reasonWords(opened.case, node, guards.words)}

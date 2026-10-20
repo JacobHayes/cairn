@@ -4,6 +4,7 @@
 // a kind shows its cascade first (A18): every participation, filling decision, default owner,
 // and message draft placeholder naming it is rewritten in the same patch. Limits are checked
 // before sending.
+import { KIND_COUNT_MAX, ROLE_COUNT_MAX, TITLE_BYTES_MAX } from "@cairn/client";
 import { useState } from "react";
 
 import { useDraft } from "../data/drafts.ts";
@@ -12,7 +13,7 @@ import { CascadeDialog } from "./CascadeDialog.tsx";
 import { planKindRemoval, planRoleRemoval } from "./cascade.ts";
 import type { Kind, Mutation, Role } from "./graph.ts";
 import { isSlug, mintKey, slugOf, uniqueId } from "./keys.ts";
-import { KIND_COUNT_MAX, ROLE_COUNT_MAX, TITLE_BYTES_MAX, overBytes } from "./limits.ts";
+import { overBytes } from "./limits.ts";
 import { Picker } from "./parts.tsx";
 import { Refusal } from "./StructureEditors.tsx";
 import { domainOf, named, type Authored } from "./target.ts";

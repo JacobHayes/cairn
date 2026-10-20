@@ -92,6 +92,7 @@ impl DerivedJourney<'_> {
             unassigned: pick(&|key| derived.is_unassigned(self.graph, key)),
             shortfalls: pick(&|key| derived.dates().shortfall_days(key).is_some()),
             stalled: blocking.stalled().cloned(),
+            completion_suggested: self.completion_suggested(),
             counts: self.counts(&scoped, &in_scope, listed.len(), frontier.len(), subtree),
         })
     }

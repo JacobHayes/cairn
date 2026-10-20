@@ -187,7 +187,7 @@ fn level_table(level: &Level, out: &mut String) -> Result<()> {
                 (roll.ready_to_finish, "ready to finish"),
                 (roll.children_active, "children active"),
                 (roll.all_blocked, "all blocked"),
-                (roll.decision_needed, "decision needed"),
+                (roll.progress.decisions_needed > 0, "decision needed"),
                 (roll.needs_breakdown, "needs breakdown"),
             ] {
                 if on {

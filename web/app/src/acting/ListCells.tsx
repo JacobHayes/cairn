@@ -10,8 +10,8 @@ import { nodeOf, type Ready } from "../detail/model.ts";
 import { screenSwitched, useNodeAddresses } from "../journeys/address.ts";
 import { useJourneyTarget } from "../journeys/useJourneyTarget.ts";
 import { entityName } from "../detail/sections.tsx";
-import { rollups } from "../plan/tree.ts";
 import { snoozeWords } from "../status/snooze.ts";
+import { isOpen } from "../status/state.ts";
 import { statusTone, statusWord } from "../status/words.ts";
 import { dateInk, dateWords, daysWords, dueWords, inkClass } from "../status/when.ts";
 import { Badge } from "../ui/kit.tsx";
@@ -73,11 +73,11 @@ function PhoneDue({ view, line }: { view: Ready; line: Line }) {
 
 /** How far a container is, and the one thing beneath it that needs attention. */
 function Progress({ view, line }: { view: Ready; line: Line }) {
-  const roll = rollups(view).get(line.key);
-  if (roll === undefined || roll.total === 0) {
+  const roll = view.derived.nodes[line.key]?.progress;
+  if (roll == null || roll.total === 0) {
     return null;
   }
-  const attention = roll.overdue > 0 ? `${String(roll.overdue)} overdue` : roll.toDecide > 0 ? `${String(roll.toDecide)} to decide` : undefined;
+  const attention = roll.overdue > 0 ? `${String(roll.overdue)} overdue` : roll.decisions_needed > 0 ? `${String(roll.decisions_needed)} to decide` : undefined;
   return (
     <span className="muted small" data-testid="progress">
       {roll.done} of {roll.total} done
@@ -164,7 +164,7 @@ export function Cell({ column, line, context }: { column: Column; line: Line; co
   const node = nodeOf(view, line.key);
   const state = row?.display_state ?? derived?.display_state;
   const today = view.derived.today;
-  const open = state !== "done" && state !== "skipped" && state !== "not_relevant";
+  const open = isOpen(derived);
   if (column === "status") {
     return state === undefined || node === undefined ? null : <Badge tone={statusTone(state)} data-testid="list-state" data-status={state}>{statusWord(state, node.kind)}</Badge>;
   }

@@ -4,11 +4,12 @@
 // marks, the rank order, and the numbers the Signals lens shows. All read from the document and
 // its local derive; the words are words.ts's.
 import { conditionNames } from "../authoring/condition.ts";
-import { nodeOf, recordOf, startedEarly, type GraphNode, type NodeDerived, type Ready } from "../detail/model.ts";
+import { nodeOf, rankPlaces, type GraphNode, type NodeDerived, type Ready } from "../detail/model.ts";
 import { answerText, entityName } from "../detail/sections.tsx";
-import { rollups } from "../plan/tree.ts";
+import { currentStagesOf } from "../journeys/requests.ts";
+import { isFinished, isOpen } from "../status/state.ts";
 import type { DisplayState } from "../status/words.ts";
-import { currentStages, isStage } from "./ladder.ts";
+import { isStage } from "./ladder.ts";
 import type { CardBadge, CardBody, CardState, JourneyExtras, LevelNode, Looks, Signals } from "./model.ts";
 import { dependsWords, firstParagraph, footWords } from "./words.ts";
 import { snoozeWords } from "../status/snooze.ts";
@@ -23,11 +24,6 @@ export function stateOf(view: Ready, node: GraphNode): DisplayState {
   return derived.display_state;
 }
 
-/** Done or skipped: nothing is left to do on it. */
-function finishedState(state: DisplayState): boolean {
-  return state === "done" || state === "skipped";
-}
-
 /** C1: a node's owners by name, or none. */
 function ownersOf(view: Ready, key: string): string[] {
   const owners = view.derived.nodes[key]?.participations?.["k_owner"]?.entities ?? [];
@@ -37,7 +33,7 @@ function ownersOf(view: Ready, key: string): string[] {
 /** C2: the one roll-up badge a container carries, in the fixed order: a decision to make, overdue, all blocked, ready to finish, needs breakdown. */
 export function rollUpBadge(derived: NodeDerived, at: LevelNode): CardBadge | undefined {
   const roll = at.roll_up;
-  if (roll?.decision_needed === true) {
+  if ((derived.progress?.decisions_needed ?? 0) > 0) {
     return { flag: "decision to make", tone: "warn" };
   }
   if (derived.overdue === true) {
@@ -57,7 +53,7 @@ export function rollUpBadge(derived: NodeDerived, at: LevelNode): CardBadge | un
 
 interface Context {
   view: Ready;
-  ranked: string[];
+  places: ReadonlyMap<string, number>;
   mine: Set<string>;
   owned: Set<string>;
   frontier: Set<string>;
@@ -95,7 +91,7 @@ function bodyOf(context: Context, node: GraphNode, derived: NodeDerived, at: Lev
     return { kind: "answer", text: answerText(view, answer, node), rationale: rationale === undefined || rationale === "" ? undefined : firstParagraph(rationale) };
   }
   if (context.children.has(node.key)) {
-    const { done, total } = rollups(view).get(node.key) ?? { done: 0, total: 0 };
+    const { done, total } = derived.progress ?? { done: 0, total: 0 };
     return total === 0 ? undefined : { kind: "progress", done, total, badge: rollUpBadge(derived, at) };
   }
   return undefined;
@@ -115,7 +111,8 @@ function footOf(context: Context, node: GraphNode, derived: NodeDerived, state: 
     today: view.derived.today,
     due: due?.date,
     latestStart: latestStart?.date,
-    overdue: derived.overdue === true,
+    overdueDays: derived.dates.overdue_days ?? undefined,
+    open: isOpen(derived),
     reached: effective?.date,
   });
 }
@@ -138,10 +135,8 @@ function cardState(context: Context, node: GraphNode, at: LevelNode): CardState 
     throw new Error(`the derive has no node ${node.key}`);
   }
   const state = stateOf(view, node);
-  const stored = recordOf(view, node).state;
-  const finished = finishedState(state);
-  const index = context.ranked.indexOf(node.key);
-  const rank = index < 0 ? undefined : index + 1;
+  const finished = isFinished(state);
+  const rank = context.places.get(node.key);
   const names = ownersOf(view, node.key);
   const mine = context.mine.has(node.key);
   const missing = derived.unassigned === true && !finished && state !== "not_relevant";
@@ -155,8 +150,8 @@ function cardState(context: Context, node: GraphNode, at: LevelNode): CardState 
     body: bodyOf(context, node, derived, at, state),
     here: {
       frontier: context.frontier.has(node.key),
-      active: stored === "active" && !finished,
-      startedEarly: startedEarly(derived, stored),
+      active: state === "active",
+      startedEarly: derived.started_early === true,
       mine,
     },
     rank,
@@ -165,7 +160,7 @@ function cardState(context: Context, node: GraphNode, at: LevelNode): CardState 
   };
 }
 
-/** C1, C5, C6: a journey's looks for its cards; `extras` are its rank order and the viewer's items. */
+/** C1, C5, C6: a journey's looks for its cards; `extras` are the viewer's items. */
 export function journeyLooks(view: Ready, extras: JourneyExtras): Looks {
   const nodes = view.journey.graph.nodes ?? [];
   const children = new Map<string, string[]>();
@@ -174,21 +169,20 @@ export function journeyLooks(view: Ready, extras: JourneyExtras): Looks {
       children.set(node.parent, [...(children.get(node.parent) ?? []), node.key]);
     }
   }
-  const active = nodes.filter((node) => recordOf(view, node).state === "active" && !finishedState(stateOf(view, node))).map((node) => node.key);
   const context: Context = {
     view,
-    ranked: extras.ranked,
+    places: rankPlaces(view),
     mine: new Set(extras.mine),
     owned: new Set(extras.owned),
     frontier: new Set(view.derived.frontier),
-    current: currentStages(nodes, view.derived.acting_frontier, active),
+    current: currentStagesOf(view),
     children,
   };
   return {
     card: (node, at) => cardState(context, node, at),
     finished: (key) => {
       const node = nodeOf(view, key);
-      return node !== undefined && finishedState(stateOf(view, node));
+      return node !== undefined && isFinished(stateOf(view, node));
     },
   };
 }

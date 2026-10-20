@@ -4,7 +4,7 @@ import { describe, expect, it } from "vitest";
 
 import type { Mutation } from "../detail/model.ts";
 import { actingView } from "./acting.test-support.ts";
-import { assignOwner, bulkPlan, doneMutations, evidenceComplete, factsOf, hasArtifact, hasNote, missingEvidence, reasonFor, runBulk, selectionOf, type BulkAction, type Facts } from "./acts.ts";
+import { assignOwner, bulkPlan, doneMutations, evidenceComplete, factsOf, missingEvidence, reasonFor, runBulk, selectionOf, type BulkAction, type Facts } from "./acts.ts";
 
 const view = actingView();
 
@@ -30,19 +30,10 @@ describe("C11 done with its artifact (G2) or note (G4)", () => {
     expect(doneMutations("n_work", { artifact: { key: "a_new", url: "https://example.org/out" }, note }).map((mutation) => mutation.op)).toEqual(["add_annotation", "add_annotation", "transition"]);
   });
 
-  it("asks only for the evidence a node requires and lacks; a link or another node's note is not a note", () => {
-    expect(hasArtifact(view, "n_work")).toBe(false);
+  it("asks only for the evidence the engine says is missing", () => {
     expect(missingEvidence(view, facts("n_work").node)).toEqual({ artifact: true, note: false });
     expect(missingEvidence(view, facts("n_log").node)).toEqual({ artifact: false, note: true });
-    const state = view.journey.graph.state ?? {};
-    const annotated = (annotations: NonNullable<typeof state.annotations>): typeof view => ({ ...view, journey: { ...view.journey, graph: { ...view.journey.graph, state: { ...state, annotations } } } });
-    const others = annotated([
-      { key: "a_link", node: "n_log", reference: "https://example.org/r" },
-    ].map((body) => ({ body, created_by: "u_one", created_at: "2026-10-01T00:00:00Z" })));
-    expect(hasNote(others, "n_log")).toBe(false);
-    expect(missingEvidence(others, facts("n_log").node).note).toBe(true);
-    const own = annotated([{ body: { key: "a_own", node: "n_log", note: "Written up." }, created_by: "u_one", created_at: "2026-10-01T00:00:00Z" }]);
-    expect(missingEvidence(own, facts("n_log").node).note).toBe(false);
+    expect(missingEvidence(view, facts("n_later").node)).toEqual({ artifact: false, note: false });
   });
 });
 

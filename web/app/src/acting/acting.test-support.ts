@@ -7,9 +7,43 @@ import type { Ready } from "../detail/model.ts";
 
 const today = "2026-10-06";
 const none = { entries: [], total: 0 };
-const base = { gravity_from: none, unlocks_from: none, actionable: false, gravity: 1, unlocks: 0, dates: {} };
+const base = { gravity_from: none, unlocks_from: none, waits_on: none, actionable: false, gravity: 1, unlocks: 0, dates: {} };
 const relevant = { relevance: { value: "relevant" as const } };
 const start = (date: string) => ({ earliest_start: { date, chain: { constraints: [], fixed: [] } } });
+
+/** The derive's per-node values. */
+function derivedNodes(): Ready["derived"]["nodes"] {
+  return {
+    n_meet: { ...base, display_state: "ready", ...relevant, actionable: true },
+    n_pick: { ...base, display_state: "ready", ...relevant, actionable: true, unassigned: true },
+    n_work: { ...base, display_state: "ready", ...relevant, actionable: true, failing_guards: ["has_artifact"] },
+    n_hold: { ...base, display_state: "ready", ...relevant, actionable: true, needs_breakdown: true, failing_guards: ["broken_down"] },
+    n_log: { ...base, display_state: "ready", ...relevant, failing_guards: ["has_note"] },
+    n_wait: { ...base, display_state: "snoozed", ...relevant, actionable: true, snoozed: { node: "n_work" }, dates: start("2026-10-06") },
+    n_later: { ...base, display_state: "blocked", ...relevant, blocked_by: [{ node: "n_meet", via: "explicit" }], waits_on: { entries: [{ node: "n_meet", via: "explicit" }], total: 1 }, failing_guards: ["deps_done"], dates: start("2026-10-20") },
+    n_stage: {
+      ...base,
+      ...relevant,
+      display_state: "blocked",
+      blocked_by: [
+        { node: "n_meet", via: { stage_opening: { group: "n_stage" } } },
+        { node: "n_inner", via: "containment" },
+      ],
+      waits_on: { entries: [{ node: "n_meet", via: { stage_opening: { group: "n_stage" } } }], total: 1 },
+      progress: { done: 0, total: 1, overdue: 0, decisions_needed: 0 },
+    },
+    n_inner: {
+      ...base,
+      display_state: "blocked",
+      ...relevant,
+      waits_on: { entries: [{ node: "n_meet", via: { stage_opening: { group: "n_stage" } } }], total: 1 },
+      failing_guards: ["deps_done"],
+      dates: start("2026-10-13"),
+    },
+    n_done: { ...base, display_state: "done", ...relevant },
+    n_gone: { ...base, display_state: "not_relevant", relevance: { value: "not_relevant" } },
+  };
+}
 
 export function actingView(): Ready {
   return {
@@ -50,27 +84,7 @@ export function actingView(): Ready {
       today,
       frontier: ["n_meet", "n_pick", "n_work", "n_hold", "n_wait"],
       acting_frontier: ["n_meet", "n_pick", "n_work", "n_hold"],
-      nodes: {
-        n_meet: { ...base, display_state: "ready", ...relevant, actionable: true },
-        n_pick: { ...base, display_state: "ready", ...relevant, actionable: true, unassigned: true },
-        n_work: { ...base, display_state: "ready", ...relevant, actionable: true },
-        n_hold: { ...base, display_state: "ready", ...relevant, actionable: true, needs_breakdown: true },
-        n_log: { ...base, display_state: "ready", ...relevant },
-        n_wait: { ...base, display_state: "snoozed", ...relevant, actionable: true, snoozed: { node: "n_work" }, dates: start("2026-10-06") },
-        n_later: { ...base, display_state: "blocked", ...relevant, blocked_by: [{ node: "n_meet", via: "explicit" }], dates: start("2026-10-20") },
-        n_stage: {
-          ...base,
-          ...relevant,
-          display_state: "blocked",
-          blocked_by: [
-            { node: "n_meet", via: { stage_opening: { group: "n_stage" } } },
-            { node: "n_inner", via: "containment" },
-          ],
-        },
-        n_inner: { ...base, display_state: "blocked", ...relevant, blocked_through: ["n_stage"], dates: start("2026-10-13") },
-        n_done: { ...base, display_state: "done", ...relevant },
-        n_gone: { ...base, display_state: "not_relevant", relevance: { value: "not_relevant" } },
-      },
+      nodes: derivedNodes(),
     },
   };
 }

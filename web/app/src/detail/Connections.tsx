@@ -5,9 +5,9 @@ import { useContributions } from "./contributions.ts";
 import { ForceInclude } from "./editors.tsx";
 import { viaText, namer } from "./explain.ts";
 import { foldKey } from "./folds.ts";
-import type { NodeDetail, Ready } from "./model.ts";
+import { waitsMore, waitsOn, type NodeDetail, type Ready } from "./model.ts";
 import { NodeLink, Section } from "./parts.tsx";
-import { appliesIf, ownerName, waitingOn } from "./sentence.ts";
+import { appliesIf, ownerName } from "./sentence.ts";
 
 /** Gating: why the node is, or is not, in scope, in words; nothing when nothing conditions it. */
 function relevanceWords(view: Ready, detail: NodeDetail): React.ReactNode {
@@ -32,10 +32,11 @@ function relevanceWords(view: Ready, detail: NodeDetail): React.ReactNode {
 export function Connections({ view, detail }: { view: Ready; detail: NodeDetail }) {
   const { node, derived } = detail;
   const name = namer(view);
-  const waits = waitingOn(view, node.key);
+  const waits = waitsOn(view, node.key);
   const frees = useContributions(view, node.key, "unlocks", derived.unlocks_from);
   const why = relevanceWords(view, detail);
-  const count = waits.length + derived.unlocks_from.total;
+  const more = waitsMore(view, node.key);
+  const count = waits.length + more + derived.unlocks_from.total;
   const open = derived.display_state === "blocked" || derived.display_state === "conditional" || (derived.stale ?? []).length > 0;
   return (
     <Section title="Connections" summary={count === 0 ? undefined : String(count)} open={open} fold={foldKey(node.kind, "connections")} testId="connections">
@@ -52,6 +53,7 @@ export function Connections({ view, detail }: { view: Ready; detail: NodeDetail 
               </li>
             ))}
           </ul>
+          {more === 0 ? null : <span className="muted small">and {more} more</span>}
         </div>
       )}
       {frees.entries.length === 0 ? null : (

@@ -5,6 +5,7 @@
 
 import { titleOf, type Ready } from "../detail/model.ts";
 import { useNodeAddresses } from "../journeys/address.ts";
+import { isFinished } from "../status/state.ts";
 import { Button } from "../ui/kit.tsx";
 import { NodeItem, NodePanel } from "./NodeItem.tsx";
 import { doneThisPass, unlockedBy, type Pass } from "./pass.ts";
@@ -15,7 +16,7 @@ const SHOWN = 5;
 /** Whether the journey has finished `key`: done, reached or skipped. */
 function finished(view: Ready, key: string): boolean {
   const state = view.derived.nodes[key]?.display_state;
-  return state === "done" || state === "skipped";
+  return state !== undefined && isFinished(state);
 }
 
 function Group({ view, title, keys, testId, pass }: { view: Ready; title: string; keys: readonly string[]; testId: string; pass?: Pass }) {

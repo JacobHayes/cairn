@@ -69,7 +69,7 @@ Architecture-scope terms, in addition to the PRD glossary. PRD terms keep their 
 | **Composition root** | The one function per host that picks a store, a notifier, auth providers, and an assistant provider and assembles the service. |
 | **Capabilities document** | `GET /api/capabilities`: what this host offers (auth providers, assistant, MCP, SSE). The server always serves MCP and SSE; the browser host serves neither. The UI shows and hides features from it. |
 | **Host** | Something that assembles the engine with a composition root: the server binary or the browser bundle. |
-| **Generated artifacts** | Files derived from Rust types and checked in, only under the generated paths (Generated artifacts): the OpenAPI document, the TypeScript client types, the wasm bindings, the JSON Schema for the file format. |
+| **Generated artifacts** | Files derived from Rust types and checked in, only under the generated paths (Generated artifacts): the OpenAPI document, the TypeScript client types, the engine's rule tables and limits for the app, the wasm bindings, the JSON Schema for the file format. |
 
 ## Repository layout
 
@@ -155,7 +155,7 @@ Engineering practices (assertion style, fault injection, simulation testing, the
 
 Each pass reads only the outputs of earlier passes. The types passed between them live in the engine crate.
 
-`Derived` is per node plus journey-level values, and every derived value carries its explanation inputs (contributing nodes, producing chain, producing decision). Nothing in `Derived` is ever stored (D3, J1). Explanations are the "why" behind each derived value on a node: the chain of rules and pins behind a due date, the downstream nodes that make up its gravity, the dependencies that block it. Inside the engine they are complete. The browser derives locally, so it has them all and nothing is sent. Server responses that include them (node detail for agents and the API) carry each list's largest entries up to the limit plus a total, and page the rest.
+`Derived` is per node plus journey-level values, and every derived value carries its explanation inputs (contributing nodes, producing chain, producing decision). Per node it carries what every screen shows, so none recomputes it: days overdue, a container's progress (done of in-scope work beneath it, counted once), the guards a completing transition would fail now, whether active work started before its gates were met, and what the node waits on (its own unsatisfied dependencies and those its ancestors hold for it, nearest first), the last cut like the other explanations. Nothing in `Derived` is ever stored (D3, J1). Explanations are the "why" behind each derived value on a node: the chain of rules and pins behind a due date, the downstream nodes that make up its gravity, the dependencies that block it. Inside the engine they are complete. The browser derives locally, so it has them all and nothing is sent. Server responses that include them (node detail for agents and the API) carry each list's largest entries up to the limit plus a total, and page the rest.
 
 Hosts may memoize `Derived` per (domain revision, deployment revision, inputs); today is an input, so a cached value expires at date rollover. D6 requires this to be invisible; the engine has no cache of its own.
 
@@ -366,7 +366,7 @@ React (Vite) with the wasm engine.
 
 ## Generated artifacts
 
-Rust types are the source of truth for the OpenAPI document, the TypeScript client types, the wasm bindings, and the file-format JSON Schema. They are the only generated files, and they live only in the generated paths: `openapi/`, `schema/`, `web/client/generated/`, and `web/wasm/generated/`. Every generated file carries a header saying so. The compiled `.wasm` binary and the web build are build outputs, never checked in, because they are not guaranteed to rebuild byte for byte. `mise run gen` regenerates the generated paths; the ladder's generated step records every file path and content under them, regenerates, and fails if any file changed, appeared, or disappeared, which works the same in a jj working copy and in CI. A source change and its generated outputs land in the same commit.
+Rust types are the source of truth for the OpenAPI document, the TypeScript client types, the rule tables (`web/client/generated/rules.ts`: the limits, the states each kind's moves leave from, the initial and terminal states, written from `crates/engine`, so the app reads the engine's tables instead of copying them), the wasm bindings, and the file-format JSON Schema. They are the only generated files, and they live only in the generated paths: `openapi/`, `schema/`, `web/client/generated/`, and `web/wasm/generated/`. Every generated file carries a header saying so. The compiled `.wasm` binary and the web build are build outputs, never checked in, because they are not guaranteed to rebuild byte for byte. `mise run gen` regenerates the generated paths; the ladder's generated step records every file path and content under them, regenerates, and fails if any file changed, appeared, or disappeared, which works the same in a jj working copy and in CI. A source change and its generated outputs land in the same commit.
 
 ## Build, run, deploy
 

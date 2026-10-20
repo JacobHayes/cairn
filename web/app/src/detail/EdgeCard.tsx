@@ -7,7 +7,7 @@ import { Link } from "react-router";
 import { useNodeAddresses } from "../journeys/address.ts";
 import { statusWord } from "../status/words.ts";
 import { namer, viaText } from "./explain.ts";
-import { nodeDetail, nodeOf, type Ready } from "./model.ts";
+import { nodeDetail, nodeOf, waitsOn, type Ready } from "./model.ts";
 import { NodeLink } from "./parts.tsx";
 
 /** `from~to` split into its two node keys, when it names two. */
@@ -18,8 +18,7 @@ export function edgeEnds(edge: string): { from: string; to: string } | undefined
 
 /** How `to` depends on `from`: each dependency its derive lists, and the ancestor holding it when it is inherited. */
 function sourcesOf(view: Ready, from: string, to: string) {
-  const holders = [to, ...(view.derived.nodes[to]?.blocked_through ?? [])];
-  return holders.flatMap((holder) => (view.derived.nodes[holder]?.blocked_by ?? []).filter((blocker) => blocker.node === from && blocker.via !== "containment").map((blocker) => blocker.via));
+  return waitsOn(view, to).filter((held) => held.node === from).map((held) => held.via);
 }
 
 /**

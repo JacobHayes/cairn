@@ -161,10 +161,8 @@ export interface Line {
   sentence: string;
 }
 
-/** What a journey's canvas reads besides its level: the rank order and the viewer's items. */
+/** What a journey's canvas reads besides its level: the viewer's items. */
 export interface JourneyExtras {
-  /** C5: the acting frontier in rank order (the next list). */
-  ranked: string[];
   /** C5: the viewer's own items: every node they hold a participation on. */
   mine: string[];
   /** The nodes they own, which a card says with "You". */

@@ -15,7 +15,7 @@ use crate::chain::{
 use crate::derived::{
     Blocker, Bound, Consequences, Contribution, DateOrigin, DeriveInputs, Derived, DisplayState,
     DomainDocument, EffectiveDate, EffectiveParticipation, Explained, NodeDates, NodeDerived,
-    ParticipationOrigin, RankConstants, Real, Relevance, RelevanceExplanation, Score,
+    ParticipationOrigin, Progress, RankConstants, Real, Relevance, RelevanceExplanation, Score,
     StaleConsequence, StallCause, Stalled,
 };
 use crate::limits::Limit;
@@ -259,7 +259,7 @@ fn arb_node_dates() -> BoxedStrategy<NodeDates> {
         bound(),
         bound(),
         bound(),
-        prop::option::of(-60i32..60),
+        (prop::option::of(-60i32..60), prop::option::of(1u32..60)),
         prop::option::of(arb_short_chain()),
         prop::option::of((
             arb_date(),
@@ -267,11 +267,12 @@ fn arb_node_dates() -> BoxedStrategy<NodeDates> {
         )),
     )
         .prop_map(
-            |(earliest_start, latest_start, due, slack_days, shortfall, effective)| NodeDates {
+            |(earliest_start, latest_start, due, days, shortfall, effective)| NodeDates {
                 earliest_start,
                 latest_start,
                 due,
-                slack_days,
+                slack_days: days.0,
+                overdue_days: days.1,
                 shortfall,
                 effective_date: effective.map(|(date, origin)| EffectiveDate { date, origin }),
             },
@@ -291,14 +292,18 @@ fn arb_relevance() -> BoxedStrategy<RelevanceExplanation> {
         prop::collection::btree_set(arb_node_key(), 0..2),
         any::<bool>(),
         prop::collection::btree_set(arb_node_key(), 0..2),
+        prop::collection::btree_set(arb_node_key(), 0..2),
     )
         .prop_map(
-            |(value, condition_on, decisions, forced, pending_on)| RelevanceExplanation {
-                value,
-                condition_on,
-                decisions,
-                forced,
-                pending_on,
+            |(value, condition_on, decisions, forced, pending_on, unanswered)| {
+                RelevanceExplanation {
+                    value,
+                    condition_on,
+                    decisions,
+                    forced,
+                    pending_on,
+                    unanswered,
+                }
             },
         )
         .boxed()
@@ -356,6 +361,48 @@ pub fn arb_display_state() -> BoxedStrategy<DisplayState> {
     .boxed()
 }
 
+/// A node's progress, failing guards, started-early flag, and what it waits on.
+#[allow(clippy::type_complexity)]
+fn arb_derived_extras() -> BoxedStrategy<(
+    Option<Progress>,
+    std::collections::BTreeSet<Guard>,
+    bool,
+    Explained<Blocker>,
+)> {
+    let progress = prop::option::of((0u32..20, 0u32..20, 0u32..20, 0u32..20).prop_map(
+        |(total, done, overdue, decisions)| Progress {
+            done: done.min(total),
+            total,
+            overdue: overdue.min(total),
+            decisions_needed: decisions.min(total),
+        },
+    ));
+    let guards = prop::collection::btree_set(
+        prop::sample::select(vec![
+            Guard::DepsDone,
+            Guard::HasArtifact,
+            Guard::HasNote,
+            Guard::BrokenDown,
+        ]),
+        0..3,
+    );
+    let waits = (
+        prop::collection::vec(
+            (arb_node_key(), arb_dependency_via()).prop_map(|(node, via)| Blocker { node, via }),
+            0..3,
+        ),
+        0u32..5,
+    )
+        .prop_map(|(entries, extra)| {
+            let total = u32::try_from(entries.len()).unwrap_or(0) + extra;
+            Explained {
+                entries: bounded_vec(entries),
+                total,
+            }
+        });
+    (progress, guards, any::<bool>(), waits).boxed()
+}
+
 /// One node's derived values.
 pub fn arb_node_derived() -> BoxedStrategy<NodeDerived> {
     let flags = prop::collection::vec(any::<bool>(), 7);
@@ -377,25 +424,23 @@ pub fn arb_node_derived() -> BoxedStrategy<NodeDerived> {
         arb_scores(),
         arb_display_state(),
         prop::option::of(arb_score()),
+        arb_derived_extras(),
     )
         .prop_map(
             |(
                 relevance,
                 flags,
-                blocking,
+                (blocked_by, blocked_through),
                 participations,
                 stale,
                 dates,
-                snoozed,
-                scores,
+                (snoozed, snoozed_via),
+                (gravity, gravity_from, max_child_gravity, unlocks, unlocks_from, rank),
                 shown,
                 subtree,
+                (progress, failing_guards, started_early, waits_on),
             )| {
-                let (blocked_by, blocked_through) = blocking;
-                let (snoozed, snoozed_via) = snoozed;
                 let flag = |index: usize| flags.get(index).copied().unwrap_or(false);
-                let (gravity, gravity_from, max_child_gravity, unlocks, unlocks_from, rank) =
-                    scores;
                 NodeDerived {
                     relevance,
                     display_state: shown,
@@ -409,6 +454,10 @@ pub fn arb_node_derived() -> BoxedStrategy<NodeDerived> {
                     stale,
                     overdue: flag(4),
                     dates,
+                    progress,
+                    failing_guards,
+                    started_early,
+                    waits_on,
                     auto_reached: flag(5),
                     snoozed,
                     snoozed_via,

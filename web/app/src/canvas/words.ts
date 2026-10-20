@@ -3,7 +3,7 @@
 // components, so the unit tests read the same sentences the canvas draws.
 import { conditionWords, decisionOf, decisionsIn, type ConditionNames } from "../authoring/condition.ts";
 import type { GraphNode, NodeKind } from "../detail/model.ts";
-import { dateWords, daysUntil, dueWords, isSoon, NEAR_DAYS, SOON_DAYS } from "../status/when.ts";
+import { dateWords, daysUntil, daysWords, dueWords, isSoon, NEAR_DAYS, SOON_DAYS } from "../status/when.ts";
 import type { DisplayState } from "../status/words.ts";
 import type { Tone } from "./model.ts";
 
@@ -14,7 +14,10 @@ export interface FootFacts {
   today: string;
   due: string | undefined;
   latestStart: string | undefined;
-  overdue: boolean;
+  /** D3, F6: how many days past its due date, as the engine derived it; none when it is not overdue. */
+  overdueDays: number | undefined;
+  /** Still to do and in scope (`isOpen`): a finished or ruled-out node has no date to give. */
+  open: boolean;
   /** A milestone's effective date. */
   reached: string | undefined;
 }
@@ -26,15 +29,15 @@ export interface FootFacts {
  * when it was reached).
  */
 export function footWords(facts: FootFacts): { words: string; tone: Tone } | undefined {
-  const { kind, state, today, due, latestStart, overdue, reached } = facts;
+  const { kind, state, today, due, latestStart, overdueDays, open, reached } = facts;
   if (kind === "milestone" && state === "done") {
     return reached === undefined ? undefined : { words: `Reached ${dateWords(reached, today)}`, tone: "plain" };
   }
-  if (state === "done" || state === "skipped" || state === "not_relevant") {
+  if (!open) {
     return undefined;
   }
-  if (due !== undefined && overdue) {
-    return { words: dueWords(due, today), tone: "bad" };
+  if (overdueDays !== undefined) {
+    return { words: `${daysWords(overdueDays)} late`, tone: "bad" };
   }
   const started = state === "active";
   if (latestStart !== undefined && !started && kind !== "decision" && kind !== "milestone" && daysUntil(latestStart, today) <= NEAR_DAYS) {
