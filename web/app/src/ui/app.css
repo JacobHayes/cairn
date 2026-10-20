@@ -620,6 +620,37 @@ body {
   text-transform: uppercase;
   color: var(--color-error);
 }
+/* A refusal is a panel (DESIGN, Panel / card): corner ticks and a band whose label is the state word, in the error colour all round. */
+.panel-bad {
+  gap: var(--space-3);
+  border-color: var(--color-error);
+}
+/* The band is opaque, so the ticks are drawn over it: all four stay visible. */
+.panel-bad::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background: var(--corner-ticks);
+}
+.panel-bad > .label:first-child {
+  margin-bottom: 0;
+  color: var(--color-error);
+}
+/* The new-route form is a short form: it keeps a moderate measure on a wide screen. */
+.new-route {
+  max-width: 560px;
+}
+.new-field[aria-invalid="true"] {
+  border-color: var(--color-error);
+}
+/* The new-route form's text fields are 16px on a phone, so the browser does not zoom into them. */
+@media (max-width: 719px) {
+  .new-field {
+    font-size: 16px;
+  }
+}
+
 /* A chain short of days is a plan problem, not a failure: it says so in its own word. */
 .callout-short::before {
   content: "Short of days";

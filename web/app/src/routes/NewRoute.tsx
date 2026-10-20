@@ -12,7 +12,7 @@ import { TITLE_BYTES_MAX, overBytes } from "../authoring/limits.ts";
 import { RejectionView } from "../screens/RejectionView.tsx";
 import { WriteStatus } from "../screens/WriteStatus.tsx";
 import { useScreenWrite } from "../screens/write.ts";
-import { Button, Field } from "../ui/kit.tsx";
+import { Button, Field, Segmented } from "../ui/kit.tsx";
 import { ROUTES_INDEX_PATH, routePath } from "./address.ts";
 import { ImportFile } from "./ImportFile.tsx";
 import { openDraft } from "./model.ts";
@@ -31,10 +31,16 @@ function NewForm({ kind, disabled, refused, onStart }: { kind: Kind; disabled: b
   const word = kind === "segment" ? "segment" : "route";
   return (
     <form className="stack" onSubmit={(event) => { event.preventDefault(); onStart(name.trim(), routeId); }}>
-      <Field aria-label="New route name" placeholder={`Name of the ${word}`} autoFocus value={name} onChange={(event) => { setKept({ ...kept, name: event.target.value }); }} />
-      <details key={String(refused)} className="small" open={refused}>
+      <label className="stack">
+        <span className="label">Name</span>
+        <Field className="new-field" aria-label="New route name" placeholder={`Name of the ${word}`} autoFocus value={name} onChange={(event) => { setKept({ ...kept, name: event.target.value }); }} />
+      </label>
+      <details key={String(refused)} open={refused}>
         <summary className="muted">Change id</summary>
-        <Field aria-label="New route id" value={routeId} onChange={(event) => { setKept({ name, id: event.target.value }); }} />
+        <label className="stack">
+          <span className="label">Id</span>
+          <Field className="new-field" aria-label="New route id" aria-invalid={refused} value={routeId} onChange={(event) => { setKept({ name, id: event.target.value }); }} />
+        </label>
       </details>
       {problem === undefined ? null : <span className="author-problem" role="alert">{problem}</span>}
       <Button type="submit" primary disabled={disabled || name.trim() === "" || problem !== undefined} data-testid="new-create">
@@ -44,17 +50,17 @@ function NewForm({ kind, disabled, refused, onStart }: { kind: Kind; disabled: b
   );
 }
 
-/** The kind choice, as the index's type chips: picking one replaces `kind` in the address. */
-function KindChips({ kind }: { kind: Kind }) {
+/** The kind choice: picking one replaces `kind` in the address (DESIGN, Segmented control). */
+function KindChoice({ kind }: { kind: Kind }) {
   const [, setParams] = useSearchParams();
   return (
-    <div className="journey-chips" role="group" aria-label="Kind" data-testid="new-route-kinds">
-      {(["process", "segment"] as const).map((each) => (
-        <button key={each} type="button" className="chip" aria-pressed={kind === each} data-testid={`new-${each}`} onClick={() => { setParams(each === "segment" ? { kind: "segment" } : {}, { replace: true }); }}>
-          {each === "process" ? "Route" : "Segment"}
-        </button>
-      ))}
-    </div>
+    <Segmented
+      label="Kind"
+      value={kind}
+      options={[{ value: "process", label: "Route" }, { value: "segment", label: "Segment" }]}
+      onChange={(next) => { setParams(next === "segment" ? { kind: "segment" } : {}, { replace: true }); }}
+      data-testid="new-route-kinds"
+    />
   );
 }
 
@@ -71,15 +77,15 @@ export function NewRoutePage() {
     }
   };
   return (
-    <section className="stack" aria-label="New route" data-testid="new-route">
+    <section className="stack new-route" aria-label="New route" data-testid="new-route">
       <div className="row">
         <h1>{kind === "segment" ? "New segment" : "New route"}</h1>
         <span className="spacer" />
         <Link to={ROUTES_INDEX_PATH}>All routes</Link>
       </div>
-      <KindChips kind={kind} />
+      <KindChoice kind={kind} />
       <NewForm kind={kind} disabled={write.disabled} refused={write.rejection?.rejection === "stale"} onStart={(name, id) => { void start(name, id); }} />
-      {write.rejection === undefined ? <WriteStatus view={write.status} /> : <RejectionView rejection={write.rejection} onDismiss={write.dismiss} staleHeading="Not saved: a route with this id already exists. Pick another id." />}
+      {write.rejection === undefined ? <WriteStatus view={write.status} /> : <RejectionView rejection={write.rejection} onDismiss={write.dismiss} staleHeading="a route with this id already exists. Pick another id." />}
       <h2>Or import a route file</h2>
       <ImportFile edit="import:new-route" label="Import a file…" />
     </section>

@@ -66,9 +66,14 @@ export function ViolationLines({ violations, titleOf }: { violations: readonly V
   return violations.map((violation, at) => <ViolationLine key={at} violation={violation} titleOf={titleOf} />);
 }
 
+/** A refusal's first sentence: the fact in bold, its reason in plain type. */
+function NotSaved({ children }: { children: string }) {
+  return <span><strong>Not saved:</strong> {children}</span>;
+}
+
 interface RejectionProps {
   rejection: Rejection;
-  /** What a stale refusal says first, where the screen knows more than "changed first" (a create that met the id in use). */
+  /** What a stale refusal says after "Not saved:", where the screen knows more than "changed first" (a create that met the id in use). */
   staleHeading?: string | undefined;
   /** Offers to keep the edit on the current version, after a stale refusal. */
   onRebase?: (() => void) | undefined;
@@ -96,22 +101,23 @@ export function RejectionView({ rejection, onRebase, onDismiss, titleOf, omit, e
     const records = words(rejection.intervening);
     body = (
       <>
-        <strong>{staleHeading ?? "Not saved: someone else changed this first."}</strong>
+        <NotSaved>{staleHeading ?? "someone else changed this first."}</NotSaved>
         {records.length === 0 ? null : <span>What they changed: {records.join(", ")}</span>}
       </>
     );
   } else if (rejection.rejection === "invalid") {
     body = (
       <>
-        <strong>Not saved: the change breaks a rule.</strong>
+        <NotSaved>the change breaks a rule.</NotSaved>
         <ViolationLines violations={omit === undefined ? rejection.violations : rejection.violations.filter((violation) => !omit(violation))} titleOf={titleOf} />
       </>
     );
   } else {
-    body = <strong>Not saved: that change was already sent once, so it was not sent again.</strong>;
+    body = <NotSaved>that change was already sent once, so it was not sent again.</NotSaved>;
   }
   return (
-    <div className="callout callout-bad stack" role="alert" data-testid="refused" data-rejection={rejection.rejection}>
+    <div className="panel panel-bad stack" role="alert" data-testid="refused" data-rejection={rejection.rejection}>
+      <span className="label">Error</span>
       {body}
       {extras}
       <span className="row">
