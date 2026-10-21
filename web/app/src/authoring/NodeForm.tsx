@@ -173,7 +173,9 @@ export function NodeForm({ authored, node }: NodeFormProps) {
   const props = { kind: node.kind, nodeKey: node.key, draft, change, notes, tree: authored.tree, roles: authored.graph.roles ?? [], authored };
   return (
     <form className="stack" data-testid="node-form" data-node={node.key} onSubmit={(event) => { event.preventDefault(); void save(); }}>
-      <Fields props={props} />
+      <div className="detail-folds">
+        <Fields props={props} />
+      </div>
       <FormViolations places={places} />
       <WriteStatus view={write.status} />
       {write.failed === undefined ? <Receipt receipt={write.receipt} /> : write.failed.rejection.rejection === "invalid" ? null : <RejectionView rejection={write.failed.rejection} onRebase={() => void save(authored.revision)} onDismiss={discard} />}

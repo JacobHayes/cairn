@@ -328,8 +328,18 @@
     flex-wrap: wrap;
   }
 
+  /* The ⋯ menu shares the title's line; the version, the view and the primary action take the next. */
   .route-header > .row > h1 {
-    flex-basis: 100%;
+    flex-basis: calc(100% - 56px);
+  }
+
+  .route-header > .row > .route-menu {
+    order: 1;
+    margin-left: auto;
+  }
+
+  .route-header > .row > :not(h1, .route-menu) {
+    order: 2;
   }
 
   .route-header h1 {

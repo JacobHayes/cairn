@@ -28,7 +28,7 @@ export function AuthoringPanel({ authored, node, onRemoved }: AuthoringPanelProp
     // Keyed by node, so every editor's state and kept draft are the open node's own.
     <div key={node.key} className="stack author-panel" data-testid="authoring" data-node={node.key}>
       <NodeForm key={node.key} authored={authored} node={node} />
-      <p className="muted small">The sections below save as you change them.</p>
+      <p className="muted">The sections below save as you change them.</p>
       <div className="detail-folds">
         <Section title="People" summary={Object.keys(node.participations ?? {}).length === 0 ? undefined : String(Object.keys(node.participations ?? {}).length)} testId="author-participations">
           <ParticipationWiring authored={authored} node={node} />

@@ -249,7 +249,11 @@ test("C19: a version's node says when it applies including what its container's 
   await goWithin(page, "/routes/vendor-evaluation/nodes/n_partner_results?version=1");
   // Its own node has no condition; the one it follows is its container's, named and linked.
   await expect(page.getByTestId("version-applies").locator('li[data-node="n_partner_led"]')).toContainText("If ");
+  // A top-level group is a stage here as on the canvas; a nested one stays a group.
+  await goWithin(page, "/routes/vendor-evaluation/nodes/n_testing?version=1");
+  await expect(page.getByTestId("route-node")).toContainText("stage");
   await goWithin(page, "/routes/vendor-evaluation/nodes/n_partner_led?version=1");
+  await expect(page.getByTestId("route-node")).toContainText("group in testing");
   await page.getByTestId("version-holds").locator("summary").click();
   await expect(page.getByTestId("version-holds").locator('li[data-node="n_partner_results"]')).toBeVisible();
 });

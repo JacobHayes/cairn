@@ -24,7 +24,7 @@ export function FieldBox({ label, place, notes = {}, children }: { label: string
   return (
     <div className="stack author-field" data-testid="author-field" data-field={place} data-invalid={invalid ? "true" : "false"}>
       <span className="row">
-        {label === "" ? null : <span className="author-label">{label}</span>}
+        {label === "" ? null : <span className="label">{label}</span>}
         {notes.edited === true ? (
           <span className="badge warn" data-testid="edited-here">
             edited here

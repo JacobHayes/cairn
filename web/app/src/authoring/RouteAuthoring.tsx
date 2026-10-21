@@ -9,6 +9,7 @@ import "./authoring.css";
 import { Link } from "react-router";
 
 import { useDeployment } from "../data/react.ts";
+import { isStage, kindWord } from "../detail/model.ts";
 import { Section, NodeLink } from "../detail/parts.tsx";
 import { identityNamed } from "../detail/sections.tsx";
 import { choiceLabel } from "../status/answer.ts";
@@ -84,7 +85,7 @@ function VersionNode({ tree, node }: { tree: Tree; node: GraphNode }) {
           </Section>
         )}
       </div>
-      <p className="muted small">A published version is read only. Open a draft to change it.</p>
+      <p className="muted">A published version is read only. Open a draft to change it.</p>
     </div>
   );
 }
@@ -107,7 +108,7 @@ export function RouteNodePanel({ tree, nodeKey, close, authored, onRemoved }: { 
     <aside className="detail-panel panel stack" aria-label={node.title} data-testid="route-node" data-node={nodeKey}>
       <div className="stack detail-head">
         <span className="muted mono">
-          {node.kind}
+          {kindWord(node.kind, isStage(node))}
           {ancestorsOf(tree, nodeKey).length === 0 ? "" : ` in ${pathOf(tree, nodeKey)}`}
         </span>
         <h2 data-testid="detail-title">{node.title}</h2>

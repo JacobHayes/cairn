@@ -47,4 +47,4 @@ clear it, then pick version 1.
 
 - Edge selection and the edge card, the Signals lens, selecting several nodes and the node menu
   stay a journey's; the reasons are in the decision record for this change.
-- At phone width the whole route is drawn small until it is zoomed.
+- At phone width the whole route is drawn small until it is zoomed, as a journey's is: both fit the whole graph to the canvas.

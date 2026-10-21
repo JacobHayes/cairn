@@ -101,7 +101,7 @@ export function RouteHeader({ route, of, screen, node, write, blocked, onPublish
             Open a draft
           </Button>
         ) : null}
-        <Menu label="Route actions" testId="route-menu" align="end" trigger={<span aria-hidden="true">⋯</span>}>
+        <Menu label="Route actions" testId="route-menu" className="route-menu" align="end" trigger={<span aria-hidden="true">⋯</span>}>
           {(close) => (
             <>
               {of === undefined ? null : (
@@ -132,7 +132,7 @@ export function RouteHeader({ route, of, screen, node, write, blocked, onPublish
 /** What an import or a publish left, under its own label and apart from any violation (A20). */
 export function ResultBand({ words, notices, hrefOf, onDismiss }: { words: string; notices: readonly Notice[]; hrefOf: ((node: string) => string) | undefined; onDismiss: () => void }) {
   return (
-    <div className="callout stack" role="status" data-testid="route-result">
+    <div className={notices.length === 0 ? "callout result-line" : "callout stack"} role="status" data-testid="route-result">
       <span className="row">
         <strong>{words}</strong>
         <span className="spacer" />

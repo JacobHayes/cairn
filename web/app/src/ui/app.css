@@ -673,6 +673,10 @@ body {
   background: var(--color-surface);
   box-shadow: var(--shadow-sm);
 }
+/* A transient result with nothing more to say is one short line. */
+.result-line {
+  padding-block: var(--space-1);
+}
 .callout::after {
   content: "";
   position: absolute;
