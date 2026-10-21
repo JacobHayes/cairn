@@ -64,13 +64,14 @@ async function survivesMissingScreen(page: Page): Promise<void> {
   await expect(page.getByTestId("load-failure")).toHaveCount(0);
 }
 
-/** The dot says OFFLINE while the browser is offline, and the state it had when the network is back. */
+/** The dot says OFFLINE while the browser is offline, and DEMO, the in-browser host's resting state, when the network is back. */
 async function saysOffline(page: Page, context: BrowserContext): Promise<void> {
-  const state = (await syncChip(page).getAttribute("data-state")) ?? "";
+  // A save just before shows SAVED for a moment; start from the resting state so the return to it is what is checked.
+  await expect(syncChip(page)).toHaveAttribute("data-state", "demo");
   await context.setOffline(true);
   await expect(syncChip(page)).toHaveAttribute("data-state", "offline");
   await context.setOffline(false);
-  await expect(syncChip(page)).toHaveAttribute("data-state", state);
+  await expect(syncChip(page)).toHaveAttribute("data-state", "demo");
   await checkpoint(page);
 }
 
