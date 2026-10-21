@@ -108,15 +108,15 @@ function guardsOf(detail: NodeDetail): { guards: Guard[]; words: string } {
 }
 
 /** F2: a done milestone's actual date, edited. */
-function EditDate({ value, sending, disabled, onChange, onSave, onClose }: { value: string; sending: Sending; disabled: boolean; onChange: (date: string) => void; onSave: (date: string) => void; onClose: () => void }) {
+function EditDate({ value, unchanged, sending, disabled, onChange, onSave, onClose }: { value: string; unchanged: boolean; sending: Sending; disabled: boolean; onChange: (date: string) => void; onSave: (date: string) => void; onClose: () => void }) {
   return (
     <span className="stack" data-testid="edit-date-form">
       <span className="row row-end">
         <label className="stack">
-          <span className="muted">Done on</span>
+          <span className="muted">{value === "" ? "Choose the date it was done." : "Done on"}</span>
           <Field type="date" aria-label="Done on" value={value} onChange={(event) => { onChange(event.target.value); }} />
         </label>
-        <Button primary disabled={disabled || value === ""} onClick={() => { onSave(value); }}>
+        <Button primary disabled={disabled || value === "" || unchanged} onClick={() => { onSave(value); }}>
           Save
         </Button>
         <Dismiss sending={sending} onClose={onClose} />
@@ -369,7 +369,7 @@ function OpenedForm({ opened, footer, ...props }: OpenProps & { opened: Opened; 
     case "evidence":
       return <EvidenceForm {...shared} needs={missingEvidence(view, node)} value={evidenceDraft(opened.value)} onChange={(next) => { form.change("evidence", next); }} onSend={(evidence) => { submit(opened, doneMutations(node.key, evidence)); }} />;
     case "edit-date":
-      return <EditDate {...shared} value={opened.value} onChange={(next) => { form.change("edit-date", next); }} onSave={(date) => { submit(opened, [{ op: "set_recorded_date", node: node.key, end: "finish", date }]); }} />;
+      return <EditDate {...shared} value={opened.value} unchanged={opened.value === detail.record.finished_on} onChange={(next) => { form.change("edit-date", next); }} onSave={(date) => { submit(opened, [{ op: "set_recorded_date", node: node.key, end: "finish", date }]); }} />;
     case "assign":
       return (
         <span className="row" data-testid="assign">
@@ -456,6 +456,20 @@ function useMenu(menus: Omit<Menus, "insertHere">): { groups: MenuItem[][]; runn
   return { groups, runners, focusAnswer: focusAsked ? () => { setFocusAsked(false); } : undefined };
 }
 
+/** The answer form's bypass reason, while it is open and nothing is kept. */
+function anywayOf(form: ReturnType<typeof useActionsForm>, kept: unknown): Anyway | undefined {
+  const { open } = form;
+  return open?.case === "anyway" && kept === undefined
+    ? {
+        reason: open.value,
+        change: (next) => { form.change("anyway", next); },
+        cancel: form.close,
+        sent: (id) => { form.sent(id, open.version); },
+        resent: form.resent,
+      }
+    : undefined;
+}
+
 /** What the form's buttons open here: the done form and the break-down panel (the answer form is drawn in place of Decide). */
 function opensIn(form: ActionsForm): (what: Opens) => void {
   return (what) => {
@@ -472,6 +486,7 @@ export function Actions({ view, detail, onRename }: { view: Ready; detail: NodeD
   return <NodeActions key={`${view.journey.header.id}:${detail.node.key}`} view={view} detail={detail} onRename={onRename} />;
 }
 
+// A write's receipt or rejection is as wide as it needs: beside the sentence (the menu-only case) it would squeeze the sentence, so it sits under it.
 function NodeActions({ view, detail, onRename }: { view: Ready; detail: NodeDetail; onRename: () => void }) {
   const write = useNodeWrite(view, `actions:${detail.node.key}`, detail.node.key);
   const { node, record } = detail;
@@ -495,27 +510,19 @@ function NodeActions({ view, detail, onRename }: { view: Ready; detail: NodeDeta
       form.sent(id, from.version);
     }
   };
-  const anyway: Anyway | undefined =
-    open?.case === "anyway" && kept === undefined
-      ? {
-          reason: open.value,
-          change: (next) => { form.change("anyway", next); },
-          cancel: form.close,
-          sent: (id) => { form.sent(id, open.version); },
-          resent: form.resent,
-        }
-      : undefined;
+  const anyway = anywayOf(form, kept);
   const { groups, runners, focusAnswer } = useMenu({ view, detail, write, form, onRename, onCopied: () => { setCopied(true); } });
   const menu = <Overflow groups={groups} runners={runners} />;
   // A decision awaiting its answer has the answer form in the place of Decide.
   const acts = [...(offers.primary === undefined || offers.primary === "decide" ? [] : [offers.primary]), ...offers.secondary];
   const opens = opensIn(form);
   const moving = movesFrom(node.kind, record.state).includes("start") ? "Starting" : "Finishing";
-  const rejected = <Rejected view={view} write={write} onResent={form.resent} />;
   const inDialog = open?.case === "snooze";
+  const rejected = <Rejected view={view} write={write} onResent={form.resent} />;
+  const settled = kept === undefined && !inDialog ? rejected : null;
   // With nothing to do but the overflow menu, it sits beside the sentence above it instead of on a row of its own.
   const menuOnly = showsRow && acts.length === 0 && groups.length > 0 && !showsAnswer && !copied;
-  return (
+  const body = (
     <div className={menuOnly ? "stack actions-menu-only" : "stack"} data-testid="actions">
       {showsAnswer ? <AnswerEditor view={view} detail={detail} menu={menu} anyway={anyway} focus={focusAnswer} /> : null}
       {showsAnswer && offers.secondary.includes("unsnooze") ? (
@@ -538,7 +545,15 @@ function NodeActions({ view, detail, onRename }: { view: Ready; detail: NodeDeta
       {inPlace ? <OpenedForm view={view} detail={detail} write={write} form={form} opened={open} sending={sending} footer={inDialog ? rejected : null} submit={submit} /> : null}
       {kept === undefined ? null : <Kept opened={kept} view={view} onClose={form.close} />}
       {copied ? <span className="muted small">Link copied.</span> : null}
-      {kept === undefined && !inDialog ? rejected : null}
+      {menuOnly ? null : settled}
     </div>
+  );
+  return menuOnly ? (
+    <>
+      {body}
+      {settled}
+    </>
+  ) : (
+    body
   );
 }

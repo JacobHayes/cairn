@@ -7,7 +7,7 @@
 import { expect, test } from "./test.ts";
 
 import { openNode, pin, section } from "./detail.ts";
-import { fresh, goWithin, menuItem, nodeCard, nodePanel, syncChip } from "./shell.ts";
+import { fresh, goWithin, menuItem, nodeCard, nodePanel, openAt, openSheet, syncChip } from "./shell.ts";
 
 test("a later pin is rejected with its chain, kept across a reload and counted away from it, and resolved with a listed move (F5)", async ({ page }) => {
   let panel = await openNode(page, "browser", "j_vendor_eval", "n_final_report");
@@ -116,4 +116,50 @@ test("C8, J4: Details is last and folded, and its history says who did what: oth
   await panel.getByRole("button", { name: "Start" }).click();
   await expect(history).toHaveCount(before + 1);
   await expect(history.last().getByTestId("history-sentence")).toHaveText(/^You /);
+});
+
+test("a milestone done on a phone leaves its sentence a readable line, with what the write caused under it", async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  await openAt(page, "browser", "j_vendor_eval", "list", { node: "n_decision_meeting" });
+  await openSheet(page);
+  const panel = page.getByTestId("node-detail");
+  await panel.getByRole("button", { name: "Mark done", exact: true }).click();
+  await expect(panel.getByTestId("receipt")).toBeVisible();
+  const lead = (await panel.locator(".detail-lead").boundingBox())?.width ?? 0;
+  const sentence = (await panel.locator(".detail-lead > :first-child").boundingBox())?.width ?? 0;
+  expect(sentence).toBeGreaterThan(lead / 2);
+});
+
+test("a phone's late row says how late once, not as its fact and again as its due line", async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  await openAt(page, "browser", "j_vendor_eval", "list", { fixedToday: "2026-11-05" });
+  await page.getByRole("button", { name: /Controls/ }).click();
+  await page.getByRole("button", { name: /Frontier/ }).first().click();
+  await page.keyboard.press("Escape");
+  const late = page.locator(".list-node").filter({ has: page.getByTestId("fact").filter({ hasText: /late/ }) });
+  await expect(late.first()).toBeVisible();
+  await expect(late.first().locator(".list-due-phone")).toHaveCount(0);
+});
+
+test("a milestone's Done on date left empty says what to choose, and Mark done waits for it", async ({ page }) => {
+  await openAt(page, "browser", "j_vendor_eval", "list", { node: "n_decision_meeting" });
+  const panel = page.getByTestId("node-detail");
+  await panel.getByLabel("Done on").fill("");
+  await expect(panel.getByText("Choose the date it was done.")).toBeVisible();
+  await expect(panel.getByRole("button", { name: "Mark done", exact: true })).toBeDisabled();
+  await panel.getByLabel("Done on").fill("2026-10-20");
+  await expect(panel.getByText("Choose the date it was done.")).toHaveCount(0);
+  await expect(panel.getByRole("button", { name: "Mark done", exact: true })).toBeEnabled();
+});
+
+test("editing a done milestone's date offers Save only for a different date", async ({ page }) => {
+  await openAt(page, "browser", "j_vendor_eval", "list", { node: "n_decision_meeting" });
+  const panel = page.getByTestId("node-detail");
+  await panel.getByLabel("Done on").fill("2026-10-20");
+  await panel.getByRole("button", { name: "Mark done", exact: true }).click();
+  await menuItem(panel, "edit-date");
+  const form = panel.getByTestId("edit-date-form");
+  await expect(form.getByRole("button", { name: "Save" })).toBeDisabled();
+  await form.getByLabel("Done on").fill("2026-10-19");
+  await expect(form.getByRole("button", { name: "Save" })).toBeEnabled();
 });

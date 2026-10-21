@@ -40,7 +40,7 @@ function MilestoneDone({ view, write, node, disabled }: { view: Ready; write: No
   return (
     <span className="row row-end">
       <label className="stack">
-        <span className="muted">Done on</span>
+        <span className="muted">{date === "" ? "Choose the date it was done." : "Done on"}</span>
         <Field type="date" aria-label="Done on" value={date} onChange={(event) => { setDate(event.target.value); }} />
       </label>
       <Button

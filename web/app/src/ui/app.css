@@ -660,12 +660,10 @@ body {
 .toasts > .toast[data-tone="problem"] {
   border-color: var(--color-error);
 }
+/* A receipt is only ever a warning the write caused ("Kickoff is now overdue."). */
 .receipt {
-  color: var(--color-success);
-  font-size: 14px;
-}
-.receipt > .small {
   color: var(--color-warning);
+  font-size: 15px;
 }
 
 .callout {

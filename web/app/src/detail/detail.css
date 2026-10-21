@@ -109,9 +109,11 @@ textarea.grow {
   grid-column: 1;
 }
 
+/* The overflow menu shares the bottom edge with the action beside a labelled field. */
 .actions-row {
   gap: var(--space-3);
   flex-wrap: wrap;
+  align-items: flex-end;
 }
 
 .popover-panel {

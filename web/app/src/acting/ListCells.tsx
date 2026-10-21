@@ -64,15 +64,18 @@ function Return({ view, line }: { view: Ready; line: Line }) {
 }
 
 /** A phone drops the Due column, so the row says its due words under the title (a snoozed row says where the snooze ends instead). */
-function PhoneDue({ view, line }: { view: Ready; line: Line }) {
+function PhoneDue({ view, line, fact }: { view: Ready; line: Line; fact: string | undefined }) {
   const derived = view.derived.nodes[line.key];
   const node = nodeOf(view, line.key);
   const state = line.row?.display_state ?? derived?.display_state;
   const due = derived?.dates.due?.date;
   const open = state !== undefined && state !== "done" && state !== "skipped" && state !== "not_relevant" && state !== "snoozed";
-  return !open || due == null || node === undefined ? null : (
-    <span className={`list-due-phone small ${inkClass(dateInk(due, view.derived.today)) ?? "muted"}`}>{dueWords(due, view.derived.today, node.kind === "decision")}</span>
-  );
+  if (!open || due == null || node === undefined) {
+    return null;
+  }
+  const words = dueWords(due, view.derived.today, node.kind === "decision");
+  // The fact under the title already says it when it is the due words ("14 days late").
+  return words === fact ? null : <span className={`list-due-phone small ${inkClass(dateInk(due, view.derived.today)) ?? "muted"}`}>{words}</span>;
 }
 
 /** How far a container is, and the one thing beneath it that needs attention. */
@@ -126,7 +129,7 @@ function Title({ line, context }: { line: Line; context: CellContext }) {
         <NodeLink view={view} node={line.key} />
         {acting ? <Acting line={line} context={context} /> : tree ? (line.container ? <Progress view={view} line={line} /> : null) : <Under view={view} line={line} />}
         <Return view={view} line={line} />
-        <PhoneDue view={view} line={line} />
+        <PhoneDue view={view} line={line} fact={acting && line.row !== undefined ? factOf(view, line.row, context.sort ?? "rank")?.words : undefined} />
       </div>
     </div>
   );

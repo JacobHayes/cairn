@@ -28,7 +28,7 @@ export function Receipt({ receipt }: { receipt: ReceiptState | undefined }) {
     return null;
   }
   return (
-    <span className="receipt small" data-testid="receipt">
+    <span className="receipt" data-testid="receipt">
       {receipt.warning}
     </span>
   );

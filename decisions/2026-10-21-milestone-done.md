@@ -50,8 +50,31 @@ the old one?
 - A milestone's authored description (for example "its date comes from the up-front date
   decision") is the author's text and is never rewritten, so it stays as written after the
   milestone is done.
-- Panel head counts without a noun (for example the attention list) are a convention shared
-  by every panel on every screen and unrelated to this rename; changing it is its own call.
+- A panel head's count stays as it is. The design document settles it: a panel's heading is
+  the section title with its count in small mono beside it ("Needs attention 7"), and its
+  rule against a bare number is about a number with no word near it ("Unlocks 2", not "2").
+  A count that follows the word naming what is counted is that form. The critique that asked
+  for "7 items" read the rule without the panel-head passage; no panel head changes.
+- A scheduled milestone has no Mark done on its list row: the list offers a row action only
+  to the frontier, and a milestone that marks itself done on a date ahead is not on it. The
+  inspector offers Mark done on it, with the same one label, as the way to finish it early.
+- When a write's only effect on the inspector is its warning (a milestone done, with the
+  later things it left short or overdue), the warning sits under the sentence in the warning
+  colour. It had been squeezing the sentence beside the overflow menu into a column of single
+  letters on a phone, and was drawn in the success colour.
+
+- On a phone, a late row's due line is left out when the fact under its title already says
+  the same words. An empty Done on date says what to choose.
+- Editing a done milestone's date offers Save only for a different date. The warning a
+  write leaves stays one sentence under the sentence, as every receipt does; the nodes it
+  names are on the screens, and the sentence clears when the next write starts.
+- Looks that were raised and left as they are, each by what the design documents say: a
+  row's one reason under its title next to the Due column (the frontier's rows are specified
+  with both); a phone list's status chip wrapping onto two lines and the timeline's narrow
+  label ending in an ellipsis (the table and the no-spill rules give titles the room, and the
+  full words are in the inspector); the summary's actions under a row on a touch screen
+  (specified there); the filter, which holds flags and relevance switches only, so a
+  finished state is never hidden by it and has no choice in it.
 
 ## Alternatives
 

@@ -20,6 +20,20 @@ The Timeline row of a finished milestone says "Done" and its date; the summary's
 
 ![Summary](summary.png)
 
+## Phone and dark
+
+The same button and date field work at phone width and in dark. A milestone that marks itself done on its date offers the one Mark done too, from its inspector (it is not on the list's frontier rows, so a row carries none).
+
+![A scheduled milestone on a phone, dark](scheduled-phone-dark.png)
+
+![A frontier row on a phone, dark: title, reason, Mark done, one line each](list-row-phone-dark.png)
+
+![The same milestone done on a phone, light: what the write left short is under the sentence](done-phone-light.png)
+
+![An emptied Done on date says what to choose](date-cleared-phone-light.png)
+
+![A milestone done on an earlier day than today, on the Timeline in dark](timeline-done-dark.png)
+
 ## Known limits
 
 - Route files exported before this change name the old setting and must be exported again.

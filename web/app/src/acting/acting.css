@@ -332,8 +332,10 @@ summary.node-panel-head {
     display: none;
   }
 
+  /* On a line of its own under the action, so a row's title, fact, action and due always stack in that order. */
   .list-due-phone {
     display: block;
+    flex-basis: 100%;
   }
 }
 
