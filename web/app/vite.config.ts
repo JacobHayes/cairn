@@ -13,6 +13,8 @@ import { fileURLToPath } from "node:url";
 import react from "@vitejs/plugin-react";
 import { defineConfig, type Plugin, type ProxyOptions } from "vite";
 
+import { THEME_KEY } from "./src/ui/themeKey.ts";
+
 /**
  * The design language's tokens, base styles and fonts, imported from their one source with no
  * copies (DESIGN.md): `import "@design/tokens.css"`.
@@ -41,6 +43,11 @@ function fontLicense(): Plugin {
   };
 }
 
+/** Writes the theme's storage key into the page's inline script (src/ui/themeKey.ts is its one source). */
+function themeKey(): Plugin {
+  return { name: "cairn:theme-key", transformIndexHtml: (html) => html.replaceAll("__THEME_KEY__", THEME_KEY) };
+}
+
 /**
  * The paths the server keeps (crates/api/src/endpoints.rs, `PREFIX` and `RESERVED`, and the
  * health check); every other path is the app's, which Vite answers with the page.
@@ -60,7 +67,7 @@ export default defineConfig(({ command, mode }) => ({
     __CAIRN_HOST__: JSON.stringify(command === "serve" ? (server === undefined ? "browser" : "server") : mode === "demo" ? "browser" : "server"),
   },
   root: fileURLToPath(new URL(".", import.meta.url)),
-  plugins: [react(), fontLicense()],
+  plugins: [react(), fontLicense(), themeKey()],
   resolve: { alias: [{ find: "@design", replacement: DESIGN }, { find: /^.*\/generated\/cairn_wasm\.js$/, replacement: `${BINDGEN}/cairn_wasm.js` }] },
   logLevel: "warn",
   // `mise run build:web` writes dist/build/, which the binary embeds (crates/cairn/src/assets.rs),

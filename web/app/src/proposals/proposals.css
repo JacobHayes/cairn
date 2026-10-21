@@ -73,7 +73,7 @@
   display: inline-flex;
   flex-wrap: wrap;
   gap: var(--space-3);
-  font-size: 13px;
+  font: 13px var(--font-mono);
 }
 
 .layer-key-item {

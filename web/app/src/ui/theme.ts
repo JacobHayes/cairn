@@ -5,18 +5,19 @@
 // Storage that refuses (a private window) leaves the choice in memory for the tab.
 import { useSyncExternalStore } from "react";
 
+import { THEME_KEY } from "./themeKey.ts";
+
 export type ThemeChoice = "system" | "light" | "dark";
 export type ResolvedTheme = "light" | "dark";
 
 export const THEME_CHOICES: readonly ThemeChoice[] = ["system", "light", "dark"];
 
-const KEY = "cairn:theme";
 const DARK_QUERY = "(prefers-color-scheme: dark)";
 
 /** The choice stored before this page, or System. */
 export function storedTheme(): ThemeChoice {
   try {
-    const stored = globalThis.localStorage.getItem(KEY);
+    const stored = globalThis.localStorage.getItem(THEME_KEY);
     return stored === "light" || stored === "dark" ? stored : "system";
   } catch {
     return "system";
@@ -37,9 +38,9 @@ export function setTheme(choice: ThemeChoice): void {
   }
   try {
     if (choice === "system") {
-      globalThis.localStorage.removeItem(KEY);
+      globalThis.localStorage.removeItem(THEME_KEY);
     } else {
-      globalThis.localStorage.setItem(KEY, choice);
+      globalThis.localStorage.setItem(THEME_KEY, choice);
     }
   } catch {
     // Kept for this tab only.

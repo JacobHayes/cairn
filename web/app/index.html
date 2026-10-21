@@ -7,7 +7,7 @@
     <script>
       // The chosen theme, before first paint, so the page never flashes the wrong one (ui/theme.ts).
       try {
-        var theme = localStorage.getItem("cairn:theme");
+        var theme = localStorage.getItem("__THEME_KEY__");
         if (theme === "light" || theme === "dark") document.documentElement.dataset.theme = theme;
       } catch (_) {}
     </script>

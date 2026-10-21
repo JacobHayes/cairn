@@ -935,7 +935,7 @@ svg.chart .datum-line {
   color: var(--color-secondary);
 }
 .popover-body {
-  max-height: min(60dvh, 480px);
+  max-height: min(var(--popover-room, 100dvh), 60dvh, 480px); /* --popover-room: the room Menu.tsx finds for it */
   overflow-y: auto;
   padding: var(--space-3);
 }

@@ -9,7 +9,7 @@ import { KeyTable } from "../screens/KeySheet.tsx";
 function placeBeside(hint: HTMLElement): CSSProperties {
   const box = hint.getBoundingClientRect();
   // Beside the hint, slid back inside a narrow window; under it when it sits in the top half.
-  const left = Math.max(12, Math.min(box.right, globalThis.innerWidth - 360 - 12));
+  const left = `max(12px, min(${String(box.right)}px, 100vw - var(--popover-w) - 12px))`;
   return box.top < globalThis.innerHeight / 2 ? { top: box.bottom, left } : { bottom: globalThis.innerHeight - box.bottom, left };
 }
 

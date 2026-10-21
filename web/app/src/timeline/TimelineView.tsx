@@ -57,8 +57,9 @@ const SPAN_DAYS_MAX = 3650;
 /** Past this fraction of the width, a label on the axis reads leftward, so it stays on it. */
 const LABEL_FLIP_AT = 0.75;
 
-/** What a character of the axis's 11px mono labels takes (px), and the gap two labels keep between them. */
-const LABEL_CHAR_PX = 6.6;
+/** The axis labels' mono size (px; timeline.css reads it as --label-font-px), what a character of it takes, and the gap two labels keep between them. */
+const LABEL_FONT_PX = 11;
+const LABEL_CHAR_PX = LABEL_FONT_PX * 0.6;
 const LABEL_GAP_PX = 8;
 
 /** The stretch (px) a label of `words` takes along the axis from `x`, reading toward `anchor`'s side. */
@@ -155,7 +156,7 @@ function AxisHead({ axis, endTitle }: { axis: Axis; endTitle: (node: string) => 
   const nowShown = axis.now >= 0 && axis.now <= 1;
   const endWords = end === undefined ? "" : `Ends: ${endTitle(end.node)}${axis.mode === "relative" ? ` · ${dayWords(end.day)}` : ""}`;
   return (
-    <svg ref={svg} className="timeline-axis-svg" width="100%" height={AXIS_PX} aria-hidden="true" data-testid="timeline-axis" data-unit={axis.unit}>
+    <svg ref={svg} className="timeline-axis-svg" style={{ "--label-font-px": `${String(LABEL_FONT_PX)}px` } as CSSProperties} width="100%" height={AXIS_PX} aria-hidden="true" data-testid="timeline-axis" data-unit={axis.unit}>
       <Backdrop axis={axis} height={AXIS_PX} />
       {axis.ticks.map((tick, at) => (
         // Every few ticks are named, so the names do not run into each other; the rest are lines.

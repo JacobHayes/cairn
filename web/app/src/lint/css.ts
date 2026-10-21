@@ -4,7 +4,7 @@
 //   - `max-height` in `vh`, and `100vh` anywhere (the frame is `100dvh`);
 //   - `position: sticky`, except table headers, the list's pinned columns, the timeline axis, and the way back to the pass;
 //   - a raw hex colour (tokens carry colours);
-//   - a border radius over 4px (DESIGN's `--radius-lg`).
+//   - a border radius over `--radius-lg` (DESIGN's `--radius-lg`).
 // A small reader, not a CSS parser: it tracks braces and at-rules, which is all these need.
 // Plain Node runs it (run-css.ts), so it uses only syntax Node can strip types from.
 
@@ -26,9 +26,23 @@ export interface Source {
 const SCROLLERS = [".rail", ".ws-body", ".inspector-body", ".sheet-body", ".popover-body", ".modal-body"];
 /** Elements that may stick: table headers, the Plan list's pinned columns, the timeline's axis, the inspector's way back to the pass. */
 const STICKY = ["th", ".list-pinned", ".timeline-axis", ".back-to-pass"];
-/** DESIGN's `--radius-lg`, the largest radius there is (px); a rem is the design's 17px. */
-const RADIUS_MAX_PX = 4;
-const REM_PX = 17;
+/** The design's own limits, read from design/tokens.css: the largest radius there is (`--radius-lg`) and what a rem is (`--type-base-size`), in px. */
+export interface Limits {
+  radiusMaxPx: number;
+  remPx: number;
+}
+
+/** The limits `tokens` (the text of design/tokens.css) sets. */
+export function limitsOf(tokens: string): Limits {
+  const px = (name: string): number => {
+    const found = new RegExp(`--${name}:\\s*(\\d+(?:\\.\\d+)?)px`).exec(tokens);
+    if (found?.[1] === undefined) {
+      throw new Error(`design/tokens.css declares no --${name} in px`);
+    }
+    return Number(found[1]);
+  };
+  return { radiusMaxPx: px("radius-lg"), remPx: px("type-base-size") };
+}
 
 interface Declaration {
   line: number;
@@ -93,11 +107,11 @@ function styles(selector: string, allowed: string[]): boolean {
   return subjects(selector).every((subject) => allowed.some((name) => subject === name || (name.startsWith(".") ? subject.split(/(?=[.:])/).includes(name) : subject.split(/(?=[.:#])/)[0] === name)));
 }
 
-function radiusTooBig(value: string): boolean {
-  return [...value.matchAll(/(-?\d*\.?\d+)(px|rem|em)\b/g)].some(([, amount = "0", unit]) => Number(amount) * (unit === "px" ? 1 : REM_PX) > RADIUS_MAX_PX);
+function radiusTooBig(value: string, { radiusMaxPx, remPx }: Limits): boolean {
+  return [...value.matchAll(/(-?\d*\.?\d+)(px|rem|em)\b/g)].some(([, amount = "0", unit]) => Number(amount) * (unit === "px" ? 1 : remPx) > radiusMaxPx);
 }
 
-function broken(declaration: Declaration): string | undefined {
+function broken(declaration: Declaration, limits: Limits): string | undefined {
   const { property, value, selector } = declaration;
   if ((property === "overflow" || property === "overflow-y") && /\b(auto|scroll)\b/.test(value) && !styles(selector, SCROLLERS)) {
     return `${property}: ${value} on ${selector}: only ${SCROLLERS.join(", ")} scroll`;
@@ -116,8 +130,8 @@ function broken(declaration: Declaration): string | undefined {
   if (/#[0-9a-f]{3,8}\b/i.test(value)) {
     return `raw hex colour: use a token`;
   }
-  if (property.startsWith("border") && property.endsWith("radius") && radiusTooBig(value)) {
-    return `a radius over ${String(RADIUS_MAX_PX)}px`;
+  if (property.startsWith("border") && property.endsWith("radius") && radiusTooBig(value, limits)) {
+    return `a radius over ${String(limits.radiusMaxPx)}px`;
   }
   return undefined;
 }
@@ -126,11 +140,12 @@ function broken(declaration: Declaration): string | undefined {
  * The rules `sources` break. `hexOnly` files (the design's shared styles, which the app overrides
  * where it needs a frame) are held to the colour rule alone.
  */
-export function lintCss(sources: Source[], hexOnly: Source[] = []): Violation[] {
+export function lintCss(sources: Source[], hexOnly: Source[], tokens: string): Violation[] {
+  const limits = limitsOf(tokens);
   const found: Violation[] = [];
   const check = (source: Source, only: string | undefined) => {
     for (const declaration of declarationsOf(source.text)) {
-      const rule = broken(declaration);
+      const rule = broken(declaration, limits);
       if (rule !== undefined && (only === undefined || rule.startsWith(only))) {
         found.push({ file: source.file, line: declaration.line, rule, declaration: `${declaration.property}: ${declaration.value}` });
       }

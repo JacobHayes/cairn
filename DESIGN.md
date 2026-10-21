@@ -67,7 +67,8 @@ Every neutral comes from one cool ramp, `--n-0` to `--n-15`: OKLCH hue 250 throu
 | container frames, menu borders | `--color-frame` | `--n-7` | `--n-7` |
 | hairlines on chrome | `--chrome-border` | `--n-5` | `--n-11` |
 | text on paper, text on chrome | `--color-text`, `--chrome-ink` | `--n-15` | `--n-1` |
-| secondary and muted text, on chrome too | `--color-secondary`, `--color-muted`, `--chrome-muted` | `--n-8` | `--n-6` |
+| secondary text, and muted text on chrome | `--color-secondary`, `--chrome-muted` | `--n-8` | `--n-6` |
+| muted text on paper, ground and band | `--color-muted` | `--n-8` | `--n-5` |
 | primary button, chart ink | `--color-primary` | `--n-12` | `--n-11` (`--ink-fill` is chrome ink) |
 
 The hierarchy is the order of the steps. In light, paper is the lightest, then the sunken frames, the ground, the band, and the chrome the deepest: the chrome is the slightly deeper tone that frames the page. In dark the order flips: the chrome is the deepest step, then the ground, the sunken frames, paper (raised), the band, the hairlines. Chrome is always one clear step off the ground (two ramp steps), in both themes. The ramp has no gradients and no second hue, and the roles above are the only places it is used for structure.
@@ -81,10 +82,10 @@ The hierarchy is the order of the steps. In light, paper is the lightest, then t
 | `--color-accent` | `#2f6fff` | electric blue: selection, focus ring, flagged datum |
 | `--color-surface` | `--n-0` | paper: rows, cards, panels, menus |
 | `--color-text` | `--n-15` | ink on paper |
-| `--color-muted` | `--n-8` | secondary text (AA on the header band) |
+| `--color-muted` | `--n-8` (dark: `--n-5`) | secondary text (AA on the header band, and under a diff fill) |
 | `--color-border` | `--n-4` | hairlines, row rules, separators, chart gridlines |
 | `--color-error` | `#b8342c` | text: 4.5:1 on paper and the band (dark: `#f07a70`) |
-| `--color-success` | `#1f7a55` | text: 4.5:1 on paper (dark: `#45c08c`) |
+| `--color-success` | `#1e7853` | text: 4.5:1 on paper (dark: `#45c08c`) |
 | `--color-warning` | `#8a5608` | text: 4.5:1 on paper and the band (dark: `#e0a23c`) |
 
 ### Derived
@@ -106,8 +107,8 @@ The hierarchy is the order of the steps. In light, paper is the lightest, then t
 | `--opacity-snoozed` | `0.7` | `0.7` | the status language's snoozed level, between resting (1) and done (0.5): a snoozed node's title and owner, the same on a card, a list row and a timeline label |
 | `--color-hover` | `rgba(20,24,30,.07)` | `rgba(255,255,255,.07)` | neutral row hover |
 | `--color-tint` | `rgba(47,111,255,.12)` | `rgba(47,111,255,.16)` | faint blue behind a selected row |
-| `--color-add` / `--color-del` | success / error at 12% | at 28% | diff line backgrounds |
-| `--color-change` | warning at 12% | at 28% | a changed node's, row's or line's background under the proposal layer, beside `--color-add` and `--color-del` |
+| `--color-add` / `--color-del` | success / error at 8% | at 10% | diff line backgrounds, derived from the state tokens |
+| `--color-change` | warning at 8% | at 10% | a changed node's, row's or line's background under the proposal layer, beside `--color-add` and `--color-del` |
 | `--chart-ink` / `--chart-steel` / `--chart-grid` | primary / secondary / border | text / muted / border | chart marks and scaffold |
 | `--ink-fill` / `--ink-hover` | primary / `--n-10` | chrome-ink / chrome-muted | primary button fill |
 
@@ -120,11 +121,13 @@ Both themes meet these, and `web/app/src/ui/tokens.test.ts` parses `design/token
 | text and muted on surface and on band, muted on ground, and chrome ink, muted and brand on chrome | 4.5:1 |
 | `--color-frame` on ground and on sunken | 3:1 |
 | error, warning on surface and on band; success on surface (they are set as text) | 4.5:1 |
-| text and muted over `--color-add`, `--color-change` and `--color-del` (a marked card or row keeps its text legible) | 4.5:1 |
+| text and muted over `--color-add`, `--color-change` and `--color-del`, each on paper, band, ground and sunken, and error, warning and success over them on paper (a marked card or row keeps its text legible) | 4.5:1 |
 | `--color-edge` on ground and on surface | 2:1 |
 | surface on ground (a visible step before any border) | 1.08:1 |
 
 ### Dark theme
+
+A token that differs by theme is declared once, as `light-dark(light, dark)`, and the root's `color-scheme` (`light dark`, or the forced one) picks the side; there is no second block of dark values.
 
 Dark mode follows the OS preference and can be forced with `data-theme="dark"` or `"light"` on the root element. Every theme-dependent token has a value in each theme (the tables above): the same ramp, with each role taking a darker step. The paper is raised (`--n-11`) above the ground and the chrome goes deeper than both, all of them muted (the dark end of the ramp is nearly neutral, so the dark pages read as soft graphite rather than navy), and the borders lighten so they keep their contrast. The accent is the same in both themes; the status colours (error, success, warning) are the same hue with a lighter step in dark, because they are set as text and must hold 4.5:1 on the dark paper and band.
 
@@ -163,7 +166,7 @@ Mono uppercase is kept for labels, column headers, keys and status chips; button
   - a fixed rail on the left (brand with the sync dot at the right edge of its row, nav, small counts in mono) on `--chrome-bg`
   - a wide workspace in the centre on the plain `--color-ground`, with paper rows, cards and panels on it
   - an optional inspector on `--chrome-bg` for the detail of whatever is selected
-  The chrome follows the theme: light chrome in light, dark in dark. The workspace runs edge to edge between the rail and the viewport. Only a canvas inside it is ruled.
+  The rail is `--rail-w` (200px) and the inspector `--inspector-w` (400px), tokens the app reads. The chrome follows the theme: light chrome in light, dark in dark. The workspace runs edge to edge between the rail and the viewport. Only a canvas inside it is ruled.
 - **One scroller per region.** At 720px and wider the frame fills the viewport (`100dvh`) and the document never scrolls. The rail, the workspace body, the inspector body, a sheet body, a popover body and a modal body are the only scrolling elements, each scrolling once. A gesture surface (a graph or timeline canvas, which owns the wheel and touch) never sits inside a scroller. A primary table is its region's scroller, so its sticky header sticks to the right box; secondary tables (inside the inspector or a card) never scroll and end in "Show all" instead. A journey or route index row has a second line of context under its name; an absent figure is said in words (not a dash); and at phone width a row stacks as a block: the name, an upgrade notice if there is one, the context, then one attention line holding every fact the row has (what needs a look and what is yours, both, a fact that says nothing left out), so nothing a row says is dropped on a phone.
  **Inspector.** A right-hand column, or a resizable sheet along the bottom when the workspace must keep its full width. Both are chrome, with paper cards inside. One control hides it: the head's "Hide inspector" button (a `›|` chevron, tooltip "Hide the inspector  ]"), with no close button, since deselecting is the canvas background click or Esc. Hidden, the column folds to a 32px rail on the right edge, still visible, with a `|‹` "Show inspector" button and vertical mono INSPECTOR, ASSISTANT and PROPOSALS tabs (the column's own tabs turned on their side; Assistant only where it is offered, Proposals while the journey or route has an open proposal): a tab opens the column on that tab, and `]` toggles it. The Proposals tab holds that destination's open proposals as rows (the title a link to its review, under it what the proposal changes, then "Needs a refresh" in warning ink when the destination moved since it was drafted), on Identities as on a journey or a route; it is there while any proposal is open (a page with none keeps no column for it, and its `/proposals` address still shows the tab, empty, unless the destination does not exist and nothing would create it), its count in mono beside its name, in the tab bar and on the rail. While the proposal layer is on, the Inspector tab holds the review rail (see Proposal layer) instead of node detail. Selecting a node (a canvas click or a list row) brings a hidden inspector back. The sheet (below 1100px) has the same single control, and hidden it is gone but for one labelled pill, "Inspector", at the bottom centre that opens it: no bar and no blank strip are left behind.
 - **The walkthrough is one centered column.** The card and what speaks to it (the introduction, the position and Pass line, the end-of-pass and stalled notes) share one 560px measure, centered in the workspace; a narrow workspace fills it, to the gutter. The view controls sit above the column, as on the list and the timeline. There is no link back to the graph: the view picker and the browser's back lead there.
@@ -238,7 +241,7 @@ Mono uppercase is kept for labels, column headers, keys and status chips; button
 Graticule comes from the Katagami design library ("Graticule", https://katagami.ai/language/en-019efa7c-5133-7f82-a6af-bce556fd39fd, which needs sign-in). It was first adapted for a local analyst workbench. Its core colour, type, spacing, radius, shadow and motion tokens are unchanged. This version differs from the library entry in these ways:
 
 - **Accent use.** The library allows exactly one blue element per view. Here the accent marks state (selection, focus, flagged data) without a hard count.
-- **Contrast.** `--color-muted` is `#616b7a`, not `#6b7585` (3.9:1 on the band), and dark-mode steel is `#a3acba`.
+- **Contrast.** `--color-muted` holds 4.5:1 on the band in both themes, where the library's value measured 3.9:1.
 - **Dark theme.** The library defines light panels only. The dark values here are an addition, and chrome follows the theme rather than staying graphite.
 - **Additions.** The library has none of these: the rail, chrome, ground, sunken, edge, frame, band, ruling, tick, hover, tint and diff tokens; `--control-h`; the categorical and ramp palettes; and the select, keyboard-hint and toast styles.
 - **Layout.** The library's inspector is always a right column, and it puts graphite margins around the panels. Here the workspace runs edge to edge on a plain ground, chrome follows the theme, the ruling is only on canvases, and the inspector may be a bottom sheet.

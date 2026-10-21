@@ -191,7 +191,7 @@ function Unsaved({ layer }: { layer: Layer }) {
 function Origin({ proposal }: { proposal: Proposal }) {
   const userWords = useUserWords();
   return (
-    <p className="muted small" data-testid="proposal-origin">
+    <p className="meta muted" data-testid="proposal-origin">
       Proposed by {userWords(proposal.created_by)}
       {proposal.proposing_agent == null ? "" : " with an agent"}.
     </p>

@@ -6,8 +6,7 @@
    sizes here are px. */
 
 :root {
-  --rail-w: 200px;
-  --inspector-w: 400px;
+  --popover-w: 360px; /* the sync and keys popovers' width; KeysHint.tsx slides the keys popover by it */
   --fold-w: 32px; /* the hidden inspector's rail */
   --inspector-pad: 20px; /* where the inspector's cards and the assistant start their content (DESIGN, More air) */
   /* The sheet's three heights (below 1100px): the peek is the grip, the tabs and the top of the pane (a short window gets just the grip and tabs: a quarter of its height, at most 164px), and sits clear of the home indicator; the tall one leaves room above it for a notice: a window's worth, less a notice. The pill is the closed sheet's one control. */
@@ -218,7 +217,7 @@ body {
 }
 .keys-popover {
   position: fixed;
-  width: min(360px, calc(100vw - 24px));
+  width: min(var(--popover-w), calc(100vw - 24px));
 }
 
 /* The sync dot sits at the right edge of the brand row at the top of the rail; its popover is fixed (placed from the dot's box) so the rail's scroller does not clip it. */
@@ -228,7 +227,7 @@ body {
 }
 .sync-popover {
   position: fixed;
-  width: 360px;
+  width: var(--popover-w);
   font: 400 14px / 1.5 var(--font-body);
   letter-spacing: 0;
   text-transform: none;
@@ -260,7 +259,7 @@ body {
 }
 @media (max-width: 719px) {
   .sync-popover {
-    width: min(360px, calc(100vw - 2 * var(--space-3)));
+    width: min(var(--popover-w), calc(100vw - 2 * var(--space-3)));
   }
 }
 /* The top bar of a phone has no You tab; the link is for that width only. */

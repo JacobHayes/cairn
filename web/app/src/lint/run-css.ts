@@ -22,7 +22,7 @@ const design = cssIn(join(repo, "design"))
   .filter((path) => !path.endsWith("tokens.css"))
   .map(read);
 
-const violations = lintCss(app, design);
+const violations = lintCss(app, design, readFileSync(join(repo, "design/tokens.css"), "utf8"));
 for (const { file, line, rule, declaration } of violations) {
   console.error(`${file}:${String(line)}: ${rule} (${declaration})`);
 }

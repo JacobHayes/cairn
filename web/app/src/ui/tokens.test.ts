@@ -3,74 +3,122 @@
 import { readFileSync } from "node:fs";
 import { expect, it } from "vitest";
 
-const css = readFileSync(new URL("../../../../design/tokens.css", import.meta.url), "utf8");
+const css = readFileSync(new URL("../../../../design/tokens.css", import.meta.url), "utf8").replace(/\/\*[\s\S]*?\*\//g, "");
 
-/** Every colour token declared in `text`: a hex, or a `var()` of another token (resolved by the caller). */
-function declared(text: string): Map<string, string> {
-  const found = new Map<string, string>();
-  for (const [, name, value] of text.matchAll(/--([\w-]+):\s*(#[0-9a-f]{6}|var\(--[\w-]+\))(?=;)/gi)) {
-    found.set(name ?? "", value ?? "");
-  }
-  return found;
+type Theme = "light" | "dark";
+/** A colour as sRGB channels (0 to 1) and alpha. */
+type Rgba = [number, number, number, number];
+
+// Every token is declared once, in the first :root block; a theme-dependent one as light-dark(light, dark).
+const declared = new Map<string, string>();
+for (const [, name, value] of css.slice(0, css.indexOf("\n}")).matchAll(/--([\w-]+):\s*([^;]+);/g)) {
+  declared.set(name ?? "", (value ?? "").trim());
 }
 
-/** `tokens` with each `var(--x)` replaced by what x resolves to. */
-function resolved(tokens: Map<string, string>): Map<string, string> {
-  const out = new Map<string, string>();
-  for (const [name, value] of tokens) {
-    let hex = value;
-    for (let hop = 0; hop < 4 && !hex.startsWith("#"); hop += 1) {
-      hex = tokens.get(hex.slice(6, -1)) ?? "";
+/** The comma-separated arguments of a function call's inside, split at the top level. */
+function args(inside: string): string[] {
+  const out: string[] = [];
+  let depth = 0;
+  let start = 0;
+  for (let i = 0; i < inside.length; i += 1) {
+    if (inside[i] === "(") depth += 1;
+    else if (inside[i] === ")") depth -= 1;
+    else if (inside[i] === "," && depth === 0) {
+      out.push(inside.slice(start, i).trim());
+      start = i + 1;
     }
-    out.set(name, hex);
   }
+  out.push(inside.slice(start).trim());
   return out;
 }
 
-// Light is the base block; the data-theme dark block (the last one) overrides it.
-const raw = declared(css.slice(0, css.indexOf("@media (prefers-color-scheme: dark)")));
-const light = resolved(raw);
-const dark = resolved(new Map([...raw, ...declared(css.slice(css.indexOf(':root[data-theme="dark"]')))]));
+/** What `value` is in `theme`: hex, rgba(), var(), light-dark() and color-mix(in srgb, C p%, transparent). */
+function evaluate(value: string, theme: Theme): Rgba {
+  const hex = /^#([0-9a-f]{6})$/i.exec(value);
+  if (hex) {
+    const n = parseInt(hex[1] ?? "", 16);
+    return [(n >> 16) / 255, ((n >> 8) & 255) / 255, (n & 255) / 255, 1];
+  }
+  const call = /^([\w-]+)\((.*)\)$/.exec(value);
+  const [fn = "", inside = ""] = [call?.[1], call?.[2]];
+  const parts = args(inside);
+  if (fn === "var") {
+    const found = declared.get((parts[0] ?? "").slice(2));
+    if (found === undefined) throw new Error(`unknown token ${value}`);
+    return evaluate(found, theme);
+  }
+  if (fn === "light-dark") return evaluate(parts[theme === "light" ? 0 : 1] ?? "", theme);
+  if (fn === "rgba") {
+    const [r = 0, g = 0, b = 0, alpha = 1] = parts.map(Number);
+    return [r / 255, g / 255, b / 255, alpha];
+  }
+  if (fn === "color-mix") {
+    const [space, from, to] = parts;
+    const share = /^(.+) (\d+(?:\.\d+)?)%$/.exec(from ?? "");
+    if (space !== "in srgb" || to !== "transparent" || !share) throw new Error(`unsupported colour mix ${value}`);
+    const [r, g, b, alpha] = evaluate(share[1] ?? "", theme);
+    return [r, g, b, alpha * (Number(share[2]) / 100)];
+  }
+  throw new Error(`unsupported colour ${value}`);
+}
 
-function luminance(hex: string): number {
-  const [r = 0, g = 0, b = 0] = [1, 3, 5].map((i) => {
-    const c = parseInt(hex.slice(i, i + 2), 16) / 255;
-    return c <= 0.03928 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4;
-  });
+/** The colour of `token` in `theme`, as an opaque ground: stacked from the first up, each layer over the one before. */
+function over(layers: string[], theme: Theme): [number, number, number] {
+  let under: [number, number, number] = [1, 1, 1];
+  for (const layer of layers) {
+    const [r, g, b, alpha] = evaluate(`var(--${layer})`, theme);
+    under = [alpha * r + (1 - alpha) * under[0], alpha * g + (1 - alpha) * under[1], alpha * b + (1 - alpha) * under[2]];
+  }
+  return under;
+}
+
+function luminance(rgb: [number, number, number]): number {
+  const [r = 0, g = 0, b = 0] = rgb.map((c) => (c <= 0.03928 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4));
   return 0.2126 * r + 0.7152 * g + 0.0722 * b;
 }
 
-function ratio(tokens: Map<string, string>, a: string, b: string): number {
-  const [hi = 0, lo = 0] = [luminance(tokens.get(a) ?? "#000000"), luminance(tokens.get(b) ?? "#000000")].sort((x, y) => y - x);
+/** The contrast of the opaque ink `fg` on the ground stacked from `bg`, bottom layer first. */
+function ratio(theme: Theme, fg: string, bg: string[]): number {
+  const [hi = 0, lo = 0] = [luminance(over([fg], theme)), luminance(over(bg, theme))].sort((x, y) => y - x);
   return (hi + 0.05) / (lo + 0.05);
 }
 
-// [foreground, background, floor]
-const floors: [string, string, number][] = [
-  ["color-text", "color-surface", 4.5],
-  ["color-muted", "color-surface", 4.5],
-  ["color-muted", "color-ground", 4.5],
-  ["color-text", "color-band", 4.5],
-  ["color-muted", "color-band", 4.5],
-  ["color-error", "color-surface", 4.5],
-  ["color-error", "color-band", 4.5],
-  ["color-warning", "color-surface", 4.5],
-  ["color-warning", "color-band", 4.5],
-  ["color-success", "color-surface", 4.5],
-  ["chrome-ink", "chrome-bg", 4.5],
-  ["chrome-muted", "chrome-bg", 4.5],
-  ["chrome-brand", "chrome-bg", 4.5],
-  ["color-frame", "color-ground", 3],
-  ["color-frame", "color-sunken", 3],
-  ["color-edge", "color-ground", 2],
-  ["color-edge", "color-surface", 2],
-  ["color-surface", "color-ground", 1.08],
+// [foreground, background layers (bottom first), floor]
+const floors: [string, string[], number][] = [
+  ["color-text", ["color-surface"], 4.5],
+  ["color-muted", ["color-surface"], 4.5],
+  ["color-muted", ["color-ground"], 4.5],
+  ["color-text", ["color-band"], 4.5],
+  ["color-muted", ["color-band"], 4.5],
+  ["color-error", ["color-surface"], 4.5],
+  ["color-error", ["color-band"], 4.5],
+  ["color-warning", ["color-surface"], 4.5],
+  ["color-warning", ["color-band"], 4.5],
+  ["color-success", ["color-surface"], 4.5],
+  ["chrome-ink", ["chrome-bg"], 4.5],
+  ["chrome-muted", ["chrome-bg"], 4.5],
+  ["chrome-brand", ["chrome-bg"], 4.5],
+  ["color-frame", ["color-ground"], 3],
+  ["color-frame", ["color-sunken"], 3],
+  ["color-edge", ["color-ground"], 2],
+  ["color-edge", ["color-surface"], 2],
+  ["color-surface", ["color-ground"], 1.08],
 ];
 
-it.each([
-  ["light", light],
-  ["dark", dark],
-])("%s theme keeps its contrast floors", (_theme, tokens) => {
-  const short = floors.filter(([fg, bg, floor]) => !(ratio(tokens, fg, bg) >= floor)).map(([fg, bg, floor]) => `${fg} on ${bg} needs ${String(floor)}`);
+// A marked card, row, label or line keeps its text legible on every ground a diff fill lands on, and
+// the status ink set as text in a marked card keeps its own floor on paper.
+for (const fill of ["color-add", "color-change", "color-del"]) {
+  for (const ground of ["color-surface", "color-band", "color-ground", "color-sunken"]) {
+    for (const ink of ["color-text", "color-muted"]) {
+      floors.push([ink, [ground, fill], 4.5]);
+    }
+  }
+  for (const ink of ["color-error", "color-warning", "color-success"]) {
+    floors.push([ink, ["color-surface", fill], 4.5]);
+  }
+}
+
+it.each<[Theme]>([["light"], ["dark"]])("%s theme keeps its contrast floors", (theme) => {
+  const short = floors.filter(([fg, bg, floor]) => !(ratio(theme, fg, bg) >= floor)).map(([fg, bg, floor]) => `${fg} on ${bg.join(" under ")} needs ${String(floor)} and has ${ratio(theme, fg, bg).toFixed(2)}`);
   expect(short).toEqual([]);
 });

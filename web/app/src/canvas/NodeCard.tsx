@@ -13,7 +13,7 @@ import { createContext, useContext, type CSSProperties } from "react";
 import type { ContextGroup } from "../ui/ContextMenu.tsx";
 import { Meter } from "../ui/kit.tsx";
 import { statusTone, statusWord } from "../status/words.ts";
-import { BORDER_PX, CHIP_BORDER_PX, CHIP_FONT_PX, CHIP_LEADING, MARKER_ROW_PX, TITLE_LINE_PX, cardRows, headChipFits, headTitleBox, titleFitPx, titleLines, titleWordOverflows, type CardRows } from "./cards.ts";
+import { BORDER_PX, CARD_GEOMETRY_VARS, CHIP_BORDER_PX, CHIP_FONT_PX, CHIP_LEADING, MARKER_ROW_PX, TITLE_LINE_PX, cardRows, headChipFits, headTitleBox, titleFitPx, titleLines, titleWordOverflows, type CardRows } from "./cards.ts";
 import { NEAR_ZOOM } from "./gestures.ts";
 import type { LensChip } from "./lens.ts";
 import { hereWords, nodeClasses } from "./look.ts";
@@ -326,7 +326,7 @@ export function NodeCard({ data, width, height }: NodeProps<CardNode>) {
   return (
     <div
       className={classes.filter(Boolean).join(" ")}
-      style={{ width, height }}
+      style={{ ...CARD_GEOMETRY_VARS, width, height }}
       data-testid="node-card"
       data-node={card.key}
       data-kind={card.kind}

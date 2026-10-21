@@ -186,7 +186,7 @@
 .timeline-today-label,
 .timeline-end-label {
   fill: var(--color-muted);
-  font: 11px var(--font-mono);
+  font: var(--label-font-px) var(--font-mono);
   font-variant-numeric: tabular-nums;
 }
 
@@ -308,7 +308,7 @@
   padding-inline-start: var(--space-5);
 }
 
-@media (max-width: 640px) {
+@media (max-width: 719px) {
   .timeline-axis,
   .timeline-body {
     grid-template-columns: minmax(120px, 52%) minmax(0, 1fr);

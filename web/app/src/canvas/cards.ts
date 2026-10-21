@@ -32,6 +32,23 @@ export const TITLE_PX = 15;
 const TITLE_ROOM_PX = CARD_WIDTH_PX - 2 * (CARD_PAD_X_PX + BORDER_PX);
 
 /**
+ * The geometry above as CSS custom properties, set on every card's root so canvas.css draws each
+ * row at exactly the size layout counted. The stylesheet holds no copy of these numbers.
+ */
+export const CARD_GEOMETRY_VARS = {
+  "--card-border": `${String(BORDER_PX)}px`,
+  "--card-pad-x": `${String(CARD_PAD_X_PX)}px`,
+  "--card-pad-y": `${String(CARD_PAD_Y_PX)}px`,
+  "--card-head-h": `${String(HEAD_PX)}px`,
+  "--card-title-line-h": `${String(TITLE_LINE_PX)}px`,
+  "--card-body-h": `${String(BODY_PX)}px`,
+  "--card-foot-h": `${String(FOOT_PX)}px`,
+  "--card-row-gap": `${String(ROW_GAP_PX)}px`,
+  "--card-marker-h": `${String(MARKER_ROW_PX)}px`,
+  "--card-title-px": `${String(TITLE_PX)}px`,
+} as const;
+
+/**
  * The lines a card's title takes: how many it wraps to between its words in the card's room,
  * at most TITLE_LINES_MAX. This is the one rule: layout sizes the card by it and NodeCard clips
  * the title to exactly this many lines, so what is drawn never outgrows the height laid out. A
