@@ -176,17 +176,16 @@ test("selection is one set with no mode: click selects, shift-click adds, the in
   expect(await members.count()).toBeGreaterThanOrEqual(2);
 });
 
-test("the controls row: Filter wears a badge for what it hides, Frontier only emphasises", async ({ page }) => {
+test("the controls row: the open Filter counts what it hides, Frontier only emphasises", async ({ page }) => {
   await openJourney(page, "browser", "j_vendor_eval", "");
   const cards = page.getByTestId("node-card");
   await expect(nodeCard(page, "n_plan")).toBeVisible();
   const before = await cards.count();
-  // Not-relevant nodes are left out by default, and the badge says how many; showing them removes it.
-  await expect(page.getByTestId("filter-badge")).toBeVisible();
-  await expect(page.getByTestId("filter-button")).toHaveAttribute("title", /not relevant hidden/);
+  // Not-relevant nodes are left out by default, and the open Filter says how many beside its box; showing them removes the count.
   await page.getByTestId("filter-button").click();
+  await expect(page.getByTestId("show-not-relevant-count")).toBeVisible();
   await page.getByTestId("show-not-relevant").click();
-  await expect(page.getByTestId("filter-badge")).toHaveCount(0);
+  await expect(page.getByTestId("show-not-relevant-count")).toHaveCount(0);
   await page.getByTestId("filter-button").click();
   await expect.poll(() => cards.count()).toBeGreaterThan(before);
   // Frontier highlights what can move now and draws the same cards.

@@ -134,8 +134,8 @@ test("C9: a folded container stays folded across Show not relevant; a trip to th
   await fold.click();
   const row = page.locator(`[data-testid="list-row"][data-node="${folded ?? ""}"] [data-testid="list-fold"]`);
   await expect(row).toHaveAttribute("aria-expanded", "false");
-  await expect(page.getByTestId("filter-badge")).toBeVisible();
   await page.getByTestId("filter-button").click();
+  await expect(page.getByTestId("show-not-relevant-count")).toBeVisible();
   await page.getByTestId("show-not-relevant").click();
   await expect(page.getByTestId("list-total")).not.toHaveAttribute("data-total", String(total));
   await expect(row).toHaveAttribute("aria-expanded", "false");

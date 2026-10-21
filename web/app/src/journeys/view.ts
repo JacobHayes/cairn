@@ -14,7 +14,7 @@ import type { ListFlag } from "../acting/address.ts";
 import { TITLE_BYTES_MAX } from "@cairn/client";
 import { overBytes } from "../authoring/limits.ts";
 import { STEPS, type Step } from "../canvas/model.ts";
-import { journeyPath } from "./address.ts";
+import { journeyPath, type Screen } from "./address.ts";
 
 /** C9: the flags the Filter offers, in the order it lists them. */
 export const FILTER_FLAGS: readonly ListFlag[] = ["overdue", "stale", "unassigned", "shortfall", "snoozed"];
@@ -237,4 +237,29 @@ export function useViewState(): ViewStateValue {
     throw new Error("useViewState outside a view's page");
   }
   return value;
+}
+
+/** C1: the relevance classes the Filter switches, besides the relevant one that is always drawn. */
+export type RelevanceClass = "conditional" | "not_relevant";
+
+/** C1: the classes in the Filter's order. */
+export const RELEVANCE_CLASSES: readonly RelevanceClass[] = ["conditional", "not_relevant"];
+
+/**
+ * C1, C2: the one table of which relevance classes each view can draw. A class with a reason
+ * cannot be drawn there: its Filter box stays set but disabled with the reason under it, and the
+ * count of what it hides is not offered. A class without one is drawn when its box is checked.
+ * The Filter's boxes, their counts and the engine's level read this and nothing else.
+ */
+export const CLASS_REASONS: Record<Screen, Partial<Record<RelevanceClass, string>>> = {
+  graph: {},
+  list: {},
+  summary: {},
+  timeline: { not_relevant: "The timeline has no dates for work that does not apply." },
+  walk: { conditional: "Every card here is work that applies.", not_relevant: "Every card here is work that applies." },
+};
+
+/** Whether `screen` can draw `each`. */
+export function canDraw(screen: Screen, each: RelevanceClass): boolean {
+  return CLASS_REASONS[screen][each] === undefined;
 }

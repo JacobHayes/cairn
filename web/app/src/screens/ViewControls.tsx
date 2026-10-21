@@ -23,7 +23,7 @@ import type { Step } from "../canvas/model.ts";
 import type { GraphNode, Ready } from "../detail/model.ts";
 import { identityName } from "../detail/sections.tsx";
 import type { Screen } from "../journeys/address.ts";
-import { FILTER_FLAGS, filterChanged, filterChips, isStock, stockView, useViewState, withViewState, type ViewFilter } from "../journeys/view.ts";
+import { canDraw, CLASS_REASONS, FILTER_FLAGS, RELEVANCE_CLASSES, filterChanged, filterChips, isStock, stockView, useViewState, withViewState, type RelevanceClass, type ViewFilter } from "../journeys/view.ts";
 import { useMedia, PHONE_WIDTH } from "../shell/frame.tsx";
 import { Button } from "../ui/kit.tsx";
 import { ActiveFilters } from "./ActiveFilters.tsx";
@@ -36,15 +36,9 @@ const FRONTIER_WORDS = "What can move now: work that is ready and decisions that
 /** Why the walk through's Frontier is disabled. */
 const WALK_FRONTIER = "Every card here is on the frontier. Frontier applies on the other views.";
 
-/** Why a view's class switches are disabled, under them in the Filter. */
-const CLASS_REASON: Partial<Record<Screen, string>> = {
-  walk: "Every card here is work that applies.",
-  timeline: "The timeline has no dates for work that does not apply.",
-};
-
-/** What the badges on Filter and Depth say on this view (journeys/requests.ts, `badgesOf`). */
+/** What the view hides, as it says it: the badge on Depth, and in the open Filter the count each relevance class hides (journeys/requests.ts, `badgesOf`). */
 export interface Badges {
-  filter?: Badge | undefined;
+  hidden?: Partial<Record<RelevanceClass, number>> | undefined;
   depth?: Badge | undefined;
 }
 
@@ -152,7 +146,7 @@ function DepthMenu({ subject, screen, badge }: { subject: ViewSubject; screen: S
  * classes, those this view cannot draw disabled with the reason under them; for a route, the
  * conditional class alone.
  */
-export function FilterBody({ subject, screen }: { subject: ViewSubject; screen: Screen }) {
+export function FilterBody({ subject, screen, hidden = {} }: { subject: ViewSubject; screen: Screen; hidden?: Badges["hidden"] }) {
   const { state, onState } = useViewState();
   const { filter } = state;
   const set = (changed: Partial<ViewFilter>) => {
@@ -160,7 +154,31 @@ export function FilterBody({ subject, screen }: { subject: ViewSubject; screen: 
   };
   const { journey } = subject;
   const owners = (journey?.inputs.deployment.identities ?? []).map((identity) => ({ key: identity.key, text: journey === undefined ? identity.key : identityName(journey, identity.key) }));
-  const reason = CLASS_REASON[screen];
+  const reasons = [...new Set(RELEVANCE_CLASSES.filter((each) => each !== "not_relevant" || journey !== undefined).flatMap((each) => CLASS_REASONS[screen][each] ?? []))];
+  const classBox = (each: RelevanceClass, label: string, testId: string, checked: boolean) => {
+    const count = hidden[each];
+    return (
+      <Check
+        label={
+          <>
+            {label}
+            {count === undefined ? null : (
+              <>
+                {" "}
+                <span className="muted small" data-testid={`${testId}-count`}>
+                  {count}
+                </span>
+              </>
+            )}
+          </>
+        }
+        checked={checked}
+        testId={testId}
+        disabled={!canDraw(screen, each)}
+        onChange={(on) => { set(each === "conditional" ? { conditional: on } : { notRelevant: on }); }}
+      />
+    );
+  };
   return (
     <div className="stack" role="group" aria-label="Filter" data-testid="filter-body">
       {journey === undefined ? null : (
@@ -178,35 +196,31 @@ export function FilterBody({ subject, screen }: { subject: ViewSubject; screen: 
           <hr />
         </>
       )}
-      <Check label="Show conditional" checked={filter.conditional} testId="show-conditional" disabled={screen === "walk"} onChange={(conditional) => { set({ conditional }); }} />
-      {journey === undefined ? null : <Check label="Show not relevant" checked={filter.notRelevant} testId="show-not-relevant" disabled={reason !== undefined} onChange={(notRelevant) => { set({ notRelevant }); }} />}
-      {reason === undefined || journey === undefined ? null : (
-        <span className="muted small" data-testid="filter-disabled-reason">
+      {classBox("conditional", "Show conditional", "show-conditional", filter.conditional)}
+      {journey === undefined ? null : classBox("not_relevant", "Show not relevant", "show-not-relevant", filter.notRelevant)}
+      {reasons.map((reason) => (
+        <span key={reason} className="muted small" data-testid="filter-disabled-reason">
           {reason}
         </span>
-      )}
+      ))}
     </div>
   );
 }
 
-function FilterMenu({ subject, screen, badge }: { subject: ViewSubject; screen: Screen; badge: Badge | undefined }) {
+function FilterMenu({ subject, screen, hidden }: { subject: ViewSubject; screen: Screen; hidden: Badges["hidden"] }) {
   const { state } = useViewState();
   return (
     <Menu
       label="Filter"
-      title={tip("Filter what is drawn", badge)}
+      title="Filter what is drawn"
       testId="filter-button"
       role="dialog"
       className={filterChanged(state.filter) ? "view-control menu-pressed" : "view-control"}
-      trigger={
-        <Dotted badge={badge} testId="filter-badge">
-          Filter ▾
-        </Dotted>
-      }
+      trigger="Filter ▾"
     >
       {() => (
         <div className="stack" data-testid="filter-panel">
-          <FilterBody subject={subject} screen={screen} />
+          <FilterBody subject={subject} screen={screen} hidden={hidden} />
         </div>
       )}
     </Menu>
@@ -328,8 +342,7 @@ export interface ViewControlsProps {
 
 /** The controls on a phone, where a view has room for one button: the same controls in a Controls menu, with the depth and filter badges on it, and what the screen puts at the row's end beside it. */
 function PhoneControls({ subject, screen, badges, end }: { subject: ViewSubject; screen: Screen; badges: Badges | undefined; end: ReactNode }) {
-  const shown = [badges?.depth, badges?.filter].flatMap((badge) => (badge === undefined || badge.count === 0 ? [] : [badge]));
-  const total = { count: shown.reduce((sum, badge) => sum + badge.count, 0), words: shown.map((badge) => badge.words).join(". ") };
+  const total = badges?.depth;
   return (
     <div className="view-controls row" role="toolbar" aria-label="View controls" data-testid="view-controls">
       <Menu
@@ -354,7 +367,7 @@ function PhoneControls({ subject, screen, badges, end }: { subject: ViewSubject;
                 <FrontierChip ready={subject.journey} screen={screen} />
               </div>
             )}
-            <FilterBody subject={subject} screen={screen} />
+            <FilterBody subject={subject} screen={screen} hidden={badges?.hidden} />
             <Search onDone={close} />
           </div>
         )}
@@ -374,7 +387,7 @@ export function ViewControls({ subject, screen, badges, end }: ViewControlsProps
     <div className="view-controls row" role="toolbar" aria-label="View controls" data-testid="view-controls">
       <DepthMenu subject={subject} screen={screen} badge={badges?.depth} />
       {subject.journey === undefined ? null : <FrontierChip ready={subject.journey} screen={screen} />}
-      <FilterMenu subject={subject} screen={screen} badge={badges?.filter} />
+      <FilterMenu subject={subject} screen={screen} hidden={badges?.hidden} />
       <Search />
       {end === undefined ? null : <div className="view-controls-end">{end}</div>}
     </div>

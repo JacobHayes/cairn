@@ -14,7 +14,7 @@ import type { Level, LevelDisplay, Step } from "../canvas/model.ts";
 import type { GraphNode, Ready } from "../detail/model.ts";
 import type { Badge } from "../screens/badge.ts";
 import type { Screen } from "./address.ts";
-import { FILTER_FLAGS, type ViewState } from "./view.ts";
+import { canDraw, FILTER_FLAGS, RELEVANCE_CLASSES, type RelevanceClass, type ViewState } from "./view.ts";
 
 export type LevelRequest = Extract<ProjectionRequest, { projection: "level" }>;
 
@@ -153,8 +153,6 @@ export function stepHides(nodes: readonly GraphNode[], step: Step, collapsed: re
   };
 }
 
-const CLASS_WORDS: Record<Exclude<LevelDisplay, "relevant">, string> = { not_relevant: "not relevant", conditional: "conditional" };
-
 /**
  * C2: what Depth's Fade dims: the nodes the depth would not draw as their own card (`stepHides`
  * over `collapsed`, what Hide at `depth` collapses), among those the level draws (`drawn`, its
@@ -188,21 +186,23 @@ export function outOfFocus(lit: ReadonlySet<string> | undefined, faded: Readonly
 }
 
 /**
- * C1, C2: the badges on Filter and Depth. Filter counts what the classes switched off hide (the
- * level's count): every class on the graph and the list, only conditional on the timeline (which
- * has no dates for work that does not apply), none on the walk (its cards all apply). Depth counts
- * the nodes Frontier lights (the walk's: its candidate cards) that the depth hides; with Fade on
- * (`fade`) they are drawn, so none.
+ * C1, C2: what the Filter and Depth say they hide. `hidden` is the count each relevance class
+ * the view can draw (view.ts, `CLASS_REASONS`) hides, shown beside its box in the open Filter;
+ * a class the view cannot draw has none. Depth's badge counts the nodes Frontier lights (the
+ * walk's: its candidate cards) that the depth hides; with Fade on (`fade`) they are drawn, so
+ * none.
  */
-export function badgesOf(screen: Screen, byClass: Partial<Record<LevelDisplay, number>>, base: ReadonlySet<string> | undefined, hides: (key: string) => boolean, fade = false): { filter?: Badge; depth?: Badge } {
-  const classes: (keyof typeof CLASS_WORDS)[] = screen === "walk" ? [] : screen === "timeline" ? ["conditional"] : ["not_relevant", "conditional"];
-  const parts = classes.flatMap((each) => {
+export function badgesOf(screen: Screen, byClass: Partial<Record<LevelDisplay, number>>, base: ReadonlySet<string> | undefined, hides: (key: string) => boolean, fade = false): { hidden: Partial<Record<RelevanceClass, number>>; depth?: Badge } {
+  const hidden: Partial<Record<RelevanceClass, number>> = {};
+  for (const each of RELEVANCE_CLASSES) {
     const count = byClass[each] ?? 0;
-    return count === 0 ? [] : [{ count, words: `${String(count)} ${CLASS_WORDS[each]} hidden` }];
-  });
+    if (count > 0 && canDraw(screen, each)) {
+      hidden[each] = count;
+    }
+  }
   const lost = base === undefined || fade ? 0 : [...base].filter(hides).length;
   return {
-    ...(parts.length === 0 ? {} : { filter: { count: parts.reduce((sum, part) => sum + part.count, 0), words: parts.map((part) => part.words).join(", ") } }),
+    hidden,
     ...(lost === 0 ? {} : { depth: { count: lost, words: `${String(lost)} that can move now ${lost === 1 ? "is" : "are"} ${screen === "walk" ? "not walked" : "hidden"} at this depth; choose Actions${screen === "walk" ? "" : " or fade the rest"} to see them` } }),
   };
 }

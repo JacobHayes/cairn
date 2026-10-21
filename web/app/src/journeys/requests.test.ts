@@ -225,11 +225,17 @@ describe("the badges", () => {
   const byClass = { not_relevant: 3, conditional: 2 };
   const none = () => false;
 
-  it("count what the classes hide on the graph and the list, only conditional on the timeline, nothing on the walk", () => {
-    expect(badgesOf("graph", byClass, undefined, none).filter?.count).toBe(5);
-    expect(badgesOf("list", byClass, undefined, none).filter?.count).toBe(5);
-    expect(badgesOf("timeline", byClass, undefined, none).filter?.count).toBe(2);
-    expect(badgesOf("walk", byClass, undefined, none).filter).toBeUndefined();
+  it.each([
+    ["graph", { conditional: 2, not_relevant: 3 }],
+    ["list", { conditional: 2, not_relevant: 3 }],
+    ["timeline", { conditional: 2 }],
+    ["walk", {}],
+  ] as const)("count, for each class the view can draw, what that class hides: %s", (screen, expected) => {
+    expect(badgesOf(screen, byClass, undefined, none).hidden).toEqual(expected);
+  });
+
+  it("count nothing for a class that hides nothing", () => {
+    expect(badgesOf("graph", { conditional: 0, not_relevant: 4 }, undefined, none).hidden).toEqual({ not_relevant: 4 });
   });
 
   it("count on Depth the frontier nodes the step hides: a kind it does not draw, the Stages rule, or a collapse; none under Fade", () => {
