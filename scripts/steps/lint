@@ -316,6 +316,10 @@ if [ "$rust" = 1 ]; then
   ladder_suite "wasm32-unknown-unknown build" "${#wasm_crates[@]}" crates
 fi
 
+# The values written in more than one file because different tools read them (scripts/pins).
+pins_output=$(node scripts/pins 2>&1) || { ladder_show "$pins_output"; ladder_fail "a pinned value differs from its owner"; }
+ladder_suite "pins agree with their owners" "$pins_output" pins
+
 # The TypeScript checks started at the top. `--listFiles` names every file the typecheck read,
 # after any errors.
 wait

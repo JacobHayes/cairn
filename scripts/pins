@@ -1,0 +1,57 @@
+#!/usr/bin/env node
+// The values that are written in more than one file because the files are read by different
+// tools, held to their owner: the lint step runs it and fails on the first that differs.
+// Each owner is the file the project's own rules put it in (Cargo.toml for the patina
+// revision and the lints, mise.toml for the toolchain, clippy.toml for the function limit);
+// the copies are manifests that cannot read the owner (a separate Cargo workspace, a workflow,
+// ESLint). Prints the number of pins checked.
+import { existsSync, readdirSync, readFileSync } from "node:fs";
+
+const read = (file) => readFileSync(file, "utf8");
+const failures = [];
+let checked = 0;
+/** Records that `copy` in `file` differs from `owner` (`ownerFile`) unless they are equal. */
+function agree(what, owner, ownerFile, copy, file) {
+  checked += 1;
+  if (owner === undefined) failures.push(`${what}: not found in ${ownerFile}`);
+  else if (copy === undefined) failures.push(`${what}: not found in ${file}`);
+  else if (owner !== copy) failures.push(`${what}: ${file} has ${copy}, ${ownerFile} has ${owner}`);
+}
+const match = (text, pattern) => pattern.exec(text)?.[1];
+
+const cargo = read("Cargo.toml");
+const mise = read("mise.toml");
+const testbeds = readdirSync("testbeds", { withFileTypes: true })
+  .filter((entry) => entry.isDirectory() && existsSync(`testbeds/${entry.name}/Cargo.toml`))
+  .map((entry) => entry.name);
+
+// The patina revision: the SDK dependency in Cargo.toml owns it.
+const patina = match(cargo, /^patina-dst = \{[^}]*rev = "([0-9a-f]+)"/m);
+agree("the patina proptest revision", patina, "Cargo.toml", match(cargo, /^patina-dst-proptest = \{[^}]*rev = "([0-9a-f]+)"/m), "Cargo.toml");
+agree("the patina runner revision", patina, "Cargo.toml", match(mise, /patina" = \{[^}]*version = "rev:([0-9a-f]+)"/), "mise.toml");
+
+// The workspace's lints and rust-version, which a testbed (its own workspace) cannot inherit.
+const section = (text, name) => match(text, new RegExp(`^\\[${name.replace(".", "\\.")}\\]\\n((?:(?!\\[)[^\\n]*\\n?)*)`, "m"))?.split("\n").filter((line) => line.trim() !== "" && !line.startsWith("#")).join("\n");
+for (const name of testbeds) {
+  const manifest = read(`testbeds/${name}/Cargo.toml`);
+  const file = `testbeds/${name}/Cargo.toml`;
+  agree(`${name}'s patina revision`, patina, "Cargo.toml", match(manifest, /^patina-dst = \{[^}]*rev = "([0-9a-f]+)"/m), file);
+  agree(`${name}'s clippy lints`, section(cargo, "workspace.lints.clippy")?.split("\n").filter((line) => !line.startsWith("disallowed_types")).join("\n"), "Cargo.toml", section(manifest, "lints.clippy"), file);
+  agree(`${name}'s rust-version`, match(cargo, /^rust-version = "([^"]+)"/m), "Cargo.toml", match(manifest, /^rust-version = "([^"]+)"/m), file);
+  agree(`${name}'s unsafe code lint`, match(section(cargo, "workspace.lints.rust") ?? "", /unsafe_code = "(\w+)"/), "Cargo.toml", match(section(manifest, "lints.rust") ?? "", /unsafe_code = "(\w+)"/), file);
+  checked += 1;
+  if (!read(".github/workflows/check.yml").includes(`testbeds/${name}`)) failures.push(`testbeds/${name} is not in .github/workflows/check.yml's cache workspaces`);
+}
+
+// The toolchain: mise.toml pins it; the simulation job's runner picks it by environment.
+const workflow = read(".github/workflows/check.yml");
+agree("the Rust toolchain", match(mise, /^rust = \{ version = "([^"]+)"/m), "mise.toml", match(workflow, /RUSTUP_TOOLCHAIN: "([^"]+)"/), ".github/workflows/check.yml");
+
+// The function-length limit: clippy.toml owns it and ESLint's rule restates it.
+agree("the function-length limit", match(read("clippy.toml"), /^too-many-lines-threshold = (\d+)/m), "clippy.toml", match(read("eslint.config.js"), /"max-lines-per-function": \["error", \{ max: (\d+) \}\]/), "eslint.config.js");
+
+if (failures.length > 0) {
+  console.error(failures.join("\n"));
+  process.exit(1);
+}
+console.log(checked);

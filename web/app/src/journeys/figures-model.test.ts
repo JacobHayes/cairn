@@ -25,7 +25,7 @@ describe("what is still the viewer's to do (2.4)", () => {
       }
     }
     view.journey.graph.state = { ...view.journey.graph.state, nodes: { ...view.journey.graph.state?.nodes, n_report: { state: "done", provenance: "local" } } };
-    expect(yoursOf(view, entries("n_stage", "n_findings", "n_meeting", "n_report", "n_when"))).toEqual({ open: 1, actionable: 0 });
+    expect(yoursOf(view, entries("n_stage", "n_findings", "n_meeting", "n_report", "n_pick"))).toEqual({ open: 1, actionable: 0 });
   });
 });
 

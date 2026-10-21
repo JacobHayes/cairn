@@ -13,7 +13,9 @@ source scripts/ladder-lib.sh
 
 ladder_require_tool sha256sum sha256sum --version
 
-generated_paths=(openapi schema web/client/generated web/wasm/generated)
+# ARCHITECTURE owns the list (scripts/generated-paths).
+mapfile -t generated_paths < <(scripts/generated-paths)
+[ ${#generated_paths[@]} -gt 0 ] || ladder_fail "scripts/generated-paths listed no generated paths"
 
 # One line per generated file: "<sha256>  <path>", sorted.
 inventory() {

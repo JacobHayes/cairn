@@ -13,6 +13,7 @@
 #![allow(clippy::module_inception)]
 
 mod api;
+mod architecture;
 mod assistant;
 mod auth;
 mod engine;

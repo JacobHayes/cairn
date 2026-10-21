@@ -19,7 +19,7 @@ ladder_require_tool node node --version
 # CARGO_TERM_COLOR=always).
 export CARGO_TERM_COLOR=never
 
-ladder_cargo_test --test integration -- cost:: || ladder_fail "cargo test reported failures"
+ladder_cargo_test --test integration -- "${ladder_cost_modules[@]}" || ladder_fail "cargo test reported failures"
 ladder_file_suites cost
 
 ladder_step_end

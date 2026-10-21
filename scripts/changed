@@ -6,9 +6,9 @@
 // running more. The full `mise run check` and CI never ask.
 //
 // usage: scripts/changed
-//   Prints one line, "RUST WEB SERVER COUNT": RUST, WEB, and SERVER are 1 when the change
-//   touches that side's inputs (see below) and 0 when it does not, COUNT the number of changed
-//   files ("-" when the diff was unavailable, which sets all three to 1).
+//   Prints one line, "RUST WEB SERVER INTEGRATION COUNT": RUST, WEB, SERVER, and INTEGRATION
+//   are 1 when the change touches that side's inputs (see below) and 0 when it does not, COUNT
+//   the number of changed files ("-" when the diff was unavailable, which sets all four to 1).
 import { execFileSync } from "node:child_process";
 import { existsSync, readFileSync } from "node:fs";
 
@@ -29,6 +29,25 @@ const serverInputs =
   /^web\/client\/|^web\/app\/(src\/(boot\.ts|data\/(server-host|assistant|proposals)\.|assistant\/)|vite\.config\.ts)|^web\/app\/playwright\.config\.ts$/;
 /** Whether `file` is a browser spec with a test tagged @server (a removed spec holds none). */
 const holdsServerTest = (file) => /^web\/app\/e2e\/[^/]+\.spec\.ts$/.test(file) && existsSync(file) && readFileSync(file, "utf8").includes("@server");
+// The integration step's inputs: the directories of the crates its tests build and run (the
+// test binary's and the cairn binary's, with everything they depend on, from `cargo metadata`,
+// so a crate that gains or loses a dependency moves in or out with no list kept here), and the
+// fixtures and agent guide those tests read.
+function integrationInputs() {
+  const metadata = JSON.parse(execFileSync("cargo", ["metadata", "--no-deps", "--offline", "--format-version", "1"], { encoding: "utf8", stdio: ["ignore", "pipe", "pipe"], maxBuffer: 1 << 28 }));
+  const root = `${process.cwd()}/`;
+  const byName = new Map(metadata.packages.map((p) => [p.name, p]));
+  const seen = new Set();
+  const pending = ["cairn-tests", "cairn"];
+  while (pending.length > 0) {
+    const name = pending.pop();
+    if (seen.has(name) || !byName.has(name)) continue;
+    seen.add(name);
+    pending.push(...byName.get(name).dependencies.map((d) => d.name));
+  }
+  const directories = [...seen].map((name) => byName.get(name).manifest_path.replace(root, "").replace(/Cargo\.toml$/, ""));
+  return (file) => directories.some((directory) => file.startsWith(directory)) || /^(fixtures|instructions)\//.test(file);
+}
 // The tooling that runs the checks and the pinned tools are inputs of both.
 const bothInputs = /^(scripts|mise-tasks|\.github)\/|^mise\.(toml|lock)$/;
 
@@ -45,18 +64,20 @@ function changedFiles() {
   return [];
 }
 
-/** @returns {{ rust: boolean, web: boolean, server: boolean, count: number | null, error?: string }} */
+/** @returns {{ rust: boolean, web: boolean, server: boolean, integration: boolean, count: number | null, error?: string }} */
 function changedInputs() {
   try {
     const files = changedFiles();
     const touches = (inputs) => files.some((file) => inputs.test(file) || bothInputs.test(file));
     const rust = touches(rustInputs);
-    return { rust, web: touches(webInputs), server: rust || touches(serverInputs) || files.some(holdsServerTest), count: files.length };
+    const covered = integrationInputs();
+    const integration = files.some((file) => covered(file) || /^(Cargo\.(toml|lock))$/.test(file) || bothInputs.test(file));
+    return { rust, web: touches(webInputs), server: rust || touches(serverInputs) || files.some(holdsServerTest), integration, count: files.length };
   } catch (error) {
-    return { rust: true, web: true, server: true, count: null, error: String(error instanceof Error ? error.message : error).split("\n")[0] ?? "" };
+    return { rust: true, web: true, server: true, integration: true, count: null, error: String(error instanceof Error ? error.message : error).split("\n")[0] ?? "" };
   }
 }
 
-const { rust, web, server, count, error } = changedInputs();
+const { rust, web, server, integration, count, error } = changedInputs();
 if (error !== undefined) console.error(`changed: no diff (${error}); treating everything as changed`);
-console.log(`${Number(rust)} ${Number(web)} ${Number(server)} ${count ?? "-"}`);
+console.log(`${Number(rust)} ${Number(web)} ${Number(server)} ${Number(integration)} ${count ?? "-"}`);

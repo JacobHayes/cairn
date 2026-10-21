@@ -1,0 +1,13 @@
+#!/usr/bin/env bash
+# The generated paths, one per line, without a trailing slash. ARCHITECTURE (Generated
+# artifacts) owns the list: "they live only in the generated paths: `a/`, `b/`, ...". The
+# steps and tasks that need it (the generated step, the staleness check of the web build in
+# scripts/test) read it from here instead of keeping a copy.
+#
+# usage: scripts/generated-paths
+set -euo pipefail
+cd "$(dirname "$0")/.."
+paths=$(sed -n '/^## Generated artifacts/,/^## Build, run, deploy/p' ARCHITECTURE.md \
+  | grep -o 'generated paths: [^.]*\.' | grep -o '`[^`]*`' | tr -d '`' | sed 's|/$||')
+[ -n "$paths" ] || { echo "generated-paths: ARCHITECTURE lists no generated paths" >&2; exit 1; }
+printf '%s\n' "$paths"

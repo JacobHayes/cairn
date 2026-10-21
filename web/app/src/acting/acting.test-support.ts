@@ -1,90 +1,42 @@
-// A small derived journey for the acting surfaces' unit tests, written as the derive worker
-// answers it: a meeting milestone and an unassigned decision on the acting frontier; a
-// deliverable that requires an artifact; a placeholder still to break down; a decision
-// snoozed until the deliverable is done; a later decision that requires the meeting; a stage
-// the meeting opens, holding a decision; a finished action; and a decision no longer in scope.
+// A small derived journey for the acting surfaces' unit tests, built by patching a new journey
+// in the real engine and derived by it: a meeting milestone and an unassigned decision on the
+// acting frontier; a deliverable that requires an artifact; a placeholder still to break down;
+// a decision snoozed until the deliverable is done; a later decision that requires the meeting;
+// a stage the meeting opens, holding a decision; a finished action; and a decision no longer
+// in scope. The derived values are the engine's, so no state here is one it cannot produce.
+import type { Mutation } from "../authoring/graph.ts";
+import { builtJourney, loadedEngine } from "../authoring/engine.test-support.ts";
 import type { Ready } from "../detail/model.ts";
 
-const today = "2026-10-06";
-const none = { entries: [], total: 0 };
-const base = { gravity_from: none, unlocks_from: none, waits_on: none, actionable: false, gravity: 1, unlocks: 0, dates: {} };
-const relevant = { relevance: { value: "relevant" as const } };
-const start = (date: string) => ({ earliest_start: { date, chain: { constraints: [], fixed: [] } } });
+await loadedEngine();
 
-/** The derive's per-node values. */
-function derivedNodes(): Ready["derived"]["nodes"] {
-  return {
-    n_meet: { ...base, display_state: "ready", ...relevant, actionable: true },
-    n_pick: { ...base, display_state: "ready", ...relevant, actionable: true, unassigned: true },
-    n_work: { ...base, display_state: "ready", ...relevant, actionable: true, failing_guards: ["has_artifact"] },
-    n_hold: { ...base, display_state: "ready", ...relevant, actionable: true, needs_breakdown: true, failing_guards: ["broken_down"] },
-    n_log: { ...base, display_state: "ready", ...relevant, failing_guards: ["has_note"] },
-    n_wait: { ...base, display_state: "snoozed", ...relevant, actionable: true, snoozed: { node: "n_work" }, dates: start("2026-10-06") },
-    n_later: { ...base, display_state: "blocked", ...relevant, blocked_by: [{ node: "n_meet", via: "explicit" }], waits_on: { entries: [{ node: "n_meet", via: "explicit" }], total: 1 }, failing_guards: ["deps_done"], dates: start("2026-10-20") },
-    n_stage: {
-      ...base,
-      ...relevant,
-      display_state: "blocked",
-      blocked_by: [
-        { node: "n_meet", via: { stage_opening: { group: "n_stage" } } },
-        { node: "n_inner", via: "containment" },
-      ],
-      waits_on: { entries: [{ node: "n_meet", via: { stage_opening: { group: "n_stage" } } }], total: 1 },
-      progress: { done: 0, total: 1, overdue: 0, decisions_needed: 0 },
-    },
-    n_inner: {
-      ...base,
-      display_state: "blocked",
-      ...relevant,
-      waits_on: { entries: [{ node: "n_meet", via: { stage_opening: { group: "n_stage" } } }], total: 1 },
-      failing_guards: ["deps_done"],
-      dates: start("2026-10-13"),
-    },
-    n_done: { ...base, display_state: "done", ...relevant },
-    n_gone: { ...base, display_state: "not_relevant", relevance: { value: "not_relevant" } },
-  };
-}
+const decision = (key: string, title: string, extra: Record<string, unknown> = {}): Mutation =>
+  ({ op: "add_node", node: { key, id: key.slice(2), kind: "decision", title, prompt: title, answer_type: "boolean", ...extra } });
+const work = (key: string, kind: string, title: string, extra: Record<string, unknown> = {}): Mutation =>
+  ({ op: "add_node", node: { key, id: key.slice(2), kind, title, ...extra } }) as Mutation;
 
+/** A date rule: this many days after the journey was created (the engine's clock reads 2026-10-06). */
+const startingAfter = (days: number) => ({ after: "journey.created_at", offset: days });
+
+const mutations: Mutation[] = [
+  work("n_meet", "milestone", "Meeting"),
+  decision("n_pick", "Pick one"),
+  work("n_work", "deliverable", "Write it", { requires_artifact: true }),
+  work("n_hold", "action", "Break me down", { placeholder: true }),
+  work("n_log", "action", "Write the log", { requires_note: true }),
+  decision("n_wait", "Wait for it", { not_before: startingAfter(0) }),
+  decision("n_later", "Decide later", { requires: ["n_meet"], not_before: startingAfter(14) }),
+  work("n_stage", "group", "Stage", { opens_at: "n_meet" }),
+  decision("n_inner", "Inside the stage", { parent: "n_stage" }),
+  work("n_done", "action", "Finished"),
+  decision("n_gate", "Is it needed?"),
+  decision("n_gone", "Out of scope", { relevant_when: { not: { answered: "n_gate" } } }),
+  { op: "snooze", node: "n_wait", until: { node: "n_work" } },
+  { op: "transition", node: "n_done", transition: "complete" },
+  { op: "answer", decision: "n_gate", value: { boolean: false } },
+] as Mutation[];
+
+/** The journey above, derived by the engine. */
 export function actingView(): Ready {
-  return {
-    status: "ready",
-    key: { journey: "j_act", revision: 5, deployment_revision: 1, today },
-    inputs: {
-      today,
-      timezone: "UTC",
-      deployment: { revision: 1, identities: [{ key: "who_one", name: "Person One" }] },
-      rank: { urgency: 0.4, late: 0.15, gravity: 0.25, unlocks: 0.2, horizon_days: 14, undecided_discount: 0.5, other_owner_factor: 2 },
-    },
-    journey: {
-      header: { id: "j_act", name: "Acting journey", status: "active", created_at: "2026-10-01T00:00:00Z", created_on: "2026-10-01" },
-      revision: 5,
-      graph: {
-        nodes: [
-          { key: "n_meet", id: "meet", kind: "milestone", title: "Meeting" },
-          { key: "n_pick", id: "pick", kind: "decision", title: "Pick one", answer_type: "boolean" },
-          { key: "n_work", id: "work", kind: "deliverable", title: "Write it", requires_artifact: true },
-          { key: "n_hold", id: "hold", kind: "action", title: "Break me down", placeholder: true },
-          { key: "n_log", id: "log", kind: "action", title: "Write the log", requires_note: true },
-          { key: "n_wait", id: "wait", kind: "decision", title: "Wait for it", answer_type: "boolean" },
-          { key: "n_later", id: "later", kind: "decision", title: "Decide later", answer_type: "boolean", requires: ["n_meet"] },
-          { key: "n_stage", id: "stage", kind: "group", title: "Stage", opens_at: "n_meet" },
-          { key: "n_inner", id: "inner", parent: "n_stage", kind: "decision", title: "Inside the stage", answer_type: "boolean" },
-          { key: "n_done", id: "done", kind: "action", title: "Finished" },
-          { key: "n_gone", id: "gone", kind: "decision", title: "Out of scope", answer_type: "boolean" },
-        ],
-        state: {
-          nodes: {
-            n_done: { state: "done", provenance: "from_route" },
-          },
-          snoozes: { n_wait: { node: "n_work" } },
-        },
-      },
-    },
-    derived: {
-      today,
-      frontier: ["n_meet", "n_pick", "n_work", "n_hold", "n_wait"],
-      acting_frontier: ["n_meet", "n_pick", "n_work", "n_hold"],
-      nodes: derivedNodes(),
-    },
-  };
+  return builtJourney("j_act", "Acting journey", mutations);
 }

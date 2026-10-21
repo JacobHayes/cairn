@@ -235,7 +235,7 @@ impl World {
         let seed = publish_fixture_route("vendor-evaluation");
         let reply = post(
             &ann,
-            "/api/routes/vendor-evaluation/patches",
+            &cairn_api::endpoints::PATCH_ROUTE.path_with(&["vendor-evaluation"]),
             &request(&seed),
         )
         .await;
@@ -249,7 +249,12 @@ impl World {
             self.clock.set_to(step.at);
             let body = serde_json::json!({ "patch": step.patch, "note": step.note });
             ok::<serde_json::Value>(
-                &post(&ann, "/api/journeys/j_vendor_eval/patches", &body).await,
+                &post(
+                    &ann,
+                    &cairn_api::endpoints::PATCH_JOURNEY.path_with(&["j_vendor_eval"]),
+                    &body,
+                )
+                .await,
             );
         }
         ann
@@ -453,8 +458,9 @@ pub async fn proposals_of_every_domain(
     serde_json::Value,
 )> {
     use cairn_api::endpoints as at;
-    let journey: cairn_schema::Journey = get(transport, "/api/journeys/j_vendor_eval").await;
-    let deployment: cairn_schema::Deployment = get(transport, "/api/deployment").await;
+    let journey: cairn_schema::Journey =
+        get(transport, &at::JOURNEY.path_with(&["j_vendor_eval"])).await;
+    let deployment: cairn_schema::Deployment = get(transport, at::DEPLOYMENT.path).await;
     let charter = serde_json::json!({
         "title": "Charter first",
         "destination_revision": journey.revision,
@@ -476,19 +482,19 @@ pub async fn proposals_of_every_domain(
     vec![
         (
             &at::PROPOSE_JOURNEY,
-            "/api/journeys/j_vendor_eval/proposals".to_owned(),
+            at::PROPOSE_JOURNEY.path_with(&["j_vendor_eval"]),
             "pr_charter",
             charter,
         ),
         (
             &at::PROPOSE_ROUTE,
-            "/api/routes/new-route/proposals".to_owned(),
+            at::PROPOSE_ROUTE.path_with(&["new-route"]),
             "pr_route",
             route,
         ),
         (
             &at::PROPOSE_DEPLOYMENT,
-            "/api/deployment/proposals".to_owned(),
+            at::PROPOSE_DEPLOYMENT.path.to_owned(),
             "pr_identity",
             identity,
         ),

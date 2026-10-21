@@ -1,6 +1,6 @@
 // A small derived journey for node detail's unit tests, written as the derive worker answers
-// it: a stage holding a report that requires an artifact and is pinned, a meeting milestone a
-// date decision feeds (E3), and a findings deliverable the report requires.
+// it: a stage holding a report that requires an artifact and is pinned, a meeting milestone an
+// answered date decision feeds (E3), an open decision, and a findings deliverable the report requires.
 import type { Bound } from "./explain.ts";
 import type { Ready } from "./model.ts";
 
@@ -60,7 +60,7 @@ function derivedNodes(): Ready["derived"]["nodes"] {
       gravity_from: none,
       unlocks_from: none,
       waits_on: none,
-      blocked_by: [{ node: "n_findings", via: "containment" }],
+      blocked_by: [{ node: "n_findings", via: "containment" }, { node: "n_report", via: "containment" }],
       progress: { done: 0, total: 2, overdue: 0, decisions_needed: 0 },
     },
     n_report: {
@@ -70,7 +70,7 @@ function derivedNodes(): Ready["derived"]["nodes"] {
       blocked_by: [{ node: "n_findings", via: "explicit" }],
       waits_on: { entries: [{ node: "n_findings", via: "explicit" }], total: 1 },
       started_early: true,
-      failing_guards: ["deps_done", "has_artifact"],
+      failing_guards: ["deps_done"],
       dates: { due: pinnedDue, slack_days: 24 },
       gravity: 5,
       gravity_from: { entries: [{ node: "n_meeting", score: 4 }], total: 1 },
@@ -86,8 +86,9 @@ function derivedNodes(): Ready["derived"]["nodes"] {
       unlocks: 2,
       unlocks_from: { entries: [{ node: "n_report", score: 1.5, other_owner: true }], total: 1 },
     },
-    n_meeting: { ...relevant, display_state: "ready", actionable: false, waits_on: none, dates: { due: meetingDue, effective_date: { date: "2026-11-20", origin: "pin" } }, gravity_from: none, unlocks_from: none },
-    n_when: { ...relevant, display_state: "ready", actionable: false, waits_on: none, dates: {}, gravity_from: none, unlocks_from: none },
+    n_meeting: { ...relevant, display_state: "ready", actionable: true, waits_on: none, dates: { due: meetingDue, effective_date: { date: "2026-11-20", origin: "pin" } }, gravity_from: none, unlocks_from: none },
+    n_when: { ...relevant, display_state: "done", actionable: false, waits_on: none, dates: {}, gravity_from: none, unlocks_from: none },
+    n_pick: { ...relevant, display_state: "ready", actionable: true, waits_on: none, dates: {}, gravity_from: none, unlocks_from: none },
   };
 }
 
@@ -111,6 +112,7 @@ export function testView(): Ready {
           { key: "n_findings", id: "findings", parent: "n_stage", kind: "deliverable", title: "Findings" },
           { key: "n_meeting", id: "meeting", kind: "milestone", title: "Meeting" },
           { key: "n_when", id: "when", kind: "decision", title: "Meeting date", prompt: "When?", answer_type: "date", feeds_milestone: "n_meeting" },
+          { key: "n_pick", id: "pick", kind: "decision", title: "Pick one", prompt: "Which?", answer_type: "boolean" },
         ],
         state: {
           nodes: { n_report: { state: "active", provenance: "from_route", started_on: "2026-10-05" } },

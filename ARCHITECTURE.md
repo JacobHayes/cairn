@@ -84,46 +84,46 @@ cairn/
     store/         Store and Notifier traits; memory backend; the store conformance test suite. No delta types of its own: it persists the change set from schema
     store-sqlite/  SQLite backend (rusqlite: embedded, WAL mode, one writer)
     service/       service layer: load, call engine, commit; capabilities; composition root types. Runtime-free: no tokio, database driver, or transport dependency, so it builds for wasm32-unknown-unknown
-    auth/          AuthProvider trait; dev, oidc, builtin-oauth, tailscale providers; users and logins
+    auth/          AuthProvider trait; dev, oidc, builtin-oauth, tailscale, Google Cloud IAP providers; users and logins
     api/           axum endpoints, the generated OpenAPI document, SSE, the Rust client
     mcp/           rmcp server: tools, prompt metadata, instructions
     assistant/     provider trait, tool loop, proposal drafting
     cairn/         the binary: CLI, config, composition root, embedded assets
+    tests/         the library crates' integration tests, one test binary, a directory per crate under test
   web/
     app/           React UI (Vite); React Flow canvas; ELK in a worker
     client/        TypeScript client: generated/ (openapi-typescript + openapi-fetch) plus the hand-written safe-retry and subscription wrapper (H5, H6)
     wasm/          wasm package: generated/ (bindings from crates/wasm) plus the hand-written loader and the derive worker
   instructions/    the shipped agent guide (I4), served by MCP and published as SKILL.md
-  fixtures/        2-3 generic seed routes with a journey scenario each (eg: vendor evaluation, hiring loop, product launch), plus one journey with no route
+  fixtures/        2-3 generic seed routes with a journey scenario each (eg: vendor evaluation, hiring loop, product launch), plus one journey with no route and one segment
   testbeds/        simulation testbeds (PRACTICES.md, Simulation)
   openapi/         generated OpenAPI document
   schema/          generated JSON Schema for the file format
   decisions/       judgment calls awaiting the user's review, one file each (AGENTS.md)
   docs/            the guide to running a deployment, and the README's pictures
   mise.toml        pinned tools
-  mise-tasks/      tasks, one file each: gen, check (and check:fast), sim, build, serve
+  mise-tasks/      tasks, one file each, in a directory per group (`mise tasks` lists them)
   scripts/         helpers the tasks share: the ladder runner and its steps (scripts/steps/)
 ```
+
+Each arrow points from a crate to a crate that depends on it. Only direct dependencies the others do not already imply are drawn, and a test holds the diagram to the crates' manifests (`crates/tests/tests/integration/architecture.rs`), so a changed dependency fails until the diagram says it.
 
 ```mermaid
 flowchart LR
     schema --> engine
+    schema --> store
     engine --> service
-    schema --> service
     store --> service
+    store --> auth
     store --> store_sqlite[store-sqlite]
-    service --> api
-    service --> mcp
-    service --> assistant
-    auth --> api
     auth --> mcp
-    mcp --> api
+    service --> mcp
     mcp --> assistant
     assistant --> api
     api --> cairn
-    assistant --> cairn
     store_sqlite --> cairn
     service --> wasm
+    wasm --> cairn
     wasm --> web_wasm[web/wasm]
     web_wasm --> web_app[web/app]
 ```

@@ -123,9 +123,17 @@ ladder_step_end() {
   ladder_show "$ladder_name: passed, $([ "$ladder_test_count" -gt 0 ] && echo "$ladder_test_count tests" || echo "$ladder_suite_count checks"), $(ladder_elapsed)"
 }
 
-# The tests the unit step leaves to later steps, by name (the module paths PRACTICES lists):
-# it runs everything else.
-ladder_unit_skips=(--skip property:: --skip conformance:: --skip cost:: --skip in_process:: --skip binary::binary::)
+# The tests each later step owns, by name (the module paths PRACTICES lists). These are the one
+# list: the steps run what is named here, and the unit step runs everything else.
+ladder_property_modules=(property::)
+ladder_integration_modules=(conformance:: in_process::)
+ladder_cost_modules=(cost::)
+ladder_binary_modules=(binary::binary::)
+ladder_unit_skips=()
+for module in "${ladder_property_modules[@]}" "${ladder_integration_modules[@]}" "${ladder_cost_modules[@]}" "${ladder_binary_modules[@]}"; do
+  ladder_unit_skips+=(--skip "$module")
+done
+unset module
 
 # ladder_cargo_test [--test NAME] [-- TEST_ARGUMENT...]: the workspace's tests (every crate,
 # every feature), TEST_ARGUMENT being the name filters. Logs the run's output, shows the

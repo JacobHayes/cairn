@@ -98,7 +98,7 @@ describe("the lines", () => {
     expect(keysOf(flatLines(view, rows, "rank"))).toEqual(["n_inner", "n_work", "n_stage"]);
     const over = [{ ...row("n_done"), display_state: "done" as const }, row("n_work")];
     expect(keysOf(flatLines(view, over, "due"))).toEqual(["n_work", "n_done"]);
-    expect(keysOf(flatLines(view, [row("n_work"), row("n_later"), row("n_inner", ["n_stage"]), row("n_wait")], undefined))).toEqual(["n_inner", "n_later", "n_wait", "n_work"]);
+    expect(keysOf(flatLines(view, [row("n_work"), row("n_later"), row("n_inner", ["n_stage"]), row("n_wait")], undefined))).toEqual(["n_inner", "n_work", "n_later", "n_wait"]);
   });
 });
 
@@ -115,10 +115,10 @@ describe("snoozed nodes", () => {
       work.dates = finish === undefined ? {} : { due: { date: finish, chain: { constraints: [], fixed: [] } } };
       return planOrder(copy).filter((key) => ["n_wait", "n_inner", "n_later", "n_work"].includes(key));
     };
-    // Its own date is Oct 6, the soonest of all; a snooze to Oct 30 puts it after the node dated Oct 20.
+    // Its own date is Oct 6, as soon as any (it follows n_inner by plan order); a snooze to Oct 30 puts it after the node dated Oct 20.
     expect(snoozedWith({ date: "2026-10-30" })).toEqual(["n_inner", "n_later", "n_wait", "n_work"]);
     // A snooze lifting before its own date moves nothing.
-    expect(snoozedWith({ date: "2026-10-01" })).toEqual(["n_wait", "n_inner", "n_later", "n_work"]);
+    expect(snoozedWith({ date: "2026-10-01" })).toEqual(["n_inner", "n_wait", "n_later", "n_work"]);
     // Until a node is done: at that node's finish date, or undated, after the dated, when it has none.
     expect(snoozedWith({ node: "n_work" }, "2026-10-16")).toEqual(["n_inner", "n_wait", "n_work", "n_later"]);
     expect(snoozedWith({ node: "n_work" })).toEqual(["n_inner", "n_later", "n_wait", "n_work"]);

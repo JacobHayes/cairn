@@ -66,7 +66,7 @@ describe("C1: what a card says", () => {
     expect(card(model(wholeLevel(), [], [], decided), "n_choose").journey?.body).toEqual({ kind: "answer", text: "yes", rationale: "It is the cheaper one." });
     expect(card(whole, "n_choose").journey?.body).toBeUndefined();
     expect(card(whole, "n_stage").journey?.body).toEqual({ kind: "progress", done: 0, total: 2, badge: undefined });
-    expect(card(whole, "n_option").journey?.body).toEqual({ kind: "depends", text: "If Approach" });
+    expect(card(whole, "n_option").journey?.body).toEqual({ kind: "depends", text: "If \"Approach\" is answered" });
     expect(card(whole, "n_old").journey?.body).toBeUndefined();
   });
 
@@ -326,7 +326,7 @@ describe("C6: the Signals lens", () => {
     expect(text("rank")).toEqual({ n_check: "Rank #1", n_choose: "Rank #2" });
     expect(text("gravity")).toMatchObject({ n_choose: "Gravity 8", n_option: "Gravity 4.5", n_build: "Gravity 9" });
     expect(text("gravity")["n_kick"]).toBeUndefined();
-    expect(Object.keys(text("unlocks")).sort()).toEqual(["n_check", "n_choose"]);
+    expect(Object.keys(text("unlocks")).sort()).toEqual(["n_choose"]);
     expect(text("slack")).toEqual({ n_choose: "Slack 2 days", n_build: "Slack 40 days" });
   });
 });

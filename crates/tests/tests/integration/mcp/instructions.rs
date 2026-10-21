@@ -83,79 +83,116 @@ fn the_guide_says_each_display_state_as_the_screens_do() {
     assert_eq!(said, expected);
 }
 
-/// I2: each capability the PRD lists as the minimum tool surface, and the tools that cover
-/// it; every tool named is one the set has.
+/// The clauses of the PRD's minimum tool surface (I2), as the PRD writes them: the text after
+/// "Tool surface includes at least:" in the I2 requirement, split at its semicolons.
+fn prd_tool_surface() -> Vec<String> {
+    let path = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../PRD.md");
+    let prd = std::fs::read_to_string(&path).expect("the PRD is in the repository");
+    let line = prd
+        .lines()
+        .find(|line| line.starts_with("- **I2**"))
+        .expect("the PRD has the I2 requirement");
+    let (_, surface) = line
+        .split_once("Tool surface includes at least: ")
+        .expect("I2 lists the tool surface");
+    surface
+        .trim_end_matches('.')
+        .split("; ")
+        .map(str::to_owned)
+        .collect()
+}
+
+/// Each clause of the PRD's tool surface, as the PRD words it, and the tools that cover it.
+const COVERAGE: &[(&str, &[&str])] = &[
+    (
+        "list/get routes and journeys",
+        &["list_routes", "get_route", "list_journeys", "get_snapshot"],
+    ),
+    (
+        "create a journey (from route or empty)",
+        &["create_journey"],
+    ),
+    (
+        "create/edit a route draft and publish it",
+        &[
+            "open_draft",
+            "apply_patch",
+            "create_proposal",
+            "publish_draft",
+        ],
+    ),
+    ("get the graph at an aggregation level", &["get_level"]),
+    (
+        "get the ranked frontier, decisions needed, needs breakdown, unassigned, active, blocked, stale, overdue, shortfall, and \"mine\"",
+        &["list_frontier", "get_snapshot"],
+    ),
+    (
+        "get node detail with priority and date explanations",
+        &["get_node"],
+    ),
+    ("answer decisions", &["answer_decision"]),
+    ("transition nodes", &["transition_node"]),
+    ("snooze/unsnooze", &["snooze", "unsnooze"]),
+    ("assign participations", &["assign"]),
+    ("apply a patch", &["apply_patch"]),
+    (
+        "draft, list, get and edit proposals",
+        &[
+            "create_proposal",
+            "list_proposals",
+            "get_proposal",
+            "edit_proposal",
+            "apply_proposal",
+        ],
+    ),
+    (
+        "pin/unpin dates and resolve conflicts",
+        &["set_date", "resolve_date_conflict"],
+    ),
+    (
+        "force-include, keep under skipped ancestors, and bypass guards",
+        &["override"],
+    ),
+    (
+        "list identities by name or email, find the journeys that refer to an identity, and manage identities (create, link, merge, delete)",
+        &["list_identities", "list_journeys", "manage_identity"],
+    ),
+    ("route import/export", &["import_route", "export_route"]),
+    ("save as route", &["save_as_route"]),
+    ("re-link", &["relink"]),
+    ("upgrade", &["upgrade"]),
+    (
+        "segments through the route tools (filtered by kind), insert a segment, upgrade an insertion, save as segment, and link an insertion",
+        &[
+            "list_routes",
+            "create_proposal",
+            "upgrade",
+            "save_as_route",
+            "relink",
+        ],
+    ),
+    ("search", &["search"]),
+];
+
+/// I2: each clause of the PRD's minimum tool surface, and the tools that cover it. The PRD
+/// owns the clauses: the table must hold exactly them, so a clause added, reworded, or
+/// removed there fails here until its tools are named; every tool named must exist.
 #[test]
-fn every_i2_capability_has_a_tool() {
-    let coverage: &[(&str, &[&str])] = &[
-        ("list/get routes", &["list_routes", "get_route"]),
-        ("list/get journeys", &["list_journeys", "get_snapshot"]),
-        (
-            "create a journey (from route or empty)",
-            &["create_journey"],
-        ),
-        (
-            "create/edit a route draft and publish it",
-            &[
-                "open_draft",
-                "apply_patch",
-                "create_proposal",
-                "publish_draft",
-            ],
-        ),
-        ("get the graph at an aggregation level", &["get_level"]),
-        (
-            "get the ranked frontier",
-            &["list_frontier", "get_snapshot"],
-        ),
-        (
-            "decisions needed, needs breakdown, unassigned, active, blocked, stale, overdue, shortfall, mine",
-            &["list_frontier"],
-        ),
-        (
-            "get node detail with priority and date explanations",
-            &["get_node"],
-        ),
-        ("answer decisions", &["answer_decision"]),
-        ("transition nodes", &["transition_node"]),
-        ("snooze/unsnooze", &["snooze", "unsnooze"]),
-        ("assign participations", &["assign"]),
-        ("apply a patch", &["apply_patch"]),
-        (
-            "draft, list, get and edit proposals",
-            &[
-                "create_proposal",
-                "list_proposals",
-                "get_proposal",
-                "edit_proposal",
-                "apply_proposal",
-            ],
-        ),
-        (
-            "pin/unpin dates and resolve conflicts",
-            &["set_date", "resolve_date_conflict"],
-        ),
-        (
-            "force-include, keep under skipped ancestors, and bypass guards",
-            &["override"],
-        ),
-        (
-            "manage identities (create, link, merge)",
-            &["manage_identity"],
-        ),
-        ("route import/export", &["import_route", "export_route"]),
-        ("save as route", &["save_as_route"]),
-        ("re-link", &["relink"]),
-        ("upgrade", &["upgrade"]),
-        ("search", &["search"]),
-    ];
+fn every_clause_of_the_prd_tool_surface_has_a_tool() {
     let tools: BTreeSet<&str> = ToolSet::definitions().iter().map(|t| t.name).collect();
-    for (capability, covered_by) in coverage {
-        assert!(!covered_by.is_empty(), "{capability}");
+    for (clause, covered_by) in COVERAGE {
+        assert!(!covered_by.is_empty(), "{clause}");
         for tool in *covered_by {
-            assert!(tools.contains(tool), "{capability}: no tool {tool}");
+            assert!(tools.contains(tool), "{clause}: no tool {tool}");
         }
     }
+    let table: BTreeSet<&str> = COVERAGE.iter().map(|(clause, _)| *clause).collect();
+    let prd = prd_tool_surface();
+    let prd: BTreeSet<&str> = prd.iter().map(String::as_str).collect();
+    assert_eq!(
+        table, prd,
+        "the table covers the PRD's clauses, no more and no fewer"
+    );
 }
 
 /// Every property name, enum value, and constant in a JSON Schema.

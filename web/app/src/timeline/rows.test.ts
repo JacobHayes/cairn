@@ -10,7 +10,7 @@ import { dayOf, type Timeline } from "./model.ts";
 import { chartOf, routeChartOf, type ChartOptions } from "./rows.ts";
 
 /** The fixture's level at All: every node, each under its parent. */
-const whole = [{ key: "n_stage" }, { key: "n_report", parent: "n_stage" }, { key: "n_findings", parent: "n_stage" }, { key: "n_meeting" }, { key: "n_when" }];
+const whole = [{ key: "n_stage" }, { key: "n_report", parent: "n_stage" }, { key: "n_findings", parent: "n_stage" }, { key: "n_meeting" }, { key: "n_pick" }];
 const options: ChartOptions = { drawn: whole, open: () => true, selected: undefined, faded: () => false };
 
 const timeline: Timeline = {
@@ -49,7 +49,7 @@ describe("the rows are the drawn nodes with dates", () => {
     ]);
     const stage = chart.rows.find((row) => row.key === "n_stage");
     expect([stage?.from, stage?.to]).toEqual([dayOf("2026-10-03"), dayOf("2026-11-02")]);
-    expect(chart.undated).toEqual(["n_when"]);
+    expect(chart.undated).toEqual(["n_pick"]);
     expect(chart.rows.map((row) => [row.key, row.guides])).toEqual([["n_stage", []], ["n_findings", [true]], ["n_report", [false]], ["n_meeting", []]]);
   });
 
@@ -74,14 +74,14 @@ describe("the rows are the drawn nodes with dates", () => {
 
   it("lists a selected node that has no row, whatever its state, and no other finished or undrawn one", () => {
     const view = testView();
-    const finished = view.derived.nodes["n_when"];
+    const finished = view.derived.nodes["n_pick"];
     if (finished === undefined) {
-      throw new Error("no n_when");
+      throw new Error("no n_pick");
     }
-    view.derived.nodes["n_when"] = { ...finished, display_state: "done" };
+    view.derived.nodes["n_pick"] = { ...finished, display_state: "done" };
     expect(chartOf(view, timeline, options).undated).toEqual([]);
-    expect(chartOf(view, timeline, { ...options, selected: "n_when" }).undated).toEqual(["n_when"]);
-    expect(chartOf(view, timeline, { ...options, drawn: [{ key: "n_stage" }, { key: "n_meeting" }], selected: "n_when" }).undated).toEqual(["n_when"]);
+    expect(chartOf(view, timeline, { ...options, selected: "n_pick" }).undated).toEqual(["n_pick"]);
+    expect(chartOf(view, timeline, { ...options, drawn: [{ key: "n_stage" }, { key: "n_meeting" }], selected: "n_pick" }).undated).toEqual(["n_pick"]);
   });
 });
 

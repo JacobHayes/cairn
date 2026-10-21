@@ -26,7 +26,7 @@ export CARGO_TERM_COLOR=never
 # The test binaries built once up front, run by name (ladder_cargo_test): every module this step owns, then
 # one suite each. A test the run picked that no suite counts fails the step, so the filter
 # never runs more than the suites report.
-ladder_cargo_test -- conformance:: in_process:: || ladder_fail "cargo test reported failures"
+ladder_cargo_test -- "${ladder_integration_modules[@]}" || ladder_fail "cargo test reported failures"
 # suite<TAB>crate<TAB>the test path it holds, as an awk regular expression
 suites=$'store conformance: memory\tcairn-store\t(^|::)conformance::
 store conformance: sqlite\tcairn-store-sqlite\t(^|::)conformance::

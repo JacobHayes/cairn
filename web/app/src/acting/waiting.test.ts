@@ -12,7 +12,7 @@ const waiting = waitingDecisions(actingView(), summary);
 
 describe("waitingDecisions", () => {
   it("lists the open decisions in scope off the acting frontier, earliest start first", () => {
-    expect(waiting.map((each) => each.decision)).toEqual(["n_wait", "n_inner", "n_later"]);
+    expect(waiting.map((each) => each.decision)).toEqual(["n_inner", "n_wait", "n_later"]);
   });
 
   it("names a decision's own requirement", () => {

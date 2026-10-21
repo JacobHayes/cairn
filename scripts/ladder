@@ -20,8 +20,10 @@
 # (web-unit, browser) when neither side changed (the web unit tests compare the browser host's
 # module with the server's answers). The browser step runs only against the in-browser host,
 # with no web build embedded and no binary built or tested, unless the change touches the
-# server side of the web app. The full check and CI skip nothing. The slowest Rust steps
-# (integration, cost) and advisories, which needs the network, are left out of --fast.
+# server side of the web app. The full check and CI skip nothing. The integration step runs when the
+# change touches the crates its tests build, with their dependencies, derived from the manifests
+# (scripts/changed; decisions/2026-10-21-check-fast-runs-the-integration-tests-their-inputs-touch.md);
+# cost and advisories, which needs the network, are left out of --fast.
 #
 # CI runs the full check in parts, one runner each and side by side: --part NAME runs the steps
 # of that part, in the order above, building only what they need. A part is the steps that
@@ -61,6 +63,10 @@ partition_check() {
     part=${entry#*:}
     [[ " ${all_first[*]} ${all_side[*]} " == *" $step "* ]] || partition_fail "$entry names a step that is not in the full check"
     [[ " ${parts[*]} " == *" $part "* ]] || partition_fail "$entry names a part that is not listed"
+  done
+  for entry in scripts/steps/*; do
+    step=${entry##*/}
+    [[ " ${all_first[*]} ${all_side[*]} " == *" $step "* ]] || partition_fail "scripts/steps/$step is no step of the full check"
   done
   for part in "${parts[@]}"; do
     count=0
@@ -103,13 +109,15 @@ esac
 rust=1
 web=1
 server=1
+integration=1
 if [ -n "$fast" ]; then
-  read -r changed_rust changed_web changed_server changed_count < <(scripts/changed)
+  read -r changed_rust changed_web changed_server changed_integration changed_count < <(scripts/changed)
   if [ "$changed_count" != - ]; then
     rust=$changed_rust
     web=$changed_web
     server=$changed_server
-    echo "ladder: $changed_count files changed (Rust inputs: $rust, web inputs: $web, server side: $server); leaving out the steps they do not touch"
+    integration=$changed_integration
+    echo "ladder: $changed_count files changed (Rust inputs: $rust, web inputs: $web, server side: $server, integration tests: $integration); leaving out the steps they do not touch"
   fi
 fi
 # The steps read these: lint leaves out the Rust half, browser the binary and its web build.
@@ -129,6 +137,7 @@ else
   if [ "$rust" = 1 ]; then first+=(unit); fi
   if [ "$rust" = 1 ] || [ "$web" = 1 ]; then first+=(web-unit); fi
   if [ "$rust" = 1 ]; then side+=(property); fi
+  if [ "$integration" = 1 ]; then side+=(integration); fi
   if [ "$web" = 1 ]; then side+=(browser); fi
 fi
 

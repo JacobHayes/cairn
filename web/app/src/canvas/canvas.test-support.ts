@@ -16,16 +16,18 @@ const relevant = { relevance: { value: "relevant" as const } };
 const owned = { participations: { k_owner: { identities: ["who_one"], origin: "explicit" as const } } };
 const bound = (date: string) => ({ date, chain: { constraints: [], fixed: [] } });
 
+const inputs: Ready["inputs"] = {
+  today,
+  timezone: "UTC",
+  deployment: { revision: 1, identities: [{ key: "who_one", name: "Person One" }] },
+  rank: { urgency: 0.4, late: 0.15, gravity: 0.25, unlocks: 0.2, horizon_days: 14, undecided_discount: 0.5, other_owner_factor: 2 },
+};
+
 export function canvasView(): Ready {
   return {
     status: "ready",
     key: { journey: "j_canvas", revision: 3, deployment_revision: 1, today },
-    inputs: {
-      today,
-      timezone: "UTC",
-      deployment: { revision: 1, identities: [{ key: "who_one", name: "Person One" }] },
-      rank: { urgency: 0.4, late: 0.15, gravity: 0.25, unlocks: 0.2, horizon_days: 14, undecided_discount: 0.5, other_owner_factor: 2 },
-    },
+    inputs,
     journey: {
       header: { id: "j_canvas", name: "Canvas journey", status: "active", created_at: "2026-10-01T00:00:00Z", created_on: "2026-10-01" },
       revision: 3,
@@ -36,26 +38,29 @@ export function canvasView(): Ready {
           { key: "n_stage", id: "stage", kind: "group", title: "Build stage", opens_at: "n_kick" },
           { key: "n_build", id: "build", parent: "n_stage", kind: "deliverable", title: "Build it", requires: ["n_option"] },
           { key: "n_check", id: "check", parent: "n_build", kind: "action", title: "Check the build" },
-          { key: "n_option", id: "option", kind: "deliverable", title: "Optional extra" },
-          { key: "n_old", id: "old", kind: "action", title: "Old step" },
+          { key: "n_option", id: "option", kind: "deliverable", title: "Optional extra", relevant_when: { answered: "n_choose" } },
+          { key: "n_scope", id: "scope", kind: "decision", title: "Scope", prompt: "Is the old step in scope?", answer_type: "boolean" },
+          { key: "n_old", id: "old", kind: "action", title: "Old step", relevant_when: { not: { answered: "n_scope" } } },
         ],
         state: {
           nodes: {
             n_kick: { state: "done", provenance: "from_route" },
             n_build: { state: "active", provenance: "from_route" },
             n_old: { state: "todo", provenance: "from_route" },
+            n_scope: { state: "decided", provenance: "from_route" },
           },
+          answers: { n_scope: { boolean: true } },
         },
       },
     },
     derived: {
       today,
-      frontier: ["n_choose", "n_check"],
-      acting_frontier: ["n_choose", "n_check"],
+      frontier: ["n_choose"],
+      acting_frontier: ["n_choose"],
       nodes: {
         n_kick: { ...base, display_state: "done", ...relevant, gravity: 9 },
         n_choose: { ...base, display_state: "ready", ...relevant, ...owned, actionable: true, gravity: 8, unlocks: 1, dates: { due: bound("2026-10-09"), latest_start: bound("2026-10-08"), slack_days: 2 } },
-        n_stage: { ...base, display_state: "active", ...relevant, gravity: 4, progress: stageProgress },
+        n_stage: { ...base, display_state: "active", ...relevant, gravity: 4, blocked_by: [{ node: "n_build", via: "containment" }], progress: stageProgress },
         n_build: {
           ...base,
           display_state: "active",
@@ -63,14 +68,14 @@ export function canvasView(): Ready {
           ...owned,
           gravity: 4,
           overdue: true,
-          blocked_by: [{ node: "n_option", via: "explicit" }],
+          blocked_by: [{ node: "n_option", via: "explicit" }, { node: "n_check", via: "containment" }],
           waits_on: { entries: [{ node: "n_option", via: "explicit" }], total: 1 },
           started_early: true,
           failing_guards: ["deps_done"],
           progress: buildProgress,
           dates: { due: bound("2026-10-01"), overdue_days: 5 },
         },
-        n_check: { ...base, display_state: "ready", ...relevant, ...owned, actionable: true, gravity: 5, dates: { due: bound("2026-11-30") } },
+        n_check: { ...base, display_state: "blocked", ...relevant, ...owned, gravity: 5, failing_guards: ["deps_done"], dates: { due: bound("2026-11-30") } },
         n_option: {
           ...base,
           display_state: "conditional",

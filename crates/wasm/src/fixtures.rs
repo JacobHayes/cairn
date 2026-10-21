@@ -33,31 +33,9 @@ pub struct Fixture {
 /// The patch that creates the people every scenario starts from (`fixtures/people.yaml`).
 const PEOPLE: &str = include_str!("../../../fixtures/people.yaml");
 
-/// Every fixture, in the order they are seeded.
-pub const FIXTURES: [Fixture; 4] = [
-    Fixture {
-        name: "bake-off",
-        route: None,
-        journey: include_str!("../../../fixtures/bake-off/journey.yaml"),
-    },
-    Fixture {
-        name: "hiring-loop",
-        route: Some(include_str!("../../../fixtures/hiring-loop/route.yaml")),
-        journey: include_str!("../../../fixtures/hiring-loop/journey.yaml"),
-    },
-    Fixture {
-        name: "product-launch",
-        route: Some(include_str!("../../../fixtures/product-launch/route.yaml")),
-        journey: include_str!("../../../fixtures/product-launch/journey.yaml"),
-    },
-    Fixture {
-        name: "vendor-evaluation",
-        route: Some(include_str!(
-            "../../../fixtures/vendor-evaluation/route.yaml"
-        )),
-        journey: include_str!("../../../fixtures/vendor-evaluation/journey.yaml"),
-    },
-];
+// Every fixture, in name order (the order they are seeded); the `fixtures/` directory owns
+// the list (build.rs).
+include!(concat!(env!("OUT_DIR"), "/fixtures.rs"));
 
 /// Why seeding stopped: a fixture that did not parse or a step the service did not commit,
 /// which is a bug in the fixtures or the service.

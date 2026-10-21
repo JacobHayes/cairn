@@ -62,7 +62,7 @@ describe("the inspector's offers", () => {
   });
 
   it("offers a decision awaiting its answer Decide, and nothing once it is decided", () => {
-    expect(offered(testView(), "n_when").primary).toBe("decide");
+    expect(offered(testView(), "n_pick").primary).toBe("decide");
     const decided = made("n_when", { display_state: "done" });
     expect(offered(decided, "n_when").primary).toBeUndefined();
   });

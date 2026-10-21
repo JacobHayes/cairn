@@ -30,7 +30,7 @@ export CARGO_TERM_COLOR=never
 # scripts/e2e-servers) is a run, not a build.
 projects=(--project=chromium)
 if [ "${LADDER_SERVER:-1}" = 1 ]; then
-  ladder_cargo_test --test integration -- binary::binary:: || ladder_fail "the binary's tests failed"
+  ladder_cargo_test --test integration -- "${ladder_binary_modules[@]}" || ladder_fail "the binary's tests failed"
   ladder_suite "binary" "$(ladder_tests_matching cairn '^binary::binary::')" tests
   projects+=(--project=server --project=server-serial)
   export CAIRN_E2E_BINARY=1

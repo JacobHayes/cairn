@@ -24,7 +24,7 @@ export PROPTEST_CASES=${PROPTEST_CASES:-64}
 ladder_say "PROPTEST_CASES=$PROPTEST_CASES"
 
 # The test binaries built once up front, run by name (ladder_cargo_test), one suite per file.
-ladder_cargo_test --test integration -- property:: || ladder_fail "cargo test reported failures"
+ladder_cargo_test --test integration -- "${ladder_property_modules[@]}" || ladder_fail "cargo test reported failures"
 ladder_file_suites property
 
 ladder_step_end

@@ -198,64 +198,51 @@ mod in_process {
         errors
     }
 
+    /// A read of `endpoint` at `segments` (one for each placeholder in its path, which the
+    /// endpoint owns) and `query`.
+    fn read(
+        endpoint: &'static Endpoint,
+        segments: &[&str],
+        query: &str,
+    ) -> (&'static Endpoint, String) {
+        (endpoint, format!("{}{query}", endpoint.path_with(segments)))
+    }
+
     /// Reads whose answers, accepted and refused, the conformance test checks.
-    fn documented_reads() -> Vec<(&'static Endpoint, &'static str)> {
+    fn documented_reads() -> Vec<(&'static Endpoint, String)> {
+        let (journey, route, node) = ("j_vendor_eval", "vendor-evaluation", "n_kickoff");
         vec![
-            (&at::HEALTH, "/healthz"),
-            (&at::CAPABILITIES, "/api/capabilities"),
-            (&at::JOURNEYS, "/api/journeys"),
-            (&at::JOURNEY, "/api/journeys/j_vendor_eval"),
-            (&at::DOCUMENT, "/api/journeys/j_vendor_eval/document"),
-            (&at::ROUTES, "/api/routes?size=1"),
-            (&at::ROUTE, "/api/routes/vendor-evaluation"),
-            (
-                &at::ROUTE_VERSIONS,
-                "/api/routes/vendor-evaluation/versions",
-            ),
-            (
-                &at::ROUTE_VERSION,
-                "/api/routes/vendor-evaluation/versions/1",
-            ),
-            (&at::DEPLOYMENT, "/api/deployment"),
-            (
-                &at::IDENTITY_REFERENCES,
-                "/api/deployment/identities/who_d4m6uk2eqf5rbhzs/references",
-            ),
-            (&at::SEARCH, "/api/search?text=vendor"),
-            (&at::EVENTS, "/api/events?size=3"),
-            (&at::CALLER, "/api/users/me"),
-            (&at::TOKENS, "/api/users/me/tokens"),
-            (
-                &at::SNAPSHOT,
-                "/api/journeys/j_vendor_eval/snapshot?depth=1",
-            ),
-            (
-                &at::LEVEL,
-                "/api/journeys/j_vendor_eval/level?kind=group&kind=milestone",
-            ),
-            (&at::TRACE, "/api/journeys/j_vendor_eval/trace/n_access"),
-            (&at::DECISIONS, "/api/journeys/j_vendor_eval/decisions"),
-            (&at::TIMELINE, "/api/journeys/j_vendor_eval/timeline"),
-            (&at::SUMMARY, "/api/journeys/j_vendor_eval/summary"),
-            (
-                &at::NEXT,
-                "/api/journeys/j_vendor_eval/next?for_viewer=true",
-            ),
-            (&at::NODES, "/api/journeys/j_vendor_eval/nodes?flag=blocked"),
-            (&at::MINE, "/api/journeys/j_vendor_eval/mine"),
-            (&at::NODE, "/api/journeys/j_vendor_eval/nodes/n_kickoff"),
-            (
-                &at::EXPLANATIONS,
-                "/api/journeys/j_vendor_eval/nodes/n_kickoff/explanations/gravity",
-            ),
-            (
-                &at::HISTORY,
-                "/api/journeys/j_vendor_eval/history?node=n_kickoff",
-            ),
-            (&at::NODE, "/api/journeys/j_vendor_eval/nodes/n_nowhere"),
-            (&at::NEXT, "/api/journeys/j_vendor_eval/next?sort=sideways"),
-            (&at::JOURNEY, "/api/journeys/j_missing"),
-            (&at::JOURNEYS, "/api/journeys?colour=blue"),
+            read(&at::HEALTH, &[], ""),
+            read(&at::CAPABILITIES, &[], ""),
+            read(&at::JOURNEYS, &[], ""),
+            read(&at::JOURNEY, &[journey], ""),
+            read(&at::DOCUMENT, &[journey], ""),
+            read(&at::ROUTES, &[], "?size=1"),
+            read(&at::ROUTE, &[route], ""),
+            read(&at::ROUTE_VERSIONS, &[route], ""),
+            read(&at::ROUTE_VERSION, &[route, "1"], ""),
+            read(&at::DEPLOYMENT, &[], ""),
+            read(&at::IDENTITY_REFERENCES, &["who_d4m6uk2eqf5rbhzs"], ""),
+            read(&at::SEARCH, &[], "?text=vendor"),
+            read(&at::EVENTS, &[], "?size=3"),
+            read(&at::CALLER, &[], ""),
+            read(&at::TOKENS, &[], ""),
+            read(&at::SNAPSHOT, &[journey], "?depth=1"),
+            read(&at::LEVEL, &[journey], "?kind=group&kind=milestone"),
+            read(&at::TRACE, &[journey, "n_access"], ""),
+            read(&at::DECISIONS, &[journey], ""),
+            read(&at::TIMELINE, &[journey], ""),
+            read(&at::SUMMARY, &[journey], ""),
+            read(&at::NEXT, &[journey], "?for_viewer=true"),
+            read(&at::NODES, &[journey], "?flag=blocked"),
+            read(&at::MINE, &[journey], ""),
+            read(&at::NODE, &[journey, node], ""),
+            read(&at::EXPLANATIONS, &[journey, node, "gravity"], ""),
+            read(&at::HISTORY, &[journey], "?node=n_kickoff"),
+            read(&at::NODE, &[journey, "n_nowhere"], ""),
+            read(&at::NEXT, &[journey], "?sort=sideways"),
+            read(&at::JOURNEY, &["j_missing"], ""),
+            read(&at::JOURNEYS, &[], "?colour=blue"),
         ]
     }
 
@@ -265,12 +252,15 @@ mod in_process {
         let document = cairn_api::openapi::document();
         let world = World::start().await;
         let ann = world.vendor_after(2).await;
-        let get = |target: &'static str| ann.send(Method::GET, target, None);
         let reads = documented_reads();
         for (endpoint, target) in reads {
-            conforms(&document, endpoint, &get(target).await.unwrap());
+            conforms(
+                &document,
+                endpoint,
+                &ann.send(Method::GET, &target, None).await.unwrap(),
+            );
         }
-        let patches = "/api/journeys/j_vendor_eval/patches";
+        let patches = &at::PATCH_JOURNEY.path_with(&["j_vendor_eval"]);
         let note = support::patch(
             "p_note",
             "{journey: j_vendor_eval}",
@@ -306,7 +296,7 @@ mod in_process {
         conforms(
             &document,
             &at::MINT_TOKEN,
-            &post(&ann, "/api/users/me/tokens", &named).await,
+            &post(&ann, at::MINT_TOKEN.path, &named).await,
         );
     }
 
@@ -319,12 +309,18 @@ mod in_process {
         assert_eq!(operation["security"], json!([]));
         let world = World::start().await;
         let anonymous = world.anonymous();
-        let serving = anonymous.send(Method::GET, "/healthz", None).await.unwrap();
+        let serving = anonymous
+            .send(Method::GET, at::HEALTH.path, None)
+            .await
+            .unwrap();
         assert_eq!(serving.status.as_u16(), 200);
         assert_eq!(serving.json::<Value>().unwrap()["status"], json!("ok"));
         conforms(&document, &at::HEALTH, &serving);
         world.faults.fail_closed();
-        let closed = anonymous.send(Method::GET, "/healthz", None).await.unwrap();
+        let closed = anonymous
+            .send(Method::GET, at::HEALTH.path, None)
+            .await
+            .unwrap();
         assert_eq!(closed.status.as_u16(), 503);
         assert_eq!(
             closed.json::<Value>().unwrap()["status"],
@@ -345,7 +341,7 @@ mod in_process {
             "mutations": [{"op": "add_annotation", "annotation": {"key": "a_note", "note": "Seen."}}],
         });
         let create = json!({"patch_id": "p_pr", "id": "pr_note", "draft": draft});
-        let proposals = "/api/journeys/j_vendor_eval/proposals";
+        let proposals = &at::PROPOSE_JOURNEY.path_with(&["j_vendor_eval"]);
         let mut lost = create.clone();
         lost["patch_id"] = json!("p_pr_lost");
         let mut reused = create.clone();
@@ -358,38 +354,53 @@ mod in_process {
             );
         }
         let edit = json!({"patch_id": "p_edit", "base_revision": 7, "draft": draft});
-        let under = "/api/journeys/j_vendor_eval/proposals";
+        let under = &at::JOURNEY_PROPOSALS.list.path_with(&["j_vendor_eval"]);
+        let at_note = |endpoint: &Endpoint| endpoint.path_with(&["j_vendor_eval", "pr_note"]);
         let edited = ann
-            .send(Method::PATCH, &format!("{under}/pr_note"), Some(&edit))
+            .send(
+                Method::PATCH,
+                &at_note(&at::JOURNEY_PROPOSALS.edit),
+                Some(&edit),
+            )
             .await;
         conforms(&document, &at::JOURNEY_PROPOSALS.edit, &edited.unwrap());
         let get = ann
-            .send(Method::GET, &format!("{under}/pr_note"), None)
+            .send(Method::GET, &at_note(&at::JOURNEY_PROPOSALS.get), None)
             .await;
         conforms(&document, &at::JOURNEY_PROPOSALS.get, &get.unwrap());
         let missing = ann
-            .send(Method::GET, &format!("{under}/pr_missing"), None)
+            .send(
+                Method::GET,
+                &at::JOURNEY_PROPOSALS
+                    .get
+                    .path_with(&["j_vendor_eval", "pr_missing"]),
+                None,
+            )
             .await;
         conforms(&document, &at::JOURNEY_PROPOSALS.get, &missing.unwrap());
         let listed = ann.send(Method::GET, under, None).await;
         conforms(&document, &at::JOURNEY_PROPOSALS.list, &listed.unwrap());
         let waiting = ann
-            .send(Method::GET, "/api/proposals?scope=waiting", None)
+            .send(
+                Method::GET,
+                &format!("{}?scope=waiting", at::PROPOSALS.path),
+                None,
+            )
             .await;
         conforms(&document, &at::PROPOSALS, &waiting.unwrap());
-        let preview = post(&ann, &format!("{under}/pr_note/preview"), &json!({})).await;
+        let preview = post(&ann, &at_note(&at::JOURNEY_PROPOSALS.preview), &json!({})).await;
         conforms(&document, &at::JOURNEY_PROPOSALS.preview, &preview);
         let refresh = json!({"patch_id": "p_refresh", "base_revision": 1});
-        let refreshed = post(&ann, &format!("{under}/pr_note/refresh"), &refresh).await;
+        let refreshed = post(&ann, &at_note(&at::JOURNEY_PROPOSALS.refresh), &refresh).await;
         conforms(&document, &at::JOURNEY_PROPOSALS.refresh, &refreshed);
         for reviewed in [1, 2, 2] {
             let apply =
                 json!({"patch_id": format!("p_apply_{reviewed}"), "reviewed_revision": reviewed});
-            let applied = post(&ann, &format!("{under}/pr_note/apply"), &apply).await;
+            let applied = post(&ann, &at_note(&at::JOURNEY_PROPOSALS.apply), &apply).await;
             conforms(&document, &at::JOURNEY_PROPOSALS.apply, &applied);
         }
         let discard = json!({"patch_id": "p_discard", "base_revision": 2});
-        let discarded = post(&ann, &format!("{under}/pr_note/discard"), &discard).await;
+        let discarded = post(&ann, &at_note(&at::JOURNEY_PROPOSALS.discard), &discard).await;
         conforms(&document, &at::JOURNEY_PROPOSALS.discard, &discarded);
     }
 
@@ -399,15 +410,15 @@ mod in_process {
         let document = cairn_api::openapi::document();
         let world = World::start().await;
         let ann = world.vendor_after(2).await;
-        let route = "/api/routes/vendor-evaluation";
-        for target in ["/export?version=1", "/export", "/export?version=9"] {
+        let export = at::EXPORT_ROUTE.path_with(&["vendor-evaluation"]);
+        for query in ["?version=1", "", "?version=9"] {
             let reply = ann
-                .send(Method::GET, &format!("{route}{target}"), None)
+                .send(Method::GET, &format!("{export}{query}"), None)
                 .await;
             conforms(&document, &at::EXPORT_ROUTE, &reply.unwrap());
         }
         let exported = ann
-            .send(Method::GET, &format!("{route}/export?version=1"), None)
+            .send(Method::GET, &format!("{export}?version=1"), None)
             .await
             .unwrap();
         let file: Value = exported.json().unwrap();
@@ -417,7 +428,12 @@ mod in_process {
         let mut mismatched = import.clone();
         mismatched["file"]["route"] = json!("another-route");
         for body in [&import, &import, &reused, &mismatched] {
-            let reply = post(&ann, &format!("{route}/import"), body).await;
+            let reply = post(
+                &ann,
+                &at::IMPORT_ROUTE.path_with(&["vendor-evaluation"]),
+                body,
+            )
+            .await;
             conforms(&document, &at::IMPORT_ROUTE, &reply);
         }
         let free = support::patch(
@@ -426,19 +442,29 @@ mod in_process {
             0,
             "- op: create_journey\n  name: Free\n",
         );
-        post(&ann, "/api/journeys/j_free/patches", &request(&free)).await;
+        post(
+            &ann,
+            &at::PATCH_JOURNEY.path_with(&["j_free"]),
+            &request(&free),
+        )
+        .await;
         let upgrade = json!({"patch_id": "p_upgrade", "proposal": "pr_upgrade", "to": 1});
         for journey in ["j_vendor_eval", "j_free", "j_missing"] {
-            let reply = post(&ann, &format!("/api/journeys/{journey}/upgrade"), &upgrade).await;
+            let reply = post(&ann, &at::UPGRADE.path_with(&[journey]), &upgrade).await;
             conforms(&document, &at::UPGRADE, &reply);
         }
         let save =
             json!({"patch_id": "p_save", "proposal": "pr_save", "route": "saved", "name": "Saved"});
-        let saved = post(&ann, "/api/journeys/j_vendor_eval/save-as-route", &save).await;
+        let saved = post(
+            &ann,
+            &at::SAVE_AS_ROUTE.path_with(&["j_vendor_eval"]),
+            &save,
+        )
+        .await;
         conforms(&document, &at::SAVE_AS_ROUTE, &saved);
         let lineage = json!({"route": "vendor-evaluation", "version": 1});
         let relink = json!({"patch_id": "p_relink", "proposal": "pr_relink", "lineage": lineage});
-        let relinked = post(&ann, "/api/journeys/j_vendor_eval/relink", &relink).await;
+        let relinked = post(&ann, &at::RELINK.path_with(&["j_vendor_eval"]), &relink).await;
         conforms(&document, &at::RELINK, &relinked);
     }
 
@@ -455,9 +481,9 @@ mod in_process {
             let create = json!({"patch_id": format!("p_{id}"), "id": id, "draft": draft});
             conforms(&document, endpoint, &post(&ann, &target, &create).await);
             let preview = post(&ann, &format!("{target}/{id}/preview"), &json!({})).await;
-            let under = if target.starts_with("/api/journeys/") {
+            let under = if std::ptr::eq(endpoint, &raw const at::PROPOSE_JOURNEY) {
                 &at::JOURNEY_PROPOSALS
-            } else if target.starts_with("/api/routes/") {
+            } else if std::ptr::eq(endpoint, &raw const at::PROPOSE_ROUTE) {
                 &at::ROUTE_PROPOSALS
             } else {
                 &at::DEPLOYMENT_PROPOSALS

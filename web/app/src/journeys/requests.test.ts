@@ -245,8 +245,8 @@ describe("the badges", () => {
   it("count on Depth the frontier nodes the step hides: a kind it does not draw, the Stages rule, or a collapse; none under Fade", () => {
     const base = new Set(view.derived.acting_frontier);
     expect(badgesOf("graph", {}, base, stepHides(nodes, "actions", [])).depth).toBeUndefined();
-    // Decisions draws no deliverable or action.
-    expect(badgesOf("graph", {}, base, stepHides(nodes, "decisions", [])).depth?.count).toBe(2);
+    // Decisions draws no deliverable or action: the frontier's two actions and its deliverable.
+    expect(badgesOf("graph", {}, base, stepHides(nodes, "decisions", [])).depth?.count).toBe(3);
     expect(badgesOf("graph", {}, base, stepHides(nodes, "decisions", []), true).depth).toBeUndefined();
     const inside = new Set(["n_inner"]);
     expect(badgesOf("graph", {}, inside, stepHides(nodes, "actions", ["n_stage"])).depth?.count).toBe(1);

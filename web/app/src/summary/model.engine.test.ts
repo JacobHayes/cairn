@@ -12,9 +12,12 @@ import { attentionRows, blockedRows, claimActions, claimedKeys, lifecycleLine, m
 
 let host: InBrowserHost;
 const held: DerivedJourney[] = [];
+/** The journeys the seeded host holds (the fixtures'), read from it rather than listed here. */
+let fixtureJourneys: string[] = [];
 
 beforeAll(async () => {
   host = await seeded();
+  fixtureJourneys = host.journeyIndex({}).items.map((each) => each.id);
 });
 
 afterEach(() => {
@@ -194,7 +197,7 @@ describe("C10, C11, E1, E4: one action row per node", () => {
   });
 
   it("puts each node in one set, whatever the viewer", () => {
-    for (const id of ["j_vendor_eval", "j_launch", "j_bakeoff", "j_hiring"]) {
+    for (const id of fixtureJourneys) {
       const journey = open(id);
       for (const viewer of [[], ["who_g6t4ycm2pe7vsjan"], ["who_k3d7qm2xw5tn6pfa", "who_b6r2vz4jhs7cnqe3"]]) {
         const { actions, frontier } = pageOf(journey, viewer);
@@ -278,12 +281,15 @@ describe("D8, C18: what is under way and what is blocked", () => {
     expect(rows.find((each) => each.key === "n_final_review")?.fact()).toContain(journey.ready.journey.graph.nodes?.find((node) => node.key === "n_review_opens")?.title ?? "missing");
   });
 
-  it.each(["j_vendor_eval", "j_launch", "j_bakeoff", "j_hiring"])("puts a node on one list only in %s", (name) => {
-    const journey = open(name);
-    const { actions } = pageOf(journey);
-    const taken = claimedKeys(actions);
-    const all = [...taken, ...keys(underWay(journey.ready, taken)), ...keys(blockedRows(journey.ready, taken))];
-    expect(new Set(all).size).toBe(all.length);
+  it("puts a node on one list only, in every fixture journey", () => {
+    expect(fixtureJourneys.length).toBeGreaterThan(0);
+    for (const name of fixtureJourneys) {
+      const journey = open(name);
+      const { actions } = pageOf(journey);
+      const taken = claimedKeys(actions);
+      const all = [...taken, ...keys(underWay(journey.ready, taken)), ...keys(blockedRows(journey.ready, taken))];
+      expect(new Set(all).size, name).toBe(all.length);
+    }
   });
 });
 

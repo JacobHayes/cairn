@@ -142,9 +142,12 @@ if [ ${#specs[@]} -gt 0 ]; then
   # which the Rust tests below then reuse.
   if [ ${#server_files[@]} -gt 0 ]; then
     build=web/app/dist/build/index.html
+    # The generated paths (ARCHITECTURE owns the list) feed the bundle too: the client's types
+    # and rule tables and the module's bindings.
+    mapfile -t generated < <(scripts/generated-paths)
     if [ ! -f "$build" ] || [ -n "$(find web/app/src web/app/index.html web/app/vite.config.ts web/app/package.json \
       web/client/src web/client/package.json web/wasm/src web/wasm/package.json web/wasm/dist/bindgen design \
-      package-lock.json -newer "$build" -print -quit)" ]; then
+      "${generated[@]}" package-lock.json -newer "$build" -print -quit)" ]; then
       ladder_run "the app's web build" mise-tasks/build/web
     fi
     ladder_run "the build of the binary" cargo test --locked --quiet --workspace --all-features --tests --no-run

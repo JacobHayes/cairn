@@ -88,67 +88,7 @@ pub fn block_on<F: Future>(future: F) -> F::Output {
     }
 }
 
-/// Expands to one `#[test]` per conformance case, each running the case against
-/// `$backend` on the executor `$run` (a function from a future to its output).
-#[macro_export]
-macro_rules! conformance_suite {
-    ($backend:expr, $run:path) => {
-        $crate::conformance_suite!(@cases $backend, $run;
-            commits::a_first_commit_creates_the_domain_and_a_second_from_zero_conflicts,
-            commits::a_revision_conflict_is_rejected_and_leaves_state_untouched,
-            commits::what_intervened_since_a_revision_is_reported_on_request,
-            commits::a_failure_between_state_and_events_leaves_nothing,
-            commits::a_commit_fails_whole_when_either_precondition_is_stale,
-            commits::two_commits_to_one_journey_yield_one_success_and_one_conflict,
-            commits::a_resubmitted_patch_id_answers_from_its_receipt_or_is_rejected,
-            commits::an_oversize_commit_names_the_limit,
-            commits::a_route_with_many_versions_loads_its_draft_under_the_cap,
-            commits::a_journey_round_trips_every_record,
-            commits::writes_follow_the_reference_semantics,
-            commits::sibling_ids_may_swap_within_a_commit_but_not_end_duplicated,
-            commits::emails_may_move_between_identities_within_a_commit_but_stay_unique,
-            commits::an_identity_create_in_a_journey_patch_bumps_the_deployment_revision,
-            commits::an_identity_create_whose_key_is_an_identity_or_alias_is_rejected,
-            commits::an_identity_an_applied_proposal_creates_bumps_the_deployment_revision,
-            commits::riding_identity_creates_stop_at_the_identity_limit,
-            commits::a_hard_delete_removes_events_and_keeps_the_deployment_event,
-            commits::a_hard_delete_never_reuses_the_positions_it_removes,
-            commits::a_create_at_a_deleted_journey_id_is_rejected,
-            commits::a_commit_to_a_hard_deleted_journey_is_stale,
-            commits::a_decision_retyped_to_identities_makes_its_conditions_references,
-            commits::a_journey_copied_from_a_route_refers_to_the_identities_it_names,
-            commits::a_proposal_revision_is_independent_of_its_destination,
-            commits::an_identity_merge_is_stale_when_another_journey_references_its_identities,
-            every::every_field_and_variant_loads_back_equal,
-            every::a_cleared_overwrite_loads_back_equal_and_every_record_removes,
-            every::every_auth_and_conversation_field_and_variant_loads_back_equal,
-            queries::aliases_resolve_to_their_identity,
-            queries::a_condition_refers_to_an_identity_only_through_an_identity_decision,
-            queries::an_identity_delete_is_stale_while_any_graph_refers_to_it,
-            queries::current_revisions_list_every_domain_and_proposal,
-            queries::the_journey_index_filters_by_status_route_version_reference_and_upgrade,
-            queries::the_journey_index_events_and_search_page,
-            queries::proposal_listings_hold_each_scope_newest_first_with_counts,
-            queries::route_detail_lists_versions_with_their_journeys,
-            queries::events_filter_by_journey_node_user_type_patch_and_time,
-            queries::text_search_hits_names_nodes_notes_and_resources,
-            records::auth_records_round_trip,
-            records::logins_are_found_by_verified_email,
-            records::oauth_state_is_taken_once_and_expired_records_go,
-            records::agent_tokens_are_found_by_digest_and_revoked_by_a_put,
-            records::the_auth_log_appends_in_order_and_pages_by_user,
-            records::conversations_round_trip_and_list_by_user,
-        );
-    };
-    (@cases $backend:expr, $run:path; $($module:ident :: $case:ident),* $(,)?) => {
-        $(
-            #[test]
-            fn $case() {
-                $run($crate::conformance::$module::$case(&$backend));
-            }
-        )*
-    };
-}
+include!(concat!(env!("OUT_DIR"), "/conformance_suite.rs"));
 
 /// Opens a store with no faults armed.
 pub async fn open<B: Backend>(backend: &B) -> B::Store {

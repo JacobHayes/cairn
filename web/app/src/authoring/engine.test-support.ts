@@ -83,3 +83,27 @@ export function derivedJourney(host: InBrowserHost, text: string): DerivedJourne
     free: () => { derivation.free(); },
   };
 }
+
+let built: Promise<InBrowserHost> | undefined;
+
+/**
+ * A new journey named `name` with `id`, patched with `mutations` and derived by the real
+ * engine, for the unit tests of the screens that read a derived journey. Synchronous so a
+ * test support can return it: the engine is loaded once, with top-level await, by the support.
+ */
+export function builtJourney(id: string, name: string, mutations: Mutation[]): import("../data/journeys.ts").JourneyView & { status: "ready" } {
+  if (engineHost === undefined) throw new Error("the engine is not loaded: await loadedEngine() before building a journey");
+  engineHost.patch({ patch: { id: `p_create_${id}`, target: { journey: id }, base_revision: 0, mutations: [{ op: "create_journey", name }] } });
+  const derived = derivedJourney(engineHost, journeyAfter(engineHost, id, mutations));
+  const { ready } = derived;
+  derived.free();
+  return ready;
+}
+
+let engineHost: InBrowserHost | undefined;
+
+/** Loads the engine for `builtJourney`; a test support awaits it at its top level. */
+export async function loadedEngine(): Promise<void> {
+  built ??= seeded();
+  engineHost = await built;
+}
