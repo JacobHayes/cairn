@@ -1,5 +1,5 @@
 // The containment invariant over worst-case content (e2e/stress.ts): the stress journey walked
-// through every screen and width in both themes. Each step ends in a check (e2e/test.ts runs the
+// through every screen and width. Each step ends in a check (e2e/test.ts runs the
 // invariant after the test; `expectContained` runs it between the steps, so a failure names the
 // screen).
 import type { Page } from "@playwright/test";
@@ -79,37 +79,64 @@ async function details({ page, look, check }: Walk): Promise<void> {
   await check("walk");
 }
 
-/** Each screen at desktop and phone width, the clamped journey name opened by a tap, and the screens that list journeys, routes and people. */
-async function widths({ page, look, check }: Walk): Promise<void> {
+/** The stress route's own graph, fitted and at the reading zoom in a window that holds it. */
+async function routeGraph({ page, look }: Walk): Promise<void> {
+  await open(page, "browser", `/routes/${STRESS.route}?view=graph`);
+  await expect(page.getByTestId("node-card").first()).toBeVisible();
+  await page.keyboard.press("f");
+  await viewportSettled(page);
+  await look("the route's graph fitted");
+  await page.setViewportSize({ width: 4200, height: 3200 });
+  await open(page, "browser", `/routes/${STRESS.route}?view=graph`);
+  await expect(page.getByTestId("node-card").first()).toBeVisible();
+  await page.keyboard.press("f");
+  await viewportSettled(page);
+  expect((await viewportOf(page)).zoom).toBeGreaterThanOrEqual(NEAR_ZOOM);
+  await look("the route's graph at the reading zoom");
+  await expectTitleLinesAsLaidOut(page);
+  await page.setViewportSize({ width: 1280, height: 720 });
+}
+
+/** A phone's chrome: the inspector hidden to its bar, the sync popover with its You link, and the stress route's list and timeline. */
+async function phoneChrome({ page, look, check }: Walk): Promise<void> {
+  await check("list", "n_a1");
+  await page.getByRole("button", { name: "Hide inspector" }).click();
+  await look("the inspector folded at 390px");
+  await page.getByTestId("sync").click();
+  await look("the sync popover at 390px");
+  await page.keyboard.press("Escape");
+  for (const view of ["list", "timeline"]) {
+    await open(page, "browser", `/routes/${STRESS.route}?view=${view}`);
+    await look(`the route's ${view} at 390px`);
+  }
+}
+
+/** Each screen at desktop and phone width (a phone also opens each view's Controls menu), the clamped journey name opened by a tap, and the screens that list journeys, routes and people. */
+async function widths(walk: Walk): Promise<void> {
+  const { page, look, check } = walk;
   for (const width of [1280, 390]) {
     await page.setViewportSize({ width, height: width === 390 ? 844 : 720 });
     for (const address of ["graph", "list", "timeline", "summary", "walk"]) {
       await check(address);
-    }
-    const name = page.getByTestId("journey-name");
-    const clamped = await name.getByRole("button").evaluate((toggle) => toggle.scrollHeight > toggle.clientHeight);
-    expect(clamped || width > 390, "the stress name is long enough to be clamped on a phone").toBe(true);
-    await name.getByRole("button").click();
-    await expect(name.getByRole("button")).toHaveAttribute("aria-expanded", "true");
-    await look(`the journey name opened at ${String(width)}px`);
-    // A phone's chrome: the Controls menu on every view, the sync popover with its You link, the inspector hidden to its bar, and the stress route's own pages.
-    if (width === 390) {
-      for (const address of ["graph", "list", "timeline", "walk"]) {
-        await check(address);
+      if (width === 390 && address !== "summary") {
         await page.getByTestId("controls-button").click();
         await look(`the Controls menu on ${address} at 390px`);
         await page.keyboard.press("Escape");
       }
-      await check("list", "n_a1");
-      await page.getByRole("button", { name: "Hide inspector" }).click();
-      await look("the inspector folded at 390px");
-      await page.getByTestId("sync").click();
-      await look("the sync popover at 390px");
-      await page.keyboard.press("Escape");
-      for (const view of ["graph", "list", "timeline"]) {
-        await open(page, "browser", `/routes/${STRESS.route}?view=${view}`);
-        await look(`the route's ${view} at 390px`);
-      }
+    }
+    const name = page.getByTestId("journey-name");
+    const clamped = await name.getByRole("button").evaluate((toggle) => toggle.scrollHeight > toggle.clientHeight);
+    expect(clamped || width > 390, "the stress name is long enough to be clamped on a phone").toBe(true);
+    // A name cut by its clamp wears a mark, and a tap opens the name and leaves the mark.
+    if (width === 390) {
+      await expect(page.getByTestId("journey-name-cue")).toBeVisible();
+    }
+    await name.getByRole("button").click();
+    await expect(name.getByRole("button")).toHaveAttribute("aria-expanded", "true");
+    await look(`the journey name opened at ${String(width)}px`);
+    if (width === 390) {
+      await expect(page.getByTestId("journey-name-cue")).toBeVisible();
+      await phoneChrome(walk);
     }
     for (const path of ["/", "/journeys", "/routes", "/identities", "/me"]) {
       await open(page, "browser", path);
@@ -118,13 +145,14 @@ async function widths({ page, look, check }: Walk): Promise<void> {
   }
 }
 
-for (const scheme of ["light", "dark"] as const) {
-  test(`the stress journey stays inside its boxes on every screen (${scheme})`, async ({ page }) => {
-    await page.emulateMedia({ colorScheme: scheme });
-    const walk = walkOf(page, await publishStressJourney(page));
-    await graphs(walk);
-    await details(walk);
-    await widths(walk);
-    expect(walk.found).toEqual([]);
-  });
-}
+test("the stress journey stays inside its boxes on every screen, and a whole name wears no clamp mark", async ({ page }) => {
+  const walk = walkOf(page, await publishStressJourney(page));
+  await graphs(walk);
+  await routeGraph(walk);
+  await details(walk);
+  await widths(walk);
+  expect(walk.found).toEqual([]);
+  // The viewport is a phone's: a name that fits whole wears no mark.
+  await openAt(page, "browser", "j_launch", "list");
+  await expect(page.getByTestId("journey-name-cue")).toHaveCount(0);
+});

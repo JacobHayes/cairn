@@ -3,24 +3,25 @@
 // anything names an identity. The open proposals are the inspector's Proposals tab (server.spec).
 import { addIdentity, identityRow, mergeIdentities, selectIdentities } from "./around.ts";
 import { fresh, open, openSheet } from "./shell.ts";
-import { expect, test } from "./test.ts";
+import { checkpoint, expect, test } from "./test.ts";
 
 /** Ana Ruiz and Dara Singh of the fixtures' people: named by journeys. */
 const ANA = "who_k3d7qm2xw5tn6pfa";
 const DARA = "who_d4m6uk2eqf5rbhzs";
 
-test("E6: Add opens its form in the inspector, and the identity made is selected at its address", async ({ page }) => {
+test("E6: a row opens that identity alone, the checkboxes make a set the inspector merges, and the search keeps the identities whose name or email holds it", async ({ page }) => {
   await open(page, "browser", "/identities");
-  await expect(page.getByTestId("create-identity")).toHaveCount(0);
-  const name = fresh("New person");
-  const key = await addIdentity(page, name, ["new@example.org"]);
-  await expect(page).toHaveURL(new RegExp(`/identities/${key}$`));
-  await expect(identityRow(page, key)).toHaveAttribute("data-selected", "true");
-  await expect(identityRow(page, key).getByTestId("identity-emails")).toHaveText("new@example.org");
-});
-
-test("E6: a row opens that identity alone, and the checkboxes make a set the inspector merges or deletes", async ({ page }) => {
-  await open(page, "browser", "/identities");
+  // The search keeps the identities whose name or email holds it, and says how many.
+  await expect(page.getByTestId("identity").first()).toBeVisible();
+  const all = await page.getByTestId("identity").count();
+  expect(all).toBeGreaterThan(2);
+  await page.getByLabel("Search").fill("ben@");
+  await expect(page.getByTestId("identity")).toHaveCount(1);
+  await expect(page.getByTestId("identities-count")).toContainText(String(all));
+  await page.getByLabel("Search").fill("no such person");
+  await expect(page.getByTestId("identities-none-match")).toBeVisible();
+  await page.getByLabel("Search").fill("");
+  await expect(page.getByTestId("identity")).toHaveCount(all);
   const [first, second, third] = [await addIdentity(page, fresh("Alpha")), await addIdentity(page, fresh("Beta")), await addIdentity(page, fresh("Gamma"))];
   await identityRow(page, first).getByTestId("identity-name").click();
   await expect(page).toHaveURL(new RegExp(`/identities/${first}$`));
@@ -41,9 +42,8 @@ test("E6: a row opens that identity alone, and the checkboxes make a set the ins
   await expect(page.getByTestId("selection-panel")).toHaveCount(0);
   await expect(page.getByTestId("identity-detail")).toBeVisible();
   await expect(identityRow(page, second)).toHaveAttribute("data-selected", "false");
-});
-
-test("E6: merging two selected identities leaves one row, which now carries the journeys of the other", async ({ page }) => {
+  await checkpoint(page);
+  // Merging two selected identities leaves one row, which now carries the journeys of the other.
   await open(page, "browser", `/identities/${DARA}`);
   await expect(page.getByTestId("identity-detail")).toBeAttached();
   await openSheet(page);
@@ -59,7 +59,7 @@ test("E6: merging two selected identities leaves one row, which now carries the 
   await expect(page.locator("[data-rows-panel]").first()).toHaveAttribute("data-count", before);
 });
 
-test("E6: an identity nothing names is deleted from its inspector, and one a journey names cannot be", async ({ page }) => {
+test("E6: an identity nothing names is deleted from its inspector, one a journey names cannot be, and Delete over several waits for every one's read", async ({ page }) => {
   await open(page, "browser", "/identities");
   const spare = await addIdentity(page, fresh("Spare"));
   await expect(page.getByTestId("delete-identities")).toHaveAttribute("data-deletion", "allowed");
@@ -77,28 +77,14 @@ test("E6: an identity nothing names is deleted from its inspector, and one a jou
   // Each journey or route that names her is a link to it.
   const links = references.getByRole("link");
   await expect(links.first()).toHaveAttribute("href", /^\/(journeys|routes)\//);
-});
-
-test("E6: Delete over several waits for every one's read, and stays off while any is named", async ({ page }) => {
-  await open(page, "browser", "/identities");
-  const spare = await addIdentity(page, fresh("Spare"));
-  await selectIdentities(page, spare, ANA);
+  await checkpoint(page);
+  // Delete over several waits for every one's read, and stays off while any is named.
+  const another = await addIdentity(page, fresh("Spare"));
+  await selectIdentities(page, another, ANA);
   await expect(page.getByTestId("delete-identities")).toHaveAttribute("data-deletion", "referenced");
   await expect(page.getByTestId("delete-identities").getByRole("button", { name: /^Delete/ })).toBeDisabled();
   await page.getByRole("button", { name: /^Remove Ana Ruiz from the selection$/ }).click();
   await expect(page.getByTestId("delete-identities")).toHaveAttribute("data-deletion", "allowed");
-});
-
-test("E6: the search keeps the identities whose name or email holds it, and says how many", async ({ page }) => {
-  await open(page, "browser", "/identities");
-  await expect(page.getByTestId("identity").first()).toBeVisible();
-  const all = await page.getByTestId("identity").count();
-  expect(all).toBeGreaterThan(2);
-  await page.getByLabel("Search").fill("ben@");
-  await expect(page.getByTestId("identity")).toHaveCount(1);
-  await expect(page.getByTestId("identities-count")).toContainText(String(all));
-  await page.getByLabel("Search").fill("no such person");
-  await expect(page.getByTestId("identities-none-match")).toBeVisible();
 });
 
 test("E6: on a phone a row opens its identity, and the form's fields and Save stay reachable with the keyboard up", async ({ page }) => {

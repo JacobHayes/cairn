@@ -64,7 +64,7 @@ function Return({ view, line }: { view: Ready; line: Line }) {
 }
 
 /** A phone drops the Due column, so the row says its due words under the title (a snoozed row says where the snooze ends instead). */
-function PhoneDue({ view, line, fact }: { view: Ready; line: Line; fact: string | undefined }) {
+export function PhoneDue({ view, line, fact }: { view: Ready; line: Line; fact: string | undefined }) {
   const derived = view.derived.nodes[line.key];
   const node = nodeOf(view, line.key);
   const state = line.row?.display_state ?? derived?.display_state;

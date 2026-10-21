@@ -3,12 +3,14 @@
 // through the safe retry and the conflict (H5), a later page and a page on the index follow
 // what another wrote (H6), a deployment tick re-derives what it moved, and an identity
 // signed in at the demo's stub issuer links to the user (H3). Each test makes what it
-// changes, so the fixtures other tests read stay as seeded.
-import type { APIRequestContext } from "@playwright/test";
+// changes, so the fixtures other tests read stay as seeded. The tests tagged @serial change what
+// the whole deployment holds (its identities, its revision, the scripted assistant) and run
+// one at a time, after the others have finished; the rest each work on a journey or route of
+// their own (ownJourney, newRoute) and run side by side.
+import type { APIRequestContext, Page } from "@playwright/test";
 
 import { expect, test } from "./test.ts";
 
-import { startVendorJourney } from "./acting.ts";
 import { addIdentity, identityRow, mergeIdentities } from "./around.ts";
 import { addNode, newRoute, routeName } from "./authoring.ts";
 import { section } from "./detail.ts";
@@ -22,6 +24,7 @@ import {
   open,
   openFromCanvas,
   openJourney,
+  ownJourney,
   rename,
   renameOf,
   save,
@@ -29,12 +32,15 @@ import {
   syncChip,
 } from "./shell.ts";
 
+const patchId = () => `p_${crypto.randomUUID().replaceAll("-", "")}`;
+
 const title = (page: Parameters<typeof nodeCard>[0], node: string) => nodeCard(page, node).getByTestId("title");
 
 test("edits to different nodes both land, and edits to one field surface a conflict", { tag: "@server" }, async ({ context }) => {
   const [one, two] = [await context.newPage(), await context.newPage()];
-  await openJourney(one, "server", "j_hiring");
-  await openJourney(two, "server", "j_hiring");
+  const { id } = await ownJourney(context.request, "hiring-loop");
+  await openJourney(one, "server", id);
+  await openJourney(two, "server", id);
   // A stale write to another node is retried and lands with no conflict.
   const [offer, screen] = [fresh("Offer"), fresh("Screen")];
   await startRename(two, "n_screen", screen);
@@ -45,7 +51,7 @@ test("edits to different nodes both land, and edits to one field surface a confl
   await expect(two.locator('[data-testid="refused"][data-rejection="stale"]')).toHaveCount(0);
   await expect(title(one, "n_screen")).toHaveText(screen);
   // One to the same field is not: it is shown beside the other's, and kept on the current version when asked.
-  const [theirs, mine] = [fresh("Theirs"), fresh("Mine")];
+  const [theirs, mine, later] = [fresh("Theirs"), fresh("Mine"), fresh("Later")];
   await startRename(two, "n_onsite", mine);
   await rename(one, "n_onsite", theirs);
   await save(two, "n_onsite");
@@ -53,37 +59,56 @@ test("edits to different nodes both land, and edits to one field surface a confl
   await expect(syncChip(two)).toHaveAttribute("aria-label", /^CONFLICT · 1\./);
   await expect(renameOf(two, "n_onsite").getByRole("textbox")).toHaveValue(mine);
   await expect(title(one, "n_onsite")).toHaveText(theirs);
+  // What is typed after the conflict is kept across a reload.
+  await renameOf(two, "n_onsite").getByRole("textbox").fill(later);
+  await two.reload();
+  await expect(two.locator('[data-testid="refused"][data-rejection="stale"]')).toBeVisible();
+  await expect(renameOf(two, "n_onsite").getByRole("textbox")).toHaveValue(later);
   await two.getByRole("button", { name: "Keep my edit on the current version" }).click();
   await save(two, "n_onsite");
-  await expect(title(two, "n_onsite")).toHaveText(mine);
-  await expect(title(one, "n_onsite")).toHaveText(mine);
+  await expect(title(two, "n_onsite")).toHaveText(later);
+  await expect(title(one, "n_onsite")).toHaveText(later);
+  await expect(renameOf(two, "n_onsite")).toHaveCount(0);
 });
 
-test("a later page shows the edit, and a page on the index shows a journey started elsewhere", { tag: "@server" }, async ({ context }) => {
+// Serial: it counts the page's fetches of the document, and a deployment tick caused by another test's journey would add one.
+test("a later page shows the edit, and a page on the index shows a journey started elsewhere", { tag: ["@server", "@serial"] }, async ({ context }) => {
   const [one, two] = [await context.newPage(), await context.newPage()];
-  const fetched = countDocumentFetches(two, "j_launch");
-  await openJourney(one, "server", "j_launch");
-  await openJourney(two, "server", "j_launch");
+  const { id, name } = await ownJourney(context.request, "product-launch");
+  const fetched = countDocumentFetches(two, id);
+  await openJourney(one, "server", id);
+  await openJourney(two, "server", id);
   const renamed = fresh("Docs");
   await rename(one, "n_docs", renamed);
   await expect(title(two, "n_docs")).toHaveText(renamed);
   await two.getByRole("link", { name: "Journeys" }).click();
-  await expect(two.getByRole("link", { name: "Launch the reporting release" })).toBeVisible();
+  await expect(two.getByRole("link", { name })).toBeVisible();
   // The index is live: a journey started in the other page is listed with no reload.
-  const started = await startVendorJourney(one);
-  await expect(two.locator(`[data-testid="journey-row"][data-journey="${started}"]`)).toBeVisible();
-  await two.getByRole("link", { name: "Launch the reporting release" }).click();
+  const started = await ownJourney(one.request, "vendor-evaluation");
+  await expect(two.locator(`[data-testid="journey-row"][data-journey="${started.id}"]`)).toBeVisible();
+  await two.getByRole("link", { name }).click();
   await goTo(two, "graph");
   await expect(title(two, "n_docs")).toHaveText(renamed);
   await live(two);
   const later = await context.newPage();
-  await openJourney(later, "server", "j_launch");
+  await openJourney(later, "server", id);
   await expect(title(later, "n_docs")).toHaveText(renamed);
-  // H6: the page refetched once per newer revision, never for one it already held.
+  // The page refetched once per newer revision, never for one it already held.
   expect(fetched()).toBe(2);
+  // A proposal drafted in another page appears in the Proposals tab with no reload.
+  await expect(two.getByTestId("tab-proposals")).toHaveCount(0);
+  const drafted = await one.request.post(`/api/journeys/${id}/proposals`, {
+    data: {
+      id: `pr_${crypto.randomUUID().replaceAll("-", "")}`,
+      patch_id: patchId(),
+      draft: { title: "Add a follow-up", destination_revision: await derivedRevision(two), mutations: [{ op: "add_node", node: { key: "n_followup", id: "followup", kind: "action", title: "Follow up" } }] },
+    },
+  });
+  expect(drafted.ok(), await drafted.text()).toBe(true);
+  await expect(two.getByTestId("tab-proposals").getByTestId("proposals-count")).toHaveText("1");
+  await two.getByTestId("tab-proposals").click();
+  await expect(two.getByTestId("proposal-row")).toContainText("Add a follow-up");
 });
-
-const patchId = () => `p_${crypto.randomUUID().replaceAll("-", "")}`;
 
 /** An empty journey with one action owned by `owner`, made through the API; its id. */
 async function journeyOwnedBy(request: APIRequestContext, owner: string): Promise<string> {
@@ -108,7 +133,7 @@ async function journeyOwnedBy(request: APIRequestContext, owner: string): Promis
   return id;
 }
 
-test("a deployment tick refetches the deployment context and re-derives: a merge changes the owner another page shows", { tag: "@server" }, async ({ context }) => {
+test("a deployment tick refetches the deployment context and re-derives: a merge changes the owner another page shows", { tag: ["@server", "@serial"] }, async ({ context }) => {
   const [one, two] = [await context.newPage(), await context.newPage()];
   const deploymentFetches: string[] = [];
   two.on("request", (request) => {
@@ -135,8 +160,8 @@ test("a deployment tick refetches the deployment context and re-derives: a merge
   expect(deploymentFetches.length).toBe(fetchedBefore + 1);
 });
 
-test("H3: an identity with no name is asked for its name on load, and Save names it everywhere it shows", { tag: "@server" }, async ({ page }) => {
-  // Ana's: the dev user's, before the sign-in test below gives the user a second identity.
+/** An identity with no name is asked for its name on load, and Save names it everywhere it shows: the dev user's own, which is the first of theirs until the sign-in leg gives them a second. */
+async function nameless(page: Page): Promise<void> {
   const key = "who_k3d7qm2xw5tn6pfa";
   await open(page, "server", `/identities/${key}`);
   const detail = page.getByTestId("identity-detail");
@@ -159,9 +184,10 @@ test("H3: an identity with no name is asked for its name on load, and Save names
   await expect(page.locator(`[data-testid="identity"][data-identity="${key}"]`).getByTestId("identity-name")).toHaveText(name);
   await page.getByRole("navigation", { name: "Screens", exact: true }).getByRole("link", { name: "You" }).click();
   await expect(page.getByTestId("your-identity").first()).toContainText(name);
-});
+}
 
-test("an identity signed in with the stub issuer links to the user, and its verified email names their identity", { tag: "@server" }, async ({ page }) => {
+test("a nameless identity of the user is asked for its name; an identity signed in with the stub issuer links to the user, and its verified email names their identity", { tag: ["@server", "@serial"] }, async ({ page }) => {
+  await nameless(page);
   const email = `${fresh("linked").replace(/\W/g, "-")}@example.org`;
   await open(page, "server", "/identities");
   const identity = await addIdentity(page, fresh("Linked person"), [email]);
@@ -203,7 +229,7 @@ test("a route's canvas keeps its graph while its reads fail, says BEHIND, and ca
   await expect(syncChip(two)).not.toHaveAttribute("data-state", "behind");
 });
 
-test("a failed read says what happened in a sentence, and keeps the server's message, ids and all, behind Details", { tag: "@server" }, async ({ page }) => {
+test("a failed read or a refused write says what happened in a sentence, and keeps the server's message, ids and all, behind Details", { tag: "@server" }, async ({ page, context }) => {
   const raw = "read of j_hiring at revision 4 failed in who_lead";
   await page.route((url) => url.pathname === "/api/journeys", (route) => route.fulfill({ status: 500, body: raw }));
   await open(page, "server", "/journeys");
@@ -216,31 +242,22 @@ test("a failed read says what happened in a sentence, and keeps the server's mes
   // Closed again: the page a person reads shows no key, which every test ends by checking.
   await details.click();
   await expect(page.getByTestId("failed-message")).toBeHidden();
+  // A write the server refuses says the same, on a journey of its own.
+  const { id } = await ownJourney(context.request, "hiring-loop");
+  await openJourney(page, "server", id);
+  await page.route("**/api/journeys/*/patches", (route) => route.fulfill({ status: 400, contentType: "text/plain", body: "patch p_abc at revision 4 refused for n_offer" }));
+  await startRename(page, "n_offer", fresh("Refused"));
+  await save(page, "n_offer");
+  const problem = page.getByTestId("write-problem").first();
+  await expect(problem).toContainText("Not saved.");
+  await expect(problem).not.toContainText("n_offer");
+  await problem.getByRole("button", { name: "Details" }).click();
+  await expect(problem.getByTestId("failed-message")).toContainText("n_offer");
+  await problem.getByRole("button", { name: "Details" }).click();
+  await expect(problem.getByTestId("failed-message")).toBeHidden();
 });
 
-test("C14: a proposal drafted in another page appears in a journey's Proposals tab with no reload", { tag: "@server" }, async ({ context }) => {
-  const [one, two] = [await context.newPage(), await context.newPage()];
-  await open(one, "server", "/identities");
-  const owner = await addIdentity(one, fresh("Owner"));
-  const journey = await journeyOwnedBy(one.request, owner);
-  await openJourney(two, "server", journey);
-  await live(two);
-  // Nothing is open, so the page keeps no tab for it.
-  await expect(two.getByTestId("tab-proposals")).toHaveCount(0);
-  const drafted = await one.request.post(`/api/journeys/${journey}/proposals`, {
-    data: {
-      id: `pr_${crypto.randomUUID().replaceAll("-", "")}`,
-      patch_id: patchId(),
-      draft: { title: "Add a follow-up", destination_revision: 1, mutations: [{ op: "add_node", node: { key: "n_followup", id: "followup", kind: "action", title: "Follow up" } }] },
-    },
-  });
-  expect(drafted.ok(), await drafted.text()).toBe(true);
-  await expect(two.getByTestId("tab-proposals").getByTestId("proposals-count")).toHaveText("1");
-  await two.getByTestId("tab-proposals").click();
-  await expect(two.getByTestId("proposal-row")).toContainText("Add a follow-up");
-});
-
-test("C14: the deployment's open proposals are the Identities inspector's Proposals tab, found at its own address", { tag: "@server" }, async ({ page }) => {
+test("C14: the deployment's open proposals are the Identities inspector's Proposals tab, found at its own address", { tag: ["@server", "@serial"] }, async ({ page }) => {
   await open(page, "server", "/identities");
   const deployment = (await (await page.request.get("/api/deployment")).json()) as { revision: number };
   const drafted = await page.request.post("/api/deployment/proposals", {

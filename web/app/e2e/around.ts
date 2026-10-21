@@ -142,5 +142,8 @@ export async function addIdentity(page: Page, name: string, emails: readonly str
   await form.getByRole("button", { name: "Add identity" }).click();
   await expect(page).toHaveURL(/\/identities\/who_[a-z2-7]{16}$/);
   await expect(page.getByTestId("identity-detail").getByTestId("detail-title")).toHaveText(name);
-  return new URL(page.url()).pathname.split("/").pop() ?? "";
+  const key = new URL(page.url()).pathname.split("/").pop() ?? "";
+  // The identity made is the one selected, at its address.
+  await expect(identityRow(page, key)).toHaveAttribute("data-selected", "true");
+  return key;
 }

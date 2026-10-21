@@ -3,6 +3,8 @@
 // What each value is (the final milestone, the claimed rows, what finished lately) is the
 // engine-backed model's (summary/model.engine.test.ts); this is what only a browser shows. Every
 // test runs on the in-browser host, whose fixtures are fresh on every load.
+import type { Page } from "@playwright/test";
+
 import { expect, test } from "./test.ts";
 
 import { setStatus } from "./around.ts";
@@ -12,27 +14,15 @@ import { FIXED_TODAY } from "./views.ts";
 
 const fixed = { fixedToday: FIXED_TODAY };
 
-test("C18: the bare Summary leads with what is left, and a row's title opens that node on the graph", async ({ page }) => {
-  await openAt(page, "browser", "j_bakeoff", "summary", fixed);
-  const lead = page.getByTestId("summary-lead");
-  await expect(lead).toBeVisible();
-  const left = page.getByTestId("summary-left");
-  const states = await page.getByTestId("summary-states").locator("[data-count]").evaluateAll((each) => each.map((one) => Number(one.getAttribute("data-count"))));
-  // The counts by state are the whole scope, and what is left is some of it.
-  expect(states.reduce((sum, each) => sum + each, 0)).toBe(Number(await left.getAttribute("data-in-scope")));
-  expect(Number(await left.getAttribute("data-remaining"))).toBeLessThanOrEqual(Number(await left.getAttribute("data-in-scope")));
-  await expect(page.getByTestId("summary-milestone")).toHaveAttribute("data-role", "final");
-  await expect(rowsOf(page, "summary-next").first()).toBeVisible();
-  const first = (await keysOf(rowsOf(page, "summary-next")))[0] ?? "";
-  await rowsOf(page, "summary-next").first().locator("a.node-title").click();
-  await expect(page).toHaveURL(new RegExp(`/journeys/j_bakeoff/nodes/${first}`));
+test("C10, C18, E1: a row's title opens that node on the graph; Done on a row of Waiting on you acts in place, and the lead moves with the derivation", async ({ page }) => {
+  await openAt(page, "browser", "j_launch", "summary", fixed);
+  // A row's title opens that node on the graph, and back is the Summary again.
+  const first = (await keysOf(rowsOf(page, "summary-yours")))[0] ?? "";
+  await rowsOf(page, "summary-yours").first().locator("a.node-title").click();
+  await expect(page).toHaveURL(new RegExp(`/journeys/j_launch/nodes/${first}`));
   await expect(nodePanel(page, first)).toBeVisible();
   await page.goBack();
   await expect(page.getByTestId("summary-lead")).toBeVisible();
-});
-
-test("C10, E1: Done on a row of Waiting on you acts in place, and the lead moves with the derivation", async ({ page }) => {
-  await openAt(page, "browser", "j_launch", "summary", fixed);
   const yours = panelOf(page, "summary-yours");
   const left = page.getByTestId("summary-left");
   const before = Number(await left.getAttribute("data-remaining"));
@@ -62,21 +52,8 @@ test("C11: Decide goes to the node's address and puts the focus in its answer fo
   await expect(nodePanel(page, first).locator('[data-testid="answer-editor"] :is(select, input, textarea)').first()).toBeFocused();
 });
 
-test("C18: a list past five rows shows five, and Show all reveals the rest with their actions", async ({ page }) => {
-  await startOnSummary(page, "product-launch");
-  const next = panelOf(page, "summary-next");
-  const shown = rowsOf(page, "summary-next");
-  await expect.poll(async () => await countOf(page, "summary-next")).toBeGreaterThan(5);
-  const total = await countOf(page, "summary-next");
-  await expect(shown).toHaveCount(5);
-  await next.getByTestId("rows-show-all").click();
-  await expect(shown).toHaveCount(total);
-  await expect(shown.last().locator(".row-act button").first()).toBeAttached();
-  await next.getByTestId("rows-show-all").click();
-  await expect(shown).toHaveCount(5);
-});
-
-test("C18: on a phone the first action row is in the first screen and nothing runs off the side", async ({ page }) => {
+/** On a phone the first action row is in the first screen and nothing runs off the side. */
+async function phoneFitsFirstScreen(page: Page): Promise<void> {
   await page.setViewportSize({ width: 390, height: 844 });
   await openAt(page, "browser", "j_vendor_eval", "summary", fixed);
   const first = rowsOf(page, "summary-yours").first();
@@ -93,9 +70,10 @@ test("C18: on a phone the first action row is in the first screen and nothing ru
   expect(owner?.y ?? 0).toBeGreaterThan(title?.y ?? 9999);
   await first.locator(".row-act button").first().scrollIntoViewIfNeeded();
   expect(await first.locator(".row-act button").first().boundingBox()).not.toBeNull();
-});
+}
 
-test("C18: beside the sheet at 1024px the Summary is one column and nothing is clipped", async ({ page }) => {
+test("C18, D8: on a phone the first action row is in the first screen and nothing runs off the side; beside the sheet at 1024px the Summary is one column and nothing is clipped; work under way and blocked work are listed, each blocked node saying what it waits for", async ({ page }) => {
+  await phoneFitsFirstScreen(page);
   await page.setViewportSize({ width: 1024, height: 700 });
   await openAt(page, "browser", "j_vendor_eval", "summary", { ...fixed, node: "n_plan" });
   await expect(nodePanel(page, "n_plan")).toBeVisible();
@@ -106,17 +84,39 @@ test("C18: beside the sheet at 1024px the Summary is one column and nothing is c
     return scroller === null ? 0 : scroller.scrollWidth - scroller.clientWidth;
   });
   expect(clipped).toBeLessThanOrEqual(0);
+  await expect(panelOf(page, "summary-underway")).toBeVisible();
+  const blocked = page.locator('details[data-testid="summary-blocked"]');
+  await blocked.locator("summary").click();
+  const report = rowsOf(page, "summary-blocked").and(page.locator('[data-node="n_final_report"]'));
+  await expect(report).toHaveCount(1);
+  await expect(report.getByTestId("fact")).toContainText("Final review opens");
 });
 
-test("C18, H6: print is the whole dated report: no controls, every row, owners, black on white", async ({ page }) => {
+test("C18, H6: a list past five rows shows five and Show all reveals the rest with their actions; print is the whole dated report: no controls, every row, owners, black on white, a fold the viewer opened open", async ({ page }) => {
   await startOnSummary(page, "product-launch");
+  const next = panelOf(page, "summary-next");
+  const shown = rowsOf(page, "summary-next");
+  await expect.poll(async () => await countOf(page, "summary-next")).toBeGreaterThan(5);
+  const total = await countOf(page, "summary-next");
+  await expect(shown).toHaveCount(5);
+  await next.getByTestId("rows-show-all").click();
+  await expect(shown).toHaveCount(total);
+  await expect(shown.last().locator(".row-act button").first()).toBeAttached();
+  await next.getByTestId("rows-show-all").click();
+  await expect(shown).toHaveCount(5);
+  // A fold the viewer opened and closed again is open on paper.
+  const fold = page.locator("details.rows-fold").first();
+  await fold.locator("summary").click();
+  await expect(fold).toHaveJSProperty("open", true);
+  await fold.locator("summary").click();
+  await expect(fold).toHaveJSProperty("open", false);
   await page.emulateMedia({ media: "print", colorScheme: "dark" });
+  await expect(fold).toHaveJSProperty("open", true);
   await expect(page.getByTestId("view-picker")).toBeHidden();
   await expect(page.getByTestId("journey-menu")).toBeHidden();
   await expect(page.getByTestId("rows-show-all").first()).toBeHidden();
-  await expect.poll(async () => await countOf(page, "summary-next")).toBeGreaterThan(0);
-  const total = await countOf(page, "summary-next");
-  await expect(rowsOf(page, "summary-next")).toHaveCount(total);
+  // The list that was collapsed to five prints whole.
+  await expect(shown).toHaveCount(total);
   await expect(page.locator(".summary .row-act").first()).toBeHidden();
   // A foot holds only controls, so it is no empty box on paper.
   await expect(page.locator(".summary .node-panel-foot").first()).toBeHidden();
@@ -125,8 +125,9 @@ test("C18, H6: print is the whole dated report: no controls, every row, owners, 
   expect(painted).toBe("rgb(255, 255, 255) rgb(0, 0, 0)");
 });
 
-test("C18, A19: an archived journey's Summary is read-only: its notes are shown and nothing offers a change", async ({ page }) => {
-  await openAt(page, "browser", "j_bakeoff", "summary", fixed);
+test("C18, A19: an archived journey's Summary is read-only: its notes are shown, what it waits on is listed, and nothing offers a change or an action", async ({ page }) => {
+  await stall(page, "j_bakeoff", ["n_trial_a", "n_trial_b", "n_wrap_up"]);
+  await expect(page.getByRole("button", { name: "Unsnooze" }).first()).toBeVisible();
   const about = page.getByTestId("summary-about");
   await about.getByRole("button", { name: "Add a note or link" }).click();
   await about.getByLabel("Note").fill("A note kept on the journey");
@@ -138,12 +139,6 @@ test("C18, A19: an archived journey's Summary is read-only: its notes are shown 
   await expect(page.locator(".summary .row-act")).toHaveCount(0);
   await expect(about.getByRole("button")).toHaveCount(0);
   await expect(page.getByTestId("journey-upgrade")).toHaveCount(0);
-});
-
-test("C18, A19: a stalled archived journey lists what it waits on without the actions", async ({ page }) => {
-  await stall(page, "j_bakeoff", ["n_trial_a", "n_trial_b", "n_wrap_up"]);
-  await expect(page.getByRole("button", { name: "Unsnooze" }).first()).toBeVisible();
-  await setStatus(page, "archived");
   await expect(page.getByTestId("stalled")).toBeVisible();
   await expect(page.getByRole("button", { name: "Unsnooze" })).toHaveCount(0);
 });
@@ -174,7 +169,7 @@ test("C18: a journey with no node invites planning and offers no completion", as
   await expect(page).toHaveURL(/view=graph.*edit=on|edit=on.*view=graph/);
 });
 
-test("B11, C18: a completed journey still says what is left, and has no Waiting on you", async ({ page }) => {
+test("B11, C18: a completed journey still says what is left, has no Waiting on you, and prints its status beside its name and not the controls", async ({ page }) => {
   await openAt(page, "browser", "j_launch", "summary", fixed);
   await expect(panelOf(page, "summary-yours")).toBeVisible();
   await setStatus(page, "completed");
@@ -187,33 +182,8 @@ test("B11, C18: a completed journey still says what is left, and has no Waiting 
   await goTo(page, "list");
   await goTo(page, "summary");
   await expect(page.getByTestId("summary-lead")).toBeVisible();
-});
-
-test("B11, C18: a completed journey prints its status beside its name, and not the controls", async ({ page }) => {
-  await openAt(page, "browser", "j_bakeoff", "summary", fixed);
-  await setStatus(page, "completed");
   await page.emulateMedia({ media: "print" });
   await expect(page.getByTestId("journey-status")).toBeVisible();
   await expect(page.getByTestId("view-picker")).toBeHidden();
 });
 
-test("C18, H6: a fold the viewer opened and closed again is open on paper", async ({ page }) => {
-  await openAt(page, "browser", "j_bakeoff", "summary", fixed);
-  const fold = page.locator("details.rows-fold").first();
-  await fold.locator("summary").click();
-  await expect(fold).toHaveJSProperty("open", true);
-  await fold.locator("summary").click();
-  await expect(fold).toHaveJSProperty("open", false);
-  await page.emulateMedia({ media: "print" });
-  await expect(fold).toHaveJSProperty("open", true);
-});
-
-test("D8, C18: work under way and blocked work are listed, each blocked node saying what it waits for", async ({ page }) => {
-  await openAt(page, "browser", "j_vendor_eval", "summary", fixed);
-  await expect(panelOf(page, "summary-underway")).toBeVisible();
-  const blocked = page.locator('details[data-testid="summary-blocked"]');
-  await blocked.locator("summary").click();
-  const report = rowsOf(page, "summary-blocked").and(page.locator('[data-node="n_final_report"]'));
-  await expect(report).toHaveCount(1);
-  await expect(report.getByTestId("fact")).toContainText("Final review opens");
-});

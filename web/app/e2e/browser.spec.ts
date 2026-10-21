@@ -6,31 +6,85 @@
 // The timed parts of the shell that only a mounted page shows are here too: the sync dot's
 // popover (peek, pin, the leave delay, Esc, a press outside, a resize), its OFFLINE state, and
 // the toast held by the pointer.
-import { expect, test } from "./test.ts";
+import type { BrowserContext, Page } from "@playwright/test";
 
-import { newRoute, routeName } from "./authoring.ts";
+import { checkpoint, expect, test } from "./test.ts";
+
 import { openRoute, routeMenuItem, savedText } from "./around.ts";
 import { TOAST_MS } from "../src/data/toasts.ts";
 import { SYNC_POPOVER_LEAVE_MS } from "../src/shell/sync-popover.ts";
 import { derivedRevision, expectAddress, fresh, goTo, goWithin, openJourney, recentSaves, rename, syncChip, visit } from "./shell.ts";
 
-// Every error event the window sees, including the browser's own reports (a ResizeObserver
-// loop) that never reach Playwright's pageerror.
-test("the in-browser host boots, derives in the worker, applies a patch, and survives a screen that cannot load", async ({ page }) => {
+const rail = (page: Page) => page.getByRole("navigation", { name: "Screens", exact: true });
+const current = (page: Page) => rail(page).locator("[aria-current=page]");
+
+/** Notes every error event the window sees (the browser's own reports, a ResizeObserver loop, never reach Playwright's pageerror) and every screen the shell paints, with the address it paints it at, from the first mutation on. */
+async function watchWindow(page: Page): Promise<void> {
   await page.addInitScript(() => {
     const seen: string[] = [];
     Object.assign(window, { seenErrors: seen });
     window.addEventListener("error", (event) => seen.push(event.message));
+    const painted: string[] = [];
+    Object.assign(window, { painted });
+    const note = () => {
+      const main = document.querySelector("main[data-screen]");
+      const entry = main === null ? null : `${main.getAttribute("data-screen") ?? ""} @ ${location.pathname}${location.search} # ${main.querySelector("h1")?.textContent ?? ""}`;
+      if (entry !== null && painted[painted.length - 1] !== entry) {
+        painted.push(entry);
+      }
+    };
+    new MutationObserver(note).observe(document, { subtree: true, childList: true, attributes: true });
   });
+}
+
+/** Opening `/` shows Home first and the page never moves after. */
+async function opensOnHome(page: Page): Promise<void> {
   await visit(page, "browser", "/");
   await expect(page.getByTestId("home")).toBeVisible();
-  expect(new URL(page.url()).pathname + new URL(page.url()).search).toBe("/");
+  await expect(page.getByTestId("home-journey").first()).toBeVisible();
+  await expect(current(page)).toHaveText(["Home"]);
+  // Once the host has settled (its sync state is shown), past the point where a data-driven redirect would have moved the page.
+  await expect(syncChip(page)).toHaveAttribute("data-state", "demo");
+  const painted = await page.evaluate(() => (window as unknown as { painted: string[] }).painted);
+  const address = new URL(page.url()).pathname + new URL(page.url()).search;
+  // Home's heading is in the first paint of the page, at the address it was opened at, and nothing after changes either.
+  expect(painted).toEqual([`${address} @ ${address} # Waiting on you`]);
+  expect(address).toBe("/");
+  await checkpoint(page);
+}
+
+/** A tab kept open across a deployment: a screen's file is gone, the frame stays, another screen opens. */
+async function survivesMissingScreen(page: Page): Promise<void> {
+  await page.route(/\/(src\/people|assets)\/Identities[.-]/, (route) => route.abort());
+  await rail(page).getByRole("link", { name: "Identities" }).click();
+  await expect(page.getByTestId("load-failure").getByRole("button", { name: "Reload" })).toBeVisible();
+  await expect(current(page)).toHaveText(["Identities"]);
+  await expect(syncChip(page)).toBeVisible();
+  await goWithin(page, "/");
+  await expect(page.getByTestId("load-failure")).toHaveCount(0);
+}
+
+/** The dot says OFFLINE while the browser is offline, and the state it had when the network is back. */
+async function saysOffline(page: Page, context: BrowserContext): Promise<void> {
+  const state = (await syncChip(page).getAttribute("data-state")) ?? "";
+  await context.setOffline(true);
+  await expect(syncChip(page)).toHaveAttribute("data-state", "offline");
+  await context.setOffline(false);
+  await expect(syncChip(page)).toHaveAttribute("data-state", state);
+  await checkpoint(page);
+}
+
+test("the in-browser host boots, derives in the worker, applies a patch, and survives a screen that cannot load; the rail marks the screen it is on, and the dot says OFFLINE", async ({ page, context }) => {
+  await watchWindow(page);
+  await opensOnHome(page);
   await visit(page, "browser", "/journeys");
+  await expect(current(page)).toHaveText(["Journeys"]);
 
   await expect(page.getByTestId("journey-row")).toHaveCount(4);
   await page.getByRole("link", { name: "Hire a platform engineer" }).click();
   await expect(page.getByTestId("journey-name")).toHaveText("Hire a platform engineer");
   await expectAddress(page, "/journeys/j_hiring");
+  await expect(current(page)).toHaveText(["Journeys"]);
   await expect(page.getByTestId("journey-frame")).toHaveAttribute("data-screen", "summary");
   expect(await derivedRevision(page)).toBe(6);
   await goTo(page, "graph");
@@ -45,67 +99,26 @@ test("the in-browser host boots, derives in the worker, applies a patch, and sur
   await page.evaluate(() => new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve))));
   expect(await page.evaluate(() => (window as unknown as { seenErrors: string[] }).seenErrors)).toEqual([]);
 
-  // A tab kept open across a deployment: a screen's file is gone, the frame stays, another screen opens.
-  await page.route(/\/(src\/people|assets)\/Identities[.-]/, (route) => route.abort());
-  await page.getByRole("navigation", { name: "Screens", exact: true }).getByRole("link", { name: "Identities" }).click();
-  await expect(page.getByTestId("load-failure").getByRole("button", { name: "Reload" })).toBeVisible();
-  await expect(syncChip(page)).toBeVisible();
-  await goWithin(page, "/");
-  await expect(page.getByTestId("load-failure")).toHaveCount(0);
-});
-
-test("opening `/` shows Home first and the page never moves after", async ({ page }) => {
-  // Every screen the shell paints, and the address it paints it at, from the first mutation on.
-  await page.addInitScript(() => {
-    const painted: string[] = [];
-    Object.assign(window, { painted });
-    const note = () => {
-      const main = document.querySelector("main[data-screen]");
-      const entry = main === null ? null : `${main.getAttribute("data-screen") ?? ""} @ ${location.pathname}${location.search} # ${main.querySelector("h1")?.textContent ?? ""}`;
-      if (entry !== null && painted[painted.length - 1] !== entry) {
-        painted.push(entry);
-      }
-    };
-    new MutationObserver(note).observe(document, { subtree: true, childList: true, attributes: true });
-  });
-  await visit(page, "browser", "/");
-  await expect(page.getByTestId("home")).toBeVisible();
-  await expect(page.getByTestId("home-journey").first()).toBeVisible();
-  // Once the host has settled (its sync state is shown), past the point where a data-driven redirect would have moved the page.
-  await expect(syncChip(page)).toHaveAttribute("data-state", "demo");
-  const painted = await page.evaluate(() => (window as unknown as { painted: string[] }).painted);
-  const address = new URL(page.url()).pathname + new URL(page.url()).search;
-  // Home's heading is in the first paint of the page, at the address it was opened at, and nothing after changes either.
-  expect(painted).toEqual([`${address} @ ${address} # Waiting on you`]);
-  expect(address).toBe("/");
-});
-
-test("the rail marks Home at `/` only, Journeys on the index and Routes on theirs", async ({ page }) => {
-  await visit(page, "browser", "/");
-  const rail = page.getByRole("navigation", { name: "Screens", exact: true });
-  const current = rail.locator("[aria-current=page]");
-  await expect(current).toHaveText(["Home"]);
-  await rail.getByRole("link", { name: "Routes" }).click();
-  await expect(current).toHaveText(["Routes"]);
+  await rail(page).getByRole("link", { name: "Routes" }).click();
+  await expect(current(page)).toHaveText(["Routes"]);
   expect(new URL(page.url()).pathname).toBe("/routes");
-  await rail.getByRole("link", { name: "Journeys" }).click();
-  await expect(page.getByTestId("journey-row").first()).toBeVisible();
-  await expect(current).toHaveText(["Journeys"]);
-  expect(new URL(page.url()).pathname).toBe("/journeys");
-  await page.goto(`${new URL(page.url()).origin}/journeys?status=any`);
-  await expect(page.getByTestId("journey-row").first()).toBeVisible();
-  await expect(current).toHaveText(["Journeys"]);
+  await checkpoint(page);
+  await survivesMissingScreen(page);
+  await saysOffline(page, context);
 });
 
-test("the sync dot shows its popover on hover and focus, inside the window, and a click pins it", async ({ page }) => {
+test("the sync dot shows its popover on hover and focus, inside the window; it outlasts the pointer crossing the gap into it, and a pinned one closes on Esc (focus back on the dot), a press outside or a resize", async ({ page }) => {
+  // The page's timers are the test's to run (the leave delay is a timer), so a slow machine cannot stretch the beat between two moves.
+  await page.clock.install();
   await visit(page, "browser", "/");
   const chip = syncChip(page);
   const popover = page.getByTestId("sync-popover");
   await chip.hover();
   await expect(popover).toBeVisible();
-  const box = await popover.boundingBox();
-  const size = page.viewportSize();
-  expect(box !== null && size !== null && box.x >= 0 && box.x + box.width <= size.width).toBe(true);
+  // Inside the window, and shown again from the keyboard's focus.
+  const inside = await popover.boundingBox();
+  const viewport = page.viewportSize();
+  expect(inside !== null && viewport !== null && inside.x >= 0 && inside.x + inside.width <= viewport.width).toBe(true);
   await page.keyboard.press("Escape");
   await expect(popover).toHaveCount(0);
   await page.mouse.move(700, 500);
@@ -113,20 +126,9 @@ test("the sync dot shows its popover on hover and focus, inside the window, and 
   await page.keyboard.press("Shift+Tab");
   await page.keyboard.press("Tab");
   await expect(popover).toBeVisible();
+  await checkpoint(page);
   await page.keyboard.press("Escape");
   await expect(popover).toHaveCount(0);
-  await chip.click();
-  await page.mouse.move(700, 500);
-  await expect(popover).toBeVisible();
-  await expect(chip).toHaveAttribute("aria-expanded", "true");
-});
-
-test("the sync dot's popover outlasts the pointer crossing the gap into it, and a pinned one closes on Esc (focus back on the dot), a press outside or a resize", async ({ page }) => {
-  // The page's timers are the test's to run (the leave delay is a timer), so a slow machine cannot stretch the beat between two moves.
-  await page.clock.install();
-  await visit(page, "browser", "/");
-  const chip = syncChip(page);
-  const popover = page.getByTestId("sync-popover");
   await chip.hover();
   await expect(popover).toBeVisible();
   // Once it has settled (it rises in), where it is.
@@ -164,19 +166,8 @@ test("the sync dot's popover outlasts the pointer crossing the gap into it, and 
   await expect(popover).toHaveCount(0);
 });
 
-test("the sync dot says OFFLINE while the browser is offline, and the state it had when the network is back", async ({ page, context }) => {
-  await visit(page, "browser", "/");
-  const chip = syncChip(page);
-  await expect(chip).toHaveAttribute("data-state", "demo");
-  await context.setOffline(true);
-  await expect(chip).toHaveAttribute("data-state", "offline");
-  await context.setOffline(false);
-  await expect(chip).toHaveAttribute("data-state", "demo");
-});
-
 test("a toast stays while the pointer is on it, the next one replaces it, and it goes after the pointer leaves", async ({ page }) => {
-  const route = await newRoute(page, "browser", routeName("Toasting"));
-  await openRoute(page, "browser", route);
+  await openRoute(page, "browser", "hiring-loop");
   // The toast's time is a timer the test runs, so a slow machine cannot let it lapse before the pointer is on it.
   await page.clock.install();
   await page.clock.pauseAt(new Date(Date.now() + 60_000));
@@ -194,10 +185,14 @@ test("a toast stays while the pointer is on it, the next one replaces it, and it
   const first = await toast.elementHandle();
   await page.getByTestId("route-menu").focus();
   await page.keyboard.press("Enter");
+  await page.getByTestId("menu-export").focus();
   await savedText(page, () => page.keyboard.press("Enter"));
   await expect.poll(() => first.evaluate((element) => element.isConnected)).toBe(false);
   await expect(toast).toHaveCount(1);
   await pointerOn(true);
+  // A new element under a still pointer is entered at the browser's next pointer move, which a loaded machine may take late: move within the toast, so its enter has come before the pointer leaves.
+  const box = (await toast.boundingBox()) ?? { x: 0, y: 0, width: 0, height: 0 };
+  await page.mouse.move(box.x + box.width / 2 + 2, box.y + box.height / 2 + 2);
   await page.clock.runFor(TOAST_MS.confirm + 1000);
   await expect(toast).toBeVisible();
   // Once the pointer has left, the toast goes after its full time.

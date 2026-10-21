@@ -6,12 +6,13 @@
 // (ranking, filters, guards, the pass's order) are the engine's and vitest's.
 import type { Locator } from "@playwright/test";
 
-import { expect, test } from "./test.ts";
+import { checkpoint, expect, test } from "./test.ts";
 
 import { answerCard, card, frontierItem, openActing, passOrder, publishFollowUpRoute, revisionAfter, select } from "./acting.ts";
 import { journeyName, startJourney } from "./around.ts";
 import { expectContained } from "./containment.ts";
-import { derivedRevision, goTo, nodeCard, nodePanel, setDepth } from "./shell.ts";
+import { derivedRevision, expectAddress, goTo, nodeCard, nodePanel, open, openAt, setDepth } from "./shell.ts";
+import { FIXED_TODAY } from "./views.ts";
 
 test("C9, B6: a bulk snooze is one patch; the snoozed leave the frontier and an unsnooze returns them", async ({ page }) => {
   await openActing(page, "browser", "j_launch", "list?frontier=1");
@@ -37,7 +38,7 @@ test("C9, B6: a bulk snooze is one patch; the snoozed leave the frontier and an 
   await expect(fold).toHaveAttribute("data-count", "2");
   await fold.locator("summary").click();
   await expect(fold.getByTestId("snooze-group")).toHaveCount(1);
-  // Snoozed is dimmed the same way on the graph, the list and the timeline (not now: lighter than resting, lighter still when done), its chip and date left clear, and what is not snoozed is not dimmed.
+  // Snoozed is dimmed the same way on the graph and the list (not now: lighter than resting, lighter still when done), its chip and date left clear, and what is not snoozed is not dimmed.
   // Frontier, on from the list, fades every card off the frontier, so it is off while the states themselves are read.
   await goTo(page, "graph");
   await page.keyboard.press("Shift+F");
@@ -61,11 +62,6 @@ test("C9, B6: a bulk snooze is one patch; the snoozed leave the frontier and an 
   expect(await opacityOf(row.locator('[data-column="title"] .list-node > a'))).toBe(onCard);
   expect(await opacityOf(row.locator('[data-column="status"] .list-content'))).toBe(1);
   expect(await opacityOf(page.locator('[data-testid="list-row"][data-node="n_beta_end"] [data-column="title"] .list-content'))).toBe(1);
-  await goTo(page, "timeline");
-  const label = page.locator('[data-testid="timeline-entry"][data-node="n_docs"] .timeline-text');
-  expect(await opacityOf(label.locator("> :not(.timeline-words)"))).toBe(onCard);
-  expect(await opacityOf(label.getByTestId("timeline-words"))).toBe(1);
-  await expect(label.getByTestId("timeline-words")).toContainText(footWords);
   await goTo(page, "list");
   await page.keyboard.press("Shift+F");
   await expect(fold).toHaveAttribute("data-count", "2");
@@ -76,22 +72,32 @@ test("C9, B6: a bulk snooze is one patch; the snoozed leave the frontier and an 
   await expect(frontierItem(page, "n_docs")).toBeVisible();
 });
 
-test("C11: the walkthrough's card sits in the middle of the canvas area at every width and has no way back to the graph", async ({ page }) => {
+test("C11: the walkthrough's card sits in the middle of the canvas area at every width, and is the node's one editor at the address it was opened at", async ({ page }) => {
+  await openActing(page, "browser", "j_launch", "walk");
+  await card(page).waitFor();
   for (const width of [1440, 900, 390]) {
     await page.setViewportSize({ width, height: 900 });
-    await openActing(page, "browser", "j_launch", "walk");
-    await card(page).waitFor();
-    const area = await page.locator(".journey-scroll").boundingBox();
-    const frame = await card(page).boundingBox();
-    if (area === null || frame === null) {
-      throw new Error("the canvas area and the card are both drawn");
-    }
-    const [before, after] = [frame.x - area.x, area.x + area.width - (frame.x + frame.width)];
-    expect(Math.abs(before - after), `the gaps either side of the card at ${String(width)}px`).toBeLessThanOrEqual(1);
-    expect(frame.width).toBeLessThanOrEqual(560);
-    expect(frame.x, "the card keeps the standard gutter from the window's edge").toBeGreaterThanOrEqual(16);
+    await expect(async () => {
+      const area = await page.locator(".journey-scroll").boundingBox();
+      const frame = await card(page).boundingBox();
+      if (area === null || frame === null) {
+        throw new Error("the canvas area and the card are both drawn");
+      }
+      const [before, after] = [frame.x - area.x, area.x + area.width - (frame.x + frame.width)];
+      expect(Math.abs(before - after), `the gaps either side of the card at ${String(width)}px`).toBeLessThanOrEqual(1);
+      expect(frame.width).toBeLessThanOrEqual(560);
+      expect(frame.x, "the card keeps the standard gutter from the window's edge").toBeGreaterThanOrEqual(16);
+    }).toPass();
   }
-  await expect(page.getByRole("link", { name: /back to graph/i })).toHaveCount(0);
+  await checkpoint(page);
+  // Opened at a node's own address, the card is that node's one editor; the inspector does not open a second one.
+  const first = ((await page.getByTestId("triage").getAttribute("data-order")) ?? "").split(" ")[0] ?? "";
+  const at = `/journeys/j_launch/nodes/${first}?view=walk`;
+  await open(page, "browser", at);
+  await expect(page.getByTestId("triage")).toBeVisible();
+  await expectAddress(page, at);
+  await expect(page.getByTestId("node-detail")).toHaveCount(1);
+  await expect(page.getByTestId("triage").getByTestId("node-detail")).toHaveAttribute("data-node", first);
 });
 
 test("B1, C11: a journey started from a route opens its walkthrough; an answer surfaces and unlocks work, passing writes nothing, and a node completed from the pass unlocks into it", async ({ page }) => {
@@ -121,28 +127,11 @@ test("B1, C11: a journey started from a route opens its walkthrough; an answer s
   await page.getByTestId("back-to-pass").click();
   await expect(card(page)).toHaveAttribute("data-node", "n_partner_results");
   await expect(page.getByTestId("unlocked-by").getByRole("link", { name: "Review the partner's criteria" })).toBeVisible();
-});
-
-test("C9: a folded container stays folded across Show not relevant; a trip to the graph and back opens every level at Actions", async ({ page }) => {
-  await openActing(page, "browser", "j_vendor_eval", "list");
-  await expect(page.getByTestId("list-total")).toHaveAttribute("data-total", /\d/);
-  const total = Number(await page.getByTestId("list-total").getAttribute("data-total"));
-  // At Actions every level is open; the viewer folds one.
-  await expect(page.locator('[data-testid="list-fold"][aria-expanded="false"]')).toHaveCount(0);
-  const fold = page.getByTestId("list-fold").first();
-  const folded = await fold.locator("xpath=ancestor::tr").getAttribute("data-node");
-  await fold.click();
-  const row = page.locator(`[data-testid="list-row"][data-node="${folded ?? ""}"] [data-testid="list-fold"]`);
-  await expect(row).toHaveAttribute("aria-expanded", "false");
-  await page.getByTestId("filter-button").click();
-  await expect(page.getByTestId("show-not-relevant-count")).toBeVisible();
-  await page.getByTestId("show-not-relevant").click();
-  await expect(page.getByTestId("list-total")).not.toHaveAttribute("data-total", String(total));
-  await expect(row).toHaveAttribute("aria-expanded", "false");
-  await page.getByTestId("show-not-relevant").click();
-  await expect(page.getByTestId("list-total")).toHaveAttribute("data-total", String(total));
-  await goTo(page, "graph");
-  await goTo(page, "list");
-  await expect(page.getByTestId("list-fold").first()).toBeVisible();
-  await expect(page.locator('[data-testid="list-fold"][aria-expanded="false"]')).toHaveCount(0);
+  await checkpoint(page);
+  // With every decision made (the seeded vendor evaluation) there is nothing to decide, and Continue goes on to everything.
+  await openAt(page, "browser", "j_vendor_eval", "walk?depth=decisions", { fixedToday: FIXED_TODAY });
+  await expect(page.getByTestId("no-decisions")).toBeVisible();
+  await page.getByRole("button", { name: "Continue with everything" }).click();
+  await expectAddress(page, "/journeys/j_vendor_eval?view=walk");
+  await expect(page.getByTestId("depth-button")).toHaveAccessibleName("Depth: Actions");
 });

@@ -2,8 +2,10 @@
 # The two servers the app's browser tests run against (web/app/playwright.config.ts), started
 # side by side where Playwright would start its webServer entries one after another: `cairn
 # demo` (the server host: the binary over the fixtures in memory, serving its web
-# build and the API on one port) and the app's Vite dev server on the in-browser host. Each
-# one's wait (the cargo no-op, Vite's start) overlaps the other's. Prints READY once both
+# build and the API on one port) and the static demo site on the in-browser host (the app built
+# with no server, `mise run build:web demo`, served by `vite preview`: the shipped bundle, not
+# the dev server's unbundled modules and development React). Each one's wait (the cargo no-op,
+# the demo build) overlaps the other's. Prints READY once both
 # answer, which is what Playwright waits for, and exits non-zero when either stops. The ports
 # are the config's, passed in the environment: CAIRN_SERVER_PORT and CAIRN_DEMO_PORT. With
 # CAIRN_E2E_BINARY=0 the binary is left out (`mise run check:fast` does so for a spec with no
@@ -32,8 +34,12 @@ if [ "${CAIRN_E2E_BINARY:-1}" != 0 ]; then
   pids+=($!)
   urls+=("http://127.0.0.1:$CAIRN_SERVER_PORT/api/capabilities")
 fi
-# The in-browser host's server must not see a CAIRN_SERVER from the caller: it would proxy.
-(cd web/app && exec env -u CAIRN_SERVER CAIRN_APP_PORT="$CAIRN_DEMO_PORT" node "$vite" --config vite.config.ts >/dev/null) &
+# The demo site is built once, here, for every caller (the ladder's browser step, `mise run
+# check:fast`, a bare `playwright test`, `mise run proof`); its module build was made before. The
+# preview takes the port on its command line: vite.config.ts sets one under `server` only. It
+# must not see a CAIRN_SERVER from the caller.
+mise-tasks/build/web demo >/dev/null
+(cd web/app && exec env -u CAIRN_SERVER node "$vite" preview --config vite.config.ts --mode demo --outDir dist/demo --host 127.0.0.1 --port "$CAIRN_DEMO_PORT" --strictPort >/dev/null) &
 pids+=($!)
 
 # Whether every server is still running. Only what macOS's Bash 3.2 has (no `wait -n`), since

@@ -39,7 +39,7 @@ async function hold(page: Page, path: string): Promise<{ release: () => Promise<
 const referencesOf = (key: string) => `/api/deployment/identities/${key}/references`;
 const ANA = "who_k3d7qm2xw5tn6pfa";
 
-test("E6: a references read still out for one identity never speaks for the next, and Delete stays off until the next one answers", { tag: "@server" }, async ({ page }) => {
+test("E6: a references read still out for one identity never speaks for the next, and one out while the selection grows keeps Delete off until the whole set has answered", { tag: ["@server", "@serial"] }, async ({ page }) => {
   await open(page, "server", "/identities");
   const spare = await addIdentity(page, fresh("Spare"));
   await expect(page.getByTestId("delete-identities")).toHaveAttribute("data-deletion", "allowed");
@@ -63,31 +63,26 @@ test("E6: a references read still out for one identity never speaks for the next
   await expect(deletion).toHaveAttribute("data-deletion", "referenced");
   await expect(page.getByTestId("identity-references")).toBeVisible();
   await expect(deletion.getByRole("button", { name: "Delete", exact: true })).toBeDisabled();
-});
-
-test("E6: adding to the selection while the references are out keeps Delete off until the whole set has answered", { tag: "@server" }, async ({ page }) => {
-  await open(page, "server", "/identities");
-  const spare = await addIdentity(page, fresh("Spare"));
+  // The selection grows while the first read is out: its late answer says nothing about the pair.
   await page.goto("/identities");
-  const slowSpare = await hold(page, referencesOf(spare));
-  const slowAna = await hold(page, referencesOf(ANA));
+  const lateSpare = await hold(page, referencesOf(spare));
+  const lateAna = await hold(page, referencesOf(ANA));
   await identityRow(page, spare).getByTestId("identity-name").click();
-  await expect.poll(slowSpare.held).toBeGreaterThan(0);
+  await expect.poll(lateSpare.held).toBeGreaterThan(0);
   await identityRow(page, ANA).getByRole("checkbox").check();
   await expect(page.getByTestId("selection-panel")).toBeVisible();
   await openSheet(page);
-  await expect.poll(slowAna.held).toBeGreaterThan(0);
+  await expect.poll(lateAna.held).toBeGreaterThan(0);
   // The first read, of the spare one alone, answers late: it says nothing about the pair.
-  await slowSpare.release();
-  const deletion = page.getByTestId("delete-identities");
+  await lateSpare.release();
   await expect(deletion).toHaveAttribute("data-deletion", "checking");
   await expect(deletion.getByRole("button", { name: /^Delete 2$/ })).toBeDisabled();
-  await slowAna.release();
+  await lateAna.release();
   await expect(deletion).toHaveAttribute("data-deletion", "referenced");
   await expect(deletion.getByRole("button", { name: /^Delete 2$/ })).toBeDisabled();
 });
 
-test("E6: a merge whose reply comes after the deployment has moved settles on the server's state: the survivor open alone, the count down by one", { tag: "@server" }, async ({ page }) => {
+test("E6: a merge whose reply comes after the deployment has moved settles on the server's state: the survivor open alone, the count down by one", { tag: ["@server", "@serial"] }, async ({ page }) => {
   await open(page, "server", "/identities");
   const first = await addIdentity(page, fresh("Early"));
   const second = await addIdentity(page, fresh("Late"));

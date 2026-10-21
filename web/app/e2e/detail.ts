@@ -22,7 +22,10 @@ export async function section(panel: Locator, testId: string): Promise<Locator> 
 /** Sets node's pin to `date` from the dates section, without waiting for the outcome. */
 export async function pin(panel: Locator, date: string): Promise<void> {
   const editor = (await section(panel, "dates")).getByTestId("pin");
-  await editor.getByRole("button", { name: /^(Pin a date|Change the pin)$/ }).click();
+  // The form may be open already (a draft kept across a reload).
+  if ((await editor.getByTestId("pin-form").count()) === 0) {
+    await editor.getByRole("button", { name: /^(Pin a date|Change the pin)$/ }).click();
+  }
   await editor.getByLabel("Pin date").fill(date);
   await editor.getByTestId("pin-form").getByRole("button", { name: "Save" }).click();
 }

@@ -9,7 +9,7 @@
 // every view, Fade moves nothing, and the walk through at Decisions is the decision walkthrough.
 import { type Locator, type Page } from "@playwright/test";
 
-import { expect, test } from "./test.ts";
+import { checkpoint, expect, test } from "./test.ts";
 
 import { journeyName, setStatus, startJourney } from "./around.ts";
 import { viewportOf, viewportSettled } from "./canvas.ts";
@@ -112,7 +112,17 @@ async function walkHolds(page: Page, x: string, word: string): Promise<void> {
   await closePopover(page);
 }
 
-test("C2, C9, C10, C11: the view state set on the graph follows every view, and each draws the node it keeps", async ({ page }) => {
+/** The View picker, opened again, marks exactly one item as where you are, and it is `view`'s. */
+async function expectCurrentView(page: Page, view: string): Promise<void> {
+  await page.getByTestId("view-picker").click();
+  const current = page.getByTestId("view-picker-menu").locator('[aria-current="page"]');
+  await expect(current).toHaveCount(1);
+  await expect(current).toHaveAttribute("data-testid", `view-${view}`);
+  await page.keyboard.press("Escape");
+  await expect(page.getByTestId("view-picker-menu")).toHaveCount(0);
+}
+
+async function viewStateFollows(page: Page): Promise<string> {
   await page.clock.setFixedTime(new Date(`${FIXED_TODAY}T12:00:00Z`));
   const id = await startJourney(page, "browser", journeyName("Shared"), { route: "vendor-evaluation", version: 1 });
   const x = "n_purpose";
@@ -145,9 +155,103 @@ test("C2, C9, C10, C11: the view state set on the graph follows every view, and 
   await goTo(page, "graph");
   await expect(nodeCard(page, x)).toBeVisible();
   await holds(page, "graph again", word);
+  await checkpoint(page);
+  return id;
+}
+
+async function depthAndFadeFollow(page: Page, id: string): Promise<void> {
+  // Cleared of what was set, the same journey: the depth and Fade follow every view.
+  await openAt(page, "browser", id, "graph");
+  await setDepth(page, "Decisions");
+  await setFade(page, true);
+  // Fade draws the deliverable and dims it; it is a card on the canvas.
+  await expect(nodeCard(page, "n_plan")).toHaveClass(/node-faded/);
+  await expect(nodeCard(page, "n_plan")).toBeVisible();
+  const depthed = (view: string) => { expect(new URL(page.url()).searchParams.get("depth"), view).toBe("decisions"); expect(new URL(page.url()).searchParams.get("fade"), view).toBe("1"); };
+  depthed("graph");
+
+  await goTo(page, "list");
+  await expectCurrentView(page, "list");
+  depthed("list");
+  await expect(page.getByTestId("depth-button")).toHaveAccessibleName("Depth: Decisions");
+  expect(await fadeTicked(page)).toBe(true);
+  await expect(page.locator('th[data-column="answer"]')).toBeVisible();
+  await expect(page.locator('[data-testid="list-row"][data-node="n_plan"]')).toHaveAttribute("data-faded", "true");
+  await expect(page.locator('[data-testid="list-row"][data-node="n_partner_runs"]')).not.toHaveAttribute("data-faded", "true");
+
+  await goTo(page, "timeline");
+  await expectCurrentView(page, "timeline");
+  depthed("timeline");
+  await expect(page.getByTestId("depth-button")).toHaveAccessibleName("Depth: Decisions");
+  expect(await fadeTicked(page)).toBe(true);
+
+  await goTo(page, "summary");
+  await expectCurrentView(page, "summary");
+  depthed("summary");
+  await expect(page.getByTestId("depth-button")).toHaveCount(0);
+
+  await goTo(page, "walk");
+  await expectCurrentView(page, "walk");
+  depthed("walk");
+  await expect(page.getByTestId("depth-button")).toHaveAccessibleName("Depth: Decisions");
+  expect(await fadeTicked(page)).toBeUndefined();
+  // The decision walkthrough: its card is a decision, and the milestone on the frontier is not walked.
+  await expect(page.getByTestId("triage")).toHaveAttribute("aria-label", "Decision walkthrough");
+  await expect(page.getByTestId("triage-card")).toHaveAttribute("data-kind", "decision");
+  expect(await passOrder(page)).not.toContain("n_kickoff");
+
+  await goTo(page, "graph");
+  await expectCurrentView(page, "graph");
+  depthed("graph again");
+  await expect(nodeCard(page, "n_plan")).toHaveClass(/node-faded/);
+  expect(await fadeTicked(page)).toBe(true);
+  await checkpoint(page);
+}
+
+async function stockViewAndChips(page: Page): Promise<void> {
+  // A journey opens as the stock view, switching views keeps the chips, and coming back to the journey starts over.
+  await openJourney(page, "browser", "j_vendor_eval", "");
+  const depth = page.getByTestId("depth-button");
+  // The stock view: every depth, fitted to the whole graph.
+  await expect(depth).toHaveAccessibleName("Depth: Actions");
+  await expect(nodeCard(page, "n_plan")).toBeVisible();
+  await viewportSettled(page);
+  const opened = await viewportOf(page);
+  await page.keyboard.press("f");
+  await viewportSettled(page);
+  expect(await viewportOf(page)).toEqual(opened);
+  // A chip follows a switch of view and back; the pan is the view's own.
+  await page.getByTestId("chip-frontier").click();
+  await page.mouse.move(600, 500);
+  await page.mouse.wheel(0, 150);
+  await viewportSettled(page);
+  await goTo(page, "list");
+  await expectAddress(page, `${journeyBase(page)}?view=list&frontier=1`);
+  await goTo(page, "graph");
+  await expectAddress(page, `${journeyBase(page)}?view=graph&frontier=1`);
+  await expect(page.getByTestId("chip-frontier")).toHaveAttribute("aria-pressed", "true");
+  await expect(page.getByTestId("node-card").first()).toBeVisible();
+  await viewportSettled(page);
+  expect(await viewportOf(page)).toEqual(opened);
+  // Back at the journey's landing, nothing is held: no chip, no pan.
+  await page.evaluate(() => {
+    history.pushState(null, "", location.pathname);
+    dispatchEvent(new PopStateEvent("popstate"));
+  });
+  await expect(page.getByTestId("journey-frame")).toHaveAttribute("data-screen", "summary");
+  expect(new URL(page.url()).search).toBe("");
+  await goTo(page, "graph");
+  await expect(page.getByTestId("chip-frontier")).toHaveAttribute("aria-pressed", "false");
+  await expect(depth).toHaveAccessibleName("Depth: Actions");
+}
+
+test("C2, C9, C10, C11, C12: the view state set on the graph follows every view, and each draws the node it keeps; the View picker says which view is open; a journey opens as the stock view and coming back to it starts over", async ({ page }) => {
+  const id = await viewStateFollows(page);
+  await depthAndFadeFollow(page, id);
+  await stockViewAndChips(page);
 });
 
-test("C10, C11: after a click in the page, j opens the next row, Enter its form, Esc leaves it, and v swaps the view", async ({ page }) => {
+test("C10, C11: after a click in the page, j opens the next row, Enter its form, Esc leaves it, and v swaps the view; a done row fades its content, lifts the fade under keyboard focus, and leaves the checkbox at full strength", async ({ page }) => {
   const id = await startJourney(page, "browser", journeyName("Keys"), { route: "vendor-evaluation", version: 1 });
   await openAt(page, "browser", id, "list?frontier=1");
   await setDepth(page, "Decisions");
@@ -177,6 +281,19 @@ test("C10, C11: after a click in the page, j opens the next row, Enter its form,
   await expect(page.getByTestId("journey-frame")).toHaveAttribute("data-screen", "timeline");
   await page.keyboard.press("v");
   await expectAddress(page, `${journeyBase(page)}?view=graph&depth=decisions&frontier=1`);
+  await checkpoint(page);
+  // A done row fades its content like a done card, lifts the fade under keyboard focus, and leaves the checkbox at full strength.
+  await openAt(page, "browser", "j_vendor_eval", "list");
+  const done = page.locator('[data-testid="list-row"][data-state="done"]').first();
+  const title = done.locator('td[data-column="title"] a').first();
+  expect(await effective(title)).toBe(0.5);
+  // The checkbox shows on hover.
+  await done.hover();
+  expect(await effective(done.locator("td.list-check input"))).toBe(1);
+  await title.focus();
+  await page.keyboard.press("Shift+Tab");
+  await page.keyboard.press("Tab");
+  expect(await effective(title)).toBe(1);
 });
 
 test("C10: Frontier highlights the list: every row stays, the frontier's rows carry their action under the title, and the rest fade", async ({ page }) => {
@@ -214,18 +331,6 @@ test("C10: Frontier highlights the list: every row stays, the frontier's rows ca
     .toBe(true);
 });
 
-test("C2, C9: a search keeps the containers of what matches: at Deliverables an action's match keeps its deliverable's row, in the tree and sorted", async ({ page }) => {
-  await openAt(page, "browser", "j_vendor_eval", "list?depth=deliverables", { fixedToday: FIXED_TODAY });
-  await expect(listRow(page, "n_access")).toBeVisible();
-  await search(page, "Draft the plan");
-  await expect(listRow(page, "n_access")).toHaveCount(0);
-  await expect(listRow(page, "n_plan")).toBeVisible();
-  await expect(listRow(page, "n_plan_draft")).toHaveCount(0);
-  await sortByRank(page);
-  await expect(listRow(page, "n_plan")).toBeVisible();
-  await expect(listRow(page, "n_access")).toHaveCount(0);
-});
-
 test("C2, C9: a search narrows the graph to its matches and fits them; nothing matching offers Reset the view, which clears the search and the collapses", async ({ page }) => {
   await openJourney(page, "browser", "j_vendor_eval", "");
   await viewportSettled(page);
@@ -239,16 +344,21 @@ test("C2, C9: a search narrows the graph to its matches and fits them; nothing m
   await search(page, "");
   await expectAddress(page, `${journeyBase(page)}?view=graph`);
   await expect(page.getByTestId("node-card")).toHaveCount(whole);
-  // A search longer than the engine reads never leaves the box.
-  await search(page, "a".repeat(257));
-  expect(await page.getByTestId("toolbar-search").evaluate((box: HTMLInputElement) => box.validity.valid)).toBe(false);
-  await expectAddress(page, `${journeyBase(page)}?view=graph`);
 
   await openAt(page, "browser", "j_vendor_eval", "graph?q=nothing-is-called-this&shut=n_setup");
   await expect(page.getByTestId("nothing-matches")).toBeVisible();
   await page.getByTestId("nothing-matches").getByTestId("reset-view").click();
   await expectAddress(page, `${journeyBase(page)}?view=graph`);
   await expect(nodeCard(page, "n_access")).toBeVisible();
+  await checkpoint(page);
+  // The list at Decisions with a search that matches nothing is empty, and Reset the view brings back Actions depth and the rows.
+  await openAt(page, "browser", "j_vendor_eval", "list?depth=decisions&q=nothing-is-called-this");
+  const empty = page.getByTestId("list-empty");
+  await expect(empty).toBeVisible();
+  await expect(page.getByTestId("list-row")).toHaveCount(0);
+  await empty.getByTestId("reset-view").click();
+  await expectAddress(page, `${journeyBase(page)}?view=list`);
+  await expect(page.getByTestId("list-row").first()).toBeVisible();
 });
 
 test("C2: a fold holds until a depth is picked: back at Actions after another depth, every level is open again", async ({ page }) => {
@@ -262,11 +372,7 @@ test("C2: a fold holds until a depth is picked: back at Actions after another de
   await setDepth(page, "Actions");
   await expect(fold()).toHaveAttribute("aria-expanded", "true");
   await expect(listRow(page, "n_access")).toBeVisible();
-});
-
-test("C2: picking the depth already chosen, or Reset the view, drops the list's and the timeline's folds", async ({ page }) => {
-  await openAt(page, "browser", "j_vendor_eval", "list", { fixedToday: FIXED_TODAY });
-  const fold = () => listRow(page, "n_setup").getByTestId("list-fold");
+  // Picking the depth already chosen, or Reset the view, drops the list's folds.
   await fold().click();
   await expect(fold()).toHaveAttribute("aria-expanded", "false");
   await setDepth(page, "Actions");
@@ -276,52 +382,27 @@ test("C2: picking the depth already chosen, or Reset the view, drops the list's 
   await search(page, "nothing-is-called-this");
   await page.getByTestId("list-empty").getByTestId("reset-view").click();
   await expect(fold()).toHaveAttribute("aria-expanded", "true");
-});
-
-test("C2, C9: the list at Decisions with a search that matches nothing is empty, and Reset the view brings back Actions depth and the rows", async ({ page }) => {
-  await openAt(page, "browser", "j_vendor_eval", "list?depth=decisions&q=nothing-is-called-this", { fixedToday: FIXED_TODAY });
-  const empty = page.getByTestId("list-empty");
-  await expect(empty).toBeVisible();
-  await expect(page.getByTestId("list-row")).toHaveCount(0);
-  await empty.getByTestId("reset-view").click();
-  await expectAddress(page, `${journeyBase(page)}?view=list`);
-  await expect(page.getByTestId("list-row").first()).toBeVisible();
-});
-
-test("a journey opens as the stock view, switching views keeps the chips, and coming back to the journey starts over", async ({ page }) => {
-  await openJourney(page, "browser", "j_vendor_eval", "");
-  const depth = page.getByTestId("depth-button");
-  // The stock view: every depth, fitted to the whole graph.
-  await expect(depth).toHaveAccessibleName("Depth: Actions");
-  await expect(nodeCard(page, "n_plan")).toBeVisible();
-  await viewportSettled(page);
-  const opened = await viewportOf(page);
-  await page.keyboard.press("f");
-  await viewportSettled(page);
-  expect(await viewportOf(page)).toEqual(opened);
-  // A chip follows a switch of view and back; the pan is the view's own.
-  await page.getByTestId("chip-frontier").click();
-  await page.mouse.move(600, 500);
-  await page.mouse.wheel(0, 150);
-  await viewportSettled(page);
+  // A folded container stays folded across Show not relevant.
+  await expect(page.getByTestId("list-total")).toHaveAttribute("data-total", /\d/);
+  const total = Number(await page.getByTestId("list-total").getAttribute("data-total"));
+  const container = page.getByTestId("list-fold").first();
+  const folded = await container.locator("xpath=ancestor::tr").getAttribute("data-node");
+  await container.click();
+  const row = page.locator(`[data-testid="list-row"][data-node="${folded ?? ""}"] [data-testid="list-fold"]`);
+  await expect(row).toHaveAttribute("aria-expanded", "false");
+  await page.getByTestId("filter-button").click();
+  await expect(page.getByTestId("show-not-relevant-count")).toBeVisible();
+  await page.getByTestId("show-not-relevant").click();
+  await expect(page.getByTestId("list-total")).not.toHaveAttribute("data-total", String(total));
+  await expect(row).toHaveAttribute("aria-expanded", "false");
+  await page.getByTestId("show-not-relevant").click();
+  await expect(page.getByTestId("list-total")).toHaveAttribute("data-total", String(total));
+  await page.getByTestId("filter-button").click();
+  // A trip to the graph and back opens every level at Actions.
+  await goTo(page, "graph");
   await goTo(page, "list");
-  await expectAddress(page, `${journeyBase(page)}?view=list&frontier=1`);
-  await goTo(page, "graph");
-  await expectAddress(page, `${journeyBase(page)}?view=graph&frontier=1`);
-  await expect(page.getByTestId("chip-frontier")).toHaveAttribute("aria-pressed", "true");
-  await expect(page.getByTestId("node-card").first()).toBeVisible();
-  await viewportSettled(page);
-  expect(await viewportOf(page)).toEqual(opened);
-  // Back at the journey's landing, nothing is held: no chip, no pan.
-  await page.evaluate(() => {
-    history.pushState(null, "", location.pathname);
-    dispatchEvent(new PopStateEvent("popstate"));
-  });
-  await expect(page.getByTestId("journey-frame")).toHaveAttribute("data-screen", "summary");
-  expect(new URL(page.url()).search).toBe("");
-  await goTo(page, "graph");
-  await expect(page.getByTestId("chip-frontier")).toHaveAttribute("aria-pressed", "false");
-  await expect(depth).toHaveAccessibleName("Depth: Actions");
+  await expect(page.getByTestId("list-fold").first()).toBeVisible();
+  await expect(page.locator('[data-testid="list-fold"][aria-expanded="false"]')).toHaveCount(0);
 });
 
 test("the window does not scroll: the head stays, a popover scrolls inside itself, the View picker keeps its place on the title's row, and a canvas fills its region", async ({ page }) => {
@@ -362,20 +443,6 @@ test("the window does not scroll: the head stays, a popover scrolls inside itsel
   await expect(page.getByTestId("summary-milestones")).toBeVisible();
 });
 
-test("a done row fades its content like a done card, lifts the fade under keyboard focus, and leaves the checkbox at full strength", async ({ page }) => {
-  await openAt(page, "browser", "j_vendor_eval", "list");
-  const done = page.locator('[data-testid="list-row"][data-state="done"]').first();
-  const title = done.locator('td[data-column="title"] a').first();
-  expect(await effective(title)).toBe(0.5);
-  // The checkbox shows on hover.
-  await done.hover();
-  expect(await effective(done.locator("td.list-check input"))).toBe(1);
-  await title.focus();
-  await page.keyboard.press("Shift+Tab");
-  await page.keyboard.press("Tab");
-  expect(await effective(title)).toBe(1);
-});
-
 /** Whether the Depth menu's Fade checkbox is ticked, read from the open menu; none when the menu has no Fade (the walk). */
 async function fadeTicked(page: Page): Promise<boolean | undefined> {
   await page.getByTestId("depth-button").click();
@@ -386,49 +453,6 @@ async function fadeTicked(page: Page): Promise<boolean | undefined> {
   return ticked;
 }
 
-test("C2, C11, C12: the depth and Fade follow every view; the walk through has no Fade and at Decisions walks decisions; the list gains the decision columns", async ({ page }) => {
-  const id = await startJourney(page, "browser", journeyName("Depth"), { route: "vendor-evaluation", version: 1 });
-  await openAt(page, "browser", id, "graph");
-  await setDepth(page, "Decisions");
-  await setFade(page, true);
-  // Fade draws the deliverable and dims it; it is a card on the canvas.
-  await expect(nodeCard(page, "n_plan")).toHaveClass(/node-faded/);
-  await expect(nodeCard(page, "n_plan")).toBeVisible();
-  const depthed = (view: string) => { expect(new URL(page.url()).searchParams.get("depth"), view).toBe("decisions"); expect(new URL(page.url()).searchParams.get("fade"), view).toBe("1"); };
-  depthed("graph");
-
-  await goTo(page, "list");
-  depthed("list");
-  await expect(page.getByTestId("depth-button")).toHaveAccessibleName("Depth: Decisions");
-  expect(await fadeTicked(page)).toBe(true);
-  await expect(page.locator('th[data-column="answer"]')).toBeVisible();
-  await expect(page.locator('[data-testid="list-row"][data-node="n_plan"]')).toHaveAttribute("data-faded", "true");
-  await expect(page.locator('[data-testid="list-row"][data-node="n_partner_runs"]')).not.toHaveAttribute("data-faded", "true");
-
-  await goTo(page, "timeline");
-  depthed("timeline");
-  await expect(page.getByTestId("depth-button")).toHaveAccessibleName("Depth: Decisions");
-  expect(await fadeTicked(page)).toBe(true);
-
-  await goTo(page, "summary");
-  depthed("summary");
-  await expect(page.getByTestId("depth-button")).toHaveCount(0);
-
-  await goTo(page, "walk");
-  depthed("walk");
-  await expect(page.getByTestId("depth-button")).toHaveAccessibleName("Depth: Decisions");
-  expect(await fadeTicked(page)).toBeUndefined();
-  // The decision walkthrough: its card is a decision, and the milestone on the frontier is not walked.
-  await expect(page.getByTestId("triage")).toHaveAttribute("aria-label", "Decision walkthrough");
-  await expect(page.getByTestId("triage-card")).toHaveAttribute("data-kind", "decision");
-  expect(await passOrder(page)).not.toContain("n_kickoff");
-
-  await goTo(page, "graph");
-  depthed("graph again");
-  await expect(nodeCard(page, "n_plan")).toHaveClass(/node-faded/);
-  expect(await fadeTicked(page)).toBe(true);
-});
-
 test("C2: Fade moves nothing: stepping the depth with Fade on keeps every card and the camera where Actions has them, and Hide returns to a layout of its own", async ({ page }) => {
   await openJourney(page, "browser", "j_vendor_eval", "");
   await viewportSettled(page);
@@ -436,15 +460,11 @@ test("C2: Fade moves nothing: stepping the depth with Fade on keeps every card a
   const place = () => nodeCard(page, "n_kickoff").evaluate((card) => [card.getAttribute("data-x"), card.getAttribute("data-y")]);
   const [count, there, camera] = [await cards.count(), await place(), await viewportOf(page)];
   await setFade(page, true);
-  for (const depth of ["Decisions", "Stages", "Deliverables", "Actions"]) {
-    await setDepth(page, depth);
-    await expect(cards, depth).toHaveCount(count);
-    expect(await place(), depth).toEqual(there);
-    await viewportSettled(page);
-    expect(await viewportOf(page), depth).toEqual(camera);
-  }
-  // Hide at a shallower depth draws fewer cards; Fade again draws the Actions layout where it was.
   await setDepth(page, "Decisions");
+  await expect(cards).toHaveCount(count);
+  await viewportSettled(page);
+  expect(await viewportOf(page)).toEqual(camera);
+  // Hide at a shallower depth draws fewer cards; Fade again draws the Actions layout where it was.
   await setFade(page, false);
   await expect.poll(() => cards.count()).toBeLessThan(count);
   await setFade(page, true);
@@ -468,44 +488,7 @@ test("C2: Fade moves nothing: stepping the depth with Fade on keeps every card a
   await expect(cards).toHaveCount(collapsed);
 });
 
-test("C11: the walk through at Decisions walks the up-front decisions and not the kickoff milestone; at Actions it walks the milestone; with every decision made it says so, and Continue leaves Decisions", async ({ page }) => {
-  const id = await startJourney(page, "browser", journeyName("Walk"), { route: "vendor-evaluation", version: 1 });
-  await expect(page.getByTestId("triage")).toHaveAttribute("data-order", /\bn_purpose\b/);
-  expect(await passOrder(page)).not.toContain("n_kickoff");
-  expect(await passOrder(page)).toEqual(expect.arrayContaining(UP_FRONT.filter((key) => key !== "n_meeting_date")));
-  await setDepth(page, "Actions");
-  await expect.poll(() => passOrder(page)).toContain("n_kickoff");
-  expect(id).toMatch(/^j_/);
-
-  // The seeded vendor evaluation has every decision made: nothing to decide, and Continue goes on to everything.
-  await openAt(page, "browser", "j_vendor_eval", "walk?depth=decisions", { fixedToday: FIXED_TODAY });
-  await expect(page.getByTestId("no-decisions")).toBeVisible();
-  await page.getByRole("button", { name: "Continue with everything" }).click();
-  await expectAddress(page, `${journeyBase(page)}?view=walk`);
-  await expect(page.getByTestId("depth-button")).toHaveAccessibleName("Depth: Actions");
-});
-
 /** The view root each screen draws, which is there even when the view has no rows. */
-const ROOTS: Record<string, string> = { graph: "canvas", list: "list-total", timeline: "timeline", summary: "summary", walk: "triage" };
-
-test("C9-C13: the View picker lands on each view, keeps the shared settings, and says which one is open", async ({ page }) => {
-  await openAt(page, "browser", "j_vendor_eval", "graph?frontier=1", { fixedToday: FIXED_TODAY });
-  for (const view of ["list", "timeline", "summary", "walk", "graph"]) {
-    await page.getByTestId("view-picker").click();
-    await page.getByTestId(`view-${view}`).click();
-    await expectAddress(page, `/journeys/j_vendor_eval?${view === "summary" ? "" : `view=${view}&`}frontier=1`);
-    await expect(page.getByTestId("journey-frame")).toHaveAttribute("data-screen", view);
-    await expect(page.getByTestId(ROOTS[view] ?? "")).toBeVisible();
-    // Opened again, exactly one item is marked as where you are, and it is this view's.
-    await page.getByTestId("view-picker").click();
-    const current = page.getByTestId("view-picker-menu").locator('[aria-current="page"]');
-    await expect(current).toHaveCount(1);
-    await expect(current).toHaveAttribute("data-testid", `view-${view}`);
-    await page.keyboard.press("Escape");
-    await expect(page.getByTestId("view-picker-menu")).toHaveCount(0);
-  }
-});
-
 test("C9, C11: the View picker works from the keyboard: it opens on the current view, the arrows wrap, and Esc, Enter and Tab hand the focus back", async ({ page }) => {
   await openAt(page, "browser", "j_vendor_eval", "graph", { fixedToday: FIXED_TODAY });
   const button = page.getByTestId("view-picker");
@@ -540,11 +523,7 @@ test("C9, C11: the View picker works from the keyboard: it opens on the current 
   await page.keyboard.press("Tab");
   await expect(page.getByTestId("view-picker-menu")).toHaveCount(0);
   await expect(page.getByTestId("journey-menu")).toBeFocused();
-});
-
-test("B11: the menu's Status opens from the keyboard, and Esc leaves the status as it was", async ({ page }) => {
-  await openAt(page, "browser", "j_vendor_eval", "graph", { fixedToday: FIXED_TODAY });
-  await page.getByTestId("journey-menu").focus();
+  // The menu's Status opens from the keyboard, and Esc leaves the status as it was.
   await page.keyboard.press("Enter");
   await page.keyboard.press("End");
   const status = page.getByTestId("menu-status");

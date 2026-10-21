@@ -1,11 +1,6 @@
 // What the canvas's browser tests share: the lines a canvas draws, read the way the
 // page shows them, and its viewport.
-import { readFileSync } from "node:fs";
-
 import { expect, type Locator, type Page } from "@playwright/test";
-
-import { fixtureRoute, publishDraft, versionSelect } from "./around.ts";
-import { importRoute } from "./shell.ts";
 
 /** A card's line on the canvas, from `from` to `to`. */
 export function lineBetween(page: Page, from: string, to: string) {
@@ -38,35 +33,6 @@ export async function viewportSettled(page: Page): Promise<void> {
       return still;
     })
     .toBe(true);
-}
-
-/** Titles of the lengths that make a card's title wrap: one of wide capitals that still fits the character count of a line, a long one of ordinary words, and a short one. */
-const LONG_TITLES = ["MAKE ALL WORK MATCH WELL", "Settle the long list of small items that stand between the two stages", "Short title"];
-
-/**
- * Publishes, on the in-browser host, a route like the vendor evaluation whose nodes carry titles
- * that wrap to one, two and more lines, and returns its id.
- */
-export async function publishLongTitleRoute(page: Page): Promise<string> {
-  const route = "long-titles";
-  const text = readFileSync(fixtureRoute("vendor-evaluation"), "utf8");
-  const at = text.indexOf("\nnodes:");
-  let node = 0;
-  const nodes = text.slice(at).replace(/^( {2}| {4}|(?: {2}){3})title: .*$/gm, (_all, indent: string) => `${indent}title: ${LONG_TITLES[node++ % LONG_TITLES.length] ?? ""}`);
-  const file = (text.slice(0, at) + nodes).replace("route: vendor-evaluation\nname: Vendor evaluation\n", `route: ${route}\nname: Long titles\n`);
-  await importRoute(page, "browser", { name: `${route}.yaml`, mimeType: "text/yaml", buffer: Buffer.from(file) });
-  await expect(versionSelect(page)).toContainText("Draft");
-  await publishDraft(page);
-  return route;
-}
-
-/** Zooms the canvas in with its button until it is at least at the reading zoom (1). */
-export async function zoomToReading(page: Page): Promise<void> {
-  for (let step = 0; step < 12 && (await viewportOf(page)).zoom < 1; step += 1) {
-    await page.getByRole("button", { name: /zoom in/i }).click();
-    await viewportSettled(page);
-  }
-  expect((await viewportOf(page)).zoom).toBeGreaterThanOrEqual(1);
 }
 
 /**

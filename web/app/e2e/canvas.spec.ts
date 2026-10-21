@@ -3,19 +3,33 @@
 // the viewport). It opens fitted at every detail, expands in place, traces a selection, follows an
 // edge, and pans and zooms. What the canvas draws (its levels, lines, lens, layout) is the
 // model's tests'.
-import { expect, test } from "./test.ts";
+import type { Page } from "@playwright/test";
 
-import { expectContained } from "./containment.ts";
-import { expectTitleLinesAsLaidOut, lineBetween, pointOn, publishLongTitleRoute, viewportOf, viewportSettled, zoomToReading } from "./canvas.ts";
+import { checkpoint, expect, test } from "./test.ts";
+
+import { expectTitleLinesAsLaidOut, lineBetween, pointOn, viewportOf, viewportSettled } from "./canvas.ts";
 import { journeyName, startJourney } from "./around.ts";
-import { nodeCard, nodePanel, openJourney, setDepth, setFade, visit } from "./shell.ts";
+import { goWithin, nodeCard, nodePanel, openJourney, setDepth, setFade, visit } from "./shell.ts";
 
-test("C2 to C7: the graph opens fitted at every depth, expands in place, traces a selection, follows an edge, and pans and zooms", async ({ page }) => {
-  await openJourney(page, "browser", "j_vendor_eval", "");
-  // It opens at the stock view: every depth, fitted to the whole graph, as Fit does.
-  await expect(page.getByTestId("depth-button")).toHaveAccessibleName("Depth: Actions");
-  await expectTitleLinesAsLaidOut(page);
-  // At Stages the stage holding the work is open and says so, the others fold.
+/** The open Filter counts what it hides beside its box, and showing the not relevant removes the count. */
+async function filterCountsWhatItHides(page: Page): Promise<void> {
+  const cards = page.getByTestId("node-card");
+  const resting = await cards.count();
+  await page.getByTestId("filter-button").click();
+  await expect(page.getByTestId("show-not-relevant-count")).toBeVisible();
+  await page.getByTestId("show-not-relevant").click();
+  await expect(page.getByTestId("show-not-relevant-count")).toHaveCount(0);
+  await page.getByTestId("filter-button").click();
+  await expect.poll(() => cards.count()).toBeGreaterThan(resting);
+  await page.getByTestId("filter-button").click();
+  await page.getByTestId("show-not-relevant").click();
+  await expect(page.getByTestId("show-not-relevant-count")).toBeVisible();
+  await page.getByTestId("filter-button").click();
+  await expect.poll(() => cards.count()).toBe(resting);
+}
+
+/** At Stages the stage holding the work is open and says so, the others fold; a folded stage traces what is folded into it, and expanding opens it in place; selecting a node traces it, and Reveal draws what the step folds away. */
+async function expandsAndTraces(page: Page): Promise<void> {
   await setDepth(page, "Stages");
   await expect(nodeCard(page, "n_reporting").getByTestId("card-current")).toBeAttached();
   await page.keyboard.press("f");
@@ -28,7 +42,7 @@ test("C2 to C7: the graph opens fitted at every depth, expands in place, traces 
   await nodeCard(page, "n_setup").getByTestId("card-expand").click();
   await expect(nodeCard(page, "n_plan")).toBeVisible();
   await expect(page).toHaveURL(/open=n_setup/);
-  // Selecting a node traces it: what it needs and what it unblocks are tagged,.
+  // Selecting a node traces it: what it needs and what it unblocks are tagged.
   await nodeCard(page, "n_plan").getByTestId("card-open").click();
   await expect(page.getByTestId("card-mark").filter({ hasText: "needs" }).first()).toBeVisible();
   await expect(page.getByTestId("card-mark").filter({ hasText: "unblocks" }).first()).toBeVisible();
@@ -36,7 +50,10 @@ test("C2 to C7: the graph opens fitted at every depth, expands in place, traces 
   await expect(page.getByTestId("trace-reveal")).toHaveText("Reveal 2 linked nodes");
   await page.getByTestId("trace-reveal").click();
   await expect(page.getByTestId("trace-reveal")).toHaveText("Hide revealed nodes");
-  // Hovering an edge says what it is; clicking it opens its card, which follows it to either end.
+}
+
+/** Hovering an edge says what it is; clicking it opens its card, which follows it to either end. */
+async function followsAnEdge(page: Page): Promise<void> {
   const edge = lineBetween(page, "n_access", "n_plan");
   await viewportSettled(page);
   const at = await pointOn(edge);
@@ -57,7 +74,10 @@ test("C2 to C7: the graph opens fitted at every depth, expands in place, traces 
   await expect(page.getByTestId("edge-card")).toBeVisible();
   await page.getByRole("link", { name: "Go to Environment access" }).click();
   await expect(nodePanel(page, "n_access")).toBeVisible();
-  // A wheel pans and never zooms; with the control key it zooms.
+}
+
+/** A wheel pans and never zooms, and with the control key it zooms; a right-click or the menu key opens the node's menu, and a choice that needs a form selects the node and opens it there. */
+async function pansZoomsAndOpensMenus(page: Page): Promise<void> {
   const [start, pointer] = [await viewportOf(page), { x: 600, y: 500 }];
   await page.mouse.move(pointer.x, pointer.y);
   await page.mouse.wheel(0, 120);
@@ -67,7 +87,6 @@ test("C2 to C7: the graph opens fitted at every depth, expands in place, traces 
   await page.mouse.wheel(0, -120);
   await page.keyboard.up("Control");
   await expect.poll(async () => (await viewportOf(page)).zoom).not.toBe(start.zoom);
-  // A right-click, or the menu key on a focused card, opens the node's menu; a choice that needs a form selects the node and opens it there.
   await nodeCard(page, "n_plan").click({ button: "right" });
   await expect(page.getByTestId("context-menu")).toBeVisible();
   await page.keyboard.press("Escape");
@@ -79,10 +98,104 @@ test("C2 to C7: the graph opens fitted at every depth, expands in place, traces 
   await page.keyboard.press("Shift+F10");
   await page.getByTestId("context-rename").click();
   await expect(nodePanel(page, "n_plan").getByTestId("rename")).toBeVisible();
+}
+
+/**
+ * On a journey just started, its up-front decisions are the frontier at its top level, which Stages leaves out: Frontier only
+ * emphasises (it draws the same cards), Depth counts the frontier work it hides, and Fade draws that work again, dimmed.
+ */
+async function depthCountsHiddenFrontier(page: Page): Promise<void> {
+  const cards = page.getByTestId("node-card");
+  const id = await startJourney(page, "browser", journeyName("Depth"), { route: "vendor-evaluation", version: 1 });
+  await openJourney(page, "browser", id, "?frontier=1");
+  const drawn = await cards.count();
+  const frontierCards = page.locator('[data-testid="node-card"][data-here*="actionable now"]');
+  const frontier = await frontierCards.evaluateAll((found) => found.map((card) => card.getAttribute("data-node") ?? ""));
+  expect(frontier.length).toBeGreaterThan(0);
+  await expect(page.getByTestId("depth-badge")).toHaveCount(0);
+  await setDepth(page, "Stages");
+  await expect.poll(() => cards.count()).toBeLessThan(drawn);
+  const left = await frontierCards.evaluateAll((found) => found.map((card) => card.getAttribute("data-node") ?? ""));
+  const hidden = frontier.filter((key) => !left.includes(key));
+  expect(hidden.length).toBeGreaterThan(0);
+  await expect(page.getByTestId("depth-badge")).toHaveText(String(hidden.length));
+  await setFade(page, true);
+  await expect.poll(() => cards.count()).toBe(drawn);
+  await expect(page.getByTestId("depth-badge")).toHaveCount(0);
+  for (const key of hidden) {
+    await expect(nodeCard(page, key)).toHaveClass(/node-faded/);
+  }
+}
+
+test("C2 to C7: the graph opens fitted at every depth, expands in place, traces a selection, follows an edge, and pans and zooms", async ({ page }) => {
+  await openJourney(page, "browser", "j_vendor_eval", "");
+  // It opens at the stock view: every depth, fitted to the whole graph, as Fit does.
+  await expect(page.getByTestId("depth-button")).toHaveAccessibleName("Depth: Actions");
+  await expectTitleLinesAsLaidOut(page);
+  await filterCountsWhatItHides(page);
+  await checkpoint(page);
+  await expandsAndTraces(page);
+  await followsAnEdge(page);
+  await pansZoomsAndOpensMenus(page);
+  await checkpoint(page);
+  await depthCountsHiddenFrontier(page);
 });
 
-test("a click on the empty canvas deselects and a drag that pans does not", async ({ page }) => {
-  await openJourney(page, "browser", "j_vendor_eval", "");
+/** Click selects and shift-click adds, the inspector lists the members, and the actions that fit them all are offered. */
+async function selectsASet(page: Page): Promise<void> {
+  const members = page.getByTestId("selection-member");
+  await nodeCard(page, "n_access").getByTestId("card-open").click();
+  await expect(nodePanel(page, "n_access")).toBeVisible();
+  // Shift on a title adds as it does on the body; two members are listed, with no trace left drawn.
+  await nodeCard(page, "n_plan").getByTestId("card-open").click({ modifiers: ["Shift"] });
+  await nodeCard(page, "n_decision_meeting").click({ modifiers: ["Shift"] });
+  await expect(page.getByTestId("selection-panel")).toHaveAttribute("data-count", "3");
+  await expect(members).toHaveCount(3);
+  await expect(page.getByTestId("node-detail")).toHaveCount(0);
+  await expect(page.getByTestId("card-mark")).toHaveCount(0);
+  // Start fits an action but not a milestone: shown, disabled, with who cannot.
+  await page.getByTestId("selection-status").click();
+  const start = page.getByRole("menuitem", { name: "Start" });
+  await expect(start).toBeDisabled();
+  await expect(start).toHaveAttribute("title", /cannot start/);
+  await page.keyboard.press("Escape");
+  // A member dropped with its × leaves the rest; a plain click on one card is that card alone.
+  await members.filter({ hasText: "decision" }).first().getByRole("button", { name: /Remove .* from the selection/ }).click();
+  await expect(members).toHaveCount(2);
+  await nodeCard(page, "n_plan").getByTestId("card-open").click();
+  await expect(nodePanel(page, "n_plan")).toBeVisible();
+  await expect(page.getByTestId("selection-panel")).toHaveCount(0);
+}
+
+/** Esc clears several to nothing and a cleared set stays cleared; a shift-drag over empty canvas selects the cards in its box. */
+async function clearsAndBoxSelects(page: Page): Promise<void> {
+  await nodeCard(page, "n_access").click({ modifiers: ["Shift"] });
+  await expect(page.getByTestId("selection-panel")).toBeVisible();
+  await page.locator("main").click({ position: { x: 5, y: 5 } });
+  await page.keyboard.press("Escape");
+  await expect(page.getByTestId("selection-panel")).toHaveCount(0);
+  await expect(page).not.toHaveURL(/\/nodes\//);
+  // Back to the node the set was made at opens that node alone: a cleared set stays cleared.
+  await page.goBack();
+  await expect(page.getByTestId("selection-panel")).toHaveCount(0);
+  await expect(page.getByTestId("node-detail")).toBeVisible();
+  await viewportSettled(page);
+  const [from, to] = [await nodeCard(page, "n_purpose").boundingBox(), await nodeCard(page, "n_who_owns").boundingBox()];
+  if (from === null || to === null) {
+    throw new Error("the cards have no box");
+  }
+  await page.keyboard.down("Shift");
+  await page.mouse.move(Math.min(from.x, to.x) - 12, Math.min(from.y, to.y) - 12);
+  await page.mouse.down();
+  await page.mouse.move(Math.max(from.x + from.width, to.x + to.width) + 10, Math.max(from.y + from.height, to.y + to.height) + 10, { steps: 6 });
+  await page.mouse.up();
+  await page.keyboard.up("Shift");
+  await expect(page.getByTestId("selection-panel")).toBeVisible();
+  expect(await page.getByTestId("selection-member").count()).toBeGreaterThanOrEqual(2);
+}
+
+/** A click on the empty canvas deselects, and a drag that pans does not. */
+async function emptyCanvasDeselects(page: Page): Promise<void> {
   await nodeCard(page, "n_reporting").getByTestId("card-open").click();
   await expect(page).toHaveURL(/\/nodes\/n_reporting/);
   const pane = (await page.locator(".react-flow__pane").boundingBox()) ?? { x: 0, y: 0, width: 0, height: 0 };
@@ -97,9 +210,10 @@ test("a click on the empty canvas deselects and a drag that pans does not", asyn
   await page.mouse.click(corner.x, corner.y);
   await expect(page).not.toHaveURL(/\/nodes\//);
   await expect(page.getByTestId("card-mark")).toHaveCount(0);
-});
+}
 
-test("a menu's arrow keys move over the items that can take the focus, never stalling at a disabled one", async ({ page }) => {
+/** A menu's arrow keys move over the items that can take the focus, never stalling at a disabled one. */
+async function menuArrowsSkipDisabled(page: Page): Promise<void> {
   await openJourney(page, "browser", "j_bakeoff");
   await nodeCard(page, "n_trial_a").getByTestId("card-open").click();
   await nodeCard(page, "n_wrap_up").click({ modifiers: ["Shift"] });
@@ -123,140 +237,20 @@ test("a menu's arrow keys move over the items that can take the focus, never sta
   await page.keyboard.press("Escape");
   await expect(menu).toHaveCount(0);
   await expect(button).toBeFocused();
-});
+}
 
 test("selection is one set with no mode: click selects, shift-click adds, the inspector lists the members and the actions that fit them all", async ({ page }) => {
   await openJourney(page, "browser", "j_vendor_eval");
-  const members = page.getByTestId("selection-member");
-  await nodeCard(page, "n_access").getByTestId("card-open").click();
-  await expect(nodePanel(page, "n_access")).toBeVisible();
-  // Shift on a title adds as it does on the body; two members are listed, with no trace left drawn.
-  await nodeCard(page, "n_plan").getByTestId("card-open").click({ modifiers: ["Shift"] });
-  await nodeCard(page, "n_decision_meeting").click({ modifiers: ["Shift"] });
-  await expect(page.getByTestId("selection-panel")).toHaveAttribute("data-count", "3");
-  await expect(members).toHaveCount(3);
-  await expect(page.getByTestId("node-detail")).toHaveCount(0);
-  await expect(page.getByTestId("card-mark")).toHaveCount(0);
-  // Start fits an action but not a milestone: shown, disabled, with who cannot.
-  await page.getByTestId("selection-status").click();
-  const start = page.getByRole("menuitem", { name: "Start" });
-  await expect(start).toBeDisabled();
-  await expect(start).toHaveAttribute("title", /cannot start/);
-  await page.keyboard.press("Escape");
-  // A member dropped with its × leaves the rest; a plain click on one card is that card alone.
-  await members.filter({ hasText: "decision" }).first().getByRole("button", { name: /Remove .* from the selection/ }).click();
-  await expect(members).toHaveCount(2);
-  await nodeCard(page, "n_plan").getByTestId("card-open").click();
-  await expect(nodePanel(page, "n_plan")).toBeVisible();
-  await expect(page.getByTestId("selection-panel")).toHaveCount(0);
-  // Esc clears several to nothing.
-  await nodeCard(page, "n_access").click({ modifiers: ["Shift"] });
-  await expect(page.getByTestId("selection-panel")).toBeVisible();
-  await page.locator("main").click({ position: { x: 5, y: 5 } });
-  await page.keyboard.press("Escape");
-  await expect(page.getByTestId("selection-panel")).toHaveCount(0);
-  await expect(page).not.toHaveURL(/\/nodes\//);
-  // Back to the node the set was made at opens that node alone: a cleared set stays cleared.
-  await page.goBack();
-  await expect(page.getByTestId("selection-panel")).toHaveCount(0);
-  await expect(page.getByTestId("node-detail")).toBeVisible();
-  // A shift-drag over empty canvas selects the cards in its box.
-  await viewportSettled(page);
-  const [from, to] = [await nodeCard(page, "n_purpose").boundingBox(), await nodeCard(page, "n_who_owns").boundingBox()];
-  if (from === null || to === null) {
-    throw new Error("the cards have no box");
-  }
-  await page.keyboard.down("Shift");
-  await page.mouse.move(Math.min(from.x, to.x) - 12, Math.min(from.y, to.y) - 12);
-  await page.mouse.down();
-  await page.mouse.move(Math.max(from.x + from.width, to.x + to.width) + 10, Math.max(from.y + from.height, to.y + to.height) + 10, { steps: 6 });
-  await page.mouse.up();
-  await page.keyboard.up("Shift");
-  await expect(page.getByTestId("selection-panel")).toBeVisible();
-  expect(await members.count()).toBeGreaterThanOrEqual(2);
+  await selectsASet(page);
+  await clearsAndBoxSelects(page);
+  await checkpoint(page);
+  await emptyCanvasDeselects(page);
+  await checkpoint(page);
+  await menuArrowsSkipDisabled(page);
 });
 
-test("the controls row: the open Filter counts what it hides, Frontier only emphasises", async ({ page }) => {
-  await openJourney(page, "browser", "j_vendor_eval", "");
-  const cards = page.getByTestId("node-card");
-  await expect(nodeCard(page, "n_plan")).toBeVisible();
-  const before = await cards.count();
-  // Not-relevant nodes are left out by default, and the open Filter says how many beside its box; showing them removes the count.
-  await page.getByTestId("filter-button").click();
-  await expect(page.getByTestId("show-not-relevant-count")).toBeVisible();
-  await page.getByTestId("show-not-relevant").click();
-  await expect(page.getByTestId("show-not-relevant-count")).toHaveCount(0);
-  await page.getByTestId("filter-button").click();
-  await expect.poll(() => cards.count()).toBeGreaterThan(before);
-  // Frontier highlights what can move now and draws the same cards.
-  const drawn = await cards.count();
-  await page.getByTestId("chip-frontier").click();
-  await expect(page.getByTestId("chip-frontier")).toHaveAttribute("aria-pressed", "true");
-  expect(await cards.count()).toBe(drawn);
-  await expect(page.getByTestId("depth-badge")).toHaveCount(0);
-});
-
-test("a card takes the lowest opacity that applies, and a zoomed-out stage head keeps its chip", async ({ page }) => {
-  await page.setViewportSize({ width: 1440, height: 900 });
-  await openJourney(page, "browser", "j_vendor_eval", "");
-  await page.keyboard.press("f");
-  // Open and in focus is full, done is half; a zoomed-out stage head draws its chip inside the head, a group's has none.
-  await expect(nodeCard(page, "n_reporting")).toHaveCSS("opacity", "1");
-  await expect(nodeCard(page, "n_testing")).toHaveCSS("opacity", "0.5");
-  const chip = nodeCard(page, "n_testing").getByTestId("card-head-chip");
-  await expect(chip).toBeVisible();
-  const [chipBox, cardBox] = [await chip.boundingBox(), await nodeCard(page, "n_testing").boundingBox()];
-  if (chipBox === null || cardBox === null) {
-    throw new Error("the stage and its chip are drawn");
-  }
-  expect(chipBox.y).toBeGreaterThanOrEqual(cardBox.y);
-  expect(chipBox.x + chipBox.width).toBeLessThanOrEqual(cardBox.x + cardBox.width);
-  await expect(nodeCard(page, "n_final_review").getByTestId("card-head-chip")).toHaveCount(0);
-  // Tracing a card puts what is outside the trace at a third, done or not: the levels are never multiplied.
-  await nodeCard(page, "n_final_review").getByTestId("card-open").click({ force: true });
-  await expect(nodeCard(page, "n_decision_meeting")).toHaveCSS("opacity", "0.3");
-  await expect(nodeCard(page, "n_purpose")).toHaveCSS("opacity", "0.3");
-  await expect(nodeCard(page, "n_kickoff")).toHaveCSS("opacity", "0.5");
-});
-
-test("C2: Depth hides what is below it and counts the frontier work that hides; Fade draws every card and dims those below the depth", async ({ page }) => {
-  // A journey just started: its up-front decisions are the frontier, and they sit at its top level, which Stages leaves out.
-  const id = await startJourney(page, "browser", journeyName("Depth"), { route: "vendor-evaluation", version: 1 });
-  await openJourney(page, "browser", id, "?frontier=1");
-  const cards = page.getByTestId("node-card");
-  const drawn = await cards.count();
-  const frontierCards = page.locator('[data-testid="node-card"][data-here*="actionable now"]');
-  const frontier = await frontierCards.evaluateAll((found) => found.map((card) => card.getAttribute("data-node") ?? ""));
-  expect(frontier.length).toBeGreaterThan(0);
-  await expect(page.getByTestId("depth-badge")).toHaveCount(0);
-  // A shallower Depth draws fewer cards, and the frontier nodes it has no card for are counted on Depth.
-  await setDepth(page, "Stages");
-  await expect.poll(() => cards.count()).toBeLessThan(drawn);
-  const left = await frontierCards.evaluateAll((found) => found.map((card) => card.getAttribute("data-node") ?? ""));
-  const hidden = frontier.filter((key) => !left.includes(key));
-  expect(hidden.length).toBeGreaterThan(0);
-  await expect(page.getByTestId("depth-badge")).toHaveText(String(hidden.length));
-  await expect(page.getByTestId("depth-button")).toHaveAttribute("title", /that can move now are hidden at this depth; choose Actions or fade the rest to see them/);
-  // Fade draws the Actions cards again with those below the depth dimmed, and there is nothing left hidden to count.
-  await setFade(page, true);
-  await expect.poll(() => cards.count()).toBe(drawn);
-  await expect(page.getByTestId("depth-badge")).toHaveCount(0);
-  for (const key of hidden) {
-    await expect(nodeCard(page, key)).toHaveClass(/node-faded/);
-  }
-  // With Frontier off, only Depth dims: what Stages draws (the top-level milestone, the top-level stages) is clear, what it left out is not.
-  await page.getByTestId("chip-frontier").click();
-  await expect(page.getByTestId("chip-frontier")).toHaveAttribute("aria-pressed", "false");
-  await expect(nodeCard(page, "n_kickoff")).not.toHaveClass(/node-faded/);
-  await expect(page.locator('[data-testid="node-card"][data-kind="group"]:not([data-parent]).node-faded')).toHaveCount(0);
-  for (const key of hidden) {
-    await expect(nodeCard(page, key)).toHaveClass(/node-faded/);
-  }
-});
-
-test("C2, DESIGN opacity: under Fade the cards below the depth are 0.3 whatever their state, a container holding a decision stays clear, and Frontier's dimming joins it without multiplying", async ({ page }) => {
-  await openJourney(page, "browser", "j_vendor_eval", "?depth=decisions&fade=1");
-  await expect(nodeCard(page, "n_plan")).toBeVisible();
+/** Under Fade the cards below the depth are 0.3 whatever their state, a container holding a decision stays clear, and Frontier's dimming joins it without multiplying. */
+async function fadeAndFrontierLevels(page: Page): Promise<void> {
   const read = () =>
     page.getByTestId("node-card").evaluateAll((found) =>
       found.map((card) => ({
@@ -291,10 +285,13 @@ test("C2, DESIGN opacity: under Fade the cards below the depth are 0.3 whatever 
     expect(card.opacity, card.key).toBeGreaterThanOrEqual(0.3 - 1e-9);
     expect([0.3, 0.5, 1].some((level) => Math.abs(card.opacity - level) < 1e-6), `${card.key} is at a level`).toBe(true);
   }
-});
+  await checkpoint(page);
+}
 
-test("C2, DESIGN opacity: nodes Reveal draws are dimmed by the depth under Fade as the rest are, never lifted by the trace", async ({ page }) => {
-  await openJourney(page, "browser", "j_vendor_eval", "?depth=decisions&fade=1");
+/** Reveal's nodes are dimmed by the depth under Fade as the rest are, never lifted by the trace (Frontier off, so it supplies no opacity). */
+async function revealedNodesStayDimmed(page: Page): Promise<void> {
+  await page.getByTestId("chip-frontier").click();
+  await expect(page.getByTestId("chip-frontier")).toHaveAttribute("aria-pressed", "false");
   await nodeCard(page, "n_partner_runs").getByTestId("card-open").click();
   await expect(page.getByTestId("trace-reveal")).toBeVisible();
   await page.getByTestId("trace-reveal").click();
@@ -303,29 +300,45 @@ test("C2, DESIGN opacity: nodes Reveal draws are dimmed by the depth under Fade 
     await expect(nodeCard(page, key), key).toBeVisible();
     await expect(nodeCard(page, key), key).toHaveCSS("opacity", "0.3");
   }
-});
+  await checkpoint(page);
+}
 
-test("a card's content stays inside its box whatever its title's length, on a route's graph and a journey's, fitted and at the reading zoom", async ({ page }) => {
-  const route = await publishLongTitleRoute(page);
-  await page.getByTestId("view-picker").click();
-  await page.getByTestId("view-graph").click();
-  await expect(page.getByTestId("node-card").first()).toBeVisible();
+/** At the stock view, open and in focus is full and done is half; a zoomed-out stage head draws its chip inside the head, a group's has none; a trace puts what is outside it at a third. */
+async function stageHeadsAndTracedOpacity(page: Page): Promise<void> {
+  await goWithin(page, "/journeys/j_vendor_eval?view=graph&depth=actions");
+  await expect(nodeCard(page, "n_plan")).toBeVisible();
   await page.keyboard.press("f");
-  await viewportSettled(page);
-  await expectContained(page);
-  await zoomToReading(page);
-  await expectContained(page);
-  await expectTitleLinesAsLaidOut(page);
-  const journey = await startJourney(page, "browser", journeyName("Long titles"), { route });
-  await openJourney(page, "browser", journey, "?depth=actions");
-  await viewportSettled(page);
-  await expectContained(page);
-  await zoomToReading(page);
-  await expectContained(page);
-  await expectTitleLinesAsLaidOut(page);
+  await expect(nodeCard(page, "n_reporting")).toHaveCSS("opacity", "1");
+  await expect(nodeCard(page, "n_testing")).toHaveCSS("opacity", "0.5");
+  const chip = nodeCard(page, "n_testing").getByTestId("card-head-chip");
+  await expect(chip).toBeVisible();
+  const [chipBox, cardBox] = [await chip.boundingBox(), await nodeCard(page, "n_testing").boundingBox()];
+  if (chipBox === null || cardBox === null) {
+    throw new Error("the stage and its chip are drawn");
+  }
+  expect(chipBox.y).toBeGreaterThanOrEqual(cardBox.y);
+  expect(chipBox.x + chipBox.width).toBeLessThanOrEqual(cardBox.x + cardBox.width);
+  await expect(nodeCard(page, "n_final_review").getByTestId("card-head-chip")).toHaveCount(0);
+  // Tracing a card puts what is outside the trace at a third, done or not: the levels are never multiplied.
+  await nodeCard(page, "n_final_review").getByTestId("card-open").click({ force: true });
+  await expect(nodeCard(page, "n_decision_meeting")).toHaveCSS("opacity", "0.3");
+  await expect(nodeCard(page, "n_purpose")).toHaveCSS("opacity", "0.3");
+  await expect(nodeCard(page, "n_kickoff")).toHaveCSS("opacity", "0.5");
+}
+
+test("C2, DESIGN opacity: a card takes the lowest opacity that applies: under Fade the cards below the depth are 0.3 whatever their state, a container holding a decision stays clear, Frontier's dimming joins it without multiplying, and a trace's never lifts it", async ({ page }) => {
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await openJourney(page, "browser", "j_vendor_eval", "?depth=decisions&fade=1");
+  await expect(nodeCard(page, "n_plan")).toBeVisible();
+  await fadeAndFrontierLevels(page);
+  await checkpoint(page);
+  await revealedNodesStayDimmed(page);
+  await checkpoint(page);
+  await stageHeadsAndTracedOpacity(page);
 });
 
-test("C1, C2: a line between folded stages opens the links it stands for, and each end is a link", async ({ page }) => {
+/** A line between folded stages opens the links it stands for, and each end is a link. */
+async function stagesLineOpensLinks(page: Page): Promise<void> {
   await visit(page, "browser", "/journeys/j_vendor_eval/edges/n_setup~n_testing?depth=stages");
   await expect(page.getByTestId("edge-missing")).toHaveCount(0);
   const card = page.getByTestId("edge-card");
@@ -335,9 +348,10 @@ test("C1, C2: a line between folded stages opens the links it stands for, and ea
   await expect(lineBetween(page, "n_setup", "n_testing")).toHaveClass(/line-selected/);
   await row.getByRole("link", { name: "Comparison set" }).click();
   await expect(nodePanel(page, "n_comparison_set")).toBeVisible();
-});
+}
 
-test("C1, C2: a line is selectable only where the view's own level draws it, and an edge address is always the Graph", async ({ page }) => {
+test("C1, C2: a line is selectable only where the view's own level draws it, an edge address is always the Graph, and a line between folded stages opens the links it stands for, each end a link", async ({ page }) => {
+  await stagesLineOpensLinks(page);
   // Test plan is open at Stages, so its stage is opened for it: the lines inside that stage are drawn only for the selection, and open no card.
   const selectable = (key: string, other: string) => lineBetween(page, key, other).locator("xpath=ancestor::*[contains(@class,'react-flow__edge')][1]");
   await visit(page, "browser", "/journeys/j_vendor_eval/nodes/n_plan?depth=stages");

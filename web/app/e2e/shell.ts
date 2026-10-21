@@ -1,10 +1,10 @@
 // What the app's browser tests share: opening a screen on a host, and reading and editing a
 // journey page the way a person does: a node's card on the canvas, its detail beside it.
-import { expect, type Locator, type Page } from "@playwright/test";
+import { expect, type APIRequestContext, type Locator, type Page } from "@playwright/test";
 
 export type HostKind = "server" | "browser";
 
-/** The in-browser host's dev server (playwright.config.ts); the server host is the project's own. */
+/** The in-browser host's demo site (playwright.config.ts); the server host is the project's own. */
 const DEMO = `http://127.0.0.1:${process.env["CAIRN_DEMO_PORT"] ?? ""}`;
 
 /**
@@ -258,5 +258,35 @@ export async function openSheet(page: Page): Promise<void> {
   if ((await handle.isVisible()) && (await page.locator(".frame").getAttribute("data-sheet")) === "peek") {
     await handle.click();
     await expect(page.locator(".frame")).toHaveAttribute("data-sheet", "full");
+  }
+}
+
+/**
+ * A journey only this test touches, on the server host: started through one API patch from
+ * version 1 of `route`, under a name no other run used. The server tests that run side by side
+ * each make their own, so none reads or writes another's (the fixtures' journeys stay as seeded).
+ * A journey is created against the deployment revision it was checked under, so a refusal as
+ * stale (another test moved the deployment meanwhile) is asked again.
+ */
+export async function ownJourney(request: APIRequestContext, route: string, stem = "Own"): Promise<{ id: string; name: string }> {
+  const name = fresh(stem);
+  const id = `j_${name.replace(/\W/g, "_").toLowerCase()}`;
+  for (let attempt = 0; ; attempt += 1) {
+    const response = await request.post(`/api/journeys/${id}/patches`, {
+      data: {
+        patch: {
+          id: `p_${crypto.randomUUID().replaceAll("-", "")}`,
+          target: { journey: id },
+          base_revision: 0,
+          mutations: [{ op: "create_journey", name, from: { route, version: 1 } }],
+        },
+      },
+    });
+    const body = await response.text();
+    if (response.ok()) {
+      return { id, name };
+    }
+    expect(body, `starting ${id}`).toContain("stale");
+    expect(attempt, `starting ${id} kept going stale`).toBeLessThan(5);
   }
 }

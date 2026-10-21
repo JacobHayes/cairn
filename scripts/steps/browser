@@ -11,8 +11,8 @@
 # skipped, fails the step. The browsers are Playwright's own, pinned with @playwright/test:
 # `npx playwright install chromium` once per machine.
 # With LADDER_SERVER=0 (`mise run check:fast` for a change that leaves the server side of the
-# web app alone, scripts/changed) only the in-browser host's tests run, on the Vite dev server:
-# no web build, no binary built or tested.
+# web app alone, scripts/changed) only the in-browser host's tests run, on the demo site that the run builds once
+# (scripts/e2e-servers): no server binary built or tested.
 set -euo pipefail
 cd "$(dirname "$0")/../.."
 LADDER_STEP=browser
@@ -32,7 +32,7 @@ projects=(--project=chromium)
 if [ "${LADDER_SERVER:-1}" = 1 ]; then
   ladder_cargo_test --test integration -- binary::binary:: || ladder_fail "the binary's tests failed"
   ladder_suite "binary" "$(ladder_tests_matching cairn '^binary::binary::')" tests
-  projects+=(--project=server)
+  projects+=(--project=server --project=server-serial)
   export CAIRN_E2E_BINARY=1
 else
   export CAIRN_E2E_BINARY=0

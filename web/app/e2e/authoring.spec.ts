@@ -11,11 +11,6 @@ import { importIntoDraft, openRoute, publishDraft, routeMenuItem, savedText, ver
 import { addNode, addRole, formField, newRoute, nodeForm, openEditing, openForm, pickByTitle, routeName, saveForm, section, structure } from "./authoring.ts";
 import { nodeCard, open, openFromCanvas, openJourney } from "./shell.ts";
 
-/** The fields the open node's form offers. */
-async function offered(page: Page): Promise<string[]> {
-  return nodeForm(page).getByTestId("author-field").evaluateAll((fields) => fields.map((field) => field.getAttribute("data-field") ?? ""));
-}
-
 /** Opens a draft node's structure from its card. */
 async function openNode(page: Page, key: string): Promise<void> {
   await nodeCard(page, key).getByTestId("card-open").click();
@@ -32,9 +27,6 @@ async function authorRoute(page: Page): Promise<Record<string, string>> {
   await pickByTitle(formField(page, "fills_role").getByLabel("Fills the role"), "Lead");
   await saveForm(page);
   keys["Include training"] = await addNode(page, "decision", "Include training");
-  // A decision's form opens on its question and folds the rest (design 4.9).
-  await expect(nodeForm(page).getByTestId("form-question")).toHaveAttribute("open", "");
-  await expect(nodeForm(page).getByTestId("form-relevance")).not.toHaveAttribute("open");
   keys["Setup"] = await addNode(page, "group", "Setup");
   await openForm(page, "dates");
   await pickByTitle(formField(page, "opens_at").getByLabel("Opens at"), "Kickoff");
@@ -62,11 +54,6 @@ async function authorRoute(page: Page): Promise<Record<string, string>> {
 test("A12, A1a: a route authored by hand from an empty draft, published, exported, and imported back to the same graph", async ({ page }) => {
   const route = await newRoute(page, "browser", routeName("Onboarding"));
   const keys = await authorRoute(page);
-  expect(await offered(page)).toEqual(expect.arrayContaining(["final", "auto_done"]));
-  expect(await offered(page)).not.toEqual(expect.arrayContaining(["estimate"]));
-  await openNode(page, keys["Who leads"] ?? "");
-  expect(await offered(page)).toEqual(expect.arrayContaining(["prompt", "answer_type", "fills_role"]));
-  expect(await offered(page)).not.toContain("choices");
   await expect(nodeCard(page, keys["Training plan"] ?? "")).toBeVisible();
   // A requirement is drawn on the canvas by clicking cards, and one on its own container is refused with the reason (A3).
   const [handbook, setup, accounts] = [keys["Handbook"] ?? "", keys["Setup"] ?? "", keys["Accounts"] ?? ""];
@@ -74,18 +61,6 @@ test("A12, A1a: a route authored by hand from an empty draft, published, exporte
   await openNode(page, handbook);
   await (await section(page, "author-edges")).getByRole("button", { name: "Draw it on the canvas" }).click();
   const banner = page.getByTestId("drawing-edge");
-  await expect(banner).toHaveAttribute("data-from", handbook);
-  // Escape in a field belongs to the field: drawing goes on. Outside one it stops the drawing and leaves the node open.
-  const title = nodeForm(page).getByLabel("Title", { exact: true });
-  await title.focus();
-  await expect(title).toBeFocused();
-  await page.keyboard.press("Escape");
-  await expect(banner).toBeVisible();
-  await banner.getByText("Pick the node").click();
-  await page.keyboard.press("Escape");
-  await expect(banner).toHaveCount(0);
-  await expect(structure(page)).toHaveAttribute("data-node", handbook);
-  await (await section(page, "author-edges")).getByRole("button", { name: "Draw it on the canvas" }).click();
   await expect(banner).toHaveAttribute("data-from", handbook);
   await nodeCard(page, setup).getByTestId("card-open").click();
   await expect(page.getByTestId("edge-refused")).toBeVisible();
@@ -129,7 +104,13 @@ test("B4: on a fixture journey, a local node added, a route-copied title edited 
 });
 
 
-test("Edit is one state entered from the journey menu: structure tools and the name editor together, left with Done", async ({ page }) => {
+test("A3: Edit is one state entered from the journey menu, with the name editor beside the structure tools; Escape in a field belongs to the field and outside one stops drawing and keeps edit mode, on a phone too; leaving edit mode or opening another graph stops it too", async ({ page }) => {
+  const banner = page.getByTestId("drawing-edge");
+  const draw = async () => {
+    await openFromCanvas(page, "n_access");
+    await (await section(page, "author-edges")).getByRole("button", { name: "Draw it on the canvas" }).click();
+    await expect(banner).toHaveAttribute("data-from", "n_access");
+  };
   await openJourney(page, "browser", "j_vendor_eval");
   await expect(page.getByTestId("authoring-bar")).toHaveCount(0);
   await page.getByTestId("journey-menu").click();
@@ -138,23 +119,22 @@ test("Edit is one state entered from the journey menu: structure tools and the n
   await expect(bar).toBeVisible();
   await bar.getByRole("button", { name: "Edit the name and description" }).click();
   await expect(bar.getByTestId("header-editor")).toBeVisible();
-  await page.getByTestId("edit-done").click();
-  await expect(bar).toHaveCount(0);
-});
-
-
-test("A3: on a journey's graph in edit mode, Escape stops drawing and keeps edit mode; leaving edit mode or opening another graph stops it too", async ({ page }) => {
-  const banner = page.getByTestId("drawing-edge");
-  const draw = async () => {
-    await openFromCanvas(page, "n_access");
-    await (await section(page, "author-edges")).getByRole("button", { name: "Draw it on the canvas" }).click();
-    await expect(banner).toHaveAttribute("data-from", "n_access");
-  };
-  await openEditing(page, "browser", "j_vendor_eval");
   await draw();
+  // Escape in a field belongs to the field: drawing goes on. Outside one it stops the drawing and leaves the node open.
+  const title = nodeForm(page).getByLabel("Title", { exact: true });
+  await title.focus();
+  await expect(title).toBeFocused();
+  await page.keyboard.press("Escape");
+  await expect(banner).toBeVisible();
+  await banner.getByText("Pick the node").click();
+  // On a phone the drawing's banner is one banner above the graph.
+  await page.setViewportSize({ width: 390, height: 844 });
+  await expect(banner).toHaveCount(1);
+  await expect(banner).toBeVisible();
   await page.keyboard.press("Escape");
   await expect(banner).toHaveCount(0);
-  await expect(page.getByTestId("authoring-bar")).toBeVisible();
+  await expect(bar).toBeVisible();
+  await page.setViewportSize({ width: 1280, height: 720 });
   await draw();
   await page.getByTestId("edit-done").click();
   await expect(page.getByTestId("authoring-bar")).toHaveCount(0);

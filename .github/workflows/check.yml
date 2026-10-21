@@ -104,6 +104,13 @@ jobs:
       # The check prints only what failed; the complete log is a file.
       - if: failure()
         run: tail -n +1 dist/ladder/*.log
+      # Every test's time from the browser step's run, to see what the step spends its minutes on.
+      - if: always() && matrix.part == 'browser'
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: playwright-report
+          path: web/app/dist/playwright*.json
+          if-no-files-found: ignore
 
   # The gate: green only when every part ran and passed. A part that was skipped because the
   # list of parts failed counts as a failure here, not as a success.
