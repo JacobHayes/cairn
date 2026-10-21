@@ -1,0 +1,27 @@
+#!/usr/bin/env bash
+# Step advisories of `mise run check` (left out of check:fast): every lock file in the
+# repository (the workspace's and each testbed's today) against the RustSec advisory
+# database, with cargo-deny (deny.toml). A crate with an open advisory fails it, so a vulnerable dependency stops the
+# push it would ship in; the nightly run catches advisories published on quiet days. It
+# fetches the database, so it needs the network, as pushing does.
+# PRACTICES, The validation ladder.
+set -euo pipefail
+cd "$(dirname "$0")/../.."
+LADDER_STEP=advisories
+# shellcheck source=scripts/ladder-lib.sh
+source scripts/ladder-lib.sh
+
+ladder_require_tool cargo-deny cargo deny --version
+# Every lock file in the repository, found rather than listed, so a new workspace is checked
+# with no edit here. Build output and dependencies are pruned; symlinks are not followed.
+locks=()
+while IFS= read -r lock; do
+  locks+=("$lock")
+done < <(find . \( -name target -o -name node_modules -o -name dist -o -name .git -o -name .jj \) -prune \
+  -o -name Cargo.lock -type f -print | sort)
+for lock in ${locks[@]+"${locks[@]}"}; do
+  ladder_run "the advisories of ${lock#./}" \
+    cargo deny --locked --manifest-path "${lock%Cargo.lock}Cargo.toml" --config deny.toml check --hide-inclusion-graph advisories
+done
+ladder_suite "lock files against RustSec" "${#locks[@]}" "lock files"
+ladder_step_end

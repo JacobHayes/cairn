@@ -1,3 +1,3 @@
 #!/usr/bin/env -S bash -euo pipefail
-#MISE description="The whole validation: lint, then the unit tests, then generated-files freshness, then property, integration, cost, and browser tests side by side; stops at the first failing stage; CI runs it a part per runner with --part NAME (scripts/ladder --parts)"
+#MISE description="The whole validation: lint, then the unit tests, then generated-files freshness, then property, integration, cost, and browser tests and the RustSec advisories side by side; stops at the first failing stage; CI runs it a part per runner with --part NAME (scripts/ladder --parts)"
 exec scripts/locked scripts/ladder "$@"

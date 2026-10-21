@@ -9,8 +9,9 @@
 # then, in the full check, generated (regenerates files the others read, so it runs alone)
 # and embed (the binary's build with the web build embedded).
 # Only then do the slow steps that are independent of one another run side by side: property,
-# integration, cost, and browser. A step prints one line when it passes and what a person
-# acts on when it fails, and writes everything else to dist/ladder/<step>.log. The side-by-side
+# integration, cost, browser, and, in the full check, advisories (RustSec, over the network).
+# A step prints one line when it passes and what a person acts on when it fails, and writes
+# everything else to dist/ladder/<step>.log. The side-by-side
 # steps' lines are printed in order once all have finished.
 #
 # With --fast, steps are left out when the current change touches none of their inputs
@@ -20,12 +21,12 @@
 # module with the server's answers). The browser step runs only against the in-browser host,
 # with no web build embedded and no binary built or tested, unless the change touches the
 # server side of the web app. The full check and CI skip nothing. The slowest Rust steps
-# (integration, cost) are left out of --fast.
+# (integration, cost) and advisories, which needs the network, are left out of --fast.
 #
 # CI runs the full check in parts, one runner each and side by side: --part NAME runs the steps
 # of that part, in the order above, building only what they need. A part is the steps that
-# share one build (lint; rust: the Rust test steps; web: the web build and what reads it;
-# browser: the binary and Playwright). --parts prints them as a JSON array, which is the
+# share one build (lint: lint and advisories, which build nothing; rust: the Rust test steps;
+# web: the web build and what reads it; browser: the binary and Playwright). --parts prints them as a JSON array, which is the
 # workflow's matrix, so a part added here runs in CI with no workflow edit; every invocation
 # fails when a step of the full check belongs to no part, or to two.
 #
@@ -36,8 +37,8 @@ cd "$(dirname "$0")/.."
 # The steps of the full check in the order they run (one at a time, then side by side), and the
 # part each runs in on CI. Plain arrays and "step:part" entries: macOS ships Bash 3.2.
 all_first=(lint unit web-unit generated embed)
-all_side=(property integration cost browser)
-step_parts=(lint:lint unit:rust property:rust integration:rust cost:rust web-unit:web generated:web embed:web browser:browser)
+all_side=(property integration cost browser advisories)
+step_parts=(lint:lint advisories:lint unit:rust property:rust integration:rust cost:rust web-unit:web generated:web embed:web browser:browser)
 parts=(lint rust web browser)
 
 usage() { echo "usage: scripts/ladder [--fast | --part NAME | --parts]" >&2; exit 2; }

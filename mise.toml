@@ -12,6 +12,8 @@ rust = { version = "1.99.0", profile = "minimal", components = "clippy,rustfmt",
 # source once at the same revision as the SDK git dependencies in Cargo.toml. Only
 # `mise run sim` uses it; the check ladder never does.
 "cargo:https://github.com/JacobHayes/patina" = { version = "rev:1dee57b448d57c390af26a9d5af5f2d3a8820cc8", crate = "cargo-patina", locked = true }
+# RustSec advisories over every lock file: the full check's advisories step (deny.toml).
+cargo-deny = "0.20.2"
 
 [env]
 # A fixed build time for every build, local and CI. turso_core's build script embeds the wall

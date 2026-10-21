@@ -1,0 +1,11 @@
+# cargo-deny, for the full check's advisories step (scripts/steps/advisories), which runs
+# only `cargo deny check advisories`: every RustSec advisory against a crate in a lock file
+# (a vulnerability, or a crate unsound or unmaintained) fails the check, unless it is
+# listed here as accepted, with why.
+[advisories]
+ignore = [
+  # The Marvin attack: timing leaks an RSA private key. Cairn holds no RSA private key; it
+  # uses openidconnect's `rsa` only to verify RS256 signatures, with public keys. No fixed
+  # release exists.
+  { id = "RUSTSEC-2023-0071", reason = "no RSA private key: rsa only verifies signatures" },
+]
