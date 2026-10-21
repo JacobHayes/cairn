@@ -55,12 +55,16 @@ function Orphaned({ view, detail, removeTo }: { view: Ready; detail: NodeDetail;
   return (
     <div className="row" data-testid="orphaned">
       <span>Orphaned: its route version no longer has it.</span>
-      <Button disabled={write.disabled} onClick={() => void write.run([{ op: "set_provenance", node: detail.node.key, provenance: "local" }])}>
-        Keep
-      </Button>
-      <Link className="button" to={removeTo}>
-        Remove…
-      </Link>
+      {write.writable ? (
+        <>
+          <Button disabled={write.disabled} onClick={() => void write.run([{ op: "set_provenance", node: detail.node.key, provenance: "local" }])}>
+            Keep
+          </Button>
+          <Link className="button" to={removeTo}>
+            Remove…
+          </Link>
+        </>
+      ) : null}
     </div>
   );
 }
@@ -72,7 +76,7 @@ function Meta({ view, detail }: { view: Ready; detail: NodeDetail }) {
   const people = view.inputs.deployment.identities ?? [];
   const { caller } = useCaller();
   const owner =
-    derived.unassigned === true && people.length > 0 ? (
+    derived.unassigned === true && people.length > 0 && write.writable ? (
       <OwnerSelect key="assign" view={view} write={write} node={node.key} placeholder="Assign" className="assign-owner" testId="assign-owner" />
     ) : (
       ownerWords(view, ownersOf(view, node.key), caller?.identities)

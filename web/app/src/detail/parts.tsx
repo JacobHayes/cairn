@@ -126,6 +126,9 @@ export function IdentityOptions({ view }: { view: Ready }) {
 
 /** D2, E1: make a person the node's owner by choosing them: the choice sends it. */
 export function OwnerSelect({ view, write, node, placeholder, className, testId }: { view: Ready; write: NodeWrite; node: string; placeholder: string; className?: string; testId?: string }) {
+  if (!write.writable) {
+    return null;
+  }
   return (
     <select className={className} aria-label="Assign owner" data-testid={testId} disabled={write.disabled} value="" onChange={(event) => { void write.run([assignOwner(node, event.target.value)]); }}>
       <option value="">{placeholder}</option>

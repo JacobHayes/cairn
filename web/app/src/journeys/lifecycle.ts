@@ -1,9 +1,8 @@
 // A journey's life as the screens offer it: started from a route version or empty (B1),
 // completed, reopened, archived, un-archived (B11), and hard-deleted once archived, behind a
 // typed confirmation (A19). Each is one patch to the journey; the host's answer is the truth.
-import type { Schema } from "@cairn/client";
+import { STATUS_MOVES, type Schema } from "@cairn/client";
 
-import { isSegment } from "../data/reads.ts";
 import type { Mutation } from "../data/writes.ts";
 import type { JourneyStatus } from "./address.ts";
 
@@ -38,33 +37,26 @@ export function createMutation(name: string, description: string, start: Start):
   };
 }
 
-/**
- * A19, A21: the routes a journey can start from: not a segment, not retired, with a published
- * version. A retired route is hidden from creation only; its journeys still see upgrades.
- */
-export function startableRoutes(routes: readonly RouteSummary[]): RouteSummary[] {
-  return routes.filter((route) => !isSegment(route) && route.header.retired !== true && route.latest_version != null);
-}
-
 /** One status change the overview offers, and what it is called. */
 export interface StatusAction {
   to: JourneyStatus;
   label: string;
 }
 
-/** B11: the status changes a journey in `status` accepts; an archived one only un-archiving. */
+/** What a move to each status is called; out of an archive it is un-archiving. */
+const MOVE_WORDS: Record<JourneyStatus, string> = { active: "Reopen", completed: "Complete", archived: "Archive" };
+
+/** B11: the status changes a journey in `status` accepts (the engine's table), each with its words. */
 export function statusActions(status: JourneyStatus): StatusAction[] {
-  switch (status) {
-    case "active":
-      return [{ to: "completed", label: "Complete" }, { to: "archived", label: "Archive" }];
-    case "completed":
-      return [{ to: "active", label: "Reopen" }, { to: "archived", label: "Archive" }];
-    case "archived":
-      return [{ to: "completed", label: "Un-archive" }];
-  }
+  return STATUS_MOVES[status].map((to) => ({ to, label: status === "archived" ? "Un-archive" : MOVE_WORDS[to] }));
 }
 
-/** A19: hard deletion is offered once a journey is archived, and only for its name typed back. */
+/** A19, C16: hard deletion is offered once a journey is archived. The engine deletes a journey in any status; the screens put deletion behind archiving. */
+export function deletable(status: JourneyStatus): boolean {
+  return status === "archived";
+}
+
+/** A19: hard deletion is sent only for a journey it is offered for, with its name typed back. */
 export function deleteConfirmed(status: JourneyStatus, name: string, typed: string): boolean {
-  return status === "archived" && typed.trim() === name.trim();
+  return deletable(status) && typed.trim() === name.trim();
 }

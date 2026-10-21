@@ -58,6 +58,10 @@
 .small {
   font-size: 14px;
 }
+/* A phrase kept whole on its line, as an action's name in a sentence. */
+.nowrap {
+  white-space: nowrap;
+}
 .mono.small {
   font-size: 13px;
 }

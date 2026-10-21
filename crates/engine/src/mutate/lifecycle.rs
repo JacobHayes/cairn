@@ -80,7 +80,7 @@ fn create_journey(
     let Some(lineage) = from else {
         return writes;
     };
-    if refuse_segment(session, &lineage.route) {
+    if refuse_segment(session, &lineage.route) || refuse_retired(session, &lineage.route) {
         return Vec::new();
     }
     let Some(version) = session.candidate.versions.get(lineage) else {
@@ -147,6 +147,23 @@ pub(super) fn refuse_segment(session: &mut Session<'_>, route: &RouteId) -> bool
     segment
 }
 
+/// A19: a retired route is closed to new journeys; the journeys already on it keep it.
+fn refuse_retired(session: &mut Session<'_>, route: &RouteId) -> bool {
+    let retired = session
+        .candidate
+        .routes
+        .get(route)
+        .is_some_and(|held| held.header.retired);
+    if retired {
+        session.reject(
+            ViolationCode::LineageInvalid,
+            None,
+            format!("route {route} is retired: no new journey starts from it"),
+        );
+    }
+    retired
+}
+
 fn edit_journey(session: &Session<'_>, change: impl FnOnce(&mut JourneyHeader)) -> Vec<Write> {
     let Some(journey) = session.journey() else {
         unreachable!("the journey's existence was admitted")
@@ -161,22 +178,14 @@ fn edit_journey(session: &Session<'_>, change: impl FnOnce(&mut JourneyHeader)) 
     vec![Write::Put(Record::JourneyHeader(header))]
 }
 
-/// B11: active and completed move both ways; either may be archived; an archived journey
-/// returns only to completed.
+/// B11: a move the journey's status allows (`JourneyStatus::moves`).
 fn set_status(session: &mut Session<'_>, status: JourneyStatus) -> Vec<Write> {
-    use JourneyStatus::{Active, Archived, Completed};
     let from = session.journey().map(|journey| journey.header.status);
     assert!(
         from.is_some(),
         "a status change was admitted only for an existing journey"
     );
-    let legal = matches!(
-        (from, status),
-        (Some(Active), Completed | Archived)
-            | (Some(Completed), Active | Archived)
-            | (Some(Archived), Completed)
-    );
-    if !legal {
+    if !from.is_some_and(|from| from.moves().contains(&status)) {
         session.reject(
             ViolationCode::IllegalTransition,
             None,

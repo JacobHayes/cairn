@@ -17,9 +17,9 @@ mod structure;
 use std::collections::{BTreeMap, BTreeSet};
 
 use cairn_schema::{
-    Domain, GraphId, GraphKey, GraphRecord, IdentityKey, Journey, JourneyId, JourneyStatus,
-    KeyRefs, Lineage, LocalEdit, Mutation, Node, NodeKey, Patch, PatchTarget, Provenance, Record,
-    RecordKey, RevisionConflict, Subject, Violation, ViolationCode, Write,
+    Domain, GraphId, GraphKey, GraphRecord, IdentityKey, Journey, JourneyId, KeyRefs, Lineage,
+    LocalEdit, Mutation, Node, NodeKey, Patch, PatchTarget, Provenance, Record, RecordKey,
+    RevisionConflict, Subject, Violation, ViolationCode, Write,
 };
 
 use crate::edit::RemovalIndex;
@@ -27,6 +27,9 @@ use crate::graph::Document;
 use crate::pipeline::ApplyInputs;
 use crate::records::Records;
 use crate::validate::{missing_node_code, violation};
+
+/// B11, A19: why a journey whose status accepts no changes refuses one.
+const ARCHIVED_REFUSAL: &str = "an archived journey accepts only un-archiving or hard deletion";
 
 /// One apply in progress: the candidate the mutations so far produced, and what later stages
 /// need to know about them.
@@ -313,22 +316,22 @@ impl Session<'_> {
         mutation: &Mutation,
         rides: bool,
     ) -> Result<(), (ViolationCode, String)> {
-        let unarchiving = matches!(
-            mutation,
-            Mutation::SetJourneyStatus {
-                status: JourneyStatus::Completed
-            } | Mutation::DeleteJourney {}
-        );
-        let archived = self
+        let status = self
             .candidate
             .journeys
             .get(id)
-            .is_some_and(|journey| journey.header.status == JourneyStatus::Archived);
-        if archived && !unarchiving && !rides {
-            return Err((
-                ViolationCode::ArchivedJourney,
-                "an archived journey accepts only un-archiving or hard deletion".to_owned(),
-            ));
+            .map(|journey| journey.header.status);
+        // What a journey that accepts no changes still takes: a move its status allows, and
+        // hard deletion.
+        let exempt = match mutation {
+            Mutation::SetJourneyStatus { status: to } => {
+                status.is_some_and(|from| from.moves().contains(to))
+            }
+            Mutation::DeleteJourney {} => true,
+            _ => false,
+        };
+        if status.is_some_and(|status| !status.accepts_changes()) && !exempt && !rides {
+            return Err((ViolationCode::ArchivedJourney, ARCHIVED_REFUSAL.to_owned()));
         }
         if rides {
             return Ok(());

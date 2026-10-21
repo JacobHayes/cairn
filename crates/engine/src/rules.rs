@@ -1,7 +1,8 @@
 //! The rule tables the web app reads (ARCHITECTURE, Generated artifacts): the limits
 //! (PRACTICES, Explicit limits), each kind's transition table (D1), the initial state of
 //! each kind (B1) and which states are terminal, the display states and the words they are
-//! said by (D8), and every key prefix, written as the TypeScript module
+//! said by (D8), every key prefix, and what each journey status allows (B11, A19), written
+//! as the TypeScript module
 //! `web/client/generated/rules.ts` by `mise run gen`. The app never keeps its own copy of
 //! any of them. Pure text from the engine's own tables, so the file cannot drift.
 
@@ -9,7 +10,7 @@ use std::fmt::Write;
 
 use cairn_schema::id::KEY_PREFIXES;
 use cairn_schema::limits::Limit;
-use cairn_schema::{DisplayState, NodeKind, State};
+use cairn_schema::{DisplayState, JourneyStatus, NodeKind, State};
 
 use crate::transition::{Move, rows};
 
@@ -75,6 +76,7 @@ pub fn typescript() -> String {
          type NodeKind = components[\"schemas\"][\"NodeKind\"];\n\
          type State = components[\"schemas\"][\"State\"];\n\
          type DisplayState = components[\"schemas\"][\"DisplayState\"];\n\
+         type JourneyStatus = components[\"schemas\"][\"JourneyStatus\"];\n\
          \n",
     );
     limits(&mut out);
@@ -83,6 +85,7 @@ pub fn typescript() -> String {
     terminal_states(&mut out);
     display_states(&mut out);
     key_prefixes(&mut out);
+    statuses(&mut out);
     out
 }
 
@@ -227,6 +230,53 @@ fn key_prefixes(out: &mut String) {
     );
 }
 
+/// `statuses` as a TypeScript array of names.
+fn status_list(statuses: &[JourneyStatus]) -> String {
+    let names: Vec<String> = statuses
+        .iter()
+        .map(|status| format!("\"{}\"", status.name()))
+        .collect();
+    format!("[{}]", names.join(", "))
+}
+
+/// A record from each journey status to `value` of it.
+fn status_record(
+    out: &mut String,
+    name: &str,
+    kind: &str,
+    value: impl Fn(JourneyStatus) -> String,
+) {
+    let _ = writeln!(
+        out,
+        "export const {name}: Record<JourneyStatus, {kind}> = {{"
+    );
+    for status in JourneyStatus::ALL {
+        let _ = writeln!(out, "  {}: {},", status.name(), value(status));
+    }
+    out.push_str("};\n");
+}
+
+/// B11, A19: the statuses, the moves between them, and what a journey in each accepts and holds.
+fn statuses(out: &mut String) {
+    let _ = writeln!(
+        out,
+        "\n/** B11: a journey's statuses, in lifecycle order. */\nexport const JOURNEY_STATUSES: readonly JourneyStatus[] = {};\n",
+        status_list(&JourneyStatus::ALL)
+    );
+    out.push_str("/** B11: the statuses a journey in each status may move to. */\n");
+    status_record(out, "STATUS_MOVES", "readonly JourneyStatus[]", |status| {
+        status_list(status.moves())
+    });
+    out.push_str("\n/** B11, A19: whether a journey in each status accepts changes beyond its status moves and hard deletion. */\n");
+    status_record(out, "STATUS_ACCEPTS_CHANGES", "boolean", |status| {
+        status.accepts_changes().to_string()
+    });
+    out.push_str("\n/** B11: whether a journey in each status holds current work: \"mine\" and the cross-journey lists. */\n");
+    status_record(out, "STATUS_HOLDS_CURRENT_WORK", "boolean", |status| {
+        status.holds_current_work().to_string()
+    });
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -242,6 +292,10 @@ mod tests {
         for state in State::ALL {
             let written = serde_json::to_string(&state).unwrap();
             assert_eq!(written, format!("\"{}\"", state_name(state)));
+        }
+        for status in JourneyStatus::ALL {
+            let written = serde_json::to_string(&status).unwrap();
+            assert_eq!(written, format!("\"{}\"", status.name()));
         }
         let schema = serde_json::to_value(schemars::schema_for!(DisplayState)).unwrap();
         let mut every: Vec<&str> = schema["oneOf"]

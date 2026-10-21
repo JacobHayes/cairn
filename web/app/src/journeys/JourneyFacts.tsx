@@ -11,6 +11,7 @@ import type { Ready } from "../detail/model.ts";
 import { JourneyFlow } from "../proposals/Entries.tsx";
 import { Badge } from "../ui/kit.tsx";
 import { routePath } from "../routes/address.ts";
+import { useWritable } from "../screens/writable.ts";
 import type { SummaryModel } from "../summary/model.ts";
 import { dateWords } from "../status/when.ts";
 import { TROUBLES } from "../status/words.ts";
@@ -68,11 +69,11 @@ export function useLineage(ready: Ready): Lineage | undefined {
 
 /**
  * C16: where the journey came from (the route and version, its graph) and the day it started,
- * with the upgrade offered when the route has moved on, unless `readOnly` (an archived journey
- * accepts only un-archiving or deletion, A19).
+ * with the upgrade offered when the route has moved on and the page offers writes to the journey.
  */
-export function LineageBlock({ ready, lineage, readOnly = false }: { ready: Ready; lineage: Lineage | undefined; readOnly?: boolean }) {
+export function LineageBlock({ ready, lineage }: { ready: Ready; lineage: Lineage | undefined }) {
   const [upgrading, setUpgrading] = useState(false);
+  const writable = useWritable(ready);
   const { header } = ready.journey;
   const query = lineage === undefined ? undefined : { route: lineage.route, version: lineage.version };
   const { view } = useLive(indexKey(query), journeyIndex(query));
@@ -92,13 +93,13 @@ export function LineageBlock({ ready, lineage, readOnly = false }: { ready: Read
             {upgradeWords(summary)}
           </Badge>
         )}
-        {lineage.latest === undefined || readOnly ? null : (
+        {lineage.latest === undefined || !writable ? null : (
           <button type="button" className="chip" data-testid="journey-upgrade" title="Propose this journey's upgrade to the route's newer version" onClick={() => { setUpgrading(true); }}>
             Upgrade to v{lineage.latest}
           </button>
         )}
       </span>
-      {upgrading && !readOnly ? <JourneyFlow ready={ready} flow="upgrade" onClose={() => { setUpgrading(false); }} /> : null}
+      {upgrading && writable ? <JourneyFlow ready={ready} flow="upgrade" onClose={() => { setUpgrading(false); }} /> : null}
       {started}
     </>
   );

@@ -5,22 +5,11 @@ import { Panel } from "@xyflow/react";
 import { useId } from "react";
 
 import { Menu } from "../screens/Menu.tsx";
-import { Segmented } from "../ui/kit.tsx";
-import { STEP_WORDS } from "./ladder.ts";
 import { LENS_MEANING, LENS_WORDS } from "./lens.ts";
 import { LineSample } from "./LineSample.tsx";
-import { LENSES, LINE_KINDS, type Lens, type Step } from "./model.ts";
+import { LENSES, LINE_KINDS, type Lens } from "./model.ts";
 import { LINE_KIND_WORDS } from "./words.ts";
 import { plural } from "../ui/words.ts";
-
-/** C2: a route's Depth (Stages, Decisions, Deliverables, Actions: coarse to fine, as keys 1 to 4). A journey's is the Depth menu of its view controls. */
-export function Ladder({ steps, step, onStep }: { steps: readonly Step[]; step: Step; onStep: (step: Step) => void }) {
-  return (
-    <Panel position="top-left" className="canvas-panel canvas-top">
-      <Segmented label="Depth" value={step} options={steps.map((each) => ({ value: each, label: STEP_WORDS[each] }))} onChange={onStep} data-testid="ladder" />
-    </Panel>
-  );
-}
 
 /** The four kinds of line, drawn as the canvas draws them, for View, Key. */
 function Key() {

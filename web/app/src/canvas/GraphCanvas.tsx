@@ -24,7 +24,7 @@ import { NEAR_ZOOM, firstFrame, fitZoom, listenPinch, minZoomOf, roomOf, shiftIn
 import { lensChips, lensTiers } from "./lens.ts";
 import type { Layout } from "./layout.ts";
 import { fadedCards } from "./look.ts";
-import { STEPS, type CanvasModel, type Line, type Lens, type Step } from "./model.ts";
+import type { CanvasModel, Line, Lens } from "./model.ts";
 import { CardActionsContext, NodeCard, type CardActions, type CardNode } from "./NodeCard.tsx";
 import type { CanvasOverlay } from "./overlay.ts";
 import { firstFitCards } from "./refit.ts";
@@ -82,9 +82,6 @@ export interface GraphCanvasProps {
   reveal?: Reveal | undefined;
   /** The nodes the view first opens framed on (a proposal's changes, in the rail's order: see `firstFrame`), with the whole graph when none is drawn; none yet (an empty list) holds the first fit back. Fit still fits all. */
   firstFit?: readonly string[] | undefined;
-  /** The ladder's steps, for keys 1 to 4. */
-  steps?: readonly Step[];
-  onStep?: ((step: Step) => void) | undefined;
   /** What sits over the canvas: the Signal button, Reveal. A new view mounts it afresh. */
   children?: ReactNode;
   /** What sits over the canvas's top left and outlives a new view: the view's controls, whose open popover a refit must not close. */
@@ -282,23 +279,18 @@ function useReveal(reveal: Reveal | undefined, model: CanvasModel): void {
   }, [reveal, model, flow, padding]);
 }
 
-/** Keys on the canvas: 1 to 4 pick a step, `f` fits the selection, or the whole graph with none. */
+/** The canvas's own key: `f` fits the selection, or the whole graph with none. Depth's keys are the view's (screens/keys.ts). */
 function useCanvasKeys(props: GraphCanvasProps): void {
   const flow = useReactFlow();
   const padding = useFitPadding();
-  const { steps, onStep, selected } = props;
+  const { selected } = props;
   useEffect(() => {
     const onKey = (event: KeyboardEvent) => {
       // Not behind the key sheet (a modal dialog), where only its own keys act.
       if (event.defaultPrevented || event.metaKey || event.ctrlKey || event.altKey || typing(event.target) || (event.target instanceof Element && event.target.closest("dialog[open]") !== null)) {
         return;
       }
-      const step = /^[1-4]$/.test(event.key) ? STEPS[Number(event.key) - 1] : undefined;
-      if (step !== undefined) {
-        if (steps?.includes(step) === true) {
-          onStep?.(step);
-        }
-      } else if (event.key === "f") {
+      if (event.key === "f") {
         void flow.fitView(selected === undefined ? { ...FIT, padding: padding() } : { nodes: [{ id: selected }], padding: padding(), maxZoom: 1 });
       }
     };
@@ -306,7 +298,7 @@ function useCanvasKeys(props: GraphCanvasProps): void {
     return () => {
       document.removeEventListener("keydown", onKey);
     };
-  }, [flow, steps, onStep, selected, padding]);
+  }, [flow, selected, padding]);
 }
 
 /** The line under the pointer, and the chip that says what it is: where the pointer is only moves the chip, it never re-renders the cards. */

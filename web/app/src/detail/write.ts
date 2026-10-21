@@ -9,6 +9,7 @@ import { held } from "../data/edit-manager.ts";
 import { useSession, useWrite } from "../data/react.ts";
 import type { WriteView } from "../data/write-machine.ts";
 import { newPatchId, patchOf, type Rejection } from "../data/writes.ts";
+import { useWritable } from "../screens/writable.ts";
 import type { ReceiptState } from "../ui/receipt.ts";
 import { titleOf, type Mutation, type Ready } from "./model.ts";
 
@@ -53,7 +54,9 @@ export interface NodeWrite {
   status: WriteView | undefined;
   /** A write is out or may have committed. */
   pending: boolean;
-  /** Version skew or a write in flight: no new write starts. */
+  /** Whether the page offers writes to this journey at all (screens/writable.ts): a surface shows no write control without it. */
+  writable: boolean;
+  /** Not writable, version skew, or a write in flight: no new write starts. */
   disabled: boolean;
   /** The last attempt's rejection, until dismissed or a later attempt. */
   failed: Failed | undefined;
@@ -104,6 +107,7 @@ export function useNodeWrite(view: Ready, scope: string, node?: string): NodeWri
   const journey = view.journey.header.id;
   const label = node === undefined ? view.journey.header.name : titleOf(view, node);
   const write = useWrite(nodeEdit(journey, scope), label);
+  const writable = useWritable(view);
   const revision = view.journey.revision;
   const deployment = view.key.deployment_revision;
   const current: Seen = { base: revision, deployment };
@@ -112,11 +116,12 @@ export function useNodeWrite(view: Ready, scope: string, node?: string): NodeWri
     journey,
     revision,
     seen: current,
-    run: async (mutations, seen = current, id = newPatchId()) => (await write.submit(nodeCommand(journey, mutations, seen, id))) !== undefined,
+    run: async (mutations, seen = current, id = newPatchId()) => writable && (await write.submit(nodeCommand(journey, mutations, seen, id))) !== undefined,
     holds: (id) => held(edits, id),
     status: write.status,
     pending: write.busy,
-    disabled: write.disabled,
+    writable,
+    disabled: !writable || write.disabled,
     failed: write.write?.state === "rejected" && attempt !== undefined ? { id: write.write.id, attempt, rejection: write.write.rejection } : undefined,
     dismiss: write.dismiss,
     receipt: write.receipt,

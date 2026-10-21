@@ -52,7 +52,7 @@ function Gravity({ view, detail }: { view: Ready; detail: NodeDetail }) {
   const { node, derived } = detail;
   const constants = view.inputs.rank;
   const all = useContributions(view, node.key, "gravity", derived.gravity_from);
-  const container = detail.children.length > 0 || node.kind === "group";
+  const container = detail.children.length > 0;
   const parts = gravityParts(view, derived.gravity, all.entries);
   return (
     <div className="stack" data-testid="gravity-breakdown">

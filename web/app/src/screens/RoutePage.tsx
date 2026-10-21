@@ -50,7 +50,7 @@ import { treeOf } from "../authoring/graph.ts";
 import { RouteTimeline } from "../timeline/RouteTimeline.tsx";
 import { Button } from "../ui/kit.tsx";
 import { KeySheet } from "./KeySheet.tsx";
-import { useViewKeys } from "./keys.ts";
+import { keyBindingsFor, useViewKeys } from "./keys.ts";
 import { nodesOf, ROUTE_GRAPH, routeGraphKey, type Derived, type Shown } from "./route-reads.ts";
 import { useRouteDerived } from "./route-views.ts";
 import { RouteList } from "./RouteList.tsx";
@@ -345,7 +345,7 @@ function LayerPage({ id, proposal, selected, write, imports }: { id: string; pro
         <ViewStateContext value={value}>
           <LayerViewKeys id={id} proposal={proposal} shown={shown} screen={screen} state={viewState} onState={value.onState} sheetOpen={sheetOpen} setSheetOpen={setSheetOpen} />
           <LayerBody shown={shown} route={route} selected={selected} write={write} imports={imports} />
-          {sheetOpen ? <KeySheet onClose={() => { setSheetOpen(false); }} /> : null}
+          {sheetOpen ? <KeySheet bindings={keyBindingsFor(ROUTE_OFFERS, { screen, acts: false })} onClose={() => { setSheetOpen(false); }} /> : null}
         </ViewStateContext>
       )}
     </RouteLayerHost>
@@ -355,7 +355,7 @@ function LayerPage({ id, proposal, selected, write, imports }: { id: string; pro
 function LayerViewKeys({ id, proposal, shown, screen, state, onState, sheetOpen, setSheetOpen }: { id: string; proposal: string; shown: Shown | undefined; screen: Screen; state: ReturnType<typeof viewStateFrom>; onState: ReturnType<typeof useViewStateValue>["onState"]; sheetOpen: boolean; setSheetOpen: (open: boolean) => void }) {
   const { search } = useLocation();
   const steps = useMemo(() => (shown === undefined ? [] : stepsFor(nodesOf(shown))), [shown?.graph]);
-  useViewKeys({ screen, selected: undefined, sheetOpen, setSheetOpen, state, steps, onState, offers: ROUTE_OFFERS, walk: false, viewAddress: (to) => routeSwitched(id, search, to, undefined, proposal) });
+  useViewKeys({ screen, selected: undefined, sheetOpen, setSheetOpen, state, steps, onState, offers: ROUTE_OFFERS, unavailable: {}, viewAddress: (to) => routeSwitched(id, search, to, undefined, proposal) });
   return null;
 }
 
@@ -417,7 +417,7 @@ function Loaded({ shown, selected, edge, write, imports, result, setResult }: { 
     steps,
     onState: value.onState,
     offers: ROUTE_OFFERS,
-    walk: false,
+    unavailable: {},
     viewAddress: (to) => routeSwitched(id, search, to, selected),
   });
   const frame = { selected, edge, derived, write, result, setResult, imports };
@@ -425,7 +425,7 @@ function Loaded({ shown, selected, edge, write, imports, result, setResult }: { 
   return (
     <ViewStateContext value={value}>
       {draft ? authored === undefined ? <p className="muted small">Reading the route...</p> : <DraftFrame {...frame} shown={shown} authored={authored} /> : <VersionFrame {...frame} shown={shown} />}
-      {sheetOpen ? <KeySheet onClose={() => { setSheetOpen(false); }} /> : null}
+      {sheetOpen ? <KeySheet bindings={keyBindingsFor(ROUTE_OFFERS, { screen, acts: false })} onClose={() => { setSheetOpen(false); }} /> : null}
     </ViewStateContext>
   );
 }

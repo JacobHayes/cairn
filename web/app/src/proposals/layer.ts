@@ -3,7 +3,7 @@
 // before and as it would be after, the mark on every node it touches, and the revision Apply
 // sends. The views read it from `LayerContext` (one value, provided by the destination's page),
 // so a page needs no parameter threaded through it, and the one gate on every live write reads
-// it too (`useReviewing`). The pure functions beside the context are what the unit tests check:
+// it too (screens/writable.ts). The pure functions beside the context are what the unit tests check:
 // which nodes are marked how, how removed things are put back in place, the identities' diff, and
 // which proposal revision Apply may send.
 import type { Schema } from "@cairn/client";
@@ -117,9 +117,8 @@ export function useLayer(): Layer | undefined {
 }
 
 /**
- * The layer while a proposal is under review, or none: the one gate every live write on a page
- * reads. Acting on a picture of the future would be wrong, so the shared entries of node
- * actions, authoring, the header's write items and the identities' forms draw nothing under it.
+ * The layer while a proposal is under review, or none: the views draw the destination after it,
+ * with what it removes put back. Whether the page offers a write is screens/writable.ts's.
  */
 export function useReviewing(): Layer | undefined {
   const layer = useContext(LayerContext);

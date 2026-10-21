@@ -169,7 +169,7 @@ function useCards(view: Ready, state: ViewState) {
   const { rows: candidates, error: rowsError } = useRows(view, query);
   const lit = useMemo(() => new Set((candidates ?? []).map((row) => row.key)), [candidates]);
   // The walk draws at the depth whatever Fade says, and counts its candidate cards, not the frontier, against it.
-  const { drawn, error: levelError, badges } = useViewLevel({ screen: "walk", state, nodes, selected: undefined, ready: view, fade: false, lit, held: view });
+  const { drawn, error: levelError, badges } = useViewLevel({ screen: "walk", state, nodes, selected: undefined, ready: view, lit, held: view });
   const rows = useMemo(() => (candidates ?? []).filter((row) => drawn?.has(row.key) === true), [candidates, drawn]);
   return { depth, rows, read: candidates !== undefined && drawn !== undefined, error: levelError ?? rowsError, badges };
 }

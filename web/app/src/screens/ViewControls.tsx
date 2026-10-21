@@ -23,7 +23,7 @@ import type { Step } from "../canvas/model.ts";
 import type { GraphNode, Ready } from "../detail/model.ts";
 import { identityName } from "../detail/sections.tsx";
 import type { Screen } from "../journeys/address.ts";
-import { canDraw, CLASS_REASONS, FILTER_FLAGS, RELEVANCE_CLASSES, filterChanged, filterChips, isStock, stockView, useViewState, withViewState, type RelevanceClass, type ViewFilter } from "../journeys/view.ts";
+import { canDraw, fadeOn, FILTER_FLAGS, JOURNEY_OFFERS, RELEVANCE_CLASSES, ROUTE_OFFERS, SCREEN_VIEWS, filterChanged, filterChips, isStock, stockView, useViewState, withViewState, type RelevanceClass, type ViewFilter, type ViewOffers } from "../journeys/view.ts";
 import { useMedia, PHONE_WIDTH } from "../shell/frame.tsx";
 import { Button } from "../ui/kit.tsx";
 import { ActiveFilters } from "./ActiveFilters.tsx";
@@ -32,9 +32,6 @@ import { Menu } from "./Menu.tsx";
 
 /** The jargon term's words, in its tooltip. */
 const FRONTIER_WORDS = "What can move now: work that is ready and decisions that can be made, ranked by what they unlock and how soon they are due.";
-
-/** Why the walk through's Frontier is disabled. */
-const WALK_FRONTIER = "Every card here is on the frontier. Frontier applies on the other views.";
 
 /** What the view hides, as it says it: the badge on Depth, and in the open Filter the count each relevance class hides (journeys/requests.ts, `badgesOf`). */
 export interface Badges {
@@ -60,20 +57,21 @@ function tip(words: string, badge: Badge | undefined): string {
   return badge === undefined || badge.count === 0 ? words : `${words}. ${badge.words}`;
 }
 
-/** What the controls are for: a graph's nodes and, for a journey, the journey, whose owners, frontier and state the journey-only controls read. */
+/** What the controls are for: a graph's nodes, what its subject offers, and for a journey the journey, whose owners and frontier the journey's controls read. */
 export interface ViewSubject {
   nodes: readonly GraphNode[];
+  offers: ViewOffers;
   journey: Ready | undefined;
 }
 
 /** A journey's subject: everything the controls offer. */
 export function journeySubject(ready: Ready): ViewSubject {
-  return { nodes: ready.journey.graph.nodes ?? [], journey: ready };
+  return { nodes: ready.journey.graph.nodes ?? [], offers: JOURNEY_OFFERS, journey: ready };
 }
 
-/** A route's subject: its nodes alone. */
+/** A route's subject: its nodes, and what a route offers. */
 export function routeSubject(nodes: readonly GraphNode[]): ViewSubject {
-  return { nodes, journey: undefined };
+  return { nodes, offers: ROUTE_OFFERS, journey: undefined };
 }
 
 /** The steps on offer for the subject and the one chosen. */
@@ -109,7 +107,7 @@ function DepthOptions({ subject, screen, close }: { subject: ViewSubject; screen
           </label>
         ))}
       </div>
-      {screen === "walk" ? null : (
+      {!SCREEN_VIEWS[screen].fade ? null : (
         <>
           <hr className="menu-rule" />
           <Check label="Fade the rest instead of hiding it" checked={state.fade} testId="depth-fade" onChange={(fade) => { onState({ ...state, fade }); }} />
@@ -122,7 +120,7 @@ function DepthOptions({ subject, screen, close }: { subject: ViewSubject; screen
 function DepthMenu({ subject, screen, badge }: { subject: ViewSubject; screen: Screen; badge: Badge | undefined }) {
   const { state } = useViewState();
   const { step } = useSteps(subject);
-  const fading = state.fade && screen !== "walk";
+  const fading = fadeOn(screen, state);
   return (
     <Menu
       label={`Depth: ${STEP_WORDS[step]}`}
@@ -142,9 +140,9 @@ function DepthMenu({ subject, screen, badge }: { subject: ViewSubject; screen: S
 }
 
 /**
- * C9, C1: the one Filter body: for a journey only mine, the owner, the flags, then the relevance
- * classes, those this view cannot draw disabled with the reason under them; for a route, the
- * conditional class alone.
+ * C9, C1: the one Filter body: what the subject offers of only mine, the owner and the flags,
+ * then the relevance classes it offers, those this view cannot draw disabled with the reason
+ * under them (a route offers the conditional class alone).
  */
 export function FilterBody({ subject, screen, hidden = {} }: { subject: ViewSubject; screen: Screen; hidden?: Badges["hidden"] }) {
   const { state, onState } = useViewState();
@@ -152,9 +150,10 @@ export function FilterBody({ subject, screen, hidden = {} }: { subject: ViewSubj
   const set = (changed: Partial<ViewFilter>) => {
     onState({ ...state, filter: { ...filter, ...changed } });
   };
-  const { journey } = subject;
+  const { journey, offers } = subject;
   const owners = (journey?.inputs.deployment.identities ?? []).map((identity) => ({ key: identity.key, text: journey === undefined ? identity.key : identityName(journey, identity.key) }));
-  const reasons = [...new Set(RELEVANCE_CLASSES.filter((each) => each !== "not_relevant" || journey !== undefined).flatMap((each) => CLASS_REASONS[screen][each] ?? []))];
+  const classes = RELEVANCE_CLASSES.filter((each) => each !== "not_relevant" || offers.notRelevant);
+  const reasons = [...new Set(classes.flatMap((each) => SCREEN_VIEWS[screen].classes[each] ?? []))];
   const classBox = (each: RelevanceClass, label: string, testId: string, checked: boolean) => {
     const count = hidden[each];
     return (
@@ -181,9 +180,8 @@ export function FilterBody({ subject, screen, hidden = {} }: { subject: ViewSubj
   };
   return (
     <div className="stack" role="group" aria-label="Filter" data-testid="filter-body">
-      {journey === undefined ? null : (
-        <>
-          <Check label="Only mine" checked={filter.mine} testId="flag-mine" onChange={(mine) => { set({ mine }); }} />
+      {offers.mine ? <Check label="Only mine" checked={filter.mine} testId="flag-mine" onChange={(mine) => { set({ mine }); }} /> : null}
+      {offers.owner ? (
           <select aria-label="Owner" data-testid="filter-owner" value={filter.owner ?? ""} onChange={(event) => { set({ owner: event.target.value === "" ? undefined : event.target.value }); }}>
             <option value="">Owner: any</option>
             {owners.map((owner) => (
@@ -192,12 +190,11 @@ export function FilterBody({ subject, screen, hidden = {} }: { subject: ViewSubj
               </option>
             ))}
           </select>
-          <FlagChecks options={FILTER_FLAGS} chosen={filter.flags} onChange={(flags) => { set({ flags }); }} />
-          <hr />
-        </>
-      )}
+      ) : null}
+      {offers.flags ? <FlagChecks options={FILTER_FLAGS} chosen={filter.flags} onChange={(flags) => { set({ flags }); }} /> : null}
+      {offers.mine || offers.owner || offers.flags ? <hr /> : null}
       {classBox("conditional", "Show conditional", "show-conditional", filter.conditional)}
-      {journey === undefined ? null : classBox("not_relevant", "Show not relevant", "show-not-relevant", filter.notRelevant)}
+      {offers.notRelevant ? classBox("not_relevant", "Show not relevant", "show-not-relevant", filter.notRelevant) : null}
       {reasons.map((reason) => (
         <span key={reason} className="muted small" data-testid="filter-disabled-reason">
           {reason}
@@ -284,17 +281,21 @@ function SearchBox({ text, onSearch }: { text: string; onSearch: (text: string) 
   );
 }
 
-/** C10: Frontier: an emphasis that never changes what is drawn, only what stands out. The walk through's every card is on the frontier, so its Frontier is disabled. */
-function FrontierChip({ ready, screen }: { ready: Ready; screen: Screen }) {
+/** C10: Frontier, where the subject offers it: an emphasis that never changes what is drawn, only what stands out. A view it lights nothing on (`SCREEN_VIEWS`) shows it disabled with why. */
+function FrontierChip({ subject, screen }: { subject: ViewSubject; screen: Screen }) {
   const { state, onState } = useViewState();
-  const walk = screen === "walk";
+  const { journey } = subject;
+  if (!subject.offers.frontier || journey === undefined) {
+    return null;
+  }
+  const off = SCREEN_VIEWS[screen].frontier;
   return (
     <button
       type="button"
       className="chip"
       aria-pressed={state.frontier}
-      disabled={walk}
-      title={walk ? WALK_FRONTIER : `Frontier  Shift F. ${String(ready.derived.acting_frontier.length)} can move now. ${FRONTIER_WORDS}`}
+      disabled={off !== undefined}
+      title={off ?? `Frontier  Shift F. ${String(journey.derived.acting_frontier.length)} can move now. ${FRONTIER_WORDS}`}
       data-testid="chip-frontier"
       onClick={() => { onState({ ...state, frontier: !state.frontier }); }}
     >
@@ -347,7 +348,7 @@ function PhoneControls({ subject, screen, badges, end }: { subject: ViewSubject;
     <div className="view-controls row" role="toolbar" aria-label="View controls" data-testid="view-controls">
       <Menu
         label="Controls"
-        title={tip(subject.journey === undefined ? "Depth, filter and search" : "Depth, Frontier, filter and search", total)}
+        title={tip(subject.offers.frontier ? "Depth, Frontier, filter and search" : "Depth, filter and search", total)}
         testId="controls-button"
         role="dialog"
         className="view-control"
@@ -362,11 +363,11 @@ function PhoneControls({ subject, screen, badges, end }: { subject: ViewSubject;
             <span className="muted small">Depth</span>
             <DepthOptions subject={subject} screen={screen} close={close} />
             <hr className="menu-rule" />
-            {subject.journey === undefined ? null : (
+            {subject.offers.frontier ? (
               <div className="row">
-                <FrontierChip ready={subject.journey} screen={screen} />
+                <FrontierChip subject={subject} screen={screen} />
               </div>
-            )}
+            ) : null}
             <FilterBody subject={subject} screen={screen} hidden={badges?.hidden} />
             <Search onDone={close} />
           </div>
@@ -386,7 +387,7 @@ export function ViewControls({ subject, screen, badges, end }: ViewControlsProps
   return (
     <div className="view-controls row" role="toolbar" aria-label="View controls" data-testid="view-controls">
       <DepthMenu subject={subject} screen={screen} badge={badges?.depth} />
-      {subject.journey === undefined ? null : <FrontierChip ready={subject.journey} screen={screen} />}
+      <FrontierChip subject={subject} screen={screen} />
       <FilterMenu subject={subject} screen={screen} hidden={badges?.hidden} />
       <Search />
       {end === undefined ? null : <div className="view-controls-end">{end}</div>}

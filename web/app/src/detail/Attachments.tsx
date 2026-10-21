@@ -100,7 +100,7 @@ function Editor({ write, node, form, types }: { write: NodeWrite; node: string |
   );
 }
 
-function Item({ annotation, today, write, onEdit, readOnly }: { annotation: Annotation; today: string; write: NodeWrite; onEdit: () => void; readOnly: boolean }) {
+function Item({ annotation, today, write, onEdit }: { annotation: Annotation; today: string; write: NodeWrite; onEdit: () => void }) {
   const { body } = annotation;
   const { type, text } = contentOf(body);
   const link = type !== "note";
@@ -118,7 +118,7 @@ function Item({ annotation, today, write, onEdit, readOnly }: { annotation: Anno
         Added by {userWords(annotation.created_by)} on {dateWords(annotation.created_at.slice(0, 10), today)}
         {annotation.edited_at == null ? "" : `; edited ${dateWords(annotation.edited_at.slice(0, 10), today)}`}
       </span>
-      {readOnly ? null : <span className="row">
+      {!write.writable ? null : <span className="row">
         <Button disabled={write.disabled} onClick={onEdit}>Edit</Button>
         {designates ? (
           <Button disabled={write.disabled} onClick={() => void write.run([{ op: "edit_annotation", annotation: designated(body, type !== "artifact") }])}>
@@ -135,8 +135,8 @@ function Item({ annotation, today, write, onEdit, readOnly }: { annotation: Anno
 
 /**
  * G1: notes and links on `node`, or on the journey itself when `node` is null, with the form
- * that adds or edits one; `summary` heads the section, unless a fold of the caller's own
- * holds it (`bare`).
+ * that adds or edits one where the page offers writes (an archived journey's are only listed);
+ * `summary` heads the section, unless a fold of the caller's own holds it (`bare`).
  */
 export function AnnotationList({
   view,
@@ -146,7 +146,6 @@ export function AnnotationList({
   bare = false,
   open = true,
   fold,
-  readOnly = false,
   showNone = true,
 }: {
   view: Ready;
@@ -157,8 +156,6 @@ export function AnnotationList({
   /** Whether the section starts open, and the key its fold is remembered under (folds.ts). */
   open?: boolean;
   fold?: string;
-  /** An archived journey accepts no change (A19): the notes are listed, none added, edited or removed. */
-  readOnly?: boolean;
   /** Whether an empty list says "None yet." */
   showNone?: boolean;
 }) {
@@ -174,10 +171,10 @@ export function AnnotationList({
       {annotations.length === 0 && showNone ? <span className="muted small">None yet.</span> : null}
       <ul className="plain-list stack">
         {annotations.map((annotation) => (
-          <Item key={annotation.body.key} annotation={annotation} today={view.derived.today} write={write} onEdit={() => { edit(annotation); }} readOnly={readOnly} />
+          <Item key={annotation.body.key} annotation={annotation} today={view.derived.today} write={write} onEdit={() => { edit(annotation); }} />
         ))}
       </ul>
-      {readOnly ? null : form.draft === undefined ? (
+      {!write.writable ? null : form.draft === undefined ? (
         <span className="row">
           <Button disabled={write.disabled} onClick={() => { form.open({ key: newAttachmentKey(), adding: true, type: "note", title: "", text: "" }, write.seen); }}>
             Add a note or link

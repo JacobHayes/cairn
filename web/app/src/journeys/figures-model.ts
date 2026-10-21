@@ -2,7 +2,7 @@
 // what needs a look (worst first), what is the viewer's, the next milestone, and the one fact a
 // phone row leads with. Words come from the functions here, so the index, Home and the journey
 // card say a thing one way. Pure, so the unit tests check them without a page.
-import type { Schema } from "@cairn/client";
+import { STATUS_HOLDS_CURRENT_WORK, type Schema } from "@cairn/client";
 
 import type { FactTone } from "../acting/reasons.ts";
 import { openForViewer } from "../acting/yours.ts";
@@ -66,7 +66,7 @@ export type ForYou =
 
 /** The viewer's part in a journey of `status` that they hold `mine` of, `ready` of which can move now. */
 export function forYouOf(view: Ready, status: JourneyStatus, mine: readonly MineEntry[], ready: number): ForYou {
-  if (status !== "active") {
+  if (!STATUS_HOLDS_CURRENT_WORK[status]) {
     return { kind: "inactive" };
   }
   if (ready > 0) {

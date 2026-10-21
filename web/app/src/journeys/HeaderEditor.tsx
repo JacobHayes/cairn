@@ -12,18 +12,17 @@ interface HeaderDraft {
   description: string;
 }
 
-/** Edit mode's name and description: a button that opens the form, which closes again once saved or cancelled. */
+/** Edit mode's name and description (edit mode is offered only where the page offers writes): a button that opens the form, which closes again once saved or cancelled. */
 export function HeaderEditor({ ready }: { ready: Ready }) {
   const { header, revision } = ready.journey;
   const seen = { base: revision, deployment: ready.key.deployment_revision };
   const write = useScreenWrite(`journey-header:${header.id}`, header.name);
   const form = useFormDraft<HeaderDraft>(header.id, "journey", "header");
-  const archived = header.status === "archived";
   const start = { name: header.name, description: header.description ?? "" };
   if (form.draft === undefined) {
     return (
       <span className="row">
-        <Button disabled={write.disabled || archived} onClick={() => { form.open(start, seen); }}>
+        <Button disabled={write.disabled} onClick={() => { form.open(start, seen); }}>
           Edit the name and description
         </Button>
       </span>

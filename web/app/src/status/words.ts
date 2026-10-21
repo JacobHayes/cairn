@@ -56,7 +56,7 @@ export function statusTone(state: DisplayState): Tone {
  */
 export const TROUBLES: readonly { flag: "overdue" | "shortfall" | "stale"; words: (count: number) => string; tone: "bad" | "warn"; count: (model: SummaryModel) => number }[] = [
   { flag: "overdue", words: (count) => `${nodesWords(count)} overdue`, tone: "bad", count: (model) => model.overdue.length },
-  { flag: "shortfall", words: (count) => `${nodesWords(count)} short of days`, tone: "bad", count: (model) => model.shortfalls.length },
+  { flag: "shortfall", words: (count) => (count === 1 ? "1 node can't fit its work before its date" : `${nodesWords(count)} can't fit their work before their dates`), tone: "bad", count: (model) => model.shortfalls.length },
   { flag: "stale", words: (count) => `${nodesWords(count)} stale`, tone: "warn", count: (model) => model.stale.length },
 ];
 

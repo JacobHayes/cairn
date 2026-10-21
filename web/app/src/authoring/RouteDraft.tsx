@@ -13,7 +13,9 @@ import { useExport } from "../routes/exporting.ts";
 import { openDraft, retireMutation, routeMoves } from "../routes/model.ts";
 import { OpenProposalsItem } from "../proposals/DestinationProposals.tsx";
 import { useLayer } from "../proposals/layer.ts";
-import { ROUTE_SCREENS, routePath, routeSwitched } from "../routes/address.ts";
+import { routePath, routeSwitched } from "../routes/address.ts";
+import { ROUTE_OFFERS } from "../journeys/view.ts";
+import { useWritable } from "../screens/writable.ts";
 import { RouteFacts, useRouteRead } from "../routes/RouteCard.tsx";
 import { draftWords, VersionSelect } from "../routes/VersionSelect.tsx";
 import type { Screen } from "../journeys/address.ts";
@@ -75,10 +77,10 @@ export function RouteHeader({ route, of, screen, node, write, blocked, onPublish
   const moves = routeMoves(route);
   const segment = route.header.kind === "segment";
   const navigate = useNavigate();
-  // C14: under the proposal layer the page offers no live write, and the version is the one the proposal leaves.
-  // The layer, in any mode: once it is applied or discarded the page stays until Close, and its header offers no write.
+  // C14: under the proposal layer, in any mode, the version is the one the proposal leaves, and the page offers no live write (screens/writable.ts).
   const proposal = useLayer()?.id;
   const reviewing = proposal !== undefined;
+  const writable = useWritable();
   // Opening or discarding a draft changes which graph the bare address names: go to it.
   const send = (mutation: Schema<"Mutation">, bare = false) =>
     void write.run({ target: { route: id }, baseRevision: route.revision, mutations: [mutation] }, bare ? () => { void navigate(routePath(id)); } : undefined);
@@ -91,8 +93,8 @@ export function RouteHeader({ route, of, screen, node, write, blocked, onPublish
         {route.header.retired === true ? <RetiredBadge kind={route.header.kind} /> : null}
         <span className="spacer" />
         <AssistantDock target={{ route: id }} titleOf={titleOf} />
-        {screen === undefined ? null : <ViewPicker screen={screen} screens={ROUTE_SCREENS} to={(to) => routeSwitched(id, search, to, node, proposal)} title={ROUTE_VIEW_TITLE} />}
-        {reviewing ? null : drafting ? (
+        {screen === undefined ? null : <ViewPicker screen={screen} screens={ROUTE_OFFERS.screens} to={(to) => routeSwitched(id, search, to, node, proposal)} title={ROUTE_VIEW_TITLE} />}
+        {!writable ? null : drafting ? (
           <Button primary disabled={write.disabled || blocked !== undefined} title={blocked} data-testid="publish-draft" onClick={onPublish}>
             Publish
           </Button>
@@ -109,15 +111,15 @@ export function RouteHeader({ route, of, screen, node, write, blocked, onPublish
                   {drafting ? "Export the draft" : "Export this version"}
                 </button>
               )}
-              {reviewing ? null : <ImportItem flow={imports} edit={`import:draft:${id}`} close={close} />}
+              {!writable ? null : <ImportItem flow={imports} edit={`import:draft:${id}`} close={close} />}
               <OpenProposalsItem destination={{ route: id }} close={close} />
-              {reviewing ? null : <hr />}
-              {reviewing ? null : drafting ? (
+              {!writable ? null : <hr />}
+              {!writable ? null : drafting ? (
                 <button type="button" role="menuitem" className="menu-item" disabled={write.disabled} data-testid="discard-draft" onClick={() => { close(); send({ op: "discard_draft" }, true); }}>
                   Discard the draft
                 </button>
               ) : null}
-              {reviewing ? null : <button type="button" role="menuitem" className="menu-item" disabled={write.disabled} data-testid="menu-retire" onClick={() => { close(); send(retireMutation(moves.retire)); }}>
+              {!writable ? null : <button type="button" role="menuitem" className="menu-item" disabled={write.disabled} data-testid="menu-retire" onClick={() => { close(); send(retireMutation(moves.retire)); }}>
                 {moves.retire ? `Retire the ${segment ? "segment" : "route"}` : "Bring it back"}
               </button>}
             </>

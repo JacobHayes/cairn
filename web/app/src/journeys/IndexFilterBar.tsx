@@ -1,9 +1,11 @@
 // C16's filters over the journey index: status, lineage route and version, "mine", and
 // "upgrade available". Every filter holds at once; each change is a new address.
+import { JOURNEY_STATUSES } from "@cairn/client";
+
 import { Check } from "../acting/Controls.tsx";
 import type { RouteSummary } from "../data/reads.ts";
 import { FilterSelect } from "../ui/IndexHead.tsx";
-import { STATUSES, type IndexFilters } from "./address.ts";
+import type { IndexFilters } from "./address.ts";
 import { STATUS_WORDS } from "./StatusBadge.tsx";
 
 /** The journey index's filters, as the toolbar's controls: every one holds at once; each change is a new address. */
@@ -15,8 +17,8 @@ export function IndexFilterBar({ filters, routes, onChange }: { filters: IndexFi
       <FilterSelect
         label="Status"
         value={filters.status}
-        options={[...STATUSES, "any" as const].map((status) => ({ value: status, label: status === "any" ? "Any status" : STATUS_WORDS[status] }))}
-        onChange={(value) => { onChange({ ...filters, status: [...STATUSES, "any" as const].find((each) => each === value) ?? "active" }); }}
+        options={[...JOURNEY_STATUSES, "any" as const].map((status) => ({ value: status, label: status === "any" ? "Any status" : STATUS_WORDS[status] }))}
+        onChange={(value) => { onChange({ ...filters, status: [...JOURNEY_STATUSES, "any" as const].find((each) => each === value) ?? "active" }); }}
       />
       <FilterSelect
         label="Route"

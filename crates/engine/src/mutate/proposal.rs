@@ -7,7 +7,7 @@ use cairn_schema::{
     ViolationCode, Write,
 };
 
-use super::Session;
+use super::{ARCHIVED_REFUSAL, Session};
 
 /// Applies a proposal create, edit, or discard to the proposal the patch targets.
 pub(super) fn apply(session: &mut Session<'_>, mutation: &Mutation) -> Vec<Write> {
@@ -140,17 +140,17 @@ pub(super) fn apply_to_destination(
         base,
     );
     assert_eq!(found.status, ProposalStatus::Open);
-    let archived = session
+    let closed = session
         .journey()
-        .is_some_and(|journey| journey.header.status == cairn_schema::JourneyStatus::Archived);
-    if archived && found.draft.mutations.is_empty() {
+        .is_some_and(|journey| !journey.header.status.accepts_changes());
+    if closed && found.draft.mutations.is_empty() {
         // Each of a proposal's mutations is held to the archived ban; an empty one would
         // otherwise write to an archived journey (B11).
         reject_about(
             session,
             ViolationCode::ArchivedJourney,
             id,
-            "an archived journey accepts only un-archiving or hard deletion",
+            ARCHIVED_REFUSAL,
         );
         return Vec::new();
     }

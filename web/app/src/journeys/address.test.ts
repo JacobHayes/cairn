@@ -4,7 +4,7 @@
 import { describe, expect, it } from "vitest";
 
 import type { AddressName, Page } from "../address.ts";
-import { viewStateFrom } from "./view.ts";
+import { viewStateFrom, walkthroughPath } from "./view.ts";
 import {
   DEFAULT_FILTERS,
   SCREENS,
@@ -22,7 +22,6 @@ import {
   queryOf,
   screenOf,
   screenSwitched,
-  walkthroughPath,
   type IndexFilters,
   type JourneyTarget,
 } from "./address.ts";

@@ -7,22 +7,6 @@ import type { Schema } from "@cairn/client";
 export type ListFlag = Schema<"ListFlag">;
 export type SortBy = Schema<"SortBy">;
 
-/** C9's filters, in the order the list offers them. */
-export const LIST_FLAGS: ListFlag[] = [
-  "mine",
-  "unassigned",
-  "next_up",
-  "decisions_needed",
-  "needs_breakdown",
-  "active",
-  "blocked",
-  "overdue",
-  "stale",
-  "snoozed",
-  "snoozed_and_overdue",
-  "shortfall",
-];
-
 /** C9, C10: the single signals a list sorts by (Priority: effort when estimates exist). */
 export const SORTS: SortBy[] = ["rank", "slack", "gravity", "unlocks", "due", "effort"];
 

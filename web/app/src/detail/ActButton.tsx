@@ -4,7 +4,6 @@
 // surface supplies as `open`.
 import { useState } from "react";
 
-import { useReviewing } from "../proposals/layer.ts";
 import { Button, Field } from "../ui/kit.tsx";
 import { nodeOf, transition, type Mutation, type Ready } from "./model.ts";
 import { actLabel, unsnoozeOf, type Act } from "./offers.ts";
@@ -59,10 +58,8 @@ function MilestoneDone({ view, write, node, disabled }: { view: Ready; write: No
  * `dated` lets a milestone be done on another day than today, where there is room for the date.
  */
 export function ActButton({ act, view, node, write, waiting, open, dated = false }: { act: Act; view: Ready; node: string; write: NodeWrite; waiting: boolean; open: (what: Opens) => void; dated?: boolean }) {
-  // Under a proposal's layer the journey drawn is the one after it: acting on it would act on the present.
-  const reviewing = useReviewing();
   const mutation = actMutation(view, act, node);
-  if (reviewing !== undefined) {
+  if (!write.writable) {
     return null;
   }
   if (act === "done" && dated && nodeOf(view, node)?.kind === "milestone") {

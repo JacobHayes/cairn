@@ -20,10 +20,11 @@ import { useJourney } from "../data/react.ts";
 import type { Ready } from "../detail/model.ts";
 import { NodeDetailPanel } from "../detail/NodeDetail.tsx";
 import { SelectionPanel } from "../detail/SelectionPanel.tsx";
-import { indexPath, useNodeAddresses, type Screen } from "../journeys/address.ts";
+import { indexPath, unavailableScreens, useNodeAddresses, type Screen } from "../journeys/address.ts";
 import { JourneyCard } from "../journeys/JourneyCard.tsx";
 import { SummaryPage } from "../summary/SummaryPage.tsx";
-import { isStock, useViewState, ViewStateContext } from "../journeys/view.ts";
+import { useJourneyTarget } from "../journeys/useJourneyTarget.ts";
+import { isStock, JOURNEY_OFFERS, useViewState, ViewStateContext } from "../journeys/view.ts";
 import { Band } from "../proposals/Band.tsx";
 import { DestinationProposals } from "../proposals/DestinationProposals.tsx";
 import { JourneyLayerHost } from "../proposals/Hosts.tsx";
@@ -34,8 +35,9 @@ import { InsertEntryContext, useInserting } from "../segments/entry.ts";
 import { InsertStepper, type InsertPreview } from "../segments/Stepper.tsx";
 import { JourneyHeader } from "./JourneyHeader.tsx";
 import { KeySheet } from "./KeySheet.tsx";
-import { useJourneyKeys } from "./keys.ts";
+import { keyBindingsFor, useJourneyKeys } from "./keys.ts";
 import { useViewStateValue } from "./useViewStateValue.ts";
+import { useWritable } from "./writable.ts";
 import { CanvasBars, ProjectionBody, type ProjectionProps } from "./Projections.tsx";
 import "./screens.css";
 import { Failed } from "../ui/Failed.tsx";
@@ -185,10 +187,13 @@ function ReadyFrame({ ready, screen, selected, edge }: { ready: Ready } & Omit<F
   const { onState } = viewState;
   const steps = useMemo(() => stepsFor(ready.journey.graph.nodes ?? []), [ready]);
   const layer = useLayer();
-  // Acting on a picture of the future would be wrong: under a proposal's layer nothing is authored, acted on or selected in several.
+  // Under a proposal's review the inspector is the proposal's rail: nothing is selected in several there.
   const reviewing = useReviewing() !== undefined;
+  // The structure is edited only where the page offers writes to the journey.
+  const writable = useWritable(ready);
+  const target = useJourneyTarget();
   const planned = screen === "graph";
-  const authored = useMemo(() => (planned && view.edit && !reviewing ? journeyAuthored(ready) : undefined), [ready, planned, view.edit, reviewing]);
+  const authored = useMemo(() => (planned && view.edit && writable ? journeyAuthored(ready) : undefined), [ready, planned, view.edit, writable]);
   const drawing = useEdgeDrawing(authored);
   // The set is the frame's, so it survives a switch between the graph and the list; each opens a node on its own screen.
   const selection = useSelection(selected, (node) => void navigate(node === undefined ? addresses.close() : addresses.open(node)));
@@ -213,7 +218,7 @@ function ReadyFrame({ ready, screen, selected, edge }: { ready: Ready } & Omit<F
       <InsertEntryContext value={inserting.start}>
       <div className="ws-fill journey-frame" data-testid="journey-frame" data-screen={screen} data-layer={layer?.mode}>
         <div className="ws-head stack journey-head">
-          <JourneyHeader ready={ready} view={planned && !reviewing ? view : { ...view, edit: false }} screen={screen} selected={selected} />
+          <JourneyHeader ready={ready} view={authored === undefined ? { ...view, edit: false } : view} screen={screen} selected={selected} />
           <Band />
           {planned ? <CanvasBars ready={ready} view={view} authored={authored} drawing={drawing} /> : null}
         </div>
@@ -221,7 +226,7 @@ function ReadyFrame({ ready, screen, selected, edge }: { ready: Ready } & Omit<F
           <Workspace ready={ready} view={view} screen={screen} selected={selected} edge={line} authored={authored} drawing={drawing} selection={selection} preview={inserting.preview} onCard={setWalkCard} />
           {card === "inline" ? <JourneyCard ready={ready} selected={selected} /> : null}
         </div>
-        {sheetOpen ? <KeySheet onClose={() => { setSheetOpen(false); }} /> : null}
+        {sheetOpen ? <KeySheet bindings={keyBindingsFor(JOURNEY_OFFERS, { screen, unavailable: unavailableScreens(target), acts: writable })} onClose={() => { setSheetOpen(false); }} /> : null}
       </div>
       {/* After the head: a node opened from the assistant brings its detail forward last. */}
       <InspectorSlot ready={ready} screen={screen} selected={selected} structure={structure} card={card === "column"} inserting={inserting} selection={selection} authored={authored} walkCard={walkCard} />

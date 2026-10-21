@@ -19,6 +19,7 @@ import { DeploymentLayerHost } from "../proposals/Hosts.tsx";
 import { identityDiff, useLayer, useReviewing, type IdentityRow } from "../proposals/layer.ts";
 import { DIFF_LABELS } from "../proposals/model.ts";
 import { Rail } from "../proposals/Rail.tsx";
+import { useWritable } from "../screens/writable.ts";
 import { Inspector } from "../shell/frame.tsx";
 import { useEscapeTo } from "../shell/useEscapeTo.ts";
 import { FilterSearch, IndexHead } from "../ui/IndexHead.tsx";
@@ -188,12 +189,14 @@ function IdentityTable({ shown, names, selection, reviewing }: { shown: Identity
 function IdentitiesPage({ deployment, rows }: { deployment: Deployment; rows: IdentityRow[] | undefined }) {
   const layer = useLayer();
   const reviewing = useReviewing() !== undefined;
+  // Any proposal's layer leaves the page without a live write: the rail, not the inspector, speaks.
+  const live = useWritable();
   const navigate = useNavigate();
   const adding = usePage()?.name === "newIdentity";
   const address = useParams()["key"];
-  const selection = useSelection(reviewing ? undefined : address, (key) => void navigate(key === undefined ? pathTo("identities") : pathTo("identity", { key })));
+  const selection = useSelection(live ? address : undefined, (key) => void navigate(key === undefined ? pathTo("identities") : pathTo("identity", { key })));
   const [search, setSearch] = useState("");
-  useEscapeTo(reviewing || (address === undefined && !adding) ? undefined : pathTo("identities"));
+  useEscapeTo(!live || (address === undefined && !adding) ? undefined : pathTo("identities"));
   const listed: IdentityRow[] = rows ?? byName(deployment.identities ?? []).map((identity) => ({ identity, mark: undefined }));
   const shown = listed.filter((row) => matches(row.identity, search));
   const after = reviewing ? listed.filter((row) => row.mark?.kind !== "removed").length : undefined;
@@ -204,14 +207,14 @@ function IdentitiesPage({ deployment, rows }: { deployment: Deployment; rows: Id
   );
   return (
     <section className="stack index-page" aria-label="Identities" data-testid="identities" data-revision={deployment.revision} data-layer={layer?.mode} data-rows-page tabIndex={-1}>
-      <IndexHead title="Identities" action={reviewing ? undefined : add}>
+      <IndexHead title="Identities" action={live ? add : undefined}>
         <FilterSearch label="Search" placeholder="Name or email" value={search} onChange={setSearch} />
         <span className="index-count" data-testid="identities-count">{countWords({ total: (deployment.identities ?? []).length, shown: shown.length, after })}</span>
       </IndexHead>
       <Band />
       {reviewing ? null : <p className="muted index-intro">People and teams. What each does in a journey is the role it fills there.</p>}
       {listed.length === 0 ? (
-        <IndexState kind="empty" action={reviewing ? undefined : <Link to={pathTo("newIdentity")}>Add an identity &rsaquo;</Link>} data-testid="identities-empty">
+        <IndexState kind="empty" action={!live ? undefined : <Link to={pathTo("newIdentity")}>Add an identity &rsaquo;</Link>} data-testid="identities-empty">
           No identities yet.
         </IndexState>
       ) : shown.length === 0 ? (
@@ -219,9 +222,9 @@ function IdentitiesPage({ deployment, rows }: { deployment: Deployment; rows: Id
           No identity matches that search.
         </IndexState>
       ) : (
-        <IdentityTable shown={shown} names={new Map(listed.map((row) => [row.identity.key, identityLabel(row.identity)]))} selection={selection} reviewing={reviewing} />
+        <IdentityTable shown={shown} names={new Map(listed.map((row) => [row.identity.key, identityLabel(row.identity)]))} selection={selection} reviewing={!live} />
       )}
-      <InspectorOf deployment={deployment} selection={selection} reviewing={reviewing} adding={adding} address={address} />
+      <InspectorOf deployment={deployment} selection={selection} reviewing={!live} adding={adding} address={address} />
     </section>
   );
 }

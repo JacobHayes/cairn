@@ -3,8 +3,7 @@
 // completion is suggested.
 import { describe, expect, it } from "vitest";
 
-import { STATUSES } from "./address.ts";
-import { createMutation, deleteConfirmed, newJourneyId, startableRoutes, statusActions, type RouteSummary } from "./lifecycle.ts";
+import { createMutation, deleteConfirmed, newJourneyId } from "./lifecycle.ts";
 
 const JOURNEY_ID = /^j_[a-z0-9][a-z0-9_-]*$/;
 
@@ -20,22 +19,9 @@ describe("starting a journey (B1)", () => {
     expect(createMutation(" Launch ", "  ", { route: "r", version: 2 })).toEqual({ op: "create_journey", name: "Launch", from: { route: "r", version: 2 } });
     expect(createMutation("Ad hoc", "Why", undefined)).toEqual({ op: "create_journey", name: "Ad hoc", description: "Why" });
   });
-
-  it("starts only from routes that are not retired or segments and have a published version (A19, A21)", () => {
-    const route = (id: string, retired: boolean, latest: number | null, kind: "process" | "segment" = "process"): RouteSummary => ({ header: { id, name: id, retired, kind }, revision: 1, draft_open: false, latest_version: latest });
-    const offered = startableRoutes([route("open", false, 2), route("retired", true, 3), route("unpublished", false, null), route("piece", false, 1, "segment")]);
-    expect(offered.map((each) => each.header.id)).toEqual(["open"]);
-  });
 });
 
 describe("a journey's status (B11, A19)", () => {
-  /** The engine's legal moves (crates/engine, lifecycle `set_status`). */
-  const LEGAL: Record<string, string[]> = { active: ["completed", "archived"], completed: ["active", "archived"], archived: ["completed"] };
-
-  it.each(STATUSES)("offers from %s exactly the moves the engine accepts", (status) => {
-    expect(statusActions(status).map((action) => action.to).sort()).toEqual([...(LEGAL[status] ?? [])].sort());
-  });
-
   it("deletes only an archived journey, and only with its name typed back", () => {
     expect(deleteConfirmed("archived", "Launch", " Launch ")).toBe(true);
     expect(deleteConfirmed("archived", "Launch", "launch")).toBe(false);

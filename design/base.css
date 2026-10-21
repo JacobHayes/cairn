@@ -869,10 +869,12 @@ svg.chart .datum-line {
   text-decoration: none;
   cursor: pointer;
 }
-.menu-item:hover:not(:disabled) {
+.menu-item:hover:not(:disabled, [aria-disabled="true"]) {
   background: var(--color-hover);
 }
-.menu-item:disabled {
+/* A menu entry listed but unavailable: a disabled button, or an entry marked aria-disabled with its reason as the title (the View picker). */
+.menu-item:disabled,
+.menu-item[aria-disabled="true"] {
   opacity: 0.5;
   cursor: not-allowed;
 }

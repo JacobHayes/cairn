@@ -11,10 +11,9 @@ import { dateInk, dateWords, inkClass, whenWords } from "../status/when.ts";
 import { Button } from "../ui/kit.tsx";
 import { NodeLink } from "../detail/parts.tsx";
 
-/** Where a node's title leads when it is not the screen's own detail link, and whether the causes' actions are offered. */
+/** Where a node's title leads when it is not the screen's own detail link. */
 interface Reach {
   nodeTo?: ((node: string) => string) | undefined;
-  readOnly: boolean;
 }
 
 type Cause = NonNullable<Ready["derived"]["stalled"]>["waiting_on"][number];
@@ -41,7 +40,7 @@ function CauseLine({ view, write, cause, reach }: { view: Ready; write: NodeWrit
             · snoozed until {"date" in until ? <span className={inkOf(until.date)}>{snoozeEndWords(view, until)}</span> : <>{title(until.node)}{SNOOZE_NODE_TAIL}</>}
           </span>
         </span>
-        {reach.readOnly ? null : (
+        {!write.writable ? null : (
           <Button disabled={write.disabled} onClick={() => void write.run([{ op: "unsnooze", node }])}>
             {ACT_LABELS.unsnooze}
           </Button>
@@ -53,7 +52,7 @@ function CauseLine({ view, write, cause, reach }: { view: Ready; write: NodeWrit
   return (
     <li className="stall-cause" data-testid="stall-cause" data-status="auto_done" data-node={node}>
       <span>{title(node)} <span className={inkOf(date) ?? "muted"}>· {whenWords(date, undefined, today)}</span></span>
-      {reach.readOnly ? null : (
+      {!write.writable ? null : (
         <Button disabled={write.disabled} onClick={() => void write.run([transition(node, "complete")])}>
           {ACT_LABELS.done}
         </Button>
@@ -69,11 +68,11 @@ function pastEnd(causes: Cause[], endDate: string | undefined): boolean {
 
 /**
  * D5: the stalled diagnostic, or nothing when the journey is not stalled. `nodeTo` makes each
- * title lead to that address (the Summary's), and `readOnly` (an archived journey, A19) lists
- * the causes without their actions. With `endDate` (the final milestone's), snoozes that run past
+ * title lead to that address (the Summary's); where the page offers no write the causes are
+ * listed without their actions. With `endDate` (the final milestone's), snoozes that run past
  * it are said to.
  */
-export function StalledPanel({ view, nodeTo, readOnly = false, endDate }: { view: Ready; nodeTo?: (node: string) => string; readOnly?: boolean; endDate?: string | undefined }) {
+export function StalledPanel({ view, nodeTo, endDate }: { view: Ready; nodeTo?: (node: string) => string; endDate?: string | undefined }) {
   const write = useNodeWrite(view, "stalled");
   const stalled = view.derived.stalled;
   if (stalled == null) {
@@ -88,7 +87,7 @@ export function StalledPanel({ view, nodeTo, readOnly = false, endDate }: { view
       {pastEnd(stalled.waiting_on, endDate) ? <span>Every snooze runs past the final milestone ({dateWords(endDate ?? "", view.derived.today)}), so the journey cannot reach it as things stand.</span> : null}
       <ul className="stall-causes">
         {stalled.waiting_on.map((cause) => (
-          <CauseLine key={JSON.stringify(cause)} view={view} write={write} cause={cause} reach={{ nodeTo, readOnly }} />
+          <CauseLine key={JSON.stringify(cause)} view={view} write={write} cause={cause} reach={{ nodeTo }} />
         ))}
       </ul>
       <Rejected view={view} write={write} />

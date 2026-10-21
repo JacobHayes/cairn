@@ -9,7 +9,7 @@ import { canvasView } from "../canvas/canvas.test-support.ts";
 import { collapsedAt, drawnStep, kindsAt } from "../canvas/ladder.ts";
 import { STEPS, type Level, type Step } from "../canvas/model.ts";
 import type { GraphNode } from "../detail/model.ts";
-import { badgesOf, currentStagesOf, depthFaded, journeyLayoutView, levelRequestOf, lightsUp, litOf, outOfFocus, selectedRequest, stepHides, tableQueryOf, walkQueryOf } from "./requests.ts";
+import { badgesOf, currentStagesOf, depthFaded, depthLeavesOut, journeyLayoutView, levelRequestOf, lightsUp, litOf, outOfFocus, selectedRequest, stepHides, tableQueryOf, walkQueryOf } from "./requests.ts";
 import { DEFAULT_FILTER, DEFAULT_VIEW_STATE, type ViewState } from "./view.ts";
 
 const view = actingView();
@@ -171,6 +171,10 @@ describe("what Fade dims", () => {
     const level = new Set(["m", "d", "o", "s", "sb", "sa", "t"]);
     expect([...depthFaded(fade, journey, "decisions", [], level)].sort()).toEqual(["o", "sa", "sb", "t"]);
   });
+
+  it("dims neither the selected node nor what holds it, as the level draws them whatever the depth", () => {
+    expect([...depthFaded(fade, journey, "stages", collapsedAt("stages", journey, new Set(), [], []), keys, "sa")].sort()).toEqual(["d", "o", "sd", "t"]);
+  });
 });
 
 describe("what is out of focus", () => {
@@ -249,6 +253,13 @@ describe("the badges", () => {
     // At Stages a top-level decision is left out with what is beneath it.
     expect(stepHides(nodes, "stages", [])("n_pick")).toBe(true);
     expect(stepHides(nodes, "stages", [])("n_inner")).toBe(false);
+  });
+
+  it("not count on Depth a node the level draws although the step leaves it out, as the selected chain", () => {
+    const base = new Set(view.derived.acting_frontier);
+    const hidden = [...base].filter(stepHides(nodes, "decisions", []));
+    const drawn = new Set(hidden.slice(0, 1));
+    expect(badgesOf("graph", {}, base, depthLeavesOut(nodes, "decisions", [], drawn)).depth?.count).toBe(hidden.length - 1);
   });
 });
 

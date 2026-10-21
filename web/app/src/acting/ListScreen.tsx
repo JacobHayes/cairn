@@ -35,7 +35,7 @@ import { Cell, type CellContext } from "./ListCells.tsx";
 import { Folds } from "./Folds.tsx";
 import { NextForYou } from "./NextForYou.tsx";
 import { StalledPanel } from "./Stalled.tsx";
-import { addableColumns, columnsOf, columnWords, flatLines, givesWay, SORT_OF, treeLines, type Column, type Line } from "./listModel.ts";
+import { addableColumns, columnsOf, columnWords, flatLines, givesWay, isDecisionColumn, sortOf, treeLines, type Column, type Line } from "./listModel.ts";
 import { useRows } from "./useRows.ts";
 import "./acting.css";
 import { Failed } from "../ui/Failed.tsx";
@@ -54,7 +54,7 @@ function onRow(event: MouseEvent): boolean {
 }
 
 function Head({ column, columns, list, onSort }: { column: Column; columns: readonly Column[]; list: ListSettings; onSort: (sort: ListSettings["sort"]) => void }) {
-  const sort = SORT_OF[column];
+  const sort = sortOf(column);
   const words = columnWords(column);
   if (sort === undefined) {
     return <th scope="col" data-column={column} data-gives-way={givesWay(column)} className={pinned(column, columns)}>{words}</th>;
@@ -264,7 +264,7 @@ export function ListBody({ view, state, picks, list, selected, selection }: { vi
   const query = useMemo(() => tableQueryOf(list.sort), [list.sort]);
   const { rows, error: rowsError } = useRows(view, query);
   const decisionColumns = depth === "decisions";
-  const needsDecisions = decisionColumns || list.columns.some((column) => ["answer", "why", "affects"].includes(column));
+  const needsDecisions = decisionColumns || list.columns.some(isDecisionColumn);
   const projected = valueOf(useProjected(view, needsDecisions ? { projection: "decision_view" as const } : undefined));
   const decisions = useMemo(() => new Map((projected === undefined ? [] : decisionRows(view, projected)).map((decision) => [decision.key, decision])), [view, projected]);
   const ranks = rankPlaces(view);

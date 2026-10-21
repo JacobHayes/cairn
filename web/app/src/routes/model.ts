@@ -122,7 +122,12 @@ export function inUseWords(use: InUse): string {
   return use.behind > 0 ? `${String(use.behind)} of ${String(use.places)} behind` : `Used in ${plural(use.places, "place")}`;
 }
 
-/** The version a journey can be started from: the latest published, unless the route is retired (A19) or is a segment (A21); none otherwise. A draft being open does not stop it. */
+/** A19, A21: whether journeys start from the route's published versions: not from a segment, and not once the route is retired. */
+export function startsJourneys(header: Pick<Schema<"RouteSummary">["header"], "kind" | "retired">): boolean {
+  return header.kind !== "segment" && header.retired !== true;
+}
+
+/** The version a journey starts from by default: the latest published, of a route that starts journeys; none otherwise. A draft being open does not stop it. */
 export function startableVersion(route: Schema<"RouteSummary">): number | undefined {
-  return route.header.kind === "segment" || route.header.retired === true ? undefined : (route.latest_version ?? undefined);
+  return startsJourneys(route.header) ? (route.latest_version ?? undefined) : undefined;
 }

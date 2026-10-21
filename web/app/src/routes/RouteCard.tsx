@@ -16,7 +16,7 @@ import { useLive, useToday } from "../data/react.ts";
 import { DEFAULT_FILTERS, indexPath, journeyPath, newJourneyPath } from "../journeys/address.ts";
 import { dateWords } from "../status/when.ts";
 import { routePath } from "./address.ts";
-import { upgradable, versionRows, type VersionRow } from "./model.ts";
+import { startsJourneys, upgradable, versionRows, type VersionRow } from "./model.ts";
 import { plural } from "../ui/words.ts";
 
 type InsertionUse = Schema<"InsertionUse">;
@@ -124,7 +124,7 @@ export function VersionCard({ read, version }: { read: RouteRead; version: numbe
         {row === undefined ? null : <span className="muted small">Published {dateWords(row.publishedAt.slice(0, 10), today)}</span>}
       </div>
       <RouteFacts read={read}>
-        {segment || header.retired === true ? null : (
+        {!startsJourneys(header) ? null : (
           <Link className="button primary" to={newJourneyPath(header.id, version)} data-testid="start-from-version">
             Start a journey
           </Link>

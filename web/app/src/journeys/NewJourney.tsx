@@ -9,13 +9,14 @@ import { useDraft } from "../data/drafts.ts";
 import { routeIndex } from "../data/reads.ts";
 import { valueOf } from "../data/keyed-read.ts";
 import { useLive } from "../data/react.ts";
+import { startableVersion } from "../routes/model.ts";
 import { RejectionView } from "../screens/RejectionView.tsx";
 import { WriteStatus } from "../screens/WriteStatus.tsx";
 import { useScreenWrite } from "../screens/write.ts";
 import { Button, Field, Panel } from "../ui/kit.tsx";
 import { Failed } from "../ui/Failed.tsx";
-import { walkthroughPath } from "./address.ts";
-import { createMutation, newJourneyId, startableRoutes, type RouteSummary } from "./lifecycle.ts";
+import { walkthroughPath } from "./view.ts";
+import { createMutation, newJourneyId, type RouteSummary } from "./lifecycle.ts";
 
 interface Form {
   name: string;
@@ -108,7 +109,7 @@ export function NewJourney() {
   if (index === undefined) {
     return <p className="muted small">{view.status === "failed" ? <Failed what="The routes" error={view.error} /> : "Reading the routes..."}</p>;
   }
-  const routes = startableRoutes(index);
+  const routes = index.filter((route) => startableVersion(route) !== undefined);
   const asked = params.get("route") ?? "";
   const offered = routes.some((route) => route.header.id === asked);
   const initial: Form = { name: "", description: "", route: asked, version: offered ? Number(params.get("version") ?? 0) || 0 : 0 };

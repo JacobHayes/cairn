@@ -138,6 +138,9 @@ export function SelectionActions({ view, selected, onLanded, structure }: { view
       </Menu>
     );
   };
+  if (!write.writable) {
+    return null;
+  }
   return (
     <div className="stack" data-testid="selection-actions" data-count={selected.length}>
       <div className="row">

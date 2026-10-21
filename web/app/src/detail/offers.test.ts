@@ -27,23 +27,31 @@ function detailOf(view: Ready, key: string) {
   return detail;
 }
 
+describe("a page that takes no write (B11)", () => {
+  it("offers only where to find a node on a page that takes no write, on the menu and the graph's context menu", () => {
+    const view = made("n_findings", {});
+    expect(menuOf(view, detailOf(view, "n_findings"), false).flat().map((item) => item.id)).toEqual(["show-in-graph", "copy-link"]);
+    expect(contextMenuOf(view, detailOf(view, "n_findings"), false).flat().map((item) => item.id)).toEqual(["show-in-list", "copy-link"]);
+  });
+});
+
 describe("the inspector's offers", () => {
   it("lists a decided decision's Reopen and the shape of the node, with nothing to snooze or skip or answer", () => {
     const view = made("n_when", { display_state: "done" });
     view.journey.graph.state = { ...view.journey.graph.state, nodes: { ...view.journey.graph.state?.nodes, n_when: { state: "decided", provenance: "local" } } };
-    expect(menuOf(view, detailOf(view, "n_when")).map((group) => group.map((item) => item.id))).toEqual([["reopen"], ["rename", "assign", "weight"], ["show-in-graph", "edit-node", "copy-link"]]);
+    expect(menuOf(view, detailOf(view, "n_when"), true).map((group) => group.map((item) => item.id))).toEqual([["reopen"], ["rename", "assign", "weight"], ["show-in-graph", "edit-node", "copy-link"]]);
     expect(offered(view, "n_when").primary).toBeUndefined();
   });
 
   it("opens the graph's context menu with the row's actions, then the menu's groups, finding the node in the list not the graph it is on", () => {
     const view = testView();
-    const groups = contextMenuOf(view, detailOf(view, "n_findings")).map((group) => group.map((item) => item.id));
+    const groups = contextMenuOf(view, detailOf(view, "n_findings"), true).map((group) => group.map((item) => item.id));
     expect(groups[0]).toEqual(["done", "start"]);
     expect(groups.flat()).toContain("show-in-list");
     expect(groups.flat()).not.toContain("show-in-graph");
     expect(groups.at(-1)?.at(-1)).toBe("copy-link");
     // Waiting on a requirement, Mark done is left to Done anyway.
-    const waiting = contextMenuOf(view, detailOf(view, "n_report")).flat().map((item) => item.id);
+    const waiting = contextMenuOf(view, detailOf(view, "n_report"), true).flat().map((item) => item.id);
     expect(waiting).not.toContain("done");
     expect(waiting).toContain("done-anyway");
   });
@@ -73,7 +81,7 @@ describe("the inspector's offers", () => {
 
   it("names a scheduled milestone's Mark done the same on the row and in the graph's menu", () => {
     const view = made("n_meeting", { display_state: "scheduled" });
-    const menu = contextMenuOf(view, detailOf(view, "n_meeting"))[0] ?? [];
+    const menu = contextMenuOf(view, detailOf(view, "n_meeting"), true)[0] ?? [];
     expect(offered(view, "n_meeting").primary).toBe("done");
     expect(menu.map((item) => item.label)).toContain(actLabel(view, "n_meeting", "done"));
   });

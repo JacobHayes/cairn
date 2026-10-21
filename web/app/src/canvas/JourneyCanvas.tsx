@@ -15,6 +15,7 @@ import { contextMenuOf } from "../detail/offers.ts";
 import { screenSwitched } from "../journeys/address.ts";
 import { useJourneyTarget } from "../journeys/useJourneyTarget.ts";
 import { useReviewing } from "../proposals/layer.ts";
+import { useWritable } from "../screens/writable.ts";
 import { EmptyPanel, journeySubject, NothingMatches, ResetView, ViewControls } from "../screens/ViewControls.tsx";
 import { useFrameActions } from "../shell/frame.tsx";
 import { overlayOpen, typing } from "../ui/typing.ts";
@@ -89,6 +90,7 @@ function useActions(ready: Ready, view: GraphView, selected: string | undefined,
   const target = useJourneyTarget();
   const journey = ready.journey.header.id;
   const layer = useReviewing();
+  const writable = useWritable(ready);
   const proposal = target.proposal;
   return useMemo<CardActions>(
     () => ({
@@ -111,7 +113,7 @@ function useActions(ready: Ready, view: GraphView, selected: string | undefined,
       menu: layer !== undefined ? undefined : {
         groups: (key) => {
           const detail = nodeDetail(ready, key);
-          return detail === undefined ? [] : contextMenuOf(ready, detail, selection.members.includes(key)).map((items) => ({ items }));
+          return detail === undefined ? [] : contextMenuOf(ready, detail, writable, selection.members.includes(key)).map((items) => ({ items }));
         },
         // The node's own Actions carry out the choice once it is open beside the canvas.
         choose: (key, id) => {
@@ -124,7 +126,7 @@ function useActions(ready: Ready, view: GraphView, selected: string | undefined,
         },
       },
     }),
-    [navigate, frame, target, search, journey, view, selected, ready, onPick, selection, layer, proposal],
+    [navigate, frame, target, search, journey, view, selected, ready, onPick, selection, layer, writable, proposal],
   );
 }
 

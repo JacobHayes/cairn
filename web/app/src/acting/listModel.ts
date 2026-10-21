@@ -5,17 +5,25 @@
 // each row its container under its title. Also the columns, in the order they sit. Pure, so the
 // unit tests check it without a page.
 import type { Ready } from "../detail/model.ts";
-import { planOrder, treeOf } from "../plan/tree.ts";
+import { planOrder } from "../plan/tree.ts";
 import { isOpen } from "../status/state.ts";
-import { LIST_COLUMNS, type ListColumn, type ListSettings, type SortBy } from "./address.ts";
+import { LIST_COLUMNS, SORTS, type ListColumn, type ListSettings, type SortBy } from "./address.ts";
 import type { NodeRow } from "./why.ts";
 
 /** Everything a column can be: the ones every list has, then the ones Columns adds. */
 export type Column = "change" | "status" | "title" | "owner" | "due" | ListColumn;
 
+/** The columns about a decision, which sit after Title at Decisions depth and need the decisions read. */
+const DECISION_COLUMNS: readonly ListColumn[] = ["answer", "why", "affects"];
+
+/** Whether `column` is about a decision. */
+export function isDecisionColumn(column: Column): boolean {
+  return DECISION_COLUMNS.some((each) => each === column);
+}
+
 /** What Columns can add: the decision columns are already there at Decisions depth, and the rows are mixed, so Kind stays. */
 export function addableColumns(decisionColumns: boolean): readonly ListColumn[] {
-  return decisionColumns ? LIST_COLUMNS.filter((column) => !["answer", "why", "affects"].includes(column)) : LIST_COLUMNS;
+  return decisionColumns ? LIST_COLUMNS.filter((column) => !isDecisionColumn(column)) : LIST_COLUMNS;
 }
 
 /** Whether the rows are in rank order, which puts the Rank column first: a sort by rank. */
@@ -26,7 +34,7 @@ export function ranked(list: ListSettings): boolean {
 /** C9, C12: the columns shown, left to right; at Decisions depth (`decisionColumns`) the decision columns after Title. */
 export function columnsOf(list: ListSettings, decisionColumns: boolean, layered = false): Column[] {
   const chosen = addableColumns(decisionColumns).filter((column) => list.columns.includes(column) && !(column === "rank" && ranked(list)));
-  const own: Column[] = decisionColumns ? ["status", "title", "answer", "why", "affects", "owner", "due"] : ["status", "title", "owner", "due"];
+  const own: Column[] = ["status", "title", ...(decisionColumns ? DECISION_COLUMNS : []), "owner", "due"];
   return [...(layered ? (["change"] as const) : []), ...(ranked(list) ? (["rank"] as const) : []), ...own, ...chosen];
 }
 
@@ -47,15 +55,10 @@ export function givesWay(column: Column): boolean {
   return column === "why";
 }
 
-/** The signal a column sorts by; the others have none. */
-export const SORT_OF: Partial<Record<Column, SortBy>> = {
-  rank: "rank",
-  slack: "slack",
-  gravity: "gravity",
-  unlocks: "unlocks",
-  due: "due",
-  effort: "effort",
-};
+/** The signal a column sorts by, the one of the same name; the others have none. */
+export function sortOf(column: Column): SortBy | undefined {
+  return SORTS.find((each) => each === column);
+}
 
 /** One line of the table: a node the level draws, with its row. */
 export interface Line {
@@ -129,11 +132,6 @@ export function flatLines(view: Ready, rows: readonly NodeRow[], sort: SortBy | 
   const ordered = [...planned.filter((row) => !snoozed(row)), ...planned.filter(snoozed)];
   const over = (row: NodeRow) => (sort === "due" || sort === "slack") && !isOpen(view.derived.nodes[row.key]);
   return [...ordered.filter((row) => !over(row)), ...ordered.filter(over)].map((row) => ({ key: row.key, depth: 0, row, container: false, foldable: false, open: false, guides: [] }));
-}
-
-/** Whether node `key` holds other nodes. */
-export function isContainer(view: Ready, key: string): boolean {
-  return (treeOf(view).children.get(key) ?? []).length > 0;
 }
 
 /** B2, C12: a rationale's first paragraph as plain text, for a one-line cell. */

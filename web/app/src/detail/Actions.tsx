@@ -7,6 +7,7 @@
 // lost to the landing. A guard that fails disables the primary and says what it waits on;
 // answering or finishing anyway is a bypass with a reason (D4). A container holding its own
 // snooze says that moving it on lifts the snooze (B6).
+import { STATUS_ACCEPTS_CHANGES } from "@cairn/client";
 import { useActorRef, useSelector } from "@xstate/react";
 import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { useLocation, useNavigate } from "react-router";
@@ -428,7 +429,7 @@ function useMenu(menus: Omit<Menus, "insertHere">): { groups: MenuItem[][]; runn
   // C11: Decide shows the answer form in place of any other form and asks it for the focus, which it takes once drawn.
   const [focusAsked, setFocusAsked] = useState(false);
   // Only a frame with a stepper can insert: elsewhere the entry is not offered.
-  const groups = menuOf(view, detail)
+  const groups = menuOf(view, detail, write.writable)
     .map((group) => group.filter((item) => item.id !== "insert-segment" || insertHere !== undefined))
     .filter((group) => group.length > 0);
   const runners = runnersOf({ ...menus, insertHere }, (to, state) => void navigate(to, state === undefined ? {} : { state }), search);
@@ -486,6 +487,15 @@ export function Actions({ view, detail, onRename }: { view: Ready; detail: NodeD
   return <NodeActions key={`${view.journey.header.id}:${detail.node.key}`} view={view} detail={detail} onRename={onRename} />;
 }
 
+/** B11: why an archived journey's node offers nothing to act on, in the panel where the actions would be. */
+function ClosedNote({ view }: { view: Ready }) {
+  return STATUS_ACCEPTS_CHANGES[view.journey.header.status] ? null : (
+    <span className="muted" data-testid="closed-note">
+      Archived. To make changes, choose <span className="nowrap">Un-archive</span> from the journey's ⋯ menu, under Status.
+    </span>
+  );
+}
+
 // A write's receipt or rejection is as wide as it needs: beside the sentence (the menu-only case) it would squeeze the sentence, so it sits under it.
 function NodeActions({ view, detail, onRename }: { view: Ready; detail: NodeDetail; onRename: () => void }) {
   const write = useNodeWrite(view, `actions:${detail.node.key}`, detail.node.key);
@@ -493,7 +503,7 @@ function NodeActions({ view, detail, onRename }: { view: Ready; detail: NodeDeta
   const [copied, setCopied] = useState(false);
   const form = useActionsForm(write.journey, node.key, write.seen, () => { setCopied(false); });
   const offers = offered(view, node.key);
-  const deciding = answerable(node.kind, record.state);
+  const deciding = write.writable && answerable(node.kind, record.state);
   const { open } = form;
   const kept = form.view.state === "kept" ? form.view.opened : undefined;
   // Open in place of the row: every form and panel but the answer form's own reason.
@@ -513,8 +523,8 @@ function NodeActions({ view, detail, onRename }: { view: Ready; detail: NodeDeta
   const anyway = anywayOf(form, kept);
   const { groups, runners, focusAnswer } = useMenu({ view, detail, write, form, onRename, onCopied: () => { setCopied(true); } });
   const menu = <Overflow groups={groups} runners={runners} />;
-  // A decision awaiting its answer has the answer form in the place of Decide.
-  const acts = [...(offers.primary === undefined || offers.primary === "decide" ? [] : [offers.primary]), ...offers.secondary];
+  // A decision awaiting its answer has the answer form in the place of Decide; a page that takes no write has neither, and its menu says only where to find the node.
+  const acts = !write.writable ? [] : [...(offers.primary === undefined || offers.primary === "decide" ? [] : [offers.primary]), ...offers.secondary];
   const opens = opensIn(form);
   const moving = movesFrom(node.kind, record.state).includes("start") ? "Starting" : "Finishing";
   const inDialog = open?.case === "snooze";
@@ -548,12 +558,11 @@ function NodeActions({ view, detail, onRename }: { view: Ready; detail: NodeDeta
       {menuOnly ? null : settled}
     </div>
   );
-  return menuOnly ? (
+  return (
     <>
       {body}
-      {settled}
+      <ClosedNote view={view} />
+      {menuOnly ? settled : null}
     </>
-  ) : (
-    body
   );
 }

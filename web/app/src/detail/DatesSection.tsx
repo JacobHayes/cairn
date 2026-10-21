@@ -73,7 +73,7 @@ export function DatesSection({
   view: Ready;
   detail: NodeDetail;
   pinEditor?: ReactNode;
-  onMove?: (move: Mutation) => void;
+  onMove?: ((move: Mutation) => void) | undefined;
   /** Whether it starts open, and the key the viewer's choice is remembered under (folds.ts). */
   open?: boolean;
   fold?: string;

@@ -10,13 +10,14 @@ import { AssistantDock, journeyTitles } from "../assistant/AssistantPanel.tsx";
 import { graphPath, type GraphView } from "../canvas/settings.ts";
 import type { Ready } from "../detail/model.ts";
 import { DeleteJourney } from "../journeys/DeleteJourney.tsx";
-import { statusActions } from "../journeys/lifecycle.ts";
-import { SCREENS, screenSwitched, type Screen } from "../journeys/address.ts";
+import { deletable, statusActions } from "../journeys/lifecycle.ts";
+import { screenSwitched, unavailableScreens, type Screen } from "../journeys/address.ts";
 import { useJourneyTarget } from "../journeys/useJourneyTarget.ts";
 import { useInsertEntry } from "../segments/entry.ts";
 import { useSuggested } from "../journeys/suggested.ts";
 import { OpenProposalsItem } from "../proposals/DestinationProposals.tsx";
-import { useLayer, useReviewing } from "../proposals/layer.ts";
+import { JOURNEY_OFFERS } from "../journeys/view.ts";
+import { useLayer } from "../proposals/layer.ts";
 import { JourneyFlow, type JourneyFlowName } from "../proposals/Entries.tsx";
 import { Button } from "../ui/kit.tsx";
 import { plural } from "../ui/words.ts";
@@ -26,6 +27,7 @@ import { JOURNEY_VIEW_TITLE, ViewPicker } from "./ViewPicker.tsx";
 import { RejectionView } from "./RejectionView.tsx";
 import { WriteStatus } from "./WriteStatus.tsx";
 import { useScreenWrite, type ScreenWrite } from "./write.ts";
+import { useWritable } from "./writable.ts";
 import { JourneyStatusBadge, STATUS_WORDS } from "../journeys/StatusBadge.tsx";
 
 type Panel = JourneyFlowName | "delete";
@@ -67,7 +69,7 @@ function StatusItems({ ready, write, onDelete, close }: { ready: Ready; write: S
               {action.label}
             </button>
           ))}
-          {header.status === "archived" ? (
+          {deletable(header.status) ? (
             <button type="button" role="menuitem" className="menu-item" data-testid="status-delete" onClick={() => { close(); onDelete(); }}>
               Delete...
             </button>
@@ -97,9 +99,9 @@ function JourneyMenu({ ready, view, screen, selected, write, onPanel }: { ready:
   const { header } = ready.journey;
   const { search } = useLocation();
   const insert = useInsertEntry();
-  // Under a proposal's layer the menu keeps what reads: acting on a picture of the future would be wrong.
-  const reviewing = useReviewing() !== undefined;
-  const archived = header.status === "archived";
+  // Where the page offers no write the menu keeps what reads; an archived journey keeps saving it as a route (a write to a route) and its status moves.
+  const live = useWritable();
+  const writable = useWritable(ready);
   return (
     <Menu label="Journey actions" testId="journey-menu" align="end" className="no-print" trigger={<span aria-hidden="true">⋯</span>}>
       {(close) => {
@@ -110,19 +112,19 @@ function JourneyMenu({ ready, view, screen, selected, write, onPanel }: { ready:
         );
         return (
           <>
-            {archived || reviewing ? null : (
+            {!writable ? null : (
               <Link role="menuitem" className="menu-item" data-testid="menu-edit" to={graphPath(header.id, { ...view, edit: !view.edit }, { node: selected }, search)} onClick={close}>
                 {view.edit ? "Done editing" : "Edit"}
               </Link>
             )}
-            {insert === undefined || archived || reviewing ? null : (
+            {insert === undefined || !writable ? null : (
               <button type="button" role="menuitem" className="menu-item" data-testid="menu-insert-segment" onClick={() => { close(); insert(); }}>
                 Insert segment...
               </button>
             )}
-            {reviewing ? null : item("menu-save", "Save as route...", "save")}
-            {reviewing ? null : item("menu-relink", "Re-link...", "relink")}
-            {reviewing ? null : <hr />}
+            {!live ? null : item("menu-save", "Save as route...", "save")}
+            {!writable ? null : item("menu-relink", "Re-link...", "relink")}
+            {!live ? null : <hr />}
             <OpenProposalsItem destination={{ journey: header.id }} close={close} />
             {screen !== "summary" ? null : (
               <button type="button" role="menuitem" className="menu-item" data-testid="menu-print" onClick={() => { close(); globalThis.print(); }}>
@@ -132,7 +134,7 @@ function JourneyMenu({ ready, view, screen, selected, write, onPanel }: { ready:
             <button type="button" role="menuitem" className="menu-item" data-testid="menu-copy-link" onClick={() => { close(); copyLink(); }}>
               Copy link
             </button>
-            {reviewing ? null : (
+            {!live ? null : (
               <>
                 <hr />
                 <StatusItems ready={ready} write={write} onDelete={() => { onPanel("delete"); }} close={close} />
@@ -156,8 +158,10 @@ function useClamped(ref: React.RefObject<HTMLElement | null>, name: string, open
     const measure = () => {
       // Open, the name is whole: it was cut if it runs past the clamp's lines.
       const style = getComputedStyle(element);
-      const lines = Number(style.getPropertyValue("--name-lines")) || 2;
-      setClamped(open ? element.scrollHeight > lines * Number.parseFloat(style.lineHeight) + 1 : element.scrollHeight > element.clientHeight + 1);
+      const lines = Number(style.getPropertyValue("--name-lines")) || 1;
+      // Closed, one line cuts the name across (an ellipsis), several cut it down.
+      const cut = element.scrollHeight > element.clientHeight + 1 || element.scrollWidth > element.clientWidth + 1;
+      setClamped(open ? element.scrollHeight > lines * Number.parseFloat(style.lineHeight) + 1 : cut);
     };
     measure();
     // The face arriving re-flows the name without resizing its box.
@@ -185,13 +189,13 @@ export function JourneyHeader({ ready, view, screen, selected }: { ready: Ready;
   // The header changes show in place: a renamed journey shows the new name over the change fill, and its old one in the title.
   const was = reviewing ? layer.before?.journey.header : undefined;
   const renamed = was !== undefined && was.name !== header.name;
-  const unavailable = reviewing ? { summary: "Close the proposal to see the summary", walk: "Close the proposal to walk through the journey" } : undefined;
+  const live = useWritable();
   return (
     <section className="stack journey-header" aria-label={header.name} data-testid="journey-header">
       <div className="row">
         <div className="journey-header-title">
           <h1 data-testid="journey-name" data-expanded={nameOpen} data-diff={renamed ? "changed" : undefined} title={renamed ? `Was: ${was.name}` : header.name}>
-            {/* A long name is clamped to two lines; a tap or click reads it whole, where a tooltip cannot be reached. */}
+            {/* A long name is clamped to one line (three on a phone); a tap or click reads it whole, where a tooltip cannot be reached. */}
             <button ref={nameButton} type="button" className="journey-name-toggle" aria-expanded={nameOpen} onClick={() => { setNameOpen(!nameOpen); }}>
               {header.name}
             </button>
@@ -201,11 +205,11 @@ export function JourneyHeader({ ready, view, screen, selected }: { ready: Ready;
         </div>
         <AssistantDock target={{ journey: header.id }} titleOf={journeyTitles(ready)} />
         <div className="journey-header-actions">
-          <ViewPicker screen={screen} screens={SCREENS} to={(to) => screenSwitched(target, search, to)} title={JOURNEY_VIEW_TITLE} {...(unavailable === undefined ? {} : { unavailable })} />
+          <ViewPicker screen={screen} screens={JOURNEY_OFFERS.screens} to={(to) => screenSwitched(target, search, to)} title={JOURNEY_VIEW_TITLE} unavailable={unavailableScreens(target)} />
           <JourneyMenu ready={ready} view={view} screen={screen} selected={selected} write={write} onPanel={setPanel} />
         </div>
       </div>
-      {header.status === "active" && suggested !== undefined && !reviewing ? (
+      {header.status === "active" && suggested !== undefined && live ? (
         <div className="callout row" data-testid="completion-suggested">
           <span>{suggested.remaining === 0 ? "Everything in scope is done." : `The final milestone is done. ${plural(suggested.remaining, "item")} remain unfinished.`}</span>
           <Button

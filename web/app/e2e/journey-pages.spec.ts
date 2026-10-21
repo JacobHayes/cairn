@@ -574,6 +574,24 @@ test("B11, A19, C16: the status moves from the menu's Status, and the header say
   await expect(page.getByTestId("delete-journey")).toBeVisible();
 });
 
+test("B11: an archived journey takes no write: the open node keeps only where to find it, and the list offers nothing to act on", async ({ page }) => {
+  const node = "n_announcement";
+  await openAt(page, "browser", "j_launch", "list?frontier=1");
+  await page.locator(`[data-testid="list-row"][data-node="${node}"] a[data-node="${node}"]`).click();
+  const actions = nodePanel(page, node).getByTestId("actions");
+  await expect(actions.getByRole("button").nth(1)).toBeVisible();
+  const rowActs = page.locator('[data-testid="list-row"] .row-act button');
+  await expect(rowActs.first()).toBeVisible();
+  await setStatus(page, "archived");
+  // The overflow menu is all that is left, and it holds only where to find the node.
+  await expect(actions.getByRole("button")).toHaveCount(1);
+  await actions.getByRole("button").click();
+  await expect(page.getByRole("menuitem", { name: "Copy link" })).toBeVisible();
+  await expect(page.getByRole("menuitem", { name: "Rename" })).toHaveCount(0);
+  await page.keyboard.press("Escape");
+  await expect(rowActs).toHaveCount(0);
+});
+
 test("C13: a pan does not come back when the range is chosen away and back", async ({ page }) => {
   await openAt(page, "browser", "j_vendor_eval", "timeline");
   await page.getByTestId("timeline").hover();

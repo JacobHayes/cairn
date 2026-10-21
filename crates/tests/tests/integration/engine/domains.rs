@@ -132,6 +132,14 @@ fn walk_route(records: &Records, ops: &mut BTreeSet<String>) -> Records {
         "- op: set_route_retired\n  retired: true\n",
         ops,
     );
+    // A19: a retired route starts no journey until it is brought back.
+    let start =
+        "- op: create_journey\n  name: Late\n  from: {route: vendor-evaluation, version: 1}\n";
+    let late = support::patch_to(&records, "{journey: j_late}", start);
+    assert_eq!(
+        support::codes(support::apply(&records, &late, &support::fixed_inputs())),
+        [ViolationCode::LineageInvalid]
+    );
     let records = accept(
         &records,
         ROUTE,

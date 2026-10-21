@@ -4,6 +4,7 @@ import type { components } from "./api.ts";
 type NodeKind = components["schemas"]["NodeKind"];
 type State = components["schemas"]["State"];
 type DisplayState = components["schemas"]["DisplayState"];
+type JourneyStatus = components["schemas"]["JourneyStatus"];
 
 // PRACTICES, Explicit limits: the engine rejects a patch past any of these.
 /** The `node_count_max` limit. */
@@ -113,3 +114,27 @@ export const KIND_STATUS_WORDS: Partial<Record<NodeKind, Partial<Record<DisplayS
 
 /** Every key type's prefix: what a key looks like wherever one might be shown. */
 export const KEY_PREFIXES: readonly string[] = ["n_", "r_", "k_", "i_", "who_", "a_", "j_", "p_", "pr_", "u_", "ag_", "cv_"];
+
+/** B11: a journey's statuses, in lifecycle order. */
+export const JOURNEY_STATUSES: readonly JourneyStatus[] = ["active", "completed", "archived"];
+
+/** B11: the statuses a journey in each status may move to. */
+export const STATUS_MOVES: Record<JourneyStatus, readonly JourneyStatus[]> = {
+  active: ["completed", "archived"],
+  completed: ["active", "archived"],
+  archived: ["completed"],
+};
+
+/** B11, A19: whether a journey in each status accepts changes beyond its status moves and hard deletion. */
+export const STATUS_ACCEPTS_CHANGES: Record<JourneyStatus, boolean> = {
+  active: true,
+  completed: true,
+  archived: false,
+};
+
+/** B11: whether a journey in each status holds current work: "mine" and the cross-journey lists. */
+export const STATUS_HOLDS_CURRENT_WORK: Record<JourneyStatus, boolean> = {
+  active: true,
+  completed: false,
+  archived: false,
+};

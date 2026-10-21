@@ -14,7 +14,8 @@ import type { ListFlag } from "../acting/address.ts";
 import { TITLE_BYTES_MAX } from "@cairn/client";
 import { overBytes } from "../authoring/limits.ts";
 import { STEPS, type Step } from "../canvas/model.ts";
-import { journeyPath, type Screen } from "./address.ts";
+import { ROUTE_SCREENS } from "../routes/address.ts";
+import { journeyPath, SCREENS, type Screen } from "./address.ts";
 
 /** C9: the flags the Filter offers, in the order it lists them. */
 export const FILTER_FLAGS: readonly ListFlag[] = ["overdue", "stale", "unassigned", "shortfall", "snoozed"];
@@ -56,11 +57,15 @@ export interface ViewState {
 }
 
 /**
- * What a subject of the views offers of the shared state. A journey offers all of it; a route
- * has no state, owner or relevance to decide, so it offers Depth (with Fade), the conditional
- * class and the search, and the rest is neither shown nor read from its address.
+ * C11, C17: what a subject of the views offers: its views, in the order the View picker lists
+ * them, and the parts of the shared state it reads. A journey offers all of it; a route has no
+ * state, owner or relevance to decide, so it offers the Graph, List and Timeline, Depth (with
+ * Fade), the conditional class and the search, and the rest is neither shown, keyed, listed on
+ * the key sheet, nor read from its address. The controls, the keys, the key sheet and the View
+ * picker read this and nothing else.
  */
 export interface ViewOffers {
+  screens: readonly Screen[];
   frontier: boolean;
   mine: boolean;
   owner: boolean;
@@ -68,9 +73,9 @@ export interface ViewOffers {
   notRelevant: boolean;
 }
 
-export const JOURNEY_OFFERS: ViewOffers = { frontier: true, mine: true, owner: true, flags: true, notRelevant: true };
+export const JOURNEY_OFFERS: ViewOffers = { screens: SCREENS, frontier: true, mine: true, owner: true, flags: true, notRelevant: true };
 
-export const ROUTE_OFFERS: ViewOffers = { frontier: false, mine: false, owner: false, flags: false, notRelevant: false };
+export const ROUTE_OFFERS: ViewOffers = { screens: ROUTE_SCREENS, frontier: false, mine: false, owner: false, flags: false, notRelevant: false };
 
 export const DEFAULT_FILTER: ViewFilter = { mine: false, owner: undefined, flags: [], notRelevant: false, conditional: true };
 
@@ -150,6 +155,14 @@ export function viewStateParams(state: ViewState): URLSearchParams {
 /** The journey's list, filtered to `filter` (the stock filter with these settings changed): where a count of what needs a look leads. */
 export function listPath(journey: string, filter: Partial<ViewFilter>): string {
   return journeyPath({ journey }, "list", viewStateParams({ ...DEFAULT_VIEW_STATE, filter: { ...DEFAULT_FILTER, ...filter } }).toString());
+}
+
+/**
+ * C11: the decision walkthrough a new journey opens on: the walk through at Decisions depth
+ * (the creation flow, 5.5, navigates here once the journey exists; it can be launched any time).
+ */
+export function walkthroughPath(journey: string): string {
+  return journeyPath({ journey }, "walk", viewStateParams({ ...DEFAULT_VIEW_STATE, depth: "decisions" }).toString());
 }
 
 function searchOf(params: URLSearchParams): string {
@@ -245,21 +258,50 @@ export type RelevanceClass = "conditional" | "not_relevant";
 /** C1: the classes in the Filter's order. */
 export const RELEVANCE_CLASSES: readonly RelevanceClass[] = ["conditional", "not_relevant"];
 
+/** What one view does with the shared view state (`SCREEN_VIEWS`). */
+export interface ScreenView {
+  /** Whether the view reads the view state at all: the summary counts the whole journey, so it has no controls and the view-state keys do nothing there. */
+  viewState: boolean;
+  /** The relevance classes it cannot draw, each with why: its Filter box stays set but disabled with the reason under it, and the count of what it hides is not offered. */
+  classes: Partial<Record<RelevanceClass, string>>;
+  /** Why Frontier lights nothing here, when it does not: the chip stays set but disabled with the reason, and Shift F does nothing. */
+  frontier?: string;
+  /** Whether Depth's Fade applies: a view of one card at a time has nothing to dim. */
+  fade: boolean;
+  /** Whether it draws rows that `j` and `k` move through. */
+  rows: boolean;
+}
+
+/** Why the timeline cannot draw what does not apply. */
+const NO_DATES = "The timeline has no dates for work that does not apply.";
+
+/** Why the walk through draws no relevance class but the relevant one. */
+const EVERY_CARD_APPLIES = "Every card here is work that applies.";
+
 /**
- * C1, C2: the one table of which relevance classes each view can draw. A class with a reason
- * cannot be drawn there: its Filter box stays set but disabled with the reason under it, and the
- * count of what it hides is not offered. A class without one is drawn when its box is checked.
- * The Filter's boxes, their counts and the engine's level read this and nothing else.
+ * C1, C2, C10, C11, C18: the one table of what each view does with the shared view state. The
+ * controls, the Filter's boxes and counts, the keys, and the engine's level, lights and dimming
+ * read this and nothing else.
  */
-export const CLASS_REASONS: Record<Screen, Partial<Record<RelevanceClass, string>>> = {
-  graph: {},
-  list: {},
-  summary: {},
-  timeline: { not_relevant: "The timeline has no dates for work that does not apply." },
-  walk: { conditional: "Every card here is work that applies.", not_relevant: "Every card here is work that applies." },
+export const SCREEN_VIEWS: Record<Screen, ScreenView> = {
+  graph: { viewState: true, classes: {}, fade: true, rows: false },
+  list: { viewState: true, classes: {}, fade: true, rows: true },
+  timeline: { viewState: true, classes: { not_relevant: NO_DATES }, fade: true, rows: false },
+  summary: { viewState: false, classes: {}, fade: false, rows: false },
+  walk: { viewState: true, classes: { conditional: EVERY_CARD_APPLIES, not_relevant: EVERY_CARD_APPLIES }, frontier: "Every card here is on the frontier. Frontier applies on the other views.", fade: false, rows: false },
 };
 
 /** Whether `screen` can draw `each`. */
 export function canDraw(screen: Screen, each: RelevanceClass): boolean {
-  return CLASS_REASONS[screen][each] === undefined;
+  return SCREEN_VIEWS[screen].classes[each] === undefined;
+}
+
+/** Whether Frontier lights anything on `screen` with `state`. */
+export function frontierOn(screen: Screen, state: ViewState): boolean {
+  return state.frontier && SCREEN_VIEWS[screen].frontier === undefined;
+}
+
+/** Whether Depth's Fade dims rather than hides on `screen` with `state`. */
+export function fadeOn(screen: Screen, state: ViewState): boolean {
+  return state.fade && SCREEN_VIEWS[screen].fade;
 }

@@ -92,6 +92,59 @@ pub enum JourneyStatus {
     Archived,
 }
 
+impl JourneyStatus {
+    /// Every status, in lifecycle order.
+    pub const ALL: [JourneyStatus; 3] = [
+        JourneyStatus::Active,
+        JourneyStatus::Completed,
+        JourneyStatus::Archived,
+    ];
+
+    /// The status as written.
+    #[must_use]
+    pub const fn name(self) -> &'static str {
+        match self {
+            JourneyStatus::Active => "active",
+            JourneyStatus::Completed => "completed",
+            JourneyStatus::Archived => "archived",
+        }
+    }
+
+    // PRD: B11.
+    /// The statuses a journey in this one may move to: active and completed both ways,
+    /// either archived, and an archived journey back to completed only.
+    #[must_use]
+    pub const fn moves(self) -> &'static [JourneyStatus] {
+        match self {
+            JourneyStatus::Active => &[JourneyStatus::Completed, JourneyStatus::Archived],
+            JourneyStatus::Completed => &[JourneyStatus::Active, JourneyStatus::Archived],
+            JourneyStatus::Archived => &[JourneyStatus::Completed],
+        }
+    }
+
+    // PRD: B11, A19.
+    /// Whether a journey in this status accepts changes beyond its status moves and hard
+    /// deletion: an archived journey does not.
+    #[must_use]
+    pub const fn accepts_changes(self) -> bool {
+        match self {
+            JourneyStatus::Active | JourneyStatus::Completed => true,
+            JourneyStatus::Archived => false,
+        }
+    }
+
+    // PRD: B11.
+    /// Whether a journey in this status holds current work: an active one does; a completed
+    /// or archived journey leaves "mine" and the cross-journey lists.
+    #[must_use]
+    pub const fn holds_current_work(self) -> bool {
+        match self {
+            JourneyStatus::Active => true,
+            JourneyStatus::Completed | JourneyStatus::Archived => false,
+        }
+    }
+}
+
 /// A journey's own fields, apart from its graph.
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
 #[serde(deny_unknown_fields)]

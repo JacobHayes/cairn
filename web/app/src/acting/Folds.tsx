@@ -57,6 +57,9 @@ function untilWords(view: Ready, target: SnoozeTarget): string {
 /** Add the note that stale work is missing, in one patch. */
 function AddNote({ write, node }: { write: NodeWrite; node: string }) {
   const form = useFormDraft<string>(write.journey, node, "stale-note");
+  if (!write.writable) {
+    return null;
+  }
   if (form.draft === undefined) {
     return <Button onClick={() => { form.open("", write.seen); }}>Add note</Button>;
   }

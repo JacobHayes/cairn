@@ -36,6 +36,9 @@ function DraftForm({
   input: (value: string, change: (value: string) => void) => ReactNode;
   mutations: (value: string) => Mutation[];
 }) {
+  if (!write.writable) {
+    return null;
+  }
   if (draft.draft === undefined) {
     return (
       <Button disabled={write.disabled} onClick={() => { draft.open(start, write.seen); }}>
@@ -97,7 +100,7 @@ export function PinEditor({ view, detail }: { view: Ready; detail: NodeDetail })
           Pinned to <strong data-testid="pin-date">{dateWords(current, view.derived.today)}</strong>
         </span>
       )}
-      {fedBy === undefined ? null : (
+      {fedBy === undefined || !write.writable ? null : (
         <span className="muted small" data-testid="pin-through">
           The pin is set by answering <NodeLink view={view} node={fedBy.key} />: editing it here answers that decision
         </span>
@@ -112,7 +115,7 @@ export function PinEditor({ view, detail }: { view: Ready; detail: NodeDetail })
           input={dateInput("Pin date")}
           mutations={set}
         />
-        {current === undefined ? null : (
+        {current === undefined || !write.writable ? null : (
           <Button disabled={write.disabled} onClick={() => void write.run([clear])}>
             {fedBy === undefined ? "Unpin" : "Unpin (reopens the decision)"}
           </Button>
@@ -258,9 +261,11 @@ export function ForceInclude({ view, detail }: { view: Ready; detail: NodeDetail
     <div className="stack" data-testid="force-include">
       <span className="row">
         <span>Included anyway: {forced}</span>
-        <Button disabled={write.disabled} onClick={() => void write.run([{ op: "remove_override", node: key, kind: "force_include" }])}>
-          Lift
-        </Button>
+        {!write.writable ? null : (
+          <Button disabled={write.disabled} onClick={() => void write.run([{ op: "remove_override", node: key, kind: "force_include" }])}>
+            Lift
+          </Button>
+        )}
       </span>
       <Rejected view={view} write={write} />
     </div>
@@ -288,7 +293,7 @@ export function WeightEditor({ view, detail }: { view: Ready; detail: NodeDetail
           )}
           mutations={(value) => [{ op: "set_node_field", node: key, value: { weight: Number(value) } }]}
         />
-        {weight == null ? null : (
+        {weight == null || !write.writable ? null : (
           <Button disabled={write.disabled} onClick={() => void write.run([{ op: "set_node_field", node: key, value: { weight: null } }])}>
             Use the default
           </Button>
@@ -313,6 +318,9 @@ export function ParticipationEditor({ view, detail }: { view: Ready; detail: Nod
       form.close();
     }
   };
+  if (!write.writable) {
+    return null;
+  }
   return (
     <div className="stack" data-testid="participation-editor">
       <span className="row">

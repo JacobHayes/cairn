@@ -3,6 +3,8 @@
 // milestone, with the open decisions, the description, the notes and links, and the lineage as
 // folds. The Summary (summary/SummaryPage.tsx) is the same journey at full width. Kept current
 // (H6): both read the journey's local derivation.
+import { STATUS_HOLDS_CURRENT_WORK } from "@cairn/client";
+
 import { useProjected } from "../canvas/hooks.ts";
 import { errorWords, valueOf } from "../data/keyed-read.ts";
 import { AnnotationList } from "../detail/Attachments.tsx";
@@ -39,10 +41,10 @@ function LineageFold({ ready }: { ready: Ready }) {
   );
 }
 
-/** `You have 3 open items here, 2 ready`, for a participant who arrives cold (2.4); nothing when none is open. */
+/** `You have 3 open items here, 2 ready`, for a participant who arrives cold (2.4); nothing when none is open, or the journey holds no current work (B11). */
 function Yours({ ready }: { ready: Ready }) {
   const mine = useMineOf(ready.journey.header.id);
-  if (mine.status !== "ready") {
+  if (mine.status !== "ready" || !STATUS_HOLDS_CURRENT_WORK[ready.journey.header.status]) {
     return null;
   }
   const { open, actionable } = yoursOf(ready, mine.entries);
@@ -50,21 +52,23 @@ function Yours({ ready }: { ready: Ready }) {
     return null;
   }
   return (
-    <span className="muted small" data-testid="card-yours" data-open={open} data-ready={actionable}>
+    <span className="muted" data-testid="card-yours" data-open={open} data-ready={actionable}>
       You have {plural(open, "open item")} here{actionable === 0 ? "" : `, ${String(actionable)} ready`}
     </span>
   );
 }
 
+/** What can move next; on a journey that holds no current work (B11) it is what was left ready or active, as the Summary words it. */
 function NextUp({ ready }: { ready: Ready }) {
   const next = valueOf(useProjected(ready, { projection: "next" }));
   const items = (next?.items ?? []).slice(0, NEXT_UP_SHOWN);
   if (items.length === 0) {
     return null;
   }
+  const heading = STATUS_HOLDS_CURRENT_WORK[ready.journey.header.status] ? "Next up" : "Ready or active";
   return (
-    <section className="stack" aria-label="Next up" data-testid="card-next-up">
-      <span className="muted small">Next up</span>
+    <section className="stack" aria-label={heading} data-testid="card-next-up">
+      <span className="muted">{heading}</span>
       <ul className="detail-list">
         {items.map((row) => (
           <li key={row.key} data-node={row.key}>
@@ -83,9 +87,9 @@ function NextMilestone({ ready, model }: { ready: Ready; model: SummaryModel }) 
   }
   return (
     <section className="stack" aria-label="Next milestone" data-testid="card-next-milestone" data-node={next.key}>
-      <span className="muted small">Next milestone</span>
+      <span className="muted">{STATUS_HOLDS_CURRENT_WORK[ready.journey.header.status] ? "Next milestone" : "Planned milestone"}</span>
       <span>
-        <NodeLink view={ready} node={next.key} /> <span className={inkClass(dateInk(next.date, ready.derived.today)) ?? "muted small"}>· {whenWords(next.date, next.origin, ready.derived.today)}</span>
+        <NodeLink view={ready} node={next.key} /> <span className={inkClass(dateInk(next.date, ready.derived.today)) ?? "muted"}>· {whenWords(next.date, next.origin, ready.derived.today)}</span>
       </span>
     </section>
   );
@@ -103,14 +107,14 @@ function Folds({ ready, model, selected }: { ready: Ready; model: SummaryModel; 
             {model.openDecisions.map((each) => (
               <li key={each.key} data-node={each.key} data-selected={each.key === selected}>
                 <NodeLink view={ready} node={each.key} />{" "}
-                <span className="muted small">{ownerWords(ready, each.owners, caller?.identities)}</span>
+                <span className="muted">{ownerWords(ready, each.owners, caller?.identities)}</span>
               </li>
             ))}
           </ul>
         </Section>
       )}
       <Section title="Description" testId="card-description">
-        {header.description == null ? <span className="muted small">No description.</span> : <Markdown text={header.description} data-testid="overview-description" />}
+        {header.description == null ? <span className="muted">No description.</span> : <Markdown text={header.description} data-testid="overview-description" />}
       </Section>
       <Section title="Notes and links" summary={String(annotations.length)} testId="card-notes">
         <AnnotationList view={ready} node={null} annotations={annotations} bare />
@@ -130,11 +134,11 @@ export function JourneyCard({ ready, selected }: { ready: Ready; selected?: stri
   return (
     <section className="journey-card detail-panel panel stack" aria-label="Journey" data-testid="journey-card">
       <div className="stack detail-lead">
-        <span className="muted small">Journey</span>
+        <span className="muted">Journey</span>
         {model === undefined || done === undefined ? null : (
           <>
             <span data-testid="card-progress" data-done={done} data-in-scope={model.inScope} data-remaining={model.remaining}>
-              {done} of {model.inScope} in scope done{model.remaining === 0 ? "" : `, ${String(model.remaining)} to go`}
+              {done} of {model.inScope} in scope done{model.remaining === 0 ? "" : `, ${String(model.remaining)} ${STATUS_HOLDS_CURRENT_WORK[ready.journey.header.status] ? "to go" : "unfinished"}`}
             </span>
             <Meter done={done} of={model.inScope} />
           </>
@@ -142,7 +146,7 @@ export function JourneyCard({ ready, selected }: { ready: Ready; selected?: stri
       </div>
       {summaryError === undefined ? null : <p className="callout callout-bad"><Failed what="The summary" error={summaryError} /></p>}
       {model === undefined || done === undefined ? (
-        summaryError === undefined ? <p className="muted small">Summing up the journey...</p> : null
+        summaryError === undefined ? <p className="muted">Summing up the journey...</p> : null
       ) : (
         <>
           <Yours ready={ready} />

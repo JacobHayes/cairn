@@ -4,15 +4,16 @@
 // cannot reach the control that had the focus behind it, and gives the focus back on close.
 import { Fragment, useEffect, useRef } from "react";
 
+import { JOURNEY_OFFERS } from "../journeys/view.ts";
 import { Button } from "../ui/kit.tsx";
-import { KEY_BINDINGS } from "./keys.ts";
+import { keyBindingsFor, type KeyBinding } from "./keys.ts";
 
-/** The bindings as a table, for the sheet and the rail's hint. */
-export function KeyTable() {
+/** The bindings as a table, for the sheet and the rail's hint (which lists a journey's, the most any page has). */
+export function KeyTable({ bindings = keyBindingsFor(JOURNEY_OFFERS) }: { bindings?: readonly KeyBinding[] }) {
   return (
     <table className="data">
       <tbody>
-        {KEY_BINDINGS.map((binding) => (
+        {bindings.map((binding) => (
           <Fragment key={binding.keys}>
             {binding.group === undefined ? null : (
               <tr>
@@ -20,7 +21,7 @@ export function KeyTable() {
               </tr>
             )}
             <tr>
-              <td>
+              <td className="key-cell">
                 <kbd>{binding.keys}</kbd>
               </td>
               <td>{binding.words}</td>
@@ -32,7 +33,8 @@ export function KeyTable() {
   );
 }
 
-export function KeySheet({ onClose }: { onClose: () => void }) {
+/** The sheet of the page's keys: `bindings`, what its subject offers (`keyBindingsFor`). */
+export function KeySheet({ bindings, onClose }: { bindings: readonly KeyBinding[]; onClose: () => void }) {
   const sheet = useRef<HTMLDialogElement>(null);
   useEffect(() => {
     const before = document.activeElement;
@@ -68,8 +70,8 @@ export function KeySheet({ onClose }: { onClose: () => void }) {
           <span className="spacer" />
           <Button onClick={onClose}>Close</Button>
         </span>
-        <KeyTable />
-        <span className="muted small">Keys never fire while a field has focus.</span>
+        <KeyTable bindings={bindings} />
+        <span className="muted key-sheet-note">Keys never fire while a field has focus.</span>
       </div>
     </dialog>
   );

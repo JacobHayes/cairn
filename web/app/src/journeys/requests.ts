@@ -14,7 +14,7 @@ import type { Level, LevelDisplay, Step } from "../canvas/model.ts";
 import type { GraphNode, Ready } from "../detail/model.ts";
 import type { Badge } from "../screens/badge.ts";
 import type { Screen } from "./address.ts";
-import { canDraw, FILTER_FLAGS, RELEVANCE_CLASSES, type RelevanceClass, type ViewState } from "./view.ts";
+import { canDraw, FILTER_FLAGS, frontierOn, RELEVANCE_CLASSES, SCREEN_VIEWS, type RelevanceClass, type ViewState } from "./view.ts";
 
 export type LevelRequest = Extract<ProjectionRequest, { projection: "level" }>;
 
@@ -103,12 +103,9 @@ export function walkQueryOf(state: ViewState, depth: Step): ListQuery {
   };
 }
 
-/**
- * C10: the nodes Frontier lights: the acting frontier. None when Frontier is off, and on the walk
- * through and the summary (the walk's every card is on the frontier).
- */
+/** C10: the nodes Frontier lights: the acting frontier. None where it is off or lights nothing (view.ts, `SCREEN_VIEWS`). */
 export function litOf(screen: Screen, state: ViewState, ready: Ready): ReadonlySet<string> | undefined {
-  return screen === "walk" || screen === "summary" || !state.frontier ? undefined : new Set(ready.derived.acting_frontier);
+  return frontierOn(screen, state) ? new Set(ready.derived.acting_frontier) : undefined;
 }
 
 /** C2, 5.1: the stages that are current in `ready`: those holding an acting-frontier or active node. */
@@ -154,22 +151,34 @@ export function stepHides(nodes: readonly GraphNode[], step: Step, collapsed: re
 }
 
 /**
+ * C2, C7: whether the depth leaves a node out of what the level drew (`drawn`, its node keys):
+ * `stepHides`, less what the engine's level draws whatever hides it (the selected node and the
+ * containers above it). What Depth's badge counts.
+ */
+export function depthLeavesOut(nodes: readonly GraphNode[], step: Step, collapsed: readonly string[], drawn: ReadonlySet<string> | undefined): (key: string) => boolean {
+  const hides = stepHides(nodes, step, collapsed);
+  return (key) => hides(key) && drawn?.has(key) !== true;
+}
+
+/**
  * C2: what Depth's Fade dims: the nodes the depth would not draw as their own card (`stepHides`
  * over `collapsed`, what Hide at `depth` collapses), among those the level draws (`drawn`, its
  * node keys), less every container above a node the depth does draw: a container holding a node
- * in focus is not dimmed. A container of a node the level does not draw (a filter or a relevance
+ * in focus is not dimmed. The selected node is in focus whatever the depth, as the level draws
+ * it whatever hides it. A container of a node the level does not draw (a filter or a relevance
  * class hides it) holds nothing in focus. Empty with Fade off.
  */
-export function depthFaded(state: ViewState, nodes: readonly GraphNode[], depth: Step, collapsed: readonly string[], drawn: ReadonlySet<string>): ReadonlySet<string> {
+export function depthFaded(state: ViewState, nodes: readonly GraphNode[], depth: Step, collapsed: readonly string[], drawn: ReadonlySet<string>, selected?: string): ReadonlySet<string> {
   if (!state.fade) {
     return new Set();
   }
   const hides = stepHides(nodes, depth, collapsed);
+  const outOfDepth = (key: string) => key !== selected && hides(key);
   const parents = new Map(nodes.map((node) => [node.key, node.parent ?? undefined]));
-  const faded = new Set([...drawn].filter(hides));
+  const faded = new Set([...drawn].filter(outOfDepth));
   const cleared = new Set<string>();
   for (const key of drawn) {
-    if (!hides(key)) {
+    if (!outOfDepth(key)) {
       // Walked up from a node in focus, every container above it is cleared (once).
       for (let at = parents.get(key); at !== undefined && !cleared.has(at); at = parents.get(at)) {
         cleared.add(at);
@@ -187,10 +196,10 @@ export function outOfFocus(lit: ReadonlySet<string> | undefined, faded: Readonly
 
 /**
  * C1, C2: what the Filter and Depth say they hide. `hidden` is the count each relevance class
- * the view can draw (view.ts, `CLASS_REASONS`) hides, shown beside its box in the open Filter;
+ * the view can draw (view.ts, `SCREEN_VIEWS`) hides, shown beside its box in the open Filter;
  * a class the view cannot draw has none. Depth's badge counts the nodes Frontier lights (the
- * walk's: its candidate cards) that the depth hides; with Fade on (`fade`) they are drawn, so
- * none.
+ * walk's: its candidate cards) that the depth hides (`hides`); with Fade on (`fade`) they are
+ * drawn, so none.
  */
 export function badgesOf(screen: Screen, byClass: Partial<Record<LevelDisplay, number>>, base: ReadonlySet<string> | undefined, hides: (key: string) => boolean, fade = false): { hidden: Partial<Record<RelevanceClass, number>>; depth?: Badge } {
   const hidden: Partial<Record<RelevanceClass, number>> = {};
@@ -203,7 +212,7 @@ export function badgesOf(screen: Screen, byClass: Partial<Record<LevelDisplay, n
   const lost = base === undefined || fade ? 0 : [...base].filter(hides).length;
   return {
     hidden,
-    ...(lost === 0 ? {} : { depth: { count: lost, words: `${String(lost)} that can move now ${lost === 1 ? "is" : "are"} ${screen === "walk" ? "not walked" : "hidden"} at this depth; choose Actions${screen === "walk" ? "" : " or fade the rest"} to see them` } }),
+    ...(lost === 0 ? {} : { depth: { count: lost, words: `${String(lost)} that can move now ${lost === 1 ? "is" : "are"} ${screen === "walk" ? "not walked" : "hidden"} at this depth; choose Actions${SCREEN_VIEWS[screen].fade ? " or fade the rest" : ""} to see them` } }),
   };
 }
 

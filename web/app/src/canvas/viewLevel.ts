@@ -7,8 +7,8 @@ import { useMemo } from "react";
 import type { GraphNode, Ready } from "../detail/model.ts";
 import { useLayer } from "../proposals/layer.ts";
 import type { Screen } from "../journeys/address.ts";
-import { badgesOf, currentStagesOf, depthFaded, levelRequestOf, lightsUp, litOf, outOfFocus, stepHides, type LevelRequest } from "../journeys/requests.ts";
-import type { ViewState } from "../journeys/view.ts";
+import { badgesOf, currentStagesOf, depthFaded, depthLeavesOut, levelRequestOf, lightsUp, litOf, outOfFocus, type LevelRequest } from "../journeys/requests.ts";
+import { fadeOn, type ViewState } from "../journeys/view.ts";
 import { valueOf } from "../data/keyed-read.ts";
 import { useLevel, useProjected, type Held, type LevelRead } from "./hooks.ts";
 import { collapsedAt, drawnStep, stepOf } from "./ladder.ts";
@@ -31,8 +31,6 @@ export interface ViewLevelArgs {
   folds?: { open: readonly string[]; shut: readonly string[] } | undefined;
   /** Containers the level is read open (Reveal shows what is inside a collapsed stage). */
   unfold?: readonly string[] | undefined;
-  /** Whether Fade draws the rest dimmed; the walk through draws at the depth whatever Fade says. */
-  fade?: boolean;
   /** Nodes drawn beside the level's, which Fade dims as it does the rest. */
   alsoDrawn?: ReadonlySet<string> | undefined;
   /** What Frontier lights, when the view is not lit by the journey's acting frontier (the walk through lights its candidates). */
@@ -64,7 +62,9 @@ export interface ViewLevel {
 }
 
 /** The depth, the level, and what lights, dims and counts, for one view (see the file's header). */
-export function useViewLevel({ screen, state, nodes, selected, ready, held, folds, unfold, fade = state.fade, alsoDrawn, lit }: ViewLevelArgs): ViewLevel {
+export function useViewLevel({ screen, state, nodes, selected, ready, held, folds, unfold, alsoDrawn, lit }: ViewLevelArgs): ViewLevel {
+  // Fade draws the rest dimmed where the view has it (view.ts, `SCREEN_VIEWS`): the walk through draws at the depth whatever Fade says.
+  const fade = fadeOn(screen, state);
   const depth = stepOf({ step: state.depth }, nodes);
   const step = drawnStep(depth, fade);
   const current = useMemo(() => (ready === undefined ? NONE : currentStagesOf(ready)), [ready]);
@@ -86,10 +86,10 @@ export function useViewLevel({ screen, state, nodes, selected, ready, held, fold
   const base = lit ?? frontier;
   const lightsHolders = useMemo(() => (base === undefined ? undefined : lightsUp(nodes, base)), [nodes, base]);
   const faded = useMemo(
-    () => (drawn === undefined ? undefined : depthFaded({ ...state, fade }, nodes, depth, hidden, alsoDrawn === undefined ? drawn : new Set([...drawn, ...alsoDrawn]))),
-    [state, fade, nodes, depth, hidden, drawn, alsoDrawn],
+    () => (drawn === undefined ? undefined : depthFaded({ ...state, fade }, nodes, depth, hidden, alsoDrawn === undefined ? drawn : new Set([...drawn, ...alsoDrawn]), selected)),
+    [state, fade, nodes, depth, hidden, drawn, alsoDrawn, selected],
   );
   const dimmed = useMemo(() => outOfFocus(lightsHolders, faded ?? NONE), [lightsHolders, faded]);
-  const badges = useMemo(() => badgesOf(screen, level?.hidden_by_class ?? {}, base, stepHides(nodes, depth, hidden), fade), [screen, level, base, nodes, depth, hidden, fade]);
+  const badges = useMemo(() => badgesOf(screen, level?.hidden_by_class ?? {}, base, depthLeavesOut(nodes, depth, hidden, drawn), fade), [screen, level, base, nodes, depth, hidden, drawn, fade]);
   return { depth, step, current, collapsed, request, level, own, drawn, error, base, faded, dimmed, badges };
 }

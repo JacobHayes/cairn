@@ -5,6 +5,7 @@
 // local derivation already gives (model.ts), kept current as it moves (H6). The lead and the
 // sections are read in that order at every width; a wide page only places the last three in a
 // side column. Printed, every list is whole and the page is dated (it is the report, C18).
+import { STATUS_HOLDS_CURRENT_WORK } from "@cairn/client";
 import type { ReactNode } from "react";
 import { Link } from "react-router";
 
@@ -23,6 +24,7 @@ import { progressOf } from "../journeys/figures-model.ts";
 import { useMineOf, type MineEntry } from "../journeys/mine.ts";
 import { useAssistantAsk } from "../assistant/ask.ts";
 import { dateInk, dateWords, inkClass, originWord, whenWords } from "../status/when.ts";
+import { useWritable } from "../screens/writable.ts";
 import { Button, Meter } from "../ui/kit.tsx";
 import { Markdown } from "../ui/markdown.tsx";
 import { nodeAddress, planAddress, timelineAddress } from "./links.ts";
@@ -86,7 +88,8 @@ function Lead({ ready, model, note }: { ready: Ready; model: SummaryModel; note:
   const line = milestoneLine(ready, model);
   const stalled = ready.derived.stalled != null;
   const lifecycle = lifecycleLine(ready, model);
-  const active = ready.journey.header.status === "active";
+  // A completed or archived journey holds no current work: what it has left is unfinished.
+  const active = STATUS_HOLDS_CURRENT_WORK[ready.journey.header.status];
   return (
     <section className="panel stack summary-lead" aria-label="Where it stands" data-testid="summary-lead">
       <div className="summary-lead-head">
@@ -124,7 +127,7 @@ function Lead({ ready, model, note }: { ready: Ready; model: SummaryModel; note:
           {line.role === "final" ? (active ? "Final milestone" : "Planned final milestone") : "Next milestone"}: <Link to={nodeAddress(journey, line.key)}>{line.title}</Link>, <MilestoneWhen ready={ready} line={line} />
         </p>
       )}
-      {stalled ? <StalledPanel view={ready} nodeTo={(node) => nodeAddress(journey, node)} readOnly={ready.journey.header.status === "archived"} endDate={line?.role === "final" && !line.done ? line.date : undefined} /> : null}
+      {stalled ? <StalledPanel view={ready} nodeTo={(node) => nodeAddress(journey, node)} endDate={line?.role === "final" && !line.done ? line.date : undefined} /> : null}
       {note}
     </section>
   );
@@ -163,28 +166,30 @@ function Dates({ ready, model, skip }: { ready: Ready; model: SummaryModel; skip
 }
 
 /** C18: what the journey is: its description, where it came from, its notes and links. */
-function About({ ready, readOnly }: { ready: Ready; readOnly: boolean }) {
+function About({ ready }: { ready: Ready }) {
   const { header } = ready.journey;
+  const writable = useWritable(ready);
   const lineage = useLineage(ready);
   const annotations = (ready.journey.graph.state?.annotations ?? []).filter((annotation) => annotation.body.node == null);
   return (
     <section className="panel stack summary-about" aria-label="About" data-testid="summary-about">
       <span className="label">About</span>
       {header.description == null ? null : <Markdown text={header.description} data-testid="overview-description" />}
-      <LineageBlock ready={ready} lineage={lineage} readOnly={readOnly} />
-      {readOnly && annotations.length === 0 ? null : <AnnotationList view={ready} node={null} annotations={annotations} bare readOnly={readOnly} showNone={false} />}
+      <LineageBlock ready={ready} lineage={lineage} />
+      {!writable && annotations.length === 0 ? null : <AnnotationList view={ready} node={null} annotations={annotations} bare showNone={false} />}
     </section>
   );
 }
 
 /** A journey with no node at all: the way to plan it (the graph in Edit mode, or the assistant). */
-function Unplanned({ ready, readOnly }: { ready: Ready; readOnly: boolean }) {
+function Unplanned({ ready }: { ready: Ready }) {
   const ask = useAssistantAsk();
+  const writable = useWritable(ready);
   return (
     <section className="panel stack summary-empty" aria-label="Nothing planned" data-testid="summary-empty">
       <span className="label">Plan this journey</span>
       <p className="summary-left">Nothing is planned here yet.</p>
-      {readOnly ? null : (
+      {!writable ? null : (
         <span className="row">
           <Link className="button primary" to={planAddress(ready.journey.header.id)} data-testid="summary-plan">
             Plan it on the graph
@@ -213,7 +218,7 @@ function Yours({ ready, entries, owned, actions }: { ready: Ready; entries: Entr
 
 /** The rows each section lists, claimed so a node is in one action section only (model.ts `claimActions`). */
 function entriesOf(ready: Ready, model: SummaryModel, frontier: NodeRow[], owned: ReadonlySet<string>) {
-  const claimed = claimActions(ready, model, frontier, ready.journey.header.status === "active" ? owned : new Set());
+  const claimed = claimActions(ready, model, frontier, owned);
   const line = milestoneLine(ready, model);
   const sets = line?.feeder;
   const rowEntry = (row: NodeRow): Entry => {
@@ -262,10 +267,10 @@ function Waiting({ ready, error }: { ready: Ready; error: string | undefined }) 
       <div className="summary" data-testid="summary" data-status={status} tabIndex={-1}>
         <div className="summary-grid summary-grid-empty">
           <div className="summary-main stack">
-            <Unplanned ready={ready} readOnly={status === "archived"} />
+            <Unplanned ready={ready} />
           </div>
           <div className="summary-side stack">
-            <About ready={ready} readOnly={status === "archived"} />
+            <About ready={ready} />
           </div>
         </div>
       </div>
@@ -282,16 +287,15 @@ type Entries = ReturnType<typeof entriesOf>;
 
 /** The action sections, in reading order: what waits on the viewer, the decisions to make, the rest of what is next, the work under way, then what waits (folded). */
 function Actions({ ready, entries, model, owned }: { ready: Ready; entries: Entries; model: SummaryModel; owned: MineEntry[] }) {
-  const status = ready.journey.header.status;
-  const actions = status !== "archived";
-  // A completed or archived journey lists what it left, not what to do next.
-  const closed = status !== "active";
+  const actions = useWritable(ready);
+  // A completed or archived journey holds no current work: it lists what it left, not what to do next.
+  const closed = !STATUS_HOLDS_CURRENT_WORK[ready.journey.header.status];
   const open = entries.yours.length + entries.decide.length + entries.nextUp.length === 0;
   const panel = (title: string, testId: string, rows: Entry[], more: { acts?: boolean; fold?: boolean } = {}) =>
     rows.length === 0 ? null : <EntriesPanel ready={ready} title={title} testId={testId} entries={rows} actions={more.acts === true && actions} folded={more.fold === true} open={open} />;
   return (
     <div className="summary-main stack">
-      {status === "active" ? <Yours ready={ready} entries={entries.yours} owned={owned} actions={actions} /> : null}
+      <Yours ready={ready} entries={entries.yours} owned={owned} actions={actions} />
       {panel(closed ? "Open decisions" : "Decide now", "summary-decide", entries.decide, { acts: true })}
       {panel(closed ? "Ready or active" : "Next up", "summary-next", entries.nextUp, { acts: true })}
       {panel("In progress", "summary-underway", entries.underWay)}
@@ -313,8 +317,8 @@ export function SummaryPage({ ready, note }: { ready: Ready; note?: ReactNode })
   if (isEmpty(ready) || summary === undefined || frontier === undefined || mine.status !== "ready") {
     return <Waiting ready={ready} error={errorWords(read) ?? errorWords(next) ?? (mine.status === "failed" ? mine.message : undefined)} />;
   }
-  // E4, C18: "yours" is the engine's "mine", the entries where the viewer's identities own it.
-  const owned = mine.entries.filter((entry) => entry.kinds.includes(OWNER_KIND));
+  // E4, C18: "yours" is the engine's "mine", the entries where the viewer's identities own it; a journey that holds no current work has none (B11).
+  const owned = STATUS_HOLDS_CURRENT_WORK[status] ? mine.entries.filter((entry) => entry.kinds.includes(OWNER_KIND)) : [];
   const model = summaryModel(ready, summary);
   const entries = entriesOf(ready, model, frontier, new Set(owned.map((entry) => entry.node)));
   return (
@@ -326,7 +330,7 @@ export function SummaryPage({ ready, note }: { ready: Ready; note?: ReactNode })
         )}
         <div className="summary-grid">
           <Actions ready={ready} entries={entries} model={model} owned={owned} />
-          <Context ready={ready} entries={entries} model={model} archived={status === "archived"} />
+          <Context ready={ready} entries={entries} model={model} />
         </div>
       </div>
     </div>
@@ -344,12 +348,12 @@ function NeedsLook({ ready, model }: { ready: Ready; model: SummaryModel }) {
 }
 
 /** The side column on a wide page: the milestones ahead, what finished lately, and what the journey is. */
-function Context({ ready, entries, model, archived }: { ready: Ready; entries: Entries; model: SummaryModel; archived: boolean }) {
+function Context({ ready, entries, model }: { ready: Ready; entries: Entries; model: SummaryModel }) {
   return (
     <div className="summary-side stack">
       <Dates ready={ready} model={model} skip={entries.milestoneSkip} />
       {entries.recent.length === 0 ? null : <EntriesPanel ready={ready} title="Recently finished" testId="summary-recent" entries={entries.recent} actions={false} bright />}
-      <About ready={ready} readOnly={archived} />
+      <About ready={ready} />
     </div>
   );
 }

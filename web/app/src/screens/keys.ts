@@ -4,33 +4,82 @@
 // then the sheet, then clear the selection),
 // `v` (next view), `F` (FRONTIER; the canvas has `f` for fit), `w` (the Walkthrough), `m` (Only mine),
 // `1` to `4` (Depth's step), `/` (search), `?` (the sheet). The view-state keys change the journey's one view state
-// (journeys/view.ts) wherever their control is live: none on the Summary, and not `F` on the Walkthrough, whose every card
-// is on the frontier. `p` (pass) is the Walkthrough's own (acting/TriageScreen.tsx). Pure helpers carry the decisions, so
+// (journeys/view.ts) wherever their control is live, as the per-view table says (`SCREEN_VIEWS`: none on the Summary,
+// and not `F` on the Walkthrough), and only what the page's subject offers (`ViewOffers`) is keyed or listed on the
+// sheet. `p` (pass) is the Walkthrough's own (acting/TriageScreen.tsx). Pure helpers carry the decisions, so
 // they are tested without a page.
 import { useEffect, useMemo } from "react";
 import { useLocation, useNavigate } from "react-router";
 
 import { STEPS, type Step } from "../canvas/model.ts";
-import { nextProjection, screenSwitched, useNodeAddresses, type NodeAddresses, type Projection, type Screen } from "../journeys/address.ts";
+import { nextProjection, PROJECTIONS, screenSwitched, unavailableScreens, useNodeAddresses, type NodeAddresses, type Screen } from "../journeys/address.ts";
 import { useJourneyTarget } from "../journeys/useJourneyTarget.ts";
-import { JOURNEY_OFFERS, type ViewOffers, type ViewState } from "../journeys/view.ts";
+import { JOURNEY_OFFERS, SCREEN_VIEWS, type ViewOffers, type ViewState } from "../journeys/view.ts";
 import { typing } from "../ui/typing.ts";
 
-/** The bindings the sheet lists, each with its words; `group` heads the run of rows it starts. The canvas handles its own keys (canvas/GraphCanvas.tsx) and the table lists them. */
-export const KEY_BINDINGS: { keys: string; words: string; group?: string }[] = [
-  { keys: "j / k", words: "Next or previous row" },
-  { keys: "Enter", words: "The open node's primary action" },
+/** One binding the sheet lists, with its words; `group` heads the run of rows it starts, and `needs` is what the page must offer for it to act (`keyBindingsFor`). */
+export interface KeyBinding {
+  keys: string;
+  words: string;
+  group?: string;
+  needs?: "frontier" | "mine" | "walk" | "rows" | "view" | "acts";
+}
+
+/** What a page offers its keys beyond its subject's offers: the screen shown, the views it cannot show now, and whether its nodes can be acted on. Left out, each is taken as offered (a sheet for no page in particular). */
+export interface KeyPage {
+  screen?: Screen | undefined;
+  unavailable?: Partial<Record<Screen, string>>;
+  acts?: boolean;
+}
+
+/** Every binding, in the sheet's order. The canvas handles its own keys (canvas/GraphCanvas.tsx) and the table lists them. */
+const KEY_BINDINGS: readonly KeyBinding[] = [
+  { keys: "j / k", words: "Next or previous row", needs: "rows" },
+  { keys: "Enter", words: "The open node's primary action", needs: "acts" },
   { keys: "Esc", words: "Close a popover or the sheet, then clear the selection" },
   { keys: "v", words: "Cycle Graph, List and Timeline" },
-  { keys: "Shift F", words: "Toggle Frontier" },
-  { keys: "w", words: "Open the Walkthrough" },
-  { keys: "m", words: "Toggle Only mine" },
-  { keys: "1 - 4", words: "Depth: Stages, Decisions, Deliverables or Actions" },
-  { keys: "/", words: "Search" },
-  { keys: "p", words: "Pass, in the Walkthrough" },
+  { keys: "Shift F", words: "Toggle Frontier", needs: "frontier" },
+  { keys: "w", words: "Open the Walkthrough", needs: "walk" },
+  { keys: "m", words: "Toggle Only mine", needs: "mine" },
+  { keys: "1 - 4", words: "Depth: Stages, Decisions, Deliverables or Actions", needs: "view" },
+  { keys: "/", words: "Search", needs: "view" },
+  { keys: "p", words: "Pass, in the Walkthrough", needs: "walk" },
+  { keys: "]", words: "Hide or show the inspector" },
   { keys: "?", words: "This sheet" },
   { keys: "f", words: "Fit the selection, or the whole graph with none", group: "Graph" },
 ];
+
+/** Whether the page's subject has the Walkthrough, and it can be shown now. */
+function walks(offers: ViewOffers, unavailable: Partial<Record<Screen, string>>): boolean {
+  return offers.screens.includes("walk") && unavailable.walk === undefined;
+}
+
+/** Whether `binding` acts on `page`, whose subject `offers` this; the screen's part is the per-screen table's (`SCREEN_VIEWS`). */
+function keyActs(binding: KeyBinding, offers: ViewOffers, page: KeyPage): boolean {
+  const view = page.screen === undefined ? undefined : SCREEN_VIEWS[page.screen];
+  const viewState = view?.viewState !== false;
+  switch (binding.needs) {
+    case undefined:
+      return true;
+    case "walk":
+      return walks(offers, page.unavailable ?? {});
+    case "rows":
+      return view?.rows !== false;
+    case "view":
+      return viewState;
+    case "acts":
+      return page.acts !== false;
+    case "frontier":
+      return offers.frontier && viewState && view?.frontier === undefined;
+    default:
+      return offers.mine && viewState;
+  }
+}
+
+/** The bindings that act on `page`, whose subject `offers` this: what its sheet lists. */
+export function keyBindingsFor(offers: ViewOffers, page: KeyPage = {}): KeyBinding[] {
+  return KEY_BINDINGS.filter((binding) => keyActs(binding, offers, page));
+}
 
 /** The step key `key` picks (`1` Stages to `4` Actions), when the journey offers it. */
 export function stepForKey(key: string, steps: readonly Step[]): Step | undefined {
@@ -79,10 +128,10 @@ export interface KeysProps {
   state: ViewState;
   steps: readonly Step[];
   onState: (next: ViewState, picked?: boolean) => void;
-  /** What the page's subject offers: `m` and `F` act only where it offers Only mine and Frontier. */
+  /** What the page's subject offers: `m`, `F` and `w` act only where it offers Only mine, Frontier and the Walkthrough. */
   offers: ViewOffers;
-  /** Whether the subject has a Walkthrough, which `w` opens. */
-  walk: boolean;
+  /** The views the page lists but cannot show now, whose keys do nothing. */
+  unavailable: Partial<Record<Screen, string>>;
   /** The address of view `to` from the page as it is now. */
   viewAddress: (to: Screen) => string;
 }
@@ -105,18 +154,19 @@ function escape({ selected, sheetOpen, setSheetOpen, addresses, go }: Heard): vo
   }
 }
 
-/** The view state's keys: where their control is live, each changes the state (the summary has none). */
+/** The view state's keys: where their control is live (`SCREEN_VIEWS`), each changes the state. */
 function onViewState(key: string, { screen, state, steps, onState, offers }: Heard): boolean {
   if (!["F", "m", "1", "2", "3", "4"].includes(key) || (key === "F" && !offers.frontier) || (key === "m" && !offers.mine)) {
     return false;
   }
-  if (screen === "summary") {
+  const view = SCREEN_VIEWS[screen];
+  if (!view.viewState) {
     return true;
   }
   const step = stepForKey(key, steps);
   if (step !== undefined) {
     onState({ ...state, depth: step }, !state.fade);
-  } else if (key === "F" && screen !== "walk") {
+  } else if (key === "F" && view.frontier === undefined) {
     onState({ ...state, frontier: !state.frontier });
   } else if (key === "m") {
     onState({ ...state, filter: { ...state.filter, mine: !state.filter.mine } });
@@ -126,21 +176,21 @@ function onViewState(key: string, { screen, state, steps, onState, offers }: Hea
 
 /** The views and the rows: keys that exist where a journey screen has them. */
 function onChips(key: string, heard: Heard): boolean {
-  const { screen, selected, addresses, viewAddress, walk, go } = heard;
+  const { screen, selected, addresses, viewAddress, offers, unavailable, go } = heard;
   if (onViewState(key, heard)) {
     return true;
   }
   switch (key) {
     case "v": {
-      if (screen !== "graph" && screen !== "list" && screen !== "timeline") {
+      const projection = PROJECTIONS.find((each) => each === screen);
+      if (projection === undefined) {
         return false;
       }
-      const to: Projection = nextProjection(screen);
-      go(viewAddress(to));
+      go(viewAddress(nextProjection(projection)));
       return true;
     }
     case "w":
-      if (!walk) {
+      if (!walks(offers, unavailable)) {
         return false;
       }
       go(viewAddress("walk"));
@@ -198,14 +248,14 @@ export function useViewKeys(props: KeysProps): void {
   }, [props, addresses, navigate]);
 }
 
-/** A journey's keys: everything its subject offers, and its Walkthrough. */
-export function useJourneyKeys(props: Omit<KeysProps, "offers" | "walk" | "viewAddress">): void {
+/** A journey's keys: everything its subject offers, less the views its address cannot show now. */
+export function useJourneyKeys(props: Omit<KeysProps, "offers" | "unavailable" | "viewAddress">): void {
   const { search } = useLocation();
   const target = useJourneyTarget();
   const { screen, selected, sheetOpen, setSheetOpen, state, steps, onState } = props;
   useViewKeys(
     useMemo(
-      () => ({ screen, selected, sheetOpen, setSheetOpen, state, steps, onState, offers: JOURNEY_OFFERS, walk: true, viewAddress: (to: Screen) => screenSwitched(target, search, to) }),
+      () => ({ screen, selected, sheetOpen, setSheetOpen, state, steps, onState, offers: JOURNEY_OFFERS, unavailable: unavailableScreens(target), viewAddress: (to: Screen) => screenSwitched(target, search, to) }),
       [screen, selected, sheetOpen, setSheetOpen, state, steps, onState, target, search],
     ),
   );

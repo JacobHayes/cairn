@@ -47,7 +47,7 @@ export function CanvasBars({ ready, view, authored, drawing }: Pick<ProjectionPr
   return (
     <>
       {authored === undefined ? null : <JourneyAuthoringBar ready={ready} authored={authored} view={view} drawing={drawing} />}
-      {reviewing ? null : <StalledPanel view={ready} nodeTo={(node) => graphPath(ready.journey.header.id, view, { node }, search)} readOnly={ready.journey.header.status === "archived"} />}
+      {reviewing ? null : <StalledPanel view={ready} nodeTo={(node) => graphPath(ready.journey.header.id, view, { node }, search)} />}
     </>
   );
 }

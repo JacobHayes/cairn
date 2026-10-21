@@ -121,19 +121,24 @@ function items(ids: (MenuId | false)[], labels: Partial<Record<MenuId, string>> 
 /**
  * The `⋯` menu's groups, most wanted first, and only what applies: a decided decision lists
  * Reopen, then the shape of the node, then where to find it; a node that does not apply lists
- * Include anyway and where to find it.
+ * Include anyway and where to find it. Where the page offers no write (`writable` off,
+ * screens/writable.ts) only where to find it.
  */
-export function menuOf(view: Ready, detail: NodeDetail): MenuItem[][] {
+export function menuOf(view: Ready, detail: NodeDetail, writable: boolean): MenuItem[][] {
   const { node, derived, record } = detail;
   const state = record.state;
   const kind = node.kind;
-  const container = detail.children.length > 0 || kind === "group";
+  // A container holds other nodes; an empty group holds none yet, though a segment may go into it.
+  const container = detail.children.length > 0;
   const blocked = failingGuards(derived).includes("deps_done");
   const guardFails = failingGuards(derived).length > 0 || derived.needs_breakdown === true;
   const keptUnder = derived.effectively_skipped === true && state !== "skipped";
   const member = (view.journey.graph.insertions ?? []).some((insertion) => node.key in insertion.nodes);
   const where = (...extra: (MenuId | false)[]): MenuItem[] => items(["show-in-graph", member && "show-insertion", ...extra, "copy-link"]);
   const groups = (...all: MenuItem[][]) => all.filter((group) => group.length > 0);
+  if (!writable) {
+    return groups(where());
+  }
   if (derived.display_state === "not_relevant") {
     return groups(items(["include"]), where());
   }
@@ -157,7 +162,7 @@ export function menuOf(view: Ready, detail: NodeDetail): MenuItem[][] {
       ],
       branch ? { snooze: "Snooze branch…", skip: "Skip branch…" } : {},
     ),
-    items(["rename", "assign", kind !== "milestone" && "weight", "pin", isWork(node) && !container && derived.needs_breakdown !== true && "break-down", container && "insert-segment"], {
+    items(["rename", "assign", kind !== "milestone" && "weight", "pin", isWork(node) && !container && derived.needs_breakdown !== true && "break-down", (container || kind === "group") && "insert-segment"], {
       pin: kind === "decision" ? "Pin decide-by…" : kind === "milestone" ? "Pin date…" : "Pin a date…",
     }),
     where("edit-node"),
@@ -189,13 +194,14 @@ export function actLabel(view: Ready, key: string, act: Act): string {
  * then the `⋯` menu's groups as they are, with where to find the node being the graph's
  * counterpart: the list. On the canvas, where cards are selected, the last group adds the node
  * to the selection or takes it out (`member`: it is in it), which is how touch selects several.
+ * Where the page offers no write (`writable` off) it lists no action, only where to find the node.
  */
-export function contextMenuOf(view: Ready, detail: NodeDetail, member?: boolean): MenuItem<ContextId>[][] {
+export function contextMenuOf(view: Ready, detail: NodeDetail, writable: boolean, member?: boolean): MenuItem<ContextId>[][] {
   const key = detail.node.key;
   const offers = offered(view, key);
-  const acts: Act[] = [...(offers.primary === undefined || offers.waiting ? [] : [offers.primary]), ...offers.secondary];
+  const acts: Act[] = !writable ? [] : [...(offers.primary === undefined || offers.waiting ? [] : [offers.primary]), ...offers.secondary];
   const row: MenuItem<ContextId>[] = acts.map((id) => ({ id, label: actLabel(view, key, id) }));
-  const rest = menuOf(view, detail).map((group) => group.flatMap((item): MenuItem<ContextId>[] => (item.id === "show-in-graph" ? [{ id: "show-in-list", label: "Show in list" }] : [item])));
+  const rest = menuOf(view, detail, writable).map((group) => group.flatMap((item): MenuItem<ContextId>[] => (item.id === "show-in-graph" ? [{ id: "show-in-list", label: "Show in list" }] : [item])));
   const select: MenuItem<ContextId>[] = member === undefined ? [] : [{ id: "toggle-selection", label: member ? "Remove from selection" : "Add to selection" }];
   return [row, ...rest, select].filter((group) => group.length > 0);
 }

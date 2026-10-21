@@ -10,6 +10,7 @@ import { useDraft } from "../data/drafts.ts";
 import { useWrite } from "../data/react.ts";
 import type { WriteView } from "../data/write-machine.ts";
 import { patchOf } from "../data/writes.ts";
+import { useWritable } from "../screens/writable.ts";
 import type { ReceiptState } from "../ui/receipt.ts";
 import type { Ready } from "./model.ts";
 
@@ -64,7 +65,9 @@ export function useRename(view: Ready, node: string, title: string): Rename {
   const [draft, setDraft] = useDraft<TitleDraft>(key);
   const edit = useWrite(key, title);
   const { write, busy } = edit;
-  const open = draft !== undefined || write !== undefined;
+  // A draft kept from before the page stopped offering writes waits, unshown, until it offers them again.
+  const writable = useWritable(view);
+  const open = writable && (draft !== undefined || write !== undefined);
   const text = draft?.text ?? sentTitle(write) ?? "";
   const problem = draft === undefined ? undefined : overBytes(draft.text, TITLE_BYTES_MAX, "The title");
   return {
@@ -74,9 +77,9 @@ export function useRename(view: Ready, node: string, title: string): Rename {
     problem,
     base: draft?.base,
     busy,
-    canSave: draft !== undefined && draft.text.trim() !== "" && problem === undefined && !edit.disabled,
+    canSave: writable && draft !== undefined && draft.text.trim() !== "" && problem === undefined && !edit.disabled,
     start: () => {
-      if (!open) {
+      if (writable && !open) {
         setDraft({ text: title, base: view.journey.revision });
       }
     },
@@ -94,7 +97,7 @@ export function useRename(view: Ready, node: string, title: string): Rename {
       }
     },
     save: () => {
-      if (draft === undefined || draft.text.trim() === "" || problem !== undefined || edit.disabled) {
+      if (!writable || draft === undefined || draft.text.trim() === "" || problem !== undefined || edit.disabled) {
         return;
       }
       const patch = patchOf({ target: { journey }, baseRevision: draft.base, mutations: [{ op: "set_node_field", node, value: { title: draft.text } }] });

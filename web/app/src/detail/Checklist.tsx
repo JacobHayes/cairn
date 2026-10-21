@@ -20,7 +20,7 @@ function Item({ view, child, write }: { view: Ready; child: Child; write: NodeWr
   return (
     <li data-testid="child" data-node={child.key} data-state={child.displayState}>
       <span className="checklist-mark">
-        {isWork(child) && child.state !== "skipped" ? (
+        {write.writable && isWork(child) && child.state !== "skipped" ? (
           <input
             type="checkbox"
             aria-label={`${done ? "Reopen" : "Complete"} ${child.title}`}

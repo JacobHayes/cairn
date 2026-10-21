@@ -41,7 +41,7 @@ function Dates({ view, detail }: { view: Ready; detail: NodeDetail }) {
       detail={detail}
       open={detail.derived.dates.shortfall != null || detail.derived.overdue === true}
       fold={foldKey(detail.node.kind, "dates")}
-      onMove={(move) => void write.run([move])}
+      onMove={write.writable ? (move) => void write.run([move]) : undefined}
       pinEditor={
         <>
           <Rejected view={view} write={write} />

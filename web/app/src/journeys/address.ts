@@ -14,22 +14,19 @@
 // when it differs from the address's default (`defaultScreen`): the Summary for a bare journey,
 // the Graph for a node or a proposal's layer, and always for an edge, so one state has one address. Beside it the view state every view
 // shares (view.ts: `depth`, `fade`, `frontier`, `mine`, `owner`, `flag`, `show`, `q`) and each view's
-// own settings (the graph's `open`, `shut`, `lens`, `edit`, `map`; the list's `sort`, `cols`; the
+// own settings (the graph's `open`, `shut`, `lens`, `edit`; the list's `sort`, `cols`; the
 // timeline's `range`), which stay in the query when the view changes, so switching back restores
 // them. Nothing redirects, and no earlier address is kept.
 import { useMemo } from "react";
 import { useLocation } from "react-router";
 
-import type { Schema } from "@cairn/client";
+import { JOURNEY_STATUSES, STATUS_HOLDS_CURRENT_WORK, type Schema } from "@cairn/client";
 
 import { pathTo, proposalAddress, required, usePage, type Page } from "../address.ts";
 import type { JourneyIndexQuery } from "../data/host.ts";
 import { routePath, routeScreenOf, spotOf } from "../routes/address.ts";
 
 export type JourneyStatus = Schema<"JourneyStatus">;
-
-/** The statuses, in lifecycle order (B11). */
-export const STATUSES: JourneyStatus[] = ["active", "completed", "archived"];
 
 /** C16: the index's filters. `status` is one status, or every status. */
 export interface IndexFilters {
@@ -57,7 +54,7 @@ export function filtersFrom(params: URLSearchParams): IndexFilters {
   const status = params.get("status");
   const route = params.get("route") ?? undefined;
   return {
-    status: status === "any" ? "any" : (STATUSES.find((each) => each === status) ?? "active"),
+    status: status === "any" ? "any" : (JOURNEY_STATUSES.find((each) => each === status) ?? "active"),
     route,
     version: route === undefined ? undefined : positive(params.get("version")),
     mine: params.get("mine") === "1",
@@ -87,10 +84,10 @@ export function filterParams(filters: IndexFilters): URLSearchParams {
 
 /**
  * C16: the host's query for `filters`. "Mine" asks the host for the journeys referring to the
- * caller's identities (a superset of those where they hold a participation, E6), active only
- * (B11: a completed journey leaves "mine"); the index then keeps those where the journey's own
- * "mine" is not empty. None when "mine" can hold nothing: the caller has no identity, or the
- * status asked for is not active.
+ * caller's identities (a superset of those where they hold a participation, E6), in the statuses
+ * that hold current work (B11: a completed journey leaves "mine"); the index then keeps those
+ * where the journey's own "mine" is not empty. None when "mine" can hold nothing: the caller has
+ * no identity, or the status asked for holds no current work.
  */
 export function queryOf(filters: IndexFilters, identities: readonly string[]): JourneyIndexQuery | undefined {
   const query: JourneyIndexQuery = {};
@@ -107,10 +104,11 @@ export function queryOf(filters: IndexFilters, identities: readonly string[]): J
     query.upgrade_available = true;
   }
   if (filters.mine) {
-    if (identities.length === 0 || (filters.status !== "any" && filters.status !== "active")) {
+    const current = JOURNEY_STATUSES.filter((status) => STATUS_HOLDS_CURRENT_WORK[status] && (filters.status === "any" || filters.status === status));
+    if (identities.length === 0 || current.length === 0) {
       return undefined;
     }
-    query.status = ["active"];
+    query.status = current;
     query.referencing = [...identities];
   }
   return query;
@@ -191,9 +189,21 @@ export function defaultScreen(target: JourneyTarget): Screen {
   return target.node === undefined && target.edge === undefined && target.proposal === undefined ? "summary" : "graph";
 }
 
-/** The screens a proposal's layer can be drawn over: the projections; the Summary and the Walkthrough describe the journey as it is. */
-export function layerScreen(screen: Screen): Projection {
-  return screen === "summary" || screen === "walk" ? "graph" : screen;
+/** C14: the views a proposal's layer is not drawn over, each with why: the Summary and the Walkthrough describe the journey as it is. */
+const NOT_UNDER_LAYER: Partial<Record<Screen, string>> = { summary: "Close the proposal to see the summary", walk: "Close the proposal to walk through the journey" };
+
+/** The view a proposal's layer draws for `screen`: the Graph in place of a view it is not drawn over. */
+export function layerScreen(screen: Screen): Screen {
+  return NOT_UNDER_LAYER[screen] === undefined ? screen : "graph";
+}
+
+/**
+ * C11, C14: the views a journey's page at `target` lists but cannot show now, each with why:
+ * under a proposal's layer, in any mode, the Summary and the Walkthrough. The View picker shows
+ * them disabled with the reason, and their keys do nothing.
+ */
+export function unavailableScreens(target: JourneyTarget): Partial<Record<Screen, string>> {
+  return target.proposal === undefined ? {} : NOT_UNDER_LAYER;
 }
 
 /**
@@ -360,14 +370,6 @@ export function layerEntry(target: JourneyTarget, search: string, proposal: stri
 /** C14: the page under the layer at `target` + `search` without it: the view on screen stays, written off the bare journey's own default. */
 export function layerExit(target: JourneyTarget, search: string): string {
   return journeyPath({ journey: target.journey, node: target.node }, screenOf(target, new URLSearchParams(search)), search);
-}
-
-/**
- * C11: the decision walkthrough a new journey opens on: the walk through at Decisions depth
- * (the creation flow, 5.5, navigates here once the journey exists; it can be launched any time).
- */
-export function walkthroughPath(journey: string): string {
-  return journeyPath({ journey }, "walk", "?depth=decisions");
 }
 
 /** `search` with `?` in front when it holds anything, whichever way it was given. */
