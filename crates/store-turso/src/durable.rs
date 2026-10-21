@@ -1,7 +1,7 @@
 //! A commit the store cannot settle fails it closed
 //! (decisions/2026-10-09-a-commit-the-store-cannot-settle-fails-it-closed.md). Turso keeps a
 //! transaction whose record it appended to the logical log even when the log's fsync then
-//! fails and its `COMMIT` errs (`turso_core` 0.8.2, a dropped commit whose log was appended
+//! fails and its `COMMIT` errs (`turso_core` 0.8.2 and 0.8.3, a dropped commit whose log was appended
 //! is marked committed): the write is visible, and reaches the disk only with a later
 //! successful sync. So a `COMMIT` that fails other than by a conflict or a constraint leaves
 //! the store's state in doubt, and the store answers nothing more: every call errs, and the

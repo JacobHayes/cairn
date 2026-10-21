@@ -37,12 +37,12 @@ cairn-wasm = { path = "crates/wasm" }
 # The store traits (ARCHITECTURE, Store trait): plain `async fn` in a trait that stays object-safe
 # and `Send`; already compiled in the tree through rmcp.
 async-trait = "0.1.92"
-base64 = "0.22.1"
+base64 = "0.23.1"
 axum = { version = "0.8.9", default-features = false, features = ["form", "http1", "json", "query", "tokio"] }
 chrono = { version = "0.4.45", default-features = false }
 cookie = "0.18.1"
 ed25519-dalek = { version = "2.2.0", default-features = false, features = ["pem", "std"] }
-getrandom = "0.3.4"
+getrandom = "0.4.3"
 http-body-util = "0.1.3"
 hyper = { version = "1.11.1", default-features = false, features = ["client", "http1"] }
 hyper-util = { version = "0.1.21", default-features = false, features = ["tokio"] }
@@ -76,7 +76,7 @@ mime_guess = { version = "2.0.5", default-features = false }
 socket2 = { version = "0.6.5", features = ["all"] }
 toml = { version = "1.1.6", default-features = false, features = ["parse", "serde", "std"] }
 tracing-subscriber = { version = "0.3.23", default-features = false, features = ["fmt", "json", "std"] }
-jsonschema = { version = "0.58.5", default-features = false }
+jsonschema = { version = "0.59.0", default-features = false }
 # The MCP endpoint (ARCHITECTURE, MCP endpoint names it): rmcp's server over Streamable HTTP
 # as a tower service the API mounts; its client only drives the endpoint in tests.
 rmcp = { version = "3.5.1", default-features = false }
@@ -88,7 +88,7 @@ jiff = { version = "0.2.37", default-features = false, features = ["serde", "std
 proptest = { version = "1.11.0", default-features = false, features = ["std", "bit-set"] }
 schemars = { version = "1.2.2", features = ["jiff02"] }
 serde = { version = "1.0", features = ["derive"] }
-serde-saphyr = "1.3.0"
+serde-saphyr = "2.0.0"
 serde_json = { version = "1.0", features = ["float_roundtrip"] }
 serde_path_to_error = "0.1.20"
 sha2 = "0.11.0"
@@ -102,7 +102,7 @@ sha2 = "0.11.0"
 # (already in the tree under other crates).
 rustix = { version = "1.1.5", default-features = false, features = ["fs", "std"] }
 tokio ={ version = "1.53.2", default-features = false }
-turso = { version = "=0.8.2", default-features = false }
+turso = { version = "=0.8.3", default-features = false }
 # The browser host (ARCHITECTURE, Web UI): the Rust half of the wasm bindings. Pinned exactly,
 # because the `wasm-bindgen` CLI in mise.toml must be this same version to generate them.
 wasm-bindgen = "=0.2.129"
