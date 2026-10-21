@@ -128,8 +128,13 @@ impl Server {
     }
 }
 
+/// The dev user's verified email: on its first request the service creates the identity
+/// holding it, by a patch of its own (H3).
+pub const DEV_EMAIL: &str = "tester@example.org";
+
 /// Auth as the binary's root assembles it for local development: the dev sign-in provider
-/// on a loopback listener, with no token, so every request is the dev user (H1).
+/// on a loopback listener, with no token, so every request is the dev user (H1), whose
+/// verified email is what lets it sign in at all (H3).
 fn auth(store: &Arc<TursoStore>) -> Result<Auth, Stop> {
     let invalid = |label: &'static str| {
         move |error: &dyn std::fmt::Debug| Stop::Abort {
@@ -144,7 +149,9 @@ fn auth(store: &Arc<TursoStore>) -> Result<Auth, Stop> {
         user: "Tester"
             .parse()
             .map_err(|error| invalid("dev-user")(&error))?,
-        verified_emails: BTreeSet::new(),
+        verified_emails: BTreeSet::from([DEV_EMAIL
+            .parse()
+            .map_err(|error| invalid("dev-email")(&error))?]),
         token: None,
         auto_link: false,
         allow_off_loopback: false,

@@ -8,7 +8,10 @@ use std::process::ExitCode;
 use std::time::Duration;
 
 use cairn_engine::Records;
-use cairn_schema::{Deployment, Domain, Event, Journey, PatchId, Revision, RevisionOf, TouchedSet};
+use cairn_schema::{
+    Deployment, Domain, Event, EventType, Journey, PatchId, Record, Revision, RevisionOf,
+    TouchedSet, Write,
+};
 use cairn_service::Service;
 use cairn_store::{EventQuery, PageSize};
 use patina_dst::VerdictKind;
@@ -16,7 +19,7 @@ use patina_dst::VerdictKind;
 use crate::Stop;
 use crate::client::{Ack, Report};
 use crate::view::{CaughtUp, Held};
-use crate::world::Setup;
+use crate::world::{DEV_EMAIL, Setup};
 
 /// The invariants, by verdict label, in the order a run reports them.
 pub const INVARIANTS: [&str; 9] = [
@@ -121,6 +124,30 @@ fn patches(log: &[Event]) -> Vec<Logged> {
         }
     }
     logged
+}
+
+/// H3: the patches the service made itself as the dev user arrived: each creates the
+/// identity holding the dev user's verified email and nothing else. No client sends one, so
+/// none is acknowledged.
+fn arrivals(log: &[Event]) -> BTreeSet<&PatchId> {
+    let mut patches: BTreeMap<&PatchId, Vec<&Event>> = BTreeMap::new();
+    for event in log {
+        patches.entry(&event.patch_id).or_default().push(event);
+    }
+    let arrival = |event: &&Event| {
+        event.log == Domain::Deployment
+            && event.event_type == EventType::IdentityCreated
+            && matches!(
+                event.delta.as_slice(),
+                [Write::Put(Record::Identity(identity))]
+                    if identity.emails.iter().any(|email| email.as_str() == DEV_EMAIL)
+            )
+    };
+    patches
+        .into_iter()
+        .filter(|(_, events)| events.iter().all(arrival))
+        .map(|(patch, _)| patch)
+        .collect()
 }
 
 /// What a run produced, ready to judge.
@@ -230,12 +257,7 @@ impl Outcome {
                 violations.push(("retried-only-when-safe", detail));
             }
         }
-        let acknowledged: BTreeSet<&PatchId> =
-            self.acks.iter().map(|ack| &ack.receipt.patch_id).collect();
-        for patch in at.keys().filter(|patch| !acknowledged.contains(*patch)) {
-            let detail = format!("{patch} is in the log unacknowledged");
-            violations.push(("nothing-unacknowledged-applied", detail));
-        }
+        violations.extend(self.unacknowledged(at.keys().copied()));
         for patch in self
             .report
             .surfaced
@@ -247,6 +269,32 @@ impl Outcome {
         }
         for (patch, answer) in &self.report.unexpected {
             violations.push(("only-conflicts-refused", format!("{patch}: {answer}")));
+        }
+        violations
+    }
+
+    /// The patches applied that no client was told of, but for the dev user's one arrival.
+    fn unacknowledged<'a>(
+        &'a self,
+        applied: impl Iterator<Item = &'a PatchId>,
+    ) -> Vec<(&'static str, String)> {
+        let mut violations = Vec::new();
+        let acknowledged: BTreeSet<&PatchId> =
+            self.acks.iter().map(|ack| &ack.receipt.patch_id).collect();
+        let arrivals = arrivals(&self.truth.log);
+        if arrivals.len() > 1 {
+            let patches: Vec<String> = arrivals.iter().map(ToString::to_string).collect();
+            let detail = format!(
+                "the dev user arrived more than once: {}",
+                patches.join(", ")
+            );
+            violations.push(("nothing-unacknowledged-applied", detail));
+        }
+        for patch in
+            applied.filter(|patch| !acknowledged.contains(*patch) && !arrivals.contains(*patch))
+        {
+            let detail = format!("{patch} is in the log unacknowledged");
+            violations.push(("nothing-unacknowledged-applied", detail));
         }
         violations
     }
@@ -356,7 +404,29 @@ mod tests {
             };
             history.land(&patches::create_journey(2), Revision::NONE);
             history.land(&patches::create_identities(1), Revision::NONE);
+            history.arrive("p_arrival");
             history
+        }
+
+        /// The service's own patch as the dev user arrives, which no client is told of.
+        fn arrive(&mut self, id: &str) {
+            let identity = cairn_schema::Identity {
+                key: format!("who_dev_{id}").parse().unwrap(),
+                name: None,
+                emails: std::collections::BTreeSet::from([DEV_EMAIL.parse().unwrap()]),
+            };
+            let patch = Patch {
+                id: id.parse().unwrap(),
+                target: cairn_schema::PatchTarget::Deployment,
+                base_revision: self.records.deployment.revision,
+                deployment_revision: None,
+                mutations: cairn_schema::Mutations::new(vec![
+                    cairn_schema::Mutation::CreateIdentity { identity },
+                ])
+                .unwrap(),
+            };
+            self.land(&patch, Revision::NONE);
+            self.acks.pop();
         }
 
         /// Applies `patch`, logs its events, and acknowledges it as drafted at `drafted`.
@@ -447,7 +517,7 @@ mod tests {
     #[test]
     fn each_invariant_names_the_history_that_breaks_it() {
         type Break = fn(&mut Outcome);
-        let cases: [(&str, Break); 8] = [
+        let cases: [(&str, Break); 10] = [
             ("acknowledged-visible", |outcome| {
                 let ack = &mut outcome.acks[2];
                 ack.receipt.revision = ack.receipt.revision.next();
@@ -461,6 +531,21 @@ mod tests {
             }),
             ("nothing-unacknowledged-applied", |outcome| {
                 outcome.acks.pop();
+            }),
+            ("nothing-unacknowledged-applied", |outcome| {
+                // An identity created without the dev user's email is no arrival.
+                outcome.acks.remove(1);
+            }),
+            ("nothing-unacknowledged-applied", |outcome| {
+                let mut again = outcome
+                    .truth
+                    .log
+                    .iter()
+                    .find(|event| event.patch_id.as_str() == "p_arrival")
+                    .unwrap()
+                    .clone();
+                again.patch_id = "p_arrival_again".parse().unwrap();
+                outcome.truth.log.push(again);
             }),
             ("surfaced-not-applied", |outcome| {
                 outcome.report.surfaced.push("p_note".parse().unwrap());
