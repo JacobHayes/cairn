@@ -4,6 +4,7 @@
 // derive, a projection) and parsed where it reads them.
 import init, {
   Derivation,
+  RouteDerivation,
   apply,
   applyRoute,
   exportRoute,
@@ -11,9 +12,7 @@ import init, {
   preview,
   readRouteFile,
   routeFileText,
-  routeLevel,
   routeNotices,
-  routeSchedule,
   touched,
   touchedOverlaps,
 } from "../generated/cairn_wasm.js";
@@ -36,10 +35,8 @@ import {
   type ProjectionAnswer,
   type ProjectionRequest,
   type RouteApplyRequest,
-  type RouteLevelRequest,
+  type RouteDeriveRequest,
   type RouteNoticesRequest,
-  type RouteSchedule,
-  type RouteScheduleRequest,
 } from "./types.ts";
 
 /** The compiled module: compiled once per page, then instantiated by the page and posted to the derive worker. */
@@ -109,8 +106,39 @@ export class DerivedDocument {
   }
 }
 
+/** A route's graph derived once as a journey in which nothing has happened (C2, C7, C13), with every projection over it. */
+export class DerivedRoute {
+  readonly #derivation: RouteDerivation;
+
+  constructor(derivation: RouteDerivation) {
+    this.#derivation = derivation;
+  }
+
+  /** One projection, as the module wrote it. */
+  projectText(request: ProjectionRequest): string {
+    return hosted(() => this.#derivation.project(JSON.stringify(request)));
+  }
+
+  /** C13: the graph's earliest days from its start, as the module wrote it. */
+  scheduleText(): string {
+    return hosted(() => this.#derivation.schedule());
+  }
+
+  /** Releases the derivation's memory in the module, unless the module trapped. */
+  free(): void {
+    if (stoppedBy()?.error !== "aborted") {
+      this.#derivation.free();
+    }
+  }
+}
+
 /** The engine's calls for every host. */
 export class Engine {
+  /** Derives a route's graph. */
+  deriveRoute(request: RouteDeriveRequest): DerivedRoute {
+    return new DerivedRoute(hosted(() => new RouteDerivation(JSON.stringify(request))));
+  }
+
   /** Reads and derives a domain document's JSON text. */
   derive(documentText: string): DerivedDocument {
     return new DerivedDocument(hosted(() => new Derivation(documentText)));
@@ -191,17 +219,7 @@ export class Engine {
     return hosted(() => routeFileText(JSON.stringify(file)));
   }
 
-  /** C2: a route graph's canvas level, as the module wrote it (a route has no state to derive). */
-  routeLevelText(request: RouteLevelRequest): string {
-    return hosted(() => routeLevel(JSON.stringify(request)));
-  }
-
-  /** C2: a route graph's canvas level. */
-  routeLevel(request: RouteLevelRequest): Schema<"Level"> {
-    return parsed<Schema<"Level">>(this.routeLevelText(request));
-  }
-
-  /** A20: a route graph's notices, as the module wrote them. */
+    /** A20: a route graph's notices, as the module wrote them. */
   routeNoticesText(request: RouteNoticesRequest): string {
     return hosted(() => routeNotices(JSON.stringify(request)));
   }
@@ -209,16 +227,6 @@ export class Engine {
   /** A20: a route graph's notices, in path order. */
   routeNotices(request: RouteNoticesRequest): Schema<"Notice">[] {
     return parsed<Schema<"Notice">[]>(this.routeNoticesText(request));
-  }
-
-  /** C13: a route graph's schedule, as the module wrote it. */
-  routeScheduleText(request: RouteScheduleRequest): string {
-    return hosted(() => routeSchedule(JSON.stringify(request)));
-  }
-
-  /** C13: a route graph's earliest days from its start. */
-  routeSchedule(request: RouteScheduleRequest): RouteSchedule {
-    return parsed<RouteSchedule>(this.routeScheduleText(request));
   }
 
   /** The module's linear memory in bytes: the peak so far, since it never shrinks. */

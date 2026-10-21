@@ -193,3 +193,43 @@ it("a derive worker that fails rejects what was asked of it", async () => {
   const started = await fresh();
   expect(await reasonOf(started, () => started.host.DeriveWorker.start(wasmModule, brokenWorker()))).toMatchObject({ error: "aborted" });
 });
+
+it("a route's graph is held under its slot and answers its trace and schedule; a replaced slot answers only its newest graph", async () => {
+  const started = await fresh();
+  const host = await started.host.InBrowserHost.start(wasmModule, () => NOW);
+  const worker = await started.worker();
+  const deployment = host.deployment();
+  const vendor = host.routeVersion("vendor-evaluation", 1).graph;
+  const launch = host.routeVersion("product-launch", 1).graph;
+  const first = await worker.loadRoute({ graph: vendor, deployment }, "route:a#1");
+  const second = await worker.loadRoute({ graph: launch, deployment }, "route:b#2");
+  const trace = await worker.project("route:a#1", { projection: "trace", key: "n_partner_results" });
+  expect(trace.upstream).toContain("n_partner_runs");
+  // The other slot holds another graph: the same question there is a node it lacks.
+  expect(await reasonOf(started, () => worker.project("route:b#2", { projection: "trace", key: "n_partner_results" }))).toMatchObject({ error: "missing" });
+  expect((await worker.routeSchedule("route:b#2")).end).toBe("n_launch");
+  // A slot's next load is a new generation, and what the first load's handle owns is gone with it.
+  const again = await worker.loadRoute({ graph: launch, deployment }, "route:a#1");
+  expect(again.key.generation).not.toBe(first.key.generation);
+  await worker.release(first.handle);
+  expect((await worker.project("route:a#1", { projection: "trace", key: "n_launch" })).node).toBe("n_launch");
+  await worker.release(again.handle);
+  expect(await reasonOf(started, () => worker.project("route:a#1", { projection: "trace", key: "n_launch" }))).toMatchObject({ error: "missing" });
+  await worker.release(second.handle);
+  worker.terminate();
+});
+
+it("a route's slot refuses what only a journey's document answers, and a journey's refuses the route's schedule", async () => {
+  const started = await fresh();
+  const host = await started.host.InBrowserHost.start(wasmModule, () => NOW);
+  const worker = await started.worker();
+  const loaded = await worker.loadRoute({ graph: host.routeVersion("vendor-evaluation", 1).graph, deployment: host.deployment() }, "route:a#1");
+  const journey = await worker.load(host.documentText("j_vendor_eval"));
+  expect(await reasonOf(started, () => worker.derivedText("route:a#1"))).toMatchObject({ error: "missing" });
+  expect(await reasonOf(started, () => worker.renderDraft("route:a#1", { key: "n_kickoff", resource: "a_x" }))).toMatchObject({ error: "missing" });
+  expect(await reasonOf(started, () => worker.applyText("route:a#1", { patch: note("p_x", 1, "a_x").patch, at: NOW, actor: { user: "u_local" } }))).toMatchObject({ error: "missing" });
+  expect(await reasonOf(started, () => worker.preview(loaded.key, { proposal: adding("n_x", 1), at: NOW, actor: { user: "u_local" } }, "slot"))).toMatchObject({ error: "missing" });
+  expect(await reasonOf(started, () => worker.routeSchedule("j_vendor_eval"))).toMatchObject({ error: "missing" });
+  expect((await worker.derivedText(journey.key.journey)).length).toBeGreaterThan(0);
+  worker.terminate();
+});

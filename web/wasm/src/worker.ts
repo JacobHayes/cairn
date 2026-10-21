@@ -9,9 +9,9 @@
 // worker answers messages in order and runs a load to completion before the next message, so
 // an owner replaced by a successor can only have posted its load before the successor's, and
 // its release, whenever it arrives, names a load no longer held.
-import { loadEngine, type DerivedDocument, type Engine } from "./engine.ts";
+import { loadEngine, type DerivedDocument, type DerivedRoute, type Engine } from "./engine.ts";
 import type { Envelope, Reply, WorkerRequest } from "./protocol.ts";
-import { HostFailure, failureOf, stoppedBy, type DerivationHandle, type DerivationKey, type Loaded, type PreviewRequest } from "./types.ts";
+import { HostFailure, failureOf, stoppedBy, type DerivationHandle, type DerivationKey, type Loaded, type PreviewRequest, type RouteDeriveRequest } from "./types.ts";
 
 /** The parts of a dedicated worker's global scope this script uses. */
 interface WorkerScope {
@@ -19,25 +19,67 @@ interface WorkerScope {
   postMessage(message: Reply): void;
 }
 
+/** What both kinds of derivation answer and release. */
+interface Derivation {
+  projectText: DerivedDocument["projectText"];
+  free(): void;
+}
+
 /** A journey's document as posted, with its derivation. */
-interface Held {
+interface HeldJourney {
+  kind: "journey";
   document: string;
   derivation: DerivedDocument;
   /** The number of the load that made the derivation. */
   load: number;
 }
 
+/** A route's graph derived as a journey in which nothing has happened, under a slot of its own. */
+interface HeldRoute {
+  kind: "route";
+  derivation: DerivedRoute;
+  load: number;
+}
+
+type Held = HeldJourney | HeldRoute;
+
 const scope = globalThis as unknown as WorkerScope;
 const held = new Map<string, Held>();
 let engine: Engine | undefined;
 let loads = 0;
 
-function holding(journey: string): Held {
-  const found = held.get(journey);
+/** The day in a route's key: a route has no calendar date, and nothing it answers depends on one. */
+const ROUTE_DAY = "2000-01-01";
+
+function holdingAny(name: string): Held {
+  const found = held.get(name);
   if (found === undefined) {
-    throw new HostFailure({ error: "missing", message: `no document for ${journey} is loaded` });
+    throw new HostFailure({ error: "missing", message: `no document for ${name} is loaded` });
   }
   return found;
+}
+
+/** The journey held under `name`; a route's slot is refused as missing, since a journey's reads do not apply to it. */
+function holding(name: string): HeldJourney {
+  const found = holdingAny(name);
+  if (found.kind !== "journey") {
+    throw new HostFailure({ error: "missing", message: `no document for ${name} is loaded` });
+  }
+  return found;
+}
+
+/** The route held under `name`. */
+function holdingRoute(name: string): HeldRoute {
+  const found = holdingAny(name);
+  if (found.kind !== "route") {
+    throw new HostFailure({ error: "missing", message: `no route graph for ${name} is loaded` });
+  }
+  return found;
+}
+
+/** The derivation held under `name`, whichever kind. */
+function derivationOf(name: string): Derivation {
+  return holdingAny(name).derivation;
 }
 
 function ready(): Engine {
@@ -64,16 +106,31 @@ function load(document: string, slot?: string): string {
   const name = slot ?? derivation.key.journey;
   const current = held.get(name);
   // A slot is replaced by its next load whatever its revision: it holds a preview, not a revision.
-  if (slot === undefined && current !== undefined && older(derivation.key, current.derivation.key)) {
+  if (slot === undefined && current?.kind === "journey" && older(derivation.key, current.derivation.key)) {
     derivation.free();
     throw new HostFailure({ error: "superseded", held: current.derivation.key, posted: derivation.key });
   }
   current?.derivation.free();
   loads += 1;
-  held.set(name, { document, derivation, load: loads });
+  held.set(name, { kind: "journey", document, derivation, load: loads });
   const handle: DerivationHandle = { journey: name, load: loads };
   // A slot's key names the slot and its load, so what is read from one preview is never read from the next.
   const key: DerivationKey = slot === undefined ? derivation.key : { ...derivation.key, journey: slot, generation: loads };
+  return JSON.stringify({ key, handle });
+}
+
+/**
+ * Derives a route's graph and holds it under `slot` in place of what the slot held. A slot is
+ * the page's to name freshly for each load (`route:<id>:<draft|n>#<n>`), so a read through an
+ * earlier load's key is never answered from the load that replaced it.
+ */
+function loadRoute(request: RouteDeriveRequest, slot: string): string {
+  const derivation = ready().deriveRoute(request);
+  held.get(slot)?.derivation.free();
+  loads += 1;
+  held.set(slot, { kind: "route", derivation, load: loads });
+  const handle: DerivationHandle = { journey: slot, load: loads };
+  const key: DerivationKey = { journey: slot, revision: 0, deployment_revision: request.deployment.revision, today: ROUTE_DAY, generation: loads };
   return JSON.stringify({ key, handle });
 }
 
@@ -123,8 +180,10 @@ async function answer(request: WorkerRequest): Promise<string> {
       return load(request.document, request.slot);
     case "derived":
       return holding(request.journey).derivation.derivedText();
+    case "load_route":
+      return loadRoute(request.request, request.slot);
     case "project":
-      return holding(request.journey).derivation.projectText(request.request);
+      return derivationOf(request.journey).projectText(request.request);
     case "render_draft":
       return holding(request.journey).derivation.renderDraftText(request.request);
     case "preview":
@@ -134,12 +193,10 @@ async function answer(request: WorkerRequest): Promise<string> {
     case "release":
       release(request.handle);
       return "";
-    case "route_level":
-      return ready().routeLevelText(request.request);
     case "route_notices":
       return ready().routeNoticesText(request.request);
     case "route_schedule":
-      return ready().routeScheduleText(request.request);
+      return holdingRoute(request.journey).derivation.scheduleText();
     case "apply_route":
       return ready().applyRouteText(request.request);
     case "memory":

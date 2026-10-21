@@ -1,16 +1,17 @@
 // A route page's reads (ARCHITECTURE, Web UI: reads), as keyed reads (data/keyed-read.ts): the
-// route's draft or version, kept current while shown (H6), and the level and the schedule of that
-// graph from the derive worker. A refetch that fails keeps the good graph on screen and counts the canvas as behind on the
+// route's draft or version, kept current while shown (H6), and that graph derived once in the
+// derive worker as a journey in which nothing has happened and held there, like a journey's
+// document, under a slot of its own for each load. The views read their level, trace and
+// schedule from that derivation (canvas/hooks.ts). A refetch that fails keeps the good graph on screen and counts the canvas as behind on the
 // sync chip; a route that no longer exists is gone (A19).
 import type { Schema } from "@cairn/client";
 
-import type { RouteSchedule } from "@cairn/wasm";
+import type { DerivationKey } from "@cairn/wasm";
 
-import type { Deployment, Deriver, Host, Level, Route } from "../data/host.ts";
-import { HOST_READ, PROJECTION, type ReadKey, type ReadSource } from "../data/keyed-read.ts";
+import type { Deployment, Deriver, Host, Route } from "../data/host.ts";
+import { beforeWork, DERIVE, HOST_READ, type ReadKey, type ReadSource } from "../data/keyed-read.ts";
 import { isRoute, routeOf } from "../data/reads.ts";
 import type { GraphNode } from "../detail/model.ts";
-import { levelQueryOf, type LevelRequest } from "../journeys/requests.ts";
 
 /** The graph a route's page shows: its draft, or one published version. */
 export interface Shown {
@@ -23,7 +24,7 @@ export interface Shown {
 const NO_NODES: GraphNode[] = [];
 
 /** The nodes of the shown graph; one list for a graph with none, so what is derived from them is not made afresh with every render. */
-export function nodesOf(shown: Shown): GraphNode[] {
+export function nodesOf(shown: { graph: Schema<"Graph"> }): GraphNode[] {
   return shown.graph.nodes ?? NO_NODES;
 }
 
@@ -61,55 +62,68 @@ export function routeGraphKey(host: Host, id: string, version: number | undefine
   return { of: [id, version], freshness, args: { host, id, version } };
 }
 
-/** What a route's level is derived from. */
-interface LevelArgs {
+/** What a derived graph is read from: the thing it belongs to carries its graph, and `reads` names what its projections are of. */
+interface DerivedArgs<S extends { graph: Schema<"Graph"> }> {
   deriver: Deriver;
-  shown: Shown;
+  subject: S;
   deployment: Deployment;
-  today: string;
-  request: LevelRequest;
+  /** What the projections of this graph are of: the same across the loads of one subject, so a draft edit keeps the last answers on screen until the new ones arrive. */
+  reads: string;
 }
 
-export const ROUTE_LEVEL: ReadSource<LevelArgs, Level> = {
-  policy: PROJECTION,
-  read: ({ deriver, shown, deployment, today, request }) => deriver.routeLevel({ graph: shown.graph, deployment, today, query: levelQueryOf(request) }),
-};
-
 /**
- * The key of a shown graph's level for `request` (journeys/requests.ts, `levelRequestOf`, the one
- * place a view state becomes a level query, a journey's or a route's): the route, what it shows
- * and the request are what it is of (another request's level laid out under this one would hint
- * its first layout with another graph's positions); the graph, the deployment and the day are
- * what it is read from.
+ * A graph derived once in the worker and held there under a slot of its own for each load (a
+ * slot is never reused, so what is read through one load's key is never answered from the load
+ * that replaced it), together with the subject it was derived for: the views draw the subject's
+ * nodes beside the derivation's level, trace and schedule, so a newer graph is never paired with
+ * an older derivation. The handle is released when the read drops the value.
  */
-export function routeLevelKey(deriver: Deriver, shown: Shown, request: LevelRequest | undefined, deployment: Deployment | undefined, today: string): ReadKey<LevelArgs> | undefined {
-  if (deployment === undefined || request === undefined) {
-    return undefined;
-  }
+export type Derived<S extends { graph: Schema<"Graph"> }> = S & { key: DerivationKey; reads: string; free: () => void };
+
+let loads = 0;
+
+/** A source of derived graphs of `S`: the route page's shown graph, the insertion preview's graph. */
+export function derivedSource<S extends { graph: Schema<"Graph"> }>(): ReadSource<DerivedArgs<S>, Derived<S>> {
   return {
-    of: [shown.route.header.id, shown.of, JSON.stringify(request)],
-    freshness: [shown.graph, deployment.revision, today],
-    args: { deriver, shown, deployment, today, request },
+    policy: DERIVE,
+    read: async ({ deriver, subject, deployment, reads }, at) => {
+      loads += 1;
+      const loaded = await deriver.loadRoute({ graph: subject.graph, deployment }, `${reads}#${String(loads)}`);
+      let freed = false;
+      const free = () => {
+        if (!freed) {
+          freed = true;
+          void deriver.release(loaded.handle).catch(() => undefined);
+        }
+      };
+      // The read was dropped while the graph was deriving (or is, before the value is adopted): nothing will own the derivation.
+      at.signal.addEventListener("abort", free, { once: true });
+      try {
+        beforeWork(at);
+        return { ...subject, key: loaded.key, reads, free };
+      } catch (thrown) {
+        free();
+        throw thrown;
+      }
+    },
+    release(value) {
+      value.free();
+    },
   };
 }
 
-/** What a route's schedule is derived from. */
-interface ScheduleArgs {
-  deriver: Deriver;
-  shown: Shown;
-  deployment: Deployment;
-}
+/** The route page's shown graph, derived and held. */
+export const ROUTE_DERIVED = derivedSource<Shown>();
 
-/** The earliest days of a shown graph's nodes from its start (C13). */
-export const ROUTE_SCHEDULE: ReadSource<ScheduleArgs, RouteSchedule> = {
-  policy: PROJECTION,
-  read: ({ deriver, shown, deployment }) => deriver.routeSchedule({ graph: shown.graph, deployment }),
-};
-
-/** The key of a shown graph's schedule: the route and what it shows are what it is of; the graph and the deployment are what it is read from. */
-export function routeScheduleKey(deriver: Deriver, shown: Shown, deployment: Deployment | undefined): ReadKey<ScheduleArgs> | undefined {
-  if (deployment === undefined) {
+/**
+ * The key of a shown graph's derivation: the route and what it shows are what it is of; the
+ * graph and the deployment are what it is derived from, so an edit to a draft derives it again
+ * and keeps the last derivation on screen meanwhile.
+ */
+export function routeDerivedKey(deriver: Deriver, shown: Shown | undefined, deployment: Deployment | undefined): ReadKey<DerivedArgs<Shown>> | undefined {
+  if (shown === undefined || deployment === undefined) {
     return undefined;
   }
-  return { of: [shown.route.header.id, shown.of], freshness: [shown.graph, deployment.revision], args: { deriver, shown, deployment } };
+  const reads = `route:${shown.route.header.id}:${String(shown.of)}`;
+  return { of: [reads], freshness: [shown.graph, deployment.revision], args: { deriver, subject: shown, deployment, reads } };
 }

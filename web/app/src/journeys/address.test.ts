@@ -137,10 +137,10 @@ describe("opening and closing a node keeps the view", () => {
     expect(nodeAddress(at, search, key)).toBe(expected);
   });
 
-  it("opens and closes a node of a route's draft, keeping its view, and opens none on a version", () => {
+  it("opens and closes a node of a route's draft or version, keeping its view", () => {
     expect(nodeAddress(page("route", { route: "r" }), "?view=list&depth=stages", "n_x")).toBe("/routes/r/nodes/n_x?view=list&depth=stages");
     expect(nodeAddress(page("routeNode", { route: "r", key: "n_x" }), "?view=timeline&q=a", undefined)).toBe("/routes/r?view=timeline&q=a");
-    expect(nodeAddress(page("route", { route: "r" }), "?version=2&view=list", "n_x")).toBe("/routes/r?version=2&view=list");
+    expect(nodeAddress(page("route", { route: "r" }), "?version=2&view=list", "n_x")).toBe("/routes/r/nodes/n_x?version=2&view=list");
   });
 
   it("takes a node off a proposal under any destination and adds one", () => {

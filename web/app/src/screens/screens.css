@@ -316,6 +316,12 @@
   white-space: nowrap;
 }
 
+/* The controls keep their one line and their size; the title gives up its width first. */
+.route-header > .row > :not(h1) {
+  flex-shrink: 0;
+  white-space: nowrap;
+}
+
 /* On a phone the chip and the buttons drop under the title rather than squeezing it to a letter a line. */
 @media (max-width: 719px) {
   .route-header > .row {
@@ -445,9 +451,3 @@ button.route-list-title {
   white-space: nowrap;
 }
 
-/* On a phone the draft's "(from version 1)" is the menu's to say, so the header's controls stay on one line. */
-@media (max-width: 719px) {
-  .version-select > .dropdown-button .version-from {
-    display: none;
-  }
-}

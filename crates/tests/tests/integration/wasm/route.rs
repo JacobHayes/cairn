@@ -7,13 +7,12 @@
 use std::collections::BTreeSet;
 
 use cairn_schema::{
-    EdgeOrigin, Level, LevelDisplay, LevelQuery, NodeKind, Payload, Rejection, Route, RouteVersion,
-    ViolationCode,
+    EdgeOrigin, Level, LevelDisplay, LevelQuery, NodeKey, NodeKind, Payload, Rejection, Route,
+    RouteSchedule, RouteVersion, Trace, ViolationCode,
 };
 use cairn_wasm::{
-    BrowserRoot, HostError, RouteApplyRequest, RouteLevelRequest, RouteNoticesRequest,
-    RouteScheduleRequest, apply_route_locally, route_level, route_level_of, route_notices,
-    route_schedule, route_schedule_of,
+    BrowserRoot, Derivation, HostError, Projection, RouteApplyRequest, RouteDerivation,
+    RouteDeriveRequest, RouteNoticesRequest, apply_route_locally, read_document, route_notices,
 };
 
 fn version_one(root: &BrowserRoot) -> RouteVersion {
@@ -24,14 +23,31 @@ fn deployment() -> cairn_schema::Deployment {
     serde_json::from_str(&BrowserRoot::seeded().unwrap().deployment().unwrap()).unwrap()
 }
 
-fn level_of(version: &RouteVersion, query: LevelQuery) -> Level {
-    route_level_of(&RouteLevelRequest {
+fn derived(version: &RouteVersion) -> RouteDerivation {
+    RouteDerivation::of(&RouteDeriveRequest {
         graph: version.graph.clone(),
         deployment: deployment(),
-        today: "2026-10-06".parse().unwrap(),
-        query,
     })
     .unwrap()
+}
+
+fn level_of(version: &RouteVersion, query: LevelQuery) -> Level {
+    let answer = derived(version)
+        .projected(&Projection::Level(query))
+        .unwrap();
+    serde_json::from_str(&answer).unwrap()
+}
+
+fn trace_of(derivation: &RouteDerivation, node: &str) -> Trace {
+    let request = Projection::Trace {
+        key: node.parse().unwrap(),
+        standing: Vec::new(),
+    };
+    serde_json::from_str(&derivation.projected(&request).unwrap()).unwrap()
+}
+
+fn keys(nodes: &[NodeKey]) -> BTreeSet<String> {
+    nodes.iter().map(ToString::to_string).collect()
 }
 
 fn level(version: &RouteVersion, shown: &[NodeKind]) -> Level {
@@ -155,14 +171,9 @@ fn a_route_schedule_places_the_work_in_days_from_the_start() {
     let root = BrowserRoot::seeded().unwrap();
     let launch: RouteVersion =
         serde_json::from_str(&root.route_version("product-launch", "1").unwrap()).unwrap();
-    let request = RouteScheduleRequest {
-        graph: launch.graph.clone(),
-        deployment: deployment(),
-    };
-    let asked = serde_json::to_string(&request).unwrap();
-    let schedule: cairn_schema::RouteSchedule =
-        serde_json::from_str(&route_schedule(&asked).unwrap()).unwrap();
-    assert_eq!(schedule, route_schedule_of(&request).unwrap());
+    let derivation = derived(&launch);
+    let schedule: RouteSchedule = serde_json::from_str(&derivation.schedule()).unwrap();
+    assert_eq!(schedule, derivation.scheduled());
     let estimate = |node: &str| {
         let payload = &launch
             .graph
@@ -198,15 +209,36 @@ fn a_route_schedule_places_the_work_in_days_from_the_start() {
 }
 
 #[test]
-fn an_unreadable_schedule_request_is_refused() {
-    let refused: HostError = serde_json::from_str(&route_schedule("{}").unwrap_err()).unwrap();
+fn an_unreadable_route_request_is_refused() {
+    let refused = RouteDerivation::new("{}").err().unwrap();
+    let refused: HostError = serde_json::from_str(&refused).unwrap();
     assert!(matches!(refused, HostError::Unreadable { .. }));
 }
 
+/// C7: a route version's trace is structural: a node under a stage has the stage's opening
+/// and its gating decision upstream and its ancestors downstream, and the held derivation
+/// answers the trace of a journey that has just been created from the version identically.
 #[test]
-fn an_unreadable_request_is_refused() {
-    let refused: HostError = serde_json::from_str(&route_level("{}").unwrap_err()).unwrap();
-    assert!(matches!(refused, HostError::Unreadable { .. }));
+fn a_route_version_traces_as_a_journey_just_created_from_it_does() {
+    let root = BrowserRoot::seeded().unwrap();
+    let version = version_one(&root);
+    let route = derived(&version);
+    let id = root.journey_page().unwrap().items[0].id.to_string();
+    let mut pristine = read_document(&root.document(&id, "2026-10-06T12:00:00Z").unwrap()).unwrap();
+    pristine.journey.graph = version.graph.clone();
+    let journey = Derivation::of(pristine).unwrap();
+    let mut traced_something = false;
+    for node in version.graph.nodes.values().map(|node| &node.key) {
+        let request = Projection::Trace {
+            key: node.clone(),
+            standing: Vec::new(),
+        };
+        let ours = route.projected(&request).unwrap();
+        assert_eq!(ours, journey.projected(&request).unwrap(), "{node}");
+        let trace: Trace = serde_json::from_str(&ours).unwrap();
+        traced_something |= !trace.upstream.is_empty() && !trace.downstream.is_empty();
+    }
+    assert!(traced_something, "some node has both sides to its trace");
 }
 
 fn route_apply(route: Option<Route>, patch: &str) -> Result<Route, HostError> {
@@ -266,4 +298,30 @@ fn a_route_draft_is_authored_locally_and_refused_with_its_violations() {
         r#"{"id": "p_x", "target": {"route": "other"}, "base_revision": 1, "mutations": [{"op": "publish_draft"}]}"#,
     );
     assert!(matches!(elsewhere, Err(HostError::Missing { .. })));
+}
+
+/// C7: a node behind a condition traces to the decision that gates it and to the stages it
+/// sits in; a group adds nothing to the gravity of what is inside it.
+#[test]
+fn a_node_behind_a_condition_traces_to_its_gate_and_its_stages() {
+    let version = version_one(&BrowserRoot::seeded().unwrap());
+    let trace = trace_of(&derived(&version), "n_partner_results");
+    let set = |nodes: &[&str]| {
+        nodes
+            .iter()
+            .map(ToString::to_string)
+            .collect::<BTreeSet<_>>()
+    };
+    assert_eq!(
+        keys(&trace.upstream),
+        set(&["n_criteria", "n_partner_runs"])
+    );
+    assert!(keys(&trace.downstream).is_superset(&set(&[
+        "n_partner_led",
+        "n_testing",
+        "n_reporting"
+    ])));
+    let contributors = keys(&trace.gravity_contributors);
+    assert!(contributors.contains("n_final_report"));
+    assert!(contributors.is_disjoint(&set(&["n_partner_led", "n_testing", "n_reporting"])));
 }

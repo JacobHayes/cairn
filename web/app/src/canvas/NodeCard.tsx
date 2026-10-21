@@ -27,7 +27,7 @@ import { kindWord } from "../detail/model.ts";
 
 /** What a card can ask of its canvas. */
 export interface CardActions {
-  /** Open the node's detail; none on a canvas with no detail to open (a route's). */
+  /** Open the node's detail; none on a canvas with no detail to open (the insertion preview's). */
   open: ((key: string) => void) | undefined;
   /** C4: expand a collapsed container in place, or collapse an open one; none on a canvas that cannot. */
   expand: ((key: string, expanded: boolean) => void) | undefined;
@@ -231,7 +231,7 @@ function Marker({ card }: { card: Card }) {
   return (
     <div className="node-body-line">
       {trace === undefined ? (
-        // A canvas with no trace (a route's) shows the marker as words, not a button that does nothing.
+        // A canvas with no trace (the insertion preview's) shows the marker as words, not a button that does nothing.
         <span className="node-marker" {...marker}>
           {words}
         </span>
@@ -252,6 +252,9 @@ function Marker({ card }: { card: Card }) {
   );
 }
 
+/** What a contributor's dot on its tag says on hover. */
+const CONTRIBUTOR_WORDS = "Adds to the selected node's gravity";
+
 /** What hangs outside a card: its rank tag (C5), the trace's tag (C7), and the Signals chip (8.2). */
 function Hanging({ data }: { data: CardData }) {
   const { card, overlay, lens } = data;
@@ -265,7 +268,8 @@ function Hanging({ data }: { data: CardData }) {
         </span>
       )}
       {mark === undefined || mark.quiet === true || mark.diff !== undefined ? null : (
-        <span className={`node-mark hang-tag top node-mark-${mark.tone}`} data-overhang="" data-testid="card-mark" data-status={mark.label} title={mark.note}>
+        <span className={`node-mark hang-tag top node-mark-${mark.tone}`} data-overhang="" data-testid="card-mark" data-status={mark.label} data-contributor={mark.contributor === true ? "" : undefined} title={mark.contributor === true ? CONTRIBUTOR_WORDS : mark.note}>
+          {mark.contributor === true ? <span className="node-mark-dot" aria-hidden="true" /> : null}
           {mark.label}
         </span>
       )}

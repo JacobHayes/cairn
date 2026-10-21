@@ -613,14 +613,30 @@
   line-height: 20px;
 }
 
+/* A gravity contributor's UNBLOCKS tag leads with a small filled dot in the tag's own colour. */
+.node-mark-dot {
+  display: inline-block;
+  width: 6px;
+  height: 6px;
+  margin-inline-end: var(--space-1);
+  border-radius: 50%;
+  background: currentColor;
+  vertical-align: middle;
+}
+
 .node-mark-ink {
   color: var(--color-text);
   border-color: var(--color-text);
 }
 
+/* The accent on a tag is its border and dot; its words stay ink, which holds the contrast floor on the paper in both themes. */
 .node-mark-accent {
-  color: var(--color-accent);
+  color: var(--color-text);
   border-color: var(--color-accent);
+}
+
+.node-mark-accent .node-mark-dot {
+  background: var(--color-accent);
 }
 
 .node-mark-good {

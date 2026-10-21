@@ -242,7 +242,7 @@ function FrontierPanels({ view, drawn }: { view: Ready; drawn: ReadonlySet<strin
 function useRemovedRows({ view, layer, request, query, level, kept, order }: { view: Ready; layer: ReturnType<typeof useLayer>; request: LevelRequest | undefined; query: ReturnType<typeof tableQueryOf>; level: ReturnType<typeof useLevel>["level"]; kept: NodeRow[] | undefined; order: ReadonlyMap<string, number> }) {
   const was = layer?.mode === "reviewing" && layer.removed.size > 0 ? layer.before : undefined;
   const wasRows = useRows(was, query);
-  const wasLevel = useLevel(was ?? view, request);
+  const wasLevel = useLevel(was ?? view, (was ?? view).journey.graph.nodes ?? [], request);
   return useMemo(() => {
     if (was === undefined || kept === undefined || level === undefined || wasRows.rows === undefined || wasLevel.level === undefined || layer === undefined) {
       return { entries: level?.nodes, rows: kept, order, was: undefined, fromBefore: undefined };
@@ -260,7 +260,7 @@ function useRemovedRows({ view, layer, request, query, level, kept, order }: { v
 export function ListBody({ view, state, picks, list, selected, selection }: { view: Ready; state: ViewState; picks: number; list: ListSettings; selected?: string | undefined; selection: Selection }) {
   const nodes = view.journey.graph.nodes ?? [];
   const layer = useLayer();
-  const { depth, step, current, request, level, drawn, error: levelError, base: frontier, dimmed, badges } = useViewLevel({ screen: "list", state, nodes, selected, ready: view, read: (request, at) => useLevel(view, request, at) });
+  const { depth, step, current, request, level, drawn, error: levelError, base: frontier, dimmed, badges } = useViewLevel({ screen: "list", state, nodes, selected, ready: view, held: view });
   const query = useMemo(() => tableQueryOf(list.sort), [list.sort]);
   const { rows, error: rowsError } = useRows(view, query);
   const decisionColumns = depth === "decisions";

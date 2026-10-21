@@ -2,6 +2,7 @@
 // is another graph), an earlier revision's answer stays until the next arrives, and an error
 // never outlives the key it came from. The keys are what the hooks send; the machine they feed
 // is tested in data/keyed-read.test.ts, here over the same view function the hooks use.
+import type { ProjectionRequest } from "@cairn/wasm";
 import { createActor } from "xstate";
 import { describe, expect, test } from "vitest";
 
@@ -9,7 +10,7 @@ import { rowsKey } from "../acting/useRows.ts";
 import type { Deriver } from "../data/host.ts";
 import { PROJECTION, keyedRead, readView, type ReadEnv, type ReadKey, type ReadSource } from "../data/keyed-read.ts";
 import type { Ready } from "../detail/model.ts";
-import { joinedTraceKey, laidOutKey, projectedKey } from "./hooks.ts";
+import { laidOutKey, projectedKey } from "./hooks.ts";
 import type { Layouts } from "./layouts.ts";
 import type { CanvasModel } from "./model.ts";
 
@@ -60,7 +61,7 @@ describe("what a projection shows", () => {
     await read.ask(projectedKey(deriver, ready(1), level("group")));
     const other = projectedKey(deriver, ready(1), level("action"));
     expect(read.show(other)).toEqual({ status: "loading" });
-    expect(projectedKey(deriver, ready(1), level("group"))?.of).not.toEqual(projectedKey(deriver, { key: { ...ready(1).key, journey: "j_two" } } as unknown as Ready, level("group"))?.of);
+    expect(projectedKey(deriver, ready(1), level("group"))?.of).not.toEqual(projectedKey(deriver, { key: { ...ready(1).key, journey: "j_two" } }, level("group"))?.of);
     expect(read.show(projectedKey(deriver, ready(1), undefined))).toEqual({ status: "idle" });
   });
 
@@ -103,11 +104,21 @@ describe("what a layout shows", () => {
 });
 
 describe("what the other canvas reads are keyed by", () => {
-  test("a joined trace by the keys it joins, and the list's rows by the query", () => {
-    expect(joinedTraceKey(deriver, ready(1), [])).toBeUndefined();
-    const keys = joinedTraceKey(deriver, ready(1), ["n_a", "n_b"]);
-    expect(keys?.of).not.toEqual(joinedTraceKey(deriver, ready(1), ["n_a", "n_c"])?.of);
-    expect(keys?.freshness).not.toEqual(joinedTraceKey(deriver, ready(2), ["n_a", "n_b"])?.freshness);
+  test("a trace by the nodes its card stands for, and the list's rows by the query", () => {
+    const trace = (standing?: string[]) => projectedKey(deriver, ready(1), { projection: "trace", key: "n_a", ...(standing === undefined ? {} : { standing }) });
+    expect(trace(["n_b"])?.of).not.toEqual(trace(["n_c"])?.of);
+    expect(trace(["n_b"])?.of).not.toEqual(trace()?.of);
+    expect(projectedKey(deriver, ready(1), { projection: "trace", key: "n_a", standing: ["n_b"] })?.freshness).not.toEqual(projectedKey(deriver, ready(2), { projection: "trace", key: "n_a", standing: ["n_b"] })?.freshness);
     expect(rowsKey(deriver, ready(1), { status: ["open"] } as never).of).not.toEqual(rowsKey(deriver, ready(1), { status: ["done"] } as never).of);
+  });
+
+  test("a route's graph derived again is the same read, read anew, though its slot is new each time", () => {
+    const route = (slot: string, generation: number) => ({ key: { journey: slot, revision: 0, deployment_revision: 1, today: "2000-01-01", generation }, reads: "route:r:draft" });
+    const request: ProjectionRequest = { projection: "level", shown: ["group"] };
+    const first = projectedKey(deriver, route("route:r:draft#1", 1), request);
+    const next = projectedKey(deriver, route("route:r:draft#2", 2), request);
+    expect(next?.of).toEqual(first?.of);
+    expect(next?.freshness).not.toEqual(first?.freshness);
+    expect(next?.args.journey).toBe("route:r:draft#2");
   });
 });

@@ -10,8 +10,12 @@
 //! upstream of another exactly when the other is downstream of it. The gravity contributors
 //! (pass 6, over the pruned set) are marked within the downstream set.
 //!
+//! A card that stands for hidden nodes (a collapsed stage, a deliverable with its actions rolled
+//! up) traces what they trace: the walks start from the node and every node it stands for, in
+//! one pass, and what the card stands for is not part of the answer.
+//!
 //! Cost at `node_count_max`: two walks over at most 8,000 instants and about 110,000 edges,
-//! O(instants + edges) each, with a flag per instant.
+//! O(instants + edges) each, with a flag per instant, however many nodes the card stands for.
 
 use std::collections::BTreeSet;
 
@@ -38,20 +42,40 @@ impl DerivedJourney<'_> {
     ///
     /// # Panics
     ///
+    /// As [`Self::trace_standing`].
+    pub fn trace(&self, key: &NodeKey) -> Result<Trace, ProjectionError> {
+        self.trace_standing(key, &[])
+    }
+
+    /// C7: the trace of a card that stands for the nodes `standing` as well as `key`: the sets
+    /// of all of them together, less the nodes themselves.
+    ///
+    /// # Errors
+    ///
+    /// When the node, or one it stands for, is not in the journey.
+    ///
+    /// # Panics
+    ///
     /// When a gravity contributor falls outside the downstream set, which pass 6's pruned set
     /// being a subset of the full one rules out.
-    pub fn trace(&self, key: &NodeKey) -> Result<Trace, ProjectionError> {
+    pub fn trace_standing(
+        &self,
+        key: &NodeKey,
+        standing: &[NodeKey],
+    ) -> Result<Trace, ProjectionError> {
         self.known(key)?;
+        for each in standing {
+            self.known(each)?;
+        }
+        let starts: BTreeSet<&NodeKey> = std::iter::once(key).chain(standing).collect();
         let dependencies = self.derived.dependencies();
-        let upstream = walk(dependencies, key, Direction::Up);
-        let downstream = walk(dependencies, key, Direction::Down);
-        let gravity_contributors: Vec<NodeKey> = self
-            .derived
-            .priority()
-            .gravity_from(key)
-            .into_iter()
+        let upstream = walk(dependencies, &starts, Direction::Up);
+        let downstream = walk(dependencies, &starts, Direction::Down);
+        let gravity_contributors: Vec<NodeKey> = starts
+            .iter()
+            .flat_map(|start| self.derived.priority().gravity_from(start))
             .map(|contribution| contribution.node)
-            .filter(|node| node != key)
+            .filter(|node| !starts.contains(node))
             .collect::<BTreeSet<_>>()
             .into_iter()
             .collect();
@@ -70,15 +94,26 @@ impl DerivedJourney<'_> {
     }
 }
 
-/// The other nodes reached from the node's finish along full-set gate edges: upstream, those
-/// whose finish is reached; downstream, those with any instant reached. In key order.
-fn walk(dependencies: &Dependencies, key: &NodeKey, direction: Direction) -> Vec<NodeKey> {
-    let Some(node) = dependencies.node_index(key) else {
-        return Vec::new();
-    };
-    let start = Instant::new(node, Point::Finish);
-    let mut seen: BTreeSet<Instant> = BTreeSet::from([start]);
-    let mut stack = vec![start];
+/// The other nodes reached from the start nodes' finishes along full-set gate edges: upstream,
+/// those whose finish is reached; downstream, those with any instant reached. The start nodes
+/// are not in the answer. In key order.
+fn walk(
+    dependencies: &Dependencies,
+    starts: &BTreeSet<&NodeKey>,
+    direction: Direction,
+) -> Vec<NodeKey> {
+    let mut seen: BTreeSet<Instant> = BTreeSet::new();
+    let mut stack = Vec::new();
+    let mut own = BTreeSet::new();
+    for key in starts {
+        if let Some(node) = dependencies.node_index(key) {
+            let start = Instant::new(node, Point::Finish);
+            own.insert(node);
+            if seen.insert(start) {
+                stack.push(start);
+            }
+        }
+    }
     let mut found: BTreeSet<&NodeKey> = BTreeSet::new();
     while let Some(instant) = stack.pop() {
         let edges: Box<dyn Iterator<Item = &Edge>> = match direction {
@@ -95,7 +130,7 @@ fn walk(dependencies: &Dependencies, key: &NodeKey, direction: Direction) -> Vec
             }
             stack.push(next);
             let counts = direction == Direction::Down || next.point == Point::Finish;
-            if counts && next.node != node {
+            if counts && !own.contains(&next.node) {
                 found.extend(dependencies.key(next.node));
             }
         }

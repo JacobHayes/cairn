@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import type { Layer } from "../proposals/layer.ts";
-import { changedKeys } from "./JourneyCanvas.tsx";
+import { changedKeys } from "./graph.ts";
 
 const layer = (model: object, mode = "reviewing"): Layer => ({ mode, model: { known: true, previewed: true, previewError: undefined, marks: {}, entries: [], unresolved: new Map(), draft: {}, diff: { edgesAdded: [], edgesRemoved: [] }, ...model } }) as unknown as Layer;
 const conflict = (node: string) => ({ item: "conflict", conflict: { about: "field", node } });

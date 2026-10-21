@@ -93,3 +93,37 @@ fn an_unknown_node_is_an_error() {
         Err(ProjectionError::UnknownNode(key("n_nowhere")))
     );
 }
+
+/// C7: a card standing for hidden nodes traces what they trace: the sets of the card's node and
+/// of every node it stands for, joined, less those nodes themselves.
+#[test]
+fn a_card_standing_for_nodes_traces_what_they_trace() {
+    let records = support::vendor_after(1);
+    let graph = support::journey_graph(&records, VENDOR);
+    let derived = support::derived(&records, VENDOR);
+    let journey = DerivedJourney::new(&graph, &derived);
+    let standing = [key("n_plan"), key("n_plan_draft"), key("n_plan_review")];
+    let joined = journey.trace_standing(&key("n_setup"), &standing).unwrap();
+    let own: Vec<NodeKey> = std::iter::once(key("n_setup"))
+        .chain(standing.iter().cloned())
+        .collect();
+    let union = |pick: fn(&Trace) -> &Vec<NodeKey>| -> Vec<NodeKey> {
+        let mut all: Vec<NodeKey> = own
+            .iter()
+            .flat_map(|node| pick(&journey.trace(node).unwrap()).clone())
+            .filter(|node| !own.contains(node))
+            .collect();
+        all.sort();
+        all.dedup();
+        all
+    };
+    assert_eq!(joined.upstream, union(|trace| &trace.upstream));
+    assert_eq!(joined.downstream, union(|trace| &trace.downstream));
+    assert_eq!(
+        joined.gravity_contributors,
+        union(|trace| &trace.gravity_contributors)
+    );
+    // The stage alone traces less: the plan's own downstream is not reached from its group.
+    assert!(journey.trace(&key("n_setup")).unwrap().downstream.len() < joined.downstream.len());
+    assert!(joined.upstream.contains(&key("n_kickoff")));
+}

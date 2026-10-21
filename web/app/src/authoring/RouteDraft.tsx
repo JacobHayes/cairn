@@ -98,7 +98,7 @@ export function RouteHeader({ route, of, screen, node, write, blocked, onPublish
           </Button>
         ) : of !== undefined && route.draft == null ? (
           <Button primary disabled={write.disabled} data-testid="open-draft-button" onClick={() => { send(openDraft(), true); }}>
-            Open a draft<span className="phone-hidden"> to edit</span>
+            Open a draft
           </Button>
         ) : null}
         <Menu label="Route actions" testId="route-menu" align="end" trigger={<span aria-hidden="true">⋯</span>}>

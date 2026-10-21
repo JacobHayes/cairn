@@ -1,14 +1,13 @@
 // A route canvas's reads (ARCHITECTURE, Web UI: reads): what the route graph read finds for a
 // draft, a version and a route with nothing to draw, which ticks keep it current and what it
-// holds, and what makes the level of a shown graph the same read or another.
+// holds, and how a shown graph is derived and held.
 import { describe, expect, it } from "vitest";
 
 import type { Deployment, Deriver, Route, RouteVersion } from "../data/host.ts";
 import { sameKey, type ReadAt } from "../data/keyed-read.ts";
-import { levelQueryOf, levelRequestOf } from "../journeys/requests.ts";
-import { DEFAULT_VIEW_STATE } from "../journeys/view.ts";
 import { FakeDeriver, FakeHost } from "../data/fake.test-support.ts";
-import { ROUTE_GRAPH, ROUTE_LEVEL, ROUTE_SCHEDULE, routeGraphKey, routeLevelKey, routeScheduleKey, type RouteFound, type Shown } from "./route-reads.ts";
+import { ROUTE_DERIVED, ROUTE_GRAPH, routeDerivedKey, routeGraphKey, type Derived, type RouteFound, type Shown } from "./route-reads.ts";
+import { routeScheduleKey } from "./route-views.ts";
 
 const graph = { nodes: [] };
 const header = { id: "r_a", name: "A route", kind: "process" as const };
@@ -65,77 +64,87 @@ describe("the route graph read", () => {
   });
 });
 
-describe("the level of a shown graph", () => {
+/** A deriver that holds what it is asked to, by slot, and records what was loaded and released. */
+function holding() {
+  const loaded: { graph: unknown; slot: string }[] = [];
+  const released: unknown[] = [];
+  const deriver = {
+    loadRoute: (request: { graph: unknown }, slot: string) => {
+      loaded.push({ graph: request.graph, slot });
+      return Promise.resolve({ key: { journey: slot, revision: 0, deployment_revision: 4, today: "2000-01-01", generation: loaded.length }, handle: { journey: slot, load: loaded.length } });
+    },
+    release: (handle: unknown) => { released.push(handle); return Promise.resolve(); },
+  } as unknown as Deriver;
+  return { deriver, loaded, released };
+}
+
+describe("a shown graph, derived and held", () => {
   const deployment: Deployment = { revision: 4 };
   const shown: Shown = { route: routeOf({}), graph, of: "draft" };
-  const request = (step: "decisions" | "stages" | "actions", text = "") => levelRequestOf({ ...DEFAULT_VIEW_STATE, text }, step, []);
-  const key = (parts: { shown?: Shown; step?: "decisions" | "stages" | "actions"; text?: string; deployment?: Deployment | undefined; today?: string }) =>
-    routeLevelKey(new FakeDeriver(), parts.shown ?? shown, request(parts.step ?? "decisions", parts.text), "deployment" in parts ? parts.deployment : deployment, parts.today ?? "2026-10-16");
+  const key = (parts: { shown?: Shown; deployment?: Deployment | undefined }) => routeDerivedKey(new FakeDeriver(), parts.shown ?? shown, "deployment" in parts ? parts.deployment : deployment);
 
-  it("has nothing to read before the deployment is held, or without a request", () => {
+  it("has nothing to read before the deployment is held, or without a graph", () => {
     expect(key({ deployment: undefined })).toBeUndefined();
-    expect(routeLevelKey(new FakeDeriver(), shown, undefined, deployment, "2026-10-16")).toBeUndefined();
+    expect(routeDerivedKey(new FakeDeriver(), undefined, deployment)).toBeUndefined();
   });
 
-  it("is another read for another request of the same graph, laid out afresh", () => {
-    expect(key({ step: "stages" })?.of).not.toEqual(key({})?.of);
-    expect(key({ text: "ship" })?.of).not.toEqual(key({})?.of);
-  });
-
-  it("is read again, keeping what it shows, when the graph, the deployment or the day moves", () => {
+  it("is the reads of one route and what it shows, derived again, keeping what it shows, when the graph or the deployment moves", () => {
     const base = key({});
     const moved = key({ shown: { ...shown, graph: { nodes: [] } } });
     expect(sameKey(moved?.of, base?.of)).toBe(true);
     // Keys compare like effect dependencies: a graph read again is another object, whatever it holds.
     expect(sameKey(moved?.freshness, base?.freshness)).toBe(false);
     expect(sameKey(key({ deployment: { revision: 5 } })?.freshness, base?.freshness)).toBe(false);
-    expect(sameKey(key({ today: "2026-10-17" })?.freshness, base?.freshness)).toBe(false);
     expect(sameKey(key({})?.freshness, base?.freshness)).toBe(true);
   });
 
-  it("is another read for the same request of another route's graph", () => {
+  it("is another read for another route, and for a draft and a version of one route", () => {
     const other: Shown = { ...shown, route: routeOf({ header: { ...header, id: "r_b" } }) };
     expect(key({ shown: other })?.of).not.toEqual(key({})?.of);
+    expect(key({ shown: { ...shown, of: 2 } })?.of).not.toEqual(key({})?.of);
   });
 
-  it("is derived from the graph and the day with the request's query, whole and without its tag", async () => {
-    const asked: unknown[] = [];
-    const answer = { nodes: [], edges: [], shown: [] };
-    const deriver = { routeLevel: (derive: unknown) => { asked.push(derive); return Promise.resolve(answer); } } as unknown as Deriver;
-    const args = routeLevelKey(deriver, shown, request("stages", "ship"), deployment, "2026-10-16")?.args;
+  it("loads each time under a slot of its own, and answers the graph it derived with its derivation", async () => {
+    const { deriver, loaded } = holding();
+    const args = routeDerivedKey(deriver, shown, deployment)?.args;
     if (args === undefined) {
       throw new Error("no key");
     }
-    expect(await ROUTE_LEVEL.read(args, at())).toBe(answer);
-    const query = levelQueryOf(request("stages", "ship"));
-    expect(asked).toEqual([{ graph, deployment, today: "2026-10-16", query }]);
-    expect(query).not.toHaveProperty("projection");
-    expect(query).toMatchObject({ text: "ship", top: ["group", "milestone"] });
+    const first = await ROUTE_DERIVED.read(args, at());
+    const second = await ROUTE_DERIVED.read(args, at());
+    expect(first.graph).toBe(graph);
+    expect(first.route).toBe(shown.route);
+    expect(first.key.journey).toBe(loaded[0]?.slot);
+    expect(loaded[0]?.slot).not.toBe(loaded[1]?.slot);
+    expect(first.reads).toBe(second.reads);
+  });
+
+  it("frees the derivation it loaded once, when its value is dropped or its read is", async () => {
+    const { deriver, released } = holding();
+    const args = routeDerivedKey(deriver, shown, deployment)?.args;
+    if (args === undefined) {
+      throw new Error("no key");
+    }
+    const dropped = await ROUTE_DERIVED.read(args, at());
+    ROUTE_DERIVED.release?.(dropped);
+    ROUTE_DERIVED.release?.(dropped);
+    expect(released).toEqual([{ journey: dropped.key.journey, load: 1 }]);
+    const aborted = new AbortController();
+    aborted.abort();
+    await expect(ROUTE_DERIVED.read(args, { held: undefined, signal: aborted.signal, compatible: () => true })).rejects.toThrow("no longer wanted");
+    expect(released).toHaveLength(2);
   });
 });
 
-describe("the schedule of a shown graph", () => {
-  const deployment: Deployment = { revision: 4 };
-  const shown: Shown = { route: routeOf({}), graph, of: 2 };
+describe("the schedule of a derived graph", () => {
+  const derived = { key: { journey: "route:r_a:2#7", revision: 0, deployment_revision: 4, today: "2000-01-01", generation: 3 }, reads: "route:r_a:2" } as unknown as Derived<Shown>;
 
-  it("is keyed by the route and what it shows, and read again when the graph or the deployment moves", () => {
-    const base = routeScheduleKey(new FakeDeriver(), shown, deployment);
-    expect(base?.of).toEqual(["r_a", 2]);
-    expect(routeScheduleKey(new FakeDeriver(), { ...shown, of: 1 }, deployment)?.of).not.toEqual(base?.of);
-    expect(sameKey(routeScheduleKey(new FakeDeriver(), { ...shown, graph: { nodes: [] } }, deployment)?.freshness, base?.freshness)).toBe(false);
-    expect(sameKey(routeScheduleKey(new FakeDeriver(), shown, { revision: 5 })?.freshness, base?.freshness)).toBe(false);
-    expect(routeScheduleKey(new FakeDeriver(), shown, undefined)).toBeUndefined();
-  });
-
-  it("asks the deriver for the shown graph's schedule", async () => {
-    const asked: unknown[] = [];
-    const schedule = { entries: [] };
-    const deriver = { routeSchedule: (derive: unknown) => { asked.push(derive); return Promise.resolve(schedule); } } as unknown as Deriver;
-    const args = routeScheduleKey(deriver, shown, deployment)?.args;
-    if (args === undefined) {
-      throw new Error("no key");
-    }
-    expect(await ROUTE_SCHEDULE.read(args, at())).toBe(schedule);
-    expect(asked).toEqual([{ graph, deployment }]);
+  it("is of the derivation's reads and read again for each derivation", () => {
+    const base = routeScheduleKey(new FakeDeriver(), derived);
+    expect(base?.of).toEqual(["route:r_a:2"]);
+    const next = { ...derived, key: { ...derived.key, generation: 4 } };
+    expect(sameKey(routeScheduleKey(new FakeDeriver(), next)?.of, base?.of)).toBe(true);
+    expect(sameKey(routeScheduleKey(new FakeDeriver(), next)?.freshness, base?.freshness)).toBe(false);
+    expect(routeScheduleKey(new FakeDeriver(), undefined)).toBeUndefined();
   });
 });

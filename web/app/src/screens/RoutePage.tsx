@@ -5,10 +5,12 @@
 // view state and controls: a route offers Depth (with Fade), the Filter's Show conditional and
 // the search, and has no state, owner or relevance to filter by (journeys/view.ts, ROUTE_OFFERS).
 // The inspector holds the route's card while no node is open (the draft card, or a version's
-// card) and a draft node's form once one is. A draft is authored by hand here (5.6: the palette
-// above the views, edges drawn between cards); a version is read only. The address says which
-// (routes/address.ts) and the page follows the route live (H6). The assistant panel (5.8) talks
-// about the route's draft.
+// card) and the open node once one is: a draft node's form, a version node's read-only panel.
+// Selecting a node traces it on the canvas, as on a journey. A draft is authored by hand here
+// (5.6: the palette above the views, edges drawn between cards); a version is read only. The
+// address says which (routes/address.ts) and the page follows the route live (H6). The shown graph
+// is derived once (route-reads.ts) and every view draws from that derivation. The assistant panel
+// (5.8) talks about the route's draft.
 import "./screens.css";
 
 import type { Schema } from "@cairn/client";
@@ -26,7 +28,7 @@ import { RouteCanvas } from "../canvas/RouteCanvas.tsx";
 import { stepsFor } from "../canvas/ladder.ts";
 import { graphViewFrom } from "../canvas/settings.ts";
 import type { Route } from "../data/host.ts";
-import { valueOf } from "../data/keyed-read.ts";
+import { valueOf, type ReadView } from "../data/keyed-read.ts";
 import { useDeployment, useKeyedRead, useSession, useToday } from "../data/react.ts";
 import { useNodeAddresses, type Screen } from "../journeys/address.ts";
 import { ROUTE_OFFERS, useViewState, ViewStateContext, viewStateFrom } from "../journeys/view.ts";
@@ -42,13 +44,15 @@ import { useRouteRead, VersionCard } from "../routes/RouteCard.tsx";
 import { InsertionCanvas } from "../segments/Preview.tsx";
 import { useInserting } from "../segments/entry.ts";
 import { InsertStepper } from "../segments/Stepper.tsx";
-import { COLUMN, Inspector, PHONE_WIDTH, useMedia } from "../shell/frame.tsx";
+import { COLUMN, Inspector, PHONE_WIDTH, useFrameActions, useMedia } from "../shell/frame.tsx";
 import { useEscapeTo } from "../shell/useEscapeTo.ts";
+import { treeOf } from "../authoring/graph.ts";
 import { RouteTimeline } from "../timeline/RouteTimeline.tsx";
 import { Button } from "../ui/kit.tsx";
 import { KeySheet } from "./KeySheet.tsx";
 import { useViewKeys } from "./keys.ts";
-import { nodesOf, ROUTE_GRAPH, routeGraphKey, type Shown } from "./route-reads.ts";
+import { nodesOf, ROUTE_GRAPH, routeGraphKey, type Derived, type Shown } from "./route-reads.ts";
+import { useRouteDerived } from "./route-views.ts";
 import { RouteList } from "./RouteList.tsx";
 import { useViewStateValue } from "./useViewStateValue.ts";
 import { withViewState } from "../journeys/view.ts";
@@ -65,34 +69,33 @@ interface Result {
   notices: Schema<"Notice">[];
 }
 
-/** What fails a node address closed: the words the page shows after replacing it. */
-const NO_DRAFT = "No draft is open, so nothing can be edited here.";
-
 const NONE: ReadonlySet<string> = new Set();
 
-/** The body under the head: the view the address names. */
-function RouteBody({ shown, screen, selected, unanchored, onPick }: { shown: Shown; screen: Screen; selected: string | undefined; unanchored: ReadonlySet<string>; onPick: ((key: string) => boolean) | undefined }) {
+/** The body under the head: the view the address names, over the shown graph as derived. */
+function RouteBody({ derived, screen, selected, unanchored, onPick }: { derived: ReadView<Derived<Shown>>; screen: Screen; selected: string | undefined; unanchored: ReadonlySet<string>; onPick: ((key: string) => boolean) | undefined }) {
   const addresses = useNodeAddresses();
   const navigate = useNavigate();
+  const frame = useFrameActions();
   const { state, picks } = useViewState();
-  const layered = useLayer() !== undefined;
-  // Under the proposal layer a card opens its node in the rail; nothing is drawn or edited.
-  const editable = shown.of === "draft" || layered;
   const view = graphViewFrom(new URLSearchParams(useLocation().search), ROUTE_OFFERS);
-  const onOpen = editable
-    ? (key: string) => {
-        if (onPick?.(key) !== true) {
-          void navigate(addresses.open(key));
-        }
-      }
-    : undefined;
+  const shown = valueOf(derived);
+  if (shown === undefined) {
+    return derived.status === "failed" ? <p className="callout callout-bad"><Failed what="The route" error={derived.error} /></p> : <p className="muted small">Reading the route...</p>;
+  }
+  // A node opens beside the view (a draft's form, a version's panel), or ends an edge being drawn; opening the node already open brings a hidden inspector back.
+  const onOpen = (key: string) => {
+    if (onPick?.(key) !== true) {
+      frame?.show("inspector");
+      void navigate(addresses.open(key));
+    }
+  };
   switch (screen) {
     case "list":
       return <RouteList shown={shown} state={state} picks={picks} selected={selected} unanchored={unanchored} onOpen={onOpen} />;
     case "timeline":
       return <RouteTimeline shown={shown} state={state} picks={picks} selected={selected} onOpen={onOpen} />;
     default:
-      return <RouteCanvas shown={shown} view={view} selected={selected} unanchored={unanchored} editable={editable} onPick={onPick} />;
+      return <RouteCanvas shown={shown} view={view} selected={selected} unanchored={unanchored} onPick={onPick} />;
   }
 }
 
@@ -143,6 +146,7 @@ function useScreen() {
 
 interface FrameProps {
   shown: Shown;
+  derived: ReadView<Derived<Shown>>;
   selected: string | undefined;
   write: ScreenWrite;
   result: Result | undefined;
@@ -170,13 +174,13 @@ function DraftInspector({ authored, selected, card, close, inserting }: { author
   }
   return (
     <Inspector focus={`${id}:${selected}`}>
-      <RouteNodePanel authored={authored} nodeKey={selected} close={close} onRemoved={() => void navigate(close)} />
+      <RouteNodePanel tree={authored.tree} authored={authored} nodeKey={selected} close={close} onRemoved={() => void navigate(close)} />
     </Inspector>
   );
 }
 
 /** A draft: the palette, the cards' forms, and the draft card in the inspector. */
-function DraftFrame({ shown, authored, selected, write, result, setResult, imports }: FrameProps & { authored: Authored }) {
+function DraftFrame({ shown, derived, authored, selected, write, result, setResult, imports }: FrameProps & { authored: Authored }) {
   const navigate = useNavigate();
   const { search } = useLocation();
   const { screen } = useScreen();
@@ -218,9 +222,9 @@ function DraftFrame({ shown, authored, selected, write, result, setResult, impor
   const body = (
     <>
       {inserting.preview === undefined ? (
-        <RouteBody shown={shown} screen={screen} selected={selected} unanchored={unanchored} onPick={drawing.pick} />
+        <RouteBody derived={derived} screen={screen} selected={selected} unanchored={unanchored} onPick={drawing.pick} />
       ) : (
-        <InsertionCanvas preview={inserting.preview} domain={id} today={authored.today} />
+        <InsertionCanvas preview={inserting.preview} domain={id} />
       )}
       {columned || fills || selected !== undefined ? null : card}
     </>
@@ -232,38 +236,44 @@ function DraftFrame({ shown, authored, selected, write, result, setResult, impor
   );
 }
 
-/** A published version: read only, with its card in the inspector. */
-function VersionFrame({ shown, write, result, setResult, imports }: FrameProps) {
+/** A published version: read only, with its card in the inspector, or the open node's read-only panel. */
+function VersionFrame({ shown, derived, selected, write, result, setResult, imports }: FrameProps) {
   const { screen } = useScreen();
   const id = shown.route.header.id;
   const read = useRouteRead(id);
   const wide = useMedia(COLUMN);
   const phone = useMedia(PHONE_WIDTH);
+  const tree = useMemo(() => treeOf(shown.graph), [shown.graph]);
   const draftTitle = (key: string) => (shown.route.draft?.graph.nodes ?? []).find((node) => node.key === key)?.title;
   const version = shown.of === "draft" ? 0 : shown.of;
   const fills = screen === "graph";
+  // The same address the canvas's background goes to: a bare address stays bare, a named version stays named.
+  const close = useNodeAddresses().close();
+  useEscapeTo(selected === undefined ? undefined : close);
   const card = read === undefined ? null : <VersionCard read={read} version={version} />;
   const head = (
     <>
-      <RouteHeader route={shown.route} of={shown.of} screen={screen} node={undefined} write={write} blocked={undefined} onPublish={undefined} titleOf={draftTitle} imports={imports} />
+      <RouteHeader route={shown.route} of={shown.of} screen={screen} node={selected} write={write} blocked={undefined} onPublish={undefined} titleOf={draftTitle} imports={imports} />
       <ResultOf result={result} setResult={setResult} hrefOf={undefined} />
     </>
   );
   const body = (
     <>
-      <RouteBody shown={shown} screen={screen} selected={undefined} unanchored={NONE} onPick={undefined} />
-      {wide || phone || fills ? null : card}
+      <RouteBody derived={derived} screen={screen} selected={selected} unanchored={NONE} onPick={undefined} />
+      {wide || phone || fills || selected !== undefined ? null : card}
     </>
   );
   const inspector =
-    (wide || phone) && card !== null ? (
+    selected !== undefined ? (
+      <Inspector focus={`${id}:${selected}`}>
+        <RouteNodePanel tree={tree} authored={undefined} nodeKey={selected} close={close} onRemoved={() => undefined} />
+      </Inspector>
+    ) : (wide || phone) && card !== null ? (
       <Inspector focus={`${id}:v${String(version)}`} reveal={false}>
         {card}
       </Inspector>
     ) : null;
-  return (
-    <Workspace head={head} body={body} fills={fills} inspector={inspector} />
-  );
+  return <Workspace head={head} body={body} fills={fills} inspector={inspector} />;
 }
 
 /** A route with no draft and no version (its first draft was discarded): the one thing to do is open a draft; the header keeps the route's other actions. */
@@ -306,7 +316,8 @@ function LayerFrame({ shown, route, selected, imports, write }: { shown: Shown; 
   const exit = layer?.exit ?? routePath(id);
   useEscapeTo(selected === undefined ? undefined : routePath(id, { screen, proposal: layer?.id }, search));
   const fills = screen === "graph";
-  const body = <RouteBody shown={shown} screen={screen} selected={selected} unanchored={NONE} onPick={undefined} />;
+  const derived = useRouteDerived(shown);
+  const body = <RouteBody derived={derived} screen={screen} selected={selected} unanchored={NONE} onPick={undefined} />;
   return (
     <div className="ws-fill journey-frame route-frame" data-testid="route-frame" data-screen={screen} data-layer={layer?.mode} data-exit={exit}>
       <div className="ws-head stack journey-head">{head}</div>
@@ -371,33 +382,29 @@ function LayerBody({ shown, route, selected, write, imports }: { shown: Shown | 
 
 /** What the page is once the route is read: its frame, the keys and the view state every view shares. */
 function Loaded({ shown, selected, write, imports, result, setResult }: { shown: Shown; selected: string | undefined; write: ScreenWrite; imports: ImportFlow; result: Result | undefined; setResult: (result: Result | undefined) => void }) {
-  const id = shown.route.header.id;
   const location = useLocation();
   const { pathname, search } = location;
-  const held = location.state as { notice?: string } | null;
   const navigate = useNavigate();
   const params = useMemo(() => new URLSearchParams(search), [search]);
-  const screen = routeScreenOf(params);
+  const id = shown.route.header.id;
   const draft = shown.of === "draft";
   const viewState = useMemo(() => viewStateFrom(params, ROUTE_OFFERS), [params]);
   const value = useViewStateValue(viewState);
   const [sheetOpen, setSheetOpen] = useState(false);
   const steps = useMemo(() => stepsFor(nodesOf(shown)), [shown.graph]);
-  // The address fails closed: a node path means a node of the draft, so with no draft open it lands on the route; a version's nodes have no address; and what a route does not offer (Only mine, an owner, flags, Frontier, not relevant) is not kept.
-  const noDraft = selected !== undefined && !draft;
-  const asked = versionIn(params);
+  // The shown graph is derived once, and every view draws from that derivation with the graph it was derived from.
+  const derived = useRouteDerived(shown);
+  // What a route does not offer (Only mine, an owner, flags, Frontier, not relevant) is not kept.
   const clean = withViewState(search, viewState);
   const dirty = new URLSearchParams(clean).toString() !== params.toString();
   useEffect(() => {
-    if (noDraft) {
-      void navigate(routePath(id, { version: asked, screen }, clean), { replace: true, state: asked === undefined ? { notice: NO_DRAFT } : null });
-    } else if (dirty) {
-      void navigate(`${pathname}${clean}`, { replace: true, state: held });
+    if (dirty) {
+      void navigate(`${pathname}${clean}`, { replace: true });
     }
-  }, [noDraft, dirty, navigate, id, asked, screen, clean, pathname, held]);
+  }, [dirty, navigate, clean, pathname]);
   useViewKeys({
-    screen,
-    selected: draft ? selected : undefined,
+    screen: routeScreenOf(params),
+    selected,
     sheetOpen,
     setSheetOpen,
     state: viewState,
@@ -405,18 +412,12 @@ function Loaded({ shown, selected, write, imports, result, setResult }: { shown:
     onState: value.onState,
     offers: ROUTE_OFFERS,
     walk: false,
-    viewAddress: (to) => routeSwitched(id, search, to, draft ? selected : undefined),
+    viewAddress: (to) => routeSwitched(id, search, to, selected),
   });
-  const notice = held?.notice;
-  const frame = { selected: noDraft ? undefined : selected, write, result, setResult, imports };
+  const frame = { selected, derived, write, result, setResult, imports };
   const authored = useAuthored(shown);
   return (
     <ViewStateContext value={value}>
-      {notice === undefined ? null : (
-        <p className="callout" role="status" data-testid="route-notice">
-          {notice}
-        </p>
-      )}
       {draft ? authored === undefined ? <p className="muted small">Reading the route...</p> : <DraftFrame {...frame} shown={shown} authored={authored} /> : <VersionFrame {...frame} shown={shown} />}
       {sheetOpen ? <KeySheet onClose={() => { setSheetOpen(false); }} /> : null}
     </ViewStateContext>

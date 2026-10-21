@@ -5,7 +5,8 @@
 //
 //   /routes/<id>                      the route as it stands: its draft when one is open, else its latest version
 //   /routes/<id>?version=<n>          published version n
-//   /routes/<id>/nodes/<key>          a node of the draft, open in its form
+//   /routes/<id>/nodes/<key>          a node of the draft (its form) or of the route as it stands
+//   /routes/<id>/nodes/<key>?version=<n>   a node of published version n (read only)
 //   /routes/<id>?view=list|timeline   the view (the Graph when none; written only off the default)
 //   /routes/<id>/proposals/<pid>[/nodes/<key>]   the route with a proposal's layer on (C14); it reads no `version`
 //
@@ -62,8 +63,8 @@ export function spotOf(params: URLSearchParams): { version: number | undefined; 
 /**
  * Route `route`'s page at `spot`, keeping `search`'s other parameters (the view state, the
  * graph's settings) in their order. `version` and `view` are written from `spot`, never kept
- * from `search`: a version when one is named, the view only off the Graph. A version's nodes have
- * no address, so a node is written only on the route as it stands (its draft).
+ * from `search`: a version when one is named, the view only off the Graph. A node is written
+ * whatever the version: the address names the node of the graph the page shows.
  */
 export function routePath(route: string, spot: RouteSpot = {}, search = ""): string {
   const kept = new URLSearchParams(search);
@@ -87,7 +88,7 @@ export function routePath(route: string, spot: RouteSpot = {}, search = ""): str
     const text = params.toString();
     return `${path}${text === "" ? "" : `?${text}`}`;
   }
-  const path = spot.node === undefined || spot.version !== undefined ? pathTo("route", { route }) : pathTo("routeNode", { route, key: spot.node });
+  const path = spot.node === undefined ? pathTo("route", { route }) : pathTo("routeNode", { route, key: spot.node });
   return `${path}${query === "" ? "" : `?${query}`}`;
 }
 

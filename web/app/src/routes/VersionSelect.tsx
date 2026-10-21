@@ -36,7 +36,7 @@ export function VersionSelect({ route, of }: { route: Route; of: "draft" | numbe
   const today = useToday();
   const to = (version: number | undefined) => routePath(id, { version, screen: spotOf(new URLSearchParams(search)).screen }, search);
   return (
-    <Menu label={words} title="Which version the views show: the draft, or a published version" testId="version-select" className="no-print version-select" trigger={of === "draft" ? <>Draft<span className="version-from">{words.slice("Draft".length)}</span> ▾</> : <>{words} ▾</>}>
+    <Menu label={words} title="Which version the views show: the draft, or a published version" testId="version-select" className="no-print version-select" trigger={<>{of === "draft" ? "Draft" : words} ▾</>}>
       {(close) => (
         <>
           {route.draft == null ? null : (

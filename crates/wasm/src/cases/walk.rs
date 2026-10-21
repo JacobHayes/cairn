@@ -101,7 +101,9 @@ fn server_projection(service: &Service, id: &JourneyId, request: &Projection) ->
             );
             json(&detail.value.answer_effects)
         }
-        Projection::Trace { key } => {
+        Projection::Trace { key, standing } => {
+            // The server's trace is the one node's: a card standing for hidden nodes is the page's.
+            assert!(standing.is_empty(), "the server has no joined trace");
             json(&served(now_or_never(service.trace(&call, id, key)), &read("trace")).value)
         }
         Projection::DecisionView => json(
@@ -243,6 +245,7 @@ fn projections(document: &DomainDocument) -> Vec<Projection> {
         }
         requests.push(Projection::Trace {
             key: node.key.clone(),
+            standing: Vec::new(),
         });
         for field in [
             ExplainedField::Gravity,

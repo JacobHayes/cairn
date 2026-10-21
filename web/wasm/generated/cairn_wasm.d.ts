@@ -320,6 +320,36 @@ export class RootSubscription {
 }
 
 /**
+ * A route's graph validated and derived as a journey that starts on day 0 and in which nothing
+ * has happened (C2, C7, C13): what every projection of a route's canvas, list and timeline
+ * reads.
+ */
+export class RouteDerivation {
+    free(): void;
+    [Symbol.dispose](): void;
+    /**
+     * Reads a [`RouteDeriveRequest`] and derives it.
+     *
+     * # Errors
+     *
+     * The JSON of a [`HostError`]: an unreadable request or an invalid graph.
+     */
+    constructor(request: string);
+    /**
+     * One projection: `request` is the JSON of a [`Projection`].
+     *
+     * # Errors
+     *
+     * The JSON of a [`HostError`]: an unreadable request, or a node the graph lacks.
+     */
+    project(request: string): string;
+    /**
+     * C13: the schedule, as the JSON of a `RouteSchedule`.
+     */
+    schedule(): string;
+}
+
+/**
  * Applies a draft patch to `document`'s journey without committing it: `request` is the JSON
  * of an [`ApplyRequest`]; the answer is the JSON of an [`AppliedLocally`].
  *
@@ -391,17 +421,6 @@ export function readRouteFile(text: string): string;
 export function routeFileText(file: string): string;
 
 /**
- * C2: a route's canvas level: `request` is the JSON of a [`RouteLevelRequest`]; the answer is
- * the JSON of a `Level`, as a journey's level projection answers it.
- *
- * # Errors
- *
- * The JSON of a [`HostError`]: an unreadable request, an invalid graph, or a container the
- * graph lacks.
- */
-export function routeLevel(request: string): string;
-
-/**
  * A20: a route graph's notices: `request` is the JSON of a [`RouteNoticesRequest`]; the
  * answer is the JSON list of `Notice`s.
  *
@@ -410,16 +429,6 @@ export function routeLevel(request: string): string;
  * The JSON of a [`HostError`]: an unreadable request or an invalid graph.
  */
 export function routeNotices(request: string): string;
-
-/**
- * C13: a route's schedule: `request` is the JSON of a [`RouteScheduleRequest`]; the answer is
- * the JSON of a `RouteSchedule`.
- *
- * # Errors
- *
- * The JSON of a [`HostError`]: an unreadable request or an invalid graph.
- */
-export function routeSchedule(request: string): string;
 
 /**
  * Runs when the module is instantiated: a panic's message goes to the console, since the
@@ -453,6 +462,7 @@ export interface InitOutput {
     readonly __wbg_browserroot_free: (a: number, b: number) => void;
     readonly __wbg_derivation_free: (a: number, b: number) => void;
     readonly __wbg_rootsubscription_free: (a: number, b: number) => void;
+    readonly __wbg_routederivation_free: (a: number, b: number) => void;
     readonly apply: (a: number, b: number, c: number, d: number, e: number) => void;
     readonly applyRoute: (a: number, b: number, c: number) => void;
     readonly browserroot_applyProposal: (a: number, b: number, c: number, d: number, e: number, f: number, g: number, h: number, i: number, j: number) => void;
@@ -495,9 +505,10 @@ export interface InitOutput {
     readonly readRouteFile: (a: number, b: number, c: number) => void;
     readonly rootsubscription_take: (a: number, b: number, c: number) => void;
     readonly routeFileText: (a: number, b: number, c: number) => void;
-    readonly routeLevel: (a: number, b: number, c: number) => void;
     readonly routeNotices: (a: number, b: number, c: number) => void;
-    readonly routeSchedule: (a: number, b: number, c: number) => void;
+    readonly routederivation_new: (a: number, b: number, c: number) => void;
+    readonly routederivation_project: (a: number, b: number, c: number, d: number) => void;
+    readonly routederivation_schedule: (a: number, b: number) => void;
     readonly start: () => void;
     readonly touched: (a: number, b: number, c: number) => void;
     readonly touchedOverlaps: (a: number, b: number, c: number, d: number, e: number) => void;

@@ -20,10 +20,9 @@ import {
   type ProjectionRequest,
   type RenderedDraft,
   type RouteApplyRequest,
-  type RouteLevelRequest,
+  type RouteDeriveRequest,
   type RouteNoticesRequest,
   type RouteSchedule,
-  type RouteScheduleRequest,
 } from "./types.ts";
 
 type Pending = { resolve: (text: string) => void; reject: (failure: HostFailure) => void };
@@ -154,19 +153,23 @@ export class DeriveWorker {
     return parsed<Schema<"Route">>(await this.#ask({ op: "apply_route", request }));
   }
 
-  /** C2: a route graph's canvas level (a route has no state; nothing is held). */
-  async routeLevel(request: RouteLevelRequest): Promise<Schema<"Level">> {
-    return parsed<Schema<"Level">>(await this.#ask({ op: "route_level", request }));
-  }
-
   /** A20: a route graph's notices (nothing is held). */
   async routeNotices(request: RouteNoticesRequest): Promise<Schema<"Notice">[]> {
     return parsed<Schema<"Notice">[]>(await this.#ask({ op: "route_notices", request }));
   }
 
-  /** C13: a route graph's earliest days from its start (nothing is held). */
-  async routeSchedule(request: RouteScheduleRequest): Promise<RouteSchedule> {
-    return parsed<RouteSchedule>(await this.#ask({ op: "route_schedule", request }));
+  /**
+   * Derives a route's graph as a journey in which nothing has happened and holds it under
+   * `slot`: what it was derived from, and the handle of this load, which `release` takes. Its
+   * level, trace and so on are `project`; its schedule is `routeSchedule`.
+   */
+  async loadRoute(request: RouteDeriveRequest, slot: string): Promise<Loaded> {
+    return parsed<Loaded>(await this.#ask({ op: "load_route", request, slot }));
+  }
+
+  /** C13: the route held under `slot`: its nodes' earliest days from its start. */
+  async routeSchedule(slot: string): Promise<RouteSchedule> {
+    return parsed<RouteSchedule>(await this.#ask({ op: "route_schedule", journey: slot }));
   }
 
   /** Drops the derivation `handle`'s load made, unless a later load has replaced it. */

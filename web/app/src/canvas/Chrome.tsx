@@ -1,4 +1,4 @@
-// What sits over the graph (5.8): the Signal button at the top right (the lens, Key) and Reveal at
+// What sits over the graph (5.8): the Signal button at the top right (the lens, Key; a route's canvas has no signals, so its Key button takes the slot) and Reveal at
 // the bottom right. The rest of the controls are the view's own (screens/ViewControls.tsx) and the
 // zoom buttons (GraphCanvas). Quiet by rule: one control each.
 import { Panel } from "@xyflow/react";
@@ -42,6 +42,19 @@ function Key() {
         </li>
       ))}
     </ul>
+  );
+}
+
+/** A route's canvas button at the top right, where a journey's Signal button is: a route has no signals to show, so its menu is the key to the lines alone. */
+export function KeyMenu() {
+  return (
+    <Menu label="Key to the lines" title="What the lines and their ends mean" testId="key-menu" role="dialog" align="end" className="canvas-signal" trigger={"Key \u25be"}>
+      {() => (
+        <div className="stack" data-testid="key-panel">
+          <Key />
+        </div>
+      )}
+    </Menu>
   );
 }
 

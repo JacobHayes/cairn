@@ -14,10 +14,9 @@ import type {
   ProjectionRequest,
   RenderedDraft,
   RouteApplyRequest,
-  RouteLevelRequest,
+  RouteDeriveRequest,
   RouteNoticesRequest,
   RouteSchedule,
-  RouteScheduleRequest,
   DerivationKey,
   Loaded,
   LocalPreview,
@@ -140,10 +139,14 @@ export interface Deriver {
   project<R extends ProjectionRequest>(journey: string, request: R): Promise<ProjectionAnswer<R>>;
   /** A10, G3: a message draft rendered with the held journey's context. */
   renderDraft(journey: string, request: DraftRequest): Promise<RenderedDraft>;
-  /** C2: a route graph's canvas level (a route has no state to hold). */
-  routeLevel(request: RouteLevelRequest): Promise<Level>;
-  /** C13: a route graph's earliest days from its start (a route has no state to hold). */
-  routeSchedule(request: RouteScheduleRequest): Promise<RouteSchedule>;
+  /**
+   * Derives a route's graph as a journey in which nothing has happened and holds it under
+   * `slot`, which the page names afresh for each load: its level and trace are `project` on
+   * the slot, as a journey's are; `release` takes the handle.
+   */
+  loadRoute(request: RouteDeriveRequest, slot: string): Promise<Loaded>;
+  /** C13: the route held under `slot`: its nodes' earliest days from its start. */
+  routeSchedule(slot: string): Promise<RouteSchedule>;
   /** A20: a route graph's notices, in path order. */
   routeNotices(request: RouteNoticesRequest): Promise<Schema<"Notice">[]>;
   /** A draft patch applied to the held journey, committing nothing (ARCHITECTURE, Web UI: previews). */

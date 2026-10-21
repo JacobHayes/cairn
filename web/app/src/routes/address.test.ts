@@ -20,9 +20,9 @@ describe("a route's address", () => {
     expect(query(routePath("r", { screen: "timeline" })).get("view")).toBe("timeline");
   });
 
-  it("puts a node in the path of the route as it stands, and drops it when a version is named", () => {
+  it("puts a node in the path, and keeps the version a link names beside it", () => {
     expect(routePath("r", { node: "n_x" })).toBe("/routes/r/nodes/n_x");
-    expect(routePath("r", { node: "n_x", version: 2 })).toBe("/routes/r?version=2");
+    expect(routePath("r", { node: "n_x", version: 2 })).toBe("/routes/r/nodes/n_x?version=2");
   });
 
   it("takes the version and the view from the spot, never from the query it keeps", () => {
@@ -56,9 +56,9 @@ describe("switching a route's view", () => {
     expect(Object.fromEntries(back)).toEqual({ version: "2", depth: "decisions", fade: "1", q: "ship", open: "n_a", shut: "n_b" });
   });
 
-  it("keeps the node of the draft open, and none on a version", () => {
+  it("keeps the node open, on a draft and on a version", () => {
     expect(routeSwitched("r", "?view=list", "timeline", "n_x")).toBe("/routes/r/nodes/n_x?view=timeline");
-    expect(routeSwitched("r", "?version=2", "list", "n_x")).toBe("/routes/r?version=2&view=list");
+    expect(routeSwitched("r", "?version=2", "list", "n_x")).toBe("/routes/r/nodes/n_x?version=2&view=list");
   });
 
   it("stays under a proposal's layer, the layer's own address and the picked node kept", () => {

@@ -287,8 +287,8 @@ export class FakeDeriver implements Deriver {
     return Promise.reject(new Error("no drafts in the fake"));
   }
 
-  routeLevel(): Promise<never> {
-    return Promise.reject(new Error("no route levels in the fake"));
+  loadRoute(): Promise<never> {
+    return Promise.reject(new Error("no route derivations in the fake"));
   }
 
   routeSchedule(): Promise<never> {

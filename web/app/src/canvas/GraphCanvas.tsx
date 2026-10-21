@@ -498,7 +498,7 @@ function EdgeChip({ chip, line }: { chip: RefObject<HTMLDivElement | null>; line
   return (
     <div ref={chip} className="edge-hover" role="status" data-testid="edge-hover">
       {line.sentence}
-      {line.kind === "dates" ? "" : ` \u00b7 ${line.satisfied === true ? "done" : "still waiting"}`}
+      {line.kind === "dates" || line.satisfied === undefined ? "" : ` \u00b7 ${line.satisfied ? "done" : "still waiting"}`}
     </div>
   );
 }

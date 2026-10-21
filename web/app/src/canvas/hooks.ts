@@ -4,13 +4,13 @@
 // keeps showing its last answer until the next arrives, so a live edit swaps the canvas once
 // rather than blanking it. The key functions beside the hooks name everything each read uses.
 import type { Schema } from "@cairn/client";
-import type { ProjectionAnswer, ProjectionRequest } from "@cairn/wasm";
+import type { DerivationKey, ProjectionAnswer, ProjectionRequest } from "@cairn/wasm";
 import { createContext, useContext, useMemo, useState } from "react";
 
 import type { Deriver } from "../data/host.ts";
 import { PROJECTION, errorWords, valueOf, type ReadKey, type ReadSource, type ReadView } from "../data/keyed-read.ts";
 import { useKeyedRead, useSession } from "../data/react.ts";
-import type { GraphNode, Ready } from "../detail/model.ts";
+import type { GraphNode } from "../detail/model.ts";
 import { selectedRequest, type LevelRequest } from "../journeys/requests.ts";
 import { layoutRequestOf } from "./cards.ts";
 import { ancestorsOf, openAt } from "./ladder.ts";
@@ -27,6 +27,17 @@ export function useLayouts(): Layouts {
     throw new Error("useLayouts outside the layouts' provider");
   }
   return layouts;
+}
+
+/**
+ * A derivation the worker holds, which projections are asked of: a journey's (its `Ready`) or a
+ * route's graph (route-reads.ts, `Derived`). `reads` names what its projections are of when that
+ * is not the derivation's own name: a route's slot is new for each load, but the reads of one
+ * route's draft stay one read, so an edit keeps the last answers on screen until the next arrive.
+ */
+export interface Held {
+  key: DerivationKey;
+  reads?: string;
 }
 
 /** What a projection is asked of the worker. */
@@ -47,12 +58,12 @@ const PROJECT: ReadSource<ProjectArgs, unknown> = {
  * is another read (another level is another graph, and laying it out under this view would hint
  * the view's first layout with a different graph's positions). None for no request or no view.
  */
-export function projectedKey(deriver: Deriver, view: Ready | undefined, request: ProjectionRequest | undefined): ReadKey<ProjectArgs> | undefined {
+export function projectedKey(deriver: Deriver, view: Held | undefined, request: ProjectionRequest | undefined): ReadKey<ProjectArgs> | undefined {
   if (request === undefined || view === undefined) {
     return undefined;
   }
   const journey = view.key.journey;
-  return { of: [journey, JSON.stringify(request)], freshness: [JSON.stringify(view.key)], args: { deriver, journey, request } };
+  return { of: [view.reads ?? journey, JSON.stringify(request)], freshness: [JSON.stringify(view.key)], args: { deriver, journey, request } };
 }
 
 /**
@@ -60,7 +71,7 @@ export function projectedKey(deriver: Deriver, view: Ready | undefined, request:
  * derivation or the request changes; the answer of an earlier revision of the same request is
  * shown until the next arrives. Nothing for no request.
  */
-export function useProjected<R extends ProjectionRequest>(view: Ready | undefined, request: R | undefined): ReadView<ProjectionAnswer<R>> {
+export function useProjected<R extends ProjectionRequest>(view: Held | undefined, request: R | undefined): ReadView<ProjectionAnswer<R>> {
   const { deriver } = useSession();
   return useKeyedRead(PROJECT, projectedKey(deriver, view, request)).view as ReadView<ProjectionAnswer<R>>;
 }
@@ -74,8 +85,14 @@ export function useProjected<R extends ProjectionRequest>(view: Ready | undefine
  * is made from the plain read's value as held, and each read shows a value only for its own
  * request and derivation; selecting a node the plain level draws changes neither.
  */
-export function useLevel(view: Ready, request: LevelRequest | undefined, selected?: string): LevelRead {
-  return useLevelBy((asked) => useProjected(view, asked), view.journey.graph.nodes ?? [], request, selected);
+export function useLevel(view: Held | undefined, nodes: readonly GraphNode[], request: LevelRequest | undefined, selected?: string): LevelRead {
+  const plain = useProjected(view, request);
+  const plainLevel = valueOf(plain);
+  const widening = request === undefined ? undefined : selectedRequest(request, plainLevel, selected, nodes);
+  const widened = useProjected(view, widening);
+  const level = widening === undefined ? plainLevel : valueOf(widened);
+  const drawn = useMemo(() => (level === undefined ? undefined : new Set(level.nodes.map((node) => node.key))), [level]);
+  return { level, drawn, error: errorWords(plain) ?? (widening === undefined ? undefined : errorWords(widened)) };
 }
 
 /** The level a view draws: the keys it draws, and why it could not be read. */
@@ -83,58 +100,6 @@ export interface LevelRead {
   level: Schema<"Level"> | undefined;
   drawn: ReadonlySet<string> | undefined;
   error: string | undefined;
-}
-
-/**
- * `useLevel` over any subject's level read (`read`, called as a hook, once for the plain request
- * and once for the widened one): a journey's projection, a route's level. One rule for what a
- * selected node does to the level, whichever subject draws it.
- */
-export function useLevelBy(read: (request: LevelRequest | undefined) => ReadView<Schema<"Level">>, nodes: readonly GraphNode[], request: LevelRequest | undefined, selected?: string): LevelRead {
-  const plain = read(request);
-  const plainLevel = valueOf(plain);
-  const widening = request === undefined ? undefined : selectedRequest(request, plainLevel, selected, nodes);
-  const widened = read(widening);
-  const level = widening === undefined ? plainLevel : valueOf(widened);
-  const drawn = useMemo(() => (level === undefined ? undefined : new Set(level.nodes.map((node) => node.key))), [level]);
-  return { level, drawn, error: errorWords(plain) ?? (widening === undefined ? undefined : errorWords(widened)) };
-}
-
-/** What a joined trace asks of the worker: each node's own trace, less the nodes the card stands for. */
-interface TraceArgs {
-  deriver: Deriver;
-  journey: string;
-  keys: readonly string[];
-}
-
-const TRACE: ReadSource<TraceArgs, Schema<"Trace">> = {
-  policy: PROJECTION,
-  read: async ({ deriver, journey, keys }) => {
-    const own = new Set(keys);
-    const traces = await Promise.all(keys.map((each) => deriver.project(journey, { projection: "trace", key: each })));
-    const joined = (pick: (trace: Schema<"Trace">) => string[]) => [...new Set(traces.flatMap(pick))].filter((each) => !own.has(each)).sort();
-    return { node: keys[0] ?? "", upstream: joined((trace) => trace.upstream), downstream: joined((trace) => trace.downstream), gravity_contributors: joined((trace) => trace.gravity_contributors) };
-  },
-};
-
-/** The key of a joined trace: none for no keys. It is shown only for the derivation it was read from. */
-export function joinedTraceKey(deriver: Deriver, view: Ready, keys: readonly string[]): ReadKey<TraceArgs> | undefined {
-  const journey = view.key.journey;
-  return keys.length === 0 ? undefined : { of: [journey, JSON.stringify(keys)], freshness: [JSON.stringify(view.key)], args: { deriver, journey, keys } };
-}
-
-/**
- * The trace of a card that stands for hidden nodes (C2, C7): each node's own trace, joined, less
- * the nodes the card itself stands for. A collapsed stage has no edges of its own that the line
- * drawn from it comes from, so tracing it alone would find nothing downstream. None for no keys,
- * and none while the derivation it was read from is not the view's; a failure falls back to the
- * node's own trace, which the canvas already shows.
- */
-export function useJoinedTrace(view: Ready, key: string | undefined, standing: readonly string[]): Schema<"Trace"> | undefined {
-  const { deriver } = useSession();
-  const keys = key === undefined || standing.length === 0 ? [] : [key, ...standing];
-  const answer = useKeyedRead(TRACE, joinedTraceKey(deriver, view, keys)).view;
-  return answer.status === "current" ? answer.value : undefined;
 }
 
 /** A canvas, where its layout put each card, and the routes it left for each line. */

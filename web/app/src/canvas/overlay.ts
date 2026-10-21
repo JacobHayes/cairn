@@ -27,7 +27,7 @@ export interface OverlayMark {
   label: string;
   /** More to say of the card, on the tag's hover (a diff's conflict or orphan). */
   note?: string;
-  /** A gravity contributor: a dot by its state chip (5.7). */
+  /** A gravity contributor (an UNBLOCKS tag): a dot leads the tag, whose hover says it adds to the selected node's gravity. */
   contributor?: true;
   /** The tag is not drawn: the traced card itself, which the selection already shows. */
   quiet?: true;

@@ -21,7 +21,7 @@ export type ProjectionRequest =
       text?: string;
       selected?: NodeKey;
     }
-  | { projection: "trace"; key: NodeKey }
+  | { projection: "trace"; key: NodeKey; standing?: NodeKey[] }
   | { projection: "decision_view" }
   | { projection: "timeline" }
   | { projection: "status_summary" }
@@ -130,16 +130,8 @@ export interface Loaded {
 /** The query of a level projection: the request without its tag, as a journey's level and a route's both take it (C2). */
 export type LevelQuery = Omit<Extract<ProjectionRequest, { projection: "level" }>, "projection">;
 
-/** `crates/wasm` `RouteLevelRequest`: one canvas level of a route's graph, which has no state (C2). */
-export interface RouteLevelRequest {
-  graph: Schema<"Graph">;
-  deployment: Schema<"Deployment">;
-  today: string;
-  query: LevelQuery;
-}
-
-/** `crates/wasm` `RouteScheduleRequest`: a route's graph whose schedule (C13) is asked for. */
-export interface RouteScheduleRequest {
+/** `crates/wasm` `RouteDeriveRequest`: a route's graph to derive as a journey in which nothing has happened (C2, C7, C13). */
+export interface RouteDeriveRequest {
   graph: Schema<"Graph">;
   deployment: Schema<"Deployment">;
 }

@@ -9,7 +9,7 @@ import { useLayer } from "../proposals/layer.ts";
 import type { Screen } from "../journeys/address.ts";
 import { badgesOf, currentStagesOf, depthFaded, levelRequestOf, lightsUp, litOf, outOfFocus, stepHides, type LevelRequest } from "../journeys/requests.ts";
 import type { ViewState } from "../journeys/view.ts";
-import type { LevelRead } from "./hooks.ts";
+import { useLevel, type Held, type LevelRead } from "./hooks.ts";
 import { collapsedAt, drawnStep, stepOf } from "./ladder.ts";
 import type { Step } from "./model.ts";
 
@@ -24,8 +24,8 @@ export interface ViewLevelArgs {
   selected: string | undefined;
   /** The journey, for the stages that are current and the nodes Frontier lights; none for a route, which has neither. */
   ready?: Ready | undefined;
-  /** The level that `request` asks for, with `selected` always drawn: `useLevel` over a journey, `useRouteLevel` over a route. */
-  read: (request: LevelRequest | undefined, selected: string | undefined) => LevelRead;
+  /** The derivation the level is read from: a journey's, or a route's graph derived (canvas/hooks.ts, `useLevel`). */
+  held: Held;
   /** The viewer's expands and collapses since picking the depth (the canvas folds the level itself); a view that keeps its own rows asks for the whole level. */
   folds?: { open: readonly string[]; shut: readonly string[] } | undefined;
   /** Containers the level is read open (Reveal shows what is inside a collapsed stage). */
@@ -61,7 +61,7 @@ export interface ViewLevel {
 }
 
 /** The depth, the level, and what lights, dims and counts, for one view (see the file's header). */
-export function useViewLevel({ screen, state, nodes, selected, ready, read, folds, unfold, fade = state.fade, alsoDrawn, lit }: ViewLevelArgs): ViewLevel {
+export function useViewLevel({ screen, state, nodes, selected, ready, held, folds, unfold, fade = state.fade, alsoDrawn, lit }: ViewLevelArgs): ViewLevel {
   const depth = stepOf({ step: state.depth }, nodes);
   const step = drawnStep(depth, fade);
   const current = useMemo(() => (ready === undefined ? NONE : currentStagesOf(ready)), [ready]);
@@ -75,7 +75,7 @@ export function useViewLevel({ screen, state, nodes, selected, ready, read, fold
   // C14: under a proposal layer every display state is drawn, so what it changes is never filtered out.
   const layered = useLayer() !== undefined;
   const request = useMemo(() => levelRequestOf(state, step, collapsed, layered), [state, step, collapsed, layered]);
-  const { level, drawn, error } = read(request, selected);
+  const { level, drawn, error } = useLevel(held, nodes, request, selected);
   const frontier = useMemo(() => (ready === undefined ? undefined : litOf(screen, state, ready)), [screen, state, ready]);
   const base = lit ?? frontier;
   const lightsHolders = useMemo(() => (base === undefined ? undefined : lightsUp(nodes, base)), [nodes, base]);

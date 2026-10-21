@@ -13,7 +13,7 @@ import { errorWords, valueOf } from "../data/keyed-read.ts";
 import { useEffect, useMemo, useRef, useState, type CSSProperties, type ReactNode } from "react";
 import { useLocation, useNavigate } from "react-router";
 
-import { useFolds, useLevel, useProjected } from "../canvas/hooks.ts";
+import { useFolds, useProjected } from "../canvas/hooks.ts";
 
 import { titleOf, type Ready } from "../detail/model.ts";
 import { NodeLink } from "../detail/parts.tsx";
@@ -515,7 +515,7 @@ export function ProjectedTimeline({ ready, state, picks, selected }: { ready: Re
   const { range } = useMemo(() => timelineSettingsFrom(new URLSearchParams(search)), [search]);
   const nodes = ready.journey.graph.nodes ?? [];
   const layered = useLayer();
-  const { step, current, level, error: levelError, dimmed: faded, badges } = useViewLevel({ screen: "timeline", state, nodes, selected, ready, read: (request, at) => useLevel(ready, request, at) });
+  const { step, current, level, error: levelError, dimmed: faded, badges } = useViewLevel({ screen: "timeline", state, nodes, selected, ready, held: ready });
   const timelineRead = useProjected(ready, { projection: "timeline" });
   const timeline = valueOf(timelineRead);
   const navigate = useNavigate();

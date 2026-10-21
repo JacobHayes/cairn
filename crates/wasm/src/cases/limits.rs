@@ -82,7 +82,10 @@ pub fn limits_group() -> Group {
     let mut calls = vec![("derive".to_owned(), CaseCall::Derive)];
     let requests = [
         Projection::level(NodeKind::ALL.into_iter().collect(), None),
-        Projection::Trace { key: deep.clone() },
+        Projection::Trace {
+            key: deep.clone(),
+            standing: Vec::new(),
+        },
         Projection::Explanations {
             key: deep,
             field: ExplainedField::Gravity,
@@ -198,6 +201,7 @@ pub fn budget_group(nodes: usize) -> Group {
     })));
     calls.push(projection_call(Projection::Trace {
         key: deepest(&document),
+        standing: Vec::new(),
     }));
     group_of(&budget_label(nodes), text, calls)
 }

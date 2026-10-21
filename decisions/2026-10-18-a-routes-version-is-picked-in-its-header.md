@@ -23,3 +23,7 @@ address (a link would then silently change meaning when a draft opens, so the ex
 `version` parameter on named links carries the stability instead).
 
 What would change it: a route with many versions may need a search in the selector.
+
+Superseded in part: a node address names a node of whatever graph the page shows, the draft's
+or the version's named by `?version=<n>`, and no longer fails closed; a version's node opens
+read-only. See `2026-10-21-a-routes-canvas-selects-and-traces-as-a-journeys-does.md`.

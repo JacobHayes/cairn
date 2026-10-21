@@ -6,8 +6,9 @@
 //! projected ([`Projection`]), a draft patch applied locally to a journey ([`apply`]) or a
 //! route ([`apply_route`]), a proposal previewed ([`preview`]), a patch's touched set for the
 //! H5 safe retry ([`touched`]), route files exported and imported ([`export_route`],
-//! [`import_route`]), a route graph's canvas level ([`route_level`]), its schedule in days from
-//! its start ([`route_schedule`]), and its notices ([`route_notices`]). Every input and output is the schema's JSON, so each value is the
+//! [`import_route`]), a route graph derived once ([`RouteDerivation`]) and projected as a journey
+//! is (its level, its trace, its schedule in days from its start), and its notices
+//! ([`route_notices`]). Every input and output is the schema's JSON, so each value is the
 //! server's byte for byte.
 //!
 //! For the in-browser host, its composition root ([`BrowserRoot`]): the service over the
@@ -54,8 +55,7 @@ pub use root::{
     RootSubscription, Taken, Tick,
 };
 pub use route::{
-    RouteLevelRequest, RouteNoticesRequest, RouteScheduleRequest, route_level, route_level_of,
-    route_notices, route_notices_of, route_schedule, route_schedule_of,
+    RouteDerivation, RouteDeriveRequest, RouteNoticesRequest, route_notices, route_notices_of,
 };
 
 use std::future::Future;

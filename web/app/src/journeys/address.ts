@@ -238,9 +238,9 @@ export function journeyPath(target: JourneyTarget, screen: Screen = defaultScree
 /**
  * From `page` + `search`, the same page with node `key` open, or none when `key` is undefined; an
  * open edge closes either way. On a journey page the view stays the one shown (the address's
- * default can change with the node, the view does not). A route's draft node and a proposal's
- * review (under any destination) take the node in their own path; a route's published version
- * has no node to open, so closing keeps the version. A journey's or route's open proposals
+ * default can change with the node, the view does not). A route's node (the draft's or a
+ * version's) and a proposal's review (under any destination) take the node in their own path;
+ * closing keeps the version. A journey's or route's open proposals
  * have no node to close; a node opened from them opens on the journey, or in the route's
  * draft. Any other page, the deployment's open proposals among them, is unchanged.
  * A proposal's layer is the page's own with the proposal on, so a node picked or closed keeps it.

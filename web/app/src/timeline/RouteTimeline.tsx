@@ -6,7 +6,7 @@
 // the final milestone as the end anchor. The bars are the before and after order; the relations
 // themselves are on the Graph. A node with no earliest day gathers in a folded list, and a row
 // whose date rule waits on a date decision says so. A row's title opens the node's form on a
-// draft; a version's nodes open nothing.
+// draft, and the node of a version is selected and read.
 import { useMemo } from "react";
 import { useNavigate } from "react-router";
 
@@ -17,8 +17,8 @@ import { errorWords, valueOf } from "../data/keyed-read.ts";
 import { useNodeAddresses } from "../journeys/address.ts";
 
 import type { ViewState } from "../journeys/view.ts";
-import { useRouteLevel, useRouteSchedule } from "../screens/route-views.ts";
-import { nodesOf, type Shown } from "../screens/route-reads.ts";
+import { useRouteSchedule } from "../screens/route-views.ts";
+import { nodesOf, type Derived, type Shown } from "../screens/route-reads.ts";
 import { NothingMatches, routeSubject, ViewBar } from "../screens/ViewControls.tsx";
 import { routeSpec } from "./model.ts";
 import { routeChartOf } from "./rows.ts";
@@ -31,13 +31,13 @@ import { useLayer } from "../proposals/layer.ts";
 
 
 export interface RouteTimelineProps {
-  shown: Shown;
+  shown: Derived<Shown>;
   state: ViewState;
   /** How many times a depth was picked: a pick drops the viewer's folds. */
   picks: number;
   selected: string | undefined;
-  /** What opening a node does (a draft's opens its form, or is picked as the end of a requirement being drawn); none on a version, whose nodes open nothing. */
-  onOpen: ((key: string) => void) | undefined;
+  /** What opening a node does: selects it, or picks it as the end of a requirement being drawn. */
+  onOpen: (key: string) => void;
 }
 
 export function RouteTimeline({ shown, state, picks, selected, onOpen }: RouteTimelineProps) {
@@ -45,7 +45,7 @@ export function RouteTimeline({ shown, state, picks, selected, onOpen }: RouteTi
   const navigate = useNavigate();
   const nodes = nodesOf(shown);
   const tree = useMemo(() => treeOf(shown.graph), [shown.graph]);
-  const { step, current, level, error: levelError, dimmed: faded, badges } = useViewLevel({ screen: "timeline", state, nodes, selected, read: (request, at) => useRouteLevel(shown, request, at) });
+  const { step, current, level, error: levelError, dimmed: faded, badges } = useViewLevel({ screen: "timeline", state, nodes, selected, held: shown });
   const layered = useLayer();
   const scheduleRead = useRouteSchedule(shown);
   const schedule = valueOf(scheduleRead);
@@ -77,7 +77,7 @@ export function RouteTimeline({ shown, state, picks, selected, onOpen }: RouteTi
           range={undefined}
           onFold={onFold}
           selected={selected}
-          title={(key) => (onOpen === undefined ? <span>{titleOf(key)}</span> : <NodeLink node={key} title={titleOf(key)} onClick={(event) => { event.preventDefault(); onOpen(key); }} />)}
+          title={(key) => <NodeLink node={key} title={titleOf(key)} onClick={(event) => { event.preventDefault(); onOpen(key); }} />}
           endTitle={titleOf}
           activate={onOpen}
           anchorNote={

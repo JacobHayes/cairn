@@ -5,43 +5,41 @@
 import { useMemo } from "react";
 
 import type { Graph } from "../authoring/graph.ts";
-import { KINDS } from "../detail/model.ts";
+import type { LevelRequest } from "../journeys/requests.ts";
+import { derivedSource } from "../screens/route-reads.ts";
+import { KINDS, type GraphNode } from "../detail/model.ts";
 import { GraphCanvas } from "../canvas/GraphCanvas.tsx";
-import { useLaidOut } from "../canvas/hooks.ts";
-import { cardsOf, linesOf, type CanvasModel, type Level } from "../canvas/model.ts";
+import { useLaidOut, useLevel } from "../canvas/hooks.ts";
+import { cardsOf, linesOf, type CanvasModel } from "../canvas/model.ts";
 import type { CardActions } from "../canvas/NodeCard.tsx";
 import { marksOverlay } from "../canvas/overlay.ts";
-import type { Deployment, Deriver } from "../data/host.ts";
-import { errorWords, PROJECTION, valueOf, type ReadSource } from "../data/keyed-read.ts";
+import { errorWords, valueOf } from "../data/keyed-read.ts";
 import { useDeployment, useKeyedRead, useSession } from "../data/react.ts";
 import { diffMarks, graphDiff } from "../proposals/model.ts";
 import { NODE_GONE } from "../ui/gone.ts";
 import { noteOrigins } from "./model.ts";
 import type { InsertPreview } from "./Stepper.tsx";
 
-interface LevelArgs {
-  deriver: Deriver;
-  graph: Graph;
-  deployment: Deployment;
-  today: string;
-}
+const NO_NODES: GraphNode[] = [];
 
-const LEVEL: ReadSource<LevelArgs, Level> = {
-  policy: PROJECTION,
-  read: async ({ deriver, graph, deployment, today }) => deriver.routeLevel({ graph, deployment, today, query: { shown: KINDS } }),
-};
+/** Every kind at the top level, nothing collapsed: the whole graph. */
+const EVERYTHING: LevelRequest = { projection: "level", shown: KINDS };
 
-export function InsertionCanvas({ preview, domain, today }: { preview: InsertPreview; domain: string; today: string }) {
+/** The graph after, derived and held beside the page's own. */
+const PREVIEW_DERIVED = derivedSource<{ graph: Graph }>();
+
+export function InsertionCanvas({ preview, domain }: { preview: InsertPreview; domain: string }) {
   const deployment = useDeployment();
   const { deriver } = useSession();
   const diff = useMemo(() => graphDiff(preview.before, preview.after), [preview]);
   const marks = useMemo(() => noteOrigins(diffMarks(diff, [], new Set()), preview.members), [diff, preview]);
-  const { view } = useKeyedRead(LEVEL, deployment === undefined ? undefined : { of: [`insert:${domain}`], freshness: [preview.after, deployment.revision, today], args: { deriver, graph: preview.after, deployment, today } });
-  const level = valueOf(view);
-  const model = useMemo<CanvasModel | undefined>(() => {
-    const nodes = preview.after.nodes ?? [];
-    return level === undefined ? undefined : { cards: cardsOf(level, nodes), lines: linesOf(level, nodes) };
-  }, [level, preview.after]);
+  const subject = useMemo(() => ({ graph: preview.after }), [preview.after]);
+  const reads = `insert:${domain}`;
+  const derivedRead = useKeyedRead(PREVIEW_DERIVED, deployment === undefined ? undefined : { of: [reads], freshness: [preview.after, deployment.revision], args: { deriver, subject, deployment, reads } }).view;
+  const derived = valueOf(derivedRead);
+  const nodes = preview.after.nodes ?? NO_NODES;
+  const { level, error: levelError } = useLevel(derived, nodes, derived === undefined ? undefined : EVERYTHING);
+  const model = useMemo<CanvasModel | undefined>(() => (level === undefined ? undefined : { cards: cardsOf(level, nodes), lines: linesOf(level, nodes) }), [level, nodes]);
   const laid = useLaidOut(`insert:${domain}`, "diff", model);
   const laidOut = valueOf(laid);
   const overlay = useMemo(() => (laidOut === undefined ? undefined : marksOverlay("What the segment adds", marks, laidOut.model, { added: diff.edgesAdded, removed: diff.edgesRemoved })), [laidOut, marks, diff]);
@@ -50,7 +48,7 @@ export function InsertionCanvas({ preview, domain, today }: { preview: InsertPre
     [preview.after],
   );
   const changed = useMemo(() => [...Object.keys(marks), ...[...diff.edgesAdded].flatMap((edge) => [edge.node, edge.requires])], [marks, diff]);
-  const error = errorWords(view) ?? errorWords(laid);
+  const error = errorWords(derivedRead) ?? levelError ?? errorWords(laid);
   if (error !== undefined) {
     return <p className="callout callout-bad">The preview could not be drawn: {error}</p>;
   }

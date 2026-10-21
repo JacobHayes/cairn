@@ -1,7 +1,7 @@
 // C9: the List of a route: the nodes the level draws (Depth, Show conditional and the search every
 // view of a route shares, journeys/requests.ts), in tree order, each with its date rule in words
 // (a route has no state or dates), folded by the ladder with the viewer's own folds, and faded
-// below the depth as the other views fade it. A draft's title opens the node's form.
+// below the depth as the other views fade it. A title selects the node: a draft's opens its form, a version's its read-only panel.
 import type { Schema } from "@cairn/client";
 import { useMemo } from "react";
 import { useNavigate } from "react-router";
@@ -9,15 +9,15 @@ import { useNavigate } from "react-router";
 import { ruleFoot } from "../authoring/dates.ts";
 import { nodesByPath, treeOf, type Tree } from "../authoring/graph.ts";
 import type { GraphNode } from "../detail/model.ts";
-import { useFolds } from "../canvas/hooks.ts";
+import { useFolds, useLevel } from "../canvas/hooks.ts";
 
 import { useNodeAddresses } from "../journeys/address.ts";
 
 import type { ViewState } from "../journeys/view.ts";
 import { containerKeys } from "../plan/tree.ts";
 import type { LevelRequest } from "../journeys/requests.ts";
-import { nodesOf, type Shown } from "./route-reads.ts";
-import { useRouteLevel } from "./route-views.ts";
+import { nodesOf, type Derived, type Shown } from "./route-reads.ts";
+import { useRouteBefore } from "./route-views.ts";
 import { TreeFold, TreeGuides } from "../ui/Tree.tsx";
 import { NothingMatches, routeSubject, ViewBar } from "./ViewControls.tsx";
 import { Failed } from "../ui/Failed.tsx";
@@ -26,15 +26,15 @@ import { useReviewing } from "../proposals/layer.ts";
 import { DIFF_LABELS } from "../proposals/model.ts";
 
 export interface RouteListProps {
-  shown: Shown;
+  shown: Derived<Shown>;
   state: ViewState;
   /** How many times a depth was picked: a pick drops the viewer's folds. */
   picks: number;
   selected: string | undefined;
   /** The nodes with no path to the final milestone (A20). */
   unanchored: ReadonlySet<string>;
-  /** Opens a node, or picks it while an edge is drawn; none where a node opens nothing (a version). */
-  onOpen: ((key: string) => void) | undefined;
+  /** Selects a node, or picks it while an edge is drawn. */
+  onOpen: (key: string) => void;
 }
 
 /** The drawn nodes in tree order, each under the drawn node it is drawn under, with how far it sits and its tree guides (ui/Tree.tsx); a closed container's nodes are left out. */
@@ -65,10 +65,10 @@ function useListRows(tree: Tree, level: Schema<"Level"> | undefined, open: (key:
 }
 
 /** C14: under a proposal's layer the route as it is, at the same level, supplies the rows the proposal removes, put back where they were; otherwise the route's own tree and level. */
-function useWithRemoved(shown: Shown, own: Tree, ownLevel: Schema<"Level"> | undefined, request: LevelRequest) {
+function useWithRemoved(shown: Derived<Shown>, own: Tree, ownLevel: Schema<"Level"> | undefined, request: LevelRequest) {
   const layer = useReviewing();
-  const was = layer?.removed.size === 0 ? undefined : layer?.beforeShown;
-  const wasRead = useRouteLevel(was ?? shown, request);
+  const { before: was } = useRouteBefore();
+  const wasRead = useLevel(was, was === undefined ? [] : nodesOf(was), was === undefined ? undefined : request);
   return useMemo(() => {
     if (layer === undefined || was === undefined || wasRead.level === undefined || ownLevel === undefined) {
       return { tree: own, level: ownLevel };
@@ -85,7 +85,7 @@ export function RouteList({ shown, state, picks, selected, unanchored, onOpen }:
   const nodes = nodesOf(shown);
   const layer = useReviewing();
   const own = useMemo(() => treeOf(shown.graph), [shown.graph]);
-  const { step, current, request, level: ownLevel, error, dimmed: faded, badges } = useViewLevel({ screen: "list", state, nodes, selected, read: (request, at) => useRouteLevel(shown, request, at) });
+  const { step, current, request, level: ownLevel, error, dimmed: faded, badges } = useViewLevel({ screen: "list", state, nodes, selected, held: shown });
   const { open, fold } = useFolds(nodes, current, state.depth, step, picks, selected, (key) => void navigate(addresses.open(key)));
   const { tree, level } = useWithRemoved(shown, own, ownLevel, request);
   const rows = useListRows(tree, level, open);
@@ -110,7 +110,7 @@ export function RouteList({ shown, state, picks, selected, unanchored, onOpen }:
                 data-diff={diff?.kind}
                 data-choice={diff?.choice === true ? true : undefined}
                 data-faded={faded(node.key) ? true : undefined}
-                data-navigable={onOpen === undefined ? undefined : true}
+                data-navigable
                 aria-current={node.key === selected ? "true" : undefined}
                 style={{ paddingInlineStart: `calc(var(--space-2) + var(--space-5) * ${String(indent)})` }}
               >
@@ -122,13 +122,9 @@ export function RouteList({ shown, state, picks, selected, unanchored, onOpen }:
                     {diff.choice === true ? <span className="layer-choice"> · needs a choice</span> : null}
                   </span>
                 )}
-                {onOpen === undefined ? (
-                  <span className="route-list-title">{node.title}</span>
-                ) : (
-                  <button type="button" className="link route-list-title" data-testid="row-open" onClick={() => { onOpen(node.key); }}>
-                    {node.title}
-                  </button>
-                )}
+                <button type="button" className="link route-list-title" data-testid="row-open" onClick={() => { onOpen(node.key); }}>
+                  {node.title}
+                </button>
                 {foot === undefined ? null : <span className="muted small">{foot}</span>}
                 {unanchored.has(node.key) ? <span className="node-notice">No path to final</span> : null}
                 <span className="node-kind">{node.kind}</span>

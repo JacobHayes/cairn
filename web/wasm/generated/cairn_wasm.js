@@ -1318,6 +1318,107 @@ export class RootSubscription {
 if (Symbol.dispose) RootSubscription.prototype[Symbol.dispose] = RootSubscription.prototype.free;
 
 /**
+ * A route's graph validated and derived as a journey that starts on day 0 and in which nothing
+ * has happened (C2, C7, C13): what every projection of a route's canvas, list and timeline
+ * reads.
+ */
+export class RouteDerivation {
+    __destroy_into_raw() {
+        const ptr = this.__wbg_ptr;
+        this.__wbg_ptr = 0;
+        RouteDerivationFinalization.unregister(this);
+        return ptr;
+    }
+    free() {
+        const ptr = this.__destroy_into_raw();
+        wasm.__wbg_routederivation_free(ptr, 0);
+    }
+    /**
+     * Reads a [`RouteDeriveRequest`] and derives it.
+     *
+     * # Errors
+     *
+     * The JSON of a [`HostError`]: an unreadable request or an invalid graph.
+     * @param {string} request
+     */
+    constructor(request) {
+        try {
+            const retptr = wasm.__wbindgen_add_to_stack_pointer(-16);
+            const ptr0 = passStringToWasm0(request, wasm.__wbindgen_export, wasm.__wbindgen_export2);
+            const len0 = WASM_VECTOR_LEN;
+            wasm.routederivation_new(retptr, ptr0, len0);
+            var r0 = getDataViewMemory0().getInt32(retptr + 4 * 0, true);
+            var r1 = getDataViewMemory0().getInt32(retptr + 4 * 1, true);
+            var r2 = getDataViewMemory0().getInt32(retptr + 4 * 2, true);
+            if (r2) {
+                throw takeObject(r1);
+            }
+            this.__wbg_ptr = r0;
+            RouteDerivationFinalization.register(this, this.__wbg_ptr, this);
+            return this;
+        } finally {
+            wasm.__wbindgen_add_to_stack_pointer(16);
+        }
+    }
+    /**
+     * One projection: `request` is the JSON of a [`Projection`].
+     *
+     * # Errors
+     *
+     * The JSON of a [`HostError`]: an unreadable request, or a node the graph lacks.
+     * @param {string} request
+     * @returns {string}
+     */
+    project(request) {
+        let deferred3_0;
+        let deferred3_1;
+        try {
+            const retptr = wasm.__wbindgen_add_to_stack_pointer(-16);
+            const ptr0 = passStringToWasm0(request, wasm.__wbindgen_export, wasm.__wbindgen_export2);
+            const len0 = WASM_VECTOR_LEN;
+            wasm.routederivation_project(retptr, this.__wbg_ptr, ptr0, len0);
+            var r0 = getDataViewMemory0().getInt32(retptr + 4 * 0, true);
+            var r1 = getDataViewMemory0().getInt32(retptr + 4 * 1, true);
+            var r2 = getDataViewMemory0().getInt32(retptr + 4 * 2, true);
+            var r3 = getDataViewMemory0().getInt32(retptr + 4 * 3, true);
+            var ptr2 = r0;
+            var len2 = r1;
+            if (r3) {
+                ptr2 = 0; len2 = 0;
+                throw takeObject(r2);
+            }
+            deferred3_0 = ptr2;
+            deferred3_1 = len2;
+            return getStringFromWasm0(ptr2, len2);
+        } finally {
+            wasm.__wbindgen_add_to_stack_pointer(16);
+            wasm.__wbindgen_export3(deferred3_0, deferred3_1, 1);
+        }
+    }
+    /**
+     * C13: the schedule, as the JSON of a `RouteSchedule`.
+     * @returns {string}
+     */
+    schedule() {
+        let deferred1_0;
+        let deferred1_1;
+        try {
+            const retptr = wasm.__wbindgen_add_to_stack_pointer(-16);
+            wasm.routederivation_schedule(retptr, this.__wbg_ptr);
+            var r0 = getDataViewMemory0().getInt32(retptr + 4 * 0, true);
+            var r1 = getDataViewMemory0().getInt32(retptr + 4 * 1, true);
+            deferred1_0 = r0;
+            deferred1_1 = r1;
+            return getStringFromWasm0(r0, r1);
+        } finally {
+            wasm.__wbindgen_add_to_stack_pointer(16);
+            wasm.__wbindgen_export3(deferred1_0, deferred1_1, 1);
+        }
+    }
+}
+if (Symbol.dispose) RouteDerivation.prototype[Symbol.dispose] = RouteDerivation.prototype.free;
+
+/**
  * Applies a draft patch to `document`'s journey without committing it: `request` is the JSON
  * of an [`ApplyRequest`]; the answer is the JSON of an [`AppliedLocally`].
  *
@@ -1584,44 +1685,6 @@ export function routeFileText(file) {
 }
 
 /**
- * C2: a route's canvas level: `request` is the JSON of a [`RouteLevelRequest`]; the answer is
- * the JSON of a `Level`, as a journey's level projection answers it.
- *
- * # Errors
- *
- * The JSON of a [`HostError`]: an unreadable request, an invalid graph, or a container the
- * graph lacks.
- * @param {string} request
- * @returns {string}
- */
-export function routeLevel(request) {
-    let deferred3_0;
-    let deferred3_1;
-    try {
-        const retptr = wasm.__wbindgen_add_to_stack_pointer(-16);
-        const ptr0 = passStringToWasm0(request, wasm.__wbindgen_export, wasm.__wbindgen_export2);
-        const len0 = WASM_VECTOR_LEN;
-        wasm.routeLevel(retptr, ptr0, len0);
-        var r0 = getDataViewMemory0().getInt32(retptr + 4 * 0, true);
-        var r1 = getDataViewMemory0().getInt32(retptr + 4 * 1, true);
-        var r2 = getDataViewMemory0().getInt32(retptr + 4 * 2, true);
-        var r3 = getDataViewMemory0().getInt32(retptr + 4 * 3, true);
-        var ptr2 = r0;
-        var len2 = r1;
-        if (r3) {
-            ptr2 = 0; len2 = 0;
-            throw takeObject(r2);
-        }
-        deferred3_0 = ptr2;
-        deferred3_1 = len2;
-        return getStringFromWasm0(ptr2, len2);
-    } finally {
-        wasm.__wbindgen_add_to_stack_pointer(16);
-        wasm.__wbindgen_export3(deferred3_0, deferred3_1, 1);
-    }
-}
-
-/**
  * A20: a route graph's notices: `request` is the JSON of a [`RouteNoticesRequest`]; the
  * answer is the JSON list of `Notice`s.
  *
@@ -1639,43 +1702,6 @@ export function routeNotices(request) {
         const ptr0 = passStringToWasm0(request, wasm.__wbindgen_export, wasm.__wbindgen_export2);
         const len0 = WASM_VECTOR_LEN;
         wasm.routeNotices(retptr, ptr0, len0);
-        var r0 = getDataViewMemory0().getInt32(retptr + 4 * 0, true);
-        var r1 = getDataViewMemory0().getInt32(retptr + 4 * 1, true);
-        var r2 = getDataViewMemory0().getInt32(retptr + 4 * 2, true);
-        var r3 = getDataViewMemory0().getInt32(retptr + 4 * 3, true);
-        var ptr2 = r0;
-        var len2 = r1;
-        if (r3) {
-            ptr2 = 0; len2 = 0;
-            throw takeObject(r2);
-        }
-        deferred3_0 = ptr2;
-        deferred3_1 = len2;
-        return getStringFromWasm0(ptr2, len2);
-    } finally {
-        wasm.__wbindgen_add_to_stack_pointer(16);
-        wasm.__wbindgen_export3(deferred3_0, deferred3_1, 1);
-    }
-}
-
-/**
- * C13: a route's schedule: `request` is the JSON of a [`RouteScheduleRequest`]; the answer is
- * the JSON of a `RouteSchedule`.
- *
- * # Errors
- *
- * The JSON of a [`HostError`]: an unreadable request or an invalid graph.
- * @param {string} request
- * @returns {string}
- */
-export function routeSchedule(request) {
-    let deferred3_0;
-    let deferred3_1;
-    try {
-        const retptr = wasm.__wbindgen_add_to_stack_pointer(-16);
-        const ptr0 = passStringToWasm0(request, wasm.__wbindgen_export, wasm.__wbindgen_export2);
-        const len0 = WASM_VECTOR_LEN;
-        wasm.routeSchedule(retptr, ptr0, len0);
         var r0 = getDataViewMemory0().getInt32(retptr + 4 * 0, true);
         var r1 = getDataViewMemory0().getInt32(retptr + 4 * 1, true);
         var r2 = getDataViewMemory0().getInt32(retptr + 4 * 2, true);
@@ -1799,6 +1825,9 @@ const DerivationFinalization = (typeof FinalizationRegistry === 'undefined')
 const RootSubscriptionFinalization = (typeof FinalizationRegistry === 'undefined')
     ? { register: () => {}, unregister: () => {} }
     : new FinalizationRegistry(ptr => wasm.__wbg_rootsubscription_free(ptr, 1));
+const RouteDerivationFinalization = (typeof FinalizationRegistry === 'undefined')
+    ? { register: () => {}, unregister: () => {} }
+    : new FinalizationRegistry(ptr => wasm.__wbg_routederivation_free(ptr, 1));
 
 function addHeapObject(obj) {
     if (heap_next === heap.length) heap.push(heap.length + 1);

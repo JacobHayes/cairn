@@ -163,7 +163,7 @@ function Workspace({ ready, view, screen, selected, edge, authored, drawing, sel
   if (preview !== undefined) {
     return (
       <Suspense fallback={<p className="muted small">Drawing the preview...</p>}>
-        <InsertionCanvas preview={preview} domain={ready.journey.header.id} today={ready.key.today} />
+        <InsertionCanvas preview={preview} domain={ready.journey.header.id} />
       </Suspense>
     );
   }

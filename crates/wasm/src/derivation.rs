@@ -10,8 +10,9 @@ use std::collections::BTreeSet;
 
 use cairn_engine::{Derived, DerivedJourney, DraftContext, Graph, ProjectionError, derive};
 use cairn_schema::{
-    AttachmentKey, Cursor, DomainDocument, ExplainedField, KindKey, LevelQuery, ListQuery,
-    NextQuery, NodeKey, NodeKind, RenderedDraft, ResourceContent, SnapshotScope, Url,
+    AttachmentKey, Cursor, Deployment, DomainDocument, ExplainedField, IdentityKey, KindKey,
+    LevelQuery, ListQuery, NextQuery, NodeKey, NodeKind, RenderedDraft, ResourceContent,
+    SnapshotScope, Url,
 };
 use serde::{Deserialize, Serialize};
 use wasm_bindgen::prelude::wasm_bindgen;
@@ -36,10 +37,14 @@ pub enum Projection {
     /// containers collapsed and the relevance classes shown (the request's fields beside the
     /// tag).
     Level(LevelQuery),
-    /// C7: upstream and downstream of a node.
+    /// C7: upstream and downstream of a node, or of a card that stands for hidden nodes as well
+    /// (a collapsed stage): the sets of all of them together, less the nodes themselves.
     Trace {
         /// The node.
         key: NodeKey,
+        /// The nodes the card stands for.
+        #[serde(default, skip_serializing_if = "Vec::is_empty")]
+        standing: Vec<NodeKey>,
     },
     /// C12: the decision view.
     DecisionView,
@@ -114,6 +119,47 @@ pub struct DraftRequest {
     pub url: Option<Url>,
 }
 
+/// One projection run on a derived journey with the deployment and viewer it was derived for:
+/// the one path a journey's document and a route's graph are both projected through.
+///
+/// # Errors
+///
+/// [`HostError::Missing`] when the request names a node the journey does not hold.
+pub(crate) fn projected(
+    journey: &DerivedJourney<'_>,
+    deployment: &Deployment,
+    viewer: &BTreeSet<IdentityKey>,
+    request: &Projection,
+) -> Result<String, HostError> {
+    let missing = |error: ProjectionError| HostError::Missing {
+        message: error.to_string(),
+    };
+    Ok(match request {
+        Projection::Level(query) => {
+            json(&journey.level(query, deployment, viewer).map_err(missing)?)
+        }
+        Projection::AnswerEffects { key } => {
+            // None (JSON null) for a node that is not a decision, as the server's read.
+            json(&journey.answer_effects(key, deployment).map_err(missing)?)
+        }
+        Projection::Trace { key, standing } => {
+            json(&journey.trace_standing(key, standing).map_err(missing)?)
+        }
+        Projection::DecisionView => json(&journey.decision_view()),
+        Projection::Timeline => json(&journey.timeline()),
+        Projection::StatusSummary => json(&journey.status_summary()),
+        Projection::Next { query } => json(&journey.next(query, viewer).map_err(missing)?),
+        Projection::List { query } => json(&journey.list(query, viewer).map_err(missing)?),
+        Projection::Mine { kinds } => json(&journey.mine(viewer, kinds)),
+        Projection::Snapshot { scope } => json(&journey.snapshot(scope).map_err(missing)?),
+        Projection::Explanations { key, field, cursor } => json(
+            &journey
+                .explanations(key, *field, *cursor)
+                .map_err(missing)?,
+        ),
+    })
+}
+
 /// A domain document with its journey validated and derived (D3): what every projection reads.
 #[wasm_bindgen]
 #[derive(Debug)]
@@ -157,39 +203,12 @@ impl Derivation {
     ///
     /// [`HostError::Missing`] when the request names a node the journey does not hold.
     pub fn projected(&self, request: &Projection) -> Result<String, HostError> {
-        let journey = DerivedJourney::new(&self.graph, &self.derived);
-        let viewer = &self.document.inputs.viewer;
-        let missing = |error: ProjectionError| HostError::Missing {
-            message: error.to_string(),
-        };
-        Ok(match request {
-            Projection::Level(query) => json(
-                &journey
-                    .level(query, &self.document.inputs.deployment, viewer)
-                    .map_err(missing)?,
-            ),
-            Projection::AnswerEffects { key } => {
-                // None (JSON null) for a node that is not a decision, as the server's read.
-                json(
-                    &journey
-                        .answer_effects(key, &self.document.inputs.deployment)
-                        .map_err(missing)?,
-                )
-            }
-            Projection::Trace { key } => json(&journey.trace(key).map_err(missing)?),
-            Projection::DecisionView => json(&journey.decision_view()),
-            Projection::Timeline => json(&journey.timeline()),
-            Projection::StatusSummary => json(&journey.status_summary()),
-            Projection::Next { query } => json(&journey.next(query, viewer).map_err(missing)?),
-            Projection::List { query } => json(&journey.list(query, viewer).map_err(missing)?),
-            Projection::Mine { kinds } => json(&journey.mine(viewer, kinds)),
-            Projection::Snapshot { scope } => json(&journey.snapshot(scope).map_err(missing)?),
-            Projection::Explanations { key, field, cursor } => json(
-                &journey
-                    .explanations(key, *field, *cursor)
-                    .map_err(missing)?,
-            ),
-        })
+        projected(
+            &DerivedJourney::new(&self.graph, &self.derived),
+            &self.document.inputs.deployment,
+            &self.document.inputs.viewer,
+            request,
+        )
     }
 
     /// A10, G3: the message draft `request` names, rendered with the journey's context:

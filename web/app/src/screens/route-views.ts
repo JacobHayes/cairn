@@ -1,26 +1,51 @@
-// What a route's three views read (C2, C13): the level of the shown graph for the page's view
-// state, with the node the address names always drawn (the one rule a journey's views use,
-// canvas/hooks.ts), and its schedule of earliest days. A route has no state, so the level is
-// derived from the graph alone, on today's date.
+// What a route's views read: its shown graph derived once in the worker (route-reads.ts), and
+// from that derivation the level, the trace and the schedule of earliest days (C2, C7, C13), by
+// the hooks a journey's views use (canvas/hooks.ts). A route has no state, so nothing it
+// answers depends on a day.
 import type { RouteSchedule } from "@cairn/wasm";
 
-import { useLevelBy, type LevelRead } from "../canvas/hooks.ts";
-import { type ReadView } from "../data/keyed-read.ts";
-import { useDeployment, useKeyedRead, useSession, useToday } from "../data/react.ts";
-import type { LevelRequest } from "../journeys/requests.ts";
-import { nodesOf, ROUTE_LEVEL, ROUTE_SCHEDULE, routeLevelKey, routeScheduleKey, type Shown } from "./route-reads.ts";
+import { PROJECTION, valueOf, type ReadKey, type ReadSource, type ReadView } from "../data/keyed-read.ts";
+import { useDeployment, useKeyedRead, useSession } from "../data/react.ts";
+import type { Deriver } from "../data/host.ts";
+import { useReviewing } from "../proposals/layer.ts";
+import { ROUTE_DERIVED, routeDerivedKey, type Derived, type Shown } from "./route-reads.ts";
 
-/** The level of `shown` that `request` asks for, with `selected` always drawn (C7), and the keys it draws. */
-export function useRouteLevel(shown: Shown, request: LevelRequest | undefined, selected?: string): LevelRead {
+/** `shown` derived and held, as the last derivation of it that arrived (none before the first). */
+export function useRouteDerived(shown: Shown | undefined): ReadView<Derived<Shown>> {
   const { deriver } = useSession();
   const deployment = useDeployment();
-  const day = useToday();
-  return useLevelBy((asked) => useKeyedRead(ROUTE_LEVEL, routeLevelKey(deriver, shown, asked, deployment, day)).view, nodesOf(shown), request, selected);
+  return useKeyedRead(ROUTE_DERIVED, routeDerivedKey(deriver, shown, deployment)).view;
 }
 
-/** The earliest days of `shown`'s nodes from its start (C13). */
-export function useRouteSchedule(shown: Shown): ReadView<RouteSchedule> {
+interface ScheduleArgs {
+  deriver: Deriver;
+  slot: string;
+}
+
+const ROUTE_SCHEDULE: ReadSource<ScheduleArgs, RouteSchedule> = {
+  policy: PROJECTION,
+  read: ({ deriver, slot }) => deriver.routeSchedule(slot),
+};
+
+/** The key of a derived graph's schedule: what it is of is what the derivation reads are of; it is read again for each derivation. */
+export function routeScheduleKey(deriver: Deriver, derived: Derived<Shown> | undefined): ReadKey<ScheduleArgs> | undefined {
+  return derived === undefined ? undefined : { of: [derived.reads], freshness: [JSON.stringify(derived.key)], args: { deriver, slot: derived.key.journey } };
+}
+
+/** The earliest days of the derived graph's nodes from its start (C13). */
+export function useRouteSchedule(derived: Derived<Shown> | undefined): ReadView<RouteSchedule> {
   const { deriver } = useSession();
-  const deployment = useDeployment();
-  return useKeyedRead(ROUTE_SCHEDULE, routeScheduleKey(deriver, shown, deployment)).view;
+  return useKeyedRead(ROUTE_SCHEDULE, routeScheduleKey(deriver, derived)).view;
+}
+
+/**
+ * C14: under a proposal's layer that removes nodes, the route as it is, derived, which supplies
+ * what the proposal removes, put back where it was; `waiting` while it is being derived.
+ */
+export function useRouteBefore(): { before: Derived<Shown> | undefined; waiting: boolean } {
+  const layer = useReviewing();
+  const wanted = layer?.removed.size === 0 ? undefined : layer?.beforeShown;
+  const read = useRouteDerived(wanted);
+  const before = valueOf(read);
+  return { before, waiting: wanted !== undefined && before === undefined && read.status !== "failed" };
 }
