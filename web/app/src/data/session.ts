@@ -181,6 +181,7 @@ export class Session {
           store: parts.store ?? tabEditStore(),
           env: {
             host: parts.host,
+            rebase: (patch, stale) => parts.deriver.rebased(patch, stale),
             began: this.begin,
             saved: (command, answer, began) => {
               const save = saveOf(command, answer, began, this.titleOf);

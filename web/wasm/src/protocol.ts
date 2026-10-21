@@ -6,7 +6,11 @@
 // which has no state, is derived as a journey in which nothing has happened and held under a
 // slot of its own, like a journey's document: its level, its trace and its schedule are
 // projections of that derivation. A draft patch applied to a route is answered in passing,
-// holding nothing.
+// holding nothing, and so are the calls that need no derivation: a route file read or written,
+// and the safe retry's rebase of a stale patch. The worker's instance is the page's only one on
+// the server host.
+import type { Schema, Stale } from "@cairn/client";
+
 import type { ApplyRequest, DerivationHandle, DerivationKey, DraftRequest, HostError, PreviewRequest, ProjectionRequest, RouteApplyRequest, RouteDeriveRequest, RouteNoticesRequest } from "./types.ts";
 
 /** What the page asks the worker. */
@@ -23,6 +27,9 @@ export type WorkerRequest =
   | { op: "route_notices"; request: RouteNoticesRequest }
   | { op: "route_schedule"; journey: string }
   | { op: "apply_route"; request: RouteApplyRequest }
+  | { op: "read_route_file"; text: string }
+  | { op: "route_file_text"; file: Schema<"RouteFile"> }
+  | { op: "rebased"; patch: Schema<"Patch">; stale: Stale }
   | { op: "memory" };
 
 /** A request with the id its reply carries. */

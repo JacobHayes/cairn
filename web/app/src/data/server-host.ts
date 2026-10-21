@@ -14,11 +14,9 @@ import {
   type CairnClient,
   type Patch,
 } from "@cairn/client";
-import type { Engine } from "@cairn/wasm";
-
 import { serverAssistant } from "./assistant.ts";
 import { serverProposals } from "./proposals.ts";
-import { Missing, ReadFailed, Skewed, type Host, type JourneyIndexQuery, type Markdown, type RouteFiles, type RouteImport } from "./host.ts";
+import { Missing, ReadFailed, Skewed, type Host, type JourneyIndexQuery, type Markdown, type RouteImport } from "./host.ts";
 
 interface Reply<T> {
   data?: T;
@@ -49,14 +47,6 @@ async function replied<T>(what: string, read: () => Promise<Reply<T>>): Promise<
 /** The answer of a read, or why there is none. */
 async function answered<T>(what: string, read: () => Promise<Reply<T>>): Promise<T> {
   return (await replied(what, read)).data;
-}
-
-/** The page engine's route files. */
-export function filesOf(engine: Engine): RouteFiles {
-  return {
-    read: (text) => engine.readRouteFile(text),
-    text: (file) => engine.routeFileText(file),
-  };
 }
 
 /** The journey index's query parameters (C16), as `GET /api/journeys` reads them. */
@@ -90,12 +80,11 @@ async function importOver(client: CairnClient, request: RouteImport): Promise<An
   return { outcome: "failed", error: answerFailure(response.status, error) };
 }
 
-/** The server at `origin`, with this page's engine for the touched-set overlap check and the build the page was loaded from (none on a page Vite's dev server served, which is never in skew). */
-export function serverHost(origin: string, engine: Engine, build: string | undefined): Host {
+/** The server at `origin`, with the build the page was loaded from (none on a page Vite's dev server served, which is never in skew). */
+export function serverHost(origin: string, build: string | undefined): Host {
   const client: CairnClient = createCairnClient(origin);
   return {
     kind: "server",
-    overlaps: (touched, intervening) => engine.touchedOverlaps(touched, intervening),
     capabilities: () => answered("the capabilities", () => client.GET("/api/capabilities")),
     journeys: (query) => answered("the journey index", () => client.GET("/api/journeys", { params: { query: indexParams(query) } })),
     routes: (after) => answered("the route index", () => client.GET("/api/routes", { params: { query: after === undefined ? {} : { after } } })),
@@ -107,7 +96,6 @@ export function serverHost(origin: string, engine: Engine, build: string | undef
     importRoute: (request) => importOver(client, request),
     caller: () => answered("the caller", () => client.GET("/api/users/me")),
     userNames: (users) => answered("the users", () => client.GET("/api/users", { params: { query: { id: [...users] } } })),
-    files: filesOf(engine),
     deployment: () => answered("the deployment", () => client.GET("/api/deployment")),
     identityReferences: (identity) => answered(identity, () => client.GET("/api/deployment/identities/{key}/references", { params: { path: { key: identity } } })),
     documentText: async (journey) => {

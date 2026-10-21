@@ -1,23 +1,13 @@
 //! H5's safe retry, as logic that knows no transport: the HTTP client drives it, and so can
 //! a caller of the service in process (the multiplayer testbed, 6.1).
 //!
-//! A stale patch is resubmitted on its own only when what intervened cannot have touched
-//! anything it touches: the rejection's intervening touched set does not overlap the
-//! patch's own, which the rejection also carries, as applying the patch at the current
-//! revisions writes it (the client never predicts it). The resubmission names the revisions the rejection reports, never a newer
-//! one read since, because only the events up to those were compared; if more landed in
-//! between, it is stale again and compared again. It keeps its patch id: a stale patch
-//! left no receipt, so the id still names one change, and a resubmission whose response is
-//! lost is answered from its receipt like any other. Guards are evaluated at apply either
-//! way, so a retry that would now break an invariant is rejected, never widened. It only
-//! ever moves forward: a conflict whose current revision is not past the one the patch
-//! named is surfaced, never rebased onto, so no answer can send it back and forth between
-//! two revisions
-//! (decisions/2026-10-06-a-resubmission-beside-its-own-original-in-flight-is-answered.md).
+//! Whether a stale patch is safe to resubmit, and as what, is the schema's one rule
+//! ([`Patch::rebased`]), which the browser asks too; this loop resubmits while it says so.
+//! A resubmission whose response is lost is answered from its receipt like any other.
 
 use std::future::Future;
 
-use cairn_schema::{Domain, Patch, Rejection, RevisionConflict, RevisionOf, TouchedSet};
+use cairn_schema::{Patch, Rejection};
 
 use crate::wire::PatchAnswer;
 
@@ -26,41 +16,6 @@ use crate::wire::PatchAnswer;
 /// PRACTICES' tool-loop iteration limit, borrowed
 /// (decisions/2026-10-06-what-the-clients-safe-retry-resubmits-and-how-often.md).
 pub const RESUBMISSION_COUNT_MAX: u32 = 32;
-
-/// H5: the patch to resubmit after it was answered stale with `conflicts`, `intervening`,
-/// and `touched` (what it would write at the current revisions), or none when it is not
-/// safe: what intervened overlaps what it would write, or a revision moved that the patch
-/// names nowhere it could be rebased (a merge's journeys, a proposal's editing revision),
-/// or a conflict names a current revision not past the one the patch named (rebasing would
-/// move it backward).
-#[must_use]
-pub fn rebased(
-    patch: &Patch,
-    conflicts: &[RevisionConflict],
-    intervening: &TouchedSet,
-    touched: &TouchedSet,
-) -> Option<Patch> {
-    if conflicts.is_empty() || intervening.overlaps(touched) {
-        return None;
-    }
-    let target = patch.target.domain();
-    let mut rebased = patch.clone();
-    for conflict in conflicts {
-        if conflict.current <= conflict.expected {
-            return None;
-        }
-        match &conflict.of {
-            RevisionOf::Domain(domain) if *domain == target => {
-                rebased.base_revision = conflict.current;
-            }
-            RevisionOf::Domain(Domain::Deployment) if patch.deployment_revision.is_some() => {
-                rebased.deployment_revision = Some(conflict.current);
-            }
-            RevisionOf::Domain(_) | RevisionOf::Proposal(_) => return None,
-        }
-    }
-    Some(rebased)
-}
 
 /// Why a patch did not land.
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -107,7 +62,7 @@ where
                 intervening,
                 touched,
             })) if resubmitted < RESUBMISSION_COUNT_MAX => {
-                let Some(next) = rebased(&current, &conflicts, &intervening, &touched) else {
+                let Some(next) = current.rebased(&conflicts, &intervening, &touched) else {
                     let stale = Rejection::Stale {
                         conflicts,
                         intervening,
@@ -127,7 +82,9 @@ where
 #[cfg(test)]
 mod tests {
     use super::*;
-    use cairn_schema::{GraphId, GraphKey, RecordKey, Revision};
+    use cairn_schema::{
+        Domain, GraphId, GraphKey, RecordKey, RevisionConflict, RevisionOf, TouchedSet,
+    };
 
     fn patch(target: &str, deployment_revision: Option<u32>) -> Patch {
         let yaml = format!(
@@ -164,65 +121,6 @@ mod tests {
         }]
         .into_iter()
         .collect()
-    }
-
-    fn revision(number: u32) -> Revision {
-        number.try_into().unwrap()
-    }
-
-    #[test]
-    fn a_patch_is_rebased_onto_the_revisions_the_rejection_reports() {
-        let deployment = RevisionOf::Domain(Domain::Deployment);
-        let original = patch("{journey: j_one}", Some(1));
-        let conflicts = [conflict(journey("j_one"), 2, 4), conflict(deployment, 1, 3)];
-        let retry = rebased(&original, &conflicts, &on_node("n_b"), &writes()).unwrap();
-        assert_eq!(retry.base_revision, revision(4));
-        assert_eq!(retry.deployment_revision, Some(revision(3)));
-        assert_eq!(
-            (retry.id, retry.mutations),
-            (original.id, original.mutations)
-        );
-    }
-
-    #[test]
-    fn an_unsafe_retry_is_none() {
-        let original = patch("{journey: j_one}", None);
-        let mine = [conflict(journey("j_one"), 2, 3)];
-        let cases = [
-            (
-                &mine[..],
-                on_node("n_a"),
-                "what intervened touched the node",
-            ),
-            (&[][..], on_node("n_b"), "nothing moved"),
-            (
-                &[conflict(journey("j_two"), 1, 2)][..],
-                on_node("n_b"),
-                "another journey moved",
-            ),
-            (
-                &[conflict(RevisionOf::Domain(Domain::Deployment), 1, 2)][..],
-                on_node("n_b"),
-                "the patch names no deployment revision to move",
-            ),
-            (
-                &[conflict(journey("j_one"), 2, 1)][..],
-                TouchedSet::default(),
-                "the patch names a revision past the current one",
-            ),
-            (
-                &[conflict(journey("j_one"), 2, 2)][..],
-                TouchedSet::default(),
-                "the revision the patch names has not moved",
-            ),
-        ];
-        for (conflicts, intervening, why) in cases {
-            assert_eq!(
-                rebased(&original, conflicts, &intervening, &writes()),
-                None,
-                "{why}"
-            );
-        }
     }
 
     fn stale(intervening: TouchedSet) -> Refused<()> {

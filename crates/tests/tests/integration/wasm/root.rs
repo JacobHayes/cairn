@@ -8,7 +8,7 @@ use std::time::Duration;
 
 use cairn_api::wire;
 use cairn_schema::limits::PAGE_ITEM_COUNT_MAX;
-use cairn_schema::{DomainDocument, Rejection, RevisionOf, UserId};
+use cairn_schema::{DomainDocument, Patch, Rejection, RevisionOf, UserId};
 use cairn_store::limits::SSE_COALESCING_INTERVAL;
 use cairn_wasm::{BrowserRoot, HostError, PatchAnswer, Taken, Tick, read_document};
 
@@ -96,26 +96,26 @@ fn a_patch_applies_and_notifies_and_a_stale_one_is_rejected_with_what_intervened
     let separate = note("p_third", base, "a_third");
     for (request, overlaps) in [(&overlapping, true), (&separate, false)] {
         let stale = thrown(&root.patch(request, NOW).unwrap_err());
-        let HostError::Rejected {
-            rejection:
-                Rejection::Stale {
-                    conflicts,
-                    intervening,
-                    touched,
-                },
-        } = stale
-        else {
+        let HostError::Rejected { rejection } = &stale else {
+            panic!("expected a stale rejection, got {stale:?}");
+        };
+        let Rejection::Stale { conflicts, .. } = rejection else {
             panic!("expected a stale rejection, got {stale:?}");
         };
         assert_eq!(
             conflicts.first().map(|conflict| conflict.current),
             Some(receipt.revision)
         );
-        let touched = serde_json::to_string(&touched).unwrap();
-        let intervening = serde_json::to_string(&intervening).unwrap();
+        let patch: serde_json::Value = serde_json::from_str(request).unwrap();
+        let rebased = cairn_wasm::rebased(
+            &patch["patch"].to_string(),
+            &serde_json::to_string(rejection).unwrap(),
+        )
+        .unwrap();
+        let rebased: Option<Patch> = serde_json::from_str(&rebased).unwrap();
         assert_eq!(
-            cairn_wasm::touched_overlaps(&touched, &intervening),
-            Ok(overlaps),
+            rebased.map(|patch| patch.base_revision),
+            (!overlaps).then_some(receipt.revision),
             "{request}"
         );
     }

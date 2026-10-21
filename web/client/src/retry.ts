@@ -1,16 +1,8 @@
-// H5's safe retry, as logic that knows no transport (the TypeScript side of
-// crates/api/src/client/retry.rs, with the same semantics): a host's `send` submits one
-// patch, and `submit` resubmits it while each stale answer is safe to retry.
-//
-// A stale patch is resubmitted on its own only when what intervened cannot have touched
-// anything it touches: the rejection's intervening touched set does not overlap what the
-// patch would write at the current revisions, which the rejection also carries (the client
-// never predicts it), as the engine's overlap check says (the wasm engine, passed in as
-// `overlaps`, so this package does not depend on the browser host). The resubmission names the revisions
-// the rejection reports, never a newer one read since, and keeps its patch id. It only ever
-// moves forward: a conflict whose current revision is not past the one the patch named is
-// surfaced, never rebased onto
-// (decisions/2026-10-06-a-resubmission-beside-its-own-original-in-flight-is-answered.md).
+// H5's safe retry, as a loop that knows no transport: a host's `send` submits one patch, and
+// `submit` resubmits it while each stale answer is safe to retry. Whether it is, and as what
+// patch, is the engine's one rule (the schema's `Patch::rebased`, which the Rust clients call
+// directly), asked through `rebase` (the derive worker's), so this package neither depends on
+// the browser host nor keeps a second copy of the rule.
 import type { components } from "../generated/api.ts";
 
 type Schemas = components["schemas"];
@@ -29,8 +21,14 @@ export type Domain = Schemas["Domain"];
  */
 export const RESUBMISSION_COUNT_MAX = 32;
 
-/** H5: whether a stale rejection's intervening set overlaps what the patch would write (its `touched`). */
-export type Overlaps = (touched: TouchedSet, intervening: TouchedSet) => boolean;
+/** A stale rejection's parts. */
+export type Stale = Extract<Rejection, { rejection: "stale" }>;
+
+/**
+ * H5: the patch to resubmit after `patch` was answered `stale`, or none when a resubmission
+ * is not safe. A rejection makes it unsafe.
+ */
+export type Rebase = (patch: Patch, stale: Stale) => Promise<Patch | undefined>;
 
 /** What one submission was answered: the patch answer, a rejection, or a failure. */
 export type Answered<E> =
@@ -48,16 +46,16 @@ export type Submission<E> =
 export type Send<E> = (patch: Patch) => Promise<Answered<E>>;
 
 export interface RetryOptions {
-  /** The engine's overlap check. A throw (the module refused) makes a retry unsafe. */
-  overlaps: Overlaps;
+  /** The engine's safe retry. A rejection (the module refused) makes a retry unsafe. */
+  rebase: Rebase;
   /**
    * Whether automatic retries are allowed now; asked before each resubmission. Version skew
-   * stops them, since an old engine's overlap check may be wrong (ARCHITECTURE, Web UI).
+   * stops them, since an old engine's safe retry may be wrong (ARCHITECTURE, Web UI).
    */
   mayRetry?: () => boolean;
 }
 
-/** The domain a patch targets, or none for a proposal (never rebased). */
+/** The domain a patch targets, or none for a proposal. */
 export function targetDomain(target: Patch["target"]): Domain | undefined {
   if (target === "deployment") {
     return "deployment";
@@ -82,46 +80,6 @@ export function sameDomain(left: Domain, right: Domain): boolean {
   return "route" in right && left.route === right.route;
 }
 
-function overlapsSafely(overlaps: Overlaps, touched: TouchedSet, intervening: TouchedSet): boolean {
-  try {
-    return overlaps(touched, intervening);
-  } catch {
-    return true;
-  }
-}
-
-/** A stale rejection's parts. */
-export type Stale = Extract<Rejection, { rejection: "stale" }>;
-
-/**
- * H5: the patch to resubmit after it was answered `stale`, or none when it is not safe: what
- * intervened overlaps what it would write at the current revisions, or a revision moved that
- * the patch names nowhere it could be rebased, or a conflict names a current revision not
- * past the one the patch named (rebasing would move it backward).
- */
-export function rebased(patch: Patch, stale: Stale, overlaps: Overlaps): Patch | undefined {
-  const { conflicts, intervening, touched } = stale;
-  const target = targetDomain(patch.target);
-  if (target === undefined || conflicts.length === 0 || overlapsSafely(overlaps, touched, intervening)) {
-    return undefined;
-  }
-  const next: Patch = { ...patch };
-  for (const conflict of conflicts) {
-    if (conflict.current <= conflict.expected || !("domain" in conflict.of)) {
-      return undefined;
-    }
-    const moved = conflict.of.domain;
-    if (sameDomain(moved, target)) {
-      next.base_revision = conflict.current;
-    } else if (moved === "deployment" && patch.deployment_revision != null) {
-      next.deployment_revision = conflict.current;
-    } else {
-      return undefined;
-    }
-  }
-  return next;
-}
-
 /**
  * H5: submits `patch` through `send`, resubmitting it rebased while each stale answer is
  * safe to retry, at most `RESUBMISSION_COUNT_MAX` times; past that, or when a retry is not
@@ -139,10 +97,11 @@ export async function submit<E>(patch: Patch, send: Send<E>, options: RetryOptio
       return { outcome: "failed", error: answered.error, resubmitted };
     }
     const { rejection } = answered;
-    const allowed = resubmitted < RESUBMISSION_COUNT_MAX && (options.mayRetry?.() ?? true);
+    const allowed = () => resubmitted < RESUBMISSION_COUNT_MAX && (options.mayRetry?.() ?? true);
     const next =
-      allowed && rejection.rejection === "stale" ? rebased(current, rejection, options.overlaps) : undefined;
-    if (next === undefined) {
+      allowed() && rejection.rejection === "stale" ? await options.rebase(current, rejection).catch(() => undefined) : undefined;
+    // Asked again once the engine answered: skew that began while it was asked stops the resend too.
+    if (next === undefined || !allowed()) {
       return { outcome: "rejected", rejection, resubmitted };
     }
     current = next;

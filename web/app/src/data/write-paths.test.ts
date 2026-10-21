@@ -148,7 +148,6 @@ describe.each(paths)("$name", (path) => {
 describe("a stale write that cannot be rebased", () => {
   it("is rejected once for a proposal, even where a patch would be rebased on the new revision, and is sent no more", async () => {
     const host = new FakeHost();
-    host.overlaps = () => false;
     const { edits, writes } = await startRoot({ host });
     host.proposed = [{ outcome: "rejected", rejection: { rejection: "stale", conflicts: [{ of: { proposal: "pr_one" }, expected: 4, current: 5 }], intervening: [], touched: [] } }];
     await submitWrite(edits, sentOf(paths[3] as Path, "p_a"));

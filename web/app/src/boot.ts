@@ -1,9 +1,10 @@
 // Starting a tab: start the host the build was made for (vite.config.ts), compile the engine
-// once and instantiate it (the page's own instance for the touched-set overlap check or the in-browser root,
-// and the derive worker's, which is posted the compiled module), and start the session over
-// them. The server host also takes the build the page was loaded
-// from, which the server's documents must carry (version skew).
-import { DeriveWorker, InBrowserHost, compileEngine, loadEngine, type WasmModule } from "@cairn/wasm";
+// once and instantiate it in the derive worker, which is posted the compiled module and answers
+// every engine call the page makes, and start the session over them. Only the in-browser host
+// instantiates it in the page too, as its root (the service over the memory store). The server
+// host takes the build the page was loaded from, which the server's documents must carry
+// (version skew).
+import { DeriveWorker, InBrowserHost, compileEngine, type WasmModule } from "@cairn/wasm";
 
 import wasmUrl from "../../wasm/dist/bindgen/cairn_wasm_bg.wasm?url";
 
@@ -24,7 +25,7 @@ function build(): string | undefined {
 
 async function startHost(kind: HostKind, compiled: Promise<WasmModule>): Promise<Host> {
   if (kind === "server") {
-    return serverHost(location.origin, await loadEngine(await compiled), build());
+    return serverHost(location.origin, build());
   }
   return browserHost(await InBrowserHost.start(await compiled));
 }

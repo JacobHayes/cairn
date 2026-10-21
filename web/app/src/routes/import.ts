@@ -26,7 +26,7 @@ export interface ImportInput {
   edits: EditsRef;
   keys: { import: string; discard: string };
   /** A13: a file's text as the file document (YAML on disk, JSON on the wire); throws when it is not one. */
-  read: (text: string) => RouteFile;
+  read: (text: string) => Promise<RouteFile>;
   /** A route with its draft (A11). */
   route: (id: string) => Promise<Route>;
 }

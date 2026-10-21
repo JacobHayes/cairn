@@ -11,12 +11,12 @@ import init, {
   importRoute,
   preview,
   readRouteFile,
+  rebased,
   routeFileText,
   routeNotices,
-  touchedOverlaps,
 } from "../generated/cairn_wasm.js";
 
-import type { Schema } from "@cairn/client";
+import type { Schema, Stale } from "@cairn/client";
 
 import {
   hosted,
@@ -173,9 +173,9 @@ export class Engine {
     return parsed<PreviewAnswer>(this.previewText(documentText, request));
   }
 
-  /** H5: whether a stale rejection's intervening set overlaps what the patch would write (its `touched`). */
-  touchedOverlaps(touched: Schema<"TouchedSet">, intervening: Schema<"TouchedSet">): boolean {
-    return hosted(() => touchedOverlaps(JSON.stringify(touched), JSON.stringify(intervening)));
+  /** H5's safe retry: the patch to resubmit after it was answered `stale`, as the module wrote it (`null` when a resubmission is not safe). */
+  rebasedText(patch: Schema<"Patch">, stale: Stale): string {
+    return hosted(() => rebased(JSON.stringify(patch), JSON.stringify(stale)));
   }
 
   /** A13: a route version or draft as its file, as the module wrote it. */
@@ -198,9 +198,9 @@ export class Engine {
     return parsed<Schema<"Graph">>(this.importRouteText(request));
   }
 
-  /** A13: a route file's text (YAML or JSON) as the file document the API's import takes. */
-  readRouteFile(text: string): Schema<"RouteFile"> {
-    return parsed<Schema<"RouteFile">>(hosted(() => readRouteFile(text)));
+  /** A13: a route file's text (YAML or JSON) as the file document the API's import takes, as the module wrote it. */
+  readRouteFileText(text: string): string {
+    return hosted(() => readRouteFile(text));
   }
 
   /** A13: the file document as the canonical YAML a route file is kept in on disk. */

@@ -4,8 +4,8 @@
 //! For every host, the engine over JSON: a domain document read ([`read_document`]), derived
 //! once ([`Derivation`]) and
 //! projected ([`Projection`]), a draft patch applied locally to a journey ([`apply`]) or a
-//! route ([`apply_route`]), a proposal previewed ([`preview`]), a patch's touched set for the
-//! H5 safe retry ([`touched`]), route files exported and imported ([`export_route`],
+//! route ([`apply_route`]), a proposal previewed ([`preview`]), a stale patch rebased for the
+//! H5 safe retry ([`rebased`]), route files exported and imported ([`export_route`],
 //! [`import_route`]), a route graph derived once ([`RouteDerivation`]) and projected as a journey
 //! is (its level, its trace, its schedule in days from its start), and its notices
 //! ([`route_notices`]). Every input and output is the schema's JSON, so each value is the
@@ -39,7 +39,7 @@ pub use files::{
 };
 pub use local::{
     AppliedLocally, ApplyRequest, PreviewRequest, RouteApplyRequest, apply, apply_locally,
-    apply_route, apply_route_locally, preview, preview_locally, touched_overlaps,
+    apply_route, apply_route_locally, preview, preview_locally, rebased,
 };
 pub use proposals::{
     ProposalAnswer, ProposalApply, ProposalCreate, ProposalEdit, ProposalListRequest,

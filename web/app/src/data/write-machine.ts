@@ -30,6 +30,7 @@ import {
   targetDomain,
   type HttpFailure,
   type Patch,
+  type Rebase,
   type Rejection,
   type Send,
 } from "@cairn/client";
@@ -48,8 +49,8 @@ import { subjectOf } from "./writes.ts";
  */
 export const RESEND_COUNT_MAX = 5;
 
-/** What a write sends through: the host's patch, route import and proposal calls, and its overlap check. */
-export type WriteHost = Pick<Host, "send" | "overlaps" | "importRoute" | "proposals">;
+/** What a write sends through: the host's patch, route import and proposal calls. */
+export type WriteHost = Pick<Host, "send" | "importRoute" | "proposals">;
 
 /**
  * A check a control runs before its write goes out (authoring's engine preview): the rejection
@@ -60,6 +61,8 @@ export type Check = () => Promise<Rejection | undefined>;
 /** What a write reads and does outside itself; the session supplies it. */
 export interface WriteEnv {
   host: WriteHost;
+  /** H5: the engine's safe retry (the derive worker's). */
+  rebase: Rebase;
   /** Counts a write being sent (D7: a save made before a screen opened is not that screen's). */
   began(): number;
   /** Records a landed write as a save (D7). */
@@ -156,7 +159,7 @@ function deliverPatch(input: DeliverInput, command: PatchCommand, signal: AbortS
     return input.env.host.send(next, command.note);
   };
   return submit(command.patch, send, {
-    overlaps: input.env.host.overlaps,
+    rebase: input.env.rebase,
     mayRetry: () => !signal.aborted && input.env.compatible() && resubmitted < RESUBMISSION_COUNT_MAX,
   });
 }

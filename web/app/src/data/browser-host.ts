@@ -7,7 +7,6 @@ import { HostFailure, type InBrowserHost } from "@cairn/wasm";
 
 import { Missing, ReadFailed, type Host, type Markdown, type Patch, type RouteImport } from "./host.ts";
 import { browserProposals } from "./proposals.ts";
-import { filesOf } from "./server-host.ts";
 
 /** A failure of the root as the data layer reads one: what it says, with no HTTP status. */
 function failure(thrown: unknown): HttpFailure {
@@ -70,10 +69,8 @@ function ticksOf(root: InBrowserHost): OpenTicks {
 
 /** The in-browser host over `root`. */
 export function browserHost(root: InBrowserHost): Host {
-  const engine = root.engine;
   return {
     kind: "browser",
-    overlaps: (touched, intervening) => engine.touchedOverlaps(touched, intervening),
     capabilities: () => read("the capabilities", () => root.capabilities()),
     journeys: (query) => read("the journey index", () => root.journeyIndex(query ?? {})),
     routes: (after) => read("the route index", () => root.routes(after)),
@@ -83,7 +80,6 @@ export function browserHost(root: InBrowserHost): Host {
     importRoute: (request) => importInto(root, request),
     caller: () => read("the caller", () => root.caller()),
     userNames: (users) => read("the users", () => root.userNames(users)),
-    files: filesOf(engine),
     deployment: () => read("the deployment", () => root.deployment()),
     identityReferences: (identity) => read(identity, () => root.identityReferences(identity)),
     documentText: (journey) => read(journey, () => root.documentText(journey)),

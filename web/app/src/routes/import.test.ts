@@ -22,7 +22,7 @@ const open = { id: "r_one", revision: 5, draft: { revision: 2 } } as unknown as 
 const closed = { id: "r_one", revision: 5, draft: null } as unknown as Route;
 
 interface Options {
-  read?: (text: string) => RouteFile;
+  read?: (text: string) => Promise<RouteFile>;
   route?: (id: string) => Promise<Route>;
 }
 
@@ -33,7 +33,7 @@ async function started(options: Options = {}) {
     input: {
       edits: root.edits,
       keys,
-      read: options.read ?? (() => file),
+      read: options.read ?? (() => Promise.resolve(file)),
       route: (id) => {
         routes.push(id);
         return (options.route ?? (() => Promise.resolve(open)))(id);
@@ -62,9 +62,7 @@ describe("choosing a file", () => {
 
   it("submits nothing for a file that does not parse, and says why", async () => {
     const { flow, host } = await started({
-      read: () => {
-        throw new Error("line 3: not a route file");
-      },
+      read: () => Promise.reject(new Error("line 3: not a route file")),
     });
     flow.send({ type: "choose", file: picked });
     await settled();
@@ -76,12 +74,7 @@ describe("choosing a file", () => {
   it("clears what it said of a bad file when the next one is chosen", async () => {
     let good = false;
     const { flow, host } = await started({
-      read: () => {
-        if (!good) {
-          throw new Error("bad");
-        }
-        return file;
-      },
+      read: () => (good ? Promise.resolve(file) : Promise.reject(new Error("bad"))),
     });
     flow.send({ type: "choose", file: picked });
     await settled();

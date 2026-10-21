@@ -78,14 +78,16 @@ it("the in-browser root loads each fixture, applies a patch, refuses stale ones,
   expect(host.patch(note("p_browser_first", base, "a_browser_first"))).toMatchObject({ outcome: "applied", receipt: { revision: base + 1 } });
   const overlapping = note("p_browser_second", base, "a_browser_first");
   const separate = note("p_browser_third", base, "a_browser_third");
-  for (const [request, overlaps] of [[overlapping, true], [separate, false]] as const) {
+  const rebased = [];
+  for (const request of [overlapping, separate]) {
     const reason = await reasonOf(started, () => host.patch(request));
     expect(reason).toMatchObject({ error: "rejected", rejection: { rejection: "stale" } });
     const stale = reason?.error === "rejected" && reason.rejection.rejection === "stale" ? reason.rejection : undefined;
-    expect(host.engine.touchedOverlaps(stale?.touched ?? [], stale?.intervening ?? [])).toBe(overlaps);
+    rebased.push(stale && (await worker.rebased(request.patch, stale)));
   }
-  // H5: the separate one is safe to resubmit as is, at the revision the rejection named.
-  expect(host.patch({ patch: { ...separate.patch, base_revision: base + 1 } })).toMatchObject({ outcome: "applied", receipt: { revision: base + 2 } });
+  // H5: the overlapping one is not safe to resubmit; the separate one is, at the revision the rejection named.
+  expect(rebased).toEqual([undefined, { ...separate.patch, base_revision: base + 1 }]);
+  expect(host.patch({ patch: rebased[1] ?? separate.patch })).toMatchObject({ outcome: "applied", receipt: { revision: base + 2 } });
   await settle(400);
   const vendor = { domain: { journey: "j_vendor_eval" } };
   expect(heard[0]).toMatchObject({ first: true, ticks: [{ of: vendor, revision: base }] });
@@ -108,7 +110,7 @@ it("a trap stops the page's module for every caller", async () => {
   expect(trap).toEqual(aborted);
   expect(await reasonOf(started, () => host.capabilities())).toEqual(aborted);
   expect(await reasonOf(started, () => host.journeys())).toEqual(aborted);
-  expect(await reasonOf(started, () => host.engine.touchedOverlaps([], []))).toEqual(aborted);
+  expect(await reasonOf(started, () => host.engine.readRouteFileText(""))).toEqual(aborted);
 });
 
 it("the worker keeps a journey's newest document and refuses an older one", async () => {

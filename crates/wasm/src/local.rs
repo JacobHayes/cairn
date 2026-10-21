@@ -1,20 +1,20 @@
 //! Local writes over a domain document (ARCHITECTURE, Web UI: previews; Write path): a draft
 //! patch applied to the browser's in-memory journey with the engine's `apply`, a draft patch
 //! applied to a route the browser holds (its draft has no state, so there is nothing to
-//! derive), a proposal previewed (C14), and a patch's touched set for the H5 safe retry.
+//! derive), a proposal previewed (C14), and the H5 safe retry's rebase of a stale patch.
 //! Nothing here commits: committed state always comes from the server. Each mirrors what the
 //! server's service does with the same records, so its answer is the server's byte for byte.
 //!
 //! Cost: an apply is one engine apply and, for its consequences, two derives; a route apply is
-//! one engine apply; a preview is the engine's (one apply, two derives); a touched set is
-//! linear in the patch.
+//! one engine apply; a preview is the engine's (one apply, two derives); a rebase is linear
+//! in the touched sets.
 
 use std::collections::BTreeSet;
 
 use cairn_engine::{ApplyInputs, Graph, Records, consequences, derive};
 use cairn_schema::{
     Actor, Consequences, Date, Deployment, Domain, DomainDocument, Lineage, Markdown, Patch,
-    PatchTarget, Proposal, Route, RouteId, RouteVersion, Timestamp, TouchedSet,
+    PatchTarget, Proposal, Rejection, Route, RouteId, RouteVersion, Timestamp,
 };
 use serde::{Deserialize, Serialize};
 use wasm_bindgen::prelude::wasm_bindgen;
@@ -340,15 +340,24 @@ pub fn preview(document: &str, request: &str) -> Result<String, String> {
     Ok(json(&preview_locally(&document, &request)?))
 }
 
-/// H5: whether what intervened (the JSON of a stale rejection's `intervening`) overlaps what
-/// the patch would write (its `touched`), so an automatic resubmission is not safe.
+/// H5's safe retry: the JSON of the patch to resubmit after `patch` was answered `stale`
+/// (the JSON of that rejection), or `null` when a resubmission is not safe
+/// ([`Patch::rebased`], the one rule every client asks).
 ///
 /// # Errors
 ///
-/// The JSON of a [`HostError`] when either input does not read.
-#[wasm_bindgen(js_name = touchedOverlaps)]
-pub fn touched_overlaps(touched: &str, intervening: &str) -> Result<bool, String> {
-    let touched: TouchedSet = read("touched", touched)?;
-    let intervening: TouchedSet = read("intervening", intervening)?;
-    Ok(intervening.overlaps(&touched))
+/// The JSON of a [`HostError`] when either input does not read, or `stale` is another
+/// rejection.
+#[wasm_bindgen]
+pub fn rebased(patch: &str, stale: &str) -> Result<String, String> {
+    let patch: Patch = read("patch", patch)?;
+    let Rejection::Stale {
+        conflicts,
+        intervening,
+        touched,
+    } = read("stale", stale)?
+    else {
+        return Err(HostError::unreadable("stale", "another rejection than stale").into());
+    };
+    Ok(json(&patch.rebased(&conflicts, &intervening, &touched)))
 }

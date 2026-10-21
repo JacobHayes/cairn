@@ -3,7 +3,6 @@
 // was loaded from (ARCHITECTURE, Web UI: version skew).
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-import type { Engine } from "@cairn/wasm";
 
 import { Skewed } from "./host.ts";
 import { indexParams, serverHost } from "./server-host.ts";
@@ -29,7 +28,7 @@ describe("a journey's document", () => {
   /** The server host of a page loaded from `build`, over a server that stamps every answer with `headers`. */
   function stampedWith(headers: Record<string, string>, build: string | undefined) {
     vi.stubGlobal("fetch", () => Promise.resolve(new Response("{}", { headers })));
-    return serverHost("http://cairn.test", {} as Engine, build);
+    return serverHost("http://cairn.test", build);
   }
 
   afterEach(() => {

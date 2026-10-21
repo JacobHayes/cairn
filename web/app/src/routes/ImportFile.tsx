@@ -1,5 +1,5 @@
 // A13: importing a route file: a new route when no route has its id, or a new draft of that
-// route extending its latest version. The file is read by the page's engine (YAML on disk,
+// route extending its latest version. The file is read by the engine (YAML on disk,
 // JSON on the wire) and imported as one route write under a fresh patch id (H5). A11: while
 // another draft is open the import is refused, with the option to discard that draft. The
 // reading, the discarding and the importing are a workflow (import.ts) over the edit manager's
@@ -38,7 +38,7 @@ export function useImportFlow(edit: string): ImportFlow {
     input: {
       edits: session.edits,
       keys: { import: edit, discard: `${edit}:discard` },
-      read: (text) => session.host.files.read(text),
+      read: (text) => session.deriver.readRouteFile(text),
       route: (id) => session.host.route(id),
     },
   });

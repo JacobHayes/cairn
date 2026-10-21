@@ -1,7 +1,7 @@
 // What the shell's one data layer reads and writes through (ARCHITECTURE, Web UI): a host,
 // either the server over HTTP (server-host.ts) or the in-browser host with no server
 // (browser-host.ts). Both answer the API's JSON, so everything above this reads either.
-import type { Answered, HttpFailure, OpenTicks, Overlaps, Schema } from "@cairn/client";
+import type { Answered, HttpFailure, OpenTicks, Rebase, Schema } from "@cairn/client";
 import type {
   AppliedLocally,
   ApplyRequest,
@@ -79,8 +79,6 @@ export class ReadFailed extends Error {
 /** One of the two hosts. */
 export interface Host {
   readonly kind: HostKind;
-  /** H5: the page engine's touched-set overlap check. */
-  readonly overlaps: Overlaps;
   capabilities(): Promise<Capabilities>;
   /** A page of the journey index (C16), filtered as `query` asks; every journey when none. */
   journeys(query?: JourneyIndexQuery): Promise<JourneyPage>;
@@ -96,8 +94,6 @@ export interface Host {
   caller(): Promise<Caller>;
   /** H3: the names of `users` (at most a page of them); one that does not exist is left out. */
   userNames(users: readonly string[]): Promise<UserName[]>;
-  /** A13: route files as the page's engine reads and writes them (YAML on disk, JSON on the wire). */
-  readonly files: RouteFiles;
   /** A journey's domain document as the host wrote it; `Missing` when there is none, `Skewed` when another engine wrote it. */
   documentText(journey: string): Promise<string>;
   /** The deployment context (E6). */
@@ -118,14 +114,6 @@ export interface Host {
   readonly assistant: AssistantHost | undefined;
   /** H6: the host's revision ticks. */
   readonly openTicks: OpenTicks;
-}
-
-/** A13: the page engine's route file reader and writer. */
-export interface RouteFiles {
-  /** A file's text (YAML, or JSON) as the file document. */
-  read(text: string): RouteFile;
-  /** The file document as the canonical YAML kept on disk. */
-  text(file: RouteFile): string;
 }
 
 /**
@@ -161,4 +149,10 @@ export interface Deriver {
   applyRoute(request: RouteApplyRequest): Promise<Route>;
   /** Frees the derivation `handle`'s load made, unless a later load of the journey replaced it. */
   release(handle: DerivationHandle): Promise<void>;
+  /** A13: a route file's text (YAML, or JSON) as the file document. */
+  readRouteFile(text: string): Promise<RouteFile>;
+  /** A13: the file document as the canonical YAML kept on disk. */
+  routeFileText(file: RouteFile): Promise<string>;
+  /** H5: the engine's safe retry, the patch to resubmit after a stale answer or none. */
+  rebased(...stale: Parameters<Rebase>): ReturnType<Rebase>;
 }

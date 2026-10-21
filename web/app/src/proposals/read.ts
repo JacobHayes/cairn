@@ -2,29 +2,14 @@
 // proposal at its editing revision, its unresolved items and violations, the graph and
 // frontier after, and whether its destination moved since it was drafted), read again when
 // the proposal moves or its destination does. Its address, and the destination's words.
-import type { RevisionOf } from "@cairn/client";
+import { sameDomain, watchName, type RevisionOf } from "@cairn/client";
 
 import type { LiveSpec } from "../data/live.ts";
 import type { Cursor, Domain, Listing, ProposalList, ProposalReview, ProposalSummary } from "../data/proposals.ts";
 import type { Session } from "../data/session.ts";
 
 /** The watch name of a destination (`journey:<id>`, `route:<id>`, `deployment`). */
-export function watchOf(destination: Domain): string {
-  if (destination === "deployment") {
-    return "deployment";
-  }
-  return "journey" in destination ? `journey:${destination.journey}` : `route:${destination.route}`;
-}
-
-function sameDomain(left: Domain, right: Domain): boolean {
-  if (left === "deployment" || right === "deployment") {
-    return left === right;
-  }
-  if ("journey" in left) {
-    return "journey" in right && left.journey === right.journey;
-  }
-  return "route" in right && left.route === right.route;
-}
+const watchOf = (destination: Domain): string => watchName({ domain: destination });
 
 /** The destination's revision now, as the review read it: the current one when it moved. */
 export function destinationRevision(review: ProposalReview): number {

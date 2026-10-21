@@ -102,7 +102,7 @@ describe("a rejection that arrives after the control is gone, then a reload", ()
   it("keeps a stale rejection that could not be rebased with where it happened, as a conflict", async () => {
     const host = new FakeHost();
     // What intervened overlaps what the write touches, so the safe retry does not rebase it.
-    host.overlaps = () => true;
+    host.overlapping = true;
     const first = await startRoot({ host });
     first.host.answers = [refusal({ rejection: "stale", conflicts: [{ of: { domain: { journey: "j_one" } }, expected: 3, current: 4 }], intervening: [], touched: [] })];
     first.submit(renaming("p_a"));

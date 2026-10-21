@@ -411,6 +411,18 @@ export function preview(document: string, request: string): string;
 export function readRouteFile(text: string): string;
 
 /**
+ * H5's safe retry: the JSON of the patch to resubmit after `patch` was answered `stale`
+ * (the JSON of that rejection), or `null` when a resubmission is not safe
+ * ([`Patch::rebased`], the one rule every client asks).
+ *
+ * # Errors
+ *
+ * The JSON of a [`HostError`] when either input does not read, or `stale` is another
+ * rejection.
+ */
+export function rebased(patch: string, stale: string): string;
+
+/**
  * A13: the file document (the JSON of a `RouteFile`, as an export answers it) written as
  * the canonical YAML a route file is kept in on disk: sorted, in a stable field order.
  *
@@ -435,16 +447,6 @@ export function routeNotices(request: string): string;
  * abort that follows says only that the module trapped.
  */
 export function start(): void;
-
-/**
- * H5: whether what intervened (the JSON of a stale rejection's `intervening`) overlaps what
- * the patch would write (its `touched`), so an automatic resubmission is not safe.
- *
- * # Errors
- *
- * The JSON of a [`HostError`] when either input does not read.
- */
-export function touchedOverlaps(touched: string, intervening: string): boolean;
 
 export type InitInput = RequestInfo | URL | Response | BufferSource | WebAssembly.Module;
 
@@ -494,6 +496,7 @@ export interface InitOutput {
     readonly importRoute: (a: number, b: number, c: number) => void;
     readonly preview: (a: number, b: number, c: number, d: number, e: number) => void;
     readonly readRouteFile: (a: number, b: number, c: number) => void;
+    readonly rebased: (a: number, b: number, c: number, d: number, e: number) => void;
     readonly rootsubscription_take: (a: number, b: number, c: number) => void;
     readonly routeFileText: (a: number, b: number, c: number) => void;
     readonly routeNotices: (a: number, b: number, c: number) => void;
@@ -501,7 +504,6 @@ export interface InitOutput {
     readonly routederivation_project: (a: number, b: number, c: number, d: number) => void;
     readonly routederivation_schedule: (a: number, b: number) => void;
     readonly start: () => void;
-    readonly touchedOverlaps: (a: number, b: number, c: number, d: number, e: number) => void;
     readonly __wbindgen_add_to_stack_pointer: (a: number) => number;
     readonly __wbindgen_export: (a: number, b: number) => number;
     readonly __wbindgen_export2: (a: number, b: number, c: number, d: number) => number;

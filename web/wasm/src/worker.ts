@@ -199,6 +199,12 @@ async function answer(request: WorkerRequest): Promise<string> {
       return holdingRoute(request.journey).derivation.scheduleText();
     case "apply_route":
       return ready().applyRouteText(request.request);
+    case "read_route_file":
+      return ready().readRouteFileText(request.text);
+    case "route_file_text":
+      return ready().routeFileText(request.file);
+    case "rebased":
+      return ready().rebasedText(request.patch, request.stale);
     case "memory":
       return String(ready().memoryBytes());
   }

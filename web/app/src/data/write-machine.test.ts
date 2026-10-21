@@ -316,7 +316,7 @@ const proposalLanded = { outcome: "answered", answer: saved } as const;
 describe("a proposal write or an import", () => {
   it("is never rebased: a stale answer is a rejection even where a patch would be resent on the new revision", async () => {
     const { host, actor, view } = setup(undefined, [], applyCommand);
-    host.overlaps = () => true;
+    host.overlapping = true;
     host.proposed = [{ outcome: "rejected", rejection: { rejection: "stale", conflicts: [], intervening: [], touched: [] } }];
     actor.send({ type: "submit" });
     await settled();
