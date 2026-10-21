@@ -91,9 +91,11 @@ mod in_process {
 
     /// Methods of the service that are not operations: assembling it, the settings the host
     /// reads, a proposal by its id alone, which the MCP tools and the assistant name their
-    /// proposals by (the API addresses one under its destination), and the arrival every
-    /// authenticated request makes before its handler.
-    const NOT_OPERATIONS: [&str; 4] = ["new", "settings", "proposal", "arrive"];
+    /// proposals by (the API addresses one under its destination), the arrival every
+    /// authenticated request makes before its handler, and what a patch would write, which
+    /// the assistant's write wrapper reads in process (a client is told it in a stale
+    /// answer, so no endpoint serves it).
+    const NOT_OPERATIONS: [&str; 5] = ["new", "settings", "proposal", "arrive", "touched"];
 
     /// The public methods of every `impl Service` block in the service's
     /// sources.

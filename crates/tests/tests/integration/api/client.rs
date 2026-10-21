@@ -7,7 +7,7 @@ mod in_process {
     use cairn_api::client::{Client, Landed, Refused, Subscription, Tracker, in_process};
     use cairn_api::query::WatchName;
     use cairn_api::wire::{PatchAnswer, Tick};
-    use cairn_schema::{Domain, JourneyId, Patch, Rejection, RevisionOf, ViolationCode};
+    use cairn_schema::{Domain, JourneyId, Patch, Rejection, RevisionOf};
     use cairn_service::Call;
 
     use crate::api::support::{self, World};
@@ -89,11 +89,12 @@ mod in_process {
         assert_eq!(journey.graph.nodes.len(), 2, "nothing was removed");
     }
 
-    /// H5, A18: after an insertion beneath the subtree the touched sets do not overlap, so
-    /// the client resubmits the removal; at apply it would now remove more than its author
-    /// saw, so it is rejected rather than widened.
+    /// H5, A18: after an insertion beneath the subtree the removal would remove more than its
+    /// author saw, so it would not apply at the new revision; the stale answer says it
+    /// touches the whole journey and the client surfaces the conflict rather than
+    /// resubmitting it, never widening it.
     #[tokio::test]
-    async fn a_retried_removal_is_rejected_rather_than_widened() {
+    async fn a_removal_made_stale_beneath_it_is_surfaced_not_widened() {
         let world = World::start().await;
         let (ann, bob) = (world.client("ann"), world.client("bob"));
         tree(&ann).await;
@@ -101,15 +102,10 @@ mod in_process {
             "- op: add_node\n  node: {key: n_d, id: d, kind: action, title: D, parent: n_g}\n";
         landed(bob.patch(journey_patch("p_insert", 1, insert), None).await);
         let rejection = rejected(ann.patch(journey_patch("p_remove", 1, REMOVAL), None).await);
-        let Rejection::Invalid { violations } = rejection else {
-            panic!("invalid, not {rejection:#?}")
+        let Rejection::Stale { conflicts, .. } = rejection else {
+            panic!("stale, not {rejection:#?}")
         };
-        let codes: Vec<_> = violations
-            .as_slice()
-            .iter()
-            .map(|found| found.code)
-            .collect();
-        assert!(codes.contains(&ViolationCode::RemovalWidened), "{codes:?}");
+        assert_eq!(conflicts.len(), 1);
         let journey = ann.journey(&"j_tree".parse().unwrap()).await.unwrap();
         assert_eq!(journey.graph.nodes.len(), 3, "nothing was removed");
     }
