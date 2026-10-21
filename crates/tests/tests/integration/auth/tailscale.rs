@@ -33,9 +33,7 @@ mod tailscale {
         Listener::Tcp("100.100.1.1:443".parse().unwrap())
     }
 
-    /// A fake tailscaled on a unix socket, removed when dropped. The socket lives in the
-    /// runtime directory when there is one, since cargo's target directory can be too deep
-    /// for a socket path.
+    /// A fake tailscaled on a unix socket, removed when dropped.
     struct Tailscaled {
         socket: PathBuf,
     }
@@ -48,8 +46,9 @@ mod tailscale {
 
     fn socket_path() -> PathBuf {
         static NEXT: AtomicU32 = AtomicU32::new(0);
-        let directory = std::env::var_os("XDG_RUNTIME_DIR")
-            .map_or_else(|| PathBuf::from(env!("CARGO_TARGET_TMPDIR")), PathBuf::from);
+        // The system's temporary directory, not the target directory: a socket's path has
+        // at most 103 bytes on macOS (107 on Linux), which a checkout's path can use up.
+        let directory = std::env::temp_dir();
         let name = format!(
             "cairn-tailscaled-{}-{}.sock",
             std::process::id(),
@@ -57,7 +56,7 @@ mod tailscale {
         );
         let path = directory.join(name);
         assert!(
-            path.as_os_str().len() < 108,
+            path.as_os_str().len() < 104,
             "socket path too long: {}",
             path.display()
         );

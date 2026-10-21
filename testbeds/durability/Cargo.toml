@@ -2,7 +2,8 @@
 # native shim's filesystem faults and crash-restart (PRACTICES, Simulation with patina:
 # Testbeds, `durability`). Its own Cargo workspace (the empty [workspace] table), so
 # `cargo patina build` resolves only this tree. The check ladder formats and lints it as a
-# separate workspace (lint step) and never runs it; only `mise run sim` does.
+# separate workspace (lint step) and runs its unit tests (unit step); only `mise run sim`
+# simulates it.
 [workspace]
 
 [package]

@@ -264,7 +264,7 @@ flowchart TB
 | Step | Check | Typical time |
 |---|---|---|
 | lint | `rustfmt`, `clippy` (deny; the testbeds too, each a separate workspace), kebab-case patina site labels, TypeScript typecheck, `eslint`, the CSS lint (`mise run lint:css`: one scroller per region, tokens for colour and radius), the `wasm32-unknown-unknown` build of the runtime-free crates (the service and what it stands on) | seconds |
-| unit | unit tests for every Rust crate, engine scenario tests, replay harness (memory store) | seconds |
+| unit | unit tests for every Rust crate and each testbed, engine scenario tests, replay harness (memory store) | seconds |
 | web-unit | web unit tests (Vitest), including the browser host's agreement with the server's answers | seconds |
 | generated | regenerate the generated paths and fail if any file in them changed, appeared, or disappeared | seconds |
 | embed | `cargo check` of the `cairn` crate with its default features, which embeds the web build rather than reading it from disk as every other build of the ladder does (`web-dir`); it writes metadata only, so the binary the tests run and every other step's artifacts are untouched | seconds |

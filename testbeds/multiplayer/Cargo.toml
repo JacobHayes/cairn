@@ -2,7 +2,8 @@
 # virtual clients using the real Rust client (H5's safe retry, H6's subscription tracking),
 # run under the patina native shim (PRACTICES, Simulation with patina). Its own Cargo
 # workspace (the empty [workspace] table), so `cargo patina build` resolves only this tree.
-# The check ladder formats and lints it (lint step) and never runs it; only `mise run sim` does. Its
+# The check ladder formats and lints it (lint step) and runs its unit tests (unit step); only
+# `mise run sim` simulates it. Its
 # Cargo.lock started as a copy of the root's, so the crates under test resolve to the
 # versions `mise run check` tests.
 [workspace]

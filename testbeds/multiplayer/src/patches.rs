@@ -41,7 +41,7 @@ impl Draft {
             )),
             Draft::Merge { survivor, merged } => parse(&format!(
                 "id: {id}\ntarget: deployment\nbase_revision: {base}\nmutations:\n\
-                 - op: merge_identities\n  survivor: {survivor}\n  merged: {merged}\n  journeys: {{}}\n"
+                 - op: merge_identities\n  survivor: {survivor}\n  merged: [{merged}]\n  journeys: {{}}\n"
             )),
         }
     }

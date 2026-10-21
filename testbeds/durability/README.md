@@ -5,8 +5,8 @@ the real Turso store in a directory of patina's simulated filesystem, under file
 faults (`EIO`, `ENOSPC`, `EINTR`, short reads and writes) and crash-restart with torn
 writes. The question it answers: after every restart, does the state equal the replayed
 log, and is every acknowledged commit still there? Exploratory: `mise run sim` runs it,
-locally and nightly in CI; `mise run check` formats and lints it (its own Cargo workspace) but
-never runs it.
+locally and nightly in CI; `mise run check` formats and lints it (its own Cargo workspace) and
+runs its unit tests, but never simulates it.
 
 ## The program
 

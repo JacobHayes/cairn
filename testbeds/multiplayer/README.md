@@ -81,8 +81,8 @@ up after 64 attempts, or the server would not stop), 64 bad arguments; never 2.
 
 ## Commands
 
-Its own Cargo workspace: the check ladder formats and lints it (lint step) but never runs it,
-and only `mise run sim` does; its
+Its own Cargo workspace: the check ladder formats and lints it (lint step) and runs its unit
+tests (unit step), and only `mise run sim` simulates it; its
 `Cargo.lock` started as the root's, so the crates under test resolve as `check` tests them.
 
 ```

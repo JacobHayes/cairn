@@ -83,11 +83,12 @@ jobs:
       - uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2.9.2
         with:
           shared-key: check-${{ matrix.part }}-${{ steps.profiles.outputs.hash }}
-          # The testbeds build into their own target directories; only lint builds them.
+          # The testbeds build into their own target directories; lint lints them and rust runs
+          # their unit tests.
           workspaces: |
             .
-            ${{ matrix.part == 'lint' && 'testbeds/multiplayer' || '' }}
-            ${{ matrix.part == 'lint' && 'testbeds/durability' || '' }}
+            ${{ (matrix.part == 'lint' || matrix.part == 'rust') && 'testbeds/multiplayer' || '' }}
+            ${{ (matrix.part == 'lint' || matrix.part == 'rust') && 'testbeds/durability' || '' }}
           cache-on-failure: true
           save-if: ${{ github.ref == 'refs/heads/main' }}
       # The npm workspace's tools (TypeScript, eslint, openapi-typescript, Vitest, Vite).

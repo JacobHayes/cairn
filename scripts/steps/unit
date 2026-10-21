@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
-# Step unit: unit tests for every Rust crate (the property, integration, and cost steps run
-# the rest).
+# Step unit: unit tests for every Rust crate and each testbed (the property, integration, and
+# cost steps run the rest).
 # PRACTICES, The validation ladder. One suite per crate, so a crate whose tests
 # vanish fails the step. The library crates' integration tests are modules of one test binary
 # (crates/tests/tests/integration, counted for their crates by scripts/ladder-tests; the
@@ -39,5 +39,19 @@ while IFS= read -r crate; do
   [ -n "$crate" ] || continue
   ladder_suite "$crate tests" "$(ladder_tests_matching "$crate" "")" tests
 done <<<"$crates"
+
+# Each testbed is a workspace of its own, which lint formats and lints; its unit tests run here
+# too, so a change that breaks what a testbed does at run time (a patch it writes that no
+# longer parses), not only what it compiles against, fails the ladder instead of the nightly
+# `mise run sim` (decisions/2026-10-21-the-ladder-runs-the-testbeds-unit-tests.md).
+for manifest in testbeds/*/Cargo.toml; do
+  testbed=$(dirname "$manifest")
+  out=dist/ladder/unit-$(basename "$testbed").out
+  cargo test --quiet --locked --manifest-path "$manifest" >"$out" 2>&1 || {
+    ladder_show <"$out"
+    ladder_fail "cargo test reported failures in $testbed"
+  }
+  ladder_suite "$testbed tests" "$(awk '/^test result: ok\./ { count += $4 } END { print count + 0 }' "$out")" tests
+done
 
 ladder_step_end
