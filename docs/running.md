@@ -124,17 +124,34 @@ in Prometheus's format, behind the same auth as the API (a scraper uses an agent
 
 ## Upgrades and backups
 
-A process that opens the database holds it exclusively, so `cairn serve` and `cairn migrate`
-never share one: run against a live server, `migrate` fails with a locking error. The server
-applies any migrations the database lacks when it starts. To upgrade, stop the server, run
-`cairn migrate` with the new binary (a failed migration then shows before anything serves),
-and start it again.
+The database is one SQLite file in WAL mode; while Cairn has it open, SQLite keeps its
+write-ahead log beside it (`cairn.db-wal`). A Cairn process locks the file for as long as it
+has it open, so `cairn serve` and `cairn migrate` never share one: run against a live
+server, `migrate` fails saying another process has it open. The server applies any
+migrations the database lacks when it starts. To upgrade, stop the server, run `cairn
+migrate` with the new binary (a failed migration then shows before anything serves), and
+start it again.
 
-There is no online backup: stop the server, copy the database file together with the two
-files the store keeps beside it, its log and its write-ahead log, and start it again;
-restore all three together. For `cairn.db` those are `cairn.db-log` and `cairn.db-wal` (the
-log takes the database's name with its extension set to `.db-log`, so `data.sqlite` keeps
-`data.db-log` and `data.sqlite-wal`). Committed writes sit in the log until the store
-checkpoints them into the database file, so that file alone is not a backup. Do not open
-the database with another SQLite tool while Cairn runs.
+There is no online backup: the lock keeps other SQLite tools out while the server runs. Stop
+the server and copy `cairn.db`: a clean stop folds the write-ahead log back into it, and
+after a crash, copy `cairn.db-wal` with it. To restore, put the copy in place of `cairn.db`
+with its copied `cairn.db-wal`, if there is one; otherwise delete any `cairn.db-wal` beside
+it (it belongs to the file the copy replaces). Then start the server. With the server
+stopped, any SQLite tool can open the file.
+
+### From v0.5.0 or earlier
+
+Releases up to v0.5.0 kept the database in Turso's format: its writes sit in `cairn.db-log`,
+and SQLite cannot open the file until it is converted. Convert it once, with Turso's shell
+at the version those releases used (`tursodb`, in the `turso_cli` archive for your platform
+on [Turso's v0.8.2 release](https://github.com/tursodatabase/turso/releases/tag/v0.8.2)):
+
+1. Stop the server and back up `cairn.db`, `cairn.db-log`, and `cairn.db-wal` together.
+2. If the database is from a release before v0.4.2, run v0.5.0's `cairn migrate` on it
+   first: a new release opens only a database v0.4.2 or later brought up to date.
+3. Run `tursodb cairn.db "PRAGMA journal_mode = wal"`. It folds the log into the database
+   file and answers `wal`; then delete the empty `cairn.db-log`.
+4. Run `cairn migrate` with the new binary, and start the server.
+
+A database that was not converted is refused at open, with a message pointing here.
 

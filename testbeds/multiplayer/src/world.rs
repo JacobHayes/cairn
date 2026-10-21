@@ -1,4 +1,4 @@
-//! The world the clients share: a composition root like the binary's (4.7) - the Turso
+//! The world the clients share: a composition root like the binary's (4.7) - the SQLite
 //! store, the in-process notifier, the dev sign-in provider, and the API's router - served
 //! on the simulated loopback network, and the journey every client patches.
 
@@ -14,7 +14,7 @@ use cairn_schema::{
 };
 use cairn_service::{AuthKind, AuthMethod, Capabilities, DeploymentSettings, Parts, Service};
 use cairn_store::InProcessNotifier;
-use cairn_store_turso::TursoStore;
+use cairn_store_sqlite::SqliteStore;
 use tokio::sync::oneshot;
 use tokio::task::JoinHandle;
 
@@ -51,11 +51,12 @@ impl Server {
     /// An abort when the store or the listener cannot open.
     pub async fn start() -> Result<Self, Stop> {
         let (sites, faults) = Sites::hooked();
-        let store = TursoStore::open_with_faults(Path::new(DATABASE), faults)
-            .await
-            .map_err(|error| Stop::Abort {
-                label: "store",
-                detail: error.to_string(),
+        let store =
+            SqliteStore::open_with_faults(Path::new(DATABASE), faults).map_err(|error| {
+                Stop::Abort {
+                    label: "store",
+                    detail: error.to_string(),
+                }
             })?;
         let store = Arc::new(store);
         let listener = tokio::net::TcpListener::bind(SERVER)
@@ -78,7 +79,7 @@ impl Server {
             kind: AuthKind::Dev,
         }];
         let service = Service::new(Parts {
-            store: Arc::<TursoStore>::clone(&store),
+            store: Arc::<SqliteStore>::clone(&store),
             notifier: Arc::new(InProcessNotifier::new()),
             settings,
             capabilities: Capabilities::server(methods, false),
@@ -135,7 +136,7 @@ pub const DEV_EMAIL: &str = "tester@example.org";
 /// Auth as the binary's root assembles it for local development: the dev sign-in provider
 /// on a loopback listener, with no token, so every request is the dev user (H1), whose
 /// verified email is what lets it sign in at all (H3).
-fn auth(store: &Arc<TursoStore>) -> Result<Auth, Stop> {
+fn auth(store: &Arc<SqliteStore>) -> Result<Auth, Stop> {
     let invalid = |label: &'static str| {
         move |error: &dyn std::fmt::Debug| Stop::Abort {
             label,
@@ -159,7 +160,7 @@ fn auth(store: &Arc<TursoStore>) -> Result<Auth, Stop> {
     let provider = DevProvider::new(dev, Listener::Tcp(SERVER))
         .map_err(|error| invalid("dev-provider")(&error))?;
     let providers: Vec<Arc<dyn AuthProvider>> = vec![Arc::new(provider)];
-    let accounts = Accounts::new(Arc::<TursoStore>::clone(store), Clock::system());
+    let accounts = Accounts::new(Arc::<SqliteStore>::clone(store), Clock::system());
     Ok(Auth::new(accounts, Listener::Tcp(SERVER), &base, providers))
 }
 

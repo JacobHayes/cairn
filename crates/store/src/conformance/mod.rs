@@ -112,7 +112,11 @@ macro_rules! conformance_suite {
             commits::an_identity_an_applied_proposal_creates_bumps_the_deployment_revision,
             commits::riding_identity_creates_stop_at_the_identity_limit,
             commits::a_hard_delete_removes_events_and_keeps_the_deployment_event,
+            commits::a_hard_delete_never_reuses_the_positions_it_removes,
             commits::a_create_at_a_deleted_journey_id_is_rejected,
+            commits::a_commit_to_a_hard_deleted_journey_is_stale,
+            commits::a_decision_retyped_to_identities_makes_its_conditions_references,
+            commits::a_journey_copied_from_a_route_refers_to_the_identities_it_names,
             commits::a_proposal_revision_is_independent_of_its_destination,
             commits::an_identity_merge_is_stale_when_another_journey_references_its_identities,
             every::every_field_and_variant_loads_back_equal,
@@ -154,7 +158,7 @@ pub async fn open<B: Backend>(backend: &B) -> B::Store {
 /// Commits, expecting it to apply.
 pub async fn applied(store: &dyn Store, commit: Commit) -> PatchReceipt {
     match store.commit(commit).await {
-        Ok(Committed::Applied(receipt)) => receipt,
+        Ok(Committed::Applied { receipt, .. }) => receipt,
         other => panic!("expected the commit to apply, got {other:?}"),
     }
 }

@@ -16,7 +16,7 @@ use cairn_service::{
     Call, Capabilities, DeploymentSettings, DomainPatch, Parts, Service, WriteError, Written,
 };
 use cairn_store::{InProcessNotifier, MemoryStore, Store};
-use cairn_store_turso::TursoStore;
+use cairn_store_sqlite::SqliteStore;
 use jiff::tz::{Offset, TimeZone};
 
 /// The test deployment's time zone: five hours behind UTC all year (`Etc/GMT+5`), so a
@@ -43,8 +43,8 @@ pub fn memory() -> (Service, Arc<InProcessNotifier>) {
     service_over(Arc::new(MemoryStore::new()))
 }
 
-/// A fresh directory for a Turso database under `root`, one per call in this process.
-pub fn turso_path(root: &Path) -> PathBuf {
+/// A fresh directory for an SQLite database under `root`, one per call in this process.
+pub fn sqlite_path(root: &Path) -> PathBuf {
     static NEXT: AtomicU32 = AtomicU32::new(0);
     let dir = root.join(format!(
         "service-{}-{}",
@@ -56,13 +56,13 @@ pub fn turso_path(root: &Path) -> PathBuf {
     dir.join("cairn.db")
 }
 
-/// A service over a fresh Turso store under `root`.
-pub async fn turso(root: &Path) -> (Service, Arc<InProcessNotifier>) {
-    let store = TursoStore::open(&turso_path(root)).await.unwrap();
+/// A service over a fresh SQLite store under `root`.
+pub fn sqlite(root: &Path) -> (Service, Arc<InProcessNotifier>) {
+    let store = SqliteStore::open(&sqlite_path(root)).unwrap();
     service_over(Arc::new(store))
 }
 
-/// Runs a future on a current-thread tokio runtime with its timer, as the Turso backend
+/// Runs a future on a current-thread tokio runtime with its timer, as the SQLite backend
 /// needs; the memory backend needs none, but runs the same way.
 pub fn run<F: Future>(future: F) -> F::Output {
     tokio::runtime::Builder::new_current_thread()
@@ -230,7 +230,7 @@ pub async fn vendor_after(service: &Service, steps: usize) {
     }
 }
 
-/// A fresh Turso store under `root`, shared.
-pub async fn turso_store(root: &Path) -> Arc<TursoStore> {
-    Arc::new(TursoStore::open(&turso_path(root)).await.unwrap())
+/// A fresh SQLite store under `root`, shared.
+pub fn sqlite_store(root: &Path) -> Arc<SqliteStore> {
+    Arc::new(SqliteStore::open(&sqlite_path(root)).unwrap())
 }

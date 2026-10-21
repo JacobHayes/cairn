@@ -1,5 +1,5 @@
 //! The composition root (ARCHITECTURE, Service layer and composition): one function that
-//! builds the server from its configuration. The store is the caller's (Turso at the
+//! builds the server from its configuration. The store is the caller's (SQLite at the
 //! configured path for `cairn serve`, memory for `cairn demo`); the notifier is the
 //! in-process one, whose ticks the API's stream coalesces on tokio's timer; the auth providers are the configured ones, in order; the assistant is present exactly
 //! when configured, a `None` here and absent from the capabilities otherwise (I5). The API

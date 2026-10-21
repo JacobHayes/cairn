@@ -2,7 +2,7 @@
 //! guards, each minimized from a failing seed to the situation it reached and set up here
 //! explicitly with a gate on the store's commit points (PRACTICES, Simulation with patina).
 //! Every case runs over both stores. A commit held open with everything written needs
-//! Turso, since the memory store commits under one lock; there the commit is held before
+//! SQLite, since the memory store commits under one lock; there the commit is held before
 //! it begins instead, the deepest point the memory store has.
 #![cfg(test)]
 
@@ -15,7 +15,7 @@ use std::time::Duration;
 use cairn_schema::{Patch, Rejection};
 use cairn_service::{Service, WriteError, Written};
 use cairn_store::{CommitPoint, Faults, MemoryStore, PauseHook};
-use cairn_store_turso::TursoStore;
+use cairn_store_sqlite::SqliteStore;
 use tokio::sync::Notify;
 use tokio::task::JoinHandle;
 
@@ -62,14 +62,12 @@ impl Gate {
     }
 }
 
-/// A service over a fresh Turso store holding journey `j_race`, and a gate armed at
+/// A service over a fresh SQLite store holding journey `j_race`, and a gate armed at
 /// `point` on its next commit.
-async fn turso(point: CommitPoint) -> (Service, Arc<Gate>) {
+async fn sqlite(point: CommitPoint) -> (Service, Arc<Gate>) {
     let faults = Faults::default();
-    let path = support::turso_path(TMP.as_ref());
-    let store = TursoStore::open_with_faults(&path, faults.clone())
-        .await
-        .unwrap();
+    let path = support::sqlite_path(TMP.as_ref());
+    let store = SqliteStore::open_with_faults(&path, faults.clone()).unwrap();
     let (service, _) = support::service_over(Arc::new(store));
     created(&service).await;
     (service, Gate::on(&faults, point))
@@ -166,9 +164,9 @@ fn a_patch_that_loses_the_race_to_commit_is_rejected_stale_on_memory() {
 }
 
 #[test]
-fn a_patch_that_loses_the_race_to_commit_is_rejected_stale_on_turso() {
+fn a_patch_that_loses_the_race_to_commit_is_rejected_stale_on_sqlite() {
     support::run(async {
-        let (service, gate) = turso(CommitPoint::BeforeBegin).await;
+        let (service, gate) = sqlite(CommitPoint::BeforeBegin).await;
         a_patch_that_loses_the_race_to_commit_is_rejected_stale(service, gate).await;
     });
 }
@@ -188,7 +186,7 @@ fn split_applied(
 /// decisions/2026-10-06-a-resubmission-beside-its-own-original-in-flight-is-answered.md):
 /// a patch resubmitted while its original is still committing (its answer was lost, or
 /// its caller stopped waiting) is the same patch: it lands once, and the other
-/// submission is answered from its receipt. On Turso the original is held inside its
+/// submission is answered from its receipt. On SQLite the original is held inside its
 /// transaction and the resubmission waits its turn; on the memory store, which commits
 /// whole, the original is held before it begins and the resubmission lands first.
 async fn a_resubmission_while_its_original_commits_is_answered_from_its_receipt(
@@ -212,9 +210,9 @@ fn a_resubmission_while_its_original_commits_is_answered_from_its_receipt_on_mem
 }
 
 #[test]
-fn a_resubmission_while_its_original_commits_is_answered_from_its_receipt_on_turso() {
+fn a_resubmission_while_its_original_commits_is_answered_from_its_receipt_on_sqlite() {
     support::run(async {
-        let (service, gate) = turso(CommitPoint::BeforeCommit).await;
+        let (service, gate) = sqlite(CommitPoint::BeforeCommit).await;
         a_resubmission_while_its_original_commits_is_answered_from_its_receipt(service, gate).await;
     });
 }
@@ -252,9 +250,9 @@ fn a_stale_answer_beside_a_commit_in_flight_carries_what_it_touches_on_memory() 
 }
 
 #[test]
-fn a_stale_answer_beside_a_commit_in_flight_carries_what_it_touches_on_turso() {
+fn a_stale_answer_beside_a_commit_in_flight_carries_what_it_touches_on_sqlite() {
     support::run(async {
-        let (service, gate) = turso(CommitPoint::BeforeCommit).await;
+        let (service, gate) = sqlite(CommitPoint::BeforeCommit).await;
         a_stale_answer_beside_a_commit_in_flight_carries_what_it_touches(service, gate).await;
     });
 }

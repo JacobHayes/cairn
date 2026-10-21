@@ -11,8 +11,8 @@
 //!   first, so the original meets its own receipt (H5).
 //! - `store-commit-stalls` (short) and `store-commit-stalls-past-timeout` (once per run): a
 //!   commit holds its transaction open just before it commits, as a slow write does. Every
-//!   other commit to the domain waits its turn behind it in the meantime, a resubmission of
-//!   the same patch included, and then meets what it did (H5).
+//!   other commit, to any domain, waits behind it in the meantime, a resubmission of the same
+//!   patch included, and then meets what it did (H5).
 
 use std::future::Future;
 use std::pin::Pin;
@@ -31,7 +31,7 @@ const LONG: Duration = Duration::from_millis(400);
 /// Long waits per run: a long wait on an HTTP request only times its attempt out (the
 /// server drops a request whose client has gone), so it takes a few to land on the agent.
 const LONG_WAITS_PER_RUN: u32 = 4;
-/// Long stalls per run: one holds up every other commit to the domain, which is enough.
+/// Long stalls per run: one holds up every other commit, to any domain, which is enough.
 const LONG_STALLS_PER_RUN: u32 = 1;
 
 /// The long faults outlast an attempt, which is what makes the caller resubmit.
@@ -92,7 +92,7 @@ impl Sites {
                         return;
                     }
                 }
-                CommitPoint::AfterRevisionRow | CommitPoint::BetweenStateAndEvents => return,
+                CommitPoint::BetweenStateAndEvents => return,
             };
             tokio::time::sleep(pause).await;
         })

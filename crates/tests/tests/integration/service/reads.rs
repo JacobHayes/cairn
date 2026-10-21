@@ -1,4 +1,4 @@
-//! Derived reads through the service, over the memory and Turso stores alike (C8, C10, D6,
+//! Derived reads through the service, over the memory and SQLite stores alike (C8, C10, D6,
 //! I3, J4).
 #![cfg(test)]
 
@@ -16,7 +16,7 @@ use cairn_store::{LoginRecord, Store, UserRecord};
 
 use support::{applied, call, domain, patch, service_over, settings, vendor_after};
 
-/// Runs each case once over a fresh memory store and once over a fresh Turso store; each
+/// Runs each case once over a fresh memory store and once over a fresh SQLite store; each
 /// case gets the store, so it can stand a second, uncached service over it.
 macro_rules! on_both_stores {
     ($($case:ident),* $(,)?) => {
@@ -29,12 +29,12 @@ macro_rules! on_both_stores {
                 }
             )*
         }
-        mod turso {
+        mod sqlite {
             $(
                 #[test]
                 fn $case() {
                     crate::service::support::run(async {
-                        let store = crate::service::support::turso_store(crate::service::reads::TMP.as_ref()).await;
+                        let store = crate::service::support::sqlite_store(crate::service::reads::TMP.as_ref());
                         super::$case(store).await;
                     });
                 }
@@ -54,7 +54,7 @@ on_both_stores!(
 
 const AT: &str = "2026-10-06T12:00:00Z";
 
-/// Where the Turso cases keep their databases: cargo's per-target temporary directory.
+/// Where the SQLite cases keep their databases: cargo's per-target temporary directory.
 const TMP: &str = env!("CARGO_TARGET_TMPDIR");
 
 fn vendor() -> JourneyId {
@@ -382,5 +382,5 @@ fn every_derived_read_can_be_awaited_on_another_thread() {
         send(&service.history(&id, None, None));
     }
     reads(&support::memory().0);
-    support::run(async { reads(&support::turso(TMP.as_ref()).await.0) });
+    support::run(async { reads(&support::sqlite(TMP.as_ref()).0) });
 }

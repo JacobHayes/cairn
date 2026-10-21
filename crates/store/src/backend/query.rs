@@ -1,4 +1,4 @@
-//! The read side of the commit rules, shared by the memory and Turso backends: which keys name
+//! The read side of the commit rules, shared by the memory and SQLite backends: which keys name
 //! the same identities, which nodes an event is about, the text a search matches, which
 //! journeys an index lists, and where a segment is inserted.
 
@@ -10,23 +10,6 @@ use cairn_schema::{
 };
 
 use crate::query::InsertionUse;
-
-/// Every string in a JSON value that parses as an identity key, walked with an explicit stack
-/// (PRACTICES, No recursion).
-#[must_use]
-pub(super) fn identity_keys_in(value: &serde_json::Value) -> BTreeSet<IdentityKey> {
-    let mut keys = BTreeSet::new();
-    let mut stack = vec![value];
-    while let Some(value) = stack.pop() {
-        match value {
-            serde_json::Value::String(text) => keys.extend(text.parse::<IdentityKey>().ok()),
-            serde_json::Value::Array(items) => stack.extend(items),
-            serde_json::Value::Object(fields) => stack.extend(fields.values()),
-            _ => {}
-        }
-    }
-    keys
-}
 
 /// E6: the keys that name the same identities as `identities`: each one's identity (an alias
 /// resolves to the identity it was merged into), and every key naming one of those identities,

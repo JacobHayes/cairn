@@ -32,9 +32,6 @@ command -v cargo-patina >/dev/null || fail "cargo-patina is missing: run mise in
 # 6.1 integration). The campaign's own gate is waived for these alone: any other oracle that
 # never fires fails leg 4, and one of these firing is reported so it can leave the list.
 out_of_reach=(
-  # 4.1's announce fallback: needs a journey patch with an identity create riding in it and
-  # the store's revisions failing to read right after its commit; the testbed has neither.
-  service-deployment-revision-unread
   # 4.1's receipt recheck after the engine answers stale: needs the original to commit
   # between a resubmission's receipt lookup and its load, and no site delays a load.
   service-duplicate-original-committed-meanwhile

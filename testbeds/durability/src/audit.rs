@@ -10,7 +10,7 @@ use cairn_engine::{Records, replay};
 use cairn_schema::{Event, PatchId};
 use cairn_service::{Service, ServiceError};
 use cairn_store::{EventQuery, PageSize, Store, StoreError};
-use cairn_store_turso::TursoStore;
+use cairn_store_sqlite::SqliteStore;
 
 use crate::ledger::{Entry, fnv};
 use crate::plan::Plan;
@@ -95,7 +95,7 @@ impl From<ServiceError> for Unreadable {
 }
 
 /// Every event in the log, in order.
-async fn all_events(store: &TursoStore) -> Result<Vec<(u64, Event)>, StoreError> {
+async fn all_events(store: &SqliteStore) -> Result<Vec<(u64, Event)>, StoreError> {
     let mut events = Vec::new();
     let mut after = None;
     loop {
@@ -119,7 +119,7 @@ async fn all_events(store: &TursoStore) -> Result<Vec<(u64, Event)>, StoreError>
 
 /// Audits the store against `plan` and the ledger's `entries`.
 pub async fn audit(
-    store: &TursoStore,
+    store: &SqliteStore,
     service: &Service,
     plan: &Plan,
     entries: &[Entry],
@@ -237,7 +237,7 @@ fn log_shape(
 /// Checks each submitted step's receipt against its events and acknowledgement.
 async fn receipts(
     audit: &mut Audit,
-    store: &TursoStore,
+    store: &SqliteStore,
     plan: &Plan,
     intended: &BTreeSet<usize>,
     acknowledged: &BTreeMap<usize, u32>,

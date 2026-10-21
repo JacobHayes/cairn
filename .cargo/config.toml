@@ -1,0 +1,7 @@
+# Read by every build under this directory, the testbeds' too.
+[env]
+# The bundled SQLite's build flags. SQLite's allocation statistics, on by default, take one
+# process-wide mutex on every allocation, which serializes the store's readers (8 concurrent
+# journey loads: 2,200 a second with them, 22,000 without), and nothing reads them
+# (decisions/2026-10-21-the-store-is-sqlite-with-one-writer.md).
+LIBSQLITE3_FLAGS = "-DSQLITE_DEFAULT_MEMSTATUS=0"

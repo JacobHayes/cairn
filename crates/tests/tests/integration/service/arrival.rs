@@ -10,15 +10,15 @@ use cairn_service::Service;
 use cairn_store::{EventQuery, LoginRecord, MemoryStore, PageSize, Store, UserRecord};
 
 use crate::service::support::{
-    agent_call, applied, call, domain, patch, run, service_over, turso_store,
+    agent_call, applied, call, domain, patch, run, service_over, sqlite_store,
 };
 
 const AT: &str = "2026-10-06T12:00:00Z";
 
-/// Where the Turso cases keep their databases: cargo's per-target temporary directory.
+/// Where the SQLite cases keep their databases: cargo's per-target temporary directory.
 const TMP: &str = env!("CARGO_TARGET_TMPDIR");
 
-/// Runs a case once over a fresh memory store and once over a fresh Turso store.
+/// Runs a case once over a fresh memory store and once over a fresh SQLite store.
 fn on_both<F, Fut>(case: F)
 where
     F: Fn(Arc<dyn Store>) -> Fut,
@@ -26,7 +26,7 @@ where
 {
     run(case(Arc::new(MemoryStore::new())));
     run(async {
-        case(turso_store(TMP.as_ref()).await).await;
+        case(sqlite_store(TMP.as_ref())).await;
     });
 }
 

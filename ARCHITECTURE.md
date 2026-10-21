@@ -21,7 +21,7 @@ flowchart LR
         store[Store trait]
         notify[Notifier trait]
     end
-    db[(Turso: embedded, SQLite-compatible)]
+    db[(SQLite: embedded, one file)]
     ui --> api
     ext --> mcp
     ext --> api
@@ -64,7 +64,7 @@ Architecture-scope terms, in addition to the PRD glossary. PRD terms keep their 
 | **Domain document** | A journey's full graph and state, with the derive inputs to derive it (including the deployment context and its revision). Nothing derived is in it: the browser derives it with the wasm engine and runs every projection locally. Proposals are not part of it. |
 | **Snapshot** | The I3 projection: a bounded, scoped, paginated view of a journey for agents. Cut from the same derived journey as the domain document. |
 | **Change set** | The persistence-neutral result of an accepted patch: identities put and removed by key, the events, the patch id, and the next revision. A `schema` type, so the store depends on `schema` and not the engine; in production only the engine's `apply` produces one, inside `Applied`. Each store maps it to its own rows or records. |
-| **Store** | The trait the service layer uses to load a domain, commit a patch result, and run index queries. Backends: Turso and memory. |
+| **Store** | The trait the service layer uses to load a domain, commit a patch result, and run index queries. Backends: SQLite and memory. |
 | **Notifier** | The trait that announces "domain X is now at revision N" to subscribers. In-process in both hosts. |
 | **Composition root** | The one function per host that picks a store, a notifier, auth providers, and an assistant provider and assembles the service. |
 | **Capabilities document** | `GET /api/capabilities`: what this host offers (auth providers, assistant, MCP, SSE). The server always serves MCP and SSE; the browser host serves neither. The UI shows and hides features from it. |
@@ -82,7 +82,7 @@ cairn/
     wasm/          wasm-bindgen surface for the browser: engine projections and preview for every host; service over the memory store for the in-browser host
     schema/        serde types shared by engine and shell: document, patch, API payloads; JSON Schema export
     store/         Store and Notifier traits; memory backend; the store conformance test suite. No delta types of its own: it persists the change set from schema
-    store-turso/   Turso backend (the `turso` crate: Rust, SQLite file format, MVCC)
+    store-sqlite/  SQLite backend (rusqlite: embedded, WAL mode, one writer)
     service/       service layer: load, call engine, commit; capabilities; composition root types. Runtime-free: no tokio, database driver, or transport dependency, so it builds for wasm32-unknown-unknown
     auth/          AuthProvider trait; dev, oidc, builtin-oauth, tailscale providers; users and logins
     api/           axum endpoints, the generated OpenAPI document, SSE, the Rust client
@@ -111,7 +111,7 @@ flowchart LR
     engine --> service
     schema --> service
     store --> service
-    store --> store_turso[store-turso]
+    store --> store_sqlite[store-sqlite]
     service --> api
     service --> mcp
     service --> assistant
@@ -122,7 +122,7 @@ flowchart LR
     assistant --> api
     api --> cairn
     assistant --> cairn
-    store_turso --> cairn
+    store_sqlite --> cairn
     service --> wasm
     wasm --> web_wasm[web/wasm]
     web_wasm --> web_app[web/app]
@@ -237,13 +237,13 @@ The J3 replay harness and the scenario tests run against the engine alone with a
 Small and whole-domain oriented; nothing in it walks the graph.
 
 - `load(target) -> (document, revision)`: one read for every graph, by a typed target: `Journey(id)` (graph and state), `Route(id)` (the route record and its draft), `RouteVersion(id, number)` (one published version, immutable, whose revision never moves), or `Deployment`. Loads and size caps are per graph, so a route's history never weighs on its draft. Derive needs no events; history is a separate, paged query.
-- `commit(target, base revision, preconditions, change_set) -> receipt`: one transaction: lock the domain's revision row; recheck the patch receipt (the service already looked it up before loading or applying, so a resubmission never reaches `apply`, H5); verify every revision precondition (the domain's base revision, plus the proposal's revision when applying one, I6, or, for an identity merge, the revisions of the journeys it was checked against and the unchanged set of journeys referencing its identities, or, for an identity delete, that no graph refers to its identity; for a journey patch writing an identity reference, the deployment revision it was validated against, E6), map the change set to rows, append events with patch id and ordinal, bump the revision. A domain that does not exist yet is at revision 0; its first commit takes base revision 0 and produces revision 1, and there is no separate create call. A hard-deleted journey leaves its id in a deleted-ids record, so a create at that id is rejected (A19). Deployment-scoped mutations riding in a journey patch (identity create, E6) write in the same transaction without a deployment revision check, are rejected if the key is already an identity or alias, and still bump the deployment revision and notify it, so identity views stay current (H6).
+- `commit(target, base revision, preconditions, change_set) -> receipt`: one transaction on the one writer: recheck the patch receipt (the service already looked it up before loading or applying, so a resubmission never reaches `apply`, H5); verify every revision precondition (the domain's base revision, plus the proposal's revision when applying one, I6, or, for an identity merge, the revisions of the journeys it was checked against and the unchanged set of journeys referencing its identities, or, for an identity delete, that no graph refers to its identity; for a journey patch writing an identity reference, the deployment revision it was validated against, E6), map the change set to rows, append events with patch id and ordinal, bump the revision. A domain that does not exist yet is at revision 0; its first commit takes base revision 0 and produces revision 1, and there is no separate create call. A hard-deleted journey leaves its id in a deleted-ids record, so a create at that id is rejected (A19). Deployment-scoped mutations riding in a journey patch (identity create, E6) write in the same transaction without a deployment revision check, are rejected if the key is already an identity or alias, and still bump the deployment revision and notify it, so identity views stay current (H6).
 - What intervened since a revision: the touched set of the events of every commit that moved it, which a stale commit reports and the service adds to a stale rejection the engine found before committing (the engine sees no history, H5).
 - Index and history queries: the graphs referencing an identity: journeys, route drafts, and published versions, by any of its keys (for checking a merge or a delete and for the references read, E6), journey index filters (C16), route detail (C17), events by journey, node, user, type, patch, and time (J5), and text search across journeys over titles, descriptions, notes, and resources (the MCP `search` tool and the journey index; search within one journey is the engine's `list` projection, C9).
 - Proposals: their own records keyed by proposal id, with destination and revisions as in Model (H5, I6); edits go through `commit` with the proposal revision as the precondition, and the notifier ticks the proposal. `proposals(query)` lists the open ones, newest first (created at, then id) with the scope's count, a cursor that carries both and survives the proposal it names closing, and each row's destination as it is now (exists, name, revision): the proposals under one destination, those that would create a journey or a route, and those waiting on a user (created by them, or drafted by an agent for an active journey that refers to one of their identities, aliases included).
 - Outside any domain, with no events: assistant conversations, login sessions, and transient OAuth state (authorization codes, PKCE verifiers). Which identity a user is follows from identity emails, which are deployment state and change only through deployment patches (J2), because they decide what is "mine". Users, logins, and agent tokens are auth state outside any domain, logged by the auth crate. Agent tokens: a token is shown once when minted and only its hash is stored, so a leaked database does not leak usable tokens; mint and revoke are logged by the auth crate.
 
-The trait is async and names no runtime: the store traits (and the auth and model provider traits) use `async-trait`, so each call is a plain `async fn` in an implementation and returns a boxed `Send` future, and the trait is object-safe and every layer above the backends holds the store as `Arc<dyn Store>` and is compiled once, whatever backend a host picks ([`decisions/2026-10-18-object-safe-async-traits-use-async-trait-and-the-stack-holds-a-trait-object.md`](decisions/2026-10-18-object-safe-async-traits-use-async-trait-and-the-stack-holds-a-trait-object.md)). The Turso backend runs on tokio; the memory backend runs anywhere, including the browser's event loop.
+The trait is async and names no runtime: the store traits (and the auth and model provider traits) use `async-trait`, so each call is a plain `async fn` in an implementation and returns a boxed `Send` future, and the trait is object-safe and every layer above the backends holds the store as `Arc<dyn Store>` and is compiled once, whatever backend a host picks ([`decisions/2026-10-18-object-safe-async-traits-use-async-trait-and-the-stack-holds-a-trait-object.md`](decisions/2026-10-18-object-safe-async-traits-use-async-trait-and-the-stack-holds-a-trait-object.md)). The SQLite backend runs on tokio; the memory backend runs anywhere, including the browser's event loop.
 
 A conformance suite in `crates/store` runs against every backend.
 
@@ -251,12 +251,12 @@ A conformance suite in `crates/store` runs against every backend.
 
 | Backend | Use | Notes |
 |---|---|---|
-| **Turso** | local and hosted | The `turso` crate: Rust, embedded, SQLite file format. MVCC (`BEGIN CONCURRENT`), so a long write never blocks readers and writes to different domains never queue behind each other: no busy-timeout stalls. STRICT tables, CHECK constraints for enums and non-negative numbers, foreign keys; where Turso lacks one, the backend enforces the same rule inside the commit transaction, the conformance suite tests that enforcement, and the gap is recorded in a file in `decisions/` (the foreign-key gap: [`decisions/2026-10-06-turso-checks-no-foreign-key-against-a-concurrent-transaction.md`](decisions/2026-10-06-turso-checks-no-foreign-key-against-a-concurrent-transaction.md)). |
+| **SQLite** | local and hosted | rusqlite over a bundled SQLite, built without allocation statistics (whose process-wide mutex serializes readers): embedded, one file, WAL mode. One writer: commits and the record writes outside every domain run one at a time on one connection, so a commit beside one in flight waits for it, and no two transactions ever conflict; reads run beside them on a small pool of readers, each seeing one commit's state whole, so a long write never blocks a read. STRICT tables, CHECK constraints for enums and non-negative numbers, foreign keys deferred to the commit. Each call waits for its connection on the runtime, then runs its whole transaction on tokio's blocking pool (a hand-off of about 6 microseconds), so a slow disk stalls that call and never a runtime thread. Readers refuse writes (`query_only`), so only the writer ever writes. One process per database: every connection opens on SQLite's `unix-excl` VFS, so the process holds an exclusive lock on the file while it is open and keeps the write-ahead log's index in memory, not in a mapped `-shm` file ([`decisions/2026-10-21-the-store-is-sqlite-with-one-writer.md`](decisions/2026-10-21-the-store-is-sqlite-with-one-writer.md)). |
 | **Memory** | tests, fixtures, the in-browser host | The reference implementation the conformance suite is written against. Nothing persists: an in-browser session starts from the fixtures on every load. |
 
-Nothing is answered from a write that may not be on disk. Turso keeps a commit whose log sync failed, so a `COMMIT` that fails other than by a conflict or a constraint leaves the Turso backend's state in doubt: it fails closed (every call errs, `GET /healthz` answers 503) and `cairn serve` exits non-zero, so a supervisor restarts it. Every open first drops the database files' cached pages (Linux), so what it reads comes from disk and not from a cache that may hold an unsynced record ([`decisions/2026-10-09-a-commit-the-store-cannot-settle-fails-it-closed.md`](decisions/2026-10-09-a-commit-the-store-cannot-settle-fails-it-closed.md)).
+Nothing is answered from a write that may not be on disk. Every commit syncs the write-ahead log (`synchronous = FULL`). A `COMMIT` that fails other than by a constraint (an I/O error, a full disk) may have left its record in the log unsynced, so it leaves the backend's state in doubt: it fails closed (every call errs, `GET /healthz` answers 503) and `cairn serve` exits non-zero, so a supervisor restarts it. Every open first drops the database files' cached pages (Linux), so what it reads comes from disk and not from a cache that may hold an unsynced record ([`decisions/2026-10-09-a-commit-the-store-cannot-settle-fails-it-closed.md`](decisions/2026-10-09-a-commit-the-store-cannot-settle-fails-it-closed.md)).
 
-No sqlx: it has no Turso driver, and Cairn needs little of it. Queries are runtime SQL (Cairn never planned on sqlx's compile-time macros), connections come from a small pool of our own within the limits, and migrations are numbered SQL files embedded in the binary and applied in order inside one transaction. The conformance suite checks the SQL.
+No sqlx: Cairn needs little of it. Queries are runtime SQL (Cairn never planned on sqlx's compile-time macros), a call runs its whole transaction on tokio's blocking pool (sqlx's SQLite driver would send each statement to a worker thread), connections come from a small pool of our own within the limits, and migrations are numbered SQL files embedded in the binary and applied in order inside one transaction. The conformance suite checks the SQL.
 
 Later backends sit behind the same trait and conformance suite: Postgres, for managed backups and several instances; the schema is written to port.
 
@@ -264,8 +264,8 @@ Later backends sit behind the same trait and conformance suite: Postgres, for ma
 
 Relational rows, no graph-as-blob (A14). Structured field values (a condition tree, a date rule, an event delta, a proposal's mutation list) are JSON columns validated by the engine schema before write.
 
-- `routes` (id, name, kind, retired, revision): the route domain row, locked at commit for the route and its draft
-- `journeys` (id, revision, name, description, status, lineage route and version, created_at, created_on): the journey domain row, locked at commit; `route_drafts` (route, extends) and `route_versions` (route, version_number, published_at)
+- `routes` (id, name, kind, retired, revision): the route domain row, for the route and its draft
+- `journeys` (id, revision, name, description, status, lineage route and version, created_at, created_on): the journey domain row; `route_drafts` (route, extends) and `route_versions` (route, version_number, published_at)
 - `graphs` (id, kind: route_version | route_draft | journey, journey or route and version, default_owner): the graph every content and state row belongs to; timestamps are timezone-free
 - Graph content, keyed by (graph_id, key): `nodes` (parent_key, id, kind, title, description, weight, estimate, flags, condition, date_rule, stage_bounds, decision fields), `edges`, `roles`, `participation_kinds`, `participations` with `participation_identities`, `resources`, `insertions` (graph_id, key, segment, version, parent_key, roles, kinds, nodes), indexed by (segment, version) for segment detail
 - Journey state, keyed by (graph_id, key): `node_states` (state, provenance, atomic, recorded dates), `local_edits`, `answers` (value, rationale) with `answer_identities`, `role_fills` with `role_fill_identities`, `pins`, `snoozes`, `overrides`, `tombstones`, `annotations` (notes and links); the identity rows, with `condition_identities` (graph_id, node, identity: the identities a node's condition compares an identity decision with, filled by the one typed rule in `cairn-schema`), are what the graphs referencing an identity are found by (E6)
@@ -279,7 +279,7 @@ Uniqueness: (graph_id, key) on every content and state table; (graph_id, parent_
 
 ### Concurrency and notification
 
-- Coarse per-domain optimistic locking (H5): `commit` runs as one MVCC transaction (`BEGIN CONCURRENT`) whose first write is the domain's revision row, so commits to one domain conflict and commits to different domains do not wait on each other. Before it begins, a commit takes its turn, in process, at every revision row it writes and at its patch id (in one order, waiting at most the connection acquire limit), so a commit beside one in flight on the same rows waits for it and then sees what it did: a resubmission meets its original's receipt, and a stale answer names only revisions that exist, with what really intervened. A commit that writes an identity reference (a node, answer, role fill, or participation naming an identity), or creates an identity, also claims the deployment's revision row, so those commits queue behind each other across every journey and route (and beside deployment patches and proposals to the deployment), as they already conflicted there. A write-write conflict Turso still reports (a connection outside those turns) is retried once from the start, then answered by what has moved, or as a failure when nothing has yet. A conflict response carries the touched set of the intervening events. The safe automatic retry is client-side: refetch, compare that touched set with the patch's own, resubmit or show the changes; it only ever moves a patch forward.
+- Coarse per-domain optimistic locking (H5): `commit` runs as one transaction on the store's one writer, which checks the domain's revision and every other revision the commit names, then writes, so commits run one at a time: a commit beside one in flight waits for the writer (at most the connection acquire limit) and then sees what that one did. A resubmission meets its original's receipt, and a stale answer names only revisions that exist, with what really intervened. Reads never wait on the writer. A conflict response carries the touched set of the intervening events. The safe automatic retry is client-side: refetch, compare that touched set with the patch's own, resubmit or show the changes; it only ever moves a patch forward.
 - `Notifier` publishes (domain, revision) after every commit, for journeys, routes, proposals, and the deployment. It is an in-process broadcast: with one process, every commit passes through it. An index view subscribes to every domain of a kind (all journeys, all routes) and is told which ones changed. On subscribe or reconnect the current revisions are sent at once, so a commit between a fetch and a subscription is never missed; that first message is complete, so a domain deleted meanwhile shows as absent (or at revision 0 when watched by name). Subscribers compare each tick with the revision they hold, per domain, and refetch only when it is newer (H6).
 
 ## Service layer and composition
@@ -290,7 +290,7 @@ The **composition root** in `crates/cairn` builds one `Service` from config:
 
 ```
 Capabilities {
-  store:      Turso(path)
+  store:      Sqlite(path)
   auth:       [Dev | Oidc(config) | BuiltinOauth(config) | Tailscale(config) | GcpIap(config)]
   assistant:  None | Some(provider config)
   public_url: the deployment's external base URL (links, OAuth redirects, MCP resource metadata)

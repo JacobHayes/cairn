@@ -1,4 +1,4 @@
-//! The service on the Turso store in one data directory, and the client that drives it: it
+//! The service on the SQLite store in one data directory, and the client that drives it: it
 //! submits each planned step until it is acknowledged, retrying a failed write with the
 //! same patch id (H5), and reopens the store in-process when writes keep failing. A store
 //! that has failed closed ends the run instead: the server exits and its supervisor restarts
@@ -12,8 +12,8 @@ use cairn_schema::{Actor, RankConstants};
 use cairn_service::{
     Call, Capabilities, DeploymentSettings, DomainPatch, Parts, Service, WriteError, Written,
 };
-use cairn_store::{CommitPoint, Faults, InProcessNotifier, PauseHook, Store, StoreError};
-use cairn_store_turso::TursoStore;
+use cairn_store::{CommitPoint, Faults, InProcessNotifier, PauseHook, Store};
+use cairn_store_sqlite::SqliteStore;
 use jiff::tz::{Offset, TimeZone};
 
 use crate::ledger::{Entry, Ledger};
@@ -63,7 +63,7 @@ impl World {
     /// Opens the store in `directory` with the commit-point hook, which records in the
     /// ledger each point the in-flight step's commit reaches, so a crash-restart sweep can
     /// stop the process right after one (`--fs-crash-at sync:N`).
-    pub async fn open(directory: PathBuf, plan: Plan, ledger: Ledger) -> Result<World, Stop> {
+    pub fn open(directory: PathBuf, plan: Plan, ledger: Ledger) -> Result<World, Stop> {
         let ledger = Arc::new(Mutex::new(ledger));
         let faults = Faults::default();
         let hooked = Arc::clone(&ledger);
@@ -77,7 +77,7 @@ impl World {
             Box::pin(std::future::ready(()))
         });
         faults.pause_with(hook);
-        let open = Open::new(&directory, &faults).await?;
+        let open = Open::new(&directory, &faults)?;
         Ok(World {
             directory,
             plan,
@@ -98,7 +98,7 @@ impl World {
     }
 
     /// The store.
-    pub fn store(&self) -> &TursoStore {
+    pub fn store(&self) -> &SqliteStore {
         &self.opened().store
     }
 
@@ -109,9 +109,9 @@ impl World {
 
     /// Closes the store and opens it again from disk: a clean in-process restart, which
     /// loses nothing the store acknowledged.
-    pub async fn reopen(&mut self) -> Result<(), Stop> {
+    pub fn reopen(&mut self) -> Result<(), Stop> {
         self.open = None;
-        self.open = Some(Open::new(&self.directory, &self.faults).await?);
+        self.open = Some(Open::new(&self.directory, &self.faults)?);
         self.reopened += 1;
         Ok(())
     }
@@ -193,7 +193,7 @@ impl World {
                         )));
                     }
                     if failed % REOPEN_AFTER == 0 {
-                        self.reopen().await?;
+                        self.reopen()?;
                     }
                 }
             }
@@ -203,17 +203,17 @@ impl World {
 
 /// The store and the service over it, as a composition root assembles them.
 struct Open {
-    store: Arc<TursoStore>,
+    store: Arc<SqliteStore>,
     service: Service,
 }
 
 impl Open {
-    async fn new(directory: &Path, faults: &Faults) -> Result<Open, Stop> {
-        let store = Arc::new(open_store(directory, faults).await?);
+    fn new(directory: &Path, faults: &Faults) -> Result<Open, Stop> {
+        let store = Arc::new(open_store(directory, faults)?);
         let zone = TimeZone::fixed(Offset::constant(-5));
         let settings = DeploymentSettings::new(parse("Etc/GMT+5"), zone, RankConstants::default());
         let service = Service::new(Parts {
-            store: Arc::<TursoStore>::clone(&store),
+            store: Arc::<SqliteStore>::clone(&store),
             notifier: Arc::new(InProcessNotifier::new()),
             settings,
             capabilities: Capabilities::server(Vec::new(), false),
@@ -241,45 +241,23 @@ pub fn report_violation(label: &str, detail: &str) {
     eprintln!("DURABILITY_VIOLATION {label} {detail}");
 }
 
-/// Turso panics, rather than answering an error, when an injected I/O error reaches these
-/// points of an open
-/// (decisions/2026-10-07-turso-an-open-under-injected-i-o-faults-panics-or-fails.md). An open
-/// that panics with one of them is a store that did not open; any other panic is a finding
-/// and goes on unwinding.
-const TURSO_OPEN_PANICS: [&str; 1] = ["failed to get file size"];
-
-/// Opens the store once. The world does not retry a failed open unless told to: a server
-/// whose store does not open exits and is restarted by its supervisor, and Turso can panic
-/// when an open is retried in the process a failed one ran in
-/// (decisions/2026-10-07-turso-an-open-under-injected-i-o-faults-panics-or-fails.md).
-async fn open_store(directory: &Path, faults: &Faults) -> Result<TursoStore, Stop> {
-    let path = database(directory);
-    let faults = faults.clone();
-    let opening = tokio::spawn(async move { TursoStore::open_with_faults(&path, faults).await });
-    match opening.await {
-        Ok(opened) => opened.map_err(|error: StoreError| Stop::Unavailable(error.to_string())),
-        Err(error) if error.is_panic() => {
-            let payload = error.into_panic();
-            let message = payload
-                .downcast_ref::<String>()
-                .cloned()
-                .or_else(|| {
-                    payload
-                        .downcast_ref::<&str>()
-                        .map(|text| (*text).to_owned())
-                })
-                .unwrap_or_default();
-            if TURSO_OPEN_PANICS
-                .iter()
-                .any(|known| message.contains(known))
-            {
-                return Err(Stop::Unavailable(format!("turso panicked: {message}")));
+/// Opens the store, as a server under a supervisor does: one whose store does not open
+/// exits and is started again, so a failed open is tried again, up to [`ATTEMPTS`] times.
+/// SQLite opens again cleanly in the process a failed open ran in. A panic in an open is a
+/// finding and unwinds.
+fn open_store(directory: &Path, faults: &Faults) -> Result<SqliteStore, Stop> {
+    let mut failed = 0;
+    loop {
+        match SqliteStore::open_with_faults(&database(directory), faults.clone()) {
+            Ok(store) => return Ok(store),
+            Err(error) => {
+                eprintln!("DURABILITY_OPEN_RETRY error={error}");
+                failed += 1;
+                if failed >= ATTEMPTS {
+                    return Err(Stop::Unavailable(error.to_string()));
+                }
             }
-            std::panic::resume_unwind(payload)
         }
-        Err(error) => Err(Stop::Unavailable(format!(
-            "the open was cancelled: {error}"
-        ))),
     }
 }
 

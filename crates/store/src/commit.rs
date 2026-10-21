@@ -55,7 +55,13 @@ pub struct Commit {
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum Committed {
     /// Persisted now.
-    Applied(PatchReceipt),
+    Applied {
+        /// The receipt stored.
+        receipt: PatchReceipt,
+        /// The deployment revision the commit left: moved when an identity create rode in
+        /// (E6), so the service announces the revision it really committed.
+        deployment: Revision,
+    },
     /// The patch id had already been committed with the same content (H5): nothing was
     /// written, and the receipt is the original one.
     AlreadyApplied(PatchReceipt),
@@ -66,7 +72,7 @@ impl Committed {
     #[must_use]
     pub fn receipt(&self) -> &PatchReceipt {
         match self {
-            Committed::Applied(receipt) | Committed::AlreadyApplied(receipt) => receipt,
+            Committed::Applied { receipt, .. } | Committed::AlreadyApplied(receipt) => receipt,
         }
     }
 }

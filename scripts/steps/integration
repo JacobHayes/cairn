@@ -29,7 +29,7 @@ export CARGO_TERM_COLOR=never
 ladder_cargo_test -- conformance:: in_process:: || ladder_fail "cargo test reported failures"
 # suite<TAB>crate<TAB>the test path it holds, as an awk regular expression
 suites=$'store conformance: memory\tcairn-store\t(^|::)conformance::
-store conformance: turso\tcairn-store-turso\t(^|::)conformance::
+store conformance: sqlite\tcairn-store-sqlite\t(^|::)conformance::
 API in process\tcairn-api\t(^|::)in_process::
 MCP in process\tcairn-api\t(^|::)mcp_in_process::
 binary in process\tcairn\t^server::in_process::'

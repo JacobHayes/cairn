@@ -158,7 +158,10 @@ impl MemoryStore {
             .proposals
             .extend(taken_proposals.into_iter().map(|id| (id, Revision::NONE)));
         state.receipts.insert(receipt.patch_id.clone(), stored);
-        Ok(Committed::Applied(receipt.clone()))
+        Ok(Committed::Applied {
+            receipt: receipt.clone(),
+            deployment,
+        })
     }
 
     fn revisions_now(&self) -> Revisions {

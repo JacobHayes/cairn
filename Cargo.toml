@@ -21,7 +21,7 @@ cairn-mcp = { path = "crates/mcp" }
 cairn-schema = { path = "crates/schema" }
 cairn-service = { path = "crates/service" }
 cairn-store = { path = "crates/store" }
-cairn-store-turso = { path = "crates/store-turso" }
+cairn-store-sqlite = { path = "crates/store-sqlite" }
 cairn-wasm = { path = "crates/wasm" }
 # The auth crate (ARCHITECTURE, Auth): axum for the layer and the providers' own routes
 # (HTTP/1 on tokio, plus forms, queries, and JSON for the OAuth
@@ -57,7 +57,7 @@ tower = { version = "0.5.2", default-features = false, features = ["util"] }
 url = "2.5.8"
 # The HTTP API (ARCHITECTURE, HTTP API; Observability): futures-core for the SSE body's
 # stream trait (already in the tree under axum); tracing for structured request logs (in
-# the tree under turso); metrics, the facade 4.7 attaches an exporter to, for request,
+# the tree under hyper-util and rmcp); metrics, the facade 4.7 attaches an exporter to, for request,
 # patch, and panic counts and latencies; metrics-util only to read them back in tests.
 futures-core = "0.3.34"
 metrics = "0.24.6"
@@ -92,17 +92,14 @@ serde-saphyr = "2.0.0"
 serde_json = { version = "1.0", features = ["float_roundtrip"] }
 serde_path_to_error = "0.1.20"
 sha2 = "0.11.0"
-# The store backends (ARCHITECTURE, Backends): Turso pinned exactly while pre-1.0, without its
-# default allocator and full-text search; tokio for the Turso backend's pool alone. `turso` is
-# the Rust SDK Turso documents for applications, and it re-exports its engine (`turso::core`),
-# which the Turso backend's test seam names. It also builds Turso's two C-ABI crates as static
-# and shared libraries that nothing links, about 450 MB a target directory
-# (decisions/2026-10-08-turso-is-embedded-through-the-turso-crate.md). rustix, on Linux only,
-# for the safe `posix_fadvise` the Turso backend evicts cached database pages with at open
-# (already in the tree under other crates).
+# The store backends (ARCHITECTURE, Backends): rusqlite with SQLite bundled (compiled from
+# its amalgamation, so every build has the same SQLite whatever the host has) and its
+# prepared-statement cache; tokio for the SQLite backend's waits for a connection alone.
+# rustix, on Linux only, for the safe `posix_fadvise` the SQLite backend evicts cached
+# database pages with at open (already in the tree under other crates).
+rusqlite = { version = "0.40.2", default-features = false, features = ["bundled", "cache"] }
 rustix = { version = "1.1.5", default-features = false, features = ["fs", "std"] }
 tokio ={ version = "1.53.2", default-features = false }
-turso = { version = "=0.8.3", default-features = false }
 # The browser host (ARCHITECTURE, Web UI): the Rust half of the wasm bindings. Pinned exactly,
 # because the `wasm-bindgen` CLI in mise.toml must be this same version to generate them.
 wasm-bindgen = "=0.2.129"
@@ -138,7 +135,7 @@ disallowed_types = "allow"
 # Debug assertions and overflow checks stay on. Line tables for the workspace's own crates,
 # so panics and backtraces still name file and line, and no debug info for dependencies: with
 # full debug info every test binary was hundreds of megabytes, each with its own copy of
-# Turso's. Lower both locally to step through code in a debugger.
+# its dependencies'. Lower both locally to step through code in a debugger.
 [profile.dev]
 opt-level = 1
 lto = "off"

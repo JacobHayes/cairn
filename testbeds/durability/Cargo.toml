@@ -1,4 +1,4 @@
-# Brief 6.2, the durability testbed: the service on the real Turso store under the patina
+# Brief 6.2, the durability testbed: the service on the real SQLite store under the patina
 # native shim's filesystem faults and crash-restart (PRACTICES, Simulation with patina:
 # Testbeds, `durability`). Its own Cargo workspace (the empty [workspace] table), so
 # `cargo patina build` resolves only this tree. The check ladder formats and lints it as a
@@ -17,18 +17,18 @@ repository = "https://github.com/JacobHayes/cairn"
 publish = false
 
 [dependencies]
-# The crates under test, by path: the service over the Turso store, and the engine's replay
+# The crates under test, by path: the service over the SQLite store, and the engine's replay
 # the invariants compare against.
 cairn-engine = { path = "../../crates/engine" }
 cairn-schema = { path = "../../crates/schema" }
 cairn-service = { path = "../../crates/service" }
 cairn-store = { path = "../../crates/store" }
-cairn-store-turso = { path = "../../crates/store-turso" }
+cairn-store-sqlite = { path = "../../crates/store-sqlite" }
 # The deployment's time zone the service takes, at the root workspace's version.
 jiff = { version = "0.2.37", default-features = false, features = ["std"] }
 # The SDK at the revision Cargo.toml's [workspace.dependencies] and mise.toml pin.
 patina-dst = { git = "https://github.com/JacobHayes/patina", rev = "1dee57b448d57c390af26a9d5af5f2d3a8820cc8" }
-# The Turso backend's runtime: one current-thread runtime with its timer (the working shape
+# The SQLite backend's runtime: one current-thread runtime with its timer (the working shape
 # under the shim).
 tokio = { version = "1.53.2", default-features = false, features = ["rt", "time"] }
 

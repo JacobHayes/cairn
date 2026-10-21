@@ -1,6 +1,6 @@
 //! Brief 6.1, the multiplayer testbed (PRACTICES, Simulation with patina: Testbeds).
 //!
-//! One process runs Cairn's real HTTP server (4.2's router over a service on the Turso
+//! One process runs Cairn's real HTTP server (4.2's router over a service on the SQLite
 //! store) and N virtual clients, all as tasks on a multi-thread tokio runtime
 //! (`WORKER_THREADS` workers; decisions/2026-10-18-the-multiplayer-testbed-runs-a-multi-thread-runtime.md). Each client patches one
 //! shared journey through the real Rust client: H5's safe retry resubmits a stale patch

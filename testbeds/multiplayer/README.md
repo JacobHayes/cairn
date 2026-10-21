@@ -8,7 +8,7 @@ Proof: `briefs/proof/6.1/README.md`.
 
 ## The program
 
-`src/main.rs` assembles a composition root as the binary's will (`src/world.rs`): the Turso
+`src/main.rs` assembles a composition root as the binary's will (`src/world.rs`): the SQLite
 store on a file in the run's virtual filesystem, the in-process notifier, the dev sign-in
 provider (no token: every request is the dev user), and 4.2's `cairn_api::router`, served by
 axum on `127.0.0.1:7878`. Everything runs as tasks on a multi-thread tokio runtime with four workers, so requests
@@ -110,10 +110,10 @@ did not exist yet; the client rebased back, and so on until its 32-resubmission 
 out in no time at all, and the caller was told the patch conflicted. Then the original
 landed. The same stale answer, given to any other patch beside a commit in flight, named
 that revision with nothing intervening even when the commit in flight touched what the patch
-did. Fixed (DECISIONS.md, the same entry): a Turso commit first takes its turn at every
-revision row it writes and at its patch id, so one beside a commit in flight on them waits
-for it and then meets its receipt or what it really touched; and the client never rebases a
-patch backward. `crates/tests/tests/integration/service/in_flight.rs` holds both cases over both stores, and
+did. Fixed (DECISIONS.md, the same entry): a commit beside one in flight waits for it and then
+meets its receipt or what it really touched (the store has one writer, so a commit waits
+for the writer, `decisions/2026-10-21-the-store-is-sqlite-with-one-writer.md`); and
+the client never rebases a patch backward. `crates/tests/tests/integration/service/in_flight.rs` holds both cases over both stores, and
 the campaign tolerates no finding.
 
 When a smoke generation fails, read its observed verdict and replay the saved trace before

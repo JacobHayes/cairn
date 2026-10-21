@@ -17,8 +17,6 @@ pub enum CommitPoint {
     /// Nothing is begun: the commit has its change set and waits, as for a connection. A
     /// commit held here lets another that loaded the same revision land first.
     BeforeBegin,
-    /// The domain's revision row is written (the commit's first write) and nothing else.
-    AfterRevisionRow,
     /// The state rows are written and the events are not.
     BetweenStateAndEvents,
     /// Everything is written; the transaction has not committed.

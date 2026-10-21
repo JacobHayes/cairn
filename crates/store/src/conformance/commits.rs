@@ -341,7 +341,7 @@ pub async fn two_commits_to_one_journey_yield_one_success_and_one_conflict<B: Ba
     let outcomes = [first, second];
     let applied_count = outcomes
         .iter()
-        .filter(|outcome| matches!(outcome, Ok(Committed::Applied(_))))
+        .filter(|outcome| matches!(outcome, Ok(Committed::Applied { .. })))
         .count();
     assert_eq!(applied_count, 1, "{outcomes:?}");
     let conflict = outcomes.into_iter().find_map(Result::err).unwrap();
@@ -904,13 +904,32 @@ pub async fn an_identity_create_in_a_journey_patch_bumps_the_deployment_revision
         create_journey("p_one", "j_one", Vec::new()),
         identity("who_new", "New", &["new@example.org"]),
     );
-    applied(&store, riding.commit()).await;
+    let committed = store.commit(riding.commit()).await;
+    assert!(
+        matches!(committed, Ok(Committed::Applied { deployment, .. }) if deployment == revision(1)),
+        "the commit answers the deployment revision it left: {committed:?}"
+    );
+    let plain = journey_patch("p_plain", "j_one", 1)
+        .event(
+            EventType::NodeAdded,
+            Subject::Node(node_key("n_a")),
+            vec![put_in(
+                &journey_graph("j_one"),
+                GraphRecord::Node(action("n_a", "a", None)),
+            )],
+        )
+        .commit();
+    let committed = store.commit(plain).await;
+    assert!(
+        matches!(committed, Ok(Committed::Applied { deployment, .. }) if deployment == revision(1)),
+        "a commit with no identity create leaves the deployment where it was: {committed:?}"
+    );
     let loaded = deployment(&store).await;
     assert_eq!(loaded.revision, revision(1));
     assert!(loaded.identities.get(&id("who_new")).is_some());
     assert_eq!(
         journey(&store, "j_one").await.unwrap().revision,
-        revision(1)
+        revision(2)
     );
     let revisions = store.revisions().await.unwrap();
     assert_eq!(revisions.deployment, revision(1));
@@ -1115,6 +1134,39 @@ fn delete_journey(patch: &str, journey: &str, base: u32) -> crate::commit::Commi
         .commit()
 }
 
+/// A19, J5: a hard delete of the journey holding the newest events never hands their
+/// positions out again, so a history cursor past them still sees the deletion's event.
+pub async fn a_hard_delete_never_reuses_the_positions_it_removes<B: Backend>(backend: &B) {
+    let store = open(backend).await;
+    applied(
+        &store,
+        create_journey("p_other", "j_other", Vec::new()).commit(),
+    )
+    .await;
+    applied(
+        &store,
+        create_journey("p_one", "j_one", vec![action("n_a", "a", None)]).commit(),
+    )
+    .await;
+    let seen = super::all_events(&store).await;
+    let cursor = seen.iter().map(|logged| logged.seq).max();
+    applied(&store, delete_journey("p_delete", "j_one", 1)).await;
+    let query = crate::query::EventQuery {
+        after: cursor,
+        size: crate::query::PageSize::MAX,
+        ..crate::query::EventQuery::default()
+    };
+    let after: Vec<_> = store
+        .events(&query)
+        .await
+        .unwrap()
+        .items
+        .into_iter()
+        .map(|logged| logged.event.patch_id.as_str().to_owned())
+        .collect();
+    assert_eq!(after, vec!["p_delete".to_owned()]);
+}
+
 /// A19, J1: a hard delete removes the journey, its events, and its proposals; the
 /// deployment log keeps the one event naming the deletion; the receipts still answer.
 pub async fn a_hard_delete_removes_events_and_keeps_the_deployment_event<B: Backend>(backend: &B) {
@@ -1245,6 +1297,169 @@ pub async fn a_create_at_a_deleted_journey_id_is_rejected<B: Backend>(backend: &
         vec![ViolationCode::DeletedJourneyId]
     );
     assert_eq!(snapshot(&store).await, before);
+}
+
+/// A19, H5: a commit drafted against a journey that is then hard-deleted is stale on it, and
+/// writes nothing: the journey stays gone.
+pub async fn a_commit_to_a_hard_deleted_journey_is_stale<B: Backend>(backend: &B) {
+    let store = open(backend).await;
+    applied(
+        &store,
+        create_journey("p_one", "j_one", vec![action("n_a", "a", None)]).commit(),
+    )
+    .await;
+    applied(&store, delete_journey("p_delete", "j_one", 1)).await;
+    let before = snapshot(&store).await;
+    let add = journey_patch("p_add", "j_one", 1)
+        .event(
+            EventType::NodeAdded,
+            Subject::Node(node_key("n_b")),
+            vec![put_in(
+                &journey_graph("j_one"),
+                GraphRecord::Node(action("n_b", "b", None)),
+            )],
+        )
+        .commit();
+    let (conflicts, _) = stale_parts(failed(&store, add).await);
+    let of: Vec<_> = conflicts
+        .iter()
+        .map(|conflict| conflict.of.clone())
+        .collect();
+    assert_eq!(of, vec![journey_of("j_one")]);
+    assert_eq!(journey(&store, "j_one").await, None);
+    assert_eq!(snapshot(&store).await, before);
+}
+
+/// The two identities a merge or delete case starts from, `who_a` and `who_b`.
+async fn two_identities(store: &dyn Store) {
+    let setup = deployment_patch("p_people", 0).event(
+        EventType::IdentityCreated,
+        Subject::Identity(id("who_a")),
+        vec![
+            Write::Put(Record::Identity(identity("who_a", "A", &[]))),
+            Write::Put(Record::Identity(identity("who_b", "B", &[]))),
+        ],
+    );
+    applied(store, setup.commit()).await;
+}
+
+/// An identity decision `n_who` and an action relevant when it is `who_b`.
+fn deciding_who(answer_type: &str) -> [cairn_schema::Node<cairn_schema::KeyRefs>; 2] {
+    [
+        node(json!({
+            "key": "n_who", "id": "who", "kind": "decision", "title": "Who",
+            "prompt": "Who?", "answer_type": answer_type,
+        })),
+        node(json!({
+            "key": "n_after", "id": "after", "kind": "action", "title": "After",
+            "relevant_when": {"equals": {"decision": "n_who", "value": "who_b"}},
+        })),
+    ]
+}
+
+/// E6: retyping a text decision to an identity decision turns the conditions that compare
+/// it into references to the compared identity, though no write names the key: a delete of
+/// that identity drafted as unreferenced is then stale on the journey.
+pub async fn a_decision_retyped_to_identities_makes_its_conditions_references<B: Backend>(
+    backend: &B,
+) {
+    let store = open(backend).await;
+    two_identities(&store).await;
+    let [decision, after] = deciding_who("text");
+    applied(
+        &store,
+        create_journey("p_one", "j_one", vec![decision, after]).commit(),
+    )
+    .await;
+    let [retyped, _] = deciding_who("identity");
+    let retype = journey_patch("p_retype", "j_one", 1)
+        .event(
+            EventType::NodeChanged,
+            Subject::Node(node_key("n_who")),
+            vec![put_in(&journey_graph("j_one"), GraphRecord::Node(retyped))],
+        )
+        .commit();
+    applied(&store, retype).await;
+    let delete = deployment_patch("p_delete", 1)
+        .unreferenced(&["who_b"])
+        .event(
+            EventType::IdentityDeleted,
+            Subject::Identity(id("who_b")),
+            vec![Write::Remove(RecordKey::Identity(id("who_b")))],
+        )
+        .commit();
+    let (conflicts, _) = stale_parts(failed(&store, delete).await);
+    let of: Vec<_> = conflicts
+        .iter()
+        .map(|conflict| conflict.of.clone())
+        .collect();
+    assert_eq!(of, vec![journey_of("j_one")]);
+}
+
+/// E6: a journey created from a route version whose conditions name an identity refers to
+/// it, though its writes copy the graph and name no key: a merge of that identity drafted
+/// before the journey existed is then stale on it.
+pub async fn a_journey_copied_from_a_route_refers_to_the_identities_it_names<B: Backend>(
+    backend: &B,
+) {
+    let store = open(backend).await;
+    two_identities(&store).await;
+    let draft = GraphId::RouteDraft(id("r"));
+    let route = create_route("p_route", "r").event(
+        EventType::NodeAdded,
+        Subject::Node(node_key("n_who")),
+        deciding_who("identity")
+            .into_iter()
+            .map(|node| put_in(&draft, GraphRecord::Node(node)))
+            .collect(),
+    );
+    applied(&store, route.commit()).await;
+    applied(
+        &store,
+        build::publish(route_patch("p_publish", "r", 1), "r", 1, 2).commit(),
+    )
+    .await;
+    let from_route = journey_patch("p_new", "j_new", 0)
+        .event(
+            EventType::JourneyCreated,
+            Subject::Journey(id("j_new")),
+            vec![
+                Write::Put(Record::JourneyHeader(build::journey_header(
+                    "j_new",
+                    "New",
+                    Some(("r", 1)),
+                ))),
+                Write::CopyGraph {
+                    from: GraphId::RouteVersion {
+                        route: id("r"),
+                        version: build::version(1),
+                    },
+                    to: journey_graph("j_new"),
+                },
+            ],
+        )
+        .commit();
+    applied(&store, from_route).await;
+    let merge = deployment_patch("p_merge", 1)
+        .referencing(&["who_a", "who_b"], &[])
+        .event(
+            EventType::IdentitiesMerged,
+            Subject::Identity(id("who_b")),
+            vec![
+                Write::Remove(RecordKey::Identity(id("who_b"))),
+                Write::Put(Record::IdentityAlias {
+                    alias: id("who_b"),
+                    identity: id("who_a"),
+                }),
+            ],
+        )
+        .commit();
+    let (conflicts, _) = stale_parts(failed(&store, merge).await);
+    let of: Vec<_> = conflicts
+        .iter()
+        .map(|conflict| conflict.of.clone())
+        .collect();
+    assert_eq!(of, vec![journey_of("j_new")]);
 }
 
 /// H5, I6: a proposal's editing revision moves on its own, never its destination's; an

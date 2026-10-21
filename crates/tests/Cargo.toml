@@ -24,7 +24,7 @@ cairn-mcp.workspace = true
 cairn-schema = { workspace = true, features = ["testing"] }
 cairn-service.workspace = true
 cairn-store = { workspace = true, features = ["conformance"] }
-cairn-store-turso = { workspace = true, features = ["io-seam"] }
+cairn-store-sqlite.workspace = true
 cairn-wasm.workspace = true
 chrono.workspace = true
 cookie.workspace = true
@@ -47,7 +47,7 @@ tokio = { workspace = true, features = ["macros", "net", "rt", "sync", "test-uti
 tower.workspace = true
 tracing.workspace = true
 tracing-subscriber.workspace = true
-turso.workspace = true
+rusqlite.workspace = true
 url.workspace = true
 
 [lints]

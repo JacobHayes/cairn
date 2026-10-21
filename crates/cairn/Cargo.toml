@@ -29,7 +29,7 @@ cairn-engine.workspace = true
 cairn-schema.workspace = true
 cairn-service.workspace = true
 cairn-store.workspace = true
-cairn-store-turso.workspace = true
+cairn-store-sqlite.workspace = true
 # `cairn demo` seeds the fixtures the in-browser host is seeded with.
 cairn-wasm.workspace = true
 chrono.workspace = true

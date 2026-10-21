@@ -1,4 +1,4 @@
-//! Domain patches through the service, over the memory and Turso stores alike (A11, A12,
+//! Domain patches through the service, over the memory and SQLite stores alike (A11, A12,
 //! A17, A19, B1, B11, D7, E6, H2, H3, H5, H6, Journey durability).
 #![cfg(test)]
 
@@ -17,7 +17,7 @@ use support::{
     step_call, step_patch, vendor_after,
 };
 
-/// Runs each case once over a fresh memory store and once over a fresh Turso store.
+/// Runs each case once over a fresh memory store and once over a fresh SQLite store.
 macro_rules! on_both_stores {
     ($($case:ident),* $(,)?) => {
         mod memory {
@@ -29,12 +29,12 @@ macro_rules! on_both_stores {
                 }
             )*
         }
-        mod turso {
+        mod sqlite {
             $(
                 #[test]
                 fn $case() {
                     crate::service::support::run(async {
-                        let (service, notifier) = crate::service::support::turso(crate::service::writes::TMP.as_ref()).await;
+                        let (service, notifier) = crate::service::support::sqlite(crate::service::writes::TMP.as_ref());
                         super::$case(&service, &notifier).await;
                     });
                 }
@@ -71,7 +71,7 @@ on_both_stores!(
 
 const AT: &str = "2026-10-06T12:00:00Z";
 
-/// Where the Turso cases keep their databases: cargo's per-target temporary directory.
+/// Where the SQLite cases keep their databases: cargo's per-target temporary directory.
 const TMP: &str = env!("CARGO_TARGET_TMPDIR");
 
 /// The events a scenario's patches emit: one per mutation (J2).
@@ -1295,9 +1295,9 @@ fn every_operation_can_be_awaited_on_another_thread() {
     send(&memory.subscribe(BTreeSet::new()));
     send(&memory.journey(&journey_id("j_one")));
     support::run(async {
-        let (turso, _) = support::turso(TMP.as_ref()).await;
-        send(&turso.patch(&call, &created));
-        send(&turso.subscribe(BTreeSet::new()));
+        let (sqlite, _) = support::sqlite(TMP.as_ref());
+        send(&sqlite.patch(&call, &created));
+        send(&sqlite.subscribe(BTreeSet::new()));
     });
 }
 

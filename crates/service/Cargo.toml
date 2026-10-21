@@ -20,7 +20,6 @@ serde.workspace = true
 [dev-dependencies]
 cairn-engine = { workspace = true, features = ["testing"] }
 cairn-store = { workspace = true, features = ["conformance"] }
-cairn-store-turso.workspace = true
 patina-dst-proptest.workspace = true
 proptest.workspace = true
 serde_json.workspace = true

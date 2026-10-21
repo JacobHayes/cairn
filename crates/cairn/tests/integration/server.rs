@@ -415,11 +415,7 @@ mod in_process {
         crate::support::seed::seed_fixtures(&database)
             .await
             .unwrap();
-        let store = Arc::new(
-            cairn_store_turso::TursoStore::open(&database)
-                .await
-                .unwrap(),
-        );
+        let store = Arc::new(cairn_store_sqlite::SqliteStore::open(&database).unwrap());
         let config = support::config(&support::dev_provider(Some("dev-token")));
         let assembly = root::Assembly {
             store,
@@ -449,7 +445,7 @@ mod in_process {
             cairn_api::observe::REQUESTS,
             cairn_api::observe::REQUEST_DURATION,
             cairn_service::DERIVE_DURATION,
-            cairn_store_turso::COMMIT_DURATION,
+            cairn_store_sqlite::COMMIT_DURATION,
         ] {
             assert!(metrics.contains(name), "{name} missing from:\n{metrics}");
         }

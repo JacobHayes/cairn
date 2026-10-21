@@ -6,8 +6,8 @@ use std::time::Duration;
 
 /// Items in one page of history, the journey index, or search results: callers page.
 pub const PAGE_ITEM_COUNT_MAX: u32 = 200;
-/// Store connections per process: each in-flight request borrows one for its load or
-/// commit.
+/// Store reader connections per process, besides the one writer: each in-flight read
+/// borrows one; every write takes the writer in turn.
 pub const STORE_CONNECTION_COUNT_MAX: u32 = 16;
 /// How long a request waits for a store connection: commits take milliseconds, so five
 /// seconds of waiting is contention, which at this scale is a bug.

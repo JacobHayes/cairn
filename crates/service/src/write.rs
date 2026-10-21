@@ -297,14 +297,22 @@ impl Service {
             change_set: applied.change_set().clone(),
         };
         match self.store.commit(commit).await {
-            Ok(Committed::Applied(receipt)) => {
+            Ok(Committed::Applied {
+                receipt,
+                deployment,
+            }) => {
                 assert_eq!(
                     receipt,
                     applied.change_set().receipt,
                     "the store keeps the receipt"
                 );
-                self.announce(&patch.target, &receipt, &loaded.records, applied)
-                    .await;
+                self.announce(
+                    &patch.target,
+                    &receipt,
+                    deployment,
+                    &loaded.records,
+                    applied,
+                );
                 Ok(Written::Applied {
                     receipt,
                     consequences: caused,
@@ -326,14 +334,14 @@ impl Service {
     /// H6: announces every revision a commit moved: its domain's, or for a patch to a
     /// proposal the proposal's (I6: drafting never moves the destination); each proposal a
     /// domain patch applied; and the deployment's when an identity create riding in a journey or
-    /// route patch moved it. The deployment's revision is read back from the store, which
-    /// another such commit may have moved further in the meantime: announcing an older one
-    /// would be ignored by a subscriber that heard the newer, and announcing one never
-    /// committed would hide the real one when it comes.
-    async fn announce(
+    /// route patch moved it, at `deployment`, the revision the store says the commit left
+    /// (the engine's records cannot know of another such commit that landed after their
+    /// load).
+    fn announce(
         &self,
         target: &PatchTarget,
         receipt: &PatchReceipt,
+        deployment: Revision,
         before: &Records,
         applied: &Applied,
     ) {
@@ -360,19 +368,9 @@ impl Service {
         if domain == Domain::Deployment || !creates_identities {
             return;
         }
-        // The store's revision, or, when it cannot be read back, the one the engine's records
-        // computed: a riding create moves the deployment once per commit, so that is this
-        // commit's revision or a lower one already committed, never one that does not exist.
-        let computed = applied.records().deployment.revision;
-        let committed = if let Ok(revisions) = self.store.revisions().await {
-            revisions.deployment
-        } else {
-            patina_dst::reachable!("service-deployment-revision-unread");
-            computed
-        };
-        if committed > before.deployment.revision {
+        if deployment > before.deployment.revision {
             self.notifier
-                .publish(&RevisionOf::Domain(Domain::Deployment), committed);
+                .publish(&RevisionOf::Domain(Domain::Deployment), deployment);
         }
     }
 }

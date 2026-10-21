@@ -1,7 +1,8 @@
 //! What a restarted incarnation learns before and after it opens the store: the step that
 //! was in flight when the process stopped, the last commit point the store reported for it,
-//! and whether the crash left a torn tail on Turso's logical log, which the store's open must
-//! discard (Turso's frame-level atomicity: a frame whose trailer is missing is not replayed).
+//! and whether the crash left a torn tail on SQLite's write-ahead log, which the store's open
+//! must discard (SQLite's frame-level atomicity: a frame cut short, or one whose checksum
+//! does not follow from the frames before it, ends recovery).
 //!
 //! The coverage oracles here fire only in a restarted incarnation, which only a crash-restart
 //! makes, and `cargo patina campaign` draws no crash
@@ -25,10 +26,10 @@ pub const INTERRUPTED_LANDED: &str = "durability-crash-interrupted-commit-landed
 pub const BETWEEN_STATE_AND_EVENTS: &str = "durability-crash-between-state-and-events";
 pub const TORN_TAIL_DISCARDED: &str = "durability-torn-log-tail-discarded";
 
-/// The last four bytes of a whole Turso logical-log frame (`END_MAGIC`, little-endian).
-const FRAME_END: &[u8; 4] = b"MVTE";
-/// The logical log's header length (`LOG_HDR_SIZE`).
-const LOG_HEADER_LENGTH: usize = 56;
+/// The write-ahead log's header length.
+const LOG_HEADER_LENGTH: usize = 32;
+/// A frame's header length; the page follows it.
+const FRAME_HEADER_LENGTH: usize = 24;
 
 /// What the disk and the ledger say before the store opens.
 pub struct Before {
@@ -55,7 +56,7 @@ impl Before {
             }
         }
         let mut log = database(directory).into_os_string();
-        log.push("-log");
+        log.push("-wal");
         let bytes = read_if_present(&log.into()).map_err(|error| Stop::Abort {
             label: "durability-store-files-readable",
             detail: error.to_string(),
@@ -91,13 +92,22 @@ impl Before {
     }
 }
 
-/// Whether a logical log ends partway through its header or a frame.
+/// Whether a write-ahead log ends partway through its header or a frame. The header names
+/// the page size (bytes 8 to 11, big-endian), and every frame is its header and one page. A
+/// coverage oracle only: after a checkpoint SQLite writes the log again from its start
+/// without shortening the file, so a frame torn there leaves the length whole.
 fn torn(log: &[u8]) -> bool {
-    match log.len() {
-        0 | LOG_HEADER_LENGTH => false,
-        length if length < LOG_HEADER_LENGTH => true,
-        length => &log[length - FRAME_END.len()..] != FRAME_END,
+    if log.is_empty() {
+        return false;
     }
+    let page = log
+        .get(8..12)
+        .and_then(|bytes| <[u8; 4]>::try_from(bytes).ok());
+    let (Some(page), Some(frames)) = (page, log.len().checked_sub(LOG_HEADER_LENGTH)) else {
+        return true;
+    };
+    let page = usize::try_from(u32::from_be_bytes(page)).unwrap_or(usize::MAX);
+    frames % (FRAME_HEADER_LENGTH + page) != 0
 }
 
 /// The steps the ledger records as acknowledged.
@@ -138,10 +148,10 @@ mod tests {
 
     #[test]
     fn a_log_is_torn_when_it_ends_inside_its_header_or_a_frame() {
-        let header = vec![0u8; LOG_HEADER_LENGTH];
+        let mut header = vec![0u8; LOG_HEADER_LENGTH];
+        header[8..12].copy_from_slice(&512u32.to_be_bytes());
         let mut whole = header.clone();
-        whole.extend_from_slice(b"frame bytes");
-        whole.extend_from_slice(FRAME_END);
+        whole.extend_from_slice(&[7u8; FRAME_HEADER_LENGTH + 512]);
         let cases: [(&[u8], bool); 5] = [
             (&[], false),
             (&header, false),

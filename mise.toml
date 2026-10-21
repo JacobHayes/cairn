@@ -14,9 +14,3 @@ rust = { version = "1.99.0", profile = "minimal", components = "clippy,rustfmt",
 "cargo:https://github.com/JacobHayes/patina" = { version = "rev:1dee57b448d57c390af26a9d5af5f2d3a8820cc8", crate = "cargo-patina", locked = true }
 # RustSec advisories over every lock file: the full check's advisories step (deny.toml).
 cargo-deny = "0.20.2"
-
-[env]
-# A fixed build time for every build, local and CI. turso_core's build script embeds the wall
-# clock in its output unless this is set, so the crate and everything built on it missed the
-# build cache in every fresh target directory. The value is the time of the project's first commit (2026-10-06T07:13:23Z).
-SOURCE_DATE_EPOCH = "1791270803"

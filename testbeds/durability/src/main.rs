@@ -1,5 +1,5 @@
 //! Brief 6.2, the durability testbed (PRACTICES, Simulation with patina: Testbeds,
-//! `durability`; PRD J2, J3, A17). The service runs on the real Turso store in one data
+//! `durability`; PRD J2, J3, A17). The service runs on the real SQLite store in one data
 //! directory and one client submits a seeded plan of domain patches, recording in a durable
 //! ledger what it submitted and what was acknowledged. Under the patina native shim the
 //! filesystem can fail operations (EIO), shorten writes, and crash the process at a chosen
@@ -134,7 +134,7 @@ async fn run(options: &Options) -> Result<String, Stop> {
     let restarted = !ledger.entries().is_empty();
     let plan = plan_of(&mut ledger, options)?;
     let before = restart::Before::read(&options.directory, &ledger)?;
-    let mut world = World::open(options.directory.clone(), plan, ledger).await?;
+    let mut world = World::open(options.directory.clone(), plan, ledger)?;
     world.ack_before_commit = options.ack_before_commit;
     let mut resubmit = None;
     if restarted {
@@ -149,7 +149,7 @@ async fn run(options: &Options) -> Result<String, Stop> {
             continue;
         }
         if patina_dst::buggify!("durability-reopen-between-steps") {
-            world.reopen().await?;
+            world.reopen()?;
             check(&world, "after-reopen").await?;
         }
         let written = world.submit(index).await?;

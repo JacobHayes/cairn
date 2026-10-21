@@ -1,7 +1,7 @@
 # Durability testbed
 
 Brief 6.2 (PRACTICES, Simulation with patina: Testbeds, `durability`). The service runs on
-the real Turso store in a directory of patina's simulated filesystem, under filesystem
+the real SQLite store in a directory of patina's simulated filesystem, under filesystem
 faults (`EIO`, `ENOSPC`, `EINTR`, short reads and writes) and crash-restart with torn
 writes. The question it answers: after every restart, does the state equal the replayed
 log, and is every acknowledged commit still there? Exploratory: `mise run sim` runs it,
@@ -16,10 +16,11 @@ runs its unit tests, but never simulates it.
   through the engine, so a rejection in a run is a finding.
 - `ledger.rs`: the client's memory on the same disk: the plan's seed, an intent before
   each submission, each commit point the store's fault hook reports for the step in
-  flight (`AfterRevisionRow` and the rest, so a crash selector can land right after one),
+  flight (`BetweenStateAndEvents` and the rest, so a crash selector can land right after one),
   and the acknowledgement with its revision. Each entry is checksummed and synced before
   the client acts on it; a torn last entry is cut off on reopen.
-- `world.rs`: the service over `TursoStore` as a composition root builds it. One client
+- `world.rs`: the service over `SqliteStore` as a composition root builds it, opened again
+  after a failed open as a supervisor would start the server again. One client
   submits each step until it is answered, retrying a failed write with the same patch id
   (H5) and reopening the store after three failures in a row, unless the store has failed
   closed, which ends the run `unavailable`. Buggify sites lose an
@@ -31,8 +32,8 @@ runs its unit tests, but never simulates it.
   deployment equal the engine's replay of the log from empty (J3). Each broken invariant
   is a `violation` verdict and the run exits 1.
 - `restart.rs`: in an incarnation that starts on an existing ledger, before the store
-  opens it notes the step in flight, its last commit point, and whether Turso's logical
-  log ends inside a frame; after the restart audit it fires the crash oracles and checks
+  opens it notes the step in flight, its last commit point, and whether SQLite's
+  write-ahead log ends inside a frame; after the restart audit it fires the crash oracles and checks
   that the step in flight, resubmitted, is answered from its receipt exactly when it
   landed.
 
@@ -67,8 +68,8 @@ mise run sim     # every leg of sim.sh, from the repository root
    fails closed ends `unavailable`, as one whose store does not open does. The testbed does
    not judge a failed sync itself: that path is pinned by the store's deterministic test
    (the store finding below), and a run whose store fails closed ends without an audit.
-The known gaps in Findings are not checked here: they exercise pinned patina or Turso, not
-Cairn (`decisions/2026-10-17-simulation-runs-no-known-gap-checks.md`).
+The known gaps in Findings are not checked here: they exercise pinned patina, or the Turso
+store this testbed first ran on, not Cairn (`decisions/2026-10-17-simulation-runs-no-known-gap-checks.md`).
 
 No check here depends on one seed's outcome: a seed reproduces a run on one binary only
 (`decisions/2026-10-16-simulation-checks-pin-no-seed.md`).
@@ -85,9 +86,12 @@ Each finding is recorded in `decisions/`, linked at the end of its item.
   open drops the files' cached pages first. Patina keeps the dirty data of a failed fsync
   (Linux drops it) and accepts `posix_fadvise` without changing anything, so a run cannot
   show the restart reading from disk: the world ends the run when the store fails closed,
-  instead of reopening it in-process. Its deterministic tests are
-  `crates/tests/tests/integration/store_turso/conformance/conformance/log_sync.rs`, which
-  pin the path through Turso's I/O seam; the testbed does not judge sync failures. Recorded in
+  instead of reopening it in-process. Its deterministic tests
+  pinned the path through Turso's I/O seam and went with that store; the SQLite store keeps
+  the rule (`decisions/2026-10-21-the-store-is-sqlite-with-one-writer.md`), pinned by
+  `crates/tests/tests/integration/store_sqlite/conformance/conformance/fail_closed.rs`,
+  which injects the failure in place of the `COMMIT`; the testbed does not judge sync
+  failures. Recorded in
   [`decisions/2026-10-09-a-commit-the-store-cannot-settle-fails-it-closed.md`](../../decisions/2026-10-09-a-commit-the-store-cannot-settle-fails-it-closed.md),
   which replaced the barrier of
   [`decisions/2026-10-07-the-log-sync-fix-nothing-is-answered-from-a-write-until.md`](../../decisions/2026-10-07-the-log-sync-fix-nothing-is-answered-from-a-write-until.md).
@@ -97,17 +101,32 @@ Each finding is recorded in `decisions/`, linked at the end of its item.
   store's migrations no longer set `temp_store = MEMORY` and leg 5 reaches every crash point
   on a fresh store. Recorded in
   [`decisions/2026-10-16-a-fresh-store-opens-without-a-temporary-directory.md`](../../decisions/2026-10-16-a-fresh-store-opens-without-a-temporary-directory.md).
-- **Turso: opens under injected faults.** A log size error at open panics; a short read of
+- **Turso: opens under injected faults (gone with that store).** A log size error at open panics; a short read of
   the log header fails the open (both were cases of the store's tests, removed as they only
   re-proved the pinned Turso's gaps); an open retried in-process
   after a failed one panics in the page cache (a testbed-only path: Cairn's server exits and is restarted instead); `EINTR` is reported, not retried.
   Recorded in
   [`decisions/2026-10-07-turso-an-open-under-injected-i-o-faults-panics-or-fails.md`](../../decisions/2026-10-07-turso-an-open-under-injected-i-o-faults-panics-or-fails.md).
-- **Patina: no crash in campaigns, no partial Turso frame.** A campaign never draws a crash,
-  so the crash oracles carry constant labels (out of the link-time table) and the sweep
-  gates them. Byte tearing tears the ledger's appends but never leaves part of a Turso log
-  frame, so the torn-tail oracle has not fired. Recorded in
+  On the SQLite store an open that panics is a finding like any other panic.
+- **Patina: no crash in campaigns.** A campaign never draws a crash, so the crash oracles
+  carry constant labels (out of the link-time table) and the sweep gates them. On Turso, byte
+  tearing never left part of a log frame and the torn-tail oracle never fired; on SQLite it
+  leaves part of a write-ahead log frame and the oracle fires, so leg 5 requires it. Recorded
+  in
   [`decisions/2026-10-07-patina-a-campaign-draws-no-crash-and-no-crash-leaves-part.md`](../../decisions/2026-10-07-patina-a-campaign-draws-no-crash-and-no-crash-leaves-part.md).
+- **SQLite: a `SIGBUS` in the log index, and fail-closed on every write fault (the move to
+  SQLite).** With SQLite's default VFS, two campaign generations died of `SIGBUS` writing the
+  write-ahead log's index into a memory-mapped `-shm` file. The cause is patina's: the shim
+  loads a newly mapped file with one fault-injected read and sizes the mapping to what that
+  read returned, so a short read leaves pages past it unbacked, which Linux never does (a
+  mapping's size is the file's). The store now opens on `unix-excl`, which keeps that index
+  in memory, so nothing is mapped. SQLite writes a
+  commit's log frames only at `COMMIT`, so any write fault in a commit fails the store
+  closed: leg 6 completes 14 of 112 runs where Turso completed 77, with no invariant broken. A
+  read fault can answer "database disk image is malformed": SQLite reports `EIO` on a read as
+  `SQLITE_IOERR_CORRUPTFS`; the retry succeeds. The world retries a failed open, as a
+  supervisor's restart would, since SQLite opens again cleanly in-process. Recorded in
+  [`decisions/2026-10-21-the-store-is-sqlite-with-one-writer.md`](../../decisions/2026-10-21-the-store-is-sqlite-with-one-writer.md).
 - Reused from 6.1: kebab-case literal site labels (the label rule's reasons are in
   [`decisions/2026-10-18-patina-main-retires-four-testbed-workarounds.md`](../../decisions/2026-10-18-patina-main-retires-four-testbed-workarounds.md))
   and verdicts rather than `always!`

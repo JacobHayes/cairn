@@ -21,5 +21,5 @@ mod people;
 mod served_text;
 mod service;
 mod store;
-mod store_turso;
+mod store_sqlite;
 mod wasm;

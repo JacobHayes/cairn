@@ -1,4 +1,4 @@
-//! Proposals through the service, over the memory and Turso stores alike (C14, D7, H2, H5,
+//! Proposals through the service, over the memory and SQLite stores alike (C14, D7, H2, H5,
 //! H6, I6, A17).
 #![cfg(test)]
 
@@ -17,7 +17,7 @@ use cairn_store::{EventQuery, Store, Take, Tick, Watch};
 
 use support::{agent_call, applied, call, domain, patch, rejected, service_over};
 
-/// Runs each case once over a fresh memory store and once over a fresh Turso store.
+/// Runs each case once over a fresh memory store and once over a fresh SQLite store.
 macro_rules! on_both_stores {
     ($($case:ident),* $(,)?) => {
         mod memory {
@@ -29,12 +29,12 @@ macro_rules! on_both_stores {
                 }
             )*
         }
-        mod turso {
+        mod sqlite {
             $(
                 #[test]
                 fn $case() {
                     crate::service::support::run(async {
-                        let store = crate::service::support::turso_store(crate::service::proposals::TMP.as_ref()).await;
+                        let store = crate::service::support::sqlite_store(crate::service::proposals::TMP.as_ref());
                         super::$case(store).await;
                     });
                 }
@@ -58,7 +58,7 @@ on_both_stores!(
 
 const AT: &str = "2026-10-06T12:00:00Z";
 
-/// Where the Turso cases keep their databases: cargo's per-target temporary directory.
+/// Where the SQLite cases keep their databases: cargo's per-target temporary directory.
 const TMP: &str = env!("CARGO_TARGET_TMPDIR");
 
 fn j_p() -> JourneyId {
@@ -726,5 +726,5 @@ fn every_proposal_operation_can_be_awaited_on_another_thread() {
         send(&service.proposal(&id));
     }
     operations(&support::memory().0);
-    support::run(async { operations(&support::turso(TMP.as_ref()).await.0) });
+    support::run(async { operations(&support::sqlite(TMP.as_ref()).0) });
 }

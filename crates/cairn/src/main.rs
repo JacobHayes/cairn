@@ -18,7 +18,7 @@ use cairn::root::StartupError;
 use cairn::{demo, root, telemetry};
 use cairn_auth::{Accounts, Clock};
 use cairn_store::{MemoryStore, Store};
-use cairn_store_turso::TursoStore;
+use cairn_store_sqlite::SqliteStore;
 use clap::{Parser, Subcommand};
 
 #[derive(Parser)]
@@ -80,7 +80,7 @@ fn main() -> ExitCode {
         Command::Config {
             command: ConfigCommand::Check(argument),
         } => load(&argument).and_then(|config| check(&config)),
-        Command::Migrate(argument) => load(&argument).and_then(|config| runtime(migrate(config))),
+        Command::Migrate(argument) => load(&argument).and_then(|config| migrate(&config)),
         Command::Serve(argument) => load(&argument).and_then(|config| runtime(serve(config))),
         Command::Demo(argument) => runtime(demo(argument.listen)),
     };
@@ -148,9 +148,8 @@ fn check(config: &Config) -> Result<(), String> {
 
 /// `migrate`: opening the store creates the file if absent and applies every migration it
 /// lacks, in one transaction.
-async fn migrate(config: Config) -> Result<(), String> {
-    cairn_store_turso::TursoStore::open(&config.database)
-        .await
+fn migrate(config: &Config) -> Result<(), String> {
+    SqliteStore::open(&config.database)
         .map_err(|error| format!("the database {}: {error}", config.database.display()))?;
     println!("migrated {}", config.database.display());
     Ok(())
@@ -159,13 +158,8 @@ async fn migrate(config: Config) -> Result<(), String> {
 /// `serve`, until SIGINT or SIGTERM.
 async fn serve(config: Config) -> Result<(), String> {
     telemetry::init_logs();
-    // Opened once: a failed open stops the process, never a retry here, since Turso cannot
-    // open again in a process a failed open ran in, and some open failures are not
-    // recoverable at all
-    // (decisions/2026-10-07-turso-an-open-under-injected-i-o-faults-panics-or-fails.md). A
-    // supervisor restarts the process.
-    let store = TursoStore::open(&config.database)
-        .await
+    // Opened once: a failed open stops the process, and a supervisor restarts it.
+    let store = SqliteStore::open(&config.database)
         .map_err(|error| stopped_by(&StartupError::Store(error)))?;
     run(&config, Arc::new(store), Router::new()).await
 }

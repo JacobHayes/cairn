@@ -321,7 +321,7 @@ fn proposal_listed(
 
 /// C14: the page of a listing, from every open proposal `candidates`: the scope's members,
 /// newest first by creation time then id, after the cursor, with the scope's whole count. The
-/// reference the Turso backend's SQL answers alike (the conformance suite holds them to it).
+/// reference the SQLite backend's SQL answers alike (the conformance suite holds them to it).
 fn proposal_page(
     query: &ProposalQuery,
     candidates: Vec<ProposalSummary>,

@@ -16,8 +16,8 @@
 #      invariant (a store that does not open on a failing disk is an honest outcome; a
 #      store that fails closed ends the run `unavailable`).
 #
-# The known patina and Turso gaps (README, Findings) are not checked here: they exercise
-# those pinned dependencies, not Cairn, and are recorded in decisions/
+# The known patina gaps (README, Findings) are not checked here: they exercise that pinned
+# dependency, not Cairn, and are recorded in decisions/
 # (decisions/2026-10-17-simulation-runs-no-known-gap-checks.md). No check here depends on
 # one seed's outcome (decisions/2026-10-16-simulation-checks-pin-no-seed.md).
 set -euo pipefail
@@ -75,9 +75,6 @@ out_of_reach=(
   service-patch-lost-at-commit
   service-resubmission-raced-original
   service-stale-patch-completed-with-intervening
-  # A read of the revisions failing in the instant after a commit that creates an identity in
-  # passing: injected errors land there too rarely for a smoke campaign.
-  service-deployment-revision-unread
   # Derived reads, proposals, and route-file imports: the plan writes domain patches only.
   service-derived-read-answered-from-memo
   service-import-resubmission-rebuilt-from-receipt
@@ -162,12 +159,13 @@ for err in "${crash_logs[@]}"; do
   grep -q '^PATINA_FS_CRASH_RESTART .*result=restarted' "$err" || fail "crash sweep: no restart in $err"
   grep -q '^DURABILITY_RESULT outcome=complete ' "$err" || fail "crash sweep: the store did not open or finish: $err"
 done
-# The torn-tail oracle is not required: at the pinned patina no crash leaves part of a Turso
-# log frame on disk (README, Findings).
+# Byte tearing leaves part of a frame at the end of SQLite's write-ahead log, which the open
+# discards, so the torn-tail oracle is required too.
 crash_oracles='durability-crash-between-state-and-events
 durability-crash-interrupted-commit-landed
 durability-crash-interrupted-commit-lost
-durability-restart-recovered-commits'
+durability-restart-recovered-commits
+durability-torn-log-tail-discarded'
 fired=$(satisfied "${crash_logs[@]}")
 missing=$(comm -23 <(sort <<<"$crash_oracles") <(printf '%s\n' "$fired"))
 [ -z "$missing" ] || fail "crash sweep: oracles never fired: $missing"
@@ -188,5 +186,5 @@ while read -r status err; do
     fi
   fi
 done <"$out/crash-errors.runs"
-complete=$(grep -l '^DURABILITY_RESULT outcome=complete ' $(awk '{print $2}' "$out/crash-errors.runs") | wc -l)
+complete=$(cat $(awk '{print $2}' "$out/crash-errors.runs") | grep -c '^DURABILITY_RESULT outcome=complete ' || true)
 say "leg 6 passed: crash under errors, $complete of $(wc -l <"$out/crash-errors.runs") runs completed, no invariant broke"

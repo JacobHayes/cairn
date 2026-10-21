@@ -8,16 +8,12 @@ use std::sync::Arc;
 use cairn_schema::RankConstants;
 use cairn_service::{AuthKind, AuthMethod, Capabilities, DeploymentSettings, Parts, Service};
 use cairn_store::InProcessNotifier;
-use cairn_store_turso::TursoStore;
+use cairn_store_sqlite::SqliteStore;
 use jiff::tz::TimeZone;
 
 /// Seeds every fixture into the database at `path`, which must be new.
 pub async fn seed_fixtures(path: &Path) -> Result<(), String> {
-    let store = Arc::new(
-        TursoStore::open(path)
-            .await
-            .map_err(|error| error.to_string())?,
-    );
+    let store = Arc::new(SqliteStore::open(path).map_err(|error| error.to_string())?);
     let settings = DeploymentSettings::new(
         "UTC".parse().map_err(|error: String| error)?,
         TimeZone::UTC,

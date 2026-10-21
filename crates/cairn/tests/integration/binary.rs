@@ -97,8 +97,7 @@ mod commands {
     }
 
     /// A database that does not open stops `serve` and `migrate` with a nonzero exit
-    /// naming it; the process never retries the open, which Turso cannot survive in one
-    /// process
+    /// naming it; the process never retries the open, and a supervisor restarts it
     /// (decisions/2026-10-07-a-database-that-does-not-open-stops-the-binary-it-never.md).
     #[test]
     fn a_database_that_does_not_open_stops_the_process() {
@@ -163,7 +162,7 @@ mod binary {
     use super::*;
     use crate::support::{self, get, send};
     use cairn_store::{Document, LoadTarget, Store};
-    use cairn_store_turso::TursoStore;
+    use cairn_store_sqlite::SqliteStore;
     use serde_json::json;
 
     /// A started `cairn serve`, stopped (killed) when dropped unless a test has already
@@ -328,9 +327,15 @@ mod binary {
             revision = reply.json()["receipt"]["revision"].as_u64().unwrap();
         }
 
+        // One process has the database: `migrate` beside the live server is refused.
+        let beside = run(&["migrate", "--config", path.to_str().unwrap()], &[]);
+        let stderr = String::from_utf8_lossy(&beside.stderr);
+        assert!(!beside.status.success(), "{stderr}");
+        assert!(stderr.contains("another process has it open"), "{stderr}");
+
         assert!(served.terminate().success());
 
-        let store = TursoStore::open(&directory.join("cairn.db")).await.unwrap();
+        let store = SqliteStore::open(&directory.join("cairn.db")).unwrap();
         let target = LoadTarget::Journey("j_persisted".parse().unwrap());
         let Some(Document::Journey(journey)) = store.load(&target).await.unwrap() else {
             panic!("the journey is not in the database file");

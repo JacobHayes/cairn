@@ -1,5 +1,5 @@
 //! The commit rules every backend applies the same way, over schema values, so the memory
-//! and Turso backends cannot drift: the change set's shape, which receipts a stale
+//! and SQLite backends cannot drift: the change set's shape, which receipts a stale
 //! revision's intervening events come from, and the checks only a commit can make on the
 //! records it produced. The read side (what a graph refers to, which nodes an event is
 //! about, search text, index listing, insertion uses) is in [`query`].
@@ -17,8 +17,6 @@ use cairn_schema::{
 use crate::commit::{Commit, CommitError, Committed, StoreError};
 
 pub mod query;
-
-use query::identity_keys_in;
 
 /// What a commit's change set says about itself, checked before anything is read.
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -40,9 +38,6 @@ pub struct Shape {
     pub graphs: BTreeSet<GraphId>,
     /// Whether the change set writes the deployment's identities or aliases.
     pub writes_deployment: bool,
-    /// Whether it writes a graph record that names an identity (an answer, a role fill, a
-    /// participation, a node): what an identity merge checks journeys for (E6).
-    pub references_identities: bool,
     /// The graphs whose nodes the change set writes, so the rows of the identities their
     /// conditions compare are rebuilt (E6).
     pub conditions_changed: BTreeSet<GraphId>,
@@ -87,7 +82,6 @@ impl Shape {
             deletes_journey: None,
             graphs: BTreeSet::new(),
             writes_deployment: false,
-            references_identities: false,
             conditions_changed: BTreeSet::new(),
         };
         for event in &change_set.events {
@@ -122,14 +116,7 @@ impl Shape {
                 }
                 key.clone()
             }
-            Write::CopyGraph { to, .. } => {
-                // A copy (a journey from a route, a publish, an upgrade) carries whatever
-                // identities its source names without a write naming them, so it takes the
-                // deployment lock like one that does: a merge or delete cannot commit beside it
-                // unseen.
-                self.references_identities = true;
-                RecordKey::Graph(to.clone())
-            }
+            Write::CopyGraph { to, .. } => RecordKey::Graph(to.clone()),
         };
         if let RecordKey::Graph(graph) | RecordKey::InGraph { graph, .. } = &key {
             self.graphs.insert(graph.clone());
@@ -146,14 +133,6 @@ impl Shape {
         } = &key
         {
             self.conditions_changed.insert(graph.clone());
-        }
-        // A put of an identity decision can add an identity reference without naming a key: retyping a decision
-        // to an identity type turns the conditions comparing it into references. It takes the
-        // deployment lock like a write that names one, so a delete cannot commit beside it.
-        if let Write::Put(Record::Graph { record, .. }) = write
-            && (names_an_identity(record) || is_identity_decision(record))
-        {
-            self.references_identities = true;
         }
         if matches!(key, RecordKey::Identity(_) | RecordKey::IdentityAlias(_)) {
             self.writes_deployment = true;
@@ -179,30 +158,6 @@ impl Shape {
             self.domain
         ))
     }
-}
-
-/// Whether a graph record is a node put whose answer type is an identity type.
-fn is_identity_decision(record: &GraphRecord) -> bool {
-    matches!(record, GraphRecord::Node(_))
-        && serde_json::to_value(record).is_ok_and(|written| {
-            written
-                .pointer("/node/answer_type")
-                .or_else(|| written.get("answer_type"))
-                .and_then(serde_json::Value::as_str)
-                .is_some_and(|kind| matches!(kind, "identity" | "identity_list"))
-        })
-}
-
-/// Whether a graph record names an identity key anywhere in its written form.
-fn names_an_identity(record: &GraphRecord) -> bool {
-    let named = matches!(
-        record,
-        GraphRecord::Answer { .. }
-            | GraphRecord::RoleFill { .. }
-            | GraphRecord::Participation { .. }
-    );
-    named
-        && serde_json::to_value(record).is_ok_and(|written| !identity_keys_in(&written).is_empty())
 }
 
 /// The events are the receipt's patch's, numbered from 0 in order, each in the patch's

@@ -1,0 +1,492 @@
+//! Auth state and conversations: plain rows outside every domain, answering as the memory
+//! backend does.
+
+use std::collections::BTreeSet;
+
+use cairn_schema::{ConversationId, Email, Slug, Timestamp, Title, UserId};
+use cairn_store::backend;
+use cairn_store::{
+    AgentTokenRecord, AuthLogEntry, AuthLogQuery, ConversationMessage, ConversationRecord,
+    ConversationSummary, LoggedAuthEntry, LoginRecord, OAuthStateRecord, Page, PageSize,
+    SecretHash, SessionRecord, StoreError, UserRecord,
+};
+use rusqlite::Connection;
+use rusqlite::types::Value;
+
+use crate::sql::{
+    Row, corrupt, execute, first, int, json_enum, opt_text, opt_time, rows, text, time,
+};
+
+fn user_exists(connection: &Connection, user: &UserId) -> Result<(), StoreError> {
+    match first(
+        connection,
+        "SELECT 1 FROM users WHERE id = ?1",
+        vec![text(user)],
+    )? {
+        Some(_) => Ok(()),
+        None => Err(backend::no_such_user(user)),
+    }
+}
+
+pub(crate) fn put_user(connection: &Connection, user: &UserRecord) -> Result<(), StoreError> {
+    let UserRecord { id, created_at } = user;
+    execute(
+        connection,
+        "INSERT OR REPLACE INTO users (id, created_at) VALUES (?1, ?2)",
+        vec![text(id), time(*created_at)?],
+    )?;
+    Ok(())
+}
+
+pub(crate) fn user(connection: &Connection, id: &UserId) -> Result<Option<UserRecord>, StoreError> {
+    let select = "SELECT created_at FROM users WHERE id = ?1";
+    let Some(row) = first(connection, select, vec![text(id)])? else {
+        return Ok(None);
+    };
+    Ok(Some(UserRecord {
+        id: id.clone(),
+        created_at: row.timestamp(0)?,
+    }))
+}
+
+pub(crate) fn put_login(connection: &Connection, login: &LoginRecord) -> Result<(), StoreError> {
+    let LoginRecord {
+        provider,
+        subject,
+        user,
+        name,
+        verified_emails,
+        linked_at,
+    } = login;
+    user_exists(connection, user)?;
+    let key = || vec![text(provider), text(subject)];
+    execute(
+        connection,
+        "INSERT OR REPLACE INTO user_logins (provider, subject, user_id, name, linked_at) \
+         VALUES (?1, ?2, ?3, ?4, ?5)",
+        vec![
+            text(provider),
+            text(subject),
+            text(user),
+            opt_text(name.as_ref()),
+            time(*linked_at)?,
+        ],
+    )?;
+    execute(
+        connection,
+        "DELETE FROM login_emails WHERE provider = ?1 AND subject = ?2",
+        key(),
+    )?;
+    for email in verified_emails {
+        let mut params = key();
+        params.push(text(email));
+        execute(
+            connection,
+            "INSERT INTO login_emails (provider, subject, email) VALUES (?1, ?2, ?3)",
+            params,
+        )?;
+    }
+    Ok(())
+}
+
+fn logins(
+    connection: &Connection,
+    filter: &str,
+    params: Vec<Value>,
+) -> Result<Vec<LoginRecord>, StoreError> {
+    let select = format!(
+        "SELECT provider, subject, user_id, name, linked_at FROM user_logins WHERE {filter} \
+         ORDER BY provider, subject"
+    );
+    let mut found = Vec::new();
+    for row in rows(connection, &select, params)? {
+        let select = "SELECT email FROM login_emails WHERE provider = ?1 AND subject = ?2";
+        let mut verified_emails = BTreeSet::new();
+        for email in rows(
+            connection,
+            select,
+            vec![text(&row.text(0)?), text(&row.text(1)?)],
+        )? {
+            verified_emails.insert(email.parse(0)?);
+        }
+        found.push(LoginRecord {
+            provider: row.parse(0)?,
+            subject: row.parse(1)?,
+            user: row.parse(2)?,
+            name: row.opt_parse(3)?,
+            verified_emails,
+            linked_at: row.timestamp(4)?,
+        });
+    }
+    Ok(found)
+}
+
+pub(crate) fn login(
+    connection: &Connection,
+    provider: &Slug,
+    subject: &Title,
+) -> Result<Option<LoginRecord>, StoreError> {
+    let filter = "provider = ?1 AND subject = ?2";
+    let found = logins(connection, filter, vec![text(provider), text(subject)])?;
+    Ok(found.into_iter().next())
+}
+
+pub(crate) fn logins_of(
+    connection: &Connection,
+    user: &UserId,
+) -> Result<Vec<LoginRecord>, StoreError> {
+    logins(connection, "user_id = ?1", vec![text(user)])
+}
+
+pub(crate) fn logins_with_email(
+    connection: &Connection,
+    email: &Email,
+) -> Result<Vec<LoginRecord>, StoreError> {
+    let filter = "EXISTS (SELECT 1 FROM login_emails AS verified \
+                  WHERE verified.provider = user_logins.provider \
+                  AND verified.subject = user_logins.subject AND verified.email = ?1)";
+    logins(connection, filter, vec![text(email)])
+}
+
+pub(crate) fn put_session(
+    connection: &Connection,
+    session: &SessionRecord,
+) -> Result<(), StoreError> {
+    let SessionRecord {
+        token_hash,
+        user,
+        created_at,
+        expires_at,
+    } = session;
+    user_exists(connection, user)?;
+    execute(
+        connection,
+        "INSERT OR REPLACE INTO sessions (token_hash, user_id, created_at, expires_at) \
+         VALUES (?1, ?2, ?3, ?4)",
+        vec![
+            text(token_hash),
+            text(user),
+            time(*created_at)?,
+            time(*expires_at)?,
+        ],
+    )?;
+    Ok(())
+}
+
+pub(crate) fn session(
+    connection: &Connection,
+    token_hash: &SecretHash,
+    now: Timestamp,
+) -> Result<Option<SessionRecord>, StoreError> {
+    let select = "SELECT user_id, created_at, expires_at FROM sessions \
+                  WHERE token_hash = ?1 AND expires_at > ?2";
+    let Some(row) = first(connection, select, vec![text(token_hash), time(now)?])? else {
+        return Ok(None);
+    };
+    Ok(Some(SessionRecord {
+        token_hash: token_hash.clone(),
+        user: row.parse(0)?,
+        created_at: row.timestamp(1)?,
+        expires_at: row.timestamp(2)?,
+    }))
+}
+
+pub(crate) fn remove_session(
+    connection: &Connection,
+    token_hash: &SecretHash,
+) -> Result<bool, StoreError> {
+    let sql = "DELETE FROM sessions WHERE token_hash = ?1";
+    Ok(execute(connection, sql, vec![text(token_hash)])? > 0)
+}
+
+pub(crate) fn put_oauth_state(
+    connection: &Connection,
+    state: &OAuthStateRecord,
+) -> Result<(), StoreError> {
+    let OAuthStateRecord {
+        key_hash,
+        kind,
+        payload,
+        expires_at,
+    } = state;
+    execute(
+        connection,
+        "INSERT OR REPLACE INTO oauth_transient (key_hash, kind, payload, expires_at) \
+         VALUES (?1, ?2, ?3, ?4)",
+        vec![
+            text(key_hash),
+            json_enum(kind)?,
+            text(payload),
+            time(*expires_at)?,
+        ],
+    )?;
+    Ok(())
+}
+
+pub(crate) fn take_oauth_state(
+    connection: &Connection,
+    key_hash: &SecretHash,
+    now: Timestamp,
+) -> Result<Option<OAuthStateRecord>, StoreError> {
+    let select = "SELECT kind, payload, expires_at FROM oauth_transient WHERE key_hash = ?1";
+    let Some(row) = first(connection, select, vec![text(key_hash)])? else {
+        return Ok(None);
+    };
+    let sql = "DELETE FROM oauth_transient WHERE key_hash = ?1";
+    execute(connection, sql, vec![text(key_hash)])?;
+    let state = OAuthStateRecord {
+        key_hash: key_hash.clone(),
+        kind: row.name(0)?,
+        payload: row.parse(1)?,
+        expires_at: row.timestamp(2)?,
+    };
+    Ok((state.expires_at > now).then_some(state))
+}
+
+pub(crate) fn remove_expired(connection: &Connection, now: Timestamp) -> Result<u64, StoreError> {
+    let mut removed = 0;
+    for table in ["sessions", "oauth_transient"] {
+        let sql = format!("DELETE FROM {table} WHERE expires_at <= ?1");
+        removed += execute(connection, &sql, vec![time(now)?])?;
+    }
+    Ok(removed)
+}
+
+pub(crate) fn put_agent_token(
+    connection: &Connection,
+    token: &AgentTokenRecord,
+) -> Result<(), StoreError> {
+    let AgentTokenRecord {
+        agent,
+        token_hash,
+        name,
+        user,
+        created_at,
+        revoked_at,
+    } = token;
+    user_exists(connection, user)?;
+    let select = "SELECT 1 FROM agent_tokens WHERE token_hash = ?1 AND agent <> ?2";
+    if first(connection, select, vec![text(token_hash), text(agent)])?.is_some() {
+        return Err(StoreError::Malformed(format!(
+            "another agent token has the digest of {agent}'s"
+        )));
+    }
+    execute(
+        connection,
+        "INSERT OR REPLACE INTO agent_tokens (agent, token_hash, name, user_id, created_at, \
+         revoked_at) VALUES (?1, ?2, ?3, ?4, ?5, ?6)",
+        vec![
+            text(agent),
+            text(token_hash),
+            text(name),
+            text(user),
+            time(*created_at)?,
+            opt_time(*revoked_at)?,
+        ],
+    )?;
+    Ok(())
+}
+
+fn agent_token(row: &Row) -> Result<AgentTokenRecord, StoreError> {
+    Ok(AgentTokenRecord {
+        agent: row.parse(0)?,
+        token_hash: row.parse(1)?,
+        name: row.parse(2)?,
+        user: row.parse(3)?,
+        created_at: row.timestamp(4)?,
+        revoked_at: row.opt_timestamp(5)?,
+    })
+}
+
+const TOKEN_COLUMNS: &str = "agent, token_hash, name, user_id, created_at, revoked_at";
+
+pub(crate) fn agent_token_by_hash(
+    connection: &Connection,
+    token_hash: &SecretHash,
+) -> Result<Option<AgentTokenRecord>, StoreError> {
+    let select = format!("SELECT {TOKEN_COLUMNS} FROM agent_tokens WHERE token_hash = ?1");
+    first(connection, &select, vec![text(token_hash)])?
+        .map(|row| agent_token(&row))
+        .transpose()
+}
+
+pub(crate) fn agent_tokens_of(
+    connection: &Connection,
+    user: &UserId,
+) -> Result<Vec<AgentTokenRecord>, StoreError> {
+    let select =
+        format!("SELECT {TOKEN_COLUMNS} FROM agent_tokens WHERE user_id = ?1 ORDER BY agent");
+    rows(connection, &select, vec![text(user)])?
+        .iter()
+        .map(agent_token)
+        .collect()
+}
+
+/// Appends at the next position, which SQLite numbers in commit order: one writer commits
+/// at a time.
+pub(crate) fn append_auth_log(
+    connection: &Connection,
+    entry: &AuthLogEntry,
+) -> Result<u64, StoreError> {
+    let AuthLogEntry {
+        at,
+        event,
+        user,
+        subject,
+    } = entry;
+    let appended = first(
+        connection,
+        "INSERT INTO auth_log (at, event, user_id, subject) VALUES (?1, ?2, ?3, ?4) \
+         RETURNING seq",
+        vec![
+            time(*at)?,
+            json_enum(event)?,
+            text(user),
+            opt_text(subject.as_ref()),
+        ],
+    )?
+    .ok_or_else(|| corrupt("an append returned no position"))?;
+    u64::try_from(appended.int(0)?).map_err(|error| corrupt(&format!("seq: {error}")))
+}
+
+/// The auth log, in order.
+pub(crate) fn auth_log(
+    connection: &Connection,
+    query: &AuthLogQuery,
+) -> Result<Page<LoggedAuthEntry, u64>, StoreError> {
+    let after = query
+        .after
+        .map(|after| i64::try_from(after).unwrap_or(i64::MAX));
+    let select = format!(
+        "SELECT seq, at, event, user_id, subject FROM auth_log \
+         WHERE (?1 IS NULL OR seq > ?1) AND (?2 IS NULL OR user_id = ?2) \
+         ORDER BY seq LIMIT {}",
+        query.size.get() + 1
+    );
+    let params = vec![
+        after.map_or(Value::Null, int),
+        opt_text(query.user.as_ref()),
+    ];
+    let mut items = Vec::new();
+    for row in rows(connection, &select, params)? {
+        items.push(LoggedAuthEntry {
+            seq: u64::try_from(row.int(0)?).map_err(|error| corrupt(&format!("seq: {error}")))?,
+            entry: AuthLogEntry {
+                at: row.timestamp(1)?,
+                event: row.name(2)?,
+                user: row.parse(3)?,
+                subject: row.opt_parse(4)?,
+            },
+        });
+    }
+    Ok(Page::cut(items, query.size, |logged| logged.seq))
+}
+
+pub(crate) fn put_conversation(
+    connection: &Connection,
+    conversation: &ConversationRecord,
+) -> Result<(), StoreError> {
+    backend::check_conversation_size(conversation)?;
+    let ConversationRecord {
+        id,
+        user,
+        title,
+        created_at,
+        updated_at,
+        messages,
+    } = conversation;
+    execute(
+        connection,
+        "INSERT OR REPLACE INTO conversations (id, user_id, title, created_at, updated_at) \
+         VALUES (?1, ?2, ?3, ?4, ?5)",
+        vec![
+            text(id),
+            text(user),
+            opt_text(title.as_ref()),
+            time(*created_at)?,
+            time(*updated_at)?,
+        ],
+    )?;
+    let sql = "DELETE FROM conversation_messages WHERE conversation = ?1";
+    execute(connection, sql, vec![text(id)])?;
+    for (position, message) in (0_i64..).zip(messages) {
+        let ConversationMessage {
+            author,
+            at,
+            content,
+        } = message;
+        execute(
+            connection,
+            "INSERT INTO conversation_messages (conversation, position, author, at, content) \
+             VALUES (?1, ?2, ?3, ?4, ?5)",
+            vec![
+                text(id),
+                int(position),
+                json_enum(author)?,
+                time(*at)?,
+                text(content),
+            ],
+        )?;
+    }
+    Ok(())
+}
+
+pub(crate) fn conversation(
+    connection: &Connection,
+    id: &ConversationId,
+) -> Result<Option<ConversationRecord>, StoreError> {
+    let select = "SELECT user_id, title, created_at, updated_at FROM conversations WHERE id = ?1";
+    let Some(row) = first(connection, select, vec![text(id)])? else {
+        return Ok(None);
+    };
+    let select = "SELECT author, at, content FROM conversation_messages WHERE conversation = ?1 \
+                  ORDER BY position";
+    let mut messages = Vec::new();
+    for message in rows(connection, select, vec![text(id)])? {
+        messages.push(ConversationMessage {
+            author: message.name(0)?,
+            at: message.timestamp(1)?,
+            content: message.parse(2)?,
+        });
+    }
+    Ok(Some(ConversationRecord {
+        id: id.clone(),
+        user: row.parse(0)?,
+        title: row.opt_parse(1)?,
+        created_at: row.timestamp(2)?,
+        updated_at: row.timestamp(3)?,
+        messages,
+    }))
+}
+
+pub(crate) fn conversations_of(
+    connection: &Connection,
+    user: &UserId,
+    after: Option<&ConversationId>,
+    size: PageSize,
+) -> Result<Page<ConversationSummary, ConversationId>, StoreError> {
+    let select = format!(
+        "SELECT id, title, updated_at FROM conversations \
+         WHERE user_id = ?1 AND (?2 IS NULL OR id > ?2) ORDER BY id LIMIT {}",
+        size.get() + 1
+    );
+    let mut items = Vec::new();
+    for row in rows(connection, &select, vec![text(user), opt_text(after)])? {
+        items.push(ConversationSummary {
+            id: row.parse(0)?,
+            title: row.opt_parse(1)?,
+            updated_at: row.timestamp(2)?,
+        });
+    }
+    Ok(Page::cut(items, size, |summary| summary.id.clone()))
+}
+
+pub(crate) fn remove_conversation(
+    connection: &Connection,
+    id: &ConversationId,
+) -> Result<bool, StoreError> {
+    let sql = "DELETE FROM conversation_messages WHERE conversation = ?1";
+    execute(connection, sql, vec![text(id)])?;
+    let sql = "DELETE FROM conversations WHERE id = ?1";
+    Ok(execute(connection, sql, vec![text(id)])? > 0)
+}

@@ -1,5 +1,5 @@
 //! Route files, upgrade, save as route, and re-link through the service, over the memory and
-//! Turso stores alike (A13, B7, B8, B9, C14, I6, I7; Journey durability, Portable data).
+//! SQLite stores alike (A13, B7, B8, B9, C14, I6, I7; Journey durability, Portable data).
 #![cfg(test)]
 
 use crate::service::support;
@@ -19,7 +19,7 @@ use support::{
     service_over, vendor_after,
 };
 
-/// Runs each case once over a fresh memory store and once over a fresh Turso store.
+/// Runs each case once over a fresh memory store and once over a fresh SQLite store.
 macro_rules! on_both_stores {
     ($($case:ident),* $(,)?) => {
         mod memory {
@@ -31,12 +31,12 @@ macro_rules! on_both_stores {
                 }
             )*
         }
-        mod turso {
+        mod sqlite {
             $(
                 #[test]
                 fn $case() {
                     crate::service::support::run(async {
-                        let store = crate::service::support::turso_store(crate::service::routes::TMP.as_ref()).await;
+                        let store = crate::service::support::sqlite_store(crate::service::routes::TMP.as_ref());
                         super::$case(store).await;
                     });
                 }
@@ -57,7 +57,7 @@ on_both_stores!(
 
 const AT: &str = "2026-10-30T12:00:00Z";
 
-/// Where the Turso cases keep their databases: cargo's per-target temporary directory.
+/// Where the SQLite cases keep their databases: cargo's per-target temporary directory.
 const TMP: &str = env!("CARGO_TARGET_TMPDIR");
 
 fn vendor() -> JourneyId {
@@ -587,7 +587,7 @@ fn every_route_operation_can_be_awaited_on_another_thread() {
     let file: RouteFile = from_yaml(&std::fs::read_to_string(path).unwrap()).unwrap();
     let lead = call("u_lead", AT);
     operations(&support::memory().0, &file, &lead);
-    support::run(async { operations(&support::turso(TMP.as_ref()).await.0, &file, &lead) });
+    support::run(async { operations(&support::sqlite(TMP.as_ref()).0, &file, &lead) });
 }
 
 /// The journey moved by a note, as a second person would.
