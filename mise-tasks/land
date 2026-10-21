@@ -1,6 +1,6 @@
 #!/usr/bin/env -S bash -euo pipefail
-#MISE description="Land the current change: under a lock, rebase it onto main, run the fast check on the result, and move the main bookmark to it (never pushes)"
-# usage: mise run land
+#MISE description="Land the current change (only the fix while CI on main is red): under a lock, rebase it onto main, run the fast check on the result, and move the main bookmark to it (never pushes)"
+# usage: mise run land [--fix]
 # The lock (scripts/locked, with CAIRN_LOCK_FILE) is a file in the jj repository's directory, so every workspace of the repository
 # lands one at a time and a change is always checked on the main it will sit on. The change
 # is the working copy, or its parent when the working copy is empty. The rebase moves the
@@ -16,6 +16,27 @@ if [ -z "${CAIRN_LANDING:-}" ]; then
   CAIRN_LANDING=1 CAIRN_LOCK_FILE=$repo/cairn-land.lock exec scripts/locked "$0" "$@"
 fi
 unset CAIRN_LANDING CAIRN_LOCK_FILE
+
+# CI's run on main is the gate (decisions/2026-10-21-ci-on-main-is-the-gate.md): while the newest
+# finished run on main failed, only the fix lands (--fix), so nothing stacks on a broken main. When
+# no finished run can be found, the landing goes ahead with a warning; CI still checks what is pushed.
+fix=0
+for arg in "$@"; do
+  case "$arg" in
+    --fix) fix=1 ;;
+    *) echo "land: unknown argument $arg (usage: mise run land [--fix])" >&2; exit 2 ;;
+  esac
+done
+# A newer push replaces a waiting run (cancelled), so look past many of them for a finished one.
+if last=$(gh run list -b main -e push -L 100 --json status,conclusion,url \
+  -q '[.[] | select(.status == "completed" and .conclusion != "cancelled")][0] | select(.) | "\(.conclusion) \(.url)"' 2>/dev/null) && [ -n "$last" ]; then
+  if [ "${last%% *}" = failure ] && [ "$fix" -eq 0 ]; then
+    echo "land: CI on main is red (${last#* }); land only its fix, with mise run land --fix" >&2
+    exit 1
+  fi
+else
+  echo "land: could not find a finished CI run on main; landing without that check" >&2
+fi
 
 # The change is the working copy, or its parent when the working copy is empty.
 head=@
