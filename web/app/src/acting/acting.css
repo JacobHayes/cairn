@@ -410,7 +410,7 @@ table.data.list-table .badge {
   color: var(--color-muted);
 }
 
-/* Done rows (done, decided, reached) follow the done card: the neutral row fill, muted text, the hollow green chip, and the content at 0.5. The fade is on the content, not the cell or row, so the held cells stay opaque and the hover, selection and focus marks keep full strength; the checkbox column is left out so the checkbox stays at full strength. The lowest opacity wins: no row has a second fade, so none multiplies. */
+/* Done rows (done, decided) follow the done card: the neutral row fill, muted text, the hollow green chip, and the content at 0.5. The fade is on the content, not the cell or row, so the held cells stay opaque and the hover, selection and focus marks keep full strength; the checkbox column is left out so the checkbox stays at full strength. The lowest opacity wins: no row has a second fade, so none multiplies. */
 .node-row[data-state="done"] > *,
 .list-table tr[data-state="done"]:not([data-diff]) td:not(.list-check) > .list-content {
   opacity: 0.5;

@@ -101,7 +101,7 @@ function bulkMutation(action: BulkAction, facts: Facts): Mutation | undefined {
     case "start":
       return moves.includes("start") ? transition(node.key, "start") : undefined;
     case "done":
-      return moves.includes("complete") ? transition(node.key, "complete") : moves.includes("reach") ? transition(node.key, "reach") : undefined;
+      return moves.includes("complete") ? transition(node.key, "complete") : undefined;
     case "skip":
       return moves.includes("skip") ? transition(node.key, "skip", action.reason) : undefined;
     case "assign":

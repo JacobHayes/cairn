@@ -66,7 +66,7 @@ fn days_overdue_measure_the_overdue_flag() {
 
 /// A stage with work at every depth: a deliverable with two actions (one done, one late), a
 /// group of two decisions (one snoozed), a skipped deliverable with a kept action and a loose
-/// one, an empty group, work pending on an unanswerable decision, and an auto-reached milestone.
+/// one, an empty group, work pending on an unanswerable decision, and an milestone done by its date.
 fn stage_records() -> Records {
     let records = support::journey(&add(&[
         "{key: n_cutoff, id: cutoff, kind: milestone, title: Cutoff}",
@@ -84,13 +84,13 @@ fn stage_records() -> Records {
         "{key: n_loose, id: loose, parent: n_skipped, kind: action, title: Loose}",
         "{key: n_empty, id: empty, parent: n_stage, kind: group, title: Empty}",
         "{key: n_pending, id: pending, parent: n_stage, kind: action, title: Pending, relevant_when: {equals: {decision: n_d2, value: true}}}",
-        "{key: n_reach, id: reach, parent: n_stage, kind: milestone, title: Reach, auto_reach: true}",
+        "{key: n_goal, id: goal, parent: n_stage, kind: milestone, title: Goal, auto_done: true}",
     ]));
     support::accepted(
         &records,
         &format!(
             "- op: set_pin\n  node: n_cutoff\n  date: \"2026-10-05\"\n\
-- op: set_pin\n  node: n_reach\n  date: \"2026-10-06\"\n\
+- op: set_pin\n  node: n_goal\n  date: \"2026-10-06\"\n\
 - op: snooze\n  node: n_ask_later\n  until: {{date: \"2026-10-20\"}}\n\
 - op: apply_override\n  node: n_kept\n  override: {{keep: {{reason: Still needed.}}}}\n{}{}",
             transition("n_a1", "complete"),
@@ -111,7 +111,7 @@ fn progress_counts_the_work_beneath_a_container() {
     let schema = derived.to_schema(&graph);
     let progress = |name: &str| schema.nodes[&key(name)].progress;
     // Beneath the stage: deliverable, its two actions, both decisions, the kept action and
-    // the auto-reached milestone; the loose action is skipped through its container.
+    // the milestone done by its date; the loose action is skipped through its container.
     assert_eq!(
         progress("n_stage"),
         Some(Progress {
@@ -212,7 +212,7 @@ fn failing_guards_name_each_guard_a_completion_would_fail() {
 
 /// D4: an undecided node held only by its own condition gate fails no `deps_done` guard
 /// (finishing it is accepted with a warning), a decision fails the dependencies it waits on,
-/// and a milestone reaches under the same rule.
+/// and a milestone completes under the same rule.
 #[test]
 fn failing_guards_follow_the_transition_each_kind_completes_with() {
     let records = support::journey(&add(&[
@@ -248,8 +248,9 @@ fn failing_guards_follow_the_transition_each_kind_completes_with() {
 /// The move that completes `key` from its stored state, none when it has none to attempt.
 fn completing_step(journey: &Journey, key: &NodeKey) -> Option<&'static str> {
     let step = match journey.graph.nodes.as_map()[key].kind() {
-        cairn_schema::NodeKind::Deliverable | cairn_schema::NodeKind::Action => "complete",
-        cairn_schema::NodeKind::Milestone => "reach",
+        cairn_schema::NodeKind::Deliverable
+        | cairn_schema::NodeKind::Action
+        | cairn_schema::NodeKind::Milestone => "complete",
         cairn_schema::NodeKind::Decision | cairn_schema::NodeKind::Group => return None,
     };
     let completes = matches!(
@@ -296,7 +297,7 @@ fn failing_guards_are_what_applying_the_transition_refuses() {
                     match support::apply(&records, &patch, &support::fixed_inputs()) {
                         Ok(_) => {
                             // A completion records a finish date, which can move the dates
-                            // an auto-reached milestone reads, so the patch's graph can
+                            // an milestone done by its date reads, so the patch's graph can
                             // satisfy a gate this graph does not: a guard reported now may be
                             // gone by the time it is attempted, never the other way round.
                             if found.failing_guards.is_empty() {
@@ -497,10 +498,10 @@ fn unanswered_names_the_decisions_an_undecided_node_waits_on() {
 }
 
 /// B11: completion is suggested when the journey has a node and none in scope is left open,
-/// or its final milestone is reached; never for an empty journey. The status summary and
+/// or its final milestone is done; never for an empty journey. The status summary and
 /// the snapshot agree.
 #[test]
-fn completion_is_suggested_when_nothing_is_left_or_the_end_is_reached() {
+fn completion_is_suggested_when_nothing_is_left_or_the_end_is_done() {
     let suggested = |records: &Records| {
         let graph = support::journey_graph(records, support::JOURNEY);
         let derived = support::derived(records, support::JOURNEY);
@@ -523,22 +524,22 @@ fn completion_is_suggested_when_nothing_is_left_or_the_end_is_reached() {
     );
     let records = support::journey(&add(&[
         FIRST,
-        "{key: n_end, id: end, kind: milestone, title: End, final: true, auto_reach: true}",
+        "{key: n_end, id: end, kind: milestone, title: End, final: true, auto_done: true}",
         "{key: n_open, id: open, kind: action, title: Open}",
     ]));
     assert!(!suggested(&records), "work remains and the end is pending");
-    let reached = support::accepted(
+    let finished = support::accepted(
         &records,
         "- op: set_pin\n  node: n_end\n  date: \"2026-10-06\"\n",
     );
-    assert!(suggested(&reached), "the final milestone reads as reached");
+    assert!(suggested(&finished), "the final milestone reads as done");
     let all_done = support::accepted(
         &records,
         &format!(
             "{}{}{}",
             transition("n_first", "complete"),
             transition("n_open", "complete"),
-            transition("n_end", "reach")
+            transition("n_end", "complete")
         ),
     );
     assert!(suggested(&all_done));

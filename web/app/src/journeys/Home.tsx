@@ -2,7 +2,7 @@
 // across journeys), each in that journey's own rank and bounded to five rows with the rest one
 // click away; then the journeys where their work is not ready yet, then a link to every journey. It renders in the first paint: the title is there and the reading
 // line sits under it, and a journey's group appears as it is read. A row opens the node's own address; its
-// actions (Start, Done, Mark reached, Assign) act in place, and Decide opens the node's answer
+// actions (Start, Done, Mark done, Assign) act in place, and Decide opens the node's answer
 // form, which is the inspector's. The candidates are the active journeys referring to the
 // caller's identities (the host's filter, a superset); each is read in the tab and its own "mine"
 // decides (H3: every identity of the caller's counts). Kept current (H6).

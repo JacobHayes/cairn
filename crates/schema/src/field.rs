@@ -46,8 +46,8 @@ pub enum NodeField {
     RequiresNote,
     /// A milestone's `final` flag.
     Final,
-    /// A milestone's `auto_reach` flag.
-    AutoReach,
+    /// A milestone's `auto_done` flag.
+    AutoDone,
     /// A group's `opens_at`.
     OpensAt,
     /// A group's `closes_at`.
@@ -84,7 +84,7 @@ impl NodeField {
         NodeField::RequiresArtifact,
         NodeField::RequiresNote,
         NodeField::Final,
-        NodeField::AutoReach,
+        NodeField::AutoDone,
         NodeField::OpensAt,
         NodeField::ClosesAt,
         NodeField::Gates,
@@ -130,8 +130,8 @@ pub enum NodeFieldValue<R: References> {
     RequiresNote(bool),
     /// The `final` flag.
     Final(bool),
-    /// The `auto_reach` flag.
-    AutoReach(bool),
+    /// The `auto_done` flag.
+    AutoDone(bool),
     /// A new `opens_at`, or none.
     OpensAt(Option<R::Node>),
     /// A new `closes_at`, or none.
@@ -170,7 +170,7 @@ impl<R: References> NodeFieldValue<R> {
             NodeFieldValue::RequiresArtifact(_) => NodeField::RequiresArtifact,
             NodeFieldValue::RequiresNote(_) => NodeField::RequiresNote,
             NodeFieldValue::Final(_) => NodeField::Final,
-            NodeFieldValue::AutoReach(_) => NodeField::AutoReach,
+            NodeFieldValue::AutoDone(_) => NodeField::AutoDone,
             NodeFieldValue::OpensAt(_) => NodeField::OpensAt,
             NodeFieldValue::ClosesAt(_) => NodeField::ClosesAt,
             NodeFieldValue::Gates(_) => NodeField::Gates,
@@ -200,7 +200,7 @@ impl<R: References> NodeFieldValue<R> {
             | NodeField::RequiresArtifact
             | NodeField::RequiresNote
             | NodeField::Final
-            | NodeField::AutoReach
+            | NodeField::AutoDone
             | NodeField::OpensAt
             | NodeField::ClosesAt
             | NodeField::Gates
@@ -240,8 +240,8 @@ impl<R: References> NodeFieldValue<R> {
             (NodeField::Final, Payload::Milestone(milestone)) => {
                 Some(NodeFieldValue::Final(milestone.is_final))
             }
-            (NodeField::AutoReach, Payload::Milestone(milestone)) => {
-                Some(NodeFieldValue::AutoReach(milestone.auto_reach))
+            (NodeField::AutoDone, Payload::Milestone(milestone)) => {
+                Some(NodeFieldValue::AutoDone(milestone.auto_done))
             }
             (NodeField::OpensAt, Payload::Group(group)) => {
                 Some(NodeFieldValue::OpensAt(group.opens_at.clone()))
@@ -321,8 +321,8 @@ impl<R: References> NodeFieldValue<R> {
             (NodeFieldValue::Final(flag), Payload::Milestone(milestone)) => {
                 milestone.is_final = flag;
             }
-            (NodeFieldValue::AutoReach(flag), Payload::Milestone(milestone)) => {
-                milestone.auto_reach = flag;
+            (NodeFieldValue::AutoDone(flag), Payload::Milestone(milestone)) => {
+                milestone.auto_done = flag;
             }
             (NodeFieldValue::OpensAt(node), Payload::Group(group)) => group.opens_at = node,
             (NodeFieldValue::ClosesAt(node), Payload::Group(group)) => group.closes_at = node,

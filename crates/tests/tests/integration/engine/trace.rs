@@ -64,7 +64,7 @@ fn the_plan_traces_across_levels() {
 }
 
 /// C7: once the partner decision is answered no, the partner-led subset is not relevant; the
-/// trace still shows it downstream, and it contributes no gravity. A reached kickoff is still
+/// trace still shows it downstream, and it contributes no gravity. A done kickoff is still
 /// upstream of what it opened.
 #[test]
 fn not_relevant_and_terminal_nodes_stay_traceable() {

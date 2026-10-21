@@ -105,10 +105,10 @@ pub fn arb_payload<R: ArbRefs>() -> impl Strategy<Value = Payload<R>> {
                 })
             }
         ),
-        (any::<bool>(), any::<bool>()).prop_map(|(is_final, auto_reach)| Payload::Milestone(
+        (any::<bool>(), any::<bool>()).prop_map(|(is_final, auto_done)| Payload::Milestone(
             Milestone {
                 is_final,
-                auto_reach
+                auto_done
             }
         )),
         (
@@ -210,7 +210,7 @@ pub fn arb_node_field_value<R: ArbRefs>() -> impl Strategy<Value = NodeFieldValu
         any::<bool>().prop_map(NodeFieldValue::RequiresArtifact),
         any::<bool>().prop_map(NodeFieldValue::RequiresNote),
         any::<bool>().prop_map(NodeFieldValue::Final),
-        any::<bool>().prop_map(NodeFieldValue::AutoReach),
+        any::<bool>().prop_map(NodeFieldValue::AutoDone),
         optional_node().prop_map(NodeFieldValue::OpensAt),
         optional_node().prop_map(NodeFieldValue::ClosesAt),
         any::<bool>().prop_map(NodeFieldValue::Gates),

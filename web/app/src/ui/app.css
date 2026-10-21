@@ -39,6 +39,10 @@
   align-items: center;
   gap: var(--space-2);
 }
+/* A row whose controls sit on one bottom edge, where one of them carries a label above it. */
+.row-end {
+  align-items: flex-end;
+}
 /* A labelled field in a row gives way to the row's width (a select is as wide as its longest option) instead of pushing past it. */
 .row > label {
   min-width: 0;

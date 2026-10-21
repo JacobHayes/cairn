@@ -25,7 +25,7 @@ const OWN: Record<NodeKind, readonly FormField[]> = {
   deliverable: ["estimate", "requires_artifact", "requires_note", "placeholder"],
   action: ["estimate", "requires_note", "placeholder"],
   decision: ["prompt", "help", "answer_type", "choices", "fills_role", "feeds_milestone"],
-  milestone: ["final", "auto_reach"],
+  milestone: ["final", "auto_done"],
   group: ["opens_at", "closes_at", "gates", "closes"],
 };
 
@@ -65,7 +65,7 @@ export interface NodeDraft {
   requires_note: boolean;
   placeholder: boolean;
   final: boolean;
-  auto_reach: boolean;
+  auto_done: boolean;
   prompt: string;
   help: string;
   answer_type: AnswerType;
@@ -93,7 +93,7 @@ export function draftOf(node: GraphNode): NodeDraft {
     requires_note: node.requires_note ?? false,
     placeholder: node.placeholder ?? false,
     final: node.final ?? false,
-    auto_reach: node.auto_reach ?? false,
+    auto_done: node.auto_done ?? false,
     prompt: node.prompt ?? "",
     help: node.help ?? "",
     answer_type: node.answer_type ?? "boolean",
@@ -130,7 +130,7 @@ export function valueOf(field: NodeField, draft: NodeDraft): Schema<"NodeFieldVa
     requires_artifact: draft.requires_artifact,
     requires_note: draft.requires_note,
     final: draft.final,
-    auto_reach: draft.auto_reach,
+    auto_done: draft.auto_done,
     opens_at: key(draft.opens_at),
     closes_at: key(draft.closes_at),
     gates: draft.gates,

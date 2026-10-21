@@ -340,8 +340,8 @@ pub struct Action {
 pub struct Milestone {
     /// The graph's final milestone (B11); at most one per graph.
     pub is_final: bool,
-    /// Reads as reached once its date arrives and its dependencies are satisfied (F1).
-    pub auto_reach: bool,
+    /// Reads as done once its date arrives and its dependencies are satisfied (F1).
+    pub auto_done: bool,
 }
 
 /// A group's own fields: its stage bounds (F4).
@@ -754,8 +754,8 @@ pub enum KindField {
     RequiresNote,
     /// `final`: milestones.
     Final,
-    /// `auto_reach`: milestones.
-    AutoReach,
+    /// `auto_done`: milestones.
+    AutoDone,
     /// `opens_at`: groups.
     OpensAt,
     /// `closes_at`: groups.
@@ -786,7 +786,7 @@ impl KindField {
         KindField::RequiresArtifact,
         KindField::RequiresNote,
         KindField::Final,
-        KindField::AutoReach,
+        KindField::AutoDone,
         KindField::OpensAt,
         KindField::ClosesAt,
         KindField::Gates,
@@ -808,7 +808,7 @@ impl KindField {
             KindField::RequiresArtifact => "requires_artifact",
             KindField::RequiresNote => "requires_note",
             KindField::Final => "final",
-            KindField::AutoReach => "auto_reach",
+            KindField::AutoDone => "auto_done",
             KindField::OpensAt => "opens_at",
             KindField::ClosesAt => "closes_at",
             KindField::Gates => "gates",
@@ -831,7 +831,7 @@ impl KindField {
                 matches!(kind, NodeKind::Deliverable | NodeKind::Action)
             }
             KindField::RequiresArtifact => matches!(kind, NodeKind::Deliverable),
-            KindField::Final | KindField::AutoReach => matches!(kind, NodeKind::Milestone),
+            KindField::Final | KindField::AutoDone => matches!(kind, NodeKind::Milestone),
             KindField::OpensAt | KindField::ClosesAt | KindField::Gates | KindField::Closes => {
                 matches!(kind, NodeKind::Group)
             }
@@ -861,7 +861,7 @@ impl KindField {
             | KindField::RequiresArtifact
             | KindField::RequiresNote
             | KindField::Final
-            | KindField::AutoReach
+            | KindField::AutoDone
             | KindField::OpensAt
             | KindField::ClosesAt
             | KindField::Gates
@@ -1035,7 +1035,7 @@ struct NodeWire<R: References> {
         skip_serializing_if = "Option::is_none"
     )]
     #[schemars(with = "bool")]
-    auto_reach: Option<bool>,
+    auto_done: Option<bool>,
     #[serde(
         default,
         deserialize_with = "crate::serde_util::present",
@@ -1103,7 +1103,7 @@ impl<R: References> NodeWire<R> {
             ),
             (KindField::RequiresNote, self.requires_note.is_some()),
             (KindField::Final, self.is_final.is_some()),
-            (KindField::AutoReach, self.auto_reach.is_some()),
+            (KindField::AutoDone, self.auto_done.is_some()),
             (KindField::OpensAt, self.opens_at.is_some()),
             (KindField::ClosesAt, self.closes_at.is_some()),
             (KindField::Gates, self.gates.is_some()),
@@ -1206,7 +1206,7 @@ impl<R: References> NodeWire<R> {
             }),
             NodeKind::Milestone => Payload::Milestone(Milestone {
                 is_final: self.is_final.unwrap_or(false),
-                auto_reach: self.auto_reach.unwrap_or(false),
+                auto_done: self.auto_done.unwrap_or(false),
             }),
             NodeKind::Group => Payload::Group(Group {
                 opens_at: self.opens_at.take(),
@@ -1251,7 +1251,7 @@ impl<R: References> NodeWire<R> {
             }
             Payload::Milestone(milestone) => {
                 self.is_final = set(milestone.is_final, false);
-                self.auto_reach = set(milestone.auto_reach, false);
+                self.auto_done = set(milestone.auto_done, false);
             }
             Payload::Group(group) => {
                 self.opens_at = group.opens_at;
@@ -1307,7 +1307,7 @@ impl<R: References> From<Node<R>> for NodeWire<R> {
             requires_artifact: None,
             requires_note: None,
             is_final: None,
-            auto_reach: None,
+            auto_done: None,
             opens_at: None,
             closes_at: None,
             gates: None,

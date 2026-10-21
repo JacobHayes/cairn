@@ -81,7 +81,7 @@ export function dueWords(date: string, today: string, decision = false): string 
 /** Where an effective date comes from: a recorded actual, a pin, or worked out from the plan (the engine's `DateOrigin`, or the inspector's bound origin). */
 export type Origin = "actual" | "pin" | "due" | "derived";
 
-/** The one word for where a date comes from; an actual date has none on a summary (it says "reached"). */
+/** The one word for where a date comes from; an actual date has none on a summary (it says "done"). */
 export function originWord(origin: Origin): string {
   switch (origin) {
     case "actual":
@@ -97,12 +97,12 @@ export function originWord(origin: Origin): string {
 /**
  * A milestone's date as a reader weighs it, the nearness first and the calendar date after it, so
  * it reads right after a verb title or a noun title: `in 18 days (Nov 23)`, `3 days late (Oct 2)`,
- * `today (Oct 6)`; an actual date is `reached Nov 20` (never late).
+ * `today (Oct 6)`; an actual date is `done Nov 20` (never late).
  */
 export function whenWords(date: string, origin: Origin | undefined, today: string): string {
   const when = dateWords(date, today);
   if (origin === "actual") {
-    return `reached ${when}`;
+    return `done ${when}`;
   }
   const days = daysUntil(date, today);
   return days < 0 ? `${daysWords(-days)} late (${when})` : `${relativeDays(days)} (${when})`;

@@ -911,7 +911,7 @@
           },
           "drops_with_progress": {
             "$ref": "#/components/schemas/AffectedNodes",
-            "description": "Of the drops, the nodes with recorded progress (started, done, decided, reached):\nthe answer does not undo it."
+            "description": "Of the drops, the nodes with recorded progress (started, done, decided):\nthe answer does not undo it."
           },
           "opens_decisions": {
             "$ref": "#/components/schemas/AffectedNodes",
@@ -2341,7 +2341,7 @@
         "oneOf": [
           {
             "const": "actual",
-            "description": "The date it was reached.",
+            "description": "The date it was done.",
             "type": "string"
           },
           {
@@ -2971,7 +2971,7 @@
         "type": "object"
       },
       "DisplayState": {
-        "description": "The one state every surface shows for a node, composed from relevance, stored state,\neffective skip, auto-reach, blocking and snooze, and from the derived flags, which it leaves in\nplace. Stored state is what transitions act on; this is what people and agents read. The\nfirst matching value in this order wins: `not_relevant`, `skipped`, `done`, `snoozed`,\n`active`, `conditional`, `blocked`, `scheduled`, `ready`.",
+        "description": "The one state every surface shows for a node, composed from relevance, stored state,\neffective skip, auto-done, blocking and snooze, and from the derived flags, which it leaves in\nplace. Stored state is what transitions act on; this is what people and agents read. The\nfirst matching value in this order wins: `not_relevant`, `skipped`, `done`, `snoozed`,\n`active`, `conditional`, `blocked`, `scheduled`, `ready`.",
         "oneOf": [
           {
             "const": "ready",
@@ -2995,7 +2995,7 @@
           },
           {
             "const": "scheduled",
-            "description": "An `auto_reach` milestone, unblocked, whose date is ahead.",
+            "description": "An `auto_done` milestone, unblocked, whose date is ahead.",
             "type": "string"
           },
           {
@@ -3005,7 +3005,7 @@
           },
           {
             "const": "done",
-            "description": "`done`, `decided`, `reached`, auto-reached, or a group that satisfies dependencies.",
+            "description": "`done`, `decided`, a milestone done by its date, or a group that satisfies dependencies.",
             "type": "string"
           },
           {
@@ -3190,7 +3190,7 @@
       },
       "EffectiveDate": {
         "additionalProperties": false,
-        "description": "A milestone's effective date: its actual date if reached, else its pin, else its\nderived due. What other constraints see when they reference it.",
+        "description": "A milestone's effective date: its actual date if done, else its pin, else its\nderived due. What other constraints see when they reference it.",
         "properties": {
           "date": {
             "description": "The date.",
@@ -3443,7 +3443,6 @@
           "resource_changed",
           "segment_inserted",
           "node_transitioned",
-          "milestone_reached",
           "answer_set",
           "recorded_date_changed",
           "role_fill_changed",
@@ -7428,7 +7427,7 @@
             },
             "then": {
               "properties": {
-                "auto_reach": false,
+                "auto_done": false,
                 "closes": false,
                 "closes_at": false,
                 "estimate": false,
@@ -7452,7 +7451,7 @@
             "then": {
               "properties": {
                 "answer_type": false,
-                "auto_reach": false,
+                "auto_done": false,
                 "choices": false,
                 "closes": false,
                 "closes_at": false,
@@ -7477,7 +7476,7 @@
             "then": {
               "properties": {
                 "answer_type": false,
-                "auto_reach": false,
+                "auto_done": false,
                 "choices": false,
                 "closes": false,
                 "closes_at": false,
@@ -7530,7 +7529,7 @@
             "then": {
               "properties": {
                 "answer_type": false,
-                "auto_reach": false,
+                "auto_done": false,
                 "choices": false,
                 "estimate": false,
                 "feeds_milestone": false,
@@ -7699,7 +7698,7 @@
           "answer_type": {
             "$ref": "#/components/schemas/AnswerType"
           },
-          "auto_reach": {
+          "auto_done": {
             "type": "boolean"
           },
           "choices": {
@@ -7856,7 +7855,7 @@
             },
             "then": {
               "properties": {
-                "auto_reach": false,
+                "auto_done": false,
                 "closes": false,
                 "closes_at": false,
                 "estimate": false,
@@ -7880,7 +7879,7 @@
             "then": {
               "properties": {
                 "answer_type": false,
-                "auto_reach": false,
+                "auto_done": false,
                 "choices": false,
                 "closes": false,
                 "closes_at": false,
@@ -7905,7 +7904,7 @@
             "then": {
               "properties": {
                 "answer_type": false,
-                "auto_reach": false,
+                "auto_done": false,
                 "choices": false,
                 "closes": false,
                 "closes_at": false,
@@ -7958,7 +7957,7 @@
             "then": {
               "properties": {
                 "answer_type": false,
-                "auto_reach": false,
+                "auto_done": false,
                 "choices": false,
                 "estimate": false,
                 "feeds_milestone": false,
@@ -8127,7 +8126,7 @@
           "answer_type": {
             "$ref": "#/components/schemas/AnswerType"
           },
-          "auto_reach": {
+          "auto_done": {
             "type": "boolean"
           },
           "choices": {
@@ -8364,10 +8363,6 @@
             "description": "Relevant, not blocked, and non-terminal.",
             "type": "boolean"
           },
-          "auto_reached": {
-            "description": "A pending auto-reach milestone that reads as reached.",
-            "type": "boolean"
-          },
           "blocked_by": {
             "description": "What blocks it itself: its own explicit requirements, condition gates, and stage\nopening, and its children, each unsatisfied. What it inherits is listed once, on the\nancestor that holds it (`blocked_through`), never copied onto each descendant. A node\nthat is not blocked lists what its own requirements, conditions, and opening still\nhold back beneath it.",
             "items": {
@@ -8390,12 +8385,16 @@
             "$ref": "#/components/schemas/DisplayState",
             "description": "The state every surface shows for the node, composed from relevance, stored state\nand the flags beside it, which stay as they are."
           },
+          "done_by_date": {
+            "description": "A pending auto-done milestone that reads as done.",
+            "type": "boolean"
+          },
           "effectively_skipped": {
             "description": "Skipped through an ancestor's skip.",
             "type": "boolean"
           },
           "failing_guards": {
-            "description": "The bypassable guards its completing transition (complete a deliverable or\naction, answer an open decision, reach a pending milestone) would fail if attempted\nnow with no bypass in the patch. Empty for every node with no such transition left:\nfinished, not relevant, or a group.",
+            "description": "The bypassable guards its completing transition (complete a deliverable or\naction, answer an open decision, complete a pending milestone) would fail if attempted\nnow with no bypass in the patch. Empty for every node with no such transition left:\nfinished, not relevant, or a group.",
             "items": {
               "$ref": "#/components/schemas/Guard"
             },
@@ -8736,8 +8735,8 @@
             "type": "string"
           },
           {
-            "const": "auto_reach",
-            "description": "A milestone's `auto_reach` flag.",
+            "const": "auto_done",
+            "description": "A milestone's `auto_done` flag.",
             "type": "string"
           },
           {
@@ -9010,14 +9009,14 @@
           },
           {
             "additionalProperties": false,
-            "description": "The `auto_reach` flag.",
+            "description": "The `auto_done` flag.",
             "properties": {
-              "auto_reach": {
+              "auto_done": {
                 "type": "boolean"
               }
             },
             "required": [
-              "auto_reach"
+              "auto_done"
             ],
             "type": "object"
           },
@@ -9376,7 +9375,7 @@
             "type": "boolean"
           },
           "finished_on": {
-            "description": "When the node finished: the actual date a milestone was reached, the day a\ndecision was decided or work was done.",
+            "description": "When the node finished: the actual date a milestone was done, the day a\ndecision was decided or work was done.",
             "format": "date",
             "type": [
               "string",
@@ -10426,7 +10425,7 @@
             "type": "integer"
           },
           "done": {
-            "description": "Items whose display state is `done` (finished, decided, reached, or auto-reached).",
+            "description": "Items whose display state is `done` (finished, decided, or done by its date).",
             "format": "uint32",
             "minimum": 0,
             "type": "integer"
@@ -14005,9 +14004,9 @@
           },
           {
             "additionalProperties": false,
-            "description": "An auto-reach milestone whose date is ahead.",
+            "description": "An auto-done milestone whose date is ahead.",
             "properties": {
-              "auto_reach": {
+              "auto_done": {
                 "additionalProperties": false,
                 "properties": {
                   "date": {
@@ -14028,7 +14027,7 @@
               }
             },
             "required": [
-              "auto_reach"
+              "auto_done"
             ],
             "type": "object"
           }
@@ -14070,7 +14069,7 @@
           },
           {
             "const": "done",
-            "description": "Deliverable or action, completed.",
+            "description": "Deliverable, action or milestone, finished.",
             "type": "string"
           },
           {
@@ -14090,12 +14089,7 @@
           },
           {
             "const": "pending",
-            "description": "Milestone, not reached.",
-            "type": "string"
-          },
-          {
-            "const": "reached",
-            "description": "Milestone, reached.",
+            "description": "Milestone, not done.",
             "type": "string"
           },
           {
@@ -14128,7 +14122,7 @@
             "type": "object"
           },
           "completion_suggested": {
-            "description": "The journey has a node and none in scope is left open, or its final milestone\nis reached (stored or auto-reached).",
+            "description": "The journey has a node and none in scope is left open, or its final milestone\nis done (stored or done by its date).",
             "type": "boolean"
           },
           "open_decisions": {
@@ -14166,7 +14160,7 @@
             "type": "array"
           },
           "upcoming_milestones": {
-            "description": "In-scope milestones not yet reached that have a date, earliest first.",
+            "description": "In-scope milestones not yet done that have a date, earliest first.",
             "items": {
               "$ref": "#/components/schemas/UpcomingMilestone"
             },
@@ -14528,7 +14522,7 @@
         "type": "object"
       },
       "Transition": {
-        "description": "A state-machine transition. Answering a decision is [`Mutation::Answer`]; the dates a\nstart or reach records default to today and are edited with\n[`Mutation::SetRecordedDate`].",
+        "description": "A state-machine transition. Answering a decision is [`Mutation::Answer`]; the dates a\nstart or finish records default to today and are edited with\n[`Mutation::SetRecordedDate`].",
         "oneOf": [
           {
             "const": "start",
@@ -14542,7 +14536,7 @@
           },
           {
             "const": "complete",
-            "description": "To `done` (deliverable, action).",
+            "description": "To `done` (deliverable, action, milestone).",
             "type": "string"
           },
           {
@@ -14571,11 +14565,6 @@
           {
             "const": "reopen",
             "description": "Back to the initial state (always allowed).",
-            "type": "string"
-          },
-          {
-            "const": "reach",
-            "description": "`pending` to `reached` (milestone), including confirming an auto-reach.",
             "type": "string"
           }
         ]
@@ -14619,7 +14608,7 @@
       },
       "UndecidedConsequence": {
         "additionalProperties": false,
-        "description": "Finished work newly undecided: a node completed, answered, or reached while\na decision its relevance reads is unanswered, so it may not apply. A warning, never a\nrejection: the node stays undecided and is not forced into scope.",
+        "description": "Finished work newly undecided: a node completed or answered while\na decision its relevance reads is unanswered, so it may not apply. A warning, never a\nrejection: the node stays undecided and is not forced into scope.",
         "properties": {
           "node": {
             "$ref": "#/components/schemas/NodeKey",
@@ -14717,7 +14706,7 @@
       },
       "UpcomingMilestone": {
         "additionalProperties": false,
-        "description": "A milestone not yet reached and its effective date.",
+        "description": "A milestone not yet done and its effective date.",
         "properties": {
           "date": {
             "$ref": "#/components/schemas/EffectiveDate",

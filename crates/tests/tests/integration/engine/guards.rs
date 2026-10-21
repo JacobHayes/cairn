@@ -1,5 +1,5 @@
 //! The guards that need derived state, on the graph a patch produces (D4, A17): relevance
-//! and `deps_done` on completing transitions (complete, a first answer, reach), the bypass
+//! and `deps_done` on completing transitions (complete or a first answer), the bypass
 //! that records the failures it accepted, and where a snooze may sit (B6), with its wait
 //! cycles rejected.
 #![cfg(test)]
@@ -48,15 +48,26 @@ fn chain() -> Records {
 /// in any order.
 #[test]
 fn a_chain_completes_in_one_patch_in_any_order() {
-    let reach = "- op: transition\n  node: n_third\n  transition: reach\n";
+    let complete_third = "- op: transition\n  node: n_third\n  transition: complete\n";
     let orders = [
-        format!("{}{}{reach}", complete("n_first"), complete("n_second")),
-        format!("{reach}{}{}", complete("n_second"), complete("n_first")),
+        format!(
+            "{}{}{complete_third}",
+            complete("n_first"),
+            complete("n_second")
+        ),
+        format!(
+            "{complete_third}{}{}",
+            complete("n_second"),
+            complete("n_first")
+        ),
     ];
     for order in orders {
         assert!(support::journey_patch(&chain(), &order).is_ok(), "{order}");
     }
-    let [found] = &violations(&chain(), &format!("{}{reach}", complete("n_second")))[..] else {
+    let [found] = &violations(
+        &chain(),
+        &format!("{}{complete_third}", complete("n_second")),
+    )[..] else {
         panic!("one violation per guarded transition")
     };
     assert_eq!(found.code, ViolationCode::GuardFailed);
@@ -128,7 +139,7 @@ fn relevance_guards_completion() {
     );
 }
 
-/// Gating, D4: completing, answering, or reaching a node whose relevance waits on an
+/// Gating, D4: completing, or answering a node whose relevance waits on an
 /// unanswered decision is accepted, its condition gate holding nothing; the node stays
 /// undecided, gains no override, and is not stale.
 #[test]
@@ -141,7 +152,7 @@ fn undecided_work_finishes_and_stays_undecided() {
         ),
         (
             "{key: n_branch, id: branch, kind: milestone, title: Branch, relevant_when: {equals: {decision: n_flag, value: true}}}",
-            "- op: transition\n  node: n_branch\n  transition: reach\n".to_owned(),
+            "- op: transition\n  node: n_branch\n  transition: complete\n".to_owned(),
         ),
     ];
     for (node, finish) in cases {
@@ -352,14 +363,14 @@ fn snooze_wait_cycles_are_rejected() {
     assert_eq!(inside, [ViolationCode::SnoozeCycle]);
 }
 
-/// Review round 1: an `auto_reach` milestone that reads as reached has nothing left to do, so
+/// Review round 1: an `auto_done` milestone that reads as done has nothing left to do, so
 /// it is not snoozed (B6, F1).
 #[test]
-fn a_milestone_that_reads_as_reached_is_not_snoozed() {
+fn a_milestone_that_reads_as_done_is_not_snoozed() {
     let records = support::accepted(
         &support::journey(&add(&[
             FIRST,
-            "{key: n_gate, id: gate, kind: milestone, title: Gate, auto_reach: true}",
+            "{key: n_gate, id: gate, kind: milestone, title: Gate, auto_done: true}",
         ])),
         "- op: set_pin\n  node: n_gate\n  date: \"2026-10-05\"\n",
     );
@@ -393,7 +404,7 @@ fn an_answer_that_reopens_a_dependency_is_named() {
 }
 
 /// Review round 2: a failed completion names the mutation that gave its ancestor an unfinished
-/// opening, and the pin edit that put an `auto_reach` dependency's date back ahead.
+/// opening, and the pin edit that put an `auto_done` dependency's date back ahead.
 #[test]
 fn inherited_openings_and_moved_pins_are_named() {
     let staged = support::journey(&add(&[
@@ -411,7 +422,7 @@ fn inherited_openings_and_moved_pins_are_named() {
     assert_eq!(found.caused_by, BTreeSet::from([1]), "the opening");
     let gated = support::accepted(
         &support::journey(&add(&[
-            "{key: n_gate, id: gate, kind: milestone, title: Gate, auto_reach: true}",
+            "{key: n_gate, id: gate, kind: milestone, title: Gate, auto_done: true}",
             "{key: n_after, id: after, kind: action, title: After, requires: [n_gate]}",
         ])),
         "- op: set_pin\n  node: n_gate\n  date: \"2026-10-05\"\n",

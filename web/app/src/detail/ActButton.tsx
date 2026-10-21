@@ -6,7 +6,7 @@ import { useState } from "react";
 
 import { useReviewing } from "../proposals/layer.ts";
 import { Button, Field } from "../ui/kit.tsx";
-import { transition, type Mutation, type Ready } from "./model.ts";
+import { nodeOf, transition, type Mutation, type Ready } from "./model.ts";
 import { actLabel, unsnoozeOf, type Act } from "./offers.ts";
 import type { NodeWrite } from "./write.ts";
 
@@ -20,9 +20,6 @@ export function actMutation(view: Ready, act: Act, key: string): Mutation | unde
       return transition(key, "complete");
     case "start":
       return transition(key, "start");
-    case "reach":
-    case "reach-now":
-      return transition(key, "reach");
     case "mark-atomic":
       return { op: "set_atomic", node: key, atomic: true };
     case "unsnooze": {
@@ -36,27 +33,30 @@ export function actMutation(view: Ready, act: Act, key: string): Mutation | unde
   }
 }
 
-/** F1, D1: Mark reached with the date it was reached on, today unless changed. */
-function Reach({ view, write, node, disabled }: { view: Ready; write: NodeWrite; node: string; disabled: boolean }) {
+/** F1, D1: Mark a milestone done with the date it was done on, today unless changed. */
+function MilestoneDone({ view, write, node, disabled }: { view: Ready; write: NodeWrite; node: string; disabled: boolean }) {
   const today = view.derived.today;
   const [date, setDate] = useState(today);
   return (
-    <span className="row">
+    <span className="row row-end">
+      <label className="stack">
+        <span className="muted">Done on</span>
+        <Field type="date" aria-label="Done on" value={date} onChange={(event) => { setDate(event.target.value); }} />
+      </label>
       <Button
         primary
         disabled={disabled || write.disabled || date === ""}
-        onClick={() => void write.run([transition(node, "reach"), ...(date === today ? [] : [{ op: "set_recorded_date" as const, node, end: "finish" as const, date }])])}
+        onClick={() => void write.run([transition(node, "complete"), ...(date === today ? [] : [{ op: "set_recorded_date" as const, node, end: "finish" as const, date }])])}
       >
-        {actLabel(view, node, "reach")}
+        {actLabel(view, node, "done")}
       </Button>
-      <Field type="date" aria-label="Reached on" title="Reached on" value={date} onChange={(event) => { setDate(event.target.value); }} />
     </span>
   );
 }
 
 /**
  * One of a node's action buttons. `waiting`: the action would be refused, so it is disabled.
- * `dated` lets a milestone be reached on another day than today, where there is room for the date.
+ * `dated` lets a milestone be done on another day than today, where there is room for the date.
  */
 export function ActButton({ act, view, node, write, waiting, open, dated = false }: { act: Act; view: Ready; node: string; write: NodeWrite; waiting: boolean; open: (what: Opens) => void; dated?: boolean }) {
   // Under a proposal's layer the journey drawn is the one after it: acting on it would act on the present.
@@ -65,14 +65,14 @@ export function ActButton({ act, view, node, write, waiting, open, dated = false
   if (reviewing !== undefined) {
     return null;
   }
-  if (act === "reach" && dated) {
-    return <Reach view={view} write={write} node={node} disabled={waiting} />;
+  if (act === "done" && dated && nodeOf(view, node)?.kind === "milestone") {
+    return <MilestoneDone view={view} write={write} node={node} disabled={waiting} />;
   }
   const opens = act === "decide" || act === "break-down" || act === "done-with-evidence";
-  const refused = waiting && (act === "done" || act === "reach");
+  const refused = waiting && act === "done";
   return (
     <Button
-      primary={act === "done" || act === "done-with-evidence" || act === "reach" || act === "reach-now" || act === "decide" || act === "break-down"}
+      primary={act === "done" || act === "done-with-evidence" || act === "decide" || act === "break-down"}
       disabled={refused || (act !== "decide" && act !== "break-down" && write.disabled)}
       data-testid={act === "break-down" ? "break-down" : undefined}
       onClick={() => {

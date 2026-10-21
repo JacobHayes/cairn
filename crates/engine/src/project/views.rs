@@ -284,7 +284,7 @@ impl DerivedJourney<'_> {
     }
 
     /// B11: the journey has a node and none in scope is left open, or its final milestone
-    /// is reached (stored or auto-reached, F1). Completing is the person's call.
+    /// is done (stored or done by its date, F1). Completing is the person's call.
     #[must_use]
     pub fn completion_suggested(&self) -> bool {
         let document = self.graph.document();
@@ -294,8 +294,8 @@ impl DerivedJourney<'_> {
         self.remaining() == 0
             || document.nodes.values().any(|node| {
                 matches!(&node.payload, Payload::Milestone(milestone) if milestone.is_final)
-                    && (self.state(&node.key) == State::Reached
-                        || self.derived.blocking().auto_reached(&node.key))
+                    && (self.state(&node.key) == State::Done
+                        || self.derived.blocking().done_by_date(&node.key))
             })
     }
 

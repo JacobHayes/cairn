@@ -32,7 +32,6 @@ fn state_name(state: State) -> &'static str {
         State::Open => "open",
         State::Decided => "decided",
         State::Pending => "pending",
-        State::Reached => "reached",
         State::Derived => "derived",
     }
 }
@@ -45,7 +44,6 @@ fn move_name(step: Move) -> &'static str {
         Move::Complete => "complete",
         Move::Skip => "skip",
         Move::Reopen => "reopen",
-        Move::Reach => "reach",
         Move::Answer => "answer",
     }
 }

@@ -29,7 +29,7 @@ pub enum State {
     Todo,
     /// Deliverable or action, started.
     Active,
-    /// Deliverable or action, completed.
+    /// Deliverable, action or milestone, finished.
     Done,
     /// Any kind, skipped with a reason.
     Skipped,
@@ -37,17 +37,15 @@ pub enum State {
     Open,
     /// Decision, answered.
     Decided,
-    /// Milestone, not reached.
+    /// Milestone, not done.
     Pending,
-    /// Milestone, reached.
-    Reached,
     /// Group, not skipped: its display state is derived from its contents.
     Derived,
 }
 
 impl State {
     /// Every state, in declaration order.
-    pub const ALL: [State; 9] = [
+    pub const ALL: [State; 8] = [
         State::Todo,
         State::Active,
         State::Done,
@@ -55,7 +53,6 @@ impl State {
         State::Open,
         State::Decided,
         State::Pending,
-        State::Reached,
         State::Derived,
     ];
 
@@ -63,12 +60,14 @@ impl State {
     #[must_use]
     pub const fn legal_for(self, kind: NodeKind) -> bool {
         match self {
-            State::Todo | State::Active | State::Done => {
-                matches!(kind, NodeKind::Deliverable | NodeKind::Action)
-            }
+            State::Todo | State::Active => matches!(kind, NodeKind::Deliverable | NodeKind::Action),
+            State::Done => matches!(
+                kind,
+                NodeKind::Deliverable | NodeKind::Action | NodeKind::Milestone
+            ),
             State::Skipped => true,
             State::Open | State::Decided => matches!(kind, NodeKind::Decision),
-            State::Pending | State::Reached => matches!(kind, NodeKind::Milestone),
+            State::Pending => matches!(kind, NodeKind::Milestone),
             State::Derived => matches!(kind, NodeKind::Group),
         }
     }
@@ -84,11 +83,11 @@ impl State {
         }
     }
 
-    /// PRD glossary, Terminal: `done`, `skipped`, `decided`, `reached`.
+    /// PRD glossary, Terminal: `done`, `skipped`, `decided`.
     #[must_use]
     pub const fn is_terminal(self) -> bool {
         match self {
-            State::Done | State::Skipped | State::Decided | State::Reached => true,
+            State::Done | State::Skipped | State::Decided => true,
             State::Todo | State::Active | State::Open | State::Pending | State::Derived => false,
         }
     }
@@ -154,7 +153,7 @@ pub struct NodeState {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub started_on: Option<Date>,
     // PRD: F1, F2.
-    /// When the node finished: the actual date a milestone was reached, the day a
+    /// When the node finished: the actual date a milestone was done, the day a
     /// decision was decided or work was done.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub finished_on: Option<Date>,

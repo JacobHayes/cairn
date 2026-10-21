@@ -1,7 +1,7 @@
 //! Walks the fixtures through derive's pass 4 and prints, as Markdown, the values brief 2.3's
 //! proof quotes: the vendor evaluation's due dates once its decision meeting is pinned, its
 //! bounds before and after the final report is pinned, the product launch's bounds before and
-//! after its code freeze is reached late (a shortfall, not a rejection), the report pinned past
+//! after its code freeze is done late (a shortfall, not a rejection), the report pinned past
 //! the meeting rejected with its chain, shortfall, and resolution moves, and the cost test's
 //! operation counts at the limits. Each step is derived at that step's today.
 //!
@@ -371,7 +371,7 @@ fn main() -> Result<()> {
     before_after(
         &launch,
         4,
-        "Before and after an actual: the code freeze reached late",
+        "Before and after an actual: the code freeze done late",
         &mut out,
     )?;
     writeln!(out)?;

@@ -340,7 +340,6 @@ const SAY: Record<EventType, (c: Context) => Said> = {
   },
   segment_inserted: () => ({ what: "inserted a segment" }),
   node_transitioned: transitioned,
-  milestone_reached: (c) => ({ what: `marked ${it(c)} reached`, facts: { state: "reached" } }),
   answer_set: (c) => ({ what: `answered ${thing(c)}` }),
   recorded_date_changed: (c) => {
     const record = stateRecord(c);

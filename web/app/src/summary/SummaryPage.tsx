@@ -64,14 +64,14 @@ function MilestoneWhen({ ready, line }: { ready: Ready; line: MilestoneLine }) {
       </>
     );
   }
-  // F1: an auto-reaching milestone whose date has passed is reached, whatever its date came from.
-  const reached = line.reached;
-  const ink = reached ? undefined : inkClass(dateInk(line.date, today));
+  // F1: a milestone that marks itself done and whose date has passed is done, whatever its date came from.
+  const done = line.done;
+  const ink = done ? undefined : inkClass(dateInk(line.date, today));
   const origin = line.origin === undefined ? undefined : originWord(line.origin);
   return (
     <>
       <span className={ink} title={origin === undefined ? undefined : `This date is ${origin}`}>
-        {whenWords(line.date, reached ? "actual" : line.origin, today)}
+        {whenWords(line.date, done ? "actual" : line.origin, today)}
       </span>
       .
       {line.shortfallDays === undefined ? null : <span className="ink-bad">{` ${shortfallWords(ready, line.key, line.shortfallDays)}.`}</span>}
@@ -124,7 +124,7 @@ function Lead({ ready, model, note }: { ready: Ready; model: SummaryModel; note:
           {line.role === "final" ? (active ? "Final milestone" : "Planned final milestone") : "Next milestone"}: <Link to={nodeAddress(journey, line.key)}>{line.title}</Link>, <MilestoneWhen ready={ready} line={line} />
         </p>
       )}
-      {stalled ? <StalledPanel view={ready} nodeTo={(node) => nodeAddress(journey, node)} readOnly={ready.journey.header.status === "archived"} endDate={line?.role === "final" && !line.reached ? line.date : undefined} /> : null}
+      {stalled ? <StalledPanel view={ready} nodeTo={(node) => nodeAddress(journey, node)} readOnly={ready.journey.header.status === "archived"} endDate={line?.role === "final" && !line.done ? line.date : undefined} /> : null}
       {note}
     </section>
   );

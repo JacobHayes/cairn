@@ -17,7 +17,7 @@ use crate::id::{
     ProposalId, RoleKey, RouteId, UserId,
 };
 use crate::number::Revision;
-use crate::patch::{DraftSource, Mutation, Override, Patch, PatchTarget, Transition};
+use crate::patch::{DraftSource, Mutation, Override, Patch, PatchTarget};
 use crate::record::{GraphKey, RecordKey, Write};
 use crate::text::Markdown;
 use crate::touched::TouchedSet;
@@ -57,7 +57,6 @@ pub enum EventType {
     ResourceChanged,
     SegmentInserted,
     NodeTransitioned,
-    MilestoneReached,
     AnswerSet,
     RecordedDateChanged,
     RoleFillChanged,
@@ -227,10 +226,6 @@ impl Mutation {
             | Mutation::RemoveResource { .. } => EventType::ResourceChanged,
             Mutation::InsertSegment { .. } => EventType::SegmentInserted,
             // One event records a container's skip; the cascade is derived (D1a).
-            Mutation::Transition {
-                transition: Transition::Reach,
-                ..
-            } => EventType::MilestoneReached,
             Mutation::Transition { .. } => EventType::NodeTransitioned,
             Mutation::Answer { .. } => EventType::AnswerSet,
             Mutation::SetRecordedDate { .. } => EventType::RecordedDateChanged,

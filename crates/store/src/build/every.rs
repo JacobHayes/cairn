@@ -289,7 +289,7 @@ fn payloads(fill: Fill) -> Vec<Payload<KeyRefs>> {
             })),
             NodeKind::Milestone => payloads.push(Payload::Milestone(Milestone {
                 is_final: fill.on(),
-                auto_reach: fill.on(),
+                auto_done: fill.on(),
             })),
             NodeKind::Group => payloads.push(Payload::Group(Group {
                 opens_at: fill.some(node_key(1)),

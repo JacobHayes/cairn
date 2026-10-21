@@ -32,7 +32,7 @@
 //! | stage close: G `closes_at` M, `closes: true` (F4) | M >= G.finish + 0 | caps G, and through containment its contents |
 //! | pin on N, or a `feeds_milestone` answer in effect (E3) | none: fixes N.finish (a decision's or milestone's one instant) from both sides | both |
 //! | date answer of D in effect | none: fixes D's answer from both sides | both |
-//! | actual: a recorded start, or the finish of done, decided, or reached work (execution only) | none: fixes the instant, never moved | both |
+//! | actual: a recorded start, or the finish of done or decided work (execution only) | none: fixes the instant, never moved | both |
 //! | `created_on` of a journey (execution only) | none: fixes `created_at` | both |
 //! | today (execution only) | none: open decision, unstarted work's start, started work's finish no earlier than today | holds back |
 //!
@@ -197,7 +197,7 @@ impl Seeds {
                     seeds.set_actual(start, started);
                     seeds.set_actual(finish, finished);
                 }
-                State::Decided | State::Reached => seeds.set_actual(finish, finished),
+                State::Decided => seeds.set_actual(finish, finished),
                 State::Pending | State::Derived | State::Skipped => {}
             }
         }
@@ -504,10 +504,10 @@ impl Dates {
         Some(NodeIndex::from_position(at))
     }
 
-    /// F1, F6: a milestone that reads as reached (pass 5) is finished work, so neither it nor
-    /// a group whose only unfinished work it was is overdue. Pass 4 cannot know it: auto-reach
+    /// F1, F6: a milestone that reads as done (pass 5) is finished work, so neither it nor
+    /// a group whose only unfinished work it was is overdue. Pass 4 cannot know it: auto-done
     /// reads the effective dates this pass derives.
-    pub(crate) fn settle_reached(&mut self, graph: &Graph, reached: impl Fn(&NodeKey) -> bool) {
+    pub(crate) fn settle_done(&mut self, graph: &Graph, by_date: impl Fn(&NodeKey) -> bool) {
         let before = self.unfinished.clone();
         let group = |key: &NodeKey| {
             graph
@@ -516,7 +516,7 @@ impl Dates {
         };
         for (at, key) in self.keys.iter().enumerate() {
             if let Some(flag) = self.unfinished.get_mut(at) {
-                *flag = *flag && !reached(key) && !group(key);
+                *flag = *flag && !by_date(key) && !group(key);
             }
         }
         for (at, key) in self.keys.iter().enumerate() {
@@ -605,7 +605,7 @@ impl Dates {
         Some(u32::try_from(days).unwrap_or(u32::MAX))
     }
 
-    /// F1: a milestone's effective date: its actual date if reached, else its pin, else its
+    /// F1: a milestone's effective date: its actual date if done, else its pin, else its
     /// derived due. None for other kinds, or when nothing gives one.
     #[must_use]
     pub fn effective_date(&self, key: &NodeKey) -> Option<EffectiveDate> {

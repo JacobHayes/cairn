@@ -10,7 +10,7 @@
 //!   until an upstream decision is answered (pending) is never a drop.
 //! - **decided later**: a node the decision's answer can change that stays undecided or
 //!   pending after this choice, because it hangs on another decision still to be answered.
-//! - **drops with progress**: the drops that are started, done, decided, or reached; the
+//! - **drops with progress**: the drops that are started, done or decided; the
 //!   answer does not undo that.
 //!
 //! The choice the decision already holds changes nothing, so its effects are empty. A
@@ -216,7 +216,7 @@ impl DerivedJourney<'_> {
                     drops.push(node.clone());
                     if matches!(
                         self.state(node),
-                        State::Active | State::Done | State::Decided | State::Reached
+                        State::Active | State::Done | State::Decided
                     ) {
                         drops_with_progress.push(node.clone());
                     }

@@ -37,8 +37,8 @@ describe("when a node is due", () => {
 });
 
 describe("a milestone's date as a reader weighs it", () => {
-  it("says an actual date was reached, never late", () => {
-    expect(whenWords("2026-10-01", "actual", today)).toContain("reached");
+  it("says an actual date was done, never late", () => {
+    expect(whenWords("2026-10-01", "actual", today)).toContain("done");
     expect(whenWords("2026-10-01", "actual", today)).not.toContain("late");
   });
 

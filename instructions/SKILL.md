@@ -23,7 +23,7 @@ and that user.
    decisions by rank, placeholders needing breakdown, unassigned items, shortfalls, and
    counts. Scope it with `subtree` and `depth` on a large journey. It also says when
    completing the journey is suggested (nothing left in scope, or the final milestone
-   reached); completing it is the person's call.
+   done); completing it is the person's call.
 2. **Look closer only where needed.** `list_frontier` pages the ranked frontier or, with
    `filters`, the nodes that need something (`decisions_needed`, `needs_breakdown`,
    `unassigned`, `active`, `blocked` (display state blocked), `stale`, `overdue`, `shortfall`). `get_node` explains
@@ -51,9 +51,9 @@ both over the in-scope nodes.
 | `active` | active | started, or a container with work beneath it started |
 | `blocked` | blocked | a gate it waits on is unsatisfied |
 | `conditional` | conditional | it may apply, once a decision is answered |
-| `scheduled` | scheduled | an auto-reach milestone whose date is ahead |
+| `scheduled` | scheduled | a milestone that marks itself done on its date, which is ahead |
 | `snoozed` | snoozed | set aside until a date or a node |
-| `done` | done (a decision: decided; a milestone: reached) | finished |
+| `done` | done (a decision: decided) | finished |
 | `skipped` | skipped | skipped, or under a skipped container |
 | `not_relevant` | not relevant | an answer ruled it out, whatever it recorded |
 

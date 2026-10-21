@@ -4,7 +4,7 @@
 //! `weight_max`: the gravity sweep is one word operation per word of a row for each pruned
 //! gate edge, the container areas at most three more per node, and the unlocks simulations
 //! together read each instant, each pruned edge, and each kept-work entry at most once, and
-//! once more for each overdue, gated `auto_reach` milestone; the largest gravity and unlocks
+//! once more for each overdue, gated `auto_done` milestone; the largest gravity and unlocks
 //! fit a score; the
 //! schema's `Derived` keeps at most the response limit of explanation entries per list.
 
@@ -41,7 +41,7 @@ mod cost {
 
     #[test]
     fn priority_stays_linear_at_the_limits() {
-        // Read after the pinned milestones' date too, when the gated `auto_reach` ones are due.
+        // Read after the pinned milestones' date too, when the gated `auto_done` ones are due.
         // Each reading is its own derive at the limits, so they run side by side: the test
         // takes the longest of them, not their sum.
         std::thread::scope(|scope| {
@@ -55,14 +55,14 @@ mod cost {
         });
     }
 
-    /// The ranked `auto_reach` milestones due by today whose dependencies are not satisfied:
+    /// The ranked `auto_done` milestones due by today whose dependencies are not satisfied:
     /// each simulation of one repeats the part of a cascade behind it.
     fn overdue_gated_milestones(graph: &Graph, derived: &Derived) -> u64 {
         let count = graph
             .document()
             .nodes
             .values()
-            .filter(|node| matches!(&node.payload, Payload::Milestone(milestone) if milestone.auto_reach))
+            .filter(|node| matches!(&node.payload, Payload::Milestone(milestone) if milestone.auto_done))
             .filter(|node| derived.priority().in_normalization_set(&node.key))
             .filter(|node| derived.relevance().value(&node.key) == Relevance::Relevant)
             .filter(|node| !derived.blocking().deps_done(&node.key))

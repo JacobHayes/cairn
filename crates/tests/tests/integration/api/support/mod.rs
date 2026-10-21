@@ -442,7 +442,7 @@ pub fn request(patch: &Patch) -> serde_json::Value {
 
 /// A proposal for each kind of destination, as `(create endpoint, its path, proposal id,
 /// draft)`, against the vendor evaluation after kickoff: the journey's adds a charter that
-/// kickoff, already reached, requires, so its preview has consequences (D7); the route's
+/// kickoff, already done, requires, so its preview has consequences (D7); the route's
 /// creates a route at revision 0; the deployment's creates an identity.
 pub async fn proposals_of_every_domain(
     transport: &Transport,

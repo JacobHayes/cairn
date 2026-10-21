@@ -105,7 +105,7 @@ function footOf(context: Context, node: GraphNode, derived: NodeDerived, state: 
     latestStart: latestStart?.date,
     overdueDays: derived.dates.overdue_days ?? undefined,
     open: isOpen(derived),
-    reached: effective?.date,
+    doneOn: effective?.date,
   });
 }
 

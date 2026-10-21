@@ -16,7 +16,7 @@ fn a_stale_base_revision_is_a_rejection_naming_the_revision() {
     let mut patch = support::patch_to(
         &records,
         "{journey: j_vendor_eval}",
-        "- op: transition\n  node: n_kickoff\n  transition: reach\n",
+        "- op: transition\n  node: n_kickoff\n  transition: complete\n",
     );
     patch.base_revision = cairn_schema::Revision::NONE.next();
     let Err(Rejection::Stale { conflicts, .. }) =
@@ -53,7 +53,7 @@ fn a_patch_applies_all_or_nothing_and_lists_every_violation() {
     let records = vendor_after(2);
     let before = records.clone();
     let mutations = "\
-- op: transition\n  node: n_kickoff\n  transition: reach\n\
+- op: transition\n  node: n_kickoff\n  transition: complete\n\
 - op: transition\n  node: n_purpose\n  transition: start\n\
 - op: transition\n  node: n_nowhere\n  transition: start\n\
 - op: answer\n  decision: n_partner_runs\n  value: {text: maybe}\n";
@@ -79,7 +79,7 @@ fn a_patch_applies_all_or_nothing_and_lists_every_violation() {
 #[test]
 fn an_accepted_patch_advances_the_revision_by_one_with_one_event_per_mutation() {
     let records = vendor_after(2);
-    let mutations = "- op: transition\n  node: n_kickoff\n  transition: reach\n- op: transition\n  node: n_access\n  transition: start\n";
+    let mutations = "- op: transition\n  node: n_kickoff\n  transition: complete\n- op: transition\n  node: n_access\n  transition: start\n";
     let applied = vendor_patch(&records, mutations).unwrap();
     let domain = cairn_schema::Domain::Journey("j_vendor_eval".parse().unwrap());
     assert_eq!(applied.revision(), records.revision(&domain).next());
@@ -92,7 +92,7 @@ fn an_accepted_patch_advances_the_revision_by_one_with_one_event_per_mutation() 
         .collect();
     assert_eq!(
         types,
-        [EventType::MilestoneReached, EventType::NodeTransitioned]
+        [EventType::NodeTransitioned, EventType::NodeTransitioned]
     );
 }
 
@@ -287,7 +287,7 @@ fn report_ready() -> cairn_engine::Records {
     support::accepted_on(
         &vendor_after(8),
         "j_vendor_eval",
-        "- op: transition\n  node: n_review_opens\n  transition: reach\n",
+        "- op: transition\n  node: n_review_opens\n  transition: complete\n",
     )
 }
 
@@ -452,7 +452,7 @@ fn an_archived_journey_accepts_only_unarchiving_or_deletion() {
     let archived =
         vendor_patch(&records, "- op: set_journey_status\n  status: archived\n").unwrap();
     let archived = archived.records();
-    let answer = "- op: transition\n  node: n_kickoff\n  transition: reach\n";
+    let answer = "- op: transition\n  node: n_kickoff\n  transition: complete\n";
     assert_eq!(
         codes(vendor_patch(archived, answer)),
         [ViolationCode::ArchivedJourney]

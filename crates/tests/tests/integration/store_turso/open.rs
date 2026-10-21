@@ -286,7 +286,7 @@ mod open {
             &["nodes.requires_note", "annotations.type"],
         ),
         ("Action", &["nodes.kind"]),
-        ("Milestone", &["nodes.is_final", "nodes.auto_reach"]),
+        ("Milestone", &["nodes.is_final", "nodes.auto_done"]),
         (
             "Group",
             &[

@@ -1,5 +1,5 @@
 journey: j_launch
-description: "A launch pinned to a date: the freeze, beta, and materials deadlines all derive from it. Kickoff is reached, the launch pin is shifted a week when feature work slips, and the code freeze's actual date lands later than the chain from the launch pin allows."
+description: "A launch pinned to a date: the freeze, beta, and materials deadlines all derive from it. Kickoff is done, the launch pin is shifted a week when feature work slips, and the code freeze's actual date lands later than the chain from the launch pin allows."
 steps:
 - note: Start the launch, fill the roles directly, and pin the launch date.
   today: "2026-09-01"
@@ -29,7 +29,7 @@ steps:
     - op: set_pin
       node: n_launch
       date: "2026-11-16"
-- note: Kickoff is reached, recording its actual date, and feature work starts.
+- note: Kickoff is done, recording its actual date, and feature work starts.
   today: "2026-09-05"
   at: "2026-09-05T10:00:00Z"
   actor:
@@ -42,7 +42,7 @@ steps:
     mutations:
     - op: transition
       node: n_kickoff
-      transition: reach
+      transition: complete
     - op: transition
       node: n_features
       transition: start
@@ -63,8 +63,8 @@ steps:
       node: n_launch
       offset_days: 7
 - note: >-
-    Feature work and hardening finish; the code freeze is reached later than the
-    chain from the launch pin allows, which is a shortfall, not a rejection.
+    Feature work and hardening finish; the code freeze is done later than the chain
+    from the launch pin allows, which is a shortfall, not a rejection.
   today: "2026-11-04"
   at: "2026-11-04T18:00:00Z"
   actor:
@@ -83,7 +83,7 @@ steps:
       transition: complete
     - op: transition
       node: n_code_freeze
-      transition: reach
+      transition: complete
     - op: set_recorded_date
       node: n_code_freeze
       end: finish

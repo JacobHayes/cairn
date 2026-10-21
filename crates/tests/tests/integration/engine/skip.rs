@@ -53,7 +53,7 @@ fn keys(names: &[&str]) -> BTreeSet<NodeKey> {
 }
 
 #[test]
-fn a_skip_reaches_descendants_through_containment_only() {
+fn a_skip_donees_descendants_through_containment_only() {
     let derived = vendor(&[skip("n_plan")]);
     for child in ["n_plan_draft", "n_plan_review"] {
         assert_eq!(

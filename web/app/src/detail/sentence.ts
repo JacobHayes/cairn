@@ -124,7 +124,7 @@ export function rankClause(view: Ready, derived: NodeDerived, facts: RankFacts):
         ? [`holds up ${plural(derived.gravity_from.total, "node")}`]
         : [];
   const said = phrases.length === 0 ? fallback : phrases;
-  return said.length === 0 ? ` Ranks #${String(position)}.` : ` Ranks #${String(position)}: it ${said.join(" and ")}.`;
+  return said.length === 0 ? ` Ranks #${String(position)}.` : ` Ranks #${String(position)}; it ${said.join(" and ")}.`;
 }
 
 /** A container's roll-up: how much of it is done (the plan's one rule, plan/tree.ts), the decisions still to make, and the open child with the least slack. */
@@ -188,7 +188,7 @@ function stateSentence(view: Ready, detail: NodeDetail, rank: RankFacts): Piece[
     }
     case "scheduled": {
       const date = derived.dates.effective_date?.date ?? derived.dates.due?.date;
-      return [date === undefined ? "Waiting for its date, then it counts as reached by itself." : `Scheduled for ${on(date)}; it counts as reached by itself that day.`];
+      return [date === undefined ? "Waiting for its date, then it marks itself done." : `Scheduled for ${on(date)}; it marks itself done that day.`];
     }
     case "snoozed": {
       const via = derived.snoozed_via ?? undefined;
@@ -197,7 +197,7 @@ function stateSentence(view: Ready, detail: NodeDetail, rank: RankFacts): Piece[
       return via !== undefined && stored === undefined ? ["Snoozed", ...until, ", through ", { node: via }, "."] : ["Snoozed", ...until, "."];
     }
     case "done": {
-      const verb = node.kind === "decision" ? `Decided${detail.answer === undefined ? "" : ` ${answerText(view, detail.answer, node)}`}` : node.kind === "milestone" ? "Reached" : "Done";
+      const verb = node.kind === "decision" ? `Decided${detail.answer === undefined ? "" : ` ${answerText(view, detail.answer, node)}`}` : "Done";
       const unanswered = derived.relevance.value === "undecided" ? ([" May not apply: depends on ", ...undecidedNames(view, node.key), "."] satisfies Piece[]) : [];
       return [`${verb}${finished}.`, ...staleWords(view, derived.stale ?? []), ...unanswered];
     }

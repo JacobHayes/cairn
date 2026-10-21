@@ -1,5 +1,5 @@
 // A small derived journey and its canvas levels for the canvas's unit tests, written as the
-// derive worker answers them: a kickoff milestone (reached) opening a build stage, whose build
+// derive worker answers them: a kickoff milestone (done) opening a build stage, whose build
 // deliverable is active while blocked by an optional extra (started early) and holds a check
 // action; a decision the extra's condition reads, so the extra is undecided; and an old step
 // that is not relevant.
@@ -41,7 +41,7 @@ export function canvasView(): Ready {
         ],
         state: {
           nodes: {
-            n_kick: { state: "reached", provenance: "from_route" },
+            n_kick: { state: "done", provenance: "from_route" },
             n_build: { state: "active", provenance: "from_route" },
             n_old: { state: "todo", provenance: "from_route" },
           },

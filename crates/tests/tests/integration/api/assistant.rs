@@ -119,11 +119,11 @@ mod in_process {
     /// turn answered; another user's conversation about the same journey is their own.
     #[tokio::test]
     async fn a_conversation_reads_back_as_kept_and_only_by_its_user() {
-        let reach = json!({ "journey": JOURNEY, "node": "n_kickoff", "transition": "reach",
+        let complete = json!({ "journey": JOURNEY, "node": "n_kickoff", "transition": "complete",
             "patch_id": "p_kickoff", "base_revision": 2 });
         let provider = scripted(vec![
-            Step::call("transition_node", reach),
-            Step::say("Kickoff is reached."),
+            Step::call("transition_node", complete),
+            Step::say("Kickoff is done."),
         ]);
         let world = with_assistant(&provider).await;
         let ann = world.vendor_after(2).await;
@@ -156,16 +156,16 @@ mod in_process {
     /// write with its consequences, the proposal by id.
     #[tokio::test]
     async fn a_turn_answers_its_writes_as_documented() {
-        let reach = json!({ "journey": JOURNEY, "node": "n_kickoff", "transition": "reach",
+        let complete = json!({ "journey": JOURNEY, "node": "n_kickoff", "transition": "complete",
             "patch_id": "p_kickoff", "base_revision": 2 });
         let add = json!({ "op": "add_node", "node": { "key": "n_extra", "id": "extra",
             "kind": "action", "title": "An extra step" } });
         let structure = json!({ "patch": { "id": "p_extra", "target": { "journey": JOURNEY },
             "base_revision": 3, "mutations": [add] } });
         let provider = scripted(vec![
-            Step::call("transition_node", reach),
+            Step::call("transition_node", complete),
             Step::call("apply_patch", structure),
-            Step::say("Kickoff is reached; the extra step is proposed."),
+            Step::say("Kickoff is done; the extra step is proposed."),
         ]);
         let world = with_assistant(&provider).await;
         let ann = world.vendor_after(2).await;

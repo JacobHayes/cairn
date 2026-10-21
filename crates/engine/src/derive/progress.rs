@@ -75,7 +75,7 @@ impl Derived {
             return;
         }
         sum.total += 1;
-        if state.is_terminal() || self.blocking.auto_reached(key) {
+        if state.is_terminal() || self.blocking.done_by_date(key) {
             sum.done += 1;
         }
         if self.dates.overdue(key) {

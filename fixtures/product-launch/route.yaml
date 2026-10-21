@@ -34,7 +34,7 @@ nodes:
   id: beta-start
   kind: milestone
   title: Beta starts
-  auto_reach: true
+  auto_done: true
   not_before:
     after: code-freeze
     offset: 2

@@ -22,7 +22,7 @@ describe("nextForYou", () => {
 
 describe("what is open for the viewer", () => {
   // The one rule behind the journey card's count and the line for work that is all waiting.
-  it("leaves out a container, work out of scope, finished work and a milestone that reaches itself, in both", () => {
+  it("leaves out a container, work out of scope, finished work and a milestone that marks itself done, in both", () => {
     const view = actingView();
     const found = view.derived.nodes;
     const set = (key: string, change: Record<string, unknown>) => {
@@ -31,7 +31,7 @@ describe("what is open for the viewer", () => {
         found[key] = { ...was, ...change };
       }
     };
-    set("n_later", { auto_reached: true, display_state: "done" });
+    set("n_later", { done_by_date: true, display_state: "done" });
     const entries = holds("n_stage", "n_gone", "n_done", "n_later", "n_inner");
     expect(["n_stage", "n_gone", "n_done", "n_later", "n_inner"].filter((key) => openForViewer(view, key))).toEqual(["n_inner"]);
     // The line for work that is all waiting names what is open, never one of the others.

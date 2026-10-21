@@ -474,7 +474,7 @@ pub fn every_content_graph() -> cairn_schema::Graph {
         ],
         "nodes": [
             {"key": "n_kickoff", "id": "kickoff", "kind": "milestone", "title": "Kickoff",
-             "auto_reach": true},
+             "auto_done": true},
             {"key": "n_wrap", "id": "wrap-up", "kind": "milestone", "title": "Wrap-up",
              "weight": 10, "final": true,
              "due_by": {"after": "journey.created_at", "offset": 30}},
@@ -534,7 +534,7 @@ pub fn every_state() -> cairn_schema::JourneyState {
         "nodes": {
             "n_plan": {"state": "active", "provenance": "from_route", "atomic": true,
                        "started_on": "2026-10-06"},
-            "n_kickoff": {"state": "reached", "provenance": "from_route",
+            "n_kickoff": {"state": "done", "provenance": "from_route",
                           "finished_on": "2026-10-05"},
             "n_scope": {"state": "decided", "provenance": "local", "finished_on": "2026-10-05"},
             "n_steps": {"state": "todo", "provenance": "orphaned"},

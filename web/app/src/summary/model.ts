@@ -50,7 +50,7 @@ export interface SummaryModel {
   shortfalls: (Listed & { days: number | undefined })[];
   /** Stale nodes with why each is stale (D4). */
   stale: (Listed & { reasons: string[] })[];
-  /** Milestones not yet reached with their effective dates (F1), earliest first. */
+  /** Milestones not yet done with their effective dates (F1), earliest first. */
   upcoming: (Listed & { date: string; origin: DateOrigin; owners: string[] })[];
   /** Open decisions with their owners (identity keys), in rank order; no owner is unassigned. */
   openDecisions: (Listed & { owners: string[] })[];
@@ -102,8 +102,8 @@ export interface MilestoneLine {
   /** Its effective date (F1) and where it comes from; none while nothing gives it one. */
   date: string | undefined;
   origin: DateOrigin | undefined;
-  /** Whether it is reached, as its display state says: by an actual date, or by `auto_reach` once its date has passed (F1). */
-  reached: boolean;
+  /** Whether it is done, as its display state says: by an actual date, or by `auto_done` once its date has passed (F1). */
+  done: boolean;
   /** Its own shortfall in days (F6), never another node's. */
   shortfallDays: number | undefined;
   /** The decision whose answer would pin an undated final milestone (E3). */
@@ -130,7 +130,7 @@ export function milestoneLine(ready: Ready, model: SummaryModel): MilestoneLine 
       title: final.title,
       date: dates?.effective_date?.date,
       origin: dates?.effective_date?.origin,
-      reached: ready.derived.nodes[final.key]?.display_state === "done",
+      done: ready.derived.nodes[final.key]?.display_state === "done",
       shortfallDays: dates?.shortfall?.shortfall_days,
       feeder: feeder === undefined ? undefined : { key: feeder.key, title: feeder.title },
     };
@@ -145,7 +145,7 @@ export function milestoneLine(ready: Ready, model: SummaryModel): MilestoneLine 
     title: next.title,
     date: next.date,
     origin: next.origin,
-    reached: ready.derived.nodes[next.key]?.display_state === "done",
+    done: ready.derived.nodes[next.key]?.display_state === "done",
     shortfallDays: ready.derived.nodes[next.key]?.dates.shortfall?.shortfall_days,
     feeder: undefined,
   };
@@ -159,16 +159,13 @@ export interface Attention {
   tone: FactTone;
 }
 
-/** `Reached 2 days off what its chain allows`, or `Needs 2 days more than its chain allows`: what a shortfall of `count` days means for node `key`. */
+/** `Finished 2 days off what its chain allows`, or `Needs 2 days more than its chain allows`: what a shortfall of `count` days means for node `key`. */
 export function shortfallWords(ready: Ready, key: string, count: number | undefined): string {
   if (count === undefined) {
     return "Cannot be met as planned";
   }
   const finished = ready.derived.nodes[key]?.display_state === "done";
   // A recorded date can break a chain by being too late or too early, so a finished node's shortfall says only how far off it is.
-  if (finished && nodeOf(ready, key)?.kind === "milestone") {
-    return `Reached ${daysWords(count)} off what its chain allows`;
-  }
   return finished ? `Finished ${daysWords(count)} off what its chain allows` : `Needs ${daysWords(count)} more than its chain allows`;
 }
 
@@ -261,11 +258,11 @@ export function claimActions(ready: Ready, model: SummaryModel, frontier: readon
 /** A finished node and when it was recorded finished (F2). */
 export interface Finished {
   key: string;
-  /** `Done Oct 3`, `Decided Oct 2`, `Reached Oct 1`. */
+  /** `Done Oct 3`, `Decided Oct 2`. */
   fact: string;
 }
 
-const FINISHED_WORDS: Partial<Record<string, string>> = { done: "Done", decided: "Decided", reached: "Reached" };
+const FINISHED_WORDS: Partial<Record<string, string>> = { done: "Done", decided: "Decided" };
 
 /** How many finished nodes the page lists. */
 export const RECENT_SHOWN = 5;
@@ -273,7 +270,7 @@ export const RECENT_SHOWN = 5;
 /**
  * F2, C18: the in-scope nodes whose stored state is finished and which recorded a finish date,
  * newest first, then by key, at most `RECENT_SHOWN`. A reopened or skipped node, one skipped
- * through a container, a node out of scope, and a milestone reached by its date alone (no
+ * through a container, a node out of scope, and a milestone done by its date alone (no
  * record) are left out.
  */
 export function recentlyFinished(ready: Ready): Finished[] {

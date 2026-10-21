@@ -498,7 +498,7 @@
           },
           "then": {
             "properties": {
-              "auto_reach": false,
+              "auto_done": false,
               "closes": false,
               "closes_at": false,
               "estimate": false,
@@ -522,7 +522,7 @@
           "then": {
             "properties": {
               "answer_type": false,
-              "auto_reach": false,
+              "auto_done": false,
               "choices": false,
               "closes": false,
               "closes_at": false,
@@ -547,7 +547,7 @@
           "then": {
             "properties": {
               "answer_type": false,
-              "auto_reach": false,
+              "auto_done": false,
               "choices": false,
               "closes": false,
               "closes_at": false,
@@ -600,7 +600,7 @@
           "then": {
             "properties": {
               "answer_type": false,
-              "auto_reach": false,
+              "auto_done": false,
               "choices": false,
               "estimate": false,
               "feeds_milestone": false,
@@ -769,7 +769,7 @@
         "answer_type": {
           "$ref": "#/$defs/AnswerType"
         },
-        "auto_reach": {
+        "auto_done": {
           "type": "boolean"
         },
         "choices": {

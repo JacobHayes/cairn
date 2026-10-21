@@ -178,10 +178,7 @@ mod property {
             ];
             for (slot, recorded) in actuals {
                 let recorded = recorded.filter(|_| {
-                    matches!(
-                        stored.state,
-                        State::Active | State::Done | State::Decided | State::Reached
-                    )
+                    matches!(stored.state, State::Active | State::Done | State::Decided)
                 });
                 if let Some(recorded) = recorded {
                     seeds.insert(slot, (Some(day(recorded)), Some(day(recorded)), true));

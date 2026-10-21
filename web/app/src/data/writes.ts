@@ -122,7 +122,7 @@ export function describe(intent: Pick<WriteIntent, "target" | "mutations">, titl
       return `${of("Answered", "a decision")}${rest}`;
     case "transition": {
       const move = typeof first.transition === "string" ? first.transition : "skip";
-      const verb = { start: "Started", stop: "Stopped", complete: "Completed", skip: "Skipped", reopen: "Reopened", reach: "Reached" }[move];
+      const verb = { start: "Started", stop: "Stopped", complete: "Completed", skip: "Skipped", reopen: "Reopened" }[move];
       return `${of(verb, "a step")}${rest}`;
     }
     case "snooze":

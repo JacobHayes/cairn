@@ -92,7 +92,6 @@ fn arb_transition() -> BoxedStrategy<Transition> {
         Just(Transition::Complete),
         arb_reason().prop_map(|reason| Transition::Skip { reason }),
         Just(Transition::Reopen),
-        Just(Transition::Reach),
     ]
     .boxed()
 }

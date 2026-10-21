@@ -4,7 +4,7 @@
 //! atomic, each on the graph the patch produces, so a guard is never satisfied only for
 //! a moment. A guard bypass applied in the same patch accepts the failures of the guards it
 //! names, and those specific failures are recorded on it; a bypass covers a guarded
-//! transition (complete, a first answer, reach) on its node in the same patch. Relevance and
+//! transition (complete, a first answer) on its node in the same patch. Relevance and
 //! `deps_done` join this stage with derive (2.4).
 
 use std::collections::BTreeSet;

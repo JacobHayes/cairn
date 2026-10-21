@@ -140,7 +140,7 @@ fn held_journey() -> Records {
 /// C8, Priority: a node that unlocks one dependent lists it, and lists the
 /// dependents it would not free with what else each waits on, here a condition and another
 /// action, largest weight first. Answering the decision frees the held dependent, which then
-/// leaves the list and joins what it unlocks; reaching the gate leaves nothing waiting on it.
+/// leaves the list and joins what it unlocks; completing the gate leaves nothing waiting on it.
 #[test]
 fn a_node_lists_what_it_unlocks_and_what_is_still_waiting() {
     let before = held_journey();
@@ -187,16 +187,16 @@ fn a_node_lists_what_it_unlocks_and_what_is_still_waiting() {
         .collect();
     assert_eq!(freed, [key("n_freed"), key("n_cond")]);
 
-    let reached = support::accepted(
+    let finished = support::accepted(
         &answered,
-        "- op: transition\n  node: n_gate\n  transition: reach\n",
+        "- op: transition\n  node: n_gate\n  transition: complete\n",
     );
-    let graph = support::journey_graph(&reached, support::JOURNEY);
-    let derived = support::derived(&reached, support::JOURNEY);
+    let graph = support::journey_graph(&finished, support::JOURNEY);
+    let derived = support::derived(&finished, support::JOURNEY);
     let waiting = DerivedJourney::new(&graph, &derived)
         .still_waiting(&key("n_gate"))
         .unwrap();
-    assert_eq!(waiting, [], "a reached gate holds nothing back");
+    assert_eq!(waiting, [], "a done gate holds nothing back");
 }
 
 /// Priority, Unlocks: completing a node cascades through derived group completion, so a

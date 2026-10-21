@@ -25,7 +25,7 @@ const SAMPLE: Record<NodeField, unknown> = {
   requires_artifact: false,
   requires_note: false,
   final: false,
-  auto_reach: false,
+  auto_done: false,
   opens_at: null,
   closes_at: null,
   gates: true,

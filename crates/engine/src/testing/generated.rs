@@ -1,6 +1,6 @@
 //! Generated journeys built directly as documents (not through apply), for the derive passes'
 //! property and reference tests: deep containment, explicit edges, conditions, stage
-//! openings, stored states, answers, force includes, keeps, `auto_reach` milestones, date
+//! openings, stored states, answers, force includes, keeps, `auto_done` milestones, date
 //! snoozes, and weights, all generic.
 //!
 //! Every generated graph is valid by construction. Nodes are created in depth-first
@@ -487,9 +487,9 @@ impl Shape {
             }),
             NodeKind::Deliverable => Payload::Deliverable(Deliverable::default()),
             NodeKind::Action => Payload::Action(Action::default()),
-            // Half the milestones auto-reach (F1); the estimate seed is a milestone's spare bits.
+            // Half the milestones auto-done (F1); the estimate seed is a milestone's spare bits.
             NodeKind::Milestone => Payload::Milestone(Milestone {
-                auto_reach: seed.dates.estimate.is_multiple_of(2),
+                auto_done: seed.dates.estimate.is_multiple_of(2),
                 ..Milestone::default()
             }),
             NodeKind::Group => Payload::Group(self.stage(index, seed)),
@@ -554,7 +554,7 @@ impl Shape {
             let (start, finish) = match stored.state {
                 State::Active => (Some(day(started)), None),
                 State::Done => (Some(day(started)), Some(day(finished))),
-                State::Decided | State::Reached => (None, Some(day(finished))),
+                State::Decided => (None, Some(day(finished))),
                 State::Todo | State::Open | State::Pending | State::Derived | State::Skipped => {
                     (None, None)
                 }
@@ -602,7 +602,7 @@ impl Shape {
             NodeKind::Deliverable | NodeKind::Action => {
                 &[State::Todo, State::Active, State::Done, State::Skipped]
             }
-            NodeKind::Milestone => &[State::Pending, State::Reached, State::Skipped],
+            NodeKind::Milestone => &[State::Pending, State::Done, State::Skipped],
             NodeKind::Group => &[
                 State::Derived,
                 State::Derived,

@@ -254,7 +254,7 @@ mod property {
                     .dates()
                     .effective_date(key)
                     .is_some_and(|date| date.date <= today);
-                deps_done && milestone.auto_reach && relevant && arrived
+                deps_done && milestone.auto_done && relevant && arrived
             }
             _ => false,
         }

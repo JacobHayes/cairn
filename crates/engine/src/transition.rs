@@ -19,21 +19,18 @@ pub enum Move {
     Skip,
     /// `reopen`.
     Reopen,
-    /// `reach`.
-    Reach,
     /// `answer` and `revise`.
     Answer,
 }
 
 impl Move {
     /// Every move.
-    pub const ALL: [Move; 7] = [
+    pub const ALL: [Move; 6] = [
         Move::Start,
         Move::Stop,
         Move::Complete,
         Move::Skip,
         Move::Reopen,
-        Move::Reach,
         Move::Answer,
     ];
 
@@ -46,7 +43,6 @@ impl Move {
             Transition::Complete => Move::Complete,
             Transition::Skip { .. } => Move::Skip,
             Transition::Reopen => Move::Reopen,
-            Transition::Reach => Move::Reach,
         }
     }
 }
@@ -54,7 +50,7 @@ impl Move {
 /// D1: the rows of `kind`'s table for `step`, as (from, to) pairs.
 #[must_use]
 pub fn rows(kind: NodeKind, step: Move) -> &'static [(State, State)] {
-    use State::{Active, Decided, Derived, Done, Open, Pending, Reached, Skipped, Todo};
+    use State::{Active, Decided, Derived, Done, Open, Pending, Skipped, Todo};
     match kind {
         NodeKind::Deliverable | NodeKind::Action => match step {
             Move::Start => &[(Todo, Active)],
@@ -62,24 +58,24 @@ pub fn rows(kind: NodeKind, step: Move) -> &'static [(State, State)] {
             Move::Complete => &[(Todo, Done), (Active, Done)],
             Move::Skip => &[(Todo, Skipped), (Active, Skipped)],
             Move::Reopen => &[(Done, Todo), (Skipped, Todo)],
-            Move::Reach | Move::Answer => &[],
+            Move::Answer => &[],
         },
         NodeKind::Decision => match step {
             Move::Answer => &[(Open, Decided), (Decided, Decided)],
             Move::Skip => &[(Open, Skipped)],
             Move::Reopen => &[(Decided, Open), (Skipped, Open)],
-            Move::Start | Move::Stop | Move::Complete | Move::Reach => &[],
+            Move::Start | Move::Stop | Move::Complete => &[],
         },
         NodeKind::Milestone => match step {
-            Move::Reach => &[(Pending, Reached)],
+            Move::Complete => &[(Pending, Done)],
             Move::Skip => &[(Pending, Skipped)],
-            Move::Reopen => &[(Reached, Pending), (Skipped, Pending)],
-            Move::Start | Move::Stop | Move::Complete | Move::Answer => &[],
+            Move::Reopen => &[(Done, Pending), (Skipped, Pending)],
+            Move::Start | Move::Stop | Move::Answer => &[],
         },
         NodeKind::Group => match step {
             Move::Skip => &[(Derived, Skipped)],
             Move::Reopen => &[(Skipped, Derived)],
-            Move::Start | Move::Stop | Move::Complete | Move::Reach | Move::Answer => &[],
+            Move::Start | Move::Stop | Move::Complete | Move::Answer => &[],
         },
     }
 }
@@ -107,12 +103,12 @@ pub fn answered(from: State) -> Option<State> {
     next(NodeKind::Decision, from, Move::Answer)
 }
 
-/// D4: whether a move is a completing transition whose guards a bypass can cover: complete,
-/// a first answer, and reach.
+/// D4: whether a move is a completing transition whose guards a bypass can cover: complete
+/// and a first answer.
 #[must_use]
 pub fn is_guarded(kind: NodeKind, from: State, step: Move) -> bool {
     let guarded = match step {
-        Move::Complete | Move::Reach => true,
+        Move::Complete => true,
         Move::Answer => from == State::Open,
         Move::Start | Move::Stop | Move::Skip | Move::Reopen => false,
     };

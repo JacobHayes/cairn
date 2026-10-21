@@ -135,7 +135,7 @@ mutations:
       reason: Not needed this time.
 - op: transition
   node: n_kickoff
-  transition: reach
+  transition: complete
 - op: answer
   decision: n_scope
   value:

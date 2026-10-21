@@ -19,19 +19,19 @@ export interface FootFacts {
   /** Still to do and in scope (`isOpen`): a finished or ruled-out node has no date to give. */
   open: boolean;
   /** A milestone's effective date. */
-  reached: string | undefined;
+  doneOn: string | undefined;
 }
 
 /**
  * The one date a card's foot gives, in words, with the tone it reads in: how late when late;
  * "Start by" when the node has not started and must within two weeks; else its due words
  * (warning ink within a week). A finished or ruled-out node has none (a milestone says
- * when it was reached).
+ * when it was done).
  */
 export function footWords(facts: FootFacts): { words: string; tone: Tone } | undefined {
-  const { kind, state, today, due, latestStart, overdueDays, open, reached } = facts;
+  const { kind, state, today, due, latestStart, overdueDays, open, doneOn } = facts;
   if (kind === "milestone" && state === "done") {
-    return reached === undefined ? undefined : { words: `Reached ${dateWords(reached, today)}`, tone: "plain" };
+    return doneOn === undefined ? undefined : { words: `Done ${dateWords(doneOn, today)}`, tone: "plain" };
   }
   if (!open) {
     return undefined;
@@ -45,7 +45,7 @@ export function footWords(facts: FootFacts): { words: string; tone: Tone } | und
     return { words: `Start by ${dateWords(latestStart, today)}`, tone: left < 0 ? "bad" : left <= SOON_DAYS ? "warn" : "plain" };
   }
   if (due === undefined) {
-    return kind === "milestone" && reached !== undefined ? { words: dateWords(reached, today), tone: "plain" } : undefined;
+    return kind === "milestone" && doneOn !== undefined ? { words: dateWords(doneOn, today), tone: "plain" } : undefined;
   }
   return { words: dueWords(due, today, kind === "decision"), tone: isSoon(due, today) ? "warn" : "plain" };
 }

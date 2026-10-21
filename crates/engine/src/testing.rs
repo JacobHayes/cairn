@@ -382,7 +382,6 @@ fn transition(node: &str, step: Move) -> Mutation {
             reason: parse("Generated."),
         },
         Move::Reopen => Transition::Reopen,
-        Move::Reach => Transition::Reach,
         Move::Answer => {
             return yaml(&format!(
                 "op: answer\ndecision: {node}\nvalue: {{boolean: true}}\n"

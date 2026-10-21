@@ -1,13 +1,13 @@
 //! The stage that needs derived state (D4, B6; ARCHITECTURE, Write path: apply): the final
 //! candidate is derived once, with the patch's today, and every guarded transition the patch
-//! attempted (complete, a first answer, reach) is held to relevance and `deps_done` on it, so
+//! attempted (complete or a first answer) is held to relevance and `deps_done` on it, so
 //! a guard is never satisfied only for a moment and a bulk completion is accepted in any
 //! order (A17). Relevance refuses a node that is not relevant and has no bypass (force include
 //! is the escape hatch); an undecided node passes, and neither do its condition gates hold it
 //! (`deps_done` as a guard reads it), so finishing undecided work is accepted and reported as
 //! a consequence (D7) that it may not apply. A `deps_done` bypass applied in the same patch
 //! accepts the open dependencies present, and they are recorded on it. A snooze the patch made must sit on a node in scope that is not closed: not
-//! effectively skipped and not a milestone that reads as reached (B6; a blocked node may be
+//! effectively skipped and not a milestone that reads as done (B6; a blocked node may be
 //! snoozed, Gating); a group has work left beneath it. An unsnooze of a node with no snooze of
 //! its own is refused while a container's snooze still holds over it on that graph, naming the
 //! container (B6).
@@ -201,7 +201,7 @@ fn snoozes(check: &mut Check<'_, '_>, graph: &Graph, derived: &Derived) {
         if !journey.graph.state.snoozes.contains_key(key) {
             continue;
         }
-        // Closed: effectively skipped, or a milestone that reads as reached (F1).
+        // Closed: effectively skipped, or a milestone that reads as done (F1).
         let out_of_scope = !derived.relevance().in_scope(key);
         let nothing_beneath = is_group(graph, key) && !work_beneath(graph, derived, key);
         if !out_of_scope && !derived.blocking().closed(key) && !nothing_beneath {
@@ -301,7 +301,7 @@ fn shapes(write: &Write) -> Vec<Shape<'_>> {
                     Shape::Structure(&edge.requires),
                 ]
             }
-            // A pin moves an `auto_reach` milestone's date, so whether it reads as reached.
+            // A pin moves an `auto_done` milestone's date, so whether it reads as done.
             GraphRecord::NodeState { node, .. } | GraphRecord::Pin { node, .. } => {
                 vec![Shape::State(node)]
             }

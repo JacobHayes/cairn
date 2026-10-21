@@ -107,12 +107,15 @@ function guardsOf(detail: NodeDetail): { guards: Guard[]; words: string } {
   return { guards, words: guards.map(guardWords).join(" and ") };
 }
 
-/** F2: a reached milestone's actual date, edited. */
+/** F2: a done milestone's actual date, edited. */
 function EditDate({ value, sending, disabled, onChange, onSave, onClose }: { value: string; sending: Sending; disabled: boolean; onChange: (date: string) => void; onSave: (date: string) => void; onClose: () => void }) {
   return (
     <span className="stack" data-testid="edit-date-form">
-      <span className="row">
-        <Field type="date" aria-label="Reached on" value={value} onChange={(event) => { onChange(event.target.value); }} />
+      <span className="row row-end">
+        <label className="stack">
+          <span className="muted">Done on</span>
+          <Field type="date" aria-label="Done on" value={value} onChange={(event) => { onChange(event.target.value); }} />
+        </label>
         <Button primary disabled={disabled || value === ""} onClick={() => { onSave(value); }}>
           Save
         </Button>
@@ -201,7 +204,6 @@ function runnersOf({ view, detail, write, form, onRename, onCopied, insertHere }
     skip: reason("skip"),
     stop: move(transition(key, "stop")),
     "done-anyway": reason("bypass"),
-    "reach-anyway": reason("bypass"),
     "answer-anyway": reason("anyway"),
     reopen: move(transition(key, "reopen")),
     "edit-date": () => { form.openForm("edit-date", detail.record.finished_on ?? view.derived.today); },
@@ -261,7 +263,7 @@ function Overflow({ groups, runners }: { groups: MenuItem[][]; runners: Record<M
  * The action already happened, so nothing here would do it again: the text can be read and
  * copied, and Close ends it.
  */
-function Kept({ opened, view, detail, onClose }: { opened: Drafted; view: Ready; detail: NodeDetail; onClose: () => void }) {
+function Kept({ opened, view, onClose }: { opened: Drafted; view: Ready; onClose: () => void }) {
   const text = (value: ReactNode) => <span className="muted" data-testid="kept-text">{value}</span>;
   const typed = (): ReactNode => {
     switch (opened.case) {
@@ -281,7 +283,7 @@ function Kept({ opened, view, detail, onClose }: { opened: Drafted; view: Ready;
   return (
     <div className="callout stack" data-testid="kept">
       <span>
-        <strong>{keptWords(opened.case, detail.node.kind)}</strong> What you typed after sending was not sent:
+        <strong>{keptWords(opened.case)}</strong> What you typed after sending was not sent:
       </span>
       {typed()}
       <span>
@@ -313,7 +315,7 @@ function reasonMutations(kind: ReasonKind, node: GraphNode, guards: Guard[], rea
     case "include":
       return [{ op: "apply_override", node: node.key, override: { force_include: { reason } } }];
     case "bypass":
-      return [guardBypass(node.key, guards, reason), transition(node.key, node.kind === "milestone" ? "reach" : "complete")];
+      return [guardBypass(node.key, guards, reason), transition(node.key, "complete")];
   }
 }
 
@@ -327,7 +329,7 @@ function reasonWords(kind: ReasonKind, node: GraphNode, without: string): { labe
     case "include":
       return { label: "Why include it", confirm: "Include anyway", testId: "include-form" };
     case "bypass":
-      return { label: "Why bypass the guard", confirm: `${node.kind === "milestone" ? "Mark reached" : "Mark done"} without ${without}`, testId: "bypass" };
+      return { label: "Why bypass the guard", confirm: `Mark done without ${without}`, testId: "bypass" };
   }
 }
 
@@ -534,7 +536,7 @@ function NodeActions({ view, detail, onRename }: { view: Ready; detail: NodeDeta
         </>
       ) : null}
       {inPlace ? <OpenedForm view={view} detail={detail} write={write} form={form} opened={open} sending={sending} footer={inDialog ? rejected : null} submit={submit} /> : null}
-      {kept === undefined ? null : <Kept opened={kept} view={view} detail={detail} onClose={form.close} />}
+      {kept === undefined ? null : <Kept opened={kept} view={view} onClose={form.close} />}
       {copied ? <span className="muted small">Link copied.</span> : null}
       {kept === undefined && !inDialog ? rejected : null}
     </div>

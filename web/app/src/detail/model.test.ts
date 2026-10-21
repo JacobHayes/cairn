@@ -40,8 +40,8 @@ describe("movesFrom (D1)", () => {
     ["deliverable", "done", ["reopen"]],
     ["decision", "open", ["skip"]],
     ["decision", "decided", ["reopen"]],
-    ["milestone", "pending", ["reach", "skip"]],
-    ["milestone", "reached", ["reopen"]],
+    ["milestone", "pending", ["complete", "skip"]],
+    ["milestone", "done", ["reopen"]],
     ["group", "derived", ["skip"]],
     ["group", "skipped", ["reopen"]],
   ];

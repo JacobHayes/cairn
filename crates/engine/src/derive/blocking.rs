@@ -1,9 +1,9 @@
-//! Pass 5, auto-reach, blocking, and what can be acted on (PRD Containment, Gating, D1, D1a,
+//! Pass 5, auto-done, blocking, and what can be acted on (PRD Containment, Gating, D1, D1a,
 //! D2, D5, B6, F1; ARCHITECTURE, Read path: derive, pass 5). One sweep over the instants of
 //! the effective dependency graph in a topological order decides, for each instant, whether
 //! everything it waits on is satisfied; a node's finish is satisfied when the node satisfies
-//! dependencies (D1, D1a). Auto-reach is decided inside the same sweep, at the milestone's
-//! instant, so a milestone that reads as reached satisfies the instants after it and auto-reach
+//! dependencies (D1, D1a). Auto-done is decided inside the same sweep, at the milestone's
+//! instant, so a milestone that reads as done satisfies the instants after it and auto-done
 //! chains through any number of milestones (F1).
 //!
 //! What satisfies dependencies, at a node's finish:
@@ -11,12 +11,12 @@
 //! - a stored or effective skip: once every kept, in-scope node beneath it satisfies
 //!   dependencies (D1a, "skipped, kept work pending" until then); a node with no kept work
 //!   beneath it satisfies at once;
-//! - any other terminal state (`done`, `decided`, `reached`);
+//! - any other terminal state (`done`, `decided`);
 //! - a group, which has no performed state: once its relevant or undecided children and its
 //!   own requirements, openings, and conditions are satisfied, so an empty group waits for its
 //!   gates (PRD Containment);
-//! - a pending, relevant `auto_reach` milestone whose dependencies are satisfied and whose
-//!   effective date is today or earlier: it reads as reached (F1);
+//! - a pending, relevant `auto_done` milestone whose dependencies are satisfied and whose
+//!   effective date is today or earlier: it reads as done (F1);
 //! - nothing else: open, undecided, and unstarted work holds its dependents.
 //!
 //! Every other instant (a start, a container's entries) is satisfied when each gate edge it
@@ -32,7 +32,7 @@
 //! snooze holds (B6, from current state: a date snooze while today is before the date, a node
 //! snooze while its target is in scope and does not satisfy dependencies), its own or a
 //! container's over its subtree. The frontier is every actionable node; the acting frontier
-//! leaves out snoozed nodes and `auto_reach` milestones whose date is still ahead; `stalled` (D5) is an empty acting frontier with
+//! leaves out snoozed nodes and `auto_done` milestones whose date is still ahead; `stalled` (D5) is an empty acting frontier with
 //! in-scope work still open, with what it waits on ([`stalled`]).
 //!
 //! Cost at `node_count_max` (2,000 nodes, about 110,000 edges, 8,000 instants): the
@@ -61,7 +61,7 @@ use crate::graph::Graph;
 #[allow(clippy::struct_excessive_bools)]
 #[derive(Clone, Debug, Default, PartialEq, Eq)]
 struct Flags {
-    /// Terminal, effectively skipped, auto-reached, or for a group done or skipped: nothing
+    /// Terminal, effectively skipped, done by its date, or for a group done or skipped: nothing
     /// is left to do on it.
     closed: bool,
     /// Its start is satisfied: every dependency it waits on satisfies dependencies (D4's
@@ -71,11 +71,11 @@ struct Flags {
     blocked: bool,
     /// D2.
     actionable: bool,
-    /// F1: a pending `auto_reach` milestone that reads as reached.
-    auto_reached: bool,
-    /// F1: a pending, relevant `auto_reach` milestone whose effective date is today or
-    /// earlier: it reads as reached once its dependencies are satisfied.
-    reaches_when_unblocked: bool,
+    /// F1: a pending `auto_done` milestone that reads as done.
+    done_by_date: bool,
+    /// F1: a pending, relevant `auto_done` milestone whose effective date is today or
+    /// earlier: it reads as done once its dependencies are satisfied.
+    done_when_unblocked: bool,
     /// B10: a placeholder in scope and open, with no children, not marked atomic.
     needs_breakdown: bool,
     /// B6: the node's own stored snooze, while it holds.
@@ -131,9 +131,9 @@ impl Blocking {
         };
         let (order, ordering) = topological_order(dependencies);
         let mut satisfied = vec![false; dependencies.node_count() * Point::ALL.len()];
-        let mut auto_reached = vec![false; dependencies.node_count()];
+        let mut done_by_date = vec![false; dependencies.node_count()];
         for &instant in &order {
-            let value = sweep.instant(instant, &satisfied, &mut auto_reached);
+            let value = sweep.instant(instant, &satisfied, &mut done_by_date);
             if let Some(slot) = satisfied.get_mut(instant.slot()) {
                 *slot = value;
             }
@@ -143,8 +143,8 @@ impl Blocking {
             .iter()
             .enumerate()
             .map(|(at, key)| {
-                let reached = auto_reached.get(at).copied().unwrap_or(false);
-                sweep.flags(key, NodeIndex::from_position(at), &satisfied, reached)
+                let by_date = done_by_date.get(at).copied().unwrap_or(false);
+                sweep.flags(key, NodeIndex::from_position(at), &satisfied, by_date)
             })
             .collect();
         sweep.hold_subtrees(dependencies.keys(), &mut flags);
@@ -169,7 +169,7 @@ impl Blocking {
                 continue;
             }
             self.frontier.push(key.clone());
-            if flags.snoozed.is_none() && sweep.reach_ahead(key).is_none() {
+            if flags.snoozed.is_none() && sweep.date_ahead(key).is_none() {
                 self.acting_frontier.push(key.clone());
             }
         }
@@ -245,26 +245,26 @@ impl Blocking {
         self.flags_of(key).is_some_and(|flags| flags.actionable)
     }
 
-    /// Nothing is left to do on the node: terminal, effectively skipped, auto-reached, or a
+    /// Nothing is left to do on the node: terminal, effectively skipped, done by its date, or a
     /// group that is done or skipped (D5: not "effectively unfinished").
     #[must_use]
     pub fn closed(&self, key: &NodeKey) -> bool {
         self.flags_of(key).is_some_and(|flags| flags.closed)
     }
 
-    /// F1: a pending `auto_reach` milestone that reads as reached.
+    /// F1: a pending `auto_done` milestone that reads as done.
     #[must_use]
-    pub fn auto_reached(&self, key: &NodeKey) -> bool {
-        self.flags_of(key).is_some_and(|flags| flags.auto_reached)
+    pub fn done_by_date(&self, key: &NodeKey) -> bool {
+        self.flags_of(key).is_some_and(|flags| flags.done_by_date)
     }
 
-    /// F1: a pending, relevant `auto_reach` milestone whose effective date is today or
-    /// earlier, which reads as reached once its dependencies are satisfied (pass 6 completes
+    /// F1: a pending, relevant `auto_done` milestone whose effective date is today or
+    /// earlier, which reads as done once its dependencies are satisfied (pass 6 completes
     /// it in the unlocks simulations).
     #[must_use]
-    pub(crate) fn reaches_when_unblocked(&self, key: &NodeKey) -> bool {
+    pub(crate) fn done_when_unblocked(&self, key: &NodeKey) -> bool {
         self.flags_of(key)
-            .is_some_and(|flags| flags.reaches_when_unblocked)
+            .is_some_and(|flags| flags.done_when_unblocked)
     }
 
     /// B10: a placeholder in scope and open, with no children, not marked atomic.
@@ -302,7 +302,7 @@ impl Blocking {
         &self.frontier
     }
 
-    /// PRD Acting frontier: the frontier without snoozed nodes and `auto_reach` milestones
+    /// PRD Acting frontier: the frontier without snoozed nodes and `auto_done` milestones
     /// whose date is still ahead, in key order.
     #[must_use]
     pub fn acting_frontier(&self) -> &[NodeKey] {
@@ -356,7 +356,7 @@ impl Sweep<'_> {
     }
 
     /// One instant's value, every instant before it in the order decided.
-    fn instant(&self, instant: Instant, satisfied: &[bool], auto_reached: &mut [bool]) -> bool {
+    fn instant(&self, instant: Instant, satisfied: &[bool], done_by_date: &mut [bool]) -> bool {
         if instant.point != Point::Finish {
             return self.waits_satisfied(instant, satisfied);
         }
@@ -383,37 +383,37 @@ impl Sweep<'_> {
         if node.kind() == NodeKind::Group {
             return waits;
         }
-        let reached = waits && self.reads_as_reached(node);
-        if let Some(flag) = auto_reached.get_mut(instant.node.get()) {
-            *flag = reached;
+        let by_date = waits && self.reads_as_done(node);
+        if let Some(flag) = done_by_date.get_mut(instant.node.get()) {
+            *flag = by_date;
         }
-        reached
+        by_date
     }
 
-    /// F1: a pending, relevant `auto_reach` milestone whose effective date is today or
+    /// F1: a pending, relevant `auto_done` milestone whose effective date is today or
     /// earlier (its dependencies are checked by the caller).
-    fn reads_as_reached(&self, node: &Node<KeyRefs>) -> bool {
+    fn reads_as_done(&self, node: &Node<KeyRefs>) -> bool {
         let Payload::Milestone(milestone) = &node.payload else {
             return false;
         };
         let pending = stored_state(self.graph.document(), node) == State::Pending;
         let relevant = self.early.relevance.value(&node.key) == Relevance::Relevant;
         let due = self.dates.effective_date(&node.key);
-        milestone.auto_reach && pending && relevant && due.is_some_and(|due| due.date <= self.today)
+        milestone.auto_done && pending && relevant && due.is_some_and(|due| due.date <= self.today)
     }
 
-    /// PRD Acting frontier: an `auto_reach` milestone's effective date, while it is ahead.
-    fn reach_ahead(&self, key: &NodeKey) -> Option<Date> {
+    /// PRD Acting frontier: an `auto_done` milestone's effective date, while it is ahead.
+    fn date_ahead(&self, key: &NodeKey) -> Option<Date> {
         let node = self.graph.node(key)?;
         let Payload::Milestone(milestone) = &node.payload else {
             return None;
         };
         let date = self.dates.effective_date(key)?.date;
-        (milestone.auto_reach && date > self.today).then_some(date)
+        (milestone.auto_done && date > self.today).then_some(date)
     }
 
     /// One node's flags, from the sweep's instants.
-    fn flags(&self, key: &NodeKey, at: NodeIndex, satisfied: &[bool], reached: bool) -> Flags {
+    fn flags(&self, key: &NodeKey, at: NodeIndex, satisfied: &[bool], by_date: bool) -> Flags {
         let Some(node) = self.graph.node(key) else {
             return Flags::default();
         };
@@ -422,7 +422,7 @@ impl Sweep<'_> {
         let state = stored_state(document, node);
         let group = node.kind() == NodeKind::Group;
         let skipped = state == State::Skipped || self.early.skips.skipped_by(key).is_some();
-        let closed = skipped || state.is_terminal() || reached || (group && value(Point::Finish));
+        let closed = skipped || state.is_terminal() || by_date || (group && value(Point::Finish));
         let relevance = self.early.relevance.value(key);
         let in_scope = relevance != Relevance::NotRelevant;
         let deps_done = value(Point::Start);
@@ -433,8 +433,8 @@ impl Sweep<'_> {
             deps_done,
             blocked: open && !deps_done,
             actionable: open && deps_done && !group && relevance == Relevance::Relevant,
-            auto_reached: reached,
-            reaches_when_unblocked: self.reads_as_reached(node),
+            done_by_date: by_date,
+            done_when_unblocked: self.reads_as_done(node),
             needs_breakdown: open && self.unexpanded(node),
             snoozed: own.clone(),
             snoozed_own: own,

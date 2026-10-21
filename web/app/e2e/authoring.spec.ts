@@ -62,7 +62,7 @@ async function authorRoute(page: Page): Promise<Record<string, string>> {
 test("A12, A1a: a route authored by hand from an empty draft, published, exported, and imported back to the same graph", async ({ page }) => {
   const route = await newRoute(page, "browser", routeName("Onboarding"));
   const keys = await authorRoute(page);
-  expect(await offered(page)).toEqual(expect.arrayContaining(["final", "auto_reach"]));
+  expect(await offered(page)).toEqual(expect.arrayContaining(["final", "auto_done"]));
   expect(await offered(page)).not.toEqual(expect.arrayContaining(["estimate"]));
   await openNode(page, keys["Who leads"] ?? "");
   expect(await offered(page)).toEqual(expect.arrayContaining(["prompt", "answer_type", "fills_role"]));

@@ -4,7 +4,6 @@
 import type { Schema } from "@cairn/client";
 
 import type { FormCase } from "./actions-form.ts";
-import type { NodeKind } from "./model.ts";
 import { plural } from "../ui/words.ts";
 
 type ChoiceEffect = Schema<"ChoiceEffect">;
@@ -25,7 +24,7 @@ export function guardWords(guard: Schema<"Guard">): string {
 }
 
 /** What a form's write did, as the first words of a block that keeps what was typed after it: "Skipped.", "Marked done.". */
-export function keptWords(kind: FormCase, node: NodeKind): string {
+export function keptWords(kind: FormCase): string {
   switch (kind) {
     case "skip":
       return "Skipped.";
@@ -35,7 +34,7 @@ export function keptWords(kind: FormCase, node: NodeKind): string {
       return "Included.";
     case "bypass":
     case "evidence":
-      return node === "milestone" ? "Marked reached." : "Marked done.";
+      return "Marked done.";
     case "anyway":
       return "Answered.";
     case "snooze":

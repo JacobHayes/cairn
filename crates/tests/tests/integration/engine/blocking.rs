@@ -1,6 +1,6 @@
 //! Pass 5 (PRD Containment, Gating, D1, D1a, D2, D5, B6, F1): what satisfies dependencies,
 //! blocked and actionable, the frontier and the acting frontier, snoozes holding from current
-//! state, auto-reach, `stalled`, `needs_breakdown`, and `stale` (D4). Hand-built journeys are
+//! state, auto-done, `stalled`, `needs_breakdown`, and `stale` (D4). Hand-built journeys are
 //! created on 2026-10-06 and derived at that day unless a test says otherwise.
 #![cfg(test)]
 
@@ -234,7 +234,7 @@ fn an_empty_group_waits_for_its_opening_gate() {
         blockers(&waiting, "n_next"),
         BTreeSet::from([blocker("n_stage", DependencyVia::Explicit)])
     );
-    let opened = derived(&then(&records, &[transition("n_opens", "reach")]));
+    let opened = derived(&then(&records, &[transition("n_opens", "complete")]));
     assert!(
         opened.blocking().satisfies(&key("n_stage")),
         "done for edge purposes"
@@ -320,19 +320,19 @@ fn a_node_snooze_lifts_and_holds_again() {
 }
 
 const GATE: &str =
-    "{key: n_gate, id: gate, kind: milestone, title: Gate, auto_reach: true, requires: [n_work]}";
+    "{key: n_gate, id: gate, kind: milestone, title: Gate, auto_done: true, requires: [n_work]}";
 const OPENS: &str = "{key: n_opened, id: opened, kind: action, title: Opened, requires: [n_gate]}";
 
 fn pin(node: &str, on: &str) -> String {
     format!("- op: set_pin\n  node: {node}\n  date: \"{on}\"\n")
 }
 
-/// F1: a pending `auto_reach` milestone reads as reached once its effective date is today or
+/// F1: a pending `auto_done` milestone reads as done once its effective date is today or
 /// earlier and its dependencies are satisfied: it flips with the date, and reopening a
 /// dependency makes it pending again. Until its date it stays on the frontier but off the
 /// acting frontier.
 #[test]
-fn auto_reach_flips_with_the_date_and_reverses_with_a_dependency() {
+fn auto_done_flips_with_the_date_and_reverses_with_a_dependency() {
     let records = then(
         &support::journey(&add(&[WORK, GATE, OPENS])),
         &[
@@ -341,27 +341,27 @@ fn auto_reach_flips_with_the_date_and_reverses_with_a_dependency() {
         ],
     );
     let ahead = derived_on(&records, "2026-10-07").1;
-    assert!(!ahead.blocking().auto_reached(&key("n_gate")));
+    assert!(!ahead.blocking().done_by_date(&key("n_gate")));
     assert_eq!(frontier(&ahead), ["n_gate"]);
     assert_eq!(acting(&ahead), [] as [&str; 0], "its date is still ahead");
     let arrived = derived_on(&records, "2026-10-08").1;
-    assert!(arrived.blocking().auto_reached(&key("n_gate")));
+    assert!(arrived.blocking().done_by_date(&key("n_gate")));
     assert_eq!(frontier(&arrived), ["n_opened"]);
     let reopened = then(&records, &[transition("n_work", "reopen")]);
     let reverted = derived_on(&reopened, "2026-10-08").1;
-    assert!(!reverted.blocking().auto_reached(&key("n_gate")));
+    assert!(!reverted.blocking().done_by_date(&key("n_gate")));
     assert!(reverted.blocking().blocked(&key("n_opened")));
 }
 
-/// F1: auto-reach chains through two milestones, and a pending `auto_reach` milestone pinned
-/// yesterday with its dependencies satisfied reads as reached, while a plain pinned milestone
-/// still needs a manual reach.
+/// F1: auto-done chains through two milestones, and a pending `auto_done` milestone pinned
+/// yesterday with its dependencies satisfied reads as done, while a plain pinned milestone
+/// still needs marking done by hand.
 #[test]
-fn auto_reach_chains_through_two_milestones() {
+fn auto_done_chains_through_two_milestones() {
     let records = then(
         &support::journey(&add(&[
-            "{key: n_first, id: first, kind: milestone, title: First, auto_reach: true}",
-            "{key: n_second, id: second, kind: milestone, title: Second, auto_reach: true, requires: [n_first]}",
+            "{key: n_first, id: first, kind: milestone, title: First, auto_done: true}",
+            "{key: n_second, id: second, kind: milestone, title: Second, auto_done: true, requires: [n_first]}",
             "{key: n_plain, id: plain, kind: milestone, title: Plain, requires: [n_second]}",
             "{key: n_next, id: next, kind: action, title: Next, requires: [n_plain]}",
         ])),
@@ -371,35 +371,35 @@ fn auto_reach_chains_through_two_milestones() {
             pin("n_plain", "2026-10-05"),
         ],
     );
-    let reached = derived(&records);
+    let finished = derived(&records);
     for milestone in ["n_first", "n_second"] {
         assert!(
-            reached.blocking().auto_reached(&key(milestone)),
+            finished.blocking().done_by_date(&key(milestone)),
             "{milestone}"
         );
     }
-    assert!(!reached.blocking().auto_reached(&key("n_plain")));
-    // Review round 1: a milestone that reads as reached is not overdue (F1, F6).
-    assert!(!reached.dates().overdue(&key("n_first")));
+    assert!(!finished.blocking().done_by_date(&key("n_plain")));
+    // Review round 1: a milestone that reads as done is not overdue (F1, F6).
+    assert!(!finished.dates().overdue(&key("n_first")));
     assert!(
-        reached.dates().overdue(&key("n_plain")),
+        finished.dates().overdue(&key("n_plain")),
         "a plain pin past is still open"
     );
     assert_eq!(
-        frontier(&reached),
+        frontier(&finished),
         ["n_plain"],
-        "a plain pin is reached by hand"
+        "a plain pin is marked done by hand"
     );
 }
 
 /// D5: an empty acting frontier with open work is stalled, and the diagnostic names each
-/// snooze with its target, each `auto_reach` date still ahead, and the gating node a node
+/// snooze with its target, each `auto_done` date still ahead, and the gating node a node
 /// snooze waits on.
 #[test]
-fn stalled_names_a_gate_a_snooze_and_an_auto_reach_date() {
+fn stalled_names_a_gate_a_snooze_and_an_auto_done_date() {
     let records = then(
         &support::journey(&add(&[
-            "{key: n_kickoff, id: kickoff, kind: milestone, title: Kickoff, auto_reach: true}",
+            "{key: n_kickoff, id: kickoff, kind: milestone, title: Kickoff, auto_done: true}",
             "{key: n_access, id: access, kind: action, title: Access, requires: [n_kickoff]}",
             "{key: n_read, id: read, kind: action, title: Read}",
             "{key: n_plan, id: plan, kind: action, title: Plan}",
@@ -417,7 +417,7 @@ fn stalled_names_a_gate_a_snooze_and_an_auto_reach_date() {
     assert_eq!(
         found.waiting_on,
         [
-            StallCause::AutoReach {
+            StallCause::AutoDone {
                 node: key("n_kickoff"),
                 date: date("2026-10-10"),
             },
@@ -577,7 +577,7 @@ fn held_through(records: &Records, node: &str) -> (Option<NodeKey>, Option<NodeK
     )
 }
 
-/// The vendor evaluation with Testing snoozed until the decision meeting is reached and the
+/// The vendor evaluation with Testing snoozed until the decision meeting is done and the
 /// partner decision open again.
 fn testing_snoozed() -> Records {
     let records = vendor_step(
@@ -648,7 +648,7 @@ fn a_container_snooze_outlasts_its_descendants_and_clears_on_a_transition() {
     };
     let records = vendor_step(&records, &transition("n_baseline", "complete"));
     assert!(held(&records), "a descendant completing does not clear it");
-    let records = vendor_step(&records, &transition("n_decision_meeting", "reach"));
+    let records = vendor_step(&records, &transition("n_decision_meeting", "complete"));
     assert_eq!(
         held_through(&records, "n_criteria").0,
         None,

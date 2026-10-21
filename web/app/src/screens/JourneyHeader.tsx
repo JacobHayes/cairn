@@ -19,6 +19,7 @@ import { OpenProposalsItem } from "../proposals/DestinationProposals.tsx";
 import { useLayer, useReviewing } from "../proposals/layer.ts";
 import { JourneyFlow, type JourneyFlowName } from "../proposals/Entries.tsx";
 import { Button } from "../ui/kit.tsx";
+import { plural } from "../ui/words.ts";
 import { Receipt } from "../ui/Receipt.tsx";
 import { Menu } from "./Menu.tsx";
 import { JOURNEY_VIEW_TITLE, ViewPicker } from "./ViewPicker.tsx";
@@ -204,9 +205,9 @@ export function JourneyHeader({ ready, view, screen, selected }: { ready: Ready;
           <JourneyMenu ready={ready} view={view} screen={screen} selected={selected} write={write} onPanel={setPanel} />
         </div>
       </div>
-      {header.status === "active" && suggested && !reviewing ? (
+      {header.status === "active" && suggested !== undefined && !reviewing ? (
         <div className="callout row" data-testid="completion-suggested">
-          <span>Everything in scope is done.</span>
+          <span>{suggested.remaining === 0 ? "Everything in scope is done." : `The final milestone is done. ${plural(suggested.remaining, "item")} remain unfinished.`}</span>
           <Button
             primary
             disabled={write.disabled}

@@ -1,5 +1,5 @@
 //! D8, display state: the one state every surface shows for a node, composed from relevance,
-//! stored state, effective skip, auto-reach, blocking and snooze, and from the D3 flags it
+//! stored state, effective skip, auto-done, blocking and snooze, and from the D3 flags it
 //! leaves in place. Stored state is what transitions act on; display state is what people and
 //! agents read.
 //!
@@ -7,7 +7,7 @@
 //!
 //! 1. `not_relevant`: relevance is `not_relevant` and settled (nothing pending).
 //! 2. `skipped`: stored `skipped`, or effectively skipped (D1a).
-//! 3. `done`: stored `done`, `decided` or `reached`, auto-reached, or a group that satisfies
+//! 3. `done`: stored `done` or `decided`, done by its date, or a group that satisfies
 //!    dependencies.
 //! 4. `snoozed`: a snooze holds.
 //! 5. `active`: stored `active`, or a container whose only unsatisfied waits are its own
@@ -17,7 +17,7 @@
 //!    decision (`pending_on`), which relevance itself leaves unchanged.
 //! 7. `blocked`: in scope, unfinished, and its own or an inherited gate is unsatisfied; for a
 //!    container only its own gates count, never its children.
-//! 8. `scheduled`: an `auto_reach` milestone, unblocked, whose date is ahead.
+//! 8. `scheduled`: an `auto_done` milestone, unblocked, whose date is ahead.
 //! 9. `ready`: everything else.
 //!
 //! The legacy group state (D1) is kept beside it, deprecated, on the same helpers.
@@ -55,10 +55,10 @@ impl Derived {
             return DisplayState::Skipped;
         }
         let group = node.kind() == NodeKind::Group;
-        let finished = matches!(stored, State::Done | State::Decided | State::Reached);
+        let finished = matches!(stored, State::Done | State::Decided);
         let satisfied_group =
             group && relevance.value != Relevance::NotRelevant && blocking.satisfies(key);
-        if finished || blocking.auto_reached(key) || satisfied_group {
+        if finished || blocking.done_by_date(key) || satisfied_group {
             return DisplayState::Done;
         }
         if blocking.snoozed(key).is_some() {
@@ -80,7 +80,7 @@ impl Derived {
         if self.waiting(graph, key) {
             return DisplayState::Blocked;
         }
-        if self.reach_is_ahead(graph, key) {
+        if self.date_is_ahead(graph, key) {
             return DisplayState::Scheduled;
         }
         DisplayState::Ready
@@ -158,7 +158,7 @@ impl Derived {
     }
 
     /// D8: work has started beneath a container: some deliverable or action under it is
-    /// stored `active` or `done`. A decision answered or a milestone reached is not work
+    /// stored `active` or `done`. A decision answered or a milestone done is not work
     /// started (it opens or closes a gate), and a skipped node did none. Derived on read, so
     /// stopping the only started node takes the container back to what its waits say.
     fn work_has_started(graph: &Graph, key: &NodeKey) -> bool {
@@ -171,15 +171,15 @@ impl Derived {
         })
     }
 
-    /// F1: an unblocked, pending `auto_reach` milestone whose effective date is ahead.
-    fn reach_is_ahead(&self, graph: &Graph, key: &NodeKey) -> bool {
+    /// F1: an unblocked, pending `auto_done` milestone whose effective date is ahead.
+    fn date_is_ahead(&self, graph: &Graph, key: &NodeKey) -> bool {
         let Some(node) = graph.node(key) else {
             return false;
         };
         let Payload::Milestone(milestone) = &node.payload else {
             return false;
         };
-        milestone.auto_reach
+        milestone.auto_done
             && self.blocking.actionable(key)
             && self
                 .dates

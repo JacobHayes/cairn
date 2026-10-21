@@ -62,7 +62,7 @@ function Days({ props, field, label, hint }: { props: FieldsProps; field: "weigh
   );
 }
 
-function Flag({ props, field, label }: { props: FieldsProps; field: "requires_artifact" | "requires_note" | "placeholder" | "final" | "auto_reach"; label: string }) {
+function Flag({ props, field, label }: { props: FieldsProps; field: "requires_artifact" | "requires_note" | "placeholder" | "final" | "auto_done"; label: string }) {
   return (
     <FieldBox label="" place={field} notes={props.notes(field)}>
       <label className="row">
@@ -81,7 +81,7 @@ export function BasicsFields({ props }: { props: FieldsProps }) {
       <Text props={props} field="id" label="Id" />
       <Text props={props} field="description" label="Description" area />
       {has(props, "final") ? <Flag props={props} field="final" label="The final milestone" /> : null}
-      {has(props, "auto_reach") ? <Flag props={props} field="auto_reach" label="Reached by itself on its date" /> : null}
+      {has(props, "auto_done") ? <Flag props={props} field="auto_done" label="Marks itself done on its date" /> : null}
     </>
   );
 }

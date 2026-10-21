@@ -124,7 +124,7 @@ function wordsOf(view: Ready, node: GraphNode, own: Own | undefined, progress: C
   const finished = recordOf(view, node).finished_on ?? undefined;
   switch (own.shape) {
     case "milestone":
-      return late > 0 ? `${daysWords(late)} late` : view.derived.nodes[node.key]?.display_state === "done" ? `Reached ${dateWords(own.to, today)}` : `${upperFirst(originWord(own.origin ?? "due"))} ${dateWords(own.to, today)}`;
+      return late > 0 ? `${daysWords(late)} late` : view.derived.nodes[node.key]?.display_state === "done" ? `Done ${dateWords(own.to, today)}` : `${upperFirst(originWord(own.origin ?? "due"))} ${dateWords(own.to, today)}`;
     case "decision":
       return finished !== undefined && own.entry === undefined ? `Decided ${dateWords(finished, today)}` : dueWords(own.to, today, true);
     default:

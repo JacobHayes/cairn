@@ -2,8 +2,8 @@
 //! for each node in the normalization set, which nodes' remaining hard dependencies completing
 //! it would satisfy, holding current relevance and dates fixed. Each instant's rule mirrors
 //! pass 5's: a start or entry is satisfied when its pruned gate waits are; a group's finish
-//! likewise (derived group completion), and so is the finish of an `auto_reach` milestone due
-//! today or earlier (it reads as reached once unblocked, F1); a skipped container's finish
+//! likewise (derived group completion), and so is the finish of an `auto_done` milestone due
+//! today or earlier (it reads as done once unblocked, F1); a skipped container's finish
 //! when its kept work's are (D1a); any other open finish only by completing that node. The
 //! counts of unsatisfied waits are taken once from pass 5's instants and each simulation
 //! counts down from them, then puts back what it touched.
@@ -77,7 +77,7 @@ pub(super) fn simulate(
 }
 
 /// Every instant that completing `completed` satisfies, itself and what derived group
-/// completion and reached milestones cascade to, holding current relevance and dates fixed.
+/// completion and done milestones cascade to, holding current relevance and dates fixed.
 pub(in crate::derive) fn cascade(
     graph: &Graph,
     dependencies: &Dependencies,
@@ -133,7 +133,7 @@ impl<'a> Simulation<'a> {
                             .count();
                         Rule::Kept(count(open_kept))
                     }
-                    Point::Finish if !group && !blocking.reaches_when_unblocked(key) => {
+                    Point::Finish if !group && !blocking.done_when_unblocked(key) => {
                         Rule::Completion
                     }
                     Point::Start | Point::Finish | Point::Entry | Point::ConditionEntry => {

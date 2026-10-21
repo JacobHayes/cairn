@@ -1,7 +1,7 @@
 //! Property tests for pass 5 and the derived guards (PRD Gating, Containment, D2, D4,
 //! D5, B6; A17). Over generated journeys: the flags agree with each other and with the lists
 //! read off the entry chains; open work always leaves something on the frontier, so a stalled
-//! journey is held only by snoozes and `auto_reach` dates and never shows as all blocked.
+//! journey is held only by snoozes and `auto_done` dates and never shows as all blocked.
 //! Over generated patches: a node a patch completes is never stale on the graph it produced.
 
 #[cfg(test)]
@@ -64,7 +64,7 @@ mod property {
                 prop_assert!(!stalled.all_blocked);
                 let named = |key: &_| stalled.waiting_on.iter().any(|cause| matches!(
                     cause,
-                    StallCause::Snooze { node, .. } | StallCause::AutoReach { node, .. } if node == key
+                    StallCause::Snooze { node, .. } | StallCause::AutoDone { node, .. } if node == key
                 ));
                 for key in blocking.frontier() {
                     prop_assert!(
@@ -106,7 +106,7 @@ mod property {
         Graph::new(document, &records.deployment).unwrap()
     }
 
-    /// Nodes that a patch moved into `done`, `decided`, or `reached`.
+    /// Nodes that a patch moved into `done` or `decided`.
     fn completed(before: &Records, after: &Records) -> Vec<cairn_schema::NodeKey> {
         let state_in = |records: &Records, key| {
             records
@@ -123,9 +123,7 @@ mod property {
             .state
             .nodes
             .iter()
-            .filter(|(_, stored)| {
-                matches!(stored.state, State::Done | State::Decided | State::Reached)
-            })
+            .filter(|(_, stored)| matches!(stored.state, State::Done | State::Decided))
             .filter(|(key, stored)| state_in(before, *key) != Some(stored.state))
             .map(|(key, _)| key.clone())
             .collect()

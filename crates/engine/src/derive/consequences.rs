@@ -1,6 +1,6 @@
 //! D7: what a patch, or a proposal preview, newly caused in derived state: nodes that became
 //! `stale` or gained a stale reason, new or larger shortfalls, newly `overdue` nodes, finished
-//! nodes newly undecided (completed, answered, or reached while a decision their relevance
+//! nodes newly undecided (completed or answered while a decision their relevance
 //! reads is unanswered, so they may not apply; D4), and the journey becoming `stalled`, each
 //! with its explanation; and the informational half, never a warning: nodes newly on the
 //! acting frontier (`unlocked`), newly not relevant (`out_of_scope`), and newly relevant or
@@ -122,16 +122,14 @@ fn informational(
 }
 
 /// D4: the open decisions a finished node's relevance waits on: empty unless the node was
-/// completed, answered, or reached (a skip finishes nothing that could apply) and is
+/// completed or answered (a skip finishes nothing that could apply) and is
 /// undecided.
 fn finished_undecided(graph: &Graph, derived: &Derived, key: &NodeKey) -> BTreeSet<NodeKey> {
     let document = graph.document();
-    let finished = document.nodes.get(key).is_some_and(|node| {
-        matches!(
-            stored_state(document, node),
-            State::Done | State::Decided | State::Reached
-        )
-    });
+    let finished = document
+        .nodes
+        .get(key)
+        .is_some_and(|node| matches!(stored_state(document, node), State::Done | State::Decided));
     if finished {
         derived.unanswered(graph, key)
     } else {

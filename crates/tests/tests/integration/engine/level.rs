@@ -440,7 +440,7 @@ fn every_open_child_blocked_shows_all_blocked() {
     let stage = node(&waiting, "n_stage");
     assert!(stage.roll_up.as_ref().unwrap().all_blocked);
     assert_eq!(stage.group_state, Some(GroupState::Waiting));
-    let opened = support::accepted(&records, &transition("n_gate", "reach"));
+    let opened = support::accepted(&records, &transition("n_gate", "complete"));
     let open = level(&opened, support::JOURNEY, &NodeKind::ALL, None);
     assert!(!node(&open, "n_stage").roll_up.as_ref().unwrap().all_blocked);
 }

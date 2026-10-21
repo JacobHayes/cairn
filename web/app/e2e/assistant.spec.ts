@@ -20,13 +20,13 @@ test("I5, I7: a direct change reported with its node, and a breakdown proposed, 
   await expect(panel.getByTestId("assistant-empty")).toBeVisible();
 
   await script(page, [
-    { calls: [{ name: "transition_node", arguments: { journey, node: "n_kickoff", transition: "reach", patch_id: patchId(), base_revision: 1 } }] },
-    { say: "Kickoff is marked reached." },
+    { calls: [{ name: "transition_node", arguments: { journey, node: "n_kickoff", transition: "complete", patch_id: patchId(), base_revision: 1 } }] },
+    { say: "Kickoff is marked done." },
   ]);
   await ask(page, "Kickoff happened this morning.");
   const applied = panel.getByTestId("assistant-applied");
   await expect(applied).toHaveCount(1);
-  await expect(panel.getByTestId("assistant-reply")).toContainText("Kickoff is marked reached.");
+  await expect(panel.getByTestId("assistant-reply")).toContainText("Kickoff is marked done.");
   await applied.locator('[data-testid="assistant-node"][data-node="n_kickoff"]').click();
   await expect(state(nodePanel(page, "n_kickoff"))).toHaveAttribute("data-status", "done");
   // Opening the node brought the inspector tab forward; the conversation is a click back.

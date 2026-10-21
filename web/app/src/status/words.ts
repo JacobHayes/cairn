@@ -40,7 +40,6 @@ const WORDS: Record<DisplayState, string> = {
 /** The word a state takes where the kind says it differently: a decision to decide, a group not started. */
 const KIND_WORDS: Partial<Record<NodeKind, Partial<Record<DisplayState, string>>>> = {
   decision: { ready: "to decide", done: "decided" },
-  milestone: { done: "reached" },
   group: { ready: "not started" },
 };
 
@@ -113,7 +112,7 @@ const FIELD_NAMES: Record<string, string> = {
   requires_artifact: "artifact requirement",
   requires_note: "note requirement",
   final: "final setting",
-  auto_reach: "reached-by-itself setting",
+  auto_done: "marks-itself-done setting",
   opens_at: "opening date",
   closes_at: "closing date",
   gates: "gates",

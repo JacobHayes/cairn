@@ -301,13 +301,13 @@ fn two_actuals_that_break_a_rule_are_a_shortfall() {
         "{key: n_freeze, id: freeze, kind: milestone, title: Freeze, due_by: {before: n_beta, offset: 2}}",
         "{key: n_beta, id: beta, kind: milestone, title: Beta}",
     ]));
-    let reached = support::accepted(
+    let finished = support::accepted(
         &records,
-        "- op: transition\n  node: n_freeze\n  transition: reach\n\
-- op: transition\n  node: n_beta\n  transition: reach\n\
+        "- op: transition\n  node: n_freeze\n  transition: complete\n\
+- op: transition\n  node: n_beta\n  transition: complete\n\
 - op: set_recorded_date\n  node: n_beta\n  end: finish\n  date: \"2026-10-05\"\n",
     );
-    let freeze = dates_of(&reached, "n_freeze");
+    let freeze = dates_of(&finished, "n_freeze");
     let shortfall = freeze.shortfall.unwrap();
     assert_eq!(shortfall.shortfall_days, 3);
     assert_eq!(fixers(&shortfall.chain), [FixedBy::Actual, FixedBy::Actual]);
@@ -327,7 +327,7 @@ fn two_actuals_that_break_a_rule_are_a_shortfall() {
 fn today_holds_back_only_unfinished_work() {
     let records = support::journey(&add(&[
         "{key: n_work, id: work, kind: action, title: Work}",
-        "{key: n_gate, id: gate, kind: milestone, title: Gate, auto_reach: true, requires: [n_work]}",
+        "{key: n_gate, id: gate, kind: milestone, title: Gate, auto_done: true, requires: [n_work]}",
     ]));
     let pinned = support::accepted(
         &records,
@@ -352,7 +352,7 @@ fn today_holds_back_only_unfinished_work() {
     );
 }
 
-/// F1, F6: a reached milestone's actual replaces its pin, and a deadline relative to it
+/// F1, F6: a done milestone's actual replaces its pin, and a deadline relative to it
 /// follows the actual.
 #[test]
 fn a_deadline_follows_its_milestones_actual() {
@@ -368,13 +368,13 @@ fn a_deadline_follows_its_milestones_actual() {
         bound(dates_of(&pinned, "n_work").due.as_ref()),
         Some(date("2026-10-04"))
     );
-    let reached = support::accepted(
+    let finished = support::accepted(
         &pinned,
-        "- op: transition\n  node: n_kickoff\n  transition: reach\n",
+        "- op: transition\n  node: n_kickoff\n  transition: complete\n",
     );
-    let work = dates_of(&reached, "n_work");
+    let work = dates_of(&finished, "n_work");
     assert_eq!(bound(work.due.as_ref()), Some(date("2026-10-09")));
-    let kickoff = dates_of(&reached, "n_kickoff").effective_date.unwrap();
+    let kickoff = dates_of(&finished, "n_kickoff").effective_date.unwrap();
     assert_eq!(
         (kickoff.date, kickoff.origin),
         (date("2026-10-06"), DateOrigin::Actual)
@@ -487,8 +487,8 @@ fn every_shortfall_move_resolves_it() {
                     "{key: n_after, id: after, kind: milestone, title: After, requires: [n_work]}",
                 ])),
                 "- op: set_pin\n  node: n_work\n  date: \"2026-10-10\"\n\
-- op: transition\n  node: n_after\n  transition: reach\n\
-- op: apply_override\n  node: n_after\n  override: {guard_bypass: {guards: [deps_done], reason: Reached ahead of the work.}}\n",
+- op: transition\n  node: n_after\n  transition: complete\n\
+- op: apply_override\n  node: n_after\n  override: {guard_bypass: {guards: [deps_done], reason: Done ahead of the work.}}\n",
             ),
             support::JOURNEY,
             "n_work",
@@ -523,11 +523,11 @@ fn a_fact_too_early_for_created_at_or_an_answer_is_short() {
         "{key: n_settled, id: settled, kind: milestone, title: Settled, not_before: {after: journey.created_at, offset: 3}}",
         "{key: n_answered, id: answered, kind: milestone, title: Answered, not_before: {after: n_date}}",
     ]));
-    let reached = support::accepted(
+    let finished = support::accepted(
         &records,
         "- op: answer\n  decision: n_date\n  value: {date: \"2026-10-10\"}\n\
-- op: transition\n  node: n_settled\n  transition: reach\n\
-- op: transition\n  node: n_answered\n  transition: reach\n",
+- op: transition\n  node: n_settled\n  transition: complete\n\
+- op: transition\n  node: n_answered\n  transition: complete\n",
     );
     for (node, days, source) in [
         ("n_settled", 3, Instant::CreatedAt),
@@ -539,13 +539,13 @@ fn a_fact_too_early_for_created_at_or_an_answer_is_short() {
             },
         ),
     ] {
-        let shortfall = dates_of(&reached, node).shortfall.unwrap();
+        let shortfall = dates_of(&finished, node).shortfall.unwrap();
         assert_eq!(shortfall.shortfall_days, days, "{node}");
         assert_eq!(shortfall.chain.fixed[0].instant, source, "{node}");
     }
 }
 
-/// F6: the launch's code freeze is reached two days after the launch pin's chain allows; the
+/// F6: the launch's code freeze is done two days after the launch pin's chain allows; the
 /// shortfall names that chain, and an unrelated patch after it is accepted.
 #[test]
 fn a_late_actual_is_a_shortfall_never_a_rejection() {

@@ -427,7 +427,7 @@ pub struct ChoiceEffect {
     /// Nodes the answer settles as not relevant. Nodes that would still hang on another
     /// unanswered decision are `decided_later`, never here.
     pub drops: AffectedNodes,
-    /// Of the drops, the nodes with recorded progress (started, done, decided, reached):
+    /// Of the drops, the nodes with recorded progress (started, done, decided):
     /// the answer does not undo it.
     pub drops_with_progress: AffectedNodes,
     /// Nodes that would stay undecided because they hang on another decision still to be
@@ -1090,7 +1090,7 @@ pub struct OpenDecision {
 }
 
 // PRD: C18.
-/// A milestone not yet reached and its effective date.
+/// A milestone not yet done and its effective date.
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
 #[serde(deny_unknown_fields)]
 pub struct UpcomingMilestone {
@@ -1123,7 +1123,7 @@ pub struct StatusSummary {
     /// Stale nodes, by key.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub stale: Vec<NodeKey>,
-    /// In-scope milestones not yet reached that have a date, earliest first.
+    /// In-scope milestones not yet done that have a date, earliest first.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub upcoming_milestones: Vec<UpcomingMilestone>,
     /// Open, in-scope decisions with their owners, in rank order.
@@ -1131,7 +1131,7 @@ pub struct StatusSummary {
     pub open_decisions: Vec<OpenDecision>,
     // PRD: B11.
     /// The journey has a node and none in scope is left open, or its final milestone
-    /// is reached (stored or auto-reached).
+    /// is done (stored or done by its date).
     #[serde(default, skip_serializing_if = "crate::serde_util::is_false")]
     pub completion_suggested: bool,
 }

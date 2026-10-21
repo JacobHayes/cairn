@@ -1,6 +1,6 @@
 //! Walks the fixtures through derive's passes 6 and 7 and prints the proof for brief 2.5 as
 //! Markdown: the vendor evaluation's ranked frontier after it is created, after its up-front
-//! decisions are answered, and after kickoff is reached, with each node's gravity, unlocks,
+//! decisions are answered, and after kickoff is done, with each node's gravity, unlocks,
 //! slack, rank, rank terms, and top contributions; the product launch ranked globally and for
 //! two viewers once its feature work goes to a writer; and effort-adjusted ordering. Every
 //! patch goes through `apply`; every derive is at 2026-10-06, the scenario tests' clock.
@@ -166,7 +166,7 @@ fn top(contributions: &[Contribution], count: usize) -> String {
 }
 
 /// The step labels fixtures/README.md uses.
-const STEPS: [&str; 3] = ["created", "up-front decisions answered", "kickoff reached"];
+const STEPS: [&str; 3] = ["created", "up-front decisions answered", "kickoff done"];
 
 /// The vendor evaluation's ranked frontier after steps 1 to 3, as fixtures/README.md states
 /// it, then why each node ranks where it does.

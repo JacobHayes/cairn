@@ -255,7 +255,7 @@ fn zooms(vendor: &Fixture, out: &mut String) -> Result<()> {
     writeln!(out, "## The vendor evaluation at two zooms\n")?;
     writeln!(
         out,
-        "After step 3 (kickoff reached). Zoomed out, only groups shown; every other node rolls up into its group, and two edges into the final review collapse into one:\n"
+        "After step 3 (kickoff done). Zoomed out, only groups shown; every other node rolls up into its group, and two edges into the final review collapse into one:\n"
     )?;
     level_table(
         &journey.level(

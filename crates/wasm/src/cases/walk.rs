@@ -344,7 +344,7 @@ fn mutations(service: &Service, id: &JourneyId, document: &DomainDocument, note:
     let mut yaml = format!(
         "- op: add_annotation\n  annotation:\n    key: a_wasm_{note}\n    node: {first}\n    note: Checked in the browser.\n"
     );
-    // An action or deliverable to do starts (D1); a milestone is reached, a decision answered.
+    // An action or deliverable to do starts (D1); a milestone is done, a decision answered.
     let startable = next.value.items.iter().find(|row| {
         matches!(row.kind, NodeKind::Action | NodeKind::Deliverable) && row.state == State::Todo
     });

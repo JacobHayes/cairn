@@ -14,11 +14,12 @@ pub(crate) enum Step {
     Identities,
     Conditions,
     MergeLists,
+    MilestoneDone,
 }
 
 /// Every migration, numbered from 1, in order. A migration is never edited once released;
 /// a change is a new one. It is a list of steps run in one transaction with its number.
-pub(crate) const MIGRATIONS: [(u32, &[Step]); 13] = [
+pub(crate) const MIGRATIONS: [(u32, &[Step]); 14] = [
     (1, &[Step::Sql(include_str!("migrations/0001_initial.sql"))]),
     (
         2,
@@ -91,6 +92,13 @@ pub(crate) const MIGRATIONS: [(u32, &[Step]); 13] = [
             Step::MergeLists,
         ],
     ),
+    (
+        14,
+        &[
+            Step::MilestoneDone,
+            Step::Sql(include_str!("migrations/0014_milestone_done.sql")),
+        ],
+    ),
 ];
 
 /// Puts the database in MVCC mode and applies the migrations it lacks.
@@ -130,6 +138,7 @@ pub(crate) async fn run(connection: &Connection) -> Result<(), StoreError> {
                     Step::Identities => crate::to_identities::run(connection).await?,
                     Step::Conditions => crate::conditions::backfill(connection).await?,
                     Step::MergeLists => crate::to_identities::list_merged(connection).await?,
+                    Step::MilestoneDone => crate::to_done::run(connection).await?,
                 }
             }
             execute(

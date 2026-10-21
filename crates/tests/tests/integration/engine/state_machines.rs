@@ -8,9 +8,9 @@ use cairn_engine::transition::{self, Move};
 use cairn_schema::{AnswerValue, GraphKey, NodeKind, Record, State, Write};
 use support::{accepted, graph, journey, journey_patch, key};
 
-use Move::{Answer, Complete, Reach, Reopen, Skip, Start, Stop};
+use Move::{Answer, Complete, Reopen, Skip, Start, Stop};
 use NodeKind::{Action, Decision, Deliverable, Group, Milestone};
-use State::{Active, Decided, Derived, Done, Open, Pending, Reached, Skipped, Todo};
+use State::{Active, Decided, Derived, Done, Open, Pending, Skipped, Todo};
 
 /// PRD D1, row by row.
 const TABLE: &[(NodeKind, Move, State, State)] = &[
@@ -35,9 +35,9 @@ const TABLE: &[(NodeKind, Move, State, State)] = &[
     (Decision, Skip, Open, Skipped),
     (Decision, Reopen, Decided, Open),
     (Decision, Reopen, Skipped, Open),
-    (Milestone, Reach, Pending, Reached),
+    (Milestone, Complete, Pending, Done),
     (Milestone, Skip, Pending, Skipped),
-    (Milestone, Reopen, Reached, Pending),
+    (Milestone, Reopen, Done, Pending),
     (Milestone, Reopen, Skipped, Pending),
     (Group, Skip, Derived, Skipped),
     (Group, Reopen, Skipped, Derived),
@@ -110,7 +110,6 @@ fn mutation(step: Move) -> &'static str {
         Complete => "- op: transition\n  node: n_x\n  transition: complete\n",
         Skip => "- op: transition\n  node: n_x\n  transition: {skip: {reason: Not needed here.}}\n",
         Reopen => "- op: transition\n  node: n_x\n  transition: reopen\n",
-        Reach => "- op: transition\n  node: n_x\n  transition: reach\n",
         Answer => "- op: answer\n  decision: n_x\n  value: {boolean: false}\n",
     }
 }
@@ -155,13 +154,13 @@ fn transitions_record_and_clear_their_dates() {
     let reopened = accepted(&done, mutation(Reopen));
     let stored = &graph(&reopened).state.nodes[&key("n_x")];
     assert_eq!((stored.started_on, stored.finished_on), (None, None));
-    let reached = accepted(&one_node(Milestone, Pending), mutation(Reach));
+    let finished = accepted(&one_node(Milestone, Pending), mutation(Complete));
     assert_eq!(
-        graph(&reached).state.nodes[&key("n_x")].finished_on,
+        graph(&finished).state.nodes[&key("n_x")].finished_on,
         Some(today)
     );
-    let unreached = accepted(&reached, mutation(Reopen));
-    assert_eq!(graph(&unreached).state.nodes[&key("n_x")].finished_on, None);
+    let reopened = accepted(&finished, mutation(Reopen));
+    assert_eq!(graph(&reopened).state.nodes[&key("n_x")].finished_on, None);
 }
 
 #[test]

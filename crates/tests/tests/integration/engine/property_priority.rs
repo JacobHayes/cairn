@@ -24,15 +24,15 @@ mod property {
         derive(graph, None, &derive_inputs(Deployment::default()))
     }
 
-    /// The graph with no `auto_reach` milestone: completing a node can move a milestone's
+    /// The graph with no `auto_done` milestone: completing a node can move a milestone's
     /// effective date to today, and the unlocks simulation completes no node but the one completed.
-    fn without_auto_reach(graph: &Graph) -> Graph {
+    fn without_auto_done(graph: &Graph) -> Graph {
         let mut document = graph.document().clone();
         let keys: Vec<NodeKey> = document.nodes.as_map().keys().cloned().collect();
         for key in keys {
             let mut node = document.nodes.get(&key).unwrap().clone();
             if let Payload::Milestone(milestone) = &mut node.payload {
-                milestone.auto_reach = false;
+                milestone.auto_done = false;
             }
             document.nodes.put(node).unwrap();
         }
@@ -74,12 +74,10 @@ mod property {
         nodes
     }
 
-    /// The graph with `key` completed: done, or reached for a milestone; none for a kind that
-    /// completes another way.
+    /// The graph with `key` completed; none for a kind that completes another way.
     fn completed(graph: &Graph, key: &NodeKey) -> Option<Graph> {
         let state = match graph.node(key)?.kind() {
-            NodeKind::Action | NodeKind::Deliverable => State::Done,
-            NodeKind::Milestone => State::Reached,
+            NodeKind::Action | NodeKind::Deliverable | NodeKind::Milestone => State::Done,
             NodeKind::Decision | NodeKind::Group => return None,
         };
         let mut document = graph.document().clone();
@@ -123,7 +121,7 @@ mod property {
         /// `deps_done` in the normalization set once that node is done, each target once.
         #[test]
         fn unlocks_match_what_completing_the_node_unblocks(graph in arb_journey(1..=60)) {
-            let graph = without_auto_reach(&graph);
+            let graph = without_auto_done(&graph);
             let before = self::derived(&graph);
             let derived = &before;
             let priority = derived.priority();
@@ -147,11 +145,11 @@ mod property {
             }
         }
 
-        /// Priority, Unlocks, F1: with `auto_reach` milestones kept and read late enough that
+        /// Priority, Unlocks, F1: with `auto_done` milestones kept and read late enough that
         /// any dated one is due, what completing a node unblocks is still what derive finds
         /// newly `deps_done`, wherever completing it moves no effective date.
         #[test]
-        fn unlocks_match_what_completing_unblocks_through_due_auto_reach_milestones(graph in arb_journey(1..=60)) {
+        fn unlocks_match_what_completing_unblocks_through_due_auto_done_milestones(graph in arb_journey(1..=60)) {
             let mut inputs = derive_inputs(Deployment::default());
             inputs.today = "2027-06-01".parse().unwrap();
             let derived = derive(&graph, None, &inputs);

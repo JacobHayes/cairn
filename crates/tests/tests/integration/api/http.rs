@@ -111,7 +111,7 @@ mod in_process {
             "p_three",
             "{journey: j_vendor_eval}",
             2,
-            "- op: transition\n  node: n_kickoff\n  transition: reach\n\
+            "- op: transition\n  node: n_kickoff\n  transition: complete\n\
              - op: transition\n  node: n_purpose\n  transition: start\n\
              - op: transition\n  node: n_nowhere\n  transition: start\n\
              - op: answer\n  decision: n_partner_runs\n  value: {text: maybe}\n",

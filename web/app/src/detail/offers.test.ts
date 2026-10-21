@@ -71,11 +71,11 @@ describe("the inspector's offers", () => {
     expect(unsnoozeOf(view, "n_findings")).toBe("n_findings");
   });
 
-  it("names a scheduled milestone's reach the same on the row and in the graph's menu", () => {
+  it("names a scheduled milestone's Mark done the same on the row and in the graph's menu", () => {
     const view = made("n_meeting", { display_state: "scheduled" });
     const menu = contextMenuOf(view, detailOf(view, "n_meeting"))[0] ?? [];
-    expect(offered(view, "n_meeting").primary).toBe("reach-now");
-    expect(menu.map((item) => item.label)).toContain(actLabel(view, "n_meeting", "reach-now"));
+    expect(offered(view, "n_meeting").primary).toBe("done");
+    expect(menu.map((item) => item.label)).toContain(actLabel(view, "n_meeting", "done"));
   });
 
   it("offers Mark done with Start beside it, which waits when something it requires is not done", () => {

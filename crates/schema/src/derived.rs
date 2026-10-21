@@ -67,7 +67,7 @@ pub struct RelevanceExplanation {
 
 // PRD: D8, D3.
 /// The one state every surface shows for a node, composed from relevance, stored state,
-/// effective skip, auto-reach, blocking and snooze, and from the derived flags, which it leaves in
+/// effective skip, auto-done, blocking and snooze, and from the derived flags, which it leaves in
 /// place. Stored state is what transitions act on; this is what people and agents read. The
 /// first matching value in this order wins: `not_relevant`, `skipped`, `done`, `snoozed`,
 /// `active`, `conditional`, `blocked`, `scheduled`, `ready`.
@@ -88,11 +88,11 @@ pub enum DisplayState {
     /// It may apply: relevance is `undecided` and it is unfinished, or relevance is
     /// `not_relevant` but pending on an undecided decision (`pending_on`).
     Conditional,
-    /// An `auto_reach` milestone, unblocked, whose date is ahead.
+    /// An `auto_done` milestone, unblocked, whose date is ahead.
     Scheduled,
     /// A snooze holds.
     Snoozed,
-    /// `done`, `decided`, `reached`, auto-reached, or a group that satisfies dependencies.
+    /// `done`, `decided`, a milestone done by its date, or a group that satisfies dependencies.
     Done,
     // PRD: D1a.
     /// Stored `skipped`, or effectively skipped.
@@ -403,7 +403,7 @@ pub struct Bound {
 )]
 #[serde(rename_all = "snake_case")]
 pub enum DateOrigin {
-    /// The date it was reached.
+    /// The date it was done.
     Actual,
     // PRD: E3.
     /// Its pin, set directly or by answering its feeding decision.
@@ -414,7 +414,7 @@ pub enum DateOrigin {
 }
 
 // PRD: F1.
-/// A milestone's effective date: its actual date if reached, else its pin, else its
+/// A milestone's effective date: its actual date if done, else its pin, else its
 /// derived due. What other constraints see when they reference it.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
 #[serde(deny_unknown_fields)]
@@ -492,7 +492,7 @@ pub struct EffectiveParticipation {
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
 #[serde(deny_unknown_fields)]
 pub struct Progress {
-    /// Items whose display state is `done` (finished, decided, reached, or auto-reached).
+    /// Items whose display state is `done` (finished, decided, or done by its date).
     pub done: u32,
     /// Items.
     pub total: u32,
@@ -563,7 +563,7 @@ pub struct NodeDerived {
     pub progress: Option<Progress>,
     // PRD: D4.
     /// The bypassable guards its completing transition (complete a deliverable or
-    /// action, answer an open decision, reach a pending milestone) would fail if attempted
+    /// action, answer an open decision, complete a pending milestone) would fail if attempted
     /// now with no bypass in the patch. Empty for every node with no such transition left:
     /// finished, not relevant, or a group.
     #[serde(default, skip_serializing_if = "BTreeSet::is_empty")]
@@ -582,9 +582,9 @@ pub struct NodeDerived {
     #[serde(default)]
     pub waits_on: Explained<Blocker>,
     // PRD: F1.
-    /// A pending auto-reach milestone that reads as reached.
+    /// A pending auto-done milestone that reads as done.
     #[serde(default, skip_serializing_if = "crate::serde_util::is_false")]
-    pub auto_reached: bool,
+    pub done_by_date: bool,
     // PRD: B6.
     /// A snooze that holds over the node: its own, else the one of the container it is
     /// held through (`snoozed_via`).
@@ -680,8 +680,8 @@ pub enum StallCause {
         /// What it waits for.
         until: SnoozeTarget,
     },
-    /// An auto-reach milestone whose date is ahead.
-    AutoReach {
+    /// An auto-done milestone whose date is ahead.
+    AutoDone {
         /// The milestone.
         node: NodeKey,
         /// Its effective date.
@@ -730,7 +730,7 @@ pub struct StaleConsequence {
 }
 
 // PRD: D4, D7.
-/// Finished work newly undecided: a node completed, answered, or reached while
+/// Finished work newly undecided: a node completed or answered while
 /// a decision its relevance reads is unanswered, so it may not apply. A warning, never a
 /// rejection: the node stays undecided and is not forced into scope.
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]

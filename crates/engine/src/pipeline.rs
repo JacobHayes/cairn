@@ -28,7 +28,7 @@ use crate::stages;
 /// reads either itself.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct ApplyInputs {
-    /// Today, in the deployment's time zone: the date a start, completion, decision, or reach
+    /// Today, in the deployment's time zone: the date a start, completion, or decision
     /// records (F1, F2).
     pub today: Date,
     /// The commit time, on every event and on notes and links (G1, J1).

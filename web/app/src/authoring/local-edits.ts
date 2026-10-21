@@ -47,7 +47,7 @@ const FIELD_DEFAULTS: Partial<Record<NodeField, unknown>> = {
   requires_artifact: false,
   requires_note: false,
   final: false,
-  auto_reach: false,
+  auto_done: false,
   gates: true,
   closes: true,
 };

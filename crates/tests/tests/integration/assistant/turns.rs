@@ -356,9 +356,9 @@ async fn a_provider_timeout_is_reported_and_the_writes_before_it_stand() {
     let world = World::new();
     let lead = user("u_lead");
     world.vendor_journey(&lead).await;
-    let reach = json!({ "journey": "j_vendor_eval", "node": "n_kickoff", "transition": "reach",
+    let complete = json!({ "journey": "j_vendor_eval", "node": "n_kickoff", "transition": "complete",
         "patch_id": "p_kickoff", "base_revision": 1 });
-    world.script([Step::call("transition_node", reach), Step::Hang]);
+    world.script([Step::call("transition_node", complete), Step::Hang]);
     let turn = world
         .turn(&lead, &vendor_target(), "Kickoff happened.")
         .await;
@@ -661,7 +661,7 @@ async fn no_tool_call_runs_past_the_turn_deadline() {
     let world = World::new();
     let lead = user("u_lead");
     world.vendor_journey(&lead).await;
-    let reach = json!({ "journey": "j_vendor_eval", "node": "n_kickoff", "transition": "reach",
+    let complete = json!({ "journey": "j_vendor_eval", "node": "n_kickoff", "transition": "complete",
         "patch_id": "p_late", "base_revision": 1 });
     let reply = |step: Step| {
         let Step::Reply(reply) = step else {
@@ -680,7 +680,7 @@ async fn no_tool_call_runs_past_the_turn_deadline() {
     let work = TURN_DURATION_MAX.checked_sub(TURN_SAVE_RESERVE).unwrap();
     let left = work.checked_sub(slow * 5).unwrap();
     assert!(left > Duration::ZERO);
-    let write = Step::Slow(left, reply(Step::call("transition_node", reach)));
+    let write = Step::Slow(left, reply(Step::call("transition_node", complete)));
     world.script(reads.chain([write, Step::say("Done.")]));
     let turn = world
         .turn(&lead, &vendor_target(), "Kickoff happened.")
@@ -767,9 +767,9 @@ async fn a_commit_landing_just_past_the_deadline_is_reported() {
     faults.pause_with(std::sync::Arc::new(move |_| {
         Box::pin(tokio::time::sleep_until(lands))
     }));
-    let reach = json!({ "journey": "j_vendor_eval", "node": "n_kickoff", "transition": "reach",
+    let complete = json!({ "journey": "j_vendor_eval", "node": "n_kickoff", "transition": "complete",
         "patch_id": "p_late", "base_revision": 1 });
-    world.script([Step::call("transition_node", reach), Step::say("Hello.")]);
+    world.script([Step::call("transition_node", complete), Step::say("Hello.")]);
     let turn = world
         .turn(&lead, &vendor_target(), "Kickoff happened.")
         .await;
@@ -790,9 +790,9 @@ async fn a_stalled_commit_cannot_hold_a_turn_past_its_limit() {
     let lead = user("u_lead");
     world.vendor_journey(&lead).await;
     faults.pause_with(std::sync::Arc::new(|_| Box::pin(std::future::pending())));
-    let reach = json!({ "journey": "j_vendor_eval", "node": "n_kickoff", "transition": "reach",
+    let complete = json!({ "journey": "j_vendor_eval", "node": "n_kickoff", "transition": "complete",
         "patch_id": "p_stalled", "base_revision": 1 });
-    world.script([Step::call("transition_node", reach), Step::say("Hello.")]);
+    world.script([Step::call("transition_node", complete), Step::say("Hello.")]);
     let started = tokio::time::Instant::now();
     let turn = world
         .turn(&lead, &vendor_target(), "Kickoff happened.")

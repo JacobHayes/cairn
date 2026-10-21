@@ -113,7 +113,7 @@ impl Derived {
             failing_guards: self.failing_guards(graph, key, annotated),
             started_early: self.started_early(graph, key),
             waits_on,
-            auto_reached: blocking.auto_reached(key),
+            done_by_date: blocking.done_by_date(key),
             snoozed: blocking.snoozed(key).cloned(),
             snoozed_via: blocking.snoozed_via(key).cloned(),
             needs_breakdown: blocking.needs_breakdown(key),
@@ -172,7 +172,7 @@ impl Derived {
 
     /// D4: the bypassable guards the node's completing transition would fail if attempted
     /// now with no bypass in the patch: completing a deliverable or action, answering an open
-    /// decision, reaching a pending milestone. Empty for any other node, and for one out of
+    /// decision, completing a pending milestone. Empty for any other node, and for one out of
     /// scope or closed. A bypass recorded by an earlier patch removes nothing: apply accepts
     /// only a bypass in the same patch. `annotated` is [`annotated_nodes`] of `graph`.
     fn failing_guards(

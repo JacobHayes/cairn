@@ -163,7 +163,7 @@ fn the_product_launch_records_a_late_actual() {
     let state = &only_graph(&records).state;
     assert_eq!(state.pins[&key("n_launch")], "2026-11-23".parse().unwrap());
     let freeze = &state.nodes[&key("n_code_freeze")];
-    assert_eq!(freeze.state, State::Reached);
+    assert_eq!(freeze.state, State::Done);
     assert_eq!(freeze.finished_on, Some("2026-11-04".parse().unwrap()));
 }
 

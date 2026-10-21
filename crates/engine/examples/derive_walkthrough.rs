@@ -402,7 +402,7 @@ fn skip(fixture: &Fixture, out: &mut String) -> Result<()> {
     let mutations = "- op: apply_override\n  node: n_plan_review\n  override: {keep: {reason: The review still happens.}}\n- op: transition\n  node: n_setup\n  transition: {skip: {reason: Setup is provided.}}\n";
     writeln!(
         out,
-        "After step 4 (kickoff reached, access started), one patch keeps `setup/plan/review` and skips `setup`:\n\n```yaml\n{mutations}```\n"
+        "After step 4 (kickoff done, access started), one patch keeps `setup/plan/review` and skips `setup`:\n\n```yaml\n{mutations}```\n"
     )?;
     let records = applied(fixture.at(4)?, &fixture.journey, mutations)?;
     let (graph, derived) = derived(&records, &fixture.journey)?;

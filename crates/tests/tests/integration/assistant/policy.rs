@@ -83,7 +83,7 @@ fn state_cases() -> Vec<Case> {
         ),
         (
             "transition_node",
-            journey(json!({ "node": "n_kickoff", "transition": "reach", "patch_id": "p_reach" })),
+            journey(json!({ "node": "n_kickoff", "transition": "complete", "patch_id": "p_done" })),
             Policy::Direct,
         ),
         (

@@ -12,7 +12,7 @@
 //! 4. The date network ([`dates`]): earliest and latest bounds, `due`, `latest_start`,
 //!    slack, effective dates, `overdue`, and `shortfall`, each with its chain; the plan
 //!    layer's check is validation's ([`check_plan`]).
-//! 5. Auto-reach, blocking, and what can be acted on ([`blocking`]): what satisfies
+//! 5. Auto-done, blocking, and what can be acted on ([`blocking`]): what satisfies
 //!    dependencies, `deps_done`, blocked, actionable, the frontier, snoozes that hold, the
 //!    acting frontier, `stalled`, and `needs_breakdown`.
 //! 6. Gravity and unlocks ([`priority`]): each node's downstream set and gravity, its
@@ -109,7 +109,7 @@ impl Derived {
         &self.dates
     }
 
-    /// Pass 5: auto-reach, blocking, the frontiers, snoozes, and `stalled`.
+    /// Pass 5: auto-done, blocking, the frontiers, snoozes, and `stalled`.
     #[must_use]
     pub fn blocking(&self) -> &Blocking {
         &self.blocking
@@ -276,7 +276,7 @@ impl Derived {
     }
 
     /// Priority, Unlocks: the nodes whose finish completing `key` satisfies: itself, and what
-    /// derived group completion and reached milestones cascade to, as the unlocks simulation does.
+    /// derived group completion and done milestones cascade to, as the unlocks simulation does.
     /// `graph` is the one derived.
     #[must_use]
     pub(crate) fn finished_by(&self, graph: &Graph, key: &NodeKey) -> BTreeSet<NodeKey> {
@@ -414,7 +414,7 @@ pub(crate) fn derive_at(
     let participation = participation::pass(journey, &early.relevance, deployment);
     let mut dates = Dates::pass(journey, &early, today, created_on);
     let blocking = Blocking::pass(journey, &early, &dates, today);
-    dates.settle_reached(journey, |key| blocking.auto_reached(key));
+    dates.settle_done(journey, |key| blocking.done_by_date(key));
     let priority = Priority::pass(journey, &early, &participation, &blocking, rank);
     let ranking = Ranking::pass(&priority, &dates, &blocking, rank, |key| {
         priority.unlocks(key)

@@ -20,7 +20,7 @@ nodes:
   id: kickoff
   kind: milestone
   title: Kickoff
-  auto_reach: true
+  auto_done: true
 - id: wrap-up
   kind: milestone
   title: Wrap-up

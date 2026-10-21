@@ -228,7 +228,7 @@ pub struct InsertedEdge {
 
 // PRD: D1.
 /// A state-machine transition. Answering a decision is [`Mutation::Answer`]; the dates a
-/// start or reach records default to today and are edited with
+/// start or finish records default to today and are edited with
 /// [`Mutation::SetRecordedDate`].
 #[derive(
     Clone, Debug, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize, JsonSchema,
@@ -239,7 +239,7 @@ pub enum Transition {
     Start,
     /// `active` to `todo`.
     Stop,
-    /// To `done` (deliverable, action).
+    /// To `done` (deliverable, action, milestone).
     Complete,
     // PRD: D1.
     /// To `skipped`, with the reason a skip requires.
@@ -250,9 +250,6 @@ pub enum Transition {
     // PRD: D1.
     /// Back to the initial state (always allowed).
     Reopen,
-    // PRD: F1.
-    /// `pending` to `reached` (milestone), including confirming an auto-reach.
-    Reach,
 }
 
 // PRD: F1, F2.

@@ -175,7 +175,7 @@ export function mutationWords(mutation: Mutation, names: Names): string {
       return `Unpin ${node(mutation.node)}`;
     case "transition": {
       const move = typeof mutation.transition === "string" ? mutation.transition : "skip";
-      return `${move === "reach" ? "Mark reached" : upperFirst(move)} ${node(mutation.node)}`;
+      return `${upperFirst(move)} ${node(mutation.node)}`;
     }
     case "snooze":
       return `Snooze ${node(mutation.node)} until ${"date" in mutation.until ? names.date(mutation.until.date) : `${node(mutation.until.node)}${SNOOZE_NODE_TAIL}`}`;

@@ -169,7 +169,7 @@ fn the_timeline_places_milestones_pins_and_due_dates() {
 #[test]
 fn the_status_summary_counts_and_lists() {
     let summary = Derive::vendor(3).journey().status_summary();
-    assert_eq!(summary.by_state.get(&State::Reached), Some(&1));
+    assert_eq!(summary.by_state.get(&State::Done), Some(&1));
     assert_eq!(summary.by_state.get(&State::Decided), Some(&5));
     assert_eq!(
         summary.remaining,

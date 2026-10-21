@@ -2,5 +2,6 @@
 
 mod conformance;
 mod identities_migration;
+mod milestone_done_migration;
 mod open;
 mod property_round_trip;

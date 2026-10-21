@@ -2,7 +2,7 @@
 //! the values brief 2.4's proof quotes: the vendor evaluation's frontier after each step, the
 //! frontier and acting frontier before and after a completion, a blocked node with its origin
 //! blockers listed once, a snooze holding then lifting, a stalled journey with what it waits
-//! on, a guard rejection and a bypass, the consequences of a patch, an auto-reach milestone on
+//! on, a guard rejection and a bypass, the consequences of a patch, an auto-done milestone on
 //! its date, and the pass's operation count at the limits. Every patch here goes through
 //! `apply`; every derive is at the step's today.
 //!
@@ -149,7 +149,7 @@ fn via(via: &DependencyVia) -> String {
 const STEPS: [&str; 8] = [
     "1 (created)",
     "2 (up-front decisions)",
-    "3 (kickoff reached)",
+    "3 (kickoff done)",
     "4 (access started)",
     "5 (access done, workload broken down)",
     "6 (plan done, comparison set answered)",
@@ -295,7 +295,7 @@ fn cause(cause: &StallCause) -> String {
         } => {
             format!("`{node}` snoozed until {}", until(target))
         }
-        StallCause::AutoReach { node, date } => format!("`{node}` auto-reaches on {date}"),
+        StallCause::AutoDone { node, date } => format!("`{node}` marks itself done on {date}"),
     }
 }
 
@@ -412,26 +412,26 @@ fn stale(vendor: &Fixture, out: &mut String) -> Result<()> {
 }
 
 /// F1: the launch's beta start on its effective date and the day before.
-fn auto_reach(launch: &Fixture, out: &mut String) -> Result<()> {
-    writeln!(out, "## An auto-reach milestone on its date\n")?;
+fn auto_done(launch: &Fixture, out: &mut String) -> Result<()> {
+    writeln!(out, "## An auto-done milestone on its date\n")?;
     let (records, inputs) = launch.step(4)?;
     let beta: NodeKey = "n_beta_start".parse()?;
     let (_, now) = launch.derive(records, inputs.today)?;
     let date = now.dates().effective_date(&beta).ok_or("no date")?.date;
     writeln!(
         out,
-        "The product launch after its last step; `n_beta_start` auto-reaches, effective date {date}:\n"
+        "The product launch after its last step; `n_beta_start` is done by its date, effective date {date}:\n"
     )?;
     writeln!(
         out,
-        "| Today | auto-reached | on the frontier | on the acting frontier |"
+        "| Today | done by its date | on the frontier | on the acting frontier |"
     )?;
     writeln!(out, "|---|---|---|---|")?;
     for today in [date.yesterday()?, date] {
         let (_, derived) = launch.derive(records, today)?;
         let blocking = derived.blocking();
         let row = (
-            blocking.auto_reached(&beta),
+            blocking.done_by_date(&beta),
             blocking.frontier().contains(&beta),
             blocking.acting_frontier().contains(&beta),
         );
@@ -477,7 +477,7 @@ fn main() -> Result<()> {
         &|out| stalled(&vendor, out),
         &|out| guards(&vendor, out),
         &|out| stale(&vendor, out),
-        &|out| auto_reach(&launch, out),
+        &|out| auto_done(&launch, out),
         &cost,
     ];
     for section in sections {

@@ -1,6 +1,6 @@
 // C10, C11, E1: what a row offers at its right end: the actions the node offers everywhere
-// (detail/offers.ts: Mark done, or Mark done... when a note or link is needed first; Start; Mark
-// reached; Decide, Break down and Mark atomic, which open or finish in the inspector), and who owns it (You, or an inline Assign when nobody does). Each is
+// (detail/offers.ts: Mark done, or Mark done... when a note or link is needed first; Start;
+// Decide, Break down and Mark atomic, which open or finish in the inspector), and who owns it (You, or an inline Assign when nobody does). Each is
 // one patch through the shell's write path, its rejection shown under the row (A15, D4).
 // Anything more is one click away in the inspector. The write's feedback is the shell's
 // notices; this is the one place a row sends from.

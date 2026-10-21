@@ -6,8 +6,8 @@ type DisplayState = Schema<"DisplayState">;
 type NodeDerived = Schema<"NodeDerived">;
 
 /**
- * D8: nothing is left to do on the node: its display state is done (finished, decided, reached
- * or auto-reached) or skipped (stored or through a container).
+ * D8: nothing is left to do on the node: its display state is done (finished, decided
+ * or done by its date) or skipped (stored or through a container).
  */
 export function isFinished(state: DisplayState): boolean {
   return state === "done" || state === "skipped";

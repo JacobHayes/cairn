@@ -65,14 +65,14 @@ export const CHAIN_COUNT_PER_REJECTION_MAX = 16;
 export const EXPLANATION_ENTRY_COUNT_MAX = 50;
 
 /** A move by name (D1); answering a decision is its own mutation. */
-export type Move = "start" | "stop" | "complete" | "skip" | "reopen" | "reach" | "answer";
+export type Move = "start" | "stop" | "complete" | "skip" | "reopen" | "answer";
 
 /** D1: the states each kind's moves leave from. */
 export const MOVES_FROM: Record<NodeKind, Partial<Record<Move, State[]>>> = {
   decision: { skip: ["open"], reopen: ["decided", "skipped"], answer: ["open", "decided"] },
   deliverable: { start: ["todo"], stop: ["active"], complete: ["todo", "active"], skip: ["todo", "active"], reopen: ["done", "skipped"] },
   action: { start: ["todo"], stop: ["active"], complete: ["todo", "active"], skip: ["todo", "active"], reopen: ["done", "skipped"] },
-  milestone: { skip: ["pending"], reopen: ["reached", "skipped"], reach: ["pending"] },
+  milestone: { complete: ["pending"], skip: ["pending"], reopen: ["done", "skipped"] },
   group: { skip: ["derived"], reopen: ["skipped"] },
 };
 
@@ -86,4 +86,4 @@ export const INITIAL_STATE: Record<NodeKind, State> = {
 };
 
 /** D1: the states a node is finished in. */
-export const TERMINAL_STATES: readonly State[] = ["done", "skipped", "decided", "reached"];
+export const TERMINAL_STATES: readonly State[] = ["done", "skipped", "decided"];

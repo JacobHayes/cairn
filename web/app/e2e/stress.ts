@@ -51,7 +51,7 @@ export function stressRoute(): string {
   const nodes = [
     node("kickoff", "milestone", SHORT),
     node("final", "milestone", CAPS, ["weight: 10", "final: true", "requires:", "- stage-a", "- stage-b", "- stage-d"]),
-    node("sched", "milestone", LONG, ["auto_reach: true", "not_before:", "  after: kickoff", "  offset: 5"]),
+    node("sched", "milestone", LONG, ["auto_done: true", "not_before:", "  after: kickoff", "  offset: 5"]),
     node("when", "decision", WORD, ["prompt: When is the final milestone?", "answer_type: date", "feeds_milestone: final"]),
     node("flag", "decision", LONG, ["prompt: Does the optional stage apply?", "answer_type: boolean"]),
     node("flag_two", "decision", CAPS, ["prompt: Does the other stage apply?", "answer_type: boolean"]),

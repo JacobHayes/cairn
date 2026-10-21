@@ -444,7 +444,7 @@ kbd {
 .badge:is(.done, .good) {
   --dot: var(--color-success);
 }
-/* Done, decided and reached draw a check in the dot's place: a mask the chip's cap height, its stroke the text's weight, in the success colour. */
+/* Done and decided draw a check in the dot's place: a mask the chip's cap height, its stroke the text's weight, in the success colour. */
 .badge.done::before {
   width: 0.7em;
   height: 0.7em;

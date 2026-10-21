@@ -55,7 +55,7 @@ fn field_line(field: KindField) -> String {
         | KindField::RequiresArtifact
         | KindField::RequiresNote
         | KindField::Final
-        | KindField::AutoReach
+        | KindField::AutoDone
         | KindField::Gates
         | KindField::Closes => "true",
         KindField::OpensAt | KindField::ClosesAt | KindField::FeedsMilestone => "kickoff",

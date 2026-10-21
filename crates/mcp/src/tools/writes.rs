@@ -42,7 +42,7 @@ pub(crate) const SPECS: &[Spec] = &[
     Spec {
         name: "transition_node",
         description: "Moves a node through its lifecycle: start, stop, complete, skip (with a \
-            reason), reopen, or reach (a milestone). Guards are checked against the result.",
+            reason), reopen, or complete (a milestone). Guards are checked against the result.",
         writes: true,
         destructive: true,
         schema: schema::<TransitionNode>,

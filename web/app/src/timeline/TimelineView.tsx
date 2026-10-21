@@ -115,8 +115,8 @@ function Backdrop({ axis, height }: { axis: Axis; height: number }) {
       {axis.ticks.map((tick) => (
         <line key={tick.day} className="timeline-grid" x1={percent(tick.at)} x2={percent(tick.at)} y1={0} y2={height} />
       ))}
+      {end === undefined || end === axis.now ? null : <line className="timeline-end" x1={percent(end)} x2={percent(end)} y1={0} y2={height} />}
       <line className="timeline-today" x1={percent(axis.now)} x2={percent(axis.now)} y1={0} y2={height} />
-      {end === undefined ? null : <line className="timeline-end" x1={percent(end)} x2={percent(end)} y1={0} y2={height} />}
     </>
   );
 }

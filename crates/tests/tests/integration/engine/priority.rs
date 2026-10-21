@@ -230,19 +230,19 @@ fn unlocks_cascade_through_group_completion_once_per_target() {
     );
 }
 
-/// Priority, Unlocks, F1: an `auto_reach` milestone due today or earlier reads as reached as
+/// Priority, Unlocks, F1: an `auto_done` milestone due today or earlier reads as done as
 /// soon as it is unblocked, so completing what gates it also unblocks what waits on it; one
 /// still ahead of its date is unblocked and holds what follows.
 #[test]
-fn unlocks_cascade_through_a_due_auto_reach_milestone() {
+fn unlocks_cascade_through_a_due_auto_done_milestone() {
     let records = support::journey(&format!(
         "{}- op: set_pin\n  node: n_due\n  date: \"2026-10-01\"\n- op: set_pin\n  node: n_ahead\n  date: \"2026-10-20\"\n",
         add(&[
             "{key: n_gate, id: gate, kind: action, title: Gate}",
-            "{key: n_due, id: due, kind: milestone, title: Due, auto_reach: true, requires: [n_gate]}",
+            "{key: n_due, id: due, kind: milestone, title: Due, auto_done: true, requires: [n_gate]}",
             "{key: n_after, id: after, kind: action, title: After, weight: 10, requires: [n_due]}",
             "{key: n_other, id: other, kind: action, title: Other}",
-            "{key: n_ahead, id: ahead, kind: milestone, title: Ahead, auto_reach: true, requires: [n_other]}",
+            "{key: n_ahead, id: ahead, kind: milestone, title: Ahead, auto_done: true, requires: [n_other]}",
             "{key: n_later, id: later, kind: action, title: Later, weight: 10, requires: [n_ahead]}",
         ])
     ));

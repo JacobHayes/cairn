@@ -177,7 +177,7 @@ export function guardBypass(node: string, guards: Schema<"Guard">[], reason: str
 /** A transition by name (D1); answering a decision is its own mutation. */
 export type Move = Exclude<EngineMove, "answer">;
 
-const MOVE_ORDER: Move[] = ["start", "stop", "complete", "reach", "skip", "reopen"];
+const MOVE_ORDER: Move[] = ["start", "stop", "complete", "skip", "reopen"];
 
 /** D1: the moves a node of `kind` in `state` can make, in the order the panel offers them. */
 export function movesFrom(kind: NodeKind, state: State): Move[] {
@@ -197,7 +197,7 @@ export function transition(node: string, move: Move, reason = ""): Mutation {
   return { op: "transition", node, transition: move };
 }
 
-/** D1: whether a node in `state` is finished (done, skipped, decided, reached). */
+/** D1: whether a node in `state` is finished (done, skipped, decided). */
 export function isTerminal(state: State): boolean {
   return TERMINAL_STATES.includes(state);
 }
@@ -261,7 +261,7 @@ export type FlagTone = "good" | "warn" | "bad" | "plain";
 
 /**
  * D3: the derived flags a node carries (C8) that are real attention, those that are set. The one list every surface (inspector, rows, cards) renders. What
- * its display state already says (blocked, snoozed, skipped, actionable, auto-reached) is not
+ * its display state already says (blocked, snoozed, skipped, actionable, done by its date) is not
  * a flag (D8); started early is the engine's.
  */
 export function flagsOf(derived: NodeDerived): { flag: string; tone: FlagTone }[] {

@@ -91,7 +91,7 @@ const PLAIN: &str = "{key: n_plain, id: plain, kind: action, title: Plain}";
 const FIRST: &str = "{key: n_first, id: first, kind: action, title: First}";
 const SECOND: &str =
     "{key: n_second, id: second, kind: action, title: Second, requires: [n_first]}";
-const GATE: &str = "{key: n_gate, id: gate, kind: milestone, title: Gate, auto_reach: true}";
+const GATE: &str = "{key: n_gate, id: gate, kind: milestone, title: Gate, auto_done: true}";
 const STAGE: &str = "{key: n_stage, id: stage, kind: deliverable, title: Stage}";
 const STEP_A: &str = "{key: n_step_a, id: step-a, parent: n_stage, kind: action, title: Step A}";
 const STEP_B: &str = "{key: n_step_b, id: step-b, parent: n_stage, kind: action, title: Step B}";
@@ -116,7 +116,7 @@ const DROP: &str = "{key: n_drop, id: drop, kind: action, title: Drop}";
 const FINISH: &str = "{key: n_finish, id: finish, kind: action, title: Finish}";
 const BEGUN: &str = "{key: n_begun, id: begun, kind: action, title: Begun}";
 const LATE: &str = "{key: n_late, id: late, kind: action, title: Late, relevant_when: {equals: {decision: n_ask, value: true}}}";
-const GATED: &str = "{key: n_gated, id: gated, kind: milestone, title: Gated, auto_reach: true, requires: [n_first]}";
+const GATED: &str = "{key: n_gated, id: gated, kind: milestone, title: Gated, auto_done: true, requires: [n_first]}";
 const THIRD: &str = "{key: n_third, id: third, kind: decision, title: Third, prompt: Third?, answer_type: boolean, relevant_when: {not: {equals: {decision: n_branch, value: true}}}}";
 const READER: &str = "{key: n_reader, id: reader, kind: action, title: Reader, relevant_when: {equals: {decision: n_third, value: false}}}";
 
@@ -128,12 +128,12 @@ fn board() -> Records {
     ]))
 }
 
-/// A step written in words: `done n_x`, `start n_x`, `reach n_x`, `reopen n_x`, `skip n_x`,
+/// A step written in words: `done n_x`, `start n_x`, `reopen n_x`, `skip n_x`,
 /// `yes n_decision`, `no n_decision`, `pin n_x 2026-10-05`, `snooze n_x 2026-10-09`.
 fn step(text: &str) -> String {
     match text.split(' ').collect::<Vec<_>>().as_slice() {
         ["done", node] => transition(node, "complete"),
-        [verb @ ("start" | "stop" | "reach" | "reopen"), node] => transition(node, verb),
+        [verb @ ("start" | "stop" | "reopen"), node] => transition(node, verb),
         ["skip", node] => skip(node),
         ["yes", decision] => answer(decision, "{boolean: true}"),
         ["no", decision] => answer(decision, "{boolean: false}"),
@@ -172,8 +172,8 @@ fn precedence_rows() {
         (&["start n_deep_leaf", "stop n_deep_leaf"], DAY, "n_deep", Ready),
         (&["start n_deep_leaf", "stop n_deep_leaf"], DAY, "n_deep_mid", Ready),
         (&["yes n_mix_ask"], DAY, "n_mix", Ready),
-        (&["reach n_mix_gate"], DAY, "n_mix", Ready),
-        (&["yes n_mix_ask", "reach n_mix_gate", "start n_mix_do", "stop n_mix_do"], DAY, "n_mix", Ready),
+        (&["done n_mix_gate"], DAY, "n_mix", Ready),
+        (&["yes n_mix_ask", "done n_mix_gate", "start n_mix_do", "stop n_mix_do"], DAY, "n_mix", Ready),
         (&[], DAY, "n_second", Blocked),
         (&[], DAY, "n_wall_kid", Blocked),
         (&["done n_first"], DAY, "n_walled", Ready),
@@ -181,7 +181,7 @@ fn precedence_rows() {
         (&["done n_finish"], DAY, "n_finish", Done),
         (&["yes n_ask"], DAY, "n_ask", Done),
         (&["done n_box_kid"], DAY, "n_box", Done),
-        (&["reach n_gate"], DAY, "n_gate", Done),
+        (&["done n_gate"], DAY, "n_gate", Done),
         (&["pin n_gate 2026-10-05"], DAY, "n_gate", Done),
         (&["skip n_drop"], DAY, "n_drop", Skipped),
         (&["skip n_stage"], DAY, "n_step_a", Skipped),

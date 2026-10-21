@@ -100,21 +100,21 @@ describe("C13, F1, F6: the lead's milestone line", () => {
     expect(line?.key).toBe(model.upcoming[0]?.key);
   });
 
-  it("says a reached final milestone reached, from an actual date", () => {
+  it("says a done final milestone is done, from an actual date", () => {
     const journey = open("j_bakeoff", [
-      { op: "transition", node: "n_wrap_up", transition: "reach" },
+      { op: "transition", node: "n_wrap_up", transition: "complete" },
     ]);
     const line = milestoneLine(journey.ready, pageOf(journey).model);
     expect(line).toMatchObject({ role: "final", key: "n_wrap_up", origin: "actual" });
   });
 });
 
-describe("F1, C13: the final milestone line says when it is reached", () => {
-  it("is not reached while open, and is once reached", () => {
+describe("F1, C13: the final milestone line says when it is done", () => {
+  it("is not done while open, and is once done", () => {
     const before = open("j_bakeoff");
-    expect(milestoneLine(before.ready, pageOf(before).model)).toMatchObject({ role: "final", reached: false });
-    const after = open("j_bakeoff", [transition("n_wrap_up", "reach")]);
-    expect(milestoneLine(after.ready, pageOf(after).model)).toMatchObject({ role: "final", reached: true });
+    expect(milestoneLine(before.ready, pageOf(before).model)).toMatchObject({ role: "final", done: false });
+    const after = open("j_bakeoff", [transition("n_wrap_up", "complete")]);
+    expect(milestoneLine(after.ready, pageOf(after).model)).toMatchObject({ role: "final", done: true });
   });
 });
 
@@ -130,17 +130,17 @@ describe("C18, D3, D4, F6: what needs attention", () => {
     expect(worst).toEqual([...worst].sort((a, b) => a - b));
   });
 
-  it("says a reached node's shortfall as a late reach, and open work's as the days it needs", () => {
+  it("says a finished node's shortfall as how far off it finished, and open work's as the days it needs", () => {
     const journey = open("j_launch");
     const { model } = pageOf(journey);
     const reasons = (key: string) => attentionRows(journey.ready, model).find((row) => row.key === key)?.reasons.join(";") ?? "";
     const stateOf = (key: string) => journey.ready.journey.graph.state?.nodes?.[key]?.state;
     const short = model.shortfalls.map((each) => each.key);
-    const reached = short.filter((key) => stateOf(key) === "reached");
-    const open_ = short.filter((key) => stateOf(key) !== "reached");
-    expect(reached.length).toBeGreaterThan(0);
+    const finished = short.filter((key) => stateOf(key) === "done");
+    const open_ = short.filter((key) => stateOf(key) !== "done");
+    expect(finished.length).toBeGreaterThan(0);
     expect(open_.length).toBeGreaterThan(0);
-    reached.forEach((key) => { expect(reasons(key)).toMatch(/Reached \d+ days? off/); });
+    finished.forEach((key) => { expect(reasons(key)).toMatch(/Finished \d+ days? off/); });
     open_.forEach((key) => { expect(reasons(key)).toMatch(/Needs \d+ days? more/); });
   });
 
@@ -245,7 +245,7 @@ describe("F2: recently finished", () => {
     const dates = rows.map((row) => record(row.key)?.finished_on ?? "");
     expect(dates).toEqual([...dates].sort().reverse());
     for (const row of rows) {
-      expect(["done", "decided", "reached"]).toContain(record(row.key)?.state);
+      expect(["done", "decided"]).toContain(record(row.key)?.state);
     }
   });
 

@@ -15,7 +15,7 @@
 //! terminal nodes are traversed (their edges stay) but count nothing, and nor do not-relevant
 //! ones a requirement entry passes through. What a node counts, its own weight included, is
 //! its counted weight: its weight times the undecided discount when it is undecided, and
-//! nothing when it is closed (terminal, effectively skipped, auto-reached, or a group whose
+//! nothing when it is closed (terminal, effectively skipped, done by its date, or a group whose
 //! work is done) or not relevant, so gravity is what still rides on a node, and an upstream
 //! node's set holds a downstream node's set and the node itself: gravity never decreases
 //! upstream.
@@ -23,8 +23,8 @@
 //! Unlocks: for each node in the rank normalization set (relevant or undecided, open, not a
 //! group), completing it is simulated over pass 5's instants: its finish is satisfied, and
 //! each instant whose last unsatisfied wait that was is satisfied in turn, cascading through
-//! derived group completion, through `auto_reach` milestones due today or earlier (which read
-//! as reached once unblocked, F1), and through skipped containers whose kept work it finishes
+//! derived group completion, through `auto_done` milestones due today or earlier (which read
+//! as done once unblocked, F1), and through skipped containers whose kept work it finishes
 //! (D1a). Every other open node's finish stays unsatisfied: completing one node completes no
 //! other. The nodes whose start (`deps_done`) is satisfied by that are what it unblocks; each
 //! counts its weight, the undecided discount, and the owner factor once.
@@ -38,10 +38,10 @@
 //! satisfies has every unsatisfied wait behind it lead back to the completed node's finish, so
 //! the simulations of nodes that only completion satisfies never satisfy the same instant, and
 //! together they read each instant, each pruned edge, and each kept-work entry (at most
-//! 2,000 x 16) at most once. The only overlap is an `auto_reach` milestone due today but still
+//! 2,000 x 16) at most once. The only overlap is an `auto_done` milestone due today but still
 //! blocked: it is ranked, and its own simulation repeats the part of a cascade behind it. With
 //! `m` such milestones the simulations read at most (1 + m) x (instants + edges + kept work);
-//! `m` counts the overdue, gated `auto_reach` milestones: few in practice, and in a
+//! `m` counts the overdue, gated `auto_done` milestones: few in practice, and in a
 //! constructed worst case (every milestone overdue, chained ahead of the rest of the graph)
 //! about 700 x 180,000 reads. Memory: two counters and a flag per instant, and the
 //! unblocked nodes, one entry per node per simulation that reaches it.

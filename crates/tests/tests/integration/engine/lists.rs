@@ -236,7 +236,10 @@ fn list_filters_combine_and_search_reads_notes_and_resources() {
         states: BTreeSet::from([State::Done]),
         ..ListQuery::default()
     };
-    assert_eq!(Derive::vendor(5).listed(&done, &[]), ["n_access"]);
+    assert_eq!(
+        Derive::vendor(5).listed(&done, &[]),
+        ["n_access", "n_kickoff"]
+    );
     let started = Derive::vendor(4);
     for (text, expected) in [
         ("waiting on the ENVIRONMENT team", "n_access"),

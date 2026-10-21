@@ -272,7 +272,7 @@ const BREAKAGES: &[(&str, Breakage, ViolationCode)] = &[
             edit(d, "n_kickoff", |n| {
                 n.payload = Payload::Milestone(Milestone {
                     is_final: true,
-                    auto_reach: false,
+                    auto_done: false,
                 });
             });
         },

@@ -355,7 +355,6 @@ fn term<'g>(
         | State::Active
         | State::Done
         | State::Pending
-        | State::Reached
         | State::Derived => Term::Unanswered,
     }
 }
@@ -399,7 +398,6 @@ fn hopeful_term<'g>(
         | State::Active
         | State::Done
         | State::Pending
-        | State::Reached
         | State::Derived => Term::Unanswered,
     }
 }

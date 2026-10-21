@@ -64,7 +64,7 @@ describe("C9: bulk actions", () => {
     const plan = bulkPlan({ act: "done" }, [facts("n_meet"), ...work]);
     expect(plan).toEqual({
       mutations: [
-        { op: "transition", node: "n_meet", transition: "reach" },
+        { op: "transition", node: "n_meet", transition: "complete" },
         { op: "transition", node: "n_work", transition: "complete" },
         { op: "transition", node: "n_hold", transition: "complete" },
       ],

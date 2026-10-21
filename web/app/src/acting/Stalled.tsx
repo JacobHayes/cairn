@@ -1,6 +1,6 @@
 // C10, D5: when the acting frontier is empty, what the journey waits on, with the actions the
 // diagnostic offers where they are allowed: unsnooze a snoozed node (B6), or confirm an
-// `auto_reach` milestone reached before its date. Each is one patch.
+// `auto_done` milestone marked done before its date. Each is one patch.
 
 import { transition, type Ready } from "../detail/model.ts";
 import { ACT_LABELS } from "../detail/offers.ts";
@@ -49,13 +49,13 @@ function CauseLine({ view, write, cause, reach }: { view: Ready; write: NodeWrit
       </li>
     );
   }
-  const { node, date } = cause.auto_reach;
+  const { node, date } = cause.auto_done;
   return (
-    <li className="stall-cause" data-testid="stall-cause" data-status="auto_reach" data-node={node}>
+    <li className="stall-cause" data-testid="stall-cause" data-status="auto_done" data-node={node}>
       <span>{title(node)} <span className={inkOf(date) ?? "muted"}>· {whenWords(date, undefined, today)}</span></span>
       {reach.readOnly ? null : (
-        <Button disabled={write.disabled} onClick={() => void write.run([transition(node, "reach")])}>
-          {ACT_LABELS["reach-now"]}
+        <Button disabled={write.disabled} onClick={() => void write.run([transition(node, "complete")])}>
+          {ACT_LABELS.done}
         </Button>
       )}
     </li>

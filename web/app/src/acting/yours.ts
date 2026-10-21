@@ -10,7 +10,7 @@ import { namedList } from "../ui/words.ts";
 
 /**
  * Whether node `key` is still the viewer's to do if it is in their "mine": in scope, not a
- * container, not skipped, not a milestone that reaches itself, and not finished (2.4). The one
+ * container, not skipped, not a milestone that marks itself done, and not finished (2.4). The one
  * rule Home's counts and the journey card's use, and the line for work that is all waiting.
  */
 export function openForViewer(view: Ready, key: string): boolean {

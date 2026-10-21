@@ -7,7 +7,7 @@ import { isOpen } from "../status/state.ts";
 import { failingGuards, isTerminal, isWork, movesFrom, nodeOf, recordOf, storedSnooze, titleOf, type NodeDetail, type Ready } from "./model.ts";
 
 /** The action beside a node, on any surface: what a person does to it in one move. */
-export type Act = "decide" | "done" | "done-with-evidence" | "start" | "reach" | "reach-now" | "break-down" | "mark-atomic" | "unsnooze";
+export type Act = "decide" | "done" | "done-with-evidence" | "start" | "break-down" | "mark-atomic" | "unsnooze";
 
 export interface Offered {
   /** The one primary, none when the node is finished, does not apply, or is a stage. */
@@ -34,7 +34,6 @@ export function offered(view: Ready, key: string): Offered {
     return { primary: undefined, secondary: [], waiting: false };
   }
   const record = recordOf(view, node);
-  const shown = derived.display_state;
   const snooze: Act[] = unsnoozeOf(view, key) === undefined ? [] : ["unsnooze"];
   if (!isOpen(derived)) {
     return { primary: undefined, secondary: [], waiting: false };
@@ -49,7 +48,7 @@ export function offered(view: Ready, key: string): Offered {
   }
   switch (node.kind) {
     case "milestone":
-      return { primary: shown === "scheduled" ? "reach-now" : "reach", secondary: snooze, waiting };
+      return { primary: "done", secondary: snooze, waiting };
     case "decision":
       return { primary: record.state === "open" ? "decide" : undefined, secondary: snooze, waiting: false };
     default: {
@@ -72,7 +71,6 @@ export type MenuId =
   | "skip"
   | "stop"
   | "done-anyway"
-  | "reach-anyway"
   | "answer-anyway"
   | "reopen"
   | "edit-date"
@@ -99,7 +97,6 @@ const LABELS: Record<MenuId, string> = {
   skip: "Skip…",
   stop: "Stop",
   "done-anyway": "Done anyway…",
-  "reach-anyway": "Reach anyway…",
   "answer-anyway": "Answer anyway…",
   reopen: "Reopen",
   "edit-date": "Edit actual date…",
@@ -155,8 +152,7 @@ export function menuOf(view: Ready, detail: NodeDetail): MenuItem[][] {
         "skip",
         state === "active" && "stop",
         kind === "decision" && blocked && "answer-anyway",
-        kind === "milestone" && blocked && "reach-anyway",
-        isWork(node) && guardFails && "done-anyway",
+        (kind === "milestone" ? blocked : isWork(node) && guardFails) && "done-anyway",
         keptUnder && "keep",
       ],
       branch ? { snooze: "Snooze branch…", skip: "Skip branch…" } : {},
@@ -177,8 +173,6 @@ export const ACT_LABELS: Record<Act, string> = {
   done: "Mark done",
   "done-with-evidence": "Mark done…",
   start: "Start",
-  reach: "Mark reached",
-  "reach-now": "Confirm reached now",
   "break-down": "Break down",
   "mark-atomic": "Mark atomic",
   unsnooze: "Unsnooze",

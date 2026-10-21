@@ -100,7 +100,7 @@ mod mcp_in_process {
             ),
             (
                 "transition_node",
-                json!({ "node": "n_kickoff", "transition": "reach" }),
+                json!({ "node": "n_kickoff", "transition": "complete" }),
             ),
             (
                 "snooze",
@@ -440,9 +440,9 @@ mod mcp_in_process {
         let reply = post(&ann, "/api/users/me/tokens", &json!({ "name": "helper" })).await;
         let minted: MintedToken = reply.json().unwrap();
         let agent = Agent::connect(&world, &minted.token).await;
-        let reach = json!({ "journey": JOURNEY, "node": "n_kickoff", "transition": "reach",
-            "patch_id": "p_reach", "base_revision": 2 });
-        agent.ok("transition_node", reach).await;
+        let complete = json!({ "journey": JOURNEY, "node": "n_kickoff", "transition": "complete",
+            "patch_id": "p_done", "base_revision": 2 });
+        agent.ok("transition_node", complete).await;
         let history = json!({ "journey": JOURNEY, "node": "n_kickoff" });
         let history = agent.ok("get_history", history).await;
         let actor = &history["patches"].as_array().unwrap().last().unwrap()["events"][0]["actor"];

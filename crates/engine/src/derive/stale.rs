@@ -1,6 +1,6 @@
 //! `stale` (D4; ARCHITECTURE, Read path: derive, pass 7): a terminal node whose completing
 //! guards would now fail, checked against the transition it used: `done` was completed
-//! (`deps_done`, `has_artifact`, `has_note`, `broken_down`), `decided` answered and `reached` reached
+//! (`deps_done`, `has_artifact`, `has_note`, `broken_down`), and `decided` answered
 //! (`deps_done`), and a `skipped` node is never stale, since its skip required nothing. The
 //! failures a guard bypass recorded are accepted (D4: a bypass records the specific failures
 //! present), so only a later, distinct failure makes the node stale. Visible, never blocking.
@@ -89,7 +89,7 @@ pub(crate) fn reasons(
     };
     let completed = match stored_state(document, node) {
         State::Done => true,
-        State::Decided | State::Reached => false,
+        State::Decided => false,
         State::Skipped
         | State::Todo
         | State::Active

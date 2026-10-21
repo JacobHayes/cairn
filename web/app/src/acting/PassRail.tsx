@@ -13,7 +13,7 @@ import { doneThisPass, unlockedBy, type Pass } from "./pass.ts";
 /** How many nodes a rail group names before it says how many more. */
 const SHOWN = 5;
 
-/** Whether the journey has finished `key`: done, reached or skipped. */
+/** Whether the journey has finished `key`: done or skipped. */
 function finished(view: Ready, key: string): boolean {
   const state = view.derived.nodes[key]?.display_state;
   return state !== undefined && isFinished(state);

@@ -43,7 +43,7 @@ a late-filled `findings_reviewer`, and a final-review stage that opens 14 days b
 decision meeting and closes at it, with the final report (weight 5, artifact required) inside.
 The decision meeting is the final milestone, weight 10. Resources: an access-request message
 draft, a report template, and two example test plans. The scenario answers the up-front
-decisions, reaches kickoff, breaks down the workload, answers the comparison set once the plan
+decisions, completes kickoff, breaks down the workload, answers the comparison set once the plan
 is done, snoozes the baseline on a node, pins the report earlier than its derived due date,
 finishes the workload and the baseline (which completes testing and opens reporting), and
 answers the reviewer with a person created in the same patch.
@@ -68,7 +68,7 @@ on a gate is blocked. The scenario's `fixture_readme.rs` checks these values.
 
 | Node, display state / stored state | created (step 1) | up-front decisions (step 2) | comparison set (step 6) | findings reviewer (step 8) |
 |---|---|---|---|---|
-| `kickoff` | `ready` / `pending` | `ready` / `pending` | `done` / `reached` | `done` / `reached` |
+| `kickoff` | `ready` / `pending` | `ready` / `pending` | `done` / `done` | `done` / `done` |
 | `partner-runs` | `ready` / `open` | `done` / `decided` | `done` / `decided` | `done` / `decided` |
 | `setup` | `blocked` / `derived` | `blocked` / `derived` | `active` / `derived` | `done` / `derived` |
 | `setup/access` | `blocked` / `todo` | `blocked` / `todo` | `done` / `done` | `done` / `done` |
@@ -114,14 +114,14 @@ values.
 
 What can be acted on after each step (brief 2.4): the frontier (every actionable node: relevant,
 open, not blocked, not a group) and, where it differs, the acting frontier (without snoozed
-nodes and `auto_reach` milestones whose date is ahead). Nothing in this route auto-reaches, so
+nodes and `auto_done` milestones whose date is ahead). Nothing in this route marks itself done, so
 the values do not depend on the day they are read. `fixture_readme.rs` checks them.
 
 | After step | Frontier | Off the acting frontier |
 |---|---|---|
 | 1 (created) | `n_decision_meeting`, `n_kickoff`, `n_meeting_date`, `n_partner_runs`, `n_purpose`, `n_who_informed`, `n_who_owns` | |
 | 2 (up-front decisions) | `n_decision_meeting`, `n_kickoff` | |
-| 3 (kickoff reached) | `n_access`, `n_decision_meeting`, `n_workload` | |
+| 3 (kickoff done) | `n_access`, `n_decision_meeting`, `n_workload` | |
 | 4 (access started) | `n_access`, `n_decision_meeting`, `n_workload` | |
 | 5 (access done, workload broken down) | `n_decision_meeting`, `n_plan_draft`, `n_workload_ingest`, `n_workload_query` | |
 | 6 (plan done, comparison set answered) | `n_baseline`, `n_decision_meeting`, `n_workload_ingest`, `n_workload_query` | |
@@ -138,7 +138,7 @@ and its rank under the default constants, to four places. Rank is global: every 
 owner factor is 1 throughout. Kickoff leads while it gates Setup (its gravity holds Setup, the
 plan, and everything after them, the undecided baseline at half); the partner decision's gravity
 holds the partner-led subset at half while it is undecided; the four up-front decisions tie and
-fall back to key order; once kickoff is reached, environment access leads. Every slack is past
+fall back to key order; once kickoff is done, environment access leads. Every slack is past
 the 14-day horizon, so urgency is 0. `fixture_readme.rs` checks the ranks.
 
 | After step | Node | Gravity | Unlocks | Slack | Rank |
@@ -210,16 +210,16 @@ hidden, what rolls up, and the next list, which holds only the offer letter's de
 
 Many milestones and date rules and no conditions. The launch is the final milestone; code
 freeze is due 21 days before it, the beta starts no sooner than two days after the freeze (and
-reaches itself on its date) and ends ten days after it starts, the documentation is due a week
+marks itself done on its date) and ends ten days after it starts, the documentation is due a week
 before launch, the announcement three days before and no sooner than the beta's end, the
 go/no-go a day before, and the retrospective no sooner than five days after. Build and beta are
 stages bounded by milestones on both ends. The launch materials name the multi-valued `writers`
 role through a multi-valued `contributor` kind (owner, being single-valued, cannot take a
-multi-valued role, A7). The scenario pins the launch date, reaches kickoff,
+multi-valued role, A7). The scenario pins the launch date, completes kickoff,
 shifts the launch pin a week when feature work slips, and records a code-freeze actual
 date later than the plan's chain allows: a shortfall, which is reported, never rejected.
 Derived (brief 2.3): with the launch pinned to 2026-11-23, the freeze is due 21 days before it,
-on 2026-11-02; reached on 2026-11-04, it is short by 2 days, and so is the launch.
+on 2026-11-02; done on 2026-11-04, it is short by 2 days, and so is the launch.
 
 Projected at the end of the scenario (brief 2.6), read at 2026-10-06: the level with actions
 hidden, what rolls up, and the first three items of the next list.
@@ -264,7 +264,7 @@ engine's insertion test checks the root paths and the frontier.
 Each scenario's journey at its end, summarized for observers (brief 5.4, C18), read on
 2026-10-06: the in-scope nodes by display state (D8; `by_state` counts the same nodes by
 stored state), how many are left to finish, the overdue, short, and stale nodes, the milestones not yet
-reached with their effective dates, and the open decisions in rank order. Nothing is
+done with their effective dates, and the open decisions in rank order. Nothing is
 overdue on that day; the product launch's late code freeze leaves it and the launch short
 (F6). The engine's tests (`crates/tests/tests/integration/engine/fixture_readme.rs`) check these lines.
 

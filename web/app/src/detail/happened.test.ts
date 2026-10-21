@@ -70,7 +70,6 @@ const CASES: Record<EventType, Case> = {
   resource_changed: { event: event("resource_changed", plan, [put({ resource: { node: "n_plan", resource: { key: "a_tip", tip: "Start early", title: "A tip" } } })]) },
   segment_inserted: { event: event("segment_inserted", { insertion: "i_one" }) },
   node_transitioned: { event: event("node_transitioned", plan, [state("n_plan", { state: "active" })]), facts: { state: "active" } },
-  milestone_reached: { event: event("milestone_reached", plan, [state("n_plan", { state: "reached" })]), facts: { state: "reached" } },
   answer_set: { event: event("answer_set", { node: "n_decide" }, [put({ answer: { decision: "n_decide", value: { boolean: true } } })]) },
   recorded_date_changed: { event: event("recorded_date_changed", plan, [state("n_plan", { state: "done", finished_on: "2026-10-05" })]), facts: { date: "2026-10-05", recorded: "finished" } },
   role_fill_changed: { event: event("role_fill_changed", { role: "r_lead" }, [put({ role_fill: { role: "r_lead", identities: ["who_ana"] } })]), facts: { identities: ["Ana Reyes"] } },

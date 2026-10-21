@@ -157,7 +157,7 @@ fn move_node(session: &mut Session<'_>, node: &NodeKey, transition: &Transition)
     match step {
         Move::Start => next.started_on = Some(today),
         Move::Stop => next.started_on = None,
-        Move::Complete | Move::Reach => next.finished_on = Some(today),
+        Move::Complete => next.finished_on = Some(today),
         Move::Reopen => {
             next.started_on = None;
             next.finished_on = None;

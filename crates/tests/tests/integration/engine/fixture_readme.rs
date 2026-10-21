@@ -53,7 +53,7 @@ fn quoted(text: &str) -> Vec<&str> {
     text.split('`').skip(1).step_by(2).collect()
 }
 
-/// The step a cell names: its leading number (`3 (kickoff reached)`), or the number after
+/// The step a cell names: its leading number (`3 (kickoff done)`), or the number after
 /// `step` in a header cell (`created (step 1)`).
 fn step_of(cell: &str) -> usize {
     let digits = cell.split("step ").last().unwrap_or(cell);
@@ -406,7 +406,7 @@ fn the_projection_lines_are_what_the_engine_projects() {
 
 /// C18: each fixture's status-summary line, read at the end of its scenario on the scenario
 /// tests' fixed day: the in-scope nodes by display state, how many remain, the overdue, short and
-/// stale nodes, the milestones not yet reached with their dates, and the open decisions.
+/// stale nodes, the milestones not yet done with their dates, and the open decisions.
 #[test]
 fn the_status_summary_lines_are_what_the_engine_summarizes() {
     let text = readme();

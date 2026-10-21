@@ -461,7 +461,7 @@ pub fn arb_node_derived() -> BoxedStrategy<NodeDerived> {
                     failing_guards,
                     started_early,
                     waits_on,
-                    auto_reached: flag(5),
+                    done_by_date: flag(5),
                     snoozed,
                     snoozed_via,
                     needs_breakdown: flag(6),
@@ -483,7 +483,7 @@ fn arb_stalled() -> BoxedStrategy<Stalled> {
         arb_node_key().prop_map(StallCause::Gate),
         (arb_node_key(), arb_snooze_target())
             .prop_map(|(node, until)| StallCause::Snooze { node, until }),
-        (arb_node_key(), arb_date()).prop_map(|(node, date)| StallCause::AutoReach { node, date }),
+        (arb_node_key(), arb_date()).prop_map(|(node, date)| StallCause::AutoDone { node, date }),
     ];
     (prop::collection::vec(cause, 1..3), any::<bool>())
         .prop_map(|(waiting_on, all_blocked)| Stalled {

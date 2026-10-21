@@ -25,7 +25,7 @@ async fn a_refused_write_carries_every_violation() {
         "target": { "journey": "j_vendor_eval" },
         "base_revision": 1,
         "mutations": [
-            { "op": "transition", "node": "n_kickoff", "transition": "complete" },
+            { "op": "transition", "node": "n_kickoff", "transition": "start" },
             { "op": "transition", "node": "n_nowhere", "transition": "start" },
             { "op": "answer", "decision": "n_partner_runs", "value": { "text": "maybe" } },
         ],
@@ -57,7 +57,7 @@ async fn a_refused_write_carries_every_violation() {
 async fn completing_a_placeholder_not_broken_down_is_refused_until_bypassed() {
     let world = World::new();
     let ann = user("u_ann");
-    // Kickoff reached and access started: the workload is open and its stage has opened.
+    // Kickoff done and access started: the workload is open and its stage has opened.
     world.vendor_after(&ann, 4).await;
     let complete = json!({
         "journey": "j_vendor_eval", "node": "n_workload", "transition": "complete",
@@ -208,7 +208,7 @@ async fn an_agent_write_records_the_agent_and_its_user() {
     world.vendor_journey(&ann).await;
     let helper = agent("ag_helper", "u_ann");
     let arguments = json!({
-        "journey": "j_vendor_eval", "node": "n_kickoff", "transition": "reach",
+        "journey": "j_vendor_eval", "node": "n_kickoff", "transition": "complete",
         "patch_id": "p_kickoff", "base_revision": 1, "note": "Kickoff held.",
     });
     world.ok(&helper, "transition_node", arguments).await;
@@ -232,7 +232,7 @@ async fn a_date_conflict_is_resolved_only_by_a_listed_move() {
     world.vendor_journey(&ann).await;
     let not_a_move = json!({
         "journey": "j_vendor_eval",
-        "resolution": { "op": "transition", "node": "n_kickoff", "transition": "reach" },
+        "resolution": { "op": "transition", "node": "n_kickoff", "transition": "complete" },
         "patch_id": "p_not_a_move", "base_revision": 1,
     });
     let refused = world.call(&ann, "resolve_date_conflict", not_a_move).await;
@@ -266,9 +266,9 @@ async fn a_merge_resubmitted_after_its_journeys_moved_is_answered_from_its_recei
         .await;
     assert_eq!(merged["status"], "applied");
 
-    let reach = json!({ "journey": "j_vendor_eval", "node": "n_kickoff", "transition": "reach",
-        "patch_id": "p_reach", "base_revision": 2 });
-    world.ok(&ann, "transition_node", reach).await;
+    let complete = json!({ "journey": "j_vendor_eval", "node": "n_kickoff", "transition": "complete",
+        "patch_id": "p_done", "base_revision": 2 });
+    world.ok(&ann, "transition_node", complete).await;
     let again = world
         .ok(
             &ann,

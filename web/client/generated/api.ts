@@ -1353,7 +1353,7 @@ export interface components {
              */
             drops: components["schemas"]["AffectedNodes"];
             /**
-             * @description Of the drops, the nodes with recorded progress (started, done, decided, reached):
+             * @description Of the drops, the nodes with recorded progress (started, done, decided):
              *     the answer does not undo it.
              */
             drops_with_progress: components["schemas"]["AffectedNodes"];
@@ -1919,7 +1919,7 @@ export interface components {
         };
         /**
          * @description The one state every surface shows for a node, composed from relevance, stored state,
-         *     effective skip, auto-reach, blocking and snooze, and from the derived flags, which it leaves in
+         *     effective skip, auto-done, blocking and snooze, and from the derived flags, which it leaves in
          *     place. Stored state is what transitions act on; this is what people and agents read. The
          *     first matching value in this order wins: `not_relevant`, `skipped`, `done`, `snoozed`,
          *     `active`, `conditional`, `blocked`, `scheduled`, `ready`.
@@ -1970,7 +1970,7 @@ export interface components {
         /** @description How an edge on the canvas arose (implicit gates are drawn dotted). */
         EdgeOrigin: "explicit" | "condition" | "stage_opening";
         /**
-         * @description A milestone's effective date: its actual date if reached, else its pin, else its
+         * @description A milestone's effective date: its actual date if done, else its pin, else its
          *     derived due. What other constraints see when they reference it.
          */
         EffectiveDate: {
@@ -2061,7 +2061,7 @@ export interface components {
          *     their content ([`Mutation::event_type`]).
          * @enum {string}
          */
-        EventType: "journey_created" | "journey_edited" | "journey_status_changed" | "journey_deleted" | "route_created" | "route_edited" | "route_retired" | "route_unretired" | "draft_opened" | "route_version_imported" | "saved_as_route" | "draft_discarded" | "route_published" | "node_added" | "node_changed" | "weight_changed" | "node_removed" | "edge_changed" | "role_changed" | "participation_kind_changed" | "default_owner_changed" | "participation_changed" | "resource_changed" | "segment_inserted" | "node_transitioned" | "milestone_reached" | "answer_set" | "recorded_date_changed" | "role_fill_changed" | "date_pinned" | "date_shifted" | "date_unpinned" | "snooze_set" | "unsnoozed" | "override_applied" | "guard_bypassed" | "override_removed" | "atomic_changed" | "annotation_added" | "annotation_edited" | "annotation_removed" | "journey_upgraded" | "relinked" | "provenance_changed" | "local_edit_changed" | "identity_created" | "identity_edited" | "identities_merged" | "identity_deleted" | "proposal_created" | "proposal_edited" | "proposal_applied" | "proposal_discarded";
+        EventType: "journey_created" | "journey_edited" | "journey_status_changed" | "journey_deleted" | "route_created" | "route_edited" | "route_retired" | "route_unretired" | "draft_opened" | "route_version_imported" | "saved_as_route" | "draft_discarded" | "route_published" | "node_added" | "node_changed" | "weight_changed" | "node_removed" | "edge_changed" | "role_changed" | "participation_kind_changed" | "default_owner_changed" | "participation_changed" | "resource_changed" | "segment_inserted" | "node_transitioned" | "answer_set" | "recorded_date_changed" | "role_fill_changed" | "date_pinned" | "date_shifted" | "date_unpinned" | "snooze_set" | "unsnoozed" | "override_applied" | "guard_bypassed" | "override_removed" | "atomic_changed" | "annotation_added" | "annotation_edited" | "annotation_removed" | "journey_upgraded" | "relinked" | "provenance_changed" | "local_edit_changed" | "identity_created" | "identity_edited" | "identities_merged" | "identity_deleted" | "proposal_created" | "proposal_edited" | "proposal_applied" | "proposal_discarded";
         /**
          * @description A list of explanation entries with its total: complete inside
          *     the engine and the browser; a server response keeps the largest entries up to
@@ -3245,7 +3245,7 @@ export interface components {
         /** @description A node. */
         Node: {
             answer_type?: components["schemas"]["AnswerType"];
-            auto_reach?: boolean;
+            auto_done?: boolean;
             choices?: components["schemas"]["Choices"];
             closes?: boolean;
             closes_at?: components["schemas"]["NodeKey"];
@@ -3277,7 +3277,7 @@ export interface components {
         /** @description A node. */
         Node2: {
             answer_type?: components["schemas"]["AnswerType"];
-            auto_reach?: boolean;
+            auto_done?: boolean;
             choices?: components["schemas"]["Choices"];
             closes?: boolean;
             closes_at?: components["schemas"]["Path"];
@@ -3337,8 +3337,6 @@ export interface components {
         NodeDerived: {
             /** @description Relevant, not blocked, and non-terminal. */
             actionable: boolean;
-            /** @description A pending auto-reach milestone that reads as reached. */
-            auto_reached?: boolean;
             /**
              * @description What blocks it itself: its own explicit requirements, condition gates, and stage
              *     opening, and its children, each unsatisfied. What it inherits is listed once, on the
@@ -3359,11 +3357,13 @@ export interface components {
              *     and the flags beside it, which stay as they are.
              */
             display_state: components["schemas"]["DisplayState"];
+            /** @description A pending auto-done milestone that reads as done. */
+            done_by_date?: boolean;
             /** @description Skipped through an ancestor's skip. */
             effectively_skipped?: boolean;
             /**
              * @description The bypassable guards its completing transition (complete a deliverable or
-             *     action, answer an open decision, reach a pending milestone) would fail if attempted
+             *     action, answer an open decision, complete a pending milestone) would fail if attempted
              *     now with no bypass in the patch. Empty for every node with no such transition left:
              *     finished, not relevant, or a group.
              */
@@ -3492,7 +3492,7 @@ export interface components {
             still_waiting: components["schemas"]["StillWaiting"];
         };
         /** @description A node field, by name. */
-        NodeField: "id" | "parent" | "title" | "description" | "weight" | "relevant_when" | "due_by" | "not_before" | "estimate" | "placeholder" | "requires_artifact" | "requires_note" | "final" | "auto_reach" | "opens_at" | "closes_at" | "gates" | "closes" | "prompt" | "help" | "choices" | "fills_role" | "feeds_milestone";
+        NodeField: "id" | "parent" | "title" | "description" | "weight" | "relevant_when" | "due_by" | "not_before" | "estimate" | "placeholder" | "requires_artifact" | "requires_note" | "final" | "auto_done" | "opens_at" | "closes_at" | "gates" | "closes" | "prompt" | "help" | "choices" | "fills_role" | "feeds_milestone";
         /** @description A new value for one node field. */
         NodeFieldValueResolved: {
             id: components["schemas"]["Slug"];
@@ -3521,7 +3521,7 @@ export interface components {
         } | {
             final: boolean;
         } | {
-            auto_reach: boolean;
+            auto_done: boolean;
         } | {
             opens_at: components["schemas"]["NodeKey"] | null;
         } | {
@@ -3617,7 +3617,7 @@ export interface components {
             atomic?: boolean;
             /**
              * Format: date
-             * @description When the node finished: the actual date a milestone was reached, the day a
+             * @description When the node finished: the actual date a milestone was done, the day a
              *     decision was decided or work was done.
              */
             finished_on?: string | null;
@@ -3907,7 +3907,7 @@ export interface components {
             decisions_needed: number;
             /**
              * Format: uint32
-             * @description Items whose display state is `done` (finished, decided, reached, or auto-reached).
+             * @description Items whose display state is `done` (finished, decided, or done by its date).
              */
             done: number;
             /**
@@ -5144,7 +5144,7 @@ export interface components {
                 until: components["schemas"]["SnoozeTarget"];
             };
         } | {
-            auto_reach: {
+            auto_done: {
                 /**
                  * Format: date
                  * @description Its effective date.
@@ -5166,7 +5166,7 @@ export interface components {
          *     which values belong to which kind. A group has no performed state: it is `derived`
          *     unless explicitly `skipped`.
          */
-        State: "todo" | "active" | "done" | "skipped" | "open" | "decided" | "pending" | "reached" | "derived";
+        State: "todo" | "active" | "done" | "skipped" | "open" | "decided" | "pending" | "derived";
         /** @description The journey status summary for observers and reporting. */
         StatusSummary: {
             /**
@@ -5182,7 +5182,7 @@ export interface components {
             };
             /**
              * @description The journey has a node and none in scope is left open, or its final milestone
-             *     is reached (stored or auto-reached).
+             *     is done (stored or done by its date).
              */
             completion_suggested?: boolean;
             /** @description Open, in-scope decisions with their owners, in rank order. */
@@ -5198,7 +5198,7 @@ export interface components {
             shortfalls?: components["schemas"]["NodeKey"][];
             /** @description Stale nodes, by key. */
             stale?: components["schemas"]["NodeKey"][];
-            /** @description In-scope milestones not yet reached that have a date, earliest first. */
+            /** @description In-scope milestones not yet done that have a date, earliest first. */
             upcoming_milestones?: components["schemas"]["UpcomingMilestone"][];
         };
         /**
@@ -5317,7 +5317,7 @@ export interface components {
         };
         /**
          * @description A state-machine transition. Answering a decision is [`Mutation::Answer`]; the dates a
-         *     start or reach records default to today and are edited with
+         *     start or finish records default to today and are edited with
          *     [`Mutation::SetRecordedDate`].
          */
         Transition: "start" | "stop" | "complete" | {
@@ -5325,7 +5325,7 @@ export interface components {
                 /** @description Why. */
                 reason: components["schemas"]["Reason"];
             };
-        } | "reopen" | "reach";
+        } | "reopen";
         /** @description What one turn answers. */
         TurnReply: {
             /**
@@ -5341,7 +5341,7 @@ export interface components {
             reply?: components["schemas"]["Markdown"] | null;
         };
         /**
-         * @description Finished work newly undecided: a node completed, answered, or reached while
+         * @description Finished work newly undecided: a node completed or answered while
          *     a decision its relevance reads is unanswered, so it may not apply. A warning, never a
          *     rejection: the node stays undecided and is not forced into scope.
          */
@@ -5374,7 +5374,7 @@ export interface components {
         };
         /** @description Why a review item blocks resolving its proposal. */
         UnresolvedReason: "no_choice" | "not_offered" | "mixed_mapping" | "no_default_owner";
-        /** @description A milestone not yet reached and its effective date. */
+        /** @description A milestone not yet done and its effective date. */
         UpcomingMilestone: {
             /** @description Its effective date. */
             date: components["schemas"]["EffectiveDate"];

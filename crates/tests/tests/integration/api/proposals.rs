@@ -194,7 +194,7 @@ mod in_process {
                 assert_eq!(
                     stale,
                     ["n_kickoff"],
-                    "kickoff, reached, now waits on the charter"
+                    "kickoff, done, now waits on the charter"
                 );
             } else {
                 assert_eq!(review.consequences.len(), 0, "{id}");
