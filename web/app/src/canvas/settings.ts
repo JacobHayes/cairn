@@ -92,11 +92,11 @@ export function graphSearch(view: GraphView, search: string): string {
 }
 
 /**
- * A journey's graph showing `view` at `target` (a node, an edge, or neither): the view state and
+ * A journey's graph showing `view` at `target` (a node, or neither): the view state and
  * the graph's own settings rewritten in `search`, every other parameter kept, and `view=graph`
  * written only off its default (`journeyPath`). `search` is the query of the page the link is on;
  * links from anywhere else pass none.
  */
-export function graphPath(journey: string, view: GraphView, target: { node?: string | undefined; edge?: string | undefined; proposal?: string | undefined }, search: string): string {
+export function graphPath(journey: string, view: GraphView, target: { node?: string | undefined; proposal?: string | undefined }, search: string): string {
   return journeyPath({ journey, ...target }, "graph", graphSearch(view, search));
 }

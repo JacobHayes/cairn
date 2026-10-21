@@ -17,7 +17,7 @@ const graph = view.journey.graph.nodes ?? [];
 function model(level: Level, ranked = ["n_choose", "n_check"], mine: string[] = [], ready = view): CanvasModel {
   const ranking = { ...ready, derived: { ...ready.derived, acting_frontier: ranked } };
   const looks = journeyLooks(ranking, { mine, owned: mine });
-  return { cards: cardsOf(level, graph, looks), lines: linesOf(level, graph, (key) => looks.finished(key)) };
+  return { cards: cardsOf(level, graph, looks), lines: linesOf(level, graph, (edge) => looks.waiting(edge)) };
 }
 
 function card(model: CanvasModel, key: string): Card {
@@ -109,14 +109,15 @@ describe("a route's canvas (8.11)", () => {
 
 describe("C1: lines", () => {
   test.each([
-    ["n_option->n_build", "requires", undefined, "arrow", "Build it needs Optional extra"],
-    ["n_choose->n_option", "condition", DOTTED, "diamond", "Applies only depending on Approach"],
-    ["n_kick->n_stage", "stage_opening", DOTTED, "bar", "Build stage waits for Kickoff, where it opens"],
-  ])("the edge %s is a %s: dash %s, a %s marker, and it says %s", (id, kind, dash, marker, sentence) => {
+    ["n_option->n_build", "requires", undefined, "arrow", "n_option", "n_build"],
+    ["n_choose->n_option", "condition", DOTTED, "diamond", "n_choose", "n_option"],
+    ["n_kick->n_stage", "stage_opening", DOTTED, "bar", "n_kick", "n_stage"],
+  ])("the edge %s is a %s: dash %s, a %s marker, and its one edge has %s as its requirement and %s as its dependent", (id, kind, dash, marker, requirement, dependent) => {
     const line = whole.lines.find((each) => each.id === id);
     expect(line).toBeDefined();
     if (line !== undefined) {
-      expect([line.kind, lineLook(line).dash, lineLook(line).marker, line.sentence]).toEqual([kind, dash, marker, sentence]);
+      expect([line.kind, lineLook(line).dash, lineLook(line).marker]).toEqual([kind, dash, marker]);
+      expect(line.edges.map((each) => [each.requirement, each.dependent, each.kind])).toEqual([[requirement, dependent, kind]]);
     }
   });
 
@@ -133,7 +134,8 @@ describe("C1: lines", () => {
       // The decision is hidden and nothing drawn holds it.
       edge("n_choose", "n_option"),
     ];
-    expect(linesOf(level, graph).map((line) => [line.id, line.count])).toEqual([["n_option->n_build", 2]]);
+    // The line stands for the two edges that landed on it, each still between its own ends.
+    expect(linesOf(level, graph).map((line) => [line.id, line.edges.map((each) => [each.requirement, each.dependent])])).toEqual([["n_option->n_build", [["n_option", "n_build"], ["n_option", "n_check"]]]]);
   });
 
   test("a stand-in for a requirement and a condition is solid and says how many it stands for", () => {
@@ -153,6 +155,54 @@ describe("C1: lines", () => {
     const [line] = linesOf(level, graph);
     expect([line?.kind, line?.count]).toEqual(["requires", 2]);
     expect(line && lineLook(line).dash).toBeUndefined();
+    // The requirement is listed first, the condition after it.
+    expect(line?.edges.map((each) => each.kind)).toEqual(["requires", "condition"]);
+  });
+
+});
+
+describe("C1: what a line waits on and holds", () => {
+  test("an edge waits by the dependent's own unsatisfied gates, not by how its requirement looks", () => {
+    const waits = (ready: ReturnType<typeof canvasView>, id: string) => model(wholeLevel(), undefined, [], ready).lines.find((each) => each.id === id)?.edges.map((each) => each.waits);
+    // The fixture: Build is blocked by Optional extra (explicit), Optional extra by Approach (its condition).
+    expect([waits(view, "n_option->n_build"), waits(view, "n_choose->n_option"), waits(view, "n_kick->n_stage")]).toEqual([[true], [true], [false]]);
+    // The requirement is finished, but the engine still lists it as holding the dependent (a skipped container with kept work pending does this).
+    const kept = changed((each) => { derivedOf(each, "n_option").display_state = "done"; });
+    expect(waits(kept, "n_option->n_build")).toEqual([true]);
+    // The requirement is unfinished, but the engine no longer lists it (a not-relevant prerequisite stops gating).
+    const dropped = changed((each) => { derivedOf(each, "n_build").blocked_by = []; });
+    expect(waits(dropped, "n_option->n_build")).toEqual([false]);
+    // A condition waits only on a condition blocker of this dependent; the same decision blocking as an explicit requirement is another edge.
+    const other = changed((each) => { derivedOf(each, "n_option").blocked_by = [{ node: "n_choose", via: { condition: { condition_on: "n_build" } } }]; });
+    expect(waits(other, "n_choose->n_option")).toEqual([false]);
+    // A stage opening waits only on a blocker that names that stage.
+    const opening = changed((each) => { derivedOf(each, "n_stage").blocked_by = [{ node: "n_kick", via: { stage_opening: { group: "n_stage" } } }]; });
+    const elsewhere = changed((each) => { derivedOf(each, "n_stage").blocked_by = [{ node: "n_kick", via: { stage_opening: { group: "n_other" } } }]; });
+    expect([waits(opening, "n_kick->n_stage"), waits(elsewhere, "n_kick->n_stage")]).toEqual([[true], [false]]);
+  });
+
+  test("a link that holds dates only never waits, and the line is satisfied exactly when no edge waits", () => {
+    const level = wholeLevel();
+    level.edges = [{ from: "n_kick", to: "n_stage", gates: false, implicit: true, underlying: [{ requirement: "n_kick", dependent: "n_stage", origin: "stage_opening", gates: false }] }];
+    const open = changed((each) => { derivedOf(each, "n_kick").display_state = "ready"; derivedOf(each, "n_stage").blocked_by = [{ node: "n_kick", via: { stage_opening: { group: "n_stage" } } }]; });
+    const [dates] = model(level, undefined, [], open).lines;
+    expect([dates?.kind, dates?.edges.map((each) => each.waits), dates?.satisfied]).toEqual(["dates", [false], true]);
+    const [both] = model(wholeLevel(), undefined, [], view).lines.filter((each) => each.id === "n_option->n_build");
+    expect(both?.satisfied).toBe(false);
+  });
+
+  test("a route's lines carry no state", () => {
+    const [line] = linesOf(wholeLevel(), graph);
+    expect([line?.edges.map((each) => each.waits), line?.satisfied]).toEqual([[undefined], undefined]);
+  });
+
+  test("a requirement on a container holds what is inside it; one on a leaf holds nothing", () => {
+    const level = wholeLevel();
+    level.edges = [
+      { from: "n_kick", to: "n_stage", gates: true, underlying: [{ requirement: "n_kick", dependent: "n_stage", origin: "explicit", gates: true }] },
+      { from: "n_kick", to: "n_choose", gates: true, underlying: [{ requirement: "n_kick", dependent: "n_choose", origin: "explicit", gates: true }] },
+    ];
+    expect(linesOf(level, graph).map((line) => [line.id, line.edges[0]?.holds])).toEqual([["n_kick->n_stage", true], ["n_kick->n_choose", false]]);
   });
 
 });

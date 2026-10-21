@@ -72,7 +72,7 @@ interface Result {
 const NONE: ReadonlySet<string> = new Set();
 
 /** The body under the head: the view the address names, over the shown graph as derived. */
-function RouteBody({ derived, screen, selected, unanchored, onPick }: { derived: ReadView<Derived<Shown>>; screen: Screen; selected: string | undefined; unanchored: ReadonlySet<string>; onPick: ((key: string) => boolean) | undefined }) {
+function RouteBody({ derived, screen, selected, edge, unanchored, onPick }: { derived: ReadView<Derived<Shown>>; screen: Screen; selected: string | undefined; edge: string | undefined; unanchored: ReadonlySet<string>; onPick: ((key: string) => boolean) | undefined }) {
   const addresses = useNodeAddresses();
   const navigate = useNavigate();
   const frame = useFrameActions();
@@ -95,7 +95,7 @@ function RouteBody({ derived, screen, selected, unanchored, onPick }: { derived:
     case "timeline":
       return <RouteTimeline shown={shown} state={state} picks={picks} selected={selected} onOpen={onOpen} />;
     default:
-      return <RouteCanvas shown={shown} view={view} selected={selected} unanchored={unanchored} onPick={onPick} />;
+      return <RouteCanvas shown={shown} view={view} selected={selected} edge={edge} unanchored={unanchored} onPick={onPick} />;
   }
 }
 
@@ -138,16 +138,19 @@ function Workspace({ head, body, inspector, fills }: { head: ReactNode; body: Re
   );
 }
 
-/** The view the address names. */
+/** The view the address names: the Graph for a line, whatever `view=` says. */
 function useScreen() {
   const { search } = useLocation();
-  return { screen: routeScreenOf(new URLSearchParams(search)) };
+  const edge = useParams()["edge"];
+  return { screen: edge === undefined ? routeScreenOf(new URLSearchParams(search)) : "graph" as const };
 }
 
 interface FrameProps {
   shown: Shown;
   derived: ReadView<Derived<Shown>>;
   selected: string | undefined;
+  /** The line whose card is open, `<from>~<to>`, when no node is; the canvas draws it in the inspector. */
+  edge: string | undefined;
   write: ScreenWrite;
   result: Result | undefined;
   setResult: (result: Result | undefined) => void;
@@ -180,7 +183,7 @@ function DraftInspector({ authored, selected, card, close, inserting }: { author
 }
 
 /** A draft: the palette, the cards' forms, and the draft card in the inspector. */
-function DraftFrame({ shown, derived, authored, selected, write, result, setResult, imports }: FrameProps & { authored: Authored }) {
+function DraftFrame({ shown, derived, authored, selected, edge, write, result, setResult, imports }: FrameProps & { authored: Authored }) {
   const navigate = useNavigate();
   const { search } = useLocation();
   const { screen } = useScreen();
@@ -205,7 +208,9 @@ function DraftFrame({ shown, derived, authored, selected, write, result, setResu
   const discard = () => void write.run({ target, baseRevision: shown.route.revision, mutations: [{ op: "discard_draft" }] }, () => { void navigate(here(undefined)); });
   const card = <DraftCard route={id} violations={violations} notices={notices} hrefOf={hrefOf} write={write} blocked={blocked} titleOf={titleOf} onPublish={publish} onDiscard={discard} />;
   const close = here(undefined);
-  useEscapeTo(selected === undefined ? undefined : close);
+  // The line's card is the inspector's only while no node is open and no segment is being placed.
+  const line = selected === undefined && inserting.at === undefined ? edge : undefined;
+  useEscapeTo(selected === undefined && line === undefined ? undefined : close);
   const fills = screen === "graph" || inserting.preview !== undefined;
   const columned = wide || phone;
   const head = (
@@ -222,7 +227,7 @@ function DraftFrame({ shown, derived, authored, selected, write, result, setResu
   const body = (
     <>
       {inserting.preview === undefined ? (
-        <RouteBody derived={derived} screen={screen} selected={selected} unanchored={unanchored} onPick={drawing.pick} />
+        <RouteBody derived={derived} screen={screen} selected={selected} edge={line} unanchored={unanchored} onPick={drawing.pick} />
       ) : (
         <InsertionCanvas preview={inserting.preview} domain={id} />
       )}
@@ -231,13 +236,13 @@ function DraftFrame({ shown, derived, authored, selected, write, result, setResu
   );
   return (
     <ConnectContext value={drawing}>
-      <Workspace head={head} body={body} fills={fills} inspector={<DraftInspector authored={authored} selected={selected} card={columned ? card : undefined} close={close} inserting={inserting} />} />
+      <Workspace head={head} body={body} fills={fills} inspector={<DraftInspector authored={authored} selected={selected} card={columned && line === undefined ? card : undefined} close={close} inserting={inserting} />} />
     </ConnectContext>
   );
 }
 
 /** A published version: read only, with its card in the inspector, or the open node's read-only panel. */
-function VersionFrame({ shown, derived, selected, write, result, setResult, imports }: FrameProps) {
+function VersionFrame({ shown, derived, selected, edge, write, result, setResult, imports }: FrameProps) {
   const { screen } = useScreen();
   const id = shown.route.header.id;
   const read = useRouteRead(id);
@@ -249,7 +254,7 @@ function VersionFrame({ shown, derived, selected, write, result, setResult, impo
   const fills = screen === "graph";
   // The same address the canvas's background goes to: a bare address stays bare, a named version stays named.
   const close = useNodeAddresses().close();
-  useEscapeTo(selected === undefined ? undefined : close);
+  useEscapeTo(selected === undefined && edge === undefined ? undefined : close);
   const card = read === undefined ? null : <VersionCard read={read} version={version} />;
   const head = (
     <>
@@ -259,7 +264,7 @@ function VersionFrame({ shown, derived, selected, write, result, setResult, impo
   );
   const body = (
     <>
-      <RouteBody derived={derived} screen={screen} selected={selected} unanchored={NONE} onPick={undefined} />
+      <RouteBody derived={derived} screen={screen} selected={selected} edge={edge} unanchored={NONE} onPick={undefined} />
       {wide || phone || fills || selected !== undefined ? null : card}
     </>
   );
@@ -268,7 +273,7 @@ function VersionFrame({ shown, derived, selected, write, result, setResult, impo
       <Inspector focus={`${id}:${selected}`}>
         <RouteNodePanel tree={tree} authored={undefined} nodeKey={selected} close={close} onRemoved={() => undefined} />
       </Inspector>
-    ) : (wide || phone) && card !== null ? (
+    ) : edge === undefined && (wide || phone) && card !== null ? (
       <Inspector focus={`${id}:v${String(version)}`} reveal={false}>
         {card}
       </Inspector>
@@ -317,7 +322,7 @@ function LayerFrame({ shown, route, selected, imports, write }: { shown: Shown; 
   useEscapeTo(selected === undefined ? undefined : routePath(id, { screen, proposal: layer?.id }, search));
   const fills = screen === "graph";
   const derived = useRouteDerived(shown);
-  const body = <RouteBody derived={derived} screen={screen} selected={selected} unanchored={NONE} onPick={undefined} />;
+  const body = <RouteBody derived={derived} screen={screen} selected={selected} edge={undefined} unanchored={NONE} onPick={undefined} />;
   return (
     <div className="ws-fill journey-frame route-frame" data-testid="route-frame" data-screen={screen} data-layer={layer?.mode} data-exit={exit}>
       <div className="ws-head stack journey-head">{head}</div>
@@ -381,12 +386,13 @@ function LayerBody({ shown, route, selected, write, imports }: { shown: Shown | 
 }
 
 /** What the page is once the route is read: its frame, the keys and the view state every view shares. */
-function Loaded({ shown, selected, write, imports, result, setResult }: { shown: Shown; selected: string | undefined; write: ScreenWrite; imports: ImportFlow; result: Result | undefined; setResult: (result: Result | undefined) => void }) {
+function Loaded({ shown, selected, edge, write, imports, result, setResult }: { shown: Shown; selected: string | undefined; edge: string | undefined; write: ScreenWrite; imports: ImportFlow; result: Result | undefined; setResult: (result: Result | undefined) => void }) {
   const location = useLocation();
   const { pathname, search } = location;
   const navigate = useNavigate();
   const params = useMemo(() => new URLSearchParams(search), [search]);
   const id = shown.route.header.id;
+  const { screen } = useScreen();
   const draft = shown.of === "draft";
   const viewState = useMemo(() => viewStateFrom(params, ROUTE_OFFERS), [params]);
   const value = useViewStateValue(viewState);
@@ -403,7 +409,7 @@ function Loaded({ shown, selected, write, imports, result, setResult }: { shown:
     }
   }, [dirty, navigate, clean, pathname]);
   useViewKeys({
-    screen: routeScreenOf(params),
+    screen,
     selected,
     sheetOpen,
     setSheetOpen,
@@ -414,7 +420,7 @@ function Loaded({ shown, selected, write, imports, result, setResult }: { shown:
     walk: false,
     viewAddress: (to) => routeSwitched(id, search, to, selected),
   });
-  const frame = { selected, derived, write, result, setResult, imports };
+  const frame = { selected, edge, derived, write, result, setResult, imports };
   const authored = useAuthored(shown);
   return (
     <ViewStateContext value={value}>
@@ -478,7 +484,7 @@ function RouteContent({ result: kept, setResult }: { result: Result | undefined;
   } else if ("empty" in found) {
     body = <EmptyRoute route={found.empty} write={write} imports={imports} />;
   } else {
-    body = <Loaded shown={found.shown} selected={at.key} write={write} imports={imports} result={result} setResult={setResult} />;
+    body = <Loaded shown={found.shown} selected={at.key} edge={at.edge} write={write} imports={imports} result={result} setResult={setResult} />;
   }
   return (
     <>

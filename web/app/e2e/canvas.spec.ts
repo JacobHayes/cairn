@@ -8,7 +8,7 @@ import { expect, test } from "./test.ts";
 import { expectContained } from "./containment.ts";
 import { expectTitleLinesAsLaidOut, lineBetween, pointOn, publishLongTitleRoute, viewportOf, viewportSettled, zoomToReading } from "./canvas.ts";
 import { journeyName, startJourney } from "./around.ts";
-import { nodeCard, nodePanel, openJourney, setDepth, setFade } from "./shell.ts";
+import { nodeCard, nodePanel, openJourney, setDepth, setFade, visit } from "./shell.ts";
 
 test("C2 to C7: the graph opens fitted at every depth, expands in place, traces a selection, follows an edge, and pans and zooms", async ({ page }) => {
   await openJourney(page, "browser", "j_vendor_eval", "");
@@ -324,4 +324,35 @@ test("a card's content stays inside its box whatever its title's length, on a ro
   await zoomToReading(page);
   await expectContained(page);
   await expectTitleLinesAsLaidOut(page);
+});
+
+test("C1, C2: a line between folded stages opens the links it stands for, and each end is a link", async ({ page }) => {
+  await visit(page, "browser", "/journeys/j_vendor_eval/edges/n_setup~n_testing?depth=stages");
+  await expect(page.getByTestId("edge-missing")).toHaveCount(0);
+  const card = page.getByTestId("edge-card");
+  await expect(card).toBeVisible();
+  const row = card.locator('[data-requirement="n_plan"][data-dependent="n_comparison_set"]');
+  await expect(row).toHaveAttribute("data-waits", /^(true|false)$/);
+  await expect(lineBetween(page, "n_setup", "n_testing")).toHaveClass(/line-selected/);
+  await row.getByRole("link", { name: "Comparison set" }).click();
+  await expect(nodePanel(page, "n_comparison_set")).toBeVisible();
+});
+
+test("C1, C2: a line is selectable only where the view's own level draws it, and an edge address is always the Graph", async ({ page }) => {
+  // Test plan is open at Stages, so its stage is opened for it: the lines inside that stage are drawn only for the selection, and open no card.
+  const selectable = (key: string, other: string) => lineBetween(page, key, other).locator("xpath=ancestor::*[contains(@class,'react-flow__edge')][1]");
+  await visit(page, "browser", "/journeys/j_vendor_eval/nodes/n_plan?depth=stages");
+  await expect(nodeCard(page, "n_plan")).toBeVisible();
+  await expect(selectable("n_access", "n_plan")).not.toHaveClass(/\bselectable\b/);
+  // With nothing selected the stages' own line is the view's, and opens one.
+  await visit(page, "browser", "/journeys/j_vendor_eval?depth=stages&view=graph");
+  await expect(selectable("n_setup", "n_testing")).toHaveClass(/\bselectable\b/);
+  // A line address on the List's query is the Graph, with its card; a depth that folds its ends says the view draws no line, and both ends stay one click away.
+  await visit(page, "browser", "/journeys/j_vendor_eval/edges/n_access~n_plan?view=list");
+  await expect(page.getByTestId("edge-card")).toBeVisible();
+  await expect(page.getByTestId("journey-frame")).toHaveAttribute("data-screen", "graph");
+  await setDepth(page, "Stages");
+  await expect(page.getByTestId("edge-missing")).toBeVisible();
+  await expect(page.getByRole("link", { name: "Go to Environment access" })).toBeVisible();
+  await expect(page.getByRole("link", { name: "Go to Test plan" })).toBeVisible();
 });

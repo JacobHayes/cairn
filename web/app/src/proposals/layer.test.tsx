@@ -5,7 +5,7 @@ import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
 
 import type { Graph } from "../authoring/graph.ts";
-import type { Card, Line } from "../canvas/model.ts";
+import { lineOf, type Card, type Line } from "../canvas/model.ts";
 import type { Deployment } from "../data/host.ts";
 import { applyRevision, identityDiff, LayerContext, layerMarks, useReviewing, withRemoved, withRemovedRows, type Layer } from "./layer.ts";
 
@@ -38,7 +38,7 @@ describe("layerMarks (C14)", () => {
 });
 
 const card = (key: string, parent?: string, rolledUp: string[] = []): Card => ({ key, kind: "action", title: key, parent, stage: false, collapsed: rolledUp.length > 0, checklist: [], rolledUp, hiddenPrerequisites: [], journey: undefined });
-const line = (from: string, to: string): Line => ({ id: `${from}->${to}`, from, to, implicit: false, gates: true, kind: "requires", count: 1, sentence: "" });
+const line = (from: string, to: string): Line => lineOf(`${from}->${to}`, from, to, [{ requirement: from, dependent: to, kind: "requires", holds: false, sentence: "" }]);
 
 describe("withRemoved (C14)", () => {
   const was = { cards: [card("n_a"), card("n_b", "n_a"), card("n_c")], lines: [line("n_b", "n_c")] };

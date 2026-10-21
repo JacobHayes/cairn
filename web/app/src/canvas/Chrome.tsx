@@ -8,7 +8,9 @@ import { Menu } from "../screens/Menu.tsx";
 import { Segmented } from "../ui/kit.tsx";
 import { STEP_WORDS } from "./ladder.ts";
 import { LENS_MEANING, LENS_WORDS } from "./lens.ts";
-import { LENSES, type Lens, type Step } from "./model.ts";
+import { LineSample } from "./LineSample.tsx";
+import { LENSES, LINE_KINDS, type Lens, type Step } from "./model.ts";
+import { LINE_KIND_WORDS } from "./words.ts";
 import { plural } from "../ui/words.ts";
 
 /** C2: a route's Depth (Stages, Decisions, Deliverables, Actions: coarse to fine, as keys 1 to 4). A journey's is the Depth menu of its view controls. */
@@ -22,23 +24,12 @@ export function Ladder({ steps, step, onStep }: { steps: readonly Step[]; step: 
 
 /** The four kinds of line, drawn as the canvas draws them, for View, Key. */
 function Key() {
-  const samples = [
-    { marker: "arrow", dash: undefined, words: "Needs: the line ends in an arrow." },
-    { marker: "diamond", dash: "2 3", words: "Applies only if: the line ends in a hollow diamond." },
-    { marker: "bar", dash: "2 3", words: "Waits for the stage to open: the line ends in a bar." },
-    { marker: "none", dash: "2 3", words: "Dates only: a faint dotted line that does not block." },
-  ] as const;
   return (
     <ul className="canvas-key" data-testid="canvas-key">
-      {samples.map((sample) => (
-        <li key={sample.marker}>
-          <svg width="44" height="14" viewBox="0 0 44 14" aria-hidden="true">
-            <path d={sample.marker === "none" ? "M2 7 H42" : "M2 7 H32"} stroke="currentColor" fill="none" strokeDasharray={sample.dash} />
-            {sample.marker === "arrow" ? <path d="M42 7 L33 2.500 L33 11.500 Z" fill="currentColor" /> : null}
-            {sample.marker === "diamond" ? <path d="M42 7 L37.500 2.500 L33 7 L37.500 11.500 Z" fill="var(--color-surface)" stroke="currentColor" /> : null}
-            {sample.marker === "bar" ? <path d="M40 2 V12" stroke="currentColor" strokeWidth="2" /> : null}
-          </svg>
-          <span>{sample.words}</span>
+      {LINE_KINDS.map((kind) => (
+        <li key={kind}>
+          <LineSample kind={kind} />
+          <span>{`${LINE_KIND_WORDS[kind].label}: ${LINE_KIND_WORDS[kind].key}`}</span>
         </li>
       ))}
     </ul>

@@ -9,6 +9,7 @@ import {
   DEFAULT_FILTERS,
   SCREENS,
   defaultScreen,
+  edgeAddress,
   filterParams,
   filtersFrom,
   indexPath,
@@ -98,13 +99,19 @@ describe("a journey's address", () => {
   });
 
   it("reads the view back from the query it was written to, whatever order the query is in", () => {
-    for (const target of [JOURNEY, NODE, EDGE]) {
+    for (const target of [JOURNEY, NODE]) {
       for (const screen of SCREENS) {
         const search = journeyPath(target, screen, "?depth=stages&q=x").split("?")[1] ?? "";
         expect(screenOf(target, new URLSearchParams(search))).toBe(screen);
       }
     }
     expect(screenOf(NODE, new URLSearchParams("view=bogus"))).toBe("graph");
+  });
+
+  it("shows a drawn line on the Graph, whatever view the query names", () => {
+    for (const screen of SCREENS) {
+      expect(screenOf(EDGE, new URLSearchParams(`view=${screen}`))).toBe("graph");
+    }
   });
 
   it("gives the index, the new-journey form and the walkthrough addresses the router names", () => {
@@ -157,6 +164,25 @@ describe("opening and closing a node keeps the view", () => {
     ["the deployment's has no nodes", page("deploymentProposals"), "n_x", "/identities/proposals"],
   ])("a node from open proposals: %s", (_, at, key, expected) => {
     expect(nodeAddress(at, "", key)).toBe(expected);
+  });
+});
+
+describe("opening a drawn line", () => {
+  it.each([
+    ["from a journey's List, on the Graph with the settings kept and no node", page("journeyNode", { ...J, key: "n_x" }), "?view=list&depth=stages", "/journeys/j_a/edges/n_x~n_y?depth=stages"],
+    ["from the bare journey", page("journey", J), "?view=summary", "/journeys/j_a/edges/n_x~n_y"],
+    ["from another line", page("journeyEdge", { ...J, edge: "n_a~n_b" }), "?lens=gravity", "/journeys/j_a/edges/n_x~n_y?lens=gravity"],
+    ["from a route's List, keeping the version", page("routeNode", { route: "r", key: "n_a" }), "?version=2&view=list&depth=stages", "/routes/r/edges/n_x~n_y?version=2&depth=stages"],
+    ["from a route's draft", page("route", { route: "r" }), "?q=a", "/routes/r/edges/n_x~n_y?q=a"],
+  ])("writes the line's address %s", (_, at, search, expected) => {
+    expect(edgeAddress(at, search, "n_x", "n_y")).toBe(expected);
+  });
+
+  it("closes into a node or the bare route, keeping the version", () => {
+    const at = page("routeEdge", { route: "r", edge: "n_x~n_y" });
+    expect(nodeAddress(at, "?version=2&view=list", "n_x")).toBe("/routes/r/nodes/n_x?version=2");
+    expect(nodeAddress(at, "?version=2", undefined)).toBe("/routes/r?version=2");
+    expect(nodeAddress(at, "", undefined)).toBe("/routes/r");
   });
 });
 

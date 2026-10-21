@@ -18,7 +18,6 @@ import { useSelection, type Selection } from "../canvas/selection.ts";
 import { graphViewFrom, type GraphView } from "../canvas/settings.ts";
 import { useJourney } from "../data/react.ts";
 import type { Ready } from "../detail/model.ts";
-import { EdgeCard } from "../detail/EdgeCard.tsx";
 import { NodeDetailPanel } from "../detail/NodeDetail.tsx";
 import { SelectionPanel } from "../detail/SelectionPanel.tsx";
 import { indexPath, useNodeAddresses, type Screen } from "../journeys/address.ts";
@@ -48,7 +47,7 @@ export interface FrameProps {
   screen: Screen;
   /** The node whose detail is open. */
   selected: string | undefined;
-  /** The link whose card is open, `<from>~<to>`, when no node is. */
+  /** The line whose card is open, `<from>~<to>`, when no node is; the canvas draws its card in the inspector. */
   edge?: string | undefined;
   /** The proposal whose layer is on (C14). */
   proposal?: string | undefined;
@@ -91,7 +90,6 @@ function InspectorSlot({
   ready,
   screen,
   selected,
-  edge,
   structure,
   card,
   inserting,
@@ -102,7 +100,6 @@ function InspectorSlot({
   ready: Ready;
   screen: Screen;
   selected: string | undefined;
-  edge: string | undefined;
   /** The walk's current card: its own panel is the node's editor, so the address naming it opens nothing beside it. */
   walkCard: string | undefined;
   structure: ReactNode;
@@ -129,13 +126,6 @@ function InspectorSlot({
     return (
       <Inspector focus={`${journey}:selection`}>
         <SelectionPanel ready={ready} selection={selection} authored={authored} />
-      </Inspector>
-    );
-  }
-  if (selected === undefined && edge !== undefined) {
-    return (
-      <Inspector focus={`${journey}:${edge}`}>
-        <EdgeCard view={ready} edge={edge} />
       </Inspector>
     );
   }
@@ -203,6 +193,8 @@ function ReadyFrame({ ready, screen, selected, edge }: { ready: Ready } & Omit<F
   // The set is the frame's, so it survives a switch between the graph and the list; each opens a node on its own screen.
   const selection = useSelection(selected, (node) => void navigate(node === undefined ? addresses.close() : addresses.open(node)));
   const inserting = useInserting(`journey:${journey}`);
+  // The line's card is the inspector's only when nothing else is: no node, no stepper, no layer's rail.
+  const line = selected === undefined && inserting.at === undefined && !reviewing && selection.members.length < 2 ? edge : undefined;
   const [sheetOpen, setSheetOpen] = useState(false);
   useJourneyKeys({ screen, selected: reviewing ? undefined : selected, sheetOpen, setSheetOpen, state: view.state, steps, onState });
   const node = authored === undefined || selected === undefined ? undefined : authored.tree.byKey.get(selected);
@@ -226,13 +218,13 @@ function ReadyFrame({ ready, screen, selected, edge }: { ready: Ready } & Omit<F
           {planned ? <CanvasBars ready={ready} view={view} authored={authored} drawing={drawing} /> : null}
         </div>
         <div className={fills ? "ws-canvas journey-body" : "journey-body journey-scroll stack"}>
-          <Workspace ready={ready} view={view} screen={screen} selected={selected} edge={edge} authored={authored} drawing={drawing} selection={selection} preview={inserting.preview} onCard={setWalkCard} />
+          <Workspace ready={ready} view={view} screen={screen} selected={selected} edge={line} authored={authored} drawing={drawing} selection={selection} preview={inserting.preview} onCard={setWalkCard} />
           {card === "inline" ? <JourneyCard ready={ready} selected={selected} /> : null}
         </div>
         {sheetOpen ? <KeySheet onClose={() => { setSheetOpen(false); }} /> : null}
       </div>
       {/* After the head: a node opened from the assistant brings its detail forward last. */}
-      <InspectorSlot ready={ready} screen={screen} selected={selected} edge={edge} structure={structure} card={card === "column"} inserting={inserting} selection={selection} authored={authored} walkCard={walkCard} />
+      <InspectorSlot ready={ready} screen={screen} selected={selected} structure={structure} card={card === "column"} inserting={inserting} selection={selection} authored={authored} walkCard={walkCard} />
       </InsertEntryContext>
     </ConnectContext>
     </ViewStateContext>

@@ -39,3 +39,5 @@ records that do not exist); selection kept in component state (breaks links and 
 What would change it: routes gaining state of their own (a rehearsal), which would make the
 Signals lens meaningful there; or a set action on a route's nodes, which would make
 multi-select worth having.
+
+Superseded in part: edge selection and the edge card are done (`2026-10-21-a-drawn-line-opens-the-links-it-stands-for.md`). A route's lines are selectable and open the one card a journey's lines open.

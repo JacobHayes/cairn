@@ -10,7 +10,7 @@ import type { Schema } from "@cairn/client";
 import { createContext, useContext } from "react";
 
 import type { Edge, Graph } from "../authoring/graph.ts";
-import type { CanvasModel, Card, Line } from "../canvas/model.ts";
+import { lineOf, type CanvasModel, type Card, type Line } from "../canvas/model.ts";
 import { standsFor } from "../canvas/overlay.ts";
 import type { Deployment } from "../data/host.ts";
 import type { Domain, ProposalReview } from "../data/proposals.ts";
@@ -201,7 +201,8 @@ export function withRemoved(after: CanvasModel, before: CanvasModel | undefined,
     }
     const id = `${from}->${to}`;
     if (!lines.has(id)) {
-      lines.set(id, { id, from, to, implicit: false, gates: true, kind: "requires", count: 1, sentence: "No longer required" });
+      // Lines are not selectable under a layer, so nothing reads the edge's own words.
+      lines.set(id, lineOf(id, from, to, [{ requirement: edge.requires, dependent: edge.node, kind: "requires", holds: false, sentence: "No longer required" }]));
     }
     removedLines.add(id);
   }

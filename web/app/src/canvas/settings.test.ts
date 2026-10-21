@@ -18,7 +18,6 @@ describe("a journey graph's address", () => {
     expect(onNode.startsWith("/journeys/j_a/nodes/n_x?")).toBe(true);
     expect(query(onNode).has("view")).toBe(false);
     expect(screenOf({ journey: "j_a", node: "n_x" }, query(onNode))).toBe("graph");
-    expect(graphPath("j_a", DEFAULT_GRAPH_VIEW, { edge: "n_a~n_b" }, "")).toBe("/journeys/j_a/edges/n_a~n_b");
   });
 
   it("rewrites the graph's settings in the query it is given and keeps every other parameter, the other views' own settings included", () => {

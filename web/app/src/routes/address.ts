@@ -7,6 +7,7 @@
 //   /routes/<id>?version=<n>          published version n
 //   /routes/<id>/nodes/<key>          a node of the draft (its form) or of the route as it stands
 //   /routes/<id>/nodes/<key>?version=<n>   a node of published version n (read only)
+//   /routes/<id>/edges/<from>~<to>[?version=<n>]   the line the graph shown draws between those two cards (always the Graph)
 //   /routes/<id>?view=list|timeline   the view (the Graph when none; written only off the default)
 //   /routes/<id>/proposals/<pid>[/nodes/<key>]   the route with a proposal's layer on (C14); it reads no `version`
 //
@@ -38,6 +39,8 @@ export const ROUTE_SCREENS: readonly Screen[] = ["graph", "list", "timeline"];
 export interface RouteSpot {
   version?: number | undefined;
   node?: string | undefined;
+  /** A drawn line, as `<from>~<to>`; a node wins over it. */
+  edge?: string | undefined;
   screen?: Screen | undefined;
   proposal?: string | undefined;
 }
@@ -64,7 +67,8 @@ export function spotOf(params: URLSearchParams): { version: number | undefined; 
  * Route `route`'s page at `spot`, keeping `search`'s other parameters (the view state, the
  * graph's settings) in their order. `version` and `view` are written from `spot`, never kept
  * from `search`: a version when one is named, the view only off the Graph. A node is written
- * whatever the version: the address names the node of the graph the page shows.
+ * whatever the version: the address names the node of the graph the page shows. A line is written
+ * the same way, when no node is.
  */
 export function routePath(route: string, spot: RouteSpot = {}, search = ""): string {
   const kept = new URLSearchParams(search);
@@ -88,7 +92,7 @@ export function routePath(route: string, spot: RouteSpot = {}, search = ""): str
     const text = params.toString();
     return `${path}${text === "" ? "" : `?${text}`}`;
   }
-  const path = spot.node === undefined ? pathTo("route", { route }) : pathTo("routeNode", { route, key: spot.node });
+  const path = spot.node !== undefined ? pathTo("routeNode", { route, key: spot.node }) : spot.edge !== undefined ? pathTo("routeEdge", { route, edge: spot.edge }) : pathTo("route", { route });
   return `${path}${query === "" ? "" : `?${query}`}`;
 }
 

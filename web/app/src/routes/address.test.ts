@@ -25,6 +25,13 @@ describe("a route's address", () => {
     expect(routePath("r", { node: "n_x", version: 2 })).toBe("/routes/r/nodes/n_x?version=2");
   });
 
+  it("puts a drawn line in the path, keeps the version, lets a node win, and writes none under a proposal", () => {
+    expect(routePath("r", { edge: "n_a~n_b" })).toBe("/routes/r/edges/n_a~n_b");
+    expect(routePath("r", { edge: "n_a~n_b", version: 2 }, "?depth=stages")).toBe("/routes/r/edges/n_a~n_b?version=2&depth=stages");
+    expect(routePath("r", { edge: "n_a~n_b", node: "n_x" })).toBe("/routes/r/nodes/n_x");
+    expect(routePath("r", { edge: "n_a~n_b", proposal: "p_1" })).toBe("/routes/r/proposals/p_1");
+  });
+
   it("takes the version and the view from the spot, never from the query it keeps", () => {
     const path = routePath("r", { version: 2 }, "?version=1&view=list&depth=stages&q=a&open=n_s");
     expect(query(path).getAll("version")).toEqual(["2"]);

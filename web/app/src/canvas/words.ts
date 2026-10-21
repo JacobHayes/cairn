@@ -5,7 +5,7 @@ import { conditionWords, decisionOf, decisionsIn, type ConditionNames } from "..
 import type { GraphNode, NodeKind } from "../detail/model.ts";
 import { dateWords, daysUntil, daysWords, dueWords, isSoon, NEAR_DAYS, SOON_DAYS } from "../status/when.ts";
 import type { DisplayState } from "../status/words.ts";
-import type { Tone } from "./model.ts";
+import type { Line, LineKind, LineLink, Tone } from "./model.ts";
 
 /** What a card's foot knows about its node. */
 export interface FootFacts {
@@ -72,4 +72,48 @@ export function dependsWords(node: GraphNode, names: ConditionNames): string | u
 export function firstParagraph(markdown: string): string {
   const first = markdown.trim().split(/\n\s*\n/)[0] ?? "";
   return first.replace(/[*_`#>]|\[([^\]]*)\]\([^)]*\)/g, (_, text: string | undefined) => text ?? "").replace(/\s+/g, " ").trim();
+}
+
+/** What each kind of line is called, and how the Key says to tell it apart: one table, for the Key and for a line's card. */
+export const LINE_KIND_WORDS: Record<LineKind, { label: string; key: string }> = {
+  requires: { label: "Needs", key: "the line ends in an arrow." },
+  condition: { label: "Applies only if", key: "the line ends in a hollow diamond." },
+  stage_opening: { label: "Waits for the stage to open", key: "the line ends in a bar." },
+  dates: { label: "Dates only", key: "a faint dotted line that does not block." },
+};
+
+/**
+ * C1: what one edge says, in words: why the dependent waits on the requirement, or for a link that
+ * holds dates only, that it does not. The ends are whatever the caller passes (plain titles for a
+ * hover, links for a card), so the two say the same thing.
+ */
+export function edgeSentence<T>(edge: Pick<LineLink, "kind" | "holds">, dependent: T, requirement: T): (T | string)[] {
+  switch (edge.kind) {
+    case "requires":
+      return edge.holds ? [dependent, " needs ", requirement, ", and so does everything inside it"] : [dependent, " needs ", requirement];
+    case "condition":
+      return [dependent, " applies only depending on ", requirement, ", and waits for it"];
+    case "stage_opening":
+      return [dependent, " opens at ", requirement, "; it and everything inside it wait for that"];
+    case "dates":
+      return [dependent, " takes its dates from ", requirement, ", where it opens; nothing waits on it"];
+  }
+}
+
+/** The edge's sentence as one string, for a hover. */
+export function edgeWords(edge: Pick<LineLink, "kind" | "holds">, dependent: string, requirement: string): string {
+  return edgeSentence(edge, dependent, requirement).join("");
+}
+
+/** Whether a line still holds anything back, in words; none for a line that holds dates only, or where there is no state. */
+export function lineWaitWords(line: Pick<Line, "kind" | "satisfied">): string | undefined {
+  return line.kind === "dates" || line.satisfied === undefined ? undefined : line.satisfied ? "holds nothing back now" : "still waiting";
+}
+
+/** Whether an edge still holds its dependent back, in words; none for a link that holds dates only, or where there is no state. */
+export function waitWords(edge: Pick<LineLink, "kind" | "waits">): string | undefined {
+  if (edge.kind === "dates" || edge.waits === undefined) {
+    return undefined;
+  }
+  return edge.waits ? "still waiting" : "holds nothing back now";
 }

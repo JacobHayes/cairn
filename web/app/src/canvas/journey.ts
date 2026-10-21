@@ -3,6 +3,8 @@
 // container's progress and roll-up badge, what a conditional node depends on, the "I am here"
 // marks, the rank order, and the numbers the Signals lens shows. All read from the document and
 // its local derive; the words are words.ts's.
+import type { Schema } from "@cairn/client";
+
 import { conditionNames } from "../authoring/condition.ts";
 import { type GraphNode, isStage, type NodeDerived, nodeOf, rankPlaces, type Ready, titleOf } from "../detail/model.ts";
 import { answerText, identityName, ownersOf, ownerWords, UNASSIGNED, YOU } from "../detail/sections.tsx";
@@ -176,5 +178,18 @@ export function journeyLooks(view: Ready, extras: JourneyExtras): Looks {
       const node = nodeOf(view, key);
       return node !== undefined && isFinished(stateOf(view, node));
     },
+    waiting: (edge) => (view.derived.nodes[edge.dependent]?.blocked_by ?? []).some((blocker) => blocker.node === edge.requirement && holdsEdge(blocker.via, edge)),
   };
+}
+
+/** Whether a blocker's origin is the edge's own: an explicit requirement, the dependent's condition, or the stage's opening. */
+function holdsEdge(via: Schema<"Blocker">["via"], edge: Schema<"UnderlyingEdge">): boolean {
+  switch (edge.origin) {
+    case "explicit":
+      return via === "explicit";
+    case "condition":
+      return typeof via === "object" && "condition" in via && via.condition.condition_on === edge.dependent;
+    case "stage_opening":
+      return typeof via === "object" && "stage_opening" in via && via.stage_opening.group === edge.dependent;
+  }
 }

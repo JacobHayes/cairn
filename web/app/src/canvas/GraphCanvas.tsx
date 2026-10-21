@@ -28,6 +28,7 @@ import { STEPS, type CanvasModel, type Line, type Lens, type Step } from "./mode
 import { CardActionsContext, NodeCard, type CardActions, type CardNode } from "./NodeCard.tsx";
 import type { CanvasOverlay } from "./overlay.ts";
 import { firstFitCards } from "./refit.ts";
+import { lineWaitWords } from "./words.ts";
 
 import { nodeTitle } from "../ui/gone.ts";
 
@@ -167,6 +168,9 @@ function edgesOf({ model, layout, overlay, faded, selectedEdge }: GraphCanvasPro
       faded: line.kind !== "condition" && faded?.has(line.from) === true && faded.has(line.to),
     },
     selected: line.id === selectedEdge,
+    // A line the view's own level does not draw (a selection's or Reveal's) keeps its hover and opens no card.
+    selectable: line.selectable,
+    focusable: line.selectable,
   }));
 }
 
@@ -412,7 +416,7 @@ function useZoomVariable(root: RefObject<HTMLDivElement | null>): void {
 }
 
 /** What xyflow tells us was picked: the lasso's cards, added to the selection as the box moves, or the edge chosen by click or key. */
-function useChanges({ selection, model, selectedEdge, onEdge, onBackground }: GraphCanvasProps) {
+function useChanges({ selection, model, onEdge, onBackground }: GraphCanvasProps) {
   // A box adds to what was selected when it began; the cards it passes over come and go.
   const lassoing = useRef(false);
   const before = useRef<readonly string[]>([]);
@@ -450,7 +454,7 @@ function useChanges({ selection, model, selectedEdge, onEdge, onBackground }: Gr
       }
       for (const change of changes) {
         const line = change.type === "select" && change.selected ? model.lines.find((each) => each.id === change.id) : undefined;
-        if (line !== undefined && line.id !== selectedEdge) {
+        if (line?.selectable === true) {
           onEdge?.(line);
         }
       }
@@ -493,12 +497,19 @@ const INPUT = {
   edgesFocusable: true,
 } as const;
 
-/** What hovering a line says (5.7): its sentence, and whether it still waits. */
+/** The cards at the ends of the line being hovered and of the one selected: both are drawn in ink, so the card beside says which two it describes. */
+function useEdgeEnds(model: CanvasModel, selectedEdge: string | undefined, hover: Line | undefined): ReadonlySet<string> {
+  const open = useMemo(() => model.lines.find((line) => line.id === selectedEdge), [model, selectedEdge]);
+  return useMemo(() => new Set([hover, open].flatMap((line) => (line === undefined ? [] : [line.from, line.to]))), [hover, open]);
+}
+
+/** What hovering a line says (5.7): its sentence, and where the journey's state is known, whether it still holds anything back. */
 function EdgeChip({ chip, line }: { chip: RefObject<HTMLDivElement | null>; line: Line }) {
+  const state = lineWaitWords(line);
   return (
     <div ref={chip} className="edge-hover" role="status" data-testid="edge-hover">
       {line.sentence}
-      {line.kind === "dates" || line.satisfied === undefined ? "" : ` \u00b7 ${line.satisfied ? "done" : "still waiting"}`}
+      {state === undefined ? "" : ` \u00b7 ${state}`}
     </div>
   );
 }
@@ -550,7 +561,7 @@ function Flow(props: GraphCanvasProps) {
   const theme = useResolvedTheme();
   const root = useRef<HTMLDivElement>(null);
   const { chip, hover, move, enter, leave } = useEdgeHover(root);
-  const edgeEnds = useMemo(() => new Set(hover === undefined ? [] : [hover.from, hover.to]), [hover]);
+  const edgeEnds = useEdgeEnds(props.model, props.selectedEdge, hover);
   const nodes = useMemo(() => nodesOf(withEmphasis(props), edgeEnds), [props, edgeEnds]);
   const edges = useMemo(() => edgesOf(withEmphasis(props)), [props]);
   const { menu, menus, openMenu, closeMenu } = useNodeMenu(props);
@@ -588,6 +599,12 @@ function Flow(props: GraphCanvasProps) {
             if (menus !== undefined) {
               event.preventDefault();
               openMenu(node.id, { x: event.clientX, y: event.clientY });
+            }
+          }}
+          // A click on the line that is already selected changes no selection, so only the click can bring its card back.
+          onEdgeClick={(_, edge) => {
+            if (edge.data?.line.selectable === true) {
+              props.onEdge?.(edge.data.line);
             }
           }}
           onEdgeMouseEnter={(event, edge) => { enter(event, edge.data?.line); }}

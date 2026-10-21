@@ -30,7 +30,7 @@ export interface ProjectionProps {
   selection: Selection;
   screen: Exclude<Screen, "summary">;
   selected: string | undefined;
-  /** The edge whose card is open, as `<from>~<to>`. */
+  /** The line whose card is open, as `<from>~<to>`; the canvas draws it in the inspector. */
   edge: string | undefined;
   /** In edit mode, the journey's structure as authored, and the edge being drawn (5.6). */
   authored: Authored | undefined;

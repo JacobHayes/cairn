@@ -26,6 +26,7 @@ import { GraphCanvas } from "./GraphCanvas.tsx";
 import { changedKeys, outsideOf, useCanvasGraph, useRevealed, type Side } from "./graph.ts";
 import { Panel } from "@xyflow/react";
 import { ancestorsOf, withExpanded } from "./ladder.ts";
+import { LineInspector, useLineOpening } from "./LineCard.tsx";
 import { cardsOf, linesOf, type Level } from "./model.ts";
 import type { CardActions } from "./NodeCard.tsx";
 import { refitKey } from "./refit.ts";
@@ -35,6 +36,8 @@ export interface RouteCanvasProps {
   shown: Derived<Shown>;
   view: GraphView;
   selected: string | undefined;
+  /** The line whose card is open, as `<from>~<to>`; the canvas draws it in the inspector. */
+  edge: string | undefined;
   /** The nodes with no path to the final milestone (A20): their cards say so. */
   unanchored: ReadonlySet<string>;
   /** A card picked while an edge is drawn ends the edge instead of opening (5.6); true when it took the pick. */
@@ -58,7 +61,7 @@ function routeSide(shown: Derived<Shown>, tree: Tree, unanchored: ReadonlySet<st
 }
 
 /** What the canvas draws: the shared graph hook over the route's side, and its before side under a proposal's layer. */
-function useGraph(shown: Derived<Shown>, view: GraphView, selected: string | undefined, unanchored: ReadonlySet<string>) {
+function useGraph(shown: Derived<Shown>, view: GraphView, selected: string | undefined, edge: string | undefined, unanchored: ReadonlySet<string>) {
   const id = shown.route.header.id;
   const layer = useReviewing();
   const tree = useMemo(() => treeOf(shown.graph), [shown.graph]);
@@ -69,7 +72,7 @@ function useGraph(shown: Derived<Shown>, view: GraphView, selected: string | und
   const was = useMemo(() => (before === undefined || wasTree === undefined ? undefined : routeSide(before, wasTree, new Set())), [before, wasTree]);
   const title = useCallback((key: string) => titleIn(tree, key), [tree]);
   const domain = layer === undefined ? `route:${id}:${String(shown.of)}` : `route:${id}/proposals/${layer.id}`;
-  const graph = useCanvasGraph({ view, side, was, wait: waiting, layer, ready: undefined, selected, address: selected, domain, title });
+  const graph = useCanvasGraph({ view, side, was, wait: waiting, layer, ready: undefined, selected, address: selected, domain, title, edge });
   return { ...graph, tree };
 }
 
@@ -105,12 +108,15 @@ function useActions(shown: Derived<Shown>, view: GraphView, selected: string | u
   }, [navigate, frame, addresses, id, version, view, search, selected, nodes, tree, onPick, proposal]);
 }
 
-export function RouteCanvas({ shown, view, selected, unanchored, onPick }: RouteCanvasProps) {
+export function RouteCanvas({ shown, view, selected, edge, unanchored, onPick }: RouteCanvasProps) {
   const navigate = useNavigate();
   const addresses = useNodeAddresses();
-  const { laidOut, overlay, layer, error, faded, badges, tree, trace, ...graph } = useGraph(shown, view, selected, unanchored);
+  const { laidOut, overlay, layer, error, faded, badges, tree, trace, line, ...graph } = useGraph(shown, view, selected, edge, unanchored);
   const actions = useActions(shown, view, selected, onPick, tree, layer?.id);
   const reveal = useRevealed(selected);
+  const opening = useLineOpening(edge, layer !== undefined);
+  // The line's card is the shell's inspector's, drawn from the line this canvas draws; a canvas that failed has nothing to say about one.
+  const card = edge === undefined || error !== undefined ? null : <LineInspector focus={`${shown.route.header.id}:${edge}`} line={line} ends={opening.ends} title={(key) => titleIn(tree, key)} has={(key) => tree.byKey.has(key)} />;
   const controls = <ViewControls subject={routeSubject(nodesOf(shown))} screen="graph" badges={badges} />;
   if (error !== undefined) {
     return (
@@ -125,10 +131,12 @@ export function RouteCanvas({ shown, view, selected, unanchored, onPick }: Route
     );
   }
   if (laidOut === undefined) {
-    return <p className="muted small">Laying out the canvas...</p>;
+    return <><p className="muted small">Laying out the canvas...</p>{card}</>;
   }
   return (
-    <GraphCanvas
+    <>
+      {card}
+      <GraphCanvas
       model={laidOut.model}
       layout={laidOut.layout}
       overlay={overlay}
@@ -136,11 +144,13 @@ export function RouteCanvas({ shown, view, selected, unanchored, onPick }: Route
       lens={undefined}
       faded={faded}
       selected={selected}
+      selectedEdge={opening.selected}
       actions={actions}
       viewKey={refitKey(laidOut, shown.of === "draft" || layer !== undefined)}
       label={`${shown.route.header.name}: canvas`}
       reveal={reveal}
-      onBackground={selected === undefined ? undefined : () => { void navigate(addresses.close()); }}
+      onEdge={opening.onEdge}
+      onBackground={selected === undefined && edge === undefined ? undefined : () => { void navigate(addresses.close()); }}
       held={
         <>
           {controls}
@@ -157,5 +167,6 @@ export function RouteCanvas({ shown, view, selected, unanchored, onPick }: Route
       </Panel>
       <RevealBox linked={graph.revealed ?? (selected === undefined ? 0 : outsideOf(trace, laidOut.model))} revealed={graph.revealed !== undefined} onReveal={() => { graph.reveal(outsideOf(trace, laidOut.model)); }} onHide={graph.hide} />
     </GraphCanvas>
+    </>
   );
 }

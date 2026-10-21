@@ -262,9 +262,32 @@ fn kept_work_holds_a_skipped_containers_dependents() {
         ["n_review"],
         "the effectively skipped draft is off it"
     );
+    assert_eq!(
+        blockers(&pending, "n_uses"),
+        BTreeSet::from([blocker("n_plan", DependencyVia::Explicit)]),
+        "the skipped container still holds its dependent, and says so"
+    );
     let kept_done = derived(&then(&skipped, &[transition("n_review", "complete")]));
     assert!(kept_done.blocking().satisfies(&key("n_plan")));
     assert_eq!(frontier(&kept_done), ["n_uses"]);
+}
+
+const GATED_PREREQUISITE: &str = "- op: add_node\n  node: {key: n_first, id: first, kind: decision, title: First, prompt: First?, answer_type: boolean}\n\
+- op: add_node\n  node: {key: n_gated, id: gated, kind: action, title: Gated, relevant_when: {equals: {decision: n_first, value: true}}}\n\
+- op: add_node\n  node: {key: n_after, id: after, kind: action, title: After, requires: [n_gated]}\n";
+
+/// Gating: a prerequisite the answers rule out stops gating without being finished, so the
+/// dependent's blockers no longer list it (what a drawn line reads to say it holds nothing back).
+#[test]
+fn a_ruled_out_prerequisite_stops_holding_its_dependent() {
+    let records = support::journey(GATED_PREREQUISITE);
+    let yes = then(&records, &[answer("n_first", "{boolean: true}")]);
+    assert_eq!(
+        blockers(&derived(&yes), "n_after"),
+        BTreeSet::from([blocker("n_gated", DependencyVia::Explicit)])
+    );
+    let no = then(&records, &[answer("n_first", "{boolean: false}")]);
+    assert!(blockers(&derived(&no), "n_after").is_empty());
 }
 
 fn snooze(node: &str, until: &str) -> String {

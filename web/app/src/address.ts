@@ -29,6 +29,7 @@ export const ADDRESSES = [
   { name: "routeNew", path: "/routes/new", section: "routes" },
   { name: "route", path: "/routes/:route", section: "routes" },
   { name: "routeNode", path: "/routes/:route/nodes/:key", section: "routes" },
+  { name: "routeEdge", path: "/routes/:route/edges/:edge", section: "routes" },
   { name: "routeProposals", path: "/routes/:route/proposals", section: "routes" },
   { name: "routeProposal", path: "/routes/:route/proposals/:proposal", section: "routes" },
   { name: "routeProposalNode", path: "/routes/:route/proposals/:proposal/nodes/:key", section: "routes" },

@@ -16,7 +16,7 @@ import { itemNode } from "../proposals/model.ts";
 import type { Reveal } from "./GraphCanvas.tsx";
 import { useLaidOut, useLevel, useProjected, type Held } from "./hooks.ts";
 import { ancestorsOf } from "./ladder.ts";
-import { STRENGTH, type CanvasModel, type Level, type Line } from "./model.ts";
+import { endsOf, lineIdOf, lineOf, type CanvasModel, type Level, type LineLink } from "./model.ts";
 import { marksOverlay, standsFor, traceOverlay } from "./overlay.ts";
 import type { GraphView } from "./settings.ts";
 import { useViewLevel } from "./viewLevel.ts";
@@ -49,30 +49,26 @@ export function onlyTraced(model: CanvasModel, traced: ReadonlySet<string>, draw
     }
     return at?.key;
   };
-  const lines = new Map<string, Line>();
+  const joined = new Map<string, { from: string; to: string; edges: LineLink[] }>();
   for (const line of model.lines) {
     const [from, to] = [standIn(line.from), standIn(line.to)];
     if (from === undefined || to === undefined || from === to) {
       continue;
     }
-    const [id, kept] = [`${from}->${to}`, lines.get(`${from}->${to}`)];
-    // A line with no state (a route's) stays without after the merge; one with state is satisfied only when both are.
-    const satisfied = kept === undefined ? line.satisfied : kept.satisfied === undefined && line.satisfied === undefined ? undefined : kept.satisfied === true && line.satisfied === true;
-    lines.set(
-      id,
-      kept === undefined
-        ? { ...line, id, from, to }
-        : {
-            ...kept,
-            kind: STRENGTH[line.kind] > STRENGTH[kept.kind] ? line.kind : kept.kind,
-            count: kept.count + line.count,
-            implicit: kept.implicit && line.implicit,
-            gates: kept.gates || line.gates,
-            ...(satisfied === undefined ? {} : { satisfied }),
-          },
-    );
+    const id = lineIdOf(from, to);
+    const kept = joined.get(id) ?? { from, to, edges: [] };
+    joined.set(id, kept);
+    for (const edge of line.edges) {
+      kept.edges.push(edge);
+    }
   }
-  return { cards: model.cards.filter((card) => !out.has(card.key)), lines: [...lines.values()] };
+  const lines = [...joined.entries()].map(([id, line]) => lineOf(id, line.from, line.to, line.edges));
+  return { cards: model.cards.filter((card) => !out.has(card.key)), lines };
+}
+
+/** The model with each line marked selectable when `ids` (the lines the view's own level draws) holds it; every line is when there is no restriction. */
+export function withSelectable(model: CanvasModel, ids: ReadonlySet<string> | undefined): CanvasModel {
+  return ids === undefined ? model : { ...model, lines: model.lines.map((line) => ({ ...line, selectable: ids.has(line.id) })) };
 }
 
 /** What the trace reaches that has no card of its own (outside the step, folded into a container, or left out). */
@@ -118,11 +114,13 @@ export interface CanvasGraphArgs {
   domain: string;
   /** A node's title, for the trace's legend. */
   title: (key: string) => string;
+  /** The line whose card is open, as `<from>~<to>` in the address; none for no line. */
+  edge?: string | undefined;
 }
 
 /** The view's level (C2), and while Reveal is on, the whole graph's beside it under the same collapse, less what neither draws nor the trace reaches. */
-function useComposed(args: { side: Side; was: Side | undefined; wait: boolean; layer: Layer | undefined; level: Level | undefined; collapsed: string[]; revealed: ReadonlySet<string> | undefined; wasLevel: Level | undefined; wasFailed: boolean }) {
-  const { side, was, wait, layer, level, collapsed, revealed, wasLevel, wasFailed } = args;
+function useComposed(args: { side: Side; was: Side | undefined; wait: boolean; layer: Layer | undefined; level: Level | undefined; own: Level | undefined; collapsed: string[]; revealed: ReadonlySet<string> | undefined; wasLevel: Level | undefined; wasFailed: boolean }) {
+  const { side, was, wait, layer, level, own, collapsed, revealed, wasLevel, wasFailed } = args;
   const everything = useMemo<LevelRequest | undefined>(() => (revealed === undefined ? undefined : { projection: "level", shown: KINDS, ...(collapsed.length === 0 ? {} : { collapsed }) }), [revealed, collapsed]);
   const wholeRead = useProjected(side.held, everything);
   const whole = valueOf(wholeRead);
@@ -135,16 +133,19 @@ function useComposed(args: { side: Side; was: Side | undefined; wait: boolean; l
     }
     const drawn = build(shown);
     const kept = revealed === undefined ? drawn : onlyTraced(drawn, revealed, new Set(level.nodes.map((node) => node.key)));
+    // A line opens its card only where the view's own level draws it; under a proposal's layer none does.
+    const selectable = layer !== undefined ? new Set<string>() : own === shown && revealed === undefined ? undefined : new Set((own === undefined ? [] : build(own).lines).map((line) => line.id));
     if (layer?.model === undefined || wasBuild === undefined || wasLevel === undefined) {
-      return { model: kept, removedLines: new Set(), shrunk: new Map() };
+      return { model: withSelectable(kept, selectable), removedLines: new Set(), shrunk: new Map() };
     }
-    return withRemoved(kept, wasBuild(wasLevel), layer.removed, layer.model.diff.edgesRemoved);
-  }, [build, level, whole, revealed, was, wait, wasBuild, wasLevel, wasFailed, layer]);
+    const composed = withRemoved(kept, wasBuild(wasLevel), layer.removed, layer.model.diff.edgesRemoved);
+    return { ...composed, model: withSelectable(composed.model, selectable) };
+  }, [build, level, own, whole, revealed, was, wait, wasBuild, wasLevel, wasFailed, layer]);
   return { composed, error: errorWords(wholeRead) };
 }
 
 /** What the canvas draws: the view's level laid out, the selected node's trace over it, what the highlights light, and what Reveal asks for. */
-export function useCanvasGraph({ view, side, was, wait = false, layer, ready, selected, address, domain, title }: CanvasGraphArgs) {
+export function useCanvasGraph({ view, side, was, wait = false, layer, ready, selected, address, domain, title, edge }: CanvasGraphArgs) {
   const { nodes } = side;
   // The trace and the diff never show at once: under a proposal's layer a pick is for the rail.
   const { trace, learn } = useSelectionTrace(side.held, layer === undefined ? selected : undefined);
@@ -156,7 +157,7 @@ export function useCanvasGraph({ view, side, was, wait = false, layer, ready, se
   const revealed = revealedFor !== undefined && revealedFor.node === selected ? revealedFor : undefined;
   const traceOnly = revealed === undefined ? undefined : traced;
   const open = useMemo(() => (traceOnly === undefined ? [] : [...traceOnly].flatMap((key) => ancestorsOf(nodes, key))), [traceOnly, nodes]);
-  const { depth, collapsed, request, level, error: levelError, faded, base: lit, badges } = useViewLevel({
+  const { depth, collapsed, request, level, own, error: levelError, faded, base: lit, badges } = useViewLevel({
     screen: "graph",
     state: view.state,
     nodes,
@@ -169,11 +170,15 @@ export function useCanvasGraph({ view, side, was, wait = false, layer, ready, se
   });
   const removedAt = asked === address ? undefined : address;
   const wasRead = useLevel(was?.held, was?.nodes ?? NO_NODES, was === undefined ? undefined : request, removedAt);
-  const { composed, error: wholeError } = useComposed({ side, was, wait, layer, level, collapsed, revealed: traceOnly, wasLevel: wasRead.level, wasFailed: wasRead.error !== undefined });
+  const { composed, error: wholeError } = useComposed({ side, was, wait, layer, level, own, collapsed, revealed: traceOnly, wasLevel: wasRead.level, wasFailed: wasRead.error !== undefined });
   const model = composed?.model;
   // Frontier, Fade's dimming and the viewer's expands and collapses keep the layout's positions; the step drawn, the Filter and the search lay it out afresh.
   const laidRead = useLaidOut(domain, journeyLayoutView(view.state, depth), model);
   const laidOut = valueOf(laidRead);
+  // The line is the one the canvas draws: none when the view draws no such line, nothing yet before the first layout or when the level failed.
+  const ends = edge === undefined ? undefined : endsOf(edge);
+  const wanted = ends === undefined ? undefined : lineIdOf(ends.from, ends.to);
+  const line = edge === undefined || laidOut === undefined || levelError !== undefined ? undefined : (laidOut.model.lines.find((each) => each.id === wanted) ?? null);
   const rolledUp = laidOut?.model.cards.find((card) => card.key === selected)?.rolledUp;
   useEffect(() => {
     if (rolledUp !== undefined) {
@@ -195,6 +200,7 @@ export function useCanvasGraph({ view, side, was, wait = false, layer, ready, se
     trace,
     faded,
     laidOut,
+    line,
     overlay,
     lit,
     badges,

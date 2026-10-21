@@ -13,6 +13,7 @@ import type { DisplayState } from "../status/words.ts";
 
 import { nodeTitle } from "../ui/gone.ts";
 import { isStage } from "../detail/model.ts";
+import { edgeWords } from "./words.ts";
 
 export type Level = Schema<"Level">;
 export type LevelNode = Schema<"LevelNode">;
@@ -141,23 +142,53 @@ export interface CardState {
 /** How an edge is drawn (5.6), strongest first: a requirement, a condition gate, a stage opening, or dates alone. */
 export type LineKind = "requires" | "condition" | "stage_opening" | "dates";
 
-/** One line on the canvas: an edge between two cards (C1). */
+/** The kinds of line, strongest first. */
+export const LINE_KINDS: readonly LineKind[] = ["requires", "condition", "stage_opening", "dates"];
+
+/**
+ * One edge of the graph a line stands for (C1): `dependent` waits on `requirement`. Where the
+ * journey's state is known it also says whether the edge still holds its dependent back.
+ */
+export interface LineLink {
+  requirement: string;
+  dependent: string;
+  kind: LineKind;
+  /** The dependent holds nodes: a requirement on it is a gate on everything inside it. */
+  holds: boolean;
+  /** The edge still holds its dependent back, by the engine's own rule; none where there is no state (a route's). */
+  waits?: boolean;
+  /** What the edge says, in words with plain titles: the line's hover. */
+  sentence: string;
+}
+
+/** One line on the canvas: the graph's edges between two cards (C1), kept so its card can list each. */
 export interface Line {
   id: string;
   from: string;
   to: string;
-  /** Every edge it stands for is implicit: drawn dotted (C1). */
-  implicit: boolean;
-  /** Some edge it stands for blocks. */
-  gates: boolean;
+  /** The edges it stands for, strongest kind first, then in the engine's order. */
+  edges: LineLink[];
   /** The strongest style among the edges it stands for. */
   kind: LineKind;
   /** How many edges it stands for. */
   count: number;
-  /** Nothing it stands for still waits: every requirement behind it is finished. Set where journey state is known. */
+  /** Nothing it stands for still waits. Set where journey state is known. */
   satisfied?: boolean;
   /** What hovering it says, in words. */
   sentence: string;
+  /** Its card can be opened: the view's base level draws it (set where the model is composed). */
+  selectable: boolean;
+}
+
+/** The cards a line joins, as an address names them (`<from>~<to>`); none unless it names exactly two. */
+export function endsOf(edge: string): { from: string; to: string } | undefined {
+  const [from, to, ...rest] = edge.split("~");
+  return from === undefined || to === undefined || from === "" || to === "" || rest.length > 0 ? undefined : { from, to };
+}
+
+/** The id a line between cards `from` and `to` has in a model. */
+export function lineIdOf(from: string, to: string): string {
+  return `${from}->${to}`;
 }
 
 /** What a journey's canvas reads besides its level: the viewer's items. */
@@ -178,22 +209,6 @@ type Nodes = Map<string, GraphNode>;
 
 function nodesOf(graph: GraphNode[]): Nodes {
   return new Map(graph.map((node) => [node.key, node]));
-}
-
-/** C1: what one edge says, in words: why the dependent waits on the requirement. */
-function sentenceOf(edge: Schema<"UnderlyingEdge">, nodes: Nodes): string {
-  const title = (key: string) => nodeTitle(nodes.get(key)?.title);
-  if (!edge.gates) {
-    return `Dated from ${title(edge.requirement)}; does not block`;
-  }
-  switch (edge.origin) {
-    case "explicit":
-      return `${title(edge.dependent)} needs ${title(edge.requirement)}`;
-    case "condition":
-      return `Applies only depending on ${title(edge.requirement)}`;
-    case "stage_opening":
-      return `${title(edge.dependent)} waits for ${title(edge.requirement)}, where it opens`;
-  }
 }
 
 /** Which line style wins where several edges stand in one line: solid over condition over stage opening over dates. */
@@ -237,47 +252,71 @@ function inside(parents: Map<string, string | null | undefined>, inner: string, 
 }
 
 /**
- * C1: the level's edges as lines, each saying in words what it stands for. An edge whose end is
- * hidden is drawn to the card that stands for it (where it is rolled up, or the container folded
- * over it); one that then joins a card to itself or to a card around it (a node's requirement on
- * its own child) is not drawn, and edges that land between the same two cards are one line. A line
- * never ends where no card is.
+ * C1: a line from the edges it stands for: the kind is the strongest of theirs, the count theirs,
+ * it is satisfied where every edge has a state and none waits, and its hover says the strongest
+ * kind's edges. The edges are ordered strongest kind first, then as given (a stable sort).
  */
-export function linesOf(level: Level, graph: GraphNode[], finished?: (key: string) => boolean): Line[] {
+export function lineOf(id: string, from: string, to: string, links: readonly LineLink[]): Line {
+  const edges = [...links].sort((one, other) => STRENGTH[other.kind] - STRENGTH[one.kind]);
+  const kind = edges[0]?.kind ?? "dates";
+  const strongest = edges.filter((each) => each.kind === kind).map((each) => each.sentence);
+  return {
+    id,
+    from,
+    to,
+    edges,
+    kind,
+    count: edges.length,
+    ...(edges.some((each) => each.waits === undefined) ? {} : { satisfied: edges.every((each) => each.waits !== true) }),
+    sentence: `${strongest.slice(0, 2).join("; ")}${strongest.length > 2 ? `; and ${String(strongest.length - 2)} more` : ""}`,
+    selectable: true,
+  };
+}
+
+/**
+ * C1: the level's edges as lines, each keeping the graph's edges it stands for. An edge whose end
+ * is hidden is drawn to the card that stands for it (where it is rolled up, or the container
+ * folded over it); one that then joins a card to itself or to a card around it (a node's
+ * requirement on its own child) is not drawn, and edges that land between the same two cards are
+ * one line. A line never ends where no card is. `waiting` says whether an edge still holds its
+ * dependent back; a route has no state, so passes none.
+ */
+export function linesOf(level: Level, graph: GraphNode[], waiting?: (edge: Schema<"UnderlyingEdge">) => boolean): Line[] {
   const nodes = nodesOf(graph);
   const cardFor = standIn(level, nodes);
   const parents = new Map(level.nodes.map((at) => [at.key, at.parent]));
-  const joined = new Map<string, { from: string; to: string; underlying: Schema<"UnderlyingEdge">[]; implicit: boolean }>();
+  const holders = new Set(graph.flatMap((node) => (node.parent == null ? [] : [node.parent])));
+  const joined = new Map<string, { from: string; to: string; links: LineLink[] }>();
   for (const edge of level.edges) {
     const [from, to] = [cardFor(edge.from), cardFor(edge.to)];
     if (from === undefined || to === undefined || from === to || inside(parents, from, to) || inside(parents, to, from)) {
       continue;
     }
-    const id = `${from}->${to}`;
-    const before = joined.get(id);
-    joined.set(id, { from, to, underlying: [...(before?.underlying ?? []), ...edge.underlying], implicit: (before?.implicit ?? true) && edge.implicit === true });
+    const id = lineIdOf(from, to);
+    const line = joined.get(id) ?? { from, to, links: [] };
+    joined.set(id, line);
+    for (const each of edge.underlying) {
+      line.links.push(linkOf(each, nodes, holders, waiting));
+    }
   }
-  return [...joined.entries()].map(([id, line]) => {
-    const kind = line.underlying.map(kindOf).reduce<LineKind>((best, each) => (STRENGTH[each] > STRENGTH[best] ? each : best), "dates");
-    const strongest = line.underlying.filter((each) => kindOf(each) === kind).map((each) => sentenceOf(each, nodes));
-    return {
-      id,
-      from: line.from,
-      to: line.to,
-      implicit: line.implicit,
-      gates: line.underlying.some((each) => each.gates),
-      kind,
-      count: line.underlying.length,
-      ...(finished === undefined ? {} : { satisfied: line.underlying.every((each) => !each.gates || finished(each.requirement)) }),
-      sentence: `${strongest.slice(0, 2).join("; ")}${strongest.length > 2 ? `; and ${String(strongest.length - 2)} more` : ""}`,
-    };
-  });
+  return [...joined.entries()].map(([id, line]) => lineOf(id, line.from, line.to, line.links));
+}
+
+function linkOf(edge: Schema<"UnderlyingEdge">, nodes: Nodes, holders: ReadonlySet<string>, waiting: ((edge: Schema<"UnderlyingEdge">) => boolean) | undefined): LineLink {
+  const link = { requirement: edge.requirement, dependent: edge.dependent, kind: kindOf(edge), holds: holders.has(edge.dependent), sentence: "" };
+  return {
+    ...link,
+    sentence: edgeWords(link, nodeTitle(nodes.get(edge.dependent)?.title), nodeTitle(nodes.get(edge.requirement)?.title)),
+    ...(waiting === undefined ? {} : { waits: edge.gates && waiting(edge) }),
+  };
 }
 
 /** What a journey adds to each card: its state, and whether a checklist item is finished. */
 export interface Looks {
   card(node: GraphNode, at: LevelNode): CardState;
   finished(key: string): boolean;
+  /** Whether an edge still holds its dependent back, by the engine's own rule (the dependent's unsatisfied gates), not by what its requirement's state looks like. */
+  waiting(edge: Schema<"UnderlyingEdge">): boolean;
 }
 
 /** C2: the level's nodes as cards; on a journey, `looks` adds each card's state. */

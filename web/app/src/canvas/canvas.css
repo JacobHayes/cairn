@@ -1020,3 +1020,25 @@
 .node-diff.node-not-relevant {
   background: var(--paper);
 }
+
+/* A line's card lists the edges it stands for, one row each: the kind and its glyph, the sentence, then its state on a line of its own. */
+.line-links {
+  display: grid;
+  gap: var(--space-4);
+  padding: 0;
+  list-style: none;
+}
+
+.line-link {
+  display: grid;
+  gap: var(--space-1);
+}
+
+.line-state {
+  display: block;
+}
+
+.line-sample {
+  flex: none;
+  color: var(--color-secondary);
+}

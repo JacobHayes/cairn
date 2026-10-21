@@ -9,7 +9,8 @@ import { useLayer } from "../proposals/layer.ts";
 import type { Screen } from "../journeys/address.ts";
 import { badgesOf, currentStagesOf, depthFaded, levelRequestOf, lightsUp, litOf, outOfFocus, stepHides, type LevelRequest } from "../journeys/requests.ts";
 import type { ViewState } from "../journeys/view.ts";
-import { useLevel, type Held, type LevelRead } from "./hooks.ts";
+import { valueOf } from "../data/keyed-read.ts";
+import { useLevel, useProjected, type Held, type LevelRead } from "./hooks.ts";
 import { collapsedAt, drawnStep, stepOf } from "./ladder.ts";
 import type { Step } from "./model.ts";
 
@@ -49,6 +50,8 @@ export interface ViewLevel {
   /** The level request the read was made with. */
   request: LevelRequest;
   level: LevelRead["level"];
+  /** The view's own level: the plain read of its request with nothing selected or unfolded, which a line must be drawn by to be selectable. */
+  own: LevelRead["level"];
   drawn: LevelRead["drawn"];
   error: LevelRead["error"];
   /** The nodes Frontier lights, none when it is off. */
@@ -67,15 +70,18 @@ export function useViewLevel({ screen, state, nodes, selected, ready, held, fold
   const current = useMemo(() => (ready === undefined ? NONE : currentStagesOf(ready)), [ready]);
   const open = folds?.open;
   const shut = folds?.shut;
-  const collapsed = useMemo(
-    () => (open === undefined || shut === undefined ? [] : collapsedAt(step, nodes, current, open, shut).filter((key) => unfold?.includes(key) !== true)),
-    [step, nodes, current, open, shut, unfold],
-  );
+  const folded = useMemo(() => (open === undefined || shut === undefined ? [] : collapsedAt(step, nodes, current, open, shut)), [step, nodes, current, open, shut]);
+  const collapsed = useMemo(() => folded.filter((key) => unfold?.includes(key) !== true), [folded, unfold]);
   const hidden = useMemo(() => collapsedAt(depth, nodes, current, open ?? [], shut ?? []), [depth, nodes, current, open, shut]);
   // C14: under a proposal layer every display state is drawn, so what it changes is never filtered out.
   const layered = useLayer() !== undefined;
   const request = useMemo(() => levelRequestOf(state, step, collapsed, layered), [state, step, collapsed, layered]);
-  const { level, drawn, error } = useLevel(held, nodes, request, selected);
+  const { level, plain, drawn, error } = useLevel(held, nodes, request, selected);
+  // The view's own level, which a line must be drawn by to be selectable: the plain read with nothing unfolded. Only an unfold makes it a read of its own.
+  const unfolded = unfold !== undefined && unfold.length > 0;
+  const baseRequest = useMemo(() => (unfolded ? levelRequestOf(state, step, folded, layered) : undefined), [unfolded, state, step, folded, layered]);
+  const baseRead = useProjected(held, baseRequest);
+  const own = unfolded ? valueOf(baseRead) : plain;
   const frontier = useMemo(() => (ready === undefined ? undefined : litOf(screen, state, ready)), [screen, state, ready]);
   const base = lit ?? frontier;
   const lightsHolders = useMemo(() => (base === undefined ? undefined : lightsUp(nodes, base)), [nodes, base]);
@@ -85,5 +91,5 @@ export function useViewLevel({ screen, state, nodes, selected, ready, held, fold
   );
   const dimmed = useMemo(() => outOfFocus(lightsHolders, faded ?? NONE), [lightsHolders, faded]);
   const badges = useMemo(() => badgesOf(screen, level?.hidden_by_class ?? {}, base, stepHides(nodes, depth, hidden), fade), [screen, level, base, nodes, depth, hidden, fade]);
-  return { depth, step, current, collapsed, request, level, drawn, error, base, faded, dimmed, badges };
+  return { depth, step, current, collapsed, request, level, own, drawn, error, base, faded, dimmed, badges };
 }

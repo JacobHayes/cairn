@@ -11,7 +11,8 @@ import { openRoute, pickVersion, publishDraft, routeMenuItem, versionSelect } fr
 import { formField, saveForm } from "./authoring.ts";
 import { publishVersionTwo } from "./proposals.ts";
 import { publishSegment } from "./segments.ts";
-import { expectAddress, follow, goWithin, nodeCard, open, setDepth } from "./shell.ts";
+import { expectAddress, follow, goWithin, importRoute, nodeCard, open, setDepth } from "./shell.ts";
+import { lineBetween, pointOn, viewportSettled } from "./canvas.ts";
 import { search } from "./view-state.ts";
 
 /** Opens a draft on the route being shown (a version) and waits for the draft view. */
@@ -286,4 +287,65 @@ test("the Key to the lines opens from the route canvas", async ({ page }) => {
   await openRoute(page, "browser", "vendor-evaluation");
   await page.getByTestId("key-menu").click();
   await expect(page.getByTestId("canvas-key")).toBeVisible();
+});
+
+/** Clicks the line between two cards on the route canvas. */
+async function clickLine(page: Page, from: string, to: string): Promise<void> {
+  await viewportSettled(page);
+  const at = await pointOn(lineBetween(page, from, to));
+  await page.mouse.click(at.x, at.y);
+}
+
+test("C1, C7, C19: a line on a route opens its card: on a version the address keeps the version and the card says no state, a row's link opens the read-only panel, and the empty canvas clears it", async ({ page }) => {
+  await openRoute(page, "browser", "vendor-evaluation", "?version=1&depth=stages");
+  await clickLine(page, "n_setup", "n_testing");
+  await expect(page).toHaveURL(/\/routes\/vendor-evaluation\/edges\/n_setup~n_testing\?.*version=1/);
+  const card = page.getByTestId("edge-card");
+  await expect(card).toBeVisible();
+  await expect(lineBetween(page, "n_setup", "n_testing")).toHaveClass(/line-selected/);
+  // The folded stages stand for the link between the nodes inside them, which has no state on a route.
+  const row = card.locator('[data-requirement="n_plan"][data-dependent="n_comparison_set"]');
+  await expect(row).toBeVisible();
+  await expect(card.locator("[data-waits]")).toHaveCount(0);
+  await row.getByRole("link", { name: "Comparison set" }).click();
+  await expect(page).toHaveURL(/\/routes\/vendor-evaluation\/nodes\/n_comparison_set\?.*version=1/);
+  await expect(page.getByTestId("version-node")).toBeVisible();
+  await page.goBack();
+  const pane = (await page.locator(".react-flow__pane").boundingBox()) ?? { x: 0, y: 0, width: 0, height: 0 };
+  await page.mouse.click(pane.x + pane.width - 12, pane.y + pane.height - 60);
+  await expect(page).toHaveURL(/\/routes\/vendor-evaluation\?.*version=1/);
+  await expect(card).toHaveCount(0);
+});
+
+test("C1, C7: a line on a route's draft opens its card in place of the draft card; a second click on it brings a hidden inspector back, and Esc brings the draft card back", async ({ page }) => {
+  await openRoute(page, "browser", "vendor-evaluation");
+  await openDraftHere(page);
+  await clickLine(page, "n_access", "n_plan");
+  await expect(page.getByTestId("edge-card")).toHaveAttribute("data-from", "n_access");
+  await expect(page.getByTestId("draft-card")).toHaveCount(0);
+  await page.keyboard.press("]");
+  await expect(page.getByTestId("edge-card")).toBeHidden();
+  await clickLine(page, "n_access", "n_plan");
+  await expect(page.getByTestId("edge-card")).toBeVisible();
+  await page.keyboard.press("Escape");
+  await expect(page).toHaveURL(/\/routes\/vendor-evaluation(\?|$)/);
+  await expect(page.getByTestId("draft-card")).toBeVisible();
+});
+
+test("C1: a line that stands for many links lists the first of them and shows the rest on request", async ({ page }) => {
+  // Two stages joined by sixty requirements: more than a card lists at once.
+  const leaf = (stage: string, i: number, requires: string) => `- key: n_${stage}${String(i)}\n  id: ${stage}${String(i)}\n  parent: ${stage}\n  kind: action\n  title: ${stage.toUpperCase()} step ${String(i)}\n${requires}`;
+  const needs = (i: number) => `  requires:\n  - a/a${String(i % 3)}\n  - a/a${String((i + 1) % 3)}\n`;
+  const nodes = [0, 1, 2].map((i) => leaf("a", i, "")).join("") + Array.from({ length: 30 }, (_, i) => leaf("b", i, needs(i))).join("");
+  const file = `format: 1\nroute: many-links\nname: Many links\nnodes:\n- key: n_a\n  id: a\n  kind: group\n  title: Prepare\n- key: n_b\n  id: b\n  kind: group\n  title: Deliver\n${nodes}- key: n_end\n  id: end\n  kind: milestone\n  title: Done\n  final: true\n  requires:\n  - b/b0\n`;
+  await importRoute(page, "browser", { name: "many-links.yaml", mimeType: "text/yaml", buffer: Buffer.from(file) });
+  await expect(versionSelect(page)).toContainText("Draft");
+  await goWithin(page, "/routes/many-links/edges/n_a~n_b?depth=stages");
+  const rows = page.getByTestId("edge-card").locator("[data-requirement]");
+  await expect(rows.first()).toBeVisible();
+  const first = await rows.count();
+  expect(first).toBeLessThan(60);
+  await page.getByTestId("edge-links-all").click();
+  await expect(rows).toHaveCount(60);
+  await expect(page.getByTestId("edge-links-all")).toHaveCount(0);
 });

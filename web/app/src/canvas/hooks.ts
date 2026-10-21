@@ -92,12 +92,14 @@ export function useLevel(view: Held | undefined, nodes: readonly GraphNode[], re
   const widened = useProjected(view, widening);
   const level = widening === undefined ? plainLevel : valueOf(widened);
   const drawn = useMemo(() => (level === undefined ? undefined : new Set(level.nodes.map((node) => node.key))), [level]);
-  return { level, drawn, error: errorWords(plain) ?? (widening === undefined ? undefined : errorWords(widened)) };
+  return { level, plain: plainLevel, drawn, error: errorWords(plain) ?? (widening === undefined ? undefined : errorWords(widened)) };
 }
 
 /** The level a view draws: the keys it draws, and why it could not be read. */
 export interface LevelRead {
   level: Schema<"Level"> | undefined;
+  /** The plain read of the request, before a selected node widened it. */
+  plain: Schema<"Level"> | undefined;
   drawn: ReadonlySet<string> | undefined;
   error: string | undefined;
 }

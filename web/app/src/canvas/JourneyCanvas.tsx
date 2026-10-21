@@ -5,12 +5,12 @@
 // selected node as an overlay (selecting a node traces it; several selected trace nothing), and
 // what Frontier lights at full strength with the rest faded, as is what Depth's Fade dims (the
 // level is then the Actions one, so nothing moves). A card opens the
-// node's detail (5.1) beside the canvas, or joins the selection; an edge opens the edge's card.
+// node's detail (5.1) beside the canvas, or joins the selection; a line opens its card (LineCard.tsx).
 import { Panel } from "@xyflow/react";
 import { useCallback, useEffect, useMemo } from "react";
 import { useLocation, useNavigate } from "react-router";
 
-import { nodeDetail, OWNER_KIND, type GraphNode, type Ready, titleOf } from "../detail/model.ts";
+import { nodeDetail, nodeOf, OWNER_KIND, type GraphNode, type Ready, titleOf } from "../detail/model.ts";
 import { contextMenuOf } from "../detail/offers.ts";
 import { screenSwitched } from "../journeys/address.ts";
 import { useJourneyTarget } from "../journeys/useJourneyTarget.ts";
@@ -25,6 +25,7 @@ import { outsideOf, useCanvasGraph, useRevealed, changedKeys } from "./graph.ts"
 import { useProjected } from "./hooks.ts";
 import { journeyLooks } from "./journey.ts";
 import { ancestorsOf, withExpanded } from "./ladder.ts";
+import { LineInspector, useLineOpening } from "./LineCard.tsx";
 import { cardsOf, linesOf, type CanvasModel, type JourneyExtras, type Level } from "./model.ts";
 import type { CardActions } from "./NodeCard.tsx";
 import { refitKey } from "./refit.ts";
@@ -36,7 +37,7 @@ import { Failed } from "../ui/Failed.tsx";
 export function journeyModel(ready: Ready, level: Level, extras: JourneyExtras): CanvasModel {
   const graph = ready.journey.graph.nodes ?? [];
   const looks = journeyLooks(ready, extras);
-  return { cards: cardsOf(level, graph, looks), lines: linesOf(level, graph, (key) => looks.finished(key)) };
+  return { cards: cardsOf(level, graph, looks), lines: linesOf(level, graph, (edge) => looks.waiting(edge)) };
 }
 
 /** Whether a read has neither a value nor a failure to show yet. */
@@ -45,7 +46,7 @@ const isPending = (read: ReadView<unknown>) => read.status === "idle" || read.st
 const NO_NODES: readonly GraphNode[] = [];
 
 /** What the canvas draws: the shared graph hook over the journey's side, and the journey's before side under a proposal's layer. */
-function useGraph(ready: Ready, view: GraphView, selected: string | undefined, address: string | undefined) {
+function useGraph(ready: Ready, view: GraphView, selected: string | undefined, address: string | undefined, edge: string | undefined) {
   const journey = ready.journey.header.id;
   const layer = useReviewing();
   const nodes = ready.journey.graph.nodes ?? NO_NODES;
@@ -65,14 +66,14 @@ function useGraph(ready: Ready, view: GraphView, selected: string | undefined, a
   const before = layer?.before;
   const was = useMemo(() => (before === undefined ? undefined : { held: before, nodes: before.journey.graph.nodes ?? NO_NODES, model: (level: Level) => journeyModel(before, level, { mine: [], owned: [] }) }), [before]);
   const title = useCallback((key: string) => titleOf(ready, key), [ready]);
-  return useCanvasGraph({ view, side, was, layer, ready, selected, address, domain: layer === undefined ? journey : `${journey}/proposals/${layer.id}`, title });
+  return useCanvasGraph({ view, side, was, layer, ready, selected, address, domain: layer === undefined ? journey : `${journey}/proposals/${layer.id}`, title, edge });
 }
 
 export interface JourneyCanvasProps {
   ready: Ready;
   view: GraphView;
   selected: string | undefined;
-  /** The edge whose card is open, as `<from>~<to>`. */
+  /** The line whose card is open, as `<from>~<to>`. */
   edge: string | undefined;
   /** In edit mode, a card picked while an edge is drawn ends the edge instead of opening (5.6); true when it took the pick. */
   onPick?: ((key: string) => boolean) | undefined;
@@ -169,20 +170,25 @@ export function JourneyCanvas({ ready, view, selected, edge, onPick, selection }
   // One member is inspected and traced; several are only tinted.
   const [single, ...others] = selection.members;
   const alone = others.length === 0 ? single : undefined;
-  const graph = useGraph(ready, view, alone, selected);
+  const graph = useGraph(ready, view, alone, selected, edge);
+  const line = useLineOpening(edge, graph.layer !== undefined);
   const actions = useActions(ready, view, selected, onPick, selection);
   const proposal = useJourneyTarget().proposal;
   const go = (next: GraphView, node: string | undefined) => void navigate(graphPath(journey, next, { node, proposal }, location.search));
   useEscapeEdit(view.edit && others.length === 0, useCallback(() => { void navigate(graphPath(journey, { ...view, edit: false }, { node: selected }, location.search)); }, [navigate, journey, view, selected, location.search]));
   const reveal = useRevealed(selected);
   const { laidOut, overlay, trace } = graph;
+  // The line's card is the shell's inspector's, drawn from the line this canvas draws; a canvas that failed has nothing to say about one.
+  const card = edge === undefined || graph.error !== undefined ? null : <LineInspector focus={`${journey}:${edge}`} line={graph.line} ends={line.ends} title={(key) => titleOf(ready, key)} has={(key) => nodeOf(ready, key) !== undefined} />;
   if (graph.error !== undefined) {
     return <CanvasFailed ready={ready} badges={graph.badges} error={graph.error} />;
   }
   if (laidOut === undefined) {
-    return <p className="muted small">Laying out the canvas...</p>;
+    return <><p className="muted small">Laying out the canvas...</p>{card}</>;
   }
   return (
+    <>
+      {card}
       <GraphCanvas
         model={laidOut.model}
         layout={laidOut.layout}
@@ -191,11 +197,11 @@ export function JourneyCanvas({ ready, view, selected, edge, onPick, selection }
         emphasis={graph.lit}
         faded={graph.faded}
         selected={alone}
-        selectedEdge={edge?.replace("~", "->")}
+        selectedEdge={line.selected}
         actions={actions}
         viewKey={refitKey(laidOut, view.edit)}
         label={`${ready.journey.header.name}: canvas`}
-        onEdge={graph.layer === undefined ? (line) => void navigate(graphPath(journey, view, { edge: `${line.from}~${line.to}` }, location.search)) : undefined}
+        onEdge={line.onEdge}
         onBackground={() => {
           if (selection.members.length > 0) {
             selection.clear();
@@ -222,5 +228,6 @@ export function JourneyCanvas({ ready, view, selected, edge, onPick, selection }
         </Panel>
         <RevealBox linked={graph.revealed ?? (alone === undefined ? 0 : outsideOf(trace, laidOut.model))} revealed={graph.revealed !== undefined} onReveal={() => { graph.reveal(outsideOf(trace, laidOut.model)); }} onHide={graph.hide} />
       </GraphCanvas>
+    </>
   );
 }

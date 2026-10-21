@@ -7,12 +7,12 @@
 //   /journeys/new?route=&version=           the new-journey form
 //   /journeys/<id>                          a journey
 //   /journeys/<id>/nodes/<key>              a node selected in it
-//   /journeys/<id>/edges/<from>~<to>        an edge's card (the graph)
+//   /journeys/<id>/edges/<from>~<to>        a drawn line's card: the line between those two cards at the view the query describes (always the Graph)
 //   /journeys/<id>/proposals/<pid>[/nodes/<key>]   the journey with a proposal's layer on (C14)
 //
 // `view=graph|list|timeline|summary|walk` says how a journey is looked at, and is written only
 // when it differs from the address's default (`defaultScreen`): the Summary for a bare journey,
-// the Graph for a node, an edge or a proposal's layer, so one state has one address. Beside it the view state every view
+// the Graph for a node or a proposal's layer, and always for an edge, so one state has one address. Beside it the view state every view
 // shares (view.ts: `depth`, `fade`, `frontier`, `mine`, `owner`, `flag`, `show`, `q`) and each view's
 // own settings (the graph's `open`, `shut`, `lens`, `edit`, `map`; the list's `sort`, `cols`; the
 // timeline's `range`), which stay in the query when the view changes, so switching back restores
@@ -198,11 +198,12 @@ export function layerScreen(screen: Screen): Projection {
 
 /**
  * The view `params` names for `target` (`view=`), or its default; an unknown value is the default.
+ * A drawn line is the Graph's, whatever `view=` says.
  * Under a proposal's layer the Summary and the Walkthrough resolve to the Graph.
  */
 export function screenOf(target: JourneyTarget, params: URLSearchParams): Screen {
   const view = params.get("view");
-  const named = SCREENS.find((each) => each === view) ?? defaultScreen(target);
+  const named = target.edge !== undefined ? "graph" : (SCREENS.find((each) => each === view) ?? defaultScreen(target));
   return target.proposal === undefined ? named : layerScreen(named);
 }
 
@@ -264,6 +265,11 @@ export function nodeAddress(page: Page, search: string, key: string | undefined)
       const route = required(params, "route");
       return routePath(route, { ...spotOf(new URLSearchParams(search)), node: key }, search);
     }
+    case "routeEdge": {
+      // A line is the Graph's, so a node opened from it is opened there.
+      const route = required(params, "route");
+      return routePath(route, { version: spotOf(new URLSearchParams(search)).version, node: key, screen: "graph" }, search);
+    }
     case "routeProposals": {
       const route = required(params, "route");
       return key === undefined ? `${pathTo("routeProposals", { route })}${query}` : routePath(route, { node: key, screen: routeScreenOf(new URLSearchParams(search)) }, search);
@@ -286,10 +292,33 @@ export function nodeAddress(page: Page, search: string, key: string | undefined)
   }
 }
 
-/** Where a node of the page being rendered opens, and where closing it goes. */
+/**
+ * From `page` + `search`, the address of the line drawn from card `from` to card `to`: on the
+ * journey's or the route's Graph, the view settings and the version kept, no node open. Any other
+ * page is unchanged.
+ */
+export function edgeAddress(page: Page, search: string, from: string, to: string): string {
+  const { name, params } = page;
+  const edge = `${from}~${to}`;
+  switch (name) {
+    case "journey":
+    case "journeyNode":
+    case "journeyEdge":
+      return journeyPath({ journey: required(params, "journey"), edge }, "graph", search);
+    case "route":
+    case "routeNode":
+    case "routeEdge":
+      return routePath(required(params, "route"), { version: spotOf(new URLSearchParams(search)).version, edge, screen: "graph" }, search);
+    default:
+      return nodeAddress(page, search, undefined);
+  }
+}
+
+/** Where a node of the page being rendered opens, where closing it goes, and where a drawn line opens. */
 export interface NodeAddresses {
   open(key: string): string;
   close(): string;
+  line(from: string, to: string): string;
 }
 
 /** The page's node addresses (`nodeAddress`), from the pattern the router matched; outside a page, the current location. */
@@ -297,8 +326,9 @@ export function useNodeAddresses(): NodeAddresses {
   const page = usePage();
   const { pathname, search } = useLocation();
   return useMemo(() => {
-    const at = (key: string | undefined) => (page === undefined ? `${pathname}${withQuestion(search)}` : nodeAddress(page, search, key));
-    return { open: (key) => at(key), close: () => at(undefined) };
+    const stay = `${pathname}${withQuestion(search)}`;
+    const at = (key: string | undefined) => (page === undefined ? stay : nodeAddress(page, search, key));
+    return { open: (key) => at(key), close: () => at(undefined), line: (from, to) => (page === undefined ? stay : edgeAddress(page, search, from, to)) };
   }, [page, pathname, search]);
 }
 
