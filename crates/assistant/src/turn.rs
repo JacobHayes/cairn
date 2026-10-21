@@ -11,7 +11,7 @@ use std::time::Duration;
 
 use cairn_auth::Clock;
 use cairn_mcp::{ToolError, ToolSet, instructions};
-use cairn_schema::{Actor, AgentId, ConversationId, Markdown};
+use cairn_schema::{Actor, AgentId, ChangeClass, ConversationId, Markdown};
 use cairn_service::Service;
 use cairn_store::{ConversationMessage, ConversationRecord, MessageAuthor, Store};
 use schemars::JsonSchema;
@@ -27,7 +27,7 @@ use crate::limits::{
     TURN_IN_FLIGHT_COUNT_MAX, TURN_SAVE_RESERVE,
 };
 use crate::provider::{Exchange, Message, Provider, ProviderError, Reply, ToolResult, ToolSpec};
-use crate::wrapper::{self, Action, Ledger, REFUSED_TOOLS};
+use crate::wrapper::{self, Action, Ledger};
 
 /// The agent id every assistant write records beside the user it acts for (H2).
 pub const ASSISTANT_AGENT: &str = "ag_assistant";
@@ -439,11 +439,7 @@ impl Assistant {
 fn tool_specs() -> Vec<ToolSpec> {
     ToolSet::definitions()
         .into_iter()
-        .filter(|definition| {
-            !REFUSED_TOOLS
-                .iter()
-                .any(|(name, _)| *name == definition.name)
-        })
+        .filter(|definition| wrapper::refusal(definition.writes).is_none())
         .map(|definition| ToolSpec {
             name: definition.name.to_owned(),
             description: definition.description.to_owned(),
@@ -456,21 +452,35 @@ fn tool_specs() -> Vec<ToolSpec> {
 /// shipped guide and workflows (I4, I5: the same instructions as external agents), and the
 /// target as read at the start of the turn.
 fn system(user: &Actor, target: &Target, context: &Value) -> String {
+    let mut refused: Vec<&str> = Vec::new();
+    for definition in ToolSet::definitions() {
+        if let Some(why) = wrapper::refusal(definition.writes)
+            && !refused.contains(&why)
+        {
+            refused.push(why);
+        }
+    }
     let mut prompt = format!(
         "You are Cairn's in-app assistant, working for user {user} on {target}. You have the \
          same tools as any agent acting for them, and every write you make is recorded \
          as yours, on their behalf.\n\n\
-         How your writes land: a state change (a transition, an answer, a note, an \
-         assignment, a pin, a snooze, a journey weight override) applies directly when it \
-         touches at most {DIRECT_WRITE_NODE_COUNT_MAX} nodes, and its result lists what it \
-         caused: tell the user. A structural change (nodes, edges, roles, conditions, date \
-         rules, anything on a route or its draft), or a state change touching more nodes, is \
-         drafted as one proposal instead, which the result says: tell the user it is ready \
-         for review. You never apply a proposal or import a route file: those are the user's \
-         to do. When the user asks for a proposal, draft one with create_proposal.\n\n\
-         # Guide\n\n{guide}\n\n# Workflows\n",
+         How your writes land: a state change ({state}) applies directly when it touches at \
+         most {DIRECT_WRITE_NODE_COUNT_MAX} nodes, and its result lists what it caused: tell \
+         the user. A structural change ({structural}), or a state change touching more nodes, \
+         is drafted as one proposal instead, which the result says: tell the user it is ready \
+         for review. When the user asks for a proposal, draft one with create_proposal. Some \
+         writes are the user's alone, and you have no tool for them:\n",
         user = user.user,
-        guide = instructions::guide(),
+        state = ChangeClass::State.meaning(),
+        structural = ChangeClass::Structural.meaning(),
+    );
+    for why in refused {
+        let _ = writeln!(prompt, "- {why}");
+    }
+    let _ = write!(
+        prompt,
+        "\n# Guide\n\n{guide}\n\n# Workflows\n",
+        guide = instructions::guide()
     );
     for workflow in instructions::workflows() {
         let _ = write!(

@@ -114,11 +114,10 @@ pub fn apply(
     let result = cairn_engine::apply(records, patch, inputs);
     if let Err(Rejection::Invalid { violations }) = &result {
         for violation in violations.as_slice() {
-            let ids = crate::served_text::requirement_ids(&violation.message);
-            let documents = crate::served_text::document_names(&violation.message);
+            let cited = crate::served_text::citations(&violation.message);
             assert!(
-                ids.is_empty() && documents.is_empty(),
-                "a violation message says its rule in words, not {ids:?} {documents:?}: {}",
+                cited.is_empty(),
+                "a violation message says its rule in words, not {cited:?}: {}",
                 violation.message
             );
         }

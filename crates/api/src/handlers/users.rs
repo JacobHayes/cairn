@@ -3,7 +3,6 @@
 use axum::Json;
 use axum::extract::{Extension, RawQuery, State};
 use axum::http::StatusCode;
-use cairn_schema::limits::PAGE_ITEM_COUNT_MAX;
 use cairn_schema::{Actor, AgentId, UserId};
 
 use super::Answer;
@@ -29,11 +28,6 @@ pub async fn caller(State(api): State<Api>, Extension(actor): Extension<Actor>) 
 pub async fn user_names(RawQuery(raw): RawQuery, State(api): State<Api>) -> Answer<Vec<UserName>> {
     let params = Params::parse(raw.as_deref(), query::USER_NAME_PARAMS)?;
     let users: Vec<UserId> = params.all("id")?;
-    if users.len() > usize::try_from(PAGE_ITEM_COUNT_MAX).unwrap_or(usize::MAX) {
-        return Err(ApiError::bad_request(format!(
-            "at most {PAGE_ITEM_COUNT_MAX} users can be named at once"
-        )));
-    }
     let names = api.service.user_names(&users).await?;
     Ok(Json(names.into_iter().map(Into::into).collect()))
 }

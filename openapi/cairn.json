@@ -8362,18 +8362,6 @@
             "$ref": "#/components/schemas/ExplainedContribution",
             "description": "The contributors to gravity."
           },
-          "max_child_gravity": {
-            "anyOf": [
-              {
-                "$ref": "#/components/schemas/Score"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "deprecated": true,
-            "description": "A container's largest child gravity, one level down.\n\nDeprecated: read `subtree_gravity`, the gravity of the container's whole area. Kept so\nexisting clients keep reading it."
-          },
           "membership_lost": {
             "description": "Its seeding identity left the role it was broken down by.",
             "type": "boolean"
@@ -12848,18 +12836,6 @@
             "description": "A child is `active`.",
             "type": "boolean"
           },
-          "max_child_gravity": {
-            "anyOf": [
-              {
-                "$ref": "#/components/schemas/Score"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "deprecated": true,
-            "description": "The largest in-scope child gravity (Priority), one level down.\n\nDeprecated: read `subtree_gravity`, the gravity of the container's whole area."
-          },
           "min_child_slack_days": {
             "description": "The least slack among in-scope, open children; none when none has a deadline.",
             "format": "int32",
@@ -15402,14 +15378,15 @@
             "style": "form"
           },
           {
-            "description": "Items per page, 1 to the page limit (200); larger sizes are cut to it.",
+            "description": "Items per page, 1 to the page limit, the maximum; larger sizes are cut to it.",
             "explode": true,
             "in": "query",
             "name": "size",
             "required": false,
             "schema": {
               "format": "uint32",
-              "minimum": 0,
+              "maximum": 200,
+              "minimum": 1,
               "type": "integer"
             },
             "style": "form"
@@ -16475,14 +16452,15 @@
             "style": "form"
           },
           {
-            "description": "Items per page, 1 to the page limit (200); larger sizes are cut to it.",
+            "description": "Items per page, 1 to the page limit, the maximum; larger sizes are cut to it.",
             "explode": true,
             "in": "query",
             "name": "size",
             "required": false,
             "schema": {
               "format": "uint32",
-              "minimum": 0,
+              "maximum": 200,
+              "minimum": 1,
               "type": "integer"
             },
             "style": "form"
@@ -16727,14 +16705,15 @@
             "style": "form"
           },
           {
-            "description": "Items per page, 1 to the page limit (200); larger sizes are cut to it.",
+            "description": "Items per page, 1 to the page limit, the maximum; larger sizes are cut to it.",
             "explode": true,
             "in": "query",
             "name": "size",
             "required": false,
             "schema": {
               "format": "uint32",
-              "minimum": 0,
+              "maximum": 200,
+              "minimum": 1,
               "type": "integer"
             },
             "style": "form"
@@ -18652,14 +18631,15 @@
             "style": "form"
           },
           {
-            "description": "Items per page, 1 to the page limit (200); larger sizes are cut to it.",
+            "description": "Items per page, 1 to the page limit, the maximum; larger sizes are cut to it.",
             "explode": true,
             "in": "query",
             "name": "size",
             "required": false,
             "schema": {
               "format": "uint32",
-              "minimum": 0,
+              "maximum": 200,
+              "minimum": 1,
               "type": "integer"
             },
             "style": "form"
@@ -20643,14 +20623,15 @@
             "style": "form"
           },
           {
-            "description": "Items per page, 1 to the page limit (200); larger sizes are cut to it.",
+            "description": "Items per page, 1 to the page limit, the maximum; larger sizes are cut to it.",
             "explode": true,
             "in": "query",
             "name": "size",
             "required": false,
             "schema": {
               "format": "uint32",
-              "minimum": 0,
+              "maximum": 200,
+              "minimum": 1,
               "type": "integer"
             },
             "style": "form"
@@ -20753,14 +20734,15 @@
             "style": "form"
           },
           {
-            "description": "Items per page, 1 to the page limit (200); larger sizes are cut to it.",
+            "description": "Items per page, 1 to the page limit, the maximum; larger sizes are cut to it.",
             "explode": true,
             "in": "query",
             "name": "size",
             "required": false,
             "schema": {
               "format": "uint32",
-              "minimum": 0,
+              "maximum": 200,
+              "minimum": 1,
               "type": "integer"
             },
             "style": "form"
@@ -21586,14 +21568,15 @@
             "style": "form"
           },
           {
-            "description": "Items per page, 1 to the page limit (200); larger sizes are cut to it.",
+            "description": "Items per page, 1 to the page limit, the maximum; larger sizes are cut to it.",
             "explode": true,
             "in": "query",
             "name": "size",
             "required": false,
             "schema": {
               "format": "uint32",
-              "minimum": 0,
+              "maximum": 200,
+              "minimum": 1,
               "type": "integer"
             },
             "style": "form"
@@ -22868,14 +22851,15 @@
             "style": "form"
           },
           {
-            "description": "Items per page, 1 to the page limit (200); larger sizes are cut to it.",
+            "description": "Items per page, 1 to the page limit, the maximum; larger sizes are cut to it.",
             "explode": true,
             "in": "query",
             "name": "size",
             "required": false,
             "schema": {
               "format": "uint32",
-              "minimum": 0,
+              "maximum": 200,
+              "minimum": 1,
               "type": "integer"
             },
             "style": "form"
@@ -22956,7 +22940,7 @@
         "operationId": "listUserNames",
         "parameters": [
           {
-            "description": "The users to name, at most the page limit (200); one that does not exist is left out.",
+            "description": "The users to name, at most a page of them; one that does not exist is left out.",
             "explode": true,
             "in": "query",
             "name": "id",
@@ -22965,6 +22949,7 @@
               "items": {
                 "$ref": "#/components/schemas/UserId"
               },
+              "maxItems": 200,
               "type": "array"
             },
             "style": "form"

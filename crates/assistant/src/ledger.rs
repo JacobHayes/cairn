@@ -8,12 +8,12 @@
 
 use std::collections::{BTreeMap, BTreeSet};
 
-use cairn_mcp::{ToolError, ToolSet};
-use cairn_schema::{Actor, Domain, Mutation, NodeKey, ProposalId, Revision};
+use cairn_mcp::{CreateProposal, EditProposal, ProposalChange, ProposalOutput, ToolError, ToolSet};
+use cairn_schema::{Actor, Domain, Markdown, Mutation, NodeKey, Patch, ProposalId, Revision};
 use cairn_service::DomainPatch;
-use serde_json::{Value, json};
+use serde_json::json;
 
-use crate::wrapper::{Action, Because, Outcome, proposal_id_of, title};
+use crate::wrapper::{Action, Because, Outcome, draft, proposal_id_of};
 
 /// The turn's direct writes and the proposals its overflow went to.
 #[derive(Debug, Default)]
@@ -76,12 +76,13 @@ impl Ledger {
         &mut self,
         tools: &ToolSet,
         actor: &Actor,
-        (tool, note): (&str, Option<&str>),
+        tool: &str,
         drafted: &DomainPatch,
         current: Option<Revision>,
         nodes: &BTreeSet<NodeKey>,
     ) -> Outcome {
         let patch = drafted.patch();
+        let note = drafted.note();
         let domain = patch.target.domain();
         let count = u32::try_from(self.asked(&domain, nodes)).unwrap_or(u32::MAX);
         let because = Because::TooManyNodesThisTurn { count };
@@ -135,33 +136,28 @@ impl Ledger {
 }
 
 impl Overflow {
-    /// Its draft as the proposal tools take it.
-    fn draft(&self, tool: &str, note: Option<&str>) -> Value {
-        json!({
-            "title": title(tool, note, self.mutations.len()),
-            "description": note,
-            "destination_revision": self.destination_revision,
-            "mutations": self.mutations,
-        })
-    }
-
     /// Creates it, under the overflowing patch's id.
     async fn create(
         &mut self,
         tools: &ToolSet,
         actor: &Actor,
         destination: &Domain,
-        (tool, note): (&str, Option<&str>),
-        patch: &cairn_schema::Patch,
-    ) -> Result<Value, ToolError> {
-        let create = json!({
-            "proposal": self.proposal,
-            "destination": destination,
-            "draft": self.draft(tool, note),
-            "patch_id": patch.id,
-        });
-        let output = tools.call(actor, "create_proposal", create).await?;
-        self.editing = editing_revision(&output);
+        (tool, note): (&str, Option<&Markdown>),
+        patch: &Patch,
+    ) -> Result<ProposalOutput, ToolError> {
+        let create = CreateProposal {
+            proposal: self.proposal.clone(),
+            destination: destination.clone(),
+            draft: draft(
+                tool,
+                note,
+                self.destination_revision,
+                self.mutations.clone(),
+            )?,
+            patch_id: patch.id.clone(),
+        };
+        let output = tools.create_proposal_as(actor, create).await?;
+        self.editing = output.editing_revision().unwrap_or(Revision::NONE);
         Ok(output)
     }
 
@@ -171,28 +167,27 @@ impl Overflow {
         tools: &ToolSet,
         actor: &Actor,
         tool: &str,
-        note: Option<&str>,
-    ) -> Result<Value, ToolError> {
+        note: Option<&Markdown>,
+    ) -> Result<ProposalOutput, ToolError> {
         self.edits += 1;
         let patch_id = format!("p_{}_edit_{}", self.proposal.as_str(), self.edits);
-        let edit = json!({
-            "proposal": self.proposal,
-            "change": { "replace": { "draft": self.draft(tool, note) } },
-            "base_revision": self.editing,
-            "patch_id": patch_id,
-        });
-        let output = tools.call(actor, "edit_proposal", edit).await?;
-        self.editing = editing_revision(&output);
+        let patch_id = patch_id.parse().map_err(|error| ToolError::Failed {
+            message: format!("an overflow edit's patch id did not parse: {error:?}"),
+        })?;
+        let draft = draft(
+            tool,
+            note,
+            self.destination_revision,
+            self.mutations.clone(),
+        )?;
+        let edit = EditProposal {
+            proposal: self.proposal.clone(),
+            change: ProposalChange::Replace { draft },
+            base_revision: self.editing,
+            patch_id,
+        };
+        let output = tools.edit_proposal_as(actor, edit).await?;
+        self.editing = output.editing_revision().unwrap_or(Revision::NONE);
         Ok(output)
     }
-}
-
-/// The editing revision a proposal tool's output names: the proposal's own, or its
-/// receipt's.
-fn editing_revision(output: &Value) -> Revision {
-    let named = output["proposal"]["revision"]
-        .as_u64()
-        .or_else(|| output["receipt"]["revision"].as_u64());
-    let revision = named.and_then(|revision| u32::try_from(revision).ok());
-    serde_json::from_value(json!(revision.unwrap_or(0))).unwrap_or(Revision::NONE)
 }

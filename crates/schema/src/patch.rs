@@ -821,6 +821,24 @@ pub enum ChangeClass {
     State,
 }
 
+impl ChangeClass {
+    /// What a change of this class is, in words: what the assistant tells its model about
+    /// which of its writes apply directly.
+    #[must_use]
+    pub const fn meaning(self) -> &'static str {
+        match self {
+            ChangeClass::Structural => {
+                "a change to what the graph is (its nodes, edges, roles, conditions, date \
+                 rules, resources), or any change to a route or its draft"
+            }
+            ChangeClass::State => {
+                "a change to what has happened in a journey (transitions, answers, \
+                 participations, pins, dates, snoozes, notes, overrides)"
+            }
+        }
+    }
+}
+
 impl Mutation {
     /// PRD glossary, Structural change: what this mutation is in a journey or the
     /// deployment. Every change to a route is structural ([`Patch::change_class`]).

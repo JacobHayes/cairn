@@ -4,13 +4,14 @@
 
 use std::collections::BTreeSet;
 
+use cairn_schema::limits::PAGE_ITEM_COUNT_MAX;
 use cairn_schema::{
     Actor, Deployment, Email, Identity, IdentityKey, KeyAllocator, Mutation, Mutations, Patch,
     PatchId, PatchTarget, Revision, Title, UserId, mint,
 };
 use cairn_store::LoginRecord;
 
-use crate::{Call, DomainPatch, Service, ServiceError, WriteError};
+use crate::{Call, DomainPatch, ReadError, Service, ServiceError, WriteError};
 
 /// How many times an arrival tries to create the identity before giving up: a lost race
 /// costs one more try, and nothing in a sound deployment costs three.
@@ -148,8 +149,12 @@ impl Service {
     ///
     /// # Errors
     ///
-    /// When the store fails.
-    pub async fn user_names(&self, users: &[UserId]) -> Result<Vec<UserName>, ServiceError> {
+    /// [`ReadError::TooManyUsers`] for more users than a page holds; when the store fails.
+    pub async fn user_names(&self, users: &[UserId]) -> Result<Vec<UserName>, ReadError> {
+        // PRACTICES: Explicit limits.
+        if !u32::try_from(users.len()).is_ok_and(|count| count <= PAGE_ITEM_COUNT_MAX) {
+            return Err(ReadError::TooManyUsers { count: users.len() });
+        }
         let deployment = self.deployment().await?;
         let mut names = Vec::with_capacity(users.len());
         for user in users {

@@ -18,4 +18,7 @@ mod toolset;
 
 pub use error::ToolError;
 pub use server::{MCP_PATH, TOOL_CALL_DURATION, TOOL_CALLS, UNKNOWN_TOOL, router};
-pub use toolset::{ToolDefinition, ToolSet};
+pub use tools::{
+    CreateProposal, EditProposal, ProposalCall, ProposalChange, ProposalOutput, WriteOutput,
+};
+pub use toolset::{ToolDefinition, ToolSet, Writes};

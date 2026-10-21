@@ -23,8 +23,8 @@ pub struct ToolDefinition {
     pub name: &'static str,
     /// What it does and when to use it, for the agent.
     pub description: &'static str,
-    /// Whether it writes (a patch or a proposal); a tool that does not only reads.
-    pub writes: bool,
+    /// What it writes; a tool that writes nothing only reads.
+    pub writes: Writes,
     /// The JSON Schema of its arguments: an object.
     pub input_schema: Map<String, Value>,
     /// The JSON Schema of what it answers when it succeeds: an object. Not listed over MCP
@@ -33,12 +33,40 @@ pub struct ToolDefinition {
     pub output_schema: Map<String, Value>,
 }
 
+// PRD: I5, I7.
+/// What a tool writes: what the endpoint's annotations say of it, and what the assistant's
+/// write wrapper decides its calls by.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum Writes {
+    /// Nothing: it reads.
+    Nothing,
+    /// One patch it drafts from its arguments, which [`ToolSet::drafted_patch`] works out
+    /// without writing.
+    Patch,
+    /// One patch Cairn builds from a file the caller hands it: what it writes is known only
+    /// once it is written.
+    File,
+    /// A proposal, for someone to review: nothing reaches its destination until one is
+    /// applied.
+    Proposal,
+    /// A reviewed proposal applied to its destination, the caller recorded as confirming it.
+    Confirmation,
+}
+
+impl Writes {
+    /// Whether it writes anything.
+    #[must_use]
+    pub const fn any(self) -> bool {
+        !matches!(self, Writes::Nothing)
+    }
+}
+
 /// A tool's entry in a module's table: its definition but for the schema, which is generated
 /// from its arguments' type on demand.
 pub(crate) struct Spec {
     pub name: &'static str,
     pub description: &'static str,
-    pub writes: bool,
+    pub writes: Writes,
     /// A write that may undo or overwrite what is there (a skip, a clear, a discard, a
     /// merge, any patch), not only add to it: the MCP `destructiveHint`.
     pub destructive: bool,
@@ -150,6 +178,14 @@ impl ToolSet {
         Self { service, clock }
     }
 
+    /// A call made now as `actor`.
+    pub(crate) fn call_as(&self, actor: &Actor) -> Call {
+        Call {
+            actor: actor.clone(),
+            now: self.clock.now(),
+        }
+    }
+
     /// Every tool, in the order they are listed to an agent.
     #[must_use]
     pub fn definitions() -> Vec<ToolDefinition> {
@@ -178,10 +214,7 @@ impl ToolSet {
         name: &str,
         arguments: Value,
     ) -> Result<Value, ToolError> {
-        let call = Call {
-            actor: actor.clone(),
-            now: self.clock.now(),
-        };
+        let call = self.call_as(actor);
         match tools::group_of(name) {
             Some(tools::Group::Derive) => self.derive(&call, name, arguments).await,
             Some(tools::Group::Read) => self.read(&call, name, arguments).await,
@@ -206,19 +239,14 @@ impl ToolSet {
         actor: &Actor,
         patch: &Patch,
     ) -> Result<Result<TouchedSet, Rejection>, ToolError> {
-        let call = Call {
-            actor: actor.clone(),
-            now: self.clock.now(),
-        };
-        Ok(self.service.touched(&call, patch).await?)
+        Ok(self.service.touched(&self.call_as(actor), patch).await?)
     }
 
     // PRD: I5.
     /// The domain patch the direct-write tool `name` would submit for `arguments`, worked
     /// out as [`call`](Self::call) would, without writing anything: what the assistant's
     /// write wrapper reads to decide whether a write applies directly or becomes a proposal.
-    /// `None` for a tool that submits no domain patch of its own drafting: the reads,
-    /// the proposal tools, and `import_route` (the service builds its patch from the file).
+    /// `None` for a tool that drafts no patch from its arguments (any but [`Writes::Patch`]).
     ///
     /// # Errors
     ///
@@ -229,11 +257,10 @@ impl ToolSet {
         name: &str,
         arguments: Value,
     ) -> Result<Option<DomainPatch>, ToolError> {
-        match tools::group_of(name) {
-            Some(tools::Group::Write) => self.drafted_patch_of(name, arguments).await,
-            Some(tools::Group::Derive | tools::Group::Read | tools::Group::Propose) | None => {
-                Ok(None)
-            }
+        match tools::spec(name).map(|spec| spec.writes) {
+            Some(Writes::Patch) => self.drafted_patch_of(name, arguments).await,
+            Some(Writes::Nothing | Writes::File | Writes::Proposal | Writes::Confirmation)
+            | None => Ok(None),
         }
     }
 }

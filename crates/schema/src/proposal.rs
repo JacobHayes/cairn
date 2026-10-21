@@ -864,25 +864,43 @@ impl fmt::Display for NestedProposalError {
 
 impl std::error::Error for NestedProposalError {}
 
+impl ProposalDraft {
+    /// A proposal's content, checked: none of its mutations edits a proposal.
+    ///
+    /// # Errors
+    ///
+    /// [`NestedProposalError`] when one does.
+    pub fn new(
+        title: Title,
+        description: Option<Markdown>,
+        destination_revision: Revision,
+        mutations: BoundedVec<Mutation, MutationCountPerPatch>,
+        items: BoundedVec<ReviewItem, ByDocumentSize>,
+    ) -> Result<Self, NestedProposalError> {
+        if mutations.as_slice().iter().any(Mutation::edits_a_proposal) {
+            return Err(NestedProposalError);
+        }
+        Ok(Self {
+            title,
+            description,
+            destination_revision,
+            mutations,
+            items,
+        })
+    }
+}
+
 impl TryFrom<ProposalDraftWire> for ProposalDraft {
     type Error = NestedProposalError;
 
     fn try_from(wire: ProposalDraftWire) -> Result<Self, NestedProposalError> {
-        if wire
-            .mutations
-            .as_slice()
-            .iter()
-            .any(Mutation::edits_a_proposal)
-        {
-            return Err(NestedProposalError);
-        }
-        Ok(Self {
-            title: wire.title,
-            description: wire.description,
-            destination_revision: wire.destination_revision,
-            mutations: wire.mutations,
-            items: wire.items,
-        })
+        Self::new(
+            wire.title,
+            wire.description,
+            wire.destination_revision,
+            wire.mutations,
+            wire.items,
+        )
     }
 }
 

@@ -17,7 +17,7 @@ use serde::{Deserialize, Serialize};
 use serde_json::Value;
 
 use super::{Cut, Paged, page};
-use crate::toolset::{Spec, output, parse, schema};
+use crate::toolset::{Spec, Writes, output, parse, schema};
 use crate::{ToolError, ToolSet};
 
 /// The store-backed read tools.
@@ -28,7 +28,7 @@ pub(crate) const SPECS: &[Spec] = &[
             status, route version, revision, and whether an upgrade is available. Filter by \
             status, route, upgrade available, the caller's own, or the journeys that refer to \
             given identities (directly or through a merged key).",
-        writes: false,
+        writes: Writes::Nothing,
         destructive: false,
         schema: schema::<ListJourneys>,
         output: schema::<JourneysOutput>,
@@ -38,7 +38,7 @@ pub(crate) const SPECS: &[Spec] = &[
         description: "The deployment's identities (people and teams journeys refer to), in key \
             order, a page at a time: each one's key, name, emails, and the keys merged into \
             it. Pass text to list the ones whose name or an email contains it.",
-        writes: false,
+        writes: Writes::Nothing,
         destructive: false,
         schema: schema::<ListIdentities>,
         output: schema::<IdentitiesOutput>,
@@ -49,7 +49,7 @@ pub(crate) const SPECS: &[Spec] = &[
             kind (absent means a process; a segment is a reusable piece that is inserted, \
             never started), revision, latest published version, and whether a draft is open. \
             Pass kind to list one kind.",
-        writes: false,
+        writes: Writes::Nothing,
         destructive: false,
         schema: schema::<ListRoutes>,
         output: schema::<RoutesOutput>,
@@ -58,7 +58,7 @@ pub(crate) const SPECS: &[Spec] = &[
         name: "get_route",
         description: "A route's draft, or a published version by number, with its kind: its roles, \
             participation kinds, default owner, and a page of its nodes in key order.",
-        writes: false,
+        writes: Writes::Nothing,
         destructive: false,
         schema: schema::<GetRoute>,
         output: schema::<RouteOutput>,
@@ -67,7 +67,7 @@ pub(crate) const SPECS: &[Spec] = &[
         name: "export_route",
         description: "A published version, or the draft, as a route file in YAML, every key \
             kept.",
-        writes: false,
+        writes: Writes::Nothing,
         destructive: false,
         schema: schema::<ExportRoute>,
         output: schema::<ExportOutput>,
@@ -80,7 +80,7 @@ pub(crate) const SPECS: &[Spec] = &[
             active journey that refers to them), or the ones that would create a journey or a \
             route. Use it to find a proposal again whose id you lost; then fetch it with \
             `get_proposal`.",
-        writes: false,
+        writes: Writes::Nothing,
         destructive: false,
         schema: schema::<ListProposals>,
         output: schema::<ProposalsOutput>,
@@ -92,7 +92,7 @@ pub(crate) const SPECS: &[Spec] = &[
             every violation, the frontier after, consequences, a route draft's notices, and \
             whether its destination moved since it was drafted (then refresh it with \
             `edit_proposal`).",
-        writes: false,
+        writes: Writes::Nothing,
         destructive: false,
         schema: schema::<GetProposal>,
         output: schema::<ProposalOutput>,
@@ -102,7 +102,7 @@ pub(crate) const SPECS: &[Spec] = &[
         description: "Text search across journeys (names, descriptions, node titles and \
             descriptions, notes, resources), a page of journeys at a time, each with where \
             the text was found.",
-        writes: false,
+        writes: Writes::Nothing,
         destructive: false,
         schema: schema::<Search>,
         output: schema::<SearchOutput>,
@@ -111,7 +111,7 @@ pub(crate) const SPECS: &[Spec] = &[
         name: "get_history",
         description: "A journey's history, or one node's, grouped by patch, a page at a time: \
             who did what and when, with each patch's note.",
-        writes: false,
+        writes: Writes::Nothing,
         destructive: false,
         schema: schema::<GetHistory>,
         output: schema::<HistoryOutput>,

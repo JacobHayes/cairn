@@ -140,6 +140,7 @@ impl From<ReadError> for ToolError {
         match error {
             ReadError::JourneyMissing(id) => ToolError::not_found(format_args!("journey {id}")),
             ReadError::ProposalMissing(id) => ToolError::not_found(format_args!("proposal {id}")),
+            ReadError::TooManyUsers { .. } => ToolError::refused(error),
             ReadError::Projection(error) => ToolError::NotFound {
                 message: error.to_string(),
             },

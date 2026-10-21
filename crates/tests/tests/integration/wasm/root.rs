@@ -7,7 +7,8 @@
 use std::time::Duration;
 
 use cairn_api::wire;
-use cairn_schema::{DomainDocument, Rejection, RevisionOf};
+use cairn_schema::limits::PAGE_ITEM_COUNT_MAX;
+use cairn_schema::{DomainDocument, Rejection, RevisionOf, UserId};
 use cairn_store::limits::SSE_COALESCING_INTERVAL;
 use cairn_wasm::{BrowserRoot, HostError, PatchAnswer, Taken, Tick, read_document};
 
@@ -368,4 +369,22 @@ fn the_local_user_is_given_an_identity_when_none_holds_their_email() {
             .identities
             .contains(&before.identities.iter().next().unwrap().clone())
     );
+}
+
+/// H3: the in-browser host names at most a page of users in one read, as the server does,
+/// and refuses more as a request the caller can change.
+#[test]
+fn naming_more_users_than_a_page_holds_is_refused() {
+    let root = BrowserRoot::seeded().unwrap();
+    let page = usize::try_from(PAGE_ITEM_COUNT_MAX).unwrap();
+    let users = |count: usize| -> Vec<UserId> {
+        (0..count)
+            .map(|each| format!("u_user{each}").parse().unwrap())
+            .collect()
+    };
+    assert_eq!(root.user_names_now(&users(page)), Ok(Vec::new()));
+    assert!(matches!(
+        root.user_names_now(&users(page + 1)),
+        Err(HostError::Refused { .. })
+    ));
 }

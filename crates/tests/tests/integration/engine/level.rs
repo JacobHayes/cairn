@@ -10,7 +10,7 @@ use std::collections::{BTreeMap, BTreeSet};
 
 use cairn_engine::{DerivedJourney, ProjectionError, Records};
 use cairn_schema::{
-    DisplayState, EdgeOrigin, Level, LevelDisplay, LevelNode, LevelQuery, NodeKind, Score,
+    DisplayState, EdgeOrigin, Level, LevelDisplay, LevelNode, LevelQuery, NodeKind,
 };
 use support::{add_nodes as add, key};
 
@@ -387,10 +387,6 @@ fn a_container_rolls_up_its_childrens_badges() {
         .map(cairn_schema::IdentityKey::as_str)
         .collect();
     assert_eq!(owners, ["who_a", "who_b"]);
-    assert_eq!(
-        badges.max_child_gravity,
-        Some(Score::from_millionths(1_000_000))
-    );
     assert!(!badges.all_blocked, "the decision is open to act on");
     assert_eq!(group.display_state, DisplayState::Ready);
     assert!(

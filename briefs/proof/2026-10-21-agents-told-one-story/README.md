@@ -38,5 +38,5 @@ a deliverable waiting on its own pieces no longer reads as all blocked.
 
 ## Known limits
 
-- A key shown in capitals (text the page sets in upper case) is not detected.
-- `max_child_gravity` is still served beside `subtree_gravity`.
+- None known: a key the page sets in capitals is caught too, and the deprecated child-gravity
+  field is gone, since nothing read it.

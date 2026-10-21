@@ -12,17 +12,21 @@
 //!   limit: a bulk request split into many calls is still one change, and what would carry
 //!   the turn past the limit is drafted as one proposal ([`Ledger`]).
 //!
-//! The proposal tools draft proposals already and pass through. Applying a proposal is the
-//! user's click (I7), and importing a route file is the user's too, so both are refused; so
-//! is any write tool whose patch the wrapper cannot see, which keeps a write tool added later
-//! from slipping past it.
+//! Each tool says what it writes ([`Writes`]), and the wrapper decides by that: the proposal
+//! tools draft proposals already and pass through. Applying a proposal is the user's click
+//! (I7), and importing a file is the user's too, so both are refused ([`refusal`]); so is a
+//! patch tool whose patch the wrapper cannot see, which keeps a write tool added later from
+//! slipping past it.
 
 use std::collections::{BTreeMap, BTreeSet};
 
-use cairn_mcp::{ToolError, ToolSet};
+use cairn_mcp::{
+    CreateProposal, ProposalCall, ProposalOutput, ToolError, ToolSet, WriteOutput, Writes,
+};
 use cairn_schema::{
-    Actor, ChangeClass, Consequences, Domain, Graph, JourneyId, NodeKey, Patch, PatchReceipt,
-    PatchTarget, ProposalId, Rejection, Revision, Title,
+    Actor, BoundedVec, ChangeClass, Consequences, Domain, Graph, JourneyId, Markdown, Mutation,
+    NodeKey, Patch, PatchReceipt, PatchTarget, ProposalDraft, ProposalId, Rejection, Revision,
+    Title,
 };
 use cairn_service::DomainPatch;
 use cairn_store::{Document, LoadTarget, Store};
@@ -36,28 +40,21 @@ pub use crate::touched::touched_nodes;
 
 use crate::limits::DIRECT_WRITE_NODE_COUNT_MAX;
 
-/// The tools that draft a proposal themselves: they pass through, since review is where a
-/// proposal goes.
-pub const PROPOSAL_TOOLS: [&str; 5] = [
-    "create_proposal",
-    "edit_proposal",
-    "upgrade",
-    "save_as_route",
-    "relink",
-];
-
-/// The write tools the assistant never runs, with why: what they do is the user's to do.
-pub const REFUSED_TOOLS: [(&str, &str); 2] = [
-    (
-        "apply_proposal",
-        "applying a proposal is the user's click: tell them it is ready for review",
-    ),
-    (
-        "import_route",
-        "importing a route file is the user's to do; draft the route's nodes as a proposal \
-         instead",
-    ),
-];
+// PRD: I7.
+/// Why the assistant never runs a tool that writes `writes`, when it is the user's to do;
+/// `None` for what the assistant may write.
+#[must_use]
+pub const fn refusal(writes: Writes) -> Option<&'static str> {
+    match writes {
+        Writes::Confirmation => {
+            Some("applying a proposal is the user's click: tell them it is ready for review")
+        }
+        Writes::File => {
+            Some("importing a file is the user's to do; draft what it holds as a proposal instead")
+        }
+        Writes::Nothing | Writes::Patch | Writes::Proposal => None,
+    }
+}
 
 /// What the wrapper does with one tool call (I5).
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -184,17 +181,16 @@ pub async fn decide(
     let writes = ToolSet::definitions()
         .into_iter()
         .find(|definition| definition.name == name)
-        .is_some_and(|definition| definition.writes);
-    if !writes {
-        return Ok(Decision::Read);
+        .map_or(Writes::Nothing, |definition| definition.writes);
+    if let Some(why) = refusal(writes) {
+        return Ok(Decision::Refused(why.to_owned()));
     }
-    if let Some((_, why)) = REFUSED_TOOLS.iter().find(|(refused, _)| *refused == name) {
-        return Ok(Decision::Refused((*why).to_owned()));
+    match writes {
+        Writes::Nothing => return Ok(Decision::Read),
+        Writes::Proposal => return Ok(Decision::Proposal),
+        Writes::Patch | Writes::File | Writes::Confirmation => {}
     }
     let Some(drafted) = tools.drafted_patch(name, arguments.clone()).await? else {
-        if PROPOSAL_TOOLS.contains(&name) {
-            return Ok(Decision::Proposal);
-        }
         return Ok(Decision::Refused(format!(
             "the assistant cannot tell what {name} would change, so it does not run it"
         )));
@@ -301,9 +297,7 @@ pub async fn run(
     match decision {
         Decision::Refused(message) => not_run(ToolError::Refused { message }),
         Decision::Rejected(rejection) => not_run(ToolError::Rejected { rejection }),
-        Decision::Propose(because, drafted) => {
-            propose(tools, actor, name, &arguments, &drafted, because).await
-        }
+        Decision::Propose(because, drafted) => propose(tools, actor, name, &drafted, because).await,
         Decision::Direct {
             drafted,
             nodes,
@@ -312,9 +306,8 @@ pub async fn run(
             let domain = drafted.patch().target.domain();
             let count = ledger.with(&domain, &nodes);
             if !within_limit(count) {
-                let note = arguments.get("note").and_then(Value::as_str);
                 return ledger
-                    .overflow(tools, actor, (name, note), &drafted, current, &nodes)
+                    .overflow(tools, actor, name, &drafted, current, &nodes)
                     .await;
             }
             let answer = tools.call(actor, name, arguments).await;
@@ -329,19 +322,19 @@ pub async fn run(
             Outcome { answer, action }
         }
         Decision::Proposal => {
-            let proposal = arguments.get("proposal").cloned();
-            let discards = arguments.get("change").and_then(Value::as_str) == Some("discard");
+            let call = ToolSet::proposal_call(name, &arguments);
             let answer = tools.call(actor, name, arguments).await;
             let action = answer.as_ref().ok().and_then(|output| {
-                let proposal = serde_json::from_value(proposal?).ok()?;
+                let ProposalCall { proposal, discards } = call?;
                 let tool = name.to_owned();
                 Some(if discards {
                     Action::Discarded { tool, proposal }
                 } else {
+                    let output: ProposalOutput = serde_json::from_value(output.clone()).ok()?;
                     Action::Proposed {
                         tool,
                         proposal,
-                        destination: destination_of(output)?,
+                        destination: output.destination()?.clone(),
                         because: Because::Asked,
                     }
                 })
@@ -370,27 +363,24 @@ async fn propose(
     tools: &ToolSet,
     actor: &Actor,
     name: &str,
-    arguments: &Value,
     drafted: &DomainPatch,
     because: Because,
 ) -> Outcome {
     let patch = drafted.patch();
     let proposal = proposal_id(patch);
-    let note = arguments.get("note").and_then(Value::as_str);
-    let mutations = patch.mutations.as_slice();
-    let draft = json!({
-        "title": title(name, note, mutations.len()),
-        "description": note,
-        "destination_revision": patch.base_revision,
-        "mutations": mutations,
-    });
-    let create = json!({
-        "proposal": proposal,
-        "destination": patch.target.domain(),
-        "draft": draft,
-        "patch_id": patch.id,
-    });
-    let answer = tools.call(actor, "create_proposal", create).await;
+    let mutations = patch.mutations.as_slice().to_vec();
+    let answer = match draft(name, drafted.note(), patch.base_revision, mutations) {
+        Ok(draft) => {
+            let create = CreateProposal {
+                proposal: proposal.clone(),
+                destination: patch.target.domain(),
+                draft,
+                patch_id: patch.id.clone(),
+            };
+            tools.create_proposal_as(actor, create).await
+        }
+        Err(error) => Err(error),
+    };
     match answer {
         Ok(output) => {
             patina_dst::sometimes!(
@@ -415,15 +405,36 @@ async fn propose(
     }
 }
 
-/// The destination a proposal tool's answer is about: the proposal's, or, when the answer
-/// is only a receipt (a write answered from an earlier one), the receipt's domain, which is
-/// the proposal's destination.
-fn destination_of(output: &Value) -> Option<Domain> {
-    let proposal = output
-        .get("proposal")
-        .and_then(|held| held.get("destination"));
-    let receipt = output.get("receipt").and_then(|held| held.get("domain"));
-    serde_json::from_value(proposal.or(receipt)?.clone()).ok()
+/// The content of a proposal the assistant drafts for the tool `tool`: `mutations` against
+/// `destination_revision`, titled and described by the write's note.
+///
+/// # Errors
+///
+/// [`ToolError::Arguments`] when there are more mutations than one proposal holds, or one of
+/// them edits a proposal.
+pub(crate) fn draft(
+    tool: &str,
+    note: Option<&Markdown>,
+    destination_revision: Revision,
+    mutations: Vec<Mutation>,
+) -> Result<ProposalDraft, ToolError> {
+    let count = mutations.len();
+    let mutations = BoundedVec::new(mutations).map_err(|error| ToolError::Arguments {
+        path: "draft.mutations".to_owned(),
+        message: error.to_string(),
+    })?;
+    let title = title(tool, note.map(Markdown::as_str), count);
+    ProposalDraft::new(
+        title,
+        note.cloned(),
+        destination_revision,
+        mutations,
+        BoundedVec::default(),
+    )
+    .map_err(|error| ToolError::Arguments {
+        path: "draft.mutations".to_owned(),
+        message: error.to_string(),
+    })
 }
 
 /// The proposal id a write drafted as a proposal is filed under: `pr_` and a digest of its
@@ -456,21 +467,14 @@ pub(crate) fn title(tool: &str, note: Option<&str>, count: usize) -> Title {
         })
 }
 
-/// A direct write's output, as the tool set answers it.
-#[derive(Deserialize)]
-struct Written {
-    receipt: PatchReceipt,
-    #[serde(default)]
-    consequences: BTreeMap<JourneyId, Consequences>,
-}
-
 /// The applied action a direct write's output reports.
 fn applied(tool: &str, output: &Value, nodes: &BTreeSet<NodeKey>) -> Option<Action> {
-    let written: Written = serde_json::from_value(output.clone()).ok()?;
+    let written: WriteOutput = serde_json::from_value(output.clone()).ok()?;
+    let (receipt, consequences) = written.into_parts();
     Some(Action::Applied {
         tool: tool.to_owned(),
-        receipt: written.receipt,
+        receipt,
         nodes: nodes.iter().cloned().collect(),
-        consequences: written.consequences,
+        consequences,
     })
 }

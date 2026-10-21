@@ -249,7 +249,7 @@ async fn every_write_tool_is_decided_by_mutation_kind_and_destination() {
     let covered: BTreeSet<&str> = cases.iter().map(|(name, _, _)| *name).collect();
     let writes: BTreeSet<&str> = ToolSet::definitions()
         .into_iter()
-        .filter(|definition| definition.writes)
+        .filter(|definition| definition.writes.any())
         .map(|definition| definition.name)
         .collect();
     assert_eq!(covered, writes, "a case for every write tool, and no other");
@@ -269,7 +269,7 @@ async fn every_write_tool_is_decided_by_mutation_kind_and_destination() {
     }
     for read in ToolSet::definitions()
         .into_iter()
-        .filter(|definition| !definition.writes)
+        .filter(|definition| !definition.writes.any())
     {
         let decided = wrapper::decide(
             &world.tools,
@@ -376,6 +376,36 @@ async fn a_weight_change_is_proposed_on_a_draft_and_applied_on_a_journey() {
     };
     assert_eq!(receipt.revision.get(), 2);
     assert_eq!(world.journey_revision(JOURNEY).await, 2);
+}
+
+/// I6: a write the assistant drafts as a proposal is held to what a proposal may hold, as one
+/// drafted with `create_proposal` is: a mutation that edits a proposal is refused, and nothing
+/// is saved.
+#[tokio::test]
+async fn a_drafted_proposal_cannot_hold_a_proposal_edit() {
+    let world = World::new();
+    let ann = user("u_ann");
+    world.vendor_journey(&ann).await;
+    let draft = world.open_vendor_draft(&ann).await;
+    let assistant = assisting("u_ann");
+    let nested = json!({ "patch": { "id": "p_nested", "target": { "route": ROUTE },
+        "base_revision": draft, "mutations": [{ "op": "discard_proposal" }] } });
+    let outcome = run(&world, &assistant, "apply_patch", nested).await;
+    assert!(
+        matches!(outcome.answer, Err(ToolError::Arguments { .. })),
+        "{outcome:?}"
+    );
+    assert_eq!(outcome.action, None);
+    let listed = world
+        .tools
+        .call(
+            &assistant,
+            "list_proposals",
+            json!({ "scope": "destination", "destination": { "route": ROUTE } }),
+        )
+        .await
+        .unwrap();
+    assert_eq!(listed["count"], 0, "{listed}");
 }
 
 /// I5: a state change touching more than ten nodes is one proposal, so a misheard bulk

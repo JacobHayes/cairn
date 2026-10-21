@@ -642,13 +642,6 @@ pub struct NodeDerived {
     pub gravity: Score,
     /// The contributors to gravity.
     pub gravity_from: Explained<Contribution>,
-    /// A container's largest child gravity, one level down.
-    ///
-    /// Deprecated: read `subtree_gravity`, the gravity of the container's whole area. Kept so
-    /// existing clients keep reading it.
-    #[serde(skip_serializing_if = "Option::is_none")]
-    #[schemars(extend("deprecated" = true))]
-    pub max_child_gravity: Option<Score>,
     /// A container's subtree gravity (Priority): what rides on its whole area, the counted
     /// weight of the container and its open descendants and everything downstream of any of
     /// them, each once. Never less than any member's `gravity`; none for a node with no

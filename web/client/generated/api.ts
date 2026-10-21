@@ -3361,14 +3361,6 @@ export interface components {
             gravity: components["schemas"]["Score"];
             /** @description The contributors to gravity. */
             gravity_from: components["schemas"]["ExplainedContribution"];
-            /**
-             * @deprecated
-             * @description A container's largest child gravity, one level down.
-             *
-             *     Deprecated: read `subtree_gravity`, the gravity of the container's whole area. Kept so
-             *     existing clients keep reading it.
-             */
-            max_child_gravity?: components["schemas"]["Score"] | null;
             /** @description Its seeding identity left the role it was broken down by. */
             membership_lost?: boolean;
             /** @description A placeholder with no children that is not atomic. */
@@ -4739,13 +4731,6 @@ export interface components {
             /** @description A child is `active`. */
             children_active?: boolean;
             /**
-             * @deprecated
-             * @description The largest in-scope child gravity (Priority), one level down.
-             *
-             *     Deprecated: read `subtree_gravity`, the gravity of the container's whole area.
-             */
-            max_child_gravity?: components["schemas"]["Score"] | null;
-            /**
              * Format: int32
              * @description The least slack among in-scope, open children; none when none has a deadline.
              */
@@ -5806,7 +5791,7 @@ export interface operations {
                 after_at?: string;
                 /** @description The page starts after this proposal (with `after_at`). */
                 after?: components["schemas"]["ProposalId"];
-                /** @description Items per page, 1 to the page limit (200); larger sizes are cut to it. */
+                /** @description Items per page, 1 to the page limit, the maximum; larger sizes are cut to it. */
                 size?: number;
             };
             header?: never;
@@ -6625,7 +6610,7 @@ export interface operations {
                 until?: string;
                 /** @description The page starts after this position in the log. */
                 after?: number;
-                /** @description Items per page, 1 to the page limit (200); larger sizes are cut to it. */
+                /** @description Items per page, 1 to the page limit, the maximum; larger sizes are cut to it. */
                 size?: number;
             };
             header?: never;
@@ -6775,7 +6760,7 @@ export interface operations {
                 upgrade_available?: boolean;
                 /** @description The page starts after this journey. */
                 after?: components["schemas"]["JourneyId"];
-                /** @description Items per page, 1 to the page limit (200); larger sizes are cut to it. */
+                /** @description Items per page, 1 to the page limit, the maximum; larger sizes are cut to it. */
                 size?: number;
             };
             header?: never;
@@ -8092,7 +8077,7 @@ export interface operations {
                 after_at?: string;
                 /** @description The page starts after this proposal (with `after_at`). */
                 after?: components["schemas"]["ProposalId"];
-                /** @description Items per page, 1 to the page limit (200); larger sizes are cut to it. */
+                /** @description Items per page, 1 to the page limit, the maximum; larger sizes are cut to it. */
                 size?: number;
             };
             header?: never;
@@ -9623,7 +9608,7 @@ export interface operations {
                 after_at?: string;
                 /** @description The page starts after this proposal (with `after_at`). */
                 after?: components["schemas"]["ProposalId"];
-                /** @description Items per page, 1 to the page limit (200); larger sizes are cut to it. */
+                /** @description Items per page, 1 to the page limit, the maximum; larger sizes are cut to it. */
                 size?: number;
             };
             header?: never;
@@ -9696,7 +9681,7 @@ export interface operations {
                 kind?: components["schemas"]["RouteKind"];
                 /** @description The page starts after this route. */
                 after?: components["schemas"]["RouteId"];
-                /** @description Items per page, 1 to the page limit (200); larger sizes are cut to it. */
+                /** @description Items per page, 1 to the page limit, the maximum; larger sizes are cut to it. */
                 size?: number;
             };
             header?: never;
@@ -10344,7 +10329,7 @@ export interface operations {
                 after_at?: string;
                 /** @description The page starts after this proposal (with `after_at`). */
                 after?: components["schemas"]["ProposalId"];
-                /** @description Items per page, 1 to the page limit (200); larger sizes are cut to it. */
+                /** @description Items per page, 1 to the page limit, the maximum; larger sizes are cut to it. */
                 size?: number;
             };
             header?: never;
@@ -11345,7 +11330,7 @@ export interface operations {
                 text: components["schemas"]["Title"];
                 /** @description The page starts after this journey. */
                 after?: components["schemas"]["JourneyId"];
-                /** @description Items per page, 1 to the page limit (200); larger sizes are cut to it. */
+                /** @description Items per page, 1 to the page limit, the maximum; larger sizes are cut to it. */
                 size?: number;
             };
             header?: never;
@@ -11414,7 +11399,7 @@ export interface operations {
     listUserNames: {
         parameters: {
             query: {
-                /** @description The users to name, at most the page limit (200); one that does not exist is left out. */
+                /** @description The users to name, at most a page of them; one that does not exist is left out. */
                 id: components["schemas"]["UserId"][];
             };
             header?: never;

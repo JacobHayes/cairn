@@ -82,10 +82,10 @@ impl ServerHandler for Server {
         let tools = ToolSet::definitions().into_iter().map(|definition| {
             let destructive = tools::spec(definition.name).is_some_and(|spec| spec.destructive);
             let mut annotations = ToolAnnotations::new()
-                .read_only(!definition.writes)
+                .read_only(!definition.writes.any())
                 .destructive(destructive);
             // A write resubmitted under its patch id is answered from its receipt (H5).
-            annotations.idempotent_hint = Some(definition.writes);
+            annotations.idempotent_hint = Some(definition.writes.any());
             // Output schemas stay out of the list: an agent reads the output it gets, and they
             // would multiply the list's size, per
             // decisions/2026-10-06-the-tool-list-carries-the-mutation-vocabulary-once-and-no.md.
@@ -184,7 +184,7 @@ async fn observed(
         .map(str::to_owned);
     let span = tracing::info_span!("tool", tool, patch_id = patch_id.as_deref());
     let started = Instant::now();
-    let answer = if spec.writes {
+    let answer = if spec.writes.any() {
         let task = tokio::spawn(async move { tools.call(&actor, tool, arguments).await });
         task.await.unwrap_or_else(|error| {
             Err(ToolError::Failed {

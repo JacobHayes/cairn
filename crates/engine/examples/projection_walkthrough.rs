@@ -197,8 +197,8 @@ fn level_table(level: &Level, out: &mut String) -> Result<()> {
                     badges.push(name.to_owned());
                 }
             }
-            if let Some(gravity) = roll.max_child_gravity {
-                badges.push(format!("max child gravity {}", gravity.value()));
+            if let Some(gravity) = roll.subtree_gravity {
+                badges.push(format!("subtree gravity {}", gravity.value()));
             }
             if let Some(slack) = roll.min_child_slack_days {
                 badges.push(format!("min child slack {slack}"));

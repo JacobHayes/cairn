@@ -18,7 +18,7 @@ use serde::{Deserialize, Serialize};
 use serde_json::Value;
 
 use super::{At, Paged, page};
-use crate::toolset::{Spec, output, parse, schema};
+use crate::toolset::{Spec, Writes, output, parse, schema};
 use crate::{ToolError, ToolSet};
 
 /// The derived read tools.
@@ -32,7 +32,7 @@ pub(crate) const SPECS: &[Spec] = &[
             by rank, placeholders needing breakdown, unassigned items, shortfalls, and counts by \
             stored state and by display state. Scope it to a subtree and depth; page the node list with `cursor`. Its `revision` is the \
             `base_revision` of a write that follows.",
-        writes: false,
+        writes: Writes::Nothing,
         destructive: false,
         schema: schema::<GetSnapshot>,
         output: schema::<At<SnapshotOutput>>,
@@ -43,7 +43,7 @@ pub(crate) const SPECS: &[Spec] = &[
             node with its breadcrumb and why it ranks where it does. With `filters`, the \
             in-scope nodes they all hold for instead, in rank order; `mine` keeps the \
             caller's own.",
-        writes: false,
+        writes: Writes::Nothing,
         destructive: false,
         schema: schema::<ListFrontier>,
         output: schema::<At<FrontierOutput>>,
@@ -60,7 +60,7 @@ pub(crate) const SPECS: &[Spec] = &[
             brings in, drops, and leaves to be decided later, and what it pins or fills. \
             Explanation lists hold their largest entries; pass `explanations` to page the \
             rest.",
-        writes: false,
+        writes: Writes::Nothing,
         destructive: false,
         schema: schema::<GetNode>,
         output: schema::<At<NodeOutput>>,
@@ -72,7 +72,7 @@ pub(crate) const SPECS: &[Spec] = &[
             and the edges between them. `collapsed` rolls containers into their own cards; \
             `display` limits the relevance classes shown. Nodes are paged; edges are those \
             touching the page.",
-        writes: false,
+        writes: Writes::Nothing,
         destructive: false,
         schema: schema::<GetLevel>,
         output: schema::<At<LevelOutput>>,

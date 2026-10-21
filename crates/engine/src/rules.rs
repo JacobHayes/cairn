@@ -9,7 +9,7 @@
 use std::fmt::Write;
 
 use cairn_schema::id::KEY_PREFIXES;
-use cairn_schema::limits::Limit;
+use cairn_schema::limits::{Limit, PAGE_ITEM_COUNT_MAX};
 use cairn_schema::{DisplayState, JourneyStatus, NodeKind, State};
 
 use crate::transition::{Move, rows};
@@ -101,6 +101,11 @@ fn limits(out: &mut String) {
             limit.max()
         );
     }
+    let _ = writeln!(
+        out,
+        "/** Items in one page, and users one read names: the server refuses more names. */\n\
+         export const PAGE_ITEM_COUNT_MAX = {PAGE_ITEM_COUNT_MAX};"
+    );
     out.push('\n');
 }
 

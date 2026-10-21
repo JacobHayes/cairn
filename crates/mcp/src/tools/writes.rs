@@ -21,7 +21,7 @@ use serde_json::Value;
 
 use super::WriteOutput;
 use crate::toolset::{
-    Spec, output, parse, schema, schema_citing_mutations, schema_citing_review_items,
+    Spec, Writes, output, parse, schema, schema_citing_mutations, schema_citing_review_items,
 };
 use crate::{ToolError, ToolSet};
 
@@ -34,7 +34,7 @@ pub(crate) const SPECS: &[Spec] = &[
             changes what is relevant, fills roles, and pins dates; the result lists the \
             consequences: warnings, and what the answer unlocked, took out of scope, or \
             brought into scope. Name the deployment revision when the answer names identities.",
-        writes: true,
+        writes: Writes::Patch,
         destructive: true,
         schema: schema::<AnswerDecision>,
         output: schema::<WriteOutput>,
@@ -43,7 +43,7 @@ pub(crate) const SPECS: &[Spec] = &[
         name: "transition_node",
         description: "Moves a node through its lifecycle: start, stop, complete, skip (with a \
             reason), reopen, or complete (a milestone). Guards are checked against the result.",
-        writes: true,
+        writes: Writes::Patch,
         destructive: true,
         schema: schema::<TransitionNode>,
         output: schema::<WriteOutput>,
@@ -53,7 +53,7 @@ pub(crate) const SPECS: &[Spec] = &[
         description: "Sets who holds a participation kind (owner, or one of the graph's own) on \
             a node: a role, or explicit identities (an empty list is an explicit none). Omit \
             `source` to clear it, so the node inherits again.",
-        writes: true,
+        writes: Writes::Patch,
         destructive: true,
         schema: schema::<Assign>,
         output: schema::<WriteOutput>,
@@ -64,7 +64,7 @@ pub(crate) const SPECS: &[Spec] = &[
             done. A container (a group, or work with children) with open work beneath it \
             sets its whole subtree aside, each descendant naming it as `snoozed_via`; a \
             target inside the subtree, or depending on anything in it, is rejected.",
-        writes: true,
+        writes: Writes::Patch,
         destructive: true,
         schema: schema::<Snooze>,
         output: schema::<WriteOutput>,
@@ -73,7 +73,7 @@ pub(crate) const SPECS: &[Spec] = &[
         name: "unsnooze",
         description: "Lifts a node's own snooze. A node held only through a container's \
             snooze (`snoozed_via`) is refused, naming the container to unsnooze instead.",
-        writes: true,
+        writes: Writes::Patch,
         destructive: true,
         schema: schema::<Unsnooze>,
         output: schema::<WriteOutput>,
@@ -82,7 +82,7 @@ pub(crate) const SPECS: &[Spec] = &[
         name: "set_date",
         description: "Pins a node to a date, shifts or clears its pin, or records an \
             actual start or finish date.",
-        writes: true,
+        writes: Writes::Patch,
         destructive: true,
         schema: schema::<SetDate>,
         output: schema::<WriteOutput>,
@@ -92,7 +92,7 @@ pub(crate) const SPECS: &[Spec] = &[
         description: "Applies an override to a node with a reason: force include it \
             despite its conditions, keep it under a skipped ancestor, or bypass named guards. \
             Or removes one.",
-        writes: true,
+        writes: Writes::Patch,
         destructive: true,
         schema: schema::<OverrideNode>,
         output: schema::<WriteOutput>,
@@ -103,7 +103,7 @@ pub(crate) const SPECS: &[Spec] = &[
             one of the resolution moves a rejection or a node's dates listed (shift, repin, or \
             unpin a pin; revise a date answer; loosen a rule's offset; shrink an estimate; drop \
             a requirement), then, in the same patch, the mutations that were refused.",
-        writes: true,
+        writes: Writes::Patch,
         destructive: true,
         schema: schema_citing_mutations::<ResolveDateConflict>,
         output: schema::<WriteOutput>,
@@ -112,7 +112,7 @@ pub(crate) const SPECS: &[Spec] = &[
         name: "create_journey",
         description: "Creates a journey, empty or from a published route version, as the \
             first patch against its new id (base revision 0).",
-        writes: true,
+        writes: Writes::Patch,
         destructive: false,
         schema: schema::<CreateJourney>,
         output: schema::<WriteOutput>,
@@ -123,7 +123,7 @@ pub(crate) const SPECS: &[Spec] = &[
             deployment: ordered mutations against a base revision, all or nothing. \
             Structure (nodes, edges, roles, kinds, resources), notes, and bulk changes go \
             here; a proposal is better when someone should review first.",
-        writes: true,
+        writes: Writes::Patch,
         destructive: true,
         schema: schema_citing_review_items::<ApplyPatch>,
         output: schema::<WriteOutput>,
@@ -133,7 +133,7 @@ pub(crate) const SPECS: &[Spec] = &[
         description: "Opens a route's draft for editing, creating the route first when \
             `create` is given (base revision 0). Edit the draft with `apply_patch` or a \
             proposal on the route, then publish it.",
-        writes: true,
+        writes: Writes::Patch,
         destructive: false,
         schema: schema::<OpenDraft>,
         output: schema::<WriteOutput>,
@@ -143,7 +143,7 @@ pub(crate) const SPECS: &[Spec] = &[
         description: "Publishes a route's draft as its next version; journeys on older \
             versions can then upgrade. The result lists notices: work with no chain to or \
             from the final milestone, advisory only.",
-        writes: true,
+        writes: Writes::Patch,
         destructive: false,
         schema: schema::<PublishDraft>,
         output: schema::<WriteOutput>,
@@ -153,7 +153,7 @@ pub(crate) const SPECS: &[Spec] = &[
         description: "Imports a route file (YAML) as a new route, or as a new draft of an \
             existing one matched by key or path. Every violation in the file is listed; the \
             result lists notices, advisory only.",
-        writes: true,
+        writes: Writes::File,
         destructive: false,
         schema: schema::<ImportRoute>,
         output: schema::<WriteOutput>,
@@ -164,7 +164,7 @@ pub(crate) const SPECS: &[Spec] = &[
             or emails (an email links it to the user who signs in with it), merges \
             duplicates into one that remains, or deletes one nothing refers to. A \
             deployment patch.",
-        writes: true,
+        writes: Writes::Patch,
         destructive: true,
         schema: schema::<ManageIdentity>,
         output: schema::<WriteOutput>,

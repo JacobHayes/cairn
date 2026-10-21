@@ -5,7 +5,7 @@
 use std::time::Duration;
 
 /// Items in one page of history, the journey index, or search results: callers page.
-pub const PAGE_ITEM_COUNT_MAX: u32 = 200;
+pub use cairn_schema::limits::PAGE_ITEM_COUNT_MAX;
 /// Store reader connections per process, besides the one writer: each in-flight read
 /// borrows one; every write takes the writer in turn.
 pub const STORE_CONNECTION_COUNT_MAX: u32 = 16;

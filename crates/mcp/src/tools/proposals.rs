@@ -5,7 +5,7 @@
 //! as proposals and reach their destination only when one is applied (B7, B8, B9, I7).
 
 use cairn_schema::{
-    Domain, JourneyId, Lineage, Markdown, PatchId, PatchReceipt, Proposal, ProposalDraft,
+    Actor, Domain, JourneyId, Lineage, Markdown, PatchId, PatchReceipt, Proposal, ProposalDraft,
     ProposalId, Revision, RouteId, Title, VersionNumber,
 };
 use cairn_service::{Call, ProposalWritten};
@@ -14,7 +14,7 @@ use serde::{Deserialize, Serialize};
 use serde_json::Value;
 
 use super::WriteOutput;
-use crate::toolset::{Spec, output, parse, schema, schema_citing_mutations};
+use crate::toolset::{Spec, Writes, output, parse, schema, schema_citing_mutations};
 use crate::{ToolError, ToolSet};
 
 /// The proposal tools.
@@ -31,7 +31,7 @@ pub(crate) const SPECS: &[Spec] = &[
             {\"route\": \"security-review\", \"version\": 1}, \"parent\": \"<node key or \
             omit>\", \"edges\": [{\"node\": {\"segment\": \"<segment node key>\"}, \
             \"requires\": {\"host\": \"<node key>\"}}]}.",
-        writes: true,
+        writes: Writes::Proposal,
         destructive: false,
         schema: schema_citing_mutations::<CreateProposal>,
         output: schema::<ProposalOutput>,
@@ -41,7 +41,7 @@ pub(crate) const SPECS: &[Spec] = &[
         description: "Changes an open proposal against its editing revision: replace its \
             content, discard it, or refresh it against its destination as it stands now (when \
             the destination moved since it was drafted). Each change needs a new review.",
-        writes: true,
+        writes: Writes::Proposal,
         destructive: true,
         schema: schema_citing_mutations::<EditProposal>,
         output: schema::<ProposalOutput>,
@@ -52,7 +52,7 @@ pub(crate) const SPECS: &[Spec] = &[
             destination's are checked, its mutations validated and committed with its \
             applied status, and the caller recorded as confirming it. Rejected with \
             every violation, or as stale with what moved (then refresh it).",
-        writes: true,
+        writes: Writes::Confirmation,
         destructive: true,
         schema: schema::<ApplyProposal>,
         output: schema::<WriteOutput>,
@@ -62,7 +62,7 @@ pub(crate) const SPECS: &[Spec] = &[
         description: "Drafts upgrading a journey to a newer version of its route as a \
             proposal: route changes it did not edit are taken, its local edits kept, and \
             conflicts become review items. Nothing changes until it is applied.",
-        writes: true,
+        writes: Writes::Proposal,
         destructive: false,
         schema: schema::<Upgrade>,
         output: schema::<ProposalOutput>,
@@ -72,7 +72,7 @@ pub(crate) const SPECS: &[Spec] = &[
         description: "Drafts saving a journey's structure as a new route's draft, as a \
             proposal on that route, with review items for participations and nodes to \
             leave out.",
-        writes: true,
+        writes: Writes::Proposal,
         destructive: false,
         schema: schema::<SaveAsRoute>,
         output: schema::<ProposalOutput>,
@@ -82,7 +82,7 @@ pub(crate) const SPECS: &[Spec] = &[
         description: "Drafts linking a journey to a published route version as a proposal \
 : where it differs from the version is kept as its own edit unless the \
             reviewer takes the route's.",
-        writes: true,
+        writes: Writes::Proposal,
         destructive: false,
         schema: schema::<Relink>,
         output: schema::<ProposalOutput>,
@@ -90,6 +90,55 @@ pub(crate) const SPECS: &[Spec] = &[
 ];
 
 impl ToolSet {
+    // PRD: I5, I6.
+    /// Drafts a proposal as `actor`, as `create_proposal` does: what the assistant's write
+    /// wrapper drafts a write it does not apply directly into.
+    ///
+    /// # Errors
+    ///
+    /// What `create_proposal` answers.
+    pub async fn create_proposal_as(
+        &self,
+        actor: &Actor,
+        arguments: CreateProposal,
+    ) -> Result<ProposalOutput, ToolError> {
+        self.create_proposal(&self.call_as(actor), arguments).await
+    }
+
+    // PRD: I5, I6.
+    /// Changes an open proposal as `actor`, as `edit_proposal` does.
+    ///
+    /// # Errors
+    ///
+    /// What `edit_proposal` answers.
+    pub async fn edit_proposal_as(
+        &self,
+        actor: &Actor,
+        arguments: EditProposal,
+    ) -> Result<ProposalOutput, ToolError> {
+        self.edit_proposal(&self.call_as(actor), arguments).await
+    }
+
+    /// What a call of the proposal tool `name` with `arguments` is about, or `None` for
+    /// another tool or arguments that do not match its schema.
+    #[must_use]
+    pub fn proposal_call(name: &str, arguments: &Value) -> Option<ProposalCall> {
+        let arguments = arguments.clone();
+        let (proposal, discards) = match name {
+            "create_proposal" => (parse::<CreateProposal>(arguments).ok()?.proposal, false),
+            "edit_proposal" => {
+                let edit = parse::<EditProposal>(arguments).ok()?;
+                let discards = matches!(edit.change, ProposalChange::Discard);
+                (edit.proposal, discards)
+            }
+            "upgrade" => (parse::<Upgrade>(arguments).ok()?.proposal, false),
+            "save_as_route" => (parse::<SaveAsRoute>(arguments).ok()?.proposal, false),
+            "relink" => (parse::<Relink>(arguments).ok()?.proposal, false),
+            _ => return None,
+        };
+        Some(ProposalCall { proposal, discards })
+    }
+
     /// Runs the proposal tool `name`.
     pub(crate) async fn propose(
         &self,
@@ -236,9 +285,18 @@ impl ToolSet {
     }
 }
 
+/// What a call of a proposal tool is about.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct ProposalCall {
+    /// The proposal it names.
+    pub proposal: ProposalId,
+    /// Whether it discards it.
+    pub discards: bool,
+}
+
 /// What a proposal write answers.
-#[derive(Debug, Serialize, JsonSchema)]
-struct ProposalOutput {
+#[derive(Debug, Serialize, Deserialize, JsonSchema)]
+pub struct ProposalOutput {
     /// `saved` now; `already_saved`, a resubmitted patch id answered from its receipt (fetch
     /// the proposal for where it stands); or `existing`, a create of an id the caller already
     /// holds, answered with it as it stands.
@@ -251,12 +309,31 @@ struct ProposalOutput {
     proposal: Option<Proposal>,
 }
 
-#[derive(Debug, Serialize, JsonSchema)]
+#[derive(Debug, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "snake_case")]
 enum ProposalStatusOutput {
     Saved,
     AlreadySaved,
     Existing,
+}
+
+impl ProposalOutput {
+    /// The proposal's destination: the proposal's, or, when the answer is only a receipt
+    /// (a write answered from an earlier one), the receipt's domain, which is the proposal's
+    /// destination.
+    #[must_use]
+    pub fn destination(&self) -> Option<&Domain> {
+        let held = self.proposal.as_ref().map(|proposal| &proposal.destination);
+        held.or_else(|| self.receipt.as_ref().map(|receipt| &receipt.domain))
+    }
+
+    /// The proposal's editing revision, which its next change names: the proposal's own, or
+    /// its receipt's.
+    #[must_use]
+    pub fn editing_revision(&self) -> Option<Revision> {
+        let held = self.proposal.as_ref().map(|proposal| proposal.revision);
+        held.or_else(|| self.receipt.as_ref().map(|receipt| receipt.revision))
+    }
 }
 
 impl From<ProposalWritten> for ProposalOutput {
@@ -284,36 +361,36 @@ impl From<ProposalWritten> for ProposalOutput {
 /// `create_proposal`.
 #[derive(Debug, Deserialize, JsonSchema)]
 #[serde(deny_unknown_fields)]
-pub(crate) struct CreateProposal {
+pub struct CreateProposal {
     /// The proposal's id, chosen by the caller (`pr_` and a slug).
-    proposal: ProposalId,
+    pub proposal: ProposalId,
     /// The domain it would change: `{"journey": id}`, `{"route": id}`, or `"deployment"`.
-    destination: Domain,
+    pub destination: Domain,
     /// Its content: a title, an optional description, the destination revision it was
     /// drafted against (0 to create the destination), and its mutations in order.
-    draft: ProposalDraft,
+    pub draft: ProposalDraft,
     /// A new id for this write.
-    patch_id: PatchId,
+    pub patch_id: PatchId,
 }
 
 /// `edit_proposal`.
 #[derive(Debug, Deserialize, JsonSchema)]
 #[serde(deny_unknown_fields)]
-pub(crate) struct EditProposal {
+pub struct EditProposal {
     /// The proposal.
-    proposal: ProposalId,
+    pub proposal: ProposalId,
     /// The change.
-    change: ProposalChange,
+    pub change: ProposalChange,
     /// The proposal's editing revision the change was drafted against.
-    base_revision: Revision,
+    pub base_revision: Revision,
     /// A new id for this write.
-    patch_id: PatchId,
+    pub patch_id: PatchId,
 }
 
 /// A change to an open proposal.
 #[derive(Debug, Deserialize, JsonSchema)]
 #[serde(rename_all = "snake_case", deny_unknown_fields)]
-pub(crate) enum ProposalChange {
+pub enum ProposalChange {
     /// Replace its content.
     Replace {
         /// The new content.

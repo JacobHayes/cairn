@@ -119,7 +119,6 @@ impl Derived {
             needs_breakdown: blocking.needs_breakdown(key),
             gravity: priority.gravity(key),
             gravity_from: for_response(priority.gravity_from(key)),
-            max_child_gravity: priority.max_child_gravity(key),
             subtree_gravity: priority.subtree_gravity(key),
             unlocks: priority.unlocks(key),
             unlocks_from: for_response(priority.unlocks_from(key)),

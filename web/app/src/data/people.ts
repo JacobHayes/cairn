@@ -4,7 +4,7 @@
 // user the host has no record of is "someone no longer here"; one whose name has not arrived
 // yet is plainly "someone", never the id. The names follow the deployment, since an identity's
 // name is the one a linked user goes by: a newer deployment reads the held ones again.
-import { backoffDelayMs } from "@cairn/client";
+import { backoffDelayMs, PAGE_ITEM_COUNT_MAX } from "@cairn/client";
 
 import type { Host } from "./host.ts";
 import { classify } from "./keyed-read.ts";
@@ -13,9 +13,6 @@ import { classify } from "./keyed-read.ts";
 export const GONE = "someone no longer here";
 /** What a user is called until the host has answered. */
 export const PENDING = "someone";
-
-/** The most users one read names (the API's page limit, PRACTICES). */
-const BATCH_MAX = 200;
 
 /** The names held for a tab: asked together, answered together, read again when the deployment moves. */
 export class People {
@@ -78,7 +75,7 @@ export class People {
   }
 
   #read(): void {
-    const batch = [...this.#wanted].slice(0, BATCH_MAX);
+    const batch = [...this.#wanted].slice(0, PAGE_ITEM_COUNT_MAX);
     batch.forEach((user) => this.#wanted.delete(user));
     if (batch.length === 0) {
       return;

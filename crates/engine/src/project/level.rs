@@ -444,7 +444,6 @@ impl<'a> DerivedJourney<'a> {
                     .all(|child| derived.display_state(self.graph, child) == DisplayState::Blocked),
             progress,
             needs_breakdown: children.iter().any(|child| blocking.needs_breakdown(child)),
-            max_child_gravity: derived.priority().max_child_gravity(key),
             subtree_gravity: derived.priority().subtree_gravity(key),
             min_child_slack_days: children
                 .iter()

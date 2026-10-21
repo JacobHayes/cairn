@@ -12,6 +12,7 @@ use std::fmt;
 use std::sync::Arc;
 
 use cairn_engine::{DerivedJourney, ProjectionError};
+use cairn_schema::limits::PAGE_ITEM_COUNT_MAX;
 use cairn_schema::{
     Annotation, AnswerEffects, AnswerValue, Cursor, Date, DecisionView, Deployment, DisplayState,
     Domain, ExplainedField, ExplanationPage, IdentityKey, JourneyId, KeyRefs, KindKey, Level,
@@ -38,11 +39,17 @@ pub struct Projected<T> {
     pub value: T,
 }
 
-/// A derived read that could not be answered.
+/// A read that could not be answered.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum ReadError {
     /// No such journey.
     JourneyMissing(JourneyId),
+    // PRACTICES: Explicit limits.
+    /// More users asked to be named in one read than a page holds.
+    TooManyUsers {
+        /// How many were asked for.
+        count: usize,
+    },
     /// No such proposal.
     ProposalMissing(ProposalId),
     /// The query names something the journey does not hold.
@@ -68,6 +75,10 @@ impl fmt::Display for ReadError {
         match self {
             ReadError::JourneyMissing(id) => write!(formatter, "no journey {id}"),
             ReadError::ProposalMissing(id) => write!(formatter, "no proposal {id}"),
+            ReadError::TooManyUsers { count } => write!(
+                formatter,
+                "at most {PAGE_ITEM_COUNT_MAX} users can be named at once, not {count}"
+            ),
             ReadError::Projection(error) => error.fmt(formatter),
             ReadError::Failed(error) => error.fmt(formatter),
         }

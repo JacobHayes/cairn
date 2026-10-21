@@ -664,7 +664,11 @@ fn render(
 fn query_parameter(spec: &ParamSpec, generator: &mut SchemaGenerator) -> Value {
     let one = (spec.schema)(generator);
     let schema = if spec.repeated {
-        json!({"type": "array", "items": one})
+        let mut array = json!({"type": "array", "items": one});
+        if let Some(count_max) = spec.count_max {
+            array["maxItems"] = json!(count_max);
+        }
+        array
     } else {
         one.to_value()
     };

@@ -291,7 +291,7 @@ mod in_process {
         assert_eq!(name_of(&bob_user), Some("bob".to_owned()));
         assert_eq!(named.len(), 2, "u_nobody has no name to give");
 
-        let many = (0..201)
+        let many = (0..=cairn_schema::limits::PAGE_ITEM_COUNT_MAX)
             .map(|each| format!("id=u_user{each}"))
             .collect::<Vec<_>>()
             .join("&");

@@ -136,6 +136,7 @@ impl From<ReadError> for ApiError {
         match error {
             ReadError::JourneyMissing(id) => ApiError::not_found(format_args!("journey {id}")),
             ReadError::ProposalMissing(id) => ApiError::not_found(format_args!("proposal {id}")),
+            ReadError::TooManyUsers { .. } => ApiError::bad_request(error.to_string()),
             // The query names a node the journey does not hold (the engine's one projection
             // error).
             ReadError::Projection(error) => {

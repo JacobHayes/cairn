@@ -293,7 +293,7 @@ fn the_list_filters_by_display_state() {
     );
 }
 
-const PAGE: usize = 200;
+const PAGE: usize = cairn_schema::limits::PAGE_ITEM_COUNT_MAX as usize;
 
 /// A journey of `count` independent actions.
 fn many(count: usize) -> Records {
@@ -312,7 +312,7 @@ fn the_list_pages_with_a_cursor() {
         .journey()
         .list(&ListQuery::default(), &BTreeSet::new())
         .unwrap();
-    assert_eq!((first.rows.len(), first.total), (PAGE, 205));
+    assert_eq!((first.rows.len(), first.total as usize), (PAGE, PAGE + 5));
     let rest = ListQuery {
         cursor: first.next.unwrap(),
         ..ListQuery::default()

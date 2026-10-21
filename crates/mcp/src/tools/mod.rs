@@ -12,7 +12,9 @@ use std::collections::BTreeMap;
 use cairn_schema::{Consequences, Cursor, Date, JourneyId, Notice, PatchReceipt, Revision};
 use cairn_service::{Projected, Written};
 use schemars::JsonSchema;
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
+
+pub use proposals::{CreateProposal, EditProposal, ProposalCall, ProposalChange, ProposalOutput};
 
 use crate::limits::PAGE_ITEM_COUNT_MAX;
 use crate::toolset::Spec;
@@ -145,8 +147,8 @@ impl<T> Cut<T> {
 
 // PRD: D7.
 /// What a direct write answers: its receipt and what it newly caused.
-#[derive(Clone, Debug, Serialize, JsonSchema)]
-pub(crate) struct WriteOutput {
+#[derive(Clone, Debug, Serialize, Deserialize, JsonSchema)]
+pub struct WriteOutput {
     // PRD: H5.
     /// `applied` now, or `already_applied`: the patch id was committed before with the same
     /// content and is answered from its receipt, with no consequences.
@@ -168,11 +170,19 @@ pub(crate) struct WriteOutput {
 }
 
 /// Whether a write was applied now or answered from its receipt.
-#[derive(Clone, Copy, Debug, Serialize, JsonSchema)]
+#[derive(Clone, Copy, Debug, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "snake_case")]
 enum WriteStatus {
     Applied,
     AlreadyApplied,
+}
+
+impl WriteOutput {
+    /// The receipt and what the write newly caused in each journey it changed.
+    #[must_use]
+    pub fn into_parts(self) -> (PatchReceipt, BTreeMap<JourneyId, Consequences>) {
+        (self.receipt, self.consequences)
+    }
 }
 
 impl From<Written> for WriteOutput {

@@ -331,7 +331,6 @@ fn arb_participation() -> BoxedStrategy<EffectiveParticipation> {
 type Scores = (
     Score,
     Explained<Contribution>,
-    Option<Score>,
     Score,
     Explained<Contribution>,
     Option<Real>,
@@ -341,7 +340,6 @@ fn arb_scores() -> BoxedStrategy<Scores> {
     (
         arb_score(),
         arb_explained(),
-        prop::option::of(arb_score()),
         arb_score(),
         arb_explained(),
         prop::option::of(
@@ -441,7 +439,7 @@ pub fn arb_node_derived() -> BoxedStrategy<NodeDerived> {
                 stale,
                 dates,
                 (snoozed, snoozed_via),
-                (gravity, gravity_from, max_child_gravity, unlocks, unlocks_from, rank),
+                (gravity, gravity_from, unlocks, unlocks_from, rank),
                 shown,
                 subtree,
                 (progress, failing_guards, started_early, waits_on),
@@ -470,7 +468,6 @@ pub fn arb_node_derived() -> BoxedStrategy<NodeDerived> {
                     needs_breakdown: flag(6),
                     gravity,
                     gravity_from,
-                    max_child_gravity,
                     subtree_gravity: subtree,
                     unlocks,
                     unlocks_from,

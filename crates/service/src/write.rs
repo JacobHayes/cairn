@@ -44,6 +44,12 @@ impl DomainPatch {
     pub fn patch(&self) -> &Patch {
         &self.patch
     }
+
+    /// The note its events carry.
+    #[must_use]
+    pub fn note(&self) -> Option<&Markdown> {
+        self.note.as_ref()
+    }
 }
 
 /// The patch targets a proposal, which is edited through its own lifecycle, not as a domain.

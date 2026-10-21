@@ -140,8 +140,7 @@ fn a_terminal_node_is_traversed_but_not_counted() {
     );
 }
 
-/// Priority, Gravity: a child's gravity holds its parent and everything after the parent, so
-/// a container's largest child gravity is at least its own.
+/// Priority, Gravity: a child's gravity holds its parent and everything after the parent.
 #[test]
 fn a_child_carries_its_parents_gravity() {
     let records = support::journey(&add(&[
@@ -151,15 +150,9 @@ fn a_child_carries_its_parents_gravity() {
         "{key: n_uses, id: uses, kind: action, title: Uses, weight: 4, requires: [n_plan]}",
     ]));
     let derived = derived(&records);
-    let priority = derived.priority();
     assert_eq!(gravity(&derived, "n_plan"), 2.0 + 4.0);
     assert_eq!(gravity(&derived, "n_draft"), 1.0 + 2.0 + 4.0);
     assert_eq!(gravity(&derived, "n_review"), 3.0 + 2.0 + 4.0);
-    assert_eq!(
-        priority.max_child_gravity(&key("n_plan")),
-        Some(priority.gravity(&key("n_review")))
-    );
-    assert_eq!(priority.max_child_gravity(&key("n_uses")), None);
 }
 
 fn owned(node: &str, requires: &str, weight: u32, owner: Option<&str>) -> String {
@@ -354,10 +347,6 @@ fn the_projection_carries_the_signals_and_their_inputs() {
         derived.ranking().rank(&key("n_kickoff"))
     );
     let setup = &projected.nodes[&key("n_setup")];
-    assert_eq!(
-        setup.max_child_gravity,
-        derived.priority().gravity(&key("n_access")).into()
-    );
     assert_eq!(setup.rank, None, "a group is not ranked");
     let json = cairn_schema::to_json(&projected).unwrap();
     assert_eq!(

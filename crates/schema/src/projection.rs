@@ -136,12 +136,6 @@ pub struct RollUp {
     /// A child needs breakdown.
     #[serde(default, skip_serializing_if = "crate::serde_util::is_false")]
     pub needs_breakdown: bool,
-    /// The largest in-scope child gravity (Priority), one level down.
-    ///
-    /// Deprecated: read `subtree_gravity`, the gravity of the container's whole area.
-    #[serde(skip_serializing_if = "Option::is_none")]
-    #[schemars(extend("deprecated" = true))]
-    pub max_child_gravity: Option<Score>,
     /// The gravity of the container's whole area (Priority): its counted weight and its open
     /// descendants', and everything downstream of any of them, each once.
     #[serde(default, skip_serializing_if = "Option::is_none")]

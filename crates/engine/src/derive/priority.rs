@@ -92,7 +92,6 @@ pub struct Priority {
     /// Per node: the nodes downstream of its finish, `words` words each.
     downstream: Vec<u64>,
     gravity: Vec<Score>,
-    max_child_gravity: Vec<Option<Score>>,
     /// Per container: the gravity of its whole area.
     subtree_gravity: Vec<Option<Score>>,
     /// Per node: in scope and not closed.
@@ -130,7 +129,6 @@ impl Priority {
             counted: Vec::new(),
             downstream: Vec::new(),
             gravity: Vec::new(),
-            max_child_gravity: Vec::new(),
             subtree_gravity: Vec::new(),
             open: Vec::new(),
             owners: Vec::new(),
@@ -241,24 +239,7 @@ impl Priority {
                 Score::from_millionths(total)
             })
             .collect();
-        let tree = graph.tree();
-        self.max_child_gravity = self
-            .keys
-            .iter()
-            .map(|key| {
-                let children = tree.children(key);
-                (!children.is_empty()).then(|| {
-                    children
-                        .iter()
-                        .filter_map(|child| self.position(child))
-                        .filter(|&child| self.in_scope_at(child))
-                        .map(|child| self.gravity_at(child))
-                        .max()
-                        .unwrap_or_default()
-                })
-            })
-            .collect();
-        self.subtree_gravity = self.sweep_areas(tree);
+        self.subtree_gravity = self.sweep_areas(graph.tree());
     }
 
     /// Each container's subtree gravity: the counted weight of its area, the open nodes of its
@@ -323,10 +304,6 @@ impl Priority {
 
     fn gravity_at(&self, at: usize) -> Score {
         self.gravity.get(at).copied().unwrap_or_default()
-    }
-
-    fn in_scope_at(&self, at: usize) -> bool {
-        self.in_scope.get(at).copied().unwrap_or(false)
     }
 
     /// The nodes downstream of the node at `at`, in key order.
@@ -443,14 +420,6 @@ impl Priority {
         self.downstream_of(at)
             .filter_map(|other| self.keys.get(other))
             .collect()
-    }
-
-    /// Priority: a container's largest in-scope child gravity; none for a node with no
-    /// children.
-    #[must_use]
-    pub fn max_child_gravity(&self, key: &NodeKey) -> Option<Score> {
-        self.at(key)
-            .and_then(|at| self.max_child_gravity.get(at).copied().flatten())
     }
 
     /// Priority: a container's subtree gravity, the gravity of its whole area (Priority,

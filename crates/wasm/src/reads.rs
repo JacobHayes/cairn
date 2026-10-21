@@ -11,6 +11,7 @@ use cairn_schema::{
     PatchId, Revision, RouteFile, RouteHeader, RouteId, Slug, Timestamp, Title, UserId,
     VersionNumber,
 };
+use cairn_service::ReadError;
 use cairn_store::{JourneyQuery, PageSize};
 use serde::{Deserialize, Serialize};
 use wasm_bindgen::prelude::wasm_bindgen;
@@ -357,9 +358,15 @@ impl BrowserRoot {
     ///
     /// # Errors
     ///
-    /// When the store fails.
+    /// [`HostError::Refused`] for more users than a page holds; when the store fails.
     pub fn user_names_now(&self, users: &[UserId]) -> Result<Vec<UserName>, HostError> {
-        let names = now_or_never(self.service().user_names(users)).map_err(failed)?;
+        let names =
+            now_or_never(self.service().user_names(users)).map_err(|error| match error {
+                ReadError::TooManyUsers { .. } => HostError::Refused {
+                    message: error.to_string(),
+                },
+                error => failed(error),
+            })?;
         Ok(names
             .into_iter()
             .map(|found| UserName {

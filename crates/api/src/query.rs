@@ -8,6 +8,7 @@ use std::collections::BTreeSet;
 use std::fmt;
 use std::str::FromStr;
 
+use cairn_schema::limits::PAGE_ITEM_COUNT_MAX;
 use cairn_schema::{
     Cursor, DisplayState, Domain, EventType, IdentityKey, JourneyId, JourneyStatus, KindKey,
     LevelDisplay, LevelQuery, ListFlag, ListQuery, NextQuery, NodeKey, NodeKind, PatchId,
@@ -36,6 +37,8 @@ pub struct ParamSpec {
     pub required: bool,
     /// The schema of one value.
     pub schema: fn(&mut SchemaGenerator) -> Schema,
+    /// The most values a repeated parameter takes, when the service refuses more.
+    pub count_max: Option<u32>,
 }
 
 /// The schema of `T`, as a reference to its component when it has a name.
@@ -51,6 +54,7 @@ impl ParamSpec {
             repeated: false,
             required: false,
             schema: schema_of::<T>,
+            count_max: None,
         }
     }
 
@@ -69,10 +73,24 @@ impl ParamSpec {
     }
 }
 
-const SIZE: ParamSpec = ParamSpec::one::<u32>(
-    "size",
-    "Items per page, 1 to the page limit (200); larger sizes are cut to it.",
-);
+// PRACTICES: Explicit limits.
+const SIZE: ParamSpec = ParamSpec {
+    schema: page_size,
+    ..ParamSpec::one::<u32>(
+        "size",
+        "Items per page, 1 to the page limit, the maximum; larger sizes are cut to it.",
+    )
+};
+
+/// A page size's schema: 1 to the page limit.
+fn page_size(_: &mut SchemaGenerator) -> Schema {
+    schemars::json_schema!({
+        "type": "integer",
+        "format": "uint32",
+        "minimum": 1,
+        "maximum": PAGE_ITEM_COUNT_MAX,
+    })
+}
 
 /// `GET /api/journeys` (C16).
 pub const JOURNEY_PARAMS: &[ParamSpec] = &[
@@ -185,9 +203,10 @@ pub const EVENT_PARAMS: &[ParamSpec] = &[
 /// `GET /api/users` (H3).
 pub const USER_NAME_PARAMS: &[ParamSpec] = &[ParamSpec {
     required: true,
+    count_max: Some(PAGE_ITEM_COUNT_MAX),
     ..ParamSpec::many::<UserId>(
         "id",
-        "The users to name, at most the page limit (200); one that does not exist is left out.",
+        "The users to name, at most a page of them; one that does not exist is left out.",
     )
 }];
 

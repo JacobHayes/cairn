@@ -65,6 +65,8 @@ export const REQUEST_BYTES_MAX = 25165824;
 export const CHAIN_COUNT_PER_REJECTION_MAX = 16;
 /** The `explanation_entry_count_max` limit. */
 export const EXPLANATION_ENTRY_COUNT_MAX = 50;
+/** Items in one page, and users one read names: the server refuses more names. */
+export const PAGE_ITEM_COUNT_MAX = 200;
 
 /** A move by name (D1); answering a decision is its own mutation. */
 export type Move = "start" | "stop" | "complete" | "skip" | "reopen" | "answer";
@@ -138,3 +140,9 @@ export const STATUS_HOLDS_CURRENT_WORK: Record<JourneyStatus, boolean> = {
   completed: false,
   archived: false,
 };
+
+// What text a person or an agent reads never cites, from the repository's documents.
+/** A requirement id: a section letter, one or two digits, an optional lowercase letter. */
+export const REQUIREMENT_ID_PATTERN = "(?<![A-Za-z0-9_`])[ABCDEFGHIJ][0-9]{1,2}[a-z]?(?![A-Za-z0-9_`])";
+/** The name of one of the repository's documents, as a word. */
+export const DOCUMENT_NAME_PATTERN = "(?<![A-Za-z0-9_])(?:AGENTS|ARCHITECTURE|CLAUDE|DESIGN|PRACTICES|PRD|README)(?![A-Za-z0-9_])";
