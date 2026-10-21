@@ -182,7 +182,7 @@ export function RolesAndKindsPanel({ authored }: { authored: Authored }) {
       <SlotList authored={authored} kind={ROLES} slots={authored.graph.roles ?? []} />
       <DefaultOwner authored={authored} />
       <strong>Participation kinds</strong>
-      <span className="muted small">Owner is built in; these are informational (A7).</span>
+      <span className="muted small">Owner is built in; these are informational.</span>
       <SlotList authored={authored} kind={KINDS} slots={authored.graph.participation_kinds ?? []} />
     </div>
   );

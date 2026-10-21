@@ -7,7 +7,6 @@
 
 use std::collections::BTreeMap;
 
-use cairn_engine::DraftError;
 use cairn_schema::{
     Consequences, DestinationAfter, Domain, JourneyId, Lineage, Markdown, PatchId, PatchReceipt,
     Proposal, ProposalDraft, ProposalId, ProposalPreview, Revision, RevisionConflict, RouteId,
@@ -210,17 +209,16 @@ pub(crate) fn write_failed(error: WriteError) -> HostError {
     }
 }
 
-/// A draft's failure: what is missing, the write's failure, or why it cannot be drafted (no
-/// lineage, a version that is not newer, a draft too large), which the API answers as a
-/// problem and the root as a failure with the same words.
+/// A draft's failure, as the service classifies it: what is missing, why it cannot be
+/// drafted, or the write's failure.
 fn propose_failed(error: ProposeError) -> HostError {
     match error {
-        ProposeError::Draft(
-            error @ (DraftError::JourneyMissing(_) | DraftError::VersionMissing(_)),
-        ) => HostError::Missing {
+        ProposeError::Missing(error) => HostError::Missing {
             message: error.to_string(),
         },
-        ProposeError::Draft(error) => failed(error),
+        ProposeError::CannotDraft(error) => HostError::Refused {
+            message: error.to_string(),
+        },
         ProposeError::Write(error) => write_failed(error),
     }
 }

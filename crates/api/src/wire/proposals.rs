@@ -320,6 +320,10 @@ pub struct ProposalSummary {
     pub outline: ProposalOutline,
     /// Its destination as it is now.
     pub now: DestinationNow,
+    // PRD: I6.
+    /// Its destination moved since it was drafted (written, created, or removed since): it
+    /// needs a refresh before it can be applied.
+    pub stale: bool,
 }
 
 /// Where a proposal listing resumes: pass its two fields as `after_at` and `after`.
@@ -393,6 +397,7 @@ impl From<cairn_store::ProposalSummary> for ProposalSummary {
             created_at,
             outline,
             now,
+            stale,
         } = summary;
         Self {
             id,
@@ -405,6 +410,7 @@ impl From<cairn_store::ProposalSummary> for ProposalSummary {
             created_at,
             outline,
             now: now.into(),
+            stale,
         }
     }
 }

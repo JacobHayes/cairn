@@ -697,7 +697,7 @@ async fn writes_under(
             "refresh",
             refresh.await.map(drop).map_err(|error| match error {
                 ProposeError::Write(error) => error,
-                other @ ProposeError::Draft(_) => panic!("a refresh under {elsewhere}: {other:?}"),
+                other => panic!("a refresh under {elsewhere}: {other:?}"),
             }),
         ),
         ("apply", apply.await.map(drop)),

@@ -41,9 +41,8 @@ pub(crate) const SPECS: &[Spec] = &[
         name: "list_frontier",
         description: "The ranked acting frontier, a page at a time: what to do next, each \
             node with its breadcrumb and why it ranks where it does. With `filters`, the \
-            in-scope nodes they all hold for instead (decisions needed, needs breakdown, \
-            unassigned, active, blocked, stale, overdue, shortfall), in rank order; `mine` \
-            keeps the caller's own.",
+            in-scope nodes they all hold for instead, in rank order; `mine` keeps the \
+            caller's own.",
         writes: false,
         destructive: false,
         schema: schema::<ListFrontier>,
@@ -335,7 +334,7 @@ pub(crate) struct ListFrontier {
     /// With none, the acting frontier in rank order: what to do next. With any, the in-scope
     /// nodes every filter holds for, in rank order.
     #[serde(default)]
-    filters: BTreeSet<FrontierFilter>,
+    filters: BTreeSet<ListFlag>,
     // PRD: E4.
     /// Only nodes the caller participates in.
     #[serde(default)]
@@ -352,47 +351,6 @@ pub(crate) struct ListFrontier {
     /// Where the page starts: the `next` of the page before, at the same revision.
     #[serde(default)]
     cursor: Cursor,
-}
-
-// PRD: I2.
-/// What `list_frontier` filters by.
-#[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Deserialize, JsonSchema)]
-#[serde(rename_all = "snake_case")]
-pub(crate) enum FrontierFilter {
-    /// Actionable decisions.
-    DecisionsNeeded,
-    // PRD: B10.
-    /// Placeholders to break down.
-    NeedsBreakdown,
-    /// No owner.
-    Unassigned,
-    /// Started and not finished.
-    Active,
-    /// Waiting on something unfinished.
-    Blocked,
-    // PRD: D4.
-    /// Done, but a completing guard would now fail.
-    Stale,
-    /// Due before today.
-    Overdue,
-    // PRD: F6.
-    /// A plan that can no longer be met.
-    Shortfall,
-}
-
-impl From<FrontierFilter> for ListFlag {
-    fn from(filter: FrontierFilter) -> Self {
-        match filter {
-            FrontierFilter::DecisionsNeeded => ListFlag::DecisionsNeeded,
-            FrontierFilter::NeedsBreakdown => ListFlag::NeedsBreakdown,
-            FrontierFilter::Unassigned => ListFlag::Unassigned,
-            FrontierFilter::Active => ListFlag::Active,
-            FrontierFilter::Blocked => ListFlag::Blocked,
-            FrontierFilter::Stale => ListFlag::Stale,
-            FrontierFilter::Overdue => ListFlag::Overdue,
-            FrontierFilter::Shortfall => ListFlag::Shortfall,
-        }
-    }
 }
 
 /// A page of the frontier or of a filtered list, in rank order.
@@ -537,7 +495,7 @@ impl ToolSet {
                 }
             }));
         }
-        let mut flags: BTreeSet<ListFlag> = arguments.filters.into_iter().map(Into::into).collect();
+        let mut flags = arguments.filters;
         if arguments.mine {
             flags.insert(ListFlag::Mine);
         }

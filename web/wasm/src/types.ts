@@ -264,6 +264,7 @@ export type HostError =
   | { error: "invalid"; violations: Schema<"Violations"> }
   | { error: "rejected"; rejection: Schema<"Rejection"> }
   | { error: "missing"; message: string }
+  | { error: "refused"; message: string }
   | { error: "failed"; message: string }
   | { error: "aborted"; message: string }
   | { error: "superseded"; held: DerivationKey; posted: DerivationKey };

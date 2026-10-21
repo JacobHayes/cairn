@@ -151,7 +151,10 @@ impl From<ReadError> for ToolError {
 impl From<ProposeError> for ToolError {
     fn from(error: ProposeError) -> Self {
         match error {
-            ProposeError::Draft(error) => ToolError::refused(error),
+            ProposeError::Missing(error) => ToolError::NotFound {
+                message: error.to_string(),
+            },
+            ProposeError::CannotDraft(error) => ToolError::refused(error),
             ProposeError::Write(error) => error.into(),
         }
     }

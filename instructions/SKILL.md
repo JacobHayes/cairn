@@ -25,8 +25,8 @@ and that user.
    completing the journey is suggested (nothing left in scope, or the final milestone
    done); completing it is the person's call.
 2. **Look closer only where needed.** `list_frontier` pages the ranked frontier or, with
-   `filters`, the nodes that need something (`decisions_needed`, `needs_breakdown`,
-   `unassigned`, `active`, `blocked` (display state blocked), `stale`, `overdue`, `shortfall`). `get_node` explains
+   `filters`, the nodes that need something (`decisions_needed`, `blocked`, `stale`, and
+   the others its schema lists; `blocked` is the display state). `get_node` explains
    one node: why it is relevant or blocked, its dates, and why it ranks where it does.
    `get_level` shows the graph at one level of containment.
 3. **Write in small, named steps.** Each write is one patch. Give it a new `patch_id` you
@@ -47,7 +47,7 @@ both over the in-scope nodes.
 
 | `display_state` | Say | Meaning |
 |---|---|---|
-| `ready` | ready (a decision: to decide) | nothing is in the way; work can start now |
+| `ready` | ready (a decision: to decide; a group: not started) | nothing is in the way; work can start now |
 | `active` | active | started, or a container with work beneath it started |
 | `blocked` | blocked | a gate it waits on is unsatisfied |
 | `conditional` | conditional | it may apply, once a decision is answered |

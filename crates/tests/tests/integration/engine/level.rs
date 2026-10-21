@@ -10,7 +10,7 @@ use std::collections::{BTreeMap, BTreeSet};
 
 use cairn_engine::{DerivedJourney, ProjectionError, Records};
 use cairn_schema::{
-    EdgeOrigin, GroupState, Level, LevelDisplay, LevelNode, LevelQuery, NodeKind, Score,
+    DisplayState, EdgeOrigin, Level, LevelDisplay, LevelNode, LevelQuery, NodeKind, Score,
 };
 use support::{add_nodes as add, key};
 
@@ -305,8 +305,8 @@ fn edges_landing_on_the_same_pair_collapse_into_one() {
     assert!(!collapsed.implicit, "one of the two is explicit");
     let decided = level(&support::vendor_after(2), VENDOR, &[NodeKind::Group], None);
     assert_eq!(
-        node(&decided, "n_partner_led").group_state,
-        Some(GroupState::NotRelevant),
+        node(&decided, "n_partner_led").display_state,
+        DisplayState::NotRelevant,
         "a group the partner decision ruled out"
     );
 }
@@ -392,7 +392,7 @@ fn a_container_rolls_up_its_childrens_badges() {
         Some(Score::from_millionths(1_000_000))
     );
     assert!(!badges.all_blocked, "the decision is open to act on");
-    assert_eq!(group.group_state, Some(GroupState::NotStarted));
+    assert_eq!(group.display_state, DisplayState::Ready);
     assert!(
         !node(&fresh, "n_work")
             .roll_up
@@ -410,10 +410,7 @@ fn a_container_rolls_up_its_childrens_badges() {
             .unwrap()
             .children_active
     );
-    assert_eq!(
-        node(&active, "n_group").group_state,
-        Some(GroupState::Active)
-    );
+    assert_eq!(node(&active, "n_group").display_state, DisplayState::Active);
 
     let stepped = support::accepted(&started, &transition("n_step", "complete"));
     let ready = level(&stepped, support::JOURNEY, &NodeKind::ALL, None);
@@ -426,8 +423,9 @@ fn a_container_rolls_up_its_childrens_badges() {
     );
 }
 
-/// C2: `all_blocked` holds when every relevant child not done is blocked, and a group whose
-/// opening is ahead reads as waiting.
+/// C2, D8: `all_blocked` holds when every relevant child not done shows blocked, and a group
+/// whose opening is ahead shows blocked; a child container waiting only on its own children
+/// is not blocked, so it never makes its parent read as all blocked.
 #[test]
 fn every_open_child_blocked_shows_all_blocked() {
     let records = support::journey(&add(&[
@@ -439,10 +437,19 @@ fn every_open_child_blocked_shows_all_blocked() {
     let waiting = level(&records, support::JOURNEY, &NodeKind::ALL, None);
     let stage = node(&waiting, "n_stage");
     assert!(stage.roll_up.as_ref().unwrap().all_blocked);
-    assert_eq!(stage.group_state, Some(GroupState::Waiting));
+    assert_eq!(stage.display_state, DisplayState::Blocked);
     let opened = support::accepted(&records, &transition("n_gate", "complete"));
     let open = level(&opened, support::JOURNEY, &NodeKind::ALL, None);
     assert!(!node(&open, "n_stage").roll_up.as_ref().unwrap().all_blocked);
+
+    let nested = support::journey(&add(&[
+        "{key: n_area, id: area, kind: group, title: Area}",
+        "{key: n_part, id: part, parent: n_area, kind: deliverable, title: Part}",
+        "{key: n_piece, id: piece, parent: n_part, kind: action, title: Piece}",
+    ]));
+    let shown = level(&nested, support::JOURNEY, &NodeKind::ALL, None);
+    assert_eq!(node(&shown, "n_part").display_state, DisplayState::Ready);
+    assert!(!node(&shown, "n_area").roll_up.as_ref().unwrap().all_blocked);
 }
 
 /// D1a: a skipped deliverable with kept work beneath it reads "skipped, kept work pending"
@@ -462,8 +469,8 @@ fn a_skipped_container_shows_kept_work_pending() {
     let pending = level(&skipped, support::JOURNEY, &NodeKind::ALL, None);
     assert!(node(&pending, "n_plan").kept_work_pending);
     assert_eq!(
-        node(&pending, "n_side").group_state,
-        Some(GroupState::Skipped)
+        node(&pending, "n_side").display_state,
+        DisplayState::Skipped
     );
     let kept_done = support::accepted(&skipped, &transition("n_draft", "complete"));
     let done = level(&kept_done, support::JOURNEY, &NodeKind::ALL, None);

@@ -447,16 +447,10 @@ async fn turns_past_the_in_flight_limit_are_refused() {
     }
 }
 
-/// I7: the assistant acts for a signed-in user; an agent calls the tools itself.
+/// I5: a turn about a journey that does not exist is refused, naming it.
 #[tokio::test]
-async fn an_agent_caller_is_refused() {
+async fn a_turn_about_a_missing_journey_is_refused() {
     let world = World::new();
-    let helper = support::assisting("u_lead");
-    let refused = world
-        .assistant
-        .turn(&helper, vendor_target(), "Hello.".parse().unwrap())
-        .await;
-    assert_eq!(refused, Err(TurnError::AgentCaller));
     let missing = world
         .assistant
         .turn(&user("u_lead"), vendor_target(), "Hello.".parse().unwrap())

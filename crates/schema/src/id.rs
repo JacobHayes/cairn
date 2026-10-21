@@ -249,7 +249,18 @@ fn parse_prefixed(text: &str, prefix: &'static str) -> Result<(), IdError> {
     }
 }
 
+/// Every key type, each with its prefix in [`KEY_PREFIXES`], so a new key type cannot be
+/// left out of the list a check for keys on screen reads.
 macro_rules! prefixed {
+    ($($(#[$doc:meta])* $name:ident, $prefix:literal;)*) => {
+        $(prefixed_key!($(#[$doc])* $name, $prefix);)*
+
+        /// Every key type's prefix: what a key looks like wherever one might be shown.
+        pub const KEY_PREFIXES: &[&str] = &[$($prefix),*];
+    };
+}
+
+macro_rules! prefixed_key {
     ($(#[$doc:meta])* $name:ident, $prefix:literal) => {
         $(#[$doc])*
         #[derive(Clone, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
@@ -286,56 +297,34 @@ macro_rules! prefixed {
     };
 }
 
-prefixed!(
+prefixed! {
     /// A node's stable key (`n_`), minted once and kept through renames, moves, copies,
     /// and exports.
-    NodeKey, "n_"
-);
-prefixed!(
+    NodeKey, "n_";
     /// A role's stable key (`r_`).
-    RoleKey, "r_"
-);
-prefixed!(
+    RoleKey, "r_";
     /// A participation kind's stable key (`k_`). The built-in `owner` kind is `k_owner`.
-    KindKey, "k_"
-);
-prefixed!(
+    KindKey, "k_";
     /// A segment insertion's key (`i_`), minted by the client like any new key; every key
     /// the insertion creates derives from it (B13).
-    InsertionKey, "i_"
-);
-prefixed!(
+    InsertionKey, "i_";
     /// An identity's key (`who_`): deployment-scoped, so one person is one identity everywhere.
-    IdentityKey, "who_"
-);
-prefixed!(
+    IdentityKey, "who_";
     /// An attachment's key (`a_`): a resource, note, or link.
-    AttachmentKey, "a_"
-);
-prefixed!(
+    AttachmentKey, "a_";
     /// A journey's id (`j_`), client-generated and never reused (A19).
-    JourneyId, "j_"
-);
-prefixed!(
+    JourneyId, "j_";
     /// A patch's client-generated id (`p_`), the H5 safe-retry handle.
-    PatchId, "p_"
-);
-prefixed!(
+    PatchId, "p_";
     /// A proposal's client-generated id (`pr_`, I6).
-    ProposalId, "pr_"
-);
-prefixed!(
+    ProposalId, "pr_";
     /// An authenticated user's id (`u_`), the actor on every change (H2).
-    UserId, "u_"
-);
-prefixed!(
+    UserId, "u_";
     /// An agent's id (`ag_`): the agent token a change was made through, acting for a user.
-    AgentId, "ag_"
-);
-prefixed!(
+    AgentId, "ag_";
     /// An assistant conversation's id (`cv_`), outside every domain.
-    ConversationId, "cv_"
-);
+    ConversationId, "cv_";
+}
 
 impl KindKey {
     /// The built-in `owner` kind's key.

@@ -1,13 +1,15 @@
 //! The rule tables the web app reads (ARCHITECTURE, Generated artifacts): the limits
 //! (PRACTICES, Explicit limits), each kind's transition table (D1), the initial state of
-//! each kind (B1) and which states are terminal, written as the TypeScript module
+//! each kind (B1) and which states are terminal, the display states and the words they are
+//! said by (D8), and every key prefix, written as the TypeScript module
 //! `web/client/generated/rules.ts` by `mise run gen`. The app never keeps its own copy of
 //! any of them. Pure text from the engine's own tables, so the file cannot drift.
 
 use std::fmt::Write;
 
+use cairn_schema::id::KEY_PREFIXES;
 use cairn_schema::limits::Limit;
-use cairn_schema::{NodeKind, State};
+use cairn_schema::{DisplayState, NodeKind, State};
 
 use crate::transition::{Move, rows};
 
@@ -36,6 +38,21 @@ fn state_name(state: State) -> &'static str {
     }
 }
 
+/// The display state's name as the API writes it.
+fn display_state_name(state: DisplayState) -> &'static str {
+    match state {
+        DisplayState::Ready => "ready",
+        DisplayState::Active => "active",
+        DisplayState::Blocked => "blocked",
+        DisplayState::Conditional => "conditional",
+        DisplayState::Scheduled => "scheduled",
+        DisplayState::Snoozed => "snoozed",
+        DisplayState::Done => "done",
+        DisplayState::Skipped => "skipped",
+        DisplayState::NotRelevant => "not_relevant",
+    }
+}
+
 /// The move's name as the API writes it.
 fn move_name(step: Move) -> &'static str {
     match step {
@@ -57,12 +74,15 @@ pub fn typescript() -> String {
          \n\
          type NodeKind = components[\"schemas\"][\"NodeKind\"];\n\
          type State = components[\"schemas\"][\"State\"];\n\
+         type DisplayState = components[\"schemas\"][\"DisplayState\"];\n\
          \n",
     );
     limits(&mut out);
     moves(&mut out);
     initial_states(&mut out);
     terminal_states(&mut out);
+    display_states(&mut out);
+    key_prefixes(&mut out);
     out
 }
 
@@ -139,6 +159,74 @@ fn terminal_states(out: &mut String) {
     );
 }
 
+/// D8: the display states in the order a count lists them, the word each is said by, and
+/// where a node's kind says one differently.
+fn display_states(out: &mut String) {
+    let names: Vec<String> = DisplayState::ALL
+        .iter()
+        .map(|state| format!("\"{}\"", display_state_name(*state)))
+        .collect();
+    let _ = writeln!(
+        out,
+        "\n/** D8: every display state, in the order a count lists them. */\n\
+         export const DISPLAY_STATES: readonly DisplayState[] = [{}];\n",
+        names.join(", ")
+    );
+    out.push_str("/** D8: the word each display state is said by. */\n");
+    out.push_str("export const STATUS_WORDS: Record<DisplayState, string> = {\n");
+    for state in DisplayState::ALL {
+        let _ = writeln!(
+            out,
+            "  {}: \"{}\",",
+            display_state_name(state),
+            state.word(None)
+        );
+    }
+    out.push_str("};\n\n");
+    out.push_str(
+        "/** D8: the words a node's kind says a display state by, where they differ. */\n",
+    );
+    out.push_str(
+        "export const KIND_STATUS_WORDS: Partial<Record<NodeKind, Partial<Record<DisplayState, string>>>> = {\n",
+    );
+    for kind in NodeKind::ALL {
+        let differing: Vec<String> = DisplayState::ALL
+            .iter()
+            .filter(|state| state.word(Some(kind)) != state.word(None))
+            .map(|state| {
+                format!(
+                    "{}: \"{}\"",
+                    display_state_name(*state),
+                    state.word(Some(kind))
+                )
+            })
+            .collect();
+        if !differing.is_empty() {
+            let _ = writeln!(
+                out,
+                "  {}: {{ {} }},",
+                kind_name(kind),
+                differing.join(", ")
+            );
+        }
+    }
+    out.push_str("};\n");
+}
+
+/// Every key type's prefix, so a check for keys shown where a name belongs knows them all.
+fn key_prefixes(out: &mut String) {
+    let prefixes: Vec<String> = KEY_PREFIXES
+        .iter()
+        .map(|prefix| format!("\"{prefix}\""))
+        .collect();
+    let _ = writeln!(
+        out,
+        "\n/** Every key type's prefix: what a key looks like wherever one might be shown. */\n\
+         export const KEY_PREFIXES: readonly string[] = [{}];",
+        prefixes.join(", ")
+    );
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -155,6 +243,24 @@ mod tests {
             let written = serde_json::to_string(&state).unwrap();
             assert_eq!(written, format!("\"{}\"", state_name(state)));
         }
+        let schema = serde_json::to_value(schemars::schema_for!(DisplayState)).unwrap();
+        let mut every: Vec<&str> = schema["oneOf"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .map(|value| value["const"].as_str().unwrap())
+            .collect();
+        let mut listed: Vec<&str> = DisplayState::ALL
+            .iter()
+            .map(|state| display_state_name(*state))
+            .collect();
+        for state in DisplayState::ALL {
+            let written = serde_json::to_string(&state).unwrap();
+            assert_eq!(written, format!("\"{}\"", display_state_name(state)));
+        }
+        every.sort_unstable();
+        listed.sort_unstable();
+        assert_eq!(listed, every, "every display state is listed once");
         let text = typescript();
         for limit in Limit::ALL {
             assert!(text.contains(&format!(

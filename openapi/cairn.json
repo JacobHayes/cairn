@@ -4515,41 +4515,6 @@
           }
         ]
       },
-      "GroupState": {
-        "description": "A group's display state, derived from its children and dependencies. Deprecated:\n[`DisplayState`] is the state of every node, groups included; this stays, equal in\nmeaning on groups, until a later breaking release.",
-        "oneOf": [
-          {
-            "const": "not_relevant",
-            "description": "Not relevant (Gating): drawn grayed.",
-            "type": "string"
-          },
-          {
-            "const": "skipped",
-            "description": "Explicitly or effectively skipped.",
-            "type": "string"
-          },
-          {
-            "const": "done",
-            "description": "It satisfies dependencies: its children and gates are done.",
-            "type": "string"
-          },
-          {
-            "const": "waiting",
-            "description": "Its own or an inherited requirement, opening, or condition is not yet satisfied.",
-            "type": "string"
-          },
-          {
-            "const": "active",
-            "description": "Work beneath it has started: a deliverable or action under it is active or done.",
-            "type": "string"
-          },
-          {
-            "const": "not_started",
-            "description": "Open to start, nothing beneath it started.",
-            "type": "string"
-          }
-        ]
-      },
       "Guard": {
         "description": "A transition guard.",
         "oneOf": [
@@ -5542,18 +5507,6 @@
             "$ref": "#/components/schemas/DisplayState",
             "description": "The state every surface shows for the node."
           },
-          "group_state": {
-            "anyOf": [
-              {
-                "$ref": "#/components/schemas/GroupState"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "deprecated": true,
-            "description": "A group's display state. Deprecated: read `display_state`, which every node carries."
-          },
           "hidden_prerequisites": {
             "description": "Its hidden, unsatisfied prerequisites that no visible edge stands for: the \"hidden\nprerequisites\" marker, which opens the trace. Empty when it has none.",
             "items": {
@@ -5693,7 +5646,7 @@
           },
           {
             "const": "decisions_needed",
-            "description": "An actionable decision.",
+            "description": "A decision that can be answered now.",
             "type": "string"
           },
           {
@@ -5703,37 +5656,37 @@
           },
           {
             "const": "active",
-            "description": "Stored `active`.",
+            "description": "Stored `active`: started and not finished.",
             "type": "string"
           },
           {
             "const": "blocked",
-            "description": "Blocked.",
+            "description": "Showing the display state `blocked`: a gate it waits on is unsatisfied (a container's\nown children never count).",
             "type": "string"
           },
           {
             "const": "overdue",
-            "description": "Overdue.",
+            "description": "Due before today.",
             "type": "string"
           },
           {
             "const": "stale",
-            "description": "Stale.",
+            "description": "Finished, but a completing guard would now fail.",
             "type": "string"
           },
           {
             "const": "snoozed",
-            "description": "Snoozed.",
+            "description": "A snooze holds over it.",
             "type": "string"
           },
           {
             "const": "snoozed_and_overdue",
-            "description": "Snoozed and overdue.",
+            "description": "Snoozed and due before today.",
             "type": "string"
           },
           {
             "const": "shortfall",
-            "description": "With a shortfall.",
+            "description": "Its plan can no longer be met.",
             "type": "string"
           }
         ]
@@ -9226,10 +9179,6 @@
             },
             "type": "array"
           },
-          "blocked": {
-            "description": "Gating, Blocked.",
-            "type": "boolean"
-          },
           "display_state": {
             "$ref": "#/components/schemas/DisplayState",
             "description": "The state every surface shows for the node."
@@ -11411,6 +11360,10 @@
             "$ref": "#/components/schemas/Revision",
             "description": "Its editing revision."
           },
+          "stale": {
+            "description": "Its destination moved since it was drafted (written, created, or removed since): it\nneeds a refresh before it can be applied.",
+            "type": "boolean"
+          },
           "title": {
             "$ref": "#/components/schemas/Title",
             "description": "What it proposes, in a line."
@@ -11425,7 +11378,8 @@
           "created_by",
           "created_at",
           "outline",
-          "now"
+          "now",
+          "stale"
         ],
         "type": "object"
       },
@@ -12887,7 +12841,7 @@
         "description": "What a container shows of its children.",
         "properties": {
           "all_blocked": {
-            "description": "Every relevant child that is not done is blocked (`all_blocked`), and there is one.",
+            "description": "Every relevant child that is not done shows the display state `blocked`, and there is\none.",
             "type": "boolean"
           },
           "children_active": {
@@ -13703,12 +13657,6 @@
             "minimum": 0,
             "type": "integer"
           },
-          "blocked": {
-            "description": "Blocked nodes.",
-            "format": "uint32",
-            "minimum": 0,
-            "type": "integer"
-          },
           "by_display_state": {
             "additionalProperties": {
               "format": "uint32",
@@ -13759,8 +13707,7 @@
           "by_display_state",
           "listed",
           "frontier",
-          "acting_frontier",
-          "blocked"
+          "acting_frontier"
         ],
         "type": "object"
       },
@@ -23208,18 +23155,13 @@
           },
           "403": {
             "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Problem"
-                }
-              },
               "text/plain": {
                 "schema": {
                   "type": "string"
                 }
               }
             },
-            "description": "Only a user may do this, not an agent acting for one. Or: The auth layer refused the peer: a local-only provider and a remote peer, or login headers from a peer no proxy-mode provider trusts (in text)."
+            "description": "The auth layer refused the peer: a local-only provider and a remote peer, or login headers from a peer no proxy-mode provider trusts (in text)."
           },
           "500": {
             "content": {

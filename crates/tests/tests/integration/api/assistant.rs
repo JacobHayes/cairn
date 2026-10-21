@@ -194,27 +194,55 @@ mod in_process {
         );
     }
 
-    /// I7, H2: the assistant acts for a signed-in user; an agent token is refused, and a
-    /// journey that does not exist is not found.
+    /// H2, I5: every endpoint for users only refuses an agent token before its handler runs,
+    /// whatever it was asked; one that is not, such as listing the user's tokens, answers it.
     #[tokio::test]
-    async fn an_agent_token_is_refused_and_a_missing_journey_not_found() {
+    async fn every_endpoint_for_users_only_refuses_an_agent() {
         let provider = scripted(Vec::new());
         let world = with_assistant(&provider).await;
         let ann = world.vendor_after(1).await;
         let minted = post(&ann, "/api/users/me/tokens", &json!({ "name": "Helper" })).await;
         let minted: MintedToken = ok(&minted);
         let helper = world.bearer(&minted.token);
+        let for_users: Vec<&Endpoint> = at::ALL.into_iter().filter(|e| e.user_only).collect();
+        assert_ne!(for_users, [] as [&cairn_api::endpoints::Endpoint; 0]);
+        for endpoint in for_users {
+            let segments = vec!["x"; endpoint.path.matches('{').count()];
+            let path = endpoint.path_with(&segments);
+            let body = (endpoint.method != Method::GET).then(|| json!({}));
+            let reply = helper
+                .send(endpoint.method.clone(), &path, body.as_ref())
+                .await
+                .unwrap();
+            assert_eq!(
+                reply.status,
+                StatusCode::FORBIDDEN,
+                "{}",
+                endpoint.operation
+            );
+            let problem = reply.json::<Problem>().unwrap();
+            assert_eq!(
+                problem.error,
+                ProblemCode::UserOnly,
+                "{}",
+                endpoint.operation
+            );
+        }
+        let listed = helper
+            .send(Method::GET, at::TOKENS.path, None)
+            .await
+            .unwrap();
+        assert_eq!(listed.status, StatusCode::OK);
+    }
+
+    /// I5: a turn about a journey that does not exist is not found, as the document says,
+    /// and no provider call is made.
+    #[tokio::test]
+    async fn a_turn_about_a_missing_journey_is_not_found() {
+        let provider = scripted(Vec::new());
+        let world = with_assistant(&provider).await;
+        let ann = world.vendor_after(1).await;
         let said = json!({ "message": "Hello." });
-        let target = at::ASSISTANT_JOURNEY.path_with(&[JOURNEY]);
-        let refused = post(&helper, &target, &said).await;
-        assert_eq!(refused.status, StatusCode::FORBIDDEN);
-        assert_eq!(
-            refused.json::<Problem>().unwrap().error,
-            ProblemCode::UserOnly
-        );
-        let read = helper.send(Method::GET, &target, None).await.unwrap();
-        assert_eq!(read.status, StatusCode::FORBIDDEN);
-        assert_eq!(read.json::<Problem>().unwrap().error, ProblemCode::UserOnly);
         let missing = post(
             &ann,
             &at::ASSISTANT_JOURNEY.path_with(&["j_nowhere"]),

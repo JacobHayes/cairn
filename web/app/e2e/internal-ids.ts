@@ -1,15 +1,35 @@
 // The invariant that no screen shows a key where a name belongs: a user, identity, node, journey,
 // proposal or patch id, an agent or conversation id, a digest, or a revision number, in text a
-// person reads or in a tooltip or label. Every browser test ends by checking the pages it
-// opened (e2e/test.ts), so a screen that prints one fails whatever it was testing. The patterns
-// are the API's key shapes (the OpenAPI document's id patterns).
+// person reads or in a tooltip or label; nor a requirement id or the name of one of the
+// repository's documents, which a person cannot follow. Every browser test ends by checking the
+// pages it opened (e2e/test.ts), so a screen that prints one fails whatever it was testing. The
+// key prefixes are the engine's (generated, every key type's), the requirement ids' letters are
+// the PRD's section headings, and the documents are the capitalised Markdown files at the
+// repository's root, as the served-text check in the integration tests reads them.
+import { readdirSync, readFileSync } from "node:fs";
+import { fileURLToPath } from "node:url";
+
 import type { Page } from "@playwright/test";
+
+import { KEY_PREFIXES } from "../../client/generated/rules.ts";
+
+const ROOT = fileURLToPath(new URL("../../../", import.meta.url));
+
+/** The letters of the PRD's requirement sections: each `### X.` heading. */
+const SECTIONS = [...readFileSync(`${ROOT}PRD.md`, "utf8").matchAll(/^### ([A-Z])\. /gm)].map((match) => match[1]).join("");
+
+/** The repository's documents: the Markdown files at its root named in capitals. */
+const DOCUMENTS = readdirSync(ROOT)
+  .map((name) => /^([A-Z]+)\.md$/.exec(name)?.[1])
+  .filter((name) => name !== undefined);
 
 /** One kind of key, and the pattern that finds it. */
 const KEYS: { what: string; pattern: RegExp }[] = [
-  { what: "an id", pattern: /\b(?:a|ag|cv|e|i|j|k|n|p|pr|r|u)_[a-z0-9][a-z0-9_-]*\b/g },
+  { what: "an id", pattern: new RegExp(`\\b(?:${KEY_PREFIXES.join("|")})[a-z0-9][a-z0-9_-]*\\b`, "g") },
   { what: "a digest", pattern: /\b[0-9a-f]{32,}\b/g },
   { what: "a revision number", pattern: /\brev(?:ision)?s?\.? ?#?\d+/gi },
+  { what: "a requirement id", pattern: new RegExp(`(?<![\\w\`])[${SECTIONS}]\\d{1,2}[a-z]?(?![\\w\`])`, "g") },
+  { what: "a document name", pattern: new RegExp(`\\b(?:${DOCUMENTS.join("|")})\\b`, "g") },
 ];
 
 /** Where a key was shown. */

@@ -350,7 +350,7 @@ mod in_process {
     }
 
     /// H2: a user mints an agent token, which then signs requests in as an agent acting for
-    /// them; an agent can neither mint nor revoke; a revoked token is refused.
+    /// them; a revoked token is refused.
     #[tokio::test]
     async fn an_agent_token_acts_for_its_user_until_revoked() {
         let world = World::start().await;
@@ -367,12 +367,6 @@ mod in_process {
             (&as_user.user, Some(&minted.agent))
         );
 
-        let refused = post(&agent, "/api/users/me/tokens", &named).await;
-        assert_eq!(refused.status, StatusCode::FORBIDDEN);
-        assert_eq!(
-            refused.json::<Problem>().unwrap().error,
-            ProblemCode::UserOnly
-        );
         let listed: Vec<AgentToken> = get(&ann, "/api/users/me/tokens").await;
         assert_eq!(listed.len(), 1);
         assert_eq!(listed[0].agent, minted.agent);

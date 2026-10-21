@@ -7,7 +7,6 @@
 use axum::http::header::RETRY_AFTER;
 use axum::http::{HeaderValue, StatusCode};
 use axum::response::{IntoResponse, Response};
-use cairn_engine::DraftError;
 use cairn_schema::Rejection;
 use cairn_service::{ProposeError, ReadError, ServiceError, WriteError};
 use cairn_store::StoreError;
@@ -160,17 +159,12 @@ impl From<WriteError> for ApiError {
 impl From<ProposeError> for ApiError {
     fn from(error: ProposeError) -> Self {
         match error {
-            ProposeError::Draft(DraftError::JourneyMissing(id)) => {
-                ApiError::not_found(format_args!("journey {id}"))
+            ProposeError::Missing(error) => {
+                ApiError::problem(ProblemCode::NotFound, error.to_string())
             }
-            ProposeError::Draft(DraftError::VersionMissing(lineage)) => ApiError::not_found(
-                format_args!("version {} of route {}", lineage.version, lineage.route),
-            ),
-            ProposeError::Draft(
-                error @ (DraftError::NoLineage(_)
-                | DraftError::NotNewer { .. }
-                | DraftError::TooLarge),
-            ) => ApiError::problem(ProblemCode::CannotDraft, error.to_string()),
+            ProposeError::CannotDraft(error) => {
+                ApiError::problem(ProblemCode::CannotDraft, error.to_string())
+            }
             ProposeError::Write(error) => error.into(),
         }
     }
@@ -179,9 +173,6 @@ impl From<ProposeError> for ApiError {
 impl From<cairn_auth::AuthError> for ApiError {
     fn from(error: cairn_auth::AuthError) -> Self {
         match error {
-            cairn_auth::AuthError::AgentNotAllowed => {
-                ApiError::problem(ProblemCode::UserOnly, error.to_string())
-            }
             cairn_auth::AuthError::NoSuchToken => ApiError::not_found("such agent token"),
             cairn_auth::AuthError::Store(error) => ServiceError::Store(error).into(),
             cairn_auth::AuthError::Random(_)

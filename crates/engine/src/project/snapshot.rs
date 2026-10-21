@@ -182,12 +182,6 @@ impl DerivedJourney<'_> {
             listed: count(listed),
             frontier: count(frontier),
             acting_frontier: count(acting),
-            blocked: count(
-                in_scope
-                    .iter()
-                    .filter(|key| derived.blocking().blocked(key))
-                    .count(),
-            ),
         }
     }
 }

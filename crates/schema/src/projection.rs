@@ -112,32 +112,6 @@ pub struct LevelEdge {
     pub underlying: Vec<UnderlyingEdge>,
 }
 
-// PRD: D8.
-// PRD: D1, C2.
-/// A group's display state, derived from its children and dependencies. Deprecated:
-/// [`DisplayState`] is the state of every node, groups included; this stays, equal in
-/// meaning on groups, until a later breaking release.
-#[derive(
-    Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize, JsonSchema,
-)]
-#[serde(rename_all = "snake_case")]
-pub enum GroupState {
-    // PRD: C1.
-    /// Not relevant (Gating): drawn grayed.
-    NotRelevant,
-    // PRD: D1a.
-    /// Explicitly or effectively skipped.
-    Skipped,
-    /// It satisfies dependencies: its children and gates are done.
-    Done,
-    /// Its own or an inherited requirement, opening, or condition is not yet satisfied.
-    Waiting,
-    /// Work beneath it has started: a deliverable or action under it is active or done.
-    Active,
-    /// Open to start, nothing beneath it started.
-    NotStarted,
-}
-
 // PRD: C2.
 /// What a container shows of its children.
 #[allow(clippy::struct_excessive_bools)]
@@ -151,7 +125,8 @@ pub struct RollUp {
     /// A child is `active`.
     #[serde(default, skip_serializing_if = "crate::serde_util::is_false")]
     pub children_active: bool,
-    /// Every relevant child that is not done is blocked (`all_blocked`), and there is one.
+    /// Every relevant child that is not done shows the display state `blocked`, and there is
+    /// one.
     #[serde(default, skip_serializing_if = "crate::serde_util::is_false")]
     pub all_blocked: bool,
     // PRD: C2, C4.
@@ -207,10 +182,6 @@ pub struct LevelNode {
     // PRD: D8.
     /// The state every surface shows for the node.
     pub display_state: DisplayState,
-    /// A group's display state. Deprecated: read `display_state`, which every node carries.
-    #[serde(skip_serializing_if = "Option::is_none")]
-    #[schemars(extend("deprecated" = true))]
-    pub group_state: Option<GroupState>,
     /// A container's badges and roll-ups.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub roll_up: Option<RollUp>,
@@ -559,9 +530,6 @@ pub struct NodeRow {
     /// Whether work can be started on it now: relevant, not blocked, and not finished.
     #[serde(default, skip_serializing_if = "crate::serde_util::is_false")]
     pub actionable: bool,
-    /// Gating, Blocked.
-    #[serde(default, skip_serializing_if = "crate::serde_util::is_false")]
-    pub blocked: bool,
     // PRD: D1a.
     /// Skipped through an ancestor.
     #[serde(default, skip_serializing_if = "crate::serde_util::is_false")]
@@ -662,24 +630,28 @@ pub enum ListFlag {
     Unassigned,
     /// On the acting frontier.
     NextUp,
-    /// An actionable decision.
+    /// A decision that can be answered now.
     DecisionsNeeded,
     // PRD: B10.
     /// Placeholders that still need to be broken down.
     NeedsBreakdown,
-    /// Stored `active`.
+    /// Stored `active`: started and not finished.
     Active,
-    /// Blocked.
+    // PRD: D8.
+    /// Showing the display state `blocked`: a gate it waits on is unsatisfied (a container's
+    /// own children never count).
     Blocked,
-    /// Overdue.
+    /// Due before today.
     Overdue,
-    /// Stale.
+    // PRD: D4.
+    /// Finished, but a completing guard would now fail.
     Stale,
-    /// Snoozed.
+    /// A snooze holds over it.
     Snoozed,
-    /// Snoozed and overdue.
+    /// Snoozed and due before today.
     SnoozedAndOverdue,
-    /// With a shortfall.
+    // PRD: F6.
+    /// Its plan can no longer be met.
     Shortfall,
 }
 
@@ -805,8 +777,6 @@ pub struct SnapshotCounts {
     pub frontier: u32,
     /// The acting frontier: its top N and the rest.
     pub acting_frontier: u32,
-    /// Blocked nodes.
-    pub blocked: u32,
 }
 
 // PRD: I3.

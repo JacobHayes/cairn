@@ -108,17 +108,21 @@ impl State {
             .proposals
             .values()
             .filter(|proposal| proposal.status == ProposalStatus::Open)
-            .map(|proposal| ProposalSummary {
-                id: proposal.id.clone(),
-                destination: proposal.destination.clone(),
-                title: proposal.draft.title.clone(),
-                revision: proposal.revision,
-                drafted_against: proposal.draft.destination_revision,
-                created_by: proposal.created_by.clone(),
-                proposing_agent: proposal.proposing_agent.clone(),
-                created_at: proposal.created_at,
-                outline: ProposalOutline::of(proposal.draft.mutations.as_slice()),
-                now: self.destination_now(&proposal.destination),
+            .map(|proposal| {
+                let now = self.destination_now(&proposal.destination);
+                ProposalSummary {
+                    id: proposal.id.clone(),
+                    destination: proposal.destination.clone(),
+                    title: proposal.draft.title.clone(),
+                    revision: proposal.revision,
+                    drafted_against: proposal.draft.destination_revision,
+                    created_by: proposal.created_by.clone(),
+                    proposing_agent: proposal.proposing_agent.clone(),
+                    created_at: proposal.created_at,
+                    outline: ProposalOutline::of(proposal.draft.mutations.as_slice()),
+                    stale: now.moved_since(proposal.draft.destination_revision),
+                    now,
+                }
             })
             .collect();
         let destination = match &query.scope {

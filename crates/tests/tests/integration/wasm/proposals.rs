@@ -282,8 +282,8 @@ fn a_journey_saved_as_a_route_is_relinked_to_its_version() {
     );
 }
 
-/// What cannot be drafted is refused, not a panic: an upgrade of a journey with no route, a
-/// proposal that does not exist.
+/// What cannot be drafted is refused as the caller's to change, not a failure or a panic: an
+/// upgrade of a journey with no route; a proposal that does not exist is missing.
 #[test]
 fn what_cannot_be_drafted_or_found_is_refused() {
     let root = BrowserRoot::seeded().unwrap();
@@ -293,7 +293,7 @@ fn what_cannot_be_drafted_or_found_is_refused() {
             .upgrade_json("j_bakeoff", &request.to_string(), NOW)
             .unwrap_err(),
     );
-    assert!(matches!(refused, HostError::Failed { .. }), "{refused:?}");
+    assert!(matches!(refused, HostError::Refused { .. }), "{refused:?}");
     let missing = thrown(&root.proposal(JOURNEY, "pr_absent").unwrap_err());
     assert!(matches!(missing, HostError::Missing { .. }));
     let missing = thrown(

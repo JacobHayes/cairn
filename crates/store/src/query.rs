@@ -250,6 +250,17 @@ pub struct DestinationNow {
     pub status: Option<JourneyStatus>,
 }
 
+impl DestinationNow {
+    // PRD: I6.
+    /// The destination moved since `drafted`, the revision a proposal was drafted against: it
+    /// was written since, created since (a proposal to create it), or removed since. Such a
+    /// proposal needs a refresh before it can be applied.
+    #[must_use]
+    pub fn moved_since(&self, drafted: Revision) -> bool {
+        self.revision != drafted
+    }
+}
+
 /// An open proposal in a listing.
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub struct ProposalSummary {
@@ -274,6 +285,8 @@ pub struct ProposalSummary {
     pub outline: ProposalOutline,
     /// Its destination as it is now.
     pub now: DestinationNow,
+    /// Its destination moved since it was drafted ([`DestinationNow::moved_since`]).
+    pub stale: bool,
 }
 
 /// One page of open proposals, with the scope's whole open count.

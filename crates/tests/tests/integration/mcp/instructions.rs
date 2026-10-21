@@ -7,6 +7,7 @@ use std::collections::BTreeSet;
 
 use cairn_mcp::ToolSet;
 use cairn_mcp::instructions::{self, SKILL};
+use cairn_schema::{DisplayState, NodeKind};
 use serde_json::Value;
 
 /// I4: the instructions name only tools that exist. An identifier written as code (`name`)
@@ -40,6 +41,46 @@ fn the_instructions_name_only_tools_and_fields_that_exist() {
     }
     let every: BTreeSet<String> = definitions.iter().map(|t| t.name.to_owned()).collect();
     assert_eq!(named_tools, every, "the guide names every tool");
+}
+
+/// D8: the guide's table of display states says each one by the words every screen does:
+/// the state's word, then each kind's own word where it differs.
+#[test]
+fn the_guide_says_each_display_state_as_the_screens_do() {
+    let said: Vec<(String, String)> = SKILL
+        .lines()
+        .filter_map(|line| {
+            let mut cells = line.strip_prefix("| `")?.split(" | ");
+            let state = cells.next()?.strip_suffix('`')?.to_owned();
+            serde_json::from_value::<DisplayState>(Value::String(state.clone())).ok()?;
+            Some((state, cells.next()?.to_owned()))
+        })
+        .collect();
+    let expected: Vec<(String, String)> = DisplayState::ALL
+        .iter()
+        .map(|state| {
+            let name = serde_json::to_value(state)
+                .unwrap()
+                .as_str()
+                .unwrap()
+                .to_owned();
+            let kinds: Vec<String> = NodeKind::ALL
+                .iter()
+                .filter(|kind| state.word(Some(**kind)) != state.word(None))
+                .map(|kind| format!("a {}: {}", kind.name(), state.word(Some(*kind))))
+                .collect();
+            let words = if kinds.is_empty() {
+                state.word(None).to_owned()
+            } else {
+                format!("{} ({})", state.word(None), kinds.join("; "))
+            };
+            (name, words)
+        })
+        .collect();
+    let (mut said, mut expected) = (said, expected);
+    said.sort();
+    expected.sort();
+    assert_eq!(said, expected);
 }
 
 /// I2: each capability the PRD lists as the minimum tool surface, and the tools that cover

@@ -117,10 +117,10 @@ export function edgeRefusal(tree: Tree, node: string, requires: string): string 
     return "A node cannot require itself.";
   }
   if (isAncestor(tree, requires, node)) {
-    return "It sits inside that node: containment already relates them, so an explicit edge to an ancestor is refused (A3).";
+    return "It sits inside that node: containment already relates them, so an explicit edge to an ancestor is refused.";
   }
   if (isAncestor(tree, node, requires)) {
-    return "That node sits inside it: a parent already requires its children, so an explicit edge to a descendant is refused (A3).";
+    return "That node sits inside it: a parent already requires its children, so an explicit edge to a descendant is refused.";
   }
   if ((tree.byKey.get(node)?.requires ?? []).includes(requires)) {
     return "It already requires that node.";

@@ -45,7 +45,7 @@ pub enum DraftError {
 impl fmt::Display for DraftError {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            DraftError::JourneyMissing(id) => write!(formatter, "journey {id} was not loaded"),
+            DraftError::JourneyMissing(id) => write!(formatter, "no journey {id}"),
             DraftError::NoLineage(id) => write!(formatter, "journey {id} follows no route"),
             DraftError::NotNewer { current, to } => write!(
                 formatter,
@@ -53,7 +53,7 @@ impl fmt::Display for DraftError {
             ),
             DraftError::VersionMissing(lineage) => write!(
                 formatter,
-                "version {} of route {} was not loaded",
+                "no version {} of route {}",
                 lineage.version, lineage.route
             ),
             DraftError::TooLarge => {

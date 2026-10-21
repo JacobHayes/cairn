@@ -40,7 +40,6 @@ impl DerivedJourney<'_> {
             ancestors: self.ancestors(key),
             relevance: derived.relevance().value(key),
             actionable: blocking.actionable(key),
-            blocked: blocking.blocked(key),
             effectively_skipped: derived.skips().skipped_by(key).is_some(),
             owners: self.owners(key).clone(),
             unassigned: derived.is_unassigned(self.graph, key),

@@ -497,12 +497,7 @@ fn one_per_graph(check: &GraphCheck<'_>, out: &mut Vec<Violation>) {
         if rest.is_empty() {
             continue;
         }
-        let mut found = at_node(
-            check.tree,
-            first,
-            code,
-            "at most one per graph (Invariants)",
-        );
+        let mut found = at_node(check.tree, first, code, "at most one per graph");
         found.related = rest
             .iter()
             .map(|key| Subject::Node((*key).clone()))

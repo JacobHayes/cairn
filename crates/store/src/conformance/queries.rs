@@ -1038,6 +1038,10 @@ pub async fn proposal_listings_hold_each_scope_newest_first_with_counts<B: Backe
     );
     assert_eq!(active.items[0].now, now);
     assert_eq!(active.items[0].drafted_against, revision(1));
+    assert!(
+        !active.items[0].stale,
+        "drafted against the revision it is at"
+    );
     // C14: a listing says what each proposal changes, worked out from its mutations by one rule.
     let drafted = build::proposal("pr_any", &journey("j_active"), 1);
     assert_eq!(
@@ -1053,6 +1057,10 @@ pub async fn proposal_listings_hold_each_scope_newest_first_with_counts<B: Backe
     assert_eq!(
         (now.exists, now.name, now.revision),
         (false, None, revision(0))
+    );
+    assert!(
+        gone.items[0].stale,
+        "drafted against a revision it is no longer at"
     );
 
     // The cursor is a position, so it holds when the proposal it names closes.

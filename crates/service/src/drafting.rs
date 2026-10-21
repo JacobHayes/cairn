@@ -26,15 +26,31 @@ use cairn_schema::{
 use crate::write::engine;
 use crate::{Call, ProposalWritten, Service, ServiceError, WriteError, load};
 
-/// A proposal the service could not draft or store.
+/// A proposal the service could not draft or store, classified once here so every host
+/// answers it the same way: something it names is missing, the caller asked for a draft that
+/// cannot be made, or the write was refused or failed.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum ProposeError {
-    /// The engine cannot draft it from what is stored: the journey or a version does not
-    /// exist, the journey follows no route, the version is not newer, or the draft is too
-    /// large (B7, B8, B9).
-    Draft(DraftError),
+    /// What the draft reads does not exist: the journey or a route version (B7, B8, B9).
+    Missing(DraftError),
+    /// The engine cannot draft it from what exists, which the caller can change: the journey
+    /// follows no route, the version is not newer, or the draft is too large (B7, B8, B9).
+    CannotDraft(DraftError),
     /// The proposal write was refused or failed.
     Write(WriteError),
+}
+
+impl From<DraftError> for ProposeError {
+    fn from(error: DraftError) -> Self {
+        match error {
+            DraftError::JourneyMissing(_) | DraftError::VersionMissing(_) => {
+                ProposeError::Missing(error)
+            }
+            DraftError::NoLineage(_) | DraftError::NotNewer { .. } | DraftError::TooLarge => {
+                ProposeError::CannotDraft(error)
+            }
+        }
+    }
 }
 
 impl From<WriteError> for ProposeError {
@@ -58,7 +74,7 @@ impl From<cairn_store::StoreError> for ProposeError {
 impl fmt::Display for ProposeError {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            ProposeError::Draft(error) => error.fmt(formatter),
+            ProposeError::Missing(error) | ProposeError::CannotDraft(error) => error.fmt(formatter),
             ProposeError::Write(error) => error.fmt(formatter),
         }
     }
@@ -87,8 +103,9 @@ impl Service {
     ///
     /// # Errors
     ///
-    /// [`ProposeError::Draft`] when the journey or a version does not exist, the journey
-    /// follows no route, or `to` is older; [`ProposeError::Write`] when the proposal write is
+    /// [`ProposeError::Missing`] when the journey or a version does not exist,
+    /// [`ProposeError::CannotDraft`] when the journey follows no route or `to` is older;
+    /// [`ProposeError::Write`] when the proposal write is
     /// refused or fails.
     pub async fn propose_upgrade(
         &self,
@@ -199,7 +216,7 @@ impl Service {
     /// # Errors
     ///
     /// [`WriteError::ProposalMissing`] when there is no such proposal under `destination`;
-    /// [`ProposeError::Draft`] as for drafting it; [`ProposeError::Write`] when the edit is
+    /// [`ProposeError::Missing`] or [`ProposeError::CannotDraft`] as for drafting it; [`ProposeError::Write`] when the edit is
     /// stale, the proposal is not open, or the write fails.
     pub async fn refresh_proposal(
         &self,
@@ -280,7 +297,7 @@ impl Service {
         engine(&Domain::Journey(journey.clone()), || {
             cairn_engine::upgrade(&records, journey, to, &inputs)
         })?
-        .map_err(ProposeError::Draft)
+        .map_err(ProposeError::from)
     }
 
     async fn draft_save(
@@ -295,7 +312,7 @@ impl Service {
         engine(&Domain::Route(route.clone()), || {
             cairn_engine::save_as_route(&records, journey, route, name, &inputs)
         })?
-        .map_err(ProposeError::Draft)
+        .map_err(ProposeError::from)
     }
 
     async fn draft_relink(
@@ -308,7 +325,7 @@ impl Service {
         engine(&Domain::Journey(journey.clone()), || {
             cairn_engine::relink(&records, journey, lineage)
         })?
-        .map_err(ProposeError::Draft)
+        .map_err(ProposeError::from)
     }
 
     /// The apply inputs a draft's trial apply runs with: `call`'s actor and today.

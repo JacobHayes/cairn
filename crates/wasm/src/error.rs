@@ -32,6 +32,13 @@ pub enum HostError {
         /// What is missing.
         message: String,
     },
+    /// A call the caller can change but the root cannot carry out as asked: a proposal it
+    /// cannot draft (a journey that follows no route, a version that is not newer, a draft
+    /// too large).
+    Refused {
+        /// Why.
+        message: String,
+    },
     /// The in-browser root's service or store failed.
     Failed {
         /// What failed.

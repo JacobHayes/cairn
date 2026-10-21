@@ -7,16 +7,46 @@
 //! (`engine::support::apply`).
 #![cfg(test)]
 
+use std::collections::BTreeSet;
+use std::path::Path;
+use std::sync::LazyLock;
+
 use serde_json::Value;
 
-/// The requirement ids in `text`: a letter from A to J, one or two digits and an optional
-/// lowercase letter, standing alone as a word.
+/// The PRD, whose requirement sections' headings give the letters an id starts with.
+const PRD: &str = include_str!("../../../../PRD.md");
+
+/// The letters of the PRD's requirement sections: each `### X.` heading.
+static SECTIONS: LazyLock<BTreeSet<u8>> = LazyLock::new(|| {
+    PRD.lines()
+        .filter_map(|line| line.strip_prefix("### "))
+        .filter_map(|heading| match heading.as_bytes() {
+            [letter, b'.', ..] if letter.is_ascii_uppercase() => Some(*letter),
+            _ => None,
+        })
+        .collect()
+});
+
+/// The repository's documents: the Markdown files at its root named in capitals (the PRD and
+/// the others), whose names a reader of served text cannot open.
+static DOCUMENTS: LazyLock<BTreeSet<String>> = LazyLock::new(|| {
+    let root = Path::new(env!("CARGO_MANIFEST_DIR")).join("../..");
+    std::fs::read_dir(&root)
+        .expect("the repository root reads")
+        .filter_map(|entry| entry.ok()?.file_name().into_string().ok())
+        .filter_map(|name| name.strip_suffix(".md").map(str::to_owned))
+        .filter(|stem| !stem.is_empty() && stem.bytes().all(|byte| byte.is_ascii_uppercase()))
+        .collect()
+});
+
+/// The requirement ids in `text`: a section letter of the PRD, one or two digits and an
+/// optional lowercase letter, standing alone as a word.
 pub fn requirement_ids(text: &str) -> Vec<&str> {
     let bytes = text.as_bytes();
     let word = |byte: u8| byte.is_ascii_alphanumeric() || byte == b'_' || byte == b'`';
     let mut found = Vec::new();
     for start in 0..bytes.len() {
-        if !(b'A'..=b'J').contains(&bytes[start]) || (start > 0 && word(bytes[start - 1])) {
+        if !SECTIONS.contains(&bytes[start]) || (start > 0 && word(bytes[start - 1])) {
             continue;
         }
         let digits = bytes[start + 1..]
@@ -37,12 +67,18 @@ pub fn requirement_ids(text: &str) -> Vec<&str> {
     found
 }
 
-/// The names of the repository's documents in `text` (the PRD and the others), which a reader
-/// of served text cannot open.
+/// The names of the repository's documents in `text`.
 pub fn document_names(text: &str) -> Vec<&str> {
     text.split(|c: char| !c.is_ascii_alphanumeric() && c != '_')
-        .filter(|word| matches!(*word, "PRD" | "ARCHITECTURE" | "PRACTICES" | "DESIGN"))
+        .filter(|word| DOCUMENTS.contains(*word))
         .collect()
+}
+
+/// What `text` cites that a reader cannot follow: requirement ids and document names.
+fn citations(text: &str) -> Vec<&str> {
+    let mut found = requirement_ids(text);
+    found.extend(document_names(text));
+    found
 }
 
 /// Every string a JSON document serves as prose, with the path to it. Schema keywords whose
@@ -71,14 +107,19 @@ fn prose(value: &Value, path: &str, out: &mut Vec<(String, String)>) {
     }
 }
 
-fn assert_no_ids(served: &str, document: &Value) {
+/// Every prose string in `document` that cites what a reader cannot follow, with where it is
+/// served from (`served`) and its path in the document.
+fn cited(served: &str, document: &Value) -> Vec<String> {
     let mut texts = Vec::new();
     prose(document, "", &mut texts);
-    let found: Vec<String> = texts
+    texts
         .iter()
-        .filter(|(_, text)| !requirement_ids(text).is_empty() || !document_names(text).is_empty())
+        .filter(|(_, text)| !citations(text).is_empty())
         .map(|(path, text)| format!("{served}{path}: {text}"))
-        .collect();
+        .collect()
+}
+
+fn assert_no_ids(found: &[String]) {
     assert!(
         found.is_empty(),
         "requirement ids or document names in served text:\n{}",
@@ -94,14 +135,14 @@ fn the_detector_finds_ids_and_only_ids() {
         ("D1a: the states", vec!["D1a"]),
         ("a route file at version 2", vec![]),
         ("the `A2` column and snake_b2 and ABC1", vec![]),
-        ("range K3 and a30", vec![]),
+        ("range Z3 and a30", vec![]),
     ];
     for (text, ids) in cases {
         assert_eq!(requirement_ids(text), ids, "{text}");
     }
     assert_eq!(
-        document_names("a node (PRD glossary, Pin; ARCHITECTURE, Terms)"),
-        ["PRD", "ARCHITECTURE"]
+        document_names("a node (PRD glossary, Pin; ARCHITECTURE, Terms; DESIGN, Status)"),
+        ["PRD", "ARCHITECTURE", "DESIGN"]
     );
     assert_eq!(
         document_names("a PRDX, a prd and an ARCHITECTURES"),
@@ -111,27 +152,31 @@ fn the_detector_finds_ids_and_only_ids() {
 
 #[test]
 fn the_api_document_describes_without_ids() {
-    assert_no_ids("openapi", &cairn_api::openapi::document());
+    assert_no_ids(&cited("openapi", &cairn_api::openapi::document()));
 }
 
 #[test]
 fn the_route_file_schema_describes_without_ids() {
     for (name, content) in cairn_schema::json_schema::generated_files() {
         let document: Value = serde_json::from_str(&content).expect("a generated schema is JSON");
-        assert_no_ids(name, &document);
+        assert_no_ids(&cited(name, &document));
     }
 }
 
+/// Every tool's description and its whole input and output schemas, their definitions and
+/// every property's description included, all reported together.
 #[test]
 fn the_mcp_tools_describe_without_ids() {
+    let mut found = Vec::new();
     for tool in cairn_mcp::ToolSet::definitions() {
         let document = serde_json::json!({
             "description": tool.description,
             "input": tool.input_schema,
             "output": tool.output_schema,
         });
-        assert_no_ids(tool.name, &document);
+        found.extend(cited(tool.name, &document));
     }
+    assert_no_ids(&found);
 }
 
 #[test]
@@ -148,10 +193,6 @@ fn the_agent_guide_and_workflows_say_rules_in_words() {
         ));
     }
     for (name, text) in served {
-        assert!(
-            requirement_ids(&text).is_empty(),
-            "{name}: {:?}",
-            requirement_ids(&text)
-        );
+        assert_eq!(citations(&text), [] as [&str; 0], "{name}");
     }
 }

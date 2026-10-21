@@ -9,11 +9,6 @@ import type { PanelRow } from "../acting/RowsPanel.tsx";
 import type { ProposalSummary } from "../data/proposals.ts";
 import { outlineWords } from "./words.ts";
 
-/** Whether the destination moved since the proposal was drafted (a create whose destination now exists counts), so it needs a refresh before it can be applied (I6). */
-export function needsRefresh(item: ProposalSummary): boolean {
-  return item.now.revision !== item.drafted_against;
-}
-
 /**
  * One proposal's row: its title, and under it what it changes (the outline), or that it needs a
  * refresh. `context` names the destination where the list does not (Home, the indexes); `current`
@@ -21,7 +16,7 @@ export function needsRefresh(item: ProposalSummary): boolean {
  */
 export function ProposalRow({ item, context, current }: { item: ProposalSummary; context?: ReactNode; current?: boolean }) {
   const { search } = useLocation();
-  const stale = needsRefresh(item);
+  const stale = item.stale;
   return (
     <li className="node-row proposal-row" data-row data-testid="proposal-row" data-proposal={item.id} data-stale={stale} aria-current={current === true ? "true" : undefined} data-selected={current === true}>
       <div className="node-row-main">

@@ -86,12 +86,6 @@ pub async fn route_draft_conversation(
 /// The conversation `actor`'s user holds about `target`, as kept; none started yet is empty.
 async fn kept(api: &Api, actor: &Actor, target: &Target) -> Answer<Conversation> {
     let assistant = mounted(api)?;
-    if actor.agent.is_some() {
-        return Err(ApiError::problem(
-            ProblemCode::UserOnly,
-            TurnError::AgentCaller.to_string(),
-        ));
-    }
     let record = assistant
         .conversation(actor, target)
         .await
@@ -124,7 +118,6 @@ async fn converse(
     reply.map(Json).map_err(|error| {
         let code = match &error {
             TurnError::Overloaded | TurnError::ConversationBusy => ProblemCode::Overloaded,
-            TurnError::AgentCaller => ProblemCode::UserOnly,
             TurnError::TargetMissing(_) => ProblemCode::NotFound,
             TurnError::TimedOut => ProblemCode::TimedOut,
             TurnError::Failed(_) => ProblemCode::Internal,

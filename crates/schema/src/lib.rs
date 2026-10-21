@@ -92,11 +92,11 @@ pub use patch::{
 };
 pub use projection::{
     AffectedNodes, AnswerEffects, ChoiceEffect, Cursor, DecisionEntry, DecisionView, EdgeOrigin,
-    ExplainedField, ExplanationPage, GroupState, HistoryPage, Level, LevelDisplay, LevelEdge,
-    LevelNode, LevelQuery, ListFlag, ListPage, ListQuery, MineEntry, Next, NextQuery, NodeRow,
-    OpenDecision, PatchEvents, RankTerms, RenderedDraft, RenderedSegment, RollUp, RouteSchedule,
-    ScheduleEntry, Snapshot, SnapshotCounts, SnapshotNode, SnapshotScope, SortBy, StatusSummary,
-    Timeline, TimelineEntry, Trace, UndatedEntry, UnderlyingEdge, UpcomingMilestone,
+    ExplainedField, ExplanationPage, HistoryPage, Level, LevelDisplay, LevelEdge, LevelNode,
+    LevelQuery, ListFlag, ListPage, ListQuery, MineEntry, Next, NextQuery, NodeRow, OpenDecision,
+    PatchEvents, RankTerms, RenderedDraft, RenderedSegment, RollUp, RouteSchedule, ScheduleEntry,
+    Snapshot, SnapshotCounts, SnapshotNode, SnapshotScope, SortBy, StatusSummary, Timeline,
+    TimelineEntry, Trace, UndatedEntry, UnderlyingEdge, UpcomingMilestone,
 };
 pub use proposal::{
     Conflict, ConflictResolution, DestinationAfter, Kept, OutlineFact, ParticipationMapping,

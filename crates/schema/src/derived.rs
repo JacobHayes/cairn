@@ -14,6 +14,7 @@ use crate::collections::{BoundedVec, ByDocumentSize, CollectionError};
 use crate::domain::{Deployment, Journey};
 use crate::id::{IdentityKey, KindKey, NodeKey, RoleKey};
 use crate::limits::{EXPLANATION_ENTRY_COUNT_MAX, Limit, WEIGHT_MAX};
+use crate::node::NodeKind;
 use crate::state::{Guard, GuardFailure, SnoozeTarget};
 use jiff::civil::Date;
 
@@ -99,6 +100,43 @@ pub enum DisplayState {
     Skipped,
     /// Does not apply, and settled (Gating): the recorded state survives beneath it.
     NotRelevant,
+}
+
+impl DisplayState {
+    /// Every display state, in the order a count lists them: what is moving first, what is
+    /// out last.
+    pub const ALL: [DisplayState; 9] = [
+        DisplayState::Active,
+        DisplayState::Ready,
+        DisplayState::Blocked,
+        DisplayState::Conditional,
+        DisplayState::Scheduled,
+        DisplayState::Snoozed,
+        DisplayState::Done,
+        DisplayState::Skipped,
+        DisplayState::NotRelevant,
+    ];
+
+    /// The word the state is said by, to a person or by an agent; for a node of `kind`, the
+    /// kind's own word where it says the state differently (a decision is to decide, then
+    /// decided; a group that has not started says so).
+    #[must_use]
+    pub const fn word(self, kind: Option<NodeKind>) -> &'static str {
+        match (self, kind) {
+            (DisplayState::Ready, Some(NodeKind::Decision)) => "to decide",
+            (DisplayState::Done, Some(NodeKind::Decision)) => "decided",
+            (DisplayState::Ready, Some(NodeKind::Group)) => "not started",
+            (DisplayState::Ready, _) => "ready",
+            (DisplayState::Active, _) => "active",
+            (DisplayState::Blocked, _) => "blocked",
+            (DisplayState::Conditional, _) => "conditional",
+            (DisplayState::Scheduled, _) => "scheduled",
+            (DisplayState::Snoozed, _) => "snoozed",
+            (DisplayState::Done, _) => "done",
+            (DisplayState::Skipped, _) => "skipped",
+            (DisplayState::NotRelevant, _) => "not relevant",
+        }
+    }
 }
 
 // PRD: D1.

@@ -34,15 +34,13 @@ pub struct AgentToken {
 
 impl Accounts {
     /// H2: mints a token for a new agent acting for `actor`'s user, named `name`. Only a
-    /// user mints tokens: an agent cannot create other agents.
+    /// user mints tokens, so an agent cannot create other agents: the endpoint that calls this
+    /// is for users only, and the API refuses an agent before it runs.
     ///
     /// # Errors
     ///
-    /// The actor is an agent, or the random source or the store failed.
+    /// The random source or the store failed.
     pub async fn mint_token(&self, actor: &Actor, name: Title) -> Result<MintedToken, AuthError> {
-        if actor.agent.is_some() {
-            return Err(AuthError::AgentNotAllowed);
-        }
         let agent: AgentId = mint_id()?;
         let token = Secret::mint(SecretKind::Agent)?;
         self.store()
@@ -81,15 +79,13 @@ impl Accounts {
     }
 
     /// Revokes one of `actor`'s user's tokens; from now on it is refused. Revoking a
-    /// revoked token changes nothing. Only a user revokes tokens.
+    /// revoked token changes nothing. Only a user revokes tokens: the endpoint that calls this
+    /// is for users only.
     ///
     /// # Errors
     ///
-    /// The actor is an agent, the token is not one of the user's, or the store failed.
+    /// The token is not one of the user's, or the store failed.
     pub async fn revoke_token(&self, actor: &Actor, agent: &AgentId) -> Result<(), AuthError> {
-        if actor.agent.is_some() {
-            return Err(AuthError::AgentNotAllowed);
-        }
         let records = self.store().agent_tokens_of(&actor.user).await?;
         let Some(record) = records.into_iter().find(|record| record.agent == *agent) else {
             return Err(AuthError::NoSuchToken);

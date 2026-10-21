@@ -71,3 +71,32 @@ fn breakdown() -> Value {
     json!({ "title": "Break the workload down", "destination_revision": 1,
         "mutations": [child("ingest"), child("query")] })
 }
+
+/// B7, B9, I6: a draft the service cannot make is answered by its kind, as every host answers
+/// it: a journey or route version that does not exist is not found, and a journey that follows
+/// no route cannot be upgraded, which the caller is told is refused.
+#[tokio::test]
+async fn a_draft_that_cannot_be_made_is_answered_by_its_kind() {
+    let world = World::new();
+    let ann = user("u_ann");
+    world.vendor_journey(&ann).await;
+    let free = json!({ "journey": "j_free", "patch_id": "p_free", "name": "Free" });
+    world.ok(&ann, "create_journey", free).await;
+    let upgrade = |journey: &str| json!({ "journey": journey, "to": 2, "proposal": "pr_up", "patch_id": "p_up" });
+    let relink = json!({ "journey": "j_vendor_eval", "proposal": "pr_relink", "patch_id": "p_relink",
+        "to": { "route": "vendor-evaluation", "version": 9 } });
+    let cases = [
+        ("upgrade", upgrade("j_missing"), "not found"),
+        ("relink", relink, "not found"),
+        ("upgrade", upgrade("j_free"), "refused"),
+    ];
+    for (tool, arguments, kind) in cases {
+        let answered = world.call(&ann, tool, arguments).await;
+        let found = match &answered {
+            Err(cairn_mcp::ToolError::NotFound { .. }) => "not found",
+            Err(cairn_mcp::ToolError::Refused { .. }) => "refused",
+            _ => "something else",
+        };
+        assert_eq!(found, kind, "{tool}: {answered:?}");
+    }
+}

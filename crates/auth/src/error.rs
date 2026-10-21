@@ -51,8 +51,6 @@ pub enum AuthError {
         /// The user holding it.
         holder: UserId,
     },
-    /// An agent tried what only a user may: mint a token or authorize a client (H2).
-    AgentNotAllowed,
     /// The token named is not one of the user's.
     NoSuchToken,
 }
@@ -69,7 +67,6 @@ impl fmt::Display for AuthError {
             AuthError::LoginHeldByAnotherUser { holder } => {
                 write!(formatter, "the login already belongs to user {holder}")
             }
-            AuthError::AgentNotAllowed => formatter.write_str("an agent cannot do this"),
             AuthError::NoSuchToken => formatter.write_str("no such agent token"),
         }
     }

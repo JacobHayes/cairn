@@ -2329,12 +2329,6 @@ export interface components {
         } | {
             annotation: components["schemas"]["Annotation"];
         };
-        /**
-         * @description A group's display state, derived from its children and dependencies. Deprecated:
-         *     [`DisplayState`] is the state of every node, groups included; this stays, equal in
-         *     meaning on groups, until a later breaking release.
-         */
-        GroupState: "not_relevant" | "skipped" | "done" | "waiting" | "active" | "not_started";
         /** @description A transition guard. */
         Guard: "deps_done" | "has_artifact" | "has_note" | "broken_down";
         /**
@@ -2702,11 +2696,6 @@ export interface components {
         LevelNode: {
             /** @description The state every surface shows for the node. */
             display_state: components["schemas"]["DisplayState"];
-            /**
-             * @deprecated
-             * @description A group's display state. Deprecated: read `display_state`, which every node carries.
-             */
-            group_state?: components["schemas"]["GroupState"] | null;
             /**
              * @description Its hidden, unsatisfied prerequisites that no visible edge stands for: the "hidden
              *     prerequisites" marker, which opens the trace. Empty when it has none.
@@ -3554,8 +3543,6 @@ export interface components {
             actionable?: boolean;
             /** @description Its ancestors, root first: the breadcrumb. */
             ancestors?: components["schemas"]["NodeKey"][];
-            /** @description Gating, Blocked. */
-            blocked?: boolean;
             /** @description The state every surface shows for the node. */
             display_state: components["schemas"]["DisplayState"];
             /**
@@ -4355,6 +4342,11 @@ export interface components {
             proposing_agent?: components["schemas"]["AgentId"] | null;
             /** @description Its editing revision. */
             revision: components["schemas"]["Revision"];
+            /**
+             * @description Its destination moved since it was drafted (written, created, or removed since): it
+             *     needs a refresh before it can be applied.
+             */
+            stale: boolean;
             /** @description What it proposes, in a line. */
             title: components["schemas"]["Title"];
         };
@@ -4739,7 +4731,10 @@ export interface components {
         };
         /** @description What a container shows of its children. */
         RollUp: {
-            /** @description Every relevant child that is not done is blocked (`all_blocked`), and there is one. */
+            /**
+             * @description Every relevant child that is not done shows the display state `blocked`, and there is
+             *     one.
+             */
             all_blocked?: boolean;
             /** @description A child is `active`. */
             children_active?: boolean;
@@ -5039,11 +5034,6 @@ export interface components {
              * @description The acting frontier: its top N and the rest.
              */
             acting_frontier: number;
-            /**
-             * Format: uint32
-             * @description Blocked nodes.
-             */
-            blocked: number;
             /**
              * @description The same in-scope nodes by display state; they add up to `in_scope`, and none is
              *     `not_relevant`. A not-relevant node pending on an undecided decision is out of scope
@@ -11592,13 +11582,12 @@ export interface operations {
                     "text/plain": string;
                 };
             };
-            /** @description Only a user may do this, not an agent acting for one. Or: The auth layer refused the peer: a local-only provider and a remote peer, or login headers from a peer no proxy-mode provider trusts (in text). */
+            /** @description The auth layer refused the peer: a local-only provider and a remote peer, or login headers from a peer no proxy-mode provider trusts (in text). */
             403: {
                 headers: {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["Problem"];
                     "text/plain": string;
                 };
             };

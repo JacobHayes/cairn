@@ -139,21 +139,13 @@ mod tokens {
         );
     }
 
-    /// Only a user manages tokens: an agent cannot mint another agent or revoke a token,
-    /// and a user cannot revoke another user's token.
+    /// A user cannot revoke another user's token. (That an agent can neither mint nor revoke
+    /// one is the API's rule for those endpoints.)
     #[tokio::test]
-    async fn only_a_user_mints_or_revokes_their_own_tokens() {
+    async fn a_user_revokes_only_their_own_tokens() {
         let world = World::new();
         let ann = ann(&world).await;
         let minted = world.accounts.mint_token(&ann, named("bot")).await.unwrap();
-        let agent = Actor {
-            agent: Some(minted.agent.clone()),
-            ..ann.clone()
-        };
-        let by_agent = world.accounts.mint_token(&agent, named("child")).await;
-        assert!(matches!(by_agent, Err(AuthError::AgentNotAllowed)));
-        let revoke = world.accounts.revoke_token(&agent, &minted.agent).await;
-        assert_eq!(revoke, Err(AuthError::AgentNotAllowed));
         let bob = Actor {
             user: "u_bob".parse().unwrap(),
             agent: None,

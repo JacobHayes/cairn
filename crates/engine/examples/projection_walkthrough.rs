@@ -179,7 +179,7 @@ fn fixture_lines(name: &str, fixture: &Fixture, step: usize, out: &mut String) -
 fn level_table(level: &Level, out: &mut String) -> Result<()> {
     writeln!(
         out,
-        "| Node | Under | Rolled up | Marker | Group state | Badges |"
+        "| Node | Under | Rolled up | Marker | Display state | Badges |"
     )?;
     writeln!(out, "|---|---|---|---|---|---|")?;
     for node in &level.nodes {
@@ -213,9 +213,7 @@ fn level_table(level: &Level, out: &mut String) -> Result<()> {
             }
             badges.join("; ")
         });
-        let state = node
-            .group_state
-            .map_or_else(String::new, |state| format!("{state:?}"));
+        let state = format!("{:?}", node.display_state);
         writeln!(
             out,
             "| {} | {under} | {} | {} | {state} | {badges} |",

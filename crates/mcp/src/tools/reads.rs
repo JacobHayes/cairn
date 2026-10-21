@@ -397,7 +397,8 @@ struct ProposalListed {
     created_at: Timestamp,
     /// Whether its destination exists yet; a proposal can create it.
     destination_exists: bool,
-    /// Whether its destination moved since it was drafted: refresh it before applying.
+    /// Whether its destination moved since it was drafted (written, created, or removed
+    /// since): refresh it before applying.
     stale: bool,
 }
 
@@ -753,7 +754,7 @@ impl ToolSet {
                 .items
                 .into_iter()
                 .map(|summary| ProposalListed {
-                    stale: summary.now.exists && summary.now.revision != summary.drafted_against,
+                    stale: summary.stale,
                     destination_exists: summary.now.exists,
                     id: summary.id,
                     destination: summary.destination,

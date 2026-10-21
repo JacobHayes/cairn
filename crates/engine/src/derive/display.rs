@@ -20,12 +20,10 @@
 //! 8. `scheduled`: an `auto_done` milestone, unblocked, whose date is ahead.
 //! 9. `ready`: everything else.
 //!
-//! The legacy group state (D1) is kept beside it, deprecated, on the same helpers.
-//!
 //! Cost at `node_count_max`: a node reads its passes' flags; a container also reads its
 //! descendants, 2,000 x 2,000 at worst over every node, O(nodes) per container.
 
-use cairn_schema::{DisplayState, GroupState, NodeKey, NodeKind, Payload, Relevance, State};
+use cairn_schema::{DisplayState, NodeKey, NodeKind, Payload, Relevance, State};
 
 use super::dependencies::{Instant, Point};
 use super::{Derived, stored_state};
@@ -96,39 +94,6 @@ impl Derived {
                 .is_some_and(|node| node.kind() != NodeKind::Group)
             && self.relevance.in_scope(key)
             && !self.blocking.closed(key)
-    }
-
-    /// D1: a group's legacy display state from its children and dependencies. Deprecated:
-    /// [`Derived::display_state`] is the state of every node.
-    ///
-    /// # Panics
-    ///
-    /// When `graph` is not the one derived, or does not hold `key`.
-    #[must_use]
-    pub fn group_state(&self, graph: &Graph, key: &NodeKey) -> GroupState {
-        let state = |key: &NodeKey| {
-            let Some(node) = graph.node(key) else {
-                panic!("the graph holds {key}");
-            };
-            stored_state(graph.document(), node)
-        };
-        if self.relevance.value(key) == Relevance::NotRelevant {
-            return GroupState::NotRelevant;
-        }
-        if state(key) == State::Skipped || self.skips.skipped_by(key).is_some() {
-            return GroupState::Skipped;
-        }
-        if self.blocking.satisfies(key) {
-            return GroupState::Done;
-        }
-        if !self.entered(key) {
-            return GroupState::Waiting;
-        }
-        if Self::work_has_started(graph, key) {
-            GroupState::Active
-        } else {
-            GroupState::NotStarted
-        }
     }
 
     /// D8: the node waits on a gate of its own or one it inherits: a container, on its

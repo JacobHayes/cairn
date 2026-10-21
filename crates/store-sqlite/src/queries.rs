@@ -283,13 +283,16 @@ fn proposal_summary(
         let now = destination_now(connection, &destination)?;
         nows.insert(destination.clone(), now);
     }
+    let now = nows[&destination].clone();
+    let drafted_against = row.number(5)?;
     Ok(ProposalSummary {
         id: row.parse(0)?,
-        now: nows[&destination].clone(),
+        stale: now.moved_since(drafted_against),
+        now,
         destination,
         title: row.parse(3)?,
         revision: row.number(4)?,
-        drafted_against: row.number(5)?,
+        drafted_against,
         created_by: row.parse(6)?,
         proposing_agent: row.opt_parse(7)?,
         created_at: row.timestamp(8)?,

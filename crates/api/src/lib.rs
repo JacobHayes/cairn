@@ -106,6 +106,38 @@ fn served(assistant: bool) -> Served {
     served
 }
 
+/// `method_router`, refusing an agent before its handler runs when `endpoint` is for users
+/// only: the one place that rule is enforced, read from the flag the API document reads.
+fn guarded(endpoint: &Endpoint, method_router: MethodRouter<Api>) -> MethodRouter<Api> {
+    if endpoint.user_only {
+        method_router.route_layer(middleware::from_fn(users_only))
+    } else {
+        method_router
+    }
+}
+
+// PRD: H2, I5.
+/// Refuses a request an agent makes, acting for its user: what only a user may do.
+async fn users_only(
+    request: axum::extract::Request,
+    next: middleware::Next,
+) -> axum::response::Response {
+    use axum::response::IntoResponse;
+    if request
+        .extensions()
+        .get::<Actor>()
+        .is_some_and(|actor| actor.agent.is_some())
+    {
+        return error::ApiError::problem(
+            wire::ProblemCode::UserOnly,
+            "only a user may do this, not an agent acting for one; an agent calls the tools \
+             over MCP",
+        )
+        .into_response();
+    }
+    next.run(request).await
+}
+
 /// [`router`], with the assistant's endpoints when the host's root assembled one (I5;
 /// ARCHITECTURE, Service layer and composition: absence is a `None` at the root). They sit
 /// behind the auth layer and the body and in-flight limits but outside the request
@@ -161,12 +193,12 @@ pub fn router_beside(
     let served = served(api.assistant.is_some());
     let mut routes = Router::new();
     for (endpoint, method_router) in served {
-        routes = routes.route(endpoint.path, method_router);
+        routes = routes.route(endpoint.path, guarded(endpoint, method_router));
     }
     let conversing = api.assistant.is_some().then(|| {
         let mut routes = Router::new();
         for (endpoint, method_router) in handle::assistant::served() {
-            routes = routes.route(endpoint.path, method_router);
+            routes = routes.route(endpoint.path, guarded(endpoint, method_router));
         }
         routes.with_state(api.clone())
     });

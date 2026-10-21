@@ -85,9 +85,6 @@ pub enum TurnError {
     Overloaded,
     /// A turn of this conversation is already running: try again once it has answered.
     ConversationBusy,
-    /// The caller is an agent: the assistant acts for a signed-in user, and an agent has the
-    /// tools itself over MCP (I7).
-    AgentCaller,
     /// The journey does not exist.
     TargetMissing(Target),
     /// Reading the target or the conversation ran past the turn's limit: nothing was
@@ -107,9 +104,6 @@ impl std::fmt::Display for TurnError {
             ),
             TurnError::ConversationBusy => formatter.write_str(
                 "a turn of this conversation is already running; try again once it answers",
-            ),
-            TurnError::AgentCaller => formatter.write_str(
-                "the assistant acts for a signed-in user; an agent calls the tools over MCP",
             ),
             TurnError::TargetMissing(target) => write!(formatter, "no {target}"),
             TurnError::TimedOut => formatter
@@ -172,23 +166,21 @@ impl Assistant {
             .map_err(|error| TurnError::Failed(error.to_string()))
     }
 
-    /// I5: one turn of `actor`'s conversation about `target`, starting from `message`. The
+    /// I5: one turn of `actor`'s conversation about `target`, starting from `message`;
+    /// `actor` is a user, since the endpoints that call this are for users only. The
     /// turn runs on its own task, so a client that goes away never cuts a write off; its
     /// conversation is saved and its writes reported however it ends.
     ///
     /// # Errors
     ///
-    /// [`TurnError`] when it cannot run: too many in flight, an agent caller, a journey that
-    /// does not exist, or a failed store.
+    /// [`TurnError`] when it cannot run: too many in flight, a journey that does not exist,
+    /// or a failed store.
     pub async fn turn(
         &self,
         actor: &Actor,
         target: Target,
         message: Markdown,
     ) -> Result<TurnReply, TurnError> {
-        if actor.agent.is_some() {
-            return Err(TurnError::AgentCaller);
-        }
         let Ok(slot) = Arc::clone(&self.in_flight).try_acquire_owned() else {
             return Err(TurnError::Overloaded);
         };

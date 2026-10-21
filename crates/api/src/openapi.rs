@@ -709,16 +709,7 @@ fn problems_of(operation: &Operation) -> Vec<(&'static str, &'static str)> {
         problems.push(("413", "The body is over the request size limit."));
         problems.push(("415", "The body is not application/json."));
     }
-    let user_only = [
-        &endpoints::TOKENS,
-        &endpoints::REVOKE_TOKEN,
-        &endpoints::ASSISTANT_JOURNEY,
-        &endpoints::ASSISTANT_ROUTE_DRAFT,
-    ];
-    if user_only
-        .iter()
-        .any(|endpoint| endpoint.path == operation.endpoint.path)
-    {
+    if operation.endpoint.user_only {
         problems.push((
             "403",
             "Only a user may do this, not an agent acting for one.",

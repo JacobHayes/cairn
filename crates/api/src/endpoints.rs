@@ -17,6 +17,10 @@ pub struct Endpoint {
     pub operation: &'static str,
     /// Served outside the auth layer, to anyone: the health check alone.
     pub public: bool,
+    // PRD: H2, I5.
+    /// Only a user may call it, never an agent acting for one: the router refuses an agent
+    /// before the handler runs, and the API document says so.
+    pub user_only: bool,
 }
 
 impl Endpoint {
@@ -84,6 +88,18 @@ const fn endpoint(method: Method, path: &'static str, operation: &'static str) -
         path,
         operation,
         public: false,
+        user_only: false,
+    }
+}
+
+/// An endpoint only a user may call, never an agent acting for one.
+const fn for_users(method: Method, path: &'static str, operation: &'static str) -> Endpoint {
+    Endpoint {
+        method,
+        path,
+        operation,
+        public: false,
+        user_only: true,
     }
 }
 
@@ -94,6 +110,7 @@ pub static HEALTH: Endpoint = Endpoint {
     path: "/healthz",
     operation: "getHealth",
     public: true,
+    user_only: false,
 };
 /// `GET /api/capabilities`: what this host offers.
 pub static CAPABILITIES: Endpoint = endpoint(Method::GET, "/api/capabilities", "getCapabilities");
@@ -320,9 +337,10 @@ pub static USER_NAMES: Endpoint = endpoint(Method::GET, "/api/users", "listUserN
 /// `GET /api/users/me/tokens`: the caller's agent tokens.
 pub static TOKENS: Endpoint = endpoint(Method::GET, "/api/users/me/tokens", "listAgentTokens");
 /// `POST /api/users/me/tokens`: mints an agent token (H2).
-pub static MINT_TOKEN: Endpoint = endpoint(Method::POST, "/api/users/me/tokens", "mintAgentToken");
-/// `DELETE /api/users/me/tokens/{agent}`: revokes one.
-pub static REVOKE_TOKEN: Endpoint = endpoint(
+/// Only a user mints one: an agent cannot create other agents.
+pub static MINT_TOKEN: Endpoint = for_users(Method::POST, "/api/users/me/tokens", "mintAgentToken");
+/// `DELETE /api/users/me/tokens/{agent}`: revokes one; only a user does.
+pub static REVOKE_TOKEN: Endpoint = for_users(
     Method::DELETE,
     "/api/users/me/tokens/{agent}",
     "revokeAgentToken",
@@ -330,28 +348,28 @@ pub static REVOKE_TOKEN: Endpoint = endpoint(
 
 /// `POST /api/journeys/{id}/assistant`: one assistant turn about a journey (I5), when the host
 /// offers the assistant.
-pub static ASSISTANT_JOURNEY: Endpoint = endpoint(
+pub static ASSISTANT_JOURNEY: Endpoint = for_users(
     Method::POST,
     "/api/journeys/{id}/assistant",
     "converseAboutJourney",
 );
 /// `POST /api/routes/{id}/draft/assistant`: one assistant turn about a route's draft (I5, A12),
 /// when the host offers the assistant.
-pub static ASSISTANT_ROUTE_DRAFT: Endpoint = endpoint(
+pub static ASSISTANT_ROUTE_DRAFT: Endpoint = for_users(
     Method::POST,
     "/api/routes/{id}/draft/assistant",
     "converseAboutRouteDraft",
 );
 /// `GET /api/journeys/{id}/assistant`: the caller's conversation about a journey (I5), when the
 /// host offers the assistant.
-pub static ASSISTANT_JOURNEY_CONVERSATION: Endpoint = endpoint(
+pub static ASSISTANT_JOURNEY_CONVERSATION: Endpoint = for_users(
     Method::GET,
     "/api/journeys/{id}/assistant",
     "conversationAboutJourney",
 );
 /// `GET /api/routes/{id}/draft/assistant`: the caller's conversation about a route's draft (I5),
 /// when the host offers the assistant.
-pub static ASSISTANT_ROUTE_DRAFT_CONVERSATION: Endpoint = endpoint(
+pub static ASSISTANT_ROUTE_DRAFT_CONVERSATION: Endpoint = for_users(
     Method::GET,
     "/api/routes/{id}/draft/assistant",
     "conversationAboutRouteDraft",

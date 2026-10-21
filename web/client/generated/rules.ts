@@ -3,6 +3,7 @@ import type { components } from "./api.ts";
 
 type NodeKind = components["schemas"]["NodeKind"];
 type State = components["schemas"]["State"];
+type DisplayState = components["schemas"]["DisplayState"];
 
 // PRACTICES, Explicit limits: the engine rejects a patch past any of these.
 /** The `node_count_max` limit. */
@@ -87,3 +88,28 @@ export const INITIAL_STATE: Record<NodeKind, State> = {
 
 /** D1: the states a node is finished in. */
 export const TERMINAL_STATES: readonly State[] = ["done", "skipped", "decided"];
+
+/** D8: every display state, in the order a count lists them. */
+export const DISPLAY_STATES: readonly DisplayState[] = ["active", "ready", "blocked", "conditional", "scheduled", "snoozed", "done", "skipped", "not_relevant"];
+
+/** D8: the word each display state is said by. */
+export const STATUS_WORDS: Record<DisplayState, string> = {
+  active: "active",
+  ready: "ready",
+  blocked: "blocked",
+  conditional: "conditional",
+  scheduled: "scheduled",
+  snoozed: "snoozed",
+  done: "done",
+  skipped: "skipped",
+  not_relevant: "not relevant",
+};
+
+/** D8: the words a node's kind says a display state by, where they differ. */
+export const KIND_STATUS_WORDS: Partial<Record<NodeKind, Partial<Record<DisplayState, string>>>> = {
+  decision: { ready: "to decide", done: "decided" },
+  group: { ready: "not started" },
+};
+
+/** Every key type's prefix: what a key looks like wherever one might be shown. */
+export const KEY_PREFIXES: readonly string[] = ["n_", "r_", "k_", "i_", "who_", "a_", "j_", "p_", "pr_", "u_", "ag_", "cv_"];

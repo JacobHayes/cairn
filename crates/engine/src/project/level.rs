@@ -54,8 +54,9 @@ use std::collections::{BTreeMap, BTreeSet};
 
 use cairn_schema::limits::CONTAINMENT_DEPTH_MAX;
 use cairn_schema::{
-    DependencyVia, Deployment, EdgeOrigin, IdentityKey, Level, LevelDisplay, LevelEdge, LevelNode,
-    LevelQuery, NodeKey, NodeKind, Progress, Relevance, RollUp, State, UnderlyingEdge,
+    DependencyVia, Deployment, DisplayState, EdgeOrigin, IdentityKey, Level, LevelDisplay,
+    LevelEdge, LevelNode, LevelQuery, NodeKey, NodeKind, Progress, Relevance, RollUp, State,
+    UnderlyingEdge,
 };
 
 use super::{DerivedJourney, ProjectionError};
@@ -155,8 +156,6 @@ impl<'a> DerivedJourney<'a> {
                     rolled_up: members,
                     kept_work_pending: self.kept_work_pending(key),
                     display_state: self.derived.display_state(self.graph, key),
-                    group_state: (self.node(key).kind() == NodeKind::Group)
-                        .then(|| self.derived.group_state(self.graph, key)),
                     roll_up: progress
                         .get(key)
                         .map(|progress| self.roll_up(key, *progress)),
@@ -440,7 +439,9 @@ impl<'a> DerivedJourney<'a> {
                 .iter()
                 .any(|child| self.state(child) == State::Active),
             all_blocked: !relevant_open.is_empty()
-                && relevant_open.iter().all(|child| blocking.blocked(child)),
+                && relevant_open
+                    .iter()
+                    .all(|child| derived.display_state(self.graph, child) == DisplayState::Blocked),
             progress,
             needs_breakdown: children.iter().any(|child| blocking.needs_breakdown(child)),
             max_child_gravity: derived.priority().max_child_gravity(key),
