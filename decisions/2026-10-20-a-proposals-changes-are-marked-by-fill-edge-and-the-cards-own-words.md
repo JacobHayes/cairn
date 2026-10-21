@@ -14,3 +14,5 @@ Call:
 Alternatives: a hanging badge held constant on screen (the old failure: it outgrows the cards); a badge scaled with the card and hidden when zoomed out (a tag on every card still reads as clutter, worst on a phone); colour alone (fails without it).
 
 What would change it: a mark that must show at a zoom where a 2px edge is itself too heavy.
+
+Superseded by decisions/2026-10-21-a-proposals-change-marks-scale-with-the-card.md: the marks stand; the rule is that a mark scales with its card, not that it is never a badge.
