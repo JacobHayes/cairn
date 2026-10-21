@@ -150,7 +150,7 @@ describe("a stale write that cannot be rebased", () => {
     const host = new FakeHost();
     host.overlaps = () => false;
     const { edits, writes } = await startRoot({ host });
-    host.proposed = [{ outcome: "rejected", rejection: { rejection: "stale", conflicts: [{ of: { proposal: "pr_one" }, expected: 4, current: 5 }], intervening: [] } }];
+    host.proposed = [{ outcome: "rejected", rejection: { rejection: "stale", conflicts: [{ of: { proposal: "pr_one" }, expected: 4, current: 5 }], intervening: [], touched: [] } }];
     await submitWrite(edits, sentOf(paths[3] as Path, "p_a"));
     expect(host.called).toEqual(["apply"]);
     expect(problemsOf(writes(), false).map((problem) => problem.kind)).toEqual(["conflict"]);

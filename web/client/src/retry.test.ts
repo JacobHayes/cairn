@@ -10,6 +10,7 @@ import {
   type Overlaps,
   type Patch,
   type RevisionConflict,
+  type Stale,
   type TouchedSet,
 } from "./retry.ts";
 
@@ -32,19 +33,22 @@ const conflict = (of: Of, expected: number, current: number): RevisionConflict =
 /** What touches node `node` of journey `j_one` alone. */
 const onNode = (node: string): TouchedSet => [{ in_graph: { graph: { journey: "j_one" }, key: { node } } }];
 
-/** The engine's overlap check, for a patch that touches node `n_a` alone. */
-const overlaps: Overlaps = (_patch, intervening) => JSON.stringify(intervening).includes('"n_a"');
+/** The engine's overlap check over these tests' sets, each a node's address: whether they share one. */
+const overlaps: Overlaps = (touched, intervening) => intervening.some((key) => JSON.stringify(touched).includes(JSON.stringify(key)));
+
+/** A stale answer: what the patch would write is node `n_a`'s. */
+const stale = (conflicts: RevisionConflict[], intervening: TouchedSet): Stale => ({ rejection: "stale", conflicts, intervening, touched: onNode("n_a") });
 
 describe("rebased", () => {
   it("moves a patch onto the revisions the rejection reports, keeping its id and mutations", () => {
     const original = patch(1);
     const conflicts = [conflict(journey("j_one"), 2, 4), conflict(deployment, 1, 3)];
-    const retry = rebased(original, conflicts, onNode("n_b"), overlaps);
+    const retry = rebased(original, stale(conflicts, onNode("n_b")), overlaps);
     expect(retry).toEqual({ ...original, base_revision: 4, deployment_revision: 3 });
   });
 
   it.each<[string, RevisionConflict[], TouchedSet]>([
-    ["what intervened touched the node", [conflict(journey("j_one"), 2, 3)], onNode("n_a")],
+    ["what intervened touched what the patch would write", [conflict(journey("j_one"), 2, 3)], onNode("n_a")],
     ["nothing moved", [], onNode("n_b")],
     ["another journey moved", [conflict(journey("j_two"), 1, 2)], onNode("n_b")],
     ["the patch names no deployment revision to move", [conflict(deployment, 1, 2)], onNode("n_b")],
@@ -52,14 +56,14 @@ describe("rebased", () => {
     ["the patch names a revision past the current one", [conflict(journey("j_one"), 2, 1)], []],
     ["the revision the patch names has not moved", [conflict(journey("j_one"), 2, 2)], []],
   ])("is none when %s", (_why, conflicts, intervening) => {
-    expect(rebased(patch(), conflicts, intervening, overlaps)).toBeUndefined();
+    expect(rebased(patch(), stale(conflicts, intervening), overlaps)).toBeUndefined();
   });
 
   it("is none when the engine cannot say whether the sets overlap", () => {
     const refusing: Overlaps = () => {
       throw new Error("version skew");
     };
-    expect(rebased(patch(), [conflict(journey("j_one"), 2, 3)], onNode("n_b"), refusing)).toBeUndefined();
+    expect(rebased(patch(), stale([conflict(journey("j_one"), 2, 3)], onNode("n_b")), refusing)).toBeUndefined();
   });
 });
 
@@ -74,7 +78,7 @@ function scripted(answers: (TouchedSet | undefined)[]) {
       return Promise.resolve({ outcome: "answered", answer: { outcome: "already_applied", receipt } });
     }
     const conflicts = [conflict(journey("j_one"), submitted.base_revision, submitted.base_revision + 1)];
-    return Promise.resolve({ outcome: "rejected", rejection: { rejection: "stale", conflicts, intervening } });
+    return Promise.resolve({ outcome: "rejected", rejection: stale(conflicts, intervening) });
   };
   return { sent, send };
 }
@@ -121,7 +125,7 @@ describe("submit", () => {
       const named = next.base_revision;
       sent.push(named);
       const current = named === 2 ? 3 : 2;
-      const rejection = { rejection: "stale" as const, conflicts: [conflict(journey("j_one"), named, current)], intervening: [] };
+      const rejection = stale([conflict(journey("j_one"), named, current)], []);
       return Promise.resolve<Answered<never>>({ outcome: "rejected", rejection });
     }, { overlaps });
     expect(submitted.outcome).toBe("rejected");

@@ -9,9 +9,7 @@ use std::sync::Arc;
 use std::time::Duration;
 
 use cairn_auth::{Accounts, Auth, AuthProvider, Clock, DevConfig, DevProvider, Listener};
-use cairn_schema::{
-    IdentityKey, JourneyId, NodeKey, PatchReceipt, RankConstants, Revision, TouchedSet,
-};
+use cairn_schema::{IdentityKey, JourneyId, NodeKey, PatchReceipt, RankConstants, Revision};
 use cairn_service::{AuthKind, AuthMethod, Capabilities, DeploymentSettings, Parts, Service};
 use cairn_store::InProcessNotifier;
 use cairn_store_sqlite::SqliteStore;
@@ -181,8 +179,8 @@ pub struct Setup {
     /// Each pair is (survivor, merged).
     pub merges: Vec<(IdentityKey, IdentityKey)>,
     pub deployment_revision: Revision,
-    /// What setup's own patches were acknowledged with, and what each touches.
-    pub receipts: Vec<(PatchReceipt, TouchedSet)>,
+    /// What setup's own patches were acknowledged with.
+    pub receipts: Vec<PatchReceipt>,
 }
 
 /// Creates the shared journey and the identities to merge, through the API.
@@ -197,7 +195,7 @@ pub async fn set_up(client: &Client) -> Result<Setup, Stop> {
         journey: patches::journey(),
         nodes: (0..NODE_COUNT).map(patches::node).collect(),
         merges: (0..MERGE_COUNT).map(patches::merge_pair).collect(),
-        deployment_revision: identities.0.revision,
+        deployment_revision: identities.revision,
         receipts: vec![created, identities],
     })
 }

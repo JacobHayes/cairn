@@ -17,7 +17,7 @@ const receipt = { patch_id: "p_x", domain: { journey: "j_one" }, content_hash: "
 const applied: Answered<HttpFailure> = { outcome: "answered", answer: { outcome: "applied", receipt, consequences: {} } };
 const lost: Answered<HttpFailure> = { outcome: "failed", error: { status: 0, message: "network down" } };
 const invalid: Rejection = { rejection: "invalid", violations: [] };
-const stale: Answered<HttpFailure> = { outcome: "rejected", rejection: { rejection: "stale", conflicts: [{ of: { domain: { journey: "j_one" } }, expected: 3, current: 5 }], intervening: [] } };
+const stale: Answered<HttpFailure> = { outcome: "rejected", rejection: { rejection: "stale", conflicts: [{ of: { domain: { journey: "j_one" } }, expected: 3, current: 5 }], intervening: [], touched: [] } };
 
 const record = (id: string, delivery: EditRecord["delivery"], node = "n_a"): EditRecord => ({
   version: EDIT_RECORD_VERSION,

@@ -84,7 +84,7 @@ describe("a rejection that arrives after the control is gone, then a reload", ()
     first.submit(renaming("p_a"));
     await settled();
     // The control is long gone by the time the answer comes.
-    held.resolve(refusal({ rejection: "stale", conflicts: [{ of: { domain: { journey: "j_one" } }, expected: 3, current: 0 }], intervening: [] }));
+    held.resolve(refusal({ rejection: "stale", conflicts: [{ of: { domain: { journey: "j_one" } }, expected: 3, current: 0 }], intervening: [], touched: [] }));
     await settled();
     first.root.stop();
 
@@ -104,7 +104,7 @@ describe("a rejection that arrives after the control is gone, then a reload", ()
     // What intervened overlaps what the write touches, so the safe retry does not rebase it.
     host.overlaps = () => true;
     const first = await startRoot({ host });
-    first.host.answers = [refusal({ rejection: "stale", conflicts: [{ of: { domain: { journey: "j_one" } }, expected: 3, current: 4 }], intervening: [] })];
+    first.host.answers = [refusal({ rejection: "stale", conflicts: [{ of: { domain: { journey: "j_one" } }, expected: 3, current: 4 }], intervening: [], touched: [] })];
     first.submit(renaming("p_a"));
     await settled();
     first.root.stop();
@@ -180,7 +180,7 @@ describe("the kept records", () => {
 
 describe("what the chip says of a write", () => {
   const base = { id: "p_a", about: aboutNode(), command: { kind: "patch" as const, patch: renaming("p_a") }, resubmitted: 0 };
-  const stale: Rejection = { rejection: "stale", conflicts: [], intervening: [] };
+  const stale: Rejection = { rejection: "stale", conflicts: [], intervening: [], touched: [] };
 
   it("calls a stale rejection a conflict and another refusal not saved, offers Retry only where a resend can help, and says nothing of a write still trying", () => {
     const words = (view: Parameters<typeof unlandedWords>[0], skewed = false) => {
@@ -199,7 +199,7 @@ describe("what the chip says of a write", () => {
 
   it("says what was removed, and offers no way back to it", async () => {
     const { host, submit, writes } = await startRoot();
-    host.answers = [refusal({ rejection: "stale", conflicts: [{ of: { domain: { journey: "j_one" } }, expected: 3, current: 0 }], intervening: [] })];
+    host.answers = [refusal({ rejection: "stale", conflicts: [{ of: { domain: { journey: "j_one" } }, expected: 3, current: 0 }], intervening: [], touched: [] })];
     submit(renaming("p_a"));
     await settled();
     const view = writeView(writes().p_a?.snapshot as WriteSnapshot);

@@ -7,8 +7,12 @@ use crate::service::support;
 use std::collections::BTreeSet;
 use std::fmt::Write as _;
 
+use cairn_api::client::retry::{self, Refused};
+use cairn_api::wire::PatchAnswer;
 use cairn_engine::Records;
-use cairn_schema::{Domain, EventType, JourneyId, Rejection, RevisionOf, Subject, ViolationCode};
+use cairn_schema::{
+    Domain, EventType, JourneyId, Rejection, RevisionOf, Subject, TouchedSet, ViolationCode,
+};
 use cairn_service::{DomainPatch, Service, Written};
 use cairn_store::{EventQuery, InProcessNotifier, Take, Tick, Watch};
 
@@ -48,6 +52,7 @@ on_both_stores!(
     a_resubmission_after_another_patch_is_answered_from_its_receipt,
     a_subtree_removal_conflicts_with_an_edit_inside_it,
     a_removal_retried_after_an_insertion_beneath_it_is_not_widened,
+    a_retried_role_removal_never_clears_a_fill_made_meanwhile,
     a_merge_that_breaks_a_referencing_journey_is_rejected_naming_it,
     a_merge_moves_emails_and_an_email_stays_on_one_identity,
     a_merge_is_stale_once_a_journey_it_checked_moves_or_a_new_one_refers,
@@ -211,8 +216,8 @@ const CHILD: &str = "{key: n_c, id: c, kind: action, title: C, parent: n_g}";
 const REMOVAL: &str = "- op: remove_node\n  removal: {node: n_g, descendants: [n_c]}\n";
 
 /// H5: a subtree removal drafted at revision 1 is stale once an edit inside the subtree
-/// lands; the rejection carries what the edit touched, which overlaps the removal, so the
-/// client may not retry it on its own.
+/// lands; the rejection carries what the edit touched, which overlaps what the removal
+/// would write, so the client may not retry it on its own.
 async fn a_subtree_removal_conflicts_with_an_edit_inside_it(
     service: &Service,
     _: &InProcessNotifier,
@@ -229,11 +234,8 @@ async fn a_subtree_removal_conflicts_with_an_edit_inside_it(
     let Rejection::Stale {
         conflicts,
         intervening,
-    } = rejected(
-        service
-            .patch(&call("u_lead", AT), &domain(removal.clone()))
-            .await,
-    )
+        touched,
+    } = rejected(service.patch(&call("u_lead", AT), &domain(removal)).await)
     else {
         panic!("the removal is stale");
     };
@@ -247,15 +249,13 @@ async fn a_subtree_removal_conflicts_with_an_edit_inside_it(
         (1, 2)
     );
     assert!(!intervening.as_set().is_empty());
-    assert!(
-        intervening.overlaps(&removal.touched()),
-        "not safe to retry"
-    );
+    assert!(intervening.overlaps(&touched), "not safe to retry");
 }
 
-/// H5, A18: when what intervened is an insertion beneath the subtree, the touched sets do
-/// not overlap and the client retries at the new revision; the retry names only what its
-/// author saw, so it is rejected rather than widened to the new node.
+/// H5, A18: when what intervened is an insertion beneath the subtree, the removal would not
+/// apply at the new revision (it names only what its author saw), so the stale answer says
+/// it touches the whole journey and no client retries it on its own; resubmitted there by
+/// hand, it is rejected rather than widened to the new node.
 async fn a_removal_retried_after_an_insertion_beneath_it_is_not_widened(
     service: &Service,
     _: &InProcessNotifier,
@@ -269,14 +269,17 @@ async fn a_removal_retried_after_an_insertion_beneath_it_is_not_widened(
     );
     applied(service.patch(&call("u_other", AT), &domain(insert)).await);
     let removal = patch("p_remove", "{journey: j_tree}", 1, REMOVAL);
-    let Rejection::Stale { intervening, .. } = rejected(
-        service
-            .patch(&call("u_lead", AT), &domain(removal.clone()))
-            .await,
-    ) else {
+    let Rejection::Stale { touched, .. } =
+        rejected(service.patch(&call("u_lead", AT), &domain(removal)).await)
+    else {
         panic!("the removal is stale");
     };
-    assert!(!intervening.overlaps(&removal.touched()), "safe to retry");
+    let journey = Domain::Journey(journey_id("j_tree"));
+    assert_eq!(
+        touched,
+        TouchedSet::whole(journey),
+        "never retried on its own"
+    );
     let retry = patch("p_remove_retry", "{journey: j_tree}", 2, REMOVAL);
     let refused = rejected(service.patch(&call("u_lead", AT), &domain(retry)).await);
     assert!(
@@ -289,6 +292,63 @@ async fn a_removal_retried_after_an_insertion_beneath_it_is_not_widened(
         .unwrap()
         .unwrap();
     assert_eq!(journey.graph.nodes.len(), 3, "nothing was removed");
+}
+
+/// H5: a role removal drafted while the role was empty is stale once someone fills it. What
+/// the removal would write now (the fill too) comes from applying it, so the client's safe
+/// retry surfaces the conflict instead of resubmitting a removal that silently clears the
+/// fill; when the fill was another role's, it resubmits and lands.
+async fn a_retried_role_removal_never_clears_a_fill_made_meanwhile(
+    service: &Service,
+    _: &InProcessNotifier,
+) {
+    let (people_call, people) = crate::people::people_write();
+    applied(service.patch(&people_call, &people).await);
+    let deployment = service.deployment().await.unwrap().revision;
+    for (journey, filled, lands) in [("j_same", "r_lead", false), ("j_other", "r_alt", true)] {
+        let target = format!("{{journey: {journey}}}");
+        let roles = "\
+- op: create_journey\n  name: Roles\n\
+- op: add_role\n  role: {key: r_lead, id: lead, title: Lead}\n\
+- op: add_role\n  role: {key: r_alt, id: alt, title: Alt}\n";
+        let created = patch(&format!("p_create_{journey}"), &target, 0, roles);
+        applied(service.patch(&call("u_lead", AT), &domain(created)).await);
+        let fill =
+            format!("- op: fill_role\n  role: {filled}\n  identities: [who_e7h2jv3nxc4yaw6t]\n");
+        let fill = cairn_schema::Patch {
+            deployment_revision: Some(deployment),
+            ..patch(&format!("p_fill_{journey}"), &target, 1, &fill)
+        };
+        applied(service.patch(&call("u_other", AT), &domain(fill)).await);
+        let removal = patch(
+            &format!("p_remove_{journey}"),
+            &target,
+            1,
+            "- op: remove_role\n  role: r_lead\n",
+        );
+        let submitted = retry::submit(removal, |patch| async move {
+            let answer = service.patch(&call("u_lead", AT), &domain(patch)).await;
+            answer.map(PatchAnswer::from).map_err(|error| match error {
+                cairn_service::WriteError::Rejected(rejection) => Refused::Rejected(rejection),
+                other => Refused::Failed(other.to_string()),
+            })
+        })
+        .await;
+        assert_eq!(submitted.is_ok(), lands, "{journey}: {submitted:?}");
+        let held = service
+            .journey(&journey_id(journey))
+            .await
+            .unwrap()
+            .unwrap();
+        let fills: Vec<String> = held
+            .graph
+            .state
+            .role_fills
+            .keys()
+            .map(ToString::to_string)
+            .collect();
+        assert_eq!(fills, [filled], "{journey}: the fill made meanwhile stays");
+    }
 }
 
 /// E6: a merge whose aliases make a contradictory chain apply in a referencing journey is

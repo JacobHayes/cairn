@@ -50,7 +50,7 @@ describe("goneOf", () => {
   });
 
   const patchFor = (target: Patch["target"]): Patch => ({ id: "p_test", target, base_revision: 3, mutations: [] });
-  const staleAt = (domain: Schema<"Domain">, current: number): Rejection => ({ rejection: "stale", conflicts: [{ of: { domain }, expected: 3, current }], intervening: [] });
+  const staleAt = (domain: Schema<"Domain">, current: number): Rejection => ({ rejection: "stale", conflicts: [{ of: { domain }, expected: 3, current }], intervening: [], touched: [] });
 
   it("says a journey or route answered at revision 0 is gone, and one that moved on is not", () => {
     expect(goneOf(patchFor({ journey: "j_one" }), staleAt({ journey: "j_one" }, 0))).toEqual({ journey: "j_one" });

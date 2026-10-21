@@ -81,8 +81,8 @@ it("the in-browser root loads each fixture, applies a patch, refuses stale ones,
   for (const [request, overlaps] of [[overlapping, true], [separate, false]] as const) {
     const reason = await reasonOf(started, () => host.patch(request));
     expect(reason).toMatchObject({ error: "rejected", rejection: { rejection: "stale" } });
-    const intervening = reason?.error === "rejected" && reason.rejection.rejection === "stale" ? reason.rejection.intervening : [];
-    expect(host.engine.touchedOverlaps(request.patch, intervening)).toBe(overlaps);
+    const stale = reason?.error === "rejected" && reason.rejection.rejection === "stale" ? reason.rejection : undefined;
+    expect(host.engine.touchedOverlaps(stale?.touched ?? [], stale?.intervening ?? [])).toBe(overlaps);
   }
   // H5: the separate one is safe to resubmit as is, at the revision the rejection named.
   expect(host.patch({ patch: { ...separate.patch, base_revision: base + 1 } })).toMatchObject({ outcome: "applied", receipt: { revision: base + 2 } });
@@ -108,7 +108,7 @@ it("a trap stops the page's module for every caller", async () => {
   expect(trap).toEqual(aborted);
   expect(await reasonOf(started, () => host.capabilities())).toEqual(aborted);
   expect(await reasonOf(started, () => host.journeys())).toEqual(aborted);
-  expect(await reasonOf(started, () => host.engine.touchedText(note("p_after", 1, "a_after").patch))).toEqual(aborted);
+  expect(await reasonOf(started, () => host.engine.touchedOverlaps([], []))).toEqual(aborted);
 });
 
 it("the worker keeps a journey's newest document and refuses an older one", async () => {

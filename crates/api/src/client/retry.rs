@@ -3,7 +3,8 @@
 //!
 //! A stale patch is resubmitted on its own only when what intervened cannot have touched
 //! anything it touches: the rejection's intervening touched set does not overlap the
-//! patch's own. The resubmission names the revisions the rejection reports, never a newer
+//! patch's own, which the rejection also carries, as applying the patch at the current
+//! revisions writes it (the client never predicts it). The resubmission names the revisions the rejection reports, never a newer
 //! one read since, because only the events up to those were compared; if more landed in
 //! between, it is stale again and compared again. It keeps its patch id: a stale patch
 //! left no receipt, so the id still names one change, and a resubmission whose response is
@@ -26,18 +27,20 @@ use crate::wire::PatchAnswer;
 /// (decisions/2026-10-06-what-the-clients-safe-retry-resubmits-and-how-often.md).
 pub const RESUBMISSION_COUNT_MAX: u32 = 32;
 
-/// H5: the patch to resubmit after it was answered stale with `conflicts` and
-/// `intervening`, or none when it is not safe: what intervened overlaps what it touches,
-/// or a revision moved that the patch names nowhere it could be rebased (a merge's
-/// journeys, a proposal's editing revision), or a conflict names a current revision not
-/// past the one the patch named (rebasing would move it backward).
+/// H5: the patch to resubmit after it was answered stale with `conflicts`, `intervening`,
+/// and `touched` (what it would write at the current revisions), or none when it is not
+/// safe: what intervened overlaps what it would write, or a revision moved that the patch
+/// names nowhere it could be rebased (a merge's journeys, a proposal's editing revision),
+/// or a conflict names a current revision not past the one the patch named (rebasing would
+/// move it backward).
 #[must_use]
 pub fn rebased(
     patch: &Patch,
     conflicts: &[RevisionConflict],
     intervening: &TouchedSet,
+    touched: &TouchedSet,
 ) -> Option<Patch> {
-    if conflicts.is_empty() || intervening.overlaps(&patch.touched()) {
+    if conflicts.is_empty() || intervening.overlaps(touched) {
         return None;
     }
     let target = patch.target.domain();
@@ -102,11 +105,13 @@ where
             Err(Refused::Rejected(Rejection::Stale {
                 conflicts,
                 intervening,
+                touched,
             })) if resubmitted < RESUBMISSION_COUNT_MAX => {
-                let Some(next) = rebased(&current, &conflicts, &intervening) else {
+                let Some(next) = rebased(&current, &conflicts, &intervening, &touched) else {
                     let stale = Rejection::Stale {
                         conflicts,
                         intervening,
+                        touched,
                     };
                     return Err(Refused::Rejected(stale));
                 };
@@ -145,6 +150,11 @@ mod tests {
         RevisionOf::Domain(Domain::Journey(id.parse().unwrap()))
     }
 
+    /// What the patch writes: node `n_a`'s state.
+    fn writes() -> TouchedSet {
+        on_node("n_a")
+    }
+
     /// What touches node `node` of journey `j_one` alone.
     fn on_node(node: &str) -> TouchedSet {
         let graph = GraphId::Journey("j_one".parse().unwrap());
@@ -165,7 +175,7 @@ mod tests {
         let deployment = RevisionOf::Domain(Domain::Deployment);
         let original = patch("{journey: j_one}", Some(1));
         let conflicts = [conflict(journey("j_one"), 2, 4), conflict(deployment, 1, 3)];
-        let retry = rebased(&original, &conflicts, &on_node("n_b")).unwrap();
+        let retry = rebased(&original, &conflicts, &on_node("n_b"), &writes()).unwrap();
         assert_eq!(retry.base_revision, revision(4));
         assert_eq!(retry.deployment_revision, Some(revision(3)));
         assert_eq!(
@@ -207,7 +217,11 @@ mod tests {
             ),
         ];
         for (conflicts, intervening, why) in cases {
-            assert_eq!(rebased(&original, conflicts, &intervening), None, "{why}");
+            assert_eq!(
+                rebased(&original, conflicts, &intervening, &writes()),
+                None,
+                "{why}"
+            );
         }
     }
 
@@ -215,6 +229,7 @@ mod tests {
         Refused::Rejected(Rejection::Stale {
             conflicts: vec![conflict(journey("j_one"), 2, 3)],
             intervening,
+            touched: writes(),
         })
     }
 
@@ -273,6 +288,7 @@ mod tests {
                 Rejection::Stale {
                     conflicts: vec![conflict(journey("j_one"), named, current)],
                     intervening: TouchedSet::default(),
+                    touched: writes(),
                 },
             )))
         }));

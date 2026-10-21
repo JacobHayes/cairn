@@ -4492,6 +4492,12 @@ export interface components {
             intervening: components["schemas"]["TouchedSet"];
             /** @constant */
             rejection: "stale";
+            /**
+             * @description What the patch would write resubmitted at the current revisions, as applying it
+             *     there writes it; its whole domain when it would not apply there or that is not
+             *     known.
+             */
+            touched: components["schemas"]["TouchedSet"];
         } | {
             /** @description The patch id. */
             patch_id: components["schemas"]["PatchId"];

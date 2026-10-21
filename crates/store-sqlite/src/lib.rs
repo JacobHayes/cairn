@@ -191,9 +191,15 @@ impl SqliteStore {
         // landed since moved a conflicting revision past what this one expected too, so it
         // intervened as truly as those before.
         match committed {
-            Err(CommitError::Rejected(Rejection::Stale { conflicts, .. })) => {
+            Err(CommitError::Rejected(Rejection::Stale {
+                conflicts, touched, ..
+            })) => {
                 let intervening = self.intervening(&conflicts).await?;
-                Err(cairn_store::backend::stale(conflicts, intervening))
+                Err(CommitError::Rejected(Rejection::Stale {
+                    conflicts,
+                    intervening,
+                    touched,
+                }))
             }
             other => other,
         }

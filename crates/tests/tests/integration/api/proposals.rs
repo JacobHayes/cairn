@@ -253,6 +253,7 @@ mod in_process {
         let Rejection::Stale {
             conflicts,
             intervening,
+            ..
         } = rejection(
             &post(
                 &ann,

@@ -437,23 +437,14 @@ export function routeNotices(request: string): string;
 export function start(): void;
 
 /**
- * H5: what `patch` (its JSON) touches, as the JSON of a `TouchedSet`.
- *
- * # Errors
- *
- * The JSON of a [`HostError`] when the patch does not read.
- */
-export function touched(patch: string): string;
-
-/**
- * H5: whether what intervened (the JSON of a stale rejection's `TouchedSet`) overlaps what
- * `patch` touches, so an automatic resubmission is not safe.
+ * H5: whether what intervened (the JSON of a stale rejection's `intervening`) overlaps what
+ * the patch would write (its `touched`), so an automatic resubmission is not safe.
  *
  * # Errors
  *
  * The JSON of a [`HostError`] when either input does not read.
  */
-export function touchedOverlaps(patch: string, intervening: string): boolean;
+export function touchedOverlaps(touched: string, intervening: string): boolean;
 
 export type InitInput = RequestInfo | URL | Response | BufferSource | WebAssembly.Module;
 
@@ -510,7 +501,6 @@ export interface InitOutput {
     readonly routederivation_project: (a: number, b: number, c: number, d: number) => void;
     readonly routederivation_schedule: (a: number, b: number) => void;
     readonly start: () => void;
-    readonly touched: (a: number, b: number, c: number) => void;
     readonly touchedOverlaps: (a: number, b: number, c: number, d: number, e: number) => void;
     readonly __wbindgen_add_to_stack_pointer: (a: number) => number;
     readonly __wbindgen_export: (a: number, b: number) => number;

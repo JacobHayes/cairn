@@ -3,9 +3,10 @@
 // patch, and `submit` resubmits it while each stale answer is safe to retry.
 //
 // A stale patch is resubmitted on its own only when what intervened cannot have touched
-// anything it touches: the rejection's intervening touched set does not overlap the patch's
-// own, as the engine's touched-set function says (the wasm engine, passed in as `overlaps`,
-// so this package does not depend on the browser host). The resubmission names the revisions
+// anything it touches: the rejection's intervening touched set does not overlap what the
+// patch would write at the current revisions, which the rejection also carries (the client
+// never predicts it), as the engine's overlap check says (the wasm engine, passed in as
+// `overlaps`, so this package does not depend on the browser host). The resubmission names the revisions
 // the rejection reports, never a newer one read since, and keeps its patch id. It only ever
 // moves forward: a conflict whose current revision is not past the one the patch named is
 // surfaced, never rebased onto
@@ -28,8 +29,8 @@ export type Domain = Schemas["Domain"];
  */
 export const RESUBMISSION_COUNT_MAX = 32;
 
-/** H5: whether a stale rejection's intervening set overlaps what the patch touches. */
-export type Overlaps = (patch: Patch, intervening: TouchedSet) => boolean;
+/** H5: whether a stale rejection's intervening set overlaps what the patch would write (its `touched`). */
+export type Overlaps = (touched: TouchedSet, intervening: TouchedSet) => boolean;
 
 /** What one submission was answered: the patch answer, a rejection, or a failure. */
 export type Answered<E> =
@@ -51,7 +52,7 @@ export interface RetryOptions {
   overlaps: Overlaps;
   /**
    * Whether automatic retries are allowed now; asked before each resubmission. Version skew
-   * stops them, since an old engine's touched sets may be wrong (ARCHITECTURE, Web UI).
+   * stops them, since an old engine's overlap check may be wrong (ARCHITECTURE, Web UI).
    */
   mayRetry?: () => boolean;
 }
@@ -81,28 +82,27 @@ export function sameDomain(left: Domain, right: Domain): boolean {
   return "route" in right && left.route === right.route;
 }
 
-function overlapsSafely(overlaps: Overlaps, patch: Patch, intervening: TouchedSet): boolean {
+function overlapsSafely(overlaps: Overlaps, touched: TouchedSet, intervening: TouchedSet): boolean {
   try {
-    return overlaps(patch, intervening);
+    return overlaps(touched, intervening);
   } catch {
     return true;
   }
 }
 
+/** A stale rejection's parts. */
+export type Stale = Extract<Rejection, { rejection: "stale" }>;
+
 /**
- * H5: the patch to resubmit after it was answered stale with `conflicts` and `intervening`,
- * or none when it is not safe: what intervened overlaps what it touches, or a revision
- * moved that the patch names nowhere it could be rebased, or a conflict names a current
- * revision not past the one the patch named (rebasing would move it backward).
+ * H5: the patch to resubmit after it was answered `stale`, or none when it is not safe: what
+ * intervened overlaps what it would write at the current revisions, or a revision moved that
+ * the patch names nowhere it could be rebased, or a conflict names a current revision not
+ * past the one the patch named (rebasing would move it backward).
  */
-export function rebased(
-  patch: Patch,
-  conflicts: RevisionConflict[],
-  intervening: TouchedSet,
-  overlaps: Overlaps,
-): Patch | undefined {
+export function rebased(patch: Patch, stale: Stale, overlaps: Overlaps): Patch | undefined {
+  const { conflicts, intervening, touched } = stale;
   const target = targetDomain(patch.target);
-  if (target === undefined || conflicts.length === 0 || overlapsSafely(overlaps, patch, intervening)) {
+  if (target === undefined || conflicts.length === 0 || overlapsSafely(overlaps, touched, intervening)) {
     return undefined;
   }
   const next: Patch = { ...patch };
@@ -141,9 +141,7 @@ export async function submit<E>(patch: Patch, send: Send<E>, options: RetryOptio
     const { rejection } = answered;
     const allowed = resubmitted < RESUBMISSION_COUNT_MAX && (options.mayRetry?.() ?? true);
     const next =
-      allowed && rejection.rejection === "stale"
-        ? rebased(current, rejection.conflicts, rejection.intervening, options.overlaps)
-        : undefined;
+      allowed && rejection.rejection === "stale" ? rebased(current, rejection, options.overlaps) : undefined;
     if (next === undefined) {
       return { outcome: "rejected", rejection, resubmitted };
     }

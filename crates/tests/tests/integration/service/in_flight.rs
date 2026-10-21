@@ -12,7 +12,7 @@ use std::sync::Arc;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::time::Duration;
 
-use cairn_schema::{Patch, Rejection};
+use cairn_schema::{Domain, Patch, Rejection, TouchedSet};
 use cairn_service::{Service, WriteError, Written};
 use cairn_store::{CommitPoint, Faults, MemoryStore, PauseHook};
 use cairn_store_sqlite::SqliteStore;
@@ -128,15 +128,22 @@ async fn a_patch_that_loses_the_race_to_commit_is_rejected_stale(
     gate: Arc<Gate>,
 ) {
     let second = rename("p_second", 1, "Second");
-    let touched = second.touched();
     let (second, first) = beside_held(&service, &gate, second, rename("p_first", 1, "First")).await;
     applied(first);
     match second {
-        Err(WriteError::Rejected(Rejection::Stale { intervening, .. })) => {
+        Err(WriteError::Rejected(Rejection::Stale {
+            intervening,
+            touched,
+            ..
+        })) => {
             assert!(
                 intervening.overlaps(&touched),
                 "it carries the first's rename"
             );
+            // The commit found it stale; what it would write is still worked out by applying
+            // it over the journey as it is now, never left as the whole journey.
+            let journey = Domain::Journey("j_race".parse().unwrap());
+            assert_ne!(touched, TouchedSet::whole(journey));
         }
         other => panic!("expected a stale answer, got {other:#?}"),
     }
@@ -229,11 +236,14 @@ async fn a_stale_answer_beside_a_commit_in_flight_carries_what_it_touches(
     gate: Arc<Gate>,
 ) {
     let second = rename("p_second", 1, "Second");
-    let touched = second.touched();
     let answers = beside_held(&service, &gate, rename("p_first", 1, "First"), second).await;
     let (_, stale) = split_applied(answers);
     match stale {
-        Err(WriteError::Rejected(Rejection::Stale { intervening, .. })) => assert!(
+        Err(WriteError::Rejected(Rejection::Stale {
+            intervening,
+            touched,
+            ..
+        })) => assert!(
             intervening.overlaps(&touched),
             "the rename in flight overlaps the other, so the answer must say so"
         ),

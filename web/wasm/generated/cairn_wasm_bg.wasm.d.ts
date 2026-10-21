@@ -53,7 +53,6 @@ export const routederivation_new: (a: number, b: number, c: number) => void;
 export const routederivation_project: (a: number, b: number, c: number, d: number) => void;
 export const routederivation_schedule: (a: number, b: number) => void;
 export const start: () => void;
-export const touched: (a: number, b: number, c: number) => void;
 export const touchedOverlaps: (a: number, b: number, c: number, d: number, e: number) => void;
 export const __wbindgen_add_to_stack_pointer: (a: number) => number;
 export const __wbindgen_export: (a: number, b: number) => number;

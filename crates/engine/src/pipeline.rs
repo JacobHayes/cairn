@@ -94,7 +94,11 @@ impl Applied {
 pub fn apply(records: &Records, patch: &Patch, inputs: &ApplyInputs) -> Result<Applied, Rejection> {
     let conflicts = base_conflicts(records, patch);
     if !conflicts.is_empty() {
-        return Err(stale(conflicts));
+        // A patch that would not apply at the current revisions touches its whole domain, so
+        // no client resubmits it on its own.
+        let touched = touched(records, patch, inputs)
+            .unwrap_or_else(|_| TouchedSet::whole(patch.target.domain()));
+        return Err(stale(conflicts, touched));
     }
     let mut session = Session::new(patch, inputs, records.clone());
     let mut events = Vec::with_capacity(patch.mutations.len());
@@ -105,7 +109,10 @@ pub fn apply(records: &Records, patch: &Patch, inputs: &ApplyInputs) -> Result<A
         events.push(event(&session, mutation, delta));
     }
     if !session.conflicts.is_empty() {
-        return Err(stale(std::mem::take(&mut session.conflicts)));
+        // A revision a mutation names moved (a merge's journeys, a reviewed proposal's): no
+        // client rebases those, so what the patch would write is not worked out.
+        let whole = TouchedSet::whole(patch.target.domain());
+        return Err(stale(std::mem::take(&mut session.conflicts), whole));
     }
     let check = stages::run(&session, &events);
     let (found, bypassed) = (check.violations, check.bypassed);
@@ -244,19 +251,43 @@ fn reverify(candidate: &Records, patch: &Patch, published: &[cairn_schema::Linea
     }
 }
 
-fn stale(conflicts: Vec<RevisionConflict>) -> Rejection {
+fn stale(conflicts: Vec<RevisionConflict>, touched: TouchedSet) -> Rejection {
     // The engine sees no history; the host fills in what the intervening events touched.
     Rejection::Stale {
         conflicts,
         intervening: TouchedSet::default(),
+        touched,
     }
 }
 
-/// A17, H5: the revisions a patch names must be current: its domain's or proposal's base
-/// revision, and the deployment revision a journey patch was validated against (E6).
-fn base_conflicts(records: &Records, patch: &Patch) -> Vec<RevisionConflict> {
-    let mut conflicts = Vec::new();
-    let (of, current) = match &patch.target {
+// PRD: H5.
+/// What `patch` writes applied to `records` at their revisions (its base and deployment
+/// revisions moved to theirs, as a client's resubmission names them): the touched set of
+/// the change set apply builds there, from the handlers that write it (a role's fill, a
+/// node's bypass), never a prediction. A stale answer carries it, so a client compares
+/// what intervened with what its resubmission would really write.
+///
+/// # Errors
+///
+/// The rejection that would refuse it there, which then writes nothing: invalid, or stale
+/// on a revision one of its mutations names.
+pub fn touched(
+    records: &Records,
+    patch: &Patch,
+    inputs: &ApplyInputs,
+) -> Result<TouchedSet, Rejection> {
+    let mut now = patch.clone();
+    now.base_revision = base_revision(records, patch).1;
+    if now.deployment_revision.is_some() {
+        now.deployment_revision = Some(records.deployment.revision);
+    }
+    apply(records, &now, inputs).map(|applied| applied.change_set().touched())
+}
+
+/// Whose revision a patch's base revision names, and what it is in `records`: its
+/// proposal's for a patch to a proposal, else its domain's.
+fn base_revision(records: &Records, patch: &Patch) -> (RevisionOf, Revision) {
+    match &patch.target {
         PatchTarget::Proposal { id, .. } => (
             RevisionOf::Proposal(id.clone()),
             records
@@ -269,7 +300,14 @@ fn base_conflicts(records: &Records, patch: &Patch) -> Vec<RevisionConflict> {
             let current = records.revision(&domain);
             (RevisionOf::Domain(domain), current)
         }
-    };
+    }
+}
+
+/// A17, H5: the revisions a patch names must be current: its domain's or proposal's base
+/// revision, and the deployment revision a journey patch was validated against (E6).
+fn base_conflicts(records: &Records, patch: &Patch) -> Vec<RevisionConflict> {
+    let mut conflicts = Vec::new();
+    let (of, current) = base_revision(records, patch);
     if patch.base_revision != current {
         conflicts.push(RevisionConflict {
             of,

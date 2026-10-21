@@ -11,7 +11,7 @@
 //
 // Skew never lifts, so `skewed` is not final: a final root would stop its children, and the
 // kept writes with them. In skew the tab derives, previews, writes and retries nothing (the
-// old engine's touched sets may be wrong) and asks for a reload; unsent edits are records in
+// old engine's overlap check may be wrong) and asks for a reload; unsent edits are records in
 // session storage, so the reload keeps them. Stopping the root stops every child: the stream
 // closes, the timers cancel, and the derivations held are released.
 import { streamStatus, subscription, type OpenTicks, type StreamStatus, type SubscriptionEvent } from "@cairn/client";

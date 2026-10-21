@@ -13,7 +13,6 @@ import init, {
   readRouteFile,
   routeFileText,
   routeNotices,
-  touched,
   touchedOverlaps,
 } from "../generated/cairn_wasm.js";
 
@@ -174,19 +173,9 @@ export class Engine {
     return parsed<PreviewAnswer>(this.previewText(documentText, request));
   }
 
-  /** H5: what a patch touches, as the module wrote it. */
-  touchedText(patch: Schema<"Patch">): string {
-    return hosted(() => touched(JSON.stringify(patch)));
-  }
-
-  /** H5: what a patch touches. */
-  touched(patch: Schema<"Patch">): Schema<"TouchedSet"> {
-    return parsed<Schema<"TouchedSet">>(this.touchedText(patch));
-  }
-
-  /** H5: whether a stale rejection's intervening set overlaps what the patch touches. */
-  touchedOverlaps(patch: Schema<"Patch">, intervening: Schema<"TouchedSet">): boolean {
-    return hosted(() => touchedOverlaps(JSON.stringify(patch), JSON.stringify(intervening)));
+  /** H5: whether a stale rejection's intervening set overlaps what the patch would write (its `touched`). */
+  touchedOverlaps(touched: Schema<"TouchedSet">, intervening: Schema<"TouchedSet">): boolean {
+    return hosted(() => touchedOverlaps(JSON.stringify(touched), JSON.stringify(intervening)));
   }
 
   /** A13: a route version or draft as its file, as the module wrote it. */

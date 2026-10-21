@@ -38,8 +38,6 @@ function answer(worker: DeriveWorker, engine: Engine, journey: string, document:
       return engine.exportRouteText(call.request);
     case "import":
       return engine.importRouteText(call.request);
-    case "touched":
-      return engine.touchedText(call.patch);
   }
 }
 

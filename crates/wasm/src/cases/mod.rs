@@ -19,7 +19,7 @@ mod walk;
 pub use limits::{budget_group, budget_label, limits_document, limits_group};
 pub use walk::{NOW, server_groups};
 
-use cairn_schema::{DomainDocument, Patch};
+use cairn_schema::DomainDocument;
 use serde::{Deserialize, Serialize};
 
 use crate::error::{HostError, json};
@@ -58,11 +58,6 @@ pub enum CaseCall {
     Import {
         /// The file and base.
         request: Box<ImportRequest>,
-    },
-    /// A patch's touched set.
-    Touched {
-        /// The patch.
-        patch: Box<Patch>,
     },
 }
 
@@ -113,6 +108,5 @@ pub fn run(document: Option<&str>, call: &CaseCall) -> Result<String, HostError>
         CaseCall::Apply { request } => Ok(json(&apply_locally(&document()?, request)?)),
         CaseCall::Export { request } => Ok(json(&exported(request)?)),
         CaseCall::Import { request } => Ok(json(&imported(request)?)),
-        CaseCall::Touched { patch } => Ok(json(&patch.touched())),
     }
 }

@@ -163,6 +163,7 @@ mod in_process {
         let Rejection::Stale {
             conflicts,
             intervening,
+            touched,
         } = reply.json().unwrap()
         else {
             panic!("stale")
@@ -172,6 +173,10 @@ mod in_process {
             (2, 3)
         );
         assert!(!intervening.is_empty());
+        assert!(
+            !intervening.overlaps(&touched),
+            "Ann's note is safe to resubmit beside Bob's"
+        );
     }
 
     /// What a malformed request sends.

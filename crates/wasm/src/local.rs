@@ -340,26 +340,15 @@ pub fn preview(document: &str, request: &str) -> Result<String, String> {
     Ok(json(&preview_locally(&document, &request)?))
 }
 
-/// H5: what `patch` (its JSON) touches, as the JSON of a `TouchedSet`.
-///
-/// # Errors
-///
-/// The JSON of a [`HostError`] when the patch does not read.
-#[wasm_bindgen]
-pub fn touched(patch: &str) -> Result<String, String> {
-    let patch: Patch = read("patch", patch)?;
-    Ok(json(&patch.touched()))
-}
-
-/// H5: whether what intervened (the JSON of a stale rejection's `TouchedSet`) overlaps what
-/// `patch` touches, so an automatic resubmission is not safe.
+/// H5: whether what intervened (the JSON of a stale rejection's `intervening`) overlaps what
+/// the patch would write (its `touched`), so an automatic resubmission is not safe.
 ///
 /// # Errors
 ///
 /// The JSON of a [`HostError`] when either input does not read.
 #[wasm_bindgen(js_name = touchedOverlaps)]
-pub fn touched_overlaps(patch: &str, intervening: &str) -> Result<bool, String> {
-    let patch: Patch = read("patch", patch)?;
+pub fn touched_overlaps(touched: &str, intervening: &str) -> Result<bool, String> {
+    let touched: TouchedSet = read("touched", touched)?;
     let intervening: TouchedSet = read("intervening", intervening)?;
-    Ok(intervening.overlaps(&patch.touched()))
+    Ok(intervening.overlaps(&touched))
 }

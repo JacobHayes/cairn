@@ -175,10 +175,9 @@ impl Outcome {
         let mut acks: Vec<Ack> = setup
             .receipts
             .iter()
-            .map(|(receipt, touched)| Ack {
+            .map(|receipt| Ack {
                 receipt: receipt.clone(),
                 drafted: Revision::NONE,
-                touched: touched.clone(),
                 visible: true,
             })
             .collect();
@@ -240,11 +239,13 @@ impl Outcome {
                 );
                 violations.push(("acknowledged-visible", detail));
             }
+            // What the acknowledged patch really wrote, by its own events.
+            let wrote = held.map(|held| &held.touched);
             let over = logged.iter().filter(|patch| {
                 patch.domain == receipt.domain
                     && patch.revision > ack.drafted
                     && patch.revision < receipt.revision
-                    && patch.touched.overlaps(&ack.touched)
+                    && wrote.is_some_and(|wrote| patch.touched.overlaps(wrote))
             });
             for patch in over {
                 let detail = format!(
@@ -447,7 +448,6 @@ mod tests {
             self.acks.push(Ack {
                 receipt: receipt.clone(),
                 drafted,
-                touched: patch.touched(),
                 visible: true,
             });
             receipt

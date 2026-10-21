@@ -18,7 +18,7 @@ const busy: Answered<HttpFailure> = { outcome: "failed", error: { status: 503, m
 const unauthorized: Answered<HttpFailure> = { outcome: "failed", error: { status: 401, message: "sign in" } };
 const stale = (current: number): Answered<HttpFailure> => ({
   outcome: "rejected",
-  rejection: { rejection: "stale", conflicts: [{ of: { domain: { journey: "j_one" } }, expected: 3, current }], intervening: [] },
+  rejection: { rejection: "stale", conflicts: [{ of: { domain: { journey: "j_one" } }, expected: 3, current }], intervening: [], touched: [] },
 });
 const stales = (count: number) => Array.from({ length: count }, (_, at) => stale(5 + at));
 
@@ -317,7 +317,7 @@ describe("a proposal write or an import", () => {
   it("is never rebased: a stale answer is a rejection even where a patch would be resent on the new revision", async () => {
     const { host, actor, view } = setup(undefined, [], applyCommand);
     host.overlaps = () => true;
-    host.proposed = [{ outcome: "rejected", rejection: { rejection: "stale", conflicts: [], intervening: [] } }];
+    host.proposed = [{ outcome: "rejected", rejection: { rejection: "stale", conflicts: [], intervening: [], touched: [] } }];
     actor.send({ type: "submit" });
     await settled();
     expect(host.called).toEqual(["apply"]);
@@ -380,7 +380,7 @@ describe("a check before the first send", () => {
 
   it("says the subject is gone when the check's refusal is the shape of a missing one", async () => {
     const { actor, view } = setup();
-    const missing: Rejection = { rejection: "stale", conflicts: [{ of: { domain: { journey: "j_one" } }, expected: 3, current: 0 }], intervening: [] };
+    const missing: Rejection = { rejection: "stale", conflicts: [{ of: { domain: { journey: "j_one" } }, expected: 3, current: 0 }], intervening: [], touched: [] };
     actor.send({ type: "submit", check: () => Promise.resolve(missing) });
     await settled();
     expect(view()).toMatchObject({ state: "gone", removed: { journey: "j_one" } });

@@ -463,8 +463,8 @@ fn journey_group(service: &Service, label: &str, id: &JourneyId) -> Group {
 }
 
 /// A17, D7: the walk's patch, applied locally against the document and committed on the
-/// server: the journey after and its consequences agree. Also its touched set (H5). Then the
-/// journey after, derived and projected.
+/// server: the journey after and its consequences agree. Then the journey after, derived and
+/// projected.
 fn apply_and_after(service: &Service, group: &mut Group, id: &JourneyId) -> Group {
     let before = document(service, id);
     let patch: Patch = parsed(&format!(
@@ -483,13 +483,6 @@ fn apply_and_after(service: &Service, group: &mut Group, id: &JourneyId) -> Grou
         document: after.clone(),
         consequences: consequences.get(id).cloned().unwrap_or_default(),
     };
-    group.cases.push(Case {
-        name: "touched set of the patch".to_owned(),
-        call: CaseCall::Touched {
-            patch: Box::new(patch.clone()),
-        },
-        expected: json(&patch.touched()),
-    });
     let request = ApplyRequest {
         patch,
         note: None,

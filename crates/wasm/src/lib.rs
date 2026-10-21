@@ -39,7 +39,7 @@ pub use files::{
 };
 pub use local::{
     AppliedLocally, ApplyRequest, PreviewRequest, RouteApplyRequest, apply, apply_locally,
-    apply_route, apply_route_locally, preview, preview_locally, touched, touched_overlaps,
+    apply_route, apply_route_locally, preview, preview_locally, touched_overlaps,
 };
 pub use proposals::{
     ProposalAnswer, ProposalApply, ProposalCreate, ProposalEdit, ProposalListRequest,

@@ -24,7 +24,7 @@ use cairn_api::client::{self as api, ClientError, Landed, Refused, Transport, re
 use cairn_api::wire::PatchAnswer;
 use cairn_schema::{
     Actor, Deployment, Domain, Journey, Patch, PatchId, PatchReceipt, Rejection, Revision,
-    Timestamp, TouchedSet, UserId,
+    Timestamp, UserId,
 };
 use cairn_service::{Call, DomainPatch, Service, WriteError};
 
@@ -71,8 +71,6 @@ pub struct Ack {
     pub receipt: PatchReceipt,
     /// The revision it was drafted at, before any automatic resubmission.
     pub drafted: Revision,
-    /// What it touches (H5).
-    pub touched: TouchedSet,
     /// The next snapshot of its domain held it: at or past its revision, with its effect.
     pub visible: bool,
 }
@@ -344,10 +342,9 @@ impl Client {
     /// # Errors
     ///
     /// A liveness miss when it does not land.
-    pub async fn land(&self, patch: Patch) -> Result<(PatchReceipt, TouchedSet), Stop> {
-        let touched = patch.touched();
+    pub async fn land(&self, patch: Patch) -> Result<PatchReceipt, Stop> {
         match self.patch(patch, &Counts::default()).await {
-            Ok(landed) => Ok((landed.answer.receipt().clone(), touched)),
+            Ok(landed) => Ok(landed.answer.receipt().clone()),
             Err(Refused::Failed(Failure::GaveUp(gave_up))) => Err(gave_up.into()),
             Err(Refused::Failed(Failure::Server(error))) => {
                 Err(Stop::Liveness(format!("setup failed: {error}")))
@@ -394,12 +391,15 @@ impl Client {
                     report.acks.push(Ack {
                         receipt,
                         drafted: patch.base_revision,
-                        touched: patch.touched(),
                         visible,
                     });
                 }
-                Err(Refused::Rejected(Rejection::Stale { intervening, .. })) => {
-                    let overlapping = intervening.overlaps(&patch.touched());
+                Err(Refused::Rejected(Rejection::Stale {
+                    intervening,
+                    touched,
+                    ..
+                })) => {
+                    let overlapping = intervening.overlaps(&touched);
                     patina_dst::sometimes!(overlapping, "client-overlapping-conflict-surfaced");
                     if !overlapping {
                         report.surfaced_exhausted += 1;

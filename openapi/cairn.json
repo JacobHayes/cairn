@@ -11960,7 +11960,7 @@
         "oneOf": [
           {
             "additionalProperties": false,
-            "description": "A revision the patch named has advanced. The touched set of the intervening\nevents lets the client retry on its own when it does not overlap the patch's.",
+            "description": "A revision the patch named has advanced. The client may resubmit it on its own,\nnaming the current revisions, when what intervened does not overlap what the patch\nwould write there.",
             "properties": {
               "conflicts": {
                 "description": "The revisions that moved on.",
@@ -11976,12 +11976,17 @@
               "rejection": {
                 "const": "stale",
                 "type": "string"
+              },
+              "touched": {
+                "$ref": "#/components/schemas/TouchedSet",
+                "description": "What the patch would write resubmitted at the current revisions, as applying it\nthere writes it; its whole domain when it would not apply there or that is not\nknown."
               }
             },
             "required": [
               "rejection",
               "conflicts",
-              "intervening"
+              "intervening",
+              "touched"
             ],
             "type": "object"
           },

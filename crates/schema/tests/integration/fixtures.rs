@@ -8,8 +8,8 @@ use std::collections::BTreeSet;
 use std::path::{Path, PathBuf};
 
 use cairn_schema::{
-    AnswerSpec, Mutation, NodeKey, PatchTarget, Payload, RecordKey, ResourceContent, Revision,
-    RouteFile, Scenario, from_yaml, json_schema, to_json, to_yaml,
+    AnswerSpec, Mutation, PatchTarget, Payload, ResourceContent, Revision, RouteFile, Scenario,
+    from_yaml, json_schema, to_json, to_yaml,
 };
 
 fn fixtures_root() -> PathBuf {
@@ -116,38 +116,9 @@ fn every_route_file_validates_against_the_json_schema() {
     }
 }
 
-/// The node keys a route file declares.
-fn route_keys(route: &RouteFile) -> BTreeSet<NodeKey> {
-    route
-        .nodes
-        .as_slice()
-        .iter()
-        .map(|node| {
-            node.key
-                .clone()
-                .expect("fixture route files carry every key")
-        })
-        .collect()
-}
-
-/// The nodes a mutation adds, including those inside a proposal it creates.
-fn added_nodes(mutation: &Mutation) -> Vec<NodeKey> {
-    match mutation {
-        Mutation::AddNode { node } => vec![node.key.clone()],
-        Mutation::CreateProposal { proposal } | Mutation::EditProposal { proposal } => proposal
-            .mutations
-            .as_slice()
-            .iter()
-            .flat_map(added_nodes)
-            .collect(),
-        _ => Vec::new(),
-    }
-}
-
 #[test]
 fn scenarios_are_sequential_patches_over_their_own_route() {
     for (name, route, scenario) in fixtures() {
-        let mut known: BTreeSet<NodeKey> = route.as_ref().map(route_keys).unwrap_or_default();
         let mut revision = Revision::NONE;
         for (index, step) in scenario.steps.as_slice().iter().enumerate() {
             let patch = &step.patch;
@@ -164,7 +135,6 @@ fn scenarios_are_sequential_patches_over_their_own_route() {
                 revision = revision.next();
             }
             for mutation in patch.mutations.as_slice() {
-                known.extend(added_nodes(mutation));
                 if let Mutation::CreateJourney {
                     from: Some(lineage),
                     ..
@@ -174,14 +144,6 @@ fn scenarios_are_sequential_patches_over_their_own_route() {
                         .as_ref()
                         .unwrap_or_else(|| panic!("{at}: a lineage needs a route file"));
                     assert_eq!(lineage.route, route.route, "{at}");
-                }
-            }
-            // Every node a step touches is in the route or added earlier.
-            for key in patch.touched().as_set() {
-                if let RecordKey::InGraph { key, .. } = key
-                    && let Some(node) = key.node_scope()
-                {
-                    assert!(known.contains(node), "{at} touches unknown node {node}");
                 }
             }
         }

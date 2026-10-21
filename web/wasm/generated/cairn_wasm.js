@@ -1730,56 +1730,20 @@ export function start() {
 }
 
 /**
- * H5: what `patch` (its JSON) touches, as the JSON of a `TouchedSet`.
- *
- * # Errors
- *
- * The JSON of a [`HostError`] when the patch does not read.
- * @param {string} patch
- * @returns {string}
- */
-export function touched(patch) {
-    let deferred3_0;
-    let deferred3_1;
-    try {
-        const retptr = wasm.__wbindgen_add_to_stack_pointer(-16);
-        const ptr0 = passStringToWasm0(patch, wasm.__wbindgen_export, wasm.__wbindgen_export2);
-        const len0 = WASM_VECTOR_LEN;
-        wasm.touched(retptr, ptr0, len0);
-        var r0 = getDataViewMemory0().getInt32(retptr + 4 * 0, true);
-        var r1 = getDataViewMemory0().getInt32(retptr + 4 * 1, true);
-        var r2 = getDataViewMemory0().getInt32(retptr + 4 * 2, true);
-        var r3 = getDataViewMemory0().getInt32(retptr + 4 * 3, true);
-        var ptr2 = r0;
-        var len2 = r1;
-        if (r3) {
-            ptr2 = 0; len2 = 0;
-            throw takeObject(r2);
-        }
-        deferred3_0 = ptr2;
-        deferred3_1 = len2;
-        return getStringFromWasm0(ptr2, len2);
-    } finally {
-        wasm.__wbindgen_add_to_stack_pointer(16);
-        wasm.__wbindgen_export3(deferred3_0, deferred3_1, 1);
-    }
-}
-
-/**
- * H5: whether what intervened (the JSON of a stale rejection's `TouchedSet`) overlaps what
- * `patch` touches, so an automatic resubmission is not safe.
+ * H5: whether what intervened (the JSON of a stale rejection's `intervening`) overlaps what
+ * the patch would write (its `touched`), so an automatic resubmission is not safe.
  *
  * # Errors
  *
  * The JSON of a [`HostError`] when either input does not read.
- * @param {string} patch
+ * @param {string} touched
  * @param {string} intervening
  * @returns {boolean}
  */
-export function touchedOverlaps(patch, intervening) {
+export function touchedOverlaps(touched, intervening) {
     try {
         const retptr = wasm.__wbindgen_add_to_stack_pointer(-16);
-        const ptr0 = passStringToWasm0(patch, wasm.__wbindgen_export, wasm.__wbindgen_export2);
+        const ptr0 = passStringToWasm0(touched, wasm.__wbindgen_export, wasm.__wbindgen_export2);
         const len0 = WASM_VECTOR_LEN;
         const ptr1 = passStringToWasm0(intervening, wasm.__wbindgen_export, wasm.__wbindgen_export2);
         const len1 = WASM_VECTOR_LEN;

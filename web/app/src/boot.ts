@@ -1,5 +1,5 @@
 // Starting a tab: start the host the build was made for (vite.config.ts), compile the engine
-// once and instantiate it (the page's own instance for touched sets or the in-browser root,
+// once and instantiate it (the page's own instance for the touched-set overlap check or the in-browser root,
 // and the derive worker's, which is posted the compiled module), and start the session over
 // them. The server host also takes the build the page was loaded
 // from, which the server's documents must carry (version skew).

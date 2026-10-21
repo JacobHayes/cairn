@@ -5,7 +5,7 @@
 //! same thing with a different transport (I7).
 
 use cairn_auth::Clock;
-use cairn_schema::Actor;
+use cairn_schema::{Actor, Patch, Rejection, TouchedSet};
 use cairn_service::{Call, DomainPatch, Service};
 use schemars::JsonSchema;
 use schemars::generate::SchemaSettings;
@@ -191,6 +191,26 @@ impl ToolSet {
                 name: name.to_owned(),
             }),
         }
+    }
+
+    // PRD: I5.
+    /// What `patch` writes applied now as `actor`, at the current revisions, without
+    /// writing it, or the rejection that would refuse it there: what the assistant's write
+    /// wrapper counts the nodes of.
+    ///
+    /// # Errors
+    ///
+    /// [`ToolError::Failed`] when the read fails.
+    pub async fn touched(
+        &self,
+        actor: &Actor,
+        patch: &Patch,
+    ) -> Result<Result<TouchedSet, Rejection>, ToolError> {
+        let call = Call {
+            actor: actor.clone(),
+            now: self.clock.now(),
+        };
+        Ok(self.service.touched(&call, patch).await?)
     }
 
     // PRD: I5.

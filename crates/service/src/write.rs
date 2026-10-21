@@ -1,7 +1,7 @@
 //! Domain patches (A17; ARCHITECTURE, Service layer and composition): receipt first, load,
 //! apply, consequences, commit, notify. The service never retries: a stale patch is answered
-//! with the revisions that moved and what their events touched, and the client decides
-//! (H5).
+//! with the revisions that moved, what their events touched, and what the patch would write
+//! at the current revisions, and the client decides (H5).
 
 use std::collections::{BTreeMap, BTreeSet};
 use std::fmt;
@@ -10,8 +10,8 @@ use std::panic::{AssertUnwindSafe, catch_unwind};
 use cairn_engine::{Applied, ApplyInputs, Records, apply};
 use cairn_schema::{
     Consequences, Domain, EventType, IdentityKey, JourneyId, Location, Markdown, Mutation, Notice,
-    Patch, PatchReceipt, PatchTarget, ProposalId, Record, Rejection, Revision, RevisionOf, Subject,
-    Violation, ViolationCode, Violations, Write,
+    Patch, PatchReceipt, PatchTarget, ProposalId, Record, Rejection, Revision, RevisionConflict,
+    RevisionOf, Subject, TouchedSet, Violation, ViolationCode, Violations, Write,
 };
 use cairn_store::{Commit, CommitError, Committed, EventQuery, PageSize};
 
@@ -154,6 +154,38 @@ impl Service {
         self.write(call, patch, submitted.note.clone()).await
     }
 
+    // PRD: H5, I5.
+    /// What `patch` writes applied as `call`'s actor to its domain as it stands now, at the
+    /// current revisions, without committing anything: the touched set of the change set
+    /// apply builds, so a caller counts what the handlers really write (a role's fill, a
+    /// node's bypass), or the rejection that would refuse it there, which writes nothing. A
+    /// patch id already committed with the same content writes nothing more: a write is
+    /// answered from its receipt before it is applied (H5). Its id is not otherwise checked,
+    /// since the caller may file the patch elsewhere under it (an assistant's proposal).
+    ///
+    /// # Errors
+    ///
+    /// [`WriteError::Failed`] when the store fails or the engine panics.
+    pub async fn touched(
+        &self,
+        call: &Call,
+        patch: &Patch,
+    ) -> Result<Result<TouchedSet, Rejection>, WriteError> {
+        if let Some(Ok(_)) = self.answer_from_receipt(patch).await? {
+            return Ok(Ok(TouchedSet::default()));
+        }
+        let loaded = load::records(&*self.store, patch).await?;
+        let inputs = ApplyInputs {
+            today: self.settings.today(call.now),
+            at: call.now,
+            actor: call.actor.clone(),
+            note: None,
+        };
+        Ok(engine(&patch.target.domain(), || {
+            cairn_engine::touched(&loaded.records, patch, &inputs)
+        })?)
+    }
+
     /// The write path after the receipt lookup, for a domain patch and a patch to a proposal
     /// alike: load, apply, consequences, commit, announce.
     pub(crate) async fn write(
@@ -185,24 +217,66 @@ impl Service {
         })?;
         match accepted {
             Ok((applied, caused, noticed)) => {
-                self.commit(patch, &loaded, &applied, (caused, noticed))
-                    .await
-            }
-            Err(Rejection::Stale { conflicts, .. }) => {
-                // H5: the same patch may have committed since the receipt was looked up, and
-                // its own commit is what moved the revision; the receipt answers it then.
-                if let Some(answer) = self.answer_from_receipt(patch).await? {
-                    patina_dst::reachable!("service-duplicate-original-committed-meanwhile");
-                    return answer;
+                let committed = self
+                    .commit(patch, &loaded, &applied, (caused, noticed))
+                    .await;
+                match committed {
+                    Err(WriteError::Rejected(stale @ Rejection::Stale { .. })) => {
+                        self.stale_at_commit(patch, &inputs, stale).await
+                    }
+                    other => other,
                 }
-                patina_dst::reachable!("service-stale-patch-completed-with-intervening");
-                let intervening = self.store.intervening(&conflicts).await?;
-                Err(WriteError::Rejected(Rejection::Stale {
-                    conflicts,
-                    intervening,
-                }))
             }
+            Err(Rejection::Stale {
+                conflicts, touched, ..
+            }) => self.stale(patch, conflicts, touched).await,
             Err(rejection) => Err(WriteError::Rejected(rejection)),
+        }
+    }
+
+    /// H5: the answer for a patch the engine found stale: what intervened since the
+    /// revisions it named, beside what it would write at the current ones (the engine's).
+    async fn stale(
+        &self,
+        patch: &Patch,
+        conflicts: Vec<RevisionConflict>,
+        touched: TouchedSet,
+    ) -> Result<Written, WriteError> {
+        // H5: the same patch may have committed since the receipt was looked up, and its own
+        // commit is what moved the revision; the receipt answers it then.
+        if let Some(answer) = self.answer_from_receipt(patch).await? {
+            patina_dst::reachable!("service-duplicate-original-committed-meanwhile");
+            return answer;
+        }
+        patina_dst::reachable!("service-stale-patch-completed-with-intervening");
+        let intervening = self.store.intervening(&conflicts).await?;
+        Err(WriteError::Rejected(Rejection::Stale {
+            conflicts,
+            intervening,
+            touched,
+        }))
+    }
+
+    /// H5: a patch the commit found stale, a revision having moved after it was loaded. The
+    /// store cannot say what the patch would write at the current revisions, so it is
+    /// applied once more over what is loaded now, only to be answered stale as the engine
+    /// finds it there, with what it would write. The store's answer stands when the reload
+    /// finds nothing stale (only a precondition the commit alone checks moved).
+    async fn stale_at_commit(
+        &self,
+        patch: &Patch,
+        inputs: &ApplyInputs,
+        stale: Rejection,
+    ) -> Result<Written, WriteError> {
+        let loaded = load::records(&*self.store, patch).await?;
+        let reapplied = engine(&patch.target.domain(), || {
+            apply(&loaded.records, patch, inputs).map(drop)
+        })?;
+        match reapplied {
+            Err(Rejection::Stale {
+                conflicts, touched, ..
+            }) => self.stale(patch, conflicts, touched).await,
+            Ok(()) | Err(_) => Err(WriteError::Rejected(stale)),
         }
     }
 

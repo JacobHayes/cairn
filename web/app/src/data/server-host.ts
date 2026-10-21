@@ -90,12 +90,12 @@ async function importOver(client: CairnClient, request: RouteImport): Promise<An
   return { outcome: "failed", error: answerFailure(response.status, error) };
 }
 
-/** The server at `origin`, with this page's engine for touched sets and the build the page was loaded from (none on a page Vite's dev server served, which is never in skew). */
+/** The server at `origin`, with this page's engine for the touched-set overlap check and the build the page was loaded from (none on a page Vite's dev server served, which is never in skew). */
 export function serverHost(origin: string, engine: Engine, build: string | undefined): Host {
   const client: CairnClient = createCairnClient(origin);
   return {
     kind: "server",
-    overlaps: (patch, intervening) => engine.touchedOverlaps(patch, intervening),
+    overlaps: (touched, intervening) => engine.touchedOverlaps(touched, intervening),
     capabilities: () => answered("the capabilities", () => client.GET("/api/capabilities")),
     journeys: (query) => answered("the journey index", () => client.GET("/api/journeys", { params: { query: indexParams(query) } })),
     routes: (after) => answered("the route index", () => client.GET("/api/routes", { params: { query: after === undefined ? {} : { after } } })),

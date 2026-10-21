@@ -31,6 +31,7 @@ fn stale_parts(error: CommitError) -> (Vec<RevisionConflict>, TouchedSet) {
         CommitError::Rejected(Rejection::Stale {
             conflicts,
             intervening,
+            ..
         }) => (conflicts, intervening),
         other => panic!("expected a stale rejection, got {other:?}"),
     }

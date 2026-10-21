@@ -231,13 +231,18 @@ pub struct RevisionConflict {
 #[serde(tag = "rejection", rename_all = "snake_case", deny_unknown_fields)]
 pub enum Rejection {
     // PRD: H5.
-    /// A revision the patch named has advanced. The touched set of the intervening
-    /// events lets the client retry on its own when it does not overlap the patch's.
+    /// A revision the patch named has advanced. The client may resubmit it on its own,
+    /// naming the current revisions, when what intervened does not overlap what the patch
+    /// would write there.
     Stale {
         /// The revisions that moved on.
         conflicts: Vec<RevisionConflict>,
         /// What the intervening events touched.
         intervening: TouchedSet,
+        /// What the patch would write resubmitted at the current revisions, as applying it
+        /// there writes it; its whole domain when it would not apply there or that is not
+        /// known.
+        touched: TouchedSet,
     },
     // PRD: H5.
     /// The patch id was committed before with different content.

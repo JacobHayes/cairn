@@ -201,17 +201,20 @@ pub fn arb_rejection() -> BoxedStrategy<Rejection> {
             expected,
             current,
         });
-    let intervening = prop::collection::vec(arb_write(), 0..3).prop_map(|writes| {
-        writes
-            .iter()
-            .flat_map(crate::record::Write::keys)
-            .collect::<TouchedSet>()
-    });
+    let touched = || {
+        prop::collection::vec(arb_write(), 0..3).prop_map(|writes| {
+            writes
+                .iter()
+                .flat_map(crate::record::Write::keys)
+                .collect::<TouchedSet>()
+        })
+    };
     prop_oneof![
-        (prop::collection::vec(conflict, 1..3), intervening).prop_map(
-            |(conflicts, intervening)| Rejection::Stale {
+        (prop::collection::vec(conflict, 1..3), touched(), touched()).prop_map(
+            |(conflicts, intervening, touched)| Rejection::Stale {
                 conflicts,
-                intervening
+                intervening,
+                touched,
             }
         ),
         arb_patch_id().prop_map(|patch_id| Rejection::PatchIdReused { patch_id }),

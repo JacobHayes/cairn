@@ -63,15 +63,13 @@ mod property {
         }
 
         #[test]
-        fn a_patch_touches_something_and_overlaps_itself(patch in arb_patch()) {
-            let touched = patch.touched();
-            prop_assert!(!touched.is_empty());
-            prop_assert!(touched.overlaps(&touched));
-        }
-
-        #[test]
-        fn overlap_is_symmetric(first in arb_patch(), second in arb_patch()) {
-            prop_assert_eq!(first.touched().overlaps(&second.touched()), second.touched().overlaps(&first.touched()));
+        fn overlap_is_symmetric(
+            first in prop::collection::vec(arb_write(), 0..6),
+            second in prop::collection::vec(arb_write(), 0..6),
+        ) {
+            let touched = |writes: &[cairn_schema::Write]| writes.iter().flat_map(cairn_schema::Write::keys).collect::<cairn_schema::TouchedSet>();
+            let (first, second) = (touched(&first), touched(&second));
+            prop_assert_eq!(first.overlaps(&second), second.overlaps(&first));
         }
 
         #[test]

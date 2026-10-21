@@ -1,7 +1,7 @@
 // The TypeScript client of the Cairn API (ARCHITECTURE, Repository layout: web/client): a
 // typed fetch client over the types generated from the OpenAPI document, and the
 // hand-written wrapper beside it: the safe retry (H5, retry.ts, over the engine's touched-set
-// function the caller passes in, and http.ts, its HTTP side), revision tracking per domain
+// overlap check the caller passes in, and http.ts, its HTTP side), revision tracking per domain
 // (H6, tracker.ts, pure functions over a value), and the page's tick stream that feeds it (subscription.ts,
 // one machine).
 import createClient, { type Client, type ClientOptions } from "openapi-fetch";

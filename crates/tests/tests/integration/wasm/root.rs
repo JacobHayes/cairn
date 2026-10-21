@@ -100,6 +100,7 @@ fn a_patch_applies_and_notifies_and_a_stale_one_is_rejected_with_what_intervened
                 Rejection::Stale {
                     conflicts,
                     intervening,
+                    touched,
                 },
         } = stale
         else {
@@ -109,11 +110,10 @@ fn a_patch_applies_and_notifies_and_a_stale_one_is_rejected_with_what_intervened
             conflicts.first().map(|conflict| conflict.current),
             Some(receipt.revision)
         );
-        let patch =
-            serde_json::from_str::<serde_json::Value>(request).unwrap()["patch"].to_string();
+        let touched = serde_json::to_string(&touched).unwrap();
         let intervening = serde_json::to_string(&intervening).unwrap();
         assert_eq!(
-            cairn_wasm::touched_overlaps(&patch, &intervening),
+            cairn_wasm::touched_overlaps(&touched, &intervening),
             Ok(overlaps),
             "{request}"
         );

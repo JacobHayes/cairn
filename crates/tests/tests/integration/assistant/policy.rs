@@ -69,7 +69,9 @@ fn add_node() -> Value {
         "kind": "action", "title": "An extra step" } })
 }
 
-/// The journey's state tools: one node each, so each applies directly.
+/// The journey's state tools: one node each, so each applies directly, but for an unsnooze
+/// of a node nothing snoozed, which would be refused, so it is answered with that rejection
+/// and not run.
 fn state_cases() -> Vec<Case> {
     let journey = on_journey;
     vec![
@@ -105,7 +107,7 @@ fn state_cases() -> Vec<Case> {
         (
             "unsnooze",
             journey(json!({ "node": "n_access", "patch_id": "p_unsnooze" })),
-            Policy::Direct,
+            Policy::Rejected,
         ),
         (
             "set_date",
@@ -242,6 +244,7 @@ async fn every_write_tool_is_decided_by_mutation_kind_and_destination() {
     let ann = user("u_ann");
     world.vendor_journey(&ann).await;
     let draft = world.open_vendor_draft(&ann).await;
+    let assistant = assisting("u_ann");
     let cases = cases(draft);
     let covered: BTreeSet<&str> = cases.iter().map(|(name, _, _)| *name).collect();
     let writes: BTreeSet<&str> = ToolSet::definitions()
@@ -251,7 +254,13 @@ async fn every_write_tool_is_decided_by_mutation_kind_and_destination() {
         .collect();
     assert_eq!(covered, writes, "a case for every write tool, and no other");
     for (name, arguments, expected) in &cases {
-        let decided = wrapper::decide(&world.tools, world.store.as_ref(), name, arguments).await;
+        let decided = wrapper::decide(
+            &world.tools,
+            world.store.as_ref(),
+            &assistant,
+            (name, arguments),
+        )
+        .await;
         let policy = decided.map(|decision| decision.policy());
         assert!(
             matches!(&policy, Ok(policy) if same(policy, expected)),
@@ -262,15 +271,21 @@ async fn every_write_tool_is_decided_by_mutation_kind_and_destination() {
         .into_iter()
         .filter(|definition| !definition.writes)
     {
-        let decided =
-            wrapper::decide(&world.tools, world.store.as_ref(), read.name, &json!({})).await;
+        let decided = wrapper::decide(
+            &world.tools,
+            world.store.as_ref(),
+            &assistant,
+            (read.name, &json!({})),
+        )
+        .await;
         assert_eq!(decided, Ok(Decision::Read), "{}", read.name);
     }
 }
 
 /// I5: a write drafted as a proposal never moves its destination: what it would have
 /// written is the proposal's content, against the same revision, for the user to apply; the
-/// refused tools write nothing at all.
+/// refused tools write nothing at all, and a write that would be refused is answered with
+/// its rejection without running.
 #[tokio::test]
 async fn structural_writes_arrive_as_proposals_and_nothing_lands() {
     let world = World::new();
@@ -308,6 +323,10 @@ async fn structural_writes_arrive_as_proposals_and_nothing_lands() {
             Policy::Refused(_) => {
                 let refused = matches!(outcome.answer, Err(ToolError::Refused { .. }));
                 assert!(refused && outcome.action.is_none(), "{name}: {outcome:?}");
+            }
+            Policy::Rejected => {
+                let rejected = matches!(outcome.answer, Err(ToolError::Rejected { .. }));
+                assert!(rejected && outcome.action.is_none(), "{name}: {outcome:?}");
             }
             Policy::Direct | Policy::Proposal | Policy::Read => unreachable!(),
         }
@@ -436,6 +455,7 @@ async fn a_write_asked_again_answers_the_same_proposal() {
 async fn removals_and_skips_count_the_nodes_they_reach() {
     let world = World::new();
     let lead = user("u_lead");
+    let assistant = assisting("u_lead");
     world.vendor_journey(&lead).await;
     let mut twelve = ELEVEN.to_vec();
     twelve.push("n_kickoff");
@@ -455,8 +475,13 @@ async fn removals_and_skips_count_the_nodes_they_reach() {
         .collect();
     let removal = json!({ "patch": { "id": "p_unnote", "target": { "journey": JOURNEY },
         "base_revision": 2, "mutations": removes } });
-    let decided =
-        wrapper::decide(&world.tools, world.store.as_ref(), "apply_patch", &removal).await;
+    let decided = wrapper::decide(
+        &world.tools,
+        world.store.as_ref(),
+        &assistant,
+        ("apply_patch", &removal),
+    )
+    .await;
     assert_eq!(
         decided.map(|decision| decision.policy()),
         Ok(Policy::Propose(Because::TooManyNodes { count: Some(12) }))
@@ -465,8 +490,13 @@ async fn removals_and_skips_count_the_nodes_they_reach() {
     let skip = json!({ "journey": JOURNEY, "node": "n_setup",
         "transition": { "skip": { "reason": "Not needed." } }, "patch_id": "p_skip_setup",
         "base_revision": 2 });
-    let decided =
-        wrapper::decide(&world.tools, world.store.as_ref(), "transition_node", &skip).await;
+    let decided = wrapper::decide(
+        &world.tools,
+        world.store.as_ref(),
+        &assistant,
+        ("transition_node", &skip),
+    )
+    .await;
     let Ok(Decision::Direct { nodes, .. }) = decided else {
         panic!("{decided:?}");
     };
@@ -480,6 +510,7 @@ async fn removals_and_skips_count_the_nodes_they_reach() {
 async fn moving_notes_counts_the_nodes_they_leave() {
     let world = World::new();
     let lead = user("u_lead");
+    let assistant = assisting("u_lead");
     world.vendor_journey(&lead).await;
     let note = |index: usize, node: &str| json!({ "key": format!("a_note_{index}"), "node": node, "note": "Mine." });
     let adds: Vec<Value> = ELEVEN
@@ -495,7 +526,13 @@ async fn moving_notes_counts_the_nodes_they_leave() {
         .collect();
     let patch = json!({ "patch": { "id": "p_move", "target": { "journey": JOURNEY },
         "base_revision": 2, "mutations": moves } });
-    let decided = wrapper::decide(&world.tools, world.store.as_ref(), "apply_patch", &patch).await;
+    let decided = wrapper::decide(
+        &world.tools,
+        world.store.as_ref(),
+        &assistant,
+        ("apply_patch", &patch),
+    )
+    .await;
     let count = u32::try_from(ELEVEN.len() + 1).unwrap();
     assert_eq!(
         decided.map(|decision| decision.policy()),
@@ -503,4 +540,27 @@ async fn moving_notes_counts_the_nodes_they_leave() {
             count: Some(count)
         }))
     );
+}
+
+/// H5: a direct write asked again under its patch id, its first answer lost, is answered
+/// from its receipt like any other resubmission, never refused because applying it again
+/// would fail.
+#[tokio::test]
+async fn a_direct_write_asked_again_is_answered_from_its_receipt() {
+    let world = World::new();
+    let lead = user("u_lead");
+    world.vendor_journey(&lead).await;
+    let assistant = assisting("u_lead");
+    let note = json!({ "patch": { "id": "p_note_once", "target": { "journey": JOURNEY },
+        "base_revision": 1, "mutations": [{ "op": "add_annotation", "annotation": {
+        "key": "a_once", "node": "n_kickoff", "note": "Once." } }] } });
+    let first = run(&world, &assistant, "apply_patch", note.clone()).await;
+    assert!(
+        matches!(first.action, Some(Action::Applied { .. })),
+        "{first:?}"
+    );
+    let again = run(&world, &assistant, "apply_patch", note).await;
+    let answer = again.answer.expect("answered from its receipt");
+    assert_eq!(answer["status"], "already_applied", "{answer}");
+    assert_eq!(world.journey_revision(JOURNEY).await, 2);
 }

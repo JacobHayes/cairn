@@ -1,7 +1,5 @@
 // The agreement cases the server walk wrote (crates/wasm `cases`; the cairn-wasm-cases
 // binary), as the page and the tests read them.
-import type { Schema } from "@cairn/client";
-
 import type {
   ApplyRequest,
   ExportRequest,
@@ -17,8 +15,7 @@ export type CaseCall =
   | { kind: "preview"; request: PreviewRequest }
   | { kind: "apply"; request: ApplyRequest }
   | { kind: "export"; request: ExportRequest }
-  | { kind: "import"; request: ImportRequest }
-  | { kind: "touched"; patch: Schema<"Patch"> };
+  | { kind: "import"; request: ImportRequest };
 
 /** One call and the server's answer, byte for byte. */
 export interface Case {

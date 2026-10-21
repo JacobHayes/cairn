@@ -344,6 +344,7 @@ async fn applying_after_the_destination_moved_is_stale_with_what_intervened(stor
     let Rejection::Stale {
         conflicts,
         intervening,
+        ..
     } = rejected(
         service
             .apply_proposal(

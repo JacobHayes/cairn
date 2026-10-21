@@ -22,7 +22,7 @@ use std::collections::{BTreeMap, BTreeSet};
 use cairn_mcp::{ToolError, ToolSet};
 use cairn_schema::{
     Actor, ChangeClass, Consequences, Domain, Graph, JourneyId, NodeKey, Patch, PatchReceipt,
-    PatchTarget, ProposalId, Revision, Title,
+    PatchTarget, ProposalId, Rejection, Revision, Title,
 };
 use cairn_service::DomainPatch;
 use cairn_store::{Document, LoadTarget, Store};
@@ -72,6 +72,8 @@ pub enum Policy {
     Proposal,
     /// Not run, and why.
     Refused(String),
+    /// A write that would be refused as it stands: answered with that rejection, not run.
+    Rejected,
 }
 
 /// Why a write became a proposal.
@@ -164,8 +166,11 @@ pub struct Outcome {
     pub action: Option<Action>,
 }
 
-/// The policy for the tool `name` with `arguments`, with the domain patch a write would
-/// submit, and for a direct write the nodes it touches, read against its journey in `store`.
+/// The policy for the tool `name` with `arguments` as `actor`, with the domain patch a write
+/// would submit, and for a direct write the nodes it touches: what applying it at the
+/// current revision writes (as an overflow proposal would draft it), read against its
+/// journey in `store`. A state write that would be refused there is answered with that
+/// rejection.
 ///
 /// # Errors
 ///
@@ -173,8 +178,8 @@ pub struct Outcome {
 pub async fn decide(
     tools: &ToolSet,
     store: &dyn Store,
-    name: &str,
-    arguments: &Value,
+    actor: &Actor,
+    (name, arguments): (&str, &Value),
 ) -> Result<Decision, ToolError> {
     let writes = ToolSet::definitions()
         .into_iter()
@@ -197,10 +202,14 @@ pub async fn decide(
     if drafted.patch().change_class() == ChangeClass::Structural {
         return Ok(Decision::Propose(Because::Structural, drafted));
     }
+    let touched = match tools.touched(actor, drafted.patch()).await? {
+        Ok(touched) => touched,
+        Err(rejection) => return Ok(Decision::Rejected(rejection)),
+    };
     let stored = stored_journey(store, drafted.patch()).await?;
     let graph = stored.as_ref().map(|(graph, _)| graph);
     let current = stored.as_ref().map(|(_, revision)| *revision);
-    Ok(match touched_nodes(drafted.patch(), graph) {
+    Ok(match touched_nodes(drafted.patch(), &touched, graph) {
         Some(nodes) if within_limit(nodes.len()) => Decision::Direct {
             drafted,
             nodes,
@@ -257,6 +266,8 @@ pub enum Decision {
     Proposal,
     /// Not run.
     Refused(String),
+    /// Not run: applied as it stands, it would be refused with this.
+    Rejected(Rejection),
 }
 
 impl Decision {
@@ -269,6 +280,7 @@ impl Decision {
             Decision::Propose(because, _) => Policy::Propose(because.clone()),
             Decision::Proposal => Policy::Proposal,
             Decision::Refused(why) => Policy::Refused(why.clone()),
+            Decision::Rejected(_) => Policy::Rejected,
         }
     }
 }
@@ -282,20 +294,13 @@ pub async fn run(
     (name, arguments): (&str, Value),
     ledger: &mut Ledger,
 ) -> Outcome {
-    let decision = match decide(tools, store, name, &arguments).await {
+    let decision = match decide(tools, store, actor, (name, &arguments)).await {
         Ok(decision) => decision,
-        Err(error) => {
-            return Outcome {
-                answer: Err(error),
-                action: None,
-            };
-        }
+        Err(error) => return not_run(error),
     };
     match decision {
-        Decision::Refused(why) => Outcome {
-            answer: Err(ToolError::Refused { message: why }),
-            action: None,
-        },
+        Decision::Refused(message) => not_run(ToolError::Refused { message }),
+        Decision::Rejected(rejection) => not_run(ToolError::Rejected { rejection }),
         Decision::Propose(because, drafted) => {
             propose(tools, actor, name, &arguments, &drafted, because).await
         }
@@ -347,6 +352,14 @@ pub async fn run(
             answer: tools.call(actor, name, arguments).await,
             action: None,
         },
+    }
+}
+
+/// A tool call answered with `error` and not run.
+fn not_run(error: ToolError) -> Outcome {
+    Outcome {
+        answer: Err(error),
+        action: None,
     }
 }
 

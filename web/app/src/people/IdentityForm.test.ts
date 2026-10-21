@@ -13,6 +13,7 @@ describe("rebasing an identity edit (H5)", () => {
       { of: { domain: "deployment" as const }, expected: 3, current },
     ],
     intervening: [],
+    touched: [],
   });
 
   it("takes the deployment's revision from the rejection, or the one held if newer", () => {
