@@ -19,7 +19,7 @@ use jiff::civil::Date;
 // PRD: D1.
 /// A node's stored state. Each kind has its own machine; [`State::legal_for`] says
 /// which values belong to which kind. A group has no performed state: it is `derived`
-/// unless explicitly `skipped`.
+/// unless marked `done` or `skipped`, each with a reason.
 #[derive(
     Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize, JsonSchema,
 )]
@@ -29,7 +29,7 @@ pub enum State {
     Todo,
     /// Deliverable or action, started.
     Active,
-    /// Deliverable, action or milestone, finished.
+    /// Deliverable, action or milestone, finished; a group marked done.
     Done,
     /// Any kind, skipped with a reason.
     Skipped,
@@ -39,7 +39,7 @@ pub enum State {
     Decided,
     /// Milestone, not done.
     Pending,
-    /// Group, not skipped: its display state is derived from its contents.
+    /// Group, neither marked done nor skipped: its display state is derived from its contents.
     Derived,
 }
 
@@ -61,10 +61,7 @@ impl State {
     pub const fn legal_for(self, kind: NodeKind) -> bool {
         match self {
             State::Todo | State::Active => matches!(kind, NodeKind::Deliverable | NodeKind::Action),
-            State::Done => matches!(
-                kind,
-                NodeKind::Deliverable | NodeKind::Action | NodeKind::Milestone
-            ),
+            State::Done => !matches!(kind, NodeKind::Decision),
             State::Skipped => true,
             State::Open | State::Decided => matches!(kind, NodeKind::Decision),
             State::Pending => matches!(kind, NodeKind::Milestone),
@@ -81,6 +78,15 @@ impl State {
             NodeKind::Milestone => State::Pending,
             NodeKind::Group => State::Derived,
         }
+    }
+
+    // PRD: D1, D1a.
+    /// Whether a node of `kind` in this state skips the unfinished work beneath it, and so
+    /// carries the reason it was given: skipped, or a group marked done.
+    #[must_use]
+    pub const fn skips_beneath(self, kind: NodeKind) -> bool {
+        matches!(self, State::Skipped)
+            || (matches!(self, State::Done) && matches!(kind, NodeKind::Group))
     }
 
     /// PRD glossary, Terminal: `done`, `skipped`, `decided`.
@@ -158,9 +164,10 @@ pub struct NodeState {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub finished_on: Option<Date>,
     // PRD: D1.
-    /// Why the node was skipped, while it is (a skip requires a reason).
+    /// Why the node was skipped, or why a group was marked done, while it is (both require
+    /// a reason).
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub skip_reason: Option<Reason>,
+    pub reason: Option<Reason>,
 }
 
 impl NodeState {
@@ -173,7 +180,7 @@ impl NodeState {
             atomic: false,
             started_on: None,
             finished_on: None,
-            skip_reason: None,
+            reason: None,
         }
     }
 }

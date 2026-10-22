@@ -141,7 +141,11 @@ fn move_node(session: &mut Session<'_>, node: &NodeKey, transition: &Transition)
     };
     let step = Move::of(transition);
     let Some(to) = transition::next(kind, stored.state, step) else {
-        let message = format!("a {} in {:?} cannot {step:?}", kind.name(), stored.state);
+        let message = if kind == NodeKind::Group && step == Move::Complete {
+            "a group is not completed: mark it done with a reason".to_owned()
+        } else {
+            format!("a {} in {:?} cannot {step:?}", kind.name(), stored.state)
+        };
         session.reject(ViolationCode::IllegalTransition, Some(node), message);
         return Vec::new();
     };
@@ -161,15 +165,18 @@ fn move_node(session: &mut Session<'_>, node: &NodeKey, transition: &Transition)
         Move::Reopen => {
             next.started_on = None;
             next.finished_on = None;
-            next.skip_reason = None;
+            next.reason = None;
         }
-        Move::Skip | Move::Answer => {}
+        // A group has no performed dates: a mark done records no finish, which would turn
+        // kept work that is still open into a shortfall on the group.
+        Move::Skip | Move::MarkDone | Move::Answer => {}
     }
-    if let Transition::Skip { reason } = transition {
-        // D1: the reason a skip requires is kept with the skip, and goes when it is reopened.
-        next.skip_reason = Some(reason.clone());
+    if let Transition::Skip { reason } | Transition::MarkDone { reason } = transition {
+        // D1: the reason a skip or a mark done requires is kept with it, and goes when it is
+        // reopened.
+        next.reason = Some(reason.clone());
     }
-    assert_eq!(next.skip_reason.is_some(), next.state == State::Skipped);
+    assert_eq!(next.reason.is_some(), next.state.skips_beneath(kind));
     note_guarded(session, node, kind, stored.state, step);
     let answered = session
         .journey()

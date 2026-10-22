@@ -5891,7 +5891,7 @@
             "type": "array"
           },
           "kept_work_pending": {
-            "description": "A skipped container whose kept work is not yet done: \"skipped, kept work pending\".",
+            "description": "A skipped container, or a group marked done, whose kept work is not yet done.",
             "type": "boolean"
           },
           "key": {
@@ -8826,10 +8826,6 @@
             "description": "A pending auto-done milestone that reads as done.",
             "type": "boolean"
           },
-          "effectively_skipped": {
-            "description": "Skipped through an ancestor's skip.",
-            "type": "boolean"
-          },
           "failing_guards": {
             "description": "The bypassable guards its completing transition (complete a deliverable or\naction, answer an open decision, complete a pending milestone) would fail if attempted\nnow with no bypass in the patch. Empty for every node with no such transition left:\nfinished, not relevant, or a group.",
             "items": {
@@ -8845,6 +8841,13 @@
           "gravity_from": {
             "$ref": "#/components/schemas/ExplainedContribution",
             "description": "The contributors to gravity."
+          },
+          "kept_work_pending": {
+            "description": "For a skipped container or a group marked done: the kept work beneath it that is not\nyet done, which its dependents still wait for. Empty otherwise.",
+            "items": {
+              "$ref": "#/components/schemas/NodeKey"
+            },
+            "type": "array"
           },
           "membership_lost": {
             "description": "Its seeding identity left the role it was broken down by.",
@@ -8893,6 +8896,17 @@
           "relevance": {
             "$ref": "#/components/schemas/RelevanceExplanation",
             "description": "Relevance and what produced it."
+          },
+          "skipped_by": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/NodeKey"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The ancestor whose skip, or whose marking done, skips it; absent when it is not\nskipped through an ancestor."
           },
           "snoozed": {
             "anyOf": [
@@ -9807,7 +9821,7 @@
             "$ref": "#/components/schemas/Provenance",
             "description": "Where the node came from."
           },
-          "skip_reason": {
+          "reason": {
             "anyOf": [
               {
                 "$ref": "#/components/schemas/Reason"
@@ -9816,7 +9830,7 @@
                 "type": "null"
               }
             ],
-            "description": "Why the node was skipped, while it is (a skip requires a reason)."
+            "description": "Why the node was skipped, or why a group was marked done, while it is (both require\na reason)."
           },
           "started_on": {
             "description": "When a deliverable or action was started; editable like an actual date.",
@@ -14758,7 +14772,7 @@
         "type": "object"
       },
       "State": {
-        "description": "A node's stored state. Each kind has its own machine; [`State::legal_for`] says\nwhich values belong to which kind. A group has no performed state: it is `derived`\nunless explicitly `skipped`.",
+        "description": "A node's stored state. Each kind has its own machine; [`State::legal_for`] says\nwhich values belong to which kind. A group has no performed state: it is `derived`\nunless marked `done` or `skipped`, each with a reason.",
         "oneOf": [
           {
             "const": "todo",
@@ -14772,7 +14786,7 @@
           },
           {
             "const": "done",
-            "description": "Deliverable, action or milestone, finished.",
+            "description": "Deliverable, action or milestone, finished; a group marked done.",
             "type": "string"
           },
           {
@@ -14797,7 +14811,7 @@
           },
           {
             "const": "derived",
-            "description": "Group, not skipped: its display state is derived from its contents.",
+            "description": "Group, neither marked done nor skipped: its display state is derived from its contents.",
             "type": "string"
           }
         ]
@@ -15393,6 +15407,29 @@
             },
             "required": [
               "skip"
+            ],
+            "type": "object"
+          },
+          {
+            "additionalProperties": false,
+            "description": "A group to `done`, with the reason that requires: it reads done, and the unfinished\nwork inside it reads skipped, as under a skip, until it is reopened.",
+            "properties": {
+              "mark_done": {
+                "additionalProperties": false,
+                "properties": {
+                  "reason": {
+                    "$ref": "#/components/schemas/Reason",
+                    "description": "Why."
+                  }
+                },
+                "required": [
+                  "reason"
+                ],
+                "type": "object"
+              }
+            },
+            "required": [
+              "mark_done"
             ],
             "type": "object"
           },

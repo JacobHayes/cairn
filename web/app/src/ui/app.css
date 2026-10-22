@@ -1469,6 +1469,12 @@ button.failed-details {
     flex: 1 1 100%;
   }
 }
+/* A reason form's field is 16px on a phone, so the browser does not zoom into it. */
+@media (max-width: 719px) {
+  .reason-form input {
+    font-size: 16px;
+  }
+}
 /* A control in a narrow column wraps rather than pushing it wider. */
 :is(.author-panel, .author-bar, .detail-panel) :is(input, select, textarea) {
   max-width: 100%;

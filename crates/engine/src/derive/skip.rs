@@ -1,11 +1,11 @@
 //! Effective skip and kept work (D1a; ARCHITECTURE, Read path: derive, pass 2). Skipping a
-//! container gives its non-terminal, in-scope descendants an effective skip; stored states
-//! are untouched, so reopening the container restores them while their own explicit skips
-//! stay. A `keep` override exempts a node and its subtree from skips inherited from above
+//! container, or marking a group done, gives its non-terminal, in-scope descendants an
+//! effective skip; stored states are untouched, so reopening the container restores them
+//! while their own explicit skips stay. A `keep` override exempts a node and its subtree from skips inherited from above
 //! it; a skip below the kept node still cascades. Skip travels through containment only: a
 //! dependent of a skipped node is not skipped.
 //!
-//! Kept work: a skipped container, stored or effective, satisfies its dependents only once
+//! Kept work: a skipped container, stored or effective, or a group marked done, satisfies its dependents only once
 //! the explicitly kept, in-scope work beneath it does ("skipped, kept work pending"). This
 //! pass lists that work for each skipped container: every kept, in-scope node beneath it,
 //! nested keeps included, since a kept node's own state need not cover what it holds (it may
@@ -22,7 +22,7 @@ use std::collections::{BTreeMap, BTreeSet};
 use cairn_schema::{NodeKey, State};
 
 use super::relevance::Relevances;
-use super::{kept, stored_state};
+use super::{kept, skips_beneath, stored_state};
 use crate::graph::Graph;
 
 /// Pass 2's skip output.
@@ -30,12 +30,12 @@ use crate::graph::Graph;
 pub struct Skips {
     /// Each effectively skipped node and the skipped ancestor its skip comes from.
     effective: BTreeMap<NodeKey, NodeKey>,
-    /// Each skipped container, stored or effective, and the kept work beneath it.
+    /// Each skipped container, stored or effective, or group marked done, and the kept work beneath it.
     kept_work: BTreeMap<NodeKey, BTreeSet<NodeKey>>,
 }
 
 impl Skips {
-    /// D1a: the skipped ancestor the node's effective skip comes from; none when the node is
+    /// D1a: the skipped ancestor, or group marked done, the node's effective skip comes from; none when the node is
     /// not effectively skipped (its stored state may still be `skipped`).
     #[must_use]
     pub fn skipped_by(&self, key: &NodeKey) -> Option<&NodeKey> {
@@ -53,7 +53,8 @@ impl Skips {
         self.effective.iter()
     }
 
-    /// D1a: the explicitly kept, in-scope work beneath a skipped container, empty for any
+    /// D1a: the explicitly kept, in-scope work beneath a skipped container or a group marked
+    /// done, empty for any
     /// other node.
     #[must_use]
     pub fn kept_work(&self, key: &NodeKey) -> &BTreeSet<NodeKey> {
@@ -62,7 +63,7 @@ impl Skips {
     }
 }
 
-/// For every node under a skip it is not kept from, the nearest skipped ancestor: one walk
+/// For every node under a skip it is not kept from, the nearest skipped ancestor or group marked done: one walk
 /// down from the roots with an explicit stack (PRACTICES, No recursion). Depends on stored
 /// states and keeps only, never on relevance, so pass 1 can read it.
 #[must_use]
@@ -75,7 +76,7 @@ pub(crate) fn inherited(graph: &Graph) -> BTreeMap<NodeKey, NodeKey> {
         let parent_skipped = document
             .nodes
             .get(parent)
-            .is_some_and(|node| stored_state(document, node) == State::Skipped);
+            .is_some_and(|node| skips_beneath(document, node));
         let from_above = found.get(parent).cloned();
         for child in tree.children(parent) {
             stack.push(child);
@@ -124,7 +125,8 @@ pub(crate) fn pass(
             let skipped = document
                 .nodes
                 .get(ancestor)
-                .is_some_and(|found| skips.skipped(stored_state(document, found), ancestor));
+                .is_some_and(|found| skips_beneath(document, found))
+                || skips.effective.contains_key(ancestor);
             if skipped {
                 let work = skips.kept_work.entry(ancestor.clone()).or_default();
                 work.insert(node.key.clone());
@@ -139,7 +141,7 @@ pub(crate) fn pass(
         document
             .nodes
             .get(key)
-            .is_some_and(|found| stored_state(document, found) == State::Skipped)
+            .is_some_and(|found| skips_beneath(document, found))
     };
     assert!(
         skips.effective.values().all(stored_skip),

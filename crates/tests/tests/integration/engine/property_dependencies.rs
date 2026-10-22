@@ -234,7 +234,7 @@ mod property {
             .nodes
             .get(key)
             .map_or(State::initial(node.kind()), |stored| stored.state);
-        if state == State::Skipped || derived.skips().skipped_by(key).is_some() {
+        if state.skips_beneath(node.kind()) || derived.skips().skipped_by(key).is_some() {
             return derived
                 .skips()
                 .kept_work(key)

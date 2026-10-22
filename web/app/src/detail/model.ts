@@ -6,6 +6,7 @@
 import { INITIAL_STATE, MOVES_FROM, TERMINAL_STATES, type Move as EngineMove, type Schema } from "@cairn/client";
 
 import type { JourneyView } from "../data/journeys.ts";
+import { isOpen } from "../status/state.ts";
 import type { DisplayState } from "../status/words.ts";
 
 import { nodeTitle } from "../ui/gone.ts";
@@ -174,7 +175,7 @@ export function guardBypass(node: string, guards: Schema<"Guard">[], reason: str
 /** A transition by name (D1); answering a decision is its own mutation. */
 export type Move = Exclude<EngineMove, "answer">;
 
-const MOVE_ORDER: Move[] = ["start", "stop", "complete", "skip", "reopen"];
+const MOVE_ORDER: Move[] = ["start", "stop", "complete", "skip", "mark_done", "reopen"];
 
 /** D1: the moves a node of `kind` in `state` can make, in the order the panel offers them. */
 export function movesFrom(kind: NodeKind, state: State): Move[] {
@@ -186,12 +187,54 @@ export function answerable(kind: NodeKind, state: State): boolean {
   return MOVES_FROM[kind].answer?.includes(state) === true;
 }
 
-/** The transition mutation for `move` on `node`; a skip carries its reason (D1). */
+/** The transition mutation for `move` on `node`; a skip and a mark done carry their reason (D1). */
 export function transition(node: string, move: Move, reason = ""): Mutation {
   if (move === "skip") {
     return { op: "transition", node, transition: { skip: { reason } } };
   }
+  if (move === "mark_done") {
+    return { op: "transition", node, transition: { mark_done: { reason } } };
+  }
   return { op: "transition", node, transition: move };
+}
+
+/** The move a transition makes: its name, a string or the one key of the object that carries a reason. */
+export function moveOf(change: Schema<"Transition">): Move {
+  if (typeof change === "string") {
+    return change;
+  }
+  return "skip" in change ? "skip" : "mark_done";
+}
+
+/**
+ * D1a: how many items (nodes that are not groups) inside `key` that are unfinished and in scope
+ * would read skipped if `key` were marked done: the form says it before it is sent. Work marked
+ * Keep, and what is inside it, is left out, because it stays open.
+ */
+export function unfinishedInside(view: Ready, key: string): number {
+  const kept = view.journey.graph.state?.overrides ?? {};
+  const inside = (node: GraphNode): boolean => {
+    // Walks up from the node: it is inside the group when the walk reaches it, unless a keep is met first.
+    for (let at: GraphNode | undefined = node; at?.parent != null; at = nodeOf(view, at.parent)) {
+      if (kept[at.key]?.keep != null) {
+        return false;
+      }
+      if (at.parent === key) {
+        return true;
+      }
+    }
+    return false;
+  };
+  return (view.journey.graph.nodes ?? []).filter((node) => node.kind !== "group" && isOpen(view.derived.nodes[node.key]) && inside(node)).length;
+}
+
+/**
+ * D1a: how many items (nodes that are not groups) read skipped through `key`, a skipped
+ * container or a group marked done. The card and the sentence both say it, so it is counted
+ * here once.
+ */
+export function skippedThrough(view: Ready, key: string): number {
+  return Object.entries(view.derived.nodes).filter(([node, derived]) => derived.skipped_by === key && nodeOf(view, node)?.kind !== "group").length;
 }
 
 /** D1: whether a node in `state` is finished (done, skipped, decided). */

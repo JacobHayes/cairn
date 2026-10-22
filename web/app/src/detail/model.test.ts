@@ -42,8 +42,9 @@ describe("movesFrom (D1)", () => {
     ["decision", "decided", ["reopen"]],
     ["milestone", "pending", ["complete", "skip"]],
     ["milestone", "done", ["reopen"]],
-    ["group", "derived", ["skip"]],
+    ["group", "derived", ["skip", "mark_done"]],
     ["group", "skipped", ["reopen"]],
+    ["group", "done", ["reopen"]],
   ];
   it.each(cases)("a %s in %s can %j", (kind, state, moves) => {
     expect(movesFrom(kind, state)).toEqual(moves);

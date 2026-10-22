@@ -594,9 +594,15 @@ pub struct NodeDerived {
     /// Relevance and what produced it.
     pub relevance: RelevanceExplanation,
     // PRD: D1a.
-    /// Skipped through an ancestor's skip.
-    #[serde(default, skip_serializing_if = "crate::serde_util::is_false")]
-    pub effectively_skipped: bool,
+    /// The ancestor whose skip, or whose marking done, skips it; absent when it is not
+    /// skipped through an ancestor.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub skipped_by: Option<NodeKey>,
+    // PRD: D1a.
+    /// For a skipped container or a group marked done: the kept work beneath it that is not
+    /// yet done, which its dependents still wait for. Empty otherwise.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub kept_work_pending: Vec<NodeKey>,
     /// What blocks it itself: its own explicit requirements, condition gates, and stage
     /// opening, and its children, each unsatisfied. What it inherits is listed once, on the
     /// ancestor that holds it (`blocked_through`), never copied onto each descendant. A node

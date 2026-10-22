@@ -47,7 +47,7 @@ mod property {
         for stored in document.state.nodes.values_mut() {
             if stored.state == State::Open {
                 stored.state = State::Skipped;
-                stored.skip_reason = Some("Generated.".parse().unwrap());
+                stored.reason = Some("Generated.".parse().unwrap());
             }
         }
         plan_held(document)
@@ -64,7 +64,7 @@ mod property {
             if has_override(graph, &below, true) {
                 return None;
             }
-            if state(graph, &parent) == State::Skipped {
+            if state(graph, &parent).skips_beneath(graph.node(&parent).unwrap().kind()) {
                 return Some(parent);
             }
             below = parent;
@@ -75,7 +75,7 @@ mod property {
     /// D1a kept work by its definition: every kept, in-scope node beneath a skipped
     /// container.
     fn naive_kept_work(graph: &Graph, derived: &Derived, container: &NodeKey) -> BTreeSet<NodeKey> {
-        let skipped = state(graph, container) == State::Skipped
+        let skipped = state(graph, container).skips_beneath(graph.node(container).unwrap().kind())
             || derived.skips().skipped_by(container).is_some();
         if !skipped {
             return BTreeSet::new();
@@ -196,7 +196,7 @@ mod property {
         for stored in document.state.nodes.values_mut() {
             if stored.state == State::Open {
                 stored.state = State::Skipped;
-                stored.skip_reason = Some("Generated.".parse().unwrap());
+                stored.reason = Some("Generated.".parse().unwrap());
             }
         }
         let Err(violations) = Graph::new(document, &Deployment::default()) else {

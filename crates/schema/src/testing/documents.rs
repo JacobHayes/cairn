@@ -145,13 +145,13 @@ pub fn arb_node_state() -> impl Strategy<Value = NodeState> {
         prop::option::of(arb_reason()),
     )
         .prop_map(
-            |(state, provenance, atomic, started_on, finished_on, skip_reason)| NodeState {
+            |(state, provenance, atomic, started_on, finished_on, reason)| NodeState {
                 state,
                 provenance,
                 atomic,
                 started_on,
                 finished_on,
-                skip_reason,
+                reason,
             },
         )
 }

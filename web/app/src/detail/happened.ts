@@ -163,10 +163,12 @@ function transitioned(c: Context): Said {
   switch (state) {
     case "active":
       return { what: `started ${thing(c, node)}`, facts };
-    case "done":
-      return { what: `marked ${it(c, node)} done`, facts };
+    case "done": {
+      const reason = record?.state.reason ?? undefined;
+      return { what: `marked ${it(c, node)} done`, facts: { ...facts, ...(reason === undefined ? {} : { reason }) } };
+    }
     case "skipped": {
-      const reason = record?.state.skip_reason ?? undefined;
+      const reason = record?.state.reason ?? undefined;
       return { what: `skipped ${thing(c, node)}`, facts: { ...facts, ...(reason === undefined ? {} : { reason }) } };
     }
     case "todo":

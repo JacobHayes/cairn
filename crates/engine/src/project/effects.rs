@@ -215,10 +215,13 @@ impl DerivedJourney<'_> {
                 }
                 if now == RelevanceClass::Settled && was != RelevanceClass::Settled {
                     drops.push(node.clone());
-                    if matches!(
-                        self.state(node),
-                        State::Active | State::Done | State::Decided
-                    ) {
+                    let marked_done = self.state(node).skips_beneath(self.node(node).kind());
+                    if !marked_done
+                        && matches!(
+                            self.state(node),
+                            State::Active | State::Done | State::Decided
+                        )
+                    {
                         drops_with_progress.push(node.clone());
                     }
                 }

@@ -32,7 +32,7 @@ import { ActButton, actMutation, type Opens } from "./ActButton.tsx";
 import { EvidenceForm } from "./DoneEvidence.tsx";
 import { SnoozePanel, snoozeWords, WeightEditor } from "./editors.tsx";
 import { foldKey, setFold } from "./folds.ts";
-import { answerable, failingGuards, guardBypass, movesFrom, storedSnooze, titleOf, transition, type Guard, type GraphNode, type Mutation, type NodeDetail, type Ready } from "./model.ts";
+import { answerable, failingGuards, guardBypass, movesFrom, storedSnooze, titleOf, transition, unfinishedInside, type Guard, type GraphNode, type Mutation, type NodeDetail, type Ready } from "./model.ts";
 import { menuOf, offered, type Act, type ContextId, type MenuId, type MenuItem } from "./offers.ts";
 import { OwnerSelect } from "./parts.tsx";
 import { Rejected } from "./Rejected.tsx";
@@ -64,9 +64,10 @@ function Dismiss({ sending, onClose }: { sending: Sending; onClose: () => void }
 }
 
 /** A reason typed and confirmed in place of the action row: the form every "anyway" and skip shares. */
-function ReasonForm({ value, label, confirm, testId, sending, disabled, onChange, onConfirm, onClose }: {
+function ReasonForm({ value, label, hint, confirm, testId, sending, disabled, onChange, onConfirm, onClose }: {
   value: string;
   label: string;
+  hint?: string;
   confirm: string;
   testId: string;
   sending: Sending;
@@ -75,10 +76,19 @@ function ReasonForm({ value, label, confirm, testId, sending, disabled, onChange
   onConfirm: (reason: string) => void;
   onClose: () => void;
 }) {
+  // A form opened low in a short sheet (a phone with its keyboard up) is brought wholly into view: the field, its hint and the confirming button.
+  const shown = useRef<HTMLSpanElement>(null);
+  useEffect(() => {
+    shown.current?.scrollIntoView({ block: "nearest" });
+  }, []);
   return (
-    <span className="stack" data-testid={testId}>
+    <span className="stack reason-form" data-testid={testId} ref={shown}>
+      <label className="stack">
+        <span className="label">{label}</span>
+        <Field value={value} onChange={(event) => { onChange(event.target.value); }} />
+      </label>
+      {hint === undefined ? null : <p className="muted">{hint}</p>}
       <span className="row">
-        <Field aria-label={label} placeholder="Why" value={value} onChange={(event) => { onChange(event.target.value); }} />
         <Button primary disabled={disabled || value.trim() === ""} onClick={() => { onConfirm(value.trim()); }}>
           {confirm}
         </Button>
@@ -196,13 +206,14 @@ function runnersOf({ view, detail, write, form, onRename, onCopied, insertHere }
   const origin = memberOrigin(view.journey.graph, key);
   const journey = view.journey.header.id;
   const move = (...mutations: Mutation[]) => () => void write.run(mutations);
-  const reason = (kind: "skip" | "keep" | "include" | "bypass" | "anyway") => () => { form.openForm(kind, ""); };
+  const reason = (kind: "skip" | "mark-done" | "keep" | "include" | "bypass" | "anyway") => () => { form.openForm(kind, ""); };
   // The view the person is on goes with them (the graph draws the node whatever it hides); the copied link is the node's own address.
   const graph = graphViewFrom(new URLSearchParams(search));
   const link = `${globalThis.location.origin}${journeyPath({ journey, node: key }, "graph")}`;
   return {
     snooze: () => { form.openForm("snooze", snoozeStart(view, key)); },
     skip: reason("skip"),
+    "mark-done": reason("mark-done"),
     stop: move(transition(key, "stop")),
     "done-anyway": reason("bypass"),
     "answer-anyway": reason("anyway"),
@@ -304,13 +315,15 @@ interface OpenProps {
   submit: (opened: Drafted, mutations: Mutation[]) => void;
 }
 
-type ReasonKind = "skip" | "keep" | "include" | "bypass";
+type ReasonKind = "skip" | "mark-done" | "keep" | "include" | "bypass";
 
 /** What sending a reason form's `reason` does to `node`: D1's skip, B5's keep and force include, D4's guard bypass with the move it was needed for. */
 function reasonMutations(kind: ReasonKind, node: GraphNode, guards: Guard[], reason: string): Mutation[] {
   switch (kind) {
     case "skip":
       return [transition(node.key, "skip", reason)];
+    case "mark-done":
+      return [transition(node.key, "mark_done", reason)];
     case "keep":
       return [{ op: "apply_override", node: node.key, override: { keep: { reason } } }];
     case "include":
@@ -321,10 +334,12 @@ function reasonMutations(kind: ReasonKind, node: GraphNode, guards: Guard[], rea
 }
 
 /** The field's label and the confirming button's words of a reason form. */
-function reasonWords(kind: ReasonKind, node: GraphNode, without: string): { label: string; confirm: string; testId: string } {
+function reasonWords(kind: ReasonKind, node: GraphNode, without: string, inside: number): { label: string; confirm: string; testId: string; hint?: string } {
   switch (kind) {
     case "skip":
       return { label: "Why skip it", confirm: "Skip", testId: "skip-form" };
+    case "mark-done":
+      return { label: "Why mark it done", confirm: "Mark done", testId: "mark-done-form", hint: `${inside === 0 ? "Nothing unfinished inside to skip" : `${plural(inside, "unfinished item")} inside will be skipped`}. Work marked Keep stays open.` };
     case "keep":
       return { label: "Why keep it", confirm: "Keep", testId: "keep-form" };
     case "include":
@@ -335,12 +350,12 @@ function reasonWords(kind: ReasonKind, node: GraphNode, without: string): { labe
 }
 
 /** The forms that take a reason. */
-function ReasonCase({ detail, form, write, sending, submit, opened }: OpenProps & { opened: Extract<Drafted, { case: ReasonKind }> }) {
+function ReasonCase({ view, detail, form, write, sending, submit, opened }: OpenProps & { opened: Extract<Drafted, { case: ReasonKind }> }) {
   const { node } = detail;
   const guards = guardsOf(detail);
   return (
     <ReasonForm
-      {...reasonWords(opened.case, node, guards.words)}
+      {...reasonWords(opened.case, node, guards.words, unfinishedInside(view, node.key))}
       value={opened.value}
       sending={sending}
       disabled={write.disabled}
@@ -358,6 +373,7 @@ function OpenedForm({ opened, footer, ...props }: OpenProps & { opened: Opened; 
   const shared = { sending, disabled: write.disabled, onClose: form.close };
   switch (opened.case) {
     case "skip":
+    case "mark-done":
     case "keep":
     case "include":
     case "bypass":

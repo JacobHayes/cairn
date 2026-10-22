@@ -15,7 +15,7 @@ use crate::sql::{Row, corrupt, enum_from, enum_name, parse, rows, text};
 
 /// Every state record of one graph.
 pub(crate) fn load(connection: &Connection, id: &str) -> Result<JourneyState, StoreError> {
-    let select = "SELECT node, state, provenance, atomic, started_on, finished_on, skip_reason \
+    let select = "SELECT node, state, provenance, atomic, started_on, finished_on, reason \
                   FROM node_states WHERE graph_id = ?1";
     let nodes = keyed(connection, select, id, |row| {
         Ok(NodeState {
@@ -24,7 +24,7 @@ pub(crate) fn load(connection: &Connection, id: &str) -> Result<JourneyState, St
             atomic: row.flag(3)?,
             started_on: row.opt_parse(4)?,
             finished_on: row.opt_parse(5)?,
-            skip_reason: row.opt_parse(6)?,
+            reason: row.opt_parse(6)?,
         })
     })?;
     let select = "SELECT decision, value FROM answers WHERE graph_id = ?1";

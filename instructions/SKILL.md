@@ -59,7 +59,7 @@ both over the in-scope nodes.
 | `scheduled` | scheduled | waits for a date ahead: a milestone's day, or work's own not-before date |
 | `snoozed` | snoozed | set aside until a date or a node |
 | `done` | done (a decision: decided) | finished |
-| `skipped` | skipped | skipped, or under a skipped container |
+| `skipped` | skipped | skipped, or under a skipped container or a group marked done |
 | `not_relevant` | not relevant | an answer ruled it out, whatever it recorded |
 
 A node that rests on a decision which is itself still undecided is `conditional`, not ruled
@@ -116,6 +116,12 @@ its container cannot be unsnoozed on its own (the refusal names the container to
 a descendant's own snooze is independent of the container's, and completing a descendant
 does not lift the container's. Any transition on the container itself, such as starting it
 or skipping a group, clears its snooze.
+
+To finish a group or stage while work inside it is still open, `mark_done` it with a reason
+(`transition_node`): it reads done, and its unfinished work reads skipped as under a skip.
+Kept work stays open and still holds the group's dependents; `reopen` removes the mark. Work
+with children has no `mark_done`: complete it, bypassing the guard with a reason when its
+children are not done.
 
 Draft a **proposal** (`create_proposal`) when the change is structural (adding, removing, or
 moving nodes; edges; roles; conditions; date rules), when it touches many nodes, or when the

@@ -42,7 +42,8 @@ pub(crate) const SPECS: &[Spec] = &[
     Spec {
         name: "transition_node",
         description: "Moves a node through its lifecycle: start, stop, complete, skip (with a \
-            reason), reopen, or complete (a milestone). Guards are checked against the result.",
+            reason), mark_done (a group, with a reason: it reads done and the unfinished work \
+            inside reads skipped), or reopen. Guards are checked against the result.",
         writes: Writes::Patch,
         destructive: true,
         schema: schema::<TransitionNode>,
@@ -90,7 +91,7 @@ pub(crate) const SPECS: &[Spec] = &[
     Spec {
         name: "override",
         description: "Applies an override to a node with a reason: force include it \
-            despite its conditions, keep it under a skipped ancestor, or bypass named guards. \
+            despite its conditions, keep it under a skipped ancestor or a group marked done, or bypass named guards. \
             Or removes one.",
         writes: Writes::Patch,
         destructive: true,

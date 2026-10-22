@@ -30,6 +30,8 @@ export function keptWords(kind: FormCase): string {
   switch (kind) {
     case "skip":
       return "Skipped.";
+    case "mark-done":
+      return "Marked done.";
     case "keep":
       return "Kept.";
     case "include":

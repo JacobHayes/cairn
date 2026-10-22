@@ -400,8 +400,10 @@ impl Sweep<'_> {
         let key = &node.key;
         let state = stored_state(document, node);
         let skips = &self.early.skips;
-        if skips.skipped(state, key) {
-            // D1a: a skip satisfies once the kept work beneath it does.
+        if state.skips_beneath(node.kind()) || skips.skipped_by(key).is_some() {
+            // D1a: a skip, or a group marked done, satisfies once the kept work beneath it
+            // does. This comes before the terminal shortcut below, which would satisfy a group
+            // marked done at once.
             return skips.kept_work(key).iter().all(|kept| {
                 self.dependencies().node_index(kept).is_some_and(|at| {
                     let finish = Instant::new(at, Point::Finish);
@@ -469,7 +471,8 @@ impl Sweep<'_> {
         let value = |point| satisfied.get(Instant::new(at, point).slot()) == Some(&true);
         let state = stored_state(document, node);
         let group = node.kind() == NodeKind::Group;
-        let skipped = self.early.skips.skipped(state, key);
+        let skipped =
+            state.skips_beneath(node.kind()) || self.early.skips.skipped_by(key).is_some();
         let closed = skipped || state.is_terminal() || by_date || (group && value(Point::Finish));
         let relevance = self.early.relevance.value(key);
         let in_scope = relevance != Relevance::NotRelevant;

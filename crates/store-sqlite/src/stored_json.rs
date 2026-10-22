@@ -7,6 +7,21 @@ use serde_json::Value;
 
 use crate::sql::{SqlError, execute, rows, text};
 
+/// Renames the key `from` of `object` to `to`, keeping its value; whether `from` was there.
+pub(crate) fn rename_key(
+    object: &mut serde_json::Map<String, Value>,
+    from: &str,
+    to: &str,
+) -> bool {
+    match object.remove(from) {
+        Some(value) => {
+            object.insert(to.to_owned(), value);
+            true
+        }
+        None => false,
+    }
+}
+
 /// Rewrites the JSON `columns` of every row of `table`, found by `key`, with `rewrite`, which
 /// says whether it changed the value.
 pub(crate) fn column(

@@ -9,6 +9,7 @@ import type { Markdown, Patch } from "./host.ts";
 import { consequenceLines, warningOf, type ConsequenceLine, type SaveEvent, type TitleOf, type Unlocked } from "./activity.ts";
 import { destinationOf, proposalIdOf, type Answer, type Command } from "./edit-record.ts";
 import { proposalAddress } from "../address.ts";
+import { moveOf } from "../detail/model.ts";
 
 export type Mutation = Schema<"Mutation">;
 export type Rejection = Schema<"Rejection">;
@@ -121,7 +122,10 @@ export function describe(intent: Pick<WriteIntent, "target" | "mutations">, titl
     case "answer":
       return `${of("Answered", "a decision")}${rest}`;
     case "transition": {
-      const move = typeof first.transition === "string" ? first.transition : "skip";
+      const move = moveOf(first.transition);
+      if (move === "mark_done") {
+        return `Marked ${title ?? "a step"} done${rest}`;
+      }
       const verb = { start: "Started", stop: "Stopped", complete: "Completed", skip: "Skipped", reopen: "Reopened" }[move];
       return `${of(verb, "a step")}${rest}`;
     }

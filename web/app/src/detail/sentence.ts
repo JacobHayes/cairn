@@ -11,7 +11,7 @@ import { isOpen } from "../status/state.ts";
 import { upperFirst } from "../status/words.ts";
 import { dateWords, daysUntil, daysWords, relativeDays } from "../status/when.ts";
 import { guardFailureText, namer } from "./explain.ts";
-import { nodeOf, rankPlaces, scheduledDate, titleOf, waitsOn, type Holding, type NodeDetail, type NodeDerived, type Ready } from "./model.ts";
+import { nodeOf, rankPlaces, scheduledDate, skippedThrough, titleOf, waitsOn, type Holding, type NodeDetail, type NodeDerived, type Ready } from "./model.ts";
 import { answerText, identityName, ownersOf, ownerWords } from "./sections.tsx";
 import { listParts, plural } from "../ui/words.ts";
 
@@ -202,10 +202,21 @@ function rollUp(view: Ready, detail: NodeDetail): Piece[] {
   return [`${String(done)} of ${String(total)} done${toDecide === 0 ? "" : `; ${String(toDecide)} to decide`}`, ...slack, ". "];
 }
 
+/** Whether the node is a group marked done: its progress no longer counts what was skipped, so its sentence has no roll-up. */
+function markedDone(detail: NodeDetail): boolean {
+  return detail.node.kind === "group" && detail.record.state === "done";
+}
+
+/** D1a: the kept work beneath a skipped container or a group marked done that is not yet done, which its dependents still wait for. */
+function keptPending(derived: NodeDerived): Piece[] {
+  const kept = derived.kept_work_pending ?? [];
+  return kept.length === 0 ? [] : [" Kept work still pending: ", ...listed(kept.map((node) => [{ node }])), "."];
+}
+
 /** The sentence for the node: pieces of text, links, and the Unsnooze action. A container's starts with its roll-up. */
 export function sentenceOf(view: Ready, detail: NodeDetail, rank: RankFacts): Piece[] {
   const shown = detail.derived.display_state;
-  return shown === "not_relevant" || shown === "skipped" ? stateSentence(view, detail, rank) : [...rollUp(view, detail), ...stateSentence(view, detail, rank)];
+  return shown === "not_relevant" || shown === "skipped" || markedDone(detail) ? stateSentence(view, detail, rank) : [...rollUp(view, detail), ...stateSentence(view, detail, rank)];
 }
 
 /** What the node's display state means for it, in pieces. */
@@ -249,6 +260,11 @@ function stateSentence(view: Ready, detail: NodeDetail, rank: RankFacts): Piece[
       return via !== undefined && stored === undefined ? ["Snoozed", ...until, ", through ", { node: via }, "."] : ["Snoozed", ...until, "."];
     }
     case "done": {
+      if (markedDone(detail)) {
+        const why = record.reason == null || record.reason === "" ? "" : `: ${record.reason.replace(/\.+$/, "")}`;
+        const skipped = skippedThrough(view, node.key);
+        return [`Marked done${why}.`, ...(skipped === 0 ? [] : [` It skipped ${plural(skipped, "unfinished item")}.`]), ...keptPending(derived)];
+      }
       const verb = node.kind === "decision" ? `Decided${detail.answer === undefined ? "" : ` ${answerText(view, detail.answer, node)}`}` : "Done";
       const unanswered = derived.relevance.value === "undecided" ? ([" May not apply: depends on ", ...undecidedNames(view, node.key), "."] satisfies Piece[]) : [];
       const early = derived.dates.done_early ?? undefined;
@@ -256,11 +272,12 @@ function stateSentence(view: Ready, detail: NodeDetail, rank: RankFacts): Piece[
       return [...opening, ...staleWords(view, derived.stale ?? []), ...unanswered];
     }
     case "skipped": {
-      const through = detail.ancestors.find((ancestor) => view.journey.graph.state?.nodes?.[ancestor.key]?.state === "skipped");
-      if (record.state !== "skipped" && through !== undefined) {
-        return ["Skipped with ", { node: through.key }, "."];
+      const kept = keptPending(derived);
+      const by = derived.skipped_by ?? undefined;
+      if (record.state !== "skipped" && by !== undefined) {
+        return view.journey.graph.state?.nodes?.[by]?.state === "done" ? ["Skipped: ", { node: by }, " was marked done.", ...kept] : ["Skipped with ", { node: by }, ".", ...kept];
       }
-      return [record.skip_reason == null || record.skip_reason === "" ? "Skipped." : `Skipped: ${record.skip_reason.replace(/\.+$/, "")}.`];
+      return [record.reason == null || record.reason === "" ? "Skipped." : `Skipped: ${record.reason.replace(/\.+$/, "")}.`, ...kept];
     }
     case "not_relevant": {
       const reads = derived.relevance.decisions ?? [];

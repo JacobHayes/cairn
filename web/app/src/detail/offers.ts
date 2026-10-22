@@ -69,6 +69,7 @@ export function offered(view: Ready, key: string): Offered {
 export type MenuId =
   | "snooze"
   | "skip"
+  | "mark-done"
   | "stop"
   | "done-anyway"
   | "answer-anyway"
@@ -95,6 +96,7 @@ export interface MenuItem<Id extends string = MenuId> {
 const LABELS: Record<MenuId, string> = {
   snooze: "Snooze…",
   skip: "Skip…",
+  "mark-done": "Mark done…",
   stop: "Stop",
   "done-anyway": "Done anyway…",
   "answer-anyway": "Answer anyway…",
@@ -133,7 +135,11 @@ export function menuOf(view: Ready, detail: NodeDetail, writable: boolean): Menu
   // A completion refused until what it waits on is done or its own date comes.
   const held = failingGuards(derived).some((guard) => guard === "deps_done" || guard === "date_arrived");
   const guardFails = failingGuards(derived).length > 0 || derived.needs_breakdown === true;
-  const keptUnder = derived.effectively_skipped === true && state !== "skipped";
+  const keptUnder = derived.skipped_by != null && state !== "skipped";
+  // D1a: a skipped node, or a group marked done, skips what is unfinished beneath it.
+  const skipsBeneath = state === "skipped" || (kind === "group" && state === "done");
+  // A group with unfinished work inside can be marked done; one that reads done, skipped or not relevant cannot.
+  const markable = kind === "group" && state === "derived" && isOpen(derived);
   const member = (view.journey.graph.insertions ?? []).some((insertion) => node.key in insertion.nodes);
   const where = (...extra: (MenuId | false)[]): MenuItem[] => items(["show-in-graph", member && "show-insertion", ...extra, "copy-link"]);
   const groups = (...all: MenuItem[][]) => all.filter((group) => group.length > 0);
@@ -141,7 +147,8 @@ export function menuOf(view: Ready, detail: NodeDetail, writable: boolean): Menu
     return groups(where());
   }
   if (derived.display_state === "not_relevant") {
-    return groups(items(["include"]), where());
+    // Undoing a skip or a mark done never needs a force include.
+    return groups(items([skipsBeneath && "reopen", "include"]), where());
   }
   if (state === "skipped") {
     return groups(items(["reopen"]), items(["rename"]), where());
@@ -155,6 +162,7 @@ export function menuOf(view: Ready, detail: NodeDetail, writable: boolean): Menu
     items(
       [
         "snooze",
+        markable && "mark-done",
         "skip",
         state === "active" && "stop",
         kind === "decision" && held && "answer-anyway",

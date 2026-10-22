@@ -8,7 +8,7 @@ use cairn_engine::transition::{self, Move};
 use cairn_schema::{AnswerValue, GraphKey, NodeKind, Record, State, Write};
 use support::{accepted, graph, journey, journey_patch, key};
 
-use Move::{Answer, Complete, Reopen, Skip, Start, Stop};
+use Move::{Answer, Complete, MarkDone, Reopen, Skip, Start, Stop};
 use NodeKind::{Action, Decision, Deliverable, Group, Milestone};
 use State::{Active, Decided, Derived, Done, Open, Pending, Skipped, Todo};
 
@@ -40,7 +40,9 @@ const TABLE: &[(NodeKind, Move, State, State)] = &[
     (Milestone, Reopen, Done, Pending),
     (Milestone, Reopen, Skipped, Pending),
     (Group, Skip, Derived, Skipped),
+    (Group, MarkDone, Derived, Done),
     (Group, Reopen, Skipped, Derived),
+    (Group, Reopen, Done, Derived),
 ];
 
 fn expected(kind: NodeKind, step: Move, from: State) -> Option<State> {
@@ -96,9 +98,9 @@ fn one_node(kind: NodeKind, state: State) -> cairn_engine::Records {
             .answers
             .insert(key("n_x"), AnswerValue::Boolean(true));
     }
-    if state == Skipped {
+    if state.skips_beneath(kind) {
         let stored = journey.graph.state.nodes.get_mut(&key("n_x")).unwrap();
-        stored.skip_reason = Some("Skipped earlier.".parse().unwrap());
+        stored.reason = Some("Skipped earlier.".parse().unwrap());
     }
     records
 }
@@ -109,6 +111,9 @@ fn mutation(step: Move) -> &'static str {
         Stop => "- op: transition\n  node: n_x\n  transition: stop\n",
         Complete => "- op: transition\n  node: n_x\n  transition: complete\n",
         Skip => "- op: transition\n  node: n_x\n  transition: {skip: {reason: Not needed here.}}\n",
+        MarkDone => {
+            "- op: transition\n  node: n_x\n  transition: {mark_done: {reason: Covered elsewhere.}}\n"
+        }
         Reopen => "- op: transition\n  node: n_x\n  transition: reopen\n",
         Answer => "- op: answer\n  decision: n_x\n  value: {boolean: false}\n",
     }

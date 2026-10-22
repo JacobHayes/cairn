@@ -381,6 +381,9 @@ fn transition(node: &str, step: Move) -> Mutation {
         Move::Skip => Transition::Skip {
             reason: parse("Generated."),
         },
+        Move::MarkDone => Transition::MarkDone {
+            reason: parse("Generated."),
+        },
         Move::Reopen => Transition::Reopen,
         Move::Answer => {
             return yaml(&format!(

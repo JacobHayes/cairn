@@ -1,6 +1,7 @@
 // C8: a node's children as a checklist. Work (actions and deliverables) is checked off and
 // unchecked in place, each one transition patch (complete, reopen); any other child shows its
 // state and opens its own detail.
+import { isFinished } from "../status/state.ts";
 import { dueWords } from "../status/when.ts";
 import { statusTone, statusWord } from "../status/words.ts";
 import { Badge } from "../ui/kit.tsx";
@@ -14,7 +15,7 @@ import { useNodeWrite, type NodeWrite } from "./write.ts";
 function Item({ view, child, write }: { view: Ready; child: Child; write: NodeWrite }) {
   const done = child.state === "done";
   // The one fact on the right: the date while it is open, else who owns it.
-  const dueDate = isTerminal(child.state) ? undefined : view.derived.nodes[child.key]?.dates.due?.date;
+  const dueDate = isTerminal(child.state) || isFinished(child.displayState) ? undefined : view.derived.nodes[child.key]?.dates.due?.date;
   const due = dueDate === undefined ? undefined : dueWords(dueDate, view.derived.today, child.kind === "decision");
   const fact = due ?? ownerName(view, child.key);
   return (

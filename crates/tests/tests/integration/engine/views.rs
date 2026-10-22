@@ -461,6 +461,29 @@ fn answer_effects_report_the_second_order_branch_as_decided_later() {
     assert_eq!(yes.drops.total, 0);
 }
 
+/// C12, D1a: a group marked done that an answer rules out is dropped but is not recorded
+/// progress; work finished inside it is.
+#[test]
+fn a_group_marked_done_that_is_ruled_out_is_not_progress() {
+    let records = support::accepted(
+        &support::journey(&support::add_nodes(&[
+            "{key: n_d, id: d, kind: decision, title: D, prompt: D?, answer_type: boolean}",
+            "{key: n_g, id: g, kind: group, title: G, relevant_when: {equals: {decision: n_d, value: true}}}",
+            "{key: n_a, id: a, parent: n_g, kind: action, title: A}",
+            "{key: n_b, id: b, parent: n_g, kind: action, title: B}",
+        ])),
+        "- op: answer\n  decision: n_d\n  value: {boolean: true}\n\
+         - op: transition\n  node: n_a\n  transition: complete\n\
+         - op: transition\n  node: n_g\n  transition: {mark_done: {reason: Covered elsewhere.}}\n",
+    );
+    let effects = effects_of(records, "n_d");
+    let [no, _] = effects.choices.as_slice() else {
+        panic!("a boolean has two choices");
+    };
+    assert!(names(&no.drops.nodes).contains(&"n_g"));
+    assert_eq!(names(&no.drops_with_progress.nodes), ["n_a"]);
+}
+
 /// C12: revising a recorded answer counts the progress it would leave behind among the drops,
 /// the recorded choice has no effect, and a decision that is ruled out answers to nothing.
 #[test]

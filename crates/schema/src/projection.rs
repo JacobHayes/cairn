@@ -242,7 +242,7 @@ pub struct LevelNode {
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub hidden_prerequisites: Vec<NodeKey>,
     // PRD: D1a.
-    /// A skipped container whose kept work is not yet done: "skipped, kept work pending".
+    /// A skipped container, or a group marked done, whose kept work is not yet done.
     #[serde(default, skip_serializing_if = "crate::serde_util::is_false")]
     pub kept_work_pending: bool,
     // PRD: D8.

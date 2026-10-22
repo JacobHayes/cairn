@@ -443,7 +443,7 @@ pub fn state(fill: Fill) -> JourneyState {
                     atomic: fill.on(),
                     started_on: fill.some(day(1)),
                     finished_on: fill.some(day(2)),
-                    skip_reason: fill.some(id("Not needed here.")),
+                    reason: fill.some(id("Not needed here.")),
                 },
             )
         });

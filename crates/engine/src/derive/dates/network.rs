@@ -221,7 +221,9 @@ impl Scope {
         self.relevance.push(relevance.value(key));
         let node = document.nodes.get(key);
         let state = node.map(|node| stored_state(document, node));
-        let skipped = state.is_some_and(|stored| skips.skipped(stored, key));
+        let skipped = node
+            .is_some_and(|node| state.is_some_and(|state| state.skips_beneath(node.kind())))
+            || skips.skipped_by(key).is_some();
         let done = layer == Layer::Execution && state == Some(State::Done);
         self.skipped.push(skipped);
         self.zero.push(skipped || done);

@@ -49,7 +49,8 @@ pub fn touched_nodes(
         for mutation in patch.mutations.as_slice() {
             if let Mutation::Transition {
                 node,
-                transition: Transition::Skip { .. } | Transition::Reopen,
+                transition:
+                    Transition::Skip { .. } | Transition::MarkDone { .. } | Transition::Reopen,
             } = mutation
             {
                 nodes.extend(subtree(&children, node));

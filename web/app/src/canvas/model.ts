@@ -108,6 +108,8 @@ export interface Card {
 export type CardBody =
   | { kind: "answer"; text: string; rationale: string | undefined }
   | { kind: "progress"; done: number; total: number; badge: CardBadge | undefined }
+  /** A group marked done: in place of its progress, how many items it skipped, or that kept work inside is still pending. */
+  | { kind: "marked_done"; skipped: number; keptPending: boolean }
   | { kind: "depends"; text: string };
 
 /** What the Signals lens can put on a card (8.2): each is a number, or none when the card has no value. */

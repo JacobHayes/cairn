@@ -88,7 +88,9 @@ mod property {
 
     fn skipped(graph: &Graph, derived: &Derived, key: &NodeKey) -> bool {
         let state = graph.document().state.nodes.get(key).map(|s| s.state);
-        state == Some(State::Skipped) || derived.skips().skipped_by(key).is_some()
+        let kind = graph.node(key).unwrap().kind();
+        state.is_some_and(|state| state.skips_beneath(kind))
+            || derived.skips().skipped_by(key).is_some()
     }
 
     fn estimate(graph: &Graph, key: &NodeKey) -> i64 {

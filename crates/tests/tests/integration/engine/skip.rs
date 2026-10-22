@@ -1,4 +1,4 @@
-//! Effective skip and kept work (D1a): a container's skip reaches its non-terminal, in-scope
+//! Effective skip and kept work (D1a): a container's skip, or a group marked done, reaches its non-terminal, in-scope
 //! descendants through containment only, `keep` exempts a subtree, reopening restores what
 //! was inherited but not what was skipped explicitly, and each skipped container lists the
 //! kept work beneath it.
@@ -9,13 +9,23 @@ use crate::engine::support;
 use std::collections::BTreeSet;
 
 use cairn_engine::Derived;
-use cairn_schema::NodeKey;
+use cairn_schema::{DisplayState, NodeKey, State};
 use support::key;
 
 const VENDOR: &str = "j_vendor_eval";
 
 fn skip(node: &str) -> String {
     format!("- op: transition\n  node: {node}\n  transition: {{skip: {{reason: Not needed.}}}}\n")
+}
+
+fn mark_done(node: &str) -> String {
+    format!(
+        "- op: transition\n  node: {node}\n  transition: {{mark_done: {{reason: Covered elsewhere.}}}}\n"
+    )
+}
+
+fn complete(node: &str) -> String {
+    format!("- op: transition\n  node: {node}\n  transition: complete\n")
 }
 
 fn keep(node: &str) -> String {
@@ -185,4 +195,149 @@ fn nested_keeps_are_each_kept_work() {
         derived.skips().kept_work(&key("n_outer")),
         &keys(&["n_inner"])
     );
+}
+
+fn stored_state(records: &cairn_engine::Records, node: &str) -> State {
+    support::vendor_graph(records).state.nodes[&key(node)].state
+}
+
+fn shown(records: &cairn_engine::Records, derived: &Derived, node: &str) -> DisplayState {
+    derived.display_state(&support::journey_graph(records, VENDOR), &key(node))
+}
+
+/// D1a: marking a group done skips what is unfinished inside it and leaves finished work and
+/// every stored state alone.
+#[test]
+fn marking_a_group_done_skips_what_is_unfinished_inside() {
+    let before = vendor_records(&[complete("n_access")]);
+    let records = support::accepted_on(&before, VENDOR, &mark_done("n_setup"));
+    let derived = support::derived(&records, VENDOR);
+    for unfinished in ["n_plan", "n_plan_draft", "n_plan_review", "n_workload"] {
+        assert_eq!(
+            skipped_by(&derived, unfinished).as_deref(),
+            Some("n_setup"),
+            "{unfinished}"
+        );
+        assert_eq!(shown(&records, &derived, unfinished), DisplayState::Skipped);
+    }
+    assert_eq!(skipped_by(&derived, "n_access"), None, "finished");
+    assert_eq!(shown(&records, &derived, "n_access"), DisplayState::Done);
+    for descendant in ["n_access", "n_plan", "n_plan_draft", "n_plan_review"] {
+        assert_eq!(
+            stored_state(&records, descendant),
+            stored_state(&before, descendant),
+            "{descendant}"
+        );
+    }
+    assert_eq!(shown(&records, &derived, "n_setup"), DisplayState::Done);
+    assert!(
+        !derived.blocking().blocked(&key("n_comparison_set")),
+        "the plan it requires reads skipped, so it no longer holds the comparison set"
+    );
+}
+
+/// D1a, D4: a group marked done satisfies its dependents only once the kept work inside it
+/// does. The terminal shortcut would satisfy it at once.
+#[test]
+fn a_group_marked_done_holds_its_dependents_on_kept_work() {
+    let add = "- op: add_node\n  node: {key: n_after, id: after, kind: action, title: After, requires: [n_setup]}\n";
+    let records = vendor_records(&[add.to_owned(), keep("n_plan_review"), mark_done("n_setup")]);
+    let derived = support::derived(&records, VENDOR);
+    let blocking = derived.blocking();
+    assert!(!blocking.satisfies(&key("n_setup")));
+    assert!(blocking.blocked(&key("n_after")));
+    assert!(blocking.frontier().contains(&key("n_plan_review")));
+    let graph = support::journey_graph(&records, VENDOR);
+    assert_eq!(
+        derived
+            .node_derived(&graph, &key("n_setup"))
+            .kept_work_pending,
+        vec![key("n_plan_review")]
+    );
+    let finished = support::accepted_on(&records, VENDOR, &complete("n_plan_review"));
+    let derived = support::derived(&finished, VENDOR);
+    assert!(derived.blocking().actionable(&key("n_after")));
+    assert_eq!(
+        derived
+            .node_derived(&support::journey_graph(&finished, VENDOR), &key("n_setup"))
+            .kept_work_pending,
+        [] as [cairn_schema::NodeKey; 0]
+    );
+}
+
+#[test]
+fn nested_keeps_under_a_group_marked_done_are_each_kept_work() {
+    let derived = vendor(&[keep("n_plan"), keep("n_plan_review"), mark_done("n_setup")]);
+    assert_eq!(
+        derived.skips().kept_work(&key("n_setup")),
+        &keys(&["n_plan", "n_plan_review"])
+    );
+}
+
+#[test]
+fn work_added_after_a_mark_done_reads_skipped() {
+    let add = "- op: add_node\n  node: {key: n_late, id: late, parent: n_setup, kind: action, title: Late}\n";
+    let derived = vendor(&[mark_done("n_setup"), add.to_owned()]);
+    assert_eq!(skipped_by(&derived, "n_late").as_deref(), Some("n_setup"));
+}
+
+/// D1a: reopening removes this group's mark only: skips and keeps inside, and a mark deeper
+/// inside, stay as they were.
+#[test]
+fn reopening_a_group_marked_done_removes_only_its_mark() {
+    let records = vendor_records(&[
+        keep("n_comparison_set"),
+        skip("n_baseline"),
+        mark_done("n_partner_led"),
+        mark_done("n_testing"),
+        reopen("n_testing"),
+    ]);
+    let derived = support::derived(&records, VENDOR);
+    let stored = &support::vendor_graph(&records).state.nodes[&key("n_testing")];
+    assert_eq!(stored.state, State::Derived);
+    assert!(stored.reason.is_none());
+    for node in ["n_comparison_set", "n_baseline", "n_partner_led"] {
+        assert_ne!(
+            skipped_by(&derived, node).as_deref(),
+            Some("n_testing"),
+            "{node}"
+        );
+    }
+    assert_eq!(stored_state(&records, "n_baseline"), State::Skipped);
+    assert_eq!(stored_state(&records, "n_partner_led"), State::Done);
+    assert!(
+        support::vendor_graph(&records).state.overrides[&key("n_comparison_set")]
+            .keep
+            .is_some()
+    );
+}
+
+/// D4: marking a group done is never guarded: with its opening unmet it is accepted and not
+/// stale, and kept work inside still waits for the opening it inherits.
+#[test]
+fn marking_done_is_not_guarded() {
+    let records = support::accepted_on(
+        &support::vendor_after(1),
+        VENDOR,
+        &format!("{}{}", keep("n_plan_review"), mark_done("n_setup")),
+    );
+    let derived = support::derived(&records, VENDOR);
+    let graph = support::journey_graph(&records, VENDOR);
+    assert!(
+        derived
+            .node_derived(&graph, &key("n_setup"))
+            .stale
+            .is_empty()
+    );
+    assert!(derived.blocking().blocked(&key("n_plan_review")));
+}
+
+/// D1: completing work that has children bypasses the guard and leaves the children open:
+/// they are work of their own, so nothing cascades from a done deliverable.
+#[test]
+fn completing_work_with_children_skips_nothing() {
+    let bypass = "- op: apply_override\n  node: n_plan\n  override: {guard_bypass: {guards: [deps_done], reason: Done elsewhere.}}\n- op: transition\n  node: n_plan\n  transition: complete\n";
+    let derived = vendor(&[complete("n_access"), bypass.to_owned()]);
+    assert_eq!(skipped_by(&derived, "n_plan_draft"), None);
+    assert!(derived.blocking().frontier().contains(&key("n_plan_draft")));
 }

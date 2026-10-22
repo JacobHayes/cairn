@@ -21,7 +21,7 @@ use cairn_schema::{
     Consequences, NodeKey, ShortfallConsequence, StaleConsequence, State, UndecidedConsequence,
 };
 
-use super::{Derived, stored_state};
+use super::{Derived, skips_beneath, stored_state};
 use crate::graph::Graph;
 
 /// D7: what the `after` side newly shows against the `before` side. A node the before side
@@ -126,10 +126,10 @@ fn informational(
 /// undecided.
 fn finished_undecided(graph: &Graph, derived: &Derived, key: &NodeKey) -> BTreeSet<NodeKey> {
     let document = graph.document();
-    let finished = document
-        .nodes
-        .get(key)
-        .is_some_and(|node| matches!(stored_state(document, node), State::Done | State::Decided));
+    let finished = document.nodes.get(key).is_some_and(|node| {
+        matches!(stored_state(document, node), State::Done | State::Decided)
+            && !skips_beneath(document, node)
+    });
     if finished {
         derived.unanswered(graph, key)
     } else {

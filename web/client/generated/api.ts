@@ -2898,7 +2898,7 @@ export interface components {
              *     prerequisites" marker, which opens the trace. Empty when it has none.
              */
             hidden_prerequisites?: components["schemas"]["NodeKey"][];
-            /** @description A skipped container whose kept work is not yet done: "skipped, kept work pending". */
+            /** @description A skipped container, or a group marked done, whose kept work is not yet done. */
             kept_work_pending?: boolean;
             /** @description The node. */
             key: components["schemas"]["NodeKey"];
@@ -3595,8 +3595,6 @@ export interface components {
             display_state: components["schemas"]["DisplayState"];
             /** @description A pending auto-done milestone that reads as done. */
             done_by_date?: boolean;
-            /** @description Skipped through an ancestor's skip. */
-            effectively_skipped?: boolean;
             /**
              * @description The bypassable guards its completing transition (complete a deliverable or
              *     action, answer an open decision, complete a pending milestone) would fail if attempted
@@ -3608,6 +3606,11 @@ export interface components {
             gravity: components["schemas"]["Score"];
             /** @description The contributors to gravity. */
             gravity_from: components["schemas"]["ExplainedContribution"];
+            /**
+             * @description For a skipped container or a group marked done: the kept work beneath it that is not
+             *     yet done, which its dependents still wait for. Empty otherwise.
+             */
+            kept_work_pending?: components["schemas"]["NodeKey"][];
             /** @description Its seeding identity left the role it was broken down by. */
             membership_lost?: boolean;
             /** @description A placeholder with no children that is not atomic. */
@@ -3627,6 +3630,11 @@ export interface components {
             rank?: components["schemas"]["Real"] | null;
             /** @description Relevance and what produced it. */
             relevance: components["schemas"]["RelevanceExplanation"];
+            /**
+             * @description The ancestor whose skip, or whose marking done, skips it; absent when it is not
+             *     skipped through an ancestor.
+             */
+            skipped_by?: components["schemas"]["NodeKey"] | null;
             /**
              * @description A snooze that holds over the node: its own, else the one of the container it is
              *     held through (`snoozed_via`).
@@ -3849,8 +3857,11 @@ export interface components {
             finished_on?: string | null;
             /** @description Where the node came from. */
             provenance: components["schemas"]["Provenance"];
-            /** @description Why the node was skipped, while it is (a skip requires a reason). */
-            skip_reason?: components["schemas"]["Reason"] | null;
+            /**
+             * @description Why the node was skipped, or why a group was marked done, while it is (both require
+             *     a reason).
+             */
+            reason?: components["schemas"]["Reason"] | null;
             /**
              * Format: date
              * @description When a deliverable or action was started; editable like an actual date.
@@ -5499,7 +5510,7 @@ export interface components {
         /**
          * @description A node's stored state. Each kind has its own machine; [`State::legal_for`] says
          *     which values belong to which kind. A group has no performed state: it is `derived`
-         *     unless explicitly `skipped`.
+         *     unless marked `done` or `skipped`, each with a reason.
          */
         State: "todo" | "active" | "done" | "skipped" | "open" | "decided" | "pending" | "derived";
         /** @description The journey status summary for observers and reporting. */
@@ -5692,6 +5703,11 @@ export interface components {
          */
         Transition: "start" | "stop" | "complete" | {
             skip: {
+                /** @description Why. */
+                reason: components["schemas"]["Reason"];
+            };
+        } | {
+            mark_done: {
                 /** @description Why. */
                 reason: components["schemas"]["Reason"];
             };

@@ -156,3 +156,21 @@ test("a milestone done on a phone: an empty date says what to choose and blocks 
   await form.getByLabel("Done on").fill("2026-10-19");
   await expect(form.getByRole("button", { name: "Save" })).toBeEnabled();
 });
+
+test("a stage is marked done with a reason: what was left inside reads skipped and what waited for it is freed, and Reopen takes it back (D1a)", async ({ page }) => {
+  const stage = await openNode(page, "browser", "j_launch", "n_materials");
+  await expect(nodeCard(page, "n_announcement").getByTestId("card-state")).not.toHaveAttribute("data-state", "skipped");
+  await menuItem(stage, "mark-done");
+  const form = stage.getByTestId("mark-done-form");
+  await expect(form.getByRole("button", { name: "Mark done", exact: true })).toBeDisabled();
+  await form.getByLabel("Why mark it done").fill(fresh("Covered by the website"));
+  await form.getByRole("button", { name: "Mark done", exact: true }).click();
+  await expect(stage.getByTestId("detail-state")).toHaveAttribute("data-status", "done");
+  await expect(nodeCard(page, "n_announcement").getByTestId("card-state")).toHaveAttribute("data-state", "skipped");
+  await expect(nodeCard(page, "n_docs").getByTestId("card-state")).toHaveAttribute("data-state", "skipped");
+  await expect(nodeCard(page, "n_materials").getByTestId("card-marked-done")).toContainText("skipped");
+  await menuItem(stage, "reopen");
+  await expect(stage.getByTestId("detail-state")).not.toHaveAttribute("data-status", "done");
+  await expect(nodeCard(page, "n_announcement").getByTestId("card-state")).not.toHaveAttribute("data-state", "skipped");
+  await checkpoint(page);
+});

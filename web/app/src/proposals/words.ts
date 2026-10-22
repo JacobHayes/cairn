@@ -12,6 +12,7 @@ import { fieldWords, upperFirst } from "../status/words.ts";
 import { nodeTitle } from "../ui/gone.ts";
 import type { Conflict, ResolutionKind, ReviewItem } from "./model.ts";
 import { plural } from "../ui/words.ts";
+import { moveOf } from "../detail/model.ts";
 import { identityNamed, kindNamed, roleNamed, type Slot } from "../detail/sections.tsx";
 import type { Deployment } from "../data/host.ts";
 
@@ -98,12 +99,12 @@ export function stateValueWords(field: string, value: unknown, node: string, nam
   const record = value as Record<string, unknown>;
   switch (field) {
     case "nodes": {
-      const own = record as { state?: string; started_on?: string; finished_on?: string; skip_reason?: string; atomic?: boolean };
+      const own = record as { state?: string; started_on?: string; finished_on?: string; reason?: string; atomic?: boolean };
       const parts = [
         own.state === undefined ? undefined : own.state.replaceAll("_", " "),
         own.started_on === undefined ? undefined : `started ${names.date(own.started_on)}`,
         own.finished_on === undefined ? undefined : `finished ${names.date(own.finished_on)}`,
-        own.skip_reason === undefined ? undefined : `skipped because ${quoted(briefly(own.skip_reason))}`,
+        own.reason === undefined ? undefined : `because ${quoted(briefly(own.reason))}`,
         own.atomic === true ? "atomic" : undefined,
       ];
       return parts.filter((part) => part !== undefined).join(", ");
@@ -174,8 +175,8 @@ export function mutationWords(mutation: Mutation, names: Names): string {
     case "clear_pin":
       return `Unpin ${node(mutation.node)}`;
     case "transition": {
-      const move = typeof mutation.transition === "string" ? mutation.transition : "skip";
-      return `${upperFirst(move)} ${node(mutation.node)}`;
+      const move = moveOf(mutation.transition);
+      return move === "mark_done" ? `Mark ${node(mutation.node)} done` : `${upperFirst(move)} ${node(mutation.node)}`;
     }
     case "snooze":
       return `Snooze ${node(mutation.node)} until ${"date" in mutation.until ? names.date(mutation.until.date) : `${node(mutation.until.node)}${SNOOZE_NODE_TAIL}`}`;

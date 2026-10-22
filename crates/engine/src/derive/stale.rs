@@ -93,7 +93,12 @@ pub(crate) fn reasons(
     let Some(node) = document.nodes.get(key) else {
         return BTreeSet::new();
     };
-    let completed = match stored_state(document, node) {
+    let stored = stored_state(document, node);
+    if stored.skips_beneath(node.kind()) {
+        // A skip, or a group marked done, is not guarded: nothing it required can fail.
+        return BTreeSet::new();
+    }
+    let completed = match stored {
         State::Done => true,
         State::Decided => false,
         State::Skipped

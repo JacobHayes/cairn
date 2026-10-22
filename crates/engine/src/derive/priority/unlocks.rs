@@ -14,7 +14,7 @@ use super::super::Early;
 use super::super::blocking::Blocking;
 use super::super::dependencies::{Dependencies, EdgeClass, EdgeSet, Instant, NodeIndex, Point};
 use super::super::skip::Skips;
-use super::super::stored_state;
+use super::super::skips_beneath;
 use crate::graph::Graph;
 
 /// How an unsatisfied instant comes to be satisfied.
@@ -111,9 +111,10 @@ impl<'a> Simulation<'a> {
                     .filter(|edge| edge.class == EdgeClass::Gate)
                     .filter(|edge| unsatisfied(edge.requirement))
                     .count();
-                let skipped = graph.node(key).is_some_and(|stored| {
-                    skips.skipped(stored_state(graph.document(), stored), key)
-                });
+                let skipped = graph
+                    .node(key)
+                    .is_some_and(|stored| skips_beneath(graph.document(), stored))
+                    || skips.skipped_by(key).is_some();
                 let group = graph
                     .node(key)
                     .is_some_and(|stored| stored.kind() == NodeKind::Group);

@@ -175,6 +175,12 @@ function Body({ body }: { body: CardBody }) {
           )}
         </div>
       );
+    case "marked_done":
+      return (
+        <div className="node-body-line node-marked" data-testid="card-marked-done">
+          {body.keptPending ? "Kept work pending" : body.skipped === 0 ? "Marked done" : `Marked done \u00b7 ${String(body.skipped)} skipped`}
+        </div>
+      );
     case "depends":
       return (
         <Tip tip={body.text} kind="cut">

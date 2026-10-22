@@ -47,8 +47,8 @@ fn node_states(check: &GraphCheck<'_>, out: &mut Vec<Violation>) {
             Some(stored) if stored.atomic && !node.payload.placeholder() => {
                 "only a placeholder is marked atomic"
             }
-            Some(stored) if stored.skip_reason.is_some() != (stored.state == State::Skipped) => {
-                "a skipped node keeps the reason it was skipped for, and only a skipped node has one"
+            Some(stored) if stored.reason.is_some() != stored.state.skips_beneath(node.kind()) => {
+                "a skipped node or a group marked done keeps its reason, and no other node has one"
             }
             Some(_) => continue,
         };

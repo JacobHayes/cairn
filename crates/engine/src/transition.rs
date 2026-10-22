@@ -2,7 +2,8 @@
 //! states, to which. Answering a decision is its own mutation and its own row
 //! ([`answered`]); everything else is a [`Transition`]. Guards are not here: `has_artifact`
 //! and `broken_down` are checked on the graph a patch produces (the guards stage), and the
-//! guards that need derived state (relevance, `deps_done`) join with derive (2.4).
+//! guards that need derived state (relevance, `deps_done`) join with derive (2.4). Marking a
+//! group done is a skip-like terminal move: like a skip it is never guarded.
 
 use cairn_schema::{NodeKind, State, Transition};
 
@@ -17,6 +18,8 @@ pub enum Move {
     Complete,
     /// `skip` (a reason is required, and the mutation's type carries it).
     Skip,
+    /// `mark_done` (a group, with the reason the mutation's type carries).
+    MarkDone,
     /// `reopen`.
     Reopen,
     /// `answer` and `revise`.
@@ -25,11 +28,12 @@ pub enum Move {
 
 impl Move {
     /// Every move.
-    pub const ALL: [Move; 6] = [
+    pub const ALL: [Move; 7] = [
         Move::Start,
         Move::Stop,
         Move::Complete,
         Move::Skip,
+        Move::MarkDone,
         Move::Reopen,
         Move::Answer,
     ];
@@ -42,6 +46,7 @@ impl Move {
             Transition::Stop => Move::Stop,
             Transition::Complete => Move::Complete,
             Transition::Skip { .. } => Move::Skip,
+            Transition::MarkDone { .. } => Move::MarkDone,
             Transition::Reopen => Move::Reopen,
         }
     }
@@ -58,23 +63,24 @@ pub fn rows(kind: NodeKind, step: Move) -> &'static [(State, State)] {
             Move::Complete => &[(Todo, Done), (Active, Done)],
             Move::Skip => &[(Todo, Skipped), (Active, Skipped)],
             Move::Reopen => &[(Done, Todo), (Skipped, Todo)],
-            Move::Answer => &[],
+            Move::MarkDone | Move::Answer => &[],
         },
         NodeKind::Decision => match step {
             Move::Answer => &[(Open, Decided), (Decided, Decided)],
             Move::Skip => &[(Open, Skipped)],
             Move::Reopen => &[(Decided, Open), (Skipped, Open)],
-            Move::Start | Move::Stop | Move::Complete => &[],
+            Move::Start | Move::Stop | Move::Complete | Move::MarkDone => &[],
         },
         NodeKind::Milestone => match step {
             Move::Complete => &[(Pending, Done)],
             Move::Skip => &[(Pending, Skipped)],
             Move::Reopen => &[(Done, Pending), (Skipped, Pending)],
-            Move::Start | Move::Stop | Move::Answer => &[],
+            Move::Start | Move::Stop | Move::MarkDone | Move::Answer => &[],
         },
         NodeKind::Group => match step {
             Move::Skip => &[(Derived, Skipped)],
-            Move::Reopen => &[(Skipped, Derived)],
+            Move::MarkDone => &[(Derived, Done)],
+            Move::Reopen => &[(Skipped, Derived), (Done, Derived)],
             Move::Start | Move::Stop | Move::Complete | Move::Answer => &[],
         },
     }
@@ -110,7 +116,7 @@ pub fn is_guarded(kind: NodeKind, from: State, step: Move) -> bool {
     let guarded = match step {
         Move::Complete => true,
         Move::Answer => from == State::Open,
-        Move::Start | Move::Stop | Move::Skip | Move::Reopen => false,
+        Move::Start | Move::Stop | Move::Skip | Move::MarkDone | Move::Reopen => false,
     };
     guarded && next(kind, from, step).is_some()
 }

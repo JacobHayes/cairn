@@ -516,6 +516,13 @@ pub(crate) fn unexpanded(document: &Document, tree: &Tree, node: &Node<KeyRefs>)
     node.payload.placeholder() && !atomic && !tree.is_container(&node.key)
 }
 
+/// D1a: the node's stored state skips the unfinished work beneath it: a skipped node, or a
+/// group marked done.
+#[must_use]
+pub(crate) fn skips_beneath(document: &Document, node: &Node<KeyRefs>) -> bool {
+    stored_state(document, node).skips_beneath(node.kind())
+}
+
 /// Gating: the node is force-included.
 #[must_use]
 pub(crate) fn forced(document: &Document, key: &NodeKey) -> bool {

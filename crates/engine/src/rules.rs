@@ -60,6 +60,7 @@ fn move_name(step: Move) -> &'static str {
         Move::Stop => "stop",
         Move::Complete => "complete",
         Move::Skip => "skip",
+        Move::MarkDone => "mark_done",
         Move::Reopen => "reopen",
         Move::Answer => "answer",
     }

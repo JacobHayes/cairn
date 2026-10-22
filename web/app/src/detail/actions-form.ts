@@ -25,6 +25,7 @@ import type { Seen } from "./write.ts";
 /** What each form holds. */
 export interface FormValues {
   skip: string;
+  "mark-done": string;
   keep: string;
   include: string;
   bypass: string;
@@ -63,7 +64,7 @@ export type Drafted = {
 /** What is open: a form on a draft, or a panel. */
 export type Opened = Drafted | { case: PanelCase };
 
-const FORM_CASES: readonly FormCase[] = ["skip", "keep", "include", "bypass", "anyway", "snooze", "evidence", "edit-date"];
+const FORM_CASES: readonly FormCase[] = ["skip", "mark-done", "keep", "include", "bypass", "anyway", "snooze", "evidence", "edit-date"];
 const PANEL_CASES: readonly PanelCase[] = ["assign", "weight", "break-down"];
 
 /** A form opened on `value`, as drafted against `seen`. */
@@ -94,6 +95,7 @@ const isEvidenceDraft = (value: unknown): value is EvidenceDraft => isPlain(valu
 
 const valueReaders: { [K in FormCase]: (value: unknown) => value is FormValues[K] } = {
   skip: isText,
+  "mark-done": isText,
   keep: isText,
   include: isText,
   bypass: isText,

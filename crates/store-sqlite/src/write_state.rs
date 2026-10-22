@@ -123,11 +123,11 @@ fn node_state_put(id: &str, node: &NodeKey, state: &NodeState) -> Result<Stateme
         atomic,
         started_on,
         finished_on,
-        skip_reason,
+        reason,
     } = state;
     Ok(statement(
         "INSERT OR REPLACE INTO node_states (graph_id, node, state, provenance, atomic, \
-         started_on, finished_on, skip_reason) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8)",
+         started_on, finished_on, reason) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8)",
         vec![
             text(id),
             text(node),
@@ -136,7 +136,7 @@ fn node_state_put(id: &str, node: &NodeKey, state: &NodeState) -> Result<Stateme
             flag(*atomic),
             started_on.map_or(Value::Null, date),
             finished_on.map_or(Value::Null, date),
-            opt_text(skip_reason.as_ref()),
+            opt_text(reason.as_ref()),
         ],
     ))
 }

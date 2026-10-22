@@ -472,6 +472,8 @@ pub fn arb_node_derived() -> BoxedStrategy<NodeDerived> {
         (
             prop::option::of(arb_snooze_target()),
             prop::option::of(arb_node_key()),
+            prop::option::of(arb_node_key()),
+            prop::collection::vec(arb_node_key(), 0..2),
         ),
         arb_scores(),
         arb_display_state(),
@@ -486,7 +488,7 @@ pub fn arb_node_derived() -> BoxedStrategy<NodeDerived> {
                 participations,
                 stale,
                 dates,
-                (snoozed, snoozed_via),
+                (snoozed, snoozed_via, skipped_by, kept_work_pending),
                 (gravity, gravity_from, unlocks, unlocks_from, rank),
                 shown,
                 subtree,
@@ -496,7 +498,8 @@ pub fn arb_node_derived() -> BoxedStrategy<NodeDerived> {
                 NodeDerived {
                     relevance,
                     display_state: shown,
-                    effectively_skipped: flag(0),
+                    skipped_by,
+                    kept_work_pending,
                     blocked_by,
                     blocked_through,
                     actionable: flag(1),

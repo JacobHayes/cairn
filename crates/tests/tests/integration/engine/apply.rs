@@ -609,16 +609,13 @@ fn a_skip_keeps_its_reason_until_reopened() {
     let skipped = vendor_patch(&records, skip).unwrap();
     let stored = &vendor_graph(skipped.records()).state.nodes[&key("n_partner_led")];
     assert_eq!(
-        stored
-            .skip_reason
-            .as_ref()
-            .map(cairn_schema::Reason::as_str),
+        stored.reason.as_ref().map(cairn_schema::Reason::as_str),
         Some("No partner this time.")
     );
     let reopen = "- op: transition\n  node: n_partner_led\n  transition: reopen\n";
     let reopened = vendor_patch(skipped.records(), reopen).unwrap();
     assert_eq!(
-        vendor_graph(reopened.records()).state.nodes[&key("n_partner_led")].skip_reason,
+        vendor_graph(reopened.records()).state.nodes[&key("n_partner_led")].reason,
         None
     );
 }

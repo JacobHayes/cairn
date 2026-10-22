@@ -17,18 +17,7 @@ use rusqlite::Connection;
 use serde_json::Value;
 
 use crate::sql::SqlError;
-use crate::stored_json::column;
-
-/// Renames the key `from` of `object` to `to`, keeping its value.
-fn rename_key(object: &mut serde_json::Map<String, Value>, from: &str, to: &str) -> bool {
-    match object.remove(from) {
-        Some(value) => {
-            object.insert(to.to_owned(), value);
-            true
-        }
-        None => false,
-    }
-}
+use crate::stored_json::{column, rename_key};
 
 /// Whether `object` holds `key` with the string `expected`.
 fn holds(object: &serde_json::Map<String, Value>, key: &str, expected: &str) -> bool {

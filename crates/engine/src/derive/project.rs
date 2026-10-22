@@ -115,7 +115,14 @@ impl Derived {
         NodeDerived {
             relevance: self.relevance_explanation(graph, key),
             display_state: self.display_state(graph, key),
-            effectively_skipped: self.skips.skipped_by(key).is_some(),
+            skipped_by: self.skips.skipped_by(key).cloned(),
+            kept_work_pending: self
+                .skips
+                .kept_work(key)
+                .iter()
+                .filter(|kept| !blocking.satisfies(kept))
+                .cloned()
+                .collect(),
             blocked_by: self.blocked_by(key),
             blocked_through: self.blocked_through(graph, key),
             actionable: blocking.actionable(key),

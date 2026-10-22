@@ -247,6 +247,13 @@ pub enum Transition {
         /// Why.
         reason: Reason,
     },
+    // PRD: D1, D1a.
+    /// A group to `done`, with the reason that requires: it reads done, and the unfinished
+    /// work inside it reads skipped, as under a skip, until it is reopened.
+    MarkDone {
+        /// Why.
+        reason: Reason,
+    },
     // PRD: D1.
     /// Back to the initial state (always allowed).
     Reopen,

@@ -704,6 +704,8 @@ impl Shape {
         if let Some(stored) = document.state.nodes.get_mut(&key(index)) {
             let (start, finish) = match stored.state {
                 State::Active => (Some(day(started)), None),
+                // A group marked done has no performed dates.
+                State::Done if self.kinds[index] == NodeKind::Group => (None, None),
                 // Some work is completed straight from todo, with no start recorded.
                 State::Done => (
                     (seed.recorded.0 < 192).then_some(day(started)),
@@ -758,7 +760,8 @@ impl Shape {
         seed: &NodeSeed,
         state: State,
     ) -> Option<Bypass> {
-        let finished = matches!(state, State::Done | State::Decided);
+        let finished =
+            matches!(state, State::Done | State::Decided) && self.kinds[index] != NodeKind::Group;
         let pick = seed.dates.recorded.0 / 32;
         let (own, inherited) = match pick % 4 {
             1 => (true, false),
@@ -817,12 +820,13 @@ impl Shape {
                 State::Derived,
                 State::Derived,
                 State::Skipped,
+                State::Done,
             ],
         };
         assert!(options.iter().all(|state| state.legal_for(kind)));
         stored.state = options[usize::from(seed.state) % options.len()];
-        if stored.state == State::Skipped {
-            stored.skip_reason = Some(parse("Generated."));
+        if stored.state.skips_beneath(kind) {
+            stored.reason = Some(parse("Generated."));
         }
         let bypass = self.bypass(document, index, seed, stored.state);
         let state = &mut document.state;

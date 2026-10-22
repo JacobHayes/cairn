@@ -487,7 +487,8 @@
   color: var(--color-success);
 }
 
-.node-depends {
+.node-depends,
+.node-marked {
   color: var(--color-secondary);
 }
 

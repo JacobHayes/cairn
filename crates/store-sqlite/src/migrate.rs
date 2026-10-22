@@ -19,6 +19,7 @@ pub(crate) enum Step {
     Sql(&'static str),
     MilestoneDone,
     DeletedIds,
+    Reason,
 }
 
 /// The first migration this store applies.
@@ -27,7 +28,7 @@ const FIRST: u32 = 13;
 /// Every migration, numbered from [`FIRST`], in order. A migration is never edited once
 /// released; a change is a new one. It is a list of steps run in one transaction with its
 /// number.
-pub(crate) const MIGRATIONS: [(u32, &[Step]); 6] = [
+pub(crate) const MIGRATIONS: [(u32, &[Step]); 7] = [
     (
         FIRST,
         &[Step::Sql(include_str!("migrations/0013_schema.sql"))],
@@ -58,6 +59,13 @@ pub(crate) const MIGRATIONS: [(u32, &[Step]); 6] = [
         &[Step::Sql(include_str!(
             "migrations/0018_journey_owners.sql"
         ))],
+    ),
+    (
+        19,
+        &[
+            Step::Reason,
+            Step::Sql(include_str!("migrations/0019_reason.sql")),
+        ],
     ),
 ];
 
@@ -106,6 +114,7 @@ pub(crate) fn run(connection: &Connection) -> Result<(), StoreError> {
                 Step::Sql(sql) => connection.execute_batch(sql).map_err(SqlError::from),
                 Step::MilestoneDone => crate::to_done::run(connection),
                 Step::DeletedIds => crate::to_deleted_ids::run(connection),
+                Step::Reason => crate::to_reason::run(connection),
             })
             .and_then(|()| {
                 execute(

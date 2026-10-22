@@ -668,7 +668,7 @@ mod tests {
                         atomic: false,
                         started_on: None,
                         finished_on: None,
-                        skip_reason: None,
+                        reason: None,
                     },
                 },
             ),
