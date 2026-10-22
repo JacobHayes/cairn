@@ -26,19 +26,6 @@ export async function viewportOf(page: Page): Promise<{ x: number; y: number; zo
   return { x, y, zoom: Number(/scale\(([\d.]+)\)/.exec(style)?.[1] ?? 1) };
 }
 
-/** Waits for the viewport to stop moving (a layout change refits it with an animation). */
-export async function viewportSettled(page: Page): Promise<void> {
-  let last = "";
-  await expect
-    .poll(async () => {
-      const now = JSON.stringify(await viewportOf(page));
-      const still = now === last;
-      last = now;
-      return still;
-    })
-    .toBe(true);
-}
-
 /** In the page: the cards whose title is drawn on another number of lines than layout counted, and how many were looked at. */
 function titleLinesOff(): { checked: number; wrong: string[] } {
   const wrong: string[] = [];

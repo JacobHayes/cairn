@@ -12,9 +12,9 @@ import { type Locator, type Page } from "@playwright/test";
 import { checkpoint, expect, test } from "./test.ts";
 
 import { journeyName, setStatus, startJourney } from "./around.ts";
-import { viewportOf, viewportSettled } from "./canvas.ts";
+import { viewportOf } from "./canvas.ts";
 import { daysAfter, frontierKeys, listKeys, passOrder, select, setFrontier, withFrontier } from "./acting.ts";
-import { expectAddress, fresh, goTo, nodeCard, nodePanel, openAt, openFilter, openJourney, setDepth, setFade, whenSettled } from "./shell.ts";
+import { expectAddress, fresh, goTo, nodeCard, nodePanel, openAt, openFilter, openJourney, setDepth, setFade, settled, whenSettled } from "./shell.ts";
 import { closePopover, filterOf, ownAndPin, search, setCheck, setViewState, VIEWER } from "./view-state.ts";
 import { FIXED_TODAY } from "./views.ts";
 
@@ -217,23 +217,23 @@ async function stockViewAndChips(page: Page): Promise<void> {
   // The stock view: every depth, fitted to the whole graph.
   await expect(depth).toHaveAccessibleName("Depth: Actions");
   await expect(nodeCard(page, "n_plan")).toBeVisible();
-  await viewportSettled(page);
+  await settled(page);
   const opened = await viewportOf(page);
   await page.keyboard.press("f");
-  await viewportSettled(page);
+  await settled(page);
   expect(await viewportOf(page)).toEqual(opened);
   // A chip follows a switch of view and back; the pan is the view's own.
   await page.getByTestId("chip-frontier").click();
   await page.mouse.move(600, 500);
   await page.mouse.wheel(0, 150);
-  await viewportSettled(page);
+  await settled(page);
   await goTo(page, "list");
   await expectAddress(page, `${journeyBase(page)}?view=list&frontier=1`);
   await goTo(page, "graph");
   await expectAddress(page, `${journeyBase(page)}?view=graph&frontier=1`);
   await expect(page.getByTestId("chip-frontier")).toHaveAttribute("aria-pressed", "true");
   await expect(page.getByTestId("node-card").first()).toBeVisible();
-  await viewportSettled(page);
+  await settled(page);
   expect(await viewportOf(page)).toEqual(opened);
   // Back at the journey's landing, nothing is held: no chip, no pan.
   await page.evaluate(() => {
@@ -335,13 +335,13 @@ test("C10: Frontier highlights the list: every row stays, the frontier's rows ca
 
 test("C2, C9: a search narrows the graph to its matches and fits them; nothing matching offers Reset the view, which clears the search and the collapses", async ({ page }) => {
   await openJourney(page, "browser", "j_vendor_eval", "");
-  await viewportSettled(page);
+  await settled(page);
   const whole = await whenSettled(page, () => page.getByTestId("node-card").count());
   const fitted = await viewportOf(page);
   await search(page, "Partner");
   await expect(nodeCard(page, "n_partner_runs")).toBeVisible();
   await expect(nodeCard(page, "n_access")).toHaveCount(0);
-  await viewportSettled(page);
+  await settled(page);
   expect(await viewportOf(page)).not.toEqual(fitted);
   await search(page, "");
   await expectAddress(page, `${journeyBase(page)}?view=graph`);
@@ -476,14 +476,14 @@ async function fadeTicked(page: Page): Promise<boolean | undefined> {
 
 test("C2: Fade moves nothing: stepping the depth with Fade on keeps every card and the camera where Actions has them, and Hide returns to a layout of its own", async ({ page }) => {
   await openJourney(page, "browser", "j_vendor_eval", "");
-  await viewportSettled(page);
+  await settled(page);
   const cards = page.getByTestId("node-card");
   const place = () => whenSettled(page, () => nodeCard(page, "n_kickoff").evaluate((card) => [card.getAttribute("data-x"), card.getAttribute("data-y")]));
   const [count, there, camera] = [await whenSettled(page, () => cards.count()), await place(), await viewportOf(page)];
   await setFade(page, true);
   await setDepth(page, "Decisions");
   await expect(cards).toHaveCount(count);
-  await viewportSettled(page);
+  await settled(page);
   expect(await viewportOf(page)).toEqual(camera);
   // Hide at a shallower depth draws fewer cards; Fade again draws the Actions layout where it was.
   await setFade(page, false);

@@ -7,9 +7,9 @@ import type { Page } from "@playwright/test";
 
 import { checkpoint, expect, test } from "./test.ts";
 
-import { expectTitleLinesAsLaidOut, lineBetween, pointOn, viewportOf, viewportSettled } from "./canvas.ts";
+import { expectTitleLinesAsLaidOut, lineBetween, pointOn, viewportOf } from "./canvas.ts";
 import { journeyName, startJourney } from "./around.ts";
-import { goWithin, nodeCard, nodePanel, openJourney, setDepth, setFade, visit, whenSettled } from "./shell.ts";
+import { goWithin, nodeCard, nodePanel, openJourney, setDepth, setFade, settled, visit, whenSettled } from "./shell.ts";
 
 /** The open Filter counts what it hides beside its box, and showing the not relevant removes the count. */
 async function filterCountsWhatItHides(page: Page): Promise<void> {
@@ -55,7 +55,7 @@ async function expandsAndTraces(page: Page): Promise<void> {
 /** Hovering an edge says what it is; clicking it opens its card, which follows it to either end. */
 async function followsAnEdge(page: Page): Promise<void> {
   const edge = lineBetween(page, "n_access", "n_plan");
-  await viewportSettled(page);
+  await settled(page);
   const at = await pointOn(edge);
   await page.mouse.move(at.x, at.y);
   await expect(page.getByTestId("edge-hover")).toContainText("Test plan needs Environment access");
@@ -178,7 +178,7 @@ async function clearsAndBoxSelects(page: Page): Promise<void> {
   await page.goBack();
   await expect(page.getByTestId("selection-panel")).toHaveCount(0);
   await expect(page.getByTestId("node-detail")).toBeVisible();
-  await viewportSettled(page);
+  await settled(page);
   const [from, to] = await whenSettled(page, () => Promise.all([nodeCard(page, "n_purpose").boundingBox(), nodeCard(page, "n_who_owns").boundingBox()]));
   if (from === null || to === null) {
     throw new Error("the cards have no box");
@@ -205,7 +205,7 @@ async function emptyCanvasDeselects(page: Page): Promise<void> {
   await page.mouse.up();
   await expect(page).toHaveURL(/\/nodes\/n_reporting/);
   // A click straight after a pan is swallowed by the pan; wait for it to end.
-  await viewportSettled(page);
+  await settled(page);
   await page.mouse.click(corner.x, corner.y);
   await expect(page).not.toHaveURL(/\/nodes\//);
   await expect(page.getByTestId("card-mark")).toHaveCount(0);

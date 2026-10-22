@@ -10,8 +10,8 @@ import { expect, test } from "./test.ts";
 import { openRoute, pickVersion, publishDraft, routeMenuItem, versionSelect } from "./around.ts";
 import { formField, saveForm } from "./authoring.ts";
 import { publishVersionTwo } from "./proposals.ts";
-import { lineBetween, pointOn, viewportSettled } from "./canvas.ts";
-import { expectAddress, follow, goWithin, importRoute, nodeCard, open, setDepth, whenSettled } from "./shell.ts";
+import { lineBetween, pointOn } from "./canvas.ts";
+import { expectAddress, follow, goWithin, importRoute, nodeCard, open, setDepth, settled, whenSettled } from "./shell.ts";
 import { search } from "./view-state.ts";
 
 /** Opens a draft on the route being shown (a version) and waits for the draft view. */
@@ -247,7 +247,7 @@ test("C7, C19: a node of a published version is selected like a draft's: its add
 
 /** Clicks the line between two cards on the route canvas. */
 async function clickLine(page: Page, from: string, to: string): Promise<void> {
-  await viewportSettled(page);
+  await settled(page);
   const at = await pointOn(lineBetween(page, from, to));
   await page.mouse.click(at.x, at.y);
 }

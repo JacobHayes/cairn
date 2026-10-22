@@ -160,6 +160,42 @@ export function useWorking(): void {
   }, [root, id]);
 }
 
+let steps = 0;
+
+/**
+ * Counts each step it is given as the tab's work until the step ends: a move the page makes
+ * outside the reads, such as the canvas's fit, which React Flow runs on a later frame. A step
+ * still out when the component unmounts ends with it, so a step that never answers holds nothing.
+ */
+export function useWork(): (step: Promise<unknown>) => void {
+  const { root } = useSession();
+  const open = useRef(new Set<string>());
+  useEffect(() => {
+    const out = open.current;
+    return () => {
+      for (const id of out) {
+        root.send({ type: "rested", id });
+      }
+      out.clear();
+    };
+  }, [root]);
+  return useCallback(
+    (step: Promise<unknown>) => {
+      steps += 1;
+      const id = `step-${String(steps)}`;
+      open.current.add(id);
+      root.send({ type: "working", id });
+      const end = () => {
+        if (open.current.delete(id)) {
+          root.send({ type: "rested", id });
+        }
+      };
+      step.then(end, end);
+    },
+    [root],
+  );
+}
+
 /** The save the chip announces as it lands, for as long as its SAVED time runs. */
 export function useSavedAnnouncement(): { id: number; text: string } | undefined {
   const timing = useSelector(useSession().sync, (snapshot) => snapshot.context.timing);

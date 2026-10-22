@@ -6,10 +6,10 @@ import type { Page } from "@playwright/test";
 
 import { expect, test } from "./test.ts";
 
-import { expectTitleLinesAsLaidOut, viewportOf, viewportSettled } from "./canvas.ts";
+import { expectTitleLinesAsLaidOut, viewportOf } from "./canvas.ts";
 import { NEAR_ZOOM } from "../src/canvas/gestures.ts";
 import { containmentProblems } from "./containment.ts";
-import { nodeCard, open, openAt, whenSettled } from "./shell.ts";
+import { nodeCard, open, openAt, settled, whenSettled } from "./shell.ts";
 import { STRESS, publishStressJourney } from "./stress.ts";
 
 /** The walk's reach: every screen is looked at and every problem listed with the screen it is on, so one run shows them all. */
@@ -37,12 +37,12 @@ async function graphs({ page, look, check }: Walk): Promise<void> {
   await check("graph");
   await expect(page.getByTestId("node-card").first()).toBeVisible();
   await page.keyboard.press("f");
-  await viewportSettled(page);
+  await settled(page);
   await look("graph fitted");
   await page.setViewportSize({ width: 4200, height: 3200 });
   await check("graph");
   await page.keyboard.press("f");
-  await viewportSettled(page);
+  await settled(page);
   expect((await viewportOf(page)).zoom).toBeGreaterThanOrEqual(NEAR_ZOOM);
   await look("graph at the reading zoom");
   await expectTitleLinesAsLaidOut(page);
@@ -54,7 +54,7 @@ async function graphs({ page, look, check }: Walk): Promise<void> {
     }
   }
   await page.keyboard.press("f");
-  await viewportSettled(page);
+  await settled(page);
   await look("graph with the stages folded");
   await page.setViewportSize({ width: 1280, height: 720 });
 }
@@ -84,13 +84,13 @@ async function routeGraph({ page, look }: Walk): Promise<void> {
   await open(page, "browser", `/routes/${STRESS.route}?view=graph`);
   await expect(page.getByTestId("node-card").first()).toBeVisible();
   await page.keyboard.press("f");
-  await viewportSettled(page);
+  await settled(page);
   await look("the route's graph fitted");
   await page.setViewportSize({ width: 4200, height: 3200 });
   await open(page, "browser", `/routes/${STRESS.route}?view=graph`);
   await expect(page.getByTestId("node-card").first()).toBeVisible();
   await page.keyboard.press("f");
-  await viewportSettled(page);
+  await settled(page);
   expect((await viewportOf(page)).zoom).toBeGreaterThanOrEqual(NEAR_ZOOM);
   await look("the route's graph at the reading zoom");
   await expectTitleLinesAsLaidOut(page);

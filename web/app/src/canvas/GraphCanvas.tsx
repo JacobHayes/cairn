@@ -31,6 +31,7 @@ import { firstFitCards } from "./refit.ts";
 import { lineWaitWords } from "./words.ts";
 
 import { nodeTitle } from "../ui/gone.ts";
+import { useWork } from "../data/react.ts";
 
 const nodeTypes = { card: NodeCard };
 const edgeTypes = { line: EdgeLine };
@@ -199,11 +200,57 @@ function coveredBy(column: HTMLElement | null | undefined, canvas: HTMLElement |
   return sheet.height === 0 ? 0 : Math.max(0, canvas.getBoundingClientRect().bottom - sheet.top);
 }
 
-/** The padding a manual fit keeps, read when it runs: FIT_PADDING, and more at the bottom under the sheet or rail. */
-function useFitPadding(): () => typeof FIT_PADDING {
+/**
+ * Writes the canvas's size as it is now to the flow's store, which a fit and the room a move
+ * leaves are read from. React Flow learns a new size from its resize observer, which reports on
+ * the next frame the browser draws; a fit asked before that frame would fit the old size.
+ */
+function measureCanvas(store: ReturnType<typeof useStoreApi>): void {
+  const node = store.getState().domNode;
+  if (node !== null && node.offsetWidth > 0 && node.offsetHeight > 0) {
+    store.setState({ width: node.offsetWidth, height: node.offsetHeight });
+  }
+}
+
+/**
+ * Runs `move` on the next frame, counted as the tab's work until it has moved the view (a fit
+ * React Flow runs later still included) or is cancelled; returns the cancel.
+ */
+function onNextFrame(work: (step: Promise<unknown>) => void, move: () => Promise<unknown> | undefined): () => void {
+  let cancel: () => void = () => undefined;
+  work(
+    new Promise<unknown>((resolve) => {
+      const frame = requestAnimationFrame(() => {
+        resolve(move());
+      });
+      cancel = () => {
+        cancelAnimationFrame(frame);
+        resolve(undefined);
+      };
+    }),
+  );
+  return () => {
+    cancel();
+  };
+}
+
+/**
+ * A fit the viewer asks for (the `f` key, the Fit button, an expanded container): the whole graph,
+ * or `node` alone at no more than full size, measured when it runs and padded for the sheet or
+ * rail over the canvas's lower part. It answers once React Flow has run it, on a later frame.
+ */
+function useFit(): (node?: string) => Promise<unknown> {
   const sheet = useFrameState()?.inspector?.parentElement;
   const store = useStoreApi();
-  return useCallback(() => ({ ...FIT_PADDING, bottom: px(PAD.bottom + coveredBy(sheet, store.getState().domNode)) }), [sheet, store]);
+  const flow = useReactFlow();
+  return useCallback(
+    (node?: string) => {
+      measureCanvas(store);
+      const padding = { ...FIT_PADDING, bottom: px(PAD.bottom + coveredBy(sheet, store.getState().domNode)) };
+      return flow.fitView(node === undefined ? { ...FIT, padding } : { nodes: [{ id: node }], padding, maxZoom: 1 });
+    },
+    [sheet, store, flow],
+  );
 }
 
 /**
@@ -215,20 +262,22 @@ function useCenterAboveSheet(selected: string | undefined, layered: boolean): vo
   const flow = useReactFlow();
   const store = useStoreApi();
   const sheet = useFrameState()?.inspector?.parentElement;
+  const work = useWork();
   useEffect(() => {
     // Under a proposal's layer the rail's rows pick nodes the view may not show, in a column as on a sheet.
     if (selected === undefined || ((sheet === null || sheet === undefined || !isSheet(sheet)) && !layered)) {
       return undefined;
     }
     // After the commit that shows the sheet, so its height is there to read.
-    const frame = requestAnimationFrame(() => {
+    return onNextFrame(work, () => {
       // A card inside a container is placed relative to it: the flow knows where it is on the canvas.
       const card = flow.getInternalNode(selected);
       if (card === undefined) {
-        return;
+        return undefined;
       }
       const { x, y } = card.internals.positionAbsolute;
       const zoom = flow.getZoom();
+      measureCanvas(store);
       const { width, height, domNode } = store.getState();
       const covered = coveredBy(sheet, domNode);
       // The room the sheet and the controls leave. A card already whole inside it stays where it is, so its neighbours stay in view; one outside is moved by the least that brings it in (centred if it is larger than the room).
@@ -236,13 +285,8 @@ function useCenterAboveSheet(selected: string | undefined, layered: boolean): vo
       const view = flow.getViewport();
       const box = { left: view.x + x * zoom, top: view.y + y * zoom, width: (card.measured.width ?? 0) * zoom, height: (card.measured.height ?? 0) * zoom };
       const [dx, dy] = [shiftInto(box.left, box.width, room.left, room.right), shiftInto(box.top, box.height, room.top, room.bottom)];
-      if (dx !== 0 || dy !== 0) {
-        void flow.setViewport({ zoom, x: view.x + dx, y: view.y + dy });
-      }
+      return dx !== 0 || dy !== 0 ? flow.setViewport({ zoom, x: view.x + dx, y: view.y + dy }) : undefined;
     });
-    return () => {
-      cancelAnimationFrame(frame);
-    };
     // Picking a node moves the view; a revision's new placement of the same node does not.
   }, [selected]);
 }
@@ -250,8 +294,9 @@ function useCenterAboveSheet(selected: string | undefined, layered: boolean): vo
 /** A find centres its result, and an expand or collapse fits the container (5.1): once the card is drawn as asked. */
 function useReveal(reveal: Reveal | undefined, model: CanvasModel): void {
   const flow = useReactFlow();
-  const padding = useFitPadding();
+  const fitTo = useFit();
   const done = useRef<string | undefined>(undefined);
+  const work = useWork();
   useEffect(() => {
     if (reveal === undefined || done.current === reveal.id) {
       return undefined;
@@ -261,29 +306,26 @@ function useReveal(reveal: Reveal | undefined, model: CanvasModel): void {
     if (!ready) {
       return undefined;
     }
-    const frame = requestAnimationFrame(() => {
+    return onNextFrame(work, () => {
       done.current = reveal.id;
-      if (reveal.how === "centre") {
-        const card = flow.getInternalNode(reveal.key);
-        if (card !== undefined) {
-          const { x, y } = card.internals.positionAbsolute;
-          void flow.setCenter(x + (card.measured.width ?? 0) / 2, y + (card.measured.height ?? 0) / 2, { zoom: Math.max(flow.getZoom(), 0.6) });
-        }
-      } else {
-        void flow.fitView({ nodes: [{ id: reveal.key }], padding: padding(), maxZoom: 1 });
+      if (reveal.how !== "centre") {
+        return fitTo(reveal.key);
       }
+      const card = flow.getInternalNode(reveal.key);
+      if (card === undefined) {
+        return undefined;
+      }
+      const { x, y } = card.internals.positionAbsolute;
+      return flow.setCenter(x + (card.measured.width ?? 0) / 2, y + (card.measured.height ?? 0) / 2, { zoom: Math.max(flow.getZoom(), 0.6) });
     });
-    return () => {
-      cancelAnimationFrame(frame);
-    };
-  }, [reveal, model, flow, padding]);
+  }, [reveal, model, flow, fitTo, work]);
 }
 
 /** The canvas's own key: `f` fits the selection, or the whole graph with none. Depth's keys are the view's (screens/keys.ts). */
 function useCanvasKeys(props: GraphCanvasProps): void {
-  const flow = useReactFlow();
-  const padding = useFitPadding();
+  const fitTo = useFit();
   const { selected } = props;
+  const work = useWork();
   useEffect(() => {
     const onKey = (event: KeyboardEvent) => {
       // Not behind the key sheet (a modal dialog), where only its own keys act.
@@ -291,14 +333,14 @@ function useCanvasKeys(props: GraphCanvasProps): void {
         return;
       }
       if (event.key === "f") {
-        void flow.fitView(selected === undefined ? { ...FIT, padding: padding() } : { nodes: [{ id: selected }], padding: padding(), maxZoom: 1 });
+        work(fitTo(selected));
       }
     };
     document.addEventListener("keydown", onKey);
     return () => {
       document.removeEventListener("keydown", onKey);
     };
-  }, [flow, selected, padding]);
+  }, [fitTo, selected, work]);
 }
 
 /** The line under the pointer, and the chip that says what it is: where the pointer is only moves the chip, it never re-renders the cards. */
@@ -369,12 +411,14 @@ function useFirstFit(props: GraphCanvasProps, fit: number): void {
   const store = useStoreApi();
   const done = useRef(false);
   const target = firstFitCards(props.firstFit, props.model.cards);
+  const work = useWork();
   useEffect(() => {
     // The layer's rail is what the room is measured against, and its changes are what is framed: wait for both (an empty `firstFit` is the changes not yet known), so the cards are not framed under a sheet that is not there yet or before they are drawn.
     if (!initialized || !sized || done.current || (target !== undefined && sheet === undefined) || props.firstFit?.length === 0) {
       return;
     }
     done.current = true;
+    measureCanvas(store);
     const { width, height, domNode } = store.getState();
     // Where the inspector's sheet lies over the canvas's lower part, fit into what it leaves.
     const covered = coveredBy(sheet, domNode);
@@ -387,8 +431,8 @@ function useFirstFit(props: GraphCanvasProps, fit: number): void {
       void flow.setViewport(frame);
       return;
     }
-    void flow.fitView({ ...FIT, padding: { ...FIT_PADDING, bottom: px(PAD.bottom + covered) }, minZoom: minZoomOf(fit) });
-  }, [initialized, sized, flow, fit, target, sheet, store]);
+    work(flow.fitView({ ...FIT, padding: { ...FIT_PADDING, bottom: px(PAD.bottom + covered) }, minZoom: minZoomOf(fit) }));
+  }, [initialized, sized, flow, fit, target, sheet, store, work]);
 }
 
 /** The zoom, as `--z` on the canvas root, so a zoomed-out head can set its title to a readable size on screen without the cards re-rendering. */
@@ -542,10 +586,16 @@ function cardKeys(toggle: (key: string) => boolean, select: ((key: string) => vo
 
 /** The zoom buttons, a stack at the bottom left; Fit pads for the sheet or rail like the other fits. */
 function FitControls() {
-  const flow = useReactFlow();
-  const padding = useFitPadding();
+  const fitTo = useFit();
+  const work = useWork();
   return (
-    <Controls showInteractive={false} position="bottom-left" onFitView={() => void flow.fitView({ ...FIT, padding: padding() })} />
+    <Controls
+      showInteractive={false}
+      position="bottom-left"
+      onFitView={() => {
+        work(fitTo());
+      }}
+    />
   );
 }
 
