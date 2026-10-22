@@ -7,17 +7,24 @@
 //! not keep, since the UI routes by path: a screen's address loads the page, which shows
 //! that screen (decisions/2026-10-08-the-api-is-served-under-api-and-the-app-owns-the-rest.md).
 //!
+//! The web build holds each compressible file twice more, as `<file>.br` and `<file>.gz`,
+//! compressed once when the app is built (web/app/vite.config.ts), and a request is
+//! answered with the form its `Accept-Encoding` prefers (brotli, then gzip, else the file
+//! itself). Those companions are not served at their own paths. The page alone is
+//! compressed at startup, as it is stamped with the build's digest then.
+//!
 //! A binary with no web build, embedded or named, holds nothing, and `cairn serve` refuses
 //! to start rather than serve an API with no UI ([`router`]).
 
 use std::borrow::Cow;
 use std::fmt::{self, Write as _};
+use std::io::Write as _;
 #[cfg(feature = "web-dir")]
 use std::path::Path;
 
 use axum::Router;
-use axum::http::header::{CACHE_CONTROL, CONTENT_TYPE};
-use axum::http::{HeaderName, HeaderValue, Method, StatusCode, Uri};
+use axum::http::header::{ACCEPT_ENCODING, CACHE_CONTROL, CONTENT_ENCODING, CONTENT_TYPE, VARY};
+use axum::http::{HeaderMap, HeaderName, HeaderValue, Method, StatusCode, Uri};
 use axum::response::{IntoResponse, Response};
 use axum::routing::{MethodRouter, get};
 use sha2::{Digest as _, Sha256};
@@ -178,21 +185,32 @@ pub fn router(assets: &[Asset], build: &str) -> Result<Router, WebBuildMissing> 
                 "{INDEX} is missing: build it with `mise run build`"
             ))
         })?;
-    let page = Served::new(&stamped(page, build)?);
+    let page = stamped(page, build)?;
+    let page = Served::new(&page, Some(compressed_page(&page)));
     let mut router = Router::new()
         .route("/", page.clone().handler())
         .route(&format!("/{INDEX}"), page.clone().handler());
-    for asset in assets.iter().filter(|asset| asset.path != INDEX) {
-        router = router.route(&format!("/{}", asset.path), Served::new(asset).handler());
+    for asset in assets
+        .iter()
+        .filter(|asset| asset.path != INDEX && companion_of(asset, assets).is_none())
+    {
+        let companions = Companions {
+            brotli: find(assets, &format!("{}{BROTLI}", asset.path)),
+            gzip: find(assets, &format!("{}{GZIP}", asset.path)),
+        };
+        router = router.route(
+            &format!("/{}", asset.path),
+            Served::new(asset, Some(companions)).handler(),
+        );
     }
-    let screen = move |method: Method, uri: Uri| {
+    let screen = move |method: Method, uri: Uri, headers: HeaderMap| {
         let page = page.clone();
         async move {
             let bundle = uri.path().starts_with(&format!("/{BUNDLES}"));
             if bundle || !(method == Method::GET || method == Method::HEAD) {
                 StatusCode::NOT_FOUND.into_response()
             } else {
-                page.response()
+                page.response(&headers)
             }
         }
     };
@@ -216,15 +234,61 @@ fn stamped(page: &Asset, build: &str) -> Result<Asset, WebBuildMissing> {
 /// Where the hashed bundles sit in the build.
 const BUNDLES: &str = "assets/";
 
-/// One asset as it is answered: its media type and caching, and its bytes.
+/// The suffixes of an asset's companions: the same bytes compressed.
+const BROTLI: &str = ".br";
+const GZIP: &str = ".gz";
+
+fn find(assets: &[Asset], path: &str) -> Option<Cow<'static, [u8]>> {
+    assets
+        .iter()
+        .find(|asset| asset.path == path)
+        .map(|asset| asset.bytes.clone())
+}
+
+/// The asset `asset` is a compressed companion of, when it is one: a `.br` or `.gz` file
+/// whose uncompressed file is in the build too.
+fn companion_of<'a>(asset: &Asset, assets: &'a [Asset]) -> Option<&'a Asset> {
+    let base = asset
+        .path
+        .strip_suffix(BROTLI)
+        .or_else(|| asset.path.strip_suffix(GZIP))?;
+    assets.iter().find(|other| other.path == base)
+}
+
+/// An asset's compressed forms, where it has them.
+struct Companions {
+    brotli: Option<Cow<'static, [u8]>>,
+    gzip: Option<Cow<'static, [u8]>>,
+}
+
+/// The stamped page, compressed (it is made at startup, so it has no companions in the build).
+fn compressed_page(page: &Asset) -> Companions {
+    let mut brotli = Vec::new();
+    {
+        let mut writer = brotli::CompressorWriter::new(&mut brotli, 4096, 11, 22);
+        // Writing to a Vec cannot fail.
+        let _ = writer.write_all(&page.bytes);
+    }
+    let mut gzip = flate2::write::GzEncoder::new(Vec::new(), flate2::Compression::best());
+    let _ = gzip.write_all(&page.bytes);
+    Companions {
+        brotli: Some(Cow::Owned(brotli)),
+        gzip: gzip.finish().ok().map(Cow::Owned),
+    }
+}
+
+/// One asset as it is answered: its media type and caching, and its bytes in each form it
+/// has.
 #[derive(Clone)]
 struct Served {
     headers: [(HeaderName, HeaderValue); 2],
     bytes: Cow<'static, [u8]>,
+    brotli: Option<Cow<'static, [u8]>>,
+    gzip: Option<Cow<'static, [u8]>>,
 }
 
 impl Served {
-    fn new(asset: &Asset) -> Self {
+    fn new(asset: &Asset, companions: Option<Companions>) -> Self {
         let cache = if asset.path.starts_with(BUNDLES) {
             "public, max-age=31536000, immutable"
         } else {
@@ -232,23 +296,83 @@ impl Served {
         };
         let media_type = HeaderValue::from_str(&asset.media_type)
             .unwrap_or(HeaderValue::from_static("application/octet-stream"));
+        let companions = companions.unwrap_or(Companions {
+            brotli: None,
+            gzip: None,
+        });
         Self {
             headers: [
                 (CONTENT_TYPE, media_type),
                 (CACHE_CONTROL, HeaderValue::from_static(cache)),
             ],
             bytes: asset.bytes.clone(),
+            brotli: companions.brotli,
+            gzip: companions.gzip,
         }
     }
 
-    fn response(&self) -> Response {
-        (self.headers.clone(), self.bytes.clone()).into_response()
+    /// The asset in the form `request` accepts: brotli, else gzip, else as it is. An asset
+    /// with other forms says so in `Vary`, so a cache keeps each apart.
+    fn response(&self, request: &HeaderMap) -> Response {
+        let accepted = accepted_encodings(request);
+        let (encoding, bytes) = match (&self.brotli, &self.gzip) {
+            (Some(bytes), _) if accepted.contains(&"br") => (Some("br"), bytes),
+            (_, Some(bytes)) if accepted.contains(&"gzip") => (Some("gzip"), bytes),
+            _ => (None, &self.bytes),
+        };
+        let mut response = (self.headers.clone(), bytes.clone()).into_response();
+        if self.brotli.is_some() || self.gzip.is_some() {
+            response
+                .headers_mut()
+                .insert(VARY, HeaderValue::from_static("accept-encoding"));
+        }
+        if let Some(encoding) = encoding {
+            response
+                .headers_mut()
+                .insert(CONTENT_ENCODING, HeaderValue::from_static(encoding));
+        }
+        response
     }
 
     fn handler(self) -> MethodRouter {
-        get(move || {
+        get(move |headers: HeaderMap| {
             let served = self.clone();
-            async move { served.response() }
+            async move { served.response(&headers) }
         })
     }
+}
+
+/// The content codings (`br`, `gzip`) a request's `Accept-Encoding` allows: listed by
+/// name or by `*`, and not given a quality of 0.
+fn accepted_encodings(request: &HeaderMap) -> Vec<&'static str> {
+    let mut accepted = Vec::new();
+    let mut refused = Vec::new();
+    for value in request.get_all(ACCEPT_ENCODING) {
+        for item in value
+            .to_str()
+            .unwrap_or_default()
+            .to_ascii_lowercase()
+            .split(',')
+        {
+            let mut parts = item.split(';');
+            let name = parts.next().unwrap_or_default().trim().to_owned();
+            let weight = parts
+                .filter_map(|parameter| parameter.trim().strip_prefix("q="))
+                .find_map(|weight| weight.trim().parse::<f32>().ok())
+                .unwrap_or(1.0);
+            let target = if weight > 0.0 {
+                &mut accepted
+            } else {
+                &mut refused
+            };
+            target.push(name);
+        }
+    }
+    ["br", "gzip"]
+        .into_iter()
+        .filter(|coding| {
+            !refused.iter().any(|name| name == coding)
+                && accepted.iter().any(|name| name == coding || name == "*")
+        })
+        .collect()
 }

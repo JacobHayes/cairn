@@ -7,7 +7,9 @@
 // server runs the server host when it proxies to one and the in-browser host when it does
 // not; `vite build` makes the build the binary embeds, on the server host, and `vite build
 // --mode demo` the static demo site, on the in-browser host.
-import { readFileSync } from "node:fs";
+import { readdirSync, readFileSync, statSync, writeFileSync } from "node:fs";
+import { join } from "node:path";
+import { brotliCompressSync, constants, gzipSync } from "node:zlib";
 import { fileURLToPath } from "node:url";
 
 import react from "@vitejs/plugin-react";
@@ -43,6 +45,42 @@ function fontLicense(): Plugin {
   };
 }
 
+/**
+ * The server answers with the form a request accepts (crates/cairn/src/assets.rs), so the
+ * build writes each compressible file's brotli and gzip forms beside it, once, as `<file>.br`
+ * and `<file>.gz`; a form no smaller than the file is not written. Fingerprinted files and the
+ * page alike; the server stamps the page and compresses that itself.
+ */
+function precompress(): Plugin {
+  const COMPRESSIBLE = /\.(js|css|html|wasm|svg|json|txt|map|xml)$/;
+  const write = (directory: string): void => {
+    for (const name of readdirSync(directory)) {
+      const path = join(directory, name);
+      if (statSync(path).isDirectory()) {
+        write(path);
+      } else if (COMPRESSIBLE.test(name)) {
+        const bytes = readFileSync(path);
+        const forms: [string, Buffer][] = [
+          [".br", brotliCompressSync(bytes, { params: { [constants.BROTLI_PARAM_QUALITY]: 11, [constants.BROTLI_PARAM_SIZE_HINT]: bytes.length } })],
+          [".gz", gzipSync(bytes, { level: 9 })],
+        ];
+        for (const [suffix, form] of forms) {
+          if (form.length < bytes.length) writeFileSync(path + suffix, form);
+        }
+      }
+    }
+  };
+  let outDir = "";
+  return {
+    name: "cairn:precompress",
+    apply: "build",
+    configResolved: (config) => {
+      outDir = join(config.root, config.build.outDir);
+    },
+    closeBundle: () => { write(outDir); },
+  };
+}
+
 /** Writes the theme's storage key into the page's inline script (src/ui/themeKey.ts is its one source). */
 function themeKey(): Plugin {
   return { name: "cairn:theme-key", transformIndexHtml: (html) => html.replaceAll("__THEME_KEY__", THEME_KEY) };
@@ -67,7 +105,7 @@ export default defineConfig(({ command, mode }) => ({
     __CAIRN_HOST__: JSON.stringify(command === "serve" ? (server === undefined ? "browser" : "server") : mode === "demo" ? "browser" : "server"),
   },
   root: fileURLToPath(new URL(".", import.meta.url)),
-  plugins: [react(), fontLicense(), themeKey()],
+  plugins: [react(), fontLicense(), themeKey(), ...(mode === "demo" ? [] : [precompress()])],
   resolve: { alias: [{ find: "@design", replacement: DESIGN }, { find: /^.*\/generated\/cairn_wasm\.js$/, replacement: `${BINDGEN}/cairn_wasm.js` }] },
   logLevel: "warn",
   // `mise run build:web` writes dist/build/, which the binary embeds (crates/cairn/src/assets.rs),

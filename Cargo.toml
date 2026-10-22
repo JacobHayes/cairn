@@ -92,6 +92,9 @@ serde-saphyr = "2.0.0"
 serde_json = { version = "1.0", features = ["float_roundtrip"] }
 serde_path_to_error = "0.1.20"
 sha2 = "0.11.0"
+# Compresses the stamped page at startup (the rest of the web build is compressed when built).
+brotli = { version = "8", default-features = false, features = ["std"] }
+flate2 = "1"
 # The store backends (ARCHITECTURE, Backends): rusqlite with SQLite bundled (compiled from
 # its amalgamation, so every build has the same SQLite whatever the host has) and its
 # prepared-statement cache; tokio for the SQLite backend's waits for a connection alone.

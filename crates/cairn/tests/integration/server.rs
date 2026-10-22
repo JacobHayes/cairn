@@ -121,6 +121,120 @@ mod in_process {
         assert_eq!(health, 200);
     }
 
+    /// A server whose build holds a bundle with brotli and gzip companions, and the bundle's
+    /// text.
+    async fn serve_compressed_bundle() -> (std::net::SocketAddr, String) {
+        use std::io::Write as _;
+        let text = "export const answer = 42;\n".repeat(200);
+        let mut brotli = Vec::new();
+        brotli::CompressorWriter::new(&mut brotli, 4096, 5, 22)
+            .write_all(text.as_bytes())
+            .unwrap();
+        let mut gzip = flate2::write::GzEncoder::new(Vec::new(), flate2::Compression::fast());
+        gzip.write_all(text.as_bytes()).unwrap();
+        let mut assembly = support::assembly(Arc::new(InProcessNotifier::new()));
+        for (path, bytes) in [
+            ("assets/big-1a2b.js", text.clone().into_bytes()),
+            ("assets/big-1a2b.js.br", brotli),
+            ("assets/big-1a2b.js.gz", gzip.finish().unwrap()),
+        ] {
+            assembly.assets.push(cairn::assets::Asset {
+                path: path.to_owned(),
+                bytes: Cow::Owned(bytes),
+                media_type: "text/javascript".to_owned(),
+            });
+        }
+        let config = support::config(&support::dev_provider(None));
+        let address = support::serve(root::app(&config, assembly).unwrap()).await;
+        (address, text)
+    }
+
+    fn header(reply: &support::Reply, name: &str) -> Option<String> {
+        reply.head.lines().skip(1).find_map(|line| {
+            let (found, value) = line.split_once(':')?;
+            found
+                .eq_ignore_ascii_case(name)
+                .then(|| value.trim().to_owned())
+        })
+    }
+
+    /// A request accepting brotli gets the brotli form with its encoding named and a `Vary`
+    /// on the request header; gzip is the next choice, and a request accepting neither (or
+    /// refusing brotli) gets the file as it is. The companions are not files of their own.
+    #[tokio::test]
+    async fn an_asset_is_answered_in_the_best_form_the_request_accepts() {
+        use std::io::Read as _;
+        let (address, text) = serve_compressed_bundle().await;
+        let path = "/assets/big-1a2b.js";
+        let ask = |accept: &'static str| async move {
+            let headers = [("accept-encoding", accept)];
+            send(address, "GET", PUBLIC_HOST, path, &headers, None).await
+        };
+
+        let brotli = ask("gzip, br").await;
+        assert_eq!(header(&brotli, "content-encoding").as_deref(), Some("br"));
+        assert_eq!(header(&brotli, "vary").as_deref(), Some("accept-encoding"));
+        assert_eq!(
+            header(&brotli, "cache-control").as_deref(),
+            Some("public, max-age=31536000, immutable")
+        );
+        assert_eq!(
+            header(&brotli, "content-type").as_deref(),
+            Some("text/javascript")
+        );
+        let mut decoded = String::new();
+        brotli::Decompressor::new(brotli.body.as_slice(), 4096)
+            .read_to_string(&mut decoded)
+            .unwrap();
+        assert_eq!(decoded, text);
+        assert!(brotli.body.len() < text.len());
+
+        let gzip = ask("gzip;q=0.5, deflate").await;
+        assert_eq!(header(&gzip, "content-encoding").as_deref(), Some("gzip"));
+        let mut decoded = String::new();
+        flate2::read::GzDecoder::new(gzip.body.as_slice())
+            .read_to_string(&mut decoded)
+            .unwrap();
+        assert_eq!(decoded, text);
+
+        for accept in [
+            "identity",
+            "br;q=0, gzip;q=0",
+            "BR;Q=0, GZIP;Q=0",
+            "deflate",
+        ] {
+            let plain = ask(accept).await;
+            assert_eq!(header(&plain, "content-encoding"), None, "{accept}");
+            assert_eq!(header(&plain, "vary").as_deref(), Some("accept-encoding"));
+            assert_eq!(plain.text(), text, "{accept}");
+        }
+        let unasked = send(address, "GET", PUBLIC_HOST, path, &[], None).await;
+        assert_eq!(header(&unasked, "content-encoding"), None);
+        assert_eq!(unasked.text(), text);
+
+        let companion = get(address, PUBLIC_HOST, "/assets/big-1a2b.js.br").await;
+        assert_eq!(companion.status, 404);
+    }
+
+    /// The page is compressed too, though it is stamped when the server starts.
+    #[tokio::test]
+    async fn the_page_is_answered_in_the_form_the_request_accepts() {
+        use std::io::Read as _;
+        let (address, _) = serve_compressed_bundle().await;
+        let plain = get(address, PUBLIC_HOST, "/").await;
+        let headers = [("accept-encoding", "br")];
+        let compressed = send(address, "GET", PUBLIC_HOST, "/screen/path", &headers, None).await;
+        assert_eq!(
+            header(&compressed, "content-encoding").as_deref(),
+            Some("br")
+        );
+        let mut decoded = String::new();
+        brotli::Decompressor::new(compressed.body.as_slice(), 4096)
+            .read_to_string(&mut decoded)
+            .unwrap();
+        assert_eq!(decoded, plain.text());
+    }
+
     /// What a request reached.
     #[derive(Debug, PartialEq, Eq)]
     enum Reached {

@@ -52,6 +52,8 @@ serde.workspace = true
 serde_json.workspace = true
 # The web build's digest, which the page and every response are stamped with (src/assets.rs).
 sha2.workspace = true
+brotli.workspace = true
+flate2.workspace = true
 socket2.workspace = true
 tokio = { workspace = true, features = ["macros", "net", "rt-multi-thread", "signal", "sync", "time"] }
 toml.workspace = true
