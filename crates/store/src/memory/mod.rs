@@ -220,7 +220,7 @@ impl State {
                         let users = self.domains.graphs_using(route);
                         for graph in backend::outside_deleted(users, &shape.deletes) {
                             conflicts.push(RevisionConflict {
-                                of: referencing_domain(&graph),
+                                of: RevisionOf::Domain(graph.domain()),
                                 expected: Revision::NONE,
                                 current: self.domains.graph_revision(&graph),
                             });
@@ -239,7 +239,7 @@ impl State {
                 };
                 if outside {
                     conflicts.push(RevisionConflict {
-                        of: referencing_domain(&graph),
+                        of: RevisionOf::Domain(graph.domain()),
                         expected: Revision::NONE,
                         current: self.domains.graph_revision(&graph),
                     });
@@ -591,14 +591,4 @@ impl ConversationStore for MemoryStore {
     async fn remove_conversation(&self, id: &ConversationId) -> Result<bool, StoreError> {
         Ok(self.state().outside.remove_conversation(id))
     }
-}
-
-/// The domain a graph belongs to, as a revision's address.
-fn referencing_domain(graph: &GraphId) -> RevisionOf {
-    RevisionOf::Domain(match graph {
-        GraphId::Journey(journey) => Domain::Journey(journey.clone()),
-        GraphId::RouteDraft(route) | GraphId::RouteVersion { route, .. } => {
-            Domain::Route(route.clone())
-        }
-    })
 }

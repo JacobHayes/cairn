@@ -278,17 +278,15 @@ fn check_revisions(
         };
         let referencing = crate::queries::referencing(connection, identities)?;
         for graph in backend::outside_deleted(referencing, &shape.deletes) {
-            let (domain, outside) = match (&graph, allowed) {
-                (GraphId::Journey(journey), Some(named)) => {
-                    (Domain::Journey(journey.clone()), !named.contains(journey))
-                }
-                (GraphId::Journey(journey), None) => (Domain::Journey(journey.clone()), true),
-                (GraphId::RouteDraft(route) | GraphId::RouteVersion { route, .. }, allowed) => {
-                    (Domain::Route(route.clone()), allowed.is_none())
+            let outside = match (&graph, allowed) {
+                (GraphId::Journey(journey), Some(named)) => !named.contains(journey),
+                (GraphId::Journey(_), None) => true,
+                (GraphId::RouteDraft(_) | GraphId::RouteVersion { .. }, allowed) => {
+                    allowed.is_none()
                 }
             };
             if outside {
-                let of = RevisionOf::Domain(domain);
+                let of = RevisionOf::Domain(graph.domain());
                 let now = load::revision_of(connection, &of)?;
                 conflicts.push(RevisionConflict {
                     of,

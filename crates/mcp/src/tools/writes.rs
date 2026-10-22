@@ -4,8 +4,6 @@
 //! one mutation each; `apply_patch` takes any domain patch; the route tools open and publish
 //! a draft and import a route file; `manage_identity` writes the deployment.
 
-use std::collections::BTreeMap;
-
 use cairn_schema::{
     AnswerValue, Date, Identity, IdentityKey, IdentitySet, JourneyId, KeyRefs, KindKey, Lineage,
     Markdown, Mutation, Mutations, NodeKey, OverrideKind, ParticipationSource, Patch, PatchId,
@@ -13,7 +11,6 @@ use cairn_schema::{
     Transition, from_yaml,
 };
 use cairn_service::{Call, DomainPatch};
-use cairn_store::{JourneyQuery, PageSize};
 
 use schemars::JsonSchema;
 use serde::Deserialize;
@@ -253,7 +250,7 @@ impl ToolSet {
                 let referencing = std::iter::once(survivor.clone())
                     .chain(merged.iter().cloned())
                     .collect();
-                let journeys = self.revisions_referencing(referencing).await?;
+                let journeys = self.service.merge_revisions(referencing).await?;
                 Mutation::MergeIdentities {
                     survivor,
                     merged,
@@ -271,37 +268,6 @@ impl ToolSet {
             vec![mutation],
             arguments.note,
         )
-    }
-
-    /// Every journey referring to any of `identities`, directly or through an alias, at its
-    /// current revision: one index read per page of journeys.
-    async fn revisions_referencing(
-        &self,
-        identities: std::collections::BTreeSet<IdentityKey>,
-    ) -> Result<BTreeMap<JourneyId, Revision>, ToolError> {
-        let mut found = BTreeMap::new();
-        let mut query = JourneyQuery {
-            referencing: Some(identities),
-            size: PageSize::MAX,
-            ..JourneyQuery::default()
-        };
-        loop {
-            let page = self.service.journeys(&query).await?;
-            let count = found.len();
-            found.extend(
-                page.items
-                    .into_iter()
-                    .map(|summary| (summary.id, summary.revision)),
-            );
-            match page.next {
-                Some(after) => {
-                    // The index pages strictly forward, so this ends.
-                    assert!(found.len() > count, "a page that continues holds a journey");
-                    query.after = Some(after);
-                }
-                None => return Ok(found),
-            }
-        }
     }
 }
 

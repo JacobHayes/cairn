@@ -53,6 +53,45 @@ pub struct IdentityReferences {
 }
 
 impl Service {
+    /// E6, E7: every journey referring to any of `identities`, directly or through an alias, at
+    /// its current revision: the set a merge of them names, which the store checks at commit.
+    ///
+    /// # Errors
+    ///
+    /// When the store fails.
+    pub async fn merge_revisions(
+        &self,
+        identities: BTreeSet<IdentityKey>,
+    ) -> Result<BTreeMap<JourneyId, Revision>, ServiceError> {
+        let journeys = self.journeys_referring_to(identities).await?;
+        Ok(journeys
+            .into_iter()
+            .map(|summary| (summary.id, summary.revision))
+            .collect())
+    }
+
+    /// The index read behind both: every journey referring to any of `identities`, a page at
+    /// a time.
+    async fn journeys_referring_to(
+        &self,
+        identities: BTreeSet<IdentityKey>,
+    ) -> Result<Vec<JourneySummary>, ServiceError> {
+        let mut journeys = Vec::new();
+        let mut query = JourneyQuery {
+            referencing: Some(identities),
+            size: PageSize::MAX,
+            ..JourneyQuery::default()
+        };
+        loop {
+            let page = self.store.journeys(&query).await?;
+            journeys.extend(page.items);
+            match page.next {
+                Some(after) => query.after = Some(after),
+                None => return Ok(journeys),
+            }
+        }
+    }
+
     /// E6: the journeys and routes referring to the identity `identity`, or none when the
     /// deployment has no such identity. Authoritative: the store's exact references over every
     /// graph (journeys, route drafts and published versions), the same set a delete is
@@ -73,20 +112,9 @@ impl Service {
             .store
             .graphs_referencing(&BTreeSet::from([identity.clone()]))
             .await?;
-        let mut journeys = Vec::new();
-        let mut query = JourneyQuery {
-            referencing: Some(BTreeSet::from([identity.clone()])),
-            size: PageSize::MAX,
-            ..JourneyQuery::default()
-        };
-        loop {
-            let page = self.store.journeys(&query).await?;
-            journeys.extend(page.items);
-            match page.next {
-                Some(after) => query.after = Some(after),
-                None => break,
-            }
-        }
+        let journeys = self
+            .journeys_referring_to(BTreeSet::from([identity.clone()]))
+            .await?;
         let mut drafts = BTreeSet::new();
         let mut versions: BTreeMap<RouteId, Vec<VersionNumber>> = BTreeMap::new();
         for graph in &graphs {

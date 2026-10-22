@@ -872,8 +872,20 @@ pub async fn text_search_hits_names_nodes_notes_and_resources<B: Backend>(backen
         "resources": [
             {"key": "a_tip", "title": "Hint", "tip": "Reuse last quarter's REVIEW."},
             {"key": "a_link", "reference": "https://example.org/review-guide"},
+            {"key": "a_tpl", "template": "https://example.org/starter-kit"},
+            {"key": "a_ex", "example": "https://example.org/finished-sample"},
+            {"key": "a_msg", "message_draft": "Dear team, the zebra-launch is ready."},
         ],
     }));
+    // A link of each type: an annotation is searched by its written text, whatever its type.
+    let link = |key: &str, field: &str, url: &str| -> cairn_schema::Annotation {
+        serde_json::from_value(json!({
+            "body": {"key": key, "node": "n_task", field: url},
+            "created_by": "u_tester",
+            "created_at": build::at(0),
+        }))
+        .unwrap()
+    };
     let create = journey_patch("p_one", "j_one", 0).event(
         EventType::JourneyCreated,
         Subject::Journey(id("j_one")),
@@ -883,6 +895,30 @@ pub async fn text_search_hits_names_nodes_notes_and_resources<B: Backend>(backen
             put_in(
                 &graph,
                 GraphRecord::Annotation(build::note("a_note", None, "Reviewed twice.")),
+            ),
+            put_in(
+                &graph,
+                GraphRecord::Annotation(link(
+                    "a_art",
+                    "artifact",
+                    "https://example.org/output-bundle",
+                )),
+            ),
+            put_in(
+                &graph,
+                GraphRecord::Annotation(link(
+                    "a_ref",
+                    "reference",
+                    "https://example.org/reference-shelf",
+                )),
+            ),
+            put_in(
+                &graph,
+                GraphRecord::Annotation(link(
+                    "a_chat",
+                    "conversation",
+                    "https://example.org/chat-thread",
+                )),
             ),
         ],
     );
@@ -915,6 +951,14 @@ pub async fn text_search_hits_names_nodes_notes_and_resources<B: Backend>(backen
             vec![SearchHit::NodeDescription(node_key("n_task"))],
         ),
         ("hint", vec![resource("a_tip")]),
+        ("starter-kit", vec![resource("a_tpl")]),
+        ("finished-sample", vec![resource("a_ex")]),
+        ("zebra-launch", vec![resource("a_msg")]),
+        ("output-bundle", vec![SearchHit::Annotation(id("a_art"))]),
+        ("reference-shelf", vec![SearchHit::Annotation(id("a_ref"))]),
+        ("chat-thread", vec![SearchHit::Annotation(id("a_chat"))]),
+        ("starter-kitt", vec![]),
+        ("zebra-launches", vec![]),
         ("nowhere", vec![]),
     ];
     for (text, expected) in cases {
@@ -1108,6 +1152,25 @@ pub async fn proposal_listings_hold_each_scope_newest_first_with_counts<B: Backe
         (2, Applied),
     )
     .await;
+    // Mine on a route and on the deployment wait on me; an agent's draft for a route does not,
+    // since only a journey's references make an agent's draft mine.
+    drafted(&store, "pr_10", &route("r_one"), ("u_me", None), (8, Open)).await;
+    drafted(
+        &store,
+        "pr_11",
+        &Domain::Deployment,
+        ("u_me", None),
+        (9, Open),
+    )
+    .await;
+    drafted(
+        &store,
+        "pr_12",
+        &route("r_one"),
+        ("u_other", Some("ag_x")),
+        (10, Open),
+    )
+    .await;
 
     let waiting = ProposalScope::Waiting {
         user: id("u_me"),
@@ -1120,11 +1183,14 @@ pub async fn proposal_listings_hold_each_scope_newest_first_with_counts<B: Backe
         ),
         (ProposalScope::Destination(journey("j_done")), vec!["pr_3"]),
         (ProposalScope::Destination(route("r_new")), vec!["pr_7"]),
-        (ProposalScope::Destination(Domain::Deployment), vec!["pr_8"]),
+        (
+            ProposalScope::Destination(Domain::Deployment),
+            vec!["pr_11", "pr_8"],
+        ),
         (ProposalScope::Destination(journey("j_nothing")), vec![]),
         (ProposalScope::CreatingJourneys, vec!["pr_5"]),
         (ProposalScope::CreatingRoutes, vec!["pr_7"]),
-        (waiting, vec!["pr_4", "pr_1"]),
+        (waiting, vec!["pr_11", "pr_10", "pr_4", "pr_1"]),
     ];
     for (scope, expected) in cases {
         for size in [1, 2, 200] {

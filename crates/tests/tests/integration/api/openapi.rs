@@ -104,8 +104,17 @@ mod in_process {
     /// proposals by (the API addresses one under its destination), the arrival every
     /// authenticated request makes before its handler, and what a patch would write, which
     /// the assistant's write wrapper reads in process (a client is told it in a stale
-    /// answer, so no endpoint serves it).
-    const NOT_OPERATIONS: [&str; 5] = ["new", "settings", "proposal", "arrive", "touched"];
+    /// answer, so no endpoint serves it), and the journeys a merge must name, which the MCP
+    /// tool reads in process (the web reads each identity's references, since the store
+    /// checks the named set at commit).
+    const NOT_OPERATIONS: [&str; 6] = [
+        "new",
+        "settings",
+        "proposal",
+        "arrive",
+        "touched",
+        "merge_revisions",
+    ];
 
     /// The public methods of every `impl Service` block in the service's
     /// sources.

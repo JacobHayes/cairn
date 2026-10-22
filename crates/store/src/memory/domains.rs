@@ -125,13 +125,7 @@ impl Domains {
 
     /// The revision of the domain a graph belongs to: its journey's, or its route's.
     pub fn graph_revision(&self, graph: &GraphId) -> Revision {
-        let domain = match graph {
-            GraphId::Journey(journey) => Domain::Journey(journey.clone()),
-            GraphId::RouteDraft(route) | GraphId::RouteVersion { route, .. } => {
-                Domain::Route(route.clone())
-            }
-        };
-        self.revision(&cairn_schema::RevisionOf::Domain(domain))
+        self.revision(&cairn_schema::RevisionOf::Domain(graph.domain()))
     }
 
     /// J5: the nodes an event is about or wrote on, with the nodes whose edges a whole-node
