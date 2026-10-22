@@ -17,7 +17,8 @@ describe("the index's query parameters", () => {
       upgrade_available: false,
       after: "j_x",
     });
-    expect(indexParams({ status: [], referencing: [] })).toEqual({});
+    expect(indexParams({ owner: ["who_a"] })).toEqual({ owner: ["who_a"] });
+    expect(indexParams({ status: [], referencing: [], owner: [] })).toEqual({});
     expect(indexParams()).toEqual({});
   });
 });

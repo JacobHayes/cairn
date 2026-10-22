@@ -12,7 +12,7 @@ import { RejectionView } from "../screens/RejectionView.tsx";
 import { WriteStatus } from "../screens/WriteStatus.tsx";
 import { useScreenWrite } from "../screens/write.ts";
 import { Button } from "../ui/kit.tsx";
-import { indexPath } from "./address.ts";
+import { DEFAULT_FILTERS, indexPath } from "./address.ts";
 import { deleteBlocked, deleteLabel, deleteMutations, deleteQuestion, type Doomed } from "./lifecycle.ts";
 
 interface DeleteProps {
@@ -74,5 +74,5 @@ export function DeleteJourney({ ready, onCancel }: { ready: Ready; onCancel: () 
   const { header, revision } = ready.journey;
   const navigate = useNavigate();
   const journeys = [{ id: header.id, name: header.name, status: header.status, revision }];
-  return <DeleteJourneys journeys={journeys} onCancel={onCancel} onDeleted={() => void navigate(indexPath({ status: "any", route: undefined, version: undefined, mine: false, upgrade: false }))} />;
+  return <DeleteJourneys journeys={journeys} onCancel={onCancel} onDeleted={() => void navigate(indexPath({ ...DEFAULT_FILTERS, status: "any" }))} />;
 }

@@ -15,9 +15,10 @@ use std::str::FromStr;
 
 use cairn_schema::{
     Actor, Annotation, ChangeSet, Date, DeletedId, Deployment, Domain, Event, EventType, GraphId,
-    GraphRecord, Identity, JourneyHeader, JourneyId, JourneyStatus, Lineage, Node, NodeKey,
-    PatchId, PatchReceipt, PatchTarget, Record, RecordKey, Revision, RevisionOf, RouteHeader,
-    RouteId, RouteKind, Subject, Timestamp, Title, VersionNumber, Write, refs::KeyRefs,
+    GraphRecord, Identity, IdentitySet, JourneyHeader, JourneyId, JourneyStatus, Lineage, Node,
+    NodeKey, PatchId, PatchReceipt, PatchTarget, Record, RecordKey, Revision, RevisionOf,
+    RouteHeader, RouteId, RouteKind, Subject, Timestamp, Title, VersionNumber, Write,
+    refs::KeyRefs,
 };
 use serde_json::json;
 
@@ -71,6 +72,7 @@ pub fn journey_header(journey: &str, name: &str, lineage: Option<(&str, u32)>) -
         id: id(journey),
         name: title(name),
         description: None,
+        owners: IdentitySet::default(),
         status: JourneyStatus::Active,
         lineage: lineage.map(|(route, number)| Lineage {
             route: id(route),
@@ -361,6 +363,26 @@ fn hash_of(text: &str) -> u128 {
     text.bytes().fold(0_u128, |hash, byte| {
         hash.wrapping_mul(31).wrapping_add(u128::from(byte))
     }) << 8
+}
+
+/// A patch creating journey `journey` owned by `owners`.
+#[must_use]
+pub fn create_owned_journey(patch: &str, journey: &str, owners: &[&str]) -> PatchBuilder {
+    journey_patch(patch, journey, 0).event(
+        EventType::JourneyCreated,
+        Subject::Journey(id(journey)),
+        vec![Write::Put(Record::JourneyHeader(owned_header(
+            journey, owners,
+        )))],
+    )
+}
+
+/// A journey's fields with `owners`.
+#[must_use]
+pub fn owned_header(journey: &str, owners: &[&str]) -> JourneyHeader {
+    let mut header = journey_header(journey, journey, None);
+    header.owners = IdentitySet::new(owners.iter().map(|key| id(key))).unwrap();
+    header
 }
 
 /// A journey's creation: its fields, then `nodes` as roots or children.

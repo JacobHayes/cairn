@@ -17,8 +17,9 @@ describe("starting a journey (B1)", () => {
   });
 
   it("sends the name and lineage, and a description only when one was written", () => {
-    expect(createMutation(" Launch ", "  ", { route: "r", version: 2 })).toEqual({ op: "create_journey", name: "Launch", from: { route: "r", version: 2 } });
-    expect(createMutation("Ad hoc", "Why", undefined)).toEqual({ op: "create_journey", name: "Ad hoc", description: "Why" });
+    expect(createMutation(" Launch ", "  ", [], { route: "r", version: 2 })).toEqual({ op: "create_journey", name: "Launch", from: { route: "r", version: 2 } });
+    expect(createMutation("Owned", "", ["who_a"], undefined)).toEqual({ op: "create_journey", name: "Owned", owners: ["who_a"] });
+    expect(createMutation("Ad hoc", "Why", [], undefined)).toEqual({ op: "create_journey", name: "Ad hoc", description: "Why" });
   });
 });
 

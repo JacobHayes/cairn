@@ -5180,6 +5180,15 @@
             "$ref": "#/components/schemas/Title",
             "description": "Its name."
           },
+          "owners": {
+            "description": "Who is responsible for the journey as a whole: zero or more identities.",
+            "items": {
+              "$ref": "#/components/schemas/IdentityKey"
+            },
+            "maxItems": 100,
+            "type": "array",
+            "uniqueItems": true
+          },
           "status": {
             "$ref": "#/components/schemas/JourneyStatus",
             "description": "Its status."
@@ -5435,6 +5444,13 @@
           "name": {
             "$ref": "#/components/schemas/Title",
             "description": "Its name."
+          },
+          "owners": {
+            "description": "Who owns it, each as the identity it names now (an alias read as the identity it was\nmerged into), once, in key order.",
+            "items": {
+              "$ref": "#/components/schemas/IdentityKey"
+            },
+            "type": "array"
           },
           "revision": {
             "$ref": "#/components/schemas/Revision",
@@ -6241,6 +6257,15 @@
               "op": {
                 "const": "create_journey",
                 "type": "string"
+              },
+              "owners": {
+                "description": "Who is responsible for the journey as a whole; none when absent. Nobody is an\nowner by default, the creator included.",
+                "items": {
+                  "$ref": "#/components/schemas/IdentityKey"
+                },
+                "maxItems": 100,
+                "type": "array",
+                "uniqueItems": true
               }
             },
             "required": [
@@ -6251,7 +6276,7 @@
           },
           {
             "additionalProperties": false,
-            "description": "Rename or redescribe the journey.",
+            "description": "Rename or redescribe the journey, or change its owners. The description is set as\ngiven (absent clears it).",
             "properties": {
               "description": {
                 "anyOf": [
@@ -6271,6 +6296,18 @@
               "op": {
                 "const": "edit_journey",
                 "type": "string"
+              },
+              "owners": {
+                "description": "Who is responsible for the journey as a whole: absent keeps the owners it has, a\nlist replaces them, an empty list clears them.",
+                "items": {
+                  "$ref": "#/components/schemas/IdentityKey"
+                },
+                "maxItems": 100,
+                "type": [
+                  "array",
+                  "null"
+                ],
+                "uniqueItems": true
               }
             },
             "required": [
@@ -14065,6 +14102,10 @@
             "$ref": "#/components/schemas/SnapshotCounts",
             "description": "The counts."
           },
+          "journey": {
+            "$ref": "#/components/schemas/SnapshotJourney",
+            "description": "The journey's name, description, status and owners."
+          },
           "needs_breakdown": {
             "description": "Placeholders needing breakdown.",
             "items": {
@@ -14143,6 +14184,7 @@
           }
         },
         "required": [
+          "journey",
           "today",
           "scope",
           "nodes",
@@ -14212,6 +14254,43 @@
           "listed",
           "frontier",
           "acting_frontier"
+        ],
+        "type": "object"
+      },
+      "SnapshotJourney": {
+        "additionalProperties": false,
+        "description": "The journey's own facts in its snapshot.",
+        "properties": {
+          "description": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Markdown"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "What it is for."
+          },
+          "name": {
+            "$ref": "#/components/schemas/Title",
+            "description": "Its name."
+          },
+          "owners": {
+            "description": "Who is responsible for it as a whole, each as the identity it names now (a merged\nkey reads as the identity it was merged into).",
+            "items": {
+              "$ref": "#/components/schemas/IdentityKey"
+            },
+            "type": "array"
+          },
+          "status": {
+            "$ref": "#/components/schemas/JourneyStatus",
+            "description": "Its status."
+          }
+        },
+        "required": [
+          "name",
+          "status"
         ],
         "type": "object"
       },
@@ -17336,6 +17415,20 @@
             "explode": true,
             "in": "query",
             "name": "referencing",
+            "required": false,
+            "schema": {
+              "items": {
+                "$ref": "#/components/schemas/IdentityKey"
+              },
+              "type": "array"
+            },
+            "style": "form"
+          },
+          {
+            "description": "Journeys owned by any of these identities, directly or through an alias.",
+            "explode": true,
+            "in": "query",
+            "name": "owner",
             "required": false,
             "schema": {
               "items": {

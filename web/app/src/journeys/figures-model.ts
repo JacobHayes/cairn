@@ -88,7 +88,7 @@ export function forYouWords(forYou: ForYou): string {
     case "nothing-open":
       return "Nothing open";
     case "nothing":
-      return "Nothing yours";
+      return "No work assigned to you";
     case "inactive":
       return "Not active";
   }

@@ -623,12 +623,12 @@ fn route_group(service: &Service) -> Group {
 }
 
 /// E6: one of the vendor evaluation's stakeholders merged into a new identity, then the journey
-/// derived again over the new deployment. The merge moves neither a journey revision nor the
-/// viewer (the lead), so only the deployment revision tells a cached derive apart.
+/// derived again over the new deployment. The journey is owned by both beforehand, so its
+/// snapshot names the survivor once. The merge moves neither a journey revision nor the viewer
+/// (the lead), so only the deployment revision tells a cached derive apart.
 fn merge_group(service: &Service) -> Group {
     let id: JourneyId = parsed("j_vendor_eval");
     let deployment = served(now_or_never(service.deployment()), "deployment").revision;
-    let journey = document(service, &id).journey.revision;
     let create: Patch = parsed(&format!(
         "id: p_wasm_identity\ntarget: deployment\nbase_revision: {deployment}\nmutations:\n- op: create_identity\n  identity: {{key: who_n4q6tx2vkc5jhsd7, name: Eli Park}}\n"
     ));
@@ -636,6 +636,16 @@ fn merge_group(service: &Service) -> Group {
         now_or_never(service.patch(&reader(), &served(DomainPatch::new(create, None), "patch"))),
         "identity create",
     );
+    let before = document(service, &id).journey;
+    let own: Patch = parsed(&format!(
+        "id: p_wasm_owners\ntarget: {{journey: {id}}}\nbase_revision: {}\nmutations:\n- op: edit_journey\n  name: {}\n  owners: [who_d4m6uk2eqf5rbhzs, who_n4q6tx2vkc5jhsd7]\n",
+        before.revision, before.header.name
+    ));
+    served(
+        now_or_never(service.patch(&reader(), &served(DomainPatch::new(own, None), "patch"))),
+        "journey owners",
+    );
+    let journey = document(service, &id).journey.revision;
     let merge: Patch = parsed(&format!(
         "id: p_wasm_merge\ntarget: deployment\nbase_revision: {}\nmutations:\n- op: merge_identities\n  survivor: who_n4q6tx2vkc5jhsd7\n  merged: [who_d4m6uk2eqf5rbhzs]\n  journeys: {{{id}: {journey}}}\n",
         deployment.next()

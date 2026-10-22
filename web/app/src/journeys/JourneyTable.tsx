@@ -1,8 +1,8 @@
 // The journeys as a table (C16), the journey index's: each journey with where it
 // came from, what needs a look, what is the viewer's, how far along it is and its next milestone.
 // The index holds only summaries, so each row reads its journey in the tab (reading.ts) and says
-// "Reading..." or why it could not until it has. With `mine` only the journeys where the viewer
-// holds something are kept (E4). "Upgrade available" is the host's field on each journey, never
+// "Reading..." or why it could not until it has. With `mine` only the journeys the viewer owns or
+// where they hold something are kept (E4). "Upgrade available" is the host's field on each journey, never
 // worked out here. Kept current (H6). The rows can be picked (C16, A19): the row checkboxes, and
 // Shift-, Cmd- or Ctrl-click anywhere on a row, add and remove a journey from the index's
 // selection (JourneyIndex.tsx), which the inspector lists and deletes.
@@ -10,18 +10,22 @@ import { Failed } from "../ui/Failed.tsx";
 import { useMemo, useState, type MouseEvent, type ReactNode } from "react";
 import { Link } from "react-router";
 
-import { useRetryJourney } from "../data/react.ts";
+import { useCaller, useDeployment, useRetryJourney } from "../data/react.ts";
+import { identityNames } from "../detail/sections.tsx";
 import type { JourneySummary, RouteSummary } from "../data/reads.ts";
 import { Meter } from "../ui/kit.tsx";
 import { routePath } from "../routes/address.ts";
 import { forYouOf, forYouWords, milestoneOf, progressOf, troubleOf, troubleWords, upgradeWords, type ForYou, type Trouble } from "./figures-model.ts";
 import { journeyPath } from "./address.ts";
-import { useMineCounts, useReportMine } from "./mine.ts";
+import { mineCountOf, useMineCounts, useReportMine } from "./mine.ts";
 import { useJourneyReading, type JourneyReading } from "./reading.ts";
 import { useSeen } from "./useSeen.ts";
 import { listPath } from "./view.ts";
 import { JourneyStatusBadge } from "./StatusBadge.tsx";
 import { Tip } from "../ui/Tip.tsx";
+
+/** The most owners a row names; the rest are "and N more", and the journey's card and Summary say them all. */
+const OWNERS_SHOWN = 3;
 
 /** A journey's lineage: its route, by name when the route index has it, and version, or that it started empty. */
 function Lineage({ summary, routes }: { summary: JourneySummary; routes: readonly RouteSummary[] }) {
@@ -37,9 +41,25 @@ function Lineage({ summary, routes }: { summary: JourneySummary; routes: readonl
   );
 }
 
-/** A journey's name, its status when it is not active, and where it came from (with its upgrade): the cell that needs nothing derived. */
+/** " · Owned by you and Ana Silva" after the lineage: at most three names, the viewer's own as "you". */
+function RowOwners({ owners }: { owners: readonly string[] }) {
+  const deployment = useDeployment();
+  const { caller } = useCaller();
+  if (deployment === undefined) {
+    return null;
+  }
+  return (
+    <>
+      <span className="cell-sep">{" · "}</span>
+      <span className="cell-owners" data-testid="row-owners">Owned by {identityNames(deployment, owners, caller?.identities ?? [], "you", OWNERS_SHOWN)}</span>
+    </>
+  );
+}
+
+/** A journey's name, its status when it is not active, where it came from (with its upgrade) and who owns it: the cell that needs nothing derived. */
 export function JourneyCell({ summary, routes }: { summary: JourneySummary; routes: readonly RouteSummary[] }) {
   const upgrade = upgradeWords(summary);
+  const owners = summary.owners ?? [];
   return (
     <td data-column="journey">
       <span className="cell-first">
@@ -51,6 +71,7 @@ export function JourneyCell({ summary, routes }: { summary: JourneySummary; rout
       <span className="cell-second">
         <span className="cell-lineage">
           <Lineage summary={summary} routes={routes} />
+          {owners.length === 0 ? null : <RowOwners owners={owners} />}
         </span>
         {upgrade === undefined ? null : (
           <>
@@ -206,8 +227,10 @@ type RowProps = { summary: JourneySummary; routes: readonly RouteSummary[]; mine
 /** A journey's row with its journey read: the derived columns, or why there are none. */
 function ReadRow({ summary, routes, mine, picks, report, rowRef }: RowProps) {
   const reading = useJourneyReading(summary.id, true);
-  useReportMine(summary.id, reading.status === "ready" ? reading.mine.length : reading.status === "gone" ? 0 : undefined, report);
-  if (reading.status === "gone" || (mine && reading.status === "ready" && reading.mine.length === 0)) {
+  const { caller } = useCaller();
+  const counted = reading.status === "ready" ? mineCountOf(summary, reading.mine.length, caller?.identities ?? []) : undefined;
+  useReportMine(summary.id, reading.status === "gone" ? 0 : counted, report);
+  if (reading.status === "gone" || (mine && counted === 0)) {
     return null;
   }
   if (reading.status !== "ready") {

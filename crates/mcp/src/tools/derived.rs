@@ -25,8 +25,8 @@ use crate::{ToolError, ToolSet};
 pub(crate) const SPECS: &[Spec] = &[
     Spec {
         name: "get_snapshot",
-        description: "Call this first. The bounded state of a journey: the answers in \
-            effect, a page of in-scope nodes with their display state (what to say about \
+        description: "Call this first. The bounded state of a journey: its name, \
+            description, status and owners, the answers in effect, a page of in-scope nodes with their display state (what to say about \
             them) beside the stored state (which transition applies), owners, blocking, and \
             dates, the ranked acting frontier's top items with the rest as keys, open decisions \
             by rank, placeholders needing breakdown, unassigned items, shortfalls, and counts by \

@@ -33,12 +33,20 @@ impl State {
         let referencing = query.referencing.as_ref().map(|identities| {
             backend::query::journeys_among(&self.domains.graphs_referencing(identities))
         });
+        let aliases = &self.domains.deployment.aliases;
+        let owners = query
+            .owners
+            .as_ref()
+            .map(|wanted| backend::query::resolved_owners(wanted, aliases));
         let mut items = Vec::new();
         for (id, (header, revision)) in &self.domains.journeys {
             let summary = JourneySummary {
                 id: id.clone(),
                 name: header.name.clone(),
                 status: header.status,
+                owners: backend::query::resolved_owners(header.owners.iter(), aliases)
+                    .into_iter()
+                    .collect(),
                 lineage: header.lineage.clone(),
                 revision: *revision,
                 created_at: header.created_at,
@@ -47,7 +55,12 @@ impl State {
                     .as_ref()
                     .and_then(|lineage| self.latest_version(&lineage.route)),
             };
-            if backend::query::journey_listed(query, &summary, referencing.as_ref()) {
+            if backend::query::journey_listed(
+                query,
+                &summary,
+                referencing.as_ref(),
+                owners.as_ref(),
+            ) {
                 items.push(summary);
                 if items.len() > query.size.len() {
                     break;

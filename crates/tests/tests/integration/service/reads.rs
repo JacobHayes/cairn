@@ -10,7 +10,9 @@ use std::sync::Arc;
 
 use cairn_engine::{DerivedJourney, Graph, derive};
 use cairn_schema::limits::{EXPLANATION_ENTRY_COUNT_MAX, PAGE_ITEM_COUNT_MAX};
-use cairn_schema::{Cursor, Email, ExplainedField, JourneyId, NextQuery, NodeKey, SnapshotScope};
+use cairn_schema::{
+    Cursor, Email, ExplainedField, JourneyHeader, JourneyId, NextQuery, NodeKey, SnapshotScope,
+};
 use cairn_service::{Call, ReadError, Service};
 use cairn_store::{LoginRecord, Store, UserRecord};
 
@@ -89,13 +91,13 @@ async fn reference(
     service: &Service,
     id: &JourneyId,
     call: &Call,
-) -> (Graph, cairn_engine::Derived) {
+) -> (Graph, cairn_engine::Derived, JourneyHeader) {
     let journey = service.journey(id).await.unwrap().unwrap();
     let deployment = service.deployment().await.unwrap();
     let graph = Graph::new(journey.graph.clone(), &deployment).unwrap();
     let inputs = settings().derive_inputs(settings().today(call.now), BTreeSet::new(), deployment);
     let derived = derive(&graph, Some(journey.header.created_on), &inputs);
-    (graph, derived)
+    (graph, derived, journey.header)
 }
 
 /// C10, I3, I1: the vendor evaluation after kickoff, read through the service, ranks its next
@@ -109,7 +111,7 @@ async fn a_journey_reads_as_the_engine_alone_projects_it(store: Arc<dyn Store>) 
         .next(&reader, &vendor(), &NextQuery::default())
         .await
         .unwrap();
-    let (graph, derived) = reference(&service, &vendor(), &reader).await;
+    let (graph, derived, header) = reference(&service, &vendor(), &reader).await;
     let engine = DerivedJourney::new(&graph, &derived);
     assert_eq!(
         next.value,
@@ -129,7 +131,7 @@ async fn a_journey_reads_as_the_engine_alone_projects_it(store: Arc<dyn Store>) 
     assert_eq!(snapshot.value.acting_frontier, next.value.items);
     assert_eq!(
         snapshot.value,
-        engine.snapshot(&SnapshotScope::default()).unwrap()
+        engine.snapshot(&SnapshotScope::default(), &header).unwrap()
     );
     let missing = service
         .trace(&reader, &vendor(), &key("n_nowhere"))

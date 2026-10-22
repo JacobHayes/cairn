@@ -81,6 +81,7 @@ impl RouteDerivation {
     pub fn projected(&self, request: &Projection) -> Result<String, HostError> {
         projected(
             &DerivedJourney::new(&self.graph, &self.derived),
+            None,
             &self.deployment,
             &BTreeSet::new(),
             request,

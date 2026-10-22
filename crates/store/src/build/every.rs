@@ -538,6 +538,8 @@ pub fn journey_header(journey: &str, status: JourneyStatus, fill: Fill) -> Journ
         id: id(journey),
         name: title(if fill.on() { "Every field" } else { "Cleared" }),
         description: fill.some(id("A journey with every field.")),
+        owners: BoundedSet::new(fill.some([id("who_a"), id("who_b")]).into_iter().flatten())
+            .unwrap(),
         status,
         lineage: fill.some(Lineage {
             route: id("every"),

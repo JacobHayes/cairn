@@ -49,7 +49,7 @@ impl Loaded {
     /// referencing its identities, and for each delete that no graph refers to its identity
     /// (E6).
     ///
-    /// A journey that names an identity, or whose conditions compare an identity decision's
+    /// A journey that names an identity (an owner included), or whose conditions compare an identity decision's
     /// answer, is valid only under the identities and aliases it was checked with (E6: a merge
     /// can change what such a condition evaluates to, a delete leaves a reference dangling), so
     /// a patch leaving one is also held to the deployment revision it was loaded at, whether or
@@ -59,7 +59,7 @@ impl Loaded {
         let mut found = Vec::new();
         let compared = match &patch.target {
             PatchTarget::Journey(id) => after.journeys.get(id).is_some_and(|journey| {
-                compares_identities(&journey.graph) || !journey.graph.identity_mentions().is_empty()
+                compares_identities(&journey.graph) || !journey.identity_mentions().is_empty()
             }),
             // A route draft that names an identity (an assignment) was validated against the
             // deployment as loaded: a delete committed in between must make it stale.

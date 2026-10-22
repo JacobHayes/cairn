@@ -97,8 +97,8 @@ pub use projection::{
     LevelNode, LevelQuery, ListFlag, ListPage, ListQuery, MineEntry, MissingPlaceholder, Next,
     NextQuery, NodeRow, OpenDecision, OutsideReference, PatchEvents, RankAdds, RankTerms,
     ReferenceField, RemovalRead, RenderedDraft, RenderedSegment, RollUp, RouteSchedule,
-    ScheduleEntry, Snapshot, SnapshotCounts, SnapshotNode, SnapshotScope, SortBy, StatusSummary,
-    Timeline, TimelineEntry, Trace, UndatedEntry, UnderlyingEdge, UpcomingMilestone,
+    ScheduleEntry, Snapshot, SnapshotCounts, SnapshotJourney, SnapshotNode, SnapshotScope, SortBy,
+    StatusSummary, Timeline, TimelineEntry, Trace, UndatedEntry, UnderlyingEdge, UpcomingMilestone,
 };
 pub use proposal::{
     Conflict, ConflictResolution, ConflictReview, DestinationAfter, Kept, OutlineFact,

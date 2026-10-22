@@ -61,12 +61,6 @@ export function identityName(view: Ready, key: string): string {
   return identityNamed(view.inputs.deployment, key);
 }
 
-/** E1, E2: whether one of the viewer's `identities`, through any merge, owns the node whose owners are `owners`. */
-export function ownedBy(view: Ready, owners: readonly string[] | undefined, identities: readonly string[]): boolean {
-  const mine = new Set(identities.map((key) => resolveIdentity(view, key)));
-  return (owners ?? []).some((key) => mine.has(resolveIdentity(view, key)));
-}
-
 /** E2: the keys of a node's effective owners. */
 export function ownersOf(view: Ready, key: string): string[] {
   return view.derived.nodes[key]?.participations?.[OWNER_KIND.key]?.identities ?? [];
@@ -76,6 +70,25 @@ export function ownersOf(view: Ready, key: string): string[] {
 export const YOU = "You";
 /** What a surface says for a node nobody owns. */
 export const UNASSIGNED = "Unassigned";
+/** What a surface says for a journey nobody owns. */
+export const NO_OWNER = "No owner";
+
+/**
+ * Identities as people say them, on every surface: `keys` through any merge, each identity once,
+ * the viewer's own (`viewer`) first as `you` ("You" at the start of a sentence, "you" inside
+ * one: the caller says which), the rest by name in the order given. Nothing for no keys.
+ */
+export function identityNameList(deployment: Deployment, keys: readonly string[], viewer: readonly string[], you: string): string[] {
+  const mine = new Set(viewer.map((key) => resolveAlias(deployment, key)));
+  const resolved = [...new Set(keys.map((key) => resolveAlias(deployment, key)))];
+  const names = resolved.filter((key) => !mine.has(key)).map((key) => identityNamed(deployment, key));
+  return resolved.some((key) => mine.has(key)) ? [you, ...names] : names;
+}
+
+/** `identityNameList` as one phrase of at most `max` names (the rest as "and N more"). */
+export function identityNames(deployment: Deployment, keys: readonly string[], viewer: readonly string[], you: string, max = Infinity): string {
+  return namedList(identityNameList(deployment, keys, viewer, you), max);
+}
 
 /**
  * Who has a node, in words, on every surface: all its owners by name, the viewer (given as their
@@ -83,11 +96,7 @@ export const UNASSIGNED = "Unassigned";
  */
 export function ownerWords(view: Ready, owners: readonly string[] | undefined, viewer: readonly string[] = []): string {
   const keys = owners ?? [];
-  if (keys.length === 0) {
-    return UNASSIGNED;
-  }
-  const names = keys.filter((key) => !ownedBy(view, [key], viewer)).map((key) => identityName(view, key));
-  return namedList(keys.length > names.length ? [YOU, ...names] : names, Infinity);
+  return keys.length === 0 ? UNASSIGNED : identityNames(view.inputs.deployment, keys, viewer, YOU);
 }
 
 /** An answer as people read it: choices by their labels, identities by name. */

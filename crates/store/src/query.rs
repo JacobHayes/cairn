@@ -102,6 +102,9 @@ pub struct JourneyQuery {
     pub version: Option<VersionNumber>,
     /// Journeys referring to any of these identities, directly or through an alias (E6).
     pub referencing: Option<BTreeSet<IdentityKey>>,
+    /// Journeys owned by any of these identities, directly or through an alias; with the
+    /// other filters, every one holds.
+    pub owners: Option<BTreeSet<IdentityKey>>,
     /// Journeys whose route has, or has not, published a version newer than theirs.
     pub upgrade_available: Option<bool>,
     /// The page starts after this journey.
@@ -128,10 +131,19 @@ impl JourneyQuery {
             route,
             version,
             referencing: (!referencing.is_empty()).then_some(referencing),
+            owners: None,
             upgrade_available,
             after,
             size: size.map_or(PageSize::MAX, PageSize::new),
         }
+    }
+
+    /// The same query restricted to the journeys these identities own (E6, C16): no
+    /// identities means any journey. The one place that default is spelled.
+    #[must_use]
+    pub fn owned_by(mut self, owners: BTreeSet<IdentityKey>) -> Self {
+        self.owners = (!owners.is_empty()).then_some(owners);
+        self
     }
 }
 
@@ -144,6 +156,9 @@ pub struct JourneySummary {
     pub name: Title,
     /// Its status.
     pub status: JourneyStatus,
+    /// Who owns it, each as the identity it names now (an alias read as the identity it was
+    /// merged into), once, in key order.
+    pub owners: Vec<IdentityKey>,
     /// The route version it follows.
     pub lineage: Option<Lineage>,
     /// Its revision.

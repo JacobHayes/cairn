@@ -101,6 +101,10 @@ pub const JOURNEY_PARAMS: &[ParamSpec] = &[
         "referencing",
         "Journeys referring to any of these identities, directly or through an alias.",
     ),
+    ParamSpec::many::<IdentityKey>(
+        "owner",
+        "Journeys owned by any of these identities, directly or through an alias.",
+    ),
     ParamSpec::one::<bool>(
         "upgrade_available",
         "Journeys whose route has, or has not, published a newer version.",
@@ -483,7 +487,8 @@ pub fn journeys(params: &Params) -> Result<JourneyQuery, ApiError> {
         params.one("upgrade_available")?,
         params.one("after")?,
         params.one("size")?,
-    ))
+    )
+    .owned_by(params.all::<IdentityKey>("owner")?.into_iter().collect()))
 }
 
 /// The route index's page: the kind it lists, where it starts, and its size.

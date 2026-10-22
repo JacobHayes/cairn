@@ -15,6 +15,7 @@ use support::key;
 const VENDOR: &str = "j_vendor_eval";
 
 struct Derive {
+    journey: String,
     records: Records,
     graph: Graph,
     derived: Derived,
@@ -23,6 +24,7 @@ struct Derive {
 impl Derive {
     fn of(records: Records, journey: &str) -> Self {
         Self {
+            journey: journey.to_string(),
             graph: support::journey_graph(&records, journey),
             derived: support::derived(&records, journey),
             records,
@@ -38,7 +40,7 @@ impl Derive {
     }
 
     fn header(&self) -> &Journey {
-        &self.records.journeys[&VENDOR.parse().unwrap()]
+        &self.records.journeys[&self.journey.parse().unwrap()]
     }
 }
 
@@ -384,7 +386,10 @@ fn an_effectively_skipped_decision_is_not_open() {
     assert!(derive.derived.blocking().closed(&key("n_d")));
     assert_eq!(journey.status_summary().open_decisions.len(), 0);
     let snapshot = journey
-        .snapshot(&cairn_schema::SnapshotScope::default())
+        .snapshot(
+            &cairn_schema::SnapshotScope::default(),
+            &derive.header().header,
+        )
         .unwrap();
     assert_eq!(snapshot.open_decisions.len(), 0);
 }
@@ -405,7 +410,10 @@ fn a_merged_identity_answer_names_the_survivor_in_snapshot_and_decision_view() {
         .unwrap();
     assert_eq!(entry.answer, survivor);
     let snapshot = journey
-        .snapshot(&cairn_schema::SnapshotScope::default())
+        .snapshot(
+            &cairn_schema::SnapshotScope::default(),
+            &derive.header().header,
+        )
         .unwrap();
     assert_eq!(snapshot.answers.get(&who).cloned(), survivor);
 }

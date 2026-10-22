@@ -344,20 +344,24 @@ pub fn arb_journey_header() -> impl Strategy<Value = JourneyHeader> {
         arb_journey_id(),
         arb_title(),
         prop::option::of(arb_markdown()),
+        arb_identity_set(),
         arb_journey_status(),
         prop::option::of(arb_lineage()),
         arb_timestamp(),
         arb_date(),
     )
         .prop_map(
-            |(id, name, description, status, lineage, created_at, created_on)| JourneyHeader {
-                id,
-                name,
-                description,
-                status,
-                lineage,
-                created_at,
-                created_on,
+            |(id, name, description, owners, status, lineage, created_at, created_on)| {
+                JourneyHeader {
+                    id,
+                    name,
+                    description,
+                    owners,
+                    status,
+                    lineage,
+                    created_at,
+                    created_on,
+                }
             },
         )
 }

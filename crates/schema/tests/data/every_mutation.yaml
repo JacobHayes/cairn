@@ -7,11 +7,16 @@ mutations:
 - op: create_journey
   name: Sample journey
   description: A journey with every kind of change.
+  owners:
+  - who_one
+  - who_two
   from:
     route: sample
     version: 1
 - op: edit_journey
   name: Renamed journey
+  owners:
+  - who_one
 - op: set_journey_status
   status: completed
 - op: create_route

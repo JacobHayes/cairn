@@ -17,7 +17,7 @@ fn snapshot(records: &Records, journey: &str, scope: &SnapshotScope) -> Snapshot
     let graph = support::journey_graph(records, journey);
     let derived = support::derived(records, journey);
     DerivedJourney::new(&graph, &derived)
-        .snapshot(scope)
+        .snapshot(scope, &support::journey_header(records, journey))
         .unwrap()
 }
 
@@ -115,7 +115,8 @@ fn a_subtree_and_a_depth_scope_the_snapshot() {
         ..SnapshotScope::default()
     };
     assert_eq!(
-        DerivedJourney::new(&graph, &derived).snapshot(&unknown),
+        DerivedJourney::new(&graph, &derived)
+            .snapshot(&unknown, &support::journey_header(&records, VENDOR)),
         Err(ProjectionError::UnknownNode(key("n_nowhere")))
     );
 }

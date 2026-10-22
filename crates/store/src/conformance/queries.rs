@@ -12,8 +12,9 @@ use serde_json::json;
 
 use super::{Backend, applied, failed, open};
 use crate::build::{
-    self, action, create_journey, create_route, deployment_patch, id, identity, journey_graph,
-    journey_header, journey_patch, node, node_key, put_in, revision, route_patch, version,
+    self, action, create_journey, create_owned_journey, create_route, deployment_patch, id,
+    identity, journey_graph, journey_header, journey_patch, node, node_key, put_in, revision,
+    route_patch, version,
 };
 use crate::commit::CommitError;
 use crate::query::{
@@ -184,6 +185,133 @@ pub async fn a_condition_refers_to_an_identity_only_through_an_identity_decision
             .await
             .unwrap(),
         BTreeSet::from([journey_graph("j_one")])
+    );
+}
+
+/// The deployment with identities `who_a` (also known as `who_old`) and `who_b`.
+async fn people_with_an_alias(store: &dyn Store) {
+    let people = deployment_patch("p_people", 0).event(
+        EventType::IdentitiesMerged,
+        Subject::Identity(id("who_old")),
+        vec![
+            Write::Put(Record::Identity(identity("who_a", "A", &[]))),
+            Write::Put(Record::Identity(identity("who_b", "B", &[]))),
+            Write::Put(Record::IdentityAlias {
+                alias: id("who_old"),
+                identity: id("who_a"),
+            }),
+        ],
+    );
+    applied(store, people.commit()).await;
+}
+
+/// E6: a journey is found among the graphs referring to an identity by its owners alone, by
+/// the identity or an alias of it, until the owners are cleared or the journey is deleted.
+pub async fn a_journey_is_found_by_its_owners_alone<B: Backend>(backend: &B) {
+    let store = open(backend).await;
+    people_with_an_alias(&store).await;
+    applied(
+        &store,
+        create_owned_journey("p_one", "j_one", &["who_old"]).commit(),
+    )
+    .await;
+    let found = |keys: &[&str]| {
+        let keys: BTreeSet<_> = keys.iter().map(|key| id(key)).collect();
+        let store = &store;
+        async move { store.graphs_referencing(&keys).await.unwrap() }
+    };
+    let only = BTreeSet::from([journey_graph("j_one")]);
+    assert_eq!(found(&["who_old"]).await, only, "the key it holds");
+    assert_eq!(found(&["who_a"]).await, only, "the identity it resolves to");
+    assert!(found(&["who_b"]).await.is_empty());
+
+    let cleared = journey_patch("p_clear", "j_one", 1).event(
+        EventType::JourneyEdited,
+        Subject::Journey(id("j_one")),
+        vec![Write::Put(Record::JourneyHeader(journey_header(
+            "j_one", "j_one", None,
+        )))],
+    );
+    applied(&store, cleared.commit()).await;
+    assert!(
+        found(&["who_a"]).await.is_empty(),
+        "cleared owners stop referring"
+    );
+
+    let owned_again = journey_patch("p_again", "j_one", 2).event(
+        EventType::JourneyEdited,
+        Subject::Journey(id("j_one")),
+        vec![Write::Put(Record::JourneyHeader(build::owned_header(
+            "j_one",
+            &["who_b"],
+        )))],
+    );
+    applied(&store, owned_again.commit()).await;
+    assert_eq!(found(&["who_b"]).await, only);
+    let gone = build::hard_delete(
+        "p_gone",
+        1,
+        &[(cairn_schema::DeletedId::Journey(id("j_one")), 3)],
+    )
+    .commit();
+    applied(&store, gone).await;
+    assert!(
+        found(&["who_b"]).await.is_empty(),
+        "a deleted journey owns nothing"
+    );
+}
+
+/// C16: the index filters by owner, directly or through an alias, with every other filter
+/// holding too; each summary's owners read as the identities they name now, once.
+pub async fn the_journey_index_filters_by_owner_and_resolves_owners<B: Backend>(backend: &B) {
+    let store = open(backend).await;
+    people_with_an_alias(&store).await;
+    applied(
+        &store,
+        create_owned_journey("p_one", "j_one", &["who_a", "who_old"]).commit(),
+    )
+    .await;
+    applied(
+        &store,
+        create_owned_journey("p_two", "j_two", &["who_b"]).commit(),
+    )
+    .await;
+    applied(
+        &store,
+        create_journey("p_three", "j_three", Vec::new()).commit(),
+    )
+    .await;
+    let by = |owners: &[&str], statuses: &[JourneyStatus]| JourneyQuery {
+        owners: Some(owners.iter().map(|key| id(key)).collect()),
+        statuses: statuses.iter().copied().collect(),
+        ..JourneyQuery::default()
+    };
+    let cases = [
+        (by(&["who_a"], &[]), vec!["j_one"]),
+        (by(&["who_old"], &[]), vec!["j_one"]),
+        (by(&["who_b"], &[]), vec!["j_two"]),
+        (by(&["who_a", "who_b"], &[]), vec!["j_one", "j_two"]),
+        (by(&["who_a", "who_b"], &[JourneyStatus::Completed]), vec![]),
+    ];
+    for (query, expected) in cases {
+        let page = store.journeys(&query).await.unwrap();
+        let found: Vec<_> = page
+            .items
+            .iter()
+            .map(|summary| summary.id.clone())
+            .collect();
+        assert_eq!(found, keys(&expected), "{query:?}");
+    }
+    let page = store.journeys(&JourneyQuery::default()).await.unwrap();
+    let owners: Vec<Vec<_>> = page
+        .items
+        .iter()
+        .map(|summary| summary.owners.clone())
+        .collect();
+    assert_eq!(
+        owners,
+        vec![vec![id("who_a")], vec![], vec![id("who_b")]],
+        "two keys of one identity read as one"
     );
 }
 

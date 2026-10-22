@@ -165,8 +165,13 @@ impl Service {
         id: &JourneyId,
         scope: &SnapshotScope,
     ) -> Result<Projected<Snapshot>, ReadError> {
-        self.project(call, id, |journey, _| journey.snapshot(scope))
-            .await
+        let derivation = self.derivation(call, id).await?;
+        let value = engine(&Domain::Journey(id.clone()), || {
+            let journey = DerivedJourney::new(&derivation.graph, &derivation.derived);
+            journey.snapshot(scope, &derivation.header)
+        })?
+        .map_err(ReadError::Projection)?;
+        Ok(projected(&derivation, value))
     }
 
     /// D3: the journey's whole derive in the schema's shape (every node's derived values with
@@ -420,12 +425,7 @@ impl Service {
             projection(&journey, &derivation.deployment, &derivation.key.viewer)
         })?
         .map_err(ReadError::Projection)?;
-        Ok(Projected {
-            revision: derivation.key.revision,
-            deployment_revision: derivation.key.deployment,
-            today: derivation.key.today,
-            value,
-        })
+        Ok(projected(&derivation, value))
     }
 
     /// Runs `projection` over the journey derived for `call`.
@@ -444,12 +444,7 @@ impl Service {
             projection(&journey, &derivation.key.viewer)
         })?
         .map_err(ReadError::Projection)?;
-        Ok(Projected {
-            revision: derivation.key.revision,
-            deployment_revision: derivation.key.deployment,
-            today: derivation.key.today,
-            value,
-        })
+        Ok(projected(&derivation, value))
     }
 
     /// D3, D6: the journey derived for `call`: at its today, over the current deployment,
@@ -548,4 +543,14 @@ fn detail(
         still_waiting: StillWaiting::for_response(journey.still_waiting(key)?),
         answer_effects: journey.answer_effects(key, deployment)?,
     })
+}
+
+/// `value` with the revisions and today of the derivation it was read from.
+fn projected<T>(derivation: &Derivation, value: T) -> Projected<T> {
+    Projected {
+        revision: derivation.key.revision,
+        deployment_revision: derivation.key.deployment,
+        today: derivation.key.today,
+        value,
+    }
 }

@@ -4,8 +4,8 @@
 use std::collections::BTreeSet;
 
 use cairn_schema::{
-    AttachmentKey, Domain, Event, GraphId, InsertionKey, JourneyId, JourneyStatus, Lineage,
-    NodeKey, Revision, RouteHeader, RouteId, Timestamp, Title, VersionNumber,
+    AttachmentKey, Domain, Event, GraphId, IdentityKey, InsertionKey, JourneyId, JourneyStatus,
+    Lineage, NodeKey, Revision, RouteHeader, RouteId, Timestamp, Title, VersionNumber,
 };
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
@@ -21,6 +21,10 @@ pub struct JourneySummary {
     pub name: Title,
     /// Its status.
     pub status: JourneyStatus,
+    /// Who owns it, each as the identity it names now (an alias read as the identity it was
+    /// merged into), once, in key order.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub owners: Vec<IdentityKey>,
     /// The route version it follows.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub lineage: Option<Lineage>,
@@ -52,6 +56,7 @@ impl From<cairn_store::JourneySummary> for JourneySummary {
             id,
             name,
             status,
+            owners,
             lineage,
             revision,
             created_at,
@@ -61,6 +66,7 @@ impl From<cairn_store::JourneySummary> for JourneySummary {
             id,
             name,
             status,
+            owners,
             lineage,
             revision,
             created_at,

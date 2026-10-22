@@ -110,8 +110,8 @@ pub(crate) const SPECS: &[Spec] = &[
     },
     Spec {
         name: "create_journey",
-        description: "Creates a journey, empty or from a published route version, as the \
-            first patch against its new id (base revision 0).",
+        description: "Creates a journey, empty or from a published route version, with its \
+            owners if given, as the first patch against its new id (base revision 0).",
         writes: Writes::Patch,
         destructive: false,
         schema: schema::<CreateJourney>,
@@ -729,6 +729,14 @@ pub(crate) struct CreateJourney {
     /// What it is for.
     #[serde(default)]
     description: Option<Markdown>,
+    /// Who is responsible for the journey as a whole (identity keys); none when absent.
+    /// Nobody is an owner by default, the creator included.
+    #[serde(default)]
+    owners: IdentitySet,
+    /// The deployment revision the owners were read at (a snapshot's or `list_identities`'s);
+    /// the write is stale if an identity was merged or deleted since.
+    #[serde(default)]
+    deployment_revision: Option<Revision>,
     /// The published route version to start from; empty when absent.
     #[serde(default)]
     from: Option<Lineage>,
@@ -742,6 +750,7 @@ impl CreateJourney {
         let mutation = Mutation::CreateJourney {
             name: self.name,
             description: self.description,
+            owners: self.owners,
             from: self.from,
         };
         let target = PatchTarget::Journey(self.journey);
@@ -749,7 +758,7 @@ impl CreateJourney {
             self.patch_id,
             target,
             Revision::NONE,
-            None,
+            self.deployment_revision,
             vec![mutation],
             self.note,
         )

@@ -1,5 +1,5 @@
 // C16: the journey card, the inspector's empty state on the views other than the Summary: how
-// much is done, what needs a look, what is still the viewer's, what is next, the next
+// much is done, who owns it, what needs a look, what is still the viewer's, what is next, the next
 // milestone, with the open decisions, the description, the notes and links, and the lineage as
 // folds. The Summary (summary/SummaryPage.tsx) is the same journey at full width. Kept current
 // (H6): both read the journey's local derivation.
@@ -15,7 +15,7 @@ import { dateInk, inkClass, originWord, whenWords } from "../status/when.ts";
 import { Meter } from "../ui/kit.tsx";
 import { Markdown } from "../ui/markdown.tsx";
 import { yoursOf } from "./figures-model.ts";
-import { Flags, LineageBlock, useLineage } from "./JourneyFacts.tsx";
+import { Flags, LineageBlock, OwnersLine, useLineage } from "./JourneyFacts.tsx";
 import { useMineOf } from "./mine.ts";
 import { useMemo } from "react";
 import "./journeys.css";
@@ -155,6 +155,7 @@ export function JourneyCard({ ready, selected }: { ready: Ready; selected?: stri
         summaryError === undefined ? <p className="muted">Summing up the journey...</p> : null
       ) : (
         <>
+          <OwnersLine ready={ready} />
           <Yours ready={ready} />
           <Flags ready={ready} model={model} />
           <NextUp ready={ready} />

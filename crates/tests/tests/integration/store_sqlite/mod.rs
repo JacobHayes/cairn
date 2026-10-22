@@ -2,6 +2,7 @@
 
 mod conformance;
 mod deleted_ids_migration;
+mod journey_owners_migration;
 mod milestone_done_migration;
 mod open;
 mod property_round_trip;

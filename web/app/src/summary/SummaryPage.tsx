@@ -19,7 +19,7 @@ import { useProjected } from "../canvas/hooks.ts";
 import { errorWords, valueOf } from "../data/keyed-read.ts";
 import { AnnotationList } from "../detail/Attachments.tsx";
 import type { Ready } from "../detail/model.ts";
-import { LineageBlock, Flags, useLineage } from "../journeys/JourneyFacts.tsx";
+import { LineageBlock, Flags, OwnersLine, useLineage } from "../journeys/JourneyFacts.tsx";
 import { progressOf } from "../journeys/figures-model.ts";
 import { useMineOf, type MineEntry } from "../journeys/mine.ts";
 import { useAssistantAsk } from "../assistant/ask.ts";
@@ -175,6 +175,7 @@ function About({ ready }: { ready: Ready }) {
   return (
     <section className="panel stack summary-about" aria-label="About" data-testid="summary-about">
       <span className="label">About</span>
+      <OwnersLine ready={ready} all />
       {header.description == null ? null : <Markdown text={header.description} data-testid="overview-description" />}
       <LineageBlock ready={ready} lineage={lineage} />
       {!writable && annotations.length === 0 ? null : <AnnotationList view={ready} node={null} annotations={annotations} bare showNone={false} />}

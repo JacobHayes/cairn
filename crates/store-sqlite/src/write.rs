@@ -176,6 +176,7 @@ impl<'connection> Writer<'connection> {
             id,
             name,
             description,
+            owners,
             status,
             lineage,
             created_at,
@@ -204,6 +205,16 @@ impl<'connection> Writer<'connection> {
                 date(*created_on),
             ],
         )?;
+        self.run(
+            "DELETE FROM journey_owners WHERE journey_id = ?1",
+            vec![text(id)],
+        )?;
+        for owner in owners.iter() {
+            self.run(
+                "INSERT INTO journey_owners (journey_id, identity) VALUES (?1, ?2)",
+                vec![text(id), text(owner)],
+            )?;
+        }
         Ok(())
     }
 
@@ -610,6 +621,7 @@ impl<'connection> Writer<'connection> {
     fn remove_journey(&mut self, journey: &cairn_schema::JourneyId) -> Result<(), CommitError> {
         self.clear_graph(&GraphId::Journey(journey.clone()))?;
         let statements = [
+            "DELETE FROM journey_owners WHERE journey_id = ?1",
             "DELETE FROM journeys WHERE id = ?1",
             "DELETE FROM proposals WHERE destination_kind = 'journey' AND destination_id = ?1",
             "DELETE FROM event_nodes WHERE seq IN \

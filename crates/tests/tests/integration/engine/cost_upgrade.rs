@@ -105,6 +105,7 @@ mod cost {
                     id,
                     name: parse("Limits"),
                     description: None,
+                    owners: cairn_schema::IdentitySet::default(),
                     status: cairn_schema::JourneyStatus::Active,
                     lineage: Some(version(first, cairn_schema::Graph::default()).0),
                     created_at: parse("2026-09-20T00:00:00Z"),

@@ -29,12 +29,13 @@ export function newJourneyId(name: string, random: () => string = () => crypto.r
 export type Start = { route: string; version: number } | undefined;
 
 /** B1: the create mutation, the first patch of a journey (base revision 0, A17). */
-export function createMutation(name: string, description: string, start: Start): Mutation {
+export function createMutation(name: string, description: string, owners: readonly string[], start: Start): Mutation {
   const trimmed = description.trim();
   return {
     op: "create_journey",
     name: name.trim(),
     ...(trimmed === "" ? {} : { description: trimmed }),
+    ...(owners.length === 0 ? {} : { owners: [...owners] }),
     ...(start === undefined ? {} : { from: start }),
   };
 }

@@ -25,9 +25,10 @@ pub(crate) const SPECS: &[Spec] = &[
     Spec {
         name: "list_journeys",
         description: "The journey index, in id order, a page at a time: each journey's name, \
-            status, route version, revision, and whether an upgrade is available. Filter by \
-            status, route, upgrade available, the caller's own, or the journeys that refer to \
-            given identities (directly or through a merged key).",
+            status, owners, route version, revision, and whether an upgrade is available. \
+            Filter by status, route, owner, upgrade available, the journeys that refer to the \
+            caller, or the journeys that refer to given identities (directly or through a \
+            merged key); every filter given holds.",
         writes: Writes::Nothing,
         destructive: false,
         schema: schema::<ListJourneys>,
@@ -285,14 +286,17 @@ pub(crate) struct ListJourneys {
     #[serde(default)]
     upgrade_available: Option<bool>,
     // PRD: H3.
-    /// Only journeys that refer to the caller's identities.
+    /// Only journeys that refer to the caller: ones they own or are named in, in any status.
     #[serde(default)]
     mine: bool,
-    /// Only journeys that refer to any of these identities, by an answer, a role fill, an
-    /// explicit participation or an identity condition, directly or through a merged key; with
-    /// `mine`, to any of these or the caller's.
+    /// Only journeys that refer to any of these identities: as an owner, by an answer, a role
+    /// fill, an explicit participation or an identity condition, directly or through a merged
+    /// key; with `mine`, to any of these or the caller's.
     #[serde(default)]
     referencing: BTreeSet<IdentityKey>,
+    /// Only journeys owned by any of these identities, directly or through a merged key.
+    #[serde(default)]
+    owners: BTreeSet<IdentityKey>,
     /// The page starts after this journey: the `next` of the page before.
     #[serde(default)]
     after: Option<JourneyId>,
@@ -312,6 +316,8 @@ struct JourneyRow {
     id: JourneyId,
     name: Title,
     status: JourneyStatus,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    owners: Vec<IdentityKey>,
     #[serde(skip_serializing_if = "Option::is_none")]
     lineage: Option<Lineage>,
     revision: Revision,
@@ -683,6 +689,7 @@ impl ToolSet {
             route: arguments.route,
             version: None,
             referencing,
+            owners: (!arguments.owners.is_empty()).then_some(arguments.owners),
             upgrade_available: arguments.upgrade_available,
             after: arguments.after,
             size: PageSize::MAX,
@@ -693,6 +700,7 @@ impl ToolSet {
             id: summary.id,
             name: summary.name,
             status: summary.status,
+            owners: summary.owners,
             lineage: summary.lineage,
             revision: summary.revision,
         });

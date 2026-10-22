@@ -341,9 +341,19 @@ mod property {
         let limit = usize::try_from(PAGE_ITEM_COUNT_MAX).unwrap();
         let mut scope = scope.clone();
         let mut listed: Vec<NodeKey> = Vec::new();
-        let first = journey.snapshot(&scope).unwrap();
+        let first = journey
+            .snapshot(
+                &scope,
+                &cairn_store::build::journey_header("j_plain", "Plain", None),
+            )
+            .unwrap();
         loop {
-            let page = journey.snapshot(&scope).unwrap();
+            let page = journey
+                .snapshot(
+                    &scope,
+                    &cairn_store::build::journey_header("j_plain", "Plain", None),
+                )
+                .unwrap();
             assert!(page.nodes.len() <= limit && page.acting_frontier.len() <= limit);
             listed.extend(page.nodes.iter().map(|node| node.row.key.clone()));
             match page.next {

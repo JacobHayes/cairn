@@ -12,9 +12,9 @@ use serde_json::json;
 
 use super::{Backend, applied, both, deployment, failed, journey, open, route, snapshot};
 use crate::build::{
-    self, action, create_identity, create_journey, create_route, deployment_patch, id, identity,
-    journey_graph, journey_patch, node, node_key, proposal_patch, put_in, remove_in, revision,
-    route_patch,
+    self, action, create_identity, create_journey, create_owned_journey, create_route,
+    deployment_patch, id, identity, journey_graph, journey_patch, node, node_key, proposal_patch,
+    put_in, remove_in, revision, route_patch,
 };
 use crate::commit::{CommitError, Committed, StoreError};
 use crate::faults::{CommitPoint, Faults};
@@ -1880,4 +1880,52 @@ pub async fn an_identity_merge_is_stale_when_another_journey_references_its_iden
     let merged = deployment(&store).await;
     assert!(merged.identities.get(&id("who_b")).is_none());
     assert_eq!(merged.aliases.get(&id("who_b")), Some(&id("who_a")));
+}
+
+/// E6: an owner is a reference like any other at commit time: an identity delete validated
+/// while no journey owned the identity is stale once one does, and a merge validated without
+/// naming that journey is stale on it.
+pub async fn an_owner_makes_identity_deletes_and_merges_stale<B: Backend>(backend: &B) {
+    let store = open(backend).await;
+    let people = deployment_patch("p_people", 0).event(
+        EventType::IdentityCreated,
+        Subject::Identity(id("who_a")),
+        vec![
+            Write::Put(Record::Identity(identity("who_a", "A", &[]))),
+            Write::Put(Record::Identity(identity("who_b", "B", &[]))),
+        ],
+    );
+    applied(&store, people.commit()).await;
+    applied(
+        &store,
+        create_owned_journey("p_one", "j_one", &["who_b"]).commit(),
+    )
+    .await;
+    let delete = deployment_patch("p_delete", 1)
+        .unreferenced(&["who_b"])
+        .event(
+            EventType::IdentityDeleted,
+            Subject::Identity(id("who_b")),
+            vec![Write::Remove(RecordKey::Identity(id("who_b")))],
+        )
+        .commit();
+    let (conflicts, _) = stale_parts(failed(&store, delete).await);
+    assert_eq!(conflicts, vec![conflict(journey_of("j_one"), 0, 1)]);
+
+    let merge = deployment_patch("p_merge", 1)
+        .referencing(&["who_a", "who_b"], &[])
+        .event(
+            EventType::IdentitiesMerged,
+            Subject::Identity(id("who_b")),
+            vec![
+                Write::Remove(RecordKey::Identity(id("who_b"))),
+                Write::Put(Record::IdentityAlias {
+                    alias: id("who_b"),
+                    identity: id("who_a"),
+                }),
+            ],
+        )
+        .commit();
+    let (conflicts, _) = stale_parts(failed(&store, merge).await);
+    assert_eq!(conflicts, vec![conflict(journey_of("j_one"), 0, 1)]);
 }

@@ -39,6 +39,9 @@ pub struct JourneyIndexQuery {
     /// Journeys referring to any of these identities, directly or through an alias.
     #[serde(default)]
     pub referencing: BTreeSet<IdentityKey>,
+    /// Journeys owned by any of these identities, directly or through an alias.
+    #[serde(default)]
+    pub owner: BTreeSet<IdentityKey>,
     /// Journeys whose route has, or has not, published a version newer than theirs.
     #[serde(default)]
     pub upgrade_available: Option<bool>,
@@ -62,6 +65,7 @@ impl JourneyIndexQuery {
             self.after.clone(),
             self.size,
         )
+        .owned_by(self.owner.clone())
     }
 }
 

@@ -10,8 +10,8 @@ use std::collections::BTreeSet;
 
 use cairn_engine::{Derived, DerivedJourney, DraftContext, Graph, ProjectionError, derive};
 use cairn_schema::{
-    AttachmentKey, Cursor, Deployment, DomainDocument, ExplainedField, IdentityKey, KindKey,
-    LevelQuery, ListQuery, NextQuery, NodeKey, NodeKind, RenderedDraft, ResourceContent,
+    AttachmentKey, Cursor, Deployment, DomainDocument, ExplainedField, IdentityKey, JourneyHeader,
+    KindKey, LevelQuery, ListQuery, NextQuery, NodeKey, NodeKind, RenderedDraft, ResourceContent,
     SnapshotScope, Url,
 };
 use serde::{Deserialize, Serialize};
@@ -120,13 +120,16 @@ pub struct DraftRequest {
 }
 
 /// One projection run on a derived journey with the deployment and viewer it was derived for:
-/// the one path a journey's document and a route's graph are both projected through.
+/// the one path a journey's document and a route's graph are both projected through. `header`
+/// is the journey's own fields, which only its snapshot reads; a route has none.
 ///
 /// # Errors
 ///
-/// [`HostError::Missing`] when the request names a node the journey does not hold.
+/// [`HostError::Missing`] when the request names a node the journey does not hold, or asks a
+/// route for a snapshot.
 pub(crate) fn projected(
     journey: &DerivedJourney<'_>,
+    header: Option<&JourneyHeader>,
     deployment: &Deployment,
     viewer: &BTreeSet<IdentityKey>,
     request: &Projection,
@@ -151,7 +154,12 @@ pub(crate) fn projected(
         Projection::Next { query } => json(&journey.next(query, viewer).map_err(missing)?),
         Projection::List { query } => json(&journey.list(query, viewer).map_err(missing)?),
         Projection::Mine { kinds } => json(&journey.mine(viewer, kinds)),
-        Projection::Snapshot { scope } => json(&journey.snapshot(scope).map_err(missing)?),
+        Projection::Snapshot { scope } => {
+            let header = header.ok_or_else(|| HostError::Missing {
+                message: "a route has no snapshot".to_owned(),
+            })?;
+            json(&journey.snapshot(scope, header).map_err(missing)?)
+        }
         Projection::Explanations { key, field, cursor } => json(
             &journey
                 .explanations(key, *field, *cursor)
@@ -205,6 +213,7 @@ impl Derivation {
     pub fn projected(&self, request: &Projection) -> Result<String, HostError> {
         projected(
             &DerivedJourney::new(&self.graph, &self.derived),
+            Some(&self.document.journey.header),
             &self.document.inputs.deployment,
             &self.document.inputs.viewer,
             request,

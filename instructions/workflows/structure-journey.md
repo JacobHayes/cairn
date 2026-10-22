@@ -8,7 +8,8 @@ A journey can start with no route. Its structure is drafted the same way as a ro
 but on the journey itself.
 
 1. **Create it if needed.** `create_journey` with an id you choose (`j_` and a slug), a
-   name, and no `from`.
+   name, no `from`, and `owners` if the person named who owns
+   it.
 2. **Understand the situation.** Ask what has to happen, what has to be decided first, who
    is involved, and what dates are fixed. Keep it small: a few groups with the decisions,
    deliverables, actions, and milestones under them. For phases bounded by milestones, see Stages in the Cairn guide.

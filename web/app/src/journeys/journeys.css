@@ -36,6 +36,13 @@
   color: var(--color-secondary);
 }
 
+/* On a phone the selects stack, so their labels share one width and the boxes start at one edge. */
+@media (max-width: 719px) {
+  .index-filters .filter-label {
+    min-width: 4.5rem;
+  }
+}
+
 .index-filters .check {
   font-size: 15px;
 }

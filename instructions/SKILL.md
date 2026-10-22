@@ -84,13 +84,13 @@ out, though its relevance reads `not_relevant` and counts for nothing until then
   code, and a message. Fix all of them at once; nothing was written.
 - **Arguments.** A call whose arguments do not match the tool's schema is refused with the
   path that did not match.
-- **Identities.** A write that names identities (an identity answer, explicit participants)
-  carries the `deployment_revision` the snapshot reported. An identity has a name, emails,
+- **Identities.** A write that names identities (an identity answer, explicit participants,
+  a journey's owners) carries the `deployment_revision` the snapshot reported. An identity has a name, emails,
   or both; a person who only signed in has emails and no name. An identity that anything
   refers to (an answer, a participant, an owner, a condition) cannot be deleted: merge it into
   the identity that remains, naming the journeys that refer to it. `list_identities` finds an
   identity by name or email; `list_journeys` with `referencing` finds the journeys that
-  refer to one.
+  refer to one, and with `owners` the journeys it owns.
 - **Deleting.** Archiving a journey or retiring a route sets it aside; deleting is permanent,
   and a deleted id is never used again. Delete only when the person asks. One `apply_patch`
   to the `deployment` (its revision is the `deployment_revision` a snapshot reports) deletes
@@ -164,8 +164,11 @@ a state change, when there is one, is simpler). Several edits are one patch, one
 - **Resources and notes:** `add_resource`, `edit_resource`, `remove_resource`; and
   `add_annotation`, `edit_annotation`, `remove_annotation`.
 - **A placeholder's breakdown flag:** `set_atomic`.
-- **The journey:** `edit_journey` (name, description) and `set_journey_status` (completing
-  or archiving is the person's call). `delete_journey` is permanent; only when the
+- **The journey:** `edit_journey` (the name and description, both as given, so send the
+  snapshot's description to keep it; and `owners`, kept when left out, replaced when given,
+  cleared by an empty list) and `set_journey_status` (completing
+  or archiving is the person's call). Owners are never assumed, the creator included: leave them empty unless
+  the person names them. `delete_journey` is permanent; only when the
   person asks. Also `discard_proposal` for a proposal nobody will apply.
 - **Routes:** `create_route`, `edit_route`, `set_route_retired` (hides it from new
   journeys), and a draft's `discard_draft`; `open_draft` and `publish_draft` are also

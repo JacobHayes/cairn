@@ -3,7 +3,7 @@
 // the back button. The path mirrors the API:
 //
 //   /                                       Home: what waits on the viewer, then their journeys
-//   /journeys?status=&route=&version=&mine=&upgrade=   the journey index; its filters in the query
+//   /journeys?status=&route=&version=&owner=&mine=&upgrade=   the journey index; its filters in the query
 //   /journeys/new?route=&version=           the new-journey form
 //   /journeys/<id>                          a journey
 //   /journeys/<id>/nodes/<key>              a node selected in it
@@ -33,7 +33,9 @@ export interface IndexFilters {
   status: JourneyStatus | "any";
   route: string | undefined;
   version: number | undefined;
-  /** Only journeys holding something of the caller's ("mine", E4). */
+  /** Only journeys owned by this identity, through any merge (C16). */
+  owner: string | undefined;
+  /** Only journeys the caller owns or holds something in ("mine", E4). */
   mine: boolean;
   /** Only journeys whose route has published a newer version (C16, from the host). */
   upgrade: boolean;
@@ -43,7 +45,7 @@ export interface IndexFilters {
  * The index opens on active journeys: completed ones leave "mine" and the cross-journey lists
  * (B11), and archived ones are out of the way until asked for.
  */
-export const DEFAULT_FILTERS: IndexFilters = { status: "active", route: undefined, version: undefined, mine: false, upgrade: false };
+export const DEFAULT_FILTERS: IndexFilters = { status: "active", route: undefined, version: undefined, owner: undefined, mine: false, upgrade: false };
 
 function positive(text: string | null): number | undefined {
   const number = Number(text);
@@ -57,6 +59,7 @@ export function filtersFrom(params: URLSearchParams): IndexFilters {
     status: status === "any" ? "any" : (JOURNEY_STATUSES.find((each) => each === status) ?? "active"),
     route,
     version: route === undefined ? undefined : positive(params.get("version")),
+    owner: params.get("owner") ?? undefined,
     mine: params.get("mine") === "1",
     upgrade: params.get("upgrade") === "1",
   };
@@ -73,6 +76,9 @@ export function filterParams(filters: IndexFilters): URLSearchParams {
       params.set("version", String(filters.version));
     }
   }
+  if (filters.owner !== undefined) {
+    params.set("owner", filters.owner);
+  }
   if (filters.mine) {
     params.set("mine", "1");
   }
@@ -84,9 +90,9 @@ export function filterParams(filters: IndexFilters): URLSearchParams {
 
 /**
  * C16: the host's query for `filters`. "Mine" asks the host for the journeys referring to the
- * caller's identities (a superset of those where they hold a participation, E6), in the statuses
- * that hold current work (B11: a completed journey leaves "mine"); the index then keeps those
- * where the journey's own "mine" is not empty. None when "mine" can hold nothing: the caller has
+ * caller's identities (those they own and a superset of those where they hold a participation,
+ * E6), in the statuses that hold current work (B11: a completed journey leaves "mine"); the index
+ * then keeps those the caller owns or where the journey's own "mine" is not empty. None when "mine" can hold nothing: the caller has
  * no identity, or the status asked for holds no current work.
  */
 export function queryOf(filters: IndexFilters, identities: readonly string[]): JourneyIndexQuery | undefined {
@@ -99,6 +105,9 @@ export function queryOf(filters: IndexFilters, identities: readonly string[]): J
     if (filters.version !== undefined) {
       query.version = filters.version;
     }
+  }
+  if (filters.owner !== undefined) {
+    query.owner = [filters.owner];
   }
   if (filters.upgrade) {
     query.upgrade_available = true;

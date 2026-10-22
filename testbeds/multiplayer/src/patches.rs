@@ -94,6 +94,7 @@ pub fn create_journey(nodes: u32) -> Patch {
     let mut mutations = vec![Mutation::CreateJourney {
         name: parse("Shared"),
         description: None,
+        owners: cairn_schema::IdentitySet::default(),
         from: None,
     }];
     mutations.extend((0..nodes).map(|index| Mutation::AddNode {

@@ -373,17 +373,26 @@ pub enum Mutation {
         /// The description.
         #[serde(skip_serializing_if = "Option::is_none")]
         description: Option<Markdown>,
+        /// Who is responsible for the journey as a whole; none when absent. Nobody is an
+        /// owner by default, the creator included.
+        #[serde(default, skip_serializing_if = "IdentitySet::is_empty")]
+        owners: IdentitySet,
         /// The route version to copy, or none for an empty journey.
         #[serde(skip_serializing_if = "Option::is_none")]
         from: Option<Lineage>,
     },
-    /// Rename or redescribe the journey.
+    /// Rename or redescribe the journey, or change its owners. The description is set as
+    /// given (absent clears it).
     EditJourney {
         /// The name.
         name: Title,
         /// The description.
         #[serde(skip_serializing_if = "Option::is_none")]
         description: Option<Markdown>,
+        /// Who is responsible for the journey as a whole: absent keeps the owners it has, a
+        /// list replaces them, an empty list clears them.
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        owners: Option<IdentitySet>,
     },
     // PRD: B11.
     /// Change the journey's status.

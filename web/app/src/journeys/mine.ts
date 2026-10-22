@@ -41,6 +41,17 @@ export function useMineOf(id: string): MineView {
 }
 
 /**
+ * E4, C16: what the index's "mine" counts in a journey: the nodes where the viewer holds something
+ * (`held`), and at least one when they own the journey (the host gives its owners as the identities
+ * they name now, so an owner through a merged key meets the viewer's identity). A journey counts
+ * for "mine" when this is not zero, so owning one with no work in it is still the viewer's.
+ */
+export function mineCountOf(summary: { owners?: readonly string[] | undefined }, held: number, viewer: readonly string[]): number {
+  const owns = (summary.owners ?? []).some((owner) => viewer.includes(owner));
+  return owns ? Math.max(1, held) : held;
+}
+
+/**
  * How many of `items` hold something of the caller's, as each journey's "mine" settles: a
  * list filtered to "mine" says so when none does, rather than showing an empty table. A journey
  * that could not be read is unknown, never none, even if it had been counted before.
@@ -56,7 +67,7 @@ export function useMineCounts(items: readonly { id: string }[]) {
 }
 
 /**
- * Reports journey `id`'s "mine" count to `report`: none for one gone, and unknown (`undefined`)
+ * Reports journey `id`'s "mine" count (`mineCountOf`) to `report`: none for one gone, and unknown (`undefined`)
  * while it is read or when it could not be (it may hold the caller's work).
  */
 export function useReportMine(id: string, count: number | undefined, report: (id: string, count: number | undefined) => void): void {

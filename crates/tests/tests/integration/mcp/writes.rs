@@ -359,3 +359,74 @@ async fn the_removal_read_is_what_a_patch_needs_to_remove_a_node() {
         .collect();
     assert_eq!(left, ["n_after", "n_extra"]);
 }
+
+/// A journey is created with owners, found by them, and named by them in the snapshot and
+/// the index as the identities they are now; a create drafted against an older deployment
+/// revision than a merge of its owner is stale.
+#[tokio::test]
+async fn a_journey_is_created_with_owners_and_a_merge_moves_them_on() {
+    let world = World::new();
+    let ann = user("u_ann");
+    for (patch_id, key, base) in [("p_a", "who_a", 0), ("p_b", "who_b", 1)] {
+        let create = json!({ "change": { "create": { "identity": { "key": key, "name": key } } },
+            "patch_id": patch_id, "base_revision": base });
+        world.ok(&ann, "manage_identity", create).await;
+    }
+    let deployment = world.service.deployment().await.unwrap().revision.get();
+    let create = |journey: &str, owner: &str, deployment_revision: u32| {
+        json!({ "journey": journey, "patch_id": format!("p_{journey}"), "name": journey,
+            "owners": [owner], "deployment_revision": deployment_revision })
+    };
+    world
+        .ok(
+            &ann,
+            "create_journey",
+            create("j_owned", "who_a", deployment),
+        )
+        .await;
+    let owners = |value: &serde_json::Value| value["owners"].clone();
+    let owned = world
+        .ok(&ann, "list_journeys", json!({ "owners": ["who_a"] }))
+        .await;
+    assert_eq!(owned["journeys"][0]["id"], "j_owned");
+    assert_eq!(owners(&owned["journeys"][0]), json!(["who_a"]));
+    let snapshot = world
+        .ok(&ann, "get_snapshot", json!({ "journey": "j_owned" }))
+        .await;
+    assert_eq!(owners(&snapshot["snapshot"]["journey"]), json!(["who_a"]));
+
+    let merge = json!({ "change": { "merge": { "survivor": "who_b", "merged": ["who_a"] } },
+        "patch_id": "p_merge", "base_revision": deployment });
+    world.ok(&ann, "manage_identity", merge).await;
+    let merged = world
+        .ok(&ann, "list_journeys", json!({ "owners": ["who_a"] }))
+        .await;
+    assert_eq!(
+        merged["journeys"][0]["id"], "j_owned",
+        "the merged key still finds it"
+    );
+    assert_eq!(owners(&merged["journeys"][0]), json!(["who_b"]));
+    let snapshot = world
+        .ok(&ann, "get_snapshot", json!({ "journey": "j_owned" }))
+        .await;
+    assert_eq!(owners(&snapshot["snapshot"]["journey"]), json!(["who_b"]));
+
+    // The deployment revision the create names is checked: it moved on (the merge), and the
+    // write, which touches nothing the merge did, lands over it and says so.
+    let late = world
+        .ok(
+            &ann,
+            "create_journey",
+            create("j_late", "who_b", deployment),
+        )
+        .await;
+    assert_eq!(
+        late["over"]["conflicts"][0]["of"],
+        json!({ "domain": "deployment" }),
+        "{late}"
+    );
+    let snapshot = world
+        .ok(&ann, "get_snapshot", json!({ "journey": "j_late" }))
+        .await;
+    assert_eq!(owners(&snapshot["snapshot"]["journey"]), json!(["who_b"]));
+}

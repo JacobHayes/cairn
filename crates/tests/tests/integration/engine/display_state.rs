@@ -14,13 +14,14 @@ use DisplayState::{
 };
 use cairn_engine::{Derived, DerivedJourney, Graph, Records};
 use cairn_schema::{
-    Deployment, DisplayState, LevelQuery, NextQuery, NodeKind, Relevance, SnapshotScope, State,
-    StatusSummary,
+    Deployment, DisplayState, JourneyHeader, LevelQuery, NextQuery, NodeKind, Relevance,
+    SnapshotScope, State, StatusSummary,
 };
 use support::{add_nodes as add, key};
 
 /// A journey's graph and its derive at `today`.
 struct Seen {
+    header: JourneyHeader,
     graph: Graph,
     derived: Derived,
 }
@@ -28,6 +29,7 @@ struct Seen {
 impl Seen {
     fn of(records: &Records, journey: &str, today: &str) -> Self {
         Self {
+            header: support::journey_header(records, journey),
             graph: support::journey_graph(records, journey),
             derived: support::derived_on(records, journey, today.parse().unwrap()),
         }
@@ -296,7 +298,7 @@ fn counts_agree_everywhere_and_by_state_is_unchanged() {
         let summary: StatusSummary = seen.journey().status_summary();
         let snapshot = seen
             .journey()
-            .snapshot(&SnapshotScope::default())
+            .snapshot(&SnapshotScope::default(), &seen.header)
             .unwrap()
             .counts;
         let mut stored: BTreeMap<State, u32> = BTreeMap::new();
@@ -379,7 +381,10 @@ fn unassigned_is_for_unfinished_in_scope_work() {
     assert!(!unassigned("n_finish"), "finished");
     assert!(!unassigned("n_branch"), "not relevant");
     assert!(!unassigned("n_inner"), "not relevant");
-    let row = seen.journey().snapshot(&SnapshotScope::default()).unwrap();
+    let row = seen
+        .journey()
+        .snapshot(&SnapshotScope::default(), &seen.header)
+        .unwrap();
     assert!(row.unassigned.contains(&key("n_plain")));
     assert!(!row.unassigned.contains(&key("n_box")));
 }

@@ -442,6 +442,7 @@ fn saved_and_created(out: &mut String, records: &Records, journey: &JourneyId) -
     let create = Mutation::CreateJourney {
         name: "Again".parse()?,
         description: None,
+        owners: cairn_schema::IdentitySet::default(),
         from: Some(lineage),
     };
     let again: JourneyId = "j_again".parse()?;

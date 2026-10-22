@@ -102,17 +102,25 @@ impl Domains {
         .unwrap_or_default()
     }
 
-    /// E6: the graphs referring to any of `identities`, directly or through an alias.
+    /// E6: the graphs referring to any of `identities`, directly or through an alias: a
+    /// journey's by what its graph names and by its owners, a route's by its graph.
     pub fn graphs_referencing(
         &self,
         identities: &BTreeSet<cairn_schema::IdentityKey>,
     ) -> BTreeSet<GraphId> {
         let keys = crate::backend::query::with_aliases(identities, &self.deployment.aliases);
-        self.graphs
+        let by_graph = self
+            .graphs
             .iter()
             .filter(|(_, graph)| !graph.identity_references().is_disjoint(&keys))
-            .map(|(id, _)| id.clone())
-            .collect()
+            .map(|(id, _)| id.clone());
+        // A journey with no graph content still has owners.
+        let by_owner = self
+            .journeys
+            .iter()
+            .filter(|(_, (header, _))| header.owners.iter().any(|owner| keys.contains(owner)))
+            .map(|(id, _)| GraphId::Journey(id.clone()));
+        by_graph.chain(by_owner).collect()
     }
 
     /// The revision of the domain a graph belongs to: its journey's, or its route's.

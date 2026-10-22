@@ -111,15 +111,27 @@ fn arb_lifecycle_mutation() -> BoxedStrategy<Mutation> {
         (
             arb_title(),
             prop::option::of(arb_markdown()),
+            arb_identity_set(),
             prop::option::of(arb_lineage())
         )
-            .prop_map(|(name, description, from)| Mutation::CreateJourney {
+            .prop_map(
+                |(name, description, owners, from)| Mutation::CreateJourney {
+                    name,
+                    description,
+                    owners,
+                    from
+                }
+            ),
+        (
+            arb_title(),
+            prop::option::of(arb_markdown()),
+            prop::option::of(arb_identity_set())
+        )
+            .prop_map(|(name, description, owners)| Mutation::EditJourney {
                 name,
                 description,
-                from
+                owners
             }),
-        (arb_title(), prop::option::of(arb_markdown()))
-            .prop_map(|(name, description)| Mutation::EditJourney { name, description }),
         arb_journey_status().prop_map(|status| Mutation::SetJourneyStatus { status }),
         (arb_journey_id(), arb_revision())
             .prop_map(|(journey, revision)| Mutation::DeleteJourney { journey, revision }),

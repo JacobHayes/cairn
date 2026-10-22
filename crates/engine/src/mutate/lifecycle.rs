@@ -4,10 +4,10 @@
 use std::collections::BTreeSet;
 
 use cairn_schema::{
-    DraftSource, GraphId, GraphKey, GraphRecord, JourneyHeader, JourneyId, JourneyStatus, Limit,
-    Lineage, LocalEdit, Markdown, Mutation, NodeKey, NodeState, PatchTarget, Provenance, Record,
-    RecordKey, RetiredKey, RouteHeader, RouteId, RouteKind, Subject, Title, VersionNumber,
-    ViolationCode, Write,
+    DraftSource, GraphId, GraphKey, GraphRecord, IdentitySet, JourneyHeader, JourneyId,
+    JourneyStatus, Limit, Lineage, LocalEdit, Markdown, Mutation, NodeKey, NodeState, PatchTarget,
+    Provenance, Record, RecordKey, RetiredKey, RouteHeader, RouteId, RouteKind, Subject, Title,
+    VersionNumber, ViolationCode, Write,
 };
 
 use super::Session;
@@ -20,15 +20,33 @@ pub(super) fn apply(session: &mut Session<'_>, mutation: &Mutation) -> Vec<Write
             Mutation::CreateJourney {
                 name,
                 description,
+                owners,
                 from,
             },
-        ) => create_journey(session, id, name, description.as_ref(), from.as_ref()),
-        (PatchTarget::Journey(_), Mutation::EditJourney { name, description }) => {
-            edit_journey(session, |header| {
-                header.name = name.clone();
-                header.description.clone_from(description);
-            })
-        }
+        ) => create_journey(
+            session,
+            id,
+            JourneyDetails {
+                name,
+                description: description.as_ref(),
+                owners,
+            },
+            from.as_ref(),
+        ),
+        (
+            PatchTarget::Journey(_),
+            Mutation::EditJourney {
+                name,
+                description,
+                owners,
+            },
+        ) => edit_journey(session, |header| {
+            header.name = name.clone();
+            header.description.clone_from(description);
+            if let Some(owners) = owners {
+                header.owners = owners.clone();
+            }
+        }),
         (PatchTarget::Journey(_), Mutation::SetJourneyStatus { status }) => {
             set_status(session, *status)
         }
@@ -47,13 +65,20 @@ pub(super) fn apply(session: &mut Session<'_>, mutation: &Mutation) -> Vec<Write
     }
 }
 
+/// What a new journey is called and who owns it.
+#[derive(Clone, Copy)]
+struct JourneyDetails<'a> {
+    name: &'a Title,
+    description: Option<&'a Markdown>,
+    owners: &'a IdentitySet,
+}
+
 /// B1: a journey from a route version (nodes copied with their keys, every node in its
 /// initial state, lineage recorded) or empty (no lineage).
 fn create_journey(
     session: &mut Session<'_>,
     id: &JourneyId,
-    name: &Title,
-    description: Option<&Markdown>,
+    details: JourneyDetails<'_>,
     from: Option<&Lineage>,
 ) -> Vec<Write> {
     assert!(
@@ -62,8 +87,9 @@ fn create_journey(
     );
     let header = JourneyHeader {
         id: id.clone(),
-        name: name.clone(),
-        description: description.cloned(),
+        name: details.name.clone(),
+        description: details.description.cloned(),
+        owners: details.owners.clone(),
         status: JourneyStatus::Active,
         lineage: from.cloned(),
         created_at: session.inputs.at,

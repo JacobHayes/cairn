@@ -14,6 +14,7 @@ use crate::derived::{
     Blocker, Contribution, DateOrigin, DisplayState, EffectiveDate, HeldDependent, Progress, Real,
     Relevance, Score, Stalled,
 };
+use crate::domain::JourneyStatus;
 use crate::event::Event;
 use crate::id::{IdentityKey, KindKey, NodeKey, PatchId, Path, RoleKey, Slug};
 use crate::node::{AnswerType, NodeKind};
@@ -831,6 +832,24 @@ pub struct SnapshotCounts {
     pub acting_frontier: u32,
 }
 
+// PRD: I3, C16.
+/// The journey's own facts in its snapshot.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+#[serde(deny_unknown_fields)]
+pub struct SnapshotJourney {
+    /// Its name.
+    pub name: Title,
+    /// What it is for.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub description: Option<Markdown>,
+    /// Its status.
+    pub status: JourneyStatus,
+    /// Who is responsible for it as a whole, each as the identity it names now (a merged
+    /// key reads as the identity it was merged into).
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub owners: Vec<IdentityKey>,
+}
+
 // PRD: I3.
 /// The bounded agent view of a journey: answers, a page of in-scope nodes, the ranked
 /// acting frontier's top N with the rest as keys, open decisions by rank, placeholders needing
@@ -838,6 +857,8 @@ pub struct SnapshotCounts {
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize, JsonSchema)]
 #[serde(deny_unknown_fields)]
 pub struct Snapshot {
+    /// The journey's name, description, status and owners.
+    pub journey: SnapshotJourney,
     /// The today it was derived for.
     pub today: Date,
     /// What it covers.

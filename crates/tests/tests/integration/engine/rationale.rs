@@ -71,7 +71,10 @@ fn snapshot(records: &Records) -> Snapshot {
     let graph = support::journey_graph(records, HIRING);
     let derived = support::derived(records, HIRING);
     DerivedJourney::new(&graph, &derived)
-        .snapshot(&SnapshotScope::default())
+        .snapshot(
+            &SnapshotScope::default(),
+            &support::journey_header(records, HIRING),
+        )
         .unwrap()
 }
 

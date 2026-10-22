@@ -1,25 +1,21 @@
 //! Identity resolution through aliases (E6, H3): which identity a key names once merges are
-//! followed, and which graphs refer to a set of identities. Where a graph names an identity is
-//! `cairn_schema::Graph::identity_mentions`, the one rule the stores share.
+//! followed, and which graphs and journeys refer to a set of identities. Where they name an identity is
+//! `cairn_schema::Journey::identity_mentions` and `Graph::identity_mentions`, the one rule the
+//! stores share.
 
 use std::collections::BTreeSet;
 
-use cairn_schema::{Deployment, Graph, IdentityKey};
+use cairn_schema::{Deployment, IdentityKey};
 
-/// Whether `graph` names any of `identities` (identities or aliases resolving to one of them):
-/// in an answer, a fill, a participation, or an identity-typed condition.
+/// Whether any of `keys` (identities or aliases) resolves to one of `identities`. Callers pass
+/// what a journey or a route's graph refers to (`Journey::identity_references`,
+/// `Graph::identity_references`).
 #[must_use]
-pub(crate) fn refers_to(
-    graph: &Graph,
+pub(crate) fn refers_to<'a>(
+    keys: impl IntoIterator<Item = &'a IdentityKey>,
     deployment: &Deployment,
     identities: &BTreeSet<&IdentityKey>,
 ) -> bool {
-    let mentioned = graph.identity_mentions();
-    let compared = graph.condition_identity_mentions();
-    let keys = mentioned
-        .iter()
-        .map(|(_, key)| *key)
-        .chain(compared.iter().map(|(_, key)| key));
     keys.into_iter().any(|key| {
         let resolved = resolve(deployment, key).unwrap_or(key);
         identities.contains(resolved)

@@ -100,7 +100,12 @@ mod cost {
         assert_eq!(nodes, NODE_COUNT_MAX as usize);
         levels_stay_within_their_bounds(&journey, &derived, nodes);
         let page = PAGE_ITEM_COUNT_MAX as usize;
-        let snapshot = journey.snapshot(&SnapshotScope::default()).unwrap();
+        let snapshot = journey
+            .snapshot(
+                &SnapshotScope::default(),
+                &cairn_store::build::journey_header("j_plain", "Plain", None),
+            )
+            .unwrap();
         assert!(snapshot.nodes.len() <= page && snapshot.acting_frontier.len() <= page);
         let list = journey
             .list(&ListQuery::default(), &BTreeSet::new())

@@ -14,6 +14,7 @@ use crate::collections::{
 use crate::graph::Graph;
 use crate::id::{IdentityKey, JourneyId, RouteId};
 use crate::limits::{Limit, LimitExceeded};
+use crate::node::IdentitySet;
 use crate::number::{Revision, VersionNumber};
 use crate::text::{Email, Markdown, Title};
 use jiff::Timestamp;
@@ -197,6 +198,10 @@ pub struct JourneyHeader {
     /// What it is for.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub description: Option<Markdown>,
+    // PRD: B1, C16.
+    /// Who is responsible for the journey as a whole: zero or more identities.
+    #[serde(default, skip_serializing_if = "IdentitySet::is_empty")]
+    pub owners: IdentitySet,
     /// Its status.
     pub status: JourneyStatus,
     /// The route version it follows, if any.

@@ -1,9 +1,12 @@
-//! Where a graph names an identity (E6, H3): the one typed rule every reader of a graph's
+//! Where a graph or a journey names an identity (E6, H3): the one typed rule every reader of
 //! identity references uses, the engine's checks and both stores' reference queries alike.
+//! The journey methods are the rule for a journey (its graph's mentions plus its owners); the
+//! graph methods are the rule for a route's graph.
 
 use std::collections::BTreeSet;
 
 use crate::condition::{Clause, Condition, ConditionValue};
+use crate::domain::Journey;
 use crate::graph::Graph;
 use crate::id::{IdentityKey, NodeKey, RoleKey};
 use crate::node::{AnswerSpec, ParticipationSource, Payload};
@@ -19,6 +22,34 @@ pub enum Mention {
     RoleFill(RoleKey),
     /// An explicit participation on a node.
     Participation(NodeKey),
+    /// One of a journey's owners.
+    JourneyOwner,
+}
+
+impl Journey {
+    // PRD: E6, C16.
+    /// Every identity the journey names: its graph's mentions (see
+    /// [`Graph::identity_mentions`]) and each of its owners, by the key it holds.
+    #[must_use]
+    pub fn identity_mentions(&self) -> Vec<(Mention, &IdentityKey)> {
+        let mut found = self.graph.identity_mentions();
+        found.extend(
+            self.header
+                .owners
+                .iter()
+                .map(|owner| (Mention::JourneyOwner, owner)),
+        );
+        found
+    }
+
+    /// Every identity key the journey names anywhere: its graph's references (see
+    /// [`Graph::identity_references`]) and its owners, by the key it holds.
+    #[must_use]
+    pub fn identity_references(&self) -> BTreeSet<IdentityKey> {
+        let mut found = self.graph.identity_references();
+        found.extend(self.header.owners.iter().cloned());
+        found
+    }
 }
 
 impl Graph {

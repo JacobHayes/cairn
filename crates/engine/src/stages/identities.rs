@@ -1,19 +1,27 @@
 //! Identity references resolve (PRD Invariants: journey, identity answers resolve to identities;
-//! E6): every identity a graph the patch wrote names is an identity of the candidate deployment
-//! or an alias of one. An identity merge is checked against every journey referencing either
+//! E6): every identity a graph the patch wrote names, and every owner of a journey it wrote, is
+//! an identity of the candidate deployment or an alias of one. An identity merge is checked against every journey referencing either
 //! identity: each must still hold every invariant with the merge applied.
 
-use cairn_schema::{Deployment, Mention, Subject, Violation, ViolationCode};
+use cairn_schema::{
+    Deployment, GraphId, IdentityKey, JourneyId, Mention, Subject, Violation, ViolationCode,
+};
 
 use super::Check;
-use crate::graph::{Document, Tree};
+use crate::graph::Tree;
 use crate::identity;
 use crate::validate::{GraphCheck, at_node, violation};
 
-/// Every identity mention in `document` that resolves to no identity.
-fn unresolved(document: &Document, tree: &Tree, deployment: &Deployment) -> Vec<Violation> {
+/// Every identity in `mentions` (those of a graph, and of its journey when it is one) that
+/// resolves to no identity. A journey's owners are reported at the journey `owned`.
+fn unresolved(
+    mentions: Vec<(Mention, &IdentityKey)>,
+    owned: Option<&JourneyId>,
+    tree: &Tree,
+    deployment: &Deployment,
+) -> Vec<Violation> {
     let mut found = Vec::new();
-    for (mention, key) in document.identity_mentions() {
+    for (mention, key) in mentions {
         if identity::resolve(deployment, key).is_some() {
             continue;
         }
@@ -25,6 +33,11 @@ fn unresolved(document: &Document, tree: &Tree, deployment: &Deployment) -> Vec<
             Mention::RoleFill(role) => {
                 let mut missing = violation(ViolationCode::IdentityUnresolved, message);
                 missing.at.subject = Some(Subject::Role(role.clone()));
+                missing
+            }
+            Mention::JourneyOwner => {
+                let mut missing = violation(ViolationCode::IdentityUnresolved, message);
+                missing.at.subject = owned.map(|id| Subject::Journey(id.clone()));
                 missing
             }
         };
@@ -43,9 +56,21 @@ pub(super) fn check(check: &mut Check<'_, '_>) {
             continue;
         };
         let tree = Tree::build(document);
+        let (mentions, owned) = match &id {
+            GraphId::Journey(journey) => (
+                candidate
+                    .journeys
+                    .get(journey)
+                    .map_or_else(Vec::new, |journey| journey.identity_mentions()),
+                Some(journey),
+            ),
+            GraphId::RouteDraft(_) | GraphId::RouteVersion { .. } => {
+                (document.identity_mentions(), None)
+            }
+        };
         check
             .violations
-            .extend(unresolved(document, &tree, &candidate.deployment));
+            .extend(unresolved(mentions, owned, &tree, &candidate.deployment));
     }
     for id in &session.merge_checked {
         let Some(journey) = candidate.journeys.get(id) else {
@@ -58,7 +83,12 @@ pub(super) fn check(check: &mut Check<'_, '_>) {
             tree: &tree,
             journey: true,
         };
-        let mut broken = unresolved(document, &tree, &candidate.deployment);
+        let mut broken = unresolved(
+            journey.identity_mentions(),
+            Some(id),
+            &tree,
+            &candidate.deployment,
+        );
         crate::validate::with_plan(&graph, &candidate.deployment, &mut broken);
         for inner in broken {
             let mut found = violation(

@@ -154,7 +154,7 @@ const COVERAGE: &[(&str, &[&str])] = &[
         &["override"],
     ),
     (
-        "list identities by name or email, find the journeys that refer to an identity, and manage identities (create, link, merge, delete)",
+        "list identities by name or email, find the journeys that refer to an identity or that it owns, and manage identities (create, link, merge, delete)",
         &["list_identities", "list_journeys", "manage_identity"],
     ),
     ("route import/export", &["import_route", "export_route"]),

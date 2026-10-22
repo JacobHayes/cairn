@@ -14,8 +14,8 @@ use std::collections::{BTreeMap, BTreeSet};
 
 use cairn_schema::limits::PAGE_ITEM_COUNT_MAX;
 use cairn_schema::{
-    DisplayState, KindKey, NextQuery, NodeKey, Relevance, Snapshot, SnapshotCounts, SnapshotNode,
-    SnapshotScope, State,
+    DisplayState, IdentityKey, JourneyHeader, KindKey, NextQuery, NodeKey, Relevance, Snapshot,
+    SnapshotCounts, SnapshotJourney, SnapshotNode, SnapshotScope, State,
 };
 
 use super::rows::{count, page};
@@ -30,7 +30,11 @@ impl DerivedJourney<'_> {
     /// # Errors
     ///
     /// When the subtree is not a node of the journey.
-    pub fn snapshot(&self, scope: &SnapshotScope) -> Result<Snapshot, ProjectionError> {
+    pub fn snapshot(
+        &self,
+        scope: &SnapshotScope,
+        header: &JourneyHeader,
+    ) -> Result<Snapshot, ProjectionError> {
         let subtree = scope.subtree.as_ref();
         let mut scoped: Vec<&NodeKey> = Vec::new();
         if let Some(top) = subtree {
@@ -72,6 +76,7 @@ impl DerivedJourney<'_> {
                 .collect()
         };
         Ok(Snapshot {
+            journey: self.snapshot_journey(header),
             today: derived.today(),
             scope: scope.clone(),
             answers: in_scope
@@ -94,6 +99,22 @@ impl DerivedJourney<'_> {
             completion_suggested: self.completion_suggested(),
             counts: self.counts(&scoped, &in_scope, listed.len(), frontier.len(), subtree),
         })
+    }
+
+    /// The journey's facts, each owner as the identity it names now, once.
+    fn snapshot_journey(&self, header: &JourneyHeader) -> SnapshotJourney {
+        let participation = self.derived.participation();
+        let owners: BTreeSet<IdentityKey> = header
+            .owners
+            .iter()
+            .map(|owner| participation.canonical_identity(owner).clone())
+            .collect();
+        SnapshotJourney {
+            name: header.name.clone(),
+            description: header.description.clone(),
+            status: header.status,
+            owners: owners.into_iter().collect(),
+        }
     }
 
     /// The in-scope nodes no deeper than `depth` levels below the subtree's node (roots at

@@ -18,7 +18,7 @@ use std::collections::{BTreeSet, VecDeque};
 use std::sync::{Arc, Mutex, PoisonError};
 
 use cairn_engine::{Derived, Graph, derive};
-use cairn_schema::{Date, Deployment, IdentityKey, Journey, JourneyId, Revision};
+use cairn_schema::{Date, Deployment, IdentityKey, Journey, JourneyHeader, JourneyId, Revision};
 
 /// How many derivations the memo keeps. A derivation at the limits holds a 2,000-node graph
 /// and its derive, tens of MiB, so the bound keeps the worst case within a few hundred MiB
@@ -45,6 +45,8 @@ pub(crate) struct MemoKey {
 pub(crate) struct Derivation {
     /// What it was derived from.
     pub key: MemoKey,
+    /// Its own fields: what its snapshot reports beside the graph.
+    pub header: JourneyHeader,
     /// Its graph, validated.
     pub graph: Graph,
     /// Its derive.
@@ -66,7 +68,7 @@ impl Derivation {
         inputs: &cairn_schema::DeriveInputs,
     ) -> Self {
         let key = MemoKey {
-            journey: journey.header.id,
+            journey: journey.header.id.clone(),
             revision: journey.revision,
             deployment: deployment.revision,
             today: inputs.today,
@@ -82,6 +84,7 @@ impl Derivation {
         assert_eq!(derived.today(), key.today);
         Self {
             key,
+            header: journey.header,
             graph,
             derived,
             deployment: deployment.clone(),

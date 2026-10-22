@@ -5,9 +5,10 @@ import { useState } from "react";
 import { Link } from "react-router";
 
 import { valueOf } from "../data/keyed-read.ts";
-import { useLive } from "../data/react.ts";
+import { useCaller, useLive } from "../data/react.ts";
 import { indexKey, journeyIndex, routeIndex } from "../data/reads.ts";
 import type { Ready } from "../detail/model.ts";
+import { identityNameList, NO_OWNER } from "../detail/sections.tsx";
 import { JourneyFlow } from "../proposals/Entries.tsx";
 import { Badge } from "../ui/kit.tsx";
 import { routePath } from "../routes/address.ts";
@@ -15,7 +16,9 @@ import { useWritable } from "../screens/writable.ts";
 import type { SummaryModel } from "../summary/model.ts";
 import { dateWords } from "../status/when.ts";
 import { TROUBLES } from "../status/words.ts";
+import { namedList } from "../ui/words.ts";
 import { upgradeWords } from "./figures-model.ts";
+import { journeyPath } from "./address.ts";
 import { listPath } from "./view.ts";
 import { Tip } from "../ui/Tip.tsx";
 
@@ -43,6 +46,40 @@ export function Flags({ ready, model }: { ready: Ready; model: SummaryModel }) {
           </Link>
         </span>
       ))}
+    </span>
+  );
+}
+
+/** The most owners the card names before "and N more". */
+const OWNERS_SHOWN = 3;
+
+/**
+ * C16: who owns the journey, as "Owned by you and Ana Silva", or "No owner": on the card at most
+ * three names, the rest as "and N more" linking to the Summary, which names them all (`all`).
+ */
+export function OwnersLine({ ready, all = false }: { ready: Ready; all?: boolean }) {
+  const { caller } = useCaller();
+  const { header } = ready.journey;
+  const names = identityNameList(ready.inputs.deployment, header.owners ?? [], caller?.identities ?? [], "you");
+  if (names.length === 0) {
+    return (
+      <span className="muted" data-testid="journey-owners" data-owners="0">
+        {NO_OWNER}
+      </span>
+    );
+  }
+  const shown = all || names.length <= OWNERS_SHOWN ? names : names.slice(0, OWNERS_SHOWN - 1);
+  const more = names.length - shown.length;
+  const named = more === 0 ? namedList(shown, Infinity) : shown.join(", ");
+  return (
+    <span data-testid="journey-owners" data-owners={names.length}>
+      Owned by {named}
+      {more === 0 ? null : (
+        <>
+          {" and "}
+          <Link to={journeyPath({ journey: header.id }, "summary")}>{more} more</Link>
+        </>
+      )}
     </span>
   );
 }

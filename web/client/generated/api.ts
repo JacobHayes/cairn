@@ -2631,6 +2631,8 @@ export interface components {
             lineage?: components["schemas"]["Lineage"] | null;
             /** @description Its name. */
             name: components["schemas"]["Title"];
+            /** @description Who is responsible for the journey as a whole: zero or more identities. */
+            owners?: components["schemas"]["IdentityKey"][];
             /** @description Its status. */
             status: components["schemas"]["JourneyStatus"];
         };
@@ -2726,6 +2728,11 @@ export interface components {
             lineage?: components["schemas"]["Lineage"] | null;
             /** @description Its name. */
             name: components["schemas"]["Title"];
+            /**
+             * @description Who owns it, each as the identity it names now (an alias read as the identity it was
+             *     merged into), once, in key order.
+             */
+            owners?: components["schemas"]["IdentityKey"][];
             /** @description Its revision. */
             revision: components["schemas"]["Revision"];
             /** @description Its status. */
@@ -2987,6 +2994,11 @@ export interface components {
             name: components["schemas"]["Title"];
             /** @constant */
             op: "create_journey";
+            /**
+             * @description Who is responsible for the journey as a whole; none when absent. Nobody is an
+             *     owner by default, the creator included.
+             */
+            owners?: components["schemas"]["IdentityKey"][];
         } | {
             /** @description The description. */
             description?: components["schemas"]["Markdown"] | null;
@@ -2994,6 +3006,11 @@ export interface components {
             name: components["schemas"]["Title"];
             /** @constant */
             op: "edit_journey";
+            /**
+             * @description Who is responsible for the journey as a whole: absent keeps the owners it has, a
+             *     list replaces them, an empty list clears them.
+             */
+            owners?: components["schemas"]["IdentityKey"][] | null;
         } | {
             /** @constant */
             op: "set_journey_status";
@@ -5237,6 +5254,8 @@ export interface components {
             completion_suggested?: boolean;
             /** @description The counts. */
             counts: components["schemas"]["SnapshotCounts"];
+            /** @description The journey's name, description, status and owners. */
+            journey: components["schemas"]["SnapshotJourney"];
             /** @description Placeholders needing breakdown. */
             needs_breakdown?: components["schemas"]["NodeKey"][];
             /** @description Where the next page of nodes starts, when there is one. */
@@ -5302,6 +5321,20 @@ export interface components {
              * @description Not-relevant nodes.
              */
             not_relevant: number;
+        };
+        /** @description The journey's own facts in its snapshot. */
+        SnapshotJourney: {
+            /** @description What it is for. */
+            description?: components["schemas"]["Markdown"] | null;
+            /** @description Its name. */
+            name: components["schemas"]["Title"];
+            /**
+             * @description Who is responsible for it as a whole, each as the identity it names now (a merged
+             *     key reads as the identity it was merged into).
+             */
+            owners?: components["schemas"]["IdentityKey"][];
+            /** @description Its status. */
+            status: components["schemas"]["JourneyStatus"];
         };
         /** @description One in-scope node in the snapshot, with its participations, blocking, and dates. */
         SnapshotNode: {
@@ -7047,6 +7080,8 @@ export interface operations {
                 version?: components["schemas"]["VersionNumber"];
                 /** @description Journeys referring to any of these identities, directly or through an alias. */
                 referencing?: components["schemas"]["IdentityKey"][];
+                /** @description Journeys owned by any of these identities, directly or through an alias. */
+                owner?: components["schemas"]["IdentityKey"][];
                 /** @description Journeys whose route has, or has not, published a newer version. */
                 upgrade_available?: boolean;
                 /** @description The page starts after this journey. */

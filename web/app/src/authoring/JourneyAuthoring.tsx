@@ -36,7 +36,7 @@ export function JourneyAuthoringBar({
     <section className="stack author-bar" aria-label="Edit the journey's structure" data-testid="authoring-bar">
       <div className="row">
         <span>
-          <strong>Editing:</strong> changes are patches to this journey
+          <strong>Editing</strong> this journey
         </span>
         <span className="spacer" />
         <StructureTools

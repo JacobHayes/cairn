@@ -294,10 +294,19 @@ fn referring_graphs(session: &Session<'_>, identities: &BTreeSet<&IdentityKey>) 
                 }),
         );
     for id in graphs {
-        let Some(graph) = candidate.graph(&id) else {
+        let references = match &id {
+            GraphId::Journey(journey) => candidate
+                .journeys
+                .get(journey)
+                .map(cairn_schema::Journey::identity_references),
+            GraphId::RouteDraft(_) | GraphId::RouteVersion { .. } => candidate
+                .graph(&id)
+                .map(cairn_schema::Graph::identity_references),
+        };
+        let Some(references) = references else {
             continue;
         };
-        if !identity::refers_to(graph, deployment, identities) {
+        if !identity::refers_to(&references, deployment, identities) {
             continue;
         }
         let subject = match id {
@@ -324,7 +333,7 @@ fn check_journeys(
     let deployment = &session.candidate.deployment;
     let mut referencing = Vec::new();
     for (id, journey) in &session.candidate.journeys {
-        if identity::refers_to(&journey.graph, deployment, identities) {
+        if identity::refers_to(&journey.identity_references(), deployment, identities) {
             referencing.push((id.clone(), journey.revision));
         }
     }

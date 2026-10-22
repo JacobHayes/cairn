@@ -2,7 +2,7 @@
    drawn with the design tokens so they read the same in light and dark. */
 /* Edit structure's band: a full-width tinted row under the header, not a box in the canvas. */
 .author-bar {
-  background: var(--color-tint);
+  background: var(--color-band);
   padding: var(--space-3) var(--space-4);
 }
 

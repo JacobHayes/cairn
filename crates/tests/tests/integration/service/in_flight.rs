@@ -404,3 +404,83 @@ fn a_stale_write_racing_a_commit_is_decided_against_everything_since_its_base_on
         }
     });
 }
+
+/// Journey `j_race` at revision 2, owned by `who_a`, which names no one else, beside `who_b`.
+async fn owned(service: &Service) {
+    created(service).await;
+    let people = patch(
+        "p_people",
+        "deployment",
+        0,
+        "- op: create_identity\n  identity: {key: who_a, name: A}\n- op: create_identity\n  identity: {key: who_b, name: B}\n",
+    );
+    applied(service.patch(&call("u_lead", AT), &domain(people)).await);
+    let own = patch(
+        "p_own",
+        "{journey: j_race}",
+        1,
+        "- op: edit_journey\n  name: Race\n  owners: [who_a]\n",
+    );
+    applied(service.patch(&call("u_lead", AT), &domain(own)).await);
+}
+
+/// E6, H5: a patch to a journey that names an identity only as an owner is held to the
+/// deployment revision it was validated against: an edit that names `who_b` as an owner,
+/// waiting while `who_b` is deleted, is decided again over what was committed and refused
+/// (it would apply nowhere), rather than committed with a dangling owner.
+async fn an_owner_edit_is_refused_beside_a_delete_of_that_owner(service: Service, gate: Arc<Gate>) {
+    let edit = patch(
+        "p_owners",
+        "{journey: j_race}",
+        2,
+        "- op: edit_journey\n  name: Race\n  owners: [who_a, who_b]\n",
+    );
+    let delete = patch(
+        "p_delete",
+        "deployment",
+        1,
+        "- op: delete_identity\n  identity: who_b\n",
+    );
+    let (edit, delete) = beside_held(&service, &gate, edit, delete).await;
+    applied(delete);
+    assert!(matches!(edit, Err(WriteError::Rejected(_))), "{edit:#?}");
+    let journey = service
+        .journey(&"j_race".parse().unwrap())
+        .await
+        .unwrap()
+        .unwrap();
+    assert_eq!(
+        journey
+            .header
+            .owners
+            .iter()
+            .map(ToString::to_string)
+            .collect::<Vec<_>>(),
+        ["who_a"]
+    );
+}
+
+#[test]
+fn an_owner_edit_is_refused_beside_a_delete_of_that_owner_on_memory() {
+    support::run(async {
+        let faults = Faults::default();
+        let store = Arc::new(MemoryStore::with_faults(faults.clone()));
+        let (service, _) = support::service_over(store);
+        owned(&service).await;
+        let gate = Gate::on(&faults, CommitPoint::BeforeBegin);
+        an_owner_edit_is_refused_beside_a_delete_of_that_owner(service, gate).await;
+    });
+}
+
+#[test]
+fn an_owner_edit_is_refused_beside_a_delete_of_that_owner_on_sqlite() {
+    support::run(async {
+        let faults = Faults::default();
+        let path = support::sqlite_path(TMP.as_ref());
+        let store = SqliteStore::open_with_faults(&path, faults.clone()).unwrap();
+        let (service, _) = support::service_over(Arc::new(store));
+        owned(&service).await;
+        let gate = Gate::on(&faults, CommitPoint::BeforeBegin);
+        an_owner_edit_is_refused_beside_a_delete_of_that_owner(service, gate).await;
+    });
+}

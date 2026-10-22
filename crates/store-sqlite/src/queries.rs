@@ -37,6 +37,12 @@ pub(crate) fn journeys(
         )?)),
         None => None,
     };
+    let aliases = aliases(connection)?;
+    let owned = owners(connection)?;
+    let wanted = query
+        .owners
+        .as_ref()
+        .map(|wanted| backend::query::resolved_owners(wanted, &aliases));
     let select = "SELECT j.id, j.name, j.status, j.lineage_route, j.lineage_version, j.revision, \
                   j.created_at, (SELECT max(v.version_number) FROM route_versions v \
                   WHERE v.route_id = j.lineage_route) \
@@ -44,8 +50,13 @@ pub(crate) fn journeys(
     let after = query.after.as_ref().map_or(Value::Null, text);
     let mut items = Vec::new();
     for row in rows(connection, select, vec![after])? {
+        let id: JourneyId = row.parse(0)?;
+        let held = owned.get(&id).into_iter().flatten();
         let summary = JourneySummary {
-            id: row.parse(0)?,
+            owners: backend::query::resolved_owners(held, &aliases)
+                .into_iter()
+                .collect(),
+            id,
             name: row.parse(1)?,
             status: row.name(2)?,
             lineage: load::lineage(&row, 3)?,
@@ -53,7 +64,7 @@ pub(crate) fn journeys(
             created_at: row.timestamp(6)?,
             latest_version: row.opt_int(7)?.map(crate::sql::number).transpose()?,
         };
-        if backend::query::journey_listed(query, &summary, referencing.as_ref()) {
+        if backend::query::journey_listed(query, &summary, referencing.as_ref(), wanted.as_ref()) {
             items.push(summary);
             if items.len() > query.size.len() {
                 break;
@@ -61,6 +72,32 @@ pub(crate) fn journeys(
         }
     }
     Ok(Page::cut(items, query.size, |summary| summary.id.clone()))
+}
+
+/// Every journey's owners, by the keys it holds.
+fn owners(connection: &Connection) -> Result<BTreeMap<JourneyId, Vec<IdentityKey>>, StoreError> {
+    let mut owned: BTreeMap<JourneyId, Vec<IdentityKey>> = BTreeMap::new();
+    for row in rows(
+        connection,
+        "SELECT journey_id, identity FROM journey_owners",
+        Vec::new(),
+    )? {
+        owned.entry(row.parse(0)?).or_default().push(row.parse(1)?);
+    }
+    Ok(owned)
+}
+
+/// The deployment's aliases: each merged key and the identity it was merged into.
+fn aliases(connection: &Connection) -> Result<BTreeMap<IdentityKey, IdentityKey>, StoreError> {
+    let mut aliases = BTreeMap::new();
+    for row in rows(
+        connection,
+        "SELECT alias, identity FROM identity_aliases",
+        Vec::new(),
+    )? {
+        aliases.insert(row.parse(0)?, row.parse(1)?);
+    }
+    Ok(aliases)
 }
 
 pub(crate) fn route_detail(
@@ -185,6 +222,7 @@ pub(crate) fn referencing(
         "SELECT graph_id FROM role_fill_identities WHERE identity = ?1",
         "SELECT graph_id FROM participation_identities WHERE identity = ?1",
         "SELECT graph_id FROM condition_identities WHERE identity = ?1",
+        "SELECT 'journey/' || journey_id FROM journey_owners WHERE identity = ?1",
     ];
     let mut found = BTreeSet::new();
     for key in backend::query::with_aliases(identities, &aliases) {

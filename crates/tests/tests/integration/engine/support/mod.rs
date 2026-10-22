@@ -288,6 +288,11 @@ pub fn journey_graph(records: &Records, journey: &str) -> Graph {
     Graph::new(document, &records.deployment).unwrap_or_else(|violations| panic!("{violations:#?}"))
 }
 
+/// The journey's own fields in the records.
+pub fn journey_header(records: &Records, journey: &str) -> cairn_schema::JourneyHeader {
+    records.journeys[&journey.parse().unwrap()].header.clone()
+}
+
 /// Derives a journey in the records at the fixed clock.
 pub fn derived(records: &Records, journey: &str) -> cairn_engine::Derived {
     derived_on(records, journey, "2026-10-06".parse().unwrap())

@@ -3,9 +3,9 @@
 use std::collections::BTreeMap;
 
 use cairn_schema::{
-    Deployment, Domain, GraphId, Identity, Journey, JourneyHeader, JourneyId, Lineage, PatchId,
-    PatchReceipt, Proposal, ProposalDraft, ProposalId, Revision, RevisionOf, Route, RouteDraft,
-    RouteHeader, RouteId, RouteVersion, VersionNumber,
+    Deployment, Domain, GraphId, Identity, IdentityKey, IdentitySet, Journey, JourneyHeader,
+    JourneyId, Lineage, PatchId, PatchReceipt, Proposal, ProposalDraft, ProposalId, Revision,
+    RevisionOf, Route, RouteDraft, RouteHeader, RouteId, RouteVersion, VersionNumber,
 };
 use cairn_store::backend::StoredReceipt;
 use cairn_store::{Document, LoadTarget, Revisions, StoreError};
@@ -43,12 +43,23 @@ pub(crate) fn journey_row(
         id: id.clone(),
         name: row.parse(0)?,
         description: row.opt_parse(1)?,
+        owners: journey_owners(connection, id)?,
         status: row.name(2)?,
         lineage,
         created_at: row.timestamp(5)?,
         created_on: row.parse(6)?,
     };
     Ok(Some((header, row.number(7)?)))
+}
+
+/// A journey's owners, by the keys it holds.
+fn journey_owners(connection: &Connection, id: &JourneyId) -> Result<IdentitySet, StoreError> {
+    let select = "SELECT identity FROM journey_owners WHERE journey_id = ?1";
+    let mut owners = Vec::new();
+    for row in rows(connection, select, vec![text(id)])? {
+        owners.push(row.parse::<IdentityKey>(0)?);
+    }
+    IdentitySet::new(owners).map_err(|error| corrupt(&format!("a journey's owners: {error}")))
 }
 
 /// A journey's lineage from its route and version columns, `at` and the next.

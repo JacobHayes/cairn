@@ -508,7 +508,10 @@ fn completion_is_suggested_when_nothing_is_left_or_the_end_is_done() {
         let journey = DerivedJourney::new(&graph, &derived);
         let summary = journey.status_summary().completion_suggested;
         let snapshot = journey
-            .snapshot(&cairn_schema::SnapshotScope::default())
+            .snapshot(
+                &cairn_schema::SnapshotScope::default(),
+                &support::journey_header(records, support::JOURNEY),
+            )
             .unwrap()
             .completion_suggested;
         assert_eq!(summary, snapshot);

@@ -449,12 +449,18 @@ fn next_lists(vendor: &Fixture, out: &mut String) -> Result<()> {
 
 fn agent_snapshot(vendor: &Fixture, out: &mut String) -> Result<()> {
     let (graph, derived) = vendor.derive(3)?;
+    let records = vendor.records(3)?;
+    let header = &records
+        .journeys
+        .get(&vendor.journey)
+        .ok_or("no journey")?
+        .header;
     let journey = DerivedJourney::new(&graph, &derived);
     writeln!(
         out,
         "## The agent snapshot\n\nAfter step 3, the whole journey (I3): the acting frontier's top N (here all of it, under the page limit of 200) in rank order, the rest as keys, and the counts:\n"
     )?;
-    let snapshot = journey.snapshot(&SnapshotScope::default())?;
+    let snapshot = journey.snapshot(&SnapshotScope::default(), header)?;
     let top: Vec<&NodeKey> = snapshot
         .acting_frontier
         .iter()
@@ -488,11 +494,14 @@ fn agent_snapshot(vendor: &Fixture, out: &mut String) -> Result<()> {
         "```json\n{}```\n",
         cairn_schema::to_json_pretty(&snapshot.counts)?
     )?;
-    let setup = journey.snapshot(&SnapshotScope {
-        subtree: Some("n_setup".parse()?),
-        depth: Some(1),
-        cursor: Cursor::START,
-    })?;
+    let setup = journey.snapshot(
+        &SnapshotScope {
+            subtree: Some("n_setup".parse()?),
+            depth: Some(1),
+            cursor: Cursor::START,
+        },
+        header,
+    )?;
     let listed: Vec<&NodeKey> = setup.nodes.iter().map(|node| &node.row.key).collect();
     writeln!(
         out,

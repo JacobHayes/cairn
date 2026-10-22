@@ -34,6 +34,7 @@ describe("the index's filters in the address", () => {
     ["the default", DEFAULT_FILTERS],
     ["every status", { ...DEFAULT_FILTERS, status: "any" }],
     ["a route's version", { ...DEFAULT_FILTERS, route: "vendor-evaluation", version: 2 }],
+    ["an owner", { ...DEFAULT_FILTERS, owner: "who_a" }],
     ["mine with an upgrade", { ...DEFAULT_FILTERS, status: "archived", mine: true, upgrade: true }],
   ];
   it.each(cases)("round-trip: %s", (_, filters) => {
@@ -57,6 +58,10 @@ describe("the host's query for the filters", () => {
       upgrade_available: true,
     });
     expect(queryOf({ ...DEFAULT_FILTERS, status: "any" }, [])).toEqual({});
+  });
+
+  it("asks for the journeys an identity owns", () => {
+    expect(queryOf({ ...DEFAULT_FILTERS, owner: "who_a" }, [])).toEqual({ status: ["active"], owner: ["who_a"] });
   });
 
   it("asks for the active journeys referring to the caller's identities for mine", () => {

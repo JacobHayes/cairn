@@ -1,5 +1,5 @@
 // B1: starting a journey, from a route's version (the latest published by default) or empty,
-// with a name and an optional description. It is the journey's first patch (base revision 0,
+// with a name, an optional description and owners. It is the journey's first patch (base revision 0,
 // A17) under an id made from its name; once it lands the journey opens on its decision
 // walkthrough (C11). Retired routes are not offered (A19). The form is a draft, so a reload
 // keeps it (ARCHITECTURE, Web UI).
@@ -8,19 +8,22 @@ import { useLocation, useNavigate } from "react-router";
 import { useDraft } from "../data/drafts.ts";
 import { routeIndex } from "../data/reads.ts";
 import { valueOf } from "../data/keyed-read.ts";
-import { useLive } from "../data/react.ts";
+import { useDeployment, useLive } from "../data/react.ts";
 import { startableVersion } from "../routes/model.ts";
 import { RejectionView } from "../screens/RejectionView.tsx";
 import { WriteStatus } from "../screens/WriteStatus.tsx";
 import { useScreenWrite } from "../screens/write.ts";
 import { Button, Field, Panel } from "../ui/kit.tsx";
 import { Failed } from "../ui/Failed.tsx";
+import { OwnersField } from "./OwnersField.tsx";
 import { walkthroughPath } from "./view.ts";
 import { createMutation, newJourneyId, type RouteSummary } from "./lifecycle.ts";
 
 interface Form {
   name: string;
   description: string;
+  /** The identities who own it, by key. */
+  owners: string[];
   /** The route's id, or "" for an empty journey. */
   route: string;
   /** The version, or 0 for the route's latest. */
@@ -62,7 +65,10 @@ function NewJourneyForm({ routes, initial, asked }: { routes: RouteSummary[]; in
   const navigate = useNavigate();
   const write = useScreenWrite("new-journey");
   const [draft, setDraft] = useDraft<Form>(`new-journey:${asked}`);
-  const form = draft ?? initial;
+  // A draft kept before owners were chosen here has none.
+  const stored: Partial<Form> = draft ?? initial;
+  const form: Form = { ...(draft ?? initial), owners: stored.owners ?? [] };
+  const deployment = useDeployment();
   const chosen = routes.find((route) => route.header.id === form.route);
   // A route chosen, or kept in the draft, that is no longer offered (retired meanwhile) is not
   // "empty": the person must choose again rather than start a journey with no lineage.
@@ -74,7 +80,7 @@ function NewJourneyForm({ routes, initial, asked }: { routes: RouteSummary[]; in
     const id = newJourneyId(form.name);
     const version = form.version === 0 ? (chosen?.latest_version ?? 0) : form.version;
     const from = chosen === undefined ? undefined : { route: chosen.header.id, version };
-    if (await write.run({ target: { journey: id }, baseRevision: 0, mutations: [createMutation(form.name, form.description, from)] })) {
+    if (await write.run({ target: { journey: id }, baseRevision: 0, ...(deployment === undefined ? {} : { deploymentRevision: deployment.revision }), mutations: [createMutation(form.name, form.description, form.owners, from)] })) {
       setDraft(undefined);
       void navigate(walkthroughPath(id));
     }
@@ -86,6 +92,7 @@ function NewJourneyForm({ routes, initial, asked }: { routes: RouteSummary[]; in
         <Field id="new-name" required value={form.name} onChange={(event) => { setDraft({ ...form, name: event.target.value }); }} />
         <label htmlFor="new-description">Description</label>
         <textarea id="new-description" value={form.description} onChange={(event) => { setDraft({ ...form, description: event.target.value }); }} />
+        <OwnersField owners={form.owners} onChange={(owners) => { setDraft({ ...form, owners }); }} />
         <StartFrom form={form} routes={routes} onChange={setDraft} />
       </div>
       {unavailable ? (
@@ -112,7 +119,7 @@ export function NewJourney() {
   const routes = index.filter((route) => startableVersion(route) !== undefined);
   const asked = params.get("route") ?? "";
   const offered = routes.some((route) => route.header.id === asked);
-  const initial: Form = { name: "", description: "", route: asked, version: offered ? Number(params.get("version") ?? 0) || 0 : 0 };
+  const initial: Form = { name: "", description: "", owners: [], route: asked, version: offered ? Number(params.get("version") ?? 0) || 0 : 0 };
   return (
     <Panel aria-label="New journey">
       <h1>New journey</h1>

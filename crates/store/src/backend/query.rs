@@ -112,13 +112,29 @@ pub fn journeys_among(graphs: &BTreeSet<GraphId>) -> BTreeSet<JourneyId> {
         .collect()
 }
 
+/// E6, C16: `owners` as the identities they name now: an alias read as the identity it was
+/// merged into, once each, in key order. A journey's summary and an owner filter both read
+/// owners through it, so the filter and the rows it returns agree.
+#[must_use]
+pub fn resolved_owners<'a>(
+    owners: impl IntoIterator<Item = &'a IdentityKey>,
+    aliases: &BTreeMap<IdentityKey, IdentityKey>,
+) -> BTreeSet<IdentityKey> {
+    owners
+        .into_iter()
+        .map(|owner| aliases.get(owner).unwrap_or(owner).clone())
+        .collect()
+}
+
 /// C16: whether a journey belongs in the index `query` asks for. `referencing` is the
-/// journeys referring to the query's identities, when it names any.
+/// journeys referring to the query's identities, when it names any; `owners` is the query's
+/// owners as [`resolved_owners`] reads them, when it names any.
 #[must_use]
 pub fn journey_listed(
     query: &crate::query::JourneyQuery,
     summary: &crate::query::JourneySummary,
     referencing: Option<&BTreeSet<JourneyId>>,
+    owners: Option<&BTreeSet<IdentityKey>>,
 ) -> bool {
     let route = summary.lineage.as_ref().map(|lineage| &lineage.route);
     let version = summary.lineage.as_ref().map(|lineage| lineage.version);
@@ -130,6 +146,7 @@ pub fn journey_listed(
             .is_none_or(|wanted| route == Some(wanted))
         && query.version.is_none_or(|wanted| version == Some(wanted))
         && referencing.is_none_or(|found| found.contains(&summary.id))
+        && owners.is_none_or(|wanted| summary.owners.iter().any(|owner| wanted.contains(owner)))
         && query
             .upgrade_available
             .is_none_or(|wanted| summary.upgrade_available() == wanted)

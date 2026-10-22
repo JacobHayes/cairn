@@ -117,7 +117,7 @@ test("A3: Edit is one state entered from the journey menu, with the name editor 
   await page.getByTestId("menu-edit").click();
   const bar = page.getByTestId("authoring-bar");
   await expect(bar).toBeVisible();
-  await bar.getByRole("button", { name: "Edit the name and description" }).click();
+  await bar.getByRole("button", { name: "Edit the name, description and owners" }).click();
   await expect(bar.getByTestId("header-editor")).toBeVisible();
   await draw();
   // Escape in a field belongs to the field: drawing goes on. Outside one it stops the drawing and leaves the node open.

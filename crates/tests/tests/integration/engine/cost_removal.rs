@@ -50,6 +50,7 @@ mod cost {
                     id,
                     name: parse("Limits"),
                     description: None,
+                    owners: cairn_schema::IdentitySet::default(),
                     status: JourneyStatus::Active,
                     lineage: None,
                     created_at: parse("2026-09-20T00:00:00Z"),
