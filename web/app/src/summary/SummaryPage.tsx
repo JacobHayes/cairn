@@ -238,7 +238,7 @@ function entriesOf(ready: Ready, model: SummaryModel, frontier: NodeRow[], owned
         {chain ? (
           <>
             {" "}
-            <Link to={nodeAddress(ready.journey.header.id, each.key)} className="no-print">
+            <Link to={nodeAddress(ready.journey.header.id, each.key)} className="no-print nowrap">
               See the chain
             </Link>
           </>

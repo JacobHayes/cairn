@@ -41,8 +41,10 @@
 }
 
 /* Home: one bounded panel for each journey, a group apart (DESIGN: groups sit 24px apart). */
+/* The journey groups, and what follows them (the folds, the reading line), are a group's gap apart. */
 .home-list {
   gap: var(--space-5);
+  margin-bottom: var(--space-3);
 }
 
 .home > h1 {

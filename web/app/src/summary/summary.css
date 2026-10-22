@@ -80,6 +80,15 @@
   }
 }
 
+/* In one column the page keeps a narrow list's measure (the shared rows' 760px, acting.css), so
+   every row is a narrow row, its owner under its title; in two columns each column is that
+   narrow already. */
+@container summary (max-width: 959px) {
+  .summary-body {
+    max-width: 760px;
+  }
+}
+
 .summary:focus {
   outline: none;
 }

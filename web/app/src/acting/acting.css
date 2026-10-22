@@ -780,6 +780,20 @@ button.list-sort {
   flex-basis: 360px;
 }
 
+/* Every title in a panel starts at one edge, whatever its chip says. A wide row (the chip and
+   title on the left, the owner and buttons on the right) gives the chip a column as wide as the
+   widest chip ("not relevant"), as the list's status column does; a narrow row, below, shares
+   its panel's chip column, as wide as that panel's widest chip. A row with no chip (Home's) has
+   no column for one. */
+.rows-page .node-row-main:where(:has(> .badge)) {
+  display: grid;
+  grid-template-columns: 120px minmax(0, 1fr);
+}
+
+.rows-page .node-row-main > .badge {
+  justify-self: start;
+}
+
 /* A list read for its finished work is not faded or muted: ink on paper, the chip's word in ink with its green edge, so it holds the contrast floor in both themes (DESIGN, status language). */
 .rows-bright .node-row[data-state="done"] > * {
   opacity: 1;
@@ -831,13 +845,26 @@ button.list-sort {
   container: rows / inline-size;
 }
 
-@container rows (max-width: 940px) {
-  .rows-page .node-row {
+@container rows (max-width: 760px) {
+  /* The panel's rows share its chip column (sized by the widest chip in it, none without one)
+     and, for rows with no owner line, a column of buttons beside the text, as wide as they are. */
+  .rows-page .node-rows {
     display: grid;
-    grid-template-columns: auto minmax(0, 1fr);
+    grid-template-columns: max-content minmax(0, 1fr) auto;
+  }
+
+  /* Anything else a list holds (the Summary's milestone lines) spans it. */
+  .rows-page .node-rows > :not(.node-row) {
+    grid-column: 1 / -1;
+  }
+
+  .rows-page .node-row {
+    grid-column: 1 / -1;
+    display: grid;
+    grid-template-columns: subgrid;
     align-items: start;
-    gap: 2px var(--space-3);
-    min-height: 0;
+    align-content: center;
+    gap: 2px 0;
   }
 
   .rows-page .node-row-main {
@@ -847,17 +874,19 @@ button.list-sort {
   .rows-page .node-row-main > .badge {
     grid-column: 1;
     grid-row: 1;
+    margin-right: var(--space-3);
   }
 
   .rows-page .node-row-text {
-    grid-column: 2;
+    grid-column: 2 / -1;
   }
 
   /* Who has it is a line of its own, as wide as the title; what can be done is under it on a touch screen and over the row's corner with a pointer, so neither squeezes the name. */
   .rows-page .node-row > .row-side {
-    grid-column: 2;
+    grid-column: 2 / -1;
     flex-wrap: wrap;
     justify-content: flex-start;
+    row-gap: var(--space-2);
     margin: 0;
     padding: 0;
   }
@@ -880,6 +909,20 @@ button.list-sort {
     margin-left: auto;
   }
 
+  /* With no owner line (Home's rows) the buttons sit beside the text, centred on the row, and the
+     text gives way to them. */
+  .rows-page .node-row:not(:has(.row-owner)) .node-row-text {
+    grid-column: 2;
+  }
+
+  .rows-page .node-row:not(:has(.row-owner)) > .row-side {
+    grid-column: 3;
+    grid-row: 1;
+    align-self: center;
+    justify-content: flex-end;
+    margin-left: var(--space-4);
+  }
+
   @media (hover: hover) {
     .rows-page .node-row {
       position: relative;
@@ -888,12 +931,16 @@ button.list-sort {
     .rows-page .node-row .row-act {
       position: absolute;
       right: var(--space-4);
-      bottom: var(--space-2);
+      bottom: var(--space-3);
       margin: 0;
     }
 
     .rows-page .node-row:has(.row-act) .row-owner {
       padding-right: 190px;
+    }
+
+    .rows-page .node-row:not(:has(.row-owner)) .row-act {
+      position: static;
     }
   }
 }
@@ -906,8 +953,15 @@ button.list-sort {
 
   .rows-page .node-row-main > .badge,
   .rows-page .node-row-text,
-  .rows-page .node-row > .row-side {
+  .rows-page .node-row > .row-side,
+  .rows-page .node-row:not(:has(.row-owner)) .node-row-text,
+  .rows-page .node-row:not(:has(.row-owner)) > .row-side {
     grid-column: 1;
+  }
+
+  .rows-page .node-row:not(:has(.row-owner)) > .row-side {
+    grid-row: auto;
+    margin-left: 0;
   }
 
   /* With one column the actions have no side to sit at, so they follow the text. */
