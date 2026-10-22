@@ -208,7 +208,6 @@ function Foot({ card, owner = true }: { card: Card; owner?: boolean }) {
           )}
         </span>
       )}
-      <span className="spacer" />
       {!owner || journey.owner === undefined ? null : (
         <span className={journey.owner.missing ? "node-owner ink-warn" : "node-owner"} data-testid="card-owner" title={journey.owners}>
           {journey.owner.words}

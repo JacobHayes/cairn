@@ -46,6 +46,11 @@ async function graphs({ page, look, check }: Walk): Promise<void> {
   expect((await viewportOf(page)).zoom).toBeGreaterThanOrEqual(NEAR_ZOOM);
   await look("graph at the reading zoom");
   await expectTitleLinesAsLaidOut(page);
+  // The foot's owner is a fact the card states, so it is never cut: the date beside it gives way.
+  const owners = page.getByTestId("card-owner");
+  const clipped = await whenSettled(page, () => owners.evaluateAll((all) => ({ all: all.length, clipped: all.filter((each) => each.scrollWidth > each.clientWidth).length })));
+  expect(clipped.all).toBeGreaterThan(0);
+  expect(clipped.clipped).toBe(0);
   // Folded, a stage is a card of the usual width: its head holds the kind, CURRENT, the chip and the control.
   for (const stage of STRESS.stages) {
     const fold = nodeCard(page, stage).getByTestId("card-collapse");

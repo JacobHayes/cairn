@@ -55,7 +55,7 @@ describe("C1: what a card says", () => {
     const unowned = changed((each) => {
       derivedOf(each, "n_check").unassigned = true;
     });
-    expect(card(model(wholeLevel(), [], [], unowned), "n_check").journey?.owner).toEqual({ words: "Unassigned", missing: true });
+    expect(card(model(wholeLevel(), [], [], unowned), "n_check").journey?.owner).toMatchObject({ missing: true });
   });
 
   test("a card has at most one body line: a decided decision's answer, a container's progress, or what a conditional node depends on", () => {

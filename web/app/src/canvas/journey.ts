@@ -7,13 +7,16 @@ import type { Schema } from "@cairn/client";
 
 import { conditionNames } from "../authoring/condition.ts";
 import { type GraphNode, isStage, type NodeDerived, nodeOf, rankPlaces, type Ready, titleOf } from "../detail/model.ts";
-import { answerText, identityName, ownersOf, ownerWords, UNASSIGNED, YOU } from "../detail/sections.tsx";
+import { answerText, identityName, ownersOf, ownerWords, YOU } from "../detail/sections.tsx";
 import { currentStagesOf } from "../journeys/requests.ts";
 import { isFinished, isOpen } from "../status/state.ts";
 import type { DisplayState } from "../status/words.ts";
 import type { CardBadge, CardBody, CardState, JourneyExtras, LevelNode, Looks, Signals } from "./model.ts";
 import { dependsWords, firstParagraph, footWords } from "./words.ts";
 import { snoozeWords } from "../status/snooze.ts";
+
+/** What a card's foot says for a node nobody owns: short, so it never shares the foot's one line with a date it would cut. */
+export const NO_OWNER = "No owner";
 
 /** A node's display state (D8): the engine's one state, which the canvas shows as it is. */
 export function stateOf(view: Ready, node: GraphNode): DisplayState {
@@ -139,7 +142,7 @@ function cardState(context: Context, node: GraphNode, at: LevelNode): CardState 
     finished,
     relevance: derived.relevance.value,
     foot: state === "not_relevant" ? undefined : footOf(context, node, derived, state),
-    owner: context.owned.has(node.key) ? { words: YOU, missing: false } : missing ? { words: UNASSIGNED, missing: true } : undefined,
+    owner: context.owned.has(node.key) ? { words: YOU, missing: false } : missing ? { words: NO_OWNER, missing: true } : undefined,
     owners: ownerWords(view, owners),
     body: bodyOf(context, node, derived, at, state),
     here: {
