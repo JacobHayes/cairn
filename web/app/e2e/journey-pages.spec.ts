@@ -361,6 +361,25 @@ test("C2, C9: a search narrows the graph to its matches and fits them; nothing m
   await expect(page.getByTestId("list-row").first()).toBeVisible();
 });
 
+test("C1, C9: the Filter's badge counts the rows its settings take off the list and never the not relevant; the open Filter counts what a setting hides beside it", async ({ page }) => {
+  await openAt(page, "browser", "j_vendor_eval", "list", { fixedToday: FIXED_TODAY });
+  const total = async () => Number(await page.getByTestId("list-total").getAttribute("data-total"));
+  const badge = page.getByTestId("filter-badge");
+  await expect(badge).toHaveCount(0);
+  const before = await total();
+  await page.getByTestId("filter-button").click();
+  await page.getByTestId("flag-unassigned").click();
+  await expect.poll(total).toBeLessThan(before);
+  const hidden = before - (await total());
+  // A badge past 9 reads 9+, so the exact count is the setting's own beside its box.
+  await expect(page.getByTestId("flag-unassigned-count")).toHaveText(String(hidden));
+  await expect(badge).toHaveText(hidden > 9 ? "9+" : String(hidden));
+  // Showing the not relevant leaves the badge where it was: they are never counted.
+  await page.getByTestId("show-not-relevant").click();
+  await expect(page.getByTestId("show-not-relevant")).toHaveAttribute("data-status", "on");
+  await expect(badge).toHaveText(hidden > 9 ? "9+" : String(hidden));
+});
+
 test("C2: a fold holds until a depth is picked: back at Actions after another depth, every level is open again", async ({ page }) => {
   await openAt(page, "browser", "j_vendor_eval", "list", { fixedToday: FIXED_TODAY });
   const fold = () => listRow(page, "n_setup").getByTestId("list-fold");

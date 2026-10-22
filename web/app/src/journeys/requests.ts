@@ -8,7 +8,7 @@
 // tests read the rules without a page.
 import type { ListQuery, ProjectionRequest } from "@cairn/wasm";
 
-import type { SortBy } from "../acting/address.ts";
+import type { ListFlag, SortBy } from "../acting/address.ts";
 import { currentStages, drawnStep, kindsAt, leftOutAt, STAGES_TOP } from "../canvas/ladder.ts";
 import type { Level, LevelDisplay, Step } from "../canvas/model.ts";
 import type { GraphNode, Ready } from "../detail/model.ts";
@@ -194,24 +194,41 @@ export function outOfFocus(lit: ReadonlySet<string> | undefined, faded: Readonly
   return (key) => faded.has(key) || (lit !== undefined && !lit.has(key));
 }
 
+/** What the Filter hides, counted by the engine's level and shown beside the setting that hides it. */
+export interface HiddenCounts {
+  /** Per relevance class the view can draw, the nodes only that class hides. */
+  classes: Partial<Record<RelevanceClass, number>>;
+  /** Per flag set (Only mine included), the nodes that flag alone hides. */
+  flags: Partial<Record<ListFlag, number>>;
+  /** The nodes the owner setting alone hides. */
+  owner?: number;
+}
+
 /**
- * C1, C2: what the Filter and Depth say they hide. `hidden` is the count each relevance class
- * the view can draw (view.ts, `SCREEN_VIEWS`) hides, shown beside its box in the open Filter;
- * a class the view cannot draw has none. Depth's badge counts the nodes Frontier lights (the
- * walk's: its candidate cards) that the depth hides (`hides`); with Fade on (`fade`) they are
- * drawn, so none.
+ * C1, C2, C9: what the Filter and Depth say they hide, all from the level's counts and the
+ * per-screen table (view.ts, `SCREEN_VIEWS`). `hidden` is what each setting hides, shown beside it
+ * in the open Filter; a class the view cannot draw has none, and a view whose cards the level does not read (the walk through) has no flag or owner counts or badge. `filter` is the toolbar's badge: the
+ * nodes the Filter's settings hide in all, a ruled-out node never among them (the engine leaves
+ * it out of the flag and owner counts; the not-relevant class is left out here). Depth's badge
+ * counts the nodes Frontier lights (the walk's: its candidate cards) that the depth hides
+ * (`hides`); with Fade on (`fade`) they are drawn, so none.
  */
-export function badgesOf(screen: Screen, byClass: Partial<Record<LevelDisplay, number>>, base: ReadonlySet<string> | undefined, hides: (key: string) => boolean, fade = false): { hidden: Partial<Record<RelevanceClass, number>>; depth?: Badge } {
-  const hidden: Partial<Record<RelevanceClass, number>> = {};
+export function badgesOf(screen: Screen, level: Pick<Level, "hidden_by_class" | "hidden_by_filter"> | undefined, base: ReadonlySet<string> | undefined, hides: (key: string) => boolean, fade = false): { hidden: HiddenCounts; filter?: Badge; depth?: Badge } {
+  const classes: Partial<Record<RelevanceClass, number>> = {};
   for (const each of RELEVANCE_CLASSES) {
-    const count = byClass[each] ?? 0;
+    const count = level?.hidden_by_class?.[each] ?? 0;
     if (count > 0 && canDraw(screen, each)) {
-      hidden[each] = count;
+      classes[each] = count;
     }
   }
+  const byFilter = SCREEN_VIEWS[screen].filterCounts ? level?.hidden_by_filter : undefined;
+  const flags: Partial<Record<ListFlag, number>> = byFilter?.flags ?? {};
+  const hidden: HiddenCounts = { classes, flags, ...(byFilter?.owner === undefined || byFilter.owner === 0 ? {} : { owner: byFilter.owner }) };
+  const total = (byFilter?.total ?? 0) + (classes.conditional ?? 0);
   const lost = base === undefined || fade ? 0 : [...base].filter(hides).length;
   return {
     hidden,
+    ...(total === 0 ? {} : { filter: { count: total, words: `${String(total)} ${total === 1 ? "node is" : "nodes are"} hidden by the Filter` } }),
     ...(lost === 0 ? {} : { depth: { count: lost, words: `${String(lost)} that can move now ${lost === 1 ? "is" : "are"} ${screen === "walk" ? "not walked" : "hidden"} at this depth; choose Actions${SCREEN_VIEWS[screen].fade ? " or fade the rest" : ""} to see them` } }),
   };
 }

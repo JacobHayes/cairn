@@ -2361,6 +2361,32 @@ export interface components {
             /** @description The direct dependent that stays held. */
             node: components["schemas"]["NodeKey"];
         };
+        /**
+         * @description The nodes the Filter's flag and owner settings hide, counted over the nodes of a kind
+         *     shown, within the level, under no collapse, not selected, and not settled as not relevant
+         *     (a ruled-out node is noise, and never counted here), among those the search keeps. A
+         *     node is counted once in `total` however many settings leave it out.
+         */
+        HiddenByFilter: {
+            /**
+             * @description Per flag set (only mine included), the nodes that flag alone leaves out; a flag that
+             *     leaves none out has no entry.
+             */
+            flags?: {
+                [key: string]: number;
+            };
+            /**
+             * Format: uint32
+             * @description The nodes the owner setting alone leaves out.
+             */
+            owner?: number;
+            /**
+             * Format: uint32
+             * @description The nodes any flag or the owner setting leaves out.
+             * @default 0
+             */
+            total: number;
+        };
         /** @description A page of a journey's history, or of one node's, grouped by patch. */
         History: {
             /**
@@ -2663,6 +2689,11 @@ export interface components {
             hidden_by_class?: {
                 [key: string]: number;
             };
+            /**
+             * @description What the level's flag and owner filters leave out, among the nodes the search keeps and
+             *     that would otherwise be drawn. Empty when no flag or owner filter is set.
+             */
+            hidden_by_filter?: components["schemas"]["HiddenByFilter"];
             /** @description The visible nodes, in tree order. */
             nodes: components["schemas"]["LevelNode"][];
             /** @description The kinds shown. */

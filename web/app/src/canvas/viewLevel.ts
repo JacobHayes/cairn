@@ -90,6 +90,6 @@ export function useViewLevel({ screen, state, nodes, selected, ready, held, fold
     [state, fade, nodes, depth, hidden, drawn, alsoDrawn, selected],
   );
   const dimmed = useMemo(() => outOfFocus(lightsHolders, faded ?? NONE), [lightsHolders, faded]);
-  const badges = useMemo(() => badgesOf(screen, level?.hidden_by_class ?? {}, base, depthLeavesOut(nodes, depth, hidden, drawn), fade), [screen, level, base, nodes, depth, hidden, drawn, fade]);
+  const badges = useMemo(() => badgesOf(screen, level, base, depthLeavesOut(nodes, depth, hidden, drawn), fade), [screen, level, base, nodes, depth, hidden, drawn, fade]);
   return { depth, step, current, collapsed, request, level, own, drawn, error, base, faded, dimmed, badges };
 }

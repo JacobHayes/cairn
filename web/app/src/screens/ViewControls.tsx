@@ -16,13 +16,14 @@ import { TITLE_BYTES_MAX } from "@cairn/client";
 import { useState, type ReactNode } from "react";
 import { useLocation } from "react-router";
 
-import { Check, FlagChecks } from "../acting/Controls.tsx";
+import { Check, Counted, FlagChecks } from "../acting/Controls.tsx";
 import { overBytes } from "../authoring/limits.ts";
 import { STEP_WORDS, stepOf, stepsFor } from "../canvas/ladder.ts";
 import type { Step } from "../canvas/model.ts";
 import type { GraphNode, Ready } from "../detail/model.ts";
 import { identityName } from "../detail/sections.tsx";
 import type { Screen } from "../journeys/address.ts";
+import type { HiddenCounts } from "../journeys/requests.ts";
 import { canDraw, fadeOn, FILTER_FLAGS, JOURNEY_OFFERS, RELEVANCE_CLASSES, ROUTE_OFFERS, SCREEN_VIEWS, filterChanged, filterChips, isStock, stockView, useViewState, withViewState, type RelevanceClass, type ViewFilter, type ViewOffers } from "../journeys/view.ts";
 import { useMedia, PHONE_WIDTH } from "../shell/frame.tsx";
 import { Button } from "../ui/kit.tsx";
@@ -33,9 +34,10 @@ import { Menu } from "./Menu.tsx";
 /** The jargon term's words, in its tooltip. */
 const FRONTIER_WORDS = "What can move now: work that is ready and decisions that can be made, ranked by what they unlock and how soon they are due.";
 
-/** What the view hides, as it says it: the badge on Depth, and in the open Filter the count each relevance class hides (journeys/requests.ts, `badgesOf`). */
+/** What the view hides, as it says it: the badges on Filter and Depth, and in the open Filter the count each setting hides (journeys/requests.ts, `badgesOf`). */
 export interface Badges {
-  hidden?: Partial<Record<RelevanceClass, number>> | undefined;
+  hidden?: HiddenCounts | undefined;
+  filter?: Badge | undefined;
   depth?: Badge | undefined;
 }
 
@@ -144,7 +146,7 @@ function DepthMenu({ subject, screen, badge }: { subject: ViewSubject; screen: S
  * then the relevance classes it offers, those this view cannot draw disabled with the reason
  * under them (a route offers the conditional class alone).
  */
-export function FilterBody({ subject, screen, hidden = {} }: { subject: ViewSubject; screen: Screen; hidden?: Badges["hidden"] }) {
+export function FilterBody({ subject, screen, hidden = { classes: {}, flags: {} } }: { subject: ViewSubject; screen: Screen; hidden?: Badges["hidden"] }) {
   const { state, onState } = useViewState();
   const { filter } = state;
   const set = (changed: Partial<ViewFilter>) => {
@@ -154,34 +156,20 @@ export function FilterBody({ subject, screen, hidden = {} }: { subject: ViewSubj
   const owners = (journey?.inputs.deployment.identities ?? []).map((identity) => ({ key: identity.key, text: journey === undefined ? identity.key : identityName(journey, identity.key) }));
   const classes = RELEVANCE_CLASSES.filter((each) => each !== "not_relevant" || offers.notRelevant);
   const reasons = [...new Set(classes.flatMap((each) => SCREEN_VIEWS[screen].classes[each] ?? []))];
-  const classBox = (each: RelevanceClass, label: string, testId: string, checked: boolean) => {
-    const count = hidden[each];
-    return (
-      <Check
-        label={
-          <>
-            {label}
-            {count === undefined ? null : (
-              <>
-                {" "}
-                <span className="muted small" data-testid={`${testId}-count`}>
-                  {count}
-                </span>
-              </>
-            )}
-          </>
-        }
-        checked={checked}
-        testId={testId}
-        disabled={!canDraw(screen, each)}
-        onChange={(on) => { set(each === "conditional" ? { conditional: on } : { notRelevant: on }); }}
-      />
-    );
-  };
+  const classBox = (each: RelevanceClass, label: string, testId: string, checked: boolean) => (
+    <Check
+      label={<Counted label={label} count={hidden.classes[each]} testId={testId} />}
+      checked={checked}
+      testId={testId}
+      disabled={!canDraw(screen, each)}
+      onChange={(on) => { set(each === "conditional" ? { conditional: on } : { notRelevant: on }); }}
+    />
+  );
   return (
     <div className="stack" role="group" aria-label="Filter" data-testid="filter-body">
-      {offers.mine ? <Check label="Only mine" checked={filter.mine} testId="flag-mine" onChange={(mine) => { set({ mine }); }} /> : null}
+      {offers.mine ? <Check label={<Counted label="Only mine" count={hidden.flags.mine} testId="flag-mine" />} checked={filter.mine} testId="flag-mine" onChange={(mine) => { set({ mine }); }} /> : null}
       {offers.owner ? (
+        <span className="row">
           <select aria-label="Owner" data-testid="filter-owner" value={filter.owner ?? ""} onChange={(event) => { set({ owner: event.target.value === "" ? undefined : event.target.value }); }}>
             <option value="">Owner: any</option>
             {owners.map((owner) => (
@@ -190,8 +178,10 @@ export function FilterBody({ subject, screen, hidden = {} }: { subject: ViewSubj
               </option>
             ))}
           </select>
+          <Counted label={null} count={hidden.owner} testId="filter-owner" />
+        </span>
       ) : null}
-      {offers.flags ? <FlagChecks options={FILTER_FLAGS} chosen={filter.flags} onChange={(flags) => { set({ flags }); }} /> : null}
+      {offers.flags ? <FlagChecks options={FILTER_FLAGS} chosen={filter.flags} counts={hidden.flags} onChange={(flags) => { set({ flags }); }} /> : null}
       {offers.mine || offers.owner || offers.flags ? <hr /> : null}
       {classBox("conditional", "Show conditional", "show-conditional", filter.conditional)}
       {offers.notRelevant ? classBox("not_relevant", "Show not relevant", "show-not-relevant", filter.notRelevant) : null}
@@ -204,20 +194,24 @@ export function FilterBody({ subject, screen, hidden = {} }: { subject: ViewSubj
   );
 }
 
-function FilterMenu({ subject, screen, hidden }: { subject: ViewSubject; screen: Screen; hidden: Badges["hidden"] }) {
+function FilterMenu({ subject, screen, badges }: { subject: ViewSubject; screen: Screen; badges: Badges | undefined }) {
   const { state } = useViewState();
   return (
     <Menu
       label="Filter"
-      title="Filter what is drawn"
+      title={tip("Filter what is drawn", badges?.filter)}
       testId="filter-button"
       role="dialog"
       className={filterChanged(state.filter) ? "view-control menu-pressed" : "view-control"}
-      trigger="Filter ▾"
+      trigger={
+        <Dotted badge={badges?.filter} testId="filter-badge">
+          Filter ▾
+        </Dotted>
+      }
     >
       {() => (
         <div className="stack" data-testid="filter-panel">
-          <FilterBody subject={subject} screen={screen} hidden={hidden} />
+          <FilterBody subject={subject} screen={screen} hidden={badges?.hidden} />
         </div>
       )}
     </Menu>
@@ -341,9 +335,10 @@ export interface ViewControlsProps {
   end?: ReactNode;
 }
 
-/** The controls on a phone, where a view has room for one button: the same controls in a Controls menu, with the depth and filter badges on it, and what the screen puts at the row's end beside it. */
+/** The controls on a phone, where a view has room for one button: the same controls in a Controls menu, with the depth and filter badges summed on it, and what the screen puts at the row's end beside it. */
 function PhoneControls({ subject, screen, badges, end }: { subject: ViewSubject; screen: Screen; badges: Badges | undefined; end: ReactNode }) {
-  const total = badges?.depth;
+  const shown = [badges?.depth, badges?.filter].flatMap((badge) => (badge === undefined || badge.count === 0 ? [] : [badge]));
+  const total = shown.length === 0 ? undefined : { count: shown.reduce((sum, badge) => sum + badge.count, 0), words: shown.map((badge) => badge.words).join(". ") };
   return (
     <div className="view-controls row" role="toolbar" aria-label="View controls" data-testid="view-controls">
       <Menu
@@ -388,7 +383,7 @@ export function ViewControls({ subject, screen, badges, end }: ViewControlsProps
     <div className="view-controls row" role="toolbar" aria-label="View controls" data-testid="view-controls">
       <DepthMenu subject={subject} screen={screen} badge={badges?.depth} />
       <FrontierChip subject={subject} screen={screen} />
-      <FilterMenu subject={subject} screen={screen} hidden={badges?.hidden} />
+      <FilterMenu subject={subject} screen={screen} badges={badges} />
       <Search />
       {end === undefined ? null : <div className="view-controls-end">{end}</div>}
     </div>

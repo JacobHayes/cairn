@@ -35,7 +35,9 @@
 //! - Each visible container carries its roll-ups (C2's badges), each node its display state
 //!   (D8), and each group its legacy group state (D1). The level counts, per class left out,
 //!   the nodes hidden for their class alone (C1's count): showing that class draws exactly
-//!   those.
+//!   those. With a flag or owner filter it also counts, in all and per setting alone, the
+//!   nodes of a kind shown that the search keeps and the setting leaves out, a ruled-out
+//!   node never among them (C9's count).
 //!
 //! Cost at `node_count_max` (2,000 nodes, about 110,000 edges): the relevance classes, only
 //! when a class is hidden, are two relevance passes ([`crate::derive::pending`], about 34,000
@@ -54,9 +56,9 @@ use std::collections::{BTreeMap, BTreeSet};
 
 use cairn_schema::limits::CONTAINMENT_DEPTH_MAX;
 use cairn_schema::{
-    DependencyVia, Deployment, DisplayState, EdgeOrigin, IdentityKey, Level, LevelDisplay,
-    LevelEdge, LevelNode, LevelQuery, NodeKey, NodeKind, Progress, Relevance, RollUp, State,
-    UnderlyingEdge,
+    DependencyVia, Deployment, DisplayState, EdgeOrigin, HiddenByFilter, IdentityKey, Level,
+    LevelDisplay, LevelEdge, LevelNode, LevelQuery, ListFlag, NodeKey, NodeKind, Progress,
+    Relevance, RollUp, State, Title, UnderlyingEdge,
 };
 
 use super::{DerivedJourney, ProjectionError};
@@ -74,6 +76,48 @@ struct StandIns<'a> {
     collapsed: BTreeSet<&'a NodeKey>,
     /// The nodes hidden for their relevance class alone, per class (C1's count).
     hidden_by_class: BTreeMap<LevelDisplay, u32>,
+    /// The nodes the flag and owner filters hide, in all and each alone (C9's count).
+    hidden_by_filter: HiddenByFilter,
+}
+
+/// C9: what the query's text keeps, and what each flag and the owner keep on top of it, alone:
+/// the sets the Filter's counts are the differences of.
+struct FilterKept<'a> {
+    /// What the search keeps; every node when there is no search.
+    searched: Option<BTreeSet<&'a NodeKey>>,
+    /// What every filter and the search keep together.
+    all: BTreeSet<&'a NodeKey>,
+    flags: Vec<(ListFlag, BTreeSet<&'a NodeKey>)>,
+    owner: Option<BTreeSet<&'a NodeKey>>,
+}
+
+impl FilterKept<'_> {
+    /// Count `key`, a node drawable but for the filters, as left out by them: when the search
+    /// keeps it, in all if the filters together drop it, and under each that drops it alone.
+    fn count(&self, key: &NodeKey, hidden: &mut HiddenByFilter) {
+        if self
+            .searched
+            .as_ref()
+            .is_some_and(|searched| !searched.contains(key))
+        {
+            return;
+        }
+        if !self.all.contains(key) {
+            hidden.total += 1;
+        }
+        for (flag, keeps) in &self.flags {
+            if !keeps.contains(key) {
+                *hidden.flags.entry(*flag).or_default() += 1;
+            }
+        }
+        if self
+            .owner
+            .as_ref()
+            .is_some_and(|keeps| !keeps.contains(key))
+        {
+            hidden.owner += 1;
+        }
+    }
 }
 
 impl<'a> StandIns<'a> {
@@ -105,7 +149,7 @@ impl<'a> DerivedJourney<'a> {
         deployment: &Deployment,
         viewer: &BTreeSet<IdentityKey>,
     ) -> Result<Level, ProjectionError> {
-        let classes = (query.display.len() < LevelDisplay::ALL.len())
+        let classes = (query.display.len() < LevelDisplay::ALL.len() || query.filters_by_node())
             .then(|| classify(self.graph, deployment));
         self.level_with(query, classes.as_ref(), viewer)
     }
@@ -124,11 +168,15 @@ impl<'a> DerivedJourney<'a> {
             self.known(key)?;
         }
         assert!(
-            classes.is_some() || query.display.len() == LevelDisplay::ALL.len(),
-            "a level that leaves a class out has the classes"
+            classes.is_some()
+                || (query.display.len() == LevelDisplay::ALL.len() && !query.filters_by_node()),
+            "a level that leaves a class out, or filters by flag or owner, has the classes"
         );
         let kept = query.filters().then(|| self.kept(query, viewer));
-        let stand_ins = self.stand_ins(query, classes, kept.as_ref());
+        let by_filter = query
+            .filters_by_node()
+            .then(|| self.filter_kept(query, viewer, kept.clone().unwrap_or_default()));
+        let stand_ins = self.stand_ins(query, classes, kept.as_ref(), by_filter.as_ref());
         let mut rolled_up: BTreeMap<&NodeKey, Vec<NodeKey>> = BTreeMap::new();
         for key in &stand_ins.within {
             match stand_ins.get(key) {
@@ -174,18 +222,30 @@ impl<'a> DerivedJourney<'a> {
             nodes,
             edges: self.level_edges(&stand_ins),
             hidden_by_class: stand_ins.hidden_by_class,
+            hidden_by_filter: stand_ins.hidden_by_filter,
         })
     }
 
     /// C2, C9: the nodes the query's filters match, and every node holding one: what a level
     /// that filters keeps. Each match walks up its ancestors until one is already kept.
     fn kept(&self, query: &LevelQuery, viewer: &BTreeSet<IdentityKey>) -> BTreeSet<&'a NodeKey> {
-        let matcher = self.matcher(
+        self.kept_by(
             &query.flags,
             query.owner.as_ref(),
             query.text.as_ref(),
             viewer,
-        );
+        )
+    }
+
+    /// [`Self::kept`] for these filters alone.
+    fn kept_by(
+        &self,
+        flags: &BTreeSet<ListFlag>,
+        owner: Option<&IdentityKey>,
+        text: Option<&Title>,
+        viewer: &BTreeSet<IdentityKey>,
+    ) -> BTreeSet<&'a NodeKey> {
+        let matcher = self.matcher(flags, owner, text, viewer);
         let tree = self.graph.tree();
         let mut kept: BTreeSet<&'a NodeKey> = BTreeSet::new();
         for key in self.graph.document().nodes.as_map().keys() {
@@ -205,6 +265,35 @@ impl<'a> DerivedJourney<'a> {
             "each node is kept once"
         );
         kept
+    }
+
+    /// C9: the sets the Filter's counts are the differences of, for a query with a flag or an
+    /// owner. `all` is what the query's filters keep together.
+    fn filter_kept(
+        &self,
+        query: &LevelQuery,
+        viewer: &BTreeSet<IdentityKey>,
+        all: BTreeSet<&'a NodeKey>,
+    ) -> FilterKept<'a> {
+        let text = query.text.as_ref();
+        FilterKept {
+            searched: text.map(|text| self.kept_by(&BTreeSet::new(), None, Some(text), viewer)),
+            all,
+            flags: query
+                .flags
+                .iter()
+                .map(|flag| {
+                    (
+                        *flag,
+                        self.kept_by(&BTreeSet::from([*flag]), None, text, viewer),
+                    )
+                })
+                .collect(),
+            owner: query
+                .owner
+                .as_ref()
+                .map(|owner| self.kept_by(&BTreeSet::new(), Some(owner), text, viewer)),
+        }
     }
 
     /// C2's top-level rule for the nodes directly within the drilled container (or at the
@@ -232,6 +321,7 @@ impl<'a> DerivedJourney<'a> {
         query: &LevelQuery,
         classes: Option<&Relevances>,
         kept: Option<&BTreeSet<&'a NodeKey>>,
+        by_filter: Option<&FilterKept<'a>>,
     ) -> StandIns<'a> {
         let within = self.tree_order(query.container.as_ref());
         let chain = self.selected_chain(query, &within);
@@ -245,6 +335,7 @@ impl<'a> DerivedJourney<'a> {
         let mut inside: BTreeSet<&NodeKey> = BTreeSet::new();
         let mut left_out: BTreeSet<&NodeKey> = BTreeSet::new();
         let mut hidden_by_class: BTreeMap<LevelDisplay, u32> = BTreeMap::new();
+        let mut hidden_by_filter = HiddenByFilter::default();
         let tree = self.graph.tree();
         // Tree order puts each parent first, so its stand-in, collapse, and rule are known.
         for key in &within {
@@ -271,6 +362,16 @@ impl<'a> DerivedJourney<'a> {
                 || (!under_collapse
                     && query.shown.contains(&self.node(key).kind())
                     && kept.is_none_or(|kept| kept.contains(key)));
+            // C9: a node the search keeps and a filter leaves out, whatever its class but a settled
+            // one (noise), counted in all and under each filter that leaves it out alone.
+            if let (Some(by), Some(class)) = (by_filter, class)
+                && !on_chain
+                && !under_collapse
+                && query.shown.contains(&self.node(key).kind())
+                && class != LevelDisplay::NotRelevant
+            {
+                by.count(key, &mut hidden_by_filter);
+            }
             let shown_class = on_chain || class.is_none_or(|class| query.display.contains(&class));
             if let (true, false, Some(class)) = (drawable, shown_class, class) {
                 *hidden_by_class.entry(class).or_default() += 1;
@@ -287,6 +388,7 @@ impl<'a> DerivedJourney<'a> {
             of,
             collapsed,
             hidden_by_class,
+            hidden_by_filter,
         }
     }
 

@@ -426,6 +426,8 @@ impl ToolSet {
                 nodes,
                 edges,
                 hidden_by_class,
+                // The tool's query has no flag or owner filters, so there is nothing to count.
+                hidden_by_filter: _,
             } = level;
             let display = (display.len() < LevelDisplay::ALL.len()).then_some(display);
             let nodes = page(nodes, arguments.cursor);

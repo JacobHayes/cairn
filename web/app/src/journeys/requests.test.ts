@@ -227,6 +227,7 @@ describe("the highlights", () => {
 
 describe("the badges", () => {
   const byClass = { not_relevant: 3, conditional: 2 };
+  const level = { hidden_by_class: byClass, hidden_by_filter: { total: 5, flags: { mine: 4, stale: 3 }, owner: 2 } };
   const none = () => false;
 
   it.each([
@@ -235,21 +236,43 @@ describe("the badges", () => {
     ["timeline", { conditional: 2 }],
     ["walk", {}],
   ] as const)("count, for each class the view can draw, what that class hides: %s", (screen, expected) => {
-    expect(badgesOf(screen, byClass, undefined, none).hidden).toEqual(expected);
+    expect(badgesOf(screen, { hidden_by_class: byClass }, undefined, none).hidden.classes).toEqual(expected);
   });
 
   it("count nothing for a class that hides nothing", () => {
-    expect(badgesOf("graph", { conditional: 0, not_relevant: 4 }, undefined, none).hidden).toEqual({ not_relevant: 4 });
+    expect(badgesOf("graph", { hidden_by_class: { conditional: 0, not_relevant: 4 } }, undefined, none).hidden.classes).toEqual({ not_relevant: 4 });
+  });
+
+  it.each([
+    ["graph", 7],
+    ["list", 7],
+    ["timeline", 7],
+  ] as const)("count on Filter what the settings hide less the not relevant, and the conditional class only where the view draws it: %s", (screen, expected) => {
+    // 5 nodes hidden by a flag or the owner, 2 more by the conditional class; the 3 not relevant never count.
+    expect(badgesOf(screen, level, undefined, none).filter?.count).toBe(expected);
+  });
+
+  it("count nothing of the flags and owner on the walk through, whose cards the level's counts do not describe", () => {
+    const walk = badgesOf("walk", level, undefined, none);
+    expect(walk.filter).toBeUndefined();
+    expect(walk.hidden).toEqual({ classes: {}, flags: {} });
+  });
+
+  it("hand each setting its own count from the engine's, and none when nothing is hidden", () => {
+    const { hidden } = badgesOf("graph", level, undefined, none);
+    expect(hidden.flags).toEqual({ mine: 4, stale: 3 });
+    expect(hidden.owner).toBe(2);
+    expect(badgesOf("graph", { hidden_by_class: {} }, undefined, none)).toEqual({ hidden: { classes: {}, flags: {} } });
   });
 
   it("count on Depth the frontier nodes the step hides: a kind it does not draw, the Stages rule, or a collapse; none under Fade", () => {
     const base = new Set(view.derived.acting_frontier);
-    expect(badgesOf("graph", {}, base, stepHides(nodes, "actions", [])).depth).toBeUndefined();
+    expect(badgesOf("graph", undefined, base, stepHides(nodes, "actions", [])).depth).toBeUndefined();
     // Decisions draws no deliverable or action: the frontier's two actions and its deliverable.
-    expect(badgesOf("graph", {}, base, stepHides(nodes, "decisions", [])).depth?.count).toBe(3);
-    expect(badgesOf("graph", {}, base, stepHides(nodes, "decisions", []), true).depth).toBeUndefined();
+    expect(badgesOf("graph", undefined, base, stepHides(nodes, "decisions", [])).depth?.count).toBe(3);
+    expect(badgesOf("graph", undefined, base, stepHides(nodes, "decisions", []), true).depth).toBeUndefined();
     const inside = new Set(["n_inner"]);
-    expect(badgesOf("graph", {}, inside, stepHides(nodes, "actions", ["n_stage"])).depth?.count).toBe(1);
+    expect(badgesOf("graph", undefined, inside, stepHides(nodes, "actions", ["n_stage"])).depth?.count).toBe(1);
     // At Stages a top-level decision is left out with what is beneath it.
     expect(stepHides(nodes, "stages", [])("n_pick")).toBe(true);
     expect(stepHides(nodes, "stages", [])("n_inner")).toBe(false);
@@ -259,7 +282,7 @@ describe("the badges", () => {
     const base = new Set(view.derived.acting_frontier);
     const hidden = [...base].filter(stepHides(nodes, "decisions", []));
     const drawn = new Set(hidden.slice(0, 1));
-    expect(badgesOf("graph", {}, base, depthLeavesOut(nodes, "decisions", [], drawn)).depth?.count).toBe(hidden.length - 1);
+    expect(badgesOf("graph", undefined, base, depthLeavesOut(nodes, "decisions", [], drawn)).depth?.count).toBe(hidden.length - 1);
   });
 });
 

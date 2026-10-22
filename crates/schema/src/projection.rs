@@ -297,7 +297,14 @@ impl LevelQuery {
     /// them.
     #[must_use]
     pub fn filters(&self) -> bool {
-        !self.flags.is_empty() || self.owner.is_some() || self.text.is_some()
+        self.filters_by_node() || self.text.is_some()
+    }
+
+    /// Whether the query filters by a flag or an owner, the settings the level counts what they
+    /// leave out.
+    #[must_use]
+    pub fn filters_by_node(&self) -> bool {
+        !self.flags.is_empty() || self.owner.is_some()
     }
 
     /// What a request asks for: an empty `shown` is every kind and an empty `display` every
@@ -355,6 +362,39 @@ pub struct Level {
     /// shown.
     #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
     pub hidden_by_class: BTreeMap<LevelDisplay, u32>,
+    // PRD: C9.
+    /// What the level's flag and owner filters leave out, among the nodes the search keeps and
+    /// that would otherwise be drawn. Empty when no flag or owner filter is set.
+    #[serde(default, skip_serializing_if = "HiddenByFilter::is_empty")]
+    pub hidden_by_filter: HiddenByFilter,
+}
+
+// PRD: C9.
+/// The nodes the Filter's flag and owner settings hide, counted over the nodes of a kind
+/// shown, within the level, under no collapse, not selected, and not settled as not relevant
+/// (a ruled-out node is noise, and never counted here), among those the search keeps. A
+/// node is counted once in `total` however many settings leave it out.
+#[derive(Clone, Debug, Default, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+#[serde(deny_unknown_fields)]
+pub struct HiddenByFilter {
+    /// The nodes any flag or the owner setting leaves out.
+    #[serde(default)]
+    pub total: u32,
+    /// Per flag set (only mine included), the nodes that flag alone leaves out; a flag that
+    /// leaves none out has no entry.
+    #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
+    pub flags: BTreeMap<ListFlag, u32>,
+    /// The nodes the owner setting alone leaves out.
+    #[serde(default, skip_serializing_if = "crate::serde_util::is_zero")]
+    pub owner: u32,
+}
+
+impl HiddenByFilter {
+    /// Whether nothing is hidden by a flag or the owner.
+    #[must_use]
+    pub fn is_empty(&self) -> bool {
+        self.total == 0
+    }
 }
 
 /// Some nodes an answer's effect names: how many in all, and the first

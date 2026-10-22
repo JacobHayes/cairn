@@ -264,6 +264,8 @@ export interface ScreenView {
   viewState: boolean;
   /** The relevance classes it cannot draw, each with why: its Filter box stays set but disabled with the reason under it, and the count of what it hides is not offered. */
   classes: Partial<Record<RelevanceClass, string>>;
+  /** Whether the level's counts of what the Filter hides (the toolbar badge and the count beside each setting) describe what the view draws: the walk through draws only the frontier's cards, which the level's counts do not read, so it has none. */
+  filterCounts: boolean;
   /** Why Frontier lights nothing here, when it does not: the chip stays set but disabled with the reason, and Shift F does nothing. */
   frontier?: string;
   /** Whether Depth's Fade applies: a view of one card at a time has nothing to dim. */
@@ -284,11 +286,11 @@ const EVERY_CARD_APPLIES = "Every card here is work that applies.";
  * read this and nothing else.
  */
 export const SCREEN_VIEWS: Record<Screen, ScreenView> = {
-  graph: { viewState: true, classes: {}, fade: true, rows: false },
-  list: { viewState: true, classes: {}, fade: true, rows: true },
-  timeline: { viewState: true, classes: { not_relevant: NO_DATES }, fade: true, rows: false },
-  summary: { viewState: false, classes: {}, fade: false, rows: false },
-  walk: { viewState: true, classes: { conditional: EVERY_CARD_APPLIES, not_relevant: EVERY_CARD_APPLIES }, frontier: "Every card here is on the frontier. Frontier applies on the other views.", fade: false, rows: false },
+  graph: { viewState: true, classes: {}, filterCounts: true, fade: true, rows: false },
+  list: { viewState: true, classes: {}, filterCounts: true, fade: true, rows: true },
+  timeline: { viewState: true, classes: { not_relevant: NO_DATES }, filterCounts: true, fade: true, rows: false },
+  summary: { viewState: false, classes: {}, filterCounts: false, fade: false, rows: false },
+  walk: { viewState: true, classes: { conditional: EVERY_CARD_APPLIES, not_relevant: EVERY_CARD_APPLIES }, filterCounts: false, frontier: "Every card here is on the frontier. Frontier applies on the other views.", fade: false, rows: false },
 };
 
 /** Whether `screen` can draw `each`. */

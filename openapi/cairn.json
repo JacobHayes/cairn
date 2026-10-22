@@ -4624,6 +4624,35 @@
         ],
         "type": "object"
       },
+      "HiddenByFilter": {
+        "additionalProperties": false,
+        "description": "The nodes the Filter's flag and owner settings hide, counted over the nodes of a kind\nshown, within the level, under no collapse, not selected, and not settled as not relevant\n(a ruled-out node is noise, and never counted here), among those the search keeps. A\nnode is counted once in `total` however many settings leave it out.",
+        "properties": {
+          "flags": {
+            "additionalProperties": {
+              "format": "uint32",
+              "minimum": 0,
+              "type": "integer"
+            },
+            "description": "Per flag set (only mine included), the nodes that flag alone leaves out; a flag that\nleaves none out has no entry.",
+            "type": "object"
+          },
+          "owner": {
+            "description": "The nodes the owner setting alone leaves out.",
+            "format": "uint32",
+            "minimum": 0,
+            "type": "integer"
+          },
+          "total": {
+            "default": 0,
+            "description": "The nodes any flag or the owner setting leaves out.",
+            "format": "uint32",
+            "minimum": 0,
+            "type": "integer"
+          }
+        },
+        "type": "object"
+      },
       "History": {
         "additionalProperties": false,
         "description": "A page of a journey's history, or of one node's, grouped by patch.",
@@ -5419,6 +5448,10 @@
             },
             "description": "The count, per relevance class left out: the nodes hidden only for their class (of a\nkind shown, within the level, under no collapse, not left out by `top`, and kept by the\nfilters), so showing a class draws exactly that many more. Empty when every class is\nshown.",
             "type": "object"
+          },
+          "hidden_by_filter": {
+            "$ref": "#/components/schemas/HiddenByFilter",
+            "description": "What the level's flag and owner filters leave out, among the nodes the search keeps and\nthat would otherwise be drawn. Empty when no flag or owner filter is set."
           },
           "nodes": {
             "description": "The visible nodes, in tree order.",

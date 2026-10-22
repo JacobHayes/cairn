@@ -46,7 +46,7 @@ describe("the Filter", () => {
   const hides = { conditional: 7, not_relevant: 4 };
 
   it.each(["graph", "list", "timeline", "walk"] as const)("on %s each class it can draw shows what it hides beside its box, each it cannot is disabled with a reason and no count", (screen) => {
-    const markup = drawn(journeySubject(view), screen, badgesOf(screen, hides, undefined, () => false).hidden);
+    const markup = drawn(journeySubject(view), screen, badgesOf(screen, { hidden_by_class: hides }, undefined, () => false).hidden);
     for (const each of RELEVANCE_CLASSES) {
       const box = new RegExp(`data-testid="${TESTID[each]}"[^>]*><input[^>]*?(disabled=""|>)`).exec(markup);
       expect(box).not.toBeNull();
@@ -60,5 +60,12 @@ describe("the Filter", () => {
       }
     }
     expect(markup.includes('data-testid="filter-disabled-reason"')).toBe(RELEVANCE_CLASSES.some((each) => !canDraw(screen, each)));
+  });
+
+  it("shows a count beside Only mine, the owner and each flag that hides something, and none beside the rest", () => {
+    const hidden = badgesOf("list", { hidden_by_class: {}, hidden_by_filter: { total: 9, flags: { mine: 4, stale: 3 }, owner: 2 } }, undefined, () => false).hidden;
+    const markup = drawn(journeySubject(view), "list", hidden);
+    const counts: Record<string, number> = Object.fromEntries([...markup.matchAll(/data-testid="([a-z-]+)-count">(\d+)</g)].map((match): [string, number] => [match[1] ?? "", Number(match[2])]));
+    expect(counts).toEqual({ "flag-mine": 4, "flag-stale": 3, "filter-owner": 2 });
   });
 });

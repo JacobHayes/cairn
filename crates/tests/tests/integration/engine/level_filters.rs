@@ -290,6 +290,77 @@ fn the_class_count_skips_collapsed_and_filtered_nodes() {
     );
 }
 
+/// C9: the flag and owner counts are the nodes a setting leaves out, among those the search keeps
+/// and of a kind shown, whatever their class but a settled one; each alone, and once in all.
+#[test]
+fn the_filter_counts_what_each_setting_leaves_out() {
+    let records = journey();
+    let hidden =
+        |query: LevelQuery, viewer: &[&str]| level_of(&records, &query, viewer).hidden_by_filter;
+    let owned_by_a = LevelQuery {
+        owner: Some("who_a".parse().unwrap()),
+        ..every_kind()
+    };
+    let mine = LevelQuery {
+        flags: BTreeSet::from([ListFlag::Mine]),
+        ..every_kind()
+    };
+    // The loose deliverable, the decision, the gate, and B's spare (conditional, so counted).
+    let by_owner = hidden(owned_by_a.clone(), &[]);
+    assert_eq!((by_owner.total, by_owner.owner), (4, 4));
+    assert!(by_owner.flags.is_empty());
+    // Mine for B draws the group and the spare alone.
+    let by_mine = hidden(mine.clone(), &["who_b"]);
+    assert_eq!(by_mine.flags[&ListFlag::Mine], by_mine.total);
+    assert_eq!(by_mine.total, 7);
+    // Both: each alone, and each node left out once in all.
+    let both = hidden(
+        LevelQuery {
+            owner: owned_by_a.owner.clone(),
+            ..mine.clone()
+        },
+        &["who_b"],
+    );
+    assert_eq!((both.owner, both.flags[&ListFlag::Mine]), (4, 7));
+    assert_eq!(
+        both.total, 9,
+        "everything but the one node both keep: the group"
+    );
+    // A settled node is noise: with the spare ruled out it drops from every count.
+    let ruled_out = support::accepted(
+        &records,
+        "- op: answer\n  decision: n_ask\n  value: {boolean: false}\n",
+    );
+    let level = level_of(&ruled_out, &owned_by_a, &[]);
+    assert_eq!(
+        level.hidden_by_filter.total, 3,
+        "the ruled-out spare is no longer counted"
+    );
+    // Showing the not relevant class does not bring them back into the count.
+    let shown = level_of(
+        &ruled_out,
+        &LevelQuery {
+            display: LevelDisplay::every(),
+            ..owned_by_a.clone()
+        },
+        &[],
+    );
+    assert_eq!(shown.hidden_by_filter, level.hidden_by_filter);
+    // The search narrows what is counted: only "Moored" nodes (work, side) are searched, and the
+    // owner keeps both.
+    let searched = hidden(
+        LevelQuery {
+            text: Some("moored".parse().unwrap()),
+            ..owned_by_a
+        },
+        &[],
+    );
+    assert_eq!(searched.total, 0);
+    assert!(searched.is_empty());
+    // No flag or owner, no count.
+    assert!(hidden(searching("moored"), &[]).is_empty());
+}
+
 /// The level with `n_other` selected under `query`, checked to draw it with the containers above
 /// it, none of them collapsed.
 fn drawn_selected(records: &Records, query: LevelQuery) -> Level {

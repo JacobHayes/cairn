@@ -38,6 +38,13 @@
   white-space: nowrap;
 }
 
+/* What a setting hides, beside its label: a gap and mono figures, so several counts scan as a column. */
+.check-count {
+  margin-inline-start: var(--space-1);
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+}
+
 /* A check the view cannot honour stays, at the disabled button's strength, its value kept. */
 .check:has(input:disabled) {
   opacity: 0.45;
