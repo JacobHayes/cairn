@@ -61,8 +61,8 @@ pub use document::{
     ParseError, WriteError, from_json, from_yaml, to_json, to_json_pretty, to_yaml,
 };
 pub use domain::{
-    Deployment, Domain, GraphId, Identity, Journey, JourneyHeader, JourneyStatus, Lineage, Route,
-    RouteDraft, RouteHeader, RouteKind, RouteVersion,
+    DeletedId, Deployment, Domain, GraphId, Identity, Journey, JourneyHeader, JourneyStatus,
+    Lineage, Route, RouteDraft, RouteHeader, RouteKind, RouteVersion,
 };
 pub use event::{Actor, ChangeSet, ContentHash, Event, EventType, PatchReceipt, Subject};
 pub use field::{NodeField, NodeFieldValue};

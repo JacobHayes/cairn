@@ -4,6 +4,7 @@
 // under the header, and the List projection. A route has no state or dates, so its cards say
 // the date rule in words and no status.
 import type { Schema } from "@cairn/client";
+import { use } from "react";
 import { Link, useLocation, useNavigate } from "react-router";
 
 import { AssistantDock } from "../assistant/AssistantPanel.tsx";
@@ -30,6 +31,7 @@ import { NoticeList } from "./RouteNotices.tsx";
 import type { Authored } from "./target.ts";
 import { usePublishPreviewRead } from "./write.ts";
 import { RetiredBadge } from "../routes/RetiredBadge.tsx";
+import { DeleteRoute, deleteRouteLabel, DeletingRoute } from "../routes/DeleteRoute.tsx";
 
 type Notice = Schema<"Notice">;
 
@@ -61,22 +63,62 @@ export interface RouteHeaderProps {
 /** The import control in the `⋯`: the menu closes once the file has landed. */
 function ImportItem({ flow, edit, close }: { flow: ImportFlow; edit: string; close: () => void }) {
   useOnImported(flow, close);
-  return <ImportControl flow={flow} edit={edit} label="Import a file into the draft" />;
+  return <ImportControl flow={flow} edit={edit} label="Import a file into the draft" menu />;
+}
+
+/** The route's `⋯`: export, import into the draft, its proposals, discarding the draft, retiring, and deleting the route once nothing uses it (A19). */
+function RouteMenu({ route, of, write, imports, send, onDelete }: { route: Route; of: "draft" | number | undefined; write: ScreenWrite; imports: ImportFlow; send: (mutation: Schema<"Mutation">, bare?: boolean) => void; onDelete: () => void }) {
+  const id = route.header.id;
+  const exporting = useExport(id);
+  const drafting = of === "draft";
+  const moves = routeMoves(route);
+  const segment = route.header.kind === "segment";
+  const writable = useWritable();
+  const unused = useRouteRead(id)?.detail.in_use === false;
+  return (
+    <Menu label="Route actions" testId="route-menu" className="route-menu" align="end" trigger={<span aria-hidden="true">⋯</span>}>
+      {(close) => (
+        <>
+          {of === undefined ? null : (
+            <button type="button" role="menuitem" className="menu-item" data-testid="menu-export" onClick={() => { close(); void exporting(drafting ? undefined : of); }}>
+              {drafting ? "Export the draft" : "Export this version"}
+            </button>
+          )}
+          {!writable ? null : <ImportItem flow={imports} edit={`import:draft:${id}`} close={close} />}
+          <OpenProposalsItem destination={{ route: id }} close={close} />
+          {!writable ? null : <hr />}
+          {!writable ? null : drafting ? (
+            <button type="button" role="menuitem" className="menu-item" disabled={write.disabled} data-testid="discard-draft" onClick={() => { close(); send({ op: "discard_draft" }, true); }}>
+              Discard the draft
+            </button>
+          ) : null}
+          {!writable ? null : <button type="button" role="menuitem" className="menu-item" disabled={write.disabled} data-testid="menu-retire" onClick={() => { close(); send(retireMutation(moves.retire)); }}>
+            {moves.retire ? `Retire the ${segment ? "segment" : "route"}` : "Bring it back"}
+          </button>}
+          {!writable || !unused ? null : <hr />}
+          {!writable || !unused ? null : (
+            <button type="button" role="menuitem" className="menu-item" data-testid="menu-delete-route" onClick={() => { close(); onDelete(); }}>
+              {deleteRouteLabel(route)}
+            </button>
+          )}
+        </>
+      )}
+    </Menu>
+  );
 }
 
 /**
  * One line: the route's name, which graph its views show (the version selector), a Retired chip,
  * and on the right the View picker, the primary (Publish on the draft, Open a draft on a version
- * when none is open) and the `⋯`: export, import, proposals, and discarding or retiring.
+ * when none is open) and the `⋯` (RouteMenu); deleting the route asks under the header.
  */
 export function RouteHeader({ route, of, screen, node, write, blocked, onPublish, imports, titleOf }: RouteHeaderProps) {
   const id = route.header.id;
   const { search } = useLocation();
-  const exporting = useExport(id);
   const drafting = of === "draft";
-  const moves = routeMoves(route);
   const segment = route.header.kind === "segment";
   const navigate = useNavigate();
+  const deleting = use(DeletingRoute);
   // C14: under the proposal layer, in any mode, the version is the one the proposal leaves, and the page offers no live write (screens/writable.ts).
   const proposal = useLayer()?.id;
   const reviewing = proposal !== undefined;
@@ -94,7 +136,7 @@ export function RouteHeader({ route, of, screen, node, write, blocked, onPublish
         <span className="spacer" />
         <AssistantDock target={{ route: id }} titleOf={titleOf} />
         {screen === undefined ? null : <ViewPicker screen={screen} screens={ROUTE_OFFERS.screens} to={(to) => routeSwitched(id, search, to, node, proposal)} title={ROUTE_VIEW_TITLE} />}
-        {!writable ? null : drafting ? (
+        {!writable || deleting.asking ? null : drafting ? (
           <Button primary disabled={write.disabled || blocked !== undefined} title={blocked} data-testid="publish-draft" onClick={onPublish}>
             Publish
           </Button>
@@ -103,30 +145,10 @@ export function RouteHeader({ route, of, screen, node, write, blocked, onPublish
             Open a draft
           </Button>
         ) : null}
-        <Menu label="Route actions" testId="route-menu" className="route-menu" align="end" trigger={<span aria-hidden="true">⋯</span>}>
-          {(close) => (
-            <>
-              {of === undefined ? null : (
-                <button type="button" role="menuitem" className="menu-item" data-testid="menu-export" onClick={() => { close(); void exporting(drafting ? undefined : of); }}>
-                  {drafting ? "Export the draft" : "Export this version"}
-                </button>
-              )}
-              {!writable ? null : <ImportItem flow={imports} edit={`import:draft:${id}`} close={close} />}
-              <OpenProposalsItem destination={{ route: id }} close={close} />
-              {!writable ? null : <hr />}
-              {!writable ? null : drafting ? (
-                <button type="button" role="menuitem" className="menu-item" disabled={write.disabled} data-testid="discard-draft" onClick={() => { close(); send({ op: "discard_draft" }, true); }}>
-                  Discard the draft
-                </button>
-              ) : null}
-              {!writable ? null : <button type="button" role="menuitem" className="menu-item" disabled={write.disabled} data-testid="menu-retire" onClick={() => { close(); send(retireMutation(moves.retire)); }}>
-                {moves.retire ? `Retire the ${segment ? "segment" : "route"}` : "Bring it back"}
-              </button>}
-            </>
-          )}
-        </Menu>
+        <RouteMenu route={route} of={of} write={write} imports={imports} send={send} onDelete={() => { deleting.ask(true); }} />
       </div>
       {write.rejection === undefined ? <WriteStatus view={write.status} /> : <RejectionView rejection={write.rejection} onDismiss={write.dismiss} />}
+      {deleting.asking ? <DeleteRoute route={route} onCancel={() => { deleting.ask(false); }} /> : null}
     </section>
   );
 }
@@ -166,9 +188,11 @@ export interface DraftCardProps {
 
 /**
  * The inspector's empty state on a route draft: what blocks publishing (violations, A15), what
- * is only advisory (notices, A20, apart under their own label), Publish and Discard.
+ * is only advisory (notices, A20, apart under their own label), Publish and Discard (set aside
+ * while the route's deletion is asked).
  */
 export function DraftCard({ route, violations, notices, hrefOf, write, blocked, onPublish, onDiscard, titleOf }: DraftCardProps) {
+  const deleting = use(DeletingRoute);
   return (
     <aside className="detail-panel panel stack draft-card" aria-label="The draft" data-testid="draft-card">
       <h2>The draft</h2>
@@ -198,14 +222,16 @@ export function DraftCard({ route, violations, notices, hrefOf, write, blocked, 
         </section>
       )}
       <NoticeList notices={notices} hrefOf={hrefOf} />
-      <span className="row">
+      {deleting.asking ? null : (
+        <span className="row">
         <Button primary disabled={write.disabled || blocked !== undefined} title={blocked} onClick={onPublish}>
           Publish
         </Button>
-        <Button disabled={write.disabled} onClick={onDiscard}>
-          Discard draft
-        </Button>
-      </span>
+          <Button disabled={write.disabled} onClick={onDiscard}>
+            Discard draft
+          </Button>
+        </span>
+      )}
     </aside>
   );
 }

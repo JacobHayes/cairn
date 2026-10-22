@@ -1,5 +1,5 @@
 //! Journey and route lifecycle (A11, A17, A19, B1, B7, B9, B11): create, edit, status,
-//! delete, lineage, drafts, and publishing.
+//! lineage, drafts, and publishing.
 
 use std::collections::BTreeSet;
 
@@ -32,13 +32,6 @@ pub(super) fn apply(session: &mut Session<'_>, mutation: &Mutation) -> Vec<Write
         (PatchTarget::Journey(_), Mutation::SetJourneyStatus { status }) => {
             set_status(session, *status)
         }
-        (PatchTarget::Journey(id), Mutation::DeleteJourney {}) => vec![
-            Write::Remove(RecordKey::Domain(cairn_schema::Domain::Journey(id.clone()))),
-            Write::Put(Record::DeletedJourney {
-                journey: id.clone(),
-                deleted_at: session.inputs.at,
-            }),
-        ],
         (PatchTarget::Journey(_), Mutation::Upgrade { to }) => upgrade(session, *to),
         (PatchTarget::Journey(_), Mutation::Relink { lineage }) => relink(session, lineage),
         (

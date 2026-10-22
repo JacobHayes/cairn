@@ -121,8 +121,9 @@ pub(crate) const SPECS: &[Spec] = &[
         name: "apply_patch",
         description: "Applies any patch to a journey, a route (its draft included), or the \
             deployment: ordered mutations against a base revision, all or nothing. \
-            Structure (nodes, edges, roles, kinds, resources), notes, and bulk changes go \
-            here; a proposal is better when someone should review first.",
+            Structure (nodes, edges, roles, kinds, resources), notes, bulk changes, and \
+            deleting journeys and routes (a deployment patch) go here; a proposal is better \
+            when someone should review first.",
         writes: Writes::Patch,
         destructive: true,
         schema: schema_citing_review_items::<ApplyPatch>,

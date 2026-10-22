@@ -76,8 +76,8 @@ export function ImportFile({ edit, label = "Import a route file", onImported }: 
   return <ImportControl flow={flow} edit={edit} label={label} />;
 }
 
-/** The control over `flow`: the file chooser, the refusal that stays with its file across a reload, and the discard's state. */
-export function ImportControl({ flow, edit, label = "Import a route file" }: { flow: ImportFlow; edit: string; label?: string }) {
+/** The control over `flow`: the file chooser, the refusal that stays with its file across a reload, and the discard's state; `menu` draws the chooser as one of a menu's items. */
+export function ImportControl({ flow, edit, label = "Import a route file", menu = false }: { flow: ImportFlow; edit: string; label?: string; menu?: boolean }) {
   const skew = useSkew();
   const working = useSelector(flow, (snapshot) => snapshot.hasTag("busy"));
   const unreadable = useSelector(flow, (snapshot) => snapshot.context.unreadable);
@@ -87,7 +87,7 @@ export function ImportControl({ flow, edit, label = "Import a route file" }: { f
   const refused = importing.rejection === undefined || importing.write?.command.kind !== "import" ? undefined : importing.write.command.request.file;
   return (
     <div className="stack" data-testid="import">
-      <label className="button import-button">
+      <label className={menu ? "menu-item" : "button import-button"}>
         {label}
         <input
           className="visually-hidden"

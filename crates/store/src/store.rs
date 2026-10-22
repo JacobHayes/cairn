@@ -89,6 +89,11 @@ pub trait Store: AuthStore + ConversationStore + Send + Sync {
     /// C17: a route's published versions with the journeys on each.
     async fn route_detail(&self, route: &RouteId) -> Result<Option<RouteDetail>, StoreError>;
 
+    /// A19: the graphs using `route`: journeys whose lineage is on one of its versions, and
+    /// journeys, route drafts and published versions holding an insertion of one. What a route
+    /// delete is checked against.
+    async fn graphs_using(&self, route: &RouteId) -> Result<BTreeSet<GraphId>, StoreError>;
+
     /// E6: the graphs referring to any of `identities`, directly or through an alias: journeys,
     /// route drafts and published route versions, in an answer, a role fill, an explicit
     /// participation, or an identity-typed condition. What an identity merge and an identity

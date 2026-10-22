@@ -14,7 +14,6 @@ mutations:
   name: Renamed journey
 - op: set_journey_status
   status: completed
-- op: delete_journey
 - op: create_route
   name: Sample route
 - op: edit_route
@@ -247,6 +246,12 @@ mutations:
     j_sample: 7
 - op: delete_identity
   identity: who_two
+- op: delete_journey
+  journey: j_old
+  revision: 4
+- op: delete_route
+  route: old-route
+  revision: 2
 - op: create_proposal
   proposal:
     title: Add a review step

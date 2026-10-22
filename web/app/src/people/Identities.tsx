@@ -156,7 +156,7 @@ function IdentityTable({ shown, names, selection, reviewing }: { shown: Identity
   const { caller } = useCaller();
   const yours = new Set(caller?.identities ?? []);
   return (
-    <div className="index-table identities-table" data-testid="identity-list" data-selecting={selection.members.length > 0}>
+    <div className="index-table identities-table picks" data-testid="identity-list" data-selecting={selection.members.length > 0}>
       <table className="data" aria-label="Identities">
         <thead>
           <tr>

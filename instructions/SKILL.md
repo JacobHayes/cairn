@@ -83,6 +83,15 @@ out, though its relevance reads `not_relevant` and counts for nothing until then
   the identity that remains, naming the journeys that refer to it. `list_identities` finds an
   identity by name or email; `list_journeys` with `referencing` finds the journeys that
   refer to one.
+- **Deleting.** Archiving a journey or retiring a route sets it aside; deleting is permanent,
+  and a deleted id is never used again. Delete only when the person asks. One `apply_patch`
+  to the `deployment` (its revision is the `deployment_revision` a snapshot reports) deletes
+  any number at once: a `delete_journey` with the `journey` and its `revision`, or a
+  `delete_route` with the `route` and its `revision`, each revision from the `list_journeys`
+  or `list_routes` row. They all go or none do: one that moved since its row was read makes
+  the whole patch stale. A route or segment is deleted only while nothing uses it (no journey
+  on any of its versions, no insertion of it in any journey or route version); the refusal
+  names what does. Delete those journeys in the same patch, or retire the route instead.
 
 ## Direct writes or proposals
 

@@ -16,7 +16,7 @@ use std::collections::{BTreeMap, BTreeSet};
 
 use async_trait::async_trait;
 use cairn_schema::{
-    ConversationId, Domain, Email, GraphId, Identity, IdentityKey, JourneyId, PatchId,
+    ConversationId, DeletedId, Domain, Email, GraphId, Identity, IdentityKey, JourneyId, PatchId,
     PatchReceipt, Proposal, ProposalId, Revision, RevisionConflict, RevisionOf, Slug, Timestamp,
     Title, TouchedSet, UserId,
 };
@@ -99,13 +99,7 @@ impl MemoryStore {
             return backend::resubmission(&stored.receipt, receipt);
         }
         state.check_revisions(commit, &shape)?;
-        let mut violations = Vec::new();
-        if let (Domain::Journey(journey), true) =
-            (&shape.domain, commit.base_revision == Revision::NONE)
-            && state.domains.deleted_journeys.contains_key(journey)
-        {
-            violations.push(backend::deleted_journey(journey));
-        }
+        let mut violations = state.domains.deleted_violations(commit, &shape);
         violations.extend(backend::identity_create_violations(
             &shape,
             &state.domains.deployment,
@@ -129,15 +123,16 @@ impl MemoryStore {
         }
         let deployment = candidate.deployment.revision;
         state.domains = candidate;
-        if let Some(journey) = &shape.deletes_journey {
-            let log = Domain::Journey(journey.clone());
+        if !shape.deletes.is_empty() {
+            // A19: a deleted journey's or route's log goes with it.
+            let logs: BTreeSet<Domain> = shape.deletes.iter().map(DeletedId::domain).collect();
             let State {
                 events,
                 event_nodes,
                 ..
             } = &mut *state;
             events.retain(|logged| {
-                let kept = logged.event.log != log;
+                let kept = !logs.contains(&logged.event.log);
                 if !kept {
                     event_nodes.remove(&logged.seq);
                 }
@@ -219,9 +214,23 @@ impl State {
                     journeys,
                 } => (identities, Some(journeys)),
                 Precondition::Unreferenced { identities } => (identities, None),
+                Precondition::Unused { routes } => {
+                    for route in routes {
+                        let users = self.domains.graphs_using(route);
+                        for graph in backend::outside_deleted(users, &shape.deletes) {
+                            conflicts.push(RevisionConflict {
+                                of: referencing_domain(&graph),
+                                expected: Revision::NONE,
+                                current: self.domains.graph_revision(&graph),
+                            });
+                        }
+                    }
+                    continue;
+                }
                 Precondition::Revision { .. } => continue,
             };
-            for graph in self.domains.graphs_referencing(identities) {
+            let referencing = self.domains.graphs_referencing(identities);
+            for graph in backend::outside_deleted(referencing, &shape.deletes) {
                 let outside = match (&graph, allowed) {
                     (GraphId::Journey(journey), Some(named)) => !named.contains(journey),
                     (_, Some(_)) => false,
@@ -268,6 +277,23 @@ impl State {
 }
 
 impl Domains {
+    /// A19: what the commit would bring back or use that was hard-deleted: a create at a
+    /// deleted id, and a journey or insertion on a deleted route.
+    fn deleted_violations(&self, commit: &Commit, shape: &Shape) -> Vec<cairn_schema::Violation> {
+        let mut violations = Vec::new();
+        if let Some(id) = backend::created_id(commit, shape)
+            && self.deleted.contains_key(&id)
+        {
+            violations.push(backend::deleted_id(&id));
+        }
+        for route in &shape.used_routes {
+            if self.deleted.contains_key(&DeletedId::Route(route.clone())) {
+                violations.push(backend::used_deleted(route));
+            }
+        }
+        violations
+    }
+
     /// The checks only the commit can make, on the records it produced.
     fn violations(&self, shape: &Shape) -> Result<Vec<cairn_schema::Violation>, StoreError> {
         let mut violations = Vec::new();
@@ -301,11 +327,9 @@ impl Domains {
     /// Moves the revisions the commit advances: its domain's or proposal's, and the
     /// deployment's when identity creates rode in (E6).
     fn advance(&mut self, shape: &Shape) -> Result<(), StoreError> {
-        let deleted = shape.deletes_journey.is_some();
         match &shape.advances {
             RevisionOf::Domain(Domain::Journey(id)) => match self.journeys.get_mut(id) {
                 Some(row) => row.1 = shape.revision,
-                None if deleted => {}
                 None => return missing_header(&shape.domain),
             },
             RevisionOf::Domain(Domain::Route(id)) => match self.routes.get_mut(id) {
@@ -399,6 +423,13 @@ impl Store for MemoryStore {
         route: &cairn_schema::RouteId,
     ) -> Result<Option<RouteDetail>, StoreError> {
         Ok(self.state().route_detail(route))
+    }
+
+    async fn graphs_using(
+        &self,
+        route: &cairn_schema::RouteId,
+    ) -> Result<BTreeSet<GraphId>, StoreError> {
+        Ok(self.state().domains.graphs_using(route))
     }
 
     async fn graphs_referencing(

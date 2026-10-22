@@ -296,8 +296,6 @@ function factWords(fact: OutlineFact): string {
       return "edits the journey";
     case "sets_journey_status":
       return `sets the journey to ${fact.status}`;
-    case "deletes_journey":
-      return "deletes the journey";
     case "creates_route":
       return "creates the route";
     case "edits_route":
@@ -340,6 +338,8 @@ export function outlineWords(outline: Outline): string {
     ...(outline.identities_edited ? [`edits ${counted(outline.identities_edited, "identity", "identities")}`] : []),
     ...(outline.identities_merged ? [`merges ${counted(outline.identities_merged, "identity", "identities")}`] : []),
     ...(outline.identities_deleted ? [`deletes ${counted(outline.identities_deleted, "identity", "identities")}`] : []),
+    ...(outline.journeys_deleted ? [`deletes ${counted(outline.journeys_deleted, "journey", "journeys")}`] : []),
+    ...(outline.routes_deleted ? [`deletes ${counted(outline.routes_deleted, "route", "routes")}`] : []),
     ...(outline.other ? ["adjusts roles, kinds or defaults"] : []),
   ];
   if (phrases.length === 0) {

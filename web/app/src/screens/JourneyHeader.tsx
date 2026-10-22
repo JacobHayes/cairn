@@ -9,7 +9,7 @@ import { Link, useLocation } from "react-router";
 import { AssistantDock, journeyTitles } from "../assistant/AssistantPanel.tsx";
 import { graphPath, type GraphView } from "../canvas/settings.ts";
 import type { Ready } from "../detail/model.ts";
-import { DeleteJourney } from "../journeys/DeleteJourney.tsx";
+import { DeleteJourney } from "../journeys/DeleteJourneys.tsx";
 import { deletable, statusActions } from "../journeys/lifecycle.ts";
 import { screenSwitched, unavailableScreens, type Screen } from "../journeys/address.ts";
 import { useJourneyTarget } from "../journeys/useJourneyTarget.ts";

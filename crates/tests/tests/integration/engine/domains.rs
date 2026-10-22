@@ -520,9 +520,32 @@ fn every_mutation_type_applies_and_emits_its_event() {
     let records = walk_journey(&records, &mut ops);
     let records = walk_deployment(&records, &mut ops);
     let records = walk_proposals(&records, &mut ops);
-    let records = accept(&records, JOURNEY, "- op: delete_journey\n", &mut ops);
-    assert!(records.journeys.is_empty());
+    let records = delete_everything(&records, &mut ops);
+    assert!(records.journeys.is_empty() && records.routes.is_empty());
     assert_eq!(ops, declared_ops());
+}
+
+/// A19: one deployment patch deletes every journey and route at once, routes that journeys
+/// follow and segments routes insert among them, since nothing the patch leaves uses them.
+fn delete_everything(records: &Records, ops: &mut BTreeSet<String>) -> Records {
+    let journeys = records.journeys.iter().map(|(id, journey)| {
+        format!(
+            "- op: delete_journey\n  journey: {id}\n  revision: {}\n",
+            journey.revision.get()
+        )
+    });
+    let routes = records.routes.iter().map(|(id, route)| {
+        format!(
+            "- op: delete_route\n  route: {id}\n  revision: {}\n",
+            route.revision.get()
+        )
+    });
+    accept(
+        records,
+        "deployment",
+        &journeys.chain(routes).collect::<String>(),
+        ops,
+    )
 }
 
 #[test]

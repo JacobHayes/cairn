@@ -45,6 +45,7 @@ pub enum EventType {
     SavedAsRoute,
     DraftDiscarded,
     RoutePublished,
+    RouteDeleted,
     NodeAdded,
     NodeChanged,
     WeightChanged,
@@ -259,7 +260,8 @@ impl Mutation {
             Mutation::CreateJourney { .. } => EventType::JourneyCreated,
             Mutation::EditJourney { .. } => EventType::JourneyEdited,
             Mutation::SetJourneyStatus { .. } => EventType::JourneyStatusChanged,
-            Mutation::DeleteJourney {} => EventType::JourneyDeleted,
+            Mutation::DeleteJourney { .. } => EventType::JourneyDeleted,
+            Mutation::DeleteRoute { .. } => EventType::RouteDeleted,
             Mutation::CreateRoute { .. } => EventType::RouteCreated,
             Mutation::EditRoute { .. } => EventType::RouteEdited,
             Mutation::SetRouteRetired { retired: true } => EventType::RouteRetired,
@@ -327,6 +329,8 @@ impl Mutation {
             }
             Mutation::MergeIdentities { survivor, .. } => Subject::Identity(survivor.clone()),
             Mutation::DeleteIdentity { identity } => Subject::Identity(identity.clone()),
+            Mutation::DeleteJourney { journey, .. } => Subject::Journey(journey.clone()),
+            Mutation::DeleteRoute { route, .. } => Subject::Route(route.clone()),
             Mutation::ApplyProposal { proposal, .. } => Subject::Proposal(proposal.clone()),
             Mutation::InsertSegment { insertion, .. } => Subject::Insertion(insertion.clone()),
             other => other

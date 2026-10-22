@@ -21,6 +21,8 @@ mod queries;
 mod records;
 mod sql;
 mod state;
+mod stored_json;
+mod to_deleted_ids;
 mod to_done;
 mod write;
 mod write_state;
@@ -260,6 +262,10 @@ impl Store for SqliteStore {
 
     async fn route_detail(&self, route: &RouteId) -> Result<Option<RouteDetail>, StoreError> {
         read!(self, [route] connection => queries::route_detail(connection, &route))
+    }
+
+    async fn graphs_using(&self, route: &RouteId) -> Result<BTreeSet<GraphId>, StoreError> {
+        read!(self, [route] connection => queries::using(connection, &route))
     }
 
     async fn graphs_referencing(

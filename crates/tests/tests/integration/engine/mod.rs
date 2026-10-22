@@ -13,6 +13,7 @@ mod cost_projections;
 mod cost_removal;
 mod cost_upgrade;
 mod dates;
+mod deletions;
 mod dependencies;
 mod derived_values;
 mod display_state;

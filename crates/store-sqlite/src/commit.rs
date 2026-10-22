@@ -4,8 +4,8 @@
 //! revisions that exist, with what really intervened.
 
 use cairn_schema::{
-    Actor, Domain, Event, GraphId, NodeKey, PatchReceipt, PatchTarget, ProposalId, Revision,
-    RevisionConflict, RevisionOf, TouchedSet, Write,
+    Actor, DeletedId, Domain, Event, GraphId, NodeKey, PatchReceipt, PatchTarget, ProposalId,
+    Revision, RevisionConflict, RevisionOf, TouchedSet, Write,
 };
 use cairn_store::backend::{self, Shape, StoredReceipt};
 use cairn_store::{Commit, CommitError, CommitPoint, Committed, Faults, Precondition, StoreError};
@@ -161,12 +161,18 @@ struct Written {
 /// The change set's writes, checked: the rules only the commit can check reject it here.
 fn write(connection: &Connection, commit: &Commit, shape: &Shape) -> Result<Written, CommitError> {
     let mut violations = Vec::new();
-    if let (Domain::Journey(journey), true) =
-        (&shape.domain, commit.base_revision == Revision::NONE)
-    {
-        let select = "SELECT 1 FROM deleted_journeys WHERE id = ?1";
-        if first(connection, select, vec![text(journey)])?.is_some() {
-            violations.push(backend::deleted_journey(journey));
+    if let Some(id) = backend::created_id(commit, shape) {
+        let (kind, held) = crate::write::deleted_columns(&id);
+        let select = "SELECT 1 FROM deleted_ids WHERE kind = ?1 AND id = ?2";
+        if first(connection, select, vec![text(kind), text(&held)])?.is_some() {
+            violations.push(backend::deleted_id(&id));
+        }
+    }
+    for route in &shape.used_routes {
+        let (kind, held) = crate::write::deleted_columns(&DeletedId::Route(route.clone()));
+        let select = "SELECT 1 FROM deleted_ids WHERE kind = ?1 AND id = ?2";
+        if first(connection, select, vec![text(kind), text(&held)])?.is_some() {
+            violations.push(backend::used_deleted(route));
         }
     }
     if !shape.created_identities.is_empty() {
@@ -213,19 +219,18 @@ fn event_nodes(
     Ok(all)
 }
 
-/// A19: the proposals a commit's hard delete takes with its journey.
+/// A19: the proposals a commit's hard deletes take with their journeys and routes.
 fn proposals_of_deleted(
     connection: &Connection,
     shape: &Shape,
 ) -> Result<Vec<ProposalId>, CommitError> {
-    let Some(journey) = &shape.deletes_journey else {
-        return Ok(Vec::new());
-    };
-    let select =
-        "SELECT id FROM proposals WHERE destination_kind = 'journey' AND destination_id = ?1";
+    let select = "SELECT id FROM proposals WHERE destination_kind = ?1 AND destination_id = ?2";
     let mut ids = Vec::new();
-    for row in crate::sql::rows(connection, select, vec![text(journey)])? {
-        ids.push(row.parse(0)?);
+    for deleted in &shape.deletes {
+        let (kind, held) = crate::write::deleted_columns(deleted);
+        for row in crate::sql::rows(connection, select, vec![text(kind), text(&held)])? {
+            ids.push(row.parse(0)?);
+        }
     }
     Ok(ids)
 }
@@ -254,9 +259,25 @@ fn check_revisions(
                 journeys,
             } => (identities, Some(journeys)),
             Precondition::Unreferenced { identities } => (identities, None),
+            Precondition::Unused { routes } => {
+                for route in routes {
+                    let users = crate::queries::using(connection, route)?;
+                    for graph in backend::outside_deleted(users, &shape.deletes) {
+                        let of = RevisionOf::Domain(graph.domain());
+                        let now = load::revision_of(connection, &of)?;
+                        conflicts.push(RevisionConflict {
+                            of,
+                            expected: Revision::NONE,
+                            current: now,
+                        });
+                    }
+                }
+                continue;
+            }
             Precondition::Revision { .. } => continue,
         };
-        for graph in crate::queries::referencing(connection, identities)? {
+        let referencing = crate::queries::referencing(connection, identities)?;
+        for graph in backend::outside_deleted(referencing, &shape.deletes) {
             let (domain, outside) = match (&graph, allowed) {
                 (GraphId::Journey(journey), Some(named)) => {
                     (Domain::Journey(journey.clone()), !named.contains(journey))
@@ -359,8 +380,8 @@ fn owned(connection: &Connection, graph: &GraphId) -> Result<bool, CommitError> 
 
 /// The revisions, after the writes: the domain's moves to the one the commit produces (a
 /// first commit's header put inserted it at that), a proposal's must already be it (it
-/// moves with the proposal's other fields), a domain must still have its fields unless it
-/// was deleted, and identity creates riding in move the deployment's (E6). Returns the
+/// moves with the proposal's other fields), a domain must still have its fields, and identity
+/// creates riding in move the deployment's (E6). Returns the
 /// deployment revision after the commit.
 fn advance(
     connection: &Connection,
@@ -384,8 +405,7 @@ fn advance(
         PatchTarget::Proposal { .. } => {}
     }
     let after = load::revision_of(connection, &shape.advances)?;
-    let deleted = shape.deletes_journey.is_some();
-    if after != shape.revision && !deleted {
+    if after != shape.revision {
         let reason = match &shape.advances {
             RevisionOf::Proposal(id) => format!(
                 "a patch to proposal {id} leaves it at {after}, not {}",

@@ -307,6 +307,7 @@ const SAY: Record<EventType, (c: Context) => Said> = {
   saved_as_route: () => ({ what: "saved a journey as the route" }),
   draft_discarded: () => ({ what: "discarded the route's draft" }),
   route_published: (c) => ({ what: routeVersion(c) === undefined ? "published the route" : `published version ${routeVersion(c) ?? ""} of the route` }),
+  route_deleted: () => ({ what: "deleted the route" }),
   node_added: (c) => {
     const node = c.records.flatMap((record) => ("node" in record ? [record.node] : []))[0];
     return node === undefined

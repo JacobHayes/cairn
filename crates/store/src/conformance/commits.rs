@@ -4,9 +4,9 @@
 use std::collections::BTreeSet;
 
 use cairn_schema::{
-    Domain, Edge, EventType, Graph, GraphId, GraphKey, GraphRecord, Journey, JourneyId, Limit,
-    LocalEdit, NodeFieldValue, ProposalStatus, Record, RecordKey, Rejection, RevisionConflict,
-    RevisionOf, Subject, TouchedSet, ViolationCode, Write,
+    DeletedId, Domain, Edge, EventType, Graph, GraphId, GraphKey, GraphRecord, Journey, JourneyId,
+    Limit, LocalEdit, NodeFieldValue, ProposalStatus, Record, RecordKey, Rejection,
+    RevisionConflict, RevisionOf, Subject, TouchedSet, ViolationCode, Write,
 };
 use serde_json::json;
 
@@ -1118,21 +1118,17 @@ pub async fn riding_identity_creates_stop_at_the_identity_limit<B: Backend>(back
     );
 }
 
+fn gone_journey(journey: &str) -> DeletedId {
+    DeletedId::Journey(id(journey))
+}
+
+fn gone_route(route: &str) -> DeletedId {
+    DeletedId::Route(id(route))
+}
+
+/// A deployment patch at `base` hard-deleting one journey at revision 1.
 fn delete_journey(patch: &str, journey: &str, base: u32) -> crate::commit::Commit {
-    journey_patch(patch, journey, base)
-        .event_in(
-            Domain::Deployment,
-            EventType::JourneyDeleted,
-            Subject::Journey(id(journey)),
-            vec![
-                Write::Remove(RecordKey::Domain(Domain::Journey(id(journey)))),
-                Write::Put(Record::DeletedJourney {
-                    journey: id(journey),
-                    deleted_at: build::at(30),
-                }),
-            ],
-        )
-        .commit()
+    build::hard_delete(patch, base, &[(gone_journey(journey), 1)]).commit()
 }
 
 /// A19, J5: a hard delete of the journey holding the newest events never hands their
@@ -1151,7 +1147,7 @@ pub async fn a_hard_delete_never_reuses_the_positions_it_removes<B: Backend>(bac
     .await;
     let seen = super::all_events(&store).await;
     let cursor = seen.iter().map(|logged| logged.seq).max();
-    applied(&store, delete_journey("p_delete", "j_one", 1)).await;
+    applied(&store, delete_journey("p_delete", "j_one", 0)).await;
     let query = crate::query::EventQuery {
         after: cursor,
         size: crate::query::PageSize::MAX,
@@ -1236,7 +1232,7 @@ pub async fn a_hard_delete_removes_events_and_keeps_the_deployment_event<B: Back
     let (conflicts, intervening) = stale_parts(failed(&store, stale.commit()).await);
     assert_eq!(
         conflicts,
-        vec![conflict(RevisionOf::Domain(Domain::Deployment), 0, 1)]
+        vec![conflict(RevisionOf::Domain(Domain::Deployment), 0, 2)]
     );
     assert!(
         intervening
@@ -1265,23 +1261,87 @@ pub async fn a_hard_delete_removes_events_and_keeps_the_deployment_event<B: Back
     assert!(intervening.overlaps(&proposal_key), "{intervening:?}");
 }
 
-/// A19: a deleted journey's id is never reused: a create at it, or a proposal to it, is
-/// rejected.
-pub async fn a_create_at_a_deleted_journey_id_is_rejected<B: Backend>(backend: &B) {
+/// A19, A17: one deployment patch deletes several journeys, each with its own event in the
+/// deployment log; when one of them moved after it was read, the commit is stale on that one
+/// and deletes none.
+pub async fn a_deletion_of_several_journeys_commits_all_or_none<B: Backend>(backend: &B) {
+    let store = open(backend).await;
+    for journey in ["j_one", "j_two", "j_three"] {
+        let patch = format!("p_{journey}");
+        applied(&store, create_journey(&patch, journey, Vec::new()).commit()).await;
+    }
+    // Read at revision 1 each; then j_two moves before the deletion commits.
+    applied(
+        &store,
+        add_node("p_moved", "j_two", 1, action("n_a", "a", None)),
+    )
+    .await;
+    let before = snapshot(&store).await;
+    let all = [
+        (gone_journey("j_one"), 1),
+        (gone_journey("j_two"), 1),
+        (gone_journey("j_three"), 1),
+    ];
+    let (conflicts, intervening) =
+        stale_parts(failed(&store, build::hard_delete("p_stale", 0, &all).commit()).await);
+    assert_eq!(conflicts, vec![conflict(journey_of("j_two"), 1, 2)]);
+    assert!(
+        intervening.overlaps(&TouchedSet::whole(Domain::Journey(id("j_two")))),
+        "{intervening:?}"
+    );
+    assert_eq!(snapshot(&store).await, before);
+
+    let fresh = [
+        (gone_journey("j_one"), 1),
+        (gone_journey("j_two"), 2),
+        (gone_journey("j_three"), 1),
+    ];
+    applied(&store, build::hard_delete("p_delete", 0, &fresh).commit()).await;
+    assert!(store.revisions().await.unwrap().journeys.is_empty());
+    let deleted: Vec<_> = super::all_events(&store)
+        .await
+        .into_iter()
+        .map(|logged| (logged.event.log, logged.event.subject))
+        .collect();
+    let subjects = ["j_one", "j_two", "j_three"]
+        .map(|journey| (Domain::Deployment, Subject::Journey(id(journey))));
+    assert_eq!(deleted, subjects);
+    // A patch drafted against a deleted journey is told the deletion intervened.
+    let late = add_node("p_late", "j_one", 1, action("n_b", "b", None));
+    let (conflicts, intervening) = stale_parts(failed(&store, late).await);
+    assert_eq!(conflicts, vec![conflict(journey_of("j_one"), 1, 0)]);
+    assert!(
+        intervening
+            .as_set()
+            .contains(&RecordKey::Deleted(gone_journey("j_one"))),
+        "{intervening:?}"
+    );
+}
+
+/// A19: a deleted journey's or route's id is never reused: a create at it, or a proposal to
+/// it, is rejected.
+pub async fn a_create_at_a_deleted_id_is_rejected<B: Backend>(backend: &B) {
     let store = open(backend).await;
     applied(
         &store,
         create_journey("p_one", "j_one", Vec::new()).commit(),
     )
     .await;
-    applied(&store, delete_journey("p_delete", "j_one", 1)).await;
+    applied(&store, create_route("p_route", "gone").commit()).await;
+    let both_ids = [(gone_journey("j_one"), 1), (gone_route("gone"), 1)];
+    applied(
+        &store,
+        build::hard_delete("p_delete", 0, &both_ids).commit(),
+    )
+    .await;
+    assert_eq!(route(&store, "gone").await, None);
     let before = snapshot(&store).await;
     let again = create_journey("p_again", "j_one", vec![action("n_a", "a", None)]).commit();
     let error = failed(&store, again).await;
-    assert_eq!(
-        violation_codes(&error),
-        vec![ViolationCode::DeletedJourneyId]
-    );
+    assert_eq!(violation_codes(&error), vec![ViolationCode::DeletedId]);
+    let again = create_route("p_route_again", "gone").commit();
+    let error = failed(&store, again).await;
+    assert_eq!(violation_codes(&error), vec![ViolationCode::DeletedId]);
     let destination = Domain::Journey(id("j_one"));
     let proposal = proposal_patch("p_proposal", "pr_late", destination.clone(), 0).event(
         EventType::ProposalCreated,
@@ -1293,10 +1353,7 @@ pub async fn a_create_at_a_deleted_journey_id_is_rejected<B: Backend>(backend: &
         )))],
     );
     let error = failed(&store, proposal.commit()).await;
-    assert_eq!(
-        violation_codes(&error),
-        vec![ViolationCode::DeletedJourneyId]
-    );
+    assert_eq!(violation_codes(&error), vec![ViolationCode::DeletedId]);
     assert_eq!(snapshot(&store).await, before);
 }
 
@@ -1309,7 +1366,7 @@ pub async fn a_commit_to_a_hard_deleted_journey_is_stale<B: Backend>(backend: &B
         create_journey("p_one", "j_one", vec![action("n_a", "a", None)]).commit(),
     )
     .await;
-    applied(&store, delete_journey("p_delete", "j_one", 1)).await;
+    applied(&store, delete_journey("p_delete", "j_one", 0)).await;
     let before = snapshot(&store).await;
     let add = journey_patch("p_add", "j_one", 1)
         .event(
@@ -1329,6 +1386,165 @@ pub async fn a_commit_to_a_hard_deleted_journey_is_stale<B: Backend>(backend: &B
     assert_eq!(of, vec![journey_of("j_one")]);
     assert_eq!(journey(&store, "j_one").await, None);
     assert_eq!(snapshot(&store).await, before);
+}
+
+/// A route `route` with one published version, and a draft open again on it.
+async fn published_route(store: &dyn Store, route: &str) {
+    let create = create_route(&format!("p_{route}"), route).event(
+        EventType::NodeAdded,
+        Subject::Node(node_key("n_root")),
+        vec![put_in(
+            &GraphId::RouteDraft(id(route)),
+            GraphRecord::Node(action("n_root", "root", None)),
+        )],
+    );
+    let publish = build::publish(create, route, 1, 5);
+    applied(store, publish.commit()).await;
+}
+
+/// A journey `journey` following version 1 of `route`.
+async fn journey_on(store: &dyn Store, patch: &str, journey: &str, route: &str) {
+    let create = journey_patch(patch, journey, 0).event(
+        EventType::JourneyCreated,
+        Subject::Journey(id(journey)),
+        vec![Write::Put(Record::JourneyHeader(build::journey_header(
+            journey,
+            journey,
+            Some((route, 1)),
+        )))],
+    );
+    applied(store, create.commit()).await;
+}
+
+/// A19: a route goes with its draft, every version, its proposals and its events, and its id
+/// is recorded; the deployment log keeps the event.
+pub async fn a_hard_delete_of_a_route_takes_its_versions_and_events<B: Backend>(backend: &B) {
+    let store = open(backend).await;
+    published_route(&store, "kept").await;
+    published_route(&store, "gone").await;
+    let destination = Domain::Route(id("gone"));
+    let proposal = proposal_patch("p_proposal", "pr_route", destination.clone(), 0).event(
+        EventType::ProposalCreated,
+        Subject::Proposal(id("pr_route")),
+        vec![Write::Put(Record::Proposal(build::proposal(
+            "pr_route",
+            &destination,
+            1,
+        )))],
+    );
+    applied(&store, proposal.commit()).await;
+    applied(
+        &store,
+        build::hard_delete("p_delete", 0, &[(gone_route("gone"), 1)]).commit(),
+    )
+    .await;
+    assert_eq!(route(&store, "gone").await, None);
+    let version = LoadTarget::RouteVersion {
+        route: id("gone"),
+        version: build::version(1),
+    };
+    assert_eq!(store.load(&version).await.unwrap(), None);
+    assert_eq!(store.proposal(&id("pr_route")).await.unwrap(), None);
+    assert_eq!(store.route_detail(&id("gone")).await.unwrap(), None);
+    let mut logs: Vec<_> = super::all_events(&store)
+        .await
+        .into_iter()
+        .map(|logged| logged.event.log)
+        .collect();
+    logs.dedup();
+    assert_eq!(logs, vec![Domain::Route(id("kept")), Domain::Deployment]);
+    assert!(route(&store, "kept").await.is_some());
+}
+
+/// A19, H5: a route delete is checked at commit against what uses the route: a journey
+/// started on it, or an insertion of it, committed after the delete was read makes it stale on
+/// that domain; a journey on it that the same patch deletes does not.
+pub async fn a_route_delete_is_stale_when_something_started_using_it<B: Backend>(backend: &B) {
+    let store = open(backend).await;
+    published_route(&store, "gone").await;
+    applied(
+        &store,
+        create_journey("p_host", "j_host", vec![action("n_task", "task", None)]).commit(),
+    )
+    .await;
+    let delete = || build::hard_delete("p_delete", 0, &[(gone_route("gone"), 1)]).commit();
+
+    // A journey started on the route meanwhile.
+    journey_on(&store, "p_follower", "j_follower", "gone").await;
+    assert!(
+        store
+            .route_detail(&id("gone"))
+            .await
+            .unwrap()
+            .unwrap()
+            .in_use
+    );
+    let before = snapshot(&store).await;
+    let (conflicts, _) = stale_parts(failed(&store, delete()).await);
+    assert_eq!(conflicts, vec![conflict(journey_of("j_follower"), 0, 1)]);
+    assert_eq!(snapshot(&store).await, before);
+
+    // Deleting that journey in the same patch frees the route.
+    let together = [(gone_journey("j_follower"), 1), (gone_route("gone"), 1)];
+    let with_journey = build::hard_delete("p_together", 0, &together).commit();
+
+    // An insertion of the route's version in another journey meanwhile.
+    let insertion = insertion_of("p_insert", "j_host", 1, "gone");
+    applied(&store, insertion.commit()).await;
+    let (conflicts, _) = stale_parts(failed(&store, with_journey.clone()).await);
+    assert_eq!(conflicts, vec![conflict(journey_of("j_host"), 0, 2)]);
+
+    let freed = [
+        (gone_journey("j_follower"), 1),
+        (gone_journey("j_host"), 2),
+        (gone_route("gone"), 1),
+    ];
+    applied(
+        &store,
+        create_journey("p_other", "j_other", vec![action("n_task", "task", None)]).commit(),
+    )
+    .await;
+    // Drafted before the delete: a journey on the route, and an insertion of it.
+    let follower = journey_patch("p_late", "j_late", 0).event(
+        EventType::JourneyCreated,
+        Subject::Journey(id("j_late")),
+        vec![Write::Put(Record::JourneyHeader(build::journey_header(
+            "j_late",
+            "j_late",
+            Some(("gone", 1)),
+        )))],
+    );
+    let late_insertion = insertion_of("p_late_insert", "j_other", 1, "gone");
+    applied(&store, build::hard_delete("p_all", 0, &freed).commit()).await;
+    assert_eq!(route(&store, "gone").await, None);
+    let before = snapshot(&store).await;
+    for late in [follower, late_insertion] {
+        let error = failed(&store, late.commit()).await;
+        assert_eq!(violation_codes(&error), vec![ViolationCode::DeletedId]);
+    }
+    assert_eq!(snapshot(&store).await, before);
+}
+
+/// An insertion of `route`'s version 1 into `journey`'s `n_task`, in a patch at `base`.
+fn insertion_of(patch: &str, journey: &str, base: u32, route: &str) -> crate::build::PatchBuilder {
+    journey_patch(patch, journey, base).event(
+        EventType::SegmentInserted,
+        Subject::Insertion(id("i_gone")),
+        vec![put_in(
+            &journey_graph(journey),
+            GraphRecord::Insertion(cairn_schema::Insertion {
+                key: id("i_gone"),
+                segment: cairn_schema::Lineage {
+                    route: id(route),
+                    version: build::version(1),
+                },
+                parent: None,
+                roles: std::collections::BTreeMap::new(),
+                kinds: std::collections::BTreeMap::new(),
+                nodes: std::collections::BTreeMap::from([(node_key("n_task"), node_key("n_root"))]),
+            }),
+        )],
+    )
 }
 
 /// The two identities a merge or delete case starts from, `who_a` and `who_b`.
@@ -1395,6 +1611,18 @@ pub async fn a_decision_retyped_to_identities_makes_its_conditions_references<B:
         .map(|conflict| conflict.of.clone())
         .collect();
     assert_eq!(of, vec![journey_of("j_one")]);
+
+    // A19: deleting that journey in the same patch takes its references with it.
+    let together = build::hard_delete("p_together", 1, &[(gone_journey("j_one"), 2)])
+        .unreferenced(&["who_b"])
+        .event(
+            EventType::IdentityDeleted,
+            Subject::Identity(id("who_b")),
+            vec![Write::Remove(RecordKey::Identity(id("who_b")))],
+        )
+        .commit();
+    applied(&store, together).await;
+    assert_eq!(journey(&store, "j_one").await, None);
 }
 
 /// E6: a journey created from a route version whose conditions name an identity refers to

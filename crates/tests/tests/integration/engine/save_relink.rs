@@ -201,7 +201,9 @@ fn graph_after(records: &Records, destination: &Domain, draft: &ProposalDraft) -
     match destination_after(&after, destination, &support::derive_inputs_of(records)) {
         DestinationAfter::Journey { document } => document.journey.graph,
         DestinationAfter::Route { route, .. } => route.draft.expect("the draft it leaves").graph,
-        other => panic!("a graph destination, not {other:?}"),
+        other @ (DestinationAfter::Deployment { .. } | DestinationAfter::Absent) => {
+            panic!("a graph destination, not {other:?}")
+        }
     }
 }
 

@@ -7,11 +7,11 @@
 use std::collections::{BTreeMap, BTreeSet};
 
 use cairn_schema::{
-    ChangeSet, Deployment, Domain, EventType, Graph, GraphId, GraphKey, GraphRecord, IdentityKey,
-    JourneyId, JourneyState, Limit, Location, NodeField, NodeKey, PatchReceipt, PatchTarget,
-    ProposalId, Record, RecordKey, Rejection, RetiredKey, RetiredKeys, Revision, RevisionConflict,
-    RevisionOf, Slug, Subject, TouchedSet, Violation, ViolationCode, Violations, Write,
-    limits::GRAPH_BYTES_MAX,
+    ChangeSet, DeletedId, Deployment, Domain, EventType, Graph, GraphId, GraphKey, GraphRecord,
+    IdentityKey, JourneyHeader, JourneyState, Limit, Location, NodeField, NodeKey, PatchReceipt,
+    PatchTarget, ProposalId, Record, RecordKey, Rejection, RetiredKey, RetiredKeys, Revision,
+    RevisionConflict, RevisionOf, RouteId, Slug, Subject, TouchedSet, Violation, ViolationCode,
+    Violations, Write, limits::GRAPH_BYTES_MAX,
 };
 
 use crate::commit::{Commit, CommitError, Committed, StoreError};
@@ -32,8 +32,11 @@ pub struct Shape {
     /// A patch outside the deployment that writes identities: the deployment revision moves
     /// too (E6).
     pub bumps_deployment: bool,
-    /// The journey a hard delete removes (A19).
-    pub deletes_journey: Option<JourneyId>,
+    /// The journeys and routes a deployment patch hard-deletes (A19).
+    pub deletes: BTreeSet<DeletedId>,
+    /// The routes the change set's records use: a journey's lineage, or an insertion's
+    /// segment. Each must not have been hard-deleted meanwhile (A19).
+    pub used_routes: BTreeSet<RouteId>,
     /// Every graph the change set writes into.
     pub graphs: BTreeSet<GraphId>,
     /// Whether the change set writes the deployment's identities or aliases.
@@ -47,7 +50,8 @@ impl Shape {
     /// The rules a change set must follow whatever the stored state: its receipt names the
     /// target's domain and the revision after the base; its events are the patch's, in
     /// order; and every write stays in the domain, except identity creates riding in another
-    /// domain's patch (E6) and a hard-deleted journey's id (A19).
+    /// domain's patch (E6) and, in a deployment patch, the journeys and routes it deletes whole
+    /// (A19).
     ///
     /// # Errors
     ///
@@ -79,7 +83,8 @@ impl Shape {
             revision: receipt.revision,
             created_identities: BTreeSet::new(),
             bumps_deployment: false,
-            deletes_journey: None,
+            deletes: BTreeSet::new(),
+            used_routes: BTreeSet::new(),
             graphs: BTreeSet::new(),
             writes_deployment: false,
             conditions_changed: BTreeSet::new(),
@@ -108,11 +113,30 @@ impl Shape {
                 {
                     self.created_identities.insert(identity.key.clone());
                 }
+                match record {
+                    Record::JourneyHeader(JourneyHeader {
+                        lineage: Some(lineage),
+                        ..
+                    }) => {
+                        self.used_routes.insert(lineage.route.clone());
+                    }
+                    Record::Graph {
+                        record: GraphRecord::Insertion(insertion),
+                        ..
+                    } => {
+                        self.used_routes.insert(insertion.segment.route.clone());
+                    }
+                    _ => {}
+                }
                 record.key()
             }
             Write::Remove(key) => {
-                if let RecordKey::Domain(Domain::Journey(journey)) = key {
-                    self.deletes_journey = Some(journey.clone());
+                if let RecordKey::Domain(domain) = key
+                    && self.domain == Domain::Deployment
+                    && let Some(id) = DeletedId::of(domain)
+                {
+                    self.deletes.insert(id);
+                    return Ok(());
                 }
                 key.clone()
             }
@@ -142,15 +166,8 @@ impl Shape {
         }
         let riding_create =
             matches!(write, Write::Put(Record::Identity(_))) && self.creates_identity(event_type);
-        let own_deletion = matches!(
-            (write, &self.domain),
-            (Write::Put(Record::DeletedJourney { journey, .. }), Domain::Journey(target)) if journey == target
-        );
         if riding_create {
             self.bumps_deployment = true;
-            return Ok(());
-        }
-        if own_deletion {
             return Ok(());
         }
         malformed(format!(
@@ -160,8 +177,7 @@ impl Shape {
     }
 }
 
-/// The events are the receipt's patch's, numbered from 0 in order, each in the patch's
-/// log or, for a journey's deletion, the deployment's (A19).
+/// The events are the receipt's patch's, numbered from 0 in order, each in the patch's log.
 fn check_events(change_set: &ChangeSet, domain: &Domain) -> Result<(), StoreError> {
     let receipt = &change_set.receipt;
     if change_set.events.is_empty() {
@@ -177,7 +193,7 @@ fn check_events(change_set: &ChangeSet, domain: &Domain) -> Result<(), StoreErro
         if usize::try_from(event.ordinal).ok() != Some(position) {
             return malformed(format!("event {position} has ordinal {}", event.ordinal));
         }
-        if event.log != *domain && event.log != Domain::Deployment {
+        if event.log != *domain {
             return malformed(format!("event {position} is logged to {}", event.log));
         }
     }
@@ -254,9 +270,16 @@ impl StoredReceipt {
                 .deployment_revision
                 .is_some_and(|moved| moved > expected),
             RevisionOf::Domain(domain) => {
-                self.proposal.is_none()
+                let targeted = self.proposal.is_none()
                     && self.receipt.domain == *domain
-                    && self.receipt.revision > expected
+                    && self.receipt.revision > expected;
+                // A hard delete moves the domain it removes, whatever it was at (A19).
+                let deleted = DeletedId::of(domain).is_some_and(|id| {
+                    self.deployment_touched
+                        .as_set()
+                        .contains(&RecordKey::Deleted(id))
+                });
+                targeted || deleted
             }
             RevisionOf::Proposal(id) => {
                 let targeted =
@@ -375,14 +398,51 @@ fn violation(code: ViolationCode, subject: Subject, message: String) -> Violatio
     }
 }
 
-/// A19: a create at a hard-deleted journey's id.
+/// A19: a create at a hard-deleted journey's or route's id.
 #[must_use]
-pub fn deleted_journey(journey: &JourneyId) -> Violation {
+pub fn deleted_id(id: &DeletedId) -> Violation {
+    let subject = match id {
+        DeletedId::Journey(journey) => Subject::Journey(journey.clone()),
+        DeletedId::Route(route) => Subject::Route(route.clone()),
+    };
     violation(
-        ViolationCode::DeletedJourneyId,
-        Subject::Journey(journey.clone()),
-        format!("journey {journey} was deleted, and a deleted journey's id is never reused"),
+        ViolationCode::DeletedId,
+        subject,
+        format!("{id} was deleted, and a deleted id is never reused"),
     )
+}
+
+/// A19: a journey's lineage or an insertion on a route hard-deleted since the patch was
+/// checked: what it would use is gone, and its id is never reused.
+#[must_use]
+pub fn used_deleted(route: &RouteId) -> Violation {
+    violation(
+        ViolationCode::DeletedId,
+        Subject::Route(route.clone()),
+        format!("{route} was deleted, so nothing can follow or insert it"),
+    )
+}
+
+/// A19: the graphs among `graphs` (those using a route a commit deletes, or referring to an
+/// identity it deletes or merges) that the commit does not delete with them: a journey or
+/// route it deletes takes its own uses and references along.
+#[must_use]
+pub fn outside_deleted(graphs: BTreeSet<GraphId>, deletes: &BTreeSet<DeletedId>) -> Vec<GraphId> {
+    graphs
+        .into_iter()
+        .filter(|graph| DeletedId::of(&graph.domain()).is_none_or(|id| !deletes.contains(&id)))
+        .collect()
+}
+
+/// A19: the hard-deleted id a commit at base revision 0 would bring back: a journey's or
+/// route's first commit, or a proposal to create one.
+#[must_use]
+pub fn created_id(commit: &Commit, shape: &Shape) -> Option<DeletedId> {
+    if commit.base_revision == Revision::NONE {
+        DeletedId::of(&shape.domain)
+    } else {
+        None
+    }
 }
 
 /// E6: identity creates whose key is already an identity or an alias, against the deployment

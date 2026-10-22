@@ -13,7 +13,7 @@ use super::{
     arb_route_header, arb_route_id, arb_route_kind, arb_slug, arb_snooze_target, arb_timestamp,
     arb_title, arb_user_id, arb_version_number,
 };
-use crate::domain::{Domain, GraphId};
+use crate::domain::{DeletedId, Domain, GraphId};
 use crate::event::{Actor, ChangeSet, Event, PatchReceipt, Subject};
 use crate::graph::Edge;
 use crate::node::ParticipationSource;
@@ -121,7 +121,10 @@ fn arb_lifecycle_mutation() -> BoxedStrategy<Mutation> {
         (arb_title(), prop::option::of(arb_markdown()))
             .prop_map(|(name, description)| Mutation::EditJourney { name, description }),
         arb_journey_status().prop_map(|status| Mutation::SetJourneyStatus { status }),
-        Just(Mutation::DeleteJourney {}),
+        (arb_journey_id(), arb_revision())
+            .prop_map(|(journey, revision)| Mutation::DeleteJourney { journey, revision }),
+        (arb_route_id(), arb_revision())
+            .prop_map(|(route, revision)| Mutation::DeleteRoute { route, revision }),
         (
             arb_title(),
             prop::option::of(arb_markdown()),
@@ -726,12 +729,14 @@ fn arb_domain_record() -> BoxedStrategy<Record> {
                 published_at
             }
         ),
-        (arb_journey_id(), arb_timestamp()).prop_map(|(journey, deleted_at)| {
-            Record::DeletedJourney {
-                journey,
-                deleted_at,
-            }
-        }),
+        (
+            prop_oneof![
+                arb_journey_id().prop_map(DeletedId::Journey),
+                arb_route_id().prop_map(DeletedId::Route),
+            ],
+            arb_timestamp()
+        )
+            .prop_map(|(id, deleted_at)| Record::Deleted { id, deleted_at }),
         arb_identity().prop_map(Record::Identity),
         (arb_identity_key(), arb_identity_key())
             .prop_map(|(alias, identity)| Record::IdentityAlias { alias, identity }),

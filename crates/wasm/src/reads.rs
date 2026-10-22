@@ -176,6 +176,10 @@ pub struct RouteDetail {
     pub revision: Revision,
     /// Its versions, oldest first.
     pub versions: Vec<VersionJourneys>,
+    // PRD: A19.
+    /// Whether anything uses it: a journey following one of its versions, or an insertion of
+    /// one anywhere. A route in use cannot be deleted.
+    pub in_use: bool,
 }
 
 /// `POST /api/routes/{id}/import`'s body (A13), as the API's `RouteImport`.
@@ -328,6 +332,7 @@ impl BrowserRoot {
             header: detail.header,
             revision: detail.revision,
             versions: versions.collect(),
+            in_use: detail.in_use,
         })
     }
 

@@ -7,16 +7,18 @@
 //!
 //! Cost: one load for the deployment, one for the target, one per proposal the patch edits or
 //! applies, one per route version the patch reads, for each identity merge one index query
-//! plus one load per journey referencing any of its identities, and for each identity delete one
+//! plus one load per journey referencing any of its identities, for each identity delete one
 //! index query plus at most `chain_count_per_rejection_max` loads of the graphs referring to it
-//! (E6); every load is one graph within `graph_bytes_max`.
+//! (E6), and for each hard delete one load of the journey or route, plus for a route one index
+//! query and at most `chain_count_per_rejection_max` loads of the graphs using it (A19); every
+//! load is one graph within `graph_bytes_max`.
 
 use std::collections::{BTreeMap, BTreeSet};
 
 use cairn_engine::Records;
 use cairn_schema::{
-    Domain, GraphId, IdentityKey, JourneyId, Lineage, Mutation, Patch, PatchTarget, ProposalId,
-    Revision, RevisionOf, RouteId, limits::CHAIN_COUNT_PER_REJECTION_MAX,
+    DeletedId, Domain, GraphId, IdentityKey, JourneyId, Lineage, Mutation, Patch, PatchTarget,
+    ProposalId, Revision, RevisionOf, RouteId, Subject, limits::CHAIN_COUNT_PER_REJECTION_MAX,
 };
 use cairn_store::{Document, LoadTarget, Precondition, Store, StoreError};
 
@@ -29,6 +31,8 @@ pub(crate) struct Loaded {
     merges: Vec<(BTreeSet<IdentityKey>, BTreeMap<JourneyId, Revision>)>,
     /// E6: the identities each identity delete removes, which no graph may refer to.
     deletes: Vec<Deletion>,
+    /// A19: each journey and route a hard delete removes, at the revision it names.
+    hard_deletes: Vec<(DeletedId, Revision)>,
 }
 
 /// E6: one identity delete: the identity, and the keys that stand for it in the patch.
@@ -101,6 +105,13 @@ impl Loaded {
                 expected: reviewed,
             });
         }
+        self.deployment_preconditions(&mut found);
+        found
+    }
+
+    /// The preconditions of a deployment patch's merges, identity deletes and hard deletes:
+    /// what each was checked against is still so at commit.
+    fn deployment_preconditions(&self, found: &mut Vec<Precondition>) {
         for (identities, named) in &self.merges {
             for (journey, expected) in named {
                 found.push(Precondition::Revision {
@@ -118,7 +129,21 @@ impl Loaded {
                 identities: deletion.keys.clone(),
             });
         }
-        found
+        // A19: each deleted journey and route is still at the revision the deletion named, and
+        // nothing has started using a deleted route.
+        let mut routes = BTreeSet::new();
+        for (deleted, named) in &self.hard_deletes {
+            found.push(Precondition::Revision {
+                of: RevisionOf::Domain(deleted.domain()),
+                expected: *named,
+            });
+            if let DeletedId::Route(route) = deleted {
+                routes.insert(route.clone());
+            }
+        }
+        if !routes.is_empty() {
+            found.push(Precondition::Unused { routes });
+        }
     }
 }
 
@@ -126,8 +151,9 @@ impl Loaded {
 /// it), its target domain unless the patch creates it, the proposal it edits or applies, the
 /// published route versions it (or a proposal it applies) copies or moves from and to, and
 /// for an identity merge every journey referencing any of its identities as well as every
-/// journey it names, so the engine sees any difference between the two, and for an identity
-/// delete the graphs referring to it (E6).
+/// journey it names, so the engine sees any difference between the two, for an identity
+/// delete the graphs referring to it (E6), and for a hard delete what it deletes and the graphs
+/// using a route it deletes (A19).
 pub(crate) async fn records(store: &dyn Store, patch: &Patch) -> Result<Loaded, StoreError> {
     let mut records = Records::default();
     match store.load(&LoadTarget::Deployment).await? {
@@ -162,6 +188,7 @@ pub(crate) async fn records(store: &dyn Store, patch: &Patch) -> Result<Loaded, 
     let read = versions_read(&records, patch, &mutations);
     let merges = merges(&mutations);
     let deletes = deletes(&mutations);
+    let hard_deletes = hard_deletes(&mutations);
     for id in kinds_read(&mutations) {
         if !records.routes.contains_key(&id)
             && let Some(Document::Route(route)) = store.load(&LoadTarget::Route(id.clone())).await?
@@ -179,11 +206,85 @@ pub(crate) async fn records(store: &dyn Store, patch: &Patch) -> Result<Loaded, 
         }
     }
     load_referencing(store, &mut records, &merges, &deletes).await?;
+    load_deleted(store, &mut records, &hard_deletes).await?;
     Ok(Loaded {
         records,
         merges,
         deletes,
+        hard_deletes,
     })
+}
+
+/// A19: the journeys and routes a patch deletes, and for each route the graphs using it beyond
+/// those the patch deletes: up to the rejection limit loaded, so a refusal names them, and the
+/// rest counted.
+async fn load_deleted(
+    store: &dyn Store,
+    records: &mut Records,
+    hard_deletes: &[(DeletedId, Revision)],
+) -> Result<(), StoreError> {
+    let gone: BTreeSet<Domain> = hard_deletes
+        .iter()
+        .map(|(deleted, _)| deleted.domain())
+        .collect();
+    for (deleted, _) in hard_deletes {
+        let graph = match deleted {
+            DeletedId::Journey(id) => GraphId::Journey(id.clone()),
+            DeletedId::Route(id) => GraphId::RouteDraft(id.clone()),
+        };
+        load_graph(store, records, &graph).await?;
+    }
+    for (deleted, _) in hard_deletes {
+        let DeletedId::Route(route) = deleted else {
+            continue;
+        };
+        let users = store
+            .graphs_using(route)
+            .await?
+            .into_iter()
+            .filter(|graph| !gone.contains(&graph.domain()));
+        let (named, left_out) = load_some(store, records, users).await?;
+        let unlisted: BTreeSet<String> = left_out
+            .iter()
+            .map(subject_id)
+            .filter(|subject| !named.contains(subject))
+            .collect();
+        if !unlisted.is_empty() {
+            records.unlisted_references.insert(
+                Subject::Route(route.clone()),
+                u32::try_from(unlisted.len()).unwrap_or(u32::MAX),
+            );
+        }
+    }
+    Ok(())
+}
+
+/// Loads `graphs` until `chain_count_per_rejection_max` journeys and routes are named (a route
+/// once, however many of its graphs are among them, and one already loaded for nothing): the
+/// subjects named, and the graphs left out.
+async fn load_some(
+    store: &dyn Store,
+    records: &mut Records,
+    graphs: impl IntoIterator<Item = GraphId>,
+) -> Result<(BTreeSet<String>, Vec<GraphId>), StoreError> {
+    let mut room = CHAIN_COUNT_PER_REJECTION_MAX as usize;
+    let mut named = BTreeSet::new();
+    let mut left_out = Vec::new();
+    for graph in graphs {
+        if named.contains(&subject_id(&graph)) {
+            continue;
+        }
+        if is_loaded(records, &graph) {
+            named.insert(subject_id(&graph));
+        } else if room > 0 {
+            room -= 1;
+            load_graph(store, records, &graph).await?;
+            named.insert(subject_id(&graph));
+        } else {
+            left_out.push(graph);
+        }
+    }
+    Ok((named, left_out))
 }
 
 /// E6: the journeys a merge reads (those referencing its identities and those it names) and the
@@ -213,25 +314,10 @@ async fn load_referencing(
     }
     let mut omitted: Vec<(&IdentityKey, BTreeSet<String>, Vec<GraphId>)> = Vec::new();
     for deletion in deletes {
-        // A rejection names at most the limit of journeys and routes (a route once, however
-        // many of its graphs refer); those past it are counted below, once everything is loaded.
-        let mut room = CHAIN_COUNT_PER_REJECTION_MAX as usize;
-        let mut named = BTreeSet::new();
-        let mut left_out = Vec::new();
-        for graph in store.graphs_referencing(&deletion.keys).await? {
-            if named.contains(&subject_id(&graph)) {
-                continue;
-            }
-            if is_loaded(records, &graph) {
-                named.insert(subject_id(&graph));
-            } else if room > 0 {
-                room -= 1;
-                load_graph(store, records, &graph).await?;
-                named.insert(subject_id(&graph));
-            } else {
-                left_out.push(graph);
-            }
-        }
+        // A rejection names at most the limit of journeys and routes; those past it are
+        // counted below, once everything is loaded.
+        let referring = store.graphs_referencing(&deletion.keys).await?;
+        let (named, left_out) = load_some(store, records, referring).await?;
         omitted.push((&deletion.identity, named, left_out));
     }
     for (identity, mut named, left_out) in omitted {
@@ -249,7 +335,7 @@ async fn load_referencing(
             .collect();
         if !unlisted.is_empty() {
             records.unlisted_references.insert(
-                identity.clone(),
+                Subject::Identity(identity.clone()),
                 u32::try_from(unlisted.len()).unwrap_or(u32::MAX),
             );
         }
@@ -453,6 +539,22 @@ fn merges(mutations: &[&Mutation]) -> Vec<(BTreeSet<IdentityKey>, BTreeMap<Journ
         .collect()
 }
 
+/// A19: each journey and route the mutations hard-delete, with the revision it names.
+fn hard_deletes(mutations: &[&Mutation]) -> Vec<(DeletedId, Revision)> {
+    mutations
+        .iter()
+        .filter_map(|mutation| match mutation {
+            Mutation::DeleteJourney { journey, revision } => {
+                Some((DeletedId::Journey(journey.clone()), *revision))
+            }
+            Mutation::DeleteRoute { route, revision } => {
+                Some((DeletedId::Route(route.clone()), *revision))
+            }
+            _ => None,
+        })
+        .collect()
+}
+
 /// E6: the identities each identity delete removes: the identity, and the keys an earlier merge
 /// in the same patch folded into it, which graphs may still name though no alias says so yet.
 fn deletes(mutations: &[&Mutation]) -> Vec<Deletion> {
@@ -483,8 +585,6 @@ fn deletes(mutations: &[&Mutation]) -> Vec<Deletion> {
     found
 }
 
-/// Loads the graph `graph` names, with the journey, route or version it belongs to, unless
-/// already loaded.
 /// Whether `records` already holds the graph.
 fn is_loaded(records: &Records, graph: &GraphId) -> bool {
     match graph {
@@ -505,6 +605,8 @@ fn subject_id(graph: &GraphId) -> String {
     }
 }
 
+/// Loads the graph `graph` names, with the journey, route or version it belongs to, unless
+/// already loaded.
 async fn load_graph(
     store: &dyn Store,
     records: &mut Records,
@@ -601,6 +703,7 @@ mod tests {
                 records: records.clone(),
                 merges: Vec::new(),
                 deletes: Vec::new(),
+                hard_deletes: Vec::new(),
             };
             assert_eq!(
                 loaded.preconditions(&note_patch(), &records),
@@ -647,6 +750,7 @@ mod tests {
                 records: records.clone(),
                 merges: Vec::new(),
                 deletes: Vec::new(),
+                hard_deletes: Vec::new(),
             };
             assert_eq!(
                 loaded.preconditions(&patch, &records).len(),
@@ -672,6 +776,7 @@ mod tests {
             records: records.clone(),
             merges: Vec::new(),
             deletes: Vec::new(),
+            hard_deletes: Vec::new(),
         };
         assert_eq!(
             loaded.preconditions(&note_patch(), &records),

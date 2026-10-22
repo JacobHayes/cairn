@@ -344,29 +344,10 @@ fn event(session: &Session<'_>, mutation: &Mutation, delta: Vec<Write>) -> Event
         };
         confirming_user = Some(inputs.actor.user.clone());
     }
-    let deletes = |mutations: &[Mutation]| {
-        mutations
-            .iter()
-            .any(|mutation| matches!(mutation, Mutation::DeleteJourney {}))
-    };
-    let applies_a_deletion = match mutation {
-        Mutation::ApplyProposal { proposal, .. } => session
-            .candidate
-            .proposals
-            .get(proposal)
-            .is_some_and(|found| deletes(found.draft.mutations.as_slice())),
-        other => deletes(std::slice::from_ref(other)),
-    };
-    let log = if applies_a_deletion {
-        // A19: the deployment log keeps who deleted which journey, even through a proposal.
-        Domain::Deployment
-    } else {
-        patch.target.domain()
-    };
     Event {
         patch_id: patch.id.clone(),
         ordinal: session.ordinal,
-        log,
+        log: patch.target.domain(),
         event_type: mutation.event_type(),
         actor,
         confirming_user,

@@ -27,7 +27,7 @@ function threeVersions(retired: boolean): RouteRead {
   const published = (version: number, journeys: string[]) => ({ version, published_at: `2026-10-0${String(version)}T00:00:00Z`, journeys });
   return {
     route: { header: { id: "r", name: "R", retired }, revision: 7, versions: [1, 2, 3] },
-    detail: { header: { id: "r", name: "R", retired }, revision: 7, versions: [published(1, ["j_one"]), published(2, ["j_two"]), published(3, ["j_three"])] },
+    detail: { header: { id: "r", name: "R", retired }, revision: 7, versions: [published(1, ["j_one"]), published(2, ["j_two"]), published(3, ["j_three"])], in_use: true },
     journeys: [summary("j_one", 1, 3), summary("j_two", 2, 3), summary("j_three", 3, 3)],
   };
 }

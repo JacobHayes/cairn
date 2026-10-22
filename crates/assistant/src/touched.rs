@@ -38,7 +38,7 @@ pub fn touched_nodes(
             RecordKey::JourneyHeader(_)
             | RecordKey::RouteHeader(_)
             | RecordKey::RouteVersion { .. }
-            | RecordKey::DeletedJourney(_)
+            | RecordKey::Deleted(_)
             | RecordKey::Identity(_)
             | RecordKey::IdentityAlias(_)
             | RecordKey::Proposal { .. } => {}

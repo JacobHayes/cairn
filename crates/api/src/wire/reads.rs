@@ -127,6 +127,10 @@ pub struct RouteDetail {
     pub revision: Revision,
     /// Its versions, oldest first.
     pub versions: Vec<VersionJourneys>,
+    // PRD: A19.
+    /// Whether anything uses it: a journey following one of its versions, or an insertion of
+    /// one anywhere. A route in use cannot be deleted.
+    pub in_use: bool,
 }
 
 /// One published version and the journeys on it.
@@ -168,6 +172,7 @@ impl From<cairn_store::RouteDetail> for RouteDetail {
             header,
             revision,
             versions,
+            in_use,
         } = detail;
         let versions = versions.into_iter().map(|version| {
             let cairn_store::VersionJourneys {
@@ -205,6 +210,7 @@ impl From<cairn_store::RouteDetail> for RouteDetail {
             header,
             revision,
             versions: versions.collect(),
+            in_use,
         }
     }
 }

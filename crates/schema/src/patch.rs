@@ -358,9 +358,9 @@ impl Removal {
 /// structural or state.
 //
 // A mutation without arguments is an empty struct variant, not a unit one: serde lets a unit
-// variant of an internally tagged enum ignore unknown fields, so `{op: delete_journey,
-// journey: j_other}` would parse as a delete of the target. A struct variant rejects them;
-// the wire form `{op: delete_journey}` is the same either way.
+// variant of an internally tagged enum ignore unknown fields, so `{op: discard_draft,
+// route: r_other}` would parse as a discard of the target's draft. A struct variant rejects
+// them; the wire form `{op: discard_draft}` is the same either way.
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
 #[serde(tag = "op", rename_all = "snake_case", deny_unknown_fields)]
 pub enum Mutation {
@@ -391,9 +391,6 @@ pub enum Mutation {
         /// The new status.
         status: JourneyStatus,
     },
-    // PRD: A19.
-    /// Hard-delete the journey and its events.
-    DeleteJourney {},
 
     // Route lifecycle (A11, A13, A19).
     /// Create the target route, with no versions and no draft.
@@ -775,6 +772,30 @@ pub enum Mutation {
         identity: IdentityKey,
     },
 
+    // Hard deletion (A19), in the deployment's patch: one patch deletes every journey and
+    // route it names, or none.
+    // PRD: A19.
+    /// Delete a journey and its events for good (deployment): the deployment log keeps who
+    /// deleted it and when, and its id is never used again. Rejected when the journey is not
+    /// at `revision`; the commit rechecks it.
+    DeleteJourney {
+        /// The journey.
+        journey: JourneyId,
+        /// The journey's revision, as read.
+        revision: Revision,
+    },
+    // PRD: A19.
+    /// Delete a route or segment with its draft, every version, and its events, for good
+    /// (deployment): only while no journey's lineage and no insertion names any of its
+    /// versions. Its id is never used again. Rejected when the route is not at `revision`; the
+    /// commit rechecks the revision and that nothing has started using it.
+    DeleteRoute {
+        /// The route.
+        route: RouteId,
+        /// The route's revision, as read.
+        revision: Revision,
+    },
+
     // Proposals (I6).
     /// Create the target proposal.
     CreateProposal {
@@ -846,7 +867,8 @@ impl Mutation {
     pub fn change_class(&self) -> ChangeClass {
         match self {
             Mutation::CreateJourney { .. }
-            | Mutation::DeleteJourney {}
+            | Mutation::DeleteJourney { .. }
+            | Mutation::DeleteRoute { .. }
             | Mutation::CreateRoute { .. }
             | Mutation::EditRoute { .. }
             | Mutation::SetRouteRetired { .. }

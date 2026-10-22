@@ -14,13 +14,14 @@
 import "./screens.css";
 
 import type { Schema } from "@cairn/client";
-import { useCallback, useEffect, useMemo, useState, type ReactNode } from "react";
+import { use, useCallback, useEffect, useMemo, useState, type ReactNode } from "react";
 import { Link, useLocation, useNavigate, useParams } from "react-router";
 
 import { required } from "../address.ts";
 import { ConnectContext, DrawingBanner, useEdgeDrawing } from "../authoring/connect.tsx";
 import { RouteNodePanel } from "../authoring/RouteAuthoring.tsx";
 import { blockedWords, DraftCard, ResultBand, RouteHeader, useDraftViolations } from "../authoring/RouteDraft.tsx";
+import { DeletingRoute } from "../routes/DeleteRoute.tsx";
 import { useRouteNotices } from "../authoring/RouteNotices.tsx";
 import { StructureTools } from "../authoring/StructureTools.tsx";
 import { domainOf, routeAuthored, type Authored } from "../authoring/target.ts";
@@ -285,6 +286,7 @@ function VersionFrame({ shown, derived, selected, edge, write, result, setResult
 function EmptyRoute({ route, write, imports }: { route: Route; write: ScreenWrite; imports: ImportFlow }) {
   const id = route.header.id;
   const navigate = useNavigate();
+  const { asking } = use(DeletingRoute);
   return (
     <div className="ws-fill journey-frame route-frame" data-testid="route-frame" data-screen="empty">
       <div className="ws-head stack journey-head">
@@ -295,11 +297,13 @@ function EmptyRoute({ route, write, imports }: { route: Route; write: ScreenWrit
           <p>
             <strong>{route.header.name}</strong> has no draft and no published version.
           </p>
-          <span className="row">
-            <Button primary disabled={write.disabled} onClick={() => void write.run({ target: { route: id }, baseRevision: route.revision, mutations: [openDraft()] }, () => { void navigate(routePath(id)); })}>
-              Open a draft
-            </Button>
-          </span>
+          {asking ? null : (
+            <span className="row">
+              <Button primary disabled={write.disabled} onClick={() => void write.run({ target: { route: id }, baseRevision: route.revision, mutations: [openDraft()] }, () => { void navigate(routePath(id)); })}>
+                Open a draft
+              </Button>
+            </span>
+          )}
         </div>
       </div>
     </div>
@@ -458,6 +462,8 @@ function RouteContent({ result: kept, setResult }: { result: Result | undefined;
   const navigate = useNavigate();
   const imports = useImportFlow(`import:draft:${id}`);
   const result = kept?.route === id ? kept : undefined;
+  const [asking, ask] = useState(false);
+  const deleting = useMemo(() => ({ asking, ask }), [asking]);
   const drafting = found !== undefined && "shown" in found && found.shown.of === "draft";
   // The file names its route: when that is not this one, or a version is shown, its draft is where the result belongs.
   useOnImported(
@@ -487,9 +493,9 @@ function RouteContent({ result: kept, setResult }: { result: Result | undefined;
     body = <Loaded shown={found.shown} selected={at.key} edge={at.edge} write={write} imports={imports} result={result} setResult={setResult} />;
   }
   return (
-    <>
+    <DeletingRoute value={deleting}>
       {body}
       <DestinationProposals destination={{ route: id }} />
-    </>
+    </DeletingRoute>
   );
 }

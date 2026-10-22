@@ -68,10 +68,12 @@ on_both_stores!(
     a_group_merge_resubmitted_with_other_identities_is_another_merge,
     publishing_a_route_never_touches_its_journeys,
     an_archived_journey_takes_only_unarchiving_or_deletion_and_its_id_never_returns,
+    a_route_a_journey_follows_on_an_old_version_is_deleted_only_with_it,
+    a_segment_inserted_only_in_a_published_version_is_not_deleted,
     a_users_patch_and_their_agents_land_alike_but_for_the_stamp,
     every_commit_is_announced_with_each_revision_it_moved,
     consequences_report_what_the_patch_caused_and_not_what_midnight_did,
-    a_hard_delete_announces_no_deployment_revision_it_did_not_commit,
+    a_hard_delete_announces_the_deployment_and_each_journey_it_deleted,
 );
 
 const AT: &str = "2026-10-06T12:00:00Z";
@@ -1141,7 +1143,7 @@ async fn an_archived_journey_takes_only_unarchiving_or_deletion_and_its_id_never
             .patch(&call("u_lead", AT), &status("p_rearchive", 4, "archived"))
             .await,
     );
-    let delete = domain(patch("p_delete", target, 5, "- op: delete_journey\n"));
+    let delete = deletion(service, "p_delete", &[("j_done", 5)], &[]).await;
     applied(service.patch(&call("u_lead", AT), &delete).await);
     assert_eq!(service.journey(&journey_id("j_done")).await.unwrap(), None);
     let query = EventQuery {
@@ -1161,7 +1163,146 @@ async fn an_archived_journey_takes_only_unarchiving_or_deletion_and_its_id_never
         "- op: create_journey\n  name: Back\n",
     ));
     let refused = rejected(service.patch(&call("u_lead", AT), &recreate).await);
-    assert_eq!(codes(&refused), vec![ViolationCode::DeletedJourneyId]);
+    assert_eq!(codes(&refused), vec![ViolationCode::DeletedId]);
+}
+
+/// A deployment patch deleting each journey and route at the revision named, against the
+/// deployment's current revision.
+async fn deletion(
+    service: &Service,
+    id: &str,
+    journeys: &[(&str, u32)],
+    routes: &[(&str, u32)],
+) -> DomainPatch {
+    let mut mutations = String::new();
+    for (journey, revision) in journeys {
+        write!(
+            mutations,
+            "- op: delete_journey\n  journey: {journey}\n  revision: {revision}\n"
+        )
+        .unwrap();
+    }
+    for (route, revision) in routes {
+        write!(
+            mutations,
+            "- op: delete_route\n  route: {route}\n  revision: {revision}\n"
+        )
+        .unwrap();
+    }
+    let base = service.deployment().await.unwrap().revision.get();
+    domain(patch(id, "deployment", base, &mutations))
+}
+
+fn route_in_use(rejection: &Rejection) -> Vec<Subject> {
+    let Rejection::Invalid { violations } = rejection else {
+        panic!("expected an invalid rejection, got {rejection:#?}")
+    };
+    let [found] = violations.as_slice() else {
+        panic!("{violations:#?}")
+    };
+    assert_eq!(found.code, ViolationCode::RouteInUse);
+    found.related.clone()
+}
+
+/// A19: a route whose old version a journey still follows is refused, naming the journey,
+/// though no journey is on its latest version; deleted with the journey in one patch, both go.
+async fn a_route_a_journey_follows_on_an_old_version_is_deleted_only_with_it(
+    service: &Service,
+    _: &InProcessNotifier,
+) {
+    vendor_after(service, 1).await;
+    let route = "{route: vendor-evaluation}";
+    let republish = "- op: open_draft\n  source: edit\n- op: publish_draft\n";
+    applied(
+        service
+            .patch(
+                &call("u_author", AT),
+                &domain(patch("p_v2", route, 1, republish)),
+            )
+            .await,
+    );
+    let id = "vendor-evaluation".parse().unwrap();
+    let detail = service.route_detail(&id).await.unwrap().unwrap();
+    assert!(detail.in_use);
+    let journey = service
+        .journey(&journey_id("j_vendor_eval"))
+        .await
+        .unwrap()
+        .unwrap();
+    let alone = deletion(service, "p_route", &[], &[("vendor-evaluation", 2)]).await;
+    let refused = rejected(service.patch(&call("u_lead", AT), &alone).await);
+    assert_eq!(
+        route_in_use(&refused),
+        [Subject::Journey(journey_id("j_vendor_eval"))]
+    );
+    let both = deletion(
+        service,
+        "p_both",
+        &[("j_vendor_eval", journey.revision.get())],
+        &[("vendor-evaluation", 2)],
+    )
+    .await;
+    applied(service.patch(&call("u_lead", AT), &both).await);
+    assert_eq!(service.route_detail(&id).await.unwrap(), None);
+    let query = EventQuery {
+        log: Some(Domain::Deployment),
+        ..EventQuery::default()
+    };
+    let logged: Vec<EventType> = service
+        .events(&query)
+        .await
+        .unwrap()
+        .items
+        .iter()
+        .map(|entry| entry.event.event_type)
+        .filter(|kind| matches!(kind, EventType::JourneyDeleted | EventType::RouteDeleted))
+        .collect();
+    assert_eq!(logged, [EventType::JourneyDeleted, EventType::RouteDeleted]);
+}
+
+/// A19, A21: a segment that only a published version of another route inserts is in use: no
+/// journey and no draft holds it, and the delete is still refused, naming the route.
+async fn a_segment_inserted_only_in_a_published_version_is_not_deleted(
+    service: &Service,
+    _: &InProcessNotifier,
+) {
+    let segment = "{route: reuse}";
+    let made = "- op: create_route\n  name: Reuse\n  kind: segment\n- op: open_draft\n  source: import\n\
+                - op: add_node\n  node: {key: n_reuse, id: reuse, kind: group, title: Reuse}\n\
+                - op: add_node\n  node: {key: n_check, id: check, parent: n_reuse, kind: action, title: Check}\n\
+                - op: publish_draft\n";
+    applied(
+        service
+            .patch(
+                &call("u_author", AT),
+                &domain(patch("p_segment", segment, 0, made)),
+            )
+            .await,
+    );
+    let host = "{route: host}";
+    let inserted = "- op: create_route\n  name: Host\n- op: open_draft\n  source: import\n\
+                    - op: add_node\n  node: {key: n_slot, id: slot, kind: group, title: Slot}\n\
+                    - op: insert_segment\n  insertion: i_reuse\n  segment: {route: reuse, version: 1}\n  parent: n_slot\n\
+                    - op: publish_draft\n";
+    applied(
+        service
+            .patch(
+                &call("u_author", AT),
+                &domain(patch("p_host", host, 0, inserted)),
+            )
+            .await,
+    );
+    let reuse = "reuse".parse().unwrap();
+    assert!(service.route_detail(&reuse).await.unwrap().unwrap().in_use);
+    let alone = deletion(service, "p_segment_gone", &[], &[("reuse", 1)]).await;
+    let refused = rejected(service.patch(&call("u_lead", AT), &alone).await);
+    assert_eq!(
+        route_in_use(&refused),
+        [Subject::Route("host".parse().unwrap())]
+    );
+    let both = deletion(service, "p_both", &[], &[("reuse", 1), ("host", 1)]).await;
+    applied(service.patch(&call("u_lead", AT), &both).await);
+    assert_eq!(service.route_detail(&reuse).await.unwrap(), None);
 }
 
 /// A12, H2: the same mutations from a user and from their agent produce the same journey;
@@ -1361,15 +1502,21 @@ fn every_operation_can_be_awaited_on_another_thread() {
     });
 }
 
-/// H6: a hard delete moves no deployment revision in the store, so none is announced; the
-/// identity create that later moves it to 1 is heard.
-async fn a_hard_delete_announces_no_deployment_revision_it_did_not_commit(
+/// H6, A19: a hard delete moves the deployment and announces it, and announces each journey it
+/// deleted past the revision a view holds, so an open view learns it is gone; resubmitted, it is
+/// answered from its receipt.
+async fn a_hard_delete_announces_the_deployment_and_each_journey_it_deleted(
     service: &Service,
     _: &InProcessNotifier,
 ) {
-    create(service, "j_gone", &[]).await;
+    create(service, "j_one", &[]).await;
+    create(service, "j_two", &[]).await;
+    let of = |id: &str| RevisionOf::Domain(Domain::Journey(journey_id(id)));
     let deployment = RevisionOf::Domain(Domain::Deployment);
-    let watching: BTreeSet<Watch> = [Watch::One(deployment.clone())].into_iter().collect();
+    let watching: BTreeSet<Watch> = [deployment.clone(), of("j_one"), of("j_two")]
+        .into_iter()
+        .map(Watch::One)
+        .collect();
     let subscription = service.subscribe(watching).await.unwrap();
     let mut clock = std::time::Duration::ZERO;
     let mut take = || {
@@ -1378,26 +1525,30 @@ async fn a_hard_delete_announces_no_deployment_revision_it_did_not_commit(
     };
     let initial = take();
     assert!(matches!(initial, Take::Current(_)), "{initial:?}");
-    let delete = domain(patch(
-        "p_delete",
-        "{journey: j_gone}",
-        1,
-        "- op: delete_journey\n",
-    ));
+    let base = service.deployment().await.unwrap().revision;
+    let delete = deletion(service, "p_delete", &[("j_one", 1), ("j_two", 1)], &[]).await;
     applied(service.patch(&call("u_lead", AT), &delete).await);
-    assert_eq!(take(), Take::Empty, "the deployment did not move");
-    let identity = domain(patch(
-        "p_identity",
-        "deployment",
-        0,
-        "- op: create_identity\n  identity: {key: who_new, name: New}\n",
-    ));
-    applied(service.patch(&call("u_lead", AT), &identity).await);
-    assert_eq!(
-        take(),
-        Take::Ticks(vec![Tick {
+    let Take::Ticks(mut ticks) = take() else {
+        panic!("the delete is announced")
+    };
+    ticks.sort();
+    let two = cairn_schema::Revision::NONE.next().next();
+    let mut expected = vec![
+        Tick {
             of: deployment,
-            revision: cairn_schema::Revision::NONE.next(),
-        }])
-    );
+            revision: base.next(),
+        },
+        Tick {
+            of: of("j_one"),
+            revision: two,
+        },
+        Tick {
+            of: of("j_two"),
+            revision: two,
+        },
+    ];
+    expected.sort();
+    assert_eq!(ticks, expected);
+    let again = service.patch(&call("u_lead", AT), &delete).await.unwrap();
+    assert!(matches!(again, Written::AlreadyApplied { .. }), "{again:?}");
 }

@@ -17,8 +17,8 @@ mod structure;
 use std::collections::{BTreeMap, BTreeSet};
 
 use cairn_schema::{
-    Domain, GraphId, GraphKey, GraphRecord, IdentityKey, Journey, JourneyId, KeyRefs, Lineage,
-    LocalEdit, Mutation, Node, NodeKey, Patch, PatchTarget, Provenance, Record, RecordKey,
+    DeletedId, Domain, GraphId, GraphKey, GraphRecord, IdentityKey, Journey, JourneyId, KeyRefs,
+    Lineage, LocalEdit, Mutation, Node, NodeKey, Patch, PatchTarget, Provenance, Record, RecordKey,
     RevisionConflict, Subject, Violation, ViolationCode, Write,
 };
 
@@ -28,8 +28,8 @@ use crate::pipeline::ApplyInputs;
 use crate::records::Records;
 use crate::validate::{missing_node_code, violation};
 
-/// B11, A19: why a journey whose status accepts no changes refuses one.
-const ARCHIVED_REFUSAL: &str = "an archived journey accepts only un-archiving or hard deletion";
+/// B11: why a journey whose status accepts no changes refuses one.
+const ARCHIVED_REFUSAL: &str = "an archived journey accepts only un-archiving";
 
 /// One apply in progress: the candidate the mutations so far produced, and what later stages
 /// need to know about them.
@@ -69,6 +69,8 @@ pub(crate) struct Session<'a> {
     pub cardinality_changed: BTreeSet<Subject>,
     /// Journeys the identity merges in this patch are checked against, every merge's (E6).
     pub merge_checked: BTreeSet<JourneyId>,
+    /// The journeys and routes this patch deletes (A19).
+    pub deleted: BTreeSet<DeletedId>,
     /// What node removals reach in the patch's graph, built at the first removal and kept
     /// up to date by every later write (A18; [`RemovalIndex`]).
     pub removal_index: Option<RemovalIndex>,
@@ -88,7 +90,7 @@ enum Scope {
     Route,
     /// A journey's graph or a route's draft.
     Graph,
-    /// The deployment.
+    /// The deployment: identities, and hard deletion of journeys and routes.
     Deployment,
     /// Any domain: an identity create rides in any patch (E6).
     AnyDomain,
@@ -103,7 +105,6 @@ fn scope(mutation: &Mutation) -> Scope {
         Mutation::CreateJourney { .. }
         | Mutation::EditJourney { .. }
         | Mutation::SetJourneyStatus { .. }
-        | Mutation::DeleteJourney {}
         | Mutation::Upgrade { .. }
         | Mutation::Relink { .. } => Scope::Journey,
         Mutation::Transition { .. }
@@ -151,7 +152,9 @@ fn scope(mutation: &Mutation) -> Scope {
         | Mutation::InsertSegment { .. } => Scope::Graph,
         Mutation::EditIdentity { .. }
         | Mutation::MergeIdentities { .. }
-        | Mutation::DeleteIdentity { .. } => Scope::Deployment,
+        | Mutation::DeleteIdentity { .. }
+        | Mutation::DeleteJourney { .. }
+        | Mutation::DeleteRoute { .. } => Scope::Deployment,
         Mutation::CreateIdentity { .. } => Scope::AnyDomain,
         Mutation::ApplyProposal { .. } => Scope::Apply,
         Mutation::CreateProposal { .. }
@@ -181,15 +184,23 @@ pub(crate) fn apply(session: &mut Session<'_>, mutation: &Mutation, delta: &mut 
         Scope::Proposal => proposal::apply(session, mutation),
     };
     // A rejected mutation writes nothing (A15: nothing partial), and every write stays in
-    // the patch's domain, or the deployment for an identity create or a deleted journey (E6,
-    // A19).
+    // the patch's domain, or the deployment for an identity create (E6); a deployment patch
+    // also removes the journeys and routes it deletes whole (A19).
     assert!(writes.is_empty() || session.violations.len() == found_before);
     let domain = session.domain();
-    assert!(writes.iter().flat_map(Write::keys).all(|key| {
-        let written = key.domain();
-        written == domain
-            || written == Domain::Deployment
-            || matches!(key, RecordKey::Graph(GraphId::RouteVersion { .. }))
+    assert!(writes.iter().all(|write| {
+        let deletes = domain == Domain::Deployment
+            && matches!(
+                write,
+                Write::Remove(RecordKey::Domain(Domain::Journey(_) | Domain::Route(_)))
+            );
+        deletes
+            || write.keys().into_iter().all(|key| {
+                let written = key.domain();
+                written == domain
+                    || written == Domain::Deployment
+                    || matches!(key, RecordKey::Graph(GraphId::RouteVersion { .. }))
+            })
     }));
     for write in writes {
         session.candidate.write(&write);
@@ -218,6 +229,7 @@ impl<'a> Session<'a> {
             created_identities: BTreeSet::new(),
             published: Vec::new(),
             merge_checked: BTreeSet::new(),
+            deleted: BTreeSet::new(),
             removal_index: None,
             removal_operations: 0,
         }
@@ -288,6 +300,17 @@ impl Session<'_> {
                     (Some(_), true) => {
                         Err((ViolationCode::TargetExists, format!("route {id} exists")))
                     }
+                    (None, true)
+                        if self
+                            .candidate
+                            .deleted
+                            .contains_key(&DeletedId::Route(id.clone())) =>
+                    {
+                        Err((
+                            ViolationCode::DeletedId,
+                            format!("route {id} was deleted and its id is never reused"),
+                        ))
+                    }
                     (None, false) => Err((
                         ViolationCode::TargetMissing,
                         format!("route {id} does not exist"),
@@ -321,13 +344,12 @@ impl Session<'_> {
             .journeys
             .get(id)
             .map(|journey| journey.header.status);
-        // What a journey that accepts no changes still takes: a move its status allows, and
-        // hard deletion.
+        // What a journey that accepts no changes still takes: a move its status allows. Its
+        // hard deletion is the deployment's patch (A19).
         let exempt = match mutation {
             Mutation::SetJourneyStatus { status: to } => {
                 status.is_some_and(|from| from.moves().contains(to))
             }
-            Mutation::DeleteJourney {} => true,
             _ => false,
         };
         if status.is_some_and(|status| !status.accepts_changes()) && !exempt && !rides {
@@ -344,9 +366,13 @@ impl Session<'_> {
                     format!("journey {id} does not exist"),
                 ));
             }
-            if self.candidate.deleted_journeys.contains_key(id) {
+            if self
+                .candidate
+                .deleted
+                .contains_key(&DeletedId::Journey(id.clone()))
+            {
                 return Err((
-                    ViolationCode::DeletedJourneyId,
+                    ViolationCode::DeletedId,
                     format!("journey {id} was deleted and its id is never reused"),
                 ));
             }

@@ -4,9 +4,10 @@
 use std::collections::BTreeSet;
 
 use cairn_schema::{
-    AnswerValue, Domain, Edge, GraphId, GraphRecord, Identity, Insertion, JourneyHeader, Lineage,
-    Node, NodeKey, ParticipationKind, ParticipationSource, Proposal, ProposalDraft, Record,
-    RecordKey, Resource, RetiredKey, Revision, Role, RouteHeader, SnoozeTarget, Write,
+    AnswerValue, DeletedId, Domain, Edge, GraphId, GraphRecord, Identity, Insertion, JourneyHeader,
+    Lineage, Node, NodeKey, ParticipationKind, ParticipationSource, Proposal, ProposalDraft,
+    Record, RecordKey, Resource, RetiredKey, Revision, Role, RouteHeader, RouteId, SnoozeTarget,
+    Write,
     limits::{EDGE_COUNT_PER_NODE_MAX, KIND_COUNT_MAX},
     refs::KeyRefs,
 };
@@ -151,13 +152,11 @@ impl<'connection> Writer<'connection> {
                     params,
                 )?;
             }
-            Record::DeletedJourney {
-                journey,
-                deleted_at,
-            } => {
+            Record::Deleted { id, deleted_at } => {
+                let (kind, held) = deleted_columns(id);
                 self.run(
-                    "INSERT OR REPLACE INTO deleted_journeys (id, deleted_at) VALUES (?1, ?2)",
-                    vec![text(journey), time(*deleted_at)?],
+                    "INSERT OR REPLACE INTO deleted_ids (kind, id, deleted_at) VALUES (?1, ?2, ?3)",
+                    vec![text(kind), text(&held), time(*deleted_at)?],
                 )?;
             }
             Record::Identity(identity) => self.put_identity(identity)?,
@@ -557,6 +556,7 @@ impl<'connection> Writer<'connection> {
     fn remove(&mut self, key: &RecordKey) -> Result<(), CommitError> {
         match key {
             RecordKey::Domain(Domain::Journey(journey)) => self.remove_journey(journey)?,
+            RecordKey::Domain(Domain::Route(route)) => self.remove_route(route)?,
             RecordKey::Graph(graph @ (GraphId::Journey(_) | GraphId::RouteDraft(_))) => {
                 self.clear_graph(graph)?;
             }
@@ -594,12 +594,12 @@ impl<'connection> Writer<'connection> {
             RecordKey::Proposal { id, .. } => {
                 self.run("DELETE FROM proposals WHERE id = ?1", vec![text(id)])?;
             }
-            RecordKey::Domain(_)
+            RecordKey::Domain(Domain::Deployment)
             | RecordKey::Graph(GraphId::RouteVersion { .. })
             | RecordKey::JourneyHeader(_)
             | RecordKey::RouteHeader(_)
             | RecordKey::RouteVersion { .. }
-            | RecordKey::DeletedJourney(_) => {
+            | RecordKey::Deleted(_) => {
                 return Err(malformed(format!("{key:?} is never removed")));
             }
         }
@@ -618,6 +618,35 @@ impl<'connection> Writer<'connection> {
         ];
         for sql in statements {
             self.run(sql, vec![text(journey)])?;
+        }
+        Ok(())
+    }
+
+    /// A19: a hard delete of a route or segment: its fields, draft, every version and its
+    /// graph, its proposals, and its events.
+    fn remove_route(&mut self, route: &RouteId) -> Result<(), CommitError> {
+        let mut graphs = vec![GraphId::RouteDraft(route.clone())];
+        let select = "SELECT version_number FROM route_versions WHERE route_id = ?1";
+        for row in crate::sql::rows(self.connection, select, vec![text(route)])? {
+            graphs.push(GraphId::RouteVersion {
+                route: route.clone(),
+                version: row.number(0)?,
+            });
+        }
+        for graph in &graphs {
+            self.clear_graph(graph)?;
+        }
+        let statements = [
+            "DELETE FROM route_drafts WHERE route_id = ?1",
+            "DELETE FROM route_versions WHERE route_id = ?1",
+            "DELETE FROM routes WHERE id = ?1",
+            "DELETE FROM proposals WHERE destination_kind = 'route' AND destination_id = ?1",
+            "DELETE FROM event_nodes WHERE seq IN \
+             (SELECT seq FROM events WHERE log_kind = 'route' AND log_id = ?1)",
+            "DELETE FROM events WHERE log_kind = 'route' AND log_id = ?1",
+        ];
+        for sql in statements {
+            self.run(sql, vec![text(route)])?;
         }
         Ok(())
     }
@@ -692,6 +721,14 @@ pub(crate) fn snooze_columns(until: &SnoozeTarget) -> (Value, Value) {
     match until {
         SnoozeTarget::Date(day) => (date(*day), Value::Null),
         SnoozeTarget::Node(node) => (Value::Null, text(node)),
+    }
+}
+
+/// A19: a deleted id's kind and id columns.
+pub(crate) fn deleted_columns(id: &DeletedId) -> (&'static str, String) {
+    match id {
+        DeletedId::Journey(journey) => ("journey", journey.to_string()),
+        DeletedId::Route(route) => ("route", route.to_string()),
     }
 }
 

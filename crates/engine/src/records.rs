@@ -1,6 +1,6 @@
 //! The stored records a patch reads and writes (ARCHITECTURE, Storage > Schema outline), held
 //! in memory: the deployment, journeys, routes with their drafts, published route versions,
-//! proposals, and deleted journey ids. A host fills a [`Records`] with what it loaded for one
+//! proposals, and the ids of deleted journeys and routes. A host fills a [`Records`] with what it loaded for one
 //! patch; the scenario harness and replay hold every domain in one.
 //!
 //! [`Records::write`] applies one [`Write`] the way a store persists it, and
@@ -12,9 +12,9 @@
 use std::collections::{BTreeMap, BTreeSet};
 
 use cairn_schema::{
-    Deployment, Domain, EventType, Graph, GraphId, GraphKey, GraphRecord, IdentityKey, Journey,
+    DeletedId, Deployment, Domain, EventType, Graph, GraphId, GraphKey, GraphRecord, Journey,
     JourneyId, KeyRefs, Lineage, Node, NodeKey, Proposal, ProposalId, Record, RecordKey,
-    RetiredKey, Route, RouteDraft, RouteId, RouteVersion, Timestamp, Write,
+    RetiredKey, Route, RouteDraft, RouteId, RouteVersion, Subject, Timestamp, Write,
 };
 
 use crate::edit;
@@ -22,7 +22,8 @@ use crate::edit;
 /// Every stored record a patch may read or write, by domain. For one patch a host loads the
 /// target domain (absent when the patch creates it), the deployment (always: identity
 /// references resolve through it), the route versions the patch reads, the proposal it edits
-/// or applies, and for an identity merge the journeys referencing either identity.
+/// or applies, for an identity merge the journeys referencing either identity, and for a hard
+/// delete the journeys and routes it deletes and the graphs using a route it deletes.
 #[derive(Clone, Debug, Default, PartialEq, Eq)]
 pub struct Records {
     /// The deployment: identities, aliases, revision (E6).
@@ -35,11 +36,11 @@ pub struct Records {
     pub versions: BTreeMap<Lineage, RouteVersion>,
     /// Proposals by id (I6).
     pub proposals: BTreeMap<ProposalId, Proposal>,
-    /// Hard-deleted journey ids and when they were deleted (A19).
-    pub deleted_journeys: BTreeMap<JourneyId, Timestamp>,
-    /// E6: for an identity a patch deletes, how many graphs refer to it beyond those loaded, so
-    /// a rejection can say how many it does not list.
-    pub unlisted_references: BTreeMap<IdentityKey, u32>,
+    /// The ids of hard-deleted journeys and routes, and when each was deleted (A19).
+    pub deleted: BTreeMap<DeletedId, Timestamp>,
+    /// E6, A19: for an identity or route a patch deletes, how many journeys and routes refer to
+    /// it beyond the graphs loaded, so a rejection can say how many it does not list.
+    pub unlisted_references: BTreeMap<Subject, u32>,
 }
 
 impl Records {
@@ -189,11 +190,8 @@ impl Records {
                     },
                 );
             }
-            Record::DeletedJourney {
-                journey,
-                deleted_at,
-            } => {
-                self.deleted_journeys.insert(journey.clone(), *deleted_at);
+            Record::Deleted { id, deleted_at } => {
+                self.deleted.insert(id.clone(), *deleted_at);
             }
             Record::Identity(identity) => {
                 let put = self.deployment.identities.put(identity.clone());
@@ -239,7 +237,7 @@ impl Records {
             RecordKey::JourneyHeader(_)
             | RecordKey::RouteHeader(_)
             | RecordKey::RouteVersion { .. }
-            | RecordKey::DeletedJourney(_) => {
+            | RecordKey::Deleted(_) => {
                 panic!("{key:?} is never removed on its own")
             }
         }
@@ -249,10 +247,14 @@ impl Records {
         match domain {
             Domain::Journey(journey) => {
                 self.journeys.remove(journey);
+                self.proposals
+                    .retain(|_, proposal| proposal.destination != *domain);
             }
             Domain::Route(route) => {
                 self.routes.remove(route);
                 self.versions.retain(|lineage, _| lineage.route != *route);
+                self.proposals
+                    .retain(|_, proposal| proposal.destination != *domain);
             }
             Domain::Deployment => {
                 let revision = self.deployment.revision;
@@ -268,7 +270,11 @@ impl Records {
     /// decisions/2026-10-06-the-revisions-a-commit-moves-besides-its-targets.md): the patch's
     /// domain advances by one, unless the patch only edits a proposal, whose record carries
     /// its own revision; a patch to another domain that writes deployment records (an identity
-    /// create, a deleted journey id) also advances the deployment by one.
+    /// create) also advances the deployment by one.
+    ///
+    /// # Panics
+    ///
+    /// When the events are not all in one log: one patch's events are its domain's.
     pub fn advance(&mut self, events: &[cairn_schema::Event]) {
         let Some(first) = events.first() else {
             return;
@@ -280,29 +286,29 @@ impl Records {
         if proposal_edit {
             return;
         }
-        // A deletion's event sits in the deployment log; the patch's domain is the journey.
-        let domain = events
-            .iter()
-            .find(|event| event.event_type != EventType::JourneyDeleted)
-            .map(|event| event.log.clone());
-        match &domain {
-            Some(Domain::Journey(id)) => {
+        let domain = &first.log;
+        assert!(
+            events.iter().all(|event| event.log == *domain),
+            "one patch's events share its domain's log"
+        );
+        match domain {
+            Domain::Journey(id) => {
                 if let Some(journey) = self.journeys.get_mut(id) {
                     journey.revision = journey.revision.next();
                 }
             }
-            Some(Domain::Route(id)) => {
+            Domain::Route(id) => {
                 if let Some(route) = self.routes.get_mut(id) {
                     route.revision = route.revision.next();
                 }
             }
-            Some(Domain::Deployment) | None => {}
+            Domain::Deployment => {}
         }
         let writes_deployment = events
             .iter()
             .flat_map(|event| &event.delta)
             .any(writes_deployment_record);
-        if domain == Some(Domain::Deployment) || writes_deployment {
+        if *domain == Domain::Deployment || writes_deployment {
             self.deployment.revision = self.deployment.revision.next();
         }
     }

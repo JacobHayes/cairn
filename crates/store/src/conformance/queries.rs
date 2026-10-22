@@ -238,24 +238,14 @@ pub async fn an_identity_delete_is_stale_while_any_graph_refers_to_it<B: Backend
         ),
         "{error:?}"
     );
-    let gone = journey_patch("p_gone", "j_one", 1)
-        .event_in(
-            Domain::Deployment,
-            EventType::JourneyDeleted,
-            Subject::Journey(id("j_one")),
-            vec![
-                Write::Remove(cairn_schema::RecordKey::Domain(Domain::Journey(id(
-                    "j_one",
-                )))),
-                Write::Put(Record::DeletedJourney {
-                    journey: id("j_one"),
-                    deleted_at: build::at(30),
-                }),
-            ],
-        )
-        .commit();
+    let gone = build::hard_delete(
+        "p_gone",
+        1,
+        &[(cairn_schema::DeletedId::Journey(id("j_one")), 1)],
+    )
+    .commit();
     applied(&store, gone).await;
-    applied(&store, delete("p_delete_again", 1)).await;
+    applied(&store, delete("p_delete_again", 2)).await;
     assert_eq!(store.resolve_identity(&id("who_a")).await.unwrap(), None);
 }
 

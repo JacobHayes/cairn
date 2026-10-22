@@ -1,9 +1,11 @@
 // A journey's life as the screens offer it: started from a route version or empty (B1),
-// completed, reopened, archived, un-archived (B11), and hard-deleted once archived, behind a
-// typed confirmation (A19). Each is one patch to the journey; the host's answer is the truth.
+// completed, reopened, archived, un-archived (B11), each one patch to the journey, and
+// hard-deleted once archived (A19), several at once, as one patch to the deployment. The host's
+// answer is the truth.
 import { STATUS_MOVES, type Schema } from "@cairn/client";
 
 import type { Mutation } from "../data/writes.ts";
+import { namedList } from "../ui/words.ts";
 import type { JourneyStatus } from "./address.ts";
 
 export type RouteSummary = Schema<"RouteSummary">;
@@ -56,7 +58,44 @@ export function deletable(status: JourneyStatus): boolean {
   return status === "archived";
 }
 
-/** A19: hard deletion is sent only for a journey it is offered for, with its name typed back. */
-export function deleteConfirmed(status: JourneyStatus, name: string, typed: string): boolean {
-  return deletable(status) && typed.trim() === name.trim();
+/** A journey as a hard delete names it: its id, what it is called, its status and the revision it was read at. */
+export interface Doomed {
+  id: string;
+  name: string;
+  status: JourneyStatus;
+  revision: number;
+}
+
+/** A19: why `journeys` cannot be deleted, naming the ones not archived; none when every one is archived. */
+export function deleteBlocked(journeys: readonly Doomed[]): string | undefined {
+  const live = journeys.filter((journey) => !deletable(journey.status));
+  if (live.length === 0) {
+    return undefined;
+  }
+  if (journeys.length === 1) {
+    return "Only an archived journey can be deleted. Archive it first.";
+  }
+  return `Archive ${namedList(live.map((journey) => journey.name))} first, or remove ${live.length > 1 ? "them" : "it"} from the selection.`;
+}
+
+/** The selection in a line, for where only its first lines show (a phone's sheet, peeking): whom it names and whether they can be deleted. */
+export function selectionGist(journeys: readonly Doomed[]): string {
+  const live = journeys.filter((journey) => !deletable(journey.status)).length;
+  return `${namedList(journeys.map((journey) => journey.name))}: ${live === 0 ? `archived, so ${journeys.length === 1 ? "it" : "they"} can be deleted` : `${String(live)} not archived`}`;
+}
+
+/** A19: the deployment's mutations deleting `journeys`, each at the revision it was read at, so one moved since makes the whole patch stale. */
+export function deleteMutations(journeys: readonly Doomed[]): Mutation[] {
+  return journeys.map((journey) => ({ op: "delete_journey", journey: journey.id, revision: journey.revision }));
+}
+
+/** What the one confirmation asks, with the count. */
+export function deleteQuestion(journeys: readonly Doomed[]): string {
+  const [only] = journeys;
+  return journeys.length === 1 && only !== undefined ? `Delete ${only.name} for good?` : `Delete ${String(journeys.length)} journeys for good?`;
+}
+
+/** The button that deletes `count` journeys. */
+export function deleteLabel(count: number): string {
+  return count === 1 ? "Delete the journey" : `Delete ${String(count)} journeys`;
 }

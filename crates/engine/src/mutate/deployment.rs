@@ -1,10 +1,11 @@
-//! Identities (E6, H3): create in any patch; edit, merge and delete in the deployment's.
+//! The deployment's mutations: identities (E6, H3), created in any patch and edited, merged
+//! and deleted in the deployment's, and the hard deletion of journeys and routes (A19).
 
 use std::collections::{BTreeMap, BTreeSet};
 
 use cairn_schema::{
-    Domain, GraphId, Identity, IdentityKey, IdentitySet, JourneyId, Limit, Mutation, Record,
-    RecordKey, Revision, RevisionConflict, RevisionOf, Subject, ViolationCode, Write,
+    DeletedId, Domain, GraphId, Identity, IdentityKey, IdentitySet, JourneyId, Limit, Mutation,
+    Record, RecordKey, Revision, RevisionConflict, RevisionOf, Subject, ViolationCode, Write,
     limits::CHAIN_COUNT_PER_REJECTION_MAX,
 };
 
@@ -39,6 +40,12 @@ pub(super) fn apply(session: &mut Session<'_>, mutation: &Mutation) -> Vec<Write
             journeys,
         } => merge(session, survivor, merged, journeys),
         Mutation::DeleteIdentity { identity } => delete(session, identity),
+        Mutation::DeleteJourney { journey, revision } => {
+            hard_delete(session, &DeletedId::Journey(journey.clone()), *revision)
+        }
+        Mutation::DeleteRoute { route, revision } => {
+            hard_delete(session, &DeletedId::Route(route.clone()), *revision)
+        }
         other => unreachable!("{other:?} is dispatched elsewhere"),
     }
 }
@@ -231,7 +238,7 @@ fn delete(session: &mut Session<'_>, identity: &IdentityKey) -> Vec<Write> {
             + session
                 .candidate
                 .unlisted_references
-                .get(identity)
+                .get(&Subject::Identity(identity.clone()))
                 .copied()
                 .unwrap_or_default();
         let more = if unlisted == 0 {
@@ -349,4 +356,61 @@ fn check_journeys(
     session
         .merge_checked
         .extend(referencing.into_iter().map(|(id, _)| id));
+}
+
+// PRD: A19.
+/// A hard delete of a journey or a route: the domain goes whole, its id is recorded so it is
+/// never used again, and the deployment log keeps the event. The domain must be at the
+/// revision the deletion names, as the host loaded it; one that moved or is gone makes the
+/// patch stale, every such one listed, and the commit checks the revisions again. A route still
+/// in use is refused once the whole patch has applied (stages), so a patch can delete a route
+/// with the journeys on it in any order.
+fn hard_delete(session: &mut Session<'_>, id: &DeletedId, named: Revision) -> Vec<Write> {
+    let domain = id.domain();
+    if !session.deleted.insert(id.clone()) {
+        session.reject(
+            ViolationCode::TargetMissing,
+            None,
+            format!("{domain} is deleted earlier in this patch"),
+        );
+        if let Some(found) = session.violations.last_mut() {
+            found.at.subject = Some(deleted_subject(id));
+        }
+        return Vec::new();
+    }
+    let current = session.candidate.revision(&domain);
+    if current == Revision::NONE && named == Revision::NONE {
+        session.reject(
+            ViolationCode::TargetMissing,
+            None,
+            format!("{domain} does not exist"),
+        );
+        if let Some(found) = session.violations.last_mut() {
+            found.at.subject = Some(deleted_subject(id));
+        }
+        return Vec::new();
+    }
+    if current != named {
+        session.conflicts.push(RevisionConflict {
+            of: RevisionOf::Domain(domain),
+            expected: named,
+            current,
+        });
+        return Vec::new();
+    }
+    vec![
+        Write::Remove(RecordKey::Domain(domain)),
+        Write::Put(Record::Deleted {
+            id: id.clone(),
+            deleted_at: session.inputs.at,
+        }),
+    ]
+}
+
+/// The subject a deletion's violation is about.
+pub(crate) fn deleted_subject(id: &DeletedId) -> Subject {
+    match id {
+        DeletedId::Journey(journey) => Subject::Journey(journey.clone()),
+        DeletedId::Route(route) => Subject::Route(route.clone()),
+    }
 }

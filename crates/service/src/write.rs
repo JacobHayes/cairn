@@ -412,8 +412,9 @@ impl Service {
     }
 
     /// H6: announces every revision a commit moved: its domain's, or for a patch to a
-    /// proposal the proposal's (I6: drafting never moves the destination); each proposal a
-    /// domain patch applied; and the deployment's when an identity create riding in a journey or
+    /// proposal the proposal's (I6: drafting never moves the destination); each journey and
+    /// route a deployment patch deleted (A19); each proposal a domain patch applied; and the
+    /// deployment's when an identity create riding in a journey or
     /// route patch moved it, at `deployment`, the revision the store says the commit left
     /// (the engine's records cannot know of another such commit that landed after their
     /// load).
@@ -433,6 +434,16 @@ impl Service {
         }
         self.notifier
             .publish(&RevisionOf::Domain(domain.clone()), receipt.revision);
+        // A19: a journey or route deleted moves past the revision every view holds, so each
+        // refetches and finds it gone.
+        for write in applied.change_set().writes() {
+            if let Write::Put(Record::Deleted { id, .. }) = write {
+                let gone = id.domain();
+                let held = before.revision(&gone);
+                self.notifier
+                    .publish(&RevisionOf::Domain(gone), held.next());
+            }
+        }
         for (id, proposal) in &applied.records().proposals {
             if before.proposals.get(id).map(|held| held.revision) != Some(proposal.revision) {
                 self.notifier

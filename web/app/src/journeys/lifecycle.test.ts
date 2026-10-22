@@ -1,9 +1,9 @@
 // B1, B11, A19: what starting a journey sends, which routes it can start from, the status
-// changes each status accepts, the typed confirmation before a hard delete, and when
-// completion is suggested.
+// changes each status accepts, what a hard delete of several sends and when it is offered, and
+// when completion is suggested.
 import { describe, expect, it } from "vitest";
 
-import { createMutation, deleteConfirmed, newJourneyId } from "./lifecycle.ts";
+import { createMutation, deleteBlocked, deleteMutations, newJourneyId, type Doomed } from "./lifecycle.ts";
 
 const JOURNEY_ID = /^j_[a-z0-9][a-z0-9_-]*$/;
 
@@ -21,10 +21,22 @@ describe("starting a journey (B1)", () => {
   });
 });
 
-describe("a journey's status (B11, A19)", () => {
-  it("deletes only an archived journey, and only with its name typed back", () => {
-    expect(deleteConfirmed("archived", "Launch", " Launch ")).toBe(true);
-    expect(deleteConfirmed("archived", "Launch", "launch")).toBe(false);
-    expect(deleteConfirmed("completed", "Launch", "Launch")).toBe(false);
+describe("deleting journeys (B11, A19)", () => {
+  const journey = (id: string, status: Doomed["status"], revision: number): Doomed => ({ id, name: id.toUpperCase(), status, revision });
+
+  it("names every journey at the revision it was read at, in one patch", () => {
+    const journeys = [journey("j_a", "archived", 4), journey("j_b", "archived", 9)];
+    expect(deleteMutations(journeys)).toEqual([
+      { op: "delete_journey", journey: "j_a", revision: 4 },
+      { op: "delete_journey", journey: "j_b", revision: 9 },
+    ]);
+    expect(deleteBlocked(journeys)).toBeUndefined();
+  });
+
+  it("is offered only when every journey is archived, naming the ones that are not", () => {
+    const blocked = deleteBlocked([journey("j_a", "archived", 1), journey("j_b", "completed", 1), journey("j_c", "active", 1)]);
+    expect(blocked).toContain("J_B");
+    expect(blocked).toContain("J_C");
+    expect(blocked).not.toContain("J_A");
   });
 });

@@ -156,7 +156,7 @@ export function RouteCanvas({ shown, view, selected, edge, unanchored, onPick }:
           {controls}
           {laidOut.model.cards.length > 0 ? null : (
             <EmptyPanel testId="nothing-matches">
-              <NothingMatches />
+              {nodesOf(shown).length > 0 ? <NothingMatches /> : shown.of === "draft" ? "The draft has no nodes yet: + Add starts it." : "This version has no nodes."}
             </EmptyPanel>
           )}
         </>

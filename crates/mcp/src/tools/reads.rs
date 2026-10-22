@@ -158,7 +158,8 @@ pub(crate) struct ListIdentities {
 /// A page of the identities.
 #[derive(Debug, Serialize, JsonSchema)]
 struct IdentitiesOutput {
-    /// The deployment revision: the `base_revision` of a `manage_identity` write.
+    /// The deployment revision: the `base_revision` of a `manage_identity` write, or of an
+    /// `apply_patch` to the deployment.
     revision: Revision,
     identities: Paged<IdentityRow>,
 }

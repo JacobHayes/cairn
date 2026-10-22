@@ -299,22 +299,16 @@ mod milestone_done {
         run(async {
             let (path, store) = migrated("again");
             drop(store);
-            let before = rows(
-                &path,
-                "SELECT seq, event_type, delta FROM events ORDER BY seq",
-            );
+            let state = || {
+                [
+                    "SELECT seq, event_type, delta FROM events ORDER BY seq",
+                    "SELECT version FROM schema_migrations ORDER BY version",
+                ]
+                .map(|sql| rows(&path, sql))
+            };
+            let before = state();
             drop(SqliteStore::open(&path).unwrap());
-            assert_eq!(
-                rows(
-                    &path,
-                    "SELECT seq, event_type, delta FROM events ORDER BY seq"
-                ),
-                before
-            );
-            assert_eq!(
-                rows(&path, "SELECT MAX(version) FROM schema_migrations"),
-                [["15"]]
-            );
+            assert_eq!(state(), before);
         });
     }
 }

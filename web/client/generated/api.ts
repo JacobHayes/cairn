@@ -1832,6 +1832,15 @@ export interface components {
             /** @description The edges between decisions. */
             edges: components["schemas"]["LevelEdge"][];
         };
+        /**
+         * @description A journey or route a hard delete removed: its id is never reused, so a late create cannot
+         *     bring it back.
+         */
+        DeletedId: {
+            journey: components["schemas"]["JourneyId"];
+        } | {
+            route: components["schemas"]["RouteId"];
+        };
         /** @description How a dependency arose. */
         DependencyVia: "explicit" | "containment" | {
             inherited: {
@@ -1923,7 +1932,7 @@ export interface components {
             destination: "deployment";
         } | {
             /** @constant */
-            destination: "gone";
+            destination: "absent";
         };
         /** @description What a proposal's destination is. */
         DestinationKind: "journey" | "route" | "segment" | "deployment";
@@ -2084,7 +2093,7 @@ export interface components {
          *     their content ([`Mutation::event_type`]).
          * @enum {string}
          */
-        EventType: "journey_created" | "journey_edited" | "journey_status_changed" | "journey_deleted" | "route_created" | "route_edited" | "route_retired" | "route_unretired" | "draft_opened" | "route_version_imported" | "saved_as_route" | "draft_discarded" | "route_published" | "node_added" | "node_changed" | "weight_changed" | "node_removed" | "edge_changed" | "role_changed" | "participation_kind_changed" | "default_owner_changed" | "participation_changed" | "resource_changed" | "segment_inserted" | "node_transitioned" | "answer_set" | "recorded_date_changed" | "role_fill_changed" | "date_pinned" | "date_shifted" | "date_unpinned" | "snooze_set" | "unsnoozed" | "override_applied" | "guard_bypassed" | "override_removed" | "atomic_changed" | "annotation_added" | "annotation_edited" | "annotation_removed" | "journey_upgraded" | "relinked" | "provenance_changed" | "local_edit_changed" | "identity_created" | "identity_edited" | "identities_merged" | "identity_deleted" | "proposal_created" | "proposal_edited" | "proposal_applied" | "proposal_discarded";
+        EventType: "journey_created" | "journey_edited" | "journey_status_changed" | "journey_deleted" | "route_created" | "route_edited" | "route_retired" | "route_unretired" | "draft_opened" | "route_version_imported" | "saved_as_route" | "draft_discarded" | "route_published" | "route_deleted" | "node_added" | "node_changed" | "weight_changed" | "node_removed" | "edge_changed" | "role_changed" | "participation_kind_changed" | "default_owner_changed" | "participation_changed" | "resource_changed" | "segment_inserted" | "node_transitioned" | "answer_set" | "recorded_date_changed" | "role_fill_changed" | "date_pinned" | "date_shifted" | "date_unpinned" | "snooze_set" | "unsnoozed" | "override_applied" | "guard_bypassed" | "override_removed" | "atomic_changed" | "annotation_added" | "annotation_edited" | "annotation_removed" | "journey_upgraded" | "relinked" | "provenance_changed" | "local_edit_changed" | "identity_created" | "identity_edited" | "identities_merged" | "identity_deleted" | "proposal_created" | "proposal_edited" | "proposal_applied" | "proposal_discarded";
         /**
          * @description A list of explanation entries with its total: complete inside
          *     the engine and the browser; a server response keeps the largest entries up to
@@ -2918,9 +2927,6 @@ export interface components {
             /** @description The new status. */
             status: components["schemas"]["JourneyStatus"];
         } | {
-            /** @constant */
-            op: "delete_journey";
-        } | {
             /** @description The description. */
             description?: components["schemas"]["Markdown"] | null;
             /** @description Process (the default) or segment; fixed from here on. */
@@ -3252,6 +3258,20 @@ export interface components {
             identity: components["schemas"]["IdentityKey"];
             /** @constant */
             op: "delete_identity";
+        } | {
+            /** @description The journey. */
+            journey: components["schemas"]["JourneyId"];
+            /** @constant */
+            op: "delete_journey";
+            /** @description The journey's revision, as read. */
+            revision: components["schemas"]["Revision"];
+        } | {
+            /** @constant */
+            op: "delete_route";
+            /** @description The route's revision, as read. */
+            revision: components["schemas"]["Revision"];
+            /** @description The route. */
+            route: components["schemas"]["RouteId"];
         } | {
             /** @constant */
             op: "create_proposal";
@@ -3712,9 +3732,6 @@ export interface components {
             fact: "sets_journey_status";
             /** @description The status. */
             status: components["schemas"]["JourneyStatus"];
-        } | {
-            /** @constant */
-            fact: "deletes_journey";
         } | {
             /** @constant */
             fact: "creates_route";
@@ -4309,6 +4326,11 @@ export interface components {
             identities_merged?: number;
             /**
              * Format: uint32
+             * @description Journeys it deletes.
+             */
+            journeys_deleted?: number;
+            /**
+             * Format: uint32
              * @description Nodes it adds.
              */
             nodes_added?: number;
@@ -4337,6 +4359,11 @@ export interface components {
              * @description Requirements it removes.
              */
             requirements_removed?: number;
+            /**
+             * Format: uint32
+             * @description Routes and segments it deletes.
+             */
+            routes_deleted?: number;
         };
         /**
          * @description What a proposal would do to its destination now, for review: the items still
@@ -4497,14 +4524,14 @@ export interface components {
                 version: components["schemas"]["VersionNumber"];
             };
         } | {
-            deleted_journey: {
+            deleted: {
                 /**
                  * Format: date-time
                  * @description When it was deleted.
                  */
                 deleted_at: string;
-                /** @description The journey. */
-                journey: components["schemas"]["JourneyId"];
+                /** @description The journey or route. */
+                id: components["schemas"]["DeletedId"];
             };
         } | {
             identity: components["schemas"]["Identity"];
@@ -4544,7 +4571,7 @@ export interface components {
                 version: components["schemas"]["VersionNumber"];
             };
         } | {
-            deleted_journey: components["schemas"]["JourneyId"];
+            deleted: components["schemas"]["DeletedId"];
         } | {
             identity: components["schemas"]["IdentityKey"];
         } | {
@@ -4887,6 +4914,11 @@ export interface components {
         RouteDetail: {
             /** @description The route's fields. */
             header: components["schemas"]["RouteHeader"];
+            /**
+             * @description Whether anything uses it: a journey following one of its versions, or an insertion of
+             *     one anywhere. A route in use cannot be deleted.
+             */
+            in_use: boolean;
             /** @description Its revision. */
             revision: components["schemas"]["Revision"];
             /** @description Its versions, oldest first. */
@@ -5556,7 +5588,7 @@ export interface components {
          * @description What a violation breaks.
          * @enum {string}
          */
-        ViolationCode: "duplicate_sibling_id" | "duplicate_key" | "retired_key_reused" | "unresolved_reference" | "wrong_reference_kind" | "containment_cycle" | "leaf_with_children" | "dependency_cycle" | "edge_to_ancestor_or_descendant" | "requires_duplicates_condition" | "contradictory_chain" | "condition_answer_type_mismatch" | "condition_on_own_subtree" | "stage_bound_not_milestone" | "undeclared_kind" | "single_kind_on_multi_role" | "fills_role_cardinality" | "several_filling_decisions" | "feeds_milestone_not_milestone" | "several_feeding_decisions" | "several_final_milestones" | "field_not_on_kind" | "state_not_on_kind" | "limit_exceeded" | "dangling_reference" | "removal_widened" | "still_referenced" | "answer_type_mismatch" | "identity_unresolved" | "illegal_transition" | "reason_required" | "guard_failed" | "not_relevant" | "snooze_on_self" | "snooze_cycle" | "snooze_not_actionable" | "snoozed_through_container" | "filled_through_decision" | "pinned_through_decision" | "mutation_not_for_target" | "lineage_invalid" | "archived_journey" | "target_exists" | "target_missing" | "deleted_journey_id" | "draft_exists" | "no_draft" | "version_in_use" | "segment_rule" | "insertion_invalid" | "insertion_key_taken" | "not_a_process_route" | "identity_key_taken" | "identity_empty" | "email_taken" | "alias_cycle" | "merge_breaks_journey" | "identity_in_use" | "proposal_not_open" | "unresolved_review_item";
+        ViolationCode: "duplicate_sibling_id" | "duplicate_key" | "retired_key_reused" | "unresolved_reference" | "wrong_reference_kind" | "containment_cycle" | "leaf_with_children" | "dependency_cycle" | "edge_to_ancestor_or_descendant" | "requires_duplicates_condition" | "contradictory_chain" | "condition_answer_type_mismatch" | "condition_on_own_subtree" | "stage_bound_not_milestone" | "undeclared_kind" | "single_kind_on_multi_role" | "fills_role_cardinality" | "several_filling_decisions" | "feeds_milestone_not_milestone" | "several_feeding_decisions" | "several_final_milestones" | "field_not_on_kind" | "state_not_on_kind" | "limit_exceeded" | "dangling_reference" | "removal_widened" | "still_referenced" | "answer_type_mismatch" | "identity_unresolved" | "illegal_transition" | "reason_required" | "guard_failed" | "not_relevant" | "snooze_on_self" | "snooze_cycle" | "snooze_not_actionable" | "snoozed_through_container" | "filled_through_decision" | "pinned_through_decision" | "mutation_not_for_target" | "lineage_invalid" | "archived_journey" | "target_exists" | "target_missing" | "deleted_id" | "draft_exists" | "no_draft" | "route_in_use" | "segment_rule" | "insertion_invalid" | "insertion_key_taken" | "not_a_process_route" | "identity_key_taken" | "identity_empty" | "email_taken" | "alias_cycle" | "merge_breaks_journey" | "identity_in_use" | "proposal_not_open" | "unresolved_review_item";
         /** @description A violation list with at least one entry (a rejection always says why). */
         Violations: components["schemas"]["Violation"][];
         /** @description What a stream watches: `deployment`, `journey:<id>`, `route:<id>`, `proposal:<id>`, `journeys`, `routes`, or `proposals`. */

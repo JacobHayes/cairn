@@ -113,10 +113,10 @@ fn a_routes_after_is_the_route_even_with_no_draft() {
 }
 
 /// A journey's after carries the deployment the candidate leaves: a proposal that creates an
-/// identity and assigns a node to it derives against the identity, and one that deletes the
-/// journey leaves nothing to draw.
+/// identity and assigns a node to it derives against the identity. A proposal cannot delete its
+/// journey: deletion is the deployment's (A19).
 #[test]
-fn a_journeys_after_carries_its_deployment_and_can_be_gone() {
+fn a_journeys_after_carries_its_deployment_and_is_never_deleted() {
     let records = support::vendor_after(1);
     let journey = Domain::Journey("j_vendor_eval".parse().unwrap());
     let revision = records.revision(&journey).get();
@@ -140,11 +140,23 @@ fn a_journeys_after_carries_its_deployment_and_can_be_gone() {
     );
 
     let delete = support::draft(&format!(
-        "title: Delete\ndestination_revision: {revision}\nmutations:\n- op: delete_journey\n"
+        "title: Delete\ndestination_revision: {revision}\nmutations:\n- op: delete_journey\n  journey: j_vendor_eval\n  revision: {revision}\n"
     ));
     let made = candidate(&records, &journey, &delete, &support::fixed_inputs());
+    let codes: Vec<_> = made
+        .after
+        .unwrap_err()
+        .into_iter()
+        .map(|found| found.code)
+        .collect();
+    assert_eq!(codes, [cairn_schema::ViolationCode::MutationNotForTarget]);
+
+    // A proposal to create a journey that drafts nothing yet previews with nothing to draw.
+    let unborn = Domain::Journey("j_unborn".parse().unwrap());
+    let empty = support::draft("title: Start\ndestination_revision: 0\nmutations: []\n");
+    let made = candidate(&records, &unborn, &empty, &support::fixed_inputs());
     assert_eq!(
-        destination_after(&made.after.expect("valid"), &journey, &derive),
-        DestinationAfter::Gone
+        destination_after(&made.after.expect("valid"), &unborn, &derive),
+        DestinationAfter::Absent
     );
 }

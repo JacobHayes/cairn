@@ -54,6 +54,7 @@ const CASES: Record<EventType, Case> = {
   saved_as_route: { event: event("saved_as_route", { route: "r_launch" }) },
   draft_discarded: { event: event("draft_discarded", { route: "r_launch" }) },
   route_published: { event: event("route_published", { route: "r_launch" }) },
+  route_deleted: { event: event("route_deleted", { route: "r_launch" }) },
   node_added: { event: event("node_added", plan, [put({ node: { key: "n_plan", id: "plan", kind: "deliverable", title: "Plan the launch" } })]), facts: { title: "Plan the launch" } },
   node_changed: {
     event: event("node_changed", plan, [field("n_plan", { title: "Plan the event" })]),

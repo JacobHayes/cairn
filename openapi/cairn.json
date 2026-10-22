@@ -2617,6 +2617,37 @@
         ],
         "type": "object"
       },
+      "DeletedId": {
+        "description": "A journey or route a hard delete removed: its id is never reused, so a late create cannot\nbring it back.",
+        "oneOf": [
+          {
+            "additionalProperties": false,
+            "description": "A journey.",
+            "properties": {
+              "journey": {
+                "$ref": "#/components/schemas/JourneyId"
+              }
+            },
+            "required": [
+              "journey"
+            ],
+            "type": "object"
+          },
+          {
+            "additionalProperties": false,
+            "description": "A route or segment, with its draft and every version.",
+            "properties": {
+              "route": {
+                "$ref": "#/components/schemas/RouteId"
+              }
+            },
+            "required": [
+              "route"
+            ],
+            "type": "object"
+          }
+        ]
+      },
       "DependencyVia": {
         "description": "How a dependency arose.",
         "oneOf": [
@@ -2893,10 +2924,10 @@
             "type": "object"
           },
           {
-            "description": "The destination would no longer exist: a valid candidate with nothing to draw.",
+            "description": "The destination does not exist after the candidate: a proposal to create it that\ndrafts nothing creating it yet, with nothing to draw.",
             "properties": {
               "destination": {
-                "const": "gone",
+                "const": "absent",
                 "type": "string"
               }
             },
@@ -3439,6 +3470,7 @@
           "saved_as_route",
           "draft_discarded",
           "route_published",
+          "route_deleted",
           "node_added",
           "node_changed",
           "weight_changed",
@@ -6130,20 +6162,6 @@
           },
           {
             "additionalProperties": false,
-            "description": "Hard-delete the journey and its events.",
-            "properties": {
-              "op": {
-                "const": "delete_journey",
-                "type": "string"
-              }
-            },
-            "required": [
-              "op"
-            ],
-            "type": "object"
-          },
-          {
-            "additionalProperties": false,
             "description": "Create the target route, with no versions and no draft.",
             "properties": {
               "description": {
@@ -7310,6 +7328,54 @@
             "required": [
               "op",
               "identity"
+            ],
+            "type": "object"
+          },
+          {
+            "additionalProperties": false,
+            "description": "Delete a journey and its events for good (deployment): the deployment log keeps who\ndeleted it and when, and its id is never used again. Rejected when the journey is not\nat `revision`; the commit rechecks it.",
+            "properties": {
+              "journey": {
+                "$ref": "#/components/schemas/JourneyId",
+                "description": "The journey."
+              },
+              "op": {
+                "const": "delete_journey",
+                "type": "string"
+              },
+              "revision": {
+                "$ref": "#/components/schemas/Revision",
+                "description": "The journey's revision, as read."
+              }
+            },
+            "required": [
+              "op",
+              "journey",
+              "revision"
+            ],
+            "type": "object"
+          },
+          {
+            "additionalProperties": false,
+            "description": "Delete a route or segment with its draft, every version, and its events, for good\n(deployment): only while no journey's lineage and no insertion names any of its\nversions. Its id is never used again. Rejected when the route is not at `revision`; the\ncommit rechecks the revision and that nothing has started using it.",
+            "properties": {
+              "op": {
+                "const": "delete_route",
+                "type": "string"
+              },
+              "revision": {
+                "$ref": "#/components/schemas/Revision",
+                "description": "The route's revision, as read."
+              },
+              "route": {
+                "$ref": "#/components/schemas/RouteId",
+                "description": "The route."
+              }
+            },
+            "required": [
+              "op",
+              "route",
+              "revision"
             ],
             "type": "object"
           },
@@ -9530,19 +9596,6 @@
             "type": "object"
           },
           {
-            "description": "Deletes the journey.",
-            "properties": {
-              "fact": {
-                "const": "deletes_journey",
-                "type": "string"
-              }
-            },
-            "required": [
-              "fact"
-            ],
-            "type": "object"
-          },
-          {
             "description": "Creates the route.",
             "properties": {
               "fact": {
@@ -11240,6 +11293,12 @@
             "minimum": 0,
             "type": "integer"
           },
+          "journeys_deleted": {
+            "description": "Journeys it deletes.",
+            "format": "uint32",
+            "minimum": 0,
+            "type": "integer"
+          },
           "nodes_added": {
             "description": "Nodes it adds.",
             "format": "uint32",
@@ -11272,6 +11331,12 @@
           },
           "requirements_removed": {
             "description": "Requirements it removes.",
+            "format": "uint32",
+            "minimum": 0,
+            "type": "integer"
+          },
+          "routes_deleted": {
+            "description": "Routes and segments it deletes.",
             "format": "uint32",
             "minimum": 0,
             "type": "integer"
@@ -11728,9 +11793,9 @@
           },
           {
             "additionalProperties": false,
-            "description": "A hard-deleted journey's id, never reused.",
+            "description": "A hard-deleted journey's or route's id, never reused.",
             "properties": {
-              "deleted_journey": {
+              "deleted": {
                 "additionalProperties": false,
                 "properties": {
                   "deleted_at": {
@@ -11738,20 +11803,20 @@
                     "format": "date-time",
                     "type": "string"
                   },
-                  "journey": {
-                    "$ref": "#/components/schemas/JourneyId",
-                    "description": "The journey."
+                  "id": {
+                    "$ref": "#/components/schemas/DeletedId",
+                    "description": "The journey or route."
                   }
                 },
                 "required": [
-                  "journey",
+                  "id",
                   "deleted_at"
                 ],
                 "type": "object"
               }
             },
             "required": [
-              "deleted_journey"
+              "deleted"
             ],
             "type": "object"
           },
@@ -11937,14 +12002,14 @@
           },
           {
             "additionalProperties": false,
-            "description": "A deleted journey's id.",
+            "description": "A deleted journey's or route's id.",
             "properties": {
-              "deleted_journey": {
-                "$ref": "#/components/schemas/JourneyId"
+              "deleted": {
+                "$ref": "#/components/schemas/DeletedId"
               }
             },
             "required": [
-              "deleted_journey"
+              "deleted"
             ],
             "type": "object"
           },
@@ -13134,6 +13199,10 @@
             "$ref": "#/components/schemas/RouteHeader",
             "description": "The route's fields."
           },
+          "in_use": {
+            "description": "Whether anything uses it: a journey following one of its versions, or an insertion of\none anywhere. A route in use cannot be deleted.",
+            "type": "boolean"
+          },
           "revision": {
             "$ref": "#/components/schemas/Revision",
             "description": "Its revision."
@@ -13149,7 +13218,8 @@
         "required": [
           "header",
           "revision",
-          "versions"
+          "versions",
+          "in_use"
         ],
         "type": "object"
       },
@@ -15087,10 +15157,10 @@
           "archived_journey",
           "target_exists",
           "target_missing",
-          "deleted_journey_id",
+          "deleted_id",
           "draft_exists",
           "no_draft",
-          "version_in_use",
+          "route_in_use",
           "segment_rule",
           "insertion_invalid",
           "insertion_key_taken",

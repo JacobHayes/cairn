@@ -3,7 +3,9 @@
 // (JourneyTable.tsx). It keeps every journey the filters keep (status, lineage route and version,
 // "mine", "upgrade available"), by name, kept current (H6). "Mine" keeps the journeys where the
 // caller holds something. A read that is still going, one that failed, and an empty answer each
-// say so, with the way on.
+// say so, with the way on. Rows can be picked; the inspector lists the picked journeys and deletes
+// them together once every one is archived (SelectedJourneys.tsx, A19).
+import { useState } from "react";
 import { Link, useLocation, useNavigate } from "react-router";
 
 import { valueOf } from "../data/keyed-read.ts";
@@ -14,7 +16,9 @@ import { IndexHead } from "../ui/IndexHead.tsx";
 import { IndexState } from "../ui/kit.tsx";
 import { DEFAULT_FILTERS, filtersFrom, indexPath, newJourneyPath, queryOf, type IndexFilters } from "./address.ts";
 import { IndexFilterBar } from "./IndexFilterBar.tsx";
-import { JourneyTable } from "./JourneyTable.tsx";
+import { JourneyTable, tableOrder } from "./JourneyTable.tsx";
+import { pickRange } from "./picks.ts";
+import { SelectedJourneys } from "./SelectedJourneys.tsx";
 import "./journeys.css";
 import { Failed } from "../ui/Failed.tsx";
 
@@ -67,6 +71,22 @@ export function JourneyIndex() {
   const known = valueOf(routes) ?? [];
   const found = valueOf(view);
   const unknownViewer = filters.mine && caller === undefined && failed !== undefined;
+  const [picked, setPicked] = useState<readonly string[]>([]);
+  // Only the journeys the index still lists are selected: one deleted, or filtered away, drops out.
+  const members = tableOrder((found ?? []).filter((summary) => picked.includes(summary.id)));
+  const [anchor, setAnchor] = useState<string | undefined>(undefined);
+  const toggle = (journey: string) => {
+    setPicked((now) => (now.includes(journey) ? now.filter((each) => each !== journey) : [...now, journey]));
+    setAnchor(journey);
+  };
+  const extend = (journey: string) => {
+    const order = tableOrder(found ?? []).map((summary) => summary.id);
+    setPicked((now) => pickRange(order, now, anchor, journey));
+  };
+  const clear = () => {
+    setPicked([]);
+    setAnchor(undefined);
+  };
   return (
     <section className="stack index-page" aria-label="Journeys" data-rows-page tabIndex={-1}>
       <IndexHead
@@ -93,7 +113,8 @@ export function JourneyIndex() {
           </Failed>
         </IndexState>
       ) : null}
-      {found !== undefined && !waiting ? <JourneyTable items={found} routes={known} mine={filters.mine} none={<Nothing filters={filters} />} /> : null}
+      {found !== undefined && !waiting ? <JourneyTable items={found} routes={known} mine={filters.mine} none={<Nothing filters={filters} />} picks={{ picked: members.map((member) => member.id), toggle, extend }} /> : null}
+      <SelectedJourneys members={members} toggle={toggle} clear={clear} />
     </section>
   );
 }

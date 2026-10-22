@@ -44,6 +44,47 @@ impl fmt::Display for Domain {
     }
 }
 
+// PRD: A19.
+/// A journey or route a hard delete removed: its id is never reused, so a late create cannot
+/// bring it back.
+#[derive(
+    Clone, Debug, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize, JsonSchema,
+)]
+#[serde(rename_all = "snake_case", deny_unknown_fields)]
+pub enum DeletedId {
+    /// A journey.
+    Journey(JourneyId),
+    /// A route or segment, with its draft and every version.
+    Route(RouteId),
+}
+
+impl DeletedId {
+    /// The domain the id named.
+    #[must_use]
+    pub fn domain(&self) -> Domain {
+        match self {
+            DeletedId::Journey(id) => Domain::Journey(id.clone()),
+            DeletedId::Route(id) => Domain::Route(id.clone()),
+        }
+    }
+
+    /// The id a domain leaves when it is deleted; none for the deployment, which never is.
+    #[must_use]
+    pub fn of(domain: &Domain) -> Option<DeletedId> {
+        match domain {
+            Domain::Journey(id) => Some(DeletedId::Journey(id.clone())),
+            Domain::Route(id) => Some(DeletedId::Route(id.clone())),
+            Domain::Deployment => None,
+        }
+    }
+}
+
+impl fmt::Display for DeletedId {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        self.domain().fmt(formatter)
+    }
+}
+
 // ARCHITECTURE: Schema outline: `graphs`.
 /// Which graph a stored record belongs to.
 #[derive(

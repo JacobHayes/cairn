@@ -4,16 +4,18 @@
 //! A put stores a record's after-state at its address. A removal removes every record its
 //! address covers: a whole node takes everything on it (its fields, edges at either end,
 //! participations, resources, state, tombstone, and the notes on it), a draft takes its
-//! graph, a journey's domain takes its fields, graph, and proposals. A copy puts every
-//! record of one graph into another. Published versions are written once, by the copy that
-//! publishes them, and routes and the deployment are never removed (A11, A19).
+//! graph, a journey's or route's domain takes its fields, graphs (a route's draft and every
+//! version), and proposals (A19). A copy puts every record of one graph into another. Published
+//! versions are written once, by the copy that publishes them, and the deployment is never
+//! removed (A11).
 
 use std::collections::{BTreeMap, BTreeSet};
 
 use cairn_schema::{
-    BoundedSet, Deployment, Domain, Graph, GraphId, GraphKey, GraphRecord, Journey, JourneyHeader,
-    JourneyId, Node, Proposal, ProposalId, Record, RecordKey, RetiredKey, Revision, Route,
-    RouteDraft, RouteHeader, RouteId, RouteVersion, Timestamp, VersionNumber, Write, refs::KeyRefs,
+    BoundedSet, DeletedId, Deployment, Domain, Graph, GraphId, GraphKey, GraphRecord, Journey,
+    JourneyHeader, JourneyId, Node, Proposal, ProposalId, Record, RecordKey, RetiredKey, Revision,
+    Route, RouteDraft, RouteHeader, RouteId, RouteVersion, Timestamp, VersionNumber, Write,
+    refs::KeyRefs,
 };
 
 use crate::commit::StoreError;
@@ -29,7 +31,8 @@ pub(crate) struct Domains {
     /// Published versions and when.
     pub versions: BTreeMap<(RouteId, VersionNumber), Timestamp>,
     pub graphs: BTreeMap<GraphId, Graph>,
-    pub deleted_journeys: BTreeMap<JourneyId, Timestamp>,
+    /// The ids of hard-deleted journeys and routes (A19).
+    pub deleted: BTreeMap<DeletedId, Timestamp>,
     pub proposals: BTreeMap<ProposalId, Proposal>,
 }
 
@@ -139,17 +142,40 @@ impl Domains {
         nodes
     }
 
-    /// A19: the proposals a commit's hard delete takes with its journey.
+    /// A19: the proposals a commit's hard deletes take with their journeys and routes.
     pub fn proposals_of_deleted(&self, shape: &crate::backend::Shape) -> Vec<ProposalId> {
-        let Some(journey) = &shape.deletes_journey else {
-            return Vec::new();
-        };
-        let destination = Domain::Journey(journey.clone());
+        let destinations: BTreeSet<Domain> = shape.deletes.iter().map(DeletedId::domain).collect();
         self.proposals
             .values()
-            .filter(|proposal| proposal.destination == destination)
+            .filter(|proposal| destinations.contains(&proposal.destination))
             .map(|proposal| proposal.id.clone())
             .collect()
+    }
+
+    /// A19: the graphs using `route`: a journey whose lineage is on it, or any graph holding an
+    /// insertion of one of its versions.
+    pub fn graphs_using(&self, route: &RouteId) -> BTreeSet<GraphId> {
+        let following = self
+            .journeys
+            .iter()
+            .filter(|(_, (header, _))| {
+                header
+                    .lineage
+                    .as_ref()
+                    .is_some_and(|lineage| lineage.route == *route)
+            })
+            .map(|(id, _)| GraphId::Journey(id.clone()));
+        let inserting = self
+            .graphs
+            .iter()
+            .filter(|(_, graph)| {
+                graph
+                    .insertions
+                    .values()
+                    .any(|insertion| insertion.segment.route == *route)
+            })
+            .map(|(id, _)| id.clone());
+        following.chain(inserting).collect()
     }
 
     /// Applies one write.
@@ -199,11 +225,8 @@ impl Domains {
                     return malformed(format!("{route} version {version} is already published"));
                 }
             }
-            Record::DeletedJourney {
-                journey,
-                deleted_at,
-            } => {
-                self.deleted_journeys.insert(journey.clone(), *deleted_at);
+            Record::Deleted { id, deleted_at } => {
+                self.deleted.insert(id.clone(), *deleted_at);
             }
             Record::Identity(identity) => {
                 self.deployment
@@ -225,12 +248,19 @@ impl Domains {
 
     fn remove(&mut self, key: &RecordKey) -> Result<(), StoreError> {
         match key {
-            RecordKey::Domain(Domain::Journey(journey)) => {
+            RecordKey::Domain(domain @ Domain::Journey(journey)) => {
                 self.journeys.remove(journey);
                 self.graphs.remove(&GraphId::Journey(journey.clone()));
-                let domain = Domain::Journey(journey.clone());
                 self.proposals
-                    .retain(|_, proposal| proposal.destination != domain);
+                    .retain(|_, proposal| proposal.destination != *domain);
+            }
+            RecordKey::Domain(domain @ Domain::Route(route)) => {
+                self.routes.remove(route);
+                self.drafts.remove(route);
+                self.versions.retain(|(owner, _), _| owner != route);
+                self.graphs.retain(|graph, _| graph.domain() != *domain);
+                self.proposals
+                    .retain(|_, proposal| proposal.destination != *domain);
             }
             RecordKey::Graph(graph @ (GraphId::Journey(_) | GraphId::RouteDraft(_))) => {
                 self.graphs.remove(graph);
@@ -256,12 +286,12 @@ impl Domains {
             RecordKey::Proposal { id, .. } => {
                 self.proposals.remove(id);
             }
-            RecordKey::Domain(_)
+            RecordKey::Domain(Domain::Deployment)
             | RecordKey::Graph(GraphId::RouteVersion { .. })
             | RecordKey::JourneyHeader(_)
             | RecordKey::RouteHeader(_)
             | RecordKey::RouteVersion { .. }
-            | RecordKey::DeletedJourney(_) => {
+            | RecordKey::Deleted(_) => {
                 return malformed(format!("{key:?} is never removed"));
             }
         }

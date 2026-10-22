@@ -189,7 +189,7 @@ export function JourneyLayerHost({ id, proposal: pid, children }: JourneyHostPro
     if (review !== undefined && createsIt(review) && review.proposal.status === "open") {
       return <JourneyReviewing id={id} review={review} refetch={read.refresh} before={undefined}>{children}</JourneyReviewing>;
     }
-    // A proposal that is over keeps its receipt where the journey is gone (applied: it deleted it; discarded: it never created it).
+    // A proposal that is over keeps its receipt where the journey is missing (discarded: it never created it).
     if (review !== undefined && review.proposal.status !== "open") {
       return <LayerContext value={plain(base, review, { before: undefined, beforeShown: undefined, deployment: undefined })}>{children(undefined)}</LayerContext>;
     }

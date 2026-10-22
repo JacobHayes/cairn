@@ -149,6 +149,9 @@ pub struct RouteDetail {
     pub revision: Revision,
     /// Its versions, oldest first.
     pub versions: Vec<VersionJourneys>,
+    /// A19: whether anything uses it: a journey following one of its versions, or an insertion
+    /// of one in any journey, draft or published version. A route in use cannot be deleted.
+    pub in_use: bool,
 }
 
 /// One published version and the journeys on it.

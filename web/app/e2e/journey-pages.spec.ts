@@ -587,12 +587,16 @@ test("B11, A19, C16: the status moves from the menu's Status, and the header say
   await expect(chip).toHaveAttribute("data-status", "completed");
   await setStatus(page, "active");
   await expect(chip).toHaveCount(0);
-  // Deletion is asked for once archived.
+  // Deletion is asked for once archived, and once it lands the index is shown without it.
   await setStatus(page, "archived");
   await menu.click();
   await status.click();
   await page.getByTestId("status-delete").click();
-  await expect(page.getByTestId("delete-journey")).toBeVisible();
+  const confirm = page.getByTestId("delete-confirm");
+  await expect(confirm).toHaveAttribute("data-count", "1");
+  await confirm.getByTestId("delete-confirmed").click();
+  await expect(page).toHaveURL(/\/journeys\?status=any$/);
+  await expect(page.locator('[data-testid="journey-row"][data-journey="j_vendor_eval"]')).toHaveCount(0);
 });
 
 test("B11: an archived journey takes no write: the open node keeps only where to find it, and the list offers nothing to act on", async ({ page }) => {

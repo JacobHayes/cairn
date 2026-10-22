@@ -215,8 +215,8 @@ fn a_proposal_cannot_hold_proposal_mutations() {
 }
 
 /// A17: a mutation without arguments takes none: an extra field is an error in YAML and
-/// JSON, never dropped, so `{op: delete_journey, journey: j_other}` cannot read as a delete
-/// of the target. The bare form still parses. The argument-free mutations are found from
+/// JSON, never dropped, so `{op: discard_draft, route: r_other}` cannot read as a discard
+/// of the target's draft. The bare form still parses. The argument-free mutations are found from
 /// the every-mutation sample, so the test follows the type.
 #[test]
 fn an_argument_free_mutation_rejects_unknown_fields() {
@@ -234,13 +234,13 @@ fn an_argument_free_mutation_rejects_unknown_fields() {
         })
         .cloned()
         .collect();
-    assert!(bare.contains(&Mutation::DeleteJourney {}));
+    assert!(bare.contains(&Mutation::DiscardDraft {}));
     for mutation in &bare {
         let op = op_name(mutation);
         let plain = format!("{{\"op\": \"{op}\"}}");
         assert_eq!(&from_json::<Mutation>(&plain).unwrap(), mutation);
         assert_eq!(&from_yaml::<Mutation>(&plain).unwrap(), mutation);
-        let extra = format!("{{\"op\": \"{op}\", \"journey\": \"j_other\"}}");
+        let extra = format!("{{\"op\": \"{op}\", \"route\": \"r_other\"}}");
         assert!(from_json::<Mutation>(&extra).is_err(), "{extra}");
         assert!(from_yaml::<Mutation>(&extra).is_err(), "{extra}");
     }

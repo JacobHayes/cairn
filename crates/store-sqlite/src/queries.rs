@@ -105,7 +105,32 @@ pub(crate) fn route_detail(
         header,
         revision,
         versions,
+        in_use: !using(connection, route)?.is_empty(),
     }))
+}
+
+/// A19: the graphs using `route`: journeys whose lineage is on it, and graphs holding an
+/// insertion of one of its versions.
+pub(crate) fn using(
+    connection: &Connection,
+    route: &RouteId,
+) -> Result<BTreeSet<GraphId>, StoreError> {
+    let mut found = BTreeSet::new();
+    for row in rows(
+        connection,
+        "SELECT id FROM journeys WHERE lineage_route = ?1",
+        vec![text(route)],
+    )? {
+        found.insert(GraphId::Journey(row.parse(0)?));
+    }
+    for row in rows(
+        connection,
+        "SELECT DISTINCT graph_id FROM insertions WHERE segment = ?1",
+        vec![text(route)],
+    )? {
+        found.insert(graph_from(&row.text(0)?)?);
+    }
+    Ok(found)
 }
 
 /// The key of each published version's root of `route`.

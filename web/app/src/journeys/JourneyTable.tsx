@@ -3,9 +3,11 @@
 // The index holds only summaries, so each row reads its journey in the tab (reading.ts) and says
 // "Reading..." or why it could not until it has. With `mine` only the journeys where the viewer
 // holds something are kept (E4). "Upgrade available" is the host's field on each journey, never
-// worked out here. Kept current (H6).
+// worked out here. Kept current (H6). The rows can be picked (C16, A19): the row checkboxes, and
+// Shift-, Cmd- or Ctrl-click anywhere on a row, add and remove a journey from the index's
+// selection (JourneyIndex.tsx), which the inspector lists and deletes.
 import { Failed } from "../ui/Failed.tsx";
-import { useMemo, useState, type ReactNode } from "react";
+import { useMemo, useState, type MouseEvent, type ReactNode } from "react";
 import { Link } from "react-router";
 
 import { useRetryJourney } from "../data/react.ts";
@@ -152,15 +154,56 @@ function ReadingCell({ reading, id }: { reading: Exclude<JourneyReading, { statu
   );
 }
 
-/** A row's attributes, kept whether or not its journey is being read. */
-function attrsOf(summary: JourneySummary) {
-  return { "data-testid": "journey-row", "data-journey": summary.id, "data-status": summary.status, "data-revision": summary.revision } as const;
+/** The index's selection: the journeys picked, and picking or dropping one. */
+/** The journeys in the order the table lists them: by name. */
+export function tableOrder(items: readonly JourneySummary[]): JourneySummary[] {
+  return [...items].sort((left, right) => left.name.localeCompare(right.name));
 }
 
-type RowProps = { summary: JourneySummary; routes: readonly RouteSummary[]; mine: boolean; report: (id: string, count: number | undefined) => void; rowRef: (row: HTMLTableRowElement | null) => void };
+export interface Picks {
+  picked: readonly string[];
+  /** Adds or drops one row (its checkbox, a Cmd- or Ctrl-click), which becomes the anchor. */
+  toggle: (journey: string) => void;
+  /** Adds every row from the anchor to this one (a Shift-click). */
+  extend: (journey: string) => void;
+}
+
+/** A row's attributes, kept whether or not its journey is being read: what it is, whether it is picked, and a modified click picking it. */
+function attrsOf(summary: JourneySummary, picks: Picks) {
+  return {
+    "data-testid": "journey-row",
+    "data-journey": summary.id,
+    "data-status": summary.status,
+    "data-revision": summary.revision,
+    "data-selected": picks.picked.includes(summary.id),
+    onClickCapture: (event: MouseEvent) => {
+      if (event.shiftKey || event.metaKey || event.ctrlKey) {
+        // A modified click picks the row, wherever it lands: a link in it is not followed.
+        event.preventDefault();
+        event.stopPropagation();
+        if (event.shiftKey) {
+          picks.extend(summary.id);
+        } else {
+          picks.toggle(summary.id);
+        }
+      }
+    },
+  } as const;
+}
+
+/** The row's checkbox, which waits for hover, a picked row or a selection under way. */
+function PickCell({ summary, picks }: { summary: JourneySummary; picks: Picks }) {
+  return (
+    <td className="pick">
+      <input type="checkbox" className="pick-box" aria-label={`Select ${summary.name}`} checked={picks.picked.includes(summary.id)} onChange={() => { picks.toggle(summary.id); }} />
+    </td>
+  );
+}
+
+type RowProps = { summary: JourneySummary; routes: readonly RouteSummary[]; mine: boolean; picks: Picks; report: (id: string, count: number | undefined) => void; rowRef: (row: HTMLTableRowElement | null) => void };
 
 /** A journey's row with its journey read: the derived columns, or why there are none. */
-function ReadRow({ summary, routes, mine, report, rowRef }: RowProps) {
+function ReadRow({ summary, routes, mine, picks, report, rowRef }: RowProps) {
   const reading = useJourneyReading(summary.id, true);
   useReportMine(summary.id, reading.status === "ready" ? reading.mine.length : reading.status === "gone" ? 0 : undefined, report);
   if (reading.status === "gone" || (mine && reading.status === "ready" && reading.mine.length === 0)) {
@@ -168,7 +211,8 @@ function ReadRow({ summary, routes, mine, report, rowRef }: RowProps) {
   }
   if (reading.status !== "ready") {
     return (
-      <tr ref={rowRef} {...attrsOf(summary)}>
+      <tr ref={rowRef} {...attrsOf(summary, picks)}>
+        <PickCell summary={summary} picks={picks} />
         <JourneyCell summary={summary} routes={routes} />
         <ReadingCell reading={reading} id={summary.id} />
       </tr>
@@ -178,7 +222,8 @@ function ReadRow({ summary, routes, mine, report, rowRef }: RowProps) {
   const troubles = model === undefined ? [] : troubleOf(model, reading.view.derived.stalled != null);
   const forYou = forYouOf(reading.view, summary.status, reading.mine, reading.ready.length);
   return (
-    <tr ref={rowRef} {...attrsOf(summary)}>
+    <tr ref={rowRef} {...attrsOf(summary, picks)}>
+      <PickCell summary={summary} picks={picks} />
       <JourneyCell summary={summary} routes={routes} />
       <TroubleCell journey={summary.id} troubles={troubles} />
       <ForYouCell journey={summary.id} forYou={forYou} />
@@ -200,7 +245,8 @@ function JourneyRow(props: Omit<RowProps, "rowRef">) {
     return <ReadRow {...props} rowRef={setRow} />;
   }
   return (
-    <tr ref={setRow} {...attrsOf(props.summary)}>
+    <tr ref={setRow} {...attrsOf(props.summary, props.picks)}>
+      <PickCell summary={props.summary} picks={props.picks} />
       <JourneyCell summary={props.summary} routes={props.routes} />
       <td colSpan={4} className="cell-reading muted" data-column="reading" data-testid="row-reading">
         Reading...
@@ -214,19 +260,22 @@ function JourneyRow(props: Omit<RowProps, "rowRef">) {
  * holds something (E4). `none` is said in its place when no journey is kept; with `mine` every
  * candidate stays mounted (kept current) though its row may be empty.
  */
-export function JourneyTable({ items, routes, mine, none }: { items: JourneySummary[]; routes: RouteSummary[]; mine: boolean; none: ReactNode }) {
+export function JourneyTable({ items, routes, mine, none, picks }: { items: JourneySummary[]; routes: RouteSummary[]; mine: boolean; none: ReactNode; picks: Picks }) {
   const { report, none: nobody } = useMineCounts(mine ? items : []);
-  const sorted = useMemo(() => [...items].sort((left, right) => left.name.localeCompare(right.name)), [items]);
+  const sorted = useMemo(() => tableOrder(items), [items]);
   if (items.length === 0) {
     return none;
   }
   return (
     <>
       {mine && nobody ? none : null}
-      <div className="index-table" data-testid="journey-table" hidden={mine && nobody}>
+      <div className="index-table picks" data-testid="journey-table" data-selecting={picks.picked.length > 0} hidden={mine && nobody}>
         <table className="data">
           <thead>
             <tr>
+              <th scope="col" className="pick">
+                <span className="visually-hidden">Select</span>
+              </th>
               <th scope="col">Journey</th>
               <th scope="col">Needs a look</th>
               <th scope="col">For you</th>
@@ -238,7 +287,7 @@ export function JourneyTable({ items, routes, mine, none }: { items: JourneySumm
           </thead>
           <tbody>
             {sorted.map((summary) => (
-              <JourneyRow key={summary.id} summary={summary} routes={routes} mine={mine} report={report} />
+              <JourneyRow key={summary.id} summary={summary} routes={routes} mine={mine} picks={picks} report={report} />
             ))}
           </tbody>
         </table>

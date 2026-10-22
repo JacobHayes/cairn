@@ -16,7 +16,8 @@
 use rusqlite::Connection;
 use serde_json::Value;
 
-use crate::sql::{SqlError, execute, rows, text};
+use crate::sql::SqlError;
+use crate::stored_json::column;
 
 /// Renames the key `from` of `object` to `to`, keeping its value.
 fn rename_key(object: &mut serde_json::Map<String, Value>, from: &str, to: &str) -> bool {
@@ -84,49 +85,21 @@ fn rewrite(value: &mut Value) -> bool {
     }
 }
 
-/// Rewrites the JSON `columns` of every row of `table`, found by `key`.
-fn column(
-    connection: &Connection,
-    table: &str,
-    key: &str,
-    columns: &[&str],
-) -> Result<(), SqlError> {
-    for name in columns {
-        let select = format!("SELECT {key}, {name} FROM {table}");
-        let update = format!("UPDATE {table} SET {name} = ?1 WHERE {key} = ?2");
-        for row in rows(connection, &select, Vec::new())? {
-            let stored = row.text(1).map_err(failed)?;
-            let mut value: Value = serde_json::from_str(&stored)
-                .map_err(|error| SqlError::Other(format!("stored JSON: {error}")))?;
-            if rewrite(&mut value) {
-                let at = if table == "events" {
-                    crate::sql::int(row.int(0).map_err(failed)?)
-                } else {
-                    text(&row.text(0).map_err(failed)?)
-                };
-                execute(connection, &update, vec![text(&value.to_string()), at])?;
-            }
-        }
-    }
-    Ok(())
-}
-
-#[allow(
-    clippy::needless_pass_by_value,
-    reason = "passed to `map_err`, which hands over the error"
-)]
-fn failed(error: cairn_store::StoreError) -> SqlError {
-    SqlError::Other(format!("{error:?}"))
-}
-
 /// Runs the step over every stored JSON value that can hold an old name.
 pub(crate) fn run(connection: &Connection) -> Result<(), SqlError> {
-    column(connection, "proposals", "id", &["mutations", "items"])?;
-    column(connection, "events", "seq", &["subject", "delta"])?;
+    column(
+        connection,
+        "proposals",
+        "id",
+        &["mutations", "items"],
+        rewrite,
+    )?;
+    column(connection, "events", "seq", &["subject", "delta"], rewrite)?;
     column(
         connection,
         "patch_receipts",
         "patch_id",
         &["proposals", "deployment_touched"],
+        rewrite,
     )
 }

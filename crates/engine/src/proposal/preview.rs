@@ -101,8 +101,8 @@ pub fn candidate(
 
 /// C14: the destination once the candidate `after` applies: a journey's document with the
 /// derive inputs its views use (over the deployment after), a route with its draft and
-/// the latest version when the candidate holds it, the deployment, or none when the
-/// destination no longer exists.
+/// the latest version when the candidate holds it, or the deployment; absent while a
+/// proposal to create the journey or route drafts nothing that creates it yet.
 #[must_use]
 pub fn destination_after(
     after: &Records,
@@ -113,7 +113,7 @@ pub fn destination_after(
         Domain::Journey(id) => after
             .journeys
             .get(id)
-            .map_or(DestinationAfter::Gone, |journey| {
+            .map_or(DestinationAfter::Absent, |journey| {
                 let mut inputs = derive_inputs.clone();
                 inputs.deployment = after.deployment.clone();
                 DestinationAfter::Journey {
@@ -126,7 +126,7 @@ pub fn destination_after(
         Domain::Route(id) => after
             .routes
             .get(id)
-            .map_or(DestinationAfter::Gone, |route| {
+            .map_or(DestinationAfter::Absent, |route| {
                 let latest = route.versions.iter().max().and_then(|version| {
                     after
                         .versions

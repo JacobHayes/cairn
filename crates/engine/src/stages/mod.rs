@@ -4,6 +4,7 @@
 //! The last stage derives the final candidate once and checks what needs derived state: the
 //! relevance and `deps_done` guards and where a snooze may sit (D4, B6).
 
+mod deletions;
 mod deployment;
 mod derived;
 mod graphs;
@@ -36,14 +37,16 @@ pub(crate) struct Check<'a, 'patch> {
 pub(crate) type Stage = fn(&mut Check<'_, '_>);
 
 /// The stages, in order: every graph the patch wrote holds the structural and state
-/// invariants; a segment's graphs hold its kind's rules; identity references resolve; the deployment's aliases and emails hold; the
+/// invariants; a segment's graphs hold its kind's rules; identity references resolve; the deployment's aliases and emails hold; a route
+/// the patch deletes is used by nothing left; the
 /// guards of the transitions the patch made pass, or a bypass in the patch accepts them,
 /// first those that need no derived state, then those that do, with the snoozes it made.
-pub(crate) const STAGES: [Stage; 6] = [
+pub(crate) const STAGES: [Stage; 7] = [
     graphs::check,
     segments::check,
     identities::check,
     deployment::check,
+    deletions::check,
     guards::check,
     derived::check,
 ];

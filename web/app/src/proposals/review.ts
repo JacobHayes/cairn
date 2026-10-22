@@ -137,10 +137,8 @@ function versionsRead(ready: Ready, draft: ProposalDraft): Schema<"Lineage">[] {
 /** What a journey proposal's local preview holds: the engine's answer for the edited proposal, and the journey it would leave, derived and held under the proposal's slot. */
 export interface JourneyAfter {
   preview: ProposalPreview;
-  /** The journey as it would be, derived; none when the candidate breaks a rule, or the proposal leaves no journey. */
+  /** The journey as it would be, derived; none when the candidate breaks a rule. */
   after: Ready | undefined;
-  /** The destination is gone after it applies (a deletion). */
-  gone: boolean;
   /** Frees the worker's derivation. */
   free: () => void;
 }
@@ -199,9 +197,9 @@ const JOURNEY_AFTER: ReadSource<AfterArgs, JourneyAfter> = {
         const derived = await deriver.derived(slot);
         const { document } = destination;
         const after: Ready = { status: "ready", journey: document.journey, inputs: document.inputs, key: answer.loaded.key, derived };
-        return { preview: answer.preview, after, gone: false, free };
+        return { preview: answer.preview, after, free };
       }
-      return { preview: answer.preview, after: undefined, gone: destination?.destination === "gone", free };
+      return { preview: answer.preview, after: undefined, free };
     } catch (thrown) {
       free();
       throw thrown;

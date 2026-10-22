@@ -14,10 +14,10 @@ use std::collections::BTreeSet;
 use std::str::FromStr;
 
 use cairn_schema::{
-    Actor, Annotation, ChangeSet, Date, Deployment, Domain, Event, EventType, GraphId, GraphRecord,
-    Identity, JourneyHeader, JourneyId, JourneyStatus, Lineage, Node, NodeKey, PatchId,
-    PatchReceipt, PatchTarget, Record, RecordKey, Revision, RevisionOf, RouteHeader, RouteId,
-    RouteKind, Subject, Timestamp, Title, VersionNumber, Write, refs::KeyRefs,
+    Actor, Annotation, ChangeSet, Date, DeletedId, Deployment, Domain, Event, EventType, GraphId,
+    GraphRecord, Identity, JourneyHeader, JourneyId, JourneyStatus, Lineage, Node, NodeKey,
+    PatchId, PatchReceipt, PatchTarget, Record, RecordKey, Revision, RevisionOf, RouteHeader,
+    RouteId, RouteKind, Subject, Timestamp, Title, VersionNumber, Write, refs::KeyRefs,
 };
 use serde_json::json;
 
@@ -319,6 +319,15 @@ impl PatchBuilder {
         self
     }
 
+    /// Names the routes a patch deletes, which no graph outside its deletions may use (A19).
+    #[must_use]
+    pub fn unused(mut self, routes: &[&str]) -> Self {
+        self.preconditions.push(Precondition::Unused {
+            routes: routes.iter().map(|key| id(key)).collect(),
+        });
+        self
+    }
+
     /// The commit: every event made by the patch's actor at its minute.
     #[must_use]
     pub fn commit(mut self) -> Commit {
@@ -374,6 +383,43 @@ pub fn create_journey(patch: &str, journey: &str, nodes: Vec<Node<KeyRefs>>) -> 
         );
     }
     builder
+}
+
+/// A19: a deployment patch at `base` hard-deleting each of `deleted`, named at its revision:
+/// one event each, its revision a precondition, and the routes it deletes unused.
+#[must_use]
+pub fn hard_delete(patch: &str, base: u32, deleted: &[(DeletedId, u32)]) -> PatchBuilder {
+    let mut builder = deployment_patch(patch, base);
+    let mut routes = Vec::new();
+    for (gone, named) in deleted {
+        let (event_type, subject) = match gone {
+            DeletedId::Journey(journey) => {
+                (EventType::JourneyDeleted, Subject::Journey(journey.clone()))
+            }
+            DeletedId::Route(route) => {
+                routes.push(route.to_string());
+                (EventType::RouteDeleted, Subject::Route(route.clone()))
+            }
+        };
+        builder = builder
+            .event(
+                event_type,
+                subject,
+                vec![
+                    Write::Remove(RecordKey::Domain(gone.domain())),
+                    Write::Put(Record::Deleted {
+                        id: gone.clone(),
+                        deleted_at: at(30),
+                    }),
+                ],
+            )
+            .expects(RevisionOf::Domain(gone.domain()), *named);
+    }
+    if routes.is_empty() {
+        return builder;
+    }
+    let routes: Vec<&str> = routes.iter().map(String::as_str).collect();
+    builder.unused(&routes)
 }
 
 /// An identity create, riding in any patch (E6).

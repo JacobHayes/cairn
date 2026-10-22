@@ -8,7 +8,7 @@ use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
 use crate::attachment::{Annotation, Resource};
-use crate::domain::{Domain, GraphId, Identity, JourneyHeader, RouteHeader};
+use crate::domain::{DeletedId, Domain, GraphId, Identity, JourneyHeader, RouteHeader};
 use crate::field::{NodeField, NodeFieldValue};
 use crate::graph::{Edge, Insertion, ParticipationKind, Role};
 use crate::id::{
@@ -175,10 +175,10 @@ pub enum Record {
         published_at: Timestamp,
     },
     // PRD: A19.
-    /// A hard-deleted journey's id, never reused.
-    DeletedJourney {
-        /// The journey.
-        journey: JourneyId,
+    /// A hard-deleted journey's or route's id, never reused.
+    Deleted {
+        /// The journey or route.
+        id: DeletedId,
         /// When it was deleted.
         deleted_at: Timestamp,
     },
@@ -298,8 +298,8 @@ pub enum RecordKey {
         /// The version.
         version: VersionNumber,
     },
-    /// A deleted journey's id.
-    DeletedJourney(JourneyId),
+    /// A deleted journey's or route's id.
+    Deleted(DeletedId),
     /// An identity.
     Identity(IdentityKey),
     /// An identity alias.
@@ -438,7 +438,7 @@ impl Record {
                 route: route.clone(),
                 version: *version,
             },
-            Record::DeletedJourney { journey, .. } => RecordKey::DeletedJourney(journey.clone()),
+            Record::Deleted { id, .. } => RecordKey::Deleted(id.clone()),
             Record::Identity(identity) => RecordKey::Identity(identity.key.clone()),
             Record::IdentityAlias { alias, .. } => RecordKey::IdentityAlias(alias.clone()),
             Record::Proposal(proposal) => RecordKey::Proposal {
@@ -464,7 +464,7 @@ impl RecordKey {
             RecordKey::RouteHeader(route)
             | RecordKey::RouteDraft(route)
             | RecordKey::RouteVersion { route, .. } => Domain::Route(route.clone()),
-            RecordKey::DeletedJourney(_) | RecordKey::Identity(_) | RecordKey::IdentityAlias(_) => {
+            RecordKey::Deleted(_) | RecordKey::Identity(_) | RecordKey::IdentityAlias(_) => {
                 Domain::Deployment
             }
         }

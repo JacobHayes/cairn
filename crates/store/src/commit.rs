@@ -6,6 +6,7 @@ use std::fmt;
 
 use cairn_schema::{
     ChangeSet, IdentityKey, JourneyId, PatchReceipt, PatchTarget, Rejection, Revision, RevisionOf,
+    RouteId,
 };
 
 /// What a commit checks besides its target's base revision.
@@ -35,6 +36,13 @@ pub enum Precondition {
     Unreferenced {
         /// The identities the delete removes.
         identities: BTreeSet<IdentityKey>,
+    },
+    /// A19: the routes a patch deletes are used by no graph outside the journeys and routes it
+    /// deletes: no journey's lineage, and no insertion in a journey, a route draft, or a
+    /// published version, is on any of their versions.
+    Unused {
+        /// The routes the patch deletes.
+        routes: BTreeSet<RouteId>,
     },
 }
 
@@ -81,7 +89,7 @@ impl Committed {
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum CommitError {
     /// The patch is stale, reuses a patch id, or breaks a rule only the commit can check
-    /// (a deleted journey id, an identity key or email taken meanwhile, the graph size cap):
+    /// (a deleted journey's or route's id, an identity key or email taken meanwhile, the graph size cap):
     /// the same rejection shapes the engine returns (A15, H5).
     Rejected(Rejection),
     /// The store failed or the change set was malformed.

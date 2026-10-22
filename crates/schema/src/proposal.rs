@@ -580,8 +580,6 @@ pub enum OutlineFact {
         /// The status.
         status: JourneyStatus,
     },
-    /// Deletes the journey.
-    DeletesJourney,
     /// Creates the route.
     CreatesRoute,
     /// Renames or redescribes the route.
@@ -645,6 +643,12 @@ pub struct ProposalOutline {
     /// Identities it deletes.
     #[serde(default, skip_serializing_if = "crate::serde_util::is_zero")]
     pub identities_deleted: u32,
+    /// Journeys it deletes.
+    #[serde(default, skip_serializing_if = "crate::serde_util::is_zero")]
+    pub journeys_deleted: u32,
+    /// Routes and segments it deletes.
+    #[serde(default, skip_serializing_if = "crate::serde_util::is_zero")]
+    pub routes_deleted: u32,
     /// Roles, participation kinds, role fills, the default owner and annotations it changes.
     #[serde(default, skip_serializing_if = "crate::serde_util::is_zero")]
     pub other: u32,
@@ -724,7 +728,6 @@ fn lifecycle_fact(mutation: &Mutation) -> Option<OutlineFact> {
         Mutation::CreateJourney { .. } => OutlineFact::CreatesJourney,
         Mutation::EditJourney { .. } => OutlineFact::EditsJourney,
         Mutation::SetJourneyStatus { status } => OutlineFact::SetsJourneyStatus { status: *status },
-        Mutation::DeleteJourney {} => OutlineFact::DeletesJourney,
         Mutation::CreateRoute { .. } => OutlineFact::CreatesRoute,
         Mutation::EditRoute { .. } => OutlineFact::EditsRoute,
         Mutation::SetRouteRetired { retired: true } => OutlineFact::RetiresRoute,
@@ -756,6 +759,8 @@ fn tally_other(outline: &mut ProposalOutline, mutation: &Mutation) -> bool {
             outline.identities_merged += u32::try_from(merged.len()).unwrap_or(u32::MAX);
         }
         Mutation::DeleteIdentity { .. } => outline.identities_deleted += 1,
+        Mutation::DeleteJourney { .. } => outline.journeys_deleted += 1,
+        Mutation::DeleteRoute { .. } => outline.routes_deleted += 1,
         Mutation::AddRole { .. }
         | Mutation::EditRole { .. }
         | Mutation::RemoveRole { .. }
@@ -815,8 +820,9 @@ pub enum DestinationAfter {
         /// The deployment after.
         deployment: Deployment,
     },
-    /// The destination would no longer exist: a valid candidate with nothing to draw.
-    Gone,
+    /// The destination does not exist after the candidate: a proposal to create it that
+    /// drafts nothing creating it yet, with nothing to draw.
+    Absent,
 }
 
 /// A proposal's content: what creating or editing it carries.

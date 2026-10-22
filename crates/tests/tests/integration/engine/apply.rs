@@ -447,7 +447,7 @@ fn an_identity_created_in_a_journey_patch_advances_the_deployment_once() {
 }
 
 #[test]
-fn an_archived_journey_accepts_only_unarchiving_or_deletion() {
+fn an_archived_journey_accepts_only_unarchiving_and_can_be_deleted() {
     let records = vendor_after(2);
     let archived =
         vendor_patch(&records, "- op: set_journey_status\n  status: archived\n").unwrap();
@@ -463,19 +463,12 @@ fn an_archived_journey_accepts_only_unarchiving_or_deletion() {
         [ViolationCode::ArchivedJourney]
     );
     assert!(vendor_patch(archived, "- op: set_journey_status\n  status: completed\n").is_ok());
-    let deleted = vendor_patch(archived, "- op: delete_journey\n").unwrap();
-    let deleted = deleted.records();
-    assert!(deleted.journeys.is_empty());
-    assert!(
-        deleted
-            .deleted_journeys
-            .contains_key(&"j_vendor_eval".parse().unwrap())
-    );
-    let recreate = "- op: create_journey\n  name: Again\n";
-    assert_eq!(
-        codes(vendor_patch(deleted, recreate)),
-        [ViolationCode::DeletedJourneyId]
-    );
+    let revision = archived.journeys.values().next().unwrap().revision.get();
+    let delete =
+        format!("- op: delete_journey\n  journey: j_vendor_eval\n  revision: {revision}\n");
+    let patch = support::patch_to(archived, "deployment", &delete);
+    let deleted = support::apply(archived, &patch, &support::fixed_inputs()).unwrap();
+    assert!(deleted.records().journeys.is_empty());
 }
 
 // Review round 1 regressions.
@@ -657,25 +650,6 @@ fn replacing_a_decision_with_another_answer_type_marks_its_shape() {
 }
 
 #[test]
-fn a_proposal_may_delete_its_existing_destination() {
-    let records = vendor_after(2);
-    let target = "{proposal: {id: pr_delete, destination: {journey: j_vendor_eval}}}";
-    let create = "- op: create_proposal\n  proposal:\n    title: Delete the journey\n    destination_revision: 2\n    mutations:\n    - op: delete_journey\n";
-    let patch = support::patch_to(&records, target, create);
-    let created = support::apply(&records, &patch, &support::fixed_inputs()).unwrap();
-    let apply_it = "- op: apply_proposal\n  proposal: pr_delete\n  reviewed_revision: 1\n";
-    let patch = support::patch_to(created.records(), "{journey: j_vendor_eval}", apply_it);
-    let applied = support::apply(created.records(), &patch, &support::fixed_inputs()).unwrap();
-    assert!(applied.records().journeys.is_empty());
-    let event = &applied.events()[0];
-    assert_eq!(
-        event.log,
-        cairn_schema::Domain::Deployment,
-        "A19: the deployment log keeps the deletion"
-    );
-}
-
-#[test]
 fn bypassed_failures_are_recorded_on_the_bypass_event() {
     let records = report_ready_without_artifact();
     let mutations = "\
@@ -739,32 +713,21 @@ fn a_merge_counts_a_journey_whose_conditions_compare_the_identities() {
 }
 
 #[test]
-fn a_proposal_may_unarchive_or_delete_an_archived_journey() {
+fn a_proposal_may_unarchive_an_archived_journey() {
     let records = vendor_after(2);
     let archived =
         vendor_patch(&records, "- op: set_journey_status\n  status: archived\n").unwrap();
     let records = archived.records();
     let revision = records.journeys.values().next().unwrap().revision.get();
-    for (id, mutation) in [
-        (
-            "pr_restore",
-            "- op: set_journey_status\n      status: completed\n",
-        ),
-        ("pr_delete", "- op: delete_journey\n"),
-    ] {
-        let target = format!("{{proposal: {{id: {id}, destination: {{journey: j_vendor_eval}}}}}}");
-        let create = format!(
-            "- op: create_proposal\n  proposal:\n    title: Tidy up\n    destination_revision: {revision}\n    mutations:\n    {mutation}"
-        );
-        let patch = support::patch_to(records, &target, &create);
-        let created = support::apply(records, &patch, &support::fixed_inputs()).unwrap();
-        let apply_it = format!("- op: apply_proposal\n  proposal: {id}\n  reviewed_revision: 1\n");
-        let patch = support::patch_to(created.records(), "{journey: j_vendor_eval}", &apply_it);
-        assert!(
-            support::apply(created.records(), &patch, &support::fixed_inputs()).is_ok(),
-            "{id}"
-        );
-    }
+    let target = "{proposal: {id: pr_restore, destination: {journey: j_vendor_eval}}}";
+    let create = format!(
+        "- op: create_proposal\n  proposal:\n    title: Tidy up\n    destination_revision: {revision}\n    mutations:\n    - op: set_journey_status\n      status: completed\n"
+    );
+    let patch = support::patch_to(records, target, &create);
+    let created = support::apply(records, &patch, &support::fixed_inputs()).unwrap();
+    let apply_it = "- op: apply_proposal\n  proposal: pr_restore\n  reviewed_revision: 1\n";
+    let patch = support::patch_to(created.records(), "{journey: j_vendor_eval}", apply_it);
+    assert!(support::apply(created.records(), &patch, &support::fixed_inputs()).is_ok());
 }
 
 /// A18: a removal sees what earlier mutations in its patch changed, even after another

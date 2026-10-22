@@ -78,10 +78,10 @@ pub enum ViolationCode {
     ArchivedJourney,
     TargetExists,
     TargetMissing,
-    DeletedJourneyId,
+    DeletedId,
     DraftExists,
     NoDraft,
-    VersionInUse,
+    RouteInUse,
     // Segments (A21, B13).
     SegmentRule,
     InsertionInvalid,
