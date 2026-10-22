@@ -72,6 +72,8 @@ async function expectAt(page: Page, step: string, phase: "spotlight" | "reveal")
   await expect(callout(page)).toHaveAttribute("data-step", step);
   await expect(callout(page)).toHaveAttribute("data-phase", phase);
   await expect(scrim(page)).toHaveAttribute("data-lifted", String(phase === "reveal"));
+  // The state is placed: what the step does to the sheet on arrival has been done.
+  await expect(callout(page)).toHaveAttribute("data-ready", "true");
 }
 
 /** Walks from Home to the step that asks `step`'s action, doing the earlier steps' actions. */
@@ -80,6 +82,7 @@ async function walkTo(page: Page, step: "answer" | "frontier" | "finish" | "date
   await openFromCanvas(page, "n_outside");
   await next(page);
   if (step === "answer") {
+    await expectAt(page, "answer", "spotlight");
     return;
   }
   await decide(page, "yes");
@@ -350,16 +353,23 @@ test.describe("under 1100px, where the inspector is a sheet", () => {
     await openFromCanvas(page, "n_outside");
     await next(page);
     const frame = page.locator(".frame");
+    await expectAt(page, "answer", "spotlight");
+    await expect(frame).toHaveAttribute("data-sheet", "half");
+    // Back and forward again, with the decision still open, puts the sheet up for the action once more.
+    await page.getByTestId("tour-back").click();
+    await openFromCanvas(page, "n_outside");
+    await next(page);
+    await expectAt(page, "answer", "spotlight");
     await expect(frame).toHaveAttribute("data-sheet", "half");
     await decide(page, "yes");
     await expectAt(page, "answer", "reveal");
     await expect(frame).toHaveAttribute("data-sheet", "peek");
-    // Back onto the step arrives in its reveal; the step before and then forward again puts the sheet up for the action.
+    // Answered, the step arrives in its reveal: the sheet is down for the change.
     await page.getByTestId("tour-back").click();
     await openFromCanvas(page, "n_outside");
     await next(page);
-    await expect(callout(page)).toHaveAttribute("data-step", "answer");
-    await expect(frame).toHaveAttribute("data-sheet", "half");
+    await expectAt(page, "answer", "reveal");
+    await expect(frame).toHaveAttribute("data-sheet", "peek");
     await checkpoint(page);
   });
 
