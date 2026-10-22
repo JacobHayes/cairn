@@ -516,7 +516,10 @@ export function AnswerEditor({ view, detail, menu, anyway, focus }: { view: Read
       {state.preview?.warning === undefined ? null : <span className="muted" data-testid="preview-warning">{state.preview.warning}</span>}
       {bypassing && anyway !== undefined ? (
         <span className="row" data-testid="answer-anyway">
-          <Field aria-label="Why answer anyway" placeholder="Why (required)" value={bypass} onChange={(event) => { anyway.change(event.target.value); }} />
+          <label className="stack">
+            <span className="label">Why answer anyway (required)</span>
+            <Field value={bypass} onChange={(event) => { anyway.change(event.target.value); }} />
+          </label>
           <Button onClick={anyway.cancel}>Cancel</Button>
         </span>
       ) : null}

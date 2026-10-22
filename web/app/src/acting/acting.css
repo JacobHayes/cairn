@@ -494,6 +494,11 @@ table.data.list-table .badge {
   color: var(--color-muted);
 }
 
+/* A checked row wears the selection line like the open one (the open row's comes from the generic table rule). */
+.list-table tr[data-selected="true"] > td:first-child {
+  box-shadow: inset 2px 0 0 var(--color-accent);
+}
+
 .list-table td.list-pinned {
   background: var(--row-paper, var(--color-surface));
 }
@@ -511,8 +516,8 @@ table.data.list-table .badge {
   background-image: linear-gradient(var(--row-paper), var(--row-paper));
 }
 
-.list-table tr[data-state][aria-selected="true"] td:not(.list-pinned) {
-  background-image: linear-gradient(var(--color-tint), var(--color-tint)), linear-gradient(var(--row-paper), var(--row-paper));
+.list-table tr[data-state]:not([data-container="true"]):is([data-selected="true"], [aria-selected="true"]) td:not(.list-pinned) {
+  background-image: linear-gradient(var(--color-tint), var(--color-tint)), linear-gradient(var(--row-paper, var(--color-surface)), var(--row-paper, var(--color-surface)));
 }
 
 .list-table tbody tr[data-state]:hover td:not(.list-pinned) {
@@ -520,7 +525,7 @@ table.data.list-table .badge {
 }
 
 /* A selected row under the pointer keeps its blue tint (selection and focus are the accent's), across every cell. */
-.list-table tbody tr[data-state][aria-selected="true"]:hover td:not(.list-pinned),
+.list-table tbody tr[data-state]:not([data-container="true"]):is([data-selected="true"], [aria-selected="true"]):hover td:not(.list-pinned),
 .list-table tbody tr[data-selected="true"]:hover td.list-pinned,
 .list-table tbody tr[aria-selected="true"]:hover td.list-pinned {
   background: linear-gradient(var(--color-tint), var(--color-tint)), linear-gradient(var(--color-hover), var(--color-hover)), var(--row-paper, var(--color-surface));
@@ -671,10 +676,6 @@ table.data.list-table .badge {
   }
 }
 
-.list-table tr[aria-selected="true"] td {
-  background: var(--color-tint);
-}
-
 .list-title {
   display: flex;
   align-items: center;
@@ -734,14 +735,14 @@ table.data.list-table .badge {
   background: linear-gradient(var(--color-hover), var(--color-hover)), var(--row-paper, var(--color-band));
 }
 
-.list-table tr[data-container="true"][aria-selected="true"] td,
-.list-table tr[data-container="true"][aria-selected="true"] td.list-pinned {
+.list-table tr[data-container="true"]:is([data-selected="true"], [aria-selected="true"]) td,
+.list-table tr[data-container="true"]:is([data-selected="true"], [aria-selected="true"]) td.list-pinned {
   background: linear-gradient(var(--color-tint), var(--color-tint)), var(--row-paper, var(--color-band));
 }
 
-.list-table tbody tr[data-container="true"][aria-selected="true"]:hover td,
-.list-table tbody tr[data-container="true"][aria-selected="true"]:hover td:not(.list-pinned),
-.list-table tbody tr[data-container="true"][aria-selected="true"]:hover td.list-pinned {
+.list-table tbody tr[data-container="true"]:is([data-selected="true"], [aria-selected="true"]):hover td,
+.list-table tbody tr[data-container="true"]:is([data-selected="true"], [aria-selected="true"]):hover td:not(.list-pinned),
+.list-table tbody tr[data-container="true"]:is([data-selected="true"], [aria-selected="true"]):hover td.list-pinned {
   background: linear-gradient(var(--color-tint), var(--color-tint)), linear-gradient(var(--color-hover), var(--color-hover)), var(--row-paper, var(--color-band));
 }
 

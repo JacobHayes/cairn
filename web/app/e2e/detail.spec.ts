@@ -41,12 +41,12 @@ async function rejectionSurvivesAndResolves(page: Page) {
   // The rejection and a reason typed meanwhile are kept per tab, so a reload loses neither.
   await menuItem(panel, "done-anyway");
   const reason = fresh("Reviewed out of band");
-  await panel.getByTestId("bypass").getByLabel("Why mark it done anyway").fill(reason);
+  await panel.getByTestId("bypass").getByLabel(/Why mark it done without/).fill(reason);
   await page.reload();
   panel = page.getByTestId("node-detail");
   conflict = panel.getByTestId("date-conflict");
   await expect(conflict).toBeVisible();
-  await expect(panel.getByTestId("bypass").getByLabel("Why mark it done anyway")).toHaveValue(reason);
+  await expect(panel.getByTestId("bypass").getByLabel(/Why mark it done without/)).toHaveValue(reason);
   // Away from the control it is still counted, and Go to it comes back to it.
   await goWithin(page, "/routes?type=routes");
   await expect(syncChip(page)).toHaveAttribute("aria-label", /^NOT SAVED · 1\./);
@@ -229,6 +229,7 @@ test("a checklist item typed and not added survives a reload, and a replacement 
   await openEditing(page, "browser", "j_bakeoff");
   await openFromCanvas(page, "n_trial_a");
   let completion = await openForm(page, "completion");
+  await completion.getByLabel("Requires all items ticked before done").check();
   const add = completion.getByLabel("New item", { exact: true });
   await add.fill("Alpha");
   await add.press("Enter");
@@ -255,4 +256,21 @@ test("a checklist item typed and not added survives a reload, and a replacement 
   await openJourney(page, "browser", "j_bakeoff");
   await openFromCanvas(page, "n_trial_a");
   await expect(nodeCard(page, "n_trial_a").getByTestId("card-checklist")).toHaveAttribute("data-ticked", "0");
+  // A refused completion offers the remedy first; the reason field opens only when the bypass is chosen.
+  await openActing(page, "browser", "j_bakeoff", "list?frontier=1");
+  await frontierItem(page, "n_trial_a").locator("input[type=checkbox]").click();
+  await frontierItem(page, "n_trial_b").locator("input[type=checkbox]").click();
+  await page.getByTestId("selection-status").click();
+  await page.getByRole("menuitem", { name: "Mark done" }).click();
+  const refused = page.getByTestId("refused");
+  await expect(refused.getByRole("button", { name: /^Tick 1 item and mark both done$/ })).toBeVisible();
+  await expect(refused.getByTestId("bypass")).toHaveCount(0);
+  await refused.getByRole("button", { name: /^Mark both done without/ }).click();
+  const reason = refused.getByLabel(/^Why mark both done without/);
+  await expect(refused.getByRole("button", { name: "Mark both done with this reason" })).toBeDisabled();
+  await reason.fill("Checked in person");
+  await refused.getByRole("button", { name: "Mark both done with this reason" }).click();
+  await expect(refused).toHaveCount(0);
+  await goTo(page, "graph");
+  await expect(nodeCard(page, "n_trial_a").getByTestId("card-state")).toHaveAttribute("data-state", "done");
 });

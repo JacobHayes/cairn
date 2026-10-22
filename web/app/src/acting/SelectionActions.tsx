@@ -66,7 +66,12 @@ function FormInput({ view, open, within, onChange }: { view: Ready; open: Filled
   const group = useId();
   const { form, value } = open;
   if (form === "skip") {
-    return <Field aria-label="Why skip them" placeholder="Why" value={value} onChange={(event) => { onChange({ ...open, value: event.target.value }); }} />;
+    return (
+      <label className="stack">
+        <span className="label">Why skip them</span>
+        <Field value={value} onChange={(event) => { onChange({ ...open, value: event.target.value }); }} />
+      </label>
+    );
   }
   if (form === "assign") {
     return (

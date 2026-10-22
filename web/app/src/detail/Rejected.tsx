@@ -3,6 +3,7 @@
 // contradictory chain with its resolution moves (F5, the DateConflictResolver); a failed
 // guard that can be bypassed with a reason (D4); anything else as its violations.
 import type { Schema } from "@cairn/client";
+import { useState } from "react";
 
 import { useDraft } from "../data/drafts.ts";
 import type { OperationId } from "../data/edit-record.ts";
@@ -124,34 +125,59 @@ export function DateConflictResolver({ view, write, violations, onResolved, onRe
   );
 }
 
-function Bypass({ view, write, node, guards, onResolved, onResent }: Resolving & { node: string; guards: Guard[] }) {
-  const [draft, setReason] = useDraft<string>(`rejected-bypass:${write.journey}:${node}`);
+type Bypassed = { node: string; guards: Guard[] }[];
+
+/** The completions a retried patch carries, in words: "mark done", "mark both done", "mark all 3 done". */
+function completionWords(attempt: Attempt): string {
+  const completing = attempt.mutations.filter((mutation) => mutation.op === "transition" && mutation.transition === "complete").length;
+  return completing === 0 ? "go ahead" : completing === 1 ? "mark done" : completing === 2 ? "mark both done" : `mark all ${String(completing)} done`;
+}
+
+/** D4: the bypass of every node's failed guards at once, one reason for the lot, named by what it does; its reason field opens only when the person chooses it, after the remedy above has been offered. */
+function Bypass({ write, entries, onResolved, onResent }: Resolving & { entries: Bypassed }) {
+  const nodes = entries.map(({ node }) => node);
+  const [draft, setReason] = useDraft<string>(`rejected-bypass:${write.journey}:${nodes.join(",")}`);
+  const [chosen, choose] = useState(false);
   const reason = draft ?? "";
   const { failed } = write;
   if (failed === undefined) {
     return null;
   }
-  const override = guardBypass(node, guards, reason);
-  return (
-    <div className="row" data-testid="bypass">
-      <span>
-        <strong>{titleOf(view, node)}</strong>: do it anyway, without {guards.map(guardWords).join(" and ")}:
+  const overrides = entries.map(({ node, guards }) => guardBypass(node, guards, reason));
+  const verb = completionWords(failed.attempt).replace(/^./, (first) => first.toUpperCase());
+  const without = [...new Set(entries.flatMap(({ guards }) => guards))].map(guardWords).join(" and ");
+  if (!chosen && reason === "") {
+    return (
+      <span data-testid="bypass-offer">
+        <Button onClick={() => { choose(true); }}>
+          {`${verb} without ${without}\u2026`}
+        </Button>
       </span>
-      <Field aria-label="Why do it anyway" placeholder="Why" value={reason} onChange={(event) => { setReason(event.target.value); }} />
-      <Button
-        disabled={write.disabled || !bypassReady(reason)}
-        onClick={() => {
-          retry(write, failed, [override, ...failed.attempt.mutations], failed.attempt, {
-            onResolved: () => {
-              setReason(undefined);
-              onResolved?.();
-            },
-            onResent,
-          });
-        }}
-      >
-        Do it anyway
-      </Button>
+    );
+  }
+  return (
+    <div className="stack" data-testid="bypass">
+      <label className="stack">
+        <span className="label">{`Why ${verb.toLowerCase()} without ${without}`}</span>
+        <Field value={reason} onChange={(event) => { setReason(event.target.value); }} />
+      </label>
+      <span className="row">
+        <Button
+          disabled={write.disabled || !bypassReady(reason)}
+          onClick={() => {
+            retry(write, failed, [...overrides, ...failed.attempt.mutations], failed.attempt, {
+              onResolved: () => {
+                setReason(undefined);
+                onResolved?.();
+              },
+              onResent,
+            });
+          }}
+        >
+          {`${verb} with this reason`}
+        </Button>
+        <Button onClick={() => { setReason(undefined); choose(false); }}>Cancel</Button>
+      </span>
     </div>
   );
 }
@@ -172,9 +198,19 @@ function TickList({ view, node, items }: { view: Ready; node: string; items: rea
 /** G5: the checklist items a refusal names, and the one button that ticks them and sends the refused patch again. */
 function TickTheRest({ view, write, failed, ticks, only, onResolved, onResent }: Resolving & { failed: Failed; ticks: { node: string; items: string[] }[]; only: boolean }) {
   const total = ticks.reduce((sum, { items }) => sum + items.length, 0);
-  const completing = failed.attempt.mutations.filter((mutation) => mutation.op === "transition" && mutation.transition === "complete").length;
   return (
     <>
+      {only ? (
+        <span>
+          <Button
+            primary
+            disabled={write.disabled}
+            onClick={() => { retry(write, failed, withTicks(failed.attempt, ticks), failed.attempt, { onResolved, onResent }); }}
+          >
+            {`Tick ${plural(total, "item")} and ${completionWords(failed.attempt)}`}
+          </Button>
+        </span>
+      ) : null}
       {ticks.map(({ node, items }) => (
         <div className="stack" key={node} data-testid="tick-the-rest" data-node={node}>
           <span>
@@ -183,17 +219,6 @@ function TickTheRest({ view, write, failed, ticks, only, onResolved, onResent }:
           <TickList view={view} node={node} items={items} />
         </div>
       ))}
-      {only ? (
-        <span>
-          <Button
-            primary
-            disabled={write.disabled}
-            onClick={() => { retry(write, failed, withTicks(failed.attempt, ticks), failed.attempt, { onResolved, onResent }); }}
-          >
-            {`Tick ${plural(total, "item")} and ${completing === 1 ? "mark done" : "try again"}`}
-          </Button>
-        </span>
-      ) : null}
     </>
   );
 }
@@ -201,6 +226,7 @@ function TickTheRest({ view, write, failed, ticks, only, onResolved, onResent }:
 function Invalid({ view, write, failed, rejection, violations, onResolved, onResent }: Resolving & { failed: Failed; rejection: Rejection; violations: Violation[] }) {
   const chains = violations.filter((violation) => violation.code === "contradictory_chain");
   const ticks = untickedIn(violations);
+  const bypasses = bypassable(violations);
   return (
     <RejectionView
       rejection={rejection}
@@ -212,9 +238,7 @@ function Invalid({ view, write, failed, rejection, violations, onResolved, onRes
         <>
           <DateConflictResolver view={view} write={write} violations={chains} onResolved={onResolved} onResent={onResent} />
           <TickTheRest view={view} write={write} failed={failed} ticks={ticks.byNode} only={ticks.only} onResolved={onResolved} onResent={onResent} />
-          {bypassable(violations).map(({ node, guards }) => (
-            <Bypass key={node} view={view} write={write} node={node} guards={guards} onResolved={onResolved} onResent={onResent} />
-          ))}
+          {bypasses.length === 0 ? null : <Bypass write={write} view={view} entries={bypasses} onResolved={onResolved} onResent={onResent} />}
         </>
       }
     />

@@ -345,7 +345,7 @@ function reasonWords(kind: ReasonKind, node: GraphNode, without: string, inside:
     case "include":
       return { label: "Why include it", confirm: "Include anyway", testId: "include-form" };
     case "bypass":
-      return { label: "Why mark it done anyway", confirm: `Mark done without ${without}`, testId: "bypass" };
+      return { label: `Why mark it done without ${without}`, confirm: `Mark done without ${without}`, testId: "bypass" };
   }
 }
 

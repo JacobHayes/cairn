@@ -17,8 +17,9 @@ the ticks and the completion go in one patch.
 
 ![A refused completion naming each unticked item](refused.png)
 
-When a node is completed some other way, the refusal names each unticked item, offers to tick
-them and try again, and offers "Do it anyway" with a reason.
+When two nodes are completed together, the refusal names each unticked item and offers one
+button that ticks them and marks both done. Finishing without them is a second, quieter button
+for all of them; its reason field, with a visible label, opens only when chosen.
 
 ![The card showing a progress line](after.png)
 
