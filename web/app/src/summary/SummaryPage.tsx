@@ -49,6 +49,7 @@ import "./summary.css";
 import { Failed } from "../ui/Failed.tsx";
 import { ownersOf } from "../detail/sections.tsx";
 import { OWNER_KIND } from "../detail/model.ts";
+import { Tip } from "../ui/Tip.tsx";
 
 /** The date of a milestone line in words, where it comes from on hover, and its own shortfall as a sentence of its own. */
 function MilestoneWhen({ ready, line }: { ready: Ready; line: MilestoneLine }) {
@@ -73,9 +74,9 @@ function MilestoneWhen({ ready, line }: { ready: Ready; line: MilestoneLine }) {
   const origin = line.origin === undefined ? undefined : originWord(line.origin);
   return (
     <>
-      <span className={ink} title={origin === undefined ? undefined : `This date is ${origin}`}>
-        {whenWords(line.date, done ? "actual" : line.origin, today)}
-      </span>
+      <Tip tip={origin === undefined ? undefined : `This date is ${origin}`} tap>
+        <span className={ink}>{whenWords(line.date, done ? "actual" : line.origin, today)}</span>
+      </Tip>
       .
       {line.shortfallDays === undefined ? null : <span className="ink-bad">{` ${shortfallWords(ready, line.key, line.shortfallDays)}.`}</span>}
     </>
@@ -155,9 +156,9 @@ function Dates({ ready, model, skip }: { ready: Ready; model: SummaryModel; skip
             <Link to={nodeAddress(journey, each.key)} className="node-title">
               {each.title}
             </Link>
-            <span className={`summary-date-when ${inkClass(dateInk(each.date, today)) ?? "muted"}`} title={`This date is ${originWord(each.origin)}`}>
-              {whenWords(each.date, each.origin, today)}
-            </span>
+            <Tip tip={`This date is ${originWord(each.origin)}`} tap>
+              <span className={`summary-date-when ${inkClass(dateInk(each.date, today)) ?? "muted"}`}>{whenWords(each.date, each.origin, today)}</span>
+            </Tip>
             {short === undefined ? null : <span className="ink-bad summary-date-short">{shortfallWords(ready, each.key, short)}</span>}
           </li>
         );

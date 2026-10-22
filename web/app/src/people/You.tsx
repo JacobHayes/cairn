@@ -14,6 +14,7 @@ import { THEME_CHOICES, useThemeChoice, type ThemeChoice } from "../ui/theme.ts"
 import { Failed } from "../ui/Failed.tsx";
 import { useTour } from "../tour/Tour.tsx";
 import { identityLabel } from "./label.ts";
+import { Tip } from "../ui/Tip.tsx";
 
 /** Where a sign-in with provider `name` starts, coming back to this screen (the tab keeps its host). */
 export function signInHref(name: string): string {
@@ -41,7 +42,9 @@ function Logins({ caller }: { caller: Caller }) {
               <span className="muted">Verified emails: </span>
               <span className="mono">{login.verified_emails.join(", ") || "none"}</span>
             </span>
-            <span className="muted mono small" title={login.linked_at}>Linked {dateWords(linked, today)}</span>
+            <Tip tip={login.linked_at} tap>
+              <span className="muted mono small">Linked {dateWords(linked, today)}</span>
+            </Tip>
           </li>
         );
       })}

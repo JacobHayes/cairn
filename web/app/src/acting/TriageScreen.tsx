@@ -148,7 +148,7 @@ function PassCard({ view, card, place, by, onPass }: { view: Ready; card: NodeRo
             </span>
           )}
         </span>
-        <Button onClick={onPass} data-testid="pass" title="Pass: later in this pass; nothing is saved">
+        <Button onClick={onPass} data-testid="pass" tip="Later in this pass; nothing is saved">
           Pass <kbd>P</kbd>
         </Button>
       </span>

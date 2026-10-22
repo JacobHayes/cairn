@@ -233,7 +233,7 @@ function Overflow({ groups, runners }: { groups: MenuItem[][]; runners: Record<M
     return null;
   }
   return (
-    <Menu label="More actions" title="More actions" testId="more-actions" align="end" trigger={<span aria-hidden="true">⋯</span>}>
+    <Menu label="More actions" tip="More actions" tipKind="name" testId="more-actions" align="end" trigger={<span aria-hidden="true">⋯</span>}>
       {(close) =>
         groups.map((group, at) => (
           <div key={at} className="menu-group">

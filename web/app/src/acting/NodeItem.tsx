@@ -11,6 +11,7 @@ import { nodeOf, type Ready } from "../detail/model.ts";
 import { statusTone, statusWord } from "../status/words.ts";
 import { Badge } from "../ui/kit.tsx";
 import { NodeLink } from "../detail/parts.tsx";
+import { Tip } from "../ui/Tip.tsx";
 
 /** A click on the row itself, not on a control inside it, selects it. */
 function onRow(event: MouseEvent): boolean {
@@ -70,9 +71,11 @@ export function NodeItem({ view, node, to, selected = false, fact, factTone, chi
         <span className="node-row-text">
           <NodeLink view={view} node={node} to={to} className="node-title" data-row-title aria-current={selected ? "true" : undefined} onClick={onOpen} />
           {fact === undefined ? null : (
-            <span className={factTone === undefined ? "node-fact muted" : `node-fact ink-${factTone}`} data-testid="fact" {...(typeof fact === "string" ? { title: fact } : {})}>
-              {fact}
-            </span>
+            <Tip tip={typeof fact === "string" ? fact : undefined} kind="cut">
+              <span className={factTone === undefined ? "node-fact muted" : `node-fact ink-${factTone}`} data-testid="fact">
+                {fact}
+              </span>
+            </Tip>
           )}
         </span>
       </div>

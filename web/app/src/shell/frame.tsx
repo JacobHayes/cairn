@@ -7,11 +7,12 @@
 //
 // Outside the shell (a component rendered alone in a test) there is no slot, and both render
 // their children where they stand.
-import { createContext, useContext, useEffect, useLayoutEffect, useSyncExternalStore, type ReactNode } from "react";
+import { createContext, useContext, useEffect, useLayoutEffect, useMemo, useSyncExternalStore, type ReactNode } from "react";
 import { createPortal } from "react-dom";
 import { useLocation } from "react-router";
 
 import { useNodeAddresses } from "../journeys/address.ts";
+import type { KeyBinding } from "../screens/keys.ts";
 import type { SheetSnap } from "./InspectorColumn.tsx";
 
 export type InspectorTab = "inspector" | "assistant" | "proposals";
@@ -41,6 +42,12 @@ export function useMedia(query: string): boolean {
   );
 }
 
+/** The keys a page binds and the way to open its key sheet: what the rail's `?` previews and opens. */
+export interface PageKeys {
+  bindings: readonly KeyBinding[];
+  open: () => void;
+}
+
 /** What the shell shows of itself: the slot elements, once mounted, and the tab in view. */
 export interface FrameState {
   inspector: HTMLElement | null;
@@ -51,6 +58,8 @@ export interface FrameState {
   tab: InspectorTab;
   /** Opens the assistant panel; undefined where none is offered. */
   openAssistant: (() => void) | undefined;
+  /** The keys of the page on screen; undefined where the page binds none (the rail draws no `?`). */
+  keys: PageKeys | undefined;
 }
 
 /** The assistant's controls, which the inspector column's tabs and Esc use from the shell. */
@@ -67,6 +76,8 @@ export interface FrameActions {
   show: (tab: InspectorTab) => void;
   /** The assistant can be opened (its tab is offered) until the returned function is called. */
   dock: (dock: AssistantDock) => () => void;
+  /** The page's keys, until the returned function is called. */
+  bindKeys: (keys: PageKeys) => () => void;
   /** The Proposals tab's count, until the returned function is called. */
   countProposals: (count: number | undefined) => () => void;
   /** Where Esc takes the sheet: `address` closes the open node; undefined when nothing is open. */
@@ -174,4 +185,11 @@ export function useAssistantDock(dock: AssistantDock | undefined): void {
     }
     return actions.dock(dock);
   }, [actions, dock]);
+}
+
+/** Registers the page's keys with the shell while it is on screen: the rail's `?` previews them and opens the sheet (`setSheetOpen(true)`). `bindings` should be stable. */
+export function usePageKeys(bindings: readonly KeyBinding[], setSheetOpen: (open: boolean) => void): void {
+  const actions = useFrameActions();
+  const keys = useMemo(() => ({ bindings, open: () => { setSheetOpen(true); } }), [bindings, setSheetOpen]);
+  useEffect(() => actions?.bindKeys(keys), [actions, keys]);
 }

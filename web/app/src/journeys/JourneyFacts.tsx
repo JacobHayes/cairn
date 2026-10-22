@@ -17,6 +17,7 @@ import { dateWords } from "../status/when.ts";
 import { TROUBLES } from "../status/words.ts";
 import { upgradeWords } from "./figures-model.ts";
 import { listPath } from "./view.ts";
+import { Tip } from "../ui/Tip.tsx";
 
 /**
  * What needs a look, as one short sentence of links into the plan list: only what is not zero.
@@ -94,9 +95,11 @@ export function LineageBlock({ ready, lineage }: { ready: Ready; lineage: Lineag
           </Badge>
         )}
         {lineage.latest === undefined || !writable ? null : (
-          <button type="button" className="chip" data-testid="journey-upgrade" title="Propose this journey's upgrade to the route's newer version" onClick={() => { setUpgrading(true); }}>
-            Upgrade to v{lineage.latest}
-          </button>
+          <Tip tip="Propose this journey's upgrade to the route's newer version">
+            <button type="button" className="chip" data-testid="journey-upgrade" onClick={() => { setUpgrading(true); }}>
+              Upgrade to v{lineage.latest}
+            </button>
+          </Tip>
         )}
       </span>
       {upgrading && writable ? <JourneyFlow ready={ready} flow="upgrade" onClose={() => { setUpgrading(false); }} /> : null}

@@ -24,6 +24,7 @@ import { progressWords } from "./words.ts";
 import { plural } from "../ui/words.ts";
 import { nodeTitle } from "../ui/gone.ts";
 import { kindWord } from "../detail/model.ts";
+import { Tip } from "../ui/Tip.tsx";
 
 /** What a card can ask of its canvas. */
 export interface CardActions {
@@ -68,21 +69,21 @@ export type CardNode = Node<CardData, "card">;
 /** The title: a button that selects the node as a click on the card does (the click reaches the canvas), or plain text where there is none. */
 function Title({ card }: { card: Card }) {
   const actions = useContext(CardActionsContext);
+  // The whole title in a tip, only while the card cuts it short. Where there is no button to open the node, a tap on the title shows it too.
   return actions?.open === undefined ? (
-    <span className="node-title-text" data-testid="title" title={card.title}>
-      {card.title}
-    </span>
-  ) : (
-    <button
-      type="button"
-      className="node-open nodrag"
-      data-testid="card-open"
-      title={card.title}
-    >
+    <Tip tip={card.title} kind="cut" tap>
       <span className="node-title-text" data-testid="title">
         {card.title}
       </span>
-    </button>
+    </Tip>
+  ) : (
+    <Tip tip={card.title} kind="cut">
+      <button type="button" className="node-open nodrag" data-testid="card-open">
+        <span className="node-title-text" data-testid="title">
+          {card.title}
+        </span>
+      </button>
+    </Tip>
   );
 }
 
@@ -113,9 +114,11 @@ function Head({ card, collapsible, mark }: { card: Card; collapsible: boolean; m
         </span>
       )}
       {card.route?.unanchored === true ? (
-        <span className="node-notice" data-testid="card-notice" title="No chain links this to the final milestone, so neither priority nor dates reach it. Advisory: publishing is not blocked.">
-          No path to final
-        </span>
+        <Tip tip="No chain links this to the final milestone, so neither priority nor dates reach it. Advisory: publishing is not blocked.">
+          <span className="node-notice" data-testid="card-notice">
+            No path to final
+          </span>
+        </Tip>
       ) : null}
       <Control card={card} collapsible={collapsible} />
     </div>
@@ -145,22 +148,24 @@ function Control({ card, collapsible }: { card: Card; collapsible: boolean }) {
   );
 }
 
-function Body({ body, card }: { body: CardBody; card: Card }) {
+function Body({ body }: { body: CardBody }) {
   switch (body.kind) {
     case "answer":
       return (
         <div className="node-body-line node-answer" data-testid="card-answer">
           <strong>{body.text}</strong>
           {body.rationale === undefined ? null : (
-            <span className="node-why" title={body.rationale} aria-label={`Why: ${body.rationale}`} data-testid="card-rationale">
-              {"\u00b6"}
-            </span>
+            <Tip tip={body.rationale} kind="name">
+              <span className="node-why" aria-label={`Why: ${body.rationale}`} data-testid="card-rationale">
+                {"\u00b6"}
+              </span>
+            </Tip>
           )}
         </div>
       );
     case "progress":
       return (
-        <div className="node-body-line node-progress" data-testid="card-progress" title={card.checklist.length === 0 ? undefined : card.checklist.map((item) => `${item.done ? "Done" : "To do"}: ${item.title}`).join("\n")}>
+        <div className="node-body-line node-progress" data-testid="card-progress">
           <Meter done={body.done} of={body.total} />
           <span>{progressWords(body.done, body.total)}</span>
           {body.badge === undefined ? null : (
@@ -172,9 +177,11 @@ function Body({ body, card }: { body: CardBody; card: Card }) {
       );
     case "depends":
       return (
-        <div className="node-body-line node-depends" data-testid="card-depends" title={body.text}>
-          {body.text}
-        </div>
+        <Tip tip={body.text} kind="cut">
+          <div className="node-body-line node-depends" data-testid="card-depends">
+            {body.text}
+          </div>
+        </Tip>
       );
   }
 }
@@ -185,9 +192,11 @@ function Foot({ card, owner = true }: { card: Card; owner?: boolean }) {
   if (journey === undefined && card.route?.foot !== undefined) {
     return (
       <div className="node-foot">
-        <span className="node-date" data-testid="card-foot" title={card.route.foot}>
-          {card.route.foot}
-        </span>
+        <Tip tip={card.route.foot} kind="cut">
+          <span className="node-date" data-testid="card-foot">
+            {card.route.foot}
+          </span>
+        </Tip>
       </div>
     );
   }
@@ -197,21 +206,27 @@ function Foot({ card, owner = true }: { card: Card; owner?: boolean }) {
   return (
     <div className="node-foot">
       {journey.foot === undefined ? null : (
-        <span className={journey.foot.tone === "plain" ? "node-date" : `node-date ${journey.foot.tone}`} data-testid="card-foot" data-status={journey.foot.tone} title={journey.foot.title ?? journey.foot.words}>
-          {journey.foot.tail === undefined ? (
-            journey.foot.words
-          ) : (
-            <>
-              <span className="node-date-lead">{journey.foot.words}</span>
-              <span className="node-date-tail">{journey.foot.tail}</span>
-            </>
-          )}
-        </span>
+        // The model's own sentence when it gives one (the full words for short ones); otherwise the foot's words, only while they are cut.
+        <Tip tip={journey.foot.title ?? journey.foot.words} kind={journey.foot.title === undefined ? "cut" : "describe"}>
+          <span className={journey.foot.tone === "plain" ? "node-date" : `node-date ${journey.foot.tone}`} data-testid="card-foot" data-status={journey.foot.tone}>
+            {journey.foot.tail === undefined ? (
+              journey.foot.words
+            ) : (
+              <>
+                <span className="node-date-lead">{journey.foot.words}</span>
+                <span className="node-date-tail">{journey.foot.tail}</span>
+              </>
+            )}
+          </span>
+        </Tip>
       )}
       {!owner || journey.owner === undefined ? null : (
-        <span className={journey.owner.missing ? "node-owner ink-warn" : "node-owner"} data-testid="card-owner" title={journey.owners}>
-          {journey.owner.words}
-        </span>
+        // Who owns it, when that is more than the foot says (it says only You, or that nobody does).
+        <Tip tip={journey.owners === journey.owner.words ? undefined : `Owned by ${journey.owners}`}>
+          <span className={journey.owner.missing ? "node-owner ink-warn" : "node-owner"} data-testid="card-owner">
+            {journey.owner.words}
+          </span>
+        </Tip>
       )}
     </div>
   );
@@ -226,26 +241,30 @@ function Marker({ card }: { card: Card }) {
   const names = card.hiddenPrerequisites.map((key) => nodeTitle(actions?.title(key))).join(", ");
   const words = `Waits on ${plural(count, "hidden prerequisite")}`;
   const trace = actions?.trace;
-  const marker = { "data-testid": "hidden-prerequisites", "data-nodes": card.hiddenPrerequisites.join(" "), title: `Waits on ${names}` };
+  const marker = { "data-testid": "hidden-prerequisites", "data-nodes": card.hiddenPrerequisites.join(" ") };
   return (
     <div className="node-body-line">
       {trace === undefined ? (
         // A canvas with no trace (the insertion preview's) shows the marker as words, not a button that does nothing.
-        <span className="node-marker" {...marker}>
-          {words}
-        </span>
+        <Tip tip={`Waits on ${names}`}>
+          <span className="node-marker" {...marker}>
+            {words}
+          </span>
+        </Tip>
       ) : (
-        <button
-          type="button"
-          className="node-marker nodrag"
-          {...marker}
-          onClick={(event) => {
-            event.stopPropagation();
-            trace(card.key);
-          }}
-        >
-          {words}
-        </button>
+        <Tip tip={`Waits on ${names}`}>
+          <button
+            type="button"
+            className="node-marker nodrag"
+            {...marker}
+            onClick={(event) => {
+              event.stopPropagation();
+              trace(card.key);
+            }}
+          >
+            {words}
+          </button>
+        </Tip>
       )}
     </div>
   );
@@ -267,15 +286,19 @@ function Hanging({ data }: { data: CardData }) {
         </span>
       )}
       {mark === undefined || mark.quiet === true || mark.diff !== undefined ? null : (
-        <span className={`node-mark hang-tag top node-mark-${mark.tone}`} data-overhang="" data-testid="card-mark" data-status={mark.label} data-contributor={mark.contributor === true ? "" : undefined} title={mark.contributor === true ? CONTRIBUTOR_WORDS : mark.note}>
-          {mark.contributor === true ? <span className="node-mark-dot" aria-hidden="true" /> : null}
-          {mark.label}
-        </span>
+        <Tip tip={mark.contributor === true ? CONTRIBUTOR_WORDS : mark.note}>
+          <span className={`node-mark hang-tag top node-mark-${mark.tone}`} data-overhang="" data-testid="card-mark" data-status={mark.label} data-contributor={mark.contributor === true ? "" : undefined}>
+            {mark.contributor === true ? <span className="node-mark-dot" aria-hidden="true" /> : null}
+            {mark.label}
+          </span>
+        </Tip>
       )}
       {lens === undefined ? null : (
-        <span className={`node-lens hang-tag bottom lens-tier-${String(lens.tier)}`} data-overhang="" data-testid="card-lens" data-lens={lens.name} title={lens.chip.title}>
-          {lens.chip.text}
-        </span>
+        <Tip tip={lens.chip.title}>
+          <span className={`node-lens hang-tag bottom lens-tier-${String(lens.tier)}`} data-overhang="" data-testid="card-lens" data-lens={lens.name}>
+            {lens.chip.text}
+          </span>
+        </Tip>
       )}
     </>
   );
@@ -338,14 +361,20 @@ export function NodeCard({ data, width, height }: NodeProps<CardNode>) {
       data-parent={card.parent}
       data-x={data.place.x}
       data-y={data.place.y}
-      title={mark?.diff === undefined ? (here.length === 0 ? undefined : `I am here: ${here.join(", ")}`) : `${mark.label}: ${card.title}${mark.choice === true ? ", needs a choice" : ""}${mark.note === undefined ? "" : `. ${mark.note}`}`}
     >
+      {/* Under a proposal's layer, what the card's own words do not say: that it needs a choice, and the mark's note. */}
+      {mark?.diff === undefined || (mark.choice !== true && mark.note === undefined) ? null : (
+        <span className="visually-hidden">
+          {mark.choice === true ? "Needs a choice. " : ""}
+          {mark.note}
+        </span>
+      )}
       <Handle type="target" position={Position.Left} isConnectable={false} className="node-handle" data-overhang="" />
       {header === undefined ? (
         <div className="node-inner" style={{ height: "100%" }}>
           <Head card={card} collapsible={data.collapsible} mark={mark} />
           <TitleRow card={card} rows={rows} />
-          {journey?.body === undefined ? null : <Body body={journey.body} card={card} />}
+          {journey?.body === undefined ? null : <Body body={journey.body} />}
           <Foot card={card} />
           <Marker card={card} />
         </div>
@@ -355,7 +384,7 @@ export function NodeCard({ data, width, height }: NodeProps<CardNode>) {
           <div className="node-inner" style={{ height: header - BORDER_PX - (rows.marker ? MARKER_ROW_PX : 0) }}>
             <Head card={card} collapsible={data.collapsible} mark={mark} />
             <TitleRow card={card} rows={rows} head={{ box: headTitleBox(width ?? 0, header, rows.marker), chip: card.stage && journey !== undefined }} />
-            {journey?.body === undefined ? null : <Body body={journey.body} card={card} />}
+            {journey?.body === undefined ? null : <Body body={journey.body} />}
             <Foot card={card} owner={false} />
           </div>
           {rows.marker ? (

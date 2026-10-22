@@ -10,6 +10,7 @@ import { LineSample } from "./LineSample.tsx";
 import { LENSES, LINE_KINDS, type Lens } from "./model.ts";
 import { LINE_KIND_WORDS } from "./words.ts";
 import { plural } from "../ui/words.ts";
+import { Tip } from "../ui/Tip.tsx";
 
 /** The four kinds of line, drawn as the canvas draws them, for View, Key. */
 function Key() {
@@ -28,7 +29,7 @@ function Key() {
 /** A route's canvas button at the top right, where a journey's Signal button is: a route has no signals to show, so its menu is the key to the lines alone. */
 export function KeyMenu() {
   return (
-    <Menu label="Key to the lines" title="What the lines and their ends mean" testId="key-menu" role="dialog" align="end" className="canvas-signal" trigger={"Key \u25be"}>
+    <Menu label="Key to the lines" tip="What the lines and their ends mean" testId="key-menu" role="dialog" align="end" className="canvas-signal" trigger={"Key \u25be"}>
       {() => (
         <div className="stack" data-testid="key-panel">
           <Key />
@@ -45,7 +46,7 @@ export function SignalMenu({ lens, onLens }: { lens: Lens | undefined; onLens: (
   return (
     <Menu
       label={`Signal: ${lens === undefined ? "Off" : LENS_WORDS[lens]}`}
-      title="Which priority signal each card shows: rank, gravity, unlocks or slack"
+      tip="Which priority signal each card shows: rank, gravity, unlocks or slack"
       testId="view-menu"
       role="dialog"
       align="end"
@@ -85,15 +86,11 @@ export function RevealBox({ linked, revealed, onReveal, onHide }: { linked: numb
   }
   return (
     <Panel position="bottom-right" className="canvas-panel canvas-reveal">
-      <button
-        type="button"
-        className="button"
-        title={revealed ? "Draw only what the view shows again" : "Draw the nodes the trace reaches that have no card at this depth"}
-        data-testid="trace-reveal"
-        onClick={revealed ? onHide : onReveal}
-      >
-        {revealed ? "Hide revealed nodes" : `Reveal ${plural(linked, "linked node")}`}
-      </button>
+      <Tip tip={revealed ? "Draw only what the view shows again" : "Draw the nodes the trace reaches that have no card at this depth"}>
+        <button type="button" className="button" data-testid="trace-reveal" onClick={revealed ? onHide : onReveal}>
+          {revealed ? "Hide revealed nodes" : `Reveal ${plural(linked, "linked node")}`}
+        </button>
+      </Tip>
     </Panel>
   );
 }

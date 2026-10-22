@@ -141,7 +141,8 @@ function checkCuts(): string[] {
   /** The right edge of the text nodes `el` holds itself, whatever else it holds. */
   function ownTextRight(el: HTMLElement): number {
     const range = document.createRange();
-    let right = 0;
+    // Nothing when the element holds no text of its own: 0 would count as past the right edge of a card panned off to the left.
+    let right = -Infinity;
     for (const node of el.childNodes) {
       if (node.nodeType === Node.TEXT_NODE) {
         range.selectNodeContents(node);

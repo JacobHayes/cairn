@@ -12,7 +12,7 @@ import { checkpoint, expect, test } from "./test.ts";
 
 import { openRoute, routeMenuItem, savedText } from "./around.ts";
 import { TOAST_MS } from "../src/data/toasts.ts";
-import { SYNC_POPOVER_LEAVE_MS } from "../src/shell/sync-popover.ts";
+import { HOVER_LEAVE_MS } from "../src/ui/tip.ts";
 import { derivedRevision, expectAddress, fresh, goTo, goWithin, openJourney, recentSaves, rename, syncChip, visit, whenSettled } from "./shell.ts";
 
 const rail = (page: Page) => page.getByRole("navigation", { name: "Screens", exact: true });
@@ -147,9 +147,9 @@ test("the sync dot shows its popover on hover and focus, inside the window; it o
   }
   // The pointer leaves the dot and rests in the gap, then reaches the popover before the leave delay is up, and the popover stays past the first leave's deadline.
   await page.mouse.move(dot.x + dot.width / 2, (dot.y + dot.height + sheet.y) / 2);
-  await page.clock.runFor(SYNC_POPOVER_LEAVE_MS / 2);
+  await page.clock.runFor(HOVER_LEAVE_MS / 2);
   await page.mouse.move(sheet.x + sheet.width / 2, sheet.y + 20);
-  await page.clock.runFor(2 * SYNC_POPOVER_LEAVE_MS);
+  await page.clock.runFor(2 * HOVER_LEAVE_MS);
   await expect(popover).toBeVisible();
   await page.clock.resume();
   // Pinned, Esc closes it and the dot has the focus again.

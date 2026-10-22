@@ -2,19 +2,47 @@
 // these render): what screens compose, so they share one look in light and dark. Graticule
 // styles `button`, `input`, `select` and `textarea` as elements, so these add a class only for
 // a variant (`primary`, `ghost`), and `.field` is its labelled wrapper.
-import { useId, type ButtonHTMLAttributes, type InputHTMLAttributes, type ReactNode } from "react";
+import { useId, type ButtonHTMLAttributes, type HTMLAttributes, type InputHTMLAttributes, type ReactNode } from "react";
 
 import type { Capabilities } from "../data/host.ts";
 import { useCapabilities } from "../data/react.ts";
+import { Tip, type TipKind } from "./Tip.tsx";
 
+/**
+ * A button. `tip` is its tooltip (what pressing it does; `keys` is its key, `tipKind` is `name` for an
+ * icon-only one). `held` is a button that cannot act now and says why: it stays focusable
+ * (`aria-disabled`), a press does nothing but show the reason, and the reason is its description
+ * (a control with no reason to give is plainly `disabled`).
+ */
 export function Button({
   primary = false,
   ghost = false,
   className = "",
+  tip,
+  tipKind,
+  keys,
+  held,
+  onClick,
   ...props
-}: ButtonHTMLAttributes<HTMLButtonElement> & { primary?: boolean; ghost?: boolean }) {
+}: ButtonHTMLAttributes<HTMLButtonElement> & { primary?: boolean; ghost?: boolean; tip?: ReactNode; tipKind?: TipKind; keys?: string; held?: string | undefined }) {
   const classes = [primary ? "primary" : "", ghost ? "ghost" : "", className].filter(Boolean).join(" ");
-  return <button type="button" {...(classes === "" ? {} : { className: classes })} {...props} />;
+  const isHeld = held !== undefined;
+  const button = (
+    <button
+      type="button"
+      {...(classes === "" ? {} : { className: classes })}
+      {...props}
+      {...(isHeld ? { "aria-disabled": true, onClick: (event: { preventDefault: () => void }) => { event.preventDefault(); } } : { onClick })}
+    />
+  );
+  if (isHeld) {
+    return <Tip tip={held} tap>{button}</Tip>;
+  }
+  return (
+    <Tip tip={tip} {...(tipKind === undefined ? {} : { kind: tipKind })} {...(keys === undefined ? {} : { keys })}>
+      {button}
+    </Tip>
+  );
 }
 
 /** A text input: Graticule styles it as an element. With a `label`, it sits under a mono label in a `.field`. */
@@ -43,19 +71,19 @@ export type Tone = "plain" | "done" | "good" | "warn" | "bad" | "pending" | "ink
 
 export function Badge({
   tone = "plain",
+  className,
   children,
   ...rest
-}: {
+}: Omit<HTMLAttributes<HTMLSpanElement>, "title"> & {
   tone?: Tone;
   children: ReactNode;
   "data-testid"?: string;
   "data-status"?: string;
   /** The kind of change a proposal's layer makes to what this chip says (proposals/layer.ts). */
   "data-diff"?: string;
-  title?: string;
 }) {
   return (
-    <span className={tone === "plain" ? "badge" : `badge ${tone}`} {...rest}>
+    <span className={[tone === "plain" ? "badge" : `badge ${tone}`, className].filter(Boolean).join(" ")} {...rest}>
       {children}
     </span>
   );
@@ -82,7 +110,7 @@ export function Segmented<T extends string>({
 }: {
   label: string;
   value: T;
-  options: readonly { value: T; label: string; title?: string }[];
+  options: readonly { value: T; label: string }[];
   onChange: (value: T) => void;
   "data-testid"?: string;
 }) {
@@ -90,7 +118,7 @@ export function Segmented<T extends string>({
   return (
     <div className="segmented" role="radiogroup" aria-label={label} {...rest}>
       {options.map((option) => (
-        <label key={option.value} {...(option.title === undefined ? {} : { title: option.title })}>
+        <label key={option.value}>
           <input
             type="radio"
             name={name}

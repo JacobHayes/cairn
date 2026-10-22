@@ -4,10 +4,11 @@ import { createActor } from "xstate";
 import { describe, expect, it } from "vitest";
 
 import { CountingClock } from "../data/fake.test-support.ts";
-import { SYNC_POPOVER_LEAVE_MS, popoverAnchor, popoverPinned, popoverShown, syncPopover, type Anchor, type PopoverEvent } from "./sync-popover.ts";
+import { HOVER_LEAVE_MS } from "../ui/tip.ts";
+import { popoverAnchor, popoverPinned, popoverShown, syncPopover, type Anchor, type PopoverEvent } from "./sync-popover.ts";
 
-const here: Anchor = { top: 20, left: 30 };
-const there: Anchor = { top: 40, left: 50 };
+const here: Anchor = { top: 20, left: 30, width: 10, height: 10 };
+const there: Anchor = { top: 40, left: 50, width: 10, height: 10 };
 
 function popover() {
   const clock = new CountingClock();
@@ -34,7 +35,7 @@ describe("the sync chip's popover", () => {
     send({ type: "peek", anchor: here });
     expect(state()).toEqual({ shown: true, pinned: false });
     send({ type: "unpeek" });
-    advance(SYNC_POPOVER_LEAVE_MS - 1);
+    advance(HOVER_LEAVE_MS - 1);
     expect(state().shown).toBe(true);
     advance(1);
     expect(state().shown).toBe(false);
@@ -46,7 +47,7 @@ describe("the sync chip's popover", () => {
     send({ type: "unpeek" });
     advance(100);
     send({ type: "peek", anchor: here });
-    advance(SYNC_POPOVER_LEAVE_MS);
+    advance(HOVER_LEAVE_MS);
     expect(state().shown).toBe(true);
   });
 
@@ -56,7 +57,7 @@ describe("the sync chip's popover", () => {
     send({ type: "unpeek" });
     advance(100);
     send({ type: "unpeek" });
-    advance(SYNC_POPOVER_LEAVE_MS - 1);
+    advance(HOVER_LEAVE_MS - 1);
     expect(state().shown).toBe(true);
     advance(1);
     expect(state().shown).toBe(false);
@@ -70,7 +71,7 @@ describe("the sync chip's popover, pinned and closed", () => {
     send({ type: "pin", anchor: here });
     send({ type: "peek", anchor: here });
     send({ type: "unpeek" });
-    advance(SYNC_POPOVER_LEAVE_MS);
+    advance(HOVER_LEAVE_MS);
     expect(state()).toEqual({ shown: true, pinned: true });
     send({ type: "pin", anchor: here });
     expect(state()).toEqual({ shown: false, pinned: false });
@@ -94,7 +95,7 @@ describe("the sync chip's popover, pinned and closed", () => {
     expect(clock.pending).toEqual([]);
     // Coming back after the close starts a new peek that the old beat cannot end.
     send({ type: "peek", anchor: here });
-    advance(SYNC_POPOVER_LEAVE_MS);
+    advance(HOVER_LEAVE_MS);
     expect(state().shown).toBe(true);
   });
 

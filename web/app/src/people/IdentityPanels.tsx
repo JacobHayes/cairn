@@ -299,7 +299,7 @@ export function SeveralIdentities({ members, deployment, yours, reading, refresh
                 <Emails identity={member} />
               </span>
               <div className="row-side">
-                <Button ghost aria-label={`Remove ${identityLabel(member)} from the selection`} title="Remove from the selection" onClick={() => { selection.toggle(member.key); }}>×</Button>
+                <Button ghost aria-label={`Remove ${identityLabel(member)} from the selection`} tip="Remove from the selection" tipKind="name" onClick={() => { selection.toggle(member.key); }}>×</Button>
               </div>
             </div>
           </li>

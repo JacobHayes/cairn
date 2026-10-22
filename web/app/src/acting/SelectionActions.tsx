@@ -127,12 +127,12 @@ export function SelectionActions({ view, selected, onLanded, structure }: { view
     const reasons = offers.map(why);
     const none = reasons.every((reason) => reason !== undefined);
     return (
-      <Menu label={label} testId={`selection-${label.toLowerCase()}`} trigger={`${label} ▾`} title={none ? (reasons[0] ?? label) : label}>
+      <Menu label={label} testId={`selection-${label.toLowerCase()}`} trigger={`${label} ▾`} tip={none ? reasons[0] : undefined}>
         {(close) =>
           offers.map((offer, at) => (
-            <button key={offer.words} type="button" role="menuitem" className="menu-item" disabled={write.disabled || reasons[at] !== undefined} title={reasons[at]} onClick={() => { close(); pick(offer); }}>
+            <Button key={offer.words} role="menuitem" className="menu-item" disabled={write.disabled} held={write.disabled ? undefined : reasons[at]} onClick={() => { close(); pick(offer); }}>
               {offer.words}
-            </button>
+            </Button>
           ))
         }
       </Menu>

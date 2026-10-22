@@ -8,6 +8,7 @@ import { useEffect, useLayoutEffect, useRef, type KeyboardEvent as ReactKeyboard
 import { createPortal } from "react-dom";
 
 import { menuFocusTarget } from "./menuKeys.ts";
+import { place, windowBounds } from "./place.ts";
 
 /** The space a menu keeps from the window's edge (px). */
 const EDGE_PX = 8;
@@ -56,11 +57,10 @@ export function ContextMenu({ at, groups, label, onChoose, onClose }: { at: { x:
     if (root.current === null || box === undefined) {
       return;
     }
-    // Slid back inside the window when the pointer is near its right or lower edge.
-    const left = Math.max(EDGE_PX, Math.min(at.x, document.documentElement.clientWidth - box.width - EDGE_PX));
-    const top = Math.max(EDGE_PX, Math.min(at.y, window.innerHeight - box.height - EDGE_PX));
-    root.current.style.setProperty("left", `${String(left)}px`);
-    root.current.style.setProperty("top", `${String(top)}px`);
+    // At the pointer, slid back inside the window when it is near the right or lower edge.
+    const placed = place({ left: at.x, top: at.y, width: 0, height: 0 }, box, windowBounds(), { side: "bottom", align: "start", gap: 0, margin: EDGE_PX });
+    root.current.style.setProperty("left", `${String(placed.left)}px`);
+    root.current.style.setProperty("top", `${String(placed.top)}px`);
     items()[0]?.focus();
   }, [at]);
   useEffect(() => {

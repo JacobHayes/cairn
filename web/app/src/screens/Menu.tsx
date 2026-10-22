@@ -14,6 +14,8 @@
 import { useCallback, useEffect, useLayoutEffect, useRef, useState, type KeyboardEvent as ReactKeyboardEvent, type ReactNode, type RefObject } from "react";
 
 import { menuFocusTarget } from "../ui/menuKeys.ts";
+import { place, windowBounds } from "../ui/place.ts";
+import { Tip } from "../ui/Tip.tsx";
 
 /** The space a popover keeps from the window's edge (px). */
 const EDGE_PX = 16;
@@ -30,34 +32,34 @@ function roomOf(popover: HTMLElement): { top: number; bottom: number } {
 }
 
 /**
- * Keeps the popover in view when it opens: slid back from a side of the window it runs past,
- * and as tall as the room below its button, or above it when that is more and the popover
- * does not fit below (the inspector's action row sits low in a column that clips it).
+ * Keeps the popover in view when it opens, by the app's one placement (`place()`): slid back from
+ * a side of the window it runs past, as tall as the room below its button, or above it when that
+ * is more and the popover does not fit below (the inspector's action row sits low in a column that
+ * clips it). The popover stays under its button in the DOM, so this only moves it (a `translateX`
+ * for the slide, `data-side` for the flip).
  */
-function useInWindow(popover: RefObject<HTMLDivElement | null>, body: RefObject<HTMLDivElement | null>, open: boolean): void {
+function useInWindow(popover: RefObject<HTMLDivElement | null>, body: RefObject<HTMLDivElement | null>, align: "start" | "end", open: boolean): void {
   useLayoutEffect(() => {
     const box = popover.current?.getBoundingClientRect();
     const button = popover.current?.parentElement?.getBoundingClientRect();
     if (popover.current === null || box === undefined || button === undefined) {
       return;
     }
-    const width = document.documentElement.clientWidth;
-    const slide = Math.max(EDGE_PX - box.left, Math.min(0, width - EDGE_PX - box.right));
+    const room = roomOf(popover.current);
+    const at = place(button, box, { ...windowBounds(), top: room.top, height: room.bottom - room.top }, { side: "bottom", align, gap: 0, margin: EDGE_PX });
+    const slide = at.left - box.left;
     if (slide !== 0) {
       popover.current.style.setProperty("transform", `translateX(${String(slide)}px)`);
     }
-    const room = roomOf(popover.current);
-    const below = room.bottom - box.top - EDGE_PX;
-    const above = button.top - room.top - EDGE_PX;
-    const flip = box.height > below && above > below;
-    popover.current.dataset["side"] = flip ? "top" : "bottom";
+    popover.current.dataset["side"] = at.side;
     // DESIGN, Popover and menu: the body scrolls within the room; the stylesheet's cap (--popover-body-max) holds it to that room or less.
-    body.current?.style.setProperty("--popover-room", `${String(Math.max(flip ? above : below, 0))}px`);
-  }, [popover, body, open]);
+    body.current?.style.setProperty("--popover-room", `${String(Math.max(at.room, 0))}px`);
+  }, [popover, body, align, open]);
 }
 
 /** The items of a menu of actions that can take the focus (a disabled button cannot), in the order drawn. */
 function enabledItems(popover: HTMLElement | null): HTMLElement[] {
+  // A held item (aria-disabled) is reached, so its reason can be read.
   return [...(popover?.querySelectorAll<HTMLElement>('[role="menuitem"]:not(:disabled)') ?? [])];
 }
 
@@ -144,24 +146,17 @@ function useMenuKeys(
   return { onButtonKeyDown, onPopoverKeyDown, onClick };
 }
 
-/** The menu's items are drawn by `children`, given the way to close it. */
-export function Menu({
-  trigger,
-  label,
-  title,
-  testId,
-  align = "start",
-  className = "",
-  role = "menu",
-  tour,
-  children,
-}: {
+interface MenuProps {
   /** What the button shows. */
   trigger: ReactNode;
   /** The button's accessible name. */
   label: string;
-  /** A tooltip for the button. */
-  title?: string;
+  /** The button's tooltip: what it does. Left out when its label already says it. */
+  tip?: ReactNode;
+  /** `name` for an icon-only button, whose tooltip shows its accessible name. */
+  tipKind?: "describe" | "name";
+  /** The key that opens it, drawn in the tooltip. */
+  keys?: string;
   testId: string;
   align?: "start" | "end";
   className?: string;
@@ -169,14 +164,17 @@ export function Menu({
   role?: "menu" | "dialog";
   tour?: string;
   children: (close: () => void) => ReactNode;
-}) {
+}
+
+/** The menu's items are drawn by `children`, given the way to close it. */
+export function Menu({ trigger, label, tip, tipKind = "describe", keys, testId, align = "start", className = "", role = "menu", tour, children }: MenuProps) {
   const [open, setOpen] = useState(false);
   const root = useRef<HTMLSpanElement>(null);
   const button = useRef<HTMLButtonElement>(null);
   const popover = useRef<HTMLDivElement>(null);
   const body = useRef<HTMLDivElement>(null);
   // Placed first: focus moves into the popover only once it is placed.
-  useInWindow(popover, body, open);
+  useInWindow(popover, body, align, open);
   const keyboard = useMenuKeys(role === "menu", open, setOpen, button, popover);
   const close = useCallback(() => { setOpen(false); }, []);
   // A close the person made inside the popover hands the focus back to the button, which is
@@ -190,21 +188,22 @@ export function Menu({
   useDismiss(open, root, close, closeToButton);
   return (
     <span ref={root} className={`dropdown dropdown-${align} ${className}`.trim()}>
-      <button
-        ref={button}
-        type="button"
-        className="button dropdown-button"
-        aria-haspopup={role}
-        aria-expanded={open}
-        aria-label={label}
-        {...(title === undefined ? {} : { title })}
-        data-testid={testId}
-        {...(tour === undefined ? {} : { "data-tour": tour })}
-        onKeyDown={keyboard.onButtonKeyDown}
-        onClick={keyboard.onClick}
-      >
-        {trigger}
-      </button>
+      <Tip tip={tip} kind={tipKind} {...(keys === undefined ? {} : { keys })}>
+        <button
+          ref={button}
+          type="button"
+          className="button dropdown-button"
+          aria-haspopup={role}
+          aria-expanded={open}
+          aria-label={label}
+          data-testid={testId}
+          {...(tour === undefined ? {} : { "data-tour": tour })}
+          onKeyDown={keyboard.onButtonKeyDown}
+          onClick={keyboard.onClick}
+        >
+          {trigger}
+        </button>
+      </Tip>
       {open ? (
         <div ref={popover} className="popover dropdown-popover" role={role} data-popover="" data-overhang="" data-testid={`${testId}-menu`} onKeyDown={keyboard.onPopoverKeyDown}>
           <div ref={body} className="popover-body stack">

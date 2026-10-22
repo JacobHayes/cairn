@@ -24,12 +24,13 @@ import { Button } from "../ui/kit.tsx";
 import { plural } from "../ui/words.ts";
 import { Receipt } from "../ui/Receipt.tsx";
 import { Menu } from "./Menu.tsx";
-import { JOURNEY_VIEW_TITLE, ViewPicker } from "./ViewPicker.tsx";
+import { JOURNEY_VIEW_TIP, ViewPicker } from "./ViewPicker.tsx";
 import { RejectionView } from "./RejectionView.tsx";
 import { WriteStatus } from "./WriteStatus.tsx";
 import { useScreenWrite, type ScreenWrite } from "./write.ts";
 import { useWritable } from "./writable.ts";
 import { JourneyStatusBadge, STATUS_WORDS } from "../journeys/StatusBadge.tsx";
+import { Tip } from "../ui/Tip.tsx";
 
 type Panel = JourneyFlowName | "delete";
 
@@ -46,7 +47,6 @@ function StatusItems({ ready, write, onDelete, close }: { ready: Ready; write: S
         aria-expanded={open}
         data-testid="menu-status"
         data-status={header.status}
-        title="The journey's status: open it to change it"
         onClick={() => { setOpen(!open); }}
       >
         Status
@@ -195,18 +195,20 @@ export function JourneyHeader({ ready, view, screen, selected }: { ready: Ready;
     <section className="stack journey-header" aria-label={header.name} data-testid="journey-header">
       <div className="row">
         <div className="journey-header-title">
-          <h1 data-testid="journey-name" data-expanded={nameOpen} data-diff={renamed ? "changed" : undefined} title={renamed ? `Was: ${was.name}` : header.name}>
+          <h1 data-testid="journey-name" data-expanded={nameOpen} data-diff={renamed ? "changed" : undefined}>
             {/* A long name is clamped to one line (three on a phone); a tap or click reads it whole, where a tooltip cannot be reached. */}
-            <button ref={nameButton} type="button" className="journey-name-toggle" aria-expanded={nameOpen} onClick={() => { setNameOpen(!nameOpen); }}>
-              {header.name}
-            </button>
+            <Tip tip={renamed ? `Was: ${was.name}` : undefined}>
+              <button ref={nameButton} type="button" className="journey-name-toggle" aria-expanded={nameOpen} onClick={() => { setNameOpen(!nameOpen); }}>
+                {header.name}
+              </button>
+            </Tip>
             {clamped ? <span className="journey-name-cue" aria-hidden="true" data-testid="journey-name-cue">{nameOpen ? "\u25b4" : "\u25be"}</span> : null}
           </h1>
           <JourneyStatusBadge status={header.status} changed={was !== undefined && was.status !== header.status} />
         </div>
         <JourneyAssistant journey={header.id} titleOf={journeyTitles(ready)} />
         <div className="journey-header-actions">
-          <ViewPicker screen={screen} screens={JOURNEY_OFFERS.screens} to={(to) => screenSwitched(target, search, to)} title={JOURNEY_VIEW_TITLE} unavailable={unavailableScreens(target)} />
+          <ViewPicker screen={screen} screens={JOURNEY_OFFERS.screens} to={(to) => screenSwitched(target, search, to)} tip={JOURNEY_VIEW_TIP} unavailable={unavailableScreens(target)} />
           <JourneyMenu ready={ready} view={view} screen={screen} selected={selected} write={write} onPanel={setPanel} />
         </div>
       </div>

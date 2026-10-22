@@ -26,7 +26,7 @@ export interface ShownKey {
   key: string;
   /** The text it sits in, cut around it. */
   around: string;
-  /** Where on the page: visible text, or the attribute (title, aria-label, placeholder, alt) it is in. */
+  /** Where on the page: visible text, or the tooltip, or the attribute (aria-label, placeholder, alt) it is in. */
   where: string;
 }
 
@@ -34,12 +34,16 @@ export interface ShownKey {
 export async function shownKeys(page: Page): Promise<ShownKey[]> {
   const shown = await page.evaluate(() => {
     const found: { where: string; text: string }[] = [{ where: "text", text: document.body.innerText }];
-    for (const element of document.body.querySelectorAll("[title], [aria-label], [placeholder], [alt]")) {
+    // A tip's words, open or closed: a closed one is not drawn, but it is read as the description of what it belongs to.
+    for (const tip of document.body.querySelectorAll('[role="tooltip"]')) {
+      found.push({ where: "tooltip", text: tip.textContent });
+    }
+    for (const element of document.body.querySelectorAll("[aria-label], [placeholder], [alt]")) {
       const style = getComputedStyle(element);
       if (style.display === "none" || style.visibility === "hidden") {
         continue;
       }
-      for (const attribute of ["title", "aria-label", "placeholder", "alt"]) {
+      for (const attribute of ["aria-label", "placeholder", "alt"]) {
         const text = element.getAttribute(attribute);
         if (text !== null) {
           found.push({ where: attribute, text });

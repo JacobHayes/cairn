@@ -30,9 +30,7 @@ import { Button } from "../ui/kit.tsx";
 import { ActiveFilters } from "./ActiveFilters.tsx";
 import type { Badge } from "./badge.ts";
 import { Menu } from "./Menu.tsx";
-
-/** The jargon term's words, in its tooltip. */
-const FRONTIER_WORDS = "What can move now: work that is ready and decisions that can be made, ranked by what they unlock and how soon they are due.";
+import { Tip } from "../ui/Tip.tsx";
 
 /** What the view hides, as it says it: the badges on Filter and Depth, and in the open Filter the count each setting hides (journeys/requests.ts, `badgesOf`). */
 export interface Badges {
@@ -126,7 +124,7 @@ function DepthMenu({ subject, screen, badge }: { subject: ViewSubject; screen: S
   return (
     <Menu
       label={`Depth: ${STEP_WORDS[step]}`}
-      title={tip(`How deep ${subject.journey === undefined ? "the route" : "the journey"} is drawn: each step draws down to its kind, 1 to 4${fading ? ". The rest is faded, not hidden" : ""}`, badge)}
+      tip={tip(`How deep ${subject.journey === undefined ? "the route" : "the journey"} is drawn: each step draws down to its kind, 1 to 4${fading ? ". The rest is faded, not hidden" : ""}`, badge)}
       testId="depth-button"
       role="dialog"
       className="view-control"
@@ -199,7 +197,7 @@ function FilterMenu({ subject, screen, badges }: { subject: ViewSubject; screen:
   return (
     <Menu
       label="Filter"
-      title={tip("Filter what is drawn", badges?.filter)}
+      tip={badges?.filter === undefined || badges.filter.count === 0 ? undefined : badges.filter.words}
       testId="filter-button"
       role="dialog"
       className={filterChanged(state.filter) ? "view-control menu-pressed" : "view-control"}
@@ -253,24 +251,25 @@ function SearchBox({ text, onSearch }: { text: string; onSearch: (text: string) 
         }
       }}
     >
-      <input
-        type="search"
-        aria-label="Search"
-        placeholder="Search"
-        title="Search titles, descriptions, notes and resources, then Enter  /"
-        data-testid="toolbar-search"
-        data-search-input=""
-        name="q"
-        value={typed}
-        onChange={(event) => {
-          event.target.setCustomValidity("");
-          setTyped(event.target.value);
-          // Emptying the box (its own clear button too) takes an applied search off at once: no filter stays on unseen.
-          if (event.target.value === "" && text !== "") {
-            onSearch("");
-          }
-        }}
-      />
+      <Tip tip="Search titles, descriptions, notes and resources, then Enter" keys="/">
+        <input
+          type="search"
+          aria-label="Search"
+          placeholder="Search"
+          data-testid="toolbar-search"
+          data-search-input=""
+          name="q"
+          value={typed}
+          onChange={(event) => {
+            event.target.setCustomValidity("");
+            setTyped(event.target.value);
+            // Emptying the box (its own clear button too) takes an applied search off at once: no filter stays on unseen.
+            if (event.target.value === "" && text !== "") {
+              onSearch("");
+            }
+          }}
+        />
+      </Tip>
     </form>
   );
 }
@@ -284,18 +283,18 @@ function FrontierChip({ subject, screen }: { subject: ViewSubject; screen: Scree
   }
   const off = SCREEN_VIEWS[screen].frontier;
   return (
-    <button
-      type="button"
+    <Button
       className="chip"
       aria-pressed={state.frontier}
-      disabled={off !== undefined}
-      title={off ?? `Frontier  Shift F. ${String(journey.derived.acting_frontier.length)} can move now. ${FRONTIER_WORDS}`}
+      held={off}
+      tip={`Light up what can move now: ${String(journey.derived.acting_frontier.length)}`}
+      keys="Shift F"
       data-testid="chip-frontier"
       data-tour="frontier"
       onClick={() => { onState({ ...state, frontier: !state.frontier }); }}
     >
       Frontier
-    </button>
+    </Button>
   );
 }
 
@@ -321,7 +320,7 @@ export function EmptyPanel({ testId, children }: { testId: string; children: Rea
 export function ResetView() {
   const { state, onState } = useViewState();
   return isStock(state) ? null : (
-    <Button ghost title="Back to Actions depth, the stock filter and no search" data-testid="reset-view" onClick={() => { onState(stockView(state), true); }}>
+    <Button ghost tip="Back to Actions depth, the stock filter and no search" data-testid="reset-view" onClick={() => { onState(stockView(state), true); }}>
       Reset the view
     </Button>
   );
@@ -344,7 +343,7 @@ function PhoneControls({ subject, screen, badges, end }: { subject: ViewSubject;
     <div className="view-controls row" role="toolbar" aria-label="View controls" data-testid="view-controls">
       <Menu
         label="Controls"
-        title={tip(subject.offers.frontier ? "Depth, Frontier, filter and search" : "Depth, filter and search", total)}
+        tip={tip(subject.offers.frontier ? "Depth, Frontier, filter and search" : "Depth, filter and search", total)}
         testId="controls-button"
         tour="controls"
         role="dialog"

@@ -85,13 +85,13 @@
 }
 
 /* A row is one fixed height: a long title takes one line and ends in an ellipsis rather than run into the next row; the label's title holds it whole. */
-.timeline-text > :not(.timeline-words) {
+.timeline-text > :not(.timeline-words, .tip) {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
-/* One line: a long sentence ends in an ellipsis and its title attribute holds it whole. */
+/* One line: a long sentence ends in an ellipsis and its tooltip holds it whole. */
 .timeline-words {
   overflow: hidden;
   text-overflow: ellipsis;
@@ -133,7 +133,7 @@
 }
 
 /* Snoozed work is not now: its title at --opacity-snoozed, as on a card and a List row (the chip stays), never under the out-of-focus fade. */
-.timeline-label[data-state="snoozed"]:not([data-faded="true"]) .timeline-text > :not(.timeline-words) {
+.timeline-label[data-state="snoozed"]:not([data-faded="true"]) .timeline-text > :not(.timeline-words, .tip) {
   opacity: var(--opacity-snoozed);
 }
 

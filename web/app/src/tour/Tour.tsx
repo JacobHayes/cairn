@@ -403,7 +403,7 @@ function Band({ api, run }: { api: TourApi; run: string }) {
       </div>
       <div className="tour-actions">
         {index === 0 ? null : <Button data-testid="tour-back" onClick={() => { api.arrive(index - 1); }}>Back</Button>}
-        <Button primary aria-disabled={!done} title={done ? undefined : step.waits} data-testid="tour-next" onClick={next}>
+        <Button primary aria-disabled={!done} held={done ? undefined : step.waits} data-testid="tour-next" onClick={next}>
           {last ? "Finish the tour" : "Next"}
         </Button>
         <Button ghost data-testid="tour-skip" onClick={() => { api.end("skip"); }}>Skip the tour</Button>

@@ -12,6 +12,7 @@ import { titleOf, type Ready } from "./model.ts";
 import { assignOwner } from "../acting/acts.ts";
 import { identityName } from "./sections.tsx";
 import type { NodeWrite } from "./write.ts";
+import { Tip } from "../ui/Tip.tsx";
 
 /** B2: an answer's rationale as the journey records it, rendered as markdown. */
 export function Rationale({ text }: { text: string | undefined }) {
@@ -24,7 +25,7 @@ export function Rationale({ text }: { text: string | undefined }) {
 }
 
 /**
- * A link to a node, by its title (also its tooltip, for when a narrow place cuts it). It opens the
+ * A link to a node, by its title (whole in its tooltip while a narrow place cuts it). It opens the
  * node's detail beside the screen, keeping the view and what it shows, unless `to` says where
  * else. The title comes from the journey `view`, or from `title` where there is no journey view
  * (a route, an assistant reply); any other attribute goes to the link.
@@ -34,9 +35,11 @@ export function NodeLink({ node, to, ...rest }: { node: string; to?: string } & 
   const { view, title, ...link } = rest;
   const words = view === undefined ? title : titleOf(view, node);
   return (
-    <Link to={to ?? addresses.open(node)} data-node={node} title={words} {...link}>
-      {words}
-    </Link>
+    <Tip tip={words} kind="cut">
+      <Link to={to ?? addresses.open(node)} data-node={node} {...link}>
+        {words}
+      </Link>
+    </Tip>
   );
 }
 

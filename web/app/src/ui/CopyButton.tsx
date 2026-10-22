@@ -39,7 +39,7 @@ export function CopyButton({ what, text }: { what: string; text: string }) {
   const said = outcome?.what === "copied" ? "Copied" : outcome?.what === "failed" ? "Copy failed" : undefined;
   return (
     <>
-      <Button onClick={copy} aria-label={`Copy ${what}`} title={`Copy ${what} to the clipboard`} data-outcome={outcome?.what}>
+      <Button onClick={copy} aria-label={`Copy ${what}`} data-outcome={outcome?.what}>
         {said ?? "Copy"}
       </Button>
       {/* Heard, not only seen: the button's name stays the thing it copies. */}

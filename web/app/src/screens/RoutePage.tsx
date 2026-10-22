@@ -45,7 +45,7 @@ import { useRouteRead, VersionCard } from "../routes/RouteCard.tsx";
 import { InsertionCanvas } from "../segments/Preview.tsx";
 import { useInserting } from "../segments/entry.ts";
 import { InsertStepper } from "../segments/Stepper.tsx";
-import { COLUMN, Inspector, PHONE_WIDTH, useFrameActions, useMedia } from "../shell/frame.tsx";
+import { COLUMN, Inspector, PHONE_WIDTH, useFrameActions, useMedia, usePageKeys } from "../shell/frame.tsx";
 import { useEscapeTo } from "../shell/useEscapeTo.ts";
 import { treeOf } from "../authoring/graph.ts";
 import { RouteTimeline } from "../timeline/RouteTimeline.tsx";
@@ -343,13 +343,15 @@ function LayerPage({ id, proposal, selected, write, imports }: { id: string; pro
   const value = useViewStateValue(viewState);
   const [sheetOpen, setSheetOpen] = useState(false);
   const screen = routeScreenOf(params);
+  const bindings = useMemo(() => keyBindingsFor(ROUTE_OFFERS, { screen, acts: false }), [screen]);
+  usePageKeys(bindings, setSheetOpen);
   return (
     <RouteLayerHost id={id} proposal={proposal}>
       {(shown, route) => (
         <ViewStateContext value={value}>
           <LayerViewKeys id={id} proposal={proposal} shown={shown} screen={screen} state={viewState} onState={value.onState} sheetOpen={sheetOpen} setSheetOpen={setSheetOpen} />
           <LayerBody shown={shown} route={route} selected={selected} write={write} imports={imports} />
-          {sheetOpen ? <KeySheet bindings={keyBindingsFor(ROUTE_OFFERS, { screen, acts: false })} onClose={() => { setSheetOpen(false); }} /> : null}
+          {sheetOpen ? <KeySheet bindings={bindings} onClose={() => { setSheetOpen(false); }} /> : null}
         </ViewStateContext>
       )}
     </RouteLayerHost>
@@ -425,11 +427,13 @@ function Loaded({ shown, selected, edge, write, imports, result, setResult }: { 
     viewAddress: (to) => routeSwitched(id, search, to, selected),
   });
   const frame = { selected, edge, derived, write, result, setResult, imports };
+  const bindings = useMemo(() => keyBindingsFor(ROUTE_OFFERS, { screen, acts: false }), [screen]);
+  usePageKeys(bindings, setSheetOpen);
   const authored = useAuthored(shown);
   return (
     <ViewStateContext value={value}>
       {draft ? authored === undefined ? <p className="muted small">Reading the route...</p> : <DraftFrame {...frame} shown={shown} authored={authored} /> : <VersionFrame {...frame} shown={shown} />}
-      {sheetOpen ? <KeySheet bindings={keyBindingsFor(ROUTE_OFFERS, { screen, acts: false })} onClose={() => { setSheetOpen(false); }} /> : null}
+      {sheetOpen ? <KeySheet bindings={bindings} onClose={() => { setSheetOpen(false); }} /> : null}
     </ViewStateContext>
   );
 }

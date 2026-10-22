@@ -20,7 +20,7 @@ import { useWritable } from "../screens/writable.ts";
 import { RouteFacts, useRouteRead } from "../routes/RouteCard.tsx";
 import { draftWords, VersionSelect } from "../routes/VersionSelect.tsx";
 import type { Screen } from "../journeys/address.ts";
-import { ROUTE_VIEW_TITLE, ViewPicker } from "../screens/ViewPicker.tsx";
+import { ROUTE_VIEW_TIP, ViewPicker } from "../screens/ViewPicker.tsx";
 import { Menu } from "../screens/Menu.tsx";
 import { violationNode, type Violation } from "../data/writes.ts";
 import { RejectionView } from "../screens/RejectionView.tsx";
@@ -32,6 +32,7 @@ import type { Authored } from "./target.ts";
 import { usePublishPreviewRead } from "./write.ts";
 import { RetiredBadge } from "../routes/RetiredBadge.tsx";
 import { DeleteRoute, deleteRouteLabel, DeletingRoute } from "../routes/DeleteRoute.tsx";
+import { Tip } from "../ui/Tip.tsx";
 
 type Notice = Schema<"Notice">;
 
@@ -130,14 +131,16 @@ export function RouteHeader({ route, of, screen, node, write, blocked, onPublish
     <section className="stack route-header" aria-label={route.header.name} data-testid="route-header">
       <div className="row">
         {segment ? <span className="label" data-testid="route-kind">Segment</span> : null}
-        <h1 data-testid="route-name" title={route.header.name}>{route.header.name}</h1>
-        {of === undefined ? null : reviewing ? <Badge data-testid="version-select" title="The proposal is shown over this graph">{of === "draft" ? draftWords(route) : `Version ${String(of)}`}</Badge> : <VersionSelect route={route} of={of} />}
+        <Tip tip={route.header.name} kind="cut" tap>
+          <h1 data-testid="route-name">{route.header.name}</h1>
+        </Tip>
+        {of === undefined ? null : reviewing ? <Tip tip="The proposal is shown over this graph" tap><Badge data-testid="version-select">{of === "draft" ? draftWords(route) : `Version ${String(of)}`}</Badge></Tip> : <VersionSelect route={route} of={of} />}
         {route.header.retired === true ? <RetiredBadge kind={route.header.kind} /> : null}
         <span className="spacer" />
         <AssistantDock target={{ route: id }} titleOf={titleOf} />
-        {screen === undefined ? null : <ViewPicker screen={screen} screens={ROUTE_OFFERS.screens} to={(to) => routeSwitched(id, search, to, node, proposal)} title={ROUTE_VIEW_TITLE} />}
+        {screen === undefined ? null : <ViewPicker screen={screen} screens={ROUTE_OFFERS.screens} to={(to) => routeSwitched(id, search, to, node, proposal)} tip={ROUTE_VIEW_TIP} />}
         {!writable || deleting.asking ? null : drafting ? (
-          <Button primary disabled={write.disabled || blocked !== undefined} title={blocked} data-testid="publish-draft" onClick={onPublish}>
+          <Button primary disabled={write.disabled} held={write.disabled ? undefined : blocked} data-testid="publish-draft" onClick={onPublish}>
             Publish
           </Button>
         ) : of !== undefined && route.draft == null ? (
@@ -224,7 +227,7 @@ export function DraftCard({ route, violations, notices, hrefOf, write, blocked, 
       <NoticeList notices={notices} hrefOf={hrefOf} />
       {deleting.asking ? null : (
         <span className="row">
-        <Button primary disabled={write.disabled || blocked !== undefined} title={blocked} onClick={onPublish}>
+        <Button primary disabled={write.disabled} held={write.disabled ? undefined : blocked} onClick={onPublish}>
           Publish
         </Button>
           <Button disabled={write.disabled} onClick={onDiscard}>

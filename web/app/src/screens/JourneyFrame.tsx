@@ -30,7 +30,7 @@ import { DestinationProposals } from "../proposals/DestinationProposals.tsx";
 import { JourneyLayerHost } from "../proposals/Hosts.tsx";
 import { useLayer, useReviewing } from "../proposals/layer.ts";
 import { Rail } from "../proposals/Rail.tsx";
-import { COLUMN, Inspector, PHONE_WIDTH, useMedia } from "../shell/frame.tsx";
+import { COLUMN, Inspector, PHONE_WIDTH, useMedia, usePageKeys } from "../shell/frame.tsx";
 import { InsertEntryContext, useInserting } from "../segments/entry.ts";
 import { InsertStepper, type InsertPreview } from "../segments/Stepper.tsx";
 import { JourneyHeader } from "./JourneyHeader.tsx";
@@ -203,6 +203,8 @@ function ReadyFrame({ ready, screen, selected, edge }: { ready: Ready } & Omit<F
   const line = selected === undefined && inserting.at === undefined && !reviewing && selection.members.length < 2 ? edge : undefined;
   const [sheetOpen, setSheetOpen] = useState(false);
   useJourneyKeys({ screen, selected: reviewing ? undefined : selected, sheetOpen, setSheetOpen, state: view.state, steps, onState });
+  const bindings = useMemo(() => keyBindingsFor(JOURNEY_OFFERS, { screen, unavailable: unavailableScreens(target), acts: writable }), [screen, target, writable]);
+  usePageKeys(bindings, setSheetOpen);
   const node = authored === undefined || selected === undefined ? undefined : authored.tree.byKey.get(selected);
   const structure = authored === undefined || node === undefined ? undefined : <AuthoringPanel authored={authored} node={node} onRemoved={() => void navigate(addresses.close())} />;
   // The graph is a gesture surface that fills the workspace under the head; the rest scroll.
@@ -227,7 +229,7 @@ function ReadyFrame({ ready, screen, selected, edge }: { ready: Ready } & Omit<F
           <Workspace ready={ready} view={view} screen={screen} selected={selected} edge={line} authored={authored} drawing={drawing} selection={selection} preview={inserting.preview} onCard={setWalkCard} />
           {card === "inline" ? <JourneyCard ready={ready} selected={selected} /> : null}
         </div>
-        {sheetOpen ? <KeySheet bindings={keyBindingsFor(JOURNEY_OFFERS, { screen, unavailable: unavailableScreens(target), acts: writable })} onClose={() => { setSheetOpen(false); }} /> : null}
+        {sheetOpen ? <KeySheet bindings={bindings} onClose={() => { setSheetOpen(false); }} /> : null}
       </div>
       {/* After the head: a node opened from the assistant brings its detail forward last. */}
       <InspectorSlot ready={ready} screen={screen} selected={selected} structure={structure} card={card === "column"} inserting={inserting} selection={selection} authored={authored} walkCard={walkCard} />

@@ -85,7 +85,7 @@ function NodePicks({ label, authored, chosen, onChange }: { label: string; autho
       {chosen.map((key) => (
         <span key={key} className="row" data-testid="pick" data-node={key}>
           <span>{titleIn(authored.tree, key)}</span>
-          <Button ghost aria-label={`Remove ${titleIn(authored.tree, key)} from ${label}`} title="Remove" onClick={() => { onChange(chosen.filter((each) => each !== key)); }}>
+          <Button ghost aria-label={`Remove ${titleIn(authored.tree, key)} from ${label}`} onClick={() => { onChange(chosen.filter((each) => each !== key)); }}>
             Remove
           </Button>
         </span>

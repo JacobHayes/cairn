@@ -21,6 +21,7 @@ import { useJourneyReading, type JourneyReading } from "./reading.ts";
 import { useSeen } from "./useSeen.ts";
 import { listPath } from "./view.ts";
 import { JourneyStatusBadge } from "./StatusBadge.tsx";
+import { Tip } from "../ui/Tip.tsx";
 
 /** A journey's lineage: its route, by name when the route index has it, and version, or that it started empty. */
 function Lineage({ summary, routes }: { summary: JourneySummary; routes: readonly RouteSummary[] }) {
@@ -81,9 +82,9 @@ function TroubleCell({ journey, troubles }: { journey: string; troubles: Trouble
         {troubleWords(first)}
       </Link>
       {rest.length === 0 ? null : (
-        <span className="cell-second" title={rest.map(troubleWords).join(", ")}>
-          +{rest.length} more
-        </span>
+        <Tip tip={rest.map(troubleWords).join(", ")} tap>
+          <span className="cell-second">+{rest.length} more</span>
+        </Tip>
       )}
     </td>
   );

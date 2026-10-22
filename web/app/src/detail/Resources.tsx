@@ -16,6 +16,7 @@ import { journeyPath } from "../journeys/address.ts";
 import type { NodeDetail, Ready } from "./model.ts";
 import { Section } from "./parts.tsx";
 import { Failed } from "../ui/Failed.tsx";
+import { Tip } from "../ui/Tip.tsx";
 
 type Resource = Schema<"Resource">;
 
@@ -50,9 +51,9 @@ function MessageDraft({ view, node, resource }: { view: Ready; node: string; res
           "text" in segment ? (
             <span key={at}>{segment.text}</span>
           ) : (
-            <mark key={at} data-testid="draft-missing" title="Nothing fills this yet">
-              [missing: {segment.missing}]
-            </mark>
+            <Tip key={at} tip="Nothing fills this yet" tap>
+              <mark data-testid="draft-missing">[missing: {segment.missing}]</mark>
+            </Tip>
           ),
         )}
       </blockquote>

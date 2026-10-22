@@ -18,6 +18,7 @@ import { Failed } from "../ui/Failed.tsx";
 import { Button, Input, Segmented } from "../ui/kit.tsx";
 import { agentTokens } from "./agent-tokens.ts";
 import { CLIENTS, agentSetup, shellLine, tokenCommands, type Client, type SignInNote } from "./agents.ts";
+import { Tip } from "../ui/Tip.tsx";
 
 /** The text with a place to break after each slash, so an address wraps between its parts and not inside one. */
 function breakable(text: string): ReactNode[] {
@@ -128,10 +129,10 @@ function TokenRow({ token, busy, revoking, onRevoke }: { token: AgentToken; busy
   return (
     <li className="token-row" data-testid="agent-token">
       <span className="name">{token.name}</span>
-      <span className="mono muted small" title={token.created_at}>
-        Created {dateWords(token.created_at.slice(0, 10), today)}
-      </span>
-      <Button disabled={busy} onClick={onRevoke} aria-label={`Revoke ${token.name}`} title={`Revoke ${token.name}: it stops working at once`}>
+      <Tip tip={token.created_at} tap>
+        <span className="mono muted small">Created {dateWords(token.created_at.slice(0, 10), today)}</span>
+      </Tip>
+      <Button disabled={busy} onClick={onRevoke} aria-label={`Revoke ${token.name}`} tip="It stops working at once">
         {revoking ? "Revoking..." : "Revoke"}
       </Button>
     </li>
@@ -169,7 +170,7 @@ function Minted({ mcp, client, secret, onHide }: { mcp: McpAccess; client: Clien
         </>
       )}
       <span className="row">
-        <Button onClick={onHide} title="Hide the token: it cannot be shown again">
+        <Button onClick={onHide}>
           Hide token
         </Button>
         <span className="muted">Once hidden, it cannot be shown again.</span>
@@ -210,12 +211,11 @@ function MakeToken({ machine, refocus }: { machine: TokensMachine; refocus: bool
             }}
           />
           <span className="row">
-            <Button primary type="submit" disabled={context.name.trim() === "" || minting} title="Make the token; it is shown once">
+            <Button primary type="submit" disabled={context.name.trim() === "" || minting} tip="It is shown once">
               {minting ? "Making the token..." : "Make token"}
             </Button>
             <Button
               disabled={minting}
-              title="Go back without making a token"
               onClick={() => {
                 machine.send({ type: "cancel" });
               }}
@@ -228,7 +228,7 @@ function MakeToken({ machine, refocus }: { machine: TokensMachine; refocus: bool
         <span className="row">
           <Button
             autoFocus={refocus}
-            title="Make a token for a script or a client that cannot sign in through a browser"
+            tip="For a script or a client that cannot sign in through a browser"
             onClick={() => {
               machine.send({ type: "open" });
             }}

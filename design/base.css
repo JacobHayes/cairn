@@ -837,6 +837,46 @@ svg.chart .datum-line {
   /* A word with no break in it (a name, a path) wraps at the popover's edge instead of running out of it. */
   overflow-wrap: anywhere;
 }
+/* Tooltip: a chrome chip with a frame border, placed by the app (fixed, in the top layer). Every display rule is under :popover-open, so a closed tip stays hidden. Its words sit in one shrinkable span and its key last. */
+.tip {
+  position: fixed;
+  inset: auto;
+  margin: 0;
+  box-sizing: border-box;
+  max-width: min(320px, calc(100vw - 16px));
+  padding: var(--space-1) var(--space-3);
+  background: var(--chrome-bg);
+  color: var(--chrome-ink);
+  border: 1px solid var(--color-frame);
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-md);
+  font: 400 14px / 1.4 var(--font-body);
+  letter-spacing: 0;
+  text-transform: none;
+  white-space: normal;
+  overflow: visible;
+}
+.tip:popover-open {
+  display: flex;
+  gap: var(--space-2);
+  align-items: baseline;
+}
+.tip-words {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+.tip > kbd {
+  flex: none;
+  margin-left: auto;
+}
+/* The keys hint's preview is the one tooltip drawn as a popover: paper, with its own head and scrolling body. */
+.tip.popover:popover-open {
+  display: block;
+  padding: 0;
+  background: var(--color-surface);
+  color: var(--color-text);
+  font: inherit;
+}
 /* A menu of actions: items 4px 12px, a hairline between groups, an optional mono group label. */
 .popover[role="menu"] > .popover-body {
   padding: var(--space-1) 0;

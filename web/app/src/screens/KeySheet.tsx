@@ -4,12 +4,11 @@
 // cannot reach the control that had the focus behind it, and gives the focus back on close.
 import { Fragment, useEffect, useRef } from "react";
 
-import { JOURNEY_OFFERS } from "../journeys/view.ts";
 import { Button } from "../ui/kit.tsx";
-import { keyBindingsFor, type KeyBinding } from "./keys.ts";
+import type { KeyBinding } from "./keys.ts";
 
-/** The bindings as a table, for the sheet and the rail's hint (which lists a journey's, the most any page has). */
-export function KeyTable({ bindings = keyBindingsFor(JOURNEY_OFFERS) }: { bindings?: readonly KeyBinding[] }) {
+/** The bindings as a table, for the sheet and the rail's preview of it. */
+export function KeyTable({ bindings }: { bindings: readonly KeyBinding[] }) {
   return (
     <table className="data">
       <tbody>

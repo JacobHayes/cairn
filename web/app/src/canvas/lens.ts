@@ -15,10 +15,10 @@ export const LENS_MEANING: Record<Lens, string> = {
   slack: "How many days it can slip before the deadline.",
 };
 
-/** What a card's chip says, its hover, and the number the tint follows. */
+/** What a card's chip says, its hover (none when the chip already says it), and the number the tint follows. */
 export interface LensChip {
   text: string;
-  title: string;
+  title: string | undefined;
   value: number;
 }
 
@@ -30,7 +30,7 @@ export function lensChip(card: Card, lens: Lens): LensChip | undefined {
   }
   switch (lens) {
     case "rank":
-      return signals.rank === undefined ? undefined : { text: `Rank #${String(signals.rank)}`, title: `Number ${String(signals.rank)} of what can be done now`, value: -signals.rank };
+      return signals.rank === undefined ? undefined : { text: `Rank #${String(signals.rank)}`, title: undefined, value: -signals.rank };
     case "gravity":
       return signals.gravity === undefined ? undefined : { text: `Gravity ${String(signals.gravity)}`, title: "How much rides on it", value: signals.gravity };
     case "unlocks":

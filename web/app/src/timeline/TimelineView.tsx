@@ -31,6 +31,7 @@ import { Failed } from "../ui/Failed.tsx";
 import { useViewLevel } from "../canvas/viewLevel.ts";
 import { useLayer } from "../proposals/layer.ts";
 import { DIFF_LABELS, type DiffMark } from "../proposals/model.ts";
+import { Tip, usePointTip } from "../ui/Tip.tsx";
 
 /** The height of one row's track, and of the axis above the rows (px). */
 const ROW_PX = 56;
@@ -142,6 +143,7 @@ function useWidth(target: React.RefObject<Element | null>): number {
 function AxisHead({ axis, endTitle }: { axis: Axis; endTitle: (node: string) => string }) {
   const svg = useRef<SVGSVGElement>(null);
   const width = useWidth(svg);
+  const tip = usePointTip();
   const end = axis.anchor;
   const anchorAt = end === undefined ? undefined : positionOf(axis, end.day);
   const textAnchor = (at: number) => (at > LABEL_FLIP_AT ? "end" : "start");
@@ -171,9 +173,16 @@ function AxisHead({ axis, endTitle }: { axis: Axis; endTitle: (node: string) => 
       ) : null}
       {end === undefined || anchorAt === undefined || width === 0 ? null : (
         // A hover target on the end line itself, so the words are there when the label gave way to Today.
-        <rect x={percent(anchorAt - 4 / width)} y={0} width={8} height={AXIS_PX} fill="transparent">
-          <title>{endWords}</title>
-        </rect>
+        <rect
+          x={percent(anchorAt - 4 / width)}
+          y={0}
+          width={8}
+          height={AXIS_PX}
+          fill="transparent"
+          onPointerMove={(event) => { if (event.pointerType !== "touch") { tip.hoverAt("timeline-end", event.clientX, event.clientY, endWords); } }}
+          onPointerLeave={tip.leave}
+          onClick={(event) => { tip.tapAt("timeline-end", event.clientX, event.clientY, endWords); }}
+        />
       )}
       {end === undefined || anchorAt === undefined ? null : (
         <text className="timeline-end-label" x={percent(anchorAt)} y={32} dx={dx(anchorAt)} textAnchor={textAnchor(anchorAt)}>
@@ -275,9 +284,10 @@ function Label({ axis, row, selected, onFold, title, mark }: { axis: Axis; row: 
       <div className="timeline-title" style={{ "--depth": row.depth } as CSSProperties}>
         <TreeGuides depth={row.depth} guides={row.guides} open={row.open} />
         <TreeFold container={row.foldable} open={row.open} label={row.title} testId="timeline-fold" onFold={() => { onFold(row.key); }} />
-        <div className="timeline-text" title={row.title}>
+        <div className="timeline-text">
           {title(row.key)}
-          <span className={row.late > 0 || row.shortfallDays !== undefined ? "small timeline-words timeline-late" : "muted small timeline-words"} data-testid="timeline-words" data-marked={mark === undefined ? undefined : true} title={row.words}>
+          <Tip tip={row.words} kind="cut">
+          <span className={row.late > 0 || row.shortfallDays !== undefined ? "small timeline-words timeline-late" : "muted small timeline-words"} data-testid="timeline-words" data-marked={mark === undefined ? undefined : true}>
             {mark === undefined ? null : (
               <span className="layer-word" data-testid="row-diff" data-diff={mark.kind}>
                 {DIFF_LABELS[mark.kind]}
@@ -287,6 +297,7 @@ function Label({ axis, row, selected, onFold, title, mark }: { axis: Axis; row: 
             )}
             {mark === undefined ? row.words : <span className="timeline-words-rest">{row.words}</span>}
           </span>
+          </Tip>
         </div>
       </div>
     </li>

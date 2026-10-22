@@ -7,14 +7,11 @@
 // `close`; where the popover opens is the dot's box when it opened, carried as plain data.
 import { assign, setup, type SnapshotFrom } from "xstate";
 
-/** How long a peek outlasts the pointer leaving, so the pointer can reach the popover. */
-export const SYNC_POPOVER_LEAVE_MS = 150;
+import type { Rect } from "../ui/place.ts";
+import { HOVER_LEAVE_MS } from "../ui/tip.ts";
 
-/** Where the popover opens: just below the dot, kept inside the window. */
-export interface Anchor {
-  top: number;
-  left: number;
-}
+/** Where the popover opens from: the dot's box when it opened (the popover places itself below it). */
+export type Anchor = Rect;
 
 export type PopoverEvent =
   /** A click: pins it open, or unpins it. */
@@ -31,11 +28,11 @@ export const syncPopover = setup({
   actions: {
     place: assign({ anchor: ({ event }) => (event as Extract<PopoverEvent, { type: "pin" | "peek" }>).anchor }),
   },
-  delays: { leave: SYNC_POPOVER_LEAVE_MS },
+  delays: { leave: HOVER_LEAVE_MS },
 }).createMachine({
   id: "syncPopover",
   type: "parallel",
-  context: { anchor: { top: 0, left: 0 } },
+  context: { anchor: { left: 0, top: 0, width: 0, height: 0 } },
   states: {
     pin: {
       initial: "off",

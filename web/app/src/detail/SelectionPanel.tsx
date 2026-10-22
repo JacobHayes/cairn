@@ -38,7 +38,7 @@ export function SelectionPanel({ ready, selection, authored }: { ready: Ready; s
         {members.map(({ node }) => (
           <NodeItem key={node.key} view={ready} node={node.key} to={addresses.open(node.key)} fact={kindWord(node.kind, isStage(node))} testId="selection-member" onOpen={selection.release}>
             <div className="row-side">
-              <Button ghost aria-label={`Remove ${titleOf(ready, node.key)} from the selection`} title="Remove from the selection" onClick={() => { selection.toggle(node.key); }}>
+              <Button ghost aria-label={`Remove ${titleOf(ready, node.key)} from the selection`} tip="Remove from the selection" tipKind="name" onClick={() => { selection.toggle(node.key); }}>
                 ×
               </Button>
             </div>

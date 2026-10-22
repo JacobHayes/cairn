@@ -34,7 +34,7 @@ export function SelectedJourneys({ members, toggle, clear }: { members: readonly
                   <JourneyStatusBadge status={member.status} always />
                 </span>
                 <div className="row-side">
-                  <Button ghost aria-label={`Remove ${member.name} from the selection`} title="Remove from the selection" onClick={() => { toggle(member.id); }}>×</Button>
+                  <Button ghost aria-label={`Remove ${member.name} from the selection`} tip="Remove from the selection" tipKind="name" onClick={() => { toggle(member.id); }}>×</Button>
                 </div>
               </div>
             </li>

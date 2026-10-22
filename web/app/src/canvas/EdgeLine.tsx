@@ -1,8 +1,8 @@
 // `EdgeLine`: one edge on the canvas (C1), drawn along the route ELK left room for (5.6): an
 // orthogonal polyline with 4px corners, and at its target end the marker that says what it is: a
 // closed arrowhead for a requirement, a hollow diamond for a condition gate, a bar for a stage
-// opening, none for a link that holds dates only. No words on the line; hovering one gives the
-// sentence (GraphCanvas), and a click selects it. The line is steel, and an overlay's trace colours it.
+// opening, none for a link that holds dates only. No words on the line; hovering or focusing one gives the
+// sentence in a tip (GraphCanvas), which is also the edge's accessible name, and a click selects it. The line is steel, and an overlay's trace colours it.
 import { BaseEdge, useStore, type Edge, type EdgeProps } from "@xyflow/react";
 
 import type { Point } from "./layout.ts";
@@ -112,8 +112,6 @@ export function EdgeLine({ id, data, selected }: EdgeProps<LineEdge>) {
       data-dash={look.dash ?? "solid"}
       data-marker={look.marker}
       className={classes}
-      role="img"
-      aria-label={line.sentence}
     >
       <BaseEdge id={id} path={polyline(trimmed(route, reach(look.marker, scale)))} />
       {look.marker === "none" || end === undefined || before === undefined ? null : (

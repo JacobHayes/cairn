@@ -13,7 +13,7 @@
 import { useEffect, useRef, type KeyboardEvent as ReactKeyboardEvent, type PointerEvent as ReactPointerEvent, type Ref, type RefObject } from "react";
 
 import { COLUMN, useMedia, type InspectorTab } from "./frame.tsx";
-import { plural } from "../ui/words.ts";
+import { Tip } from "../ui/Tip.tsx";
 
 /** The sheet's heights, as `data-sheet` on the frame (app.css sets each), smallest first. */
 export const SNAPS = ["peek", "half", "full"] as const;
@@ -180,7 +180,7 @@ function TabName({ tab, count }: { tab: InspectorTab; count: number | undefined 
   return (
     <>
       {TAB_WORDS[tab]}
-      {tab === "proposals" && count !== undefined && count > 0 ? <span className="tab-count" data-testid="proposals-count" title={plural(count, "open proposal")}>{count}</span> : null}
+      {tab === "proposals" && count !== undefined && count > 0 ? <span className="tab-count" data-testid="proposals-count">{count}</span> : null}
     </>
   );
 }
@@ -189,10 +189,12 @@ function TabName({ tab, count }: { tab: InspectorTab; count: number | undefined 
 function FoldedRail({ folded, tab, tabs, proposalsCount, show, onTab, onToggle }: Pick<InspectorColumnProps, "folded" | "tab" | "tabs" | "proposalsCount" | "onTab" | "onToggle"> & { show: Ref<HTMLButtonElement> }) {
   return (
     <div className="inspector-rail" hidden={!folded}>
-      <button ref={show} type="button" className="rail-show" aria-label="Show inspector" title="Show the inspector  ]" onClick={onToggle}>
-        <FoldIcon toward="left" />
-        <span className="rail-show-label">Inspector</span>
-      </button>
+      <Tip tip="Show the inspector" keys="]" kind="name">
+        <button ref={show} type="button" className="rail-show" aria-label="Show inspector" onClick={onToggle}>
+          <FoldIcon toward="left" />
+          <span className="rail-show-label">Inspector</span>
+        </button>
+      </Tip>
       {tabs.map((each) => (
         <button
           key={each}
@@ -200,7 +202,6 @@ function FoldedRail({ folded, tab, tabs, proposalsCount, show, onTab, onToggle }
           className="rail-tab"
           data-testid={`rail-tab-${each}`}
           data-on={tab === each}
-          title={`Show the ${each}`}
           onClick={() => {
             onTab(each);
             onToggle();
@@ -229,7 +230,9 @@ export function InspectorColumn({ present, folded, tab, snap, tabs, proposalsCou
       }}>
       <FoldedRail folded={folded} tab={tab} tabs={tabs} proposalsCount={proposalsCount} show={show} onTab={onTab} onToggle={onToggle} />
       <div className="inspector-head" hidden={folded}>
-        <button type="button" className="sheet-handle" aria-label="Resize the inspector" title="Drag to resize; Enter toggles; arrows step" {...handle} />
+        <Tip tip="Drag to resize; Enter toggles; arrows step">
+          <button type="button" className="sheet-handle" aria-label="Resize the inspector" {...handle} />
+        </Tip>
         {tabs.length > 1 || tabs[0] === "proposals" ? (
           <div className="segmented on-chrome" role="tablist" aria-label="Inspector">
             {tabs.map((each) => (
@@ -252,9 +255,11 @@ export function InspectorColumn({ present, folded, tab, snap, tabs, proposalsCou
           <span className="label">Inspector</span>
         )}
         <span className="spacer" />
-        <button type="button" className="ghost hide" aria-label="Hide inspector" title="Hide the inspector  ]" onClick={onToggle}>
-          <FoldIcon toward="right" />
-        </button>
+        <Tip tip="Hide the inspector" keys="]" kind="name">
+          <button type="button" className="ghost hide" aria-label="Hide inspector" onClick={onToggle}>
+            <FoldIcon toward="right" />
+          </button>
+        </Tip>
       </div>
       <div ref={inspectorRef} className="inspector-body" data-pane="inspector" hidden={folded || tab !== "inspector"} inert={peeking} />
       <div ref={assistantRef} className="assistant-pane" data-pane="assistant" hidden={folded || tab !== "assistant"} inert={peeking} />

@@ -11,6 +11,7 @@ import type { Ready } from "../detail/model.ts";
 import { nodeAddress } from "./links.ts";
 import { useCaller } from "../data/react.ts";
 import { ownerWords } from "../detail/sections.tsx";
+import { Tip } from "../ui/Tip.tsx";
 
 /** The owner as a row says it when it offers no actions: who has it, or that nobody does. */
 function OwnerText({ view, owners }: { view: Ready; owners: string[] | undefined }) {
@@ -21,9 +22,9 @@ function OwnerText({ view, owners }: { view: Ready; owners: string[] | undefined
   const words = ownerWords(view, owners, caller?.identities);
   return (
     <div className="row-side">
-      <span className="row-owner row-owner-static" title={owners.length === 0 ? undefined : `Owned by ${words}`}>
-        {words}
-      </span>
+      <Tip tip={words} kind="cut">
+        <span className="row-owner row-owner-static">{words}</span>
+      </Tip>
     </div>
   );
 }

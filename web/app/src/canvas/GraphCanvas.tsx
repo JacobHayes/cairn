@@ -11,12 +11,13 @@
 import "@xyflow/react/dist/base.css";
 import "./canvas.css";
 
-import { Controls, ReactFlow, ReactFlowProvider, useNodesInitialized, useReactFlow, useStore, useStoreApi, type EdgeChange, type NodeChange } from "@xyflow/react";
+import { ControlButton, Controls, ReactFlow, ReactFlowProvider, useNodesInitialized, useReactFlow, useStore, useStoreApi, type EdgeChange, type NodeChange } from "@xyflow/react";
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type KeyboardEvent as ReactKeyboardEvent, type MouseEvent as ReactMouseEvent, type ReactNode, type RefObject } from "react";
 
 import { useFrameState } from "../shell/frame.tsx";
 import { useResolvedTheme } from "../ui/theme.ts";
 import { ContextMenu } from "../ui/ContextMenu.tsx";
+import { Tip, usePointTip, type PointTip } from "../ui/Tip.tsx";
 import { typing } from "../ui/typing.ts";
 import { headHeight } from "./cards.ts";
 import { EdgeLine, type LineEdge } from "./EdgeLine.tsx";
@@ -30,7 +31,6 @@ import type { CanvasOverlay } from "./overlay.ts";
 import { firstFitCards } from "./refit.ts";
 import { lineWaitWords } from "./words.ts";
 
-import { nodeTitle } from "../ui/gone.ts";
 import { useWork } from "../data/react.ts";
 
 const nodeTypes = { card: NodeCard };
@@ -148,15 +148,20 @@ function nodesOf(props: GraphCanvasProps, edgeEnds: ReadonlySet<string>): CardNo
   });
 }
 
+/** What a line says (5.7): its sentence, and where the journey's state is known, whether it still holds anything back. */
+function lineWords(line: Line): string {
+  const state = lineWaitWords(line);
+  return state === undefined ? line.sentence : `${line.sentence} \u00b7 ${state}`;
+}
+
 function edgesOf({ model, layout, overlay, faded, selectedEdge }: GraphCanvasProps): LineEdge[] {
-  const cards = new Map(model.cards.map((card) => [card.key, card]));
   return model.lines.map((line) => ({
     id: line.id,
     source: line.from,
     target: line.to,
     type: "line",
-    // The flow's own label names the keys of its two ends; the cards' titles say it to a reader.
-    ariaLabel: `Edge from ${nodeTitle(cards.get(line.from)?.title)} to ${nodeTitle(cards.get(line.to)?.title)}`,
+    // The line's one accessible name is what hovering or focusing it says.
+    ariaLabel: lineWords(line),
     data: {
       line,
       route: layout.routes[line.id],
@@ -343,31 +348,55 @@ function useCanvasKeys(props: GraphCanvasProps): void {
   }, [fitTo, selected, work]);
 }
 
-/** The line under the pointer, and the chip that says what it is: where the pointer is only moves the chip, it never re-renders the cards. */
-function useEdgeHover(root: RefObject<HTMLDivElement | null>) {
-  const chip = useRef<HTMLDivElement>(null);
-  const pointer = useRef({ x: 0, y: 0 });
+/** The line under the pointer, for the ink on its two cards; what it says is the point tip's (the pointer only moves the tip, it never re-renders the cards). */
+function useEdgeHover(props: GraphCanvasProps) {
+  const tip = usePointTip();
   const [hover, setHover] = useState<Line | undefined>(undefined);
-  const place = () => {
-    chip.current?.style.setProperty("left", `${String(pointer.current.x + 12)}px`);
-    chip.current?.style.setProperty("top", `${String(pointer.current.y + 12)}px`);
-  };
-  useLayoutEffect(place, [hover]);
-  const move = (event: ReactMouseEvent) => {
-    const box = root.current?.getBoundingClientRect();
-    pointer.current = { x: event.clientX - (box?.left ?? 0), y: event.clientY - (box?.top ?? 0) };
-    place();
+  const move = (event: ReactMouseEvent, edge: LineEdge) => {
+    if (edge.data !== undefined) {
+      tip.hoverAt(edge.data.line.id, event.clientX, event.clientY, lineWords(edge.data.line));
+    }
   };
   return {
-    chip,
     hover,
-    move,
-    enter: (event: ReactMouseEvent, line: Line | undefined) => {
-      move(event);
-      setHover(line);
+    focus: useEdgeFocus(props.model, tip),
+    handlers: {
+      // A click on the line that is already selected changes no selection, so only the click can bring its card back.
+      onEdgeClick: (event: ReactMouseEvent, edge: LineEdge) => {
+        if (edge.data?.line.selectable === true) {
+          props.onEdge?.(edge.data.line);
+        } else if (edge.data !== undefined) {
+          // A line that opens no card says its words on a tap (touch has no hover).
+          tip.tapAt(edge.data.line.id, event.clientX, event.clientY, lineWords(edge.data.line));
+        }
+      },
+      onEdgeMouseEnter: (event: ReactMouseEvent, edge: LineEdge) => {
+        setHover(edge.data?.line);
+        move(event, edge);
+      },
+      onEdgeMouseMove: move,
+      onEdgeMouseLeave: () => {
+        setHover(undefined);
+        tip.leave();
+      },
     },
-    leave: () => {
-      setHover(undefined);
+  };
+}
+
+/** A line focused from the keyboard says the same words; touch and the pointer have their own events. */
+function useEdgeFocus(model: CanvasModel, tip: PointTip) {
+  return {
+    onFocus: (event: React.FocusEvent) => {
+      const edge = event.target instanceof Element ? event.target.closest<SVGGElement>(".react-flow__edge") : null;
+      const line = edge === null ? undefined : model.lines.find((each) => each.id === edge.dataset["id"]);
+      if (edge !== null && line !== undefined && event.target instanceof Element && event.target.matches(":focus-visible")) {
+        tip.focusOn(line.id, edge.getBoundingClientRect(), lineWords(line));
+      }
+    },
+    onBlur: (event: React.FocusEvent) => {
+      if (event.target instanceof Element && event.target.closest(".react-flow__edge") !== null) {
+        tip.blur();
+      }
     },
   };
 }
@@ -539,17 +568,6 @@ function useEdgeEnds(model: CanvasModel, selectedEdge: string | undefined, hover
   return useMemo(() => new Set([hover, open].flatMap((line) => (line === undefined ? [] : [line.from, line.to]))), [hover, open]);
 }
 
-/** What hovering a line says (5.7): its sentence, and where the journey's state is known, whether it still holds anything back. */
-function EdgeChip({ chip, line }: { chip: RefObject<HTMLDivElement | null>; line: Line }) {
-  const state = lineWaitWords(line);
-  return (
-    <div ref={chip} className="edge-hover" role="status" data-testid="edge-hover">
-      {line.sentence}
-      {state === undefined ? "" : ` \u00b7 ${state}`}
-    </div>
-  );
-}
-
 /** The node menu: open on a card at a point, offered only where the cards have actions. */
 function useNodeMenu(props: GraphCanvasProps) {
   const [menu, setMenu] = useState<{ key: string; at: { x: number; y: number } } | undefined>(undefined);
@@ -584,25 +602,37 @@ function cardKeys(toggle: (key: string) => boolean, select: ((key: string) => vo
   };
 }
 
-/** The zoom buttons, a stack at the bottom left; Fit pads for the sheet or rail like the other fits. */
+/** The zoom buttons, a stack at the bottom left (our own, so each carries the shared tooltip, not the browser's); Fit pads for the sheet or rail like the other fits. */
 function FitControls() {
   const fitTo = useFit();
   const work = useWork();
+  const flow = useReactFlow();
+  const [atMin, atMax] = [useStore((state) => state.transform[2] <= state.minZoom), useStore((state) => state.transform[2] >= state.maxZoom)];
   return (
-    <Controls
-      showInteractive={false}
-      position="bottom-left"
-      onFitView={() => {
-        work(fitTo());
-      }}
-    />
+    <Controls showZoom={false} showFitView={false} showInteractive={false} position="bottom-left">
+      <Tip tip="Zoom in" kind="name">
+        <ControlButton className="react-flow__controls-zoomin" aria-label="Zoom in" disabled={atMax} onClick={() => { void flow.zoomIn(); }}>
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32"><path d="M32 18.133H18.133V32h-4.266V18.133H0v-4.266h13.867V0h4.266v13.867H32z" /></svg>
+        </ControlButton>
+      </Tip>
+      <Tip tip="Zoom out" kind="name">
+        <ControlButton className="react-flow__controls-zoomout" aria-label="Zoom out" disabled={atMin} onClick={() => { void flow.zoomOut(); }}>
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 5"><path d="M0 0h32v4.2H0z" /></svg>
+        </ControlButton>
+      </Tip>
+      <Tip tip="Fit the whole graph" kind="name">
+        <ControlButton className="react-flow__controls-fitview" aria-label="Fit the whole graph" onClick={() => { work(fitTo()); }}>
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 30"><path d="M3.692 4.63c0-.53.4-.938.939-.938h5.215V0H4.708C2.13 0 0 2.054 0 4.63v5.216h3.692V4.631zM27.354 0h-5.2v3.692h5.17c.53 0 .984.4.984.939v5.215H32V4.631A4.624 4.624 0 0027.354 0zm.954 24.83c0 .532-.4.94-.939.94h-5.215v3.768h5.215c2.577 0 4.631-2.13 4.631-4.707v-5.139h-3.692v5.139zm-23.677.94c-.531 0-.939-.4-.939-.94v-5.138H0v5.139c0 2.577 2.13 4.707 4.708 4.707h5.138V25.77H4.631z" /></svg>
+        </ControlButton>
+      </Tip>
+    </Controls>
   );
 }
 
 function Flow(props: GraphCanvasProps) {
   const theme = useResolvedTheme();
   const root = useRef<HTMLDivElement>(null);
-  const { chip, hover, move, enter, leave } = useEdgeHover(root);
+  const { hover, focus, handlers } = useEdgeHover(props);
   const edgeEnds = useEdgeEnds(props.model, props.selectedEdge, hover);
   const nodes = useMemo(() => nodesOf(withEmphasis(props), edgeEnds), [props, edgeEnds]);
   const edges = useMemo(() => edgesOf(withEmphasis(props)), [props]);
@@ -623,6 +653,8 @@ function Flow(props: GraphCanvasProps) {
         ref={root}
         className="canvas-root"
         onKeyDown={cardKeys(toggle, selection?.toggle, menus === undefined ? undefined : openMenu)}
+        onFocus={focus.onFocus}
+        onBlur={focus.onBlur}
       >
         <ReactFlow
           nodes={nodes}
@@ -643,15 +675,7 @@ function Flow(props: GraphCanvasProps) {
               openMenu(node.id, { x: event.clientX, y: event.clientY });
             }
           }}
-          // A click on the line that is already selected changes no selection, so only the click can bring its card back.
-          onEdgeClick={(_, edge) => {
-            if (edge.data?.line.selectable === true) {
-              props.onEdge?.(edge.data.line);
-            }
-          }}
-          onEdgeMouseEnter={(event, edge) => { enter(event, edge.data?.line); }}
-          onEdgeMouseMove={move}
-          onEdgeMouseLeave={leave}
+          {...handlers}
           zIndexMode="auto"
           minZoom={minZoom}
           maxZoom={ZOOM_MAX}
@@ -663,7 +687,6 @@ function Flow(props: GraphCanvasProps) {
           <FitControls />
           {props.children}
         </ReactFlow>
-        {hover === undefined ? null : <EdgeChip chip={chip} line={hover} />}
         {menu === undefined || menus === undefined ? null : <ContextMenu at={menu.at} groups={menus.groups(menu.key)} label={`Actions for ${props.actions.title(menu.key)}`} onChoose={(id) => { menus.choose(menu.key, id); }} onClose={closeMenu} />}
       </div>
     </CardActionsContext>

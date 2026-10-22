@@ -24,6 +24,7 @@ import { RowActions } from "./RowActions.tsx";
 import { plural } from "../ui/words.ts";
 import { NodeLink } from "../detail/parts.tsx";
 import type { CSSProperties } from "react";
+import { Tip } from "../ui/Tip.tsx";
 
 export interface CellContext {
   view: Ready;
@@ -56,10 +57,12 @@ function Return({ view, line }: { view: Ready; line: Line }) {
   const derived = view.derived.nodes[line.key];
   const snoozed = derived === undefined ? undefined : snoozeWords(view, derived);
   return snoozed === undefined ? null : (
-    <span className="muted small" data-testid="list-return" title={snoozed.title}>
-      {snoozed.words}
-      {snoozed.tail}
-    </span>
+    <Tip tip={`${snoozed.words}${snoozed.tail ?? ""}`} kind="cut">
+      <span className="muted small" data-testid="list-return">
+        {snoozed.words}
+        {snoozed.tail}
+      </span>
+    </Tip>
   );
 }
 
@@ -202,7 +205,7 @@ export function Cell({ column, line, context }: { column: Column; line: Line; co
       return row.due == null || !open ? null : <span className={inkClass(dateInk(row.due, today))} data-testid="list-due">{dueWords(row.due, today, node.kind === "decision")}</span>;
     case "rank": {
       const place = context.ranks.get(line.key);
-      return place !== undefined ? `#${String(place)}` : open ? <span className="muted" role="img" aria-label="Not on the frontier" title="Not on the frontier">–</span> : null;
+      return place !== undefined ? `#${String(place)}` : open ? <Tip tip="Not on the frontier" kind="name" tap><span className="muted" role="img" aria-label="Not on the frontier">–</span></Tip> : null;
     }
     case "start_by": {
       const date = derived.dates.latest_start?.date;
@@ -224,7 +227,7 @@ export function Cell({ column, line, context }: { column: Column; line: Line; co
     }
     case "why": {
       const rationale = context.decisions.get(line.key)?.rationale;
-      return rationale === undefined ? null : <span className="list-why" title={firstParagraph(rationale)}>{firstParagraph(rationale)}</span>;
+      return rationale === undefined ? null : <Tip tip={firstParagraph(rationale)} kind="cut"><span className="list-why">{firstParagraph(rationale)}</span></Tip>;
     }
     case "affects":
       return <Affects context={context} node={line.key} />;

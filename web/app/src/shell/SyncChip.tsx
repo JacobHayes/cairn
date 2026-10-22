@@ -6,7 +6,7 @@
 // region announce the changes that matter.
 import { WriteProblem } from "../ui/Failed.tsx";
 import { useActorRef, useSelector } from "@xstate/react";
-import { useEffect, useId, useRef } from "react";
+import { useEffect, useId, useLayoutEffect, useRef } from "react";
 import { Link, useNavigate } from "react-router";
 
 import { pathTo } from "../address.ts";
@@ -15,13 +15,8 @@ import { useCapabilities, useDerivation, useProblems, useSaves, useSavedAnnounce
 import { dateWords } from "../status/when.ts";
 import type { Problem, SyncSummary } from "../data/sync.ts";
 import { Button } from "../ui/kit.tsx";
+import { place, windowBounds } from "../ui/place.ts";
 import { popoverAnchor, popoverPinned, popoverShown, syncPopover, type Anchor } from "./sync-popover.ts";
-
-/** Where the popover opens: just below the dot, kept inside the window (it is fixed, so the rail's scroller does not clip it). */
-const anchorBelow = (dot: HTMLElement): Anchor => {
-  const box = dot.getBoundingClientRect();
-  return { top: box.bottom + 8, left: Math.max(12, Math.min(box.left, globalThis.innerWidth - 372)) };
-};
 
 function NeedsYou({ problems, onGo }: { problems: readonly Problem[]; onGo: () => void }) {
   const navigate = useNavigate();
@@ -114,8 +109,22 @@ function Popover({ summary, anchor, onClose }: { summary: SyncSummary; anchor: A
   const skew = useSkew();
   const offersMcp = useCapabilities().mcp != null;
   const heading = useId();
+  // Just below the dot, kept inside the window (it is fixed, so the rail's scroller does not clip it).
+  const popover = useRef<HTMLDivElement>(null);
+  useLayoutEffect(() => {
+    const element = popover.current;
+    if (element === null) {
+      return;
+    }
+    element.style.setProperty("left", "0px");
+    element.style.setProperty("top", "0px");
+    const box = element.getBoundingClientRect();
+    const at = place(anchor, box, windowBounds(), { side: "bottom", align: "start", gap: 8, margin: 12 });
+    element.style.setProperty("left", `${String(at.left)}px`);
+    element.style.setProperty("top", `${String(at.top)}px`);
+  }, [anchor]);
   return (
-    <div className="popover sync-popover" role="dialog" aria-labelledby={heading} tabIndex={-1} data-popover="" data-overhang="" data-testid="sync-popover" style={anchor}>
+    <div ref={popover} className="popover sync-popover" role="dialog" aria-labelledby={heading} tabIndex={-1} data-popover="" data-overhang="" data-testid="sync-popover">
       <div className="popover-head" id={heading}>
         Sync
       </div>
@@ -220,7 +229,7 @@ export function SyncChip() {
   // leaving or blurring lets a peeked one go, after a beat so the pointer can cross into it.
   const show = () => {
     if (chip.current !== null) {
-      ref.send({ type: "peek", anchor: anchorBelow(chip.current) });
+      ref.send({ type: "peek", anchor: chip.current.getBoundingClientRect() });
     }
   };
   const hide = () => {
@@ -250,7 +259,7 @@ export function SyncChip() {
             // A refetch failed or is slow: the stream's current revisions ask every view again.
             session.root.send({ type: "reopen" });
           } else {
-            ref.send({ type: "pin", anchor: anchorBelow(event.currentTarget) });
+            ref.send({ type: "pin", anchor: event.currentTarget.getBoundingClientRect() });
           }
         }}
       />

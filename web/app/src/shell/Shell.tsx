@@ -20,6 +20,7 @@ import { SyncChip } from "./SyncChip.tsx";
 import { Toast } from "./Toast.tsx";
 import { useFrame } from "./useFrame.ts";
 import { Pending } from "../ui/Pending.tsx";
+import { Tip, TipLayer } from "../ui/Tip.tsx";
 
 /** The screens, as links; the one the viewer is on is marked. */
 function Rail({ pathname }: { pathname: string }) {
@@ -59,9 +60,11 @@ function Rail({ pathname }: { pathname: string }) {
           <KeysHint />
         </span>
         {offersMcp ? (
-          <Link to={pathTo("agents")} className="agents-link" title="Connect an AI agent such as Claude Code or Codex" {...(section === "agents" ? { "aria-current": "page" as const } : {})}>
-            Connect an agent
-          </Link>
+          <Tip tip="Connect an AI agent such as Claude Code or Codex">
+            <Link to={pathTo("agents")} className="agents-link" {...(section === "agents" ? { "aria-current": "page" as const } : {})}>
+              Connect an agent
+            </Link>
+          </Tip>
         ) : null}
       </nav>
     </aside>
@@ -84,6 +87,7 @@ export function Shell() {
   const frame = useFrame();
   const ask = useNameAsk();
   return (
+    <TipLayer>
     <FrameActionsContext value={frame.actions}>
       <FrameStateContext value={frame.state}>
         <TourProvider nameSettled={ask.settled}>
@@ -119,5 +123,6 @@ export function Shell() {
         </TourProvider>
       </FrameStateContext>
     </FrameActionsContext>
+    </TipLayer>
   );
 }

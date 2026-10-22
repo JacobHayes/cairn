@@ -6,7 +6,7 @@
    sizes here are px. */
 
 :root {
-  --popover-w: 360px; /* the sync and keys popovers' width; KeysHint.tsx slides the keys popover by it */
+  --popover-w: 360px; /* the sync and keys popovers' width */
   --fold-w: 32px; /* the hidden inspector's rail */
   --inspector-pad: 20px; /* where the inspector's cards and the assistant start their content (DESIGN, More air) */
   /* The sheet's three heights (below 1100px): the peek is the grip, the tabs and the top of the pane (a short window gets just the grip and tabs: a quarter of its height, at most 164px), and sits clear of the home indicator; the tall one leaves room above it for a notice: a window's worth, less a notice. The pill is the closed sheet's one control. */
@@ -198,7 +198,7 @@ body {
 .rail-foot > a {
   flex: 1;
 }
-/* The shortcuts hint on the "You" line: a bare glyph, hover changes only its colour; its key list is a fixed popover beside it (shell/KeysHint.tsx). */
+/* The shortcuts hint on the "You" line: a bare glyph, hover changes only its colour; its key list is the shared tooltip beside it (shell/KeysHint.tsx). */
 .keys-hint-button {
   width: 24px;
   min-height: 24px;
@@ -217,9 +217,10 @@ body {
   outline: 2px solid var(--chrome-muted);
   outline-offset: 2px;
 }
-.keys-popover {
-  position: fixed;
+/* The keys preview is the tooltip drawn as a popover (ui/Tip.tsx, look="panel"): the popover's width. */
+.tip.popover {
   width: min(var(--popover-w), calc(100vw - 24px));
+  max-width: none;
 }
 
 /* The sync dot sits at the right edge of the brand row at the top of the rail; its popover is fixed (placed from the dot's box) so the rail's scroller does not clip it. */
@@ -1659,4 +1660,10 @@ button.tree-fold[aria-expanded="true"] .tree-chevron {
 
 .ink-warn {
   color: var(--color-warning);
+}
+
+/* A fact whose only place is a tip (ui/Tip.tsx, tap) wears a dotted underline, so its words say they can be tapped; a chip or badge is cue enough in its box. */
+:is(span, mark, time, small)[data-tip-tap]:not(.badge, .chip, .node-notice) {
+  text-decoration: underline dotted var(--color-secondary);
+  text-underline-offset: 3px;
 }

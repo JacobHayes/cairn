@@ -6,6 +6,7 @@
 import type { Page } from "@playwright/test";
 
 import { checkpoint, expect, test } from "./test.ts";
+import { openTip } from "./tips.ts";
 
 import { expectTitleLinesAsLaidOut, lineBetween, pointOn, viewportOf } from "./canvas.ts";
 import { journeyName, startJourney } from "./around.ts";
@@ -58,18 +59,8 @@ async function followsAnEdge(page: Page): Promise<void> {
   await settled(page);
   const at = await pointOn(edge);
   await page.mouse.move(at.x, at.y);
-  await expect(page.getByTestId("edge-hover")).toContainText("Test plan needs Environment access");
-  // The styled hover is the only one: the element under the pointer and its ancestors carry no native title (the browser's tooltip would cover it).
-  const native = await whenSettled(page, () => page.evaluate(({ x, y }) => {
-    const found: string[] = [];
-    for (let each = document.elementFromPoint(x, y); each !== null; each = each.parentElement) {
-      if (each.hasAttribute("title") || each.querySelector(":scope > title") !== null) {
-        found.push(each.outerHTML.slice(0, 120));
-      }
-    }
-    return found;
-  }, at));
-  expect(native).toEqual([]);
+  // The line's chip is the app's one tooltip, and it is the line's accessible name too (the browser's tooltip is excluded on every page, e2e/tips.ts).
+  await expect(openTip(page)).toContainText("Test plan needs Environment access");
   await page.mouse.click(at.x, at.y);
   await expect(page.getByTestId("edge-card")).toBeVisible();
   await page.getByRole("link", { name: "Go to Environment access" }).click();
@@ -156,7 +147,7 @@ async function selectsASet(page: Page): Promise<void> {
   await page.getByTestId("selection-status").click();
   const start = page.getByRole("menuitem", { name: "Start" });
   await expect(start).toBeDisabled();
-  await expect(start).toHaveAttribute("title", /cannot start/);
+  await expect(start).toHaveAccessibleDescription(/cannot start/);
   await page.keyboard.press("Escape");
   // A member dropped with its × leaves the rest; a plain click on one card is that card alone.
   await members.filter({ hasText: "decision" }).first().getByRole("button", { name: /Remove .* from the selection/ }).click();

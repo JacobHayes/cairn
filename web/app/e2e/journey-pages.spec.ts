@@ -305,7 +305,7 @@ test("C10: Frontier highlights the list: every row stays, the frontier's rows ca
   await setFrontier(page, true);
   await expectAddress(page, `${journeyBase(page)}?view=list&frontier=1`);
   expect(await listKeys(page)).toEqual(everything);
-  const counted = /(\d+) can move now/.exec((await whenSettled(page, () => withFrontier(page, (chip) => chip.getAttribute("title")))) ?? "")?.[1];
+  const counted = /now: (\d+)/.exec((await whenSettled(page, () => withFrontier(page, (chip) => chip.evaluate((each) => document.getElementById(each.getAttribute("aria-describedby") ?? "")?.textContent ?? "")))))?.[1];
   const frontier = await frontierKeys(page);
   expect(String(frontier.length)).toBe(counted);
   // A frontier row says what to do under its title, at a phone's width too.

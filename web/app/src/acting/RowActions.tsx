@@ -18,6 +18,7 @@ import { ownerWords, UNASSIGNED } from "../detail/sections.tsx";
 import { useFormDraft, useNodeWrite, type NodeWrite } from "../detail/write.ts";
 import { doneMutations, evidenceDraft, factsOf, missingEvidence, type EvidenceDraft } from "./acts.ts";
 import type { NodeRow } from "./why.ts";
+import { Tip } from "../ui/Tip.tsx";
 
 /**
  * E1: pick an owner for an unowned row, in the owner's slot: choosing sends it. The picker is
@@ -95,9 +96,9 @@ export function RowActions({ view, row, to, owner = true, column = false, yours 
         {column ? null : row.unassigned === true ? (
           <AssignInline view={view} write={write} node={row.key} />
         ) : !owner ? null : (
-          <span className={yours ? "row-owner" : "row-owner row-owner-other"} title={`Owned by ${owners}`}>
-            {owners}
-          </span>
+          <Tip tip={owners} kind="cut">
+            <span className={yours ? "row-owner" : "row-owner row-owner-other"}>{owners}</span>
+          </Tip>
         )}
         <span className="row-act">
           {acts.map((act) => (

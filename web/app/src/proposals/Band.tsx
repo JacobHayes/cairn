@@ -10,6 +10,7 @@ import { Button } from "../ui/kit.tsx";
 import { useLayer } from "./layer.ts";
 import { holdsWords } from "./Rail.tsx";
 import "./proposals.css";
+import { Tip } from "../ui/Tip.tsx";
 
 /** Brings the rail's hold line into view and focuses it, after the column has had a moment to appear. */
 function showHolds(): void {
@@ -47,9 +48,11 @@ export function Band() {
   if (layer.mode !== "reviewing" || layer.reviewing === undefined) {
     return (
       <div className="layer-band" role="status" data-testid="layer-band" data-mode={layer.mode}>
-        <span className="layer-band-text" title={title}>
-          &quot;{title}&quot; was {layer.mode}
-        </span>
+        <Tip tip={`"${title ?? ""}" was ${layer.mode}`} kind="cut" tap>
+          <span className="layer-band-text">
+            &quot;{title}&quot; was {layer.mode}
+          </span>
+        </Tip>
         {close}
       </div>
     );
@@ -60,13 +63,15 @@ export function Band() {
   const creates = layer.creates ? `, which creates this ${layer.kind === "route" ? "route" : "journey"}` : "";
   return (
     <div className="layer-band" data-testid="layer-band" data-mode="reviewing" data-revision={proposal.revision}>
-      <span className="layer-band-text" title={`Reviewing "${title ?? ""}"${creates}`}>
-        Reviewing &quot;{title}&quot;{creates}
-      </span>
+      <Tip tip={`Reviewing "${title ?? ""}"${creates}`} kind="cut" tap>
+        <span className="layer-band-text">
+          Reviewing &quot;{title}&quot;{creates}
+        </span>
+      </Tip>
       <Button
         primary
         aria-disabled={held ? "true" : undefined}
-        title={holds}
+        tip={holds}
         data-testid="apply-proposal"
         data-blockers={reviewing.blockers.join(" ")}
         onClick={() => {

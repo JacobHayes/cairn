@@ -20,6 +20,7 @@ import { activeJourneyCounts, inUseWords, ofType, startableVersion, typeOf, type
 import "../journeys/journeys.css";
 import { Failed } from "../ui/Failed.tsx";
 import { RetiredBadge } from "./RetiredBadge.tsx";
+import { Tip } from "../ui/Tip.tsx";
 
 const TYPES = [
   { value: "all", label: "All types" },
@@ -75,9 +76,10 @@ function RouteRow({ route, reading }: { route: RouteSummary; reading: UseReading
           {header.retired === true ? <RetiredBadge kind={header.kind} /> : route.draft_open ? <Badge tone="warn">Draft open</Badge> : null}
         </span>
         {summary === undefined || summary === "" ? null : (
-          <span className="cell-second cell-description" title={header.description ?? undefined}>
-            {summary}
-          </span>
+          // The row prints the first line only: the whole description is the tip when there is more than that line.
+          <Tip tip={header.description?.trim()} kind={(header.description?.trim() ?? "") === summary ? "cut" : "describe"} tap={(header.description?.trim() ?? "") !== summary}>
+            <span className="cell-second cell-description">{summary}</span>
+          </Tip>
         )}
       </td>
       <UseCell route={route} reading={reading} />
