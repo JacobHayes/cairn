@@ -21,7 +21,8 @@ import { Tip, usePointTip, type PointTip } from "../ui/Tip.tsx";
 import { overlayOpen, typing } from "../ui/typing.ts";
 import { useFraming, type Framing } from "../tour/presentation.ts";
 import { headHeight } from "./cards.ts";
-import { DateEdgeLine, EdgeLine, elbow, type Box, type DateEdge, type LineEdge } from "./EdgeLine.tsx";
+import { dateRoutes } from "./dateRoutes.ts";
+import { DateEdgeLine, EdgeLine, type Box, type DateEdge, type LineEdge } from "./EdgeLine.tsx";
 import { NEAR_ZOOM, firstFrame, fitZoom, listenPinch, minZoomOf, roomOf, shiftInto } from "./gestures.ts";
 import { lensChips, lensTiers } from "./lens.ts";
 import type { Layout } from "./layout.ts";
@@ -223,26 +224,20 @@ function dateEdgesOf({ model, layout, dates }: GraphCanvasProps): DateEdge[] {
     return [];
   }
   const boxes = boxesOf(model, layout);
-  const everyBox = [...boxes.values()];
-  return dates.flatMap((line, index) => {
-    const [from, to] = [boxes.get(line.from), boxes.get(line.to)];
-    if (from === undefined || to === undefined) {
-      return [];
-    }
-    return [
-      {
-        id: line.id,
-        source: line.from,
-        target: line.to,
-        type: "dates" as const,
-        ariaLabel: line.sentence,
-        data: { line, route: elbow(from, to, { index, lanes: dates.length }, everyBox) },
-        selectable: false,
-        focusable: false,
-        deletable: false,
-      },
-    ];
-  });
+  const containers = new Set(model.cards.flatMap((card) => (card.parent === undefined ? [] : [card.parent])));
+  const drawn = dates.filter((line) => boxes.has(line.from) && boxes.has(line.to));
+  const routes = dateRoutes(drawn, model.cards.map((card) => ({ key: card.key, parent: card.parent, container: containers.has(card.key) })), boxes);
+  return drawn.map((line, index) => ({
+    id: line.id,
+    source: line.from,
+    target: line.to,
+    type: "dates" as const,
+    ariaLabel: line.sentence,
+    data: { line, route: routes[index] ?? [] },
+    selectable: false,
+    focusable: false,
+    deletable: false,
+  }));
 }
 
 /** The graph's size on the canvas: the top-level cards' outer edges. */

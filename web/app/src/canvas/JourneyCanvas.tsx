@@ -39,7 +39,7 @@ import { Failed } from "../ui/Failed.tsx";
 export function journeyModel(ready: Ready, level: Level, extras: JourneyExtras): CanvasModel {
   const graph = ready.journey.graph.nodes ?? [];
   const looks = journeyLooks(ready, extras);
-  return { cards: cardsOf(level, graph, looks), lines: linesOf(level, graph, (edge) => looks.waiting(edge)) };
+  return { cards: cardsOf(level, graph, looks), lines: linesOf(level, graph, (edge) => looks.waiting(edge)), order: level.date_order ?? [] };
 }
 
 /** Whether a read has neither a value nor a failure to show yet. */

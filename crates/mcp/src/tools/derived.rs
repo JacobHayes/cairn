@@ -456,6 +456,8 @@ impl ToolSet {
                 nodes,
                 edges,
                 date_links,
+                // What the layout reads; an agent has no layout.
+                date_order: _,
                 hidden_by_class,
                 // The tool's query has no flag or owner filters, so there is nothing to count.
                 hidden_by_filter: _,

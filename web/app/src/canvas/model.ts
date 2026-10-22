@@ -224,6 +224,8 @@ export interface JourneyExtras {
 export interface CanvasModel {
   cards: Card[];
   lines: Line[];
+  /** Orders the dates imply between its cards, which the layout may read; none for a view that has no dates. */
+  order?: { from: string; to: string }[];
 }
 
 type Nodes = Map<string, GraphNode>;

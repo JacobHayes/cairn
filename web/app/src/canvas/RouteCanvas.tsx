@@ -56,6 +56,7 @@ function routeSide(shown: Derived<Shown>, tree: Tree, unanchored: ReadonlySet<st
         return { ...card, route: { foot: node === undefined ? undefined : ruleFoot(node, tree), unanchored: unanchored.has(card.key) } };
       }),
       lines: linesOf(level, nodes),
+      order: level.date_order ?? [],
     }),
   };
 }

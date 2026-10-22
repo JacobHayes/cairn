@@ -2883,6 +2883,12 @@ export interface components {
              *     sorted by their ends; empty when nothing is selected. Not edges: nothing waits on them.
              */
             date_links: components["schemas"]["LevelDateLink"][];
+            /**
+             * @description The orders the dates imply between its cards, a few per node (each rule's binding source,
+             *     each stage close and opening, each date decision before the milestone it sets): what the
+             *     layout may read. Sorted, no pair twice.
+             */
+            date_order?: components["schemas"]["LevelDateOrder"][];
             /** @description The relevance classes shown; every class when absent. */
             display?: components["schemas"]["LevelDisplay"][];
             /** @description The edges, sorted by their ends. */
@@ -2924,6 +2930,16 @@ export interface components {
              * @description The stand-in of the later end where some relationship fixes the order, else of the
              *     node whose dates they are.
              */
+            to: components["schemas"]["NodeKey"];
+        };
+        /**
+         * @description An order the dates imply between two cards of a level, which the layout may read: `from` is
+         *     the earlier end.
+         */
+        LevelDateOrder: {
+            /** @description The stand-in of the earlier end. */
+            from: components["schemas"]["NodeKey"];
+            /** @description The stand-in of the later end. */
             to: components["schemas"]["NodeKey"];
         };
         /**

@@ -27,6 +27,17 @@ describe("onlyTraced: lines that land on one pair of cards", () => {
   });
 });
 
+describe("onlyTraced: the date order", () => {
+  it("is carried to the cards that stand for the ones left out, and dropped where both are one card", () => {
+    const model: CanvasModel = {
+      cards: [card("n_from"), card("n_hidden"), card("n_inner", "n_hidden"), card("n_other", "n_hidden")],
+      lines: [],
+      order: [{ from: "n_from", to: "n_inner" }, { from: "n_inner", to: "n_other" }],
+    };
+    expect(onlyTraced(model, new Set(), new Set(["n_from", "n_hidden"])).order).toEqual([{ from: "n_from", to: "n_hidden" }]);
+  });
+});
+
 describe("a line opens its card only where the view's own level draws it", () => {
   const model: CanvasModel = { cards: [], lines: [lineOf("n_a->n_b", "n_a", "n_b", [edge("n_a", "n_b")]), lineOf("n_b->n_c", "n_b", "n_c", [edge("n_b", "n_c")])] };
 

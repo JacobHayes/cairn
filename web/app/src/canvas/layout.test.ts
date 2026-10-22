@@ -8,7 +8,7 @@ import { describe, expect, test } from "vitest";
 
 import { MARKER_LENGTH_PX } from "./EdgeLine.tsx";
 import { fitZoom, minZoomOf } from "./gestures.ts";
-import { LAYOUT_MOVED_FRACTION_MAX, edgeId, hintsOf, layOut, movedNodes, type LayoutNode, type LayoutRequest, type Placement } from "./layout.ts";
+import { LAYOUT_MOVED_FRACTION_MAX, edgeId, hintsOf, layOut, movedNodes, orderEdgesOf, type LayoutNode, type LayoutRequest, type Placement } from "./layout.ts";
 
 const CARD = { width: 240, height: 96 };
 const HEADER = 64;
@@ -204,5 +204,44 @@ describe("edges and the whole graph", () => {
 describe("fitZoom", () => {
   test("stays positive when the padding leaves no room", () => {
     expect(fitZoom({ width: 500, height: 500 }, { width: 800, height: 100 }, { top: 64, right: 24, bottom: 56, left: 56 })).toBeGreaterThan(0);
+  });
+});
+
+describe("the date order fed to the layout", () => {
+  const cards = (keys: string[], parents: Record<string, string> = {}) => keys.map((key) => ({ key, ...(parents[key] === undefined ? {} : { parent: parents[key] }) }));
+
+  test("an order against a dependency is dropped and one with it is kept", () => {
+    const kept = orderEdgesOf(cards(["a", "b", "c"]), [{ from: "a", to: "b" }], [{ from: "b", to: "a" }, { from: "b", to: "c" }]);
+    expect(kept).toEqual([{ from: "b", to: "c" }]);
+  });
+
+  test("an order between cards in different containers is lifted to their containers and checked there", () => {
+    const parents = { a1: "a", b1: "b" };
+    const all = cards(["a", "b", "a1", "b1"], parents);
+    expect(orderEdgesOf(all, [{ from: "a", to: "b" }], [{ from: "b1", to: "a1" }])).toEqual([]);
+    expect(orderEdgesOf(all, [], [{ from: "a1", to: "b1" }])).toEqual([{ from: "a", to: "b" }]);
+  });
+
+  test("an order that would close a cycle with dependencies and other orders is not kept in both directions", () => {
+    const kept = orderEdgesOf(cards(["a", "b"]), [], [{ from: "a", to: "b" }, { from: "b", to: "a" }]);
+    expect(kept).toHaveLength(1);
+  });
+
+  test("a card the dates put first is laid out left of one the dependencies alone would put left of it", async () => {
+    const keys = ["early", "late", ...Array.from({ length: 6 }, (_, at) => `x${String(at)}`)];
+    const base = request(keys.map((key) => [key]), [["x0", "x1"], ["x1", "x2"], ["x2", "early"], ["x3", "x4"], ["x4", "x5"]]);
+    const fed = { ...base, order: orderEdgesOf(cards(keys), base.edges, [{ from: "early", to: "late" }]) };
+    const placed = (await layOut(elk(), fed)).nodes;
+    expect(placed["early"]?.x).toBeLessThan(placed["late"]?.x ?? 0);
+  });
+
+  test("many date paths do not turn one dependency around", async () => {
+    const keys = ["a", "b", ...Array.from({ length: 12 }, (_, at) => `m${String(at)}`)];
+    const edges: [string, string][] = [["b", "a"]];
+    const base = request(keys.map((key) => [key]), edges);
+    const order = keys.slice(2).flatMap((key) => [{ from: "a", to: key }, { from: key, to: "b" }]);
+    const fed = { ...base, order: orderEdgesOf(cards(keys), base.edges, order) };
+    const placed = (await layOut(elk(), fed)).nodes;
+    expect(placed["b"]?.x).toBeLessThan(placed["a"]?.x ?? 0);
   });
 });

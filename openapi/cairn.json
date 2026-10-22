@@ -5971,6 +5971,13 @@
             },
             "type": "array"
           },
+          "date_order": {
+            "description": "The orders the dates imply between its cards, a few per node (each rule's binding source,\neach stage close and opening, each date decision before the milestone it sets): what the\nlayout may read. Sorted, no pair twice.",
+            "items": {
+              "$ref": "#/components/schemas/LevelDateOrder"
+            },
+            "type": "array"
+          },
           "display": {
             "description": "The relevance classes shown; every class when absent.",
             "items": {
@@ -6051,6 +6058,25 @@
           "from",
           "to",
           "links"
+        ],
+        "type": "object"
+      },
+      "LevelDateOrder": {
+        "additionalProperties": false,
+        "description": "An order the dates imply between two cards of a level, which the layout may read: `from` is\nthe earlier end.",
+        "properties": {
+          "from": {
+            "$ref": "#/components/schemas/NodeKey",
+            "description": "The stand-in of the earlier end."
+          },
+          "to": {
+            "$ref": "#/components/schemas/NodeKey",
+            "description": "The stand-in of the later end."
+          }
+        },
+        "required": [
+          "from",
+          "to"
         ],
         "type": "object"
       },

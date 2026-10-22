@@ -33,7 +33,7 @@ export function dateLinkSentence<T>(link: DateLink, node: T, source: T, options:
       const days = link.days === 0 ? undefined : daysWords(link.days);
       if (link.rule === "due_by") {
         const verb = options.decision ? "decide" : "due";
-        return days === undefined ? [node, `: ${verb} by `, ...read] : [node, `: ${verb} ${days} ${link.direction} `, ...read];
+        return days === undefined ? [node, `: ${verb} by `, ...read] : [node, `: ${verb} no later than ${days} ${link.direction} `, ...read];
       }
       return days === undefined ? [node, ": no sooner than ", ...read] : [node, `: no sooner than ${days} ${link.direction} `, ...read];
     }

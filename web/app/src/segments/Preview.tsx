@@ -39,7 +39,7 @@ export function InsertionCanvas({ preview, domain }: { preview: InsertPreview; d
   const derived = valueOf(derivedRead);
   const nodes = preview.after.nodes ?? NO_NODES;
   const { level, error: levelError } = useLevel(derived, nodes, derived === undefined ? undefined : EVERYTHING);
-  const model = useMemo<CanvasModel | undefined>(() => (level === undefined ? undefined : { cards: cardsOf(level, nodes), lines: linesOf(level, nodes) }), [level, nodes]);
+  const model = useMemo<CanvasModel | undefined>(() => (level === undefined ? undefined : { cards: cardsOf(level, nodes), lines: linesOf(level, nodes), order: level.date_order ?? [] }), [level, nodes]);
   const laid = useLaidOut(`insert:${domain}`, "diff", model);
   const laidOut = valueOf(laid);
   const overlay = useMemo(() => (laidOut === undefined ? undefined : marksOverlay("What the segment adds", marks, laidOut.model, { added: diff.edgesAdded, removed: diff.edgesRemoved })), [laidOut, marks, diff]);
