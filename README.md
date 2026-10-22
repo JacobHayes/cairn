@@ -131,9 +131,10 @@ mise run workspace name   # a jj workspace in ../cairn-ws/name with this checkou
 
 CI runs `mise run check` on every push and nightly, split into parts that run side by side
 (`scripts/ladder --parts`), and `mise run sim` nightly. To release,
-run `gh workflow run release.yml -f version=vX.Y.Z` (or the Actions tab) on main. It refuses
-unless main's head passed CI, then builds the Linux binaries, tags that commit and publishes the
-GitHub release; a version like `v0.4.0-rc.1` makes a pre-release. No file changes per release.
+run `gh workflow run release.yml -f bump=minor` (`major`, `minor` or `patch`; or the Actions
+tab) on main. It bumps that part of the highest `vX.Y.Z` tag, refuses unless main's head passed
+CI, then builds the Linux binaries, tags that commit and publishes the GitHub release. No file
+changes per release.
 
 More reading:
 

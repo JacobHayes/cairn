@@ -1,32 +1,37 @@
-# Releases (ARCHITECTURE, Build, run, deploy): dispatched by hand with a version, on main. It
-# publishes only a commit whose check passed on main, builds the binaries on each Linux target
-# with that version, and one job with write access creates the tag and the GitHub release
+# Releases (ARCHITECTURE, Build, run, deploy): dispatched by hand on main with the part to bump.
+# The workflow picks the version (scripts/next-version), publishes only a commit whose check
+# passed on main, builds the binaries on each Linux target with that version, and one job with
+# write access creates the tag and the GitHub release
 # (decisions/2026-10-22-releases-run-from-a-dispatch.md). Linux runners only.
 name: release
 
 on:
   workflow_dispatch:
     inputs:
-      version:
-        description: "The release's version, vX.Y.Z (a pre-release part such as -rc.1 makes a pre-release)"
+      bump:
+        description: "The part of the highest vX.Y.Z tag to bump (the lower parts reset)"
         required: true
-        type: string
+        type: choice
+        options: [major, minor, patch]
 
 permissions:
   contents: read
 
 # Every action is pinned by full commit SHA, its release in a comment: a tag can be moved.
 
-# Two dispatches of one version never overlap, and one in flight is never cancelled.
+# Two dispatches never overlap (each picks its version from the tags that exist), and one in
+# flight is never cancelled.
 concurrency:
-  group: release-${{ inputs.version }}
+  group: release
   cancel-in-progress: false
 
 jobs:
   # Refuses before anything is built unless this is main, main's own check passed on this
-  # commit, and the tag is free or already on it. A missing run or a failed API call refuses too.
+  # commit, and the next version's tag is free. A missing run or a failed API call refuses too.
   verify:
     runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.next.outputs.version }}
     permissions:
       contents: read
       actions: read
@@ -35,31 +40,32 @@ jobs:
       GH_REPO: ${{ github.repository }}
       REF: ${{ github.ref }}
       SHA: ${{ github.sha }}
-      TAG: ${{ inputs.version }}
+      BUMP: ${{ inputs.bump }}
+      ATTEMPT: ${{ github.run_attempt }}
     steps:
+      # A re-run would pick a new version from the tags that exist now, not the original one.
+      - name: Refuse a re-run
+        run: '[ "$ATTEMPT" = 1 ] || { echo "::error::dispatch the release again instead of re-running it"; exit 1; }'
       - name: Refuse a dispatch that is not on main
         run: '[ "$REF" = refs/heads/main ] || { echo "::error::releases are dispatched on main, not $REF"; exit 1; }'
-      - name: Refuse a version that cannot be a tag name
-        # build.rs is the one semantic-version check; this only keeps the value safe to use.
-        run: '[[ $TAG =~ ^v[0-9][0-9A-Za-z.+-]*$ ]] || { echo "::error::$TAG is not a version like v1.2.3"; exit 1; }'
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - name: Refuse unless check passed on main at this commit
         run: |
           runs=$(gh run list -w check.yml -b main -e push -c "$SHA" --status completed \
             --json conclusion --jq '[.[] | select(.conclusion == "success")] | length') \
             || { echo "::error::could not list check runs"; exit 1; }
           [ "$runs" -gt 0 ] || { echo "::error::no successful check run on main at $SHA"; exit 1; }
-      - name: Refuse a tag on another commit
+      - name: Pick the next version, and refuse a tag that exists
+        id: next
         run: |
-          if ! out=$(gh api "repos/$GH_REPO/git/ref/tags/$TAG" 2>&1); then
-            case $out in
-              *"Not Found"*) exit 0 ;;
-              *) echo "::error::could not read the tag: $out"; exit 1 ;;
-            esac
+          tags=$(gh api --paginate "repos/$GH_REPO/git/matching-refs/tags/v" --jq '.[].ref | ltrimstr("refs/tags/")') \
+            || { echo "::error::could not list the tags"; exit 1; }
+          tag=$(scripts/next-version "$BUMP" <<<"$tags")
+          if gh api "repos/$GH_REPO/git/ref/tags/$tag" >/dev/null 2>&1; then
+            echo "::error::$tag already exists"; exit 1
           fi
-          type=$(jq -r .object.type <<<"$out")
-          sha=$(jq -r .object.sha <<<"$out")
-          if [ "$type" = tag ]; then sha=$(gh api "repos/$GH_REPO/git/tags/$sha" --jq .object.sha); fi
-          [ "$sha" = "$SHA" ] || { echo "::error::$TAG already points at $sha, not $SHA"; exit 1; }
+          echo "$BUMP bump: $tag"
+          echo "version=$tag" >>"$GITHUB_OUTPUT"
 
   package:
     needs: verify
@@ -74,10 +80,9 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - uses: jdx/mise-action@2d8d4cafcbd33be2ea37d2b6f5ad595363d1f1ca # v5.1.1
       - run: npm ci
-      # build.rs refuses a version that is not a semantic version, before any tag exists.
       - run: mise run build:release
         env:
-          CAIRN_VERSION: ${{ inputs.version }}
+          CAIRN_VERSION: ${{ needs.verify.outputs.version }}
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: release-${{ matrix.runner }}
@@ -87,7 +92,7 @@ jobs:
   # The only job that can write: no checkout, no build, only the binaries the legs made. It
   # creates the tag itself, at the commit that was verified and built.
   release:
-    needs: package
+    needs: [verify, package]
     runs-on: ubuntu-latest
     permissions:
       contents: write
@@ -101,7 +106,7 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
           GH_REPO: ${{ github.repository }}
-          TAG: ${{ inputs.version }}
+          TAG: ${{ needs.verify.outputs.version }}
           SHA: ${{ github.sha }}
         run: |
           shopt -s nullglob
@@ -129,14 +134,4 @@ jobs:
             esac
           fi
           assets=("${binaries[@]}")
-          # A pre-release part (a "-" before any "+build") makes a GitHub pre-release.
-          core=${TAG%%+*}
-          prerelease=false
-          if [[ $core == *-* ]]; then prerelease=true; fi
-          if gh release view "$TAG" >/dev/null 2>&1; then
-            gh release upload "$TAG" "${assets[@]}" --clobber
-            gh release edit "$TAG" --target "$SHA" --draft=false --prerelease="$prerelease"
-          else
-            gh release create "$TAG" --target "$SHA" --generate-notes \
-              --prerelease="$prerelease" "${assets[@]}"
-          fi
+          gh release create "$TAG" --target "$SHA" --generate-notes "${assets[@]}"

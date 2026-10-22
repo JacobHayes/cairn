@@ -1,0 +1,22 @@
+#!/usr/bin/env bash
+# The next release tag: `scripts/next-version major|minor|patch` reads tag names on stdin and
+# prints the highest plain vX.Y.Z (semver order; pre-release and other tags are ignored) with the
+# chosen part bumped and the lower parts reset. With no such tag it counts from v0.0.0.
+# The release workflow runs it (decisions/2026-10-22-releases-run-from-a-dispatch.md).
+set -euo pipefail
+
+bump=${1:-}
+case $bump in
+  major | minor | patch) ;;
+  *) echo "usage: next-version major|minor|patch < tags" >&2; exit 2 ;;
+esac
+
+latest=$(grep -E '^v(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)$' | sort -V | tail -n 1 || true)
+IFS=. read -r major minor patch <<<"${latest:-v0.0.0}"
+major=${major#v}
+case $bump in
+  major) major=$((major + 1)) minor=0 patch=0 ;;
+  minor) minor=$((minor + 1)) patch=0 ;;
+  patch) patch=$((patch + 1)) ;;
+esac
+echo "v$major.$minor.$patch"
