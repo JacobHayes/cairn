@@ -166,18 +166,6 @@ pub struct DateLink {
     pub kind: DateLinkKind,
 }
 
-// PRD: C1, C15.
-/// An order the dates imply between two cards of a level, which the layout may read: `from` is
-/// the earlier end.
-#[derive(Clone, Debug, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize, JsonSchema)]
-#[serde(deny_unknown_fields)]
-pub struct LevelDateOrder {
-    /// The stand-in of the earlier end.
-    pub from: NodeKey,
-    /// The stand-in of the later end.
-    pub to: NodeKey,
-}
-
 /// The date relationships drawn at a level between the stand-ins of their ends.
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
 #[serde(deny_unknown_fields)]
@@ -443,12 +431,6 @@ pub struct Level {
     /// The date relationships between the selected card and the stand-ins of the other ends,
     /// sorted by their ends; empty when nothing is selected. Not edges: nothing waits on them.
     pub date_links: Vec<LevelDateLink>,
-    // PRD: C1, C15.
-    /// The orders the dates imply between its cards, a few per node (each rule's binding source,
-    /// each stage close and opening, each date decision before the milestone it sets): what the
-    /// layout may read. Sorted, no pair twice.
-    #[serde(default, skip_serializing_if = "Vec::is_empty")]
-    pub date_order: Vec<LevelDateOrder>,
     // PRD: C1.
     /// The count, per relevance class left out: the nodes hidden only for their class (of a
     /// kind shown, within the level, under no collapse, not left out by `top`, and kept by the

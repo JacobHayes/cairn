@@ -79,10 +79,15 @@ describe("date routes and stage frames", () => {
     expect(verticals[0]?.some((x) => verticals[1]?.includes(x))).toBe(false);
   });
 
-  test("a single port is not on the middle of the side, where a dependency leaves", () => {
-    const boxes = new Map([["a", box(0, 0)], ["b", box(600, 0)]]);
-    const [route] = dateRoutes([{ from: "a", to: "b" }], [cardOf("a"), cardOf("b")], boxes);
-    expect(Math.abs((route?.[0]?.y ?? 48) - 48)).toBeGreaterThanOrEqual(8);
+  test("no port is on the middle of a side, where a dependency meets the card, whatever the number of lines", () => {
+    for (const count of [1, 2, 3, 4, 5]) {
+      const sources = Array.from({ length: count }, (_, at) => `s${String(at)}`);
+      const boxes = new Map<string, Box>([["t", box(600, 0)], ...sources.map((key, at): [string, Box] => [key, box(0, at * 150)])]);
+      const routes = dateRoutes(sources.map((from) => ({ from, to: "t" })), [cardOf("t"), ...sources.map((key) => cardOf(key))], boxes);
+      for (const route of routes) {
+        expect(Math.abs((route.at(-1)?.y ?? 48) - 48)).toBeGreaterThanOrEqual(4);
+      }
+    }
   });
 
   test("a hundred lines at once all reach their ports", () => {

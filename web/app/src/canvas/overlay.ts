@@ -108,12 +108,18 @@ export function traceOverlay(trace: Trace, model: CanvasModel, title: string, da
       marks[card.key] = mark;
     }
   }
+  // A container holding a card at the far end of a date line stays in focus with it: a frame is never dimmed over contents that are not.
+  const parentOf = new Map(model.cards.map((card) => [card.key, card.parent]));
+  for (const key of dated) {
+    for (let at = parentOf.get(key); at !== undefined; at = parentOf.get(at)) {
+      marks[at] ??= DATED_MARK;
+    }
+  }
   const label = (key: string) => marks[key]?.label;
   const upward = (key: string) => label(key) === TRACE_LABELS.needs || label(key) === TRACE_LABELS.traced || label(key) === TRACE_LABELS.both;
   const downward = (key: string) => label(key) === TRACE_LABELS.unblocks || label(key) === TRACE_LABELS.traced || label(key) === TRACE_LABELS.both;
   // A card carries a side of the trace when it, or a card inside it, is on that side; the traced
   // card is on both, so the containers around it carry both.
-  const parentOf = new Map(model.cards.map((card) => [card.key, card.parent]));
   const carriers = (onSide: (key: string) => boolean) => {
     const carrying = new Set<string>();
     for (const card of model.cards.filter((each) => onSide(each.key))) {

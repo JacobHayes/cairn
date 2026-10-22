@@ -43,6 +43,19 @@ export function NodeLink({ node, to, ...rest }: { node: string; to?: string } & 
   );
 }
 
+/**
+ * One of a node's linked dates (C1): the other node as a link, and under it the relationship in words (the
+ * sentence the canvas says on hover), so every row reads the same way whichever end the selected node is.
+ */
+export function LinkedDateRow({ node, link, words }: { node: ReactNode; link: string; words: string }) {
+  return (
+    <li data-node={link}>
+      <span className="linked-date-node">{node}</span>
+      <span className="linked-date-words">{words}</span>
+    </li>
+  );
+}
+
 /** Whether the panel starts every section folded, as a card does; `Section`'s `keep` opts one out. */
 export const FoldedSections = createContext(false);
 

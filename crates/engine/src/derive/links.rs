@@ -188,50 +188,6 @@ impl Derived {
         })
     }
 
-    /// The orderings the layout may read, a few per node: each rule's binding source (the
-    /// earliest of a due-by's, the latest of a not-before's, by the sources' dates today; the
-    /// first by key where none has a date), each stage close and opening, and each date
-    /// decision before the milestone it sets. As `(earlier, later)` ends, in no order.
-    pub(crate) fn order_hints<'a>(&'a self, graph: &'a Graph) -> Vec<(&'a NodeKey, &'a NodeKey)> {
-        let mut hints = Vec::new();
-        let mut rules: BTreeMap<(&NodeKey, bool), Vec<Authored<'a>>> = BTreeMap::new();
-        for found in self.authored_links(graph) {
-            match found.kind {
-                DateLinkKind::Rule { rule, .. } if found.orders => rules
-                    .entry((found.node, rule == DateRuleKind::DueBy))
-                    .or_default()
-                    .push(found),
-                DateLinkKind::StageClose | DateLinkKind::StageOpening => {
-                    hints.push((found.from, found.to));
-                }
-                DateLinkKind::FedDate => hints.push((found.node, found.source)),
-                DateLinkKind::Rule { .. } => {}
-            }
-        }
-        let dated = |key: &NodeKey| {
-            self.dates
-                .effective_date(key)
-                .map(|effective| effective.date)
-                .or_else(|| self.dates.due(key))
-                .or_else(|| self.dates.earliest_start(key))
-        };
-        for ((_, due_by), candidates) in rules {
-            let binding = candidates.iter().min_by(|a, b| {
-                let (first, second) = (dated(a.source), dated(b.source));
-                let by_date = if due_by {
-                    first.cmp(&second)
-                } else {
-                    second.cmp(&first)
-                };
-                // A source with no date binds after any with one.
-                let by_known = first.is_none().cmp(&second.is_none());
-                by_known.then(by_date).then(a.source.cmp(b.source))
-            });
-            hints.extend(binding.map(|found| (found.from, found.to)));
-        }
-        hints
-    }
-
     /// The node's direct date relationships, in both directions, sorted.
     pub(crate) fn date_links_of(&self, graph: &Graph, key: &NodeKey) -> Vec<DateLink> {
         let mut links: Vec<DateLink> = self

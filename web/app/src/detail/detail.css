@@ -255,10 +255,20 @@ dl.kv dd {
   content: "▾";
 }
 
+/* Each linked date: the other node first, its relationship beneath, on the section's own content edge. */
 .linked-dates {
   margin: 0;
-  padding-inline-start: var(--space-5);
+  padding-inline-start: 0;
   list-style: none;
+}
+
+.linked-dates li {
+  display: grid;
+  gap: var(--space-1);
+}
+
+.linked-date-words {
+  color: var(--color-muted);
 }
 
 .date-label {

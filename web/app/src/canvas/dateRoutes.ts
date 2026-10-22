@@ -27,6 +27,10 @@ const BORDER_PX = 6;
 const WINDOW_PX = 200;
 /** The most lines of one selection searched on the grid; the rest take the plain elbow, so a milestone that hundreds of rules read cannot stall the page. */
 const SEARCHED_LINES_MAX = 60;
+/** The most grid points all of one selection's searches may settle between them, so a selection costs the main thread about the same however many lines it draws. */
+const WORK_MAX = 9_000;
+/** How much more than its length the search weighs the way still to go: above 1 it settles far fewer points for a route a little off the cheapest. */
+const HEURISTIC = 2;
 
 /** What the router needs of a card. */
 export interface RouteCard {
@@ -91,7 +95,7 @@ function portsOf(lines: readonly RouteLine[], boxes: ReadonlyMap<string, Box>): 
     }
     group.sort((a, b) => a.other - b.other || a.line - b.line);
     const span = portSpan(box) - 2 * PORT_INSET_PX;
-    // An odd count is spread over one more place than it needs, so none falls on the middle, where a dependency leaves.
+    // An even number of places never lands on the middle, where a dependency meets the card, so an odd group takes one place more than it has lines.
     const places = group.length % 2 === 1 ? group.length + 1 : group.length;
     group.forEach((each, rank) => placed.set(`${String(each.line)}/${each.end}`, box.y + PORT_INSET_PX + (span * (rank + 0.5)) / places));
   }
@@ -122,36 +126,41 @@ class Heap {
     this.items.push(item);
     while (at > 0) {
       const up = (at - 1) >> 1;
-      if ((this.costs[up] ?? 0) <= cost) {
+      if ((this.costs[up] as number) <= cost) {
         break;
       }
-      this.swap(at, up);
+      this.costs[at] = this.costs[up] as number;
+      this.items[at] = this.items[up] as number;
       at = up;
     }
+    this.costs[at] = cost;
+    this.items[at] = item;
   }
   pop(): number {
-    const top = this.items[0] ?? -1;
-    const last = this.items.pop() ?? 0;
-    const lastCost = this.costs.pop() ?? 0;
-    if (this.items.length > 0) {
-      this.items[0] = last;
-      this.costs[0] = lastCost;
+    const top = this.items[0] as number;
+    const [lastItem, lastCost] = [this.items.pop() as number, this.costs.pop() as number];
+    const size = this.items.length;
+    if (size > 0) {
       let at = 0;
       for (;;) {
-        const [a, b] = [2 * at + 1, 2 * at + 2];
-        let least = at;
-        if (a < this.items.length && (this.costs[a] ?? 0) < (this.costs[least] ?? 0)) least = a;
-        if (b < this.items.length && (this.costs[b] ?? 0) < (this.costs[least] ?? 0)) least = b;
-        if (least === at) break;
-        this.swap(at, least);
-        at = least;
+        let child = 2 * at + 1;
+        if (child >= size) {
+          break;
+        }
+        if (child + 1 < size && (this.costs[child + 1] as number) < (this.costs[child] as number)) {
+          child += 1;
+        }
+        if ((this.costs[child] as number) >= lastCost) {
+          break;
+        }
+        this.costs[at] = this.costs[child] as number;
+        this.items[at] = this.items[child] as number;
+        at = child;
       }
+      this.costs[at] = lastCost;
+      this.items[at] = lastItem;
     }
     return top;
-  }
-  private swap(a: number, b: number) {
-    [this.costs[a], this.costs[b]] = [this.costs[b] ?? 0, this.costs[a] ?? 0];
-    [this.items[a], this.items[b]] = [this.items[b] ?? 0, this.items[a] ?? 0];
   }
 }
 
@@ -216,9 +225,19 @@ function pointsIn(grid: Grid, box: Box, margin: number, apply: (cell: number) =>
   }
 }
 
-/** What stops or costs a route between two cards, per grid point. */
-function terrainOf(grid: Grid, line: RouteLine, cards: readonly RouteCard[], boxes: ReadonlyMap<string, Box>) {
-  const parents = new Map(cards.map((card) => [card.key, card.parent]));
+/** A rectangle of the canvas. */
+interface Area {
+  left: number;
+  right: number;
+  top: number;
+  bottom: number;
+}
+
+/** The room a search may use: the box its two stubs span, grown by `WINDOW_PX`. */
+const windowOf = (start: Point, goal: Point): Area => ({ left: Math.min(start.x, goal.x) - WINDOW_PX, right: Math.max(start.x, goal.x) + WINDOW_PX, top: Math.min(start.y, goal.y) - WINDOW_PX, bottom: Math.max(start.y, goal.y) + WINDOW_PX });
+
+/** What stops or costs a route between two cards, per grid point (cards beyond `near` cannot be met). */
+function terrainOf(grid: Grid, line: RouteLine, cards: readonly RouteCard[], boxes: ReadonlyMap<string, Box>, parents: ReadonlyMap<string, string | undefined>, near: Area) {
   const size = grid.xs.length * grid.ys.length;
   const [blocked, weight] = [new Uint8Array(size), new Float32Array(size)];
   const nested = insideOf(parents, line.from, line.to) || insideOf(parents, line.to, line.from);
@@ -228,7 +247,7 @@ function terrainOf(grid: Grid, line: RouteLine, cards: readonly RouteCard[], box
   for (const card of cards) {
     const box = boxes.get(card.key);
     const end = card.key === line.from || card.key === line.to;
-    if (box === undefined || (!end && (insideOf(parents, card.key, line.from) || insideOf(parents, card.key, line.to))) || (end && nested)) {
+    if (box === undefined || box.x > near.right || box.x + box.width < near.left || box.y > near.bottom || box.y + box.height < near.top || (!end && (insideOf(parents, card.key, line.from) || insideOf(parents, card.key, line.to))) || (end && nested)) {
       continue;
     }
     if (!end && (insideOf(parents, line.from, card.key) || insideOf(parents, line.to, card.key))) {
@@ -257,19 +276,25 @@ function terrainOf(grid: Grid, line: RouteLine, cards: readonly RouteCard[], box
  * when there is none. A step costs its length times the terrain's weight, a bend a fixed amount,
  * and a stretch in `used` extra; `heading` is the way the first step must not turn back on.
  */
-function cheapestPath(grid: Grid, terrain: { blocked: Uint8Array; weight: Float32Array }, used: Set<number>, ends: { start: Point; goal: Point; heading: Heading }): Point[] | undefined {
+function cheapestPath(grid: Grid, terrain: { blocked: Uint8Array; weight: Float32Array }, used: Set<number>, ends: { start: Point; goal: Point; heading: Heading }, work: { left: number; run: number; cost: Float64Array; came: Int32Array; seen: Int32Array }): Point[] | undefined {
   const [xs, ys] = [grid.xs, grid.ys];
   const [nx, ny] = [xs.length, ys.length];
   const [start, goal] = [indexOf(ys, ends.start.y) * nx + indexOf(xs, ends.start.x), indexOf(ys, ends.goal.y) * nx + indexOf(xs, ends.goal.x)];
   // The search stays near the stubs: a route that needs more than this much room goes round by the plain elbow.
-  const window = { left: Math.min(ends.start.x, ends.goal.x) - WINDOW_PX, right: Math.max(ends.start.x, ends.goal.x) + WINDOW_PX, top: Math.min(ends.start.y, ends.goal.y) - WINDOW_PX, bottom: Math.max(ends.start.y, ends.goal.y) + WINDOW_PX };
-  const cost = new Float64Array(nx * ny * 4).fill(Infinity);
-  const came = new Int32Array(nx * ny * 4).fill(-1);
+  const window = windowOf(ends.start, ends.goal);
+  // The buffers are the selection's, reused by every search; a state not marked for this run is unvisited.
+  const { cost, came, seen } = work;
+  work.run += 1;
+  const run = work.run;
+  const costOf = (state: number) => (seen[state] === run ? (cost[state] ?? Infinity) : Infinity);
   const heap = new Heap();
+  seen[start * 4 + ends.heading] = run;
   cost[start * 4 + ends.heading] = 0;
+  came[start * 4 + ends.heading] = -1;
   heap.push(0, start * 4 + ends.heading);
   let found = -1;
-  while (heap.size > 0 && found < 0) {
+  while (heap.size > 0 && found < 0 && work.left > 0) {
+    work.left -= 1;
     const state = heap.pop();
     const [cell, heading] = [state >> 2, (state & 3) as Heading];
     if (cell === goal) {
@@ -286,11 +311,12 @@ function cheapestPath(grid: Grid, terrain: { blocked: Uint8Array; weight: Float3
       }
       const length = Math.abs((xs[mx] ?? 0) - (xs[cx] ?? 0)) + Math.abs((ys[my] ?? 0) - (ys[cy] ?? 0));
       const reuse = used.has(Math.min(cell, to) * nx * ny + Math.max(cell, to)) ? SHARED_COST : 0;
-      const spent = (cost[state] ?? Infinity) + length * (1 + Math.max(terrain.weight[cell] ?? 0, terrain.weight[to] ?? 0) + reuse) + (turn === 0 ? 0 : BEND_COST);
-      if (spent < (cost[to * 4 + next] ?? Infinity)) {
+      const spent = costOf(state) + length * (1 + Math.max(terrain.weight[cell] ?? 0, terrain.weight[to] ?? 0) + reuse) + (turn === 0 ? 0 : BEND_COST);
+      if (spent < costOf(to * 4 + next)) {
+        seen[to * 4 + next] = run;
         cost[to * 4 + next] = spent;
         came[to * 4 + next] = state;
-        heap.push(spent + Math.abs((xs[mx] ?? 0) - ends.goal.x) + Math.abs((ys[my] ?? 0) - ends.goal.y), to * 4 + next);
+        heap.push(spent + HEURISTIC * (Math.abs((xs[mx] ?? 0) - ends.goal.x) + Math.abs((ys[my] ?? 0) - ends.goal.y)), to * 4 + next);
       }
     }
   }
@@ -343,9 +369,12 @@ export function dateRoutes(lines: readonly RouteLine[], cards: readonly RouteCar
   const routes: Point[][] = lines.map(() => []);
   const grid = live.length === 0 ? undefined : gridOf(boxes, live.flatMap((each) => [each.from, each.to]));
   const used = new Set<number>();
+  const states = grid === undefined ? 0 : grid.xs.length * grid.ys.length * 4;
+  const [parents, work] = [new Map(cards.map((card) => [card.key, card.parent])), { left: WORK_MAX, run: 0, cost: new Float64Array(states), came: new Int32Array(states), seen: new Int32Array(states) }];
   for (const [index, { port, line, at, from, to }] of live.entries()) {
-    const terrain = grid === undefined || index >= SEARCHED_LINES_MAX ? undefined : terrainOf(grid, line, cards, boxes);
-    const path = grid === undefined || terrain === undefined ? undefined : cheapestPath(grid, terrain, used, { start: from, goal: to, heading: port.out === "right" ? 0 : 2 });
+    const searching = grid !== undefined && index < SEARCHED_LINES_MAX && work.left > 0;
+    const terrain = searching ? terrainOf(grid, line, cards, boxes, parents, windowOf(from, to)) : undefined;
+    const path = searching && terrain !== undefined ? cheapestPath(grid, terrain, used, { start: from, goal: to, heading: port.out === "right" ? 0 : 2 }, work) : undefined;
     routes[at] = straightened([port.from, ...(path ?? elbowOf(from, to)), port.to]);
   }
   return routes;

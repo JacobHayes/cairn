@@ -64,8 +64,8 @@ use std::collections::{BTreeMap, BTreeSet};
 use cairn_schema::limits::CONTAINMENT_DEPTH_MAX;
 use cairn_schema::{
     DependencyVia, Deployment, DisplayState, EdgeOrigin, HiddenByFilter, IdentityKey, Level,
-    LevelDateLink, LevelDateOrder, LevelDisplay, LevelEdge, LevelNode, LevelQuery, ListFlag,
-    NodeKey, NodeKind, Progress, Relevance, RollUp, State, Title, UnderlyingEdge,
+    LevelDateLink, LevelDisplay, LevelEdge, LevelNode, LevelQuery, ListFlag, NodeKey, NodeKind,
+    Progress, Relevance, RollUp, State, Title, UnderlyingEdge,
 };
 
 use super::{DerivedJourney, ProjectionError};
@@ -230,7 +230,6 @@ impl<'a> DerivedJourney<'a> {
             nodes,
             edges: self.level_edges(&stand_ins),
             date_links: self.level_date_links(query, &stand_ins),
-            date_order: self.level_date_order(&stand_ins),
             hidden_by_class: stand_ins.hidden_by_class,
             hidden_by_filter: stand_ins.hidden_by_filter,
         })
@@ -486,24 +485,6 @@ impl<'a> DerivedJourney<'a> {
             stand_ins.get(found.from) == Some(card) || stand_ins.get(found.to) == Some(card)
         });
         collapse(&authored, |key| stand_ins.get(key))
-    }
-
-    /// C1, C15: the orders the dates imply between the cards, from the few orderings each node
-    /// has (`order_hints`), re-targeted to stand-ins, with none onto one card.
-    fn level_date_order(&self, stand_ins: &StandIns<'_>) -> Vec<LevelDateOrder> {
-        let pairs: BTreeSet<LevelDateOrder> = self
-            .derived
-            .order_hints(self.graph)
-            .into_iter()
-            .filter_map(|(earlier, later)| {
-                let (from, to) = (stand_ins.get(earlier)?, stand_ins.get(later)?);
-                (from != to).then(|| LevelDateOrder {
-                    from: from.clone(),
-                    to: to.clone(),
-                })
-            })
-            .collect();
-        pairs.into_iter().collect()
     }
 
     /// C2: a blocked node's unsatisfied gate dependencies that no drawn edge stands for, and

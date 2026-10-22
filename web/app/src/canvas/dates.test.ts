@@ -74,6 +74,17 @@ describe("date lines around a selection", () => {
   });
 });
 
+describe("a container around a date line's far end", () => {
+  test("stays in focus with it, and one that holds nothing dated is left to the trace", () => {
+    const found = model(wholeLevel());
+    const inside = { ...found, cards: found.cards.map((card) => (card.key === "n_kick" ? { ...card, parent: "n_old" } : card)) };
+    const trace = { node: "n_build", upstream: [], downstream: [], gravity_contributors: [] };
+    const overlay = traceOverlay(trace, inside, "Build it", new Set(["n_kick"]));
+    expect(overlay.marks["n_old"]).toMatchObject({ quiet: true });
+    expect(traceOverlay(trace, inside, "Build it").marks["n_old"]).toBeUndefined();
+  });
+});
+
 describe("mergeDateParts", () => {
   test("keeps the direction of a part that fixes the order, whichever comes first", () => {
     const entry = { link: rule("n_b", "n_a"), words: "b" };

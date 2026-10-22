@@ -219,7 +219,7 @@ function boxesOf(model: CanvasModel, layout: Layout): Map<string, Box> {
 }
 
 /** C1: the date lines to draw, as flow edges between the cards they join: not selectable, not focusable, and opening no card (the inspector's dates list them). */
-function dateEdgesOf({ model, layout, dates }: GraphCanvasProps): DateEdge[] {
+function dateEdgesOf({ model, layout, dates }: Pick<GraphCanvasProps, "model" | "layout" | "dates">): DateEdge[] {
   if (dates === undefined || dates.length === 0) {
     return [];
   }
@@ -304,18 +304,18 @@ function onNextFrame(work: (step: Promise<unknown>) => void, move: () => Promise
 
 /**
  * A fit the viewer asks for (the `f` key, the Fit button, an expanded container): the whole graph,
- * or `node` alone at no more than full size, measured when it runs and padded for the sheet or
+ * or `nodes` alone at no more than full size, measured when it runs and padded for the sheet or
  * rail over the canvas's lower part. It answers once React Flow has run it, on a later frame.
  */
-function useFit(): (node?: string) => Promise<unknown> {
+function useFit(): (nodes?: string | readonly string[]) => Promise<unknown> {
   const sheet = useFrameState()?.inspector?.parentElement;
   const store = useStoreApi();
   const flow = useReactFlow();
   return useCallback(
-    (node?: string) => {
+    (nodes?: string | readonly string[]) => {
       measureCanvas(store);
       const padding = { ...FIT_PADDING, bottom: px(PAD.bottom + coveredBy(sheet, store.getState().domNode)) };
-      return flow.fitView(node === undefined ? { ...FIT, padding } : { nodes: [{ id: node }], padding, maxZoom: 1 });
+      return flow.fitView(nodes === undefined ? { ...FIT, padding } : { nodes: (typeof nodes === "string" ? [nodes] : nodes).map((id) => ({ id })), padding, maxZoom: 1 });
     },
     [sheet, store, flow],
   );
@@ -714,7 +714,7 @@ function cardKeys(toggle: (key: string) => boolean, select: ((key: string) => vo
 }
 
 /** The zoom buttons, a stack at the bottom left (our own, so each carries the shared tooltip, not the browser's); Fit pads for the sheet or rail like the other fits. */
-function FitControls() {
+function FitControls({ focus }: { focus: readonly string[] | undefined }) {
   const fitTo = useFit();
   const work = useWork();
   const flow = useReactFlow();
@@ -731,6 +731,13 @@ function FitControls() {
           <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 5"><path d="M0 0h32v4.2H0z" /></svg>
         </ControlButton>
       </Tip>
+      {focus === undefined ? null : (
+        <Tip tip="Frame the selected card and its dates" kind="name">
+          <ControlButton className="react-flow__controls-focus" aria-label="Frame the selected card and its dates" onClick={() => { work(fitTo(focus)); }}>
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32"><path d="M14.5 0h3v7h-3zm0 25h3v7h-3zM0 14.5h7v3H0zm25 0h7v3h-7zM16 10a6 6 0 100 12 6 6 0 000-12zm0 3a3 3 0 110 6 3 3 0 010-6z" /></svg>
+          </ControlButton>
+        </Tip>
+      )}
       <Tip tip="Fit the whole graph" kind="name">
         <ControlButton className="react-flow__controls-fitview" aria-label="Fit the whole graph" onClick={() => { work(fitTo()); }}>
           <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 30"><path d="M3.692 4.63c0-.53.4-.938.939-.938h5.215V0H4.708C2.13 0 0 2.054 0 4.63v5.216h3.692V4.631zM27.354 0h-5.2v3.692h5.17c.53 0 .984.4.984.939v5.215H32V4.631A4.624 4.624 0 0027.354 0zm.954 24.83c0 .532-.4.94-.939.94h-5.215v3.768h5.215c2.577 0 4.631-2.13 4.631-4.707v-5.139h-3.692v5.139zm-23.677.94c-.531 0-.939-.4-.939-.94v-5.138H0v5.139c0 2.577 2.13 4.707 4.708 4.707h5.138V25.77H4.631z" /></svg>
@@ -746,7 +753,10 @@ function Flow(props: GraphCanvasProps) {
   const { hover, focus, handlers } = useEdgeHover(props);
   const edgeEnds = useEdgeEnds(props.model, props.selectedEdge, hover);
   const nodes = useMemo(() => nodesOf(withEmphasis(props), edgeEnds), [props, edgeEnds]);
-  const edges = useMemo<(LineEdge | DateEdge)[]>(() => [...edgesOf(withEmphasis(props)), ...dateEdgesOf(props)], [props]);
+  // The date lines are routed only when what they run between changes (a selection, a layout), not on every render.
+  const { model, layout, dates } = props;
+  const dateEdges = useMemo(() => dateEdgesOf({ model, layout, dates }), [model, layout, dates]);
+  const edges = useMemo<(LineEdge | DateEdge)[]>(() => [...edgesOf(withEmphasis(props)), ...dateEdges], [props, dateEdges]);
   const { menu, menus, openMenu, closeMenu } = useNodeMenu(props);
   const near = useStore((state) => state.transform[2] >= NEAR_ZOOM);
   const { minZoom, fit } = useZoomRange(props, root);
@@ -796,7 +806,7 @@ function Flow(props: GraphCanvasProps) {
           aria-label={props.label}
           data-lod={near ? "near" : "out"}
         >
-          <FitControls />
+          <FitControls focus={props.selected === undefined ? undefined : [...new Set([props.selected, ...(props.dates ?? []).flatMap((line) => [line.from, line.to])])]} />
           {props.children}
         </ReactFlow>
         {menu === undefined || menus === undefined ? null : <ContextMenu at={menu.at} groups={menus.groups(menu.key)} label={`Actions for ${props.actions.title(menu.key)}`} onChoose={(id) => { menus.choose(menu.key, id); }} onClose={closeMenu} />}

@@ -35,8 +35,6 @@ export interface Point {
 export interface LayoutRequest {
   nodes: LayoutNode[];
   edges: { from: string; to: string }[];
-  /** Orders the dates imply between sibling cards, which the layout reads as a preference (`orderEdgesOf`). */
-  order?: { from: string; to: string }[];
   /** The previous revision's positions of the same view, by key, relative to each container. */
   hints?: Record<string, Point>;
 }
@@ -145,14 +143,11 @@ export function elkGraph(request: LayoutRequest): ElkNode {
   const edges: ElkExtendedEdge[] = request.edges
     .filter((edge) => shapes.has(edge.from) && shapes.has(edge.to))
     .map((edge) => ({ id: edgeId(edge), sources: [edge.from], targets: [edge.to] }));
-  const ordered: ElkExtendedEdge[] = (request.order ?? [])
-    .filter((pair) => shapes.has(pair.from) && shapes.has(pair.to))
-    .map((pair) => ({ id: `order:${edgeId(pair)}`, sources: [pair.from], targets: [pair.to] }));
   const layoutOptions: LayoutOptions = { ...ROOT_OPTIONS };
   if (hinted) {
     layoutOptions["elk.layered.crossingMinimization.semiInteractive"] = "true";
   }
-  return { id: "root", layoutOptions, children: roots, edges: [...edges, ...ordered] };
+  return { id: "root", layoutOptions, children: roots, edges };
 }
 
 /** Each placed node of a laid-out ELK graph, relative to its container. */
@@ -212,77 +207,5 @@ export function movedNodes(before: Placement, after: Placement): string[] {
 
 /** The text that identifies a request's input, so an unchanged view is not laid out again. */
 export function signature(request: Omit<LayoutRequest, "hints">): string {
-  return JSON.stringify([request.nodes, request.edges, request.order ?? []]);
-}
-
-/**
- * C1, C15: the orders the dates imply that the layout may read. ELK's edge priorities are only
- * preferences (one dependency against a dozen timing paths reversed the dependency), so an order
- * that runs against the dependencies is removed before ELK sees it: every waits-on line and every
- * order is lifted to the two siblings under the lowest container holding both ends (the cards ELK
- * orders against each other); each container's children are ranked by the waits-on pairs alone
- * (Kahn's algorithm, preferring among those ready one with no unranked order before it, then the
- * lowest key); an order is kept when both lifted ends are ranked, the first ranks before the
- * second, and no waits-on line already joins them that way. What is kept runs forward in an order
- * the dependencies also run forward in, so the union is acyclic and ELK reverses nothing.
- */
-export function orderEdgesOf(
-  cards: readonly { key: string; parent?: string | undefined }[],
-  lines: readonly { from: string; to: string }[],
-  order: readonly { from: string; to: string }[],
-): { from: string; to: string }[] {
-  const parents = new Map(cards.map((card) => [card.key, card.parent]));
-  const chain = (key: string) => {
-    const above: string[] = [];
-    for (let at: string | undefined = key; at !== undefined && above.length <= cards.length; at = parents.get(at)) {
-      above.unshift(at);
-    }
-    return above;
-  };
-  const lift = (pair: { from: string; to: string }) => {
-    const [up, down] = [chain(pair.from), chain(pair.to)];
-    const at = up.findIndex((key, index) => key !== down[index]);
-    const [from, to] = [up[at], down[at]];
-    return at < 0 || from === undefined || to === undefined ? undefined : { from, to, container: at === 0 ? "" : (up[at - 1] ?? "") };
-  };
-  const required = lines.flatMap((line) => lift(line) ?? []);
-  const wanted = order.flatMap((pair) => lift(pair) ?? []);
-  const joined = new Set(required.map((pair) => `${pair.from}\u0000${pair.to}`));
-  const containers = new Set([...required, ...wanted].map((pair) => pair.container));
-  const kept = new Map<string, { from: string; to: string }>();
-  for (const container of containers) {
-    const [needs, hopes] = [required.filter((pair) => pair.container === container), wanted.filter((pair) => pair.container === container)];
-    const members = [...new Set([...needs, ...hopes].flatMap((pair) => [pair.from, pair.to]))].sort();
-    // How many of each member's predecessors are still unranked, by requirement and by date, and who each member precedes.
-    const [needLeft, hopeLeft] = [new Map(members.map((key) => [key, 0])), new Map(members.map((key) => [key, 0]))];
-    const [needNext, hopeNext] = [new Map<string, string[]>(), new Map<string, string[]>()];
-    for (const [pairs, left, next] of [[needs, needLeft, needNext], [hopes, hopeLeft, hopeNext]] as const) {
-      for (const pair of pairs) {
-        left.set(pair.to, (left.get(pair.to) ?? 0) + 1);
-        next.set(pair.from, [...(next.get(pair.from) ?? []), pair.to]);
-      }
-    }
-    // The next card is one nothing it requires is left for, preferring one no date puts after an unranked card, then the lowest key.
-    const rank = new Map<string, number>();
-    while (rank.size < members.length) {
-      const ready = members.filter((key) => !rank.has(key) && needLeft.get(key) === 0);
-      const next = ready.find((key) => hopeLeft.get(key) === 0) ?? ready[0];
-      if (next === undefined) {
-        break;
-      }
-      rank.set(next, rank.size);
-      for (const [nexts, left] of [[needNext, needLeft], [hopeNext, hopeLeft]] as const) {
-        for (const key of nexts.get(next) ?? []) {
-          left.set(key, (left.get(key) ?? 0) - 1);
-        }
-      }
-    }
-    for (const pair of hopes) {
-      const [a, b] = [rank.get(pair.from), rank.get(pair.to)];
-      if (a !== undefined && b !== undefined && a < b && !joined.has(`${pair.from}\u0000${pair.to}`)) {
-        kept.set(`${pair.from}\u0000${pair.to}`, { from: pair.from, to: pair.to });
-      }
-    }
-  }
-  return [...kept.values()].sort((a, b) => edgeId(a).localeCompare(edgeId(b)));
+  return JSON.stringify([request.nodes, request.edges]);
 }

@@ -64,11 +64,7 @@ export function onlyTraced(model: CanvasModel, traced: ReadonlySet<string>, draw
     }
   }
   const lines = [...joined.entries()].map(([id, line]) => lineOf(id, line.from, line.to, line.edges));
-  const order = (model.order ?? []).flatMap((pair) => {
-    const [from, to] = [standIn(pair.from), standIn(pair.to)];
-    return from === undefined || to === undefined || from === to ? [] : [{ from, to }];
-  });
-  return { cards: model.cards.filter((card) => !out.has(card.key)), lines, order };
+  return { cards: model.cards.filter((card) => !out.has(card.key)), lines };
 }
 
 /** The model with each line marked selectable when `ids` (the lines the view's own level draws) holds it; every line is when there is no restriction. */

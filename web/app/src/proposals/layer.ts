@@ -217,7 +217,7 @@ export function withRemoved(after: CanvasModel, before: CanvasModel | undefined,
     }
   }
   // The layer draws no date line, so the cards' own are carried unchanged.
-  return { model: { cards, lines: [...lines.values()], order: after.order ?? [] }, removedLines, shrunk };
+  return { model: { cards, lines: [...lines.values()] }, removedLines, shrunk };
 }
 
 /** One identity row of the identities' diff: the identity, and what the proposal does to it. */

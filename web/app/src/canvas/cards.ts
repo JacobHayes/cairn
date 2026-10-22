@@ -4,7 +4,7 @@
 // line (5.5). NodeCard draws each row at exactly these heights. A title's lines are counted from
 // its width as the browser measures it (measure.ts), so the count is what the drawing wraps to. What an overlay or the Signals
 // lens adds hangs outside the card, so neither moves a node.
-import { orderEdgesOf, type LayoutRequest } from "./layout.ts";
+import type { LayoutRequest } from "./layout.ts";
 import { emWidthOf } from "./measure.ts";
 import type { Card, CanvasModel } from "./model.ts";
 
@@ -124,7 +124,6 @@ export function layoutRequestOf(model: CanvasModel): Omit<LayoutRequest, "hints"
       };
     }),
     edges: model.lines.map((line) => ({ from: line.from, to: line.to })),
-    order: orderEdgesOf(model.cards, model.lines, model.order ?? []),
   };
 }
 

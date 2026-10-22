@@ -8,7 +8,7 @@ import { dateLinkSentence } from "../canvas/dates.ts";
 import { useProjected, type Held } from "../canvas/hooks.ts";
 import { valueOf } from "../data/keyed-read.ts";
 import { KINDS } from "../detail/model.ts";
-import { NodeLink, Section } from "../detail/parts.tsx";
+import { LinkedDateRow, NodeLink, Section } from "../detail/parts.tsx";
 import { titleIn, type Tree } from "./graph.ts";
 
 export function LinkedDates({ held, tree, nodeKey }: { held: Held | undefined; tree: Tree; nodeKey: string }) {
@@ -26,15 +26,14 @@ export function LinkedDates({ held, tree, nodeKey }: { held: Held | undefined; t
   if (links.length === 0) {
     return null;
   }
-  const part = (node: string) => (node === nodeKey ? <strong key={node}>{titleIn(tree, node)}</strong> : <NodeLink key={node} node={node} title={titleIn(tree, node)} />);
+  const words = (link: (typeof links)[number]) => dateLinkSentence(link, titleIn(tree, link.node), titleIn(tree, link.source), { decision: tree.byKey.get(link.node)?.kind === "decision" }).join("");
   return (
     <Section title="Linked dates" summary={String(links.length)} testId="linked-dates">
       <ul className="stack linked-dates">
-        {links.map((link) => (
-          <li key={id(link)} data-node={link.node === nodeKey ? link.source : link.node}>
-            {dateLinkSentence(link, part(link.node), part(link.source), { decision: tree.byKey.get(link.node)?.kind === "decision" })}
-          </li>
-        ))}
+        {links.map((link) => {
+          const other = link.node === nodeKey ? link.source : link.node;
+          return <LinkedDateRow key={id(link)} link={other} node={<NodeLink node={other} title={titleIn(tree, other)} />} words={words(link)} />;
+        })}
       </ul>
     </Section>
   );

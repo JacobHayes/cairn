@@ -11,7 +11,7 @@ import { ChainView } from "./ChainView.tsx";
 import { foldKey } from "./folds.ts";
 import type { Bound } from "./explain.ts";
 import { nodeOf, titleOf, type Mutation, type NodeDetail, type Ready } from "./model.ts";
-import { NodeLink, Section } from "./parts.tsx";
+import { LinkedDateRow, NodeLink, Section } from "./parts.tsx";
 import { ShortfallView } from "./ShortfallView.tsx";
 
 /** F7: where a bound comes from. */
@@ -76,15 +76,14 @@ export function LinkedDates({ view, detail }: { view: Ready; detail: NodeDetail 
   if (links.length === 0) {
     return null;
   }
-  const part = (node: string) => (node === key ? <strong key={node}>{titleOf(view, node)}</strong> : <NodeLink key={node} view={view} node={node} />);
+  const words = (link: (typeof links)[number]) => dateLinkSentence(link, titleOf(view, link.node), titleOf(view, link.source), { decision: nodeOf(view, link.node)?.kind === "decision" }).join("");
   return (
     <Section title="Linked dates" summary={String(links.length)} testId="linked-dates" fold={foldKey(detail.node.kind, "linked-dates")}>
       <ul className="stack linked-dates">
-        {links.map((link) => (
-          <li key={`${link.node}|${link.source}|${link.kind}|${"rule" in link ? link.rule : ""}`} data-node={link.node === key ? link.source : link.node}>
-            {dateLinkSentence(link, part(link.node), part(link.source), { decision: nodeOf(view, link.node)?.kind === "decision" })}
-          </li>
-        ))}
+        {links.map((link) => {
+          const other = link.node === key ? link.source : link.node;
+          return <LinkedDateRow key={`${link.node}|${link.source}|${link.kind}|${"rule" in link ? link.rule : ""}`} link={other} node={<NodeLink view={view} node={other} />} words={words(link)} />;
+        })}
       </ul>
     </Section>
   );
