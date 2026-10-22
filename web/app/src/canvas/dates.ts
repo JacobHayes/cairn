@@ -40,6 +40,16 @@ export function dateLinkSentence<T>(link: DateLink, node: T, source: T, options:
   }
 }
 
+/**
+ * A relationship as the line under its other node's link in the inspector: when the other node is
+ * the one whose dates these are, the link already says so, so the sentence starts at the rule.
+ */
+export function dateLinkRowWords(link: DateLink, other: string, node: string, source: string, options: { decision: boolean }): string {
+  const lead = link.node === other ? "" : node;
+  const words = dateLinkSentence(link, lead, source, options).join("");
+  return lead === "" ? words.replace(/^: /, "").replace(/^./, (first) => first.toUpperCase()) : words;
+}
+
 /** A relationship as one string, for a hover. */
 export function dateLinkWords(link: DateLink, titles: { title(key: string): string; decision(key: string): boolean }): string {
   return dateLinkSentence(link, nodeTitle(titles.title(link.node)), nodeTitle(titles.title(link.source)), { decision: titles.decision(link.node) }).join("");

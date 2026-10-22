@@ -12,7 +12,7 @@ Documentation is due 7 days before Launch: one line, arrowhead at Launch, the se
 
 ![Launch selected with Linked dates open](launch-selected.png)
 
-Launch has five relationships. The far ends and the frames around them stay in full ink while the trace fades the rest; the arrowheads on Launch's right side take places of their own. Linked dates lists the other node first, its sentence beneath.
+Launch has five relationships. The far ends and the frames around them stay in full ink while the trace fades the rest; the arrowheads on Launch's right side take places of their own. Linked dates lists the other node once, its rule beneath without repeating the name.
 
 ![Beta starts selected](beta-start-selected.png)
 
@@ -42,5 +42,6 @@ The layout does not read date order: feeding it made the launch fit view 0.16 ag
 ## Known limits
 
 - A date line to a node with no card at the current depth is not drawn; the inspector still lists it.
+- On a short card at a low zoom, the arrowheads sharing a side are close (the card's height bounds the room); each still has a place of its own.
 - A due-by line can run right to left; it reads by its arrowhead and its sentence.
 - A canvas too large for the routing grid, lines past the first 60, or a spent search budget draw a plain elbow that may cross cards.

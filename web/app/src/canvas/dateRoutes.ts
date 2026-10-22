@@ -16,7 +16,7 @@ const GRID_PX_MAX = 24;
 const GRID_POINTS_MAX = 40_000;
 /** The share of a side (px) that ports are spread over, and the margin kept at its ends. */
 const PORT_SPAN_PX = 96;
-const PORT_INSET_PX = 12;
+const PORT_INSET_PX = 8;
 /** What each step costs beyond its length: a bend, running over a stretch another line uses, crossing a frame, hugging a frame's own border. */
 const BEND_COST = 24;
 const SHARED_COST = 12;

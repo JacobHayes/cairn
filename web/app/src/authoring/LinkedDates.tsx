@@ -4,7 +4,7 @@
 // canvas draws for the selected node are read and followed by keyboard or touch. The level that
 // selects the node carries them, read with every kind shown and nothing folded, so each end is
 // the node itself.
-import { dateLinkSentence } from "../canvas/dates.ts";
+import { dateLinkRowWords } from "../canvas/dates.ts";
 import { useProjected, type Held } from "../canvas/hooks.ts";
 import { valueOf } from "../data/keyed-read.ts";
 import { KINDS } from "../detail/model.ts";
@@ -26,13 +26,13 @@ export function LinkedDates({ held, tree, nodeKey }: { held: Held | undefined; t
   if (links.length === 0) {
     return null;
   }
-  const words = (link: (typeof links)[number]) => dateLinkSentence(link, titleIn(tree, link.node), titleIn(tree, link.source), { decision: tree.byKey.get(link.node)?.kind === "decision" }).join("");
+  const words = (link: (typeof links)[number], other: string) => dateLinkRowWords(link, other, titleIn(tree, link.node), titleIn(tree, link.source), { decision: tree.byKey.get(link.node)?.kind === "decision" });
   return (
     <Section title="Linked dates" summary={String(links.length)} testId="linked-dates">
       <ul className="stack linked-dates">
         {links.map((link) => {
           const other = link.node === nodeKey ? link.source : link.node;
-          return <LinkedDateRow key={id(link)} link={other} node={<NodeLink node={other} title={titleIn(tree, other)} />} words={words(link)} />;
+          return <LinkedDateRow key={id(link)} link={other} node={<NodeLink node={other} title={titleIn(tree, other)} />} words={words(link, other)} />;
         })}
       </ul>
     </Section>

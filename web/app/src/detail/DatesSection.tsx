@@ -5,7 +5,7 @@
 // routes through a feeding decision when there is one (E3).
 import type { ReactNode } from "react";
 
-import { dateLinkSentence } from "../canvas/dates.ts";
+import { dateLinkRowWords } from "../canvas/dates.ts";
 import { dateWords, originWord } from "../status/when.ts";
 import { ChainView } from "./ChainView.tsx";
 import { foldKey } from "./folds.ts";
@@ -76,13 +76,13 @@ export function LinkedDates({ view, detail }: { view: Ready; detail: NodeDetail 
   if (links.length === 0) {
     return null;
   }
-  const words = (link: (typeof links)[number]) => dateLinkSentence(link, titleOf(view, link.node), titleOf(view, link.source), { decision: nodeOf(view, link.node)?.kind === "decision" }).join("");
+  const words = (link: (typeof links)[number], other: string) => dateLinkRowWords(link, other, titleOf(view, link.node), titleOf(view, link.source), { decision: nodeOf(view, link.node)?.kind === "decision" });
   return (
     <Section title="Linked dates" summary={String(links.length)} testId="linked-dates" fold={foldKey(detail.node.kind, "linked-dates")}>
       <ul className="stack linked-dates">
         {links.map((link) => {
           const other = link.node === key ? link.source : link.node;
-          return <LinkedDateRow key={`${link.node}|${link.source}|${link.kind}|${"rule" in link ? link.rule : ""}`} link={other} node={<NodeLink view={view} node={other} />} words={words(link)} />;
+          return <LinkedDateRow key={`${link.node}|${link.source}|${link.kind}|${"rule" in link ? link.rule : ""}`} link={other} node={<NodeLink view={view} node={other} />} words={words(link, other)} />;
         })}
       </ul>
     </Section>

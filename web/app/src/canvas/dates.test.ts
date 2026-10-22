@@ -5,7 +5,7 @@
 import { describe, expect, test } from "vitest";
 
 import { canvasView, actionsAndDecisionsHidden, wholeLevel } from "./canvas.test-support.ts";
-import { datesAround, dateLinesOf, mergeDateParts } from "./dates.ts";
+import { datesAround, dateLinesOf, dateLinkRowWords, dateLinkWords, mergeDateParts } from "./dates.ts";
 import { cardsOf, type CanvasModel, type DateLine, type DateLink, type Level, type LevelDateLink } from "./model.ts";
 import { TRACE_LABELS, traceOverlay } from "./overlay.ts";
 
@@ -82,6 +82,24 @@ describe("a container around a date line's far end", () => {
     const overlay = traceOverlay(trace, inside, "Build it", new Set(["n_kick"]));
     expect(overlay.marks["n_old"]).toMatchObject({ quiet: true });
     expect(traceOverlay(trace, inside, "Build it").marks["n_old"]).toBeUndefined();
+  });
+});
+
+describe("the words under a linked date", () => {
+  const titles = { title: (key: string) => (key === "n_a" ? "Announcement" : "Launch"), decision: () => false };
+  const link = rule("n_a", "n_l");
+
+  test("do not repeat the node whose link they sit under, while the hover still names both ends", () => {
+    const row = dateLinkRowWords(link, "n_a", "Announcement", "Launch", { decision: false });
+    expect(row).not.toContain("Announcement");
+    expect(row).toContain("Launch");
+    const hover = dateLinkWords(link, titles);
+    expect(hover).toContain("Announcement");
+    expect(hover).toContain("Launch");
+  });
+
+  test("keep the selected node's name when the link is the node it reads", () => {
+    expect(dateLinkRowWords(link, "n_l", "Announcement", "Launch", { decision: false })).toContain("Announcement");
   });
 });
 
