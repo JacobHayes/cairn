@@ -15,16 +15,37 @@ export interface Layouter {
   layOut(request: LayoutRequest): Promise<Layout>;
 }
 
-/** C15: ELK in the layout worker (layout-worker.ts), through ELK's own API and messages. */
+/** A graph of one node: laying it out is how ELK is made to let go of the graph before it. */
+const RELEASE: LayoutRequest = { nodes: [{ key: "release", width: 1, height: 1 }], edges: [] };
+
+/**
+ * C15: ELK in the layout worker (layout-worker.ts), through ELK's own API and messages.
+ *
+ * ELK keeps the last graph it laid out, as its algorithms' working state, until it lays out
+ * the next: a few megabytes for a small journey, about a gigabyte of the worker's heap for one
+ * at the node limit, held for as long as the tab stays open. So once no layout is waiting, the
+ * worker lays out a single node, which takes a few milliseconds and leaves it holding nothing.
+ */
 export class LayoutWorker implements Layouter {
   readonly #elk: Elk;
+  /** Layouts asked for and not yet answered. */
+  #waiting = 0;
 
   constructor() {
     this.#elk = new ELK({ workerFactory: () => new Worker(new URL("./layout-worker.ts", import.meta.url), { type: "module" }) });
   }
 
   layOut(request: LayoutRequest): Promise<Layout> {
-    return layOut(this.#elk, request);
+    this.#waiting += 1;
+    const laid = layOut(this.#elk, request);
+    const settled = () => {
+      this.#waiting -= 1;
+      if (this.#waiting === 0) {
+        void layOut(this.#elk, RELEASE).catch(() => undefined);
+      }
+    };
+    laid.then(settled, settled);
+    return laid;
   }
 }
 
