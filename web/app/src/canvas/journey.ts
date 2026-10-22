@@ -91,6 +91,11 @@ function bodyOf(context: Context, node: GraphNode, derived: NodeDerived, at: Lev
     const { done, total } = derived.progress ?? { done: 0, total: 0 };
     return total === 0 ? undefined : { kind: "progress", done, total, badge: rollUpBadge(derived, at) };
   }
+  // G5: work that holds no other nodes shows how much of its checklist is ticked.
+  const count = derived.checklist_count;
+  if (count != null && count.total > 0) {
+    return { kind: "checklist", ticked: count.ticked, total: count.total };
+  }
   return undefined;
 }
 
@@ -177,10 +182,6 @@ export function journeyLooks(view: Ready, extras: JourneyExtras): Looks {
   };
   return {
     card: (node, at) => cardState(context, node, at),
-    finished: (key) => {
-      const node = nodeOf(view, key);
-      return node !== undefined && isFinished(stateOf(view, node));
-    },
     waiting: (edge) => (view.derived.nodes[edge.dependent]?.blocked_by ?? []).some((blocker) => blocker.node === edge.requirement && holdsEdge(blocker.via, edge)),
   };
 }

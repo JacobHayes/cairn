@@ -178,7 +178,7 @@ export function targetText(target: EditTarget, name: Namer): string {
 }
 
 /** Why finished work is stale (D4), as the clause after the node's name: "needs a note", "Kickoff was reopened", "was finished before its date, Oct 12" (a date in `today`'s year leaves the year out). */
-export function guardFailureText(failure: Schema<"GuardFailure">, name: Namer, today?: string): string {
+export function guardFailureText(failure: Schema<"GuardFailure">, name: Namer, today: string | undefined, item: (id: string) => string): string {
   if (failure === "missing_artifact") {
     return "needs a link";
   }
@@ -189,7 +189,7 @@ export function guardFailureText(failure: Schema<"GuardFailure">, name: Namer, t
     return "was not broken down";
   }
   if ("unticked" in failure) {
-    return `has an unticked checklist item, ${failure.unticked}`;
+    return `needs "${item(failure.unticked)}" ticked`;
   }
   if ("too_early" in failure) {
     return `was finished before its date, ${dateWords(failure.too_early, today)}`;

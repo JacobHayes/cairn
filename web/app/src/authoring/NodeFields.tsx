@@ -4,7 +4,7 @@
 // what the engine said about it, at the field (A15).
 import { useState } from "react";
 
-import { ANSWER_TYPES, DEFAULT_WEIGHT } from "@cairn/client";
+import { ANSWER_TYPES, DEFAULT_WEIGHT, type Schema } from "@cairn/client";
 
 import { choiceId, choiceLabel, type Choice } from "../status/answer.ts";
 import { Button, Field } from "../ui/kit.tsx";
@@ -13,6 +13,13 @@ import { nodesFor, rolesForFill, type AnswerType, type NodeKind, type Role, type
 import { slugOf, uniqueId } from "./keys.ts";
 import { FieldBox, Picker, type FieldNotes } from "./parts.tsx";
 import { StageBoundsEditor } from "./DateRuleEditor.tsx";
+
+/** The text of a new checklist item as typed, set as typed, and `add` to change the draft and clear the text in one step. */
+export interface NewItem {
+  value: string;
+  set: (value: string) => void;
+  add: (next: Partial<NodeDraft>) => void;
+}
 
 /** What every field group is handed. */
 export interface FieldsProps {
@@ -23,6 +30,10 @@ export interface FieldsProps {
   notes: (field: FormField) => FieldNotes;
   tree: Tree;
   roles: readonly Role[];
+  /** A journey's form: the saved items of this node that carry a tick, so saving without one can say it drops the tick. */
+  ticked?: readonly Schema<"ChecklistItem">[];
+  /** The checklist's new-item text, kept with the form's draft so a reload does not lose it; without it the editor holds the text itself. */
+  newItem?: NewItem;
 }
 
 const ANSWER_TYPE_WORDS: Record<AnswerType, string> = {
@@ -65,7 +76,7 @@ function Days({ props, field, label, hint }: { props: FieldsProps; field: "weigh
   );
 }
 
-function Flag({ props, field, label }: { props: FieldsProps; field: "requires_artifact" | "requires_note" | "placeholder" | "final" | "auto_done"; label: string }) {
+function Flag({ props, field, label }: { props: FieldsProps; field: "requires_artifact" | "requires_note" | "requires_checklist" | "placeholder" | "final" | "auto_done"; label: string }) {
   return (
     <FieldBox label="" place={field} notes={props.notes(field)}>
       <label className="row">
@@ -103,10 +114,101 @@ export function WeightFields({ props }: { props: FieldsProps }) {
 export function CompletionFields({ props }: { props: FieldsProps }) {
   return (
     <>
+      {has(props, "checklist") ? <ChecklistEditor props={props} /> : null}
       {has(props, "requires_artifact") ? <Flag props={props} field="requires_artifact" label="Requires an artifact before done" /> : null}
       {has(props, "requires_note") ? <Flag props={props} field="requires_note" label="Requires a note before done" /> : null}
       {has(props, "placeholder") ? <Flag props={props} field="placeholder" label="Placeholder: each journey breaks it down" /> : null}
     </>
+  );
+}
+
+/** G5: a work node's checklist: the flag that makes every item a condition of done, the items in order (each keeps its id when moved or retitled, so its tick stays), and a new one. */
+export function ChecklistEditor({ props, flag = true }: { props: FieldsProps; flag?: boolean }) {
+  const items = props.draft.checklist;
+  const set = (next: Schema<"ChecklistItem">[]) => {
+    props.change({ checklist: next });
+  };
+  const move = (at: number, by: number) => {
+    const next = [...items];
+    const [item] = next.splice(at, 1);
+    if (item !== undefined) {
+      next.splice(at + by, 0, item);
+      set(next);
+    }
+  };
+  const [local, setLocal] = useState("");
+  const pending: NewItem = props.newItem ?? {
+    value: local,
+    set: setLocal,
+    add: (next) => {
+      props.change(next);
+      setLocal("");
+    },
+  };
+  const dropped = (props.ticked ?? []).filter((item) => !items.some((each) => each.id === item.id));
+  return (
+    <FieldBox label="Checklist" place="checklist" notes={props.notes("checklist")}>
+      {flag ? <Flag props={props} field="requires_checklist" label="Requires all items ticked before done" /> : null}
+      {items.length === 0 ? <span className="muted small">With no items, this requires nothing.</span> : null}
+      {items.map((item, at) => (
+        <span key={item.id} className="items-row" data-testid="checklist-item-edit" data-item={item.id}>
+          <Field aria-label="Item title" value={item.title} onChange={(event) => { set(items.map((each, index) => (index === at ? { ...each, title: event.target.value } : each))); }} />
+          {at === 0 ? null : (
+            <Button className="items-move items-up" aria-label={`Move ${item.title} up`} onClick={() => { move(at, -1); }}>
+              {"\u2191"}
+            </Button>
+          )}
+          {at === items.length - 1 ? null : (
+            <Button className="items-move items-down" aria-label={`Move ${item.title} down`} onClick={() => { move(at, 1); }}>
+              {"\u2193"}
+            </Button>
+          )}
+          <Button className="items-move items-remove" aria-label={`Remove the item ${item.title}`} onClick={() => { set(items.filter((_, index) => index !== at)); }}>
+            {"\u00d7"}
+          </Button>
+        </span>
+      ))}
+      {dropped.map((item) => (
+        <span key={item.id} className="muted small" data-testid="tick-dropped">
+          Saving removes the tick on "{item.title}".
+        </span>
+      ))}
+      <AddItem items={items} reserved={(props.ticked ?? []).map((item) => item.id)} pending={pending} onAdd={(item) => { pending.add({ checklist: [...items, item] }); }} />
+    </FieldBox>
+  );
+}
+
+/** A new item, added to the draft only: on its button, on Enter, and on leaving the field, so text typed and not added is never dropped by Save. */
+function AddItem({ items, reserved, pending, onAdd }: { items: readonly Schema<"ChecklistItem">[]; reserved: readonly string[]; pending: NewItem; onAdd: (item: Schema<"ChecklistItem">) => void }) {
+  const title = pending.value;
+  const setTitle = pending.set;
+  const add = () => {
+    const trimmed = title.trim();
+    if (trimmed !== "") {
+      // A removed item's id stays taken until saved, so a new item never inherits its tick.
+      onAdd({ id: uniqueId(slugOf(trimmed, "item"), new Set([...items.map((item) => item.id), ...reserved])), title: trimmed });
+    }
+  };
+  return (
+    <label className="stack">
+      <span className="label">New item</span>
+      <span className="stack items-add">
+        <Field
+          aria-label="New item"
+          placeholder="A new item"
+          value={title}
+          onChange={(event) => { setTitle(event.target.value); }}
+          onBlur={add}
+          onKeyDown={(event) => {
+            if (event.key === "Enter") {
+              event.preventDefault();
+              add();
+            }
+          }}
+        />
+        <Button disabled={title.trim() === ""} onClick={add}>Add the item</Button>
+      </span>
+    </label>
   );
 }
 

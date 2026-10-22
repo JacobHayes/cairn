@@ -92,6 +92,24 @@ function derivedNodes(): Ready["derived"]["nodes"] {
   };
 }
 
+/** `testView` with a checklist on Findings (items a, b and c, all required before done), `b` ticked. */
+export function checklistView(): Ready {
+  const view = testView();
+  const nodes = view.journey.graph.nodes ?? [];
+  const at = nodes.findIndex((node) => node.key === "n_findings");
+  const findings = nodes[at];
+  if (findings === undefined || view.journey.graph.state === undefined) {
+    throw new Error("the test journey has no Findings");
+  }
+  nodes[at] = { ...findings, requires_checklist: true, checklist: [{ id: "a", title: "Rollback plan written" }, { id: "b", title: "Support team briefed" }, { id: "c", title: "Security sign-off" }] };
+  view.journey.graph.state.ticks = { n_findings: ["b"] };
+  const derived = view.derived.nodes["n_findings"];
+  if (derived !== undefined) {
+    view.derived.nodes["n_findings"] = { ...derived, failing_guards: ["all_ticked"], checklist_count: { ticked: 1, total: 3 } };
+  }
+  return view;
+}
+
 export function testView(): Ready {
   const view: Ready = {
     status: "ready",

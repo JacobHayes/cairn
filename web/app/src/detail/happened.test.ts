@@ -4,7 +4,7 @@
 import type { Schema } from "@cairn/client";
 import { describe, expect, it } from "vitest";
 
-import { happened, noPrior, recount, remember, type Facts, type Words } from "./happened.ts";
+import { foldTicks, happened, noPrior, recount, remember, type Facts, type Words } from "./happened.ts";
 
 type Event = Schema<"Event">;
 type EventType = Schema<"EventType">;
@@ -15,6 +15,7 @@ const TITLES: Record<string, string> = { n_plan: "Plan the launch", n_review: "R
 const words: Words = {
   viewed: "n_plan",
   node: (key) => TITLES[key] ?? "an item that was removed",
+  item: (_, id) => (id === "load" ? "Load test" : "a checklist item that was removed"),
   identity: (key) => (key === "who_ana" ? "Ana Reyes" : "Someone"),
   role: (key) => (key === "r_lead" ? "Lead" : "A role"),
   kind: (key) => (key === "k_owner" ? "owner" : "Reviewer"),
@@ -83,8 +84,8 @@ const CASES: Record<EventType, Case> = {
   guard_bypassed: { event: event("guard_bypassed", plan) },
   override_removed: { event: event("override_removed", plan, [put({ overrides: { node: "n_plan", overrides: {} } })]) },
   atomic_changed: { event: event("atomic_changed", plan, [state("n_plan", { state: "todo", atomic: true })]) },
-  item_ticked: { event: event("item_ticked", plan) },
-  item_unticked: { event: event("item_unticked", plan) },
+  item_ticked: { event: event("item_ticked", plan, [put({ tick: { node: "n_plan", item: "load" } })]), facts: { item: "Load test", subject: "n_plan" } },
+  item_unticked: { event: event("item_unticked", plan, [{ remove: { in_graph: { graph: { journey: "j_test" }, key: { tick: { node: "n_plan", item: "load" } } } } }]), facts: { item: "Load test", subject: "n_plan" } },
   annotation_added: { event: event("annotation_added", { attachment: "a_note" }) },
   annotation_edited: { event: event("annotation_edited", { attachment: "a_note" }) },
   annotation_removed: { event: event("annotation_removed", { attachment: "a_note" }) },
@@ -162,5 +163,30 @@ describe("happened", () => {
   it("notes when an agent acted for the user", () => {
     expect(happened(event("unsnoozed", plan, [], { actor: { user: "u_ana", agent: "a_one" } }), words).byAgent).toBe(true);
     expect(happened(event("unsnoozed", plan), words).byAgent).toBe(false);
+  });
+});
+
+const tick = (node: string, item: string, type: EventType = "item_ticked") => event(type, { node }, [put({ tick: { node, item } })]);
+
+describe("ticks in words (G5)", () => {
+  it("says a tick by its item's title, a removed item in words, and the node when it is not the one viewed", () => {
+    expect(happened(tick("n_plan", "load"), words).what).toContain("Load test");
+    expect(happened(tick("n_plan", "load"), words).facts.onNode).toBeUndefined();
+    expect(happened(tick("n_plan", "gone"), words).facts.item).toBe("a checklist item that was removed");
+    expect(happened(tick("n_review", "load"), words).facts.onNode).toBe(TITLES.n_review);
+  });
+
+  it("folds the ticks of one node in one direction into one entry; other nodes and directions stay apart", () => {
+    const complete = event("node_transitioned", plan, [state("n_plan", { state: "done" })]);
+    const events = [tick("n_plan", "a"), tick("n_plan", "b"), tick("n_plan", "c"), tick("n_review", "load"), tick("n_plan", "d", "item_unticked"), complete];
+    const folded = foldTicks(recount(events, words));
+    expect(folded.map((each) => [each.type, each.facts.subject])).toEqual([
+      ["item_ticked", "n_plan"],
+      ["item_ticked", "n_review"],
+      ["item_unticked", "n_plan"],
+      ["node_transitioned", undefined],
+    ]);
+    expect(folded[0]?.what).toContain("3");
+    expect(folded[1]?.what).toContain("Load test");
   });
 });

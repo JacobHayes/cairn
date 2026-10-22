@@ -67,7 +67,7 @@ function rankReason(view: Ready, row: NodeRow): string | undefined {
   return ordered.map((part) => partReason(view, row, part)).find((reason) => reason !== undefined);
 }
 
-/** What the row needs before it can be finished: a note or a link, or breaking down. */
+/** What the row needs before it can be finished: a note or a link, checklist items to tick, or breaking down. */
 function requirement(view: Ready, row: NodeRow): string | undefined {
   const node = nodeOf(view, row.key);
   if (node === undefined) {
@@ -79,6 +79,9 @@ function requirement(view: Ready, row: NodeRow): string | undefined {
   }
   if (needs.artifact) {
     return "Link required";
+  }
+  if (needs.unticked.length > 0) {
+    return `${plural(needs.unticked.length, "checklist item")} to tick`;
   }
   return row.needs_breakdown === true ? "Needs breakdown" : undefined;
 }

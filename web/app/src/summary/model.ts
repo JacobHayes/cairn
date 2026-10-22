@@ -13,7 +13,7 @@ import { unblockersOf } from "../acting/waiting.ts";
 import type { FactTone } from "../acting/reasons.ts";
 import type { NodeRow } from "../acting/why.ts";
 import { guardFailureText, namer } from "../detail/explain.ts";
-import { feedingDecision, milestonesFirst, nodeOf, recordOf, scheduledDate, titleOf, type GraphNode, type Ready } from "../detail/model.ts";
+import { feedingDecision, itemTitle, milestonesFirst, nodeOf, recordOf, scheduledDate, titleOf, type GraphNode, type Ready } from "../detail/model.ts";
 import { snoozeEndWords } from "../status/snooze.ts";
 import { isOpen } from "../status/state.ts";
 import { dateWords, daysWords } from "../status/when.ts";
@@ -67,7 +67,7 @@ function overdueOf(ready: Ready, key: string): SummaryModel["overdue"][number] {
 
 function staleOf(ready: Ready, key: string): SummaryModel["stale"][number] {
   const name = namer(ready);
-  return { ...listed(ready, key), reasons: (ready.derived.nodes[key]?.stale ?? []).map((failure) => guardFailureText(failure, name, ready.derived.today)) };
+  return { ...listed(ready, key), reasons: (ready.derived.nodes[key]?.stale ?? []).map((failure) => guardFailureText(failure, name, ready.derived.today, (id) => itemTitle(ready, key, id))) };
 }
 
 /** C18: the projected summary with what a reader needs to read it. */

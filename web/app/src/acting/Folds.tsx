@@ -12,7 +12,7 @@ import { Link } from "react-router";
 import { ActButton } from "../detail/ActButton.tsx";
 import { newAttachmentKey } from "../detail/Attachments.tsx";
 import { guardFailureText, namer } from "../detail/explain.ts";
-import { titleOf, type Ready, type Mutation } from "../detail/model.ts";
+import { itemTitle, titleOf, type Ready, type Mutation } from "../detail/model.ts";
 import { Rejected } from "../detail/Rejected.tsx";
 import { useFormDraft, useNodeWrite, type NodeWrite } from "../detail/write.ts";
 import { snoozeEndWords } from "../status/snooze.ts";
@@ -89,8 +89,8 @@ function AddNote({ write, node }: { write: NodeWrite; node: string }) {
 }
 
 /** D4: a guard failure that makes finished work stale, as a sentence. */
-function staleWords(view: Ready, failure: NonNullable<ReturnType<typeof firstStale>>): string {
-  return upperFirst(guardFailureText(failure, namer(view), view.derived.today));
+function staleWords(view: Ready, key: string, failure: NonNullable<ReturnType<typeof firstStale>>): string {
+  return upperFirst(guardFailureText(failure, namer(view), view.derived.today, (id) => itemTitle(view, key, id)));
 }
 
 function firstStale(view: Ready, key: string) {
@@ -113,7 +113,7 @@ function looksOf(view: Ready, stale: NodeRow[], short: NodeRow[], lapsed: NodeRo
   };
   for (const row of stale) {
     const failure = firstStale(view, row.key);
-    add({ row, reason: failure === undefined ? "Stale" : staleWords(view, failure), fix: failure === "missing_note" ? "note" : "open" });
+    add({ row, reason: failure === undefined ? "Stale" : staleWords(view, row.key, failure), fix: failure === "missing_note" ? "note" : "open" });
   }
   for (const row of short) {
     add({ row, reason: `${daysWords(row.shortfall_days ?? 0)} short of its plan`, fix: "open" });

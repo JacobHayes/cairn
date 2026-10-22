@@ -63,7 +63,7 @@ export interface CardRows {
   /** Kind and state. */
   head: true;
   title: number;
-  /** A decided decision's answer, a container's progress, or what a conditional node depends on. */
+  /** A decided decision's answer, a container's progress, a childless piece of work's checklist count, or what a conditional node depends on. */
   body: boolean;
   /** The one date, and the owner when it is the viewer's or missing. */
   foot: boolean;

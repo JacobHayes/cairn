@@ -9,7 +9,7 @@ import type { JourneyView } from "../data/journeys.ts";
 import { isOpen } from "../status/state.ts";
 import type { DisplayState } from "../status/words.ts";
 
-import { nodeTitle } from "../ui/gone.ts";
+import { ITEM_GONE, nodeTitle } from "../ui/gone.ts";
 
 export type Ready = Extract<JourneyView, { status: "ready" }>;
 export type GraphNode = Schema<"Node">;
@@ -43,7 +43,7 @@ export type AnswerValue = Schema<"AnswerValue">;
 export type Mutation = Schema<"Mutation">;
 export type Guard = Schema<"Guard">;
 
-/** One child in a node's checklist. */
+/** One child in a node's Contents. */
 export interface Child {
   key: string;
   title: string;
@@ -101,6 +101,17 @@ export function nodeOf(view: Ready, key: string): GraphNode | undefined {
 /** A node's title, or words for a node the journey does not hold. */
 export function titleOf(view: Ready, key: string): string {
   return nodeTitle(nodeOf(view, key)?.title);
+}
+
+/** G5: a node's checklist items in order, each with whether it is ticked; empty for a node with none. */
+export function checklistOf(view: Ready, key: string): { id: string; title: string; ticked: boolean }[] {
+  const ticked = new Set(view.journey.graph.state?.ticks?.[key] ?? []);
+  return (nodeOf(view, key)?.checklist ?? []).map((item) => ({ id: item.id, title: item.title, ticked: ticked.has(item.id) }));
+}
+
+/** G5: an item's title on node `key`, or words for one no longer on its checklist. */
+export function itemTitle(view: Ready, key: string, id: string): string {
+  return nodeOf(view, key)?.checklist?.find((item) => item.id === id)?.title ?? ITEM_GONE;
 }
 
 /** A node's stored state, or its kind's initial state. */

@@ -37,7 +37,7 @@ describe("layerMarks (C14)", () => {
   });
 });
 
-const card = (key: string, parent?: string, rolledUp: string[] = []): Card => ({ key, kind: "action", title: key, parent, stage: false, collapsed: rolledUp.length > 0, checklist: [], rolledUp, hiddenPrerequisites: [], journey: undefined });
+const card = (key: string, parent?: string, rolledUp: string[] = []): Card => ({ key, kind: "action", title: key, parent, stage: false, collapsed: rolledUp.length > 0, rolledUp, hiddenPrerequisites: [], journey: undefined });
 const line = (from: string, to: string): Line => lineOf(`${from}->${to}`, from, to, [{ requirement: from, dependent: to, kind: "requires", holds: false, sentence: "" }]);
 
 describe("withRemoved (C14)", () => {

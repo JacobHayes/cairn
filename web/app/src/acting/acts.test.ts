@@ -3,6 +3,7 @@
 import { describe, expect, it } from "vitest";
 
 import type { Mutation } from "../detail/model.ts";
+import { checklistView } from "../detail/view.test-support.ts";
 import { actingView } from "./acting.test-support.ts";
 import { assignOwner, bulkPlan, doneMutations, evidenceComplete, factsOf, missingEvidence, reasonFor, runBulk, selectionOf, type BulkAction, type Facts } from "./acts.ts";
 
@@ -31,9 +32,27 @@ describe("C11 done with its artifact (G2) or note (G4)", () => {
   });
 
   it("asks only for the evidence the engine says is missing", () => {
-    expect(missingEvidence(view, facts("n_work").node)).toEqual({ artifact: true, note: false });
-    expect(missingEvidence(view, facts("n_log").node)).toEqual({ artifact: false, note: true });
-    expect(missingEvidence(view, facts("n_later").node)).toEqual({ artifact: false, note: false });
+    expect(missingEvidence(view, facts("n_work").node)).toEqual({ artifact: true, note: false, unticked: [] });
+    expect(missingEvidence(view, facts("n_log").node)).toEqual({ artifact: false, note: true, unticked: [] });
+    expect(missingEvidence(view, facts("n_later").node)).toEqual({ artifact: false, note: false, unticked: [] });
+  });
+
+  it("ticks the items still to tick before completing, after any evidence, so the guard reads them ticked", () => {
+    const note = { key: "a_note", text: "Covered it." };
+    const mutations = doneMutations("n_log", { note, ticks: ["a", "c"] });
+    expect(mutations.map((mutation) => mutation.op)).toEqual(["add_annotation", "set_ticked", "set_ticked", "transition"]);
+    expect(mutations.slice(1, 3)).toEqual([{ op: "set_ticked", node: "n_log", item: "a", ticked: true }, { op: "set_ticked", node: "n_log", item: "c", ticked: true }]);
+  });
+
+  it("asks to tick the unticked items in checklist order while the checklist is required, and nothing once the guard holds", () => {
+    const checklist = checklistView();
+    const node = checklist.journey.graph.nodes?.find((each) => each.key === "n_findings");
+    expect(node && missingEvidence(checklist, node).unticked).toEqual(["a", "c"]);
+    const derived = checklist.derived.nodes["n_findings"];
+    if (derived !== undefined) {
+      checklist.derived.nodes["n_findings"] = { ...derived, failing_guards: [] };
+    }
+    expect(node && missingEvidence(checklist, node).unticked).toEqual([]);
   });
 });
 

@@ -9,14 +9,13 @@ import { useNavigate } from "react-router";
 
 import { useCaller } from "../data/react.ts";
 import { ActButton, type Opens } from "../detail/ActButton.tsx";
-import { EvidenceForm, type Needs } from "../detail/DoneEvidence.tsx";
 import type { Ready } from "../detail/model.ts";
 import { offered } from "../detail/offers.ts";
 import { OwnerSelect } from "../detail/parts.tsx";
 import { Rejected } from "../detail/Rejected.tsx";
 import { NO_OWNER, ownerWords } from "../detail/sections.tsx";
-import { useFormDraft, useNodeWrite, type NodeWrite } from "../detail/write.ts";
-import { doneMutations, evidenceDraft, factsOf, missingEvidence, type EvidenceDraft } from "./acts.ts";
+import { useNodeWrite, type NodeWrite } from "../detail/write.ts";
+import { factsOf } from "./acts.ts";
 import type { NodeRow } from "./why.ts";
 import { Tip } from "../ui/Tip.tsx";
 
@@ -33,34 +32,6 @@ function AssignInline({ view, write, node }: { view: Ready; write: NodeWrite; no
   );
 }
 
-/** The fields Done... asks for in the row, kept as the row's own draft until the write lands. */
-function RowEvidence({ write, node, needs, form }: { write: NodeWrite; node: string; needs: Needs; form: ReturnType<typeof useFormDraft<EvidenceDraft | string>> }) {
-  const drafted = form.draft;
-  if (drafted === undefined) {
-    return null;
-  }
-  return (
-    <EvidenceForm
-      needs={needs}
-      value={evidenceDraft(drafted.value)}
-      sending={write.pending ? "saving" : false}
-      disabled={write.disabled}
-      onChange={form.change}
-      onSend={(added) => {
-        void write.run(doneMutations(node, added), drafted).then((landed) => {
-          if (landed) {
-            form.close();
-          }
-        });
-      }}
-      onClose={() => {
-        form.close();
-        write.dismiss();
-      }}
-    />
-  );
-}
-
 /**
  * The row's owner slot and primary action, and under the row the form and rejection they open.
  * With `owner` off (Mine, where every row is the viewer's) the slot says nothing unless the row
@@ -71,23 +42,15 @@ export function RowActions({ view, row, to, owner = true, column = false, yours 
   const navigate = useNavigate();
   const { caller } = useCaller();
   const write = useNodeWrite(view, `acts:${row.key}`, row.key);
-  const evidence = useFormDraft<EvidenceDraft | string>(write.journey, row.key, "done-artifact");
   const facts = factsOf(view, row.key);
   if (facts === undefined || !write.writable) {
     return null;
   }
   const offers = offered(view, row.key);
   const acts = [...(offers.primary === undefined ? [] : [offers.primary]), ...offers.secondary];
-  const needs = missingEvidence(view, facts.node);
-  // C11: the inspector opens the form or the answer for a choice that arrives with the navigation (detail/Actions.tsx).
+  // C11: the inspector opens the done form, the answer or the breakdown for a choice that arrives with the navigation (detail/Actions.tsx): one form, one draft, wherever Mark done... was chosen.
   const open = (what: Opens) => {
-    if (what === "evidence") {
-      if (evidence.draft === undefined) {
-        evidence.open({ artifact: "", note: "" }, write.seen);
-      }
-    } else {
-      void navigate(to, { state: { choice: { node: row.key, id: what } } });
-    }
+    void navigate(to, { state: { choice: { node: row.key, id: what === "evidence" ? "done-with-evidence" : what } } });
   };
   const owners = ownerWords(view, row.owners, caller?.identities);
   return (
@@ -106,7 +69,6 @@ export function RowActions({ view, row, to, owner = true, column = false, yours 
           ))}
         </span>
       </div>
-      <RowEvidence write={write} node={row.key} needs={needs} form={evidence} />
       <Rejected view={view} write={write} />
     </>
   );

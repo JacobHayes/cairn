@@ -47,6 +47,7 @@ describe("explanation words", () => {
   });
 
   it("names the reasons a node is stale", () => {
-    expect(guardFailureText({ open_dependency: "n_findings" }, name)).toContain("Findings");
+    expect(guardFailureText({ open_dependency: "n_findings" }, name, undefined, (id) => id)).toContain("Findings");
+    expect(guardFailureText({ unticked: "load" }, name, undefined, () => "Load test")).toContain("Load test");
   });
 });

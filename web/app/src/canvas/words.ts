@@ -56,6 +56,11 @@ export function progressWords(done: number, total: number): string {
   return `${String(done)} of ${String(total)} done`;
 }
 
+/** A checklist's progress as words: `7 of 11 ticked`. */
+export function checklistWords(ticked: number, total: number): string {
+  return `${String(ticked)} of ${String(total)} ticked`;
+}
+
 /**
  * What a conditional node depends on, as the words after "If": the comparison
  * (`"Who runs testing?" is Partner`) when it is a plain one, else the decisions it reads

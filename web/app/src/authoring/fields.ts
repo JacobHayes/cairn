@@ -5,7 +5,7 @@
 // `feeds_milestone` on a date). A saved draft is the one-field mutations of what changed;
 // an answer-type change replaces the node whole, the only way the engine takes one (B7:
 // a shape change).
-import { ANSWER_TYPE_FIELDS, BODY_BYTES_MAX, CHOICE_COUNT_PER_DECISION_MAX, FLAG_DEFAULTS, KIND_FIELDS, NODE_FIELDS, OFFSET_DAYS_MAX, TITLE_BYTES_MAX, WEIGHT_MAX, type KindFieldName } from "@cairn/client";
+import { ANSWER_TYPE_FIELDS, BODY_BYTES_MAX, CHECKLIST_ITEM_COUNT_PER_NODE_MAX, CHOICE_COUNT_PER_DECISION_MAX, FLAG_DEFAULTS, KIND_FIELDS, NODE_FIELDS, OFFSET_DAYS_MAX, TITLE_BYTES_MAX, WEIGHT_MAX, type KindFieldName } from "@cairn/client";
 import type { Schema } from "@cairn/client";
 
 import { choiceId, type Choice } from "../status/answer.ts";
@@ -206,7 +206,23 @@ export function draftProblems(kind: NodeKind, draft: NodeDraft): Partial<Record<
   note("prompt", draft.prompt.trim() === "" ? "A decision asks something: it needs a prompt." : overBytes(draft.prompt, BODY_BYTES_MAX, "The prompt"));
   note("help", overBytes(draft.help, BODY_BYTES_MAX, "The help"));
   note("choices", choicesProblem(draft.choices));
+  note("checklist", checklistProblem(draft.checklist));
   return problems;
+}
+
+/** G5 and the checklist limit: at most 50 items, each with a title within the title limit. */
+export function checklistProblem(items: readonly Schema<"ChecklistItem">[]): string | undefined {
+  if (items.length > CHECKLIST_ITEM_COUNT_PER_NODE_MAX) {
+    return `At most ${String(CHECKLIST_ITEM_COUNT_PER_NODE_MAX)} items.`;
+  }
+  for (const [at, item] of items.entries()) {
+    const what = `Item ${String(at + 1)}`;
+    const problem = item.title.trim() === "" ? `${what} needs a title.` : overBytes(item.title, TITLE_BYTES_MAX, `${what}'s title`);
+    if (problem !== undefined) {
+      return problem;
+    }
+  }
+  return undefined;
 }
 
 /** A4 and the choice limit: at least one choice, each an id slug, no id twice. */

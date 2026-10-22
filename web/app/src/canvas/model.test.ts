@@ -70,6 +70,19 @@ describe("C1: what a card says", () => {
     expect(card(whole, "n_old").journey?.body).toBeUndefined();
   });
 
+  test("work that holds no other nodes shows how far its checklist is ticked; with children its children's progress wins; with no items there is no line", () => {
+    const listed = changed((each) => {
+      derivedOf(each, "n_check").checklist_count = { ticked: 1, total: 3 };
+      derivedOf(each, "n_build").checklist_count = { ticked: 2, total: 4 };
+      derivedOf(each, "n_old").checklist_count = { ticked: 0, total: 0 };
+    });
+    const cards = model(wholeLevel(), [], [], listed);
+    expect(card(cards, "n_check").journey?.body).toEqual({ kind: "checklist", ticked: 1, total: 3 });
+    // n_build holds n_check: its checklist is the inspector's, its card keeps its children's progress.
+    expect(card(cards, "n_build").journey?.body).toMatchObject({ kind: "progress" });
+    expect(card(cards, "n_old").journey?.body).toBeUndefined();
+  });
+
   test("a node snoozed through its container says so in its foot, and one snoozed itself says until when", () => {
     const snoozed = changed((each) => {
       derivedOf(each, "n_check").snoozed_via = "n_stage";
@@ -205,15 +218,11 @@ describe("C1: what a line waits on and holds", () => {
 describe("C2, C4: roll-ups", () => {
   const hidden = model(actionsAndDecisionsHidden());
 
-  test("a hidden action is a checklist item on its deliverable, finished or not", () => {
-    expect(card(hidden, "n_build").checklist).toEqual([{ key: "n_check", title: "Check the build", kind: "action", done: false }]);
-  });
-
   test("a node whose prerequisite has no visible stand-in carries the marker", () => {
     expect(card(hidden, "n_option").hiddenPrerequisites).toEqual(["n_choose"]);
   });
 
-  test("a card shows the engine's display state (D8): a skipped node is finished, and checks off in its container's checklist", () => {
+  test("a card shows the engine's display state (D8): a skipped node is finished", () => {
     const skipped = changed((each) => {
       derivedOf(each, "n_build").display_state = "skipped";
       derivedOf(each, "n_build").started_early = false;
@@ -221,7 +230,6 @@ describe("C2, C4: roll-ups", () => {
     });
     const build = card(model(wholeLevel(), [], [], skipped), "n_build");
     expect([build.journey?.state, build.journey?.finished, hereWords(build)]).toEqual(["skipped", true, []]);
-    expect(card(model(actionsAndDecisionsHidden(), [], [], skipped), "n_build").checklist[0]?.done).toBe(true);
     expect(nodeClasses(build)).toContain("node-skipped");
   });
 
@@ -230,12 +238,6 @@ describe("C2, C4: roll-ups", () => {
     const done = card(model(wholeLevel(), [], [], finished), "n_build");
     expect(nodeClasses(done, { faded: true })).toEqual(expect.arrayContaining(["node-done", "node-faded"]));
     expect(nodeClasses(done)).not.toContain("node-skipped");
-  });
-
-  test("a node of a shown kind that rolled up is not a checklist item", () => {
-    const level = actionsAndDecisionsHidden();
-    level.shown = [...level.shown, "action"];
-    expect(card(model(level), "n_build").checklist).toEqual([]);
   });
 });
 

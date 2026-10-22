@@ -9,7 +9,7 @@ import { answerWords, choiceNamed, choiceLabel } from "../status/answer.ts";
 import { SNOOZE_NODE_TAIL } from "../status/snooze.ts";
 import { dateWords } from "../status/when.ts";
 import { fieldWords, upperFirst } from "../status/words.ts";
-import { nodeTitle } from "../ui/gone.ts";
+import { ITEM_GONE, nodeTitle } from "../ui/gone.ts";
 import type { Conflict, ResolutionKind, ReviewItem } from "./model.ts";
 import { plural } from "../ui/words.ts";
 import { moveOf } from "../detail/model.ts";
@@ -19,6 +19,8 @@ import type { Deployment } from "../data/host.ts";
 /** Names by key over the graphs a review shows (before and after), falling back to words for what is gone. */
 export interface Names {
   node: (key: string) => string;
+  /** A checklist item of node `node` by its title. */
+  item: (node: string, id: string) => string;
   role: (key: string) => string;
   kind: (key: string) => string;
   identity: (key: string) => string;
@@ -49,6 +51,7 @@ export function namesOf(graphs: (Graph | null | undefined)[], deployment: Deploy
   const identity = (key: string) => identityNamed(deployment, key);
   return {
     node: (key) => nodeTitle(nodes.get(key)?.title),
+    item: (node, id) => nodes.get(node)?.checklist?.find((item) => item.id === id)?.title ?? ITEM_GONE,
     role: (key) => roleNamed([...roles.values()], key),
     kind: (key) => kindNamed([...kinds.values()], key),
     identity,
@@ -118,7 +121,7 @@ export function stateValueWords(field: string, value: unknown, node: string, nam
     case "pins":
       return typeof value === "string" ? names.date(value) : "a date";
     case "ticks":
-      return Array.isArray(value) && value.length > 0 ? value.map((item) => quoted(String(item))).join(", ") : "nothing ticked";
+      return Array.isArray(value) && value.length > 0 ? value.map((item) => quoted(names.item(node, String(item)))).join(", ") : "nothing ticked";
     case "snoozes":
       return "date" in record && typeof record["date"] === "string" ? `until ${names.date(record["date"])}` : typeof record["node"] === "string" ? `until ${quoted(names.node(record["node"]))}${SNOOZE_NODE_TAIL}` : "set aside";
     case "overrides":
@@ -191,7 +194,7 @@ export function mutationWords(mutation: Mutation, names: Names): string {
     case "relink":
       return `Follow ${mutation.lineage.route} version ${String(mutation.lineage.version)}`;
     case "set_ticked":
-      return `${mutation.ticked ? "Tick" : "Untick"} the item ${quoted(mutation.item)} of ${node(mutation.node)}`;
+      return `${mutation.ticked ? "Tick" : "Untick"} ${quoted(names.item(mutation.node, mutation.item))} on ${node(mutation.node)}`;
     case "set_atomic":
       return mutation.atomic ? `Mark ${node(mutation.node)} atomic` : `${node(mutation.node)} needs breaking down`;
     case "set_participation":

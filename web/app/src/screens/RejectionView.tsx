@@ -75,6 +75,8 @@ interface RejectionProps {
   rejection: Rejection;
   /** What a stale refusal says after "Not saved:", where the screen knows more than "changed first" (a create that met the id in use). */
   staleHeading?: string | undefined;
+  /** What an invalid refusal says after "Not saved:" where one reason is the whole of it (checklist items not ticked), in place of "the change breaks a rule.". */
+  invalidHeading?: string | undefined;
   /** Offers to keep the edit on the current version, after a stale refusal. */
   onRebase?: (() => void) | undefined;
   /** Offers to drop the refused change. */
@@ -94,7 +96,7 @@ interface RejectionProps {
  * (H5: "otherwise the intervening changes are shown and the user retries"), an invalid one with
  * each rule it breaks, and a change sent twice.
  */
-export function RejectionView({ rejection, onRebase, onDismiss, titleOf, omit, extras, staleHeading, children }: RejectionProps) {
+export function RejectionView({ rejection, onRebase, onDismiss, titleOf, omit, extras, staleHeading, invalidHeading, children }: RejectionProps) {
   const words = useRecordWords();
   let body: ReactNode;
   if (rejection.rejection === "stale") {
@@ -108,7 +110,7 @@ export function RejectionView({ rejection, onRebase, onDismiss, titleOf, omit, e
   } else if (rejection.rejection === "invalid") {
     body = (
       <>
-        <NotSaved>the change breaks a rule.</NotSaved>
+        <NotSaved>{invalidHeading ?? "the change breaks a rule."}</NotSaved>
         <ViolationLines violations={omit === undefined ? rejection.violations : rejection.violations.filter((violation) => !omit(violation))} titleOf={titleOf} />
       </>
     );

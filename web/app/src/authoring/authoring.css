@@ -74,3 +74,44 @@
   text-transform: uppercase;
   color: var(--color-secondary);
 }
+
+/* A checklist item's row: its title takes the width the move and remove buttons leave, on one line; a control that cannot act (up on the first, down on the last) is absent and leaves its column empty, so the rest stay aligned down the list. */
+.items-row {
+  --items-button: 36px;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) repeat(3, var(--items-button));
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.items-row > input {
+  min-width: 0;
+}
+
+.items-up {
+  grid-column: 2;
+}
+
+.items-down {
+  grid-column: 3;
+}
+
+.items-remove {
+  grid-column: 4;
+}
+
+.items-move {
+  padding-inline: 0;
+  text-align: center;
+}
+
+@media (pointer: coarse) {
+  .items-row {
+    --items-button: var(--touch-target);
+  }
+}
+
+/* The new item's button sits under its field at the button's own width. */
+.items-add > button {
+  align-self: start;
+}

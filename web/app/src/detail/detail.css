@@ -298,7 +298,7 @@ dl.kv dd {
 }
 
 /* A done child fades its content, not its checkbox, and a snoozed one its title: the status language (DESIGN, One status language). */
-.contents li[data-state="done"] > :not(.checklist-mark) {
+.contents li[data-state="done"] > :not(.contents-mark) {
   opacity: 0.5;
 }
 
@@ -310,12 +310,58 @@ dl.kv dd {
   opacity: var(--opacity-snoozed);
 }
 
-.checklist-mark {
+/* A checklist: one row per item, the whole row its label and a touch target on a touch screen; a ticked item's title in muted ink, its box the state. */
+.checklist {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.checklist-item {
+  display: grid;
+  grid-template-columns: 20px minmax(0, 1fr);
+  gap: var(--space-2);
+  align-items: center;
+  position: relative;
+  min-height: 32px;
+  font-size: 15px;
+  cursor: pointer;
+}
+
+@media (pointer: coarse) {
+  .checklist-item {
+    min-height: var(--touch-target);
+  }
+}
+
+.checklist-read {
+  cursor: default;
+}
+
+.checklist-item[data-ticked] .checklist-title {
+  color: var(--color-muted);
+}
+
+.checklist-title {
+  overflow-wrap: anywhere;
+}
+
+/* Said to assistive technology only: the mark column shows the tick, this says both states. */
+.checklist-state {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+
+.contents-mark {
   flex: none;
   width: 20px;
 }
 
-.checklist-fact {
+.contents-fact {
   margin-left: auto;
   text-align: right;
 }
@@ -344,4 +390,15 @@ dl.kv dd {
   font-weight: 600;
   font-size: 0.9375rem;
   margin-top: var(--space-3);
+}
+
+/* The checklist items a done form or a refusal says are not ticked: every one, since the button ticks them all. */
+.done-ticks-list {
+  margin: 0;
+  padding-left: var(--space-4);
+  font-size: 15px;
+}
+
+.done-ticks-list li {
+  overflow-wrap: anywhere;
 }

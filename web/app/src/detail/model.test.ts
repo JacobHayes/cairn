@@ -1,8 +1,9 @@
 // C8's node detail composed in the tab from the document and its derive, and D1's moves.
 import { describe, expect, it } from "vitest";
 
-import { failingGuards, flagsOf, milestonesFirst, movesFrom, nodeDetail, rankPlaces, transition, waitsMore, waitsOn, type Move, type NodeKind, type State } from "./model.ts";
-import { testView } from "./view.test-support.ts";
+import { checklistOf, failingGuards, flagsOf, itemTitle, milestonesFirst, movesFrom, nodeDetail, rankPlaces, transition, waitsMore, waitsOn, type Move, type NodeKind, type State } from "./model.ts";
+import { ITEM_GONE } from "../ui/gone.ts";
+import { checklistView, testView } from "./view.test-support.ts";
 
 describe("nodeDetail", () => {
   it("composes a node's path, record, pin, annotations, and local edits from the document", () => {
@@ -30,6 +31,18 @@ describe("nodeDetail", () => {
 
   it("is undefined for a node the journey does not hold", () => {
     expect(nodeDetail(testView(), "n_absent")).toBeUndefined();
+  });
+});
+
+describe("a node's checklist (G5)", () => {
+  it("lists the items in checklist order and marks the ticked ones; a node with none has an empty list", () => {
+    expect(checklistOf(checklistView(), "n_findings").map((item) => [item.id, item.ticked])).toEqual([["a", false], ["b", true], ["c", false]]);
+    expect(checklistOf(checklistView(), "n_report")).toEqual([]);
+  });
+
+  it("names an item by its title, and one that is no longer listed in words", () => {
+    expect(itemTitle(checklistView(), "n_findings", "b")).toBe("Support team briefed");
+    expect(itemTitle(checklistView(), "n_findings", "removed")).toBe(ITEM_GONE);
   });
 });
 

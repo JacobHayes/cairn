@@ -10,7 +10,7 @@ const graph: Graph = {
   nodes: [
     { key: "n_who", id: "who", kind: "decision", title: "Who runs testing?", answer_type: "single_choice", choices: [{ id: "partner_team", title: "Partner" }, "ours"] },
     { key: "n_ok", id: "ok", kind: "decision", title: "Approved?", answer_type: "boolean" },
-    { key: "n_test", id: "test", kind: "task", title: "Run the tests" },
+    { key: "n_test", id: "test", kind: "task", title: "Run the tests", checklist: [{ id: "load", title: "Load test" }] },
   ],
 } as Graph;
 
@@ -22,6 +22,7 @@ describe("mutationWords", () => {
     ["a boolean as yes or no", { op: "answer", decision: "n_ok", value: { boolean: true } }, ["Approved?", "yes"], ["true"]],
     ["a pin as a date in words", { op: "set_pin", node: "n_test", date: "2026-11-25" }, ["Run the tests", "Nov 25"], ["2026-11-25"]],
     ["a rule by what it is", { op: "set_node_field", node: "n_test", value: { due_by: { offset: 3 } } }, ["Run the tests", "due"], ["due_by"]],
+    ["a tick by its item's title", { op: "set_ticked", node: "n_test", item: "load", ticked: true }, ["Run the tests", "Load test"], ["load\""]],
     ["a transition as a verb", { op: "transition", node: "n_test", transition: "complete" }, ["Complete", "Run the tests"], []],
   ];
   it.each(cases)("says %s", (_, mutation, shown, hidden) => {
@@ -78,6 +79,11 @@ describe("outlineWords (C14)", () => {
 });
 
 describe("stateValueWords (C14)", () => {
+  it("says the ticked items by their titles, and nothing ticked in words", () => {
+    expect(stateValueWords("ticks", ["load"], "n_test", names)).toContain("Load test");
+    expect(stateValueWords("ticks", [], "n_test", names)).not.toBe("");
+  });
+
   const cases: [string, string, unknown, string[], string[]][] = [
     ["an identity answer by the identity's name", "answers", { identity: "who_ann" }, ["Ann"], ["who_ann", "{"]],
     ["a choice answer by its label", "answers", { single_choice: "partner_team" }, ["Partner"], ["partner_team", "{"]],

@@ -4,7 +4,7 @@
 // any node rejects it whole and names which (A15, D4).
 import { OWNER_KIND, type Schema } from "@cairn/client";
 
-import { type GraphNode, movesFrom, type Mutation, type NodeDerived, nodeOf, type Ready, recordOf, type State, storedSnooze, transition } from "../detail/model.ts";
+import { checklistOf, type GraphNode, movesFrom, type Mutation, type NodeDerived, nodeOf, type Ready, recordOf, type State, storedSnooze, transition } from "../detail/model.ts";
 import { namedList } from "../ui/words.ts";
 
 /** What the acting surfaces read about one node. */
@@ -34,16 +34,29 @@ export function selectionOf(view: Ready, keys: Iterable<string>): Facts[] {
   });
 }
 
-/** What done needs added first, as the engine derived it: an artifact link (G2) and a note (G4), each only when the node requires it and has none. */
-export function missingEvidence(view: Ready, node: GraphNode): { artifact: boolean; note: boolean } {
-  const guards = view.derived.nodes[node.key]?.failing_guards ?? [];
-  return { artifact: guards.includes("has_artifact"), note: guards.includes("has_note") };
+/** What done needs added first: an artifact link, a note, and the checklist items (their ids) still to tick. */
+export interface Needs {
+  artifact: boolean;
+  note: boolean;
+  unticked: string[];
 }
 
-/** What done adds before completing: an artifact link and a note, each with its new key. */
+/**
+ * What done needs added first, as the engine derived it: an artifact link (G2) and a note (G4),
+ * each only when the node requires it and has none, and (G5) every unticked checklist item,
+ * in checklist order, while the node requires them all ticked.
+ */
+export function missingEvidence(view: Ready, node: GraphNode): Needs {
+  const guards = view.derived.nodes[node.key]?.failing_guards ?? [];
+  const unticked = guards.includes("all_ticked") ? checklistOf(view, node.key).filter((item) => !item.ticked).map((item) => item.id) : [];
+  return { artifact: guards.includes("has_artifact"), note: guards.includes("has_note"), unticked };
+}
+
+/** What done adds before completing: an artifact link and a note, each with its new key, and the checklist items to tick. */
 export interface Evidence {
   artifact?: { key: string; url: string };
   note?: { key: string; text: string };
+  ticks?: string[];
 }
 
 /** The done form's fields, as typed. */
@@ -53,7 +66,7 @@ export interface EvidenceDraft {
 }
 
 /** Whether the done form holds what the node needs, so sending it would complete the node (G2, G4). */
-export function evidenceComplete(needs: { artifact: boolean; note: boolean }, draft: EvidenceDraft): boolean {
+export function evidenceComplete(needs: Pick<Needs, "artifact" | "note">, draft: EvidenceDraft): boolean {
   return (!needs.artifact || draft.artifact.trim() !== "") && (!needs.note || draft.note.trim() !== "");
 }
 
@@ -63,14 +76,15 @@ export function evidenceDraft(saved: EvidenceDraft | string): EvidenceDraft {
 }
 
 /**
- * C11 done, with the inline artifact link (G2) and note (G4) a node that requires them and has
- * none needs: each added, then the completion, in one patch so the guards see them.
+ * C11 done, with the inline artifact link (G2), note (G4) and ticks (G5) a node that requires
+ * them and lacks them needs: each added, then the completion, in one patch so the guards see them.
  */
 export function doneMutations(key: string, evidence: Evidence = {}): Mutation[] {
-  const { artifact, note } = evidence;
+  const { artifact, note, ticks = [] } = evidence;
   return [
     ...(artifact === undefined ? [] : [{ op: "add_annotation" as const, annotation: { key: artifact.key, node: key, artifact: artifact.url } }]),
     ...(note === undefined ? [] : [{ op: "add_annotation" as const, annotation: { key: note.key, node: key, note: note.text } }]),
+    ...ticks.map((item) => ({ op: "set_ticked" as const, node: key, item, ticked: true })),
     transition(key, "complete"),
   ];
 }

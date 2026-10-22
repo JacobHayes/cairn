@@ -89,7 +89,7 @@ function PreviewLine({ preview }: { preview: Preview | undefined }) {
   );
   return (
     <span className="muted small" data-testid="cascade-preview" data-status="accepted">
-      The engine accepts this{newly.length === 0 ? "." : `; ${newly.join(", ")}.`}
+      Ready to save{newly.length === 0 ? "." : `; ${newly.join(", ")}.`}
     </span>
   );
 }

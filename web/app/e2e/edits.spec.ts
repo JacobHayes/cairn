@@ -157,10 +157,10 @@ test("a form that sent its write keeps text typed since when the send lands, and
   await done.getByRole("button", { name: "Mark done…" }).click();
   const evidence = done.getByTestId("done-evidence");
   const link = `https://example.test/${fresh("docs").replace(" ", "-")}`;
-  await evidence.getByLabel("Artifact address").fill(link);
-  await evidence.getByRole("button", { name: "Link and mark done" }).click();
+  await evidence.getByLabel("Artifact link").fill(link);
+  await evidence.getByRole("button", { name: "Add link and mark done" }).click();
   await expect(evidence.getByText("Saving...")).toBeVisible();
-  await evidence.getByLabel("Artifact address").fill(`${link}/later`);
+  await evidence.getByLabel("Artifact link").fill(`${link}/later`);
   release();
   const keptDone = done.getByTestId("kept");
   await expect(keptDone).toContainText("Marked done.");

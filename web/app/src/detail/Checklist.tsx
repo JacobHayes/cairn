@@ -1,58 +1,57 @@
-// C8: a node's children as a checklist. Work (actions and deliverables) is checked off and
-// unchecked in place, each one transition patch (complete, reopen); any other child shows its
-// state and opens its own detail.
-import { useCaller } from "../data/react.ts";
-import { isFinished } from "../status/state.ts";
-import { dueWords } from "../status/when.ts";
-import { statusTone, statusWord } from "../status/words.ts";
-import { Badge } from "../ui/kit.tsx";
+// G5: a node's own checklist, ticked and unticked in place, each tick one patch. A box shows
+// what the held write sends while it is out (it outlives this panel), else what the journey
+// records; the counts catch up when the write lands.
 import { foldKey } from "./folds.ts";
-import { type Child, isTerminal, isWork, type NodeDetail, type Ready, transition } from "./model.ts";
-import { NodeLink, Section } from "./parts.tsx";
+import { checklistOf, type NodeDetail, type Ready } from "./model.ts";
+import { Section } from "./parts.tsx";
 import { Rejected } from "./Rejected.tsx";
-import { ownerName } from "./sentence.ts";
-import { useNodeWrite, type NodeWrite } from "./write.ts";
+import { useNodeWrite } from "./write.ts";
 
-function Item({ view, child, write, viewer }: { view: Ready; child: Child; write: NodeWrite; viewer: readonly string[] | undefined }) {
-  const done = child.state === "done";
-  // The one fact on the right: the date while it is open, else who owns it.
-  const dueDate = isTerminal(child.state) || isFinished(child.displayState) ? undefined : view.derived.nodes[child.key]?.dates.due?.date;
-  const due = dueDate === undefined ? undefined : dueWords(dueDate, view.derived.today, child.kind === "decision");
-  const fact = due ?? ownerName(view, child.key, viewer);
+function ChecklistRow({ view, node, item, ticked: recorded, editable }: { view: Ready; node: string; item: { id: string; title: string }; ticked: boolean; editable: boolean }) {
+  const write = useNodeWrite(view, `tick:${node}:${item.id}`, node);
+  const sent = write.sending?.find((mutation) => mutation.op === "set_ticked" && mutation.item === item.id);
+  const ticked = sent?.op === "set_ticked" ? sent.ticked : recorded;
+  const attrs = { "data-testid": "checklist-item", "data-item": item.id, "data-ticked": ticked || undefined };
   return (
-    <li data-testid="child" data-node={child.key} data-state={child.displayState}>
-      <span className="checklist-mark">
-        {write.writable && isWork(child) && child.state !== "skipped" && child.displayState !== "skipped" ? (
+    <li>
+      {editable && write.writable ? (
+        <label className="checklist-item" {...attrs}>
           <input
             type="checkbox"
-            aria-label={`${done ? "Reopen" : "Complete"} ${child.title}`}
-            checked={done}
+            checked={ticked}
             disabled={write.disabled}
-            onChange={() => void write.run([transition(child.key, done ? "reopen" : "complete")])}
+            onChange={() => void write.run([{ op: "set_ticked", node, item: item.id, ticked: !ticked }])}
           />
-        ) : null}
-      </span>
-      <NodeLink view={view} node={child.key} /> <Badge tone={statusTone(child.displayState)}>{statusWord(child.displayState, child.kind)}</Badge>
-      {fact === undefined ? null : <span className="muted small checklist-fact">{fact}</span>}
+          <span className="checklist-title">{item.title}</span>
+        </label>
+      ) : (
+        <div className="checklist-item checklist-read" {...attrs}>
+          <span aria-hidden="true">{ticked ? "✓" : ""}</span>
+          <span className="checklist-title">{item.title}</span>
+          <span className="checklist-state">{ticked ? "ticked" : "not ticked"}</span>
+        </div>
+      )}
+      <Rejected view={view} write={write} />
     </li>
   );
 }
 
 export function Checklist({ view, detail }: { view: Ready; detail: NodeDetail }) {
-  const write = useNodeWrite(view, `checklist:${detail.node.key}`, detail.node.key);
-  const { caller } = useCaller();
-  const { children } = detail;
-  if (children.length === 0) {
+  const { key, kind } = detail.node;
+  const items = checklistOf(view, key);
+  if (items.length === 0) {
     return null;
   }
+  const state = detail.derived.display_state;
+  const editable = state !== "skipped" && state !== "not_relevant";
+  const ticked = items.filter((item) => item.ticked).length;
   return (
-    <Section title="Contents" summary={String(children.length)} open fold={foldKey(detail.node.kind, "contents")} testId="checklist">
-      <ul className="plain-list contents">
-        {children.map((child) => (
-          <Item key={child.key} view={view} child={child} write={write} viewer={caller?.identities} />
+    <Section title="Checklist" summary={`${String(ticked)} of ${String(items.length)} ticked`} open fold={foldKey(kind, "checklist")} testId="checklist">
+      <ul className="checklist">
+        {items.map((item) => (
+          <ChecklistRow key={item.id} view={view} node={key} item={item} ticked={item.ticked} editable={editable} />
         ))}
       </ul>
-      <Rejected view={view} write={write} />
     </Section>
   );
 }

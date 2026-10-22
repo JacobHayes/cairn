@@ -8,6 +8,8 @@ export const NODE_GONE = "an item that was removed";
 export function nodeTitle(title: string | undefined): string {
   return title ?? NODE_GONE;
 }
+/** A checklist item the node no longer lists. */
+export const ITEM_GONE = "a checklist item that was removed";
 /** A role the graph no longer holds. */
 export const ROLE_GONE = "a role that was removed";
 /** A role or participation kind by its title, its id when it has no title, or `gone` for one the graph no longer holds. */

@@ -5,7 +5,7 @@ import type { Schema } from "@cairn/client";
 import { beforeAll, describe, expect, it } from "vitest";
 
 import { applyToDraft, seeded } from "./engine.test-support.ts";
-import { changesOf, draftOf, draftProblems, fieldsOf, type NodeDraft } from "./fields.ts";
+import { changesOf, checklistProblem, draftOf, draftProblems, fieldsOf, type NodeDraft } from "./fields.ts";
 import type { AnswerType, Graph, GraphNode, NodeField, NodeKind } from "./graph.ts";
 
 type Deployment = Schema<"Deployment">;
@@ -113,6 +113,16 @@ describe("changesOf", () => {
     const changes = changesOf(decision, draft);
     expect(changes.map((change) => [change.field, change.mutation.op])).toEqual([["answer_type", "replace_node"]]);
     expect(applyToDraft(host.engine, host.deployment(), graphOf(decision), changes.map((change) => change.mutation))).toEqual({ accepted: true });
+  });
+});
+
+describe("checklistProblem (G5)", () => {
+  const item = (at: number, title = `Item ${String(at)}`) => ({ id: `i${String(at)}`, title });
+  it("catches too many items and a blank title; a list within the limit, or none, has no problem", () => {
+    expect(checklistProblem(Array.from({ length: 51 }, (_, at) => item(at)))).toBeDefined();
+    expect(checklistProblem([item(1), item(2, "  ")])).toBeDefined();
+    expect(checklistProblem(Array.from({ length: 50 }, (_, at) => item(at)))).toBeUndefined();
+    expect(checklistProblem([])).toBeUndefined();
   });
 });
 

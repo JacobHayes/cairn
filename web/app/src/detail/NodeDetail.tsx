@@ -15,6 +15,7 @@ import { Actions } from "./Actions.tsx";
 import { Affects } from "./Affects.tsx";
 import { AttachmentList } from "./Attachments.tsx";
 import { Checklist } from "./Checklist.tsx";
+import { Contents } from "./Contents.tsx";
 import { Connections } from "./Connections.tsx";
 import { DatesSection, LinkedDates } from "./DatesSection.tsx";
 import { PinEditor } from "./editors.tsx";
@@ -98,9 +99,10 @@ export function NodeDetailPanel({ view, nodeKey, extra, folded = false }: { view
         </div>
         {extra}
         <div className="detail-folds">
-          <Checklist view={view} detail={detail} />
+          <Contents view={view} detail={detail} />
           {node.kind === "decision" ? <Affects view={view} detail={detail} /> : null}
           <Connections view={view} detail={detail} />
+          <Checklist view={view} detail={detail} />
           <ResourceList view={view} detail={detail} />
           <AttachmentList view={view} detail={detail} />
           <Dates view={view} detail={detail} />

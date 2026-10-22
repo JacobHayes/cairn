@@ -7,7 +7,7 @@ import { actMutation } from "./ActButton.tsx";
 import { actLabel, contextMenuOf, menuOf, offered, unsnoozeOf } from "./offers.ts";
 import { plainSentence, sentenceOf } from "./sentence.ts";
 import { setAsideOptions } from "./snooze.ts";
-import { testView } from "./view.test-support.ts";
+import { checklistView, testView } from "./view.test-support.ts";
 
 /** `view` with node `key`'s derived values changed. */
 function made(key: string, derived: Partial<NodeDerived>): Ready {
@@ -103,6 +103,18 @@ describe("the inspector's offers", () => {
     const say = (view: Ready) => plainSentence(view, sentenceOf(view, detailOf(view, "n_stage"), { position: undefined, row: undefined }));
     expect(say(testView())).toBe("0 of 2 done; the tightest item, Report, has 24 days to spare. In progress.");
     expect(say(made("n_report", { dates: { slack_days: -2 } }))).toBe("0 of 2 done; 2 days past the latest start of Report. In progress.");
+  });
+});
+
+describe("G5: finishing work whose checklist is not all ticked", () => {
+  it("offers Mark done... while an item is unticked, and Mark done once every one is", () => {
+    const view = checklistView();
+    expect(offered(view, "n_findings").primary).toBe("done-with-evidence");
+    const derived = view.derived.nodes["n_findings"];
+    if (derived !== undefined) {
+      view.derived.nodes["n_findings"] = { ...derived, failing_guards: [] };
+    }
+    expect(offered(view, "n_findings").primary).toBe("done");
   });
 });
 

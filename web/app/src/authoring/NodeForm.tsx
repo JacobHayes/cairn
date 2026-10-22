@@ -17,6 +17,7 @@ import { changesOf, draftOf, draftProblems, type FormField, type NodeDraft } fro
 import { Section } from "../detail/parts.tsx";
 import type { GraphNode } from "./graph.ts";
 import { BasicsFields, CompletionFields, DecisionFields, StageFields, WeightFields, has, type FieldsProps } from "./NodeFields.tsx";
+import type { Schema } from "@cairn/client";
 import type { Violation } from "../data/writes.ts";
 import { RejectionView } from "../screens/RejectionView.tsx";
 import { FieldBox, FormViolations, type FieldNotes } from "./parts.tsx";
@@ -30,6 +31,8 @@ interface Kept {
   edits: Partial<NodeDraft>;
   /** The revision the author started from (H5). */
   base: number;
+  /** Text typed in the checklist's new-item field and not yet added, so a reload keeps it. */
+  newItem?: string;
 }
 
 /** Every problem that stops the draft being sent, by field: limits, and a rule's own. A condition's is the engine's, read by `useConditionProblem`. */
@@ -61,6 +64,12 @@ function shownViolations(preview: ReturnType<typeof useLivePreview>, write: Auth
     return { violations: failed.rejection.violations, places: failed.sent.places };
   }
   return { violations: [], places: [] };
+}
+
+/** G5: the node's saved checklist items that carry a tick, for the editor to say saving without one drops it. */
+function ticked(authored: Authored, node: GraphNode): Schema<"ChecklistItem">[] {
+  const marked = new Set(authored.graph.state?.ticks?.[node.key] ?? []);
+  return (node.checklist ?? []).filter((item) => marked.has(item.id));
 }
 
 function Relevance({ props }: { props: FieldsProps & { authored: Authored } }) {
@@ -104,7 +113,7 @@ function holds(props: FieldsProps, fields: readonly FormField[]): boolean {
  * of its fields has a violation so it shows at its field (A15).
  */
 function Fields({ props }: { props: FieldsProps & { authored: Authored } }) {
-  const completion = (["requires_artifact", "requires_note", "placeholder"] as const).filter((field) => has(props, field));
+  const completion = (["checklist", "requires_checklist", "requires_artifact", "requires_note", "placeholder"] as const).filter((field) => has(props, field));
   return (
     <>
       <Section title="Basics" open testId="form-basics">
@@ -123,7 +132,7 @@ function Fields({ props }: { props: FieldsProps & { authored: Authored } }) {
         {has(props, "opens_at") ? <StageFields props={props} /> : null}
       </Section>
       {completion.length === 0 ? null : (
-        <Section title="Completion needs" testId="form-completion">
+        <Section title="Completion needs" open={holds(props, completion)} testId="form-completion">
           <CompletionFields props={props} />
         </Section>
       )}
@@ -154,8 +163,18 @@ export function NodeForm({ authored, node }: NodeFormProps) {
   const edited = editedFields(authored, node.key);
   const notes = (field: FormField): FieldNotes => ({ problem: problems[field], violations: places.get(field), edited: edited.has(field) });
   const change = (next: Partial<NodeDraft>) => {
-    setKept({ edits: { ...edits, ...next }, base: kept?.base ?? authored.revision });
+    setKept({ ...kept, edits: { ...edits, ...next }, base: kept?.base ?? authored.revision });
     write.dismiss();
+  };
+  const newItem = {
+    value: kept?.newItem ?? "",
+    set: (value: string) => {
+      setKept({ edits, base: kept?.base ?? authored.revision, ...(value === "" ? {} : { newItem: value }) });
+    },
+    add: (next: Partial<NodeDraft>) => {
+      setKept({ edits: { ...edits, ...next }, base: kept?.base ?? authored.revision });
+      write.dismiss();
+    },
   };
   const save = async (base = kept?.base) => {
     if (await write.run(changes.map((each) => each.mutation), base)) {
@@ -167,7 +186,7 @@ export function NodeForm({ authored, node }: NodeFormProps) {
     setKept(undefined);
     write.dismiss();
   };
-  const props = { kind: node.kind, nodeKey: node.key, draft, change, notes, tree: authored.tree, roles: authored.graph.roles ?? [], authored };
+  const props = { kind: node.kind, nodeKey: node.key, draft, change, notes, tree: authored.tree, roles: authored.graph.roles ?? [], authored, ticked: ticked(authored, node), newItem };
   return (
     <form className="stack" data-testid="node-form" data-node={node.key} onSubmit={(event) => { event.preventDefault(); void save(); }}>
       <div className="detail-folds">
@@ -184,8 +203,8 @@ export function NodeForm({ authored, node }: NodeFormProps) {
           <Button disabled={kept === undefined} onClick={discard}>
             Discard changes
           </Button>
-          {preview?.outcome === "accepted" ? <span className="muted small" data-testid="preview" data-status="accepted">The engine accepts this.</span> : null}
-          {preview?.outcome === "rejected" ? <span className="muted small" data-testid="preview" data-status="rejected">The engine would refuse this; see the fields.</span> : null}
+          {preview?.outcome === "accepted" ? <span className="muted small" data-testid="preview" data-status="accepted">Ready to save.</span> : null}
+          {preview?.outcome === "rejected" ? <span className="muted small" data-testid="preview" data-status="rejected">This would be refused; see the fields.</span> : null}
           {preview?.outcome === "unavailable" ? <span className="author-problem" data-testid="preview" data-status="unavailable"><Failed what="The preview" verb="made" error={preview.message} /></span> : null}
         </span>
       )}

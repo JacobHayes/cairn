@@ -3,7 +3,7 @@ import { describe, expect, it } from "vitest";
 import { onlyTraced, withSelectable } from "./graph.ts";
 import { endsOf, lineOf, type Card, type CanvasModel, type LineLink } from "./model.ts";
 
-const card = (key: string, parent?: string): Card => ({ key, kind: "action", title: key, parent, stage: false, collapsed: false, checklist: [], rolledUp: [], hiddenPrerequisites: [], journey: undefined });
+const card = (key: string, parent?: string): Card => ({ key, kind: "action", title: key, parent, stage: false, collapsed: false, rolledUp: [], hiddenPrerequisites: [], journey: undefined });
 const edge = (requirement: string, dependent: string, extra: Partial<LineLink> = {}): LineLink => ({ requirement, dependent, kind: "requires", holds: false, sentence: "", ...extra });
 
 describe("onlyTraced: lines that land on one pair of cards", () => {

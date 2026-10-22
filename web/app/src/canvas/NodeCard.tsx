@@ -19,7 +19,7 @@ import type { LensChip } from "./lens.ts";
 import { hereWords, nodeClasses } from "./look.ts";
 import { RANK_TAG_COUNT, type Card, type CardBody } from "./model.ts";
 import type { CanvasOverlay, OverlayMark } from "./overlay.ts";
-import { progressWords } from "./words.ts";
+import { checklistWords, progressWords } from "./words.ts";
 
 import { plural } from "../ui/words.ts";
 import { nodeTitle } from "../ui/gone.ts";
@@ -173,6 +173,13 @@ function Body({ body }: { body: CardBody }) {
               {body.badge.flag}
             </span>
           )}
+        </div>
+      );
+    case "checklist":
+      return (
+        <div className="node-body-line node-progress" data-testid="card-checklist" data-ticked={body.ticked} data-total={body.total}>
+          <Meter done={body.ticked} of={body.total} />
+          <span>{checklistWords(body.ticked, body.total)}</span>
         </div>
       );
     case "marked_done":

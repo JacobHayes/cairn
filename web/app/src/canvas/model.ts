@@ -56,14 +56,6 @@ export interface CardBadge {
   tone: Tone;
 }
 
-/** A hidden node rolled up into a card, as a checklist item (C4). */
-export interface ChecklistItem {
-  key: string;
-  title: string;
-  kind: NodeKind;
-  done: boolean;
-}
-
 /** C5: what puts a card on "I am here". */
 export interface Here {
   frontier: boolean;
@@ -93,8 +85,6 @@ export interface Card {
   /** It has children (it can be expanded and collapsed, C4). */
   /** Its subtree is rolled up into it: the level collapsed it (5.3). */
   collapsed: boolean;
-  /** The hidden work that rolled up into it, as a peek on hover (C4). */
-  checklist: ChecklistItem[];
   /** Every hidden node that rolled up into it, whatever hid it (C2); the trace marks the card for each. */
   rolledUp: string[];
   /** C2: hidden, unsatisfied prerequisites no drawn edge stands for. */
@@ -104,10 +94,12 @@ export interface Card {
   route?: RouteMarks | undefined;
 }
 
-/** The one secondary line a card may carry (5.5): a decided decision's answer, a container's progress, or what a conditional node depends on. */
+/** The one secondary line a card may carry (5.5): a decided decision's answer, a container's progress, a childless piece of work's checklist count, or what a conditional node depends on. */
 export type CardBody =
   | { kind: "answer"; text: string; rationale: string | undefined }
   | { kind: "progress"; done: number; total: number; badge: CardBadge | undefined }
+  /** G5: work that holds no other nodes, how far its checklist is ticked. */
+  | { kind: "checklist"; ticked: number; total: number }
   /** A group marked done: in place of its progress, how many items it skipped, or that kept work inside is still pending. */
   | { kind: "marked_done"; skipped: number; keptPending: boolean }
   | { kind: "depends"; text: string };
@@ -344,10 +336,9 @@ function linkOf(edge: Schema<"UnderlyingEdge">, nodes: Nodes, holders: ReadonlyS
   };
 }
 
-/** What a journey adds to each card: its state, and whether a checklist item is finished. */
+/** What a journey adds to each card: its state. */
 export interface Looks {
   card(node: GraphNode, at: LevelNode): CardState;
-  finished(key: string): boolean;
   /** Whether an edge still holds its dependent back, by the engine's own rule (the dependent's unsatisfied gates), not by what its requirement's state looks like. */
   waiting(edge: Schema<"UnderlyingEdge">): boolean;
 }
@@ -368,12 +359,6 @@ export function cardsOf(level: Level, graph: GraphNode[], looks?: Looks): Card[]
         parent: at.parent ?? undefined,
         stage: isStage(node),
         collapsed: level.collapsed?.includes(node.key) === true,
-        // Work hidden by its kind is the card's checklist; a node of a shown kind that rolled up
-        // was hidden for its relevance class or a collapsed container, not work to tick off.
-        checklist: (at.rolled_up ?? []).flatMap((key) => {
-          const item = nodes.get(key);
-          return item === undefined || level.shown.includes(item.kind) ? [] : [{ key, title: item.title, kind: item.kind, done: looks?.finished(key) ?? false }];
-        }),
         rolledUp: at.rolled_up ?? [],
         hiddenPrerequisites: at.hidden_prerequisites ?? [],
         journey: looks?.card(node, at),

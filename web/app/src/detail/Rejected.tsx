@@ -10,8 +10,9 @@ import { newPatchId, violationNode, type Rejection, type Violation } from "../da
 import { RejectionView } from "../screens/RejectionView.tsx";
 import { WriteStatus } from "../screens/WriteStatus.tsx";
 import { Button, Field } from "../ui/kit.tsx";
+import { plural } from "../ui/words.ts";
 import { Receipt } from "../ui/Receipt.tsx";
-import { guardBypass, titleOf, type Mutation, type Ready } from "./model.ts";
+import { checklistOf, guardBypass, itemTitle, titleOf, type Mutation, type Ready } from "./model.ts";
 import { ShortfallView } from "./ShortfallView.tsx";
 import { guardWords } from "./words.ts";
 import { rebasedOnto, type Attempt, type Failed, type NodeWrite, type Seen } from "./write.ts";
@@ -72,6 +73,32 @@ export function bypassable(violations: Violation[]): { node: string; guards: Gua
   return [...byNode].map(([node, guards]) => ({ node, guards }));
 }
 
+/** G5, D4: the unticked items a refusal names, per node, and whether ticking them is all it needs. */
+export function untickedIn(violations: Violation[]): { byNode: { node: string; items: string[] }[]; only: boolean } {
+  const byNode = new Map<string, string[]>();
+  for (const violation of violations) {
+    const node = violationNode(violation);
+    if (violation.bypassable !== "all_ticked" || node === undefined) {
+      continue;
+    }
+    const items = byNode.get(node) ?? [];
+    for (const failure of violation.failures ?? []) {
+      if (typeof failure === "object" && "unticked" in failure && !items.includes(failure.unticked)) {
+        items.push(failure.unticked);
+      }
+    }
+    byNode.set(node, items);
+  }
+  const only = violations.length > 0 && violations.every((violation) => violation.bypassable === "all_ticked");
+  return { byNode: [...byNode].map(([node, items]) => ({ node, items })), only };
+}
+
+/** The rejected patch with each named item ticked first, so the guard reads them ticked. */
+export function withTicks(attempt: Attempt, byNode: { node: string; items: string[] }[]): Mutation[] {
+  const ticks = byNode.flatMap(({ node, items }) => items.map((item) => ({ op: "set_ticked" as const, node, item, ticked: true })));
+  return [...ticks, ...attempt.mutations];
+}
+
 /** F5: the contradictory chains a rejection lists, each with its moves, any one sent with the edit. */
 export function DateConflictResolver({ view, write, violations, onResolved, onResent }: Resolving & { violations: Violation[] }) {
   const { failed } = write;
@@ -97,7 +124,7 @@ export function DateConflictResolver({ view, write, violations, onResolved, onRe
   );
 }
 
-function Bypass({ write, node, guards, onResolved, onResent }: Omit<Resolving, "view"> & { node: string; guards: Guard[] }) {
+function Bypass({ view, write, node, guards, onResolved, onResent }: Resolving & { node: string; guards: Guard[] }) {
   const [draft, setReason] = useDraft<string>(`rejected-bypass:${write.journey}:${node}`);
   const reason = draft ?? "";
   const { failed } = write;
@@ -107,8 +134,10 @@ function Bypass({ write, node, guards, onResolved, onResent }: Omit<Resolving, "
   const override = guardBypass(node, guards, reason);
   return (
     <div className="row" data-testid="bypass">
-      <span>Do it anyway, without {guards.map(guardWords).join(" and ")}:</span>
-      <Field aria-label="Why bypass the guard" placeholder="Why" value={reason} onChange={(event) => { setReason(event.target.value); }} />
+      <span>
+        <strong>{titleOf(view, node)}</strong>: do it anyway, without {guards.map(guardWords).join(" and ")}:
+      </span>
+      <Field aria-label="Why do it anyway" placeholder="Why" value={reason} onChange={(event) => { setReason(event.target.value); }} />
       <Button
         disabled={write.disabled || !bypassReady(reason)}
         onClick={() => {
@@ -121,25 +150,70 @@ function Bypass({ write, node, guards, onResolved, onResent }: Omit<Resolving, "
           });
         }}
       >
-        Bypass
+        Do it anyway
       </Button>
     </div>
   );
 }
 
-function Invalid({ view, write, rejection, violations, onResolved, onResent }: Resolving & { rejection: Rejection; violations: Violation[] }) {
+/** G5: a node's unticked items by title, in the order of its checklist, as the done form lists them. */
+function TickList({ view, node, items }: { view: Ready; node: string; items: readonly string[] }) {
+  const order = checklistOf(view, node).map((item) => item.id);
+  const inOrder = [...items].sort((left, right) => (order.indexOf(left) + 1 || order.length + 1) - (order.indexOf(right) + 1 || order.length + 1));
+  return (
+    <ul className="done-ticks-list">
+      {inOrder.map((item) => (
+        <li key={item}>{itemTitle(view, node, item)}</li>
+      ))}
+    </ul>
+  );
+}
+
+/** G5: the checklist items a refusal names, and the one button that ticks them and sends the refused patch again. */
+function TickTheRest({ view, write, failed, ticks, only, onResolved, onResent }: Resolving & { failed: Failed; ticks: { node: string; items: string[] }[]; only: boolean }) {
+  const total = ticks.reduce((sum, { items }) => sum + items.length, 0);
+  const completing = failed.attempt.mutations.filter((mutation) => mutation.op === "transition" && mutation.transition === "complete").length;
+  return (
+    <>
+      {ticks.map(({ node, items }) => (
+        <div className="stack" key={node} data-testid="tick-the-rest" data-node={node}>
+          <span>
+            <strong>{titleOf(view, node)}</strong>:
+          </span>
+          <TickList view={view} node={node} items={items} />
+        </div>
+      ))}
+      {only ? (
+        <span>
+          <Button
+            primary
+            disabled={write.disabled}
+            onClick={() => { retry(write, failed, withTicks(failed.attempt, ticks), failed.attempt, { onResolved, onResent }); }}
+          >
+            {`Tick ${plural(total, "item")} and ${completing === 1 ? "mark done" : "try again"}`}
+          </Button>
+        </span>
+      ) : null}
+    </>
+  );
+}
+
+function Invalid({ view, write, failed, rejection, violations, onResolved, onResent }: Resolving & { failed: Failed; rejection: Rejection; violations: Violation[] }) {
   const chains = violations.filter((violation) => violation.code === "contradictory_chain");
+  const ticks = untickedIn(violations);
   return (
     <RejectionView
       rejection={rejection}
       titleOf={(node) => titleOf(view, node)}
-      omit={(violation) => violation.code === "contradictory_chain"}
+      omit={(violation) => violation.code === "contradictory_chain" || violation.bypassable === "all_ticked"}
+      {...(ticks.only ? { invalidHeading: "checklist items are not ticked." } : {})}
       onDismiss={write.dismiss}
       extras={
         <>
           <DateConflictResolver view={view} write={write} violations={chains} onResolved={onResolved} onResent={onResent} />
+          <TickTheRest view={view} write={write} failed={failed} ticks={ticks.byNode} only={ticks.only} onResolved={onResolved} onResent={onResent} />
           {bypassable(violations).map(({ node, guards }) => (
-            <Bypass key={node} write={write} node={node} guards={guards} onResolved={onResolved} onResent={onResent} />
+            <Bypass key={node} view={view} write={write} node={node} guards={guards} onResolved={onResolved} onResent={onResent} />
           ))}
         </>
       }
@@ -164,7 +238,7 @@ export function Rejected({ view, write, onResolved, onResent }: Resolving) {
   }
   const { rejection, attempt } = failed;
   if (rejection.rejection === "invalid") {
-    return <Invalid view={view} write={write} rejection={rejection} violations={rejection.violations} onResolved={onResolved} onResent={onResent} />;
+    return <Invalid view={view} write={write} failed={failed} rejection={rejection} violations={rejection.violations} onResolved={onResolved} onResent={onResent} />;
   }
   return (
     <RejectionView

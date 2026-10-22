@@ -52,6 +52,8 @@ export interface NodeWrite {
   holds: (id: OperationId) => boolean;
   /** The write the manager holds for this section, if it is not rejected: out, or in need of the person (no answer, not sent, gone). */
   status: WriteView | undefined;
+  /** The mutations of the write the manager holds for this section while it is out or may have committed; undefined otherwise. */
+  sending: Mutation[] | undefined;
   /** A write is out or may have committed. */
   pending: boolean;
   /** Whether the page offers writes to this journey at all (screens/writable.ts): a surface shows no write control without it. */
@@ -113,6 +115,7 @@ export function useNodeWrite(view: Ready, scope: string, node?: string): NodeWri
     run: async (mutations, seen = current, id = newPatchId()) => writable && (await write.submit(nodeCommand(journey, mutations, seen, id))) !== undefined,
     holds: (id) => held(edits, id),
     status: write.status,
+    sending: write.busy ? attempt?.mutations : undefined,
     pending: write.busy,
     writable,
     disabled: !writable || write.disabled,

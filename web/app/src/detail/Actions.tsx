@@ -32,7 +32,7 @@ import { ActButton, actMutation, type Opens } from "./ActButton.tsx";
 import { EvidenceForm } from "./DoneEvidence.tsx";
 import { SnoozePanel, snoozeWords, WeightEditor } from "./editors.tsx";
 import { foldKey, setFold } from "./folds.ts";
-import { answerable, failingGuards, guardBypass, movesFrom, storedSnooze, titleOf, transition, unfinishedInside, type Guard, type GraphNode, type Mutation, type NodeDetail, type Ready } from "./model.ts";
+import { answerable, failingGuards, guardBypass, itemTitle, movesFrom, storedSnooze, titleOf, transition, unfinishedInside, type Guard, type GraphNode, type Mutation, type NodeDetail, type Ready } from "./model.ts";
 import { menuOf, offered, type Act, type ContextId, type MenuId, type MenuItem } from "./offers.ts";
 import { OwnerSelect } from "./parts.tsx";
 import { Rejected } from "./Rejected.tsx";
@@ -345,7 +345,7 @@ function reasonWords(kind: ReasonKind, node: GraphNode, without: string, inside:
     case "include":
       return { label: "Why include it", confirm: "Include anyway", testId: "include-form" };
     case "bypass":
-      return { label: "Why bypass the guard", confirm: `Mark done without ${without}`, testId: "bypass" };
+      return { label: "Why mark it done anyway", confirm: `Mark done without ${without}`, testId: "bypass" };
   }
 }
 
@@ -383,8 +383,20 @@ function OpenedForm({ opened, footer, ...props }: OpenProps & { opened: Opened; 
       return null;
     case "snooze":
       return <SnoozePanel {...shared} view={view} detail={detail} value={opened.value} footer={footer} onChange={(next) => { form.change("snooze", next); }} onSnooze={(mutation) => { submit(opened, [mutation]); }} />;
-    case "evidence":
-      return <EvidenceForm {...shared} needs={missingEvidence(view, node)} value={evidenceDraft(opened.value)} onChange={(next) => { form.change("evidence", next); }} onSend={(evidence) => { submit(opened, doneMutations(node.key, evidence)); }} />;
+    case "evidence": {
+      const needs = missingEvidence(view, node);
+      return (
+        <EvidenceForm
+          {...shared}
+          needs={needs}
+          unticked={needs.unticked.map((item) => itemTitle(view, node.key, item))}
+          value={evidenceDraft(opened.value)}
+          onChange={(next) => { form.change("evidence", next); }}
+          onSend={(evidence) => { submit(opened, doneMutations(node.key, evidence)); }}
+          onWithout={() => { form.openForm("bypass", ""); }}
+        />
+      );
+    }
     case "edit-date":
       return <EditDate {...shared} value={opened.value} unchanged={opened.value === detail.record.finished_on} onChange={(next) => { form.change("edit-date", next); }} onSave={(date) => { submit(opened, [{ op: "set_recorded_date", node: node.key, end: "finish", date }]); }} />;
     case "assign":

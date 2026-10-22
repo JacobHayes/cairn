@@ -11,7 +11,7 @@ import { isOpen } from "../status/state.ts";
 import { upperFirst } from "../status/words.ts";
 import { dateWords, daysUntil, daysWords, relativeDays } from "../status/when.ts";
 import { guardFailureText, namer } from "./explain.ts";
-import { nodeOf, rankPlaces, scheduledDate, skippedThrough, titleOf, waitsOn, type Holding, type NodeDetail, type NodeDerived, type Ready } from "./model.ts";
+import { itemTitle, nodeOf, rankPlaces, scheduledDate, skippedThrough, titleOf, waitsOn, type Holding, type NodeDetail, type NodeDerived, type Ready } from "./model.ts";
 import { answerText, identityName, ownersOf, ownerWords } from "./sections.tsx";
 import { listParts, plural } from "../ui/words.ts";
 
@@ -136,12 +136,12 @@ function aheadOf(view: Ready, detail: NodeDetail, early: Schema<"DoneEarly">): P
 }
 
 /** D4: why a finished node is stale, in words. */
-function staleWords(view: Ready, failures: Schema<"GuardFailure">[]): Piece[] {
+function staleWords(view: Ready, key: string, failures: Schema<"GuardFailure">[]): Piece[] {
   const name = namer(view);
   return failures.flatMap((failure): Piece[] =>
     typeof failure === "object" && "open_dependency" in failure
       ? [" Stale: ", { node: failure.open_dependency }, " was reopened."]
-      : [` Stale: ${guardFailureText(failure, name, view.derived.today)}.`],
+      : [` Stale: ${guardFailureText(failure, name, view.derived.today, (id) => itemTitle(view, key, id))}.`],
   );
 }
 
@@ -269,7 +269,7 @@ function stateSentence(view: Ready, detail: NodeDetail, rank: RankFacts, viewer:
       const unanswered = derived.relevance.value === "undecided" ? ([" May not apply: depends on ", ...undecidedNames(view, node.key), "."] satisfies Piece[]) : [];
       const early = derived.dates.done_early ?? undefined;
       const opening: Piece[] = early === undefined ? [`${verb}${finished}.`] : [`${verb} early${finished}`, ...aheadOf(view, detail, early), "."];
-      return [...opening, ...staleWords(view, derived.stale ?? []), ...unanswered];
+      return [...opening, ...staleWords(view, node.key, derived.stale ?? []), ...unanswered];
     }
     case "skipped": {
       const kept = keptPending(derived);

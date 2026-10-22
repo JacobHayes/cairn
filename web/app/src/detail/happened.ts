@@ -10,8 +10,8 @@ import type { Schema } from "@cairn/client";
 import { SNOOZE_NODE_TAIL } from "../status/snooze.ts";
 import { dateWords } from "../status/when.ts";
 import { fieldWords } from "../status/words.ts";
-import { IDENTITY_GONE, KIND_GONE, NODE_GONE, ROLE_GONE } from "../ui/gone.ts";
-import { isStage, kindWord, type Ready, titleOf } from "./model.ts";
+import { IDENTITY_GONE, ITEM_GONE, KIND_GONE, NODE_GONE, ROLE_GONE } from "../ui/gone.ts";
+import { isStage, itemTitle, kindWord, type Ready, titleOf } from "./model.ts";
 import { identityName, kindTitle, roleTitle } from "./sections.tsx";
 import { namedList } from "../ui/words.ts";
 import { identityLabel } from "../people/label.ts";
@@ -27,6 +27,8 @@ export interface Words {
   /** The node the history is of: it reads as "this". */
   viewed: string;
   node(key: string): string;
+  /** A checklist item of node `node` by its title. */
+  item(node: string, id: string): string;
   identity(key: string): string;
   role(key: string): string;
   kind(key: string): string;
@@ -68,6 +70,12 @@ export interface Facts {
   reason?: string;
   /** The user who confirmed a proposal this event applied. */
   confirmedBy?: string;
+  /** The title of the checklist item a tick or untick is of. */
+  item?: string;
+  /** The node the event is about, by key: what a tick folds under. */
+  subject?: string;
+  /** For a tick or untick of a node other than the one viewed, that node's title (the sentence says "on" it). */
+  onNode?: string;
 }
 
 /** An event in words. */
@@ -176,6 +184,31 @@ function transitioned(c: Context): Said {
     default:
       return { what: `reopened ${it(c, node)}`, facts };
   }
+}
+
+/** The checklist item an event ticked (a tick record put) or unticked (one removed), with its node. */
+function tickOf(c: Context): { node: string; item: string } | undefined {
+  for (const write of c.writes) {
+    if ("put" in write && "graph" in write.put && "tick" in write.put.graph.record) {
+      return write.put.graph.record.tick;
+    }
+    if ("remove" in write && "in_graph" in write.remove && typeof write.remove.in_graph.key === "object" && "tick" in write.remove.in_graph.key) {
+      return write.remove.in_graph.key.tick;
+    }
+  }
+  return undefined;
+}
+
+/** G5: a tick or an untick: the item by its title, and the node when it is not the one viewed. */
+function ticking(c: Context, verb: "ticked" | "unticked"): Said {
+  const tick = tickOf(c);
+  const node = tick?.node ?? c.subject;
+  const title = tick === undefined ? ITEM_GONE : c.words.item(tick.node, tick.item);
+  const elsewhere = node !== undefined && node !== c.words.viewed;
+  return {
+    what: `${verb} ${quoted(title)}${elsewhere ? ` on ${quoted(c.words.node(node))}` : ""}`,
+    facts: { item: title, ...(node === undefined ? {} : { subject: node }), ...(elsewhere ? { onNode: c.words.node(node) } : {}) },
+  };
 }
 
 function snoozed(c: Context): Said {
@@ -367,8 +400,8 @@ const SAY: Record<EventType, (c: Context) => Said> = {
   override_applied: (c) => overrides(c, false),
   guard_bypassed: (c) => ({ what: `bypassed a check on ${it(c)}` }),
   override_removed: (c) => overrides(c, true),
-  item_ticked: (c) => ({ what: `ticked a checklist item of ${it(c)}` }),
-  item_unticked: (c) => ({ what: `unticked a checklist item of ${it(c)}` }),
+  item_ticked: (c) => ticking(c, "ticked"),
+  item_unticked: (c) => ticking(c, "unticked"),
   atomic_changed: (c) => {
     const atomic = stateRecord(c)?.state.atomic;
     return { what: atomic === true ? `allowed ${it(c)} to finish without breaking it down` : `asked for ${it(c)} to be broken down` };
@@ -437,11 +470,39 @@ export function recount(events: readonly Event[], words: Words): Happened[] {
   });
 }
 
+/**
+ * G5: a patch that ticks several items of one node reads as one phrase, `ticked 4 checklist
+ * items`: every tick of one node (and, apart, every untick) folds into the first of them. Other
+ * nodes and the other direction never merge; one item keeps its title.
+ */
+export function foldTicks(told: readonly Happened[]): Happened[] {
+  const groups = new Map<string, Happened[]>();
+  for (const each of told) {
+    if ((each.type === "item_ticked" || each.type === "item_unticked") && each.facts.subject !== undefined) {
+      const key = `${each.type}:${each.facts.subject}`;
+      groups.set(key, [...(groups.get(key) ?? []), each]);
+    }
+  }
+  return told.flatMap((each) => {
+    const group = each.facts.subject === undefined ? undefined : groups.get(`${each.type}:${each.facts.subject}`);
+    if (group === undefined || group.length === 1) {
+      return [each];
+    }
+    if (group[0] !== each) {
+      return [];
+    }
+    const verb = each.type === "item_ticked" ? "ticked" : "unticked";
+    const on = each.facts.onNode === undefined ? "" : ` on ${quoted(each.facts.onNode)}`;
+    return [{ ...each, what: `${verb} ${String(group.length)} checklist items${on}`, byAgent: group.some((member) => member.byAgent) }];
+  });
+}
+
 /** The words for `view`'s journey (none while it is not loaded), with `viewed` the node a history is of, if any. */
 export function wordsOf(view: Ready | undefined, viewed: string, person: (user: string) => string): Words {
   return {
     viewed,
     node: (key) => (view === undefined ? NODE_GONE : titleOf(view, key)),
+    item: (node, id) => (view === undefined ? ITEM_GONE : itemTitle(view, node, id)),
     identity: (key) => (view === undefined ? IDENTITY_GONE : identityName(view, key)),
     role: (key) => (view === undefined ? ROLE_GONE : roleTitle(view, key)),
     kind: (key) => (view === undefined ? KIND_GONE : kindTitle(view, key)),

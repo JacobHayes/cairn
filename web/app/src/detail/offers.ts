@@ -57,7 +57,7 @@ export function offered(view: Ready, key: string): Offered {
       }
       const needs = missingEvidence(view, node);
       return {
-        primary: needs.artifact || needs.note ? "done-with-evidence" : "done",
+        primary: needs.artifact || needs.note || needs.unticked.length > 0 ? "done-with-evidence" : "done",
         secondary: [...(moves.includes("start") ? (["start"] as const) : []), ...snooze],
         waiting,
       };

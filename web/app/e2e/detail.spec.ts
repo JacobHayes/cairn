@@ -8,8 +8,10 @@ import type { Page } from "@playwright/test";
 
 import { checkpoint, expect, test } from "./test.ts";
 
+import { frontierItem, openActing } from "./acting.ts";
+import { openEditing, openForm } from "./authoring.ts";
 import { openNode, pin, section } from "./detail.ts";
-import { fresh, goWithin, menuItem, nodeCard, nodePanel, openAt, openFromCanvas, openSheet, syncChip, whenSettled } from "./shell.ts";
+import { fresh, goTo, goWithin, menuItem, nodeCard, nodePanel, openAt, openFromCanvas, openJourney, openSheet, settled, syncChip, whenSettled } from "./shell.ts";
 
 async function discardClearsRejection(page: Page) {
   const panel = await openNode(page, "browser", "j_vendor_eval", "n_final_report");
@@ -39,12 +41,12 @@ async function rejectionSurvivesAndResolves(page: Page) {
   // The rejection and a reason typed meanwhile are kept per tab, so a reload loses neither.
   await menuItem(panel, "done-anyway");
   const reason = fresh("Reviewed out of band");
-  await panel.getByTestId("bypass").getByLabel("Why bypass the guard").fill(reason);
+  await panel.getByTestId("bypass").getByLabel("Why mark it done anyway").fill(reason);
   await page.reload();
   panel = page.getByTestId("node-detail");
   conflict = panel.getByTestId("date-conflict");
   await expect(conflict).toBeVisible();
-  await expect(panel.getByTestId("bypass").getByLabel("Why bypass the guard")).toHaveValue(reason);
+  await expect(panel.getByTestId("bypass").getByLabel("Why mark it done anyway")).toHaveValue(reason);
   // Away from the control it is still counted, and Go to it comes back to it.
   await goWithin(page, "/routes?type=routes");
   await expect(syncChip(page)).toHaveAttribute("aria-label", /^NOT SAVED · 1\./);
@@ -107,10 +109,10 @@ async function markDoneKeepsTypedText(page: Page) {
   const docs = await openFromCanvas(page, "n_docs");
   await docs.getByRole("button", { name: "Mark done…" }).click();
   const typed = fresh("https://example.test/notes");
-  await docs.getByLabel("Artifact address").fill(typed);
+  await docs.getByLabel("Artifact link").fill(typed);
   await nodeCard(page, "n_docs").click({ button: "right" });
   await page.getByTestId("context-done-with-evidence").click();
-  await expect(docs.getByLabel("Artifact address")).toHaveValue(typed);
+  await expect(docs.getByLabel("Artifact link")).toHaveValue(typed);
 }
 
 test("a later pin is rejected with its chain, kept across a reload and counted away from it, discarded or resolved with a listed move (F5); a node's actions hold one open form; its history says who did what", async ({ page }) => {
@@ -173,4 +175,84 @@ test("a stage is marked done with a reason: what was left inside reads skipped a
   await expect(stage.getByTestId("detail-state")).not.toHaveAttribute("data-status", "done");
   await expect(nodeCard(page, "n_announcement").getByTestId("card-state")).not.toHaveAttribute("data-state", "skipped");
   await checkpoint(page);
+});
+
+test("a checklist is written in the node form, ticked in place, finished with Mark done... from the list in one patch, and its progress is on the card (G5)", async ({ page }) => {
+  // Author: require the checklist, add three items, move one, and type a fourth that Save must not drop.
+  await openEditing(page, "browser", "j_bakeoff");
+  await openFromCanvas(page, "n_trial_a");
+  const completion = await openForm(page, "completion");
+  await completion.getByLabel("Requires all items ticked before done").check();
+  const add = completion.getByLabel("New item", { exact: true });
+  for (const title of ["Rollback plan written", "Load test passed"]) {
+    await add.fill(title);
+    await add.press("Enter");
+  }
+  await add.fill("Support team briefed");
+  await completion.getByRole("button", { name: "Add the item" }).click();
+  await completion.getByRole("button", { name: "Move Support team briefed up" }).click();
+  await add.fill("Status page drafted");
+  // Leaving the field adds the typed item, so Save never drops it.
+  await add.blur();
+  await expect(completion.getByTestId("checklist-item-edit")).toHaveCount(4);
+  await page.getByTestId("node-form-save").click();
+  await expect(page.getByTestId("node-form-save")).toHaveCount(0);
+  await settled(page);
+  // Act: the checklist is in the inspector in the order written; ticking two moves the card's count.
+  await openJourney(page, "browser", "j_bakeoff");
+  const panel = await openFromCanvas(page, "n_trial_a");
+  const checklist = panel.getByTestId("checklist");
+  await expect(checklist.getByTestId("checklist-item")).toHaveText(["Rollback plan written", "Support team briefed", "Load test passed", "Status page drafted"]);
+  await checklist.getByTestId("checklist-item").nth(0).click();
+  await checklist.getByTestId("checklist-item").nth(2).click();
+  await expect(nodeCard(page, "n_trial_a").getByTestId("card-checklist")).toHaveAttribute("data-ticked", "2");
+  await expect(nodeCard(page, "n_trial_a").getByTestId("card-checklist")).toHaveAttribute("data-total", "4");
+  // Finish from the list: the row opens the inspector's form, which ticks the rest and completes in one patch.
+  await openActing(page, "browser", "j_bakeoff", "list?frontier=1");
+  await frontierItem(page, "n_trial_a").getByRole("button", { name: "Mark done…" }).click();
+  const done = nodePanel(page, "n_trial_a");
+  await expect(done.getByTestId("done-ticks")).toBeVisible();
+  await expect(done.getByTestId("done-evidence").locator("li")).toHaveCount(2);
+  await done.getByTestId("done-evidence").getByRole("button", { name: "Tick 2 items and mark done" }).click();
+  await expect(done.getByTestId("detail-state")).toHaveText("done");
+  await goTo(page, "graph");
+  await expect(nodeCard(page, "n_trial_a").getByTestId("card-checklist")).toHaveAttribute("data-ticked", "4");
+  const history = (await section(done, "details")).getByTestId("history-patch");
+  await expect(history.last().getByTestId("history-sentence")).toContainText("2 checklist items");
+  // Unticking one of finished work makes it stale, said by the item's title.
+  const gone = done.getByTestId("checklist").getByTestId("checklist-item").nth(1);
+  await gone.click();
+  await expect(done.getByTestId("detail-sentence")).toContainText("Support team briefed");
+});
+
+test("a checklist item typed and not added survives a reload, and a replacement for a removed ticked item starts unticked (G5)", async ({ page }) => {
+  await openEditing(page, "browser", "j_bakeoff");
+  await openFromCanvas(page, "n_trial_a");
+  let completion = await openForm(page, "completion");
+  const add = completion.getByLabel("New item", { exact: true });
+  await add.fill("Alpha");
+  await add.press("Enter");
+  await add.fill("Typed and not added");
+  await page.reload();
+  completion = await openForm(page, "completion");
+  await expect(completion.getByLabel("New item", { exact: true })).toHaveValue("Typed and not added");
+  await completion.getByLabel("New item", { exact: true }).fill("");
+  await page.getByTestId("node-form-save").click();
+  await settled(page);
+  await openJourney(page, "browser", "j_bakeoff");
+  const panel = await openFromCanvas(page, "n_trial_a");
+  await panel.getByTestId("checklist").getByTestId("checklist-item").first().click();
+  await expect(nodeCard(page, "n_trial_a").getByTestId("card-checklist")).toHaveAttribute("data-ticked", "1");
+  // Remove the ticked item and add one with the same title: it is a new item, so it carries no tick.
+  await openEditing(page, "browser", "j_bakeoff");
+  await openFromCanvas(page, "n_trial_a");
+  completion = await openForm(page, "completion");
+  await completion.getByRole("button", { name: "Remove the item Alpha" }).click();
+  await completion.getByLabel("New item", { exact: true }).fill("Alpha");
+  await completion.getByLabel("New item", { exact: true }).press("Enter");
+  await page.getByTestId("node-form-save").click();
+  await settled(page);
+  await openJourney(page, "browser", "j_bakeoff");
+  await openFromCanvas(page, "n_trial_a");
+  await expect(nodeCard(page, "n_trial_a").getByTestId("card-checklist")).toHaveAttribute("data-ticked", "0");
 });

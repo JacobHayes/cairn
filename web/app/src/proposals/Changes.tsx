@@ -12,7 +12,7 @@ import { removalMutations, useRemovalPlan } from "../authoring/removal.ts";
 import { DateRuleEditor } from "../authoring/DateRuleEditor.tsx";
 import { draftOf, draftProblems, nodeFrom, valueOf, type FormField, type NodeDraft } from "../authoring/fields.ts";
 import { canHoldChildren, kindOption, moveTargets, newNode, nodesByPath, nodesFor, pathOf, rolesForFill, type GraphNode, type Mutation, type NodeField, type NodeKind, type ReferenceField, type Role, type Tree } from "../authoring/graph.ts";
-import { BasicsFields, ChoicesEditor, CompletionFields, DecisionFields, StageFields, WeightFields, has } from "../authoring/NodeFields.tsx";
+import { BasicsFields, ChecklistEditor, ChoicesEditor, CompletionFields, DecisionFields, StageFields, WeightFields, has } from "../authoring/NodeFields.tsx";
 import { problemsOf } from "../authoring/NodeForm.tsx";
 import { FieldBox, Picker } from "../authoring/parts.tsx";
 import type { Deployment } from "../data/host.ts";
@@ -176,6 +176,7 @@ function FieldValue({ editor, mutation, onChange, context }: { editor: string; m
       {field === "fills_role" ? <Picker aria-label={fieldWords(field)} value={draft.fills_role} none="No role" options={rolesForFill(context.roles, draft.answer_type).map((role) => ({ value: role.key, label: role.title ?? role.id }))} onChange={(event) => { change({ fills_role: event.target.value }); }} /> : null}
       {field === "parent" ? <ParentValue mutation={mutation} onChange={onChange} context={context} /> : null}
       {field === "choices" ? <ChoicesEditor props={props} /> : null}
+      {field === "checklist" ? <ChecklistEditor props={props} flag={false} /> : null}
       {field === "relevant_when" ? <ConditionEditor value={draft.relevant_when} onChange={(next) => { change({ relevant_when: next }); }} tree={context.tree} node={mutation.node} identities={context.deployment.identities ?? []} today={context.today} /> : null}
       {field === "due_by" || field === "not_before" ? <DateRuleEditor which={field} value={draft[field]} onChange={(next) => { change({ [field]: next }); }} tree={context.tree} node={mutation.node} /> : null}
     </FieldBox>

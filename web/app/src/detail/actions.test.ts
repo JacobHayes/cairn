@@ -8,7 +8,7 @@ import { resolvedAnswer } from "./AnswerEditor.tsx";
 import { isComplete } from "./contributions.ts";
 import { answerInEffect } from "./editors.tsx";
 import type { Mutation } from "./model.ts";
-import { bypassable, bypassReady, withMove } from "./Rejected.tsx";
+import { bypassable, bypassReady, untickedIn, withMove, withTicks } from "./Rejected.tsx";
 import { identityName } from "./sections.tsx";
 import { testView } from "./view.test-support.ts";
 
@@ -38,6 +38,23 @@ describe("resolving a rejection", () => {
   it("offers a bypass for each node's bypassable guards, each once", () => {
     const offered = bypassable([violation("n_a", "deps_done"), violation("n_a", "deps_done"), violation("n_a", "has_artifact"), violation("n_b")]);
     expect(offered).toEqual([{ node: "n_a", guards: ["deps_done", "has_artifact"] }]);
+  });
+});
+
+describe("a refusal for unticked checklist items (G5, D4)", () => {
+  const unticked = (node: string, item: string): Schema<"Violation"> => ({ ...violation(node, "all_ticked"), failures: [{ unticked: item }] });
+
+  it("groups the unticked items per node, and says ticking is all it needs only when nothing else broke", () => {
+    const refused = [unticked("n_a", "x"), unticked("n_a", "y"), unticked("n_b", "z")];
+    expect(untickedIn(refused)).toEqual({ byNode: [{ node: "n_a", items: ["x", "y"] }, { node: "n_b", items: ["z"] }], only: true });
+    expect(untickedIn([...refused, violation("n_a", "deps_done")]).only).toBe(false);
+    expect(untickedIn([violation("n_a", "deps_done")])).toEqual({ byNode: [], only: false });
+  });
+
+  it("sends the ticks before the refused patch, so the guard reads them ticked", () => {
+    const complete: Mutation = { op: "transition", node: "n_a", transition: "complete" };
+    const sent = withTicks({ mutations: [complete], base: 4, deployment: 2 }, [{ node: "n_a", items: ["x", "y"] }]);
+    expect(sent).toEqual([{ op: "set_ticked", node: "n_a", item: "x", ticked: true }, { op: "set_ticked", node: "n_a", item: "y", ticked: true }, complete]);
   });
 });
 
