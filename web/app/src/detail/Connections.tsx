@@ -1,6 +1,7 @@
 // C8, Gating, D4 (design 6.9): what the node waits on, what finishing it would unblock, and why
 // it applies or not. Every row is a link that opens that node's detail. Folded, and open when
 // the node is blocked, stale, or conditional, which is when there is something to read.
+import { useCaller } from "../data/react.ts";
 import { useContributions } from "./contributions.ts";
 import { ForceInclude } from "./editors.tsx";
 import { viaText, namer } from "./explain.ts";
@@ -31,6 +32,7 @@ function relevanceWords(view: Ready, detail: NodeDetail): React.ReactNode {
 }
 
 export function Connections({ view, detail }: { view: Ready; detail: NodeDetail }) {
+  const viewer = useCaller().caller?.identities;
   const { node, derived } = detail;
   const name = namer(view);
   const waits = waitsOn(view, node.key);
@@ -49,10 +51,10 @@ export function Connections({ view, detail }: { view: Ready; detail: NodeDetail 
               <li key={`${held.node}:${JSON.stringify(held.via)}`} data-node={held.node}>
                 <NodeLink view={view} node={held.node} />{" "}
                 <span className="muted small">
-                  {ownerName(view, held.node) ?? ""} {held.via === "explicit" || (typeof held.via === "object" && "stage_opening" in held.via) ? "" : viaText(held.via, name)}
+                  {ownerName(view, held.node, viewer) ?? ""} {held.via === "explicit" || (typeof held.via === "object" && "stage_opening" in held.via) ? "" : viaText(held.via, name)}
                   {held.date === undefined ? null : (
                     <span data-testid="waits-date">
-                      {ownerName(view, held.node) === undefined ? "" : " · "}scheduled for {dateWords(held.date, view.derived.today)}
+                      {ownerName(view, held.node, viewer) === undefined ? "" : " · "}scheduled for {dateWords(held.date, view.derived.today)}
                     </span>
                   )}
                 </span>

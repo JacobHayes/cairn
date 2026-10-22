@@ -326,7 +326,7 @@ export function flagsOf(derived: NodeDerived): { flag: string; tone: FlagTone }[
     }
   };
   add(derived.started_early, "started early", "plain");
-  add(derived.unassigned, "unassigned", "warn");
+  add(derived.unassigned, "no owner", "warn");
   add(derived.overdue, "overdue", "bad");
   add(derived.dates.shortfall != null, "short of days", "bad");
   add((derived.stale ?? []).length > 0, "stale", "warn");

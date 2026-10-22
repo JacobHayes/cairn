@@ -68,9 +68,7 @@ export function ownersOf(view: Ready, key: string): string[] {
 
 /** What a surface says for the viewer among a node's owners. */
 export const YOU = "You";
-/** What a surface says for a node nobody owns. */
-export const UNASSIGNED = "Unassigned";
-/** What a surface says for a journey nobody owns. */
+/** What every surface says for a node or a journey nobody owns, short enough for a card's foot: the card, the inspector, the list, the rows and the Filter. */
 export const NO_OWNER = "No owner";
 
 /**
@@ -92,11 +90,11 @@ export function identityNames(deployment: Deployment, keys: readonly string[], v
 
 /**
  * Who has a node, in words, on every surface: all its owners by name, the viewer (given as their
- * `viewer` identities) as "You", and "Unassigned" for none.
+ * `viewer` identities) as "You", and "No owner" for none.
  */
 export function ownerWords(view: Ready, owners: readonly string[] | undefined, viewer: readonly string[] = []): string {
   const keys = owners ?? [];
-  return keys.length === 0 ? UNASSIGNED : identityNames(view.inputs.deployment, keys, viewer, YOU);
+  return keys.length === 0 ? NO_OWNER : identityNames(view.inputs.deployment, keys, viewer, YOU);
 }
 
 /** An answer as people read it: choices by their labels, identities by name. */

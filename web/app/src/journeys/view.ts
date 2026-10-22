@@ -10,6 +10,8 @@
 // so the unit tests read the rules without a page.
 import { createContext, useContext } from "react";
 
+import { NO_OWNER } from "../detail/sections.tsx";
+
 import type { ListFlag } from "../acting/address.ts";
 import { TITLE_BYTES_MAX } from "@cairn/client";
 import { overBytes } from "../authoring/limits.ts";
@@ -23,7 +25,7 @@ export const FILTER_FLAGS: readonly ListFlag[] = ["overdue", "stale", "unassigne
 export const FLAG_WORDS: Partial<Record<ListFlag, string>> = {
   overdue: "Overdue",
   stale: "Stale",
-  unassigned: "Unassigned",
+  unassigned: NO_OWNER,
   shortfall: "Short of days",
   snoozed: "Snoozed",
 };

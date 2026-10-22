@@ -9,7 +9,7 @@ import type { DecisionRow } from "../decisions/model.ts";
 import { nodeOf, scheduledDate, type Ready, titleOf } from "../detail/model.ts";
 import { screenSwitched, useNodeAddresses } from "../journeys/address.ts";
 import { useJourneyTarget } from "../journeys/useJourneyTarget.ts";
-import { ownerWords, UNASSIGNED } from "../detail/sections.tsx";
+import { NO_OWNER, ownerWords } from "../detail/sections.tsx";
 import { snoozeWords } from "../status/snooze.ts";
 import { isOpen } from "../status/state.ts";
 import { statusTone, statusWord } from "../status/words.ts";
@@ -200,7 +200,7 @@ export function Cell({ column, line, context }: { column: Column; line: Line; co
   }
   switch (column) {
     case "owner":
-      return (row.owners ?? []).length > 0 ? ownerWords(view, row.owners, context.viewer) : row.unassigned === true ? <span className="list-unassigned">{UNASSIGNED}</span> : null;
+      return (row.owners ?? []).length > 0 ? ownerWords(view, row.owners, context.viewer) : row.unassigned === true ? <span className="list-unassigned">{NO_OWNER}</span> : null;
     case "due":
       return row.due == null || !open ? null : <span className={inkClass(dateInk(row.due, today))} data-testid="list-due">{dueWords(row.due, today, node.kind === "decision")}</span>;
     case "rank": {

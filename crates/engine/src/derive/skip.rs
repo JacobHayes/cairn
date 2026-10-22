@@ -53,6 +53,11 @@ impl Skips {
         self.effective.iter()
     }
 
+    /// D1a: every skipped container or group marked done that holds kept work, with that work.
+    pub fn kept_work_all(&self) -> impl Iterator<Item = (&NodeKey, &BTreeSet<NodeKey>)> {
+        self.kept_work.iter()
+    }
+
     /// D1a: the explicitly kept, in-scope work beneath a skipped container or a group marked
     /// done, empty for any
     /// other node.

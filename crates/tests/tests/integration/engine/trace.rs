@@ -127,3 +127,54 @@ fn a_card_standing_for_nodes_traces_what_they_trace() {
     assert!(journey.trace(&key("n_setup")).unwrap().downstream.len() < joined.downstream.len());
     assert!(joined.upstream.contains(&key("n_kickoff")));
 }
+
+/// D1a, C7: a group marked done, or a skipped one, needs only the kept work still pending beneath
+/// it; its other children (skipped by it, or finished) are neither needed by it nor unblocked by
+/// it, and a kept item that is finished no longer counts.
+#[test]
+fn a_container_that_skips_beneath_it_needs_only_kept_work_still_pending() {
+    let apply = |records: &Records, mutation: &str| support::accepted_on(records, VENDOR, mutation);
+    let start = apply(
+        &support::vendor_after(4),
+        "- op: transition\n  node: n_access\n  transition: complete\n",
+    );
+    let marked = "- op: transition\n  node: n_setup\n  transition: {mark_done: {reason: Covered elsewhere.}}\n";
+    let skipped =
+        "- op: transition\n  node: n_setup\n  transition: {skip: {reason: Not needed.}}\n";
+    let keep = "- op: apply_override\n  node: n_plan_review\n  override: {keep: {reason: Still needed.}}\n";
+    for skipping in [marked, skipped] {
+        let plain = apply(&start, skipping);
+        let traced = trace(&plain, "n_setup");
+        assert_eq!(
+            names(&traced.upstream),
+            ["n_kickoff"],
+            "nothing inside is needed"
+        );
+        assert!(
+            !names(&trace(&plain, "n_plan_draft").downstream).contains(&"n_setup"),
+            "skipped work unblocks nothing in the stage"
+        );
+        let kept = apply(&apply(&start, keep), skipping);
+        let traced = trace(&kept, "n_setup");
+        assert_eq!(
+            names(&traced.upstream),
+            [
+                "n_access",
+                "n_kickoff",
+                "n_plan",
+                "n_plan_draft",
+                "n_plan_review"
+            ],
+            "the kept work, the item it sits in, and what the kept work itself needs"
+        );
+        let finished = apply(
+            &kept,
+            "- op: transition\n  node: n_plan_review\n  transition: complete\n",
+        );
+        assert_eq!(
+            names(&trace(&finished, "n_setup").upstream),
+            ["n_kickoff"],
+            "finished kept work is no longer needed"
+        );
+    }
+}

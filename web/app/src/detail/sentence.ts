@@ -31,9 +31,9 @@ export function positionOf(view: Ready, key: string): number | undefined {
 }
 
 /** The node's owners in words, when it has any. */
-export function ownerName(view: Ready, key: string): string | undefined {
+export function ownerName(view: Ready, key: string, viewer: readonly string[] = []): string | undefined {
   const owners = ownersOf(view, key);
-  return owners.length === 0 ? undefined : ownerWords(view, owners);
+  return owners.length === 0 ? undefined : ownerWords(view, owners, viewer);
 }
 
 /** "A", "A and B", "A, B and C", "A, B and 2 more", as parts a sentence renders. */
@@ -42,8 +42,8 @@ function listed(items: Piece[][]): Piece[] {
 }
 
 /** A node as a phrase, with its link and owner. */
-function namedWithOwner(view: Ready, node: string): Piece[] {
-  const owner = ownerName(view, node);
+function namedWithOwner(view: Ready, node: string, viewer: readonly string[]): Piece[] {
+  const owner = ownerName(view, node, viewer);
   return [{ node }, ...(owner === undefined ? [] : [` (${owner})`])];
 }
 
@@ -53,19 +53,19 @@ function onDate(view: Ready, held: Holding): Piece[] {
 }
 
 /** One thing the node waits on, as a phrase with its link and owner, and its date when a date holds it. */
-export function holdingPhrase(view: Ready, held: Holding): Piece[] {
+export function holdingPhrase(view: Ready, held: Holding, viewer: readonly string[] = []): Piece[] {
   if (typeof held.via === "object" && "stage_opening" in held.via) {
     return ["the ", { node: held.via.stage_opening.group }, " stage opening", ...onDate(view, held)];
   }
-  return [...namedWithOwner(view, held.node), ...onDate(view, held)];
+  return [...namedWithOwner(view, held.node, viewer), ...onDate(view, held)];
 }
 
 /** The things the node waits on, as a phrase: "A (Ben) and the B stage opening", "Launch on Nov 1". */
-export function waitingPhrase(view: Ready, key: string): Piece[] {
+export function waitingPhrase(view: Ready, key: string, viewer: readonly string[] = []): Piece[] {
   const held = waitsOn(view, key);
   // A stage's own opening is what holds it: name the milestone, not the stage itself.
   const own = (each: Holding) => each.holder === undefined && typeof each.via === "object" && "stage_opening" in each.via && each.via.stage_opening.group === key;
-  return held.length === 0 ? ["earlier work"] : listed(held.map((each) => (own(each) ? [...namedWithOwner(view, each.node), ...onDate(view, each)] : holdingPhrase(view, each))));
+  return held.length === 0 ? ["earlier work"] : listed(held.map((each) => (own(each) ? [...namedWithOwner(view, each.node, viewer), ...onDate(view, each)] : holdingPhrase(view, each, viewer))));
 }
 
 /** D8: what a scheduled node waits for, in a sentence: a milestone marks itself done on its day or is marked done once it comes; work or a decision waits for its own date. */
@@ -83,11 +83,11 @@ function scheduledSentence(view: Ready, detail: NodeDetail): Piece[] {
 }
 
 /** Why work started early is early: what it still waits on, and its own date when that is ahead. */
-function earlyPhrase(view: Ready, detail: NodeDetail): Piece[] {
+function earlyPhrase(view: Ready, detail: NodeDetail, viewer: readonly string[]): Piece[] {
   const { derived, node } = detail;
   const own = derived.dates.not_before ?? undefined;
   const ahead = own !== undefined && own > view.derived.today ? [`its own date is ${dateWords(own, view.derived.today)}`] : [];
-  const waits = waitsOn(view, node.key).length > 0 || ahead.length === 0 ? ["still waits on ", ...waitingPhrase(view, node.key)] : [];
+  const waits = waitsOn(view, node.key).length > 0 || ahead.length === 0 ? ["still waits on ", ...waitingPhrase(view, node.key, viewer)] : [];
   return waits.length > 0 && ahead.length > 0 ? [...waits, ", and ", ...ahead] : [...waits, ...ahead];
 }
 
@@ -214,13 +214,13 @@ function keptPending(derived: NodeDerived): Piece[] {
 }
 
 /** The sentence for the node: pieces of text, links, and the Unsnooze action. A container's starts with its roll-up. */
-export function sentenceOf(view: Ready, detail: NodeDetail, rank: RankFacts): Piece[] {
+export function sentenceOf(view: Ready, detail: NodeDetail, rank: RankFacts, viewer: readonly string[] = []): Piece[] {
   const shown = detail.derived.display_state;
-  return shown === "not_relevant" || shown === "skipped" || markedDone(detail) ? stateSentence(view, detail, rank) : [...rollUp(view, detail), ...stateSentence(view, detail, rank)];
+  return shown === "not_relevant" || shown === "skipped" || markedDone(detail) ? stateSentence(view, detail, rank, viewer) : [...rollUp(view, detail), ...stateSentence(view, detail, rank, viewer)];
 }
 
 /** What the node's display state means for it, in pieces. */
-function stateSentence(view: Ready, detail: NodeDetail, rank: RankFacts): Piece[] {
+function stateSentence(view: Ready, detail: NodeDetail, rank: RankFacts, viewer: readonly string[]): Piece[] {
   const { derived, record, node } = detail;
   const today = view.derived.today;
   const state = derived.display_state;
@@ -232,10 +232,10 @@ function stateSentence(view: Ready, detail: NodeDetail, rank: RankFacts): Piece[
       return [`${node.kind === "decision" ? "Ready to decide." : "Ready."}${rankClause(view, derived, rank)}`];
     case "active": {
       const since = `${record.started_on == null ? "In progress." : `In progress since ${on(record.started_on)}.`}${rankClause(view, derived, rank)}`;
-      return derived.started_early === true ? [`${since} Started early: `, ...earlyPhrase(view, detail), "."] : [since];
+      return derived.started_early === true ? [`${since} Started early: `, ...earlyPhrase(view, detail, viewer), "."] : [since];
     }
     case "blocked":
-      return ["Waiting on ", ...waitingPhrase(view, node.key), "."];
+      return ["Waiting on ", ...waitingPhrase(view, node.key, viewer), "."];
     case "conditional": {
       const pending = derived.relevance.pending_on ?? [];
       const applies = appliesIf(view, detail);

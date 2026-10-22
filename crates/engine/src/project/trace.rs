@@ -10,6 +10,9 @@
 //! upstream of another exactly when the other is downstream of it. The gravity contributors
 //! (pass 6, over the pruned set) are marked within the downstream set.
 //!
+//! A container that skips what is beneath it (a skipped one, or a group marked done) waits
+//! only on the kept work still pending beneath it, so its other children are in neither set.
+//!
 //! A card that stands for hidden nodes (a collapsed stage, a deliverable with its actions rolled
 //! up) traces what they trace: the walks start from the node and every node it stands for, in
 //! one pass, and what the card stands for is not part of the answer.
@@ -22,7 +25,10 @@ use std::collections::BTreeSet;
 use cairn_schema::{NodeKey, Trace};
 
 use super::{DerivedJourney, ProjectionError};
-use crate::derive::dependencies::{Dependencies, Edge, EdgeClass, EdgeSet, Instant, Point};
+use crate::derive::dependencies::{
+    Dependencies, Edge, EdgeClass, EdgeSet, EdgeSource, Instant, Point,
+};
+use crate::derive::skips_beneath;
 
 /// Which way a walk follows the edges.
 #[derive(Clone, Copy, PartialEq, Eq)]
@@ -39,10 +45,6 @@ impl DerivedJourney<'_> {
     /// # Errors
     ///
     /// When the node is not in the journey.
-    ///
-    /// # Panics
-    ///
-    /// As [`Self::trace_standing`].
     pub fn trace(&self, key: &NodeKey) -> Result<Trace, ProjectionError> {
         self.trace_standing(key, &[])
     }
@@ -53,11 +55,6 @@ impl DerivedJourney<'_> {
     /// # Errors
     ///
     /// When the node, or one it stands for, is not in the journey.
-    ///
-    /// # Panics
-    ///
-    /// When a gravity contributor falls outside the downstream set, which pass 6's pruned set
-    /// being a subset of the full one rules out.
     pub fn trace_standing(
         &self,
         key: &NodeKey,
@@ -69,28 +66,73 @@ impl DerivedJourney<'_> {
         }
         let starts: BTreeSet<&NodeKey> = std::iter::once(key).chain(standing).collect();
         let dependencies = self.derived.dependencies();
-        let upstream = walk(dependencies, &starts, Direction::Up);
-        let downstream = walk(dependencies, &starts, Direction::Down);
+        let kept_paths = self.kept_paths();
+        let waits_on_child = |edge: &Edge| self.waits_on_child(dependencies, &kept_paths, edge);
+        let upstream = walk(dependencies, &starts, Direction::Up, &waits_on_child);
+        let downstream = walk(dependencies, &starts, Direction::Down, &waits_on_child);
         let gravity_contributors: Vec<NodeKey> = starts
             .iter()
             .flat_map(|start| self.derived.priority().gravity_from(start))
             .map(|contribution| contribution.node)
             .filter(|node| !starts.contains(node))
+            // Gravity reads the pruned set, which still holds the containment a skipping container
+            // ignores; only what the trace shows as unblocked is marked.
+            .filter(|node| downstream.binary_search(node).is_ok())
             .collect::<BTreeSet<_>>()
             .into_iter()
             .collect();
-        assert!(
-            gravity_contributors
-                .iter()
-                .all(|node| downstream.binary_search(node).is_ok()),
-            "gravity's set is within the downstream set"
-        );
         Ok(Trace {
             node: key.clone(),
             upstream,
             downstream,
             gravity_contributors,
         })
+    }
+}
+
+impl DerivedJourney<'_> {
+    /// D1a: the nodes a skipping container still waits on: each kept item that is still pending
+    /// and the containers between it and the skipping one, found once per trace.
+    fn kept_paths(&self) -> BTreeSet<&NodeKey> {
+        let blocking = self.derived.blocking();
+        let mut held = BTreeSet::new();
+        for (container, work) in self.derived.skips().kept_work_all() {
+            for kept in work.iter().filter(|kept| !blocking.satisfies(kept)) {
+                let mut at = Some(kept);
+                // The depth limit bounds the climb to the container.
+                while let Some(key) = at.filter(|key| *key != container) {
+                    held.insert(key);
+                    at = self.graph.tree().parent(key);
+                }
+            }
+        }
+        held
+    }
+
+    /// D1a: whether a containment edge still holds: a container that skips what is beneath it
+    /// (a skipped one, or a group marked done) waits only on the kept work still pending
+    /// beneath it, so its other children are neither needed by it nor unblocked by it.
+    fn waits_on_child(
+        &self,
+        dependencies: &Dependencies,
+        kept_paths: &BTreeSet<&NodeKey>,
+        edge: &Edge,
+    ) -> bool {
+        if edge.source != EdgeSource::Containment {
+            return true;
+        }
+        let (Some(parent), Some(child)) = (
+            dependencies.key(edge.dependent.node),
+            dependencies.key(edge.requirement.node),
+        ) else {
+            return true;
+        };
+        let Some(node) = self.graph.node(parent) else {
+            return true;
+        };
+        let skipping = skips_beneath(self.graph.document(), node)
+            || self.derived.skips().skipped_by(parent).is_some();
+        !skipping || kept_paths.contains(child)
     }
 }
 
@@ -101,6 +143,7 @@ fn walk(
     dependencies: &Dependencies,
     starts: &BTreeSet<&NodeKey>,
     direction: Direction,
+    holds: &dyn Fn(&Edge) -> bool,
 ) -> Vec<NodeKey> {
     let mut seen: BTreeSet<Instant> = BTreeSet::new();
     let mut stack = Vec::new();
@@ -120,7 +163,7 @@ fn walk(
             Direction::Up => Box::new(dependencies.waits(instant, EdgeSet::Full)),
             Direction::Down => Box::new(dependencies.waited_by(instant, EdgeSet::Full)),
         };
-        for edge in edges.filter(|edge| edge.class == EdgeClass::Gate) {
+        for edge in edges.filter(|edge| edge.class == EdgeClass::Gate && holds(edge)) {
             let next = match direction {
                 Direction::Up => edge.requirement,
                 Direction::Down => edge.dependent,

@@ -1,6 +1,7 @@
 // C8: a node's children as a checklist. Work (actions and deliverables) is checked off and
 // unchecked in place, each one transition patch (complete, reopen); any other child shows its
 // state and opens its own detail.
+import { useCaller } from "../data/react.ts";
 import { isFinished } from "../status/state.ts";
 import { dueWords } from "../status/when.ts";
 import { statusTone, statusWord } from "../status/words.ts";
@@ -12,16 +13,16 @@ import { Rejected } from "./Rejected.tsx";
 import { ownerName } from "./sentence.ts";
 import { useNodeWrite, type NodeWrite } from "./write.ts";
 
-function Item({ view, child, write }: { view: Ready; child: Child; write: NodeWrite }) {
+function Item({ view, child, write, viewer }: { view: Ready; child: Child; write: NodeWrite; viewer: readonly string[] | undefined }) {
   const done = child.state === "done";
   // The one fact on the right: the date while it is open, else who owns it.
   const dueDate = isTerminal(child.state) || isFinished(child.displayState) ? undefined : view.derived.nodes[child.key]?.dates.due?.date;
   const due = dueDate === undefined ? undefined : dueWords(dueDate, view.derived.today, child.kind === "decision");
-  const fact = due ?? ownerName(view, child.key);
+  const fact = due ?? ownerName(view, child.key, viewer);
   return (
     <li data-testid="child" data-node={child.key} data-state={child.displayState}>
       <span className="checklist-mark">
-        {write.writable && isWork(child) && child.state !== "skipped" ? (
+        {write.writable && isWork(child) && child.state !== "skipped" && child.displayState !== "skipped" ? (
           <input
             type="checkbox"
             aria-label={`${done ? "Reopen" : "Complete"} ${child.title}`}
@@ -39,6 +40,7 @@ function Item({ view, child, write }: { view: Ready; child: Child; write: NodeWr
 
 export function Checklist({ view, detail }: { view: Ready; detail: NodeDetail }) {
   const write = useNodeWrite(view, `checklist:${detail.node.key}`, detail.node.key);
+  const { caller } = useCaller();
   const { children } = detail;
   if (children.length === 0) {
     return null;
@@ -47,7 +49,7 @@ export function Checklist({ view, detail }: { view: Ready; detail: NodeDetail })
     <Section title="Contents" summary={String(children.length)} open fold={foldKey(detail.node.kind, "contents")} testId="checklist">
       <ul className="plain-list contents">
         {children.map((child) => (
-          <Item key={child.key} view={view} child={child} write={write} />
+          <Item key={child.key} view={view} child={child} write={write} viewer={caller?.identities} />
         ))}
       </ul>
       <Rejected view={view} write={write} />

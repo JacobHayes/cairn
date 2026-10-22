@@ -3,6 +3,7 @@
 // configured discount split out by the decision it waits on, what finishing it would unblock now
 // and what it would not yet free, and the formulas behind it. A container shows one number for its
 // whole area. Folded by default, and read on demand for the open node only.
+import { useCaller } from "../data/react.ts";
 import { rankParts, type NodeRow, type RankPart } from "../acting/why.ts";
 import { useContributions } from "./contributions.ts";
 import { isOpen } from "../status/state.ts";
@@ -96,6 +97,7 @@ function Unlocks({ view, detail, open }: { view: Ready; detail: NodeDetail; open
   const { node, derived } = detail;
   const frees = useContributions(view, node.key, "unlocks", derived.unlocks_from);
   const waiting = useStillWaiting(view, node.key, open);
+  const viewer = useCaller().caller?.identities;
   if (derived.unlocks_from.total === 0 && (waiting === undefined || waiting.held.length === 0)) {
     return (
       <span className="muted small" data-testid="unlocks">
@@ -122,7 +124,7 @@ function Unlocks({ view, detail, open }: { view: Ready; detail: NodeDetail; open
             {waiting.held.map((held) => (
               <li key={held.node} data-node={held.node}>
                 <NodeLink view={view} node={held.node} /> <span className="muted small">also waits on </span>
-                <Pieces view={view} pieces={held.also_waits_on.flatMap((blocker, at) => [...(at === 0 ? [] : [", "]), ...holdingPhrase(view, { node: blocker.node, via: blocker.via, holder: undefined, date: blocker.date ?? undefined })])} />
+                <Pieces view={view} pieces={held.also_waits_on.flatMap((blocker, at) => [...(at === 0 ? [] : [", "]), ...holdingPhrase(view, { node: blocker.node, via: blocker.via, holder: undefined, date: blocker.date ?? undefined }, viewer)])} />
               </li>
             ))}
           </ul>

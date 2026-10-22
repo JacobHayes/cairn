@@ -4,6 +4,7 @@
 // (kind and place, display state, title, owner, date), one plain sentence saying what its state
 // means, and the one thing to do about it, a decision's form being its answer; everything else
 // is a folded row showing its name and a count (DESIGN, Approachable by default).
+import { useCaller } from "../data/react.ts";
 import type { ReactNode } from "react";
 import { Link, useLocation } from "react-router";
 
@@ -54,9 +55,10 @@ function Dates({ view, detail }: { view: Ready; detail: NodeDetail }) {
 
 /** The one plain sentence: what the node's state means, with links. */
 function Sentence({ view, detail, rank }: { view: Ready; detail: NodeDetail; rank: RankFacts }) {
+  const { caller } = useCaller();
   return (
     <p className="sentence" data-testid="detail-sentence">
-      <Pieces view={view} pieces={sentenceOf(view, detail, rank)} />
+      <Pieces view={view} pieces={sentenceOf(view, detail, rank, caller?.identities)} />
     </p>
   );
 }

@@ -29,7 +29,7 @@ mod property {
     use cairn_schema::{
         AnswerSpec, Cursor, DateLinkKind, DateRuleKind, DateSource, Deployment, Event, Level,
         LevelDisplay, LevelQuery, ListFlag, ListQuery, NextQuery, NodeKey, NodeKind, PatchId,
-        Payload, SnapshotScope, Title, Trace,
+        Payload, SnapshotScope, State, Title, Trace,
     };
     use patina_dst_proptest::prelude::*;
 
@@ -366,6 +366,18 @@ mod property {
 
     fn trace_holds(graph: &Graph, derived: &Derived, traces: &BTreeMap<NodeKey, Trace>) {
         let dependencies = derived.dependencies();
+        // A container that skips what is beneath it (skipped, or a group marked done) waits only on
+        // its kept work, so the containment it ignores is left out of the checks of direct
+        // requirements and ancestors.
+        let skipping = |key: &NodeKey| {
+            let stored = graph.document().state.nodes.get(key).map(|node| node.state);
+            let group = graph
+                .node(key)
+                .is_some_and(|node| node.kind() == NodeKind::Group);
+            stored == Some(State::Skipped)
+                || (group && stored == Some(State::Done))
+                || derived.skips().skipped_by(key).is_some()
+        };
         for (key, trace) in traces {
             for up in &trace.upstream {
                 assert!(
@@ -386,7 +398,10 @@ mod property {
                 );
             }
             for direct in dependencies.of(key, EdgeSet::Full) {
-                if direct.class == EdgeClass::Gate && direct.node != *key {
+                if direct.class == EdgeClass::Gate
+                    && direct.node != *key
+                    && !(skipping(key) && graph.tree().parent(&direct.node) == Some(key))
+                {
                     assert!(
                         trace.upstream.contains(&direct.node),
                         "{} of {key}",
@@ -395,9 +410,11 @@ mod property {
                 }
             }
             let mut ancestor = graph.tree().parent(key);
+            let mut held = true;
             while let Some(above) = ancestor {
+                held &= !skipping(above);
                 assert!(
-                    trace.downstream.contains(above),
+                    trace.downstream.contains(above) || !held,
                     "ancestor {above} of {key}"
                 );
                 ancestor = graph.tree().parent(above);

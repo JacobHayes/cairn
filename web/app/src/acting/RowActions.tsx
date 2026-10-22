@@ -14,7 +14,7 @@ import type { Ready } from "../detail/model.ts";
 import { offered } from "../detail/offers.ts";
 import { OwnerSelect } from "../detail/parts.tsx";
 import { Rejected } from "../detail/Rejected.tsx";
-import { ownerWords, UNASSIGNED } from "../detail/sections.tsx";
+import { NO_OWNER, ownerWords } from "../detail/sections.tsx";
 import { useFormDraft, useNodeWrite, type NodeWrite } from "../detail/write.ts";
 import { doneMutations, evidenceDraft, factsOf, missingEvidence, type EvidenceDraft } from "./acts.ts";
 import type { NodeRow } from "./why.ts";
@@ -22,12 +22,12 @@ import { Tip } from "../ui/Tip.tsx";
 
 /**
  * E1: pick an owner for an unowned row, in the owner's slot: choosing sends it. The picker is
- * always there (a touch or keyboard user never has to find it); on paper the slot says "Unassigned".
+ * always there (a touch or keyboard user never has to find it); on paper the slot says "No owner".
  */
 function AssignInline({ view, write, node }: { view: Ready; write: NodeWrite; node: string }) {
   return (
     <span className="row-assign-slot">
-      <span className="row-owner row-unassigned">{UNASSIGNED}</span>
+      <span className="row-owner row-unassigned">{NO_OWNER}</span>
       <OwnerSelect view={view} write={write} node={node} placeholder="Assign" className="row-assign" testId="assign" />
     </span>
   );
