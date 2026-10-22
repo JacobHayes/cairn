@@ -533,6 +533,12 @@ impl Dates {
         }
     }
 
+    /// The network, for the date relationships read off its constraints.
+    #[must_use]
+    pub(crate) fn network(&self) -> &Network {
+        &self.network
+    }
+
     /// The today the dates were derived for.
     #[must_use]
     pub(crate) fn today(&self) -> Date {
@@ -843,6 +849,7 @@ impl Dates {
                     date: date(asks),
                     source: explain.source_of(position),
                 }),
+            links: Vec::new(),
         }
     }
 }

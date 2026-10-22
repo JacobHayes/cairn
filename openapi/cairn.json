@@ -2428,6 +2428,99 @@
         "minimum": 0,
         "type": "integer"
       },
+      "DateLink": {
+        "description": "One authored date relationship between two nodes.",
+        "oneOf": [
+          {
+            "description": "A due-by or not-before rule on the node, measured from the source.",
+            "properties": {
+              "answer": {
+                "description": "The source is a date decision's answer, not a milestone.",
+                "type": "boolean"
+              },
+              "days": {
+                "description": "The days between them, at least.",
+                "format": "uint32",
+                "minimum": 0,
+                "type": "integer"
+              },
+              "direction": {
+                "$ref": "#/components/schemas/Direction",
+                "description": "Whether the node falls before or after the source."
+              },
+              "kind": {
+                "const": "rule",
+                "type": "string"
+              },
+              "rule": {
+                "$ref": "#/components/schemas/DateRuleKind",
+                "description": "Which rule."
+              }
+            },
+            "required": [
+              "kind",
+              "rule",
+              "direction",
+              "days"
+            ],
+            "type": "object"
+          },
+          {
+            "description": "The stage must finish by its closing milestone.",
+            "properties": {
+              "kind": {
+                "const": "stage_close",
+                "type": "string"
+              }
+            },
+            "required": [
+              "kind"
+            ],
+            "type": "object"
+          },
+          {
+            "description": "The stage opens at the milestone for its dates only; nothing waits for it.",
+            "properties": {
+              "kind": {
+                "const": "stage_opening",
+                "type": "string"
+              }
+            },
+            "required": [
+              "kind"
+            ],
+            "type": "object"
+          },
+          {
+            "description": "The decision's answer sets the milestone's date.",
+            "properties": {
+              "kind": {
+                "const": "fed_date",
+                "type": "string"
+              }
+            },
+            "required": [
+              "kind"
+            ],
+            "type": "object"
+          }
+        ],
+        "properties": {
+          "node": {
+            "$ref": "#/components/schemas/NodeKey",
+            "description": "The node whose rule, bound or answer it is: the rule's node, the stage, the decision."
+          },
+          "source": {
+            "$ref": "#/components/schemas/NodeKey",
+            "description": "The node it reads: the rule's milestone or date decision, the stage's milestone, the\nmilestone the decision sets."
+          }
+        },
+        "required": [
+          "node",
+          "source"
+        ],
+        "type": "object"
+      },
       "DateOrigin": {
         "description": "Where a milestone's effective date comes from (pin, actual, and derived dates are\ntold apart).",
         "oneOf": [
@@ -2555,6 +2648,21 @@
           }
         },
         "type": "object"
+      },
+      "DateRuleKind": {
+        "description": "Which date rule a date relationship is.",
+        "oneOf": [
+          {
+            "const": "due_by",
+            "description": "The node is due before or after its source.",
+            "type": "string"
+          },
+          {
+            "const": "not_before",
+            "description": "The node may not start before or after its source.",
+            "type": "string"
+          }
+        ]
       },
       "DateSource": {
         "anyOf": [
@@ -3092,6 +3200,21 @@
           "kind"
         ],
         "type": "object"
+      },
+      "Direction": {
+        "description": "Which way a date rule points.",
+        "oneOf": [
+          {
+            "const": "before",
+            "description": "The node's instant falls at least `offset` days before each source.",
+            "type": "string"
+          },
+          {
+            "const": "after",
+            "description": "The node's instant falls at least `offset` days after each source.",
+            "type": "string"
+          }
+        ]
       },
       "DisplayState": {
         "description": "The one state every surface shows for a node, composed from relevance, stored state,\neffective skip, auto-done, blocking and snooze, and from the derived flags, which it leaves in\nplace. Stored state is what transitions act on; this is what people and agents read. The\nfirst matching value in this order wins: `not_relevant`, `skipped`, `done`, `snoozed`,\n`active`, `conditional`, `blocked`, `scheduled`, `ready`.",
@@ -5611,6 +5734,13 @@
             ],
             "description": "The drilled-in container; none for the whole journey."
           },
+          "date_links": {
+            "description": "The date relationships between the selected card and the stand-ins of the other ends,\nsorted by their ends; empty when nothing is selected. Not edges: nothing waits on them.",
+            "items": {
+              "$ref": "#/components/schemas/LevelDateLink"
+            },
+            "type": "array"
+          },
           "display": {
             "description": "The relevance classes shown; every class when absent.",
             "items": {
@@ -5658,7 +5788,39 @@
         "required": [
           "shown",
           "nodes",
-          "edges"
+          "edges",
+          "date_links"
+        ],
+        "type": "object"
+      },
+      "LevelDateLink": {
+        "additionalProperties": false,
+        "description": "The date relationships drawn at a level between the stand-ins of their ends.",
+        "properties": {
+          "from": {
+            "$ref": "#/components/schemas/NodeKey",
+            "description": "The stand-in of the earlier end where some relationship fixes the order, else of the\nsource."
+          },
+          "links": {
+            "description": "The relationships it stands for, sorted; never empty.",
+            "items": {
+              "$ref": "#/components/schemas/DateLink"
+            },
+            "type": "array"
+          },
+          "orders": {
+            "description": "Some relationship it stands for fixes the order: the end `to` can never come before\nthe end `from`.",
+            "type": "boolean"
+          },
+          "to": {
+            "$ref": "#/components/schemas/NodeKey",
+            "description": "The stand-in of the later end where some relationship fixes the order, else of the\nnode whose dates they are."
+          }
+        },
+        "required": [
+          "from",
+          "to",
+          "links"
         ],
         "type": "object"
       },
@@ -5690,10 +5852,6 @@
             "$ref": "#/components/schemas/NodeKey",
             "description": "The stand-in of the requirement side."
           },
-          "gates": {
-            "description": "Some underlying edge blocks.",
-            "type": "boolean"
-          },
           "implicit": {
             "description": "Every underlying edge is implicit (drawn dotted).",
             "type": "boolean"
@@ -5713,7 +5871,6 @@
         "required": [
           "from",
           "to",
-          "gates",
           "underlying"
         ],
         "type": "object"
@@ -8588,6 +8745,13 @@
               }
             ],
             "description": "The latest it can start."
+          },
+          "links": {
+            "description": "The date relationships it has directly, in both directions: its own rules, bounds and\nanswer, and the ones that read it. Sorted.",
+            "items": {
+              "$ref": "#/components/schemas/DateLink"
+            },
+            "type": "array"
           },
           "not_before": {
             "description": "The earliest its own not-before rules let it start: the latest of each source's\nearliest date plus the rule's offset. Work or a decision whose date this is, while it\nis after today, is scheduled and must wait for it to finish without a bypass. None\nwhen it has no such rule, or no source has a date.",
@@ -15307,10 +15471,6 @@
             "$ref": "#/components/schemas/NodeKey",
             "description": "The node whose `requires`, condition, or opening it is."
           },
-          "gates": {
-            "description": "It blocks; false for a stage opening with `gates: false`, which holds dates only.",
-            "type": "boolean"
-          },
           "origin": {
             "$ref": "#/components/schemas/EdgeOrigin",
             "description": "How it arose."
@@ -15323,8 +15483,7 @@
         "required": [
           "requirement",
           "dependent",
-          "origin",
-          "gates"
+          "origin"
         ],
         "type": "object"
       },

@@ -514,6 +514,11 @@ pub struct NodeDates {
     /// its finish later. Other shortfalls still apply.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub done_early: Option<DoneEarly>,
+    // PRD: C1.
+    /// The date relationships it has directly, in both directions: its own rules, bounds and
+    /// answer, and the ones that read it. Sorted.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub links: Vec<crate::projection::DateLink>,
 }
 
 // PRD: F6, D8.

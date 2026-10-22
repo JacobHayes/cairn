@@ -111,7 +111,7 @@ function useActions(shown: Derived<Shown>, view: GraphView, selected: string | u
 export function RouteCanvas({ shown, view, selected, edge, unanchored, onPick }: RouteCanvasProps) {
   const navigate = useNavigate();
   const addresses = useNodeAddresses();
-  const { laidOut, overlay, layer, error, faded, badges, tree, trace, line, ...graph } = useGraph(shown, view, selected, edge, unanchored);
+  const { laidOut, overlay, layer, error, faded, badges, tree, trace, line, dates, ...graph } = useGraph(shown, view, selected, edge, unanchored);
   const actions = useActions(shown, view, selected, onPick, tree, layer?.id);
   const reveal = useRevealed(selected);
   const opening = useLineOpening(edge, layer !== undefined);
@@ -144,6 +144,7 @@ export function RouteCanvas({ shown, view, selected, edge, unanchored, onPick }:
       lens={undefined}
       faded={faded}
       selected={selected}
+      dates={dates}
       selectedEdge={opening.selected}
       actions={actions}
       viewKey={refitKey(laidOut, shown.of === "draft" || layer !== undefined)}

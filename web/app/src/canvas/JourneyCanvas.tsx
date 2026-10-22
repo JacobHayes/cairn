@@ -202,6 +202,7 @@ export function JourneyCanvas({ ready, view, selected, edge, onPick, selection }
         emphasis={graph.lit}
         faded={graph.faded}
         selected={alone}
+        dates={graph.dates}
         selectedEdge={line.selected}
         actions={actions}
         viewKey={refitKey(laidOut, view.edit)}

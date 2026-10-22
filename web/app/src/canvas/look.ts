@@ -6,15 +6,15 @@
 import type { Card, Line, LineKind } from "./model.ts";
 import { standsFor, type CanvasOverlay } from "./overlay.ts";
 
-/** C1: the dash pattern of an implicit edge (dotted), and of a line that only holds dates. */
+/** C1: the dash pattern of an implicit edge (dotted), and of a date line (dashed, longer and heavier than the dots so the two never read alike). */
 export const DOTTED = "2 3";
+export const DATED = "6 4";
 
 /** The marker at a line's target end, by what it stands for (5.6): only the end tells a condition from a stage opening. */
-export const MARKERS: Record<LineKind, "arrow" | "diamond" | "bar" | "none"> = {
+export const MARKERS: Record<LineKind, "arrow" | "diamond" | "bar"> = {
   requires: "arrow",
   condition: "diamond",
   stage_opening: "bar",
-  dates: "none",
 };
 
 /** How a line is drawn. */
@@ -28,7 +28,7 @@ export interface LineLook {
 
 /**
  * C1: a line solid when a requirement stands behind it and dotted otherwise (a condition gate,
- * a stage opening, a link that holds dates only), steel, waiting or satisfied,
+ * a stage opening), steel, waiting or satisfied,
  * lit by an overlay in the colour of its direction, and faded to the one level when an overlay
  * dims what it does not light (or, with no overlay, when `faded`: both its cards are unlit).
  */

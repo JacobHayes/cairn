@@ -10,7 +10,8 @@ use std::collections::{BTreeMap, BTreeSet};
 
 use cairn_engine::{DerivedJourney, ProjectionError, Records};
 use cairn_schema::{
-    DisplayState, EdgeOrigin, Level, LevelDisplay, LevelNode, LevelQuery, NodeKind,
+    DateLink, DateLinkKind, DisplayState, EdgeOrigin, Level, LevelDateLink, LevelDisplay,
+    LevelNode, LevelQuery, NodeKind,
 };
 use support::{add_nodes as add, key};
 
@@ -119,10 +120,7 @@ fn every_kind_shown_draws_the_whole_graph() {
         .iter()
         .find(|edge| edge.to.as_str() == "n_setup");
     let opening = opening.unwrap();
-    assert!(
-        opening.implicit && opening.gates,
-        "an opening is a dotted gate"
-    );
+    assert!(opening.implicit, "an opening is a dotted gate");
     assert_eq!(opening.underlying[0].origin, EdgeOrigin::StageOpening);
 }
 
@@ -587,5 +585,369 @@ fn pending_nodes_travel_with_the_conditional_ones() {
     assert_eq!(
         visible(&no, &[Relevant, NotRelevant]),
         ["n_d1", "n_d2", "n_x"]
+    );
+}
+
+/// Each date link as (from, to, orders, what it stands for), the latter as `node source kind`
+/// per relationship, sorted.
+fn date_links(links: &[LevelDateLink]) -> Vec<(String, String, bool, Vec<String>)> {
+    links
+        .iter()
+        .map(|link| {
+            (
+                link.from.as_str().to_owned(),
+                link.to.as_str().to_owned(),
+                link.orders,
+                link.links.iter().map(describe).collect(),
+            )
+        })
+        .collect()
+}
+
+/// Every date link of a level, gathered from the levels that select each of its cards in
+/// turn: a level carries the links around its selected card only.
+fn every_date_link(records: &Records, journey: &str, shown: &[NodeKind]) -> Vec<LevelDateLink> {
+    let shown: BTreeSet<NodeKind> = shown.iter().copied().collect();
+    let cards = level_of(records, journey, &LevelQuery::of_kinds(shown.clone(), None));
+    let mut found: Vec<LevelDateLink> = cards
+        .nodes
+        .iter()
+        .flat_map(|card| {
+            let selecting = LevelQuery {
+                selected: Some(card.key.clone()),
+                ..LevelQuery::of_kinds(shown.clone(), None)
+            };
+            level_of(records, journey, &selecting).date_links
+        })
+        .collect();
+    found.sort_by(|a, b| (&a.from, &a.to).cmp(&(&b.from, &b.to)));
+    found.dedup();
+    found
+}
+
+fn describe(link: &DateLink) -> String {
+    let kind = match &link.kind {
+        DateLinkKind::Rule {
+            rule,
+            direction,
+            days,
+            answer,
+        } => format!(
+            "{rule:?} {direction:?} {days}{}",
+            if *answer { " answer" } else { "" }
+        ),
+        DateLinkKind::StageClose => "close".to_owned(),
+        DateLinkKind::StageOpening => "opening".to_owned(),
+        DateLinkKind::FedDate => "fed".to_owned(),
+    };
+    format!("{} {} {kind}", link.node, link.source)
+}
+
+/// One link standing for one relationship.
+fn single(from: &str, to: &str, orders: bool, link: &str) -> (String, String, bool, Vec<String>) {
+    (
+        from.to_owned(),
+        to.to_owned(),
+        orders,
+        vec![link.to_owned()],
+    )
+}
+
+/// C1: the launch fixture's date relationships, each with its direction by meaning and whether
+/// it fixes an order: closes run stage to milestone, a due-before runs work to the milestone it
+/// is due before, a not-before runs the milestone to the work, and a due-after, which fixes no
+/// order, is drawn from its source to its node.
+#[test]
+fn date_links_say_their_direction_and_whether_they_fix_an_order() {
+    let records = support::finished("product-launch");
+    let mut found = date_links(&every_date_link(&records, "j_launch", &NodeKind::ALL));
+    found.sort();
+    let rule = |node: &str, source: &str, what: &str| format!("{node} {source} {what}");
+    let expected = [
+        single(
+            "n_build",
+            "n_code_freeze",
+            true,
+            "n_build n_code_freeze close",
+        ),
+        single("n_beta", "n_beta_end", true, "n_beta n_beta_end close"),
+        single(
+            "n_code_freeze",
+            "n_launch",
+            true,
+            &rule("n_code_freeze", "n_launch", "DueBy Before 21"),
+        ),
+        single(
+            "n_docs",
+            "n_launch",
+            true,
+            &rule("n_docs", "n_launch", "DueBy Before 7"),
+        ),
+        single(
+            "n_announcement",
+            "n_launch",
+            true,
+            &rule("n_announcement", "n_launch", "DueBy Before 3"),
+        ),
+        single(
+            "n_go_no_go",
+            "n_launch",
+            true,
+            &rule("n_go_no_go", "n_launch", "DueBy Before 1"),
+        ),
+        single(
+            "n_code_freeze",
+            "n_beta_start",
+            true,
+            &rule("n_beta_start", "n_code_freeze", "NotBefore After 2"),
+        ),
+        single(
+            "n_beta_end",
+            "n_announcement",
+            true,
+            &rule("n_announcement", "n_beta_end", "NotBefore After 0"),
+        ),
+        single(
+            "n_launch",
+            "n_retro",
+            true,
+            &rule("n_retro", "n_launch", "NotBefore After 5"),
+        ),
+        single(
+            "n_beta_start",
+            "n_beta_end",
+            false,
+            &rule("n_beta_end", "n_beta_start", "DueBy After 10"),
+        ),
+    ];
+    let mut expected: Vec<_> = expected.into_iter().collect();
+    expected.sort();
+    assert_eq!(found, expected);
+}
+
+/// Every date link of the test journey's whole-graph level for inline nodes.
+fn journey_level(nodes: &[&str]) -> Vec<LevelDateLink> {
+    let records = support::journey(&support::add_nodes(nodes));
+    every_date_link(&records, support::JOURNEY, &NodeKind::ALL)
+}
+
+/// C1, A8: the signed matrix the launch fixture lacks. A zero offset fixes the order in
+/// either direction; a due-after or a not-before-before with days does not; a date answer as
+/// a source never does; a decision that sets a milestone's date is a link that fixes none.
+#[test]
+fn date_links_follow_the_signed_offsets_and_answers() {
+    let level = journey_level(&[
+        "{key: n_m, id: m, kind: milestone, title: M}",
+        "{key: n_d, id: d, kind: decision, title: D, prompt: P, answer_type: date, feeds_milestone: n_m}",
+        "{key: n_a, id: a, kind: action, title: A, due_by: {after: n_m}}",
+        "{key: n_b, id: b, kind: action, title: B, due_by: {before: n_m}}",
+        "{key: n_c, id: c, kind: action, title: C, not_before: {before: n_m}}",
+        "{key: n_e, id: e, kind: action, title: E, not_before: {before: n_m, offset: 3}}",
+        "{key: n_f, id: f, kind: action, title: F, due_by: {before: n_d, offset: 2}}",
+    ]);
+    let mut found = date_links(&level);
+    found.sort();
+    let mut expected = vec![
+        single("n_a", "n_m", true, "n_a n_m DueBy After 0"),
+        single("n_b", "n_m", true, "n_b n_m DueBy Before 0"),
+        single("n_m", "n_c", true, "n_c n_m NotBefore Before 0"),
+        single("n_m", "n_e", false, "n_e n_m NotBefore Before 3"),
+        single("n_d", "n_f", false, "n_f n_d DueBy Before 2 answer"),
+        single("n_m", "n_d", false, "n_d n_m fed"),
+    ];
+    expected.sort();
+    assert_eq!(found, expected);
+}
+
+/// C1: at Stages, the relationships of hidden work roll up into the card holding it and
+/// collapse per pair: two rules into Launch from the materials group make one link that
+/// stands for both, the group's own link to nowhere on its own card is dropped, and a link
+/// that fixes an order marks the whole pair.
+#[test]
+fn date_links_roll_up_to_stand_ins_and_collapse() {
+    let records = support::finished("product-launch");
+    let stages = every_date_link(
+        &records,
+        "j_launch",
+        &[NodeKind::Group, NodeKind::Milestone],
+    );
+    let links = date_links(&stages);
+    let materials = links
+        .iter()
+        .find(|(from, to, _, _)| (from.as_str(), to.as_str()) == ("n_materials", "n_launch"))
+        .expect("the materials group is due before launch");
+    assert!(materials.2);
+    assert_eq!(
+        materials.3,
+        [
+            "n_announcement n_launch DueBy Before 3",
+            "n_docs n_launch DueBy Before 7"
+        ]
+    );
+    assert!(
+        links.iter().all(|(from, to, _, _)| from != to),
+        "none lands on one card"
+    );
+    let underlying: usize = stages.iter().map(|link| link.links.len()).sum();
+    let whole = every_date_link(&records, "j_launch", &NodeKind::ALL);
+    let all: usize = whole.iter().map(|link| link.links.len()).sum();
+    assert!(
+        underlying < all,
+        "the relationships inside a card stand for nothing at this level"
+    );
+}
+
+/// C1: a pair holding an ordering relationship and one that fixes no order is one link, and
+/// it fixes the order.
+#[test]
+fn a_pair_with_one_ordering_relationship_fixes_the_order() {
+    let level = journey_level(&[
+        "{key: n_m, id: m, kind: milestone, title: M}",
+        "{key: n_a, id: a, kind: action, title: A, due_by: {before: n_m, offset: 2}, not_before: {before: n_m, offset: 4}}",
+    ]);
+    assert_eq!(
+        date_links(&level),
+        [(
+            "n_a".to_owned(),
+            "n_m".to_owned(),
+            true,
+            vec![
+                "n_a n_m DueBy Before 2".to_owned(),
+                "n_a n_m NotBefore Before 4".to_owned()
+            ]
+        )]
+    );
+}
+
+/// C1, F2: a relationship whose end relevance ruled out is not a link; one resting on an
+/// undecided decision is kept.
+#[test]
+fn a_ruled_out_end_has_no_date_links() {
+    let decision = "{key: n_d, id: d, kind: decision, title: D, prompt: P, answer_type: boolean}";
+    let nodes = |condition: &str| {
+        [
+            decision.to_owned(),
+            "{key: n_m, id: m, kind: milestone, title: M}".to_owned(),
+            format!(
+                "{{key: n_a, id: a, kind: action, title: A, due_by: {{before: n_m}}, relevant_when: {condition}}}"
+            ),
+            "{key: n_g, id: g, kind: group, title: G, opens_at: n_o, gates: false, closes_at: n_m}"
+                .to_string(),
+            format!("{{key: n_o, id: o, kind: milestone, title: O, relevant_when: {condition}}}"),
+        ]
+    };
+    let level_of = |records: &Records| every_date_link(records, support::JOURNEY, &NodeKind::ALL);
+    let build = |condition: &str, answer: Option<&str>| {
+        let list = nodes(condition);
+        let refs: Vec<&str> = list.iter().map(String::as_str).collect();
+        let records = support::journey(&support::add_nodes(&refs));
+        match answer {
+            Some(value) => support::accepted(
+                &records,
+                &format!("- op: answer\n  decision: n_d\n  value: {{boolean: {value}}}\n"),
+            ),
+            None => records,
+        }
+    };
+    let condition = "{equals: {decision: n_d, value: true}}";
+    let undecided = date_links(&level_of(&build(condition, None)));
+    assert_eq!(undecided.len(), 3, "{undecided:?}");
+    let ruled_in = date_links(&level_of(&build(condition, Some("true"))));
+    assert_eq!(
+        ruled_in, undecided,
+        "answering it the way it asks changes nothing"
+    );
+    let ruled_out = date_links(&level_of(&build(condition, Some("false"))));
+    assert_eq!(
+        ruled_out,
+        [single("n_g", "n_m", true, "n_g n_m close")],
+        "the rule's node and the opening milestone are ruled out; the close stays"
+    );
+}
+
+/// C1, F4, D1: a stage opening that does not gate is a date link and not an edge, and the
+/// stage's work is not blocked while the opening milestone is unreached.
+#[test]
+fn an_opening_that_does_not_gate_is_a_date_link_not_an_edge() {
+    let records = support::journey(&support::add_nodes(&[
+        "{key: n_o, id: o, kind: milestone, title: O}",
+        "{key: n_g, id: g, kind: group, title: G, opens_at: n_o, gates: false}",
+        "{key: n_w, id: w, kind: action, title: W, parent: n_g}",
+    ]));
+    let found = level(&records, support::JOURNEY, &NodeKind::ALL, None);
+    assert!(found.edges.is_empty(), "{:?}", found.edges);
+    assert_eq!(
+        date_links(&every_date_link(&records, support::JOURNEY, &NodeKind::ALL)),
+        [single("n_o", "n_g", true, "n_g n_o opening")]
+    );
+    let derived = support::derived(&records, support::JOURNEY);
+    assert!(!derived.blocking().blocked(&key("n_w")));
+}
+
+/// C8: a node's dates list its direct relationships both ways: the launch milestone's own
+/// rules and the ones that read it.
+#[test]
+fn node_dates_list_direct_links_both_ways() {
+    let records = support::finished("product-launch");
+    let graph = support::journey_graph(&records, "j_launch");
+    let derived = support::derived(&records, "j_launch");
+    let launch = derived.to_schema(&graph).nodes[&key("n_launch")]
+        .dates
+        .links
+        .clone();
+    let mut found: Vec<String> = launch.iter().map(describe).collect();
+    found.sort();
+    assert_eq!(
+        found,
+        [
+            "n_announcement n_launch DueBy Before 3",
+            "n_code_freeze n_launch DueBy Before 21",
+            "n_docs n_launch DueBy Before 7",
+            "n_go_no_go n_launch DueBy Before 1",
+            "n_retro n_launch NotBefore After 5",
+        ]
+    );
+    assert_eq!(
+        derived.node_derived(&graph, &key("n_launch")).dates.links,
+        launch,
+        "one node's detail reads the same relationships"
+    );
+}
+
+/// C1: a level carries the date relationships around its selected card only, so a graph full
+/// of them costs a level nothing until a card is selected.
+#[test]
+fn a_level_carries_date_links_around_the_selected_card_only() {
+    let records = support::finished("product-launch");
+    let kinds: BTreeSet<NodeKind> = NodeKind::ALL.into_iter().collect();
+    let unselected = level_of(
+        &records,
+        "j_launch",
+        &LevelQuery::of_kinds(kinds.clone(), None),
+    );
+    assert_eq!(
+        unselected.date_links,
+        [] as [cairn_schema::LevelDateLink; 0]
+    );
+    let selecting = |name: &str| LevelQuery {
+        selected: Some(key(name)),
+        ..LevelQuery::of_kinds(kinds.clone(), None)
+    };
+    let launch = level_of(&records, "j_launch", &selecting("n_launch")).date_links;
+    assert_ne!(launch, [] as [cairn_schema::LevelDateLink; 0]);
+    assert!(
+        launch
+            .iter()
+            .all(|link| link.from.as_str() == "n_launch" || link.to.as_str() == "n_launch")
+    );
+    let docs = level_of(&records, "j_launch", &selecting("n_docs")).date_links;
+    assert_eq!(
+        date_links(&docs),
+        [single(
+            "n_docs",
+            "n_launch",
+            true,
+            "n_docs n_launch DueBy Before 7"
+        )]
     );
 }

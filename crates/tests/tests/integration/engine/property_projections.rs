@@ -27,8 +27,9 @@ mod property {
     use cairn_engine::{Derived, DerivedJourney, Graph, derive, history};
     use cairn_schema::limits::PAGE_ITEM_COUNT_MAX;
     use cairn_schema::{
-        Cursor, Deployment, Event, Level, LevelDisplay, LevelQuery, ListFlag, ListQuery, NextQuery,
-        NodeKey, NodeKind, PatchId, SnapshotScope, Title, Trace,
+        AnswerSpec, Cursor, DateLinkKind, DateRuleKind, DateSource, Deployment, Event, Level,
+        LevelDisplay, LevelQuery, ListFlag, ListQuery, NextQuery, NodeKey, NodeKind, PatchId,
+        Payload, SnapshotScope, Title, Trace,
     };
     use patina_dst_proptest::prelude::*;
 
@@ -274,12 +275,17 @@ mod property {
                 .or_default() += 1;
         }
         assert!(drawn.values().all(|count| *count == 1), "collapsed once");
+        date_links_hold(graph, derived, level, rules);
         let dependencies = derived.dependencies();
         for edge in dependencies.edges(EdgeSet::Full) {
-            let canvas = matches!(
-                edge.source,
-                EdgeSource::Explicit | EdgeSource::Condition | EdgeSource::StageOpening
-            );
+            let canvas = match edge.source {
+                EdgeSource::Explicit | EdgeSource::Condition => true,
+                EdgeSource::StageOpening => edge.class == EdgeClass::Gate,
+                EdgeSource::Work
+                | EdgeSource::Entry
+                | EdgeSource::Chain
+                | EdgeSource::Containment => false,
+            };
             let requirement = dependencies.key(edge.requirement.node).unwrap();
             let dependent = dependencies.key(edge.dependent.node).unwrap();
             let from = rules.stand_in(graph, requirement);
@@ -291,6 +297,71 @@ mod property {
                 );
             }
         }
+    }
+
+    /// Every due-by and not-before rule with both ends in scope and on different cards, one of
+    /// them the selected card, is among the level's date links, and every rule link the level
+    /// holds is such a rule. A level with no selection holds none.
+    fn date_links_hold(graph: &Graph, derived: &Derived, level: &Level, rules: &Rules) {
+        let in_scope = |key: &NodeKey| derived.relevance().in_scope(key);
+        let card = rules
+            .selection(graph)
+            .and_then(|selected| rules.stand_in(graph, selected));
+        let mut expected: BTreeSet<(NodeKey, NodeKey, DateRuleKind)> = BTreeSet::new();
+        for node in graph.document().nodes.values() {
+            for (rule, found) in [
+                (DateRuleKind::DueBy, &node.due_by),
+                (DateRuleKind::NotBefore, &node.not_before),
+            ] {
+                for source in found.iter().flat_map(|found| found.sources.as_set()) {
+                    let DateSource::Node(source) = source else {
+                        continue;
+                    };
+                    let kind = graph.node(source).map(cairn_schema::Node::kind);
+                    let dated = match kind {
+                        Some(NodeKind::Milestone) => true,
+                        Some(NodeKind::Decision) => matches!(
+                            graph.node(source).map(|found| &found.payload),
+                            Some(Payload::Decision(decision))
+                                if matches!(decision.answer, AnswerSpec::Date { .. })
+                        ),
+                        _ => false,
+                    };
+                    let ends = (
+                        rules.stand_in(graph, &node.key),
+                        rules.stand_in(graph, source),
+                    );
+                    if dated
+                        && in_scope(&node.key)
+                        && in_scope(source)
+                        && matches!(&ends, (Some(a), Some(b)) if a != b
+                            && (card.as_ref() == Some(a) || card.as_ref() == Some(b)))
+                    {
+                        expected.insert((node.key.clone(), source.clone(), rule));
+                    }
+                }
+            }
+        }
+        let mut found: BTreeSet<(NodeKey, NodeKey, DateRuleKind)> = BTreeSet::new();
+        for link in &level.date_links {
+            assert_ne!(link.from, link.to, "no date link onto one card");
+            assert_ne!(link.links, [] as [cairn_schema::DateLink; 0]);
+            for stands_for in &link.links {
+                let ends = [
+                    rules.stand_in(graph, &stands_for.node),
+                    rules.stand_in(graph, &stands_for.source),
+                ];
+                assert!(
+                    ends.contains(&Some(link.from.clone()))
+                        && ends.contains(&Some(link.to.clone())),
+                    "a date link joins the stand-ins of its relationships' ends"
+                );
+                if let DateLinkKind::Rule { rule, .. } = stands_for.kind {
+                    found.insert((stands_for.node.clone(), stands_for.source.clone(), rule));
+                }
+            }
+        }
+        assert_eq!(found, expected, "the rule links are the rules");
     }
 
     fn trace_holds(graph: &Graph, derived: &Derived, traces: &BTreeMap<NodeKey, Trace>) {

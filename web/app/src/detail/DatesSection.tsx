@@ -5,11 +5,13 @@
 // routes through a feeding decision when there is one (E3).
 import type { ReactNode } from "react";
 
+import { dateLinkSentence } from "../canvas/dates.ts";
 import { dateWords, originWord } from "../status/when.ts";
 import { ChainView } from "./ChainView.tsx";
+import { foldKey } from "./folds.ts";
 import type { Bound } from "./explain.ts";
-import type { Mutation, NodeDetail, Ready } from "./model.ts";
-import { Section } from "./parts.tsx";
+import { nodeOf, titleOf, type Mutation, type NodeDetail, type Ready } from "./model.ts";
+import { NodeLink, Section } from "./parts.tsx";
 import { ShortfallView } from "./ShortfallView.tsx";
 
 /** F7: where a bound comes from. */
@@ -59,6 +61,32 @@ function Actuals({ view, detail }: { view: Ready; detail: NodeDetail }) {
       {started == null ? null : <span>Started <strong>{dateWords(started, view.derived.today)}</strong></span>}
       {finished == null ? null : <span>Finished <strong>{dateWords(finished, view.derived.today)}</strong></span>}
     </div>
+  );
+}
+
+/**
+ * C1, C8: the node's date relationships in both directions (its due-by and not-before rules, its
+ * stage's close, an opening that holds dates only, a decision that sets a milestone's date), each
+ * as the sentence the canvas says on hover, with the other node as a link. This is where every date
+ * line the canvas draws for the node is read and followed, with the keyboard or by touch.
+ */
+export function LinkedDates({ view, detail }: { view: Ready; detail: NodeDetail }) {
+  const key = detail.node.key;
+  const { links = [] } = detail.derived.dates;
+  if (links.length === 0) {
+    return null;
+  }
+  const part = (node: string) => (node === key ? <strong key={node}>{titleOf(view, node)}</strong> : <NodeLink key={node} view={view} node={node} />);
+  return (
+    <Section title="Linked dates" summary={String(links.length)} testId="linked-dates" fold={foldKey(detail.node.kind, "linked-dates")}>
+      <ul className="stack linked-dates">
+        {links.map((link) => (
+          <li key={`${link.node}|${link.source}|${link.kind}|${"rule" in link ? link.rule : ""}`} data-node={link.node === key ? link.source : link.node}>
+            {dateLinkSentence(link, part(link.node), part(link.source), { decision: nodeOf(view, link.node)?.kind === "decision" })}
+          </li>
+        ))}
+      </ul>
+    </Section>
   );
 }
 

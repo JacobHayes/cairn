@@ -311,8 +311,9 @@ async function stageHeadsAndTracedOpacity(page: Page): Promise<void> {
   await expect(nodeCard(page, "n_final_review").getByTestId("card-head-chip")).toHaveCount(0);
   // Tracing a card puts what is outside the trace at a third, done or not: the levels are never multiplied.
   await nodeCard(page, "n_final_review").getByTestId("card-open").click({ force: true });
-  await expect(nodeCard(page, "n_decision_meeting")).toHaveCSS("opacity", "0.3");
   await expect(nodeCard(page, "n_purpose")).toHaveCSS("opacity", "0.3");
+  // The final review closes at the decision meeting: that card is the far end of its date line, so it stays in focus.
+  await expect(nodeCard(page, "n_decision_meeting")).toHaveCSS("opacity", "1");
   await expect(nodeCard(page, "n_kickoff")).toHaveCSS("opacity", "0.5");
 }
 
@@ -358,4 +359,60 @@ test("C1, C2: a line is selectable only where the view's own level draws it, an 
   await expect(page.getByTestId("edge-missing")).toBeVisible();
   await expect(page.getByRole("link", { name: "Go to Environment access" })).toBeVisible();
   await expect(page.getByRole("link", { name: "Go to Test plan" })).toBeVisible();
+});
+
+test("C1: date relationships are drawn only for the one selected node, both ways, with an arrowhead where the order is fixed, open no card, and are listed in the inspector's linked dates", async ({ page }) => {
+  await visit(page, "browser", "/journeys/j_launch?view=graph&depth=actions");
+  await expect(nodeCard(page, "n_launch")).toBeVisible();
+  const dates = page.locator('[data-kind="dates"]');
+  // At rest no date relationship is drawn.
+  await expect(dates).toHaveCount(0);
+  // Documentation is due before the launch: one line, with the later end marked.
+  await nodeCard(page, "n_docs").getByTestId("card-open").click();
+  await expect(nodePanel(page, "n_docs")).toBeVisible();
+  await expect(dates).toHaveCount(1);
+  await expect(dates.first()).toHaveAttribute("data-marker", "open");
+  const address = page.url();
+  await dates.first().dispatchEvent("click");
+  expect(page.url()).toBe(address);
+  // The launch has five relationships; the trace fades what it does not reach to a third, and none of the far ends is.
+  await nodeCard(page, "n_launch").getByTestId("card-open").click();
+  await expect(nodePanel(page, "n_launch")).toBeVisible();
+  await expect(dates).toHaveCount(5);
+  for (const far of ["n_docs", "n_announcement", "n_go_no_go", "n_code_freeze", "n_retro"]) {
+    await expect(nodeCard(page, far), far).not.toHaveCSS("opacity", "0.3");
+  }
+  // The inspector lists them, and a link in it selects that node.
+  const linked = page.getByTestId("linked-dates");
+  await expect(linked).toBeVisible();
+  await linked.locator("summary").click();
+  await expect(linked.locator("li")).toHaveCount(5);
+  await linked.locator('li[data-node="n_docs"] a').first().click();
+  await expect(nodePanel(page, "n_docs")).toBeVisible();
+  await expect(dates).toHaveCount(1);
+  // Deselecting clears them, and a multi-selection draws none.
+  await page.keyboard.press("Escape");
+  await expect(dates).toHaveCount(0);
+  await nodeCard(page, "n_launch").getByTestId("card-open").click();
+  await expect(dates).toHaveCount(5);
+  await nodeCard(page, "n_docs").click({ modifiers: ["Shift"] });
+  await expect(dates).toHaveCount(0);
+});
+
+test("C1: a date line's far end stays in focus under Frontier, and a published route's inspector lists the same relationships", async ({ page }) => {
+  await visit(page, "browser", "/journeys/j_launch?view=graph&depth=actions");
+  await expect(nodeCard(page, "n_launch")).toBeVisible();
+  await page.getByTestId("chip-frontier").click();
+  // Launch is not on the frontier, so Frontier dims it; Documentation's line to it keeps it in focus.
+  await expect(nodeCard(page, "n_launch")).toHaveCSS("opacity", "0.3");
+  await nodeCard(page, "n_docs").getByTestId("card-open").click();
+  await expect(page.locator('[data-kind="dates"]')).toHaveCount(1);
+  await expect(nodeCard(page, "n_launch")).not.toHaveCSS("opacity", "0.3");
+  // A route's version reads the same relationships in its inspector.
+  await visit(page, "browser", "/routes/product-launch/nodes/n_launch?version=1&view=graph");
+  const linked = page.getByTestId("linked-dates");
+  await expect(linked).toBeVisible();
+  await linked.locator("summary").click();
+  await expect(linked.locator("li")).toHaveCount(5);
+  await expect(page.locator('[data-kind="dates"]')).toHaveCount(5);
 });

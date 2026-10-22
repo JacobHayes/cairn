@@ -19,6 +19,8 @@ use crate::derived::{
     RelevanceExplanation, Score, StaleConsequence, StallCause, Stalled,
 };
 use crate::limits::Limit;
+use crate::node::Direction;
+use crate::projection::{DateLink, DateLinkKind, DateRuleKind};
 use crate::rejection::{
     Location, Rejection, RevisionConflict, RevisionOf, Violation, ViolationCode, Violations,
 };
@@ -255,6 +257,29 @@ fn arb_explained() -> BoxedStrategy<Explained<Contribution>> {
         .boxed()
 }
 
+fn arb_date_link() -> BoxedStrategy<DateLink> {
+    let kind = prop_oneof![
+        (
+            prop::sample::select(vec![DateRuleKind::DueBy, DateRuleKind::NotBefore]),
+            prop::sample::select(vec![Direction::Before, Direction::After]),
+            0u32..60,
+            any::<bool>(),
+        )
+            .prop_map(|(rule, direction, days, answer)| DateLinkKind::Rule {
+                rule,
+                direction,
+                days,
+                answer
+            }),
+        Just(DateLinkKind::StageClose),
+        Just(DateLinkKind::StageOpening),
+        Just(DateLinkKind::FedDate),
+    ];
+    (arb_node_key(), arb_node_key(), kind)
+        .prop_map(|(node, source, kind)| DateLink { node, source, kind })
+        .boxed()
+}
+
 fn arb_node_dates() -> BoxedStrategy<NodeDates> {
     let bound = || {
         prop::option::of((arb_date(), arb_chain()).prop_map(|(date, chain)| Bound { date, chain }))
@@ -273,6 +298,7 @@ fn arb_node_dates() -> BoxedStrategy<NodeDates> {
             prop::option::of(arb_date()),
         ),
         prop::option::of((1u32..60, arb_date(), arb_constraint_source())),
+        prop::collection::vec(arb_date_link(), 0..3),
     )
         .prop_map(
             |(
@@ -283,6 +309,7 @@ fn arb_node_dates() -> BoxedStrategy<NodeDates> {
                 shortfall,
                 (effective, not_before),
                 early,
+                links,
             )| {
                 NodeDates {
                     earliest_start,
@@ -294,6 +321,7 @@ fn arb_node_dates() -> BoxedStrategy<NodeDates> {
                     effective_date: effective.map(|(date, origin)| EffectiveDate { date, origin }),
                     not_before,
                     done_early: early.map(|(days, date, source)| DoneEarly { days, date, source }),
+                    links,
                 }
             },
         )

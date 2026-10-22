@@ -18,6 +18,8 @@ import { edgeWords } from "./words.ts";
 export type Level = Schema<"Level">;
 export type LevelNode = Schema<"LevelNode">;
 export type LevelEdge = Schema<"LevelEdge">;
+export type LevelDateLink = Schema<"LevelDateLink">;
+export type DateLink = Schema<"DateLink">;
 export type Relevance = Schema<"Relevance">;
 export type LevelDisplay = Schema<"LevelDisplay">;
 export type Trace = Schema<"Trace">;
@@ -139,11 +141,11 @@ export interface CardState {
   current: boolean;
 }
 
-/** How an edge is drawn (5.6), strongest first: a requirement, a condition gate, a stage opening, or dates alone. */
-export type LineKind = "requires" | "condition" | "stage_opening" | "dates";
+/** How an edge is drawn (5.6), strongest first: a requirement, a condition gate, or a stage opening. Every one holds its dependent back; date relationships are not edges (`DateLine`). */
+export type LineKind = "requires" | "condition" | "stage_opening";
 
 /** The kinds of line, strongest first. */
-export const LINE_KINDS: readonly LineKind[] = ["requires", "condition", "stage_opening", "dates"];
+export const LINE_KINDS: readonly LineKind[] = ["requires", "condition", "stage_opening"];
 
 /**
  * One edge of the graph a line stands for (C1): `dependent` waits on `requirement`. Where the
@@ -180,6 +182,23 @@ export interface Line {
   selectable: boolean;
 }
 
+/**
+ * C1: the date relationships between two cards (a due-by or not-before rule, a stage's close,
+ * an opening that holds dates only, a date decision that sets a milestone), kept for the
+ * selected node to draw. Not an edge: nothing waits on it.
+ */
+export interface DateLine {
+  id: string;
+  from: string;
+  to: string;
+  /** Some relationship it stands for fixes the order: `to` can never come before `from`. */
+  orders: boolean;
+  /** The relationships it stands for, each with its words. */
+  entries: { link: DateLink; words: string }[];
+  /** What hovering it says, in words. */
+  sentence: string;
+}
+
 /** The cards a line joins, as an address names them (`<from>~<to>`); none unless it names exactly two. */
 export function endsOf(edge: string): { from: string; to: string } | undefined {
   const [from, to, ...rest] = edge.split("~");
@@ -211,13 +230,10 @@ function nodesOf(graph: GraphNode[]): Nodes {
   return new Map(graph.map((node) => [node.key, node]));
 }
 
-/** Which line style wins where several edges stand in one line: solid over condition over stage opening over dates. */
-export const STRENGTH: Record<LineKind, number> = { requires: 3, condition: 2, stage_opening: 1, dates: 0 };
+/** Which line style wins where several edges stand in one line: solid over condition over stage opening. */
+export const STRENGTH: Record<LineKind, number> = { requires: 3, condition: 2, stage_opening: 1 };
 
 function kindOf(edge: Schema<"UnderlyingEdge">): LineKind {
-  if (!edge.gates) {
-    return "dates";
-  }
   return edge.origin === "explicit" ? "requires" : edge.origin;
 }
 
@@ -258,7 +274,7 @@ function inside(parents: Map<string, string | null | undefined>, inner: string, 
  */
 export function lineOf(id: string, from: string, to: string, links: readonly LineLink[]): Line {
   const edges = [...links].sort((one, other) => STRENGTH[other.kind] - STRENGTH[one.kind]);
-  const kind = edges[0]?.kind ?? "dates";
+  const kind = edges[0]?.kind ?? "requires";
   const strongest = edges.filter((each) => each.kind === kind).map((each) => each.sentence);
   return {
     id,
@@ -283,15 +299,15 @@ export function lineOf(id: string, from: string, to: string, links: readonly Lin
  */
 export function linesOf(level: Level, graph: GraphNode[], waiting?: (edge: Schema<"UnderlyingEdge">) => boolean): Line[] {
   const nodes = nodesOf(graph);
-  const cardFor = standIn(level, nodes);
-  const parents = new Map(level.nodes.map((at) => [at.key, at.parent]));
+  const ends = retargeted(level, graph);
   const holders = new Set(graph.flatMap((node) => (node.parent == null ? [] : [node.parent])));
   const joined = new Map<string, { from: string; to: string; links: LineLink[] }>();
   for (const edge of level.edges) {
-    const [from, to] = [cardFor(edge.from), cardFor(edge.to)];
-    if (from === undefined || to === undefined || from === to || inside(parents, from, to) || inside(parents, to, from)) {
+    const found = ends(edge.from, edge.to);
+    if (found === undefined) {
       continue;
     }
+    const { from, to } = found;
     const id = lineIdOf(from, to);
     const line = joined.get(id) ?? { from, to, links: [] };
     joined.set(id, line);
@@ -302,12 +318,27 @@ export function linesOf(level: Level, graph: GraphNode[], waiting?: (edge: Schem
   return [...joined.entries()].map(([id, line]) => lineOf(id, line.from, line.to, line.links));
 }
 
+/**
+ * Where a relationship between two nodes of the level is drawn: between the cards that stand for
+ * them (the card a node is rolled up into, or the nearest card holding it). None when either has
+ * no card, or both land on one card or on a card and one inside it (a node's relationship with its
+ * own child): nothing is drawn between those.
+ */
+export function retargeted(level: Level, graph: GraphNode[]): (from: string, to: string) => { from: string; to: string } | undefined {
+  const cardFor = standIn(level, nodesOf(graph));
+  const parents = new Map(level.nodes.map((at) => [at.key, at.parent]));
+  return (from, to) => {
+    const [first, second] = [cardFor(from), cardFor(to)];
+    return first === undefined || second === undefined || first === second || inside(parents, first, second) || inside(parents, second, first) ? undefined : { from: first, to: second };
+  };
+}
+
 function linkOf(edge: Schema<"UnderlyingEdge">, nodes: Nodes, holders: ReadonlySet<string>, waiting: ((edge: Schema<"UnderlyingEdge">) => boolean) | undefined): LineLink {
   const link = { requirement: edge.requirement, dependent: edge.dependent, kind: kindOf(edge), holds: holders.has(edge.dependent), sentence: "" };
   return {
     ...link,
     sentence: edgeWords(link, nodeTitle(nodes.get(edge.dependent)?.title), nodeTitle(nodes.get(edge.requirement)?.title)),
-    ...(waiting === undefined ? {} : { waits: edge.gates && waiting(edge) }),
+    ...(waiting === undefined ? {} : { waits: waiting(edge) }),
   };
 }
 

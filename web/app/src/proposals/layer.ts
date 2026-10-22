@@ -214,6 +214,7 @@ export function withRemoved(after: CanvasModel, before: CanvasModel | undefined,
       shrunk.set(card.key, lost);
     }
   }
+  // The layer draws no date line, so the cards' own are carried unchanged.
   return { model: { cards, lines: [...lines.values()] }, removedLines, shrunk };
 }
 

@@ -50,6 +50,7 @@ mod cost {
             assert!(level.nodes.len() <= nodes);
             let underlying: usize = level.edges.iter().map(|edge| edge.underlying.len()).sum();
             assert!(level.edges.len() <= underlying && underlying <= canvas);
+            assert!(level.date_links.is_empty(), "no selection, no date links");
         }
         let filtered = {
             let query = LevelQuery {
@@ -89,6 +90,32 @@ mod cost {
                 .unwrap()
         };
         assert!(selected.nodes.iter().any(|node| node.key == deepest));
+        date_links_stay_around_the_selected_card(journey, &deepest, nodes);
+    }
+
+    /// The date links of a selected card: at most one per card, each touching it.
+    fn date_links_stay_around_the_selected_card(
+        journey: &DerivedJourney<'_>,
+        selected: &NodeKey,
+        nodes: usize,
+    ) {
+        let around = journey
+            .level(
+                &LevelQuery {
+                    selected: Some(selected.clone()),
+                    ..LevelQuery::of_kinds(NodeKind::ALL.into_iter().collect(), None)
+                },
+                &Deployment::default(),
+                &BTreeSet::new(),
+            )
+            .unwrap();
+        assert!(around.date_links.len() <= nodes);
+        assert!(
+            around
+                .date_links
+                .iter()
+                .all(|link| &link.from == selected || &link.to == selected)
+        );
     }
 
     #[test]

@@ -1814,6 +1814,39 @@ export interface components {
          *     same journey revision and derive inputs; a page read at another revision starts over.
          */
         Cursor: number;
+        /** @description One authored date relationship between two nodes. */
+        DateLink: {
+            /** @description The node whose rule, bound or answer it is: the rule's node, the stage, the decision. */
+            node: components["schemas"]["NodeKey"];
+            /**
+             * @description The node it reads: the rule's milestone or date decision, the stage's milestone, the
+             *     milestone the decision sets.
+             */
+            source: components["schemas"]["NodeKey"];
+        } & ({
+            /** @description The source is a date decision's answer, not a milestone. */
+            answer?: boolean;
+            /**
+             * Format: uint32
+             * @description The days between them, at least.
+             */
+            days: number;
+            /** @description Whether the node falls before or after the source. */
+            direction: components["schemas"]["Direction"];
+            /** @constant */
+            kind: "rule";
+            /** @description Which rule. */
+            rule: components["schemas"]["DateRuleKind"];
+        } | {
+            /** @constant */
+            kind: "stage_close";
+        } | {
+            /** @constant */
+            kind: "stage_opening";
+        } | {
+            /** @constant */
+            kind: "fed_date";
+        });
         /**
          * @description Where a milestone's effective date comes from (pin, actual, and derived dates are
          *     told apart).
@@ -1837,6 +1870,8 @@ export interface components {
             before?: components["schemas"]["DateSource"] | components["schemas"]["DateSource"][];
             offset?: components["schemas"]["Days"];
         } & (unknown | unknown);
+        /** @description Which date rule a date relationship is. */
+        DateRuleKind: "due_by" | "not_before";
         DateSource: "journey.created_at" | components["schemas"]["Path"];
         DateSourceResolved: "journey.created_at" | components["schemas"]["NodeKey"];
         Days: number;
@@ -1993,6 +2028,8 @@ export interface components {
             /** @description A journey's status. */
             status?: components["schemas"]["JourneyStatus"] | null;
         };
+        /** @description Which way a date rule points. */
+        Direction: "before" | "after";
         /**
          * @description The one state every surface shows for a node, composed from relevance, stored state,
          *     effective skip, auto-done, blocking and snooze, and from the derived flags, which it leaves in
@@ -2782,6 +2819,11 @@ export interface components {
             collapsed?: components["schemas"]["NodeKey"][];
             /** @description The drilled-in container; none for the whole journey. */
             container?: components["schemas"]["NodeKey"] | null;
+            /**
+             * @description The date relationships between the selected card and the stand-ins of the other ends,
+             *     sorted by their ends; empty when nothing is selected. Not edges: nothing waits on them.
+             */
+            date_links: components["schemas"]["LevelDateLink"][];
             /** @description The relevance classes shown; every class when absent. */
             display?: components["schemas"]["LevelDisplay"][];
             /** @description The edges, sorted by their ends. */
@@ -2805,6 +2847,26 @@ export interface components {
             /** @description The kinds shown. */
             shown: components["schemas"]["NodeKind"][];
         };
+        /** @description The date relationships drawn at a level between the stand-ins of their ends. */
+        LevelDateLink: {
+            /**
+             * @description The stand-in of the earlier end where some relationship fixes the order, else of the
+             *     source.
+             */
+            from: components["schemas"]["NodeKey"];
+            /** @description The relationships it stands for, sorted; never empty. */
+            links: components["schemas"]["DateLink"][];
+            /**
+             * @description Some relationship it stands for fixes the order: the end `to` can never come before
+             *     the end `from`.
+             */
+            orders?: boolean;
+            /**
+             * @description The stand-in of the later end where some relationship fixes the order, else of the
+             *     node whose dates they are.
+             */
+            to: components["schemas"]["NodeKey"];
+        };
         /**
          * @description Which nodes a level shows by how their relevance reads to a person. A node is
          *     `relevant` when it applies; `conditional` when it may apply (its relevance is undecided,
@@ -2820,8 +2882,6 @@ export interface components {
         LevelEdge: {
             /** @description The stand-in of the requirement side. */
             from: components["schemas"]["NodeKey"];
-            /** @description Some underlying edge blocks. */
-            gates: boolean;
             /** @description Every underlying edge is implicit (drawn dotted). */
             implicit?: boolean;
             /** @description The stand-in of the dependent side. */
@@ -3479,6 +3539,11 @@ export interface components {
             effective_date?: components["schemas"]["EffectiveDate"] | null;
             /** @description The latest it can start. */
             latest_start?: components["schemas"]["Bound"] | null;
+            /**
+             * @description The date relationships it has directly, in both directions: its own rules, bounds and
+             *     answer, and the ones that read it. Sorted.
+             */
+            links?: components["schemas"]["DateLink"][];
             /**
              * Format: date
              * @description The earliest its own not-before rules let it start: the latest of each source's
@@ -5660,8 +5725,6 @@ export interface components {
         UnderlyingEdge: {
             /** @description The node whose `requires`, condition, or opening it is. */
             dependent: components["schemas"]["NodeKey"];
-            /** @description It blocks; false for a stage opening with `gates: false`, which holds dates only. */
-            gates: boolean;
             /** @description How it arose. */
             origin: components["schemas"]["EdgeOrigin"];
             /** @description The node waited on. */

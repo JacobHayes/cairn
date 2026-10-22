@@ -16,11 +16,13 @@
 use std::collections::{BTreeMap, BTreeSet};
 
 use cairn_schema::{
-    Blocker, Contribution, DependencyVia, EffectiveParticipation, Explained, Guard, GuardFailure,
-    KindKey, NodeDerived, NodeKey, Progress, Real, Relevance, RelevanceExplanation, State,
+    Blocker, Contribution, DateLink, DependencyVia, EffectiveParticipation, Explained, Guard,
+    GuardFailure, KindKey, NodeDates, NodeDerived, NodeKey, Progress, Real, Relevance,
+    RelevanceExplanation, State,
 };
 
 use super::dependencies::EdgeSet;
+use super::links::date_links_by_node;
 use super::relevance::Producer;
 use super::stale::{Annotated, annotated_nodes, static_failures};
 use super::{Derived, held_by, stored_state};
@@ -40,6 +42,7 @@ impl Derived {
     pub fn to_schema(&self, graph: &Graph) -> cairn_schema::Derived {
         let mut progress = self.progress(graph);
         let annotated = annotated_nodes(graph.document());
+        let mut links = date_links_by_node(&self.authored_links(graph));
         let nodes: BTreeMap<NodeKey, NodeDerived> = graph
             .document()
             .nodes
@@ -49,7 +52,13 @@ impl Derived {
                 let progress = progress.remove(key);
                 (
                     key.clone(),
-                    self.node_with(graph, key, progress, &annotated),
+                    self.node_with(
+                        graph,
+                        key,
+                        progress,
+                        &annotated,
+                        links.remove(key).unwrap_or_default(),
+                    ),
                 )
             })
             .collect();
@@ -77,7 +86,13 @@ impl Derived {
     #[must_use]
     pub fn node_derived(&self, graph: &Graph, key: &NodeKey) -> NodeDerived {
         let progress = self.progress(graph).remove(key);
-        self.node_with(graph, key, progress, &annotated_nodes(graph.document()))
+        self.node_with(
+            graph,
+            key,
+            progress,
+            &annotated_nodes(graph.document()),
+            self.date_links_of(graph, key),
+        )
     }
 
     /// [`Derived::node_derived`] with the shared reads done once by the caller.
@@ -87,6 +102,7 @@ impl Derived {
         key: &NodeKey,
         progress: Option<Progress>,
         annotated: &Annotated<'_>,
+        date_links: Vec<DateLink>,
     ) -> NodeDerived {
         let blocking = &self.blocking;
         let priority = &self.priority;
@@ -108,7 +124,10 @@ impl Derived {
             membership_lost: !self.participation.membership_lost(key).is_empty(),
             stale: self.stale(graph, key),
             overdue: self.dates.overdue(key),
-            dates: self.dates.node(graph, key),
+            dates: NodeDates {
+                links: date_links,
+                ..self.dates.node(graph, key)
+            },
             progress,
             failing_guards: self.failing_guards(graph, key, annotated),
             started_early: self.started_early(graph, key),

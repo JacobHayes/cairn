@@ -68,6 +68,9 @@ export function standsFor(card: Card): string[] {
   return [card.key, ...card.rolledUp];
 }
 
+/** C1: what a card at the far end of the selected node's date line carries: a mark that keeps it in focus and says nothing. */
+export const DATED_MARK: OverlayMark = { tone: "plain", label: "dates", quiet: true };
+
 function markOf(card: Card, trace: Trace, sets: { up: Set<string>; down: Set<string>; contributors: Set<string> }): OverlayMark | undefined {
   const keys = standsFor(card);
   if (keys.includes(trace.node)) {
@@ -92,13 +95,15 @@ function markOf(card: Card, trace: Trace, sets: { up: Set<string>; down: Set<str
  * its source is needed and its target is needed or holds something needed (the node itself
  * included, so the containers around it count); downstream (accent) when its target is unblocked
  * and its source is unblocked or holds something unblocked; any other line rests. Rolled-up ends
- * follow their card's marks, and a line's kind or finished state never matters.
+ * follow their card's marks, and a line's kind or finished state never matters. `dated` are the
+ * cards at the far end of the selected node's date lines: kept in focus, with no tag.
  */
-export function traceOverlay(trace: Trace, model: CanvasModel, title: string): CanvasOverlay {
+export function traceOverlay(trace: Trace, model: CanvasModel, title: string, dated: ReadonlySet<string> = new Set()): CanvasOverlay {
   const sets = { up: new Set(trace.upstream), down: new Set(trace.downstream), contributors: new Set(trace.gravity_contributors) };
   const marks: Record<string, OverlayMark> = {};
   for (const card of model.cards) {
-    const mark = markOf(card, trace, sets);
+    // The card at the far end of a date line stays in focus without a tag: it is not part of the trace.
+    const mark = markOf(card, trace, sets) ?? (dated.has(card.key) ? DATED_MARK : undefined);
     if (mark !== undefined) {
       marks[card.key] = mark;
     }

@@ -186,6 +186,20 @@ async fn the_snapshot_and_its_lists_agree() {
     });
     let level = world.ok(&ann, "get_level", level).await;
     assert_eq!(level["collapsed"], json!(["n_setup"]));
+    // Date relationships come with a selected node, between its card and the others.
+    let plain = world
+        .ok(&ann, "get_level", json!({ "journey": "j_vendor_eval" }))
+        .await;
+    assert!(plain.get("date_links").is_none());
+    let selected = json!({ "journey": "j_vendor_eval", "selected": "n_final_review" });
+    let selected = world.ok(&ann, "get_level", selected).await;
+    let links = selected["date_links"].as_array().expect("date links");
+    assert_ne!(links.len(), 0);
+    assert!(
+        links
+            .iter()
+            .all(|link| { link["from"] == "n_final_review" || link["to"] == "n_final_review" })
+    );
 }
 
 /// Creates `j_many`, an empty journey with `count` unrelated actions, all on its frontier.

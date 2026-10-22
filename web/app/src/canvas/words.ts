@@ -80,12 +80,13 @@ export const LINE_KIND_WORDS: Record<LineKind, { label: string; key: string }> =
   requires: { label: "Needs", key: "the line ends in an arrow." },
   condition: { label: "Applies only if", key: "the line ends in a hollow diamond." },
   stage_opening: { label: "Waits for the stage to open", key: "the line ends in a bar." },
-  dates: { label: "Dates only", key: "a faint dotted line that does not block." },
 };
 
+/** What the Key says of a date relationship, which is drawn for the selected node only and is not a kind of edge. */
+export const DATE_LINE_KEY = "Dates: a dashed line, shown for the selected node; an open arrowhead marks the later end when the order is fixed.";
+
 /**
- * C1: what one edge says, in words: why the dependent waits on the requirement, or for a link that
- * holds dates only, that it does not. The ends are whatever the caller passes (plain titles for a
+ * C1: what one edge says, in words: why the dependent waits on the requirement. The ends are whatever the caller passes (plain titles for a
  * hover, links for a card), so the two say the same thing.
  */
 export function edgeSentence<T>(edge: Pick<LineLink, "kind" | "holds">, dependent: T, requirement: T): (T | string)[] {
@@ -96,8 +97,6 @@ export function edgeSentence<T>(edge: Pick<LineLink, "kind" | "holds">, dependen
       return [dependent, " applies only depending on ", requirement, ", and waits for it"];
     case "stage_opening":
       return [dependent, " opens at ", requirement, "; it and everything inside it wait for that"];
-    case "dates":
-      return [dependent, " takes its dates from ", requirement, ", where it opens; nothing waits on it"];
   }
 }
 
@@ -106,14 +105,14 @@ export function edgeWords(edge: Pick<LineLink, "kind" | "holds">, dependent: str
   return edgeSentence(edge, dependent, requirement).join("");
 }
 
-/** Whether a line still holds anything back, in words; none for a line that holds dates only, or where there is no state. */
-export function lineWaitWords(line: Pick<Line, "kind" | "satisfied">): string | undefined {
-  return line.kind === "dates" || line.satisfied === undefined ? undefined : line.satisfied ? "holds nothing back now" : "still waiting";
+/** Whether a line still holds anything back, in words; none where there is no state. */
+export function lineWaitWords(line: Pick<Line, "satisfied">): string | undefined {
+  return line.satisfied === undefined ? undefined : line.satisfied ? "holds nothing back now" : "still waiting";
 }
 
-/** Whether an edge still holds its dependent back, in words; none for a link that holds dates only, or where there is no state. */
-export function waitWords(edge: Pick<LineLink, "kind" | "waits">): string | undefined {
-  if (edge.kind === "dates" || edge.waits === undefined) {
+/** Whether an edge still holds its dependent back, in words; none where there is no state. */
+export function waitWords(edge: Pick<LineLink, "waits">): string | undefined {
+  if (edge.waits === undefined) {
     return undefined;
   }
   return edge.waits ? "still waiting" : "holds nothing back now";

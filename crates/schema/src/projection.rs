@@ -89,9 +89,6 @@ pub struct UnderlyingEdge {
     pub dependent: NodeKey,
     /// How it arose.
     pub origin: EdgeOrigin,
-    // PRD: D1.
-    /// It blocks; false for a stage opening with `gates: false`, which holds dates only.
-    pub gates: bool,
 }
 
 // PRD: C2.
@@ -108,10 +105,83 @@ pub struct LevelEdge {
     /// Every underlying edge is implicit (drawn dotted).
     #[serde(default, skip_serializing_if = "crate::serde_util::is_false")]
     pub implicit: bool,
-    /// Some underlying edge blocks.
-    pub gates: bool,
     /// The edges it stands for, sorted; never empty.
     pub underlying: Vec<UnderlyingEdge>,
+}
+
+// PRD: A8.
+/// Which date rule a date relationship is.
+#[derive(
+    Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize, JsonSchema,
+)]
+#[serde(rename_all = "snake_case")]
+pub enum DateRuleKind {
+    /// The node is due before or after its source.
+    DueBy,
+    /// The node may not start before or after its source.
+    NotBefore,
+}
+
+// PRD: C1, C15.
+/// What a date relationship is: the rule, bound or answer that makes it.
+#[derive(
+    Clone, Debug, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize, JsonSchema,
+)]
+#[serde(tag = "kind", rename_all = "snake_case", deny_unknown_fields)]
+pub enum DateLinkKind {
+    /// A due-by or not-before rule on the node, measured from the source.
+    Rule {
+        /// Which rule.
+        rule: DateRuleKind,
+        /// Whether the node falls before or after the source.
+        direction: crate::node::Direction,
+        /// The days between them, at least.
+        days: u32,
+        /// The source is a date decision's answer, not a milestone.
+        #[serde(default, skip_serializing_if = "crate::serde_util::is_false")]
+        answer: bool,
+    },
+    /// The stage must finish by its closing milestone.
+    StageClose,
+    /// The stage opens at the milestone for its dates only; nothing waits for it.
+    StageOpening,
+    /// The decision's answer sets the milestone's date.
+    FedDate,
+}
+
+// PRD: C1, C15.
+/// One authored date relationship between two nodes.
+#[derive(
+    Clone, Debug, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize, JsonSchema,
+)]
+pub struct DateLink {
+    /// The node whose rule, bound or answer it is: the rule's node, the stage, the decision.
+    pub node: NodeKey,
+    /// The node it reads: the rule's milestone or date decision, the stage's milestone, the
+    /// milestone the decision sets.
+    pub source: NodeKey,
+    /// What it is.
+    #[serde(flatten)]
+    pub kind: DateLinkKind,
+}
+
+// PRD: C1, C15.
+/// The date relationships drawn at a level between the stand-ins of their ends.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+#[serde(deny_unknown_fields)]
+pub struct LevelDateLink {
+    /// The stand-in of the earlier end where some relationship fixes the order, else of the
+    /// source.
+    pub from: NodeKey,
+    /// The stand-in of the later end where some relationship fixes the order, else of the
+    /// node whose dates they are.
+    pub to: NodeKey,
+    /// Some relationship it stands for fixes the order: the end `to` can never come before
+    /// the end `from`.
+    #[serde(default, skip_serializing_if = "crate::serde_util::is_false")]
+    pub orders: bool,
+    /// The relationships it stands for, sorted; never empty.
+    pub links: Vec<DateLink>,
 }
 
 // PRD: C2.
@@ -357,6 +427,10 @@ pub struct Level {
     pub nodes: Vec<LevelNode>,
     /// The edges, sorted by their ends.
     pub edges: Vec<LevelEdge>,
+    // PRD: C1.
+    /// The date relationships between the selected card and the stand-ins of the other ends,
+    /// sorted by their ends; empty when nothing is selected. Not edges: nothing waits on them.
+    pub date_links: Vec<LevelDateLink>,
     // PRD: C1.
     /// The count, per relevance class left out: the nodes hidden only for their class (of a
     /// kind shown, within the level, under no collapse, not left out by `top`, and kept by the

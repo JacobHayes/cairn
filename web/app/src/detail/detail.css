@@ -110,7 +110,7 @@ textarea.grow {
 }
 
 /* The overflow menu shares the bottom edge with the action beside a labelled field. */
-.actions-row {
+.row.actions-row {
   gap: var(--space-3);
   flex-wrap: wrap;
   align-items: flex-end;
@@ -253,6 +253,12 @@ dl.kv dd {
 .date-more[open] > summary::after,
 .date-row details[open] > summary::after {
   content: "▾";
+}
+
+.linked-dates {
+  margin: 0;
+  padding-inline-start: var(--space-5);
+  list-style: none;
 }
 
 .date-label {

@@ -16,7 +16,8 @@ import { itemNode } from "../proposals/model.ts";
 import type { Reveal } from "./GraphCanvas.tsx";
 import { useLaidOut, useLevel, useProjected, type Held } from "./hooks.ts";
 import { ancestorsOf } from "./ladder.ts";
-import { endsOf, lineIdOf, lineOf, type CanvasModel, type Level, type LineLink } from "./model.ts";
+import { datesAround, dateLinesOf } from "./dates.ts";
+import { endsOf, lineIdOf, lineOf, type CanvasModel, type DateLine, type Level, type LineLink } from "./model.ts";
 import { marksOverlay, standsFor, traceOverlay } from "./overlay.ts";
 import type { GraphView } from "./settings.ts";
 import { useViewLevel } from "./viewLevel.ts";
@@ -118,10 +119,15 @@ export interface CanvasGraphArgs {
   edge?: string | undefined;
 }
 
+/** The whole graph's level under the same collapse, which Reveal draws from. */
+function everythingOf(collapsed: string[]): LevelRequest {
+  return { projection: "level", shown: KINDS, ...(collapsed.length === 0 ? {} : { collapsed }) };
+}
+
 /** The view's level (C2), and while Reveal is on, the whole graph's beside it under the same collapse, less what neither draws nor the trace reaches. */
 function useComposed(args: { side: Side; was: Side | undefined; wait: boolean; layer: Layer | undefined; level: Level | undefined; own: Level | undefined; collapsed: string[]; revealed: ReadonlySet<string> | undefined; wasLevel: Level | undefined; wasFailed: boolean }) {
   const { side, was, wait, layer, level, own, collapsed, revealed, wasLevel, wasFailed } = args;
-  const everything = useMemo<LevelRequest | undefined>(() => (revealed === undefined ? undefined : { projection: "level", shown: KINDS, ...(collapsed.length === 0 ? {} : { collapsed }) }), [revealed, collapsed]);
+  const everything = useMemo<LevelRequest | undefined>(() => (revealed === undefined ? undefined : everythingOf(collapsed)), [revealed, collapsed]);
   const wholeRead = useProjected(side.held, everything);
   const whole = valueOf(wholeRead);
   const build = side.model;
@@ -185,6 +191,7 @@ export function useCanvasGraph({ view, side, was, wait = false, layer, ready, se
       learn(rolledUp);
     }
   }, [rolledUp, learn]);
+  const { dates, farEnds } = useDateLines(side.held, side.nodes, layer !== undefined ? undefined : traceOnly === undefined ? request : everythingOf(collapsed), selected);
   const overlay = useMemo(() => {
     if (laidOut === undefined) {
       return undefined;
@@ -193,14 +200,15 @@ export function useCanvasGraph({ view, side, was, wait = false, layer, ready, se
       const { diff, marks } = layer.model;
       return marksOverlay("What the proposal changes", marks, laidOut.model, { added: diff.edgesAdded, removed: diff.edgesRemoved }, composed);
     }
-    return selected !== undefined && trace !== undefined ? traceOverlay(trace, laidOut.model, title(trace.node)) : undefined;
-  }, [selected, trace, laidOut, layer, composed, title]);
+    return selected !== undefined && trace !== undefined ? traceOverlay(trace, laidOut.model, title(trace.node), farEnds) : undefined;
+  }, [selected, trace, laidOut, layer, composed, title, farEnds]);
   return {
     depth,
     trace,
     faded,
     laidOut,
     line,
+    dates,
     overlay,
     lit,
     badges,
@@ -213,6 +221,7 @@ export function useCanvasGraph({ view, side, was, wait = false, layer, ready, se
 }
 
 const NO_NODES: readonly GraphNode[] = [];
+const NO_DATES: DateLine[] = [];
 
 /**
  * The nodes a first fit frames under the layer, in the order the rail lists them: those waiting on a choice, then the other nodes the proposal marks, then the ends of the requirements it changes. Empty while the destination after is still being derived (a preview that finished without one, an invalid proposal's, is not waited for): the canvas waits for it, as what it draws changes then.
@@ -247,4 +256,19 @@ export function useRevealed(selected: string | undefined): Reveal | undefined {
     }
     return opened.key === location.key && opened.node !== undefined ? { key: opened.node, how: "centre", id: location.key } : undefined;
   }, [asked, opened, location.key]);
+}
+
+/**
+ * C1: the selected node's date lines, drawn while it alone is selected and no proposal's layer is
+ * on (no `request` then), and the cards at their far ends, which stay in focus. The level carries
+ * the relationships for the card its query selects only, so they are a read of their own that the
+ * layout never waits on.
+ */
+function useDateLines(held: Held, nodes: readonly GraphNode[], request: LevelRequest | undefined, selected: string | undefined) {
+  const around = valueOf(useProjected(held, request === undefined || selected === undefined ? undefined : { ...request, selected }));
+  return useMemo(() => {
+    const card = around?.nodes.find((each) => each.key === selected || (each.rolled_up ?? []).includes(selected ?? ""))?.key;
+    const dates = around === undefined ? NO_DATES : datesAround(dateLinesOf(around, [...nodes]), card);
+    return { dates, farEnds: new Set(dates.map((line) => (line.from === card ? line.to : line.from))) };
+  }, [around, selected, nodes]);
 }

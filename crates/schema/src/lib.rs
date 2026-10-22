@@ -92,13 +92,14 @@ pub use patch::{
     ParticipationRef, Patch, PatchTarget, RecordedEnd, Removal, RoleChoice, Transition,
 };
 pub use projection::{
-    AffectedNodes, AnswerEffects, ChoiceEffect, Cursor, DecisionEntry, DecisionView, EdgeOrigin,
-    ExplainedField, ExplanationPage, HiddenByFilter, HistoryPage, Level, LevelDisplay, LevelEdge,
-    LevelNode, LevelQuery, ListFlag, ListPage, ListQuery, MineEntry, MissingPlaceholder, Next,
-    NextQuery, NodeRow, OpenDecision, OutsideReference, PatchEvents, RankAdds, RankTerms,
-    ReferenceField, RemovalRead, RenderedDraft, RenderedSegment, RollUp, RouteSchedule,
-    ScheduleEntry, Snapshot, SnapshotCounts, SnapshotJourney, SnapshotNode, SnapshotScope, SortBy,
-    StatusSummary, Timeline, TimelineEntry, Trace, UndatedEntry, UnderlyingEdge, UpcomingMilestone,
+    AffectedNodes, AnswerEffects, ChoiceEffect, Cursor, DateLink, DateLinkKind, DateRuleKind,
+    DecisionEntry, DecisionView, EdgeOrigin, ExplainedField, ExplanationPage, HiddenByFilter,
+    HistoryPage, Level, LevelDateLink, LevelDisplay, LevelEdge, LevelNode, LevelQuery, ListFlag,
+    ListPage, ListQuery, MineEntry, MissingPlaceholder, Next, NextQuery, NodeRow, OpenDecision,
+    OutsideReference, PatchEvents, RankAdds, RankTerms, ReferenceField, RemovalRead, RenderedDraft,
+    RenderedSegment, RollUp, RouteSchedule, ScheduleEntry, Snapshot, SnapshotCounts,
+    SnapshotJourney, SnapshotNode, SnapshotScope, SortBy, StatusSummary, Timeline, TimelineEntry,
+    Trace, UndatedEntry, UnderlyingEdge, UpcomingMilestone,
 };
 pub use proposal::{
     Conflict, ConflictResolution, ConflictReview, DestinationAfter, Kept, OutlineFact,

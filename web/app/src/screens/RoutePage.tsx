@@ -30,6 +30,7 @@ import { stepsFor } from "../canvas/ladder.ts";
 import { graphViewFrom } from "../canvas/settings.ts";
 import type { Route } from "../data/host.ts";
 import { valueOf, type ReadView } from "../data/keyed-read.ts";
+import type { Held } from "../canvas/hooks.ts";
 import { useDeployment, useKeyedRead, useSession, useToday } from "../data/react.ts";
 import { useNodeAddresses, type Screen } from "../journeys/address.ts";
 import { ROUTE_OFFERS, useViewState, ViewStateContext, viewStateFrom } from "../journeys/view.ts";
@@ -159,7 +160,7 @@ interface FrameProps {
 }
 
 /** What a draft's inspector holds: the stepper while a segment is being inserted, else the draft card (where the inspector has a column) or the open node's form. */
-function DraftInspector({ authored, selected, card, close, inserting }: { authored: Authored; selected: string | undefined; card: ReactNode; close: string; inserting: ReturnType<typeof useInserting> }) {
+function DraftInspector({ authored, held, selected, card, close, inserting }: { authored: Authored; held: Held | undefined; selected: string | undefined; card: ReactNode; close: string; inserting: ReturnType<typeof useInserting> }) {
   const navigate = useNavigate();
   const id = "route" in authored.target ? authored.target.route : "";
   if (inserting.at !== undefined) {
@@ -178,7 +179,7 @@ function DraftInspector({ authored, selected, card, close, inserting }: { author
   }
   return (
     <Inspector focus={`${id}:${selected}`}>
-      <RouteNodePanel tree={authored.tree} authored={authored} nodeKey={selected} close={close} onRemoved={() => void navigate(close)} />
+      <RouteNodePanel tree={authored.tree} held={held} authored={authored} nodeKey={selected} close={close} onRemoved={() => void navigate(close)} />
     </Inspector>
   );
 }
@@ -237,7 +238,7 @@ function DraftFrame({ shown, derived, authored, selected, edge, write, result, s
   );
   return (
     <ConnectContext value={drawing}>
-      <Workspace head={head} body={body} fills={fills} inspector={<DraftInspector authored={authored} selected={selected} card={columned && line === undefined ? card : undefined} close={close} inserting={inserting} />} />
+      <Workspace head={head} body={body} fills={fills} inspector={<DraftInspector authored={authored} held={valueOf(derived)} selected={selected} card={columned && line === undefined ? card : undefined} close={close} inserting={inserting} />} />
     </ConnectContext>
   );
 }
@@ -272,7 +273,7 @@ function VersionFrame({ shown, derived, selected, edge, write, result, setResult
   const inspector =
     selected !== undefined ? (
       <Inspector focus={`${id}:${selected}`}>
-        <RouteNodePanel tree={tree} authored={undefined} nodeKey={selected} close={close} onRemoved={() => undefined} />
+        <RouteNodePanel tree={tree} held={valueOf(derived)} authored={undefined} nodeKey={selected} close={close} onRemoved={() => undefined} />
       </Inspector>
     ) : edge === undefined && (wide || phone) && card !== null ? (
       <Inspector focus={`${id}:v${String(version)}`} reveal={false}>

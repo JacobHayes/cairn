@@ -19,8 +19,8 @@
 //!   has none. A visible node is drawn under the
 //!   stand-in of its parent, or at the top level; a hidden one rolls up into its stand-in. A
 //!   collapsed container rolls its whole subtree into its own card (or its stand-in's).
-//! - Edges are the explicit requirements, condition gates, and stage openings of the full
-//!   structural graph. Each is drawn between its ends' stand-ins; it is left off when either
+//! - Edges are the explicit requirements, condition gates, and gating stage openings of the
+//!   full structural graph. Each is drawn between its ends' stand-ins; it is left off when either
 //!   has none (still traceable, C7) and when both land on the same node; edges landing on the
 //!   same pair collapse into one. A node hidden for its relevance class leaves no orphan
 //!   line: its edges re-target like any hidden node's.
@@ -39,10 +39,17 @@
 //!   nodes of a kind shown that the search keeps and the setting leaves out, a ruled-out
 //!   node never among them (C9's count).
 //!
+//! - Date relationships (C1; [`crate::derive::links`]) are not edges: nothing waits on them. Each
+//!   is drawn between its ends' stand-ins on the same terms as an edge, and the ones between the
+//!   same pair collapse into one, which says whether some relationship it stands for fixes the
+//!   order.
+//!
 //! Cost at `node_count_max` (2,000 nodes, about 110,000 edges): the relevance classes, only
 //! when a class is hidden, are two relevance passes ([`crate::derive::pending`], about 34,000
 //! steps each); stand-ins in one pass in tree order, O(nodes); the edges in one pass with a
-//! sorted map, O(edges log edges); the marker walks a blocked node's entry chains (at most
+//! sorted map, O(edges log edges); the date relationships in one pass over the date network's
+//! retained constraints (at most about 370,000), the pruned edges and the nodes, and a sorted
+//! map, O(links log links); the marker walks a blocked node's entry chains (at most
 //! about 1,300 edges each, 2.6 million in all, each node once whether it is visible or rolled
 //! up); a group's state reads its descendants (2,000 x 2,000 at worst) and a container's
 //! roll-up its children, O(nodes) in all. With filters, the list's matcher reads each node's
@@ -57,14 +64,15 @@ use std::collections::{BTreeMap, BTreeSet};
 use cairn_schema::limits::CONTAINMENT_DEPTH_MAX;
 use cairn_schema::{
     DependencyVia, Deployment, DisplayState, EdgeOrigin, HiddenByFilter, IdentityKey, Level,
-    LevelDisplay, LevelEdge, LevelNode, LevelQuery, ListFlag, NodeKey, NodeKind, Progress,
-    Relevance, RollUp, State, Title, UnderlyingEdge,
+    LevelDateLink, LevelDisplay, LevelEdge, LevelNode, LevelQuery, ListFlag, NodeKey, NodeKind,
+    Progress, Relevance, RollUp, State, Title, UnderlyingEdge,
 };
 
 use super::{DerivedJourney, ProjectionError};
 use crate::derive::Relevances;
 use crate::derive::dependencies::{EdgeClass, EdgeSet, EdgeSource};
 use crate::derive::held_by;
+use crate::derive::links::collapse;
 use crate::derive::pending::{RelevanceClass, classify};
 
 /// Each node within the level and its stand-in: itself when visible, else its nearest visible
@@ -221,6 +229,7 @@ impl<'a> DerivedJourney<'a> {
             display: query.display.clone(),
             nodes,
             edges: self.level_edges(&stand_ins),
+            date_links: self.level_date_links(query, &stand_ins),
             hidden_by_class: stand_ins.hidden_by_class,
             hidden_by_filter: stand_ins.hidden_by_filter,
         })
@@ -424,6 +433,7 @@ impl<'a> DerivedJourney<'a> {
             let origin = match edge.source {
                 EdgeSource::Explicit => EdgeOrigin::Explicit,
                 EdgeSource::Condition => EdgeOrigin::Condition,
+                EdgeSource::StageOpening if edge.class == EdgeClass::DateOnly => continue,
                 EdgeSource::StageOpening => EdgeOrigin::StageOpening,
                 EdgeSource::Work
                 | EdgeSource::Entry
@@ -447,7 +457,6 @@ impl<'a> DerivedJourney<'a> {
                 requirement: requirement.clone(),
                 dependent: dependent.clone(),
                 origin,
-                gates: edge.class == EdgeClass::Gate,
             });
         }
         drawn
@@ -458,10 +467,24 @@ impl<'a> DerivedJourney<'a> {
                 implicit: underlying
                     .iter()
                     .all(|edge| edge.origin != EdgeOrigin::Explicit),
-                gates: underlying.iter().any(|edge| edge.gates),
                 underlying: underlying.into_iter().collect(),
             })
             .collect()
+    }
+
+    /// C1: the date relationships between the selected card and the stand-ins of the other
+    /// ends, marked when they fix an order. Empty when nothing is selected: they are drawn for
+    /// one selected node only, so the level carries no others (a graph at the limits holds
+    /// a quarter of a million of them).
+    fn level_date_links(&self, query: &LevelQuery, stand_ins: &StandIns<'_>) -> Vec<LevelDateLink> {
+        let Some(card) = query.selected.as_ref().and_then(|key| stand_ins.get(key)) else {
+            return Vec::new();
+        };
+        let mut authored = self.derived.authored_links(self.graph);
+        authored.retain(|found| {
+            stand_ins.get(found.from) == Some(card) || stand_ins.get(found.to) == Some(card)
+        });
+        collapse(&authored, |key| stand_ins.get(key))
     }
 
     /// C2: a blocked node's unsatisfied gate dependencies that no drawn edge stands for, and

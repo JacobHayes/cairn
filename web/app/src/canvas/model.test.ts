@@ -123,7 +123,7 @@ describe("C1: lines", () => {
 
   test("an edge with a hidden end is drawn to the card that stands for it; one inside a card, or into nowhere, is not drawn, and edges between the same two cards are one", () => {
     const level = actionsAndDecisionsHidden();
-    const edge = (from: string, to: string) => ({ from, to, gates: true, implicit: false, underlying: [{ requirement: from, dependent: to, origin: "explicit" as const, gates: true }] });
+    const edge = (from: string, to: string) => ({ from, to, implicit: false, underlying: [{ requirement: from, dependent: to, origin: "explicit" as const }] });
     level.edges = [
       edge("n_option", "n_build"),
       // The check is rolled up into the build: this joins it to the same line as the build's own.
@@ -144,11 +144,10 @@ describe("C1: lines", () => {
       {
         from: "n_choose",
         to: "n_option",
-        gates: true,
         implicit: false,
         underlying: [
-          { requirement: "n_choose", dependent: "n_option", origin: "explicit", gates: true },
-          { requirement: "n_choose", dependent: "n_option", origin: "condition", gates: true },
+          { requirement: "n_choose", dependent: "n_option", origin: "explicit" },
+          { requirement: "n_choose", dependent: "n_option", origin: "condition" },
         ],
       },
     ];
@@ -181,14 +180,10 @@ describe("C1: what a line waits on and holds", () => {
     expect([waits(opening, "n_kick->n_stage"), waits(elsewhere, "n_kick->n_stage")]).toEqual([[true], [false]]);
   });
 
-  test("a link that holds dates only never waits, and the line is satisfied exactly when no edge waits", () => {
-    const level = wholeLevel();
-    level.edges = [{ from: "n_kick", to: "n_stage", gates: false, implicit: true, underlying: [{ requirement: "n_kick", dependent: "n_stage", origin: "stage_opening", gates: false }] }];
-    const open = changed((each) => { derivedOf(each, "n_kick").display_state = "ready"; derivedOf(each, "n_stage").blocked_by = [{ node: "n_kick", via: { stage_opening: { group: "n_stage" } } }]; });
-    const [dates] = model(level, undefined, [], open).lines;
-    expect([dates?.kind, dates?.edges.map((each) => each.waits), dates?.satisfied]).toEqual(["dates", [false], true]);
-    const [both] = model(wholeLevel(), undefined, [], view).lines.filter((each) => each.id === "n_option->n_build");
-    expect(both?.satisfied).toBe(false);
+  test("a line is satisfied exactly when no edge it stands for waits", () => {
+    const lines = model(wholeLevel(), undefined, [], view).lines;
+    const satisfied = (id: string) => lines.find((each) => each.id === id)?.satisfied;
+    expect([satisfied("n_kick->n_stage"), satisfied("n_option->n_build")]).toEqual([true, false]);
   });
 
   test("a route's lines carry no state", () => {
@@ -199,8 +194,8 @@ describe("C1: what a line waits on and holds", () => {
   test("a requirement on a container holds what is inside it; one on a leaf holds nothing", () => {
     const level = wholeLevel();
     level.edges = [
-      { from: "n_kick", to: "n_stage", gates: true, underlying: [{ requirement: "n_kick", dependent: "n_stage", origin: "explicit", gates: true }] },
-      { from: "n_kick", to: "n_choose", gates: true, underlying: [{ requirement: "n_kick", dependent: "n_choose", origin: "explicit", gates: true }] },
+      { from: "n_kick", to: "n_stage", underlying: [{ requirement: "n_kick", dependent: "n_stage", origin: "explicit" }] },
+      { from: "n_kick", to: "n_choose", underlying: [{ requirement: "n_kick", dependent: "n_choose", origin: "explicit" }] },
     ];
     expect(linesOf(level, graph).map((line) => [line.id, line.edges[0]?.holds])).toEqual([["n_kick->n_stage", true], ["n_kick->n_choose", false]]);
   });

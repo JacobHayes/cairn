@@ -14,9 +14,11 @@ import { Section, NodeLink } from "../detail/parts.tsx";
 import { identityNamed } from "../detail/sections.tsx";
 import { choiceLabel } from "../status/answer.ts";
 import { Markdown } from "../ui/markdown.tsx";
+import type { Held } from "../canvas/hooks.ts";
 import { AuthoringPanel } from "./AuthoringPanel.tsx";
 import { conditionNames, conditionWords } from "./condition.ts";
 import { ruleWords } from "./dates.ts";
+import { LinkedDates } from "./LinkedDates.tsx";
 import { ancestorsOf, childrenOf, pathOf, titleIn, type GraphNode, type Tree } from "./graph.ts";
 import type { Authored } from "./target.ts";
 
@@ -94,7 +96,7 @@ function VersionNode({ tree, node }: { tree: Tree; node: GraphNode }) {
  * A route node in the inspector: its kind and place, then, on a draft, its form (`authored`), on
  * a published version what it says read only. A node the shown graph lacks is said without its key.
  */
-export function RouteNodePanel({ tree, nodeKey, close, authored, onRemoved }: { tree: Tree; nodeKey: string; close: string; authored: Authored | undefined; onRemoved: () => void }) {
+export function RouteNodePanel({ tree, held, nodeKey, close, authored, onRemoved }: { tree: Tree; held: Held | undefined; nodeKey: string; close: string; authored: Authored | undefined; onRemoved: () => void }) {
   const node = tree.byKey.get(nodeKey);
   if (node === undefined) {
     return (
@@ -114,6 +116,9 @@ export function RouteNodePanel({ tree, nodeKey, close, authored, onRemoved }: { 
         <h2 data-testid="detail-title">{node.title}</h2>
       </div>
       {authored === undefined ? <VersionNode tree={tree} node={node} /> : <AuthoringPanel authored={authored} node={node} onRemoved={onRemoved} />}
+      <div className="detail-folds">
+        <LinkedDates held={held} tree={tree} nodeKey={nodeKey} />
+      </div>
     </aside>
   );
 }

@@ -917,6 +917,19 @@
 
 
 
+/* A date relationship (C1) is not an edge: drawn for the selected node only, in ink, dashed (the pattern in layout units, divided by the zoom to stay the same on screen), never faded, with an open arrowhead at its later end where the order is fixed. */
+.line-dates .react-flow__edge-path {
+  stroke: var(--color-text);
+  stroke-width: 1.5px;
+  stroke-dasharray: calc(6px / var(--z, 1)) calc(4px / var(--z, 1));
+}
+
+.line-dates .line-marker {
+  fill: none;
+  stroke: var(--color-text);
+  stroke-width: 1.5px;
+}
+
 .line-count {
   fill: var(--color-secondary);
   font: 500 12px / 1 var(--font-mono);

@@ -7,10 +7,10 @@ use std::collections::{BTreeMap, BTreeSet};
 
 use cairn_schema::{
     Annotation, AnswerEffects, AnswerValue, Cursor, Date, DisplayState, ExplainedField,
-    ExplanationPage, JourneyId, KeyRefs, Level, LevelDisplay, LevelEdge, LevelNode, LevelQuery,
-    ListFlag, ListQuery, LocalEdit, Markdown, Next, NextQuery, Node, NodeDerived, NodeKey,
-    NodeKind, NodeRow, NodeState, Overrides, Path, RemovalRead, Snapshot, SnapshotScope, SortBy,
-    Stalled, StillWaiting,
+    ExplanationPage, JourneyId, KeyRefs, Level, LevelDateLink, LevelDisplay, LevelEdge, LevelNode,
+    LevelQuery, ListFlag, ListQuery, LocalEdit, Markdown, Next, NextQuery, Node, NodeDerived,
+    NodeKey, NodeKind, NodeRow, NodeState, Overrides, Path, RemovalRead, Snapshot, SnapshotScope,
+    SortBy, Stalled, StillWaiting,
 };
 use cairn_service::{Call, ChildEntry, NodeDetail};
 use schemars::JsonSchema;
@@ -132,6 +132,10 @@ pub(crate) struct GetLevel {
     /// empty. A node of a class left out rolls up like a hidden kind's.
     #[serde(default)]
     display: BTreeSet<LevelDisplay>,
+    /// The node selected: drawn whatever would hide it, and the level then carries the date
+    /// relationships between its card and the others (none otherwise).
+    #[serde(default)]
+    selected: Option<NodeKey>,
     /// Where the page of visible nodes starts.
     #[serde(default)]
     cursor: Cursor,
@@ -155,6 +159,11 @@ pub(crate) struct LevelOutput {
     nodes: Paged<LevelNode>,
     /// The level's edges with an end among this page's nodes.
     edges: Vec<LevelEdge>,
+    // PRD: C1.
+    /// The level's date relationships (not edges: nothing waits on them) with an end among
+    /// this page's nodes.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    date_links: Vec<LevelDateLink>,
     // PRD: C1.
     /// Per relevance class left out, how many nodes it alone hides; none when every
     /// class is shown.
@@ -424,12 +433,13 @@ impl ToolSet {
         call: &Call,
         arguments: GetLevel,
     ) -> Result<At<LevelOutput>, ToolError> {
-        let query = LevelQuery::requested(
+        let mut query = LevelQuery::requested(
             arguments.kinds,
             arguments.container,
             arguments.collapsed,
             arguments.display,
         );
+        query.selected = arguments.selected;
         let projected = self.service.level(call, &arguments.journey, &query).await?;
         Ok(At::of(projected, |level| {
             let Level {
@@ -439,6 +449,7 @@ impl ToolSet {
                 display,
                 nodes,
                 edges,
+                date_links,
                 hidden_by_class,
                 // The tool's query has no flag or owner filters, so there is nothing to count.
                 hidden_by_filter: _,
@@ -450,6 +461,10 @@ impl ToolSet {
                 .into_iter()
                 .filter(|edge| on_page.contains(&edge.from) || on_page.contains(&edge.to))
                 .collect();
+            let date_links = date_links
+                .into_iter()
+                .filter(|link| on_page.contains(&link.from) || on_page.contains(&link.to))
+                .collect();
             LevelOutput {
                 container,
                 shown,
@@ -457,6 +472,7 @@ impl ToolSet {
                 display,
                 nodes,
                 edges,
+                date_links,
                 hidden_by_class,
             }
         }))

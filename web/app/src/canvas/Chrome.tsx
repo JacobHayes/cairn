@@ -6,13 +6,13 @@ import { useId } from "react";
 
 import { Menu } from "../screens/Menu.tsx";
 import { LENS_MEANING, LENS_WORDS } from "./lens.ts";
-import { LineSample } from "./LineSample.tsx";
+import { DateSample, LineSample } from "./LineSample.tsx";
 import { LENSES, LINE_KINDS, type Lens } from "./model.ts";
-import { LINE_KIND_WORDS } from "./words.ts";
+import { DATE_LINE_KEY, LINE_KIND_WORDS } from "./words.ts";
 import { plural } from "../ui/words.ts";
 import { Tip } from "../ui/Tip.tsx";
 
-/** The four kinds of line, drawn as the canvas draws them, for View, Key. */
+/** The kinds of line and the date line, drawn as the canvas draws them, for View, Key. */
 function Key() {
   return (
     <ul className="canvas-key" data-testid="canvas-key">
@@ -22,6 +22,10 @@ function Key() {
           <span>{`${LINE_KIND_WORDS[kind].label}: ${LINE_KIND_WORDS[kind].key}`}</span>
         </li>
       ))}
+      <li>
+        <DateSample />
+        <span>{DATE_LINE_KEY}</span>
+      </li>
     </ul>
   );
 }

@@ -20,12 +20,12 @@ import { ContextMenu } from "../ui/ContextMenu.tsx";
 import { Tip, usePointTip, type PointTip } from "../ui/Tip.tsx";
 import { typing } from "../ui/typing.ts";
 import { headHeight } from "./cards.ts";
-import { EdgeLine, type LineEdge } from "./EdgeLine.tsx";
+import { DateEdgeLine, EdgeLine, elbow, type Box, type DateEdge, type LineEdge } from "./EdgeLine.tsx";
 import { NEAR_ZOOM, firstFrame, fitZoom, listenPinch, minZoomOf, roomOf, shiftInto } from "./gestures.ts";
 import { lensChips, lensTiers } from "./lens.ts";
 import type { Layout } from "./layout.ts";
 import { fadedCards } from "./look.ts";
-import type { CanvasModel, Line, Lens } from "./model.ts";
+import type { CanvasModel, DateLine, Line, Lens } from "./model.ts";
 import { CardActionsContext, NodeCard, type CardActions, type CardNode } from "./NodeCard.tsx";
 import type { CanvasOverlay } from "./overlay.ts";
 import { firstFitCards } from "./refit.ts";
@@ -34,7 +34,7 @@ import { lineWaitWords } from "./words.ts";
 import { useWork } from "../data/react.ts";
 
 const nodeTypes = { card: NodeCard };
-const edgeTypes = { line: EdgeLine };
+const edgeTypes = { line: EdgeLine, dates: DateEdgeLine };
 
 /** C3: the most the canvas zooms in; the most it zooms out is computed from the graph (5.6). */
 const ZOOM_MAX = 1.5;
@@ -63,6 +63,8 @@ export interface GraphCanvasProps {
   /** The nodes Depth's Fade dims (journeys/requests.ts, `depthFaded`); a card out of this or of `emphasis` is dimmed once. */
   faded?: ReadonlySet<string> | null | undefined;
   selected: string | undefined;
+  /** The date relationships drawn: the selected node's, none otherwise (journey and route canvases decide; the layout never reads this). */
+  dates?: readonly DateLine[] | undefined;
   /** The edge (a line's id) whose card is open. */
   selectedEdge?: string | undefined;
   actions: CardActions;
@@ -94,10 +96,24 @@ function openContainers(model: CanvasModel): Set<string> {
   return new Set(model.cards.flatMap((card) => (card.parent === undefined ? [] : [card.parent])));
 }
 
-/** `props` with `faded` holding every card out of focus for Depth's Fade or for Frontier (`fadedCards`). */
+/** `props` with `faded` holding every card out of focus for Depth's Fade or for Frontier (`fadedCards`), less the cards a date line joins and the containers around them: a date line's far end stays in focus whatever the view dims. */
 function withEmphasis(props: GraphCanvasProps): GraphCanvasProps {
-  const { emphasis, faded, model } = props;
-  return emphasis === null || emphasis === undefined ? props : { ...props, faded: fadedCards(model.cards, faded, emphasis) };
+  const { emphasis, faded, model, dates } = props;
+  const dimmed = emphasis === null || emphasis === undefined ? faded : fadedCards(model.cards, faded, emphasis);
+  if (dimmed === null || dimmed === undefined || dates === undefined || dates.length === 0) {
+    return dimmed === faded ? props : { ...props, faded: dimmed };
+  }
+  const parents = new Map(model.cards.map((card) => [card.key, card.parent]));
+  const clear = new Set<string>();
+  for (const line of dates) {
+    for (let at: string | undefined = line.from; at !== undefined && !clear.has(at); at = parents.get(at)) {
+      clear.add(at);
+    }
+    for (let at: string | undefined = line.to; at !== undefined && !clear.has(at); at = parents.get(at)) {
+      clear.add(at);
+    }
+  }
+  return { ...props, faded: new Set([...dimmed].filter((key) => !clear.has(key))) };
 }
 
 function nodesOf(props: GraphCanvasProps, edgeEnds: ReadonlySet<string>): CardNode[] {
@@ -175,6 +191,57 @@ function edgesOf({ model, layout, overlay, faded, selectedEdge }: GraphCanvasPro
     selectable: line.selectable,
     focusable: line.selectable,
   }));
+}
+
+/** Every card's box on the canvas: a placed card is relative to its container, so the containers' places are added up. */
+function boxesOf(model: CanvasModel, layout: Layout): Map<string, Box> {
+  const parents = new Map(model.cards.map((card) => [card.key, card.parent]));
+  const boxes = new Map<string, Box>();
+  const boxOf = (key: string): Box | undefined => {
+    const known = boxes.get(key);
+    if (known !== undefined) {
+      return known;
+    }
+    const placed = layout.nodes[key];
+    if (placed === undefined) {
+      return undefined;
+    }
+    const parent = parents.get(key);
+    const base = parent === undefined ? { x: 0, y: 0 } : (boxOf(parent) ?? { x: 0, y: 0 });
+    const box = { x: base.x + placed.x, y: base.y + placed.y, width: placed.width, height: placed.height };
+    boxes.set(key, box);
+    return box;
+  };
+  model.cards.forEach((card) => boxOf(card.key));
+  return boxes;
+}
+
+/** C1: the date lines to draw, as flow edges between the cards they join: not selectable, not focusable, and opening no card (the inspector's dates list them). */
+function dateEdgesOf({ model, layout, dates }: GraphCanvasProps): DateEdge[] {
+  if (dates === undefined || dates.length === 0) {
+    return [];
+  }
+  const boxes = boxesOf(model, layout);
+  const everyBox = [...boxes.values()];
+  return dates.flatMap((line, index) => {
+    const [from, to] = [boxes.get(line.from), boxes.get(line.to)];
+    if (from === undefined || to === undefined) {
+      return [];
+    }
+    return [
+      {
+        id: line.id,
+        source: line.from,
+        target: line.to,
+        type: "dates" as const,
+        ariaLabel: line.sentence,
+        data: { line, route: elbow(from, to, { index, lanes: dates.length }, everyBox) },
+        selectable: false,
+        focusable: false,
+        deletable: false,
+      },
+    ];
+  });
 }
 
 /** The graph's size on the canvas: the top-level cards' outer edges. */
@@ -351,10 +418,10 @@ function useCanvasKeys(props: GraphCanvasProps): void {
 /** The line under the pointer, for the ink on its two cards; what it says is the point tip's (the pointer only moves the tip, it never re-renders the cards). */
 function useEdgeHover(props: GraphCanvasProps) {
   const tip = usePointTip();
-  const [hover, setHover] = useState<Line | undefined>(undefined);
-  const move = (event: ReactMouseEvent, edge: LineEdge) => {
+  const [hover, setHover] = useState<Line | DateLine | undefined>(undefined);
+  const move = (event: ReactMouseEvent, edge: LineEdge | DateEdge) => {
     if (edge.data !== undefined) {
-      tip.hoverAt(edge.data.line.id, event.clientX, event.clientY, lineWords(edge.data.line));
+      tip.hoverAt(edge.data.line.id, event.clientX, event.clientY, wordsOf(edge.data.line));
     }
   };
   return {
@@ -362,15 +429,15 @@ function useEdgeHover(props: GraphCanvasProps) {
     focus: useEdgeFocus(props.model, tip),
     handlers: {
       // A click on the line that is already selected changes no selection, so only the click can bring its card back.
-      onEdgeClick: (event: ReactMouseEvent, edge: LineEdge) => {
-        if (edge.data?.line.selectable === true) {
+      onEdgeClick: (event: ReactMouseEvent, edge: LineEdge | DateEdge) => {
+        if (edge.type === "line" && edge.data?.line.selectable === true) {
           props.onEdge?.(edge.data.line);
         } else if (edge.data !== undefined) {
-          // A line that opens no card says its words on a tap (touch has no hover).
-          tip.tapAt(edge.data.line.id, event.clientX, event.clientY, lineWords(edge.data.line));
+          // A line that opens no card says its words on a tap (touch has no hover): a date line always.
+          tip.tapAt(edge.data.line.id, event.clientX, event.clientY, wordsOf(edge.data.line));
         }
       },
-      onEdgeMouseEnter: (event: ReactMouseEvent, edge: LineEdge) => {
+      onEdgeMouseEnter: (event: ReactMouseEvent, edge: LineEdge | DateEdge) => {
         setHover(edge.data?.line);
         move(event, edge);
       },
@@ -381,6 +448,11 @@ function useEdgeHover(props: GraphCanvasProps) {
       },
     },
   };
+}
+
+/** What a line says: a waits-on line's sentence with whether it still holds anything back, a date line's sentence. */
+function wordsOf(line: Line | DateLine): string {
+  return "selectable" in line ? lineWords(line) : line.sentence;
 }
 
 /** A line focused from the keyboard says the same words; touch and the pointer have their own events. */
@@ -563,7 +635,7 @@ const INPUT = {
 } as const;
 
 /** The cards at the ends of the line being hovered and of the one selected: both are drawn in ink, so the card beside says which two it describes. */
-function useEdgeEnds(model: CanvasModel, selectedEdge: string | undefined, hover: Line | undefined): ReadonlySet<string> {
+function useEdgeEnds(model: CanvasModel, selectedEdge: string | undefined, hover: Line | DateLine | undefined): ReadonlySet<string> {
   const open = useMemo(() => model.lines.find((line) => line.id === selectedEdge), [model, selectedEdge]);
   return useMemo(() => new Set([hover, open].flatMap((line) => (line === undefined ? [] : [line.from, line.to]))), [hover, open]);
 }
@@ -635,7 +707,7 @@ function Flow(props: GraphCanvasProps) {
   const { hover, focus, handlers } = useEdgeHover(props);
   const edgeEnds = useEdgeEnds(props.model, props.selectedEdge, hover);
   const nodes = useMemo(() => nodesOf(withEmphasis(props), edgeEnds), [props, edgeEnds]);
-  const edges = useMemo(() => edgesOf(withEmphasis(props)), [props]);
+  const edges = useMemo<(LineEdge | DateEdge)[]>(() => [...edgesOf(withEmphasis(props)), ...dateEdgesOf(props)], [props]);
   const { menu, menus, openMenu, closeMenu } = useNodeMenu(props);
   const near = useStore((state) => state.transform[2] >= NEAR_ZOOM);
   const { minZoom, fit } = useZoomRange(props, root);

@@ -104,15 +104,13 @@ const node = (key: string, extra: Partial<LevelNode> = {}): LevelNode => ({ key,
 const explicit = (requirement: string, dependent: string): LevelEdge => ({
   from: requirement,
   to: dependent,
-  gates: true,
-  underlying: [{ requirement, dependent, origin: "explicit", gates: true }],
+  underlying: [{ requirement, dependent, origin: "explicit" }],
 });
 const implicit = (requirement: string, dependent: string, origin: "condition" | "stage_opening"): LevelEdge => ({
   from: requirement,
   to: dependent,
-  gates: true,
   implicit: true,
-  underlying: [{ requirement, dependent, origin, gates: true }],
+  underlying: [{ requirement, dependent, origin }],
 });
 
 /** The whole journey with every kind shown. */
@@ -129,6 +127,7 @@ export function wholeLevel(): Level {
       node("n_old"),
     ],
     edges: [implicit("n_choose", "n_option", "condition"), implicit("n_kick", "n_stage", "stage_opening"), explicit("n_option", "n_build")],
+    date_links: [],
   };
 }
 
@@ -143,5 +142,6 @@ export function actionsAndDecisionsHidden(): Level {
       node("n_option", { hidden_prerequisites: ["n_choose"] }),
     ],
     edges: [implicit("n_kick", "n_stage", "stage_opening"), explicit("n_option", "n_build")],
+    date_links: [],
   };
 }

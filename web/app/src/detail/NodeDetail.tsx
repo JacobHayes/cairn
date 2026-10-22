@@ -15,7 +15,7 @@ import { Affects } from "./Affects.tsx";
 import { AttachmentList } from "./Attachments.tsx";
 import { Checklist } from "./Checklist.tsx";
 import { Connections } from "./Connections.tsx";
-import { DatesSection } from "./DatesSection.tsx";
+import { DatesSection, LinkedDates } from "./DatesSection.tsx";
 import { PinEditor } from "./editors.tsx";
 import { Details } from "./Details.tsx";
 import { People } from "./Facts.tsx";
@@ -102,6 +102,7 @@ export function NodeDetailPanel({ view, nodeKey, extra, folded = false }: { view
           <ResourceList view={view} detail={detail} />
           <AttachmentList view={view} detail={detail} />
           <Dates view={view} detail={detail} />
+          <LinkedDates view={view} detail={detail} />
           <WhyRank view={view} detail={detail} position={position} row={row} />
           <People view={view} detail={detail} />
           <Details view={view} detail={detail} />
