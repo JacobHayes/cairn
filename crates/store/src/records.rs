@@ -8,7 +8,9 @@
 use std::fmt;
 use std::str::FromStr;
 
-use cairn_schema::{AgentId, ConversationId, Email, Markdown, Slug, Timestamp, Title, UserId};
+use cairn_schema::{
+    AgentId, ConversationId, Email, JourneyId, Markdown, Slug, Timestamp, Title, UserId,
+};
 use serde::{Deserialize, Serialize};
 
 use crate::query::PageSize;
@@ -127,6 +129,77 @@ pub struct AgentTokenRecord {
     pub created_at: Timestamp,
     /// When it was revoked, if it was.
     pub revoked_at: Option<Timestamp>,
+}
+
+/// Where a person is in the tour of Cairn (PRD: C20).
+#[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum TourState {
+    /// A run is under way: its practice journey is named.
+    Started,
+    /// The person went through it to the end.
+    Finished,
+    /// The person turned it down.
+    Dismissed,
+}
+
+impl TourState {
+    /// The stored word.
+    #[must_use]
+    pub fn as_str(self) -> &'static str {
+        match self {
+            TourState::Started => "started",
+            TourState::Finished => "finished",
+            TourState::Dismissed => "dismissed",
+        }
+    }
+}
+
+impl FromStr for TourState {
+    type Err = String;
+
+    fn from_str(text: &str) -> Result<Self, String> {
+        match text {
+            "started" => Ok(TourState::Started),
+            "finished" => Ok(TourState::Finished),
+            "dismissed" => Ok(TourState::Dismissed),
+            other => Err(format!("{other:?} is not a tour state")),
+        }
+    }
+}
+
+/// What a tour record says apart from whose it is and when it changed: the thing a write
+/// names as the record it expects to replace.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct TourMark {
+    /// Where the person is.
+    pub state: TourState,
+    /// The practice journey, while a run is started.
+    pub practice_journey: Option<JourneyId>,
+}
+
+/// A person's place in the tour of Cairn, outside every domain: one per user.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct TourRecord {
+    /// Whose.
+    pub user: UserId,
+    /// Where they are.
+    pub state: TourState,
+    /// The practice journey: named while a run is started, none once it ends.
+    pub practice_journey: Option<JourneyId>,
+    /// When it last changed.
+    pub updated_at: Timestamp,
+}
+
+impl TourRecord {
+    /// What a write expecting this record names.
+    #[must_use]
+    pub fn mark(&self) -> TourMark {
+        TourMark {
+            state: self.state,
+            practice_journey: self.practice_journey.clone(),
+        }
+    }
 }
 
 /// What an auth log entry records.

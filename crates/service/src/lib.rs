@@ -26,6 +26,7 @@ mod projections;
 mod proposals;
 mod reads;
 mod routes;
+mod tour;
 mod write;
 
 pub use call::Call;
@@ -40,6 +41,7 @@ pub use projections::{ChildEntry, History, NodeDetail, Projected, ReadError};
 pub use proposals::{ProposalReview, ProposalWritten, StaleBase};
 pub use reads::{IdentityReferences, RouteReference, RouteSummary};
 pub use routes::PatchKeys;
+pub use tour::TourView;
 pub use write::{DomainPatch, NotADomainPatch, WriteError, Written};
 
 use std::sync::Arc;

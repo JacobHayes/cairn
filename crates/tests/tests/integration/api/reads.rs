@@ -6,10 +6,11 @@
 
 mod in_process {
     use axum::http::{Method, StatusCode};
+    use cairn_api::client::{Reply, Transport};
     use cairn_api::error::status_of;
     use cairn_api::wire::{
         AgentToken, Caller, Capabilities, EventPage, JourneyPage, MintedToken, Problem,
-        ProblemCode, RouteDetail, RoutePage, SearchHit, SearchPage, UserName,
+        ProblemCode, RouteDetail, RoutePage, SearchHit, SearchPage, Tour, TourStanding, UserName,
     };
     use cairn_engine::{Graph, derive};
     use cairn_schema::{Deployment, DomainDocument, Journey, Route, RouteVersion};
@@ -396,6 +397,72 @@ mod in_process {
         assert_eq!(reply.status, StatusCode::FORBIDDEN);
         let listed: Vec<AgentToken> = get(&ann, "/api/users/me/tokens").await;
         assert_eq!(listed, [] as [cairn_api::wire::AgentToken; 0]);
+    }
+
+    /// The tour: a caller with no record reads none and today; a write replaces only the record
+    /// it expects, a stale one answers 409 with the current record, another user's tour is
+    /// their own, and a write that contradicts itself is malformed.
+    #[tokio::test]
+    async fn the_tour_is_written_only_over_the_record_expected() {
+        async fn put(who: &Transport, body: serde_json::Value) -> Reply {
+            who.send(Method::PUT, "/api/users/me/tour", Some(&body))
+                .await
+                .unwrap()
+        }
+        let world = World::start().await;
+        let ann = world.signed_in("ann");
+        let bob = world.signed_in("bob");
+        let none = serde_json::json!({ "state": "none" });
+        let before: Tour = get(&ann, "/api/users/me/tour").await;
+        assert_eq!(before.state, TourStanding::None);
+        assert_eq!(before.practice_journey, None);
+
+        let start = |journey: &str, expect: serde_json::Value| serde_json::json!({ "state": "started", "practice_journey": journey, "expect": expect });
+        let reply = put(&ann, start("j_first", none.clone())).await;
+        assert_eq!(reply.status, StatusCode::NO_CONTENT);
+        let started: Tour = get(&ann, "/api/users/me/tour").await;
+        assert_eq!(started.state, TourStanding::Started);
+        assert_eq!(
+            started
+                .practice_journey
+                .as_ref()
+                .map(ToString::to_string)
+                .as_deref(),
+            Some("j_first")
+        );
+        assert_eq!(started.today, before.today);
+
+        // A second tab that still sees no record loses, and is told what is there.
+        let late = put(&ann, start("j_second", none.clone())).await;
+        assert_eq!(late.status, StatusCode::CONFLICT);
+        assert_eq!(late.json::<Tour>().unwrap(), started);
+        let other = serde_json::json!({ "state": "started", "practice_journey": "j_second" });
+        let ending = |expect: serde_json::Value| serde_json::json!({ "state": "finished", "expect": expect });
+        let stale = put(&ann, ending(other)).await;
+        assert_eq!(stale.status, StatusCode::CONFLICT);
+
+        let run = serde_json::json!({ "state": "started", "practice_journey": "j_first" });
+        let finished = put(&ann, ending(run)).await;
+        assert_eq!(finished.status, StatusCode::NO_CONTENT);
+        let after: Tour = get(&ann, "/api/users/me/tour").await;
+        assert_eq!(
+            (after.state, after.practice_journey),
+            (TourStanding::Finished, None)
+        );
+        let bobs: Tour = get(&bob, "/api/users/me/tour").await;
+        assert_eq!(bobs.state, TourStanding::None);
+
+        let contradictions = [
+            serde_json::json!({ "state": "started", "expect": { "state": "none" } }),
+            serde_json::json!({ "state": "dismissed", "practice_journey": "j_x", "expect": { "state": "none" } }),
+            serde_json::json!({ "state": "dismissed", "expect": { "state": "started" } }),
+        ];
+        for body in contradictions {
+            let reply = put(&bob, body.clone()).await;
+            assert_eq!(reply.status, StatusCode::BAD_REQUEST, "{body}");
+        }
+        let bobs: Tour = get(&bob, "/api/users/me/tour").await;
+        assert_eq!(bobs.state, TourStanding::None);
     }
 
     /// Each malformed read is answered with its problem at its status.

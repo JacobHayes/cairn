@@ -1,7 +1,7 @@
 // H3: "on load, if there's no name, ask". Sign-in made the caller an identity from their verified
 // email alone; this modal asks what to call them and saves it as an ordinary identity edit. Later
 // closes it for this load; it asks again on the next.
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 
 import { useCaller, useDeployment } from "../data/react.ts";
 import { identityOf, nameProblem } from "../people/model.ts";
@@ -11,21 +11,36 @@ import { WriteStatus } from "../screens/WriteStatus.tsx";
 import { Button, Field } from "../ui/kit.tsx";
 import { asksName } from "./name-prompt.ts";
 
-export function NamePrompt() {
+/** What the prompt knows, which the shell reads too: the tour waits until the caller and deployment are read and nothing is being asked. */
+export interface NameAsk {
+  settled: boolean;
+  asking: boolean;
+  later: () => void;
+}
+
+export function useNameAsk(): NameAsk {
   const { caller } = useCaller();
   const deployment = useDeployment();
   const [later, setLater] = useState(false);
+  const asking = asksName(caller, deployment) !== undefined && deployment !== undefined && !later;
+  const dismiss = useCallback(() => { setLater(true); }, []);
+  return { settled: caller !== undefined && deployment !== undefined && !asking, asking, later: dismiss };
+}
+
+export function NamePrompt({ ask }: { ask: NameAsk }) {
+  const { caller } = useCaller();
+  const deployment = useDeployment();
   const [name, setName] = useState("");
   const write = useScreenWrite("name-prompt", "Your name");
   const dialog = useRef<HTMLDialogElement>(null);
   const identity = asksName(caller, deployment);
-  const asking = identity !== undefined && deployment !== undefined && !later;
+  const { asking } = ask;
   useEffect(() => {
     if (asking && dialog.current?.open === false) {
       dialog.current.showModal();
     }
   }, [asking]);
-  if (!asking) {
+  if (!asking || identity === undefined || deployment === undefined) {
     return null;
   }
   const problem = nameProblem(name);
@@ -41,7 +56,7 @@ export function NamePrompt() {
       data-testid="name-prompt"
       onCancel={(event) => {
         event.preventDefault();
-        setLater(true);
+        ask.later();
       }}
     >
       <form className="stack modal-body" onSubmit={(event) => { event.preventDefault(); void save(); }}>
@@ -55,7 +70,7 @@ export function NamePrompt() {
         {write.rejection === undefined ? <WriteStatus view={write.status} /> : <RejectionView rejection={write.rejection} onDismiss={write.dismiss} />}
         <span className="row">
           <Button primary type="submit" disabled={write.disabled || name.trim() === "" || problem !== undefined}>Save</Button>
-          <Button onClick={() => { setLater(true); }}>Later</Button>
+          <Button onClick={ask.later}>Later</Button>
         </span>
       </form>
     </dialog>

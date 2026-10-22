@@ -6,6 +6,7 @@ import type { Answered, HttpFailure, OpenTicks } from "@cairn/client";
 import { HostFailure, type InBrowserHost } from "@cairn/wasm";
 
 import { Missing, ReadFailed, type Host, type Markdown, type Patch, type RouteImport } from "./host.ts";
+import { browserTour } from "./browser-tour.ts";
 import { browserProposals } from "./proposals.ts";
 
 /** A failure of the root as the data layer reads one: what it says, with no HTTP status. */
@@ -69,6 +70,7 @@ function ticksOf(root: InBrowserHost): OpenTicks {
 
 /** The in-browser host over `root`. */
 export function browserHost(root: InBrowserHost): Host {
+  const { tour, putTour } = browserTour();
   return {
     kind: "browser",
     capabilities: () => read("the capabilities", () => root.capabilities()),
@@ -79,6 +81,8 @@ export function browserHost(root: InBrowserHost): Host {
       read(version === undefined ? `${route}'s draft` : `${route} version ${String(version)}`, () => root.exportFile(route, version)),
     importRoute: (request) => importInto(root, request),
     caller: () => read("the caller", () => root.caller()),
+    tour,
+    putTour,
     userNames: (users) => read("the users", () => root.userNames(users)),
     deployment: () => read("the deployment", () => root.deployment()),
     identityReferences: (identity) => read(identity, () => root.identityReferences(identity)),

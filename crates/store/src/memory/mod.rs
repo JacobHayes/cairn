@@ -31,7 +31,8 @@ use crate::query::{
 };
 use crate::records::{
     AgentTokenRecord, AuthLogEntry, AuthLogQuery, ConversationRecord, ConversationSummary,
-    LoggedAuthEntry, LoginRecord, OAuthStateRecord, SecretHash, SessionRecord, UserRecord,
+    LoggedAuthEntry, LoginRecord, OAuthStateRecord, SecretHash, SessionRecord, TourMark,
+    TourRecord, UserRecord,
 };
 use crate::store::{AuthStore, ConversationStore, Store};
 use crate::target::{Document, LoadTarget};
@@ -539,6 +540,18 @@ impl AuthStore for MemoryStore {
 
     async fn agent_tokens_of(&self, user: &UserId) -> Result<Vec<AgentTokenRecord>, StoreError> {
         Ok(self.state().outside.agent_tokens_of(user))
+    }
+
+    async fn tour(&self, user: &UserId) -> Result<Option<TourRecord>, StoreError> {
+        Ok(self.state().outside.tour(user))
+    }
+
+    async fn put_tour(
+        &self,
+        record: TourRecord,
+        expect: Option<TourMark>,
+    ) -> Result<Result<(), Option<TourRecord>>, StoreError> {
+        self.state().outside.put_tour(record, expect.as_ref())
     }
 
     async fn append_auth_log(&self, entry: AuthLogEntry) -> Result<u64, StoreError> {

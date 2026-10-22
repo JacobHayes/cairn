@@ -45,6 +45,11 @@ export type UserName = Schema<"UserName">;
 export type McpAccess = Schema<"McpAccess">;
 export type AgentToken = Schema<"AgentToken">;
 export type MintedToken = Schema<"MintedToken">;
+export type Tour = Schema<"Tour">;
+export type TourWriteRequest = Schema<"TourWrite">;
+
+/** What a tour write came to: written, over another record than the writer expected (the current one), or not answered. */
+export type TourWrite = { ok: true } | { ok: false; current: Tour } | { ok: false; failure: HttpFailure };
 export type { JourneyIndexQuery };
 
 export type HostKind = "server" | "browser";
@@ -105,6 +110,10 @@ export interface Host {
   importRoute(request: RouteImport): Promise<Answered<HttpFailure>>;
   /** The caller, their logins, and the identities their verified emails name (H3). */
   caller(): Promise<Caller>;
+  /** The caller's place in the tour of Cairn, and today in the deployment's zone. */
+  tour(): Promise<Tour>;
+  /** Moves the caller's place in the tour, only over the record the write expects. */
+  putTour(write: TourWriteRequest): Promise<TourWrite>;
   /** H3: the names of `users` (at most a page of them); one that does not exist is left out. */
   userNames(users: readonly string[]): Promise<UserName[]>;
   /**

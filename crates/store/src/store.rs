@@ -16,7 +16,8 @@ use crate::query::{
 };
 use crate::records::{
     AgentTokenRecord, AuthLogEntry, AuthLogQuery, ConversationRecord, ConversationSummary,
-    LoggedAuthEntry, LoginRecord, OAuthStateRecord, SecretHash, SessionRecord, UserRecord,
+    LoggedAuthEntry, LoginRecord, OAuthStateRecord, SecretHash, SessionRecord, TourMark,
+    TourRecord, UserRecord,
 };
 use crate::target::{Document, LoadTarget};
 
@@ -191,6 +192,19 @@ pub trait AuthStore: Send + Sync {
 
     /// A user's agent tokens, by agent id.
     async fn agent_tokens_of(&self, user: &UserId) -> Result<Vec<AgentTokenRecord>, StoreError>;
+
+    /// A user's place in the tour of Cairn; none before they have one.
+    async fn tour(&self, user: &UserId) -> Result<Option<TourRecord>, StoreError>;
+
+    /// Writes `record` only when the user's current record says `expect` (`None` for no
+    /// record), atomically: `Ok(Ok(()))` when written, and on a mismatch `Ok(Err(current))`
+    /// with the record unchanged, so a writer whose view is stale can continue from the
+    /// current one. A record naming a user that does not exist is malformed.
+    async fn put_tour(
+        &self,
+        record: TourRecord,
+        expect: Option<TourMark>,
+    ) -> Result<Result<(), Option<TourRecord>>, StoreError>;
 
     /// Appends to the auth log; the entry's position.
     async fn append_auth_log(&self, entry: AuthLogEntry) -> Result<u64, StoreError>;

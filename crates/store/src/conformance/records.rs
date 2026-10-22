@@ -12,7 +12,7 @@ use crate::query::PageSize;
 use crate::records::{
     AgentTokenRecord, AuthEvent, AuthLogEntry, AuthLogQuery, ConversationMessage,
     ConversationRecord, LoginRecord, MessageAuthor, OAuthStateKind, OAuthStateRecord, SecretHash,
-    SessionRecord, UserRecord,
+    SessionRecord, TourRecord, TourState, UserRecord,
 };
 use crate::store::{AuthStore, ConversationStore};
 
@@ -215,6 +215,76 @@ pub async fn agent_tokens_are_found_by_digest_and_revoked_by_a_put<B: Backend>(b
     );
     let clash = store.put_agent_token(token("ag_clash", 'd', "u_bob")).await;
     assert!(matches!(clash, Err(StoreError::Malformed(_))), "{clash:?}");
+}
+
+fn tour(user: &str, state: TourState, journey: Option<&str>, minute: i64) -> TourRecord {
+    TourRecord {
+        user: id(user),
+        state,
+        practice_journey: journey.map(id),
+        updated_at: at(minute),
+    }
+}
+
+/// A tour record is written only over the record the writer expected: an absent one is
+/// created, a stale expectation answers the current record and changes nothing, users are
+/// independent, and a record for no user is malformed.
+pub async fn a_tour_record_is_written_only_over_the_record_expected<B: Backend>(backend: &B) {
+    let store = open(backend).await;
+    store.put_user(user("u_ann")).await.unwrap();
+    store.put_user(user("u_bob")).await.unwrap();
+    assert_eq!(store.tour(&id("u_ann")).await.unwrap(), None);
+
+    let started = tour("u_ann", TourState::Started, Some("j_practice"), 1);
+    // A writer who expects a record where there is none is stale.
+    let stale = Some(tour("u_ann", TourState::Started, Some("j_other"), 0).mark());
+    assert_eq!(
+        store.put_tour(started.clone(), stale).await.unwrap(),
+        Err(None)
+    );
+    assert_eq!(store.tour(&id("u_ann")).await.unwrap(), None);
+
+    assert_eq!(store.put_tour(started.clone(), None).await.unwrap(), Ok(()));
+    assert_eq!(
+        store.tour(&id("u_ann")).await.unwrap(),
+        Some(started.clone())
+    );
+    assert_eq!(store.tour(&id("u_bob")).await.unwrap(), None);
+
+    // Creating again over a record that exists answers it unchanged.
+    let again = tour("u_ann", TourState::Started, Some("j_second"), 2);
+    assert_eq!(
+        store.put_tour(again.clone(), None).await.unwrap(),
+        Err(Some(started.clone()))
+    );
+    // A run's ending that names another run changes nothing either.
+    let ended = tour("u_ann", TourState::Finished, None, 3);
+    let other_run = Some(tour("u_ann", TourState::Started, Some("j_second"), 0).mark());
+    assert_eq!(
+        store.put_tour(ended.clone(), other_run).await.unwrap(),
+        Err(Some(started.clone()))
+    );
+    assert_eq!(
+        store.tour(&id("u_ann")).await.unwrap(),
+        Some(started.clone())
+    );
+
+    assert_eq!(
+        store
+            .put_tour(ended.clone(), Some(started.mark()))
+            .await
+            .unwrap(),
+        Ok(())
+    );
+    assert_eq!(store.tour(&id("u_ann")).await.unwrap(), Some(ended));
+    assert_eq!(store.tour(&id("u_bob")).await.unwrap(), None);
+
+    let nobody = tour("u_nobody", TourState::Dismissed, None, 4);
+    let refused = store.put_tour(nobody, None).await;
+    assert!(
+        matches!(refused, Err(StoreError::Malformed(_))),
+        "{refused:?}"
+    );
 }
 
 /// The auth log appends in order and pages, by user or not.

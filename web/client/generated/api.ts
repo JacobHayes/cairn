@@ -1033,6 +1033,24 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/users/me/tour": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** The caller's place in the tour of Cairn, and today in the deployment's zone. */
+        get: operations["getTour"];
+        /** Moves the caller's place in the tour of Cairn, only over the record the write expects. */
+        put: operations["putTour"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/healthz": {
         parameters: {
             query?: never;
@@ -5438,6 +5456,41 @@ export interface components {
         };
         /** @description A set of record addresses. */
         TouchedSet: components["schemas"]["RecordKey"][];
+        /** @description The caller's place in the tour of Cairn, and today in the deployment's zone. */
+        Tour: {
+            /** @description The practice journey of a started run; it may have been deleted since. */
+            practice_journey?: components["schemas"]["JourneyId"] | null;
+            /** @description Where they are. */
+            state: components["schemas"]["TourStanding"];
+            /**
+             * Format: date
+             * @description Today in the deployment's zone: the date the practice journey's screens call today.
+             */
+            today: string;
+        };
+        /** @description The record a tour write expects to replace. */
+        TourExpect: {
+            /** @description The practice journey of a started record. */
+            practice_journey?: components["schemas"]["JourneyId"] | null;
+            /** @description Where the writer last saw them. */
+            state: components["schemas"]["TourStanding"];
+        };
+        /** @description Where a person is in the tour of Cairn. */
+        TourStanding: "none" | "started" | "finished" | "dismissed";
+        /** @description `PUT /api/users/me/tour`: where the caller's tour goes, and the record it replaces. */
+        TourWrite: {
+            /** @description The record this replaces; a mismatch answers 409 with the current one. */
+            expect: components["schemas"]["TourExpect"];
+            /** @description The practice journey of a started run. */
+            practice_journey?: components["schemas"]["JourneyId"] | null;
+            /**
+             * @description The new place: `started` carries the practice journey; `finished` and `dismissed`
+             *     carry none.
+             */
+            state: components["schemas"]["TourWriteState"];
+        };
+        /** @description Where a tour write puts the caller. */
+        TourWriteState: "started" | "finished" | "dismissed";
         /**
          * @description What a node depends on and what depends on it, across levels, over the full structural
          *     graph: terminal and not-relevant nodes included.
@@ -11991,6 +12044,169 @@ export interface operations {
             };
             /** @description No such resource. */
             404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description The server failed; the request id names it in the logs. */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description A limit was reached or the request timed out; retry after `Retry-After`. Or: The auth layer could not ask a sign-in provider (in text, without `Retry-After`). */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Problem"];
+                    "text/plain": string;
+                };
+            };
+        };
+    };
+    getTour: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Answered. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Tour"];
+                };
+            };
+            /** @description The request is malformed. */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description No credential, or one that is refused (the auth layer, in text). */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "text/plain": string;
+                };
+            };
+            /** @description Only a user may do this, not an agent acting for one. Or: The auth layer refused the peer: a local-only provider and a remote peer, or login headers from a peer no proxy-mode provider trusts (in text). */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Problem"];
+                    "text/plain": string;
+                };
+            };
+            /** @description The server failed; the request id names it in the logs. */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description A limit was reached or the request timed out; retry after `Retry-After`. Or: The auth layer could not ask a sign-in provider (in text, without `Retry-After`). */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Problem"];
+                    "text/plain": string;
+                };
+            };
+        };
+    };
+    putTour: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["TourWrite"];
+            };
+        };
+        responses: {
+            /** @description Done. */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description The request is malformed. */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description No credential, or one that is refused (the auth layer, in text). */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "text/plain": string;
+                };
+            };
+            /** @description Only a user may do this, not an agent acting for one. Or: The auth layer refused the peer: a local-only provider and a remote peer, or login headers from a peer no proxy-mode provider trusts (in text). */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Problem"];
+                    "text/plain": string;
+                };
+            };
+            /** @description The caller's record is not the one the write expected: the current record, unchanged. */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Tour"];
+                };
+            };
+            /** @description The body is over the request size limit. */
+            413: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description The body is not application/json. */
+            415: {
                 headers: {
                     [name: string]: unknown;
                 };

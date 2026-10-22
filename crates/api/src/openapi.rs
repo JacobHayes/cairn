@@ -17,7 +17,8 @@ use crate::wire::{
     IdentityReferences, JourneyPage, Mine, MintedToken, NodeDetail, PatchAnswer, PatchRequest,
     Problem, Projected, ProposalAnswer, ProposalApply, ProposalCreate, ProposalEdit, ProposalList,
     ProposalReview, ProposalStep, RelinkRequest, RouteDetail, RouteImport, RoutePage,
-    SaveAsRouteRequest, SearchPage, Tick, TokenRequest, TurnReply, UpgradeRequest, UserName,
+    SaveAsRouteRequest, SearchPage, Tick, TokenRequest, Tour, TourWrite, TurnReply, UpgradeRequest,
+    UserName,
 };
 use cairn_schema::{
     AgentId, DecisionView, Deployment, Derived, DomainDocument, ExplainedField, ExplanationPage,
@@ -49,6 +50,8 @@ struct Operation {
     success: Success,
     /// A patch underneath: answered 409 or 422 with a rejection.
     patch: bool,
+    /// A conflict answers 409 with this body, in these words.
+    conflict: Option<(&'static str, SchemaFn)>,
     /// Drafted by the engine: also answered 422 with a problem when it cannot be drafted.
     drafts: bool,
 }
@@ -62,6 +65,7 @@ const fn operation(endpoint: &'static Endpoint, summary: &'static str) -> Operat
         body: None,
         success: Success::Empty,
         patch: false,
+        conflict: None,
         drafts: false,
     }
 }
@@ -529,6 +533,23 @@ fn users() -> Vec<Operation> {
                 "Revokes one of the caller's agent tokens.",
             )
         },
+        read::<Tour>(
+            &at::TOUR_GET,
+            "The caller's place in the tour of Cairn, and today in the deployment's zone.",
+        ),
+        Operation {
+            body: Some(schema_of::<TourWrite>),
+            conflict: Some((
+                "The caller's record is not the one the write expected: the current record, \
+                 unchanged.",
+                schema_of::<Tour>,
+            )),
+            ..operation(
+                &at::TOUR_PUT,
+                "Moves the caller's place in the tour of Cairn, only over the record the write \
+                 expects.",
+            )
+        },
     ]
 }
 
@@ -778,6 +799,12 @@ fn responses(
         answers.insert("409".to_owned(), json_of(rejection.as_value(), stale));
         let invalid = "Invalid: every violation, by path.";
         answers.insert("422".to_owned(), json_of(rejection.as_value(), invalid));
+    }
+    if let Some((description, schema)) = operation.conflict {
+        answers.insert(
+            "409".to_owned(),
+            json_of(schema(generator).as_value(), description),
+        );
     }
     if operation.drafts {
         let either = json!({"oneOf": [rejection, problem]});

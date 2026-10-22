@@ -17,7 +17,7 @@ import {
 import { serverAssistant } from "./assistant.ts";
 import type { AgentToken } from "./host.ts";
 import { serverProposals } from "./proposals.ts";
-import { Missing, ReadFailed, Skewed, type Host, type JourneyIndexQuery, type Markdown, type RouteImport } from "./host.ts";
+import { Missing, ReadFailed, Skewed, type Host, type JourneyIndexQuery, type Markdown, type RouteImport, type TourWrite, type TourWriteRequest } from "./host.ts";
 
 interface Reply<T> {
   data?: T;
@@ -121,6 +121,24 @@ function serverAgentTokens(client: CairnClient): NonNullable<Host["agentTokens"]
   };
 }
 
+/** `PUT /api/users/me/tour`: written, over another record than expected (409, with the current one), or not answered. */
+async function putTourOver(client: CairnClient, write: TourWriteRequest): Promise<TourWrite> {
+  let reply;
+  try {
+    reply = await client.PUT("/api/users/me/tour", { body: write });
+  } catch (thrown) {
+    return { ok: false, failure: networkFailure(thrown) };
+  }
+  const { error, response } = reply;
+  if (response.ok) {
+    return { ok: true };
+  }
+  if (response.status === 409 && typeof error === "object" && "state" in error) {
+    return { ok: false, current: error };
+  }
+  return { ok: false, failure: answerFailure(response.status, error) };
+}
+
 /** The server at `origin`, with the build the page was loaded from (none on a page Vite's dev server served, which is never in skew). */
 export function serverHost(origin: string, build: string | undefined): Host {
   const client: CairnClient = createCairnClient(origin);
@@ -136,6 +154,8 @@ export function serverHost(origin: string, build: string | undefined): Host {
       ),
     importRoute: (request) => importOver(client, request),
     caller: () => answered("the caller", () => client.GET("/api/users/me")),
+    tour: () => answered("the tour", () => client.GET("/api/users/me/tour")),
+    putTour: (write) => putTourOver(client, write),
     userNames: (users) => answered("the users", () => client.GET("/api/users", { params: { query: { id: [...users] } } })),
     deployment: () => answered("the deployment", () => client.GET("/api/deployment")),
     identityReferences: (identity) => answered(identity, () => client.GET("/api/deployment/identities/{key}/references", { params: { path: { key: identity } } })),

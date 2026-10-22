@@ -352,6 +352,11 @@ pub static REVOKE_TOKEN: Endpoint = for_users(
     "/api/users/me/tokens/{agent}",
     "revokeAgentToken",
 );
+/// `GET /api/users/me/tour`: the caller's place in the tour of Cairn, and today.
+pub static TOUR_GET: Endpoint = for_users(Method::GET, "/api/users/me/tour", "getTour");
+/// `PUT /api/users/me/tour`: moves the caller's place in the tour, only over the record the
+/// writer expected.
+pub static TOUR_PUT: Endpoint = for_users(Method::PUT, "/api/users/me/tour", "putTour");
 
 /// `POST /api/journeys/{id}/assistant`: one assistant turn about a journey (I5), when the host
 /// offers the assistant.
@@ -383,7 +388,7 @@ pub static ASSISTANT_ROUTE_DRAFT_CONVERSATION: Endpoint = for_users(
 );
 
 /// Every endpoint, in the order the OpenAPI document lists them.
-pub static ALL: [&Endpoint; 70] = [
+pub static ALL: [&Endpoint; 72] = [
     &HEALTH,
     &CAPABILITIES,
     &PATCH_JOURNEY,
@@ -450,6 +455,8 @@ pub static ALL: [&Endpoint; 70] = [
     &TOKENS,
     &MINT_TOKEN,
     &REVOKE_TOKEN,
+    &TOUR_GET,
+    &TOUR_PUT,
     &ASSISTANT_JOURNEY,
     &ASSISTANT_ROUTE_DRAFT,
     &ASSISTANT_JOURNEY_CONVERSATION,

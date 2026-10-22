@@ -93,10 +93,11 @@ interface Setters {
   setDock: Dispatch<SetStateAction<AssistantDock | undefined>>;
   setProposalsCount: (count: number | undefined) => void;
   setCloseTo: (address: string | undefined) => void;
+  setSnap: (snap: SheetSnap) => void;
 }
 
 /** What screens tell the shell: stable for the shell's life, so effects keyed on it run once. */
-function useActions({ setCounts, setTab, setHidden, setDock, setProposalsCount, setCloseTo }: Setters): FrameActions {
+function useActions({ setCounts, setTab, setHidden, setDock, setProposalsCount, setCloseTo, setSnap }: Setters): FrameActions {
   return useMemo<FrameActions>(
     () => ({
       mount: (slot) => {
@@ -122,8 +123,9 @@ function useActions({ setCounts, setTab, setHidden, setDock, setProposalsCount, 
         };
       },
       closeTo: setCloseTo,
+      snap: setSnap,
     }),
-    [setCounts, setTab, setHidden, setDock, setProposalsCount, setCloseTo],
+    [setCounts, setTab, setHidden, setDock, setProposalsCount, setCloseTo, setSnap],
   );
 }
 
@@ -154,7 +156,7 @@ export function useFrame(): Frame {
     wasWide.current = wide;
   }, [wide, setSnap]);
   const [closeTo, setCloseTo] = useState<string | undefined>(undefined);
-  const actions = useActions({ setCounts, setTab, setHidden, setDock, setProposalsCount, setCloseTo });
+  const actions = useActions({ setCounts, setTab, setHidden, setDock, setProposalsCount, setCloseTo, setSnap });
   // A pane with nothing in it cannot be the tab in view.
   const order: InspectorTab[] = [tab, "inspector", "assistant", "proposals"];
   const shown: InspectorTab = order.find((each) => counts[each] > 0) ?? "inspector";

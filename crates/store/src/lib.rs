@@ -42,7 +42,8 @@ pub use query::{
 pub use records::{
     AgentTokenRecord, AuthEvent, AuthLogEntry, AuthLogQuery, ConversationMessage,
     ConversationRecord, ConversationSummary, LoggedAuthEntry, LoginRecord, MessageAuthor,
-    OAuthStateKind, OAuthStateRecord, SecretHash, SessionRecord, UserRecord,
+    OAuthStateKind, OAuthStateRecord, SecretHash, SessionRecord, TourMark, TourRecord, TourState,
+    UserRecord,
 };
 pub use store::{AuthStore, ConversationStore, Store};
 pub use target::{Document, LoadTarget};

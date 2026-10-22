@@ -42,7 +42,8 @@ use cairn_store::{
     ConversationRecord, ConversationStore, ConversationSummary, Document, EventQuery, Faults,
     JourneyMatches, JourneyQuery, JourneySummary, LoadTarget, LoggedAuthEntry, LoggedEvent,
     LoginRecord, OAuthStateRecord, Page, PageSize, ProposalPage, ProposalQuery, Revisions,
-    RouteDetail, SearchQuery, SecretHash, SessionRecord, Store, StoreError, UserRecord,
+    RouteDetail, SearchQuery, SecretHash, SessionRecord, Store, StoreError, TourMark, TourRecord,
+    UserRecord,
 };
 
 use pool::Pool;
@@ -373,6 +374,18 @@ impl AuthStore for SqliteStore {
 
     async fn agent_tokens_of(&self, user: &UserId) -> Result<Vec<AgentTokenRecord>, StoreError> {
         read!(self, [user] connection => records::agent_tokens_of(connection, &user))
+    }
+
+    async fn tour(&self, user: &UserId) -> Result<Option<TourRecord>, StoreError> {
+        read!(self, [user] connection => records::tour(connection, &user))
+    }
+
+    async fn put_tour(
+        &self,
+        record: TourRecord,
+        expect: Option<TourMark>,
+    ) -> Result<Result<(), Option<TourRecord>>, StoreError> {
+        in_transaction!(self, [] connection => records::put_tour(connection, &record, expect.as_ref()))
     }
 
     async fn append_auth_log(&self, entry: AuthLogEntry) -> Result<u64, StoreError> {

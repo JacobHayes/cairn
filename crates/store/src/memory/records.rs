@@ -9,7 +9,8 @@ use crate::commit::StoreError;
 use crate::query::{Page, PageSize};
 use crate::records::{
     AgentTokenRecord, AuthLogEntry, AuthLogQuery, ConversationRecord, ConversationSummary,
-    LoggedAuthEntry, LoginRecord, OAuthStateRecord, SecretHash, SessionRecord, UserRecord,
+    LoggedAuthEntry, LoginRecord, OAuthStateRecord, SecretHash, SessionRecord, TourMark,
+    TourRecord, UserRecord,
 };
 
 /// Auth state and conversations.
@@ -20,6 +21,7 @@ pub(super) struct Outside {
     sessions: BTreeMap<SecretHash, SessionRecord>,
     oauth: BTreeMap<SecretHash, OAuthStateRecord>,
     tokens: BTreeMap<AgentId, AgentTokenRecord>,
+    tours: BTreeMap<UserId, TourRecord>,
     auth_log: Vec<LoggedAuthEntry>,
     conversations: BTreeMap<ConversationId, ConversationRecord>,
 }
@@ -130,6 +132,24 @@ impl Outside {
     pub fn agent_tokens_of(&self, user: &UserId) -> Vec<AgentTokenRecord> {
         let mine = self.tokens.values().filter(|token| token.user == *user);
         mine.cloned().collect()
+    }
+
+    pub fn tour(&self, user: &UserId) -> Option<TourRecord> {
+        self.tours.get(user).cloned()
+    }
+
+    pub fn put_tour(
+        &mut self,
+        record: TourRecord,
+        expect: Option<&TourMark>,
+    ) -> Result<Result<(), Option<TourRecord>>, StoreError> {
+        self.user_exists(&record.user)?;
+        let current = self.tours.get(&record.user);
+        if current.map(TourRecord::mark).as_ref() != expect {
+            return Ok(Err(current.cloned()));
+        }
+        self.tours.insert(record.user.clone(), record);
+        Ok(Ok(()))
     }
 
     pub fn append_auth_log(&mut self, entry: AuthLogEntry) -> u64 {

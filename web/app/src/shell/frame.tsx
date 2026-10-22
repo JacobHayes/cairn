@@ -12,6 +12,7 @@ import { createPortal } from "react-dom";
 import { useLocation } from "react-router";
 
 import { useNodeAddresses } from "../journeys/address.ts";
+import type { SheetSnap } from "./InspectorColumn.tsx";
 
 export type InspectorTab = "inspector" | "assistant" | "proposals";
 
@@ -70,6 +71,8 @@ export interface FrameActions {
   countProposals: (count: number | undefined) => () => void;
   /** Where Esc takes the sheet: `address` closes the open node; undefined when nothing is open. */
   closeTo: (address: string | undefined) => void;
+  /** Sets the sheet's height (peek, half, full); a column has no height to set. */
+  snap: (to: SheetSnap) => void;
 }
 
 export const FrameStateContext = createContext<FrameState | undefined>(undefined);

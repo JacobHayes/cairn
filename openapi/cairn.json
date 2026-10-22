@@ -14755,6 +14755,137 @@
         "type": "array",
         "uniqueItems": true
       },
+      "Tour": {
+        "additionalProperties": false,
+        "description": "The caller's place in the tour of Cairn, and today in the deployment's zone.",
+        "properties": {
+          "practice_journey": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/JourneyId"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The practice journey of a started run; it may have been deleted since."
+          },
+          "state": {
+            "$ref": "#/components/schemas/TourStanding",
+            "description": "Where they are."
+          },
+          "today": {
+            "description": "Today in the deployment's zone: the date the practice journey's screens call today.",
+            "format": "date",
+            "type": "string"
+          }
+        },
+        "required": [
+          "state",
+          "today"
+        ],
+        "type": "object"
+      },
+      "TourExpect": {
+        "additionalProperties": false,
+        "description": "The record a tour write expects to replace.",
+        "properties": {
+          "practice_journey": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/JourneyId"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The practice journey of a started record."
+          },
+          "state": {
+            "$ref": "#/components/schemas/TourStanding",
+            "description": "Where the writer last saw them."
+          }
+        },
+        "required": [
+          "state"
+        ],
+        "type": "object"
+      },
+      "TourStanding": {
+        "description": "Where a person is in the tour of Cairn.",
+        "oneOf": [
+          {
+            "const": "none",
+            "description": "No record: they have not started or dismissed it.",
+            "type": "string"
+          },
+          {
+            "const": "started",
+            "description": "A run is under way, with a practice journey.",
+            "type": "string"
+          },
+          {
+            "const": "finished",
+            "description": "They went through it to the end.",
+            "type": "string"
+          },
+          {
+            "const": "dismissed",
+            "description": "They turned it down.",
+            "type": "string"
+          }
+        ]
+      },
+      "TourWrite": {
+        "additionalProperties": false,
+        "description": "`PUT /api/users/me/tour`: where the caller's tour goes, and the record it replaces.",
+        "properties": {
+          "expect": {
+            "$ref": "#/components/schemas/TourExpect",
+            "description": "The record this replaces; a mismatch answers 409 with the current one."
+          },
+          "practice_journey": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/JourneyId"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The practice journey of a started run."
+          },
+          "state": {
+            "$ref": "#/components/schemas/TourWriteState",
+            "description": "The new place: `started` carries the practice journey; `finished` and `dismissed`\ncarry none."
+          }
+        },
+        "required": [
+          "state",
+          "expect"
+        ],
+        "type": "object"
+      },
+      "TourWriteState": {
+        "description": "Where a tour write puts the caller.",
+        "oneOf": [
+          {
+            "const": "started",
+            "description": "A run begins.",
+            "type": "string"
+          },
+          {
+            "const": "finished",
+            "description": "A run ends, gone through.",
+            "type": "string"
+          },
+          {
+            "const": "dismissed",
+            "description": "A run ends, turned down.",
+            "type": "string"
+          }
+        ]
+      },
       "Trace": {
         "additionalProperties": false,
         "description": "What a node depends on and what depends on it, across levels, over the full structural\ngraph: terminal and not-relevant nodes included.",
@@ -23852,6 +23983,193 @@
           }
         },
         "summary": "Revokes one of the caller's agent tokens."
+      }
+    },
+    "/api/users/me/tour": {
+      "get": {
+        "operationId": "getTour",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Tour"
+                }
+              }
+            },
+            "description": "Answered."
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "The request is malformed."
+          },
+          "401": {
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "description": "No credential, or one that is refused (the auth layer, in text)."
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              },
+              "text/plain": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "description": "Only a user may do this, not an agent acting for one. Or: The auth layer refused the peer: a local-only provider and a remote peer, or login headers from a peer no proxy-mode provider trusts (in text)."
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "The server failed; the request id names it in the logs."
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              },
+              "text/plain": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "description": "A limit was reached or the request timed out; retry after `Retry-After`. Or: The auth layer could not ask a sign-in provider (in text, without `Retry-After`)."
+          }
+        },
+        "summary": "The caller's place in the tour of Cairn, and today in the deployment's zone."
+      },
+      "put": {
+        "operationId": "putTour",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/TourWrite"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "204": {
+            "description": "Done."
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "The request is malformed."
+          },
+          "401": {
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "description": "No credential, or one that is refused (the auth layer, in text)."
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              },
+              "text/plain": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "description": "Only a user may do this, not an agent acting for one. Or: The auth layer refused the peer: a local-only provider and a remote peer, or login headers from a peer no proxy-mode provider trusts (in text)."
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Tour"
+                }
+              }
+            },
+            "description": "The caller's record is not the one the write expected: the current record, unchanged."
+          },
+          "413": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "The body is over the request size limit."
+          },
+          "415": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "The body is not application/json."
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "The server failed; the request id names it in the logs."
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              },
+              "text/plain": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "description": "A limit was reached or the request timed out; retry after `Retry-After`. Or: The auth layer could not ask a sign-in provider (in text, without `Retry-After`)."
+          }
+        },
+        "summary": "Moves the caller's place in the tour of Cairn, only over the record the write expects."
       }
     },
     "/healthz": {

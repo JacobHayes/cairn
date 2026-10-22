@@ -5,3 +5,4 @@ mod deleted_ids_migration;
 mod milestone_done_migration;
 mod open;
 mod property_round_trip;
+mod tour_migration;

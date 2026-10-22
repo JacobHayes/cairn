@@ -2,7 +2,7 @@
 
 use std::collections::BTreeSet;
 
-use cairn_schema::{AgentId, Email, IdentityKey, Slug, Timestamp, Title, UserId};
+use cairn_schema::{AgentId, Date, Email, IdentityKey, JourneyId, Slug, Timestamp, Title, UserId};
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
@@ -122,6 +122,115 @@ impl From<cairn_auth::AgentToken> for AgentToken {
             name,
             created_at,
             revoked_at,
+        }
+    }
+}
+
+// PRD: C20.
+/// Where a person is in the tour of Cairn.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+#[serde(rename_all = "snake_case")]
+pub enum TourStanding {
+    /// No record: they have not started or dismissed it.
+    None,
+    /// A run is under way, with a practice journey.
+    Started,
+    /// They went through it to the end.
+    Finished,
+    /// They turned it down.
+    Dismissed,
+}
+
+impl From<Option<cairn_store::TourState>> for TourStanding {
+    fn from(state: Option<cairn_store::TourState>) -> Self {
+        match state {
+            None => TourStanding::None,
+            Some(cairn_store::TourState::Started) => TourStanding::Started,
+            Some(cairn_store::TourState::Finished) => TourStanding::Finished,
+            Some(cairn_store::TourState::Dismissed) => TourStanding::Dismissed,
+        }
+    }
+}
+
+impl TourStanding {
+    /// The stored state, none for no record.
+    #[must_use]
+    pub fn state(self) -> Option<cairn_store::TourState> {
+        match self {
+            TourStanding::None => None,
+            TourStanding::Started => Some(cairn_store::TourState::Started),
+            TourStanding::Finished => Some(cairn_store::TourState::Finished),
+            TourStanding::Dismissed => Some(cairn_store::TourState::Dismissed),
+        }
+    }
+}
+
+/// The caller's place in the tour of Cairn, and today in the deployment's zone.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+#[serde(deny_unknown_fields)]
+pub struct Tour {
+    /// Where they are.
+    pub state: TourStanding,
+    /// The practice journey of a started run; it may have been deleted since.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub practice_journey: Option<JourneyId>,
+    /// Today in the deployment's zone: the date the practice journey's screens call today.
+    pub today: Date,
+}
+
+impl From<cairn_service::TourView> for Tour {
+    fn from(view: cairn_service::TourView) -> Self {
+        Self {
+            state: view.record.as_ref().map(|record| record.state).into(),
+            practice_journey: view.record.and_then(|record| record.practice_journey),
+            today: view.today,
+        }
+    }
+}
+
+/// The record a tour write expects to replace.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+#[serde(deny_unknown_fields)]
+pub struct TourExpect {
+    /// Where the writer last saw them.
+    pub state: TourStanding,
+    /// The practice journey of a started record.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub practice_journey: Option<JourneyId>,
+}
+
+/// `PUT /api/users/me/tour`: where the caller's tour goes, and the record it replaces.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+#[serde(deny_unknown_fields)]
+pub struct TourWrite {
+    /// The new place: `started` carries the practice journey; `finished` and `dismissed`
+    /// carry none.
+    pub state: TourWriteState,
+    /// The practice journey of a started run.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub practice_journey: Option<JourneyId>,
+    /// The record this replaces; a mismatch answers 409 with the current one.
+    pub expect: TourExpect,
+}
+
+/// Where a tour write puts the caller.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+#[serde(rename_all = "snake_case")]
+pub enum TourWriteState {
+    /// A run begins.
+    Started,
+    /// A run ends, gone through.
+    Finished,
+    /// A run ends, turned down.
+    Dismissed,
+}
+
+impl From<TourWriteState> for cairn_store::TourState {
+    fn from(state: TourWriteState) -> Self {
+        match state {
+            TourWriteState::Started => cairn_store::TourState::Started,
+            TourWriteState::Finished => cairn_store::TourState::Finished,
+            TourWriteState::Dismissed => cairn_store::TourState::Dismissed,
         }
     }
 }

@@ -3,7 +3,7 @@
 // column on the right (INSPECTOR | ASSISTANT; a bottom sheet below 1100px; a rail when hidden). The sync dot sits
 // beside the brand at the top of the rail. The frame is one `100dvh` grid with one scroller per
 // region (app.css); below 720px it is one scrolling column.
-import { Suspense } from "react";
+import { Suspense, type ReactNode } from "react";
 import { Link, Outlet, useLocation } from "react-router";
 
 import { pathTo, sectionOf } from "../address.ts";
@@ -13,7 +13,8 @@ import { ROUTES_INDEX_PATH } from "../routes/address.ts";
 import { FrameActionsContext, FrameStateContext } from "./frame.tsx";
 import { InspectorColumn } from "./InspectorColumn.tsx";
 import { KeysHint } from "./KeysHint.tsx";
-import { NamePrompt } from "./NamePrompt.tsx";
+import { Tour, TourProvider, useTour } from "../tour/Tour.tsx";
+import { NamePrompt, useNameAsk } from "./NamePrompt.tsx";
 import { LoadFailure } from "./LoadFailure.tsx";
 import { SyncChip } from "./SyncChip.tsx";
 import { Toast } from "./Toast.tsx";
@@ -22,6 +23,7 @@ import { Pending } from "../ui/Pending.tsx";
 
 /** The screens, as links; the one the viewer is on is marked. */
 function Rail({ pathname }: { pathname: string }) {
+  const tour = useTour();
   const section = sectionOf(pathname);
   const offersMcp = useCapabilities().mcp != null;
   const screens = [
@@ -50,6 +52,11 @@ function Rail({ pathname }: { pathname: string }) {
             Connect an agent
           </Link>
         ) : null}
+        {tour?.railLabel === undefined ? null : (
+          <button type="button" className="rail-tour" data-testid="rail-tour" onClick={tour.take}>
+            {tour.railLabel}
+          </button>
+        )}
         <span className="rail-foot">
           <Link to={pathTo("me")} {...(section === "me" ? { "aria-current": "page" as const } : {})}>
             You
@@ -61,17 +68,30 @@ function Rail({ pathname }: { pathname: string }) {
   );
 }
 
+/** The frame element, which names the tour's step so the controls it points at can be outlined (tour.css). */
+function Frame({ inspector, sheet, children }: { inspector: string; sheet: string; children: ReactNode }) {
+  const step = useTour()?.activeStep;
+  return (
+    <div className="frame" data-inspector={inspector} data-sheet={sheet} {...(step === undefined ? {} : { "data-tour-step": step })}>
+      {children}
+    </div>
+  );
+}
+
 export function Shell() {
   // The screen the router shows, for the browser tests to wait on after an in-page navigation.
   const { pathname, search } = useLocation();
   const frame = useFrame();
+  const ask = useNameAsk();
   return (
     <FrameActionsContext value={frame.actions}>
       <FrameStateContext value={frame.state}>
-        <div className="frame" data-inspector={frame.folded ? "folded" : frame.open ? "on" : "off"} data-sheet={frame.snap}>
+        <TourProvider nameSettled={ask.settled}>
+        <Frame inspector={frame.folded ? "folded" : frame.open ? "on" : "off"} sheet={frame.snap}>
           <Rail pathname={pathname} />
-          <NamePrompt />
+          <NamePrompt ask={ask} />
           <main className="workspace" data-screen={`${pathname}${search}`}>
+            <Tour />
             <div className="ws-body">
               <LoadFailure screen={pathname}>
                 <Suspense fallback={<Pending>Loading...</Pending>}>
@@ -95,7 +115,8 @@ export function Shell() {
             assistantRef={frame.setAssistant}
             proposalsRef={frame.setProposals}
           />
-        </div>
+        </Frame>
+        </TourProvider>
       </FrameStateContext>
     </FrameActionsContext>
   );

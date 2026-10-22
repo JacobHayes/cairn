@@ -9,9 +9,10 @@ import type { Capabilities, Caller } from "../data/host.ts";
 import { useCapabilities, useCaller, useDeployment, useToday } from "../data/react.ts";
 import { dateWords } from "../status/when.ts";
 import { NodePanel } from "../acting/NodeItem.tsx";
-import { Badge, Segmented } from "../ui/kit.tsx";
+import { Badge, Button, Segmented } from "../ui/kit.tsx";
 import { THEME_CHOICES, useThemeChoice, type ThemeChoice } from "../ui/theme.ts";
 import { Failed } from "../ui/Failed.tsx";
+import { useTour } from "../tour/Tour.tsx";
 import { identityLabel } from "./label.ts";
 
 /** Where a sign-in with provider `name` starts, coming back to this screen (the tab keeps its host). */
@@ -91,6 +92,28 @@ function ThemeControl() {
   );
 }
 
+/** The tour of Cairn, always here to take (again) or continue; a closing write that did not land is retried from here. */
+function TourControl() {
+  const tour = useTour();
+  if (tour?.youLabel === undefined) {
+    return null;
+  }
+  return (
+    <section className="stack" aria-label="Tour" data-testid="tour-section">
+      <span className="label">Tour</span>
+      <span className="row">
+        <Button data-testid="you-tour" onClick={tour.take}>{tour.youLabel}</Button>
+      </span>
+      {tour.unsaved ? (
+        <span className="row" role="status" data-testid="tour-unsaved">
+          <span className="muted small">Your tour preference was not saved.</span>
+          <Button ghost onClick={() => { tour.send({ type: "save" }); }}>Retry</Button>
+        </span>
+      ) : null}
+    </section>
+  );
+}
+
 /** What the app is built with that asks to be credited (the canvas's library: decisions/2026-10-09-the-canvas-attribution-is-hidden-and-xyflow-credited.md). */
 function Licenses() {
   return (
@@ -129,6 +152,7 @@ export function You() {
         )}
       </section>
       <ThemeControl />
+      <TourControl />
       <Licenses />
     </section>
   );

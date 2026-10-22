@@ -239,6 +239,7 @@ export function InspectorColumn({ present, folded, tab, snap, tabs, proposalsCou
                 role="tab"
                 aria-selected={tab === each}
                 data-testid={`tab-${each}`}
+                {...(each === "assistant" ? { "data-tour": "assistant" } : {})}
                 onClick={() => {
                   onTab(each);
                 }}

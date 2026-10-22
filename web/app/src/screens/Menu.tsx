@@ -153,6 +153,7 @@ export function Menu({
   align = "start",
   className = "",
   role = "menu",
+  tour,
   children,
 }: {
   /** What the button shows. */
@@ -166,6 +167,7 @@ export function Menu({
   className?: string;
   /** `menu` for a list of actions; `dialog` for a popover holding controls (the filter). */
   role?: "menu" | "dialog";
+  tour?: string;
   children: (close: () => void) => ReactNode;
 }) {
   const [open, setOpen] = useState(false);
@@ -173,7 +175,7 @@ export function Menu({
   const button = useRef<HTMLButtonElement>(null);
   const popover = useRef<HTMLDivElement>(null);
   const body = useRef<HTMLDivElement>(null);
-  // Placed first: the focus moves into the popover only once it is where it will be.
+  // Placed first: focus moves into the popover only once it is placed.
   useInWindow(popover, body, open);
   const keyboard = useMenuKeys(role === "menu", open, setOpen, button, popover);
   const close = useCallback(() => { setOpen(false); }, []);
@@ -197,6 +199,7 @@ export function Menu({
         aria-label={label}
         {...(title === undefined ? {} : { title })}
         data-testid={testId}
+        {...(tour === undefined ? {} : { "data-tour": tour })}
         onKeyDown={keyboard.onButtonKeyDown}
         onClick={keyboard.onClick}
       >

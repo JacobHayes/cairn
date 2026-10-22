@@ -291,6 +291,7 @@ function FrontierChip({ subject, screen }: { subject: ViewSubject; screen: Scree
       disabled={off !== undefined}
       title={off ?? `Frontier  Shift F. ${String(journey.derived.acting_frontier.length)} can move now. ${FRONTIER_WORDS}`}
       data-testid="chip-frontier"
+      data-tour="frontier"
       onClick={() => { onState({ ...state, frontier: !state.frontier }); }}
     >
       Frontier
@@ -345,6 +346,7 @@ function PhoneControls({ subject, screen, badges, end }: { subject: ViewSubject;
         label="Controls"
         title={tip(subject.offers.frontier ? "Depth, Frontier, filter and search" : "Depth, filter and search", total)}
         testId="controls-button"
+        tour="controls"
         role="dialog"
         className="view-control"
         trigger={

@@ -27,7 +27,7 @@ pub mod wire;
 
 use axum::Router;
 use axum::middleware;
-use axum::routing::{MethodRouter, any, delete, get, post};
+use axum::routing::{MethodRouter, any, delete, get, post, put};
 use cairn_assistant::Assistant;
 use cairn_auth::Auth;
 use cairn_schema::Actor;
@@ -95,6 +95,8 @@ fn served(assistant: bool) -> Served {
         (&at::TOKENS, get(handle::users::tokens)),
         (&at::MINT_TOKEN, post(handle::users::mint_token)),
         (&at::REVOKE_TOKEN, delete(handle::users::revoke_token)),
+        (&at::TOUR_GET, get(handle::users::tour)),
+        (&at::TOUR_PUT, put(handle::users::put_tour)),
     ];
     served.extend(handle::projections::served());
     served.extend(handle::proposals::served());

@@ -52,6 +52,8 @@ mod in_process {
             ("subscribe", vec![&at::STREAM]),
             ("caller", vec![&at::CALLER]),
             ("user_names", vec![&at::USER_NAMES]),
+            ("tour", vec![&at::TOUR_GET]),
+            ("put_tour", vec![&at::TOUR_PUT]),
             ("snapshot", vec![&at::SNAPSHOT]),
             ("level", vec![&at::LEVEL]),
             ("trace", vec![&at::TRACE]),

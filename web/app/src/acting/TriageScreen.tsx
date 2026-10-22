@@ -209,7 +209,7 @@ export function TriageBody({ view, state, selected, onCard }: { view: Ready; sta
     <ViewBar subject={journeySubject(view)} screen="walk" badges={badges} />
     <section className="stack pass" aria-label={decisions ? "Decision walkthrough" : "Triage"} data-testid="triage" data-order={order.join(" ")}>
       {decisions && view.journey.revision <= 1 && card !== undefined ? (
-        <p className="for-you" data-testid="walkthrough-intro">
+        <p className="for-you" data-testid="walkthrough-lead">
           Start with the decisions that shape this journey. {open} open now; each answer can open more.
         </p>
       ) : null}

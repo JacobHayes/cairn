@@ -8,7 +8,7 @@ use cairn_store::backend;
 use cairn_store::{
     AgentTokenRecord, AuthLogEntry, AuthLogQuery, ConversationMessage, ConversationRecord,
     ConversationSummary, LoggedAuthEntry, LoginRecord, OAuthStateRecord, Page, PageSize,
-    SecretHash, SessionRecord, StoreError, UserRecord,
+    SecretHash, SessionRecord, StoreError, TourMark, TourRecord, UserRecord,
 };
 use rusqlite::Connection;
 use rusqlite::types::Value;
@@ -296,6 +296,58 @@ fn agent_token(row: &Row) -> Result<AgentTokenRecord, StoreError> {
         created_at: row.timestamp(4)?,
         revoked_at: row.opt_timestamp(5)?,
     })
+}
+
+const TOUR_COLUMNS: &str = "state, practice_journey, updated_at";
+
+fn tour_row(user: &UserId, row: &Row) -> Result<TourRecord, StoreError> {
+    Ok(TourRecord {
+        user: user.clone(),
+        state: row.parse(0)?,
+        practice_journey: row.opt_parse(1)?,
+        updated_at: row.timestamp(2)?,
+    })
+}
+
+pub(crate) fn tour(
+    connection: &Connection,
+    user: &UserId,
+) -> Result<Option<TourRecord>, StoreError> {
+    let select = format!("SELECT {TOUR_COLUMNS} FROM tour WHERE user_id = ?1");
+    first(connection, &select, vec![text(user)])?
+        .map(|row| tour_row(user, &row))
+        .transpose()
+}
+
+/// Writes only over the record `expect` names, inside the writer's transaction.
+pub(crate) fn put_tour(
+    connection: &Connection,
+    record: &TourRecord,
+    expect: Option<&TourMark>,
+) -> Result<Result<(), Option<TourRecord>>, StoreError> {
+    user_exists(connection, &record.user)?;
+    let current = tour(connection, &record.user)?;
+    if current.as_ref().map(TourRecord::mark).as_ref() != expect {
+        return Ok(Err(current));
+    }
+    let TourRecord {
+        user,
+        state,
+        practice_journey,
+        updated_at,
+    } = record;
+    execute(
+        connection,
+        "INSERT OR REPLACE INTO tour (user_id, state, practice_journey, updated_at) \
+         VALUES (?1, ?2, ?3, ?4)",
+        vec![
+            text(user),
+            text(state.as_str()),
+            opt_text(practice_journey.as_ref()),
+            time(*updated_at)?,
+        ],
+    )?;
+    Ok(Ok(()))
 }
 
 const TOKEN_COLUMNS: &str = "agent, token_hash, name, user_id, created_at, revoked_at";

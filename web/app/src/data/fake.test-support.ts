@@ -10,7 +10,8 @@ import type { KeptTurns } from "../assistant/conversation.ts";
 import type { AssistantHost } from "./assistant.ts";
 import type { Answer, Command } from "./edit-record.ts";
 import type { Domain, ProposalHost, ProposalWritten } from "./proposals.ts";
-import { Missing, ReadFailed, Skewed, type Deriver, type Host, type JourneyIndexQuery, type JourneyPage, type Route, type RouteFile, type RouteImport, type RouteVersion, type Caller, type AgentTokenHost } from "./host.ts";
+import { Missing, ReadFailed, Skewed, type Deriver, type Host, type JourneyIndexQuery, type JourneyPage, type Route, type RouteFile, type RouteImport, type RouteVersion, type Caller, type AgentTokenHost, type Tour, type TourWrite, type TourWriteRequest } from "./host.ts";
+import { browserTour } from "./browser-tour.ts";
 import type { WriteEnv } from "./write-machine.ts";
 
 export interface FakeJourney {
@@ -141,6 +142,11 @@ export class FakeHost implements Host {
   readonly names = new Map<string, string>();
   /** The users asked for, one entry per read. */
   readonly namesAsked: string[][] = [];
+
+  /** The tour record, kept as the in-browser host keeps it (in memory, where there is no storage). */
+  readonly tourRecord = browserTour();
+  tour = (): Promise<Tour> => this.tourRecord.tour();
+  putTour = (write: TourWriteRequest): Promise<TourWrite> => this.tourRecord.putTour(write);
 
   userNames(users: readonly string[]): Promise<{ user: string; name: string }[]> {
     this.namesAsked.push([...users]);
