@@ -116,6 +116,8 @@ body {
 .frame > .rail {
   grid-area: rail;
   background: var(--chrome-bg);
+  /* Above the view's controls and the inspector's sheet (20), so the sync popover, which lives in the rail, is never painted under them. */
+  z-index: 30;
   position: static;
   height: auto;
   min-height: 0;

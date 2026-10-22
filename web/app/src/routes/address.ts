@@ -16,7 +16,7 @@
 // version never changes and its link must keep meaning it. Beside them the view state every view
 // shares (journeys/view.ts) and the graph's own settings ride in the query. The patterns are address.ts's.
 import { pathTo } from "../address.ts";
-import type { Screen } from "../journeys/address.ts";
+import { PROJECTIONS, type Screen } from "../journeys/address.ts";
 
 /** What the rail links to: the routes index, every type. */
 export const ROUTES_INDEX_PATH = pathTo("routes");
@@ -31,9 +31,6 @@ export const SEGMENTS_PATH = `${ROUTES_INDEX_PATH}?type=segments`;
 export function newRoutePath(kind?: "segment"): string {
   return kind === "segment" ? `${pathTo("routeNew")}?kind=segment` : pathTo("routeNew");
 }
-
-/** The views of a route, in the order its View picker lists them and `v` cycles them. */
-export const ROUTE_SCREENS: readonly Screen[] = ["graph", "list", "timeline"];
 
 /** Where on a route's page an address points: a published version (none is the route as it stands), a draft node, the view, and a proposal whose layer is on (which reviews the route as it stands, so names no version). */
 export interface RouteSpot {
@@ -55,7 +52,7 @@ export function versionIn(params: URLSearchParams): number | undefined {
 /** The view `view=` names, among a route's; the Graph when it names none of them. */
 export function routeScreenOf(params: URLSearchParams): Screen {
   const view = params.get("view");
-  return ROUTE_SCREENS.find((each) => each === view) ?? "graph";
+  return PROJECTIONS.find((each) => each === view) ?? "graph";
 }
 
 /** The version and the view an address names, to carry to another place on the same route. */

@@ -14,8 +14,7 @@ import type { ListFlag } from "../acting/address.ts";
 import { TITLE_BYTES_MAX } from "@cairn/client";
 import { overBytes } from "../authoring/limits.ts";
 import { STEPS, type Step } from "../canvas/model.ts";
-import { ROUTE_SCREENS } from "../routes/address.ts";
-import { journeyPath, SCREENS, type Screen } from "./address.ts";
+import { journeyPath, PROJECTIONS, type Screen } from "./address.ts";
 
 /** C9: the flags the Filter offers, in the order it lists them. */
 export const FILTER_FLAGS: readonly ListFlag[] = ["overdue", "stale", "unassigned", "shortfall", "snoozed"];
@@ -72,10 +71,6 @@ export interface ViewOffers {
   flags: boolean;
   notRelevant: boolean;
 }
-
-export const JOURNEY_OFFERS: ViewOffers = { screens: SCREENS, frontier: true, mine: true, owner: true, flags: true, notRelevant: true };
-
-export const ROUTE_OFFERS: ViewOffers = { screens: ROUTE_SCREENS, frontier: false, mine: false, owner: false, flags: false, notRelevant: false };
 
 export const DEFAULT_FILTER: ViewFilter = { mine: false, owner: undefined, flags: [], notRelevant: false, conditional: true };
 
@@ -283,15 +278,24 @@ const EVERY_CARD_APPLIES = "Every card here is work that applies.";
 /**
  * C1, C2, C10, C11, C18: the one table of what each view does with the shared view state. The
  * controls, the Filter's boxes and counts, the keys, and the engine's level, lights and dimming
- * read this and nothing else.
+ * read this and nothing else. Its order is the View picker's: the view a journey opens on (the
+ * Summary) first, then the projections, then the Walkthrough.
  */
 export const SCREEN_VIEWS: Record<Screen, ScreenView> = {
+  summary: { viewState: false, classes: {}, filterCounts: false, fade: false, rows: false },
   graph: { viewState: true, classes: {}, filterCounts: true, fade: true, rows: false },
   list: { viewState: true, classes: {}, filterCounts: true, fade: true, rows: true },
   timeline: { viewState: true, classes: { not_relevant: NO_DATES }, filterCounts: true, fade: true, rows: false },
-  summary: { viewState: false, classes: {}, filterCounts: false, fade: false, rows: false },
   walk: { viewState: true, classes: { conditional: EVERY_CARD_APPLIES, not_relevant: EVERY_CARD_APPLIES }, filterCounts: false, frontier: "Every card here is on the frontier. Frontier applies on the other views.", fade: false, rows: false },
 };
+
+/** The views in the View picker's order (the order of `SCREEN_VIEWS`). */
+const SCREEN_ORDER = Object.keys(SCREEN_VIEWS) as Screen[];
+
+export const JOURNEY_OFFERS: ViewOffers = { screens: SCREEN_ORDER, frontier: true, mine: true, owner: true, flags: true, notRelevant: true };
+
+/** A route has the projections only, in the picker's order. */
+export const ROUTE_OFFERS: ViewOffers = { screens: SCREEN_ORDER.filter((each) => (PROJECTIONS as readonly Screen[]).includes(each)), frontier: false, mine: false, owner: false, flags: false, notRelevant: false };
 
 /** Whether `screen` can draw `each`. */
 export function canDraw(screen: Screen, each: RelevanceClass): boolean {

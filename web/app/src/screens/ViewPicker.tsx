@@ -1,6 +1,6 @@
 // C9-C13: the views of a journey or a route as one menu in its header, "View: Graph ▾": each a
-// link, the one open marked as where you are. A journey offers the Graph, List, Timeline, Summary
-// and the Walkthrough; a route the first three. Picking a view is navigation, so the items are
+// link, the one open marked as where you are. A journey offers the Summary (where it opens), Graph, List, Timeline
+// and the Walkthrough; a route the three projections. Picking a view is navigation, so the items are
 // links with real addresses; the view state every view shares goes with the pick
 // (journeys/view.ts).
 import { Link } from "react-router";

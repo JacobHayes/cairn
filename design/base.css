@@ -867,6 +867,7 @@ svg.chart .datum-line {
   background: none;
   color: var(--color-text);
   font: inherit;
+  font-size: 14px;
   text-align: left;
   text-decoration: none;
   cursor: pointer;

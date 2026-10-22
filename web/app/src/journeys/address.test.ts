@@ -7,7 +7,7 @@ import type { AddressName, Page } from "../address.ts";
 import { viewStateFrom, walkthroughPath } from "./view.ts";
 import {
   DEFAULT_FILTERS,
-  SCREENS,
+  SCREEN_WORDS,
   defaultScreen,
   edgeAddress,
   filterParams,
@@ -24,7 +24,10 @@ import {
   screenSwitched,
   type IndexFilters,
   type JourneyTarget,
+  type Screen,
 } from "./address.ts";
+
+const SCREENS = Object.keys(SCREEN_WORDS) as Screen[];
 
 describe("the index's filters in the address", () => {
   const cases: [string, IndexFilters][] = [
@@ -85,7 +88,7 @@ describe("a journey's address", () => {
     expect([defaultScreen(JOURNEY), defaultScreen(NODE), defaultScreen(EDGE)]).toEqual(["summary", "graph", "graph"]);
   });
 
-  it.each<[string, JourneyTarget, (typeof SCREENS)[number] | undefined, string, string]>([
+  it.each<[string, JourneyTarget, Screen | undefined, string, string]>([
     ["the default of a bare journey", JOURNEY, "summary", "", "/journeys/j_a"],
     ["another view of a bare journey, view first", JOURNEY, "graph", "?depth=stages", "/journeys/j_a?view=graph&depth=stages"],
     ["the default of a node", NODE, "graph", "?depth=stages", "/journeys/j_a/nodes/n_x?depth=stages"],

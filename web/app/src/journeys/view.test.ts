@@ -3,7 +3,8 @@
 // viewer's expands and collapses. The chips take one setting off each; Reset keeps Frontier and Fade.
 import { describe, expect, it } from "vitest";
 
-import { DEFAULT_FILTER, DEFAULT_VIEW_STATE, ROUTE_OFFERS, filterChanged, filterChips, isStock, stockView, viewStateFrom, viewStateParams, withViewState, type ViewState } from "./view.ts";
+import { defaultScreen, PROJECTIONS } from "./address.ts";
+import { DEFAULT_FILTER, DEFAULT_VIEW_STATE, JOURNEY_OFFERS, ROUTE_OFFERS, filterChanged, filterChips, isStock, stockView, viewStateFrom, viewStateParams, withViewState, type ViewState } from "./view.ts";
 
 const narrowed: ViewState = {
   depth: "decisions",
@@ -119,5 +120,16 @@ describe("the view state a route reads", () => {
   it("writes back an address without what a route does not offer", () => {
     const params = withViewState(`?${asked}&version=2`, route(asked));
     expect(Object.fromEntries(new URLSearchParams(params))).toEqual({ depth: "stages", fade: "1", show: "", q: "ship", version: "2" });
+  });
+});
+
+describe("the View picker's order", () => {
+  it("lists the view a journey opens on first, then the rest", () => {
+    expect(JOURNEY_OFFERS.screens[0]).toBe(defaultScreen({ journey: "j_a" }));
+    expect(new Set(JOURNEY_OFFERS.screens).size).toBe(JOURNEY_OFFERS.screens.length);
+  });
+
+  it("gives a route the projections, which open on the Graph, in the cycle's order", () => {
+    expect(ROUTE_OFFERS.screens).toEqual(PROJECTIONS);
   });
 });

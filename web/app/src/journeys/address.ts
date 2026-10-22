@@ -148,11 +148,10 @@ export const PROJECTIONS: readonly Projection[] = ["graph", "list", "timeline"];
 /** A journey's screens: a projection, the Summary, or the Walkthrough of the frontier. */
 export type Screen = Projection | "summary" | "walk";
 
-/** C11: the screens in the order the View picker lists them: the Walkthrough is one more view. */
-export const SCREENS: readonly Screen[] = ["graph", "list", "timeline", "summary", "walk"];
-
 /** Each screen's name as the View picker says it. */
 export const SCREEN_WORDS: Record<Screen, string> = { graph: "Graph", list: "List", timeline: "Timeline", summary: "Summary", walk: "Walkthrough" };
+
+const SCREEN_NAMES = Object.keys(SCREEN_WORDS) as Screen[];
 
 /** Key `v`: the projection after `current`, wrapping round. */
 export function nextProjection(current: Projection): Projection {
@@ -213,7 +212,7 @@ export function unavailableScreens(target: JourneyTarget): Partial<Record<Screen
  */
 export function screenOf(target: JourneyTarget, params: URLSearchParams): Screen {
   const view = params.get("view");
-  const named = target.edge !== undefined ? "graph" : (SCREENS.find((each) => each === view) ?? defaultScreen(target));
+  const named = target.edge !== undefined ? "graph" : (SCREEN_NAMES.find((each) => each === view) ?? defaultScreen(target));
   return target.proposal === undefined ? named : layerScreen(named);
 }
 

@@ -52,17 +52,17 @@ function Rail({ pathname }: { pathname: string }) {
           </button>
         )}
         <span className="spacer" />
-        {offersMcp ? (
-          <Link to={pathTo("agents")} className="agents-link" title="Connect an AI agent such as Claude Code or Codex" {...(section === "agents" ? { "aria-current": "page" as const } : {})}>
-            Connect an agent
-          </Link>
-        ) : null}
         <span className="rail-foot">
           <Link to={pathTo("me")} {...(section === "me" ? { "aria-current": "page" as const } : {})}>
             You
           </Link>
           <KeysHint />
         </span>
+        {offersMcp ? (
+          <Link to={pathTo("agents")} className="agents-link" title="Connect an AI agent such as Claude Code or Codex" {...(section === "agents" ? { "aria-current": "page" as const } : {})}>
+            Connect an agent
+          </Link>
+        ) : null}
       </nav>
     </aside>
   );

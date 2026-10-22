@@ -516,9 +516,12 @@ test("C9, C11: the View picker works from the keyboard: it opens on the current 
   await button.focus();
   await page.keyboard.press("Enter");
   await expect(page.getByTestId("view-graph")).toBeFocused();
-  // Up from the first item wraps to the last, the Walkthrough; down twice from there is the List.
+  // Up from the Graph is the Summary, the first item; up again wraps to the last, the Walkthrough; down three times from there passes the Summary and the Graph to the List.
+  await page.keyboard.press("ArrowUp");
+  await expect(page.getByTestId("view-summary")).toBeFocused();
   await page.keyboard.press("ArrowUp");
   await expect(page.getByTestId("view-walk")).toBeFocused();
+  await page.keyboard.press("ArrowDown");
   await page.keyboard.press("ArrowDown");
   await page.keyboard.press("ArrowDown");
   await expect(page.getByTestId("view-list")).toBeFocused();
