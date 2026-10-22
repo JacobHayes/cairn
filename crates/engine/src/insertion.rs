@@ -48,6 +48,17 @@ pub(crate) struct Remap<'a> {
     /// The first message draft of the node being copied that passes the body limit with its
     /// placeholders translated to longer keys: the segment's resource, and the draft's size.
     pub draft_too_long: Option<(AttachmentKey, usize)>,
+    /// Whether the node being copied has participations of two kinds that map to one kind of
+    /// the graph.
+    pub kinds_collapsed: bool,
+}
+
+/// Why a node does not copy.
+pub(crate) enum Refusal {
+    /// A message draft passes the body limit once its keys are minted: the message.
+    DraftTooLong(String),
+    /// Participations of two kinds map to one kind of the graph.
+    KindsCollapsed,
 }
 
 impl Remap<'_> {
@@ -57,16 +68,20 @@ impl Remap<'_> {
     /// # Errors
     ///
     /// When a message draft, with its placeholders translated to longer keys, passes the body
-    /// limit.
-    pub(crate) fn copy(&mut self, node: &Node<KeyRefs>) -> Result<Node<KeyRefs>, String> {
+    /// limit, or participations of two kinds map to one kind.
+    pub(crate) fn copy(&mut self, node: &Node<KeyRefs>) -> Result<Node<KeyRefs>, Refusal> {
         self.draft_too_long = None;
+        self.kinds_collapsed = false;
         let copy = node.map_references(self);
-        match self.draft_too_long.take() {
-            None => Ok(copy),
-            Some((resource, bytes)) => Err(format!(
+        if let Some((resource, bytes)) = self.draft_too_long.take() {
+            return Err(Refusal::DraftTooLong(format!(
                 "message draft {resource} is {bytes} bytes once its keys are minted"
-            )),
+            )));
         }
+        if self.kinds_collapsed {
+            return Err(Refusal::KindsCollapsed);
+        }
+        Ok(copy)
     }
 }
 
@@ -93,5 +108,62 @@ impl MapReferences<KeyRefs, KeyRefs> for Remap<'_> {
 
     fn draft_too_long(&mut self, resource: &AttachmentKey, bytes: usize) {
         self.draft_too_long.get_or_insert((resource.clone(), bytes));
+    }
+
+    fn kinds_collapsed(&mut self, _: &KindKey) {
+        self.kinds_collapsed = true;
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use cairn_schema::{KindKey, NodeKey, SequentialKeys, from_yaml};
+
+    use super::{Refusal, Remap, mint};
+
+    /// A node that has the panel in two participation kinds.
+    fn node() -> cairn_schema::Node<cairn_schema::KeyRefs> {
+        let yaml = "format: 1\nroute: test\nname: Test\n\
+            roles:\n- id: panel\n  title: Panel\n  multi: true\n\
+            participation_kinds:\n- id: reviewer\n  title: Reviewer\n  multi: true\n\
+            - id: observer\n  title: Observer\n  multi: true\n\
+            nodes:\n- id: review\n  kind: action\n  title: Review\n  participations:\n    \
+            reviewer: panel\n    observer: panel\n";
+        let file = from_yaml(yaml).unwrap_or_else(|error| panic!("{error}\n{yaml}"));
+        let graph = crate::from_file(&file, &mut SequentialKeys::default()).unwrap();
+        graph.document().nodes.values().next().unwrap().clone()
+    }
+
+    /// B13: kinds that stay apart copy; two that map to one are refused, not merged.
+    #[test]
+    fn participations_of_two_kinds_that_map_to_one_are_refused() {
+        let node = node();
+        assert_eq!(node.participations.as_map().len(), 2);
+        let keep = |key: &KindKey| key.clone();
+        let merge = |_: &KindKey| mint::<KindKey>(&"i_one".parse().unwrap(), "merged");
+        for (kind, refused) in [
+            (&keep as &dyn Fn(&KindKey) -> KindKey, false),
+            (&merge, true),
+        ] {
+            let same = |key: &NodeKey| key.clone();
+            let role = |key: &cairn_schema::RoleKey| key.clone();
+            let resource = |key: &cairn_schema::AttachmentKey| key.clone();
+            let mut remap = Remap {
+                node: &same,
+                role: &role,
+                kind,
+                resource: &resource,
+                draft_too_long: None,
+                kinds_collapsed: false,
+            };
+            match remap.copy(&node) {
+                Ok(copy) => {
+                    assert!(!refused);
+                    assert_eq!(copy.participations.as_map().len(), 2);
+                }
+                Err(Refusal::KindsCollapsed) => assert!(refused),
+                Err(Refusal::DraftTooLong(message)) => panic!("{message}"),
+            }
+        }
     }
 }

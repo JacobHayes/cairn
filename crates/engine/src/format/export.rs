@@ -174,4 +174,8 @@ impl MapReferences<KeyRefs, FileRefs> for Names<'_> {
     fn draft_too_long(&mut self, _: &AttachmentKey, bytes: usize) {
         panic!("an exported message draft reads back: it is {bytes} bytes, past the body limit")
     }
+
+    fn kinds_collapsed(&mut self, kind: &KindKey) {
+        unreachable!("an export names each kind by its own id: {kind}")
+    }
 }

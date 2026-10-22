@@ -24,7 +24,7 @@ use cairn_schema::{
 
 use super::Session;
 use crate::graph::Tree;
-use crate::insertion::{Remap, mint};
+use crate::insertion::{Refusal, Remap, mint};
 
 /// Applies an `insert_segment` mutation.
 pub(super) fn apply(session: &mut Session<'_>, mutation: &Mutation) -> Vec<Write> {
@@ -254,6 +254,7 @@ fn copy_nodes(
         kind: &remap_kind,
         resource: &remap_resource,
         draft_too_long: None,
+        kinds_collapsed: false,
     };
     let mut nodes = BTreeMap::new();
     let mut members = BTreeMap::new();
@@ -264,7 +265,7 @@ fn copy_nodes(
     for original in kept {
         let mut copy = match remap.copy(original) {
             Ok(copy) => copy,
-            Err(message) => {
+            Err(Refusal::DraftTooLong(message)) => {
                 problems.push(Problem::past(
                     Limit::BodyBytes,
                     Some(&original.key),
@@ -272,13 +273,14 @@ fn copy_nodes(
                 ));
                 continue;
             }
+            Err(Refusal::KindsCollapsed) => {
+                problems.push(Problem::invalid(format!(
+                    "segment node {} has participations of two kinds that map to one kind of the graph",
+                    original.key
+                )));
+                continue;
+            }
         };
-        if copy.participations.as_map().len() != original.participations.as_map().len() {
-            problems.push(Problem::invalid(format!(
-                "segment node {} has participations of two kinds that map to one kind of the graph",
-                original.key
-            )));
-        }
         if host.nodes.get(&copy.key).is_some() || host.retired_keys.nodes.contains(&copy.key) {
             problems.push(Problem::taken(copy.key.as_str(), "node"));
         }

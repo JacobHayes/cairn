@@ -19,8 +19,8 @@ use crate::derive::skip::Skips;
 use crate::derive::stored_state;
 use crate::graph::Document;
 
-/// Slots per node: 2.2's four instants.
-const POINTS: usize = 4;
+/// Slots per node: 2.2's instants, [`Point::ALL`].
+const POINTS: usize = Point::ALL.len();
 
 /// One instant of the network, by position: node `i`'s instants at `4i..4i + 4` (2.2's
 /// [`Instant::slot`]), `created_at` after them, then each node's answer.
@@ -113,6 +113,8 @@ pub(crate) enum Layer {
 /// execution layer how far along it is.
 pub(crate) struct Scope {
     layer: Layer,
+    /// Which edges of the dependency graph become constraints.
+    edges: EdgeSet,
     relevance: Vec<Relevance>,
     skipped: Vec<bool>,
     zero: Vec<bool>,
@@ -152,19 +154,7 @@ impl Scope {
         layer: Layer,
     ) -> Self {
         let keys = (0..dependencies.node_count()).filter_map(|at| dependencies.key(index(at)));
-        let mut scope = Scope {
-            layer,
-            relevance: Vec::new(),
-            skipped: Vec::new(),
-            zero: Vec::new(),
-            started: Vec::new(),
-            underway: Vec::new(),
-            finished: Vec::new(),
-            own_date_exempt: Vec::new(),
-            accepted: BTreeMap::new(),
-            auto: BTreeSet::new(),
-            auto_ahead: BTreeSet::new(),
-        };
+        let mut scope = Scope::empty(layer, EdgeSet::Pruned);
         for (at, key) in keys.enumerate() {
             scope.read(document, dependencies, relevance, skips, at, key);
         }
@@ -181,6 +171,42 @@ impl Scope {
         scope
     }
 
+    /// The scope of a graph read for its structure alone: every node relevant, none skipped
+    /// or counting no days, the plan layer, and the full set of edges. What a chain through
+    /// the graph follows, whatever its answers say.
+    #[must_use]
+    pub(crate) fn structural(dependencies: &Dependencies) -> Self {
+        let nodes = dependencies.node_count();
+        Scope {
+            relevance: vec![Relevance::Relevant; nodes],
+            skipped: vec![false; nodes],
+            zero: vec![false; nodes],
+            started: vec![false; nodes],
+            underway: vec![false; nodes],
+            finished: vec![false; nodes],
+            own_date_exempt: vec![false; nodes],
+            ..Scope::empty(Layer::Plan, EdgeSet::Full)
+        }
+    }
+
+    /// A scope that holds no node yet.
+    fn empty(layer: Layer, edges: EdgeSet) -> Self {
+        Scope {
+            layer,
+            edges,
+            relevance: Vec::new(),
+            skipped: Vec::new(),
+            zero: Vec::new(),
+            started: Vec::new(),
+            underway: Vec::new(),
+            finished: Vec::new(),
+            own_date_exempt: Vec::new(),
+            accepted: BTreeMap::new(),
+            auto: BTreeSet::new(),
+            auto_ahead: BTreeSet::new(),
+        }
+    }
+
     /// Reads one node: relevance, skip, how far along it is, and what its bypass accepted.
     fn read(
         &mut self,
@@ -195,7 +221,7 @@ impl Scope {
         self.relevance.push(relevance.value(key));
         let node = document.nodes.get(key);
         let state = node.map(|node| stored_state(document, node));
-        let skipped = state == Some(State::Skipped) || skips.skipped_by(key).is_some();
+        let skipped = state.is_some_and(|stored| skips.skipped(stored, key));
         let done = layer == Layer::Execution && state == Some(State::Done);
         self.skipped.push(skipped);
         self.zero.push(skipped || done);
@@ -354,9 +380,22 @@ pub(crate) struct Network {
 }
 
 impl Network {
-    /// Builds the network of a graph from its pruned dependency graph and its scope.
+    /// Builds the network of a graph from its dependency graph and its scope.
     #[must_use]
     pub(crate) fn build(document: &Document, dependencies: &Dependencies, scope: &Scope) -> Self {
+        let (mut network, constraints) = Self::emit(document, dependencies, scope);
+        network.settle(constraints);
+        network
+    }
+
+    /// The slots of a graph and the constraints between them, not yet indexed: for a reader
+    /// that follows the constraints itself. The network answers only slot questions.
+    #[must_use]
+    pub(crate) fn emit(
+        document: &Document,
+        dependencies: &Dependencies,
+        scope: &Scope,
+    ) -> (Self, Vec<Constraint>) {
         let node_count = dependencies.node_count();
         assert!(node_count <= NODE_COUNT_MAX as usize);
         let single = (0..node_count)
@@ -367,13 +406,13 @@ impl Network {
                 node.is_some_and(|node| node.kind().is_leaf())
             })
             .collect();
-        let mut network = Network {
+        let network = Network {
             node_count,
             single,
             ..Network::default()
         };
         let mut constraints = Vec::new();
-        for edge in dependencies.edges(EdgeSet::Pruned) {
+        for edge in dependencies.edges(scope.edges) {
             network.push_edge(document, dependencies, scope, *edge, &mut constraints);
         }
         network.push_openings(document, dependencies, scope, &mut constraints);
@@ -387,8 +426,7 @@ impl Network {
             network.push_rules(document, dependencies, scope, node, at, &mut constraints);
             network.push_close(document, dependencies, scope, node, at, &mut constraints);
         }
-        network.settle(constraints);
-        network
+        (network, constraints)
     }
 
     /// A dependency edge as a constraint: the requirement's instant before the dependent's,
@@ -526,7 +564,7 @@ impl Network {
             return;
         }
         let mut openings: BTreeMap<NodeIndex, Edge> = BTreeMap::new();
-        for edge in dependencies.edges(EdgeSet::Pruned) {
+        for edge in dependencies.edges(scope.edges) {
             if edge.class == EdgeClass::DateOnly && edge.source == EdgeSource::StageOpening {
                 openings.insert(edge.dependent.node, *edge);
             }
@@ -595,9 +633,7 @@ impl Network {
             };
             let signed = signed_offset_days(found);
             for source in found.sources.as_set() {
-                let Some((source, from)) = self.source_slot(document, dependencies, source) else {
-                    continue;
-                };
+                let (source, from) = self.source_slot(document, dependencies, source);
                 if from.is_some_and(|from| !scope.in_scope(from)) {
                     continue;
                 }
@@ -640,15 +676,18 @@ impl Network {
         let Some(closes_at) = group.closes_at.as_ref().filter(|_| group.closes) else {
             return;
         };
-        let milestone = document
-            .nodes
-            .get(closes_at)
-            .is_some_and(|found| found.kind() == NodeKind::Milestone);
-        let Some(closing) = dependencies.node_index(closes_at) else {
-            return;
-        };
-        let inside = is_ancestor(document, &node.key, closes_at);
-        if !milestone || inside || !scope.in_scope(closing) {
+        // Validation refuses a bound that is not a milestone outside the stage.
+        let closing = dependencies
+            .node_index(closes_at)
+            .unwrap_or_else(|| unreachable!("a stage bound names a node of the graph"));
+        assert!(
+            document
+                .nodes
+                .get(closes_at)
+                .is_some_and(|found| found.kind() == NodeKind::Milestone),
+            "a stage bound is a milestone"
+        );
+        if !scope.in_scope(closing) {
             return;
         }
         let conditional = undecided(scope, at) || undecided(scope, closing);
@@ -676,27 +715,35 @@ impl Network {
     }
 
     /// The slot a rule source names, with the node it belongs to: a milestone's instant, a
-    /// date decision's answer, or `created_at`. None for a reference validation reports.
+    /// date decision's answer, or `created_at`. Validation refuses any other source.
     fn source_slot(
         &self,
         document: &Document,
         dependencies: &Dependencies,
         source: &DateSource<KeyRefs>,
-    ) -> Option<(Slot, Option<NodeIndex>)> {
+    ) -> (Slot, Option<NodeIndex>) {
         let key = match source {
-            DateSource::CreatedAt => return Some((self.created_at(), None)),
+            DateSource::CreatedAt => return (self.created_at(), None),
             DateSource::Node(key) => key,
         };
-        let at = dependencies.node_index(key)?;
-        match &document.nodes.get(key)?.payload {
-            Payload::Milestone(_) => Some((self.finish(at), Some(at))),
-            Payload::Decision(decision) if matches!(decision.answer, AnswerSpec::Date { .. }) => {
-                Some((self.answer(at), Some(at)))
+        let at = dependencies
+            .node_index(key)
+            .unwrap_or_else(|| unreachable!("a date source names a node of the graph"));
+        let payload = document.nodes.get(key).map(|found| &found.payload);
+        match payload {
+            Some(Payload::Milestone(_)) => (self.finish(at), Some(at)),
+            Some(Payload::Decision(decision))
+                if matches!(decision.answer, AnswerSpec::Date { .. }) =>
+            {
+                (self.answer(at), Some(at))
             }
-            Payload::Decision(_)
-            | Payload::Deliverable(_)
-            | Payload::Action(_)
-            | Payload::Group(_) => None,
+            Some(
+                Payload::Decision(_)
+                | Payload::Deliverable(_)
+                | Payload::Action(_)
+                | Payload::Group(_),
+            )
+            | None => unreachable!("a date source is a milestone or a date decision"),
         }
     }
 
@@ -836,12 +883,10 @@ impl Network {
         let nodes = self.node_count * POINTS;
         match at.cmp(&nodes) {
             std::cmp::Ordering::Less => {
-                let point = match at % POINTS {
-                    0 => Point::Start,
-                    1 => Point::Finish,
-                    2 => Point::Entry,
-                    _ => Point::ConditionEntry,
-                };
+                let point = Point::ALL
+                    .get(at % POINTS)
+                    .copied()
+                    .unwrap_or_else(|| unreachable!("a remainder is a position in Point::ALL"));
                 Place::Node(Instant::new(index(at / POINTS), point))
             }
             std::cmp::Ordering::Equal => Place::CreatedAt,
@@ -873,12 +918,9 @@ fn undecided(scope: &Scope, node: NodeIndex) -> bool {
 /// A9: a deliverable's or action's estimate in days; zero for any other kind or without one.
 #[must_use]
 pub(crate) fn estimate_days(node: &Node<KeyRefs>) -> i32 {
-    let days = match &node.payload {
-        Payload::Deliverable(deliverable) => deliverable.estimate,
-        Payload::Action(action) => action.estimate,
-        Payload::Decision(_) | Payload::Milestone(_) | Payload::Group(_) => None,
-    };
-    days.map_or(0, |days| i32::try_from(days.get()).unwrap_or(i32::MAX))
+    node.payload
+        .estimate()
+        .map_or(0, |days| i32::try_from(days.get()).unwrap_or(i32::MAX))
 }
 
 /// A8: a rule's offset with its direction's sign: positive after its sources, negative
@@ -890,29 +932,6 @@ pub(crate) fn signed_offset_days(rule: &DateRule<KeyRefs>) -> i32 {
         Direction::After => days,
         Direction::Before => -days,
     }
-}
-
-/// True when `ancestor` is a proper ancestor of `key`, by parent links (bounded by depth).
-fn is_ancestor(document: &Document, ancestor: &NodeKey, key: &NodeKey) -> bool {
-    let mut current = document
-        .nodes
-        .get(key)
-        .and_then(|node| node.parent.as_ref());
-    let mut steps = 0_u32;
-    while let Some(parent) = current {
-        if parent == ancestor {
-            return true;
-        }
-        steps += 1;
-        if steps > cairn_schema::limits::CONTAINMENT_DEPTH_MAX {
-            return false;
-        }
-        current = document
-            .nodes
-            .get(parent)
-            .and_then(|node| node.parent.as_ref());
-    }
-    false
 }
 
 #[cfg(test)]

@@ -404,4 +404,10 @@ impl MapReferences<FileRefs, KeyRefs> for Resolver {
             found.limit = Some(cairn_schema::Limit::BodyBytes);
         }
     }
+
+    /// Only two kinds given one key resolve alike, which the key check reports too.
+    fn kinds_collapsed(&mut self, kind: &Slug) {
+        let what = format!("the participation kind {kind} resolves to a kind another one has");
+        self.unresolved(what, None, ViolationCode::DuplicateKey);
+    }
 }

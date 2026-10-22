@@ -760,7 +760,44 @@ fn tally_other(outline: &mut ProposalOutline, mutation: &Mutation) -> bool {
         | Mutation::EditProposal { .. }
         | Mutation::ApplyProposal { .. }
         | Mutation::DiscardProposal {} => {}
-        _ => return false,
+        // `lifecycle_fact` took these above.
+        Mutation::CreateJourney { .. }
+        | Mutation::EditJourney { .. }
+        | Mutation::SetJourneyStatus { .. }
+        | Mutation::CreateRoute { .. }
+        | Mutation::EditRoute { .. }
+        | Mutation::SetRouteRetired { .. }
+        | Mutation::OpenDraft { .. }
+        | Mutation::DiscardDraft {}
+        | Mutation::PublishDraft {}
+        | Mutation::Upgrade { .. }
+        | Mutation::Relink { .. }
+        | Mutation::InsertSegment { .. } => {
+            unreachable!("a lifecycle mutation makes a lifecycle fact")
+        }
+        // The rest act on a node, which the caller tallies against the others.
+        Mutation::AddNode { .. }
+        | Mutation::SetNodeField { .. }
+        | Mutation::ReplaceNode { .. }
+        | Mutation::RemoveNode { .. }
+        | Mutation::SetParticipation { .. }
+        | Mutation::ClearParticipation { .. }
+        | Mutation::AddResource { .. }
+        | Mutation::EditResource { .. }
+        | Mutation::RemoveResource { .. }
+        | Mutation::Transition { .. }
+        | Mutation::Answer { .. }
+        | Mutation::SetRecordedDate { .. }
+        | Mutation::SetPin { .. }
+        | Mutation::ShiftPin { .. }
+        | Mutation::ClearPin { .. }
+        | Mutation::Snooze { .. }
+        | Mutation::Unsnooze { .. }
+        | Mutation::ApplyOverride { .. }
+        | Mutation::RemoveOverride { .. }
+        | Mutation::SetAtomic { .. }
+        | Mutation::SetProvenance { .. }
+        | Mutation::MarkLocalEdit { .. } => return false,
     }
     true
 }

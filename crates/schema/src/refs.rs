@@ -214,6 +214,11 @@ pub trait MapReferences<A: References, B: References> {
 
     /// A message draft that passes the body limit once translated; the resource is left out.
     fn draft_too_long(&mut self, resource: &A::AttachmentKey, bytes: usize);
+
+    /// Two participation kinds of one node that translate to one kind. Only one of them
+    /// stays in the result, so a translator that can be asked to map two kinds to one
+    /// reports it here, and one whose mapping is one to one never is.
+    fn kinds_collapsed(&mut self, kind: &A::Kind);
 }
 
 impl<A: References> Node<A> {
@@ -287,26 +292,29 @@ fn map_rule<A: References, B: References>(
     })
 }
 
-/// Two kinds that translate to one collapse into one entry, which the caller of an
-/// insertion detects by the count.
+/// Two kinds that translate to one collapse into one entry, which the translator is told.
 fn map_participations<A: References, B: References>(
     participations: &Participations<A>,
     map: &mut impl MapReferences<A, B>,
 ) -> Participations<B> {
     let mut mapped = BTreeMap::new();
-    for (kind, source) in participations.as_map() {
-        let kind = map.kind(kind);
+    for (original, source) in participations.as_map() {
+        let kind = map.kind(original);
         let source = match source {
             ParticipationSource::Role(role) => map.role(role, None).map(ParticipationSource::Role),
             ParticipationSource::Identities(identities) => {
                 Some(ParticipationSource::Identities(identities.clone()))
             }
         };
-        if let (Some(kind), Some(source)) = (kind, source) {
-            mapped.insert(kind, source);
+        if let (Some(kind), Some(source)) = (kind, source)
+            && mapped.insert(kind, source).is_some()
+        {
+            map.kinds_collapsed(original);
         }
     }
-    Participations::try_from(mapped).unwrap_or_default()
+    // No more kinds than the original had, which was within the limit.
+    Participations::try_from(mapped)
+        .unwrap_or_else(|error| unreachable!("a translation has no more kinds: {error}"))
 }
 
 fn map_resource<A: References, B: References>(

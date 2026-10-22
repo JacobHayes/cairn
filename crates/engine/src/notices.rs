@@ -3,31 +3,31 @@
 //! to or from it is listed, because neither its priority (gravity reaches only what sits
 //! upstream of a node) nor its dates (bounds read along constraints) feel that milestone.
 //!
-//! A chain follows the effective dependency graph's full structural set (explicit
-//! requirements, implicit gates, stage openings, containment) and the date constraints (date
-//! rules, stage closes, `feeds_milestone` pins), each from the instant that must come first
-//! to the one that follows. Every condition counts as relevant: the full set ignores
-//! relevance, and no rule or close is dropped for a not-relevant node, so a conditional
-//! branch is checked as if it applied. A decision that fills a role is exempt, since it acts
-//! through participations. Notices are computed, never stored, and reject nothing (A15).
+//! A chain follows the date network's constraints, read over the graph's structural scope
+//! (every node relevant, nothing skipped, the full set of dependency edges: explicit
+//! requirements, implicit gates, stage openings, containment) and so its date rules and
+//! stage closes too, each from the instant that must come first to the one that follows.
+//! Every condition counts as relevant: the full set ignores relevance, and no rule or close
+//! is dropped for a not-relevant node, so a conditional branch is checked as if it applied.
+//! The one link the network does not hold is a `feeds_milestone` pin, which ties the date
+//! decision's answer to the milestone's date both ways. A decision that fills a role is
+//! exempt, since it acts through participations. Notices are computed, never stored, and
+//! reject nothing (A15).
 //!
-//! Cost at `node_count_max` (2,000 nodes, about 110,000 dependency edges and 258,000 rule
-//! constraints): one adjacency build over 10,000 slots, then two breadth-first searches, each
-//! visiting every slot and constraint once: O(nodes + edges), a few megabytes.
+//! Cost at `node_count_max` (2,000 nodes): the network's 10,001 instants and, on the date
+//! limits graph, 310,241 constraints, held once at 36 bytes each (11 MB) while two adjacency
+//! lists over the instants are built from them (5 MB), then dropped; the two breadth-first
+//! searches each visit every instant and constraint once: O(nodes + edges). The slot pairs
+//! this replaced were about 6 MB with 2.5 MB of lists, so peak memory is about 1.9 times what it
+//! was.
 
 use std::collections::VecDeque;
 
-use cairn_schema::{
-    AnswerSpec, DateSource, KeyRefs, Node, NodeKey, NodeKind, Notice, NoticeCode, Payload,
-};
+use cairn_schema::{AnswerSpec, KeyRefs, Node, NodeKind, Notice, NoticeCode, Payload};
 
-use crate::derive::dependencies::{Dependencies, EdgeSet, Instant, Point};
-use crate::graph::{Document, Graph, Tree};
-
-/// Slots per node: the four instants, then the answer of a date decision; one more at the
-/// end for the journey's `created_at`, which rules may measure from.
-const SLOTS: usize = 5;
-const ANSWER: usize = 4;
+use crate::derive::dates::network::{Constraint, Network, Scope};
+use crate::derive::dependencies::{Dependencies, Instant, Point};
+use crate::graph::{Document, Graph};
 
 /// A20: the notices of a route graph, in path order; none when it has no `final` milestone.
 ///
@@ -44,8 +44,11 @@ pub fn notices(graph: &Graph) -> Vec<Notice> {
     let Some(last_at) = dependencies.node_index(&last.key) else {
         return Vec::new();
     };
-    let chains = Chains::build(document, graph.tree(), &dependencies);
-    let last_finish = slot(Instant::new(last_at, Point::Finish));
+    let (network, constraints) =
+        Network::emit(document, &dependencies, &Scope::structural(&dependencies));
+    let chains = Chains::build(document, &dependencies, &network, &constraints);
+    drop(constraints);
+    let last_finish = network.finish(last_at).index();
     let mut felt = chains.reached(last_finish, Way::After);
     for (at, reached) in chains
         .reached(last_finish, Way::Before)
@@ -62,8 +65,13 @@ pub fn notices(graph: &Graph) -> Vec<Notice> {
         .filter(|node| node.kind() != NodeKind::Group && !fills_role(node))
         .filter_map(|node| {
             let at = dependencies.node_index(&node.key)?;
-            let connected =
-                (0..SLOTS).any(|point| felt.get(at.get() * SLOTS + point) == Some(&true));
+            let slots = Point::ALL
+                .map(|point| network.slot(Instant::new(at, point)))
+                .into_iter()
+                .chain([network.answer(at)]);
+            let connected = slots
+                .into_iter()
+                .any(|slot| felt.get(slot.index()) == Some(&true));
             let path = graph.tree().path(&node.key)?;
             (!connected).then(|| Notice {
                 code: NoticeCode::Unanchored,
@@ -97,17 +105,6 @@ fn fills_role(node: &Node<KeyRefs>) -> bool {
     )
 }
 
-/// The slot of an instant of a node.
-fn slot(instant: Instant) -> usize {
-    let point = match instant.point {
-        Point::Start => 0,
-        Point::Finish => 1,
-        Point::Entry => 2,
-        Point::ConditionEntry => 3,
-    };
-    instant.node.get() * SLOTS + point
-}
-
 /// Which way a search follows the chains from a slot.
 #[derive(Clone, Copy)]
 enum Way {
@@ -117,88 +114,61 @@ enum Way {
     Before,
 }
 
-/// The chains between slots: `from` must come before `to`.
+/// The chains between slots, by slot: what comes after each and what comes before it.
 struct Chains {
-    slots: usize,
-    links: Vec<(usize, usize)>,
+    after: Vec<Vec<usize>>,
+    before: Vec<Vec<usize>>,
 }
 
 impl Chains {
-    fn build(document: &Document, tree: &Tree, dependencies: &Dependencies) -> Self {
-        let created_at = dependencies.node_count() * SLOTS;
-        let mut links: Vec<(usize, usize)> = dependencies
-            .edges(EdgeSet::Full)
-            .map(|edge| (slot(edge.requirement), slot(edge.dependent)))
-            .collect();
+    /// The network's constraints, each from the slot that must come first to the one that
+    /// follows, and the one link the network does not hold: a date decision's pin.
+    fn build(
+        document: &Document,
+        dependencies: &Dependencies,
+        network: &Network,
+        constraints: &[Constraint],
+    ) -> Self {
+        let mut chains = Self {
+            after: vec![Vec::new(); network.slot_count()],
+            before: vec![Vec::new(); network.slot_count()],
+        };
+        for constraint in constraints {
+            chains.link(constraint.before.index(), constraint.after.index());
+        }
         for node in document.nodes.values() {
-            let Some(at) = dependencies.node_index(&node.key) else {
-                continue;
-            };
-            let own = |point| slot(Instant::new(at, point));
-            for (rule, is_due) in [(&node.due_by, true), (&node.not_before, false)] {
-                for source in rule.iter().flat_map(|rule| rule.sources.as_set()) {
-                    let source = match source {
-                        DateSource::CreatedAt => Some(created_at),
-                        DateSource::Node(key) => date_slot(document, dependencies, key),
-                    };
-                    let Some(source) = source else {
-                        continue;
-                    };
-                    links.push(if is_due {
-                        (own(Point::Finish), source)
-                    } else {
-                        (source, own(Point::Start))
-                    });
-                }
-            }
-            if let Payload::Group(group) = &node.payload
-                && group.closes
-                && let Some(closes_at) = &group.closes_at
-                && let Some(closing) = dependencies.node_index(closes_at)
-                && matches!(
-                    document.nodes.get(closes_at).map(Node::kind),
-                    Some(NodeKind::Milestone)
-                )
-                && !tree.is_ancestor(&node.key, closes_at)
-            {
-                links.push((
-                    own(Point::Finish),
-                    slot(Instant::new(closing, Point::Finish)),
-                ));
-            }
             if let Payload::Decision(decision) = &node.payload
                 && let AnswerSpec::Date {
                     feeds_milestone: Some(milestone),
                 } = &decision.answer
+                && let Some(at) = dependencies.node_index(&node.key)
                 && let Some(pinned) = dependencies.node_index(milestone)
             {
                 // The pin makes the answer and the milestone's date one: a chain runs both ways.
-                let (answer, date) = (
-                    at.get() * SLOTS + ANSWER,
-                    slot(Instant::new(pinned, Point::Finish)),
-                );
-                links.extend([(answer, date), (date, answer)]);
+                let (answer, date) = (network.answer(at).index(), network.finish(pinned).index());
+                chains.link(answer, date);
+                chains.link(date, answer);
             }
         }
-        Self {
-            slots: created_at + 1,
-            links,
+        chains
+    }
+
+    fn link(&mut self, from: usize, to: usize) {
+        if let Some(list) = self.after.get_mut(from) {
+            list.push(to);
+        }
+        if let Some(list) = self.before.get_mut(to) {
+            list.push(from);
         }
     }
 
     /// Every slot with a chain from `start` (after) or to it (before), `start` included.
     fn reached(&self, start: usize, way: Way) -> Vec<bool> {
-        let mut next: Vec<Vec<usize>> = vec![Vec::new(); self.slots];
-        for &(from, to) in &self.links {
-            let (key, value) = match way {
-                Way::After => (from, to),
-                Way::Before => (to, from),
-            };
-            if let Some(list) = next.get_mut(key) {
-                list.push(value);
-            }
-        }
-        let mut seen = vec![false; self.slots];
+        let next = match way {
+            Way::After => &self.after,
+            Way::Before => &self.before,
+        };
+        let mut seen = vec![false; next.len()];
         let mut queue = VecDeque::from([start]);
         while let Some(current) = queue.pop_front() {
             if let Some(held) = seen.get_mut(current) {
@@ -210,19 +180,5 @@ impl Chains {
             queue.extend(next.get(current).into_iter().flatten().copied());
         }
         seen
-    }
-}
-
-/// The slot a date rule's source names: a milestone's finish or a date decision's answer.
-fn date_slot(document: &Document, dependencies: &Dependencies, source: &NodeKey) -> Option<usize> {
-    let at = dependencies.node_index(source)?;
-    match &document.nodes.get(source)?.payload {
-        Payload::Milestone(_) => Some(slot(Instant::new(at, Point::Finish))),
-        Payload::Decision(decision) if matches!(decision.answer, AnswerSpec::Date { .. }) => {
-            Some(at.get() * SLOTS + ANSWER)
-        }
-        Payload::Decision(_) | Payload::Deliverable(_) | Payload::Action(_) | Payload::Group(_) => {
-            None
-        }
     }
 }

@@ -74,13 +74,12 @@ impl Point {
         Point::ConditionEntry,
     ];
 
+    /// The point's position in [`Point::ALL`]: its place among a node's slots.
     fn offset(self) -> usize {
-        match self {
-            Point::Start => 0,
-            Point::Finish => 1,
-            Point::Entry => 2,
-            Point::ConditionEntry => 3,
-        }
+        Self::ALL
+            .iter()
+            .position(|point| *point == self)
+            .unwrap_or_else(|| unreachable!("every point is in Point::ALL"))
     }
 }
 
