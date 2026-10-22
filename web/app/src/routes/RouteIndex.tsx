@@ -11,12 +11,12 @@ import { Link, useSearchParams } from "react-router";
 
 import { valueOf, type ReadView } from "../data/keyed-read.ts";
 import { useLive } from "../data/react.ts";
-import { indexKey, journeyIndex, routeIndex, segmentUses, type RouteSummary } from "../data/reads.ts";
+import { indexKey, journeyIndex, routesOfKind, segmentUses, type RouteSummary } from "../data/reads.ts";
 import { DEFAULT_FILTERS, indexPath, newJourneyPath } from "../journeys/address.ts";
 import { IndexHead, FilterSelect } from "../ui/IndexHead.tsx";
 import { Badge, IndexState } from "../ui/kit.tsx";
 import { newRoutePath, routePath } from "./address.ts";
-import { activeJourneyCounts, inUseWords, ofType, startableVersion, typeOf, type InUse, type RouteType } from "./model.ts";
+import { activeJourneyCounts, inUseWords, kindOf, startableVersion, typeOf, type InUse, type RouteType } from "./model.ts";
 import "../journeys/journeys.css";
 import { Failed } from "../ui/Failed.tsx";
 import { RetiredBadge } from "./RetiredBadge.tsx";
@@ -124,12 +124,13 @@ function RouteTable({ routes, useOf }: { routes: RouteSummary[]; useOf: (route: 
 export function RouteIndex() {
   const [params, setParams] = useSearchParams();
   const type = typeOf(params.get("type"));
-  const { view, refresh } = useLive("routes", routeIndex);
+  const kind = kindOf(type);
+  const { view, refresh } = useLive(kind === undefined ? "routes" : `routes:${kind}`, routesOfKind(kind));
   const journeyQuery = { status: ["active" as const] };
   const active = useLive(type === "segments" ? undefined : indexKey(journeyQuery), journeyIndex(journeyQuery));
   const uses = useLive(type === "routes" ? undefined : "segment-uses", segmentUses);
   const routes = valueOf(view);
-  const shown = (routes ?? []).filter((route) => ofType(route, type)).sort((left, right) => left.header.name.localeCompare(right.header.name));
+  const shown = [...(routes ?? [])].sort((left, right) => left.header.name.localeCompare(right.header.name));
   const counts = activeJourneyCounts(valueOf(active.view) ?? []);
   const useOf = (route: RouteSummary): UseReading =>
     route.header.kind === "segment"

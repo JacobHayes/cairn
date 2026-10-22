@@ -229,14 +229,14 @@ export class BrowserRoot {
      */
     route(route: string): string;
     /**
-     * The route index from after `after` (empty for the first page), as `GET /api/routes`
-     * answers it.
+     * The route index of `kind` (the JSON of an optional kind: `null` for both) from after
+     * `after` (empty for the first page), as `GET /api/routes` answers it.
      *
      * # Errors
      *
      * The JSON of a [`HostError`].
      */
-    routes(after: string): string;
+    routes(after: string, kind: string): string;
     /**
      * H6: a subscriber to what `watching` (the JSON of a list of watch names) names, holding
      * the current revisions for its first take.
@@ -472,7 +472,7 @@ export interface InitOutput {
     readonly browserroot_route: (a: number, b: number, c: number, d: number) => void;
     readonly browserroot_routeDetail: (a: number, b: number, c: number, d: number) => void;
     readonly browserroot_routeVersion: (a: number, b: number, c: number, d: number, e: number, f: number) => void;
-    readonly browserroot_routes: (a: number, b: number, c: number, d: number) => void;
+    readonly browserroot_routes: (a: number, b: number, c: number, d: number, e: number, f: number) => void;
     readonly browserroot_subscribe: (a: number, b: number, c: number, d: number) => void;
     readonly browserroot_userNames: (a: number, b: number, c: number, d: number) => void;
     readonly derivation_derived: (a: number, b: number) => void;

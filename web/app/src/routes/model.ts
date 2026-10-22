@@ -92,9 +92,9 @@ export function typeOf(param: string | null): RouteType {
   return param === "routes" || param === "segments" ? param : "all";
 }
 
-/** Whether `route` is of `type`. */
-export function ofType(route: Schema<"RouteSummary">, type: RouteType): boolean {
-  return type === "all" || (type === "segments") === (route.header.kind === "segment");
+/** The kind of route the host is asked to list for `type`: none for every type. */
+export function kindOf(type: RouteType): Schema<"RouteKind"> | undefined {
+  return type === "all" ? undefined : type === "segments" ? "segment" : "process";
 }
 
 /** How many active journeys each route has: counted from the journeys' own lineage, never derived. */

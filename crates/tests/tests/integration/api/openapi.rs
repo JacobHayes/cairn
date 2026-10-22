@@ -76,8 +76,15 @@ mod in_process {
                     &at::PROPOSE_DEPLOYMENT,
                 ],
             ),
-            under_each("proposals", |set| &set.list),
-            ("proposals_waiting", vec![&at::PROPOSALS]),
+            (
+                "proposals",
+                vec![
+                    &at::JOURNEY_PROPOSALS.list,
+                    &at::ROUTE_PROPOSALS.list,
+                    &at::DEPLOYMENT_PROPOSALS.list,
+                    &at::PROPOSALS,
+                ],
+            ),
             under_each("proposal_at", |set| &set.get),
             under_each("edit_proposal", |set| &set.edit),
             under_each("preview_proposal", |set| &set.preview),

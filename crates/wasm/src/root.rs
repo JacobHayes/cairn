@@ -15,9 +15,9 @@ use std::sync::atomic::{AtomicU32, Ordering};
 use std::time::Duration;
 
 use cairn_schema::{
-    Actor, AppliedOver, Consequences, Domain, JourneyId, JourneyStatus, Lineage, Markdown, NodeKey,
-    Notice, Patch, PatchEvents, PatchReceipt, ProposalId, RankConstants, Revision, RevisionOf,
-    RouteId, Timestamp, Title, VersionNumber,
+    Actor, AppliedOver, Consequences, JourneyId, JourneyStatus, Lineage, Markdown, NodeKey, Notice,
+    Patch, PatchEvents, PatchReceipt, RankConstants, Revision, RevisionOf, RouteId, Timestamp,
+    Title, VersionNumber,
 };
 use cairn_service::{Call, Capabilities, DeploymentSettings, DomainPatch, Parts, Service, Written};
 use cairn_store::{InProcessNotifier, MemoryStore, Store, Subscription, Take, Watch};
@@ -152,31 +152,6 @@ pub enum Taken {
     },
     /// Nothing new.
     Empty,
-}
-
-/// A watch as the API's stream names it: `deployment`, `journey:<id>`, `route:<id>`,
-/// `proposal:<id>`, or every one of a kind: `journeys`, `routes`, `proposals`.
-fn watch(name: &str) -> Result<Watch, HostError> {
-    let unreadable = |message: String| HostError::unreadable("watch", message);
-    Ok(match name {
-        "journeys" => Watch::Journeys,
-        "routes" => Watch::Routes,
-        "proposals" => Watch::Proposals,
-        "deployment" => Watch::One(RevisionOf::Domain(Domain::Deployment)),
-        _ => match name.split_once(':') {
-            Some(("journey", id)) => Watch::One(RevisionOf::Domain(Domain::Journey(
-                id.parse().map_err(|error| unreadable(format!("{error}")))?,
-            ))),
-            Some(("route", id)) => Watch::One(RevisionOf::Domain(Domain::Route(
-                id.parse().map_err(|error| unreadable(format!("{error}")))?,
-            ))),
-            Some(("proposal", id)) => Watch::One(RevisionOf::Proposal(
-                id.parse::<ProposalId>()
-                    .map_err(|error| unreadable(format!("{error}")))?,
-            )),
-            _ => return Err(unreadable(format!("{name:?} names nothing to watch"))),
-        },
-    })
 }
 
 /// A service failure, as the root reports it.
@@ -486,7 +461,10 @@ impl BrowserRoot {
         let names: Vec<String> = read("watching", watching)?;
         let watching = names
             .iter()
-            .map(|name| watch(name))
+            .map(|name| {
+                name.parse::<Watch>()
+                    .map_err(|message| HostError::unreadable("watch", message))
+            })
             .collect::<Result<BTreeSet<Watch>, HostError>>()?;
         let subscription = now_or_never(self.service.subscribe(watching)).map_err(failed)?;
         Ok(RootSubscription {

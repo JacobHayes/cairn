@@ -26,6 +26,22 @@ use cairn_store::{
 use crate::write::{OnStale, engine};
 use crate::{Call, ReadError, Service, ServiceError, WriteError, Written, consequence, load};
 
+/// Which open proposals to list (C14, C16): the one set of listings every host offers, and the
+/// one mapping from each to the store's scope.
+#[derive(Clone, Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+#[serde(rename_all = "snake_case", deny_unknown_fields)]
+pub enum ProposalListing {
+    /// The proposals under this destination.
+    Destination(Domain),
+    /// Waiting on the caller: created by them, or drafted by an agent for an active journey
+    /// referring to one of their identities.
+    Waiting,
+    /// Those whose destination is a journey that does not exist yet.
+    NewJourneys,
+    /// Those whose destination is a route that does not exist yet.
+    NewRoutes,
+}
+
 /// What a write to a proposal answers (I6).
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum ProposalWritten {
@@ -221,46 +237,36 @@ impl Service {
             .ok_or_else(|| WriteError::ProposalMissing(id.clone()))
     }
 
-    /// C14: the open proposals of a destination scope (a destination, or the journeys or
-    /// routes proposals would create), newest first, with the scope's open count.
+    /// C14, C16: the open proposals of a listing (a destination's, those waiting on `call`'s
+    /// user, or those that would create a journey or a route), newest first, with the
+    /// listing's open count.
     ///
     /// # Errors
     ///
     /// When the store fails.
     pub async fn proposals(
         &self,
-        scope: ProposalScope,
+        call: &Call,
+        listing: ProposalListing,
         after: Option<ProposalCursor>,
         size: PageSize,
     ) -> Result<ProposalPage, ServiceError> {
+        let scope = match listing {
+            ProposalListing::Destination(destination) => ProposalScope::Destination(destination),
+            ProposalListing::Waiting => {
+                let caller = self.caller(call).await?;
+                ProposalScope::Waiting {
+                    user: caller.user,
+                    identities: caller.identities,
+                }
+            }
+            ProposalListing::NewJourneys => ProposalScope::CreatingJourneys,
+            ProposalListing::NewRoutes => ProposalScope::CreatingRoutes,
+        };
         Ok(self
             .store
             .proposals(&ProposalQuery { scope, after, size })
             .await?)
-    }
-
-    /// C16: the open proposals waiting on `call`'s user: the ones they created, and the ones
-    /// an agent drafted for an active journey referring to one of their identities.
-    ///
-    /// # Errors
-    ///
-    /// When the store fails.
-    pub async fn proposals_waiting(
-        &self,
-        call: &Call,
-        after: Option<ProposalCursor>,
-        size: PageSize,
-    ) -> Result<ProposalPage, ServiceError> {
-        let caller = self.caller(call).await?;
-        self.proposals(
-            ProposalScope::Waiting {
-                user: caller.user,
-                identities: caller.identities,
-            },
-            after,
-            size,
-        )
-        .await
     }
 
     /// C14, D7, I6: what applying the proposal now would do, at `call`'s today: its items still

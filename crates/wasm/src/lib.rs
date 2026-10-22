@@ -42,8 +42,7 @@ pub use local::{
 };
 pub use proposals::{
     ProposalAnswer, ProposalApply, ProposalCreate, ProposalEdit, ProposalListRequest,
-    ProposalListScope, ProposalReview, ProposalStep, RelinkRequest, SaveAsRouteRequest, StaleBase,
-    UpgradeRequest,
+    ProposalReview, ProposalStep, RelinkRequest, SaveAsRouteRequest, StaleBase, UpgradeRequest,
 };
 pub use reads::{
     Caller, IdentityReferences, JourneyIndexQuery, LinkedLogin, RouteDetail, RouteImport,

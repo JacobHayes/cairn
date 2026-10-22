@@ -59,9 +59,9 @@ export class InBrowserHost {
     return parsed<Schema<"JourneyPage">>(hosted(() => this.#root.journeyIndex(JSON.stringify(query))));
   }
 
-  /** The route index from after `after`, as `GET /api/routes` answers it. */
-  routes(after?: string): Schema<"RoutePage"> {
-    return parsed<Schema<"RoutePage">>(hosted(() => this.#root.routes(after ?? "")));
+  /** The route index of `kind` (both when none) from after `after`, as `GET /api/routes` answers it. */
+  routes(after?: string, kind?: Schema<"RouteKind">): Schema<"RoutePage"> {
+    return parsed<Schema<"RoutePage">>(hosted(() => this.#root.routes(after ?? "", JSON.stringify(kind ?? null))));
   }
 
   /** C17: a route's versions with the journeys on each, as `GET /api/routes/{id}/versions` answers it. */

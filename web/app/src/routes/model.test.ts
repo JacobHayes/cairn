@@ -5,7 +5,7 @@ import type { Schema } from "@cairn/client";
 import { describe, expect, it } from "vitest";
 
 import type { RouteRead } from "../data/reads.ts";
-import { activeJourneyCounts, exportName, inUseWords, ofType, routeMoves, startableVersion, typeOf, upgradable, versionRows } from "./model.ts";
+import { activeJourneyCounts, exportName, inUseWords, kindOf, routeMoves, startableVersion, typeOf, upgradable, versionRows } from "./model.ts";
 
 type Summary = Schema<"JourneySummary">;
 
@@ -96,9 +96,8 @@ describe("the routes index", () => {
     expect([counts.get("a"), counts.get("b"), counts.get("c")]).toEqual([2, 1, undefined]);
   });
 
-  it("keeps the rows of one type, and every type with none named", () => {
-    const segment = route({ kind: "segment" }, 1);
-    expect([ofType(segment, "all"), ofType(segment, "segments"), ofType(segment, "routes"), ofType(route({}, 1), "routes")]).toEqual([true, true, false, true]);
+  it("asks the host for the kind of the type shown, and for every kind with none named", () => {
+    expect([kindOf("all"), kindOf("segments"), kindOf("routes")]).toEqual([undefined, "segment", "process"]);
     expect([typeOf(null), typeOf("segments"), typeOf("routes"), typeOf("anything")]).toEqual(["all", "segments", "routes", "all"]);
   });
 

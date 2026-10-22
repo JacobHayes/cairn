@@ -66,7 +66,7 @@ export function browserHost(root: InBrowserHost): Host {
     kind: "browser",
     capabilities: () => read("the capabilities", () => root.capabilities()),
     journeys: (query) => read("the journey index", () => root.journeyIndex(query ?? {})),
-    routes: (after) => read("the route index", () => root.routes(after)),
+    routes: (after, kind) => read("the route index", () => root.routes(after, kind)),
     routeDetail: (route) => read(route, () => root.routeDetail(route)),
     exportRoute: (route, version) =>
       read(version === undefined ? `${route}'s draft` : `${route} version ${String(version)}`, () => root.exportFile(route, version)),

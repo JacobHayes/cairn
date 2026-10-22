@@ -21,6 +21,7 @@ use std::collections::{BTreeMap, BTreeSet};
 use std::fmt;
 use std::future::Future;
 use std::pin::Pin;
+use std::str::FromStr;
 use std::sync::{Arc, Mutex, MutexGuard, PoisonError, Weak};
 use std::task::{Context, Poll, Waker};
 use std::time::Duration;
@@ -52,6 +53,53 @@ impl Watch {
             Watch::Journeys => matches!(of, RevisionOf::Domain(Domain::Journey(_))),
             Watch::Routes => matches!(of, RevisionOf::Domain(Domain::Route(_))),
             Watch::Proposals => matches!(of, RevisionOf::Proposal(_)),
+        }
+    }
+}
+
+/// A watch as every host names it: `deployment`, `journey:<id>`, `route:<id>`, `proposal:<id>`,
+/// or every one of a kind: `journeys`, `routes`, `proposals`.
+impl fmt::Display for Watch {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Watch::Journeys => formatter.write_str("journeys"),
+            Watch::Routes => formatter.write_str("routes"),
+            Watch::Proposals => formatter.write_str("proposals"),
+            Watch::One(RevisionOf::Proposal(id)) => write!(formatter, "proposal:{id}"),
+            Watch::One(RevisionOf::Domain(Domain::Deployment)) => formatter.write_str("deployment"),
+            Watch::One(RevisionOf::Domain(Domain::Journey(id))) => {
+                write!(formatter, "journey:{id}")
+            }
+            Watch::One(RevisionOf::Domain(Domain::Route(id))) => write!(formatter, "route:{id}"),
+        }
+    }
+}
+
+impl FromStr for Watch {
+    type Err = String;
+
+    fn from_str(text: &str) -> Result<Self, String> {
+        let one = |of| Ok(Watch::One(of));
+        match text {
+            "journeys" => Ok(Watch::Journeys),
+            "routes" => Ok(Watch::Routes),
+            "proposals" => Ok(Watch::Proposals),
+            "deployment" => one(RevisionOf::Domain(Domain::Deployment)),
+            _ => match text.split_once(':') {
+                Some(("journey", id)) => one(RevisionOf::Domain(Domain::Journey(
+                    id.parse().map_err(|error| format!("{error}"))?,
+                ))),
+                Some(("route", id)) => one(RevisionOf::Domain(Domain::Route(
+                    id.parse().map_err(|error| format!("{error}"))?,
+                ))),
+                Some(("proposal", id)) => one(RevisionOf::Proposal(
+                    id.parse().map_err(|error| format!("{error}"))?,
+                )),
+                _ => Err(format!(
+                    "{text:?} is not deployment, journey:<id>, route:<id>, proposal:<id>, \
+                     journeys, routes, or proposals"
+                )),
+            },
         }
     }
 }
@@ -351,4 +399,28 @@ impl Mailbox {
 fn lock<T>(mutex: &Mutex<T>) -> MutexGuard<'_, T> {
     // Every critical section here leaves its state whole before anything that could panic.
     mutex.lock().unwrap_or_else(PoisonError::into_inner)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn a_watch_round_trips_through_its_name() {
+        for text in [
+            "deployment",
+            "journey:j_one",
+            "route:r_one",
+            "proposal:pr_one",
+            "journeys",
+            "routes",
+            "proposals",
+        ] {
+            let watch: Watch = text.parse().unwrap();
+            assert_eq!(watch.to_string(), text);
+        }
+        for text in ["journey", "node:n_a", "journey:", ""] {
+            assert!(text.parse::<Watch>().is_err(), "{text:?}");
+        }
+    }
 }

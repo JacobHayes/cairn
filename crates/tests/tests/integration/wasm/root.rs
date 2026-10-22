@@ -314,7 +314,7 @@ fn the_index_route_and_viewer_reads_are_the_apis_json() {
         .map(|item| item.id.to_string())
         .collect();
     assert_eq!(ids, ["j_vendor_eval"]);
-    let routes: wire::RoutePage = same(&root.routes("").unwrap());
+    let routes: wire::RoutePage = same(&root.routes("", "null").unwrap());
     assert!(
         routes
             .items
@@ -354,6 +354,36 @@ fn the_index_route_and_viewer_reads_are_the_apis_json() {
 
 /// H3: the local user arrives as a signed-in request does: an identity they no longer hold
 /// through is made again, so "mine" never goes empty.
+#[test]
+fn the_route_index_lists_only_the_kind_asked_for() {
+    let root = BrowserRoot::seeded().unwrap();
+    let file: cairn_schema::RouteFile = cairn_schema::from_yaml(include_str!(
+        "../../../../../fixtures/security-review/segment.yaml"
+    ))
+    .unwrap();
+    let import = serde_json::json!({ "patch_id": "p_segment", "file": file }).to_string();
+    root.import_file_json(&import, NOW).unwrap();
+    let kinds_of = |kind: &str| -> Vec<cairn_schema::RouteKind> {
+        let page: wire::RoutePage = serde_json::from_str(&root.routes("", kind).unwrap()).unwrap();
+        page.items.iter().map(|route| route.header.kind).collect()
+    };
+    let all = kinds_of("null");
+    let segments = kinds_of(r#""segment""#);
+    let processes = kinds_of(r#""process""#);
+    assert!(!segments.is_empty(), "the imported segment is listed");
+    assert!(
+        segments
+            .iter()
+            .all(|kind| *kind == cairn_schema::RouteKind::Segment)
+    );
+    assert!(
+        processes
+            .iter()
+            .all(|kind| *kind == cairn_schema::RouteKind::Process)
+    );
+    assert_eq!(segments.len() + processes.len(), all.len());
+}
+
 #[test]
 fn the_local_user_is_given_an_identity_when_none_holds_their_email() {
     let root = BrowserRoot::seeded().unwrap();

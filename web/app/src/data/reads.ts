@@ -64,15 +64,18 @@ export function referencesOf(identities: readonly string[]) {
 /** A21: whether the route is a segment, which is inserted and never started or followed. */
 export const isSegment = (route: RouteSummary): boolean => route.header.kind === "segment";
 
-/** The route index, kept current. */
-export function routeIndex(session: Session): LiveSpec<RouteSummary[]> {
-  return {
+/** The route index of `kind` (both kinds when none), kept current. */
+export function routesOfKind(kind: Schema<"RouteKind"> | undefined) {
+  return (session: Session): LiveSpec<RouteSummary[]> => ({
     watching: ["routes"],
     about: (of) => isRoute(of),
-    fetch: () => allPages<RouteSummary, string>((after) => session.host.routes(after)),
+    fetch: () => allPages<RouteSummary, string>((after) => session.host.routes(after, kind)),
     holds: (items) => items.map((item) => ({ of: routeOf(item.header.id), revision: item.revision })),
-  };
+  });
 }
+
+/** The route index of both kinds, kept current. */
+export const routeIndex = routesOfKind(undefined);
 
 /** B13: how much a segment is used: the insertions of it across every version, and how many are behind its latest. */
 export interface SegmentUse {
@@ -86,8 +89,7 @@ export function segmentUses(session: Session): LiveSpec<Record<string, SegmentUs
     watching: ["routes", "journeys"],
     about: (of) => isRoute(of) || isJourney(of),
     fetch: async () => {
-      const routes = await allPages<RouteSummary, string>((after) => session.host.routes(after));
-      const segments = routes.filter((route) => route.header.kind === "segment");
+      const segments = await allPages<RouteSummary, string>((after) => session.host.routes(after, "segment"));
       const uses = await Promise.all(
         segments.map(async (route): Promise<[string, SegmentUse]> => {
           const found = (await session.host.routeDetail(route.header.id)).versions.flatMap((version) => version.insertions ?? []);

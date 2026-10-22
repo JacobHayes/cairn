@@ -110,6 +110,31 @@ pub struct JourneyQuery {
     pub size: PageSize,
 }
 
+impl JourneyQuery {
+    /// The query a host's parameters ask for (C16): no identities means any journey, and no
+    /// size means the page limit. The one place those defaults are spelled.
+    #[must_use]
+    pub fn from_parameters(
+        statuses: BTreeSet<JourneyStatus>,
+        route: Option<RouteId>,
+        version: Option<VersionNumber>,
+        referencing: BTreeSet<IdentityKey>,
+        upgrade_available: Option<bool>,
+        after: Option<JourneyId>,
+        size: Option<u32>,
+    ) -> Self {
+        Self {
+            statuses,
+            route,
+            version,
+            referencing: (!referencing.is_empty()).then_some(referencing),
+            upgrade_available,
+            after,
+            size: size.map_or(PageSize::MAX, PageSize::new),
+        }
+    }
+}
+
 /// A journey in the index.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct JourneySummary {

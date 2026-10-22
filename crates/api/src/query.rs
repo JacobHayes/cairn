@@ -150,6 +150,16 @@ pub enum ProposalListing {
     NewRoutes,
 }
 
+impl From<ProposalListing> for cairn_service::ProposalListing {
+    fn from(scope: ProposalListing) -> Self {
+        match scope {
+            ProposalListing::Waiting => Self::Waiting,
+            ProposalListing::NewJourneys => Self::NewJourneys,
+            ProposalListing::NewRoutes => Self::NewRoutes,
+        }
+    }
+}
+
 /// A proposal listing's page: where it starts and its size.
 ///
 /// # Errors
@@ -462,16 +472,18 @@ impl Params {
 ///
 /// A bad request for a parameter that does not parse.
 pub fn journeys(params: &Params) -> Result<JourneyQuery, ApiError> {
-    let referencing: Vec<IdentityKey> = params.all("referencing")?;
-    Ok(JourneyQuery {
-        statuses: params.all("status")?.into_iter().collect(),
-        route: params.one("route")?,
-        version: params.one("version")?,
-        referencing: (!referencing.is_empty()).then(|| referencing.into_iter().collect()),
-        upgrade_available: params.one("upgrade_available")?,
-        after: params.one("after")?,
-        size: params.size()?,
-    })
+    Ok(JourneyQuery::from_parameters(
+        params.all("status")?.into_iter().collect(),
+        params.one("route")?,
+        params.one("version")?,
+        params
+            .all::<IdentityKey>("referencing")?
+            .into_iter()
+            .collect(),
+        params.one("upgrade_available")?,
+        params.one("after")?,
+        params.one("size")?,
+    ))
 }
 
 /// The route index's page: the kind it lists, where it starts, and its size.
@@ -626,35 +638,22 @@ impl FromStr for DomainName {
     type Err = String;
 
     fn from_str(text: &str) -> Result<Self, String> {
-        let domain = match text.split_once(':') {
-            None if text == "deployment" => Domain::Deployment,
-            Some(("journey", id)) => {
-                Domain::Journey(id.parse().map_err(|error| format!("{error}"))?)
-            }
-            Some(("route", id)) => Domain::Route(id.parse().map_err(|error| format!("{error}"))?),
-            _ => {
-                return Err(format!(
-                    "{text:?} is not deployment, journey:<id>, or route:<id>"
-                ));
-            }
-        };
-        Ok(Self(domain))
+        match text.parse::<Watch>() {
+            Ok(Watch::One(RevisionOf::Domain(domain))) => Ok(Self(domain)),
+            _ => Err(format!(
+                "{text:?} is not deployment, journey:<id>, or route:<id>"
+            )),
+        }
     }
 }
 
 impl fmt::Display for DomainName {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match &self.0 {
-            Domain::Deployment => formatter.write_str("deployment"),
-            Domain::Journey(id) => write!(formatter, "journey:{id}"),
-            Domain::Route(id) => write!(formatter, "route:{id}"),
-        }
+        Watch::One(RevisionOf::Domain(self.0.clone())).fmt(formatter)
     }
 }
 
-/// What a stream watches, as a query names it: one domain or proposal (`deployment`,
-/// `journey:<id>`, `route:<id>`, `proposal:<id>`), or every one of a kind (`journeys`,
-/// `routes`, `proposals`).
+/// What a stream watches, as a query names it: the store's watch grammar.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct WatchName(pub Watch);
 
@@ -662,31 +661,13 @@ impl FromStr for WatchName {
     type Err = String;
 
     fn from_str(text: &str) -> Result<Self, String> {
-        let watch = match text {
-            "journeys" => Watch::Journeys,
-            "routes" => Watch::Routes,
-            "proposals" => Watch::Proposals,
-            _ => match text.split_once(':') {
-                Some(("proposal", id)) => {
-                    let id: ProposalId = id.parse().map_err(|error| format!("{error}"))?;
-                    Watch::One(RevisionOf::Proposal(id))
-                }
-                _ => Watch::One(RevisionOf::Domain(text.parse::<DomainName>()?.0)),
-            },
-        };
-        Ok(Self(watch))
+        text.parse().map(Self)
     }
 }
 
 impl fmt::Display for WatchName {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match &self.0 {
-            Watch::Journeys => formatter.write_str("journeys"),
-            Watch::Routes => formatter.write_str("routes"),
-            Watch::Proposals => formatter.write_str("proposals"),
-            Watch::One(RevisionOf::Proposal(id)) => write!(formatter, "proposal:{id}"),
-            Watch::One(RevisionOf::Domain(domain)) => DomainName(domain.clone()).fmt(formatter),
-        }
+        self.0.fmt(formatter)
     }
 }
 
@@ -739,25 +720,6 @@ named_in_text!(
 #[cfg(test)]
 mod tests {
     use super::*;
-
-    #[test]
-    fn names_round_trip_through_text() {
-        for text in [
-            "deployment",
-            "journey:j_one",
-            "route:r_one",
-            "proposal:pr_one",
-            "journeys",
-            "routes",
-            "proposals",
-        ] {
-            let name: WatchName = text.parse().unwrap();
-            assert_eq!(name.to_string(), text);
-        }
-        for text in ["journey", "node:n_a", "journey:", ""] {
-            assert!(text.parse::<WatchName>().is_err(), "{text:?}");
-        }
-    }
 
     #[test]
     fn parameters_are_checked_against_what_the_endpoint_declares() {

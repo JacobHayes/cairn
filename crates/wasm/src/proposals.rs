@@ -12,8 +12,8 @@ use cairn_schema::{
     Proposal, ProposalDraft, ProposalId, ProposalPreview, Revision, RevisionConflict, RouteId,
     Title, TouchedSet, VersionNumber,
 };
-use cairn_service::{ProposalWritten, ProposeError, ReadError, WriteError};
-use cairn_store::{PageSize, ProposalCursor, ProposalPage, ProposalScope};
+use cairn_service::{ProposalListing, ProposalWritten, ProposeError, ReadError, WriteError};
+use cairn_store::{PageSize, ProposalCursor, ProposalPage};
 use serde::{Deserialize, Serialize};
 use wasm_bindgen::prelude::wasm_bindgen;
 
@@ -106,27 +106,12 @@ pub struct RelinkRequest {
     pub lineage: Lineage,
 }
 
-/// Which open proposals to list: the browser host's `GET /api/{destination}/proposals` and
-/// `GET /api/proposals?scope=`.
-#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(rename_all = "snake_case", deny_unknown_fields)]
-pub enum ProposalListScope {
-    /// The proposals under this destination.
-    Destination(Domain),
-    /// Waiting on the local user.
-    Waiting,
-    /// Those that would create a journey.
-    NewJourneys,
-    /// Those that would create a route.
-    NewRoutes,
-}
-
 /// A proposal listing's request: the scope and where the page starts.
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct ProposalListRequest {
     /// Which proposals.
-    pub scope: ProposalListScope,
+    pub scope: ProposalListing,
     /// The page starts after this proposal.
     #[serde(default)]
     pub after: Option<ProposalCursor>,
@@ -264,26 +249,8 @@ impl BrowserRoot {
         now: &str,
     ) -> Result<ProposalPage, HostError> {
         let ProposalListRequest { scope, after } = request;
-        let size = PageSize::MAX;
-        let service = self.service();
-        match scope {
-            ProposalListScope::Waiting => {
-                let call = self.call(now)?;
-                now_or_never(service.proposals_waiting(&call, after, size))
-            }
-            ProposalListScope::Destination(destination) => now_or_never(service.proposals(
-                ProposalScope::Destination(destination),
-                after,
-                size,
-            )),
-            ProposalListScope::NewJourneys => {
-                now_or_never(service.proposals(ProposalScope::CreatingJourneys, after, size))
-            }
-            ProposalListScope::NewRoutes => {
-                now_or_never(service.proposals(ProposalScope::CreatingRoutes, after, size))
-            }
-        }
-        .map_err(failed)
+        let call = self.call(now)?;
+        now_or_never(self.service().proposals(&call, scope, after, PageSize::MAX)).map_err(failed)
     }
 
     /// I6: creates a proposal for `destination` as the local user at `now`, as

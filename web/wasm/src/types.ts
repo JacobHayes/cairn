@@ -2,7 +2,7 @@
 // types the API's OpenAPI document already names (web/client/generated). Each type mirrors
 // one Rust type in crates/wasm, named in its comment; the native and browser agreement tests
 // check that every answer is the server's JSON byte for byte.
-import type { Schema } from "@cairn/client";
+import type { Schema, operations } from "@cairn/client";
 
 /** A node key, `n_...`. */
 export type NodeKey = Schema<"NodeKey">;
@@ -233,16 +233,8 @@ export interface ImportRequest {
   patch_id: Schema<"PatchId">;
 }
 
-/** `crates/wasm` `JourneyIndexQuery`: `GET /api/journeys`'s filters and page (C16) as JSON. */
-export interface JourneyIndexQuery {
-  status?: Schema<"JourneyStatus">[];
-  route?: string;
-  version?: number;
-  referencing?: Schema<"IdentityKey">[];
-  upgrade_available?: boolean;
-  after?: Schema<"JourneyId">;
-  size?: number;
-}
+/** `crates/wasm` `JourneyIndexQuery`: `GET /api/journeys`'s filters and page (C16) as JSON: the API's own query. */
+export type JourneyIndexQuery = NonNullable<operations["listJourneys"]["parameters"]["query"]>;
 
 /** `crates/wasm` `PatchRequest`, as the API's. */
 export type PatchRequest = Schema<"PatchRequest">;

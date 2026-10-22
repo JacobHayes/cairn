@@ -10,8 +10,8 @@ use cairn_schema::{
     RouteId, RouteKind, Timestamp, Title, TouchedSet, UnresolvedItem, UserId, VersionNumber,
     Violation, to_yaml,
 };
-use cairn_service::{Call, ProposalReview, StaleBase};
-use cairn_store::{JourneyQuery, PageSize, ProposalCursor, ProposalScope, SearchHit, SearchQuery};
+use cairn_service::{Call, ProposalListing, ProposalReview, StaleBase};
+use cairn_store::{JourneyQuery, PageSize, ProposalCursor, SearchHit, SearchQuery};
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
@@ -726,10 +726,9 @@ impl ToolSet {
             id: after.id,
         });
         let size = PageSize::MAX;
-        let page = match (arguments.scope, arguments.destination) {
+        let listing = match (arguments.scope, arguments.destination) {
             (ProposalsScope::Destination, Some(destination)) => {
-                let scope = ProposalScope::Destination(destination);
-                self.service.proposals(scope, after, size).await?
+                ProposalListing::Destination(destination)
             }
             (ProposalsScope::Destination, None) => {
                 return Err(ToolError::Arguments {
@@ -737,18 +736,11 @@ impl ToolSet {
                     message: "the destination scope needs a destination".to_owned(),
                 });
             }
-            (ProposalsScope::Waiting, _) => {
-                self.service.proposals_waiting(call, after, size).await?
-            }
-            (ProposalsScope::NewJourneys, _) => {
-                let scope = ProposalScope::CreatingJourneys;
-                self.service.proposals(scope, after, size).await?
-            }
-            (ProposalsScope::NewRoutes, _) => {
-                let scope = ProposalScope::CreatingRoutes;
-                self.service.proposals(scope, after, size).await?
-            }
+            (ProposalsScope::Waiting, _) => ProposalListing::Waiting,
+            (ProposalsScope::NewJourneys, _) => ProposalListing::NewJourneys,
+            (ProposalsScope::NewRoutes, _) => ProposalListing::NewRoutes,
         };
+        let page = self.service.proposals(call, listing, after, size).await?;
         Ok(ProposalsOutput {
             count: page.count,
             proposals: page

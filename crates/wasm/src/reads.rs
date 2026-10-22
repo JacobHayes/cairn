@@ -8,7 +8,7 @@ use std::collections::BTreeSet;
 
 use cairn_schema::{
     AgentId, Domain, Email, GraphId, IdentityKey, InsertionKey, JourneyId, JourneyStatus, Markdown,
-    PatchId, Revision, RouteFile, RouteHeader, RouteId, Slug, Timestamp, Title, UserId,
+    PatchId, Revision, RouteFile, RouteHeader, RouteId, RouteKind, Slug, Timestamp, Title, UserId,
     VersionNumber,
 };
 use cairn_service::ReadError;
@@ -51,15 +51,15 @@ pub struct JourneyIndexQuery {
 impl JourneyIndexQuery {
     /// The store's query, as the API reads its parameters.
     fn store_query(&self) -> JourneyQuery {
-        JourneyQuery {
-            statuses: self.status.clone(),
-            route: self.route.clone(),
-            version: self.version,
-            referencing: (!self.referencing.is_empty()).then(|| self.referencing.clone()),
-            upgrade_available: self.upgrade_available,
-            after: self.after.clone(),
-            size: self.size.map_or(PageSize::MAX, PageSize::new),
-        }
+        JourneyQuery::from_parameters(
+            self.status.clone(),
+            self.route.clone(),
+            self.version,
+            self.referencing.clone(),
+            self.upgrade_available,
+            self.after.clone(),
+            self.size,
+        )
     }
 }
 
@@ -280,15 +280,19 @@ impl BrowserRoot {
         })
     }
 
-    /// The route index: every route and segment, in id order, as `GET /api/routes` answers its
-    /// first page at the page limit.
+    /// The route index: the routes and segments of `kind` (both when none), in id order, as
+    /// `GET /api/routes` answers its first page at the page limit.
     ///
     /// # Errors
     ///
     /// When the store fails.
-    pub fn route_page(&self, after: Option<&RouteId>) -> Result<RoutePage, HostError> {
+    pub fn route_page(
+        &self,
+        kind: Option<RouteKind>,
+        after: Option<&RouteId>,
+    ) -> Result<RoutePage, HostError> {
         let page =
-            now_or_never(self.service().routes(None, after, PageSize::MAX)).map_err(failed)?;
+            now_or_never(self.service().routes(kind, after, PageSize::MAX)).map_err(failed)?;
         let items = page.items.into_iter().map(|summary| RouteSummary {
             header: summary.header,
             revision: summary.revision,
@@ -436,19 +440,20 @@ impl BrowserRoot {
         Ok(json(&self.references_of(&key)?))
     }
 
-    /// The route index from after `after` (empty for the first page), as `GET /api/routes`
-    /// answers it.
+    /// The route index of `kind` (the JSON of an optional kind: `null` for both) from after
+    /// `after` (empty for the first page), as `GET /api/routes` answers it.
     ///
     /// # Errors
     ///
     /// The JSON of a [`HostError`].
-    pub fn routes(&self, after: &str) -> Result<String, String> {
+    pub fn routes(&self, after: &str, kind: &str) -> Result<String, String> {
+        let kind: Option<RouteKind> = read("kind", kind)?;
         let after = if after.is_empty() {
             None
         } else {
             Some(route_id(after)?)
         };
-        Ok(json(&self.route_page(after.as_ref())?))
+        Ok(json(&self.route_page(kind, after.as_ref())?))
     }
 
     /// C17: route `route`'s versions with the journeys on each, as

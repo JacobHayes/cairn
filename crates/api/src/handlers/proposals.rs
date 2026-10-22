@@ -7,8 +7,8 @@ use axum::Json;
 use axum::extract::{Extension, RawPathParams, RawQuery, State};
 use axum::routing::{get, patch, post};
 use cairn_schema::{Actor, Domain, JourneyId, PatchId, Proposal, ProposalId, RouteId};
+use cairn_service::ProposalListing;
 use cairn_service::{ProposalWritten, ProposeError, WriteError};
-use cairn_store::ProposalScope;
 
 use super::{Answer, committed, refusal_outcome, written_outcome};
 use crate::Api;
@@ -100,6 +100,7 @@ fn addressed_proposal(
 pub async fn list(
     State(api): State<Api>,
     Extension(under): Extension<Under>,
+    Extension(actor): Extension<Actor>,
     params: RawPathParams,
     RawQuery(raw): RawQuery,
 ) -> Answer<ProposalList> {
@@ -107,7 +108,12 @@ pub async fn list(
     let (after, size) = query::proposals(&Params::parse(raw.as_deref(), query::PROPOSAL_PARAMS)?)?;
     let page = api
         .service
-        .proposals(ProposalScope::Destination(destination), after, size)
+        .proposals(
+            &api.call(actor),
+            ProposalListing::Destination(destination),
+            after,
+            size,
+        )
         .await?;
     Ok(Json(page.into()))
 }
@@ -120,24 +126,13 @@ pub async fn listing(
 ) -> Answer<ProposalList> {
     let params = Params::parse(raw.as_deref(), query::PROPOSAL_SCOPE_PARAMS)?;
     let (after, size) = query::proposals(&params)?;
-    let page = match params.one::<query::ProposalListing>("scope")? {
-        Some(query::ProposalListing::Waiting) => {
-            api.service
-                .proposals_waiting(&api.call(actor), after, size)
-                .await?
-        }
-        Some(query::ProposalListing::NewJourneys) => {
-            api.service
-                .proposals(ProposalScope::CreatingJourneys, after, size)
-                .await?
-        }
-        Some(query::ProposalListing::NewRoutes) => {
-            api.service
-                .proposals(ProposalScope::CreatingRoutes, after, size)
-                .await?
-        }
-        None => unreachable!("the scope is required"),
+    let Some(scope) = params.one::<query::ProposalListing>("scope")? else {
+        unreachable!("the scope is required");
     };
+    let page = api
+        .service
+        .proposals(&api.call(actor), scope.into(), after, size)
+        .await?;
     Ok(Json(page.into()))
 }
 

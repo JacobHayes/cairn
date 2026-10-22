@@ -34,7 +34,7 @@ export const browserroot_refreshProposal: (a: number, b: number, c: number, d: n
 export const browserroot_route: (a: number, b: number, c: number, d: number) => void;
 export const browserroot_routeDetail: (a: number, b: number, c: number, d: number) => void;
 export const browserroot_routeVersion: (a: number, b: number, c: number, d: number, e: number, f: number) => void;
-export const browserroot_routes: (a: number, b: number, c: number, d: number) => void;
+export const browserroot_routes: (a: number, b: number, c: number, d: number, e: number, f: number) => void;
 export const browserroot_subscribe: (a: number, b: number, c: number, d: number) => void;
 export const browserroot_userNames: (a: number, b: number, c: number, d: number) => void;
 export const derivation_derived: (a: number, b: number) => void;

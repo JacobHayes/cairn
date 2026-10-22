@@ -39,7 +39,7 @@ pub use drafting::ProposeError;
 pub use error::ServiceError;
 pub use observe::{DERIVE_DURATION, engine_call_active};
 pub use projections::{ChildEntry, History, NodeDetail, Projected, ReadError};
-pub use proposals::{ProposalReview, ProposalWritten, StaleBase};
+pub use proposals::{ProposalListing, ProposalReview, ProposalWritten, StaleBase};
 pub use reads::{IdentityReferences, RouteReference, RouteSummary};
 pub use routes::PatchKeys;
 pub use tour::TourView;
