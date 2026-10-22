@@ -109,6 +109,32 @@ export function appliesIf(view: Ready, detail: NodeDetail): string | undefined {
   return conditionWords(clause, conditionNames((decision) => nodeOf(view, decision), (key) => identityName(view, key)));
 }
 
+/**
+ * F6, D8: how a node finished early on purpose, after "Done early on <date>": ahead of a dependency (its days when the
+ * dependency has a date, else just that it is not done yet), of a child it contains, of a stage opening that does not
+ * gate, or of its own not-before date, with the reason its guard bypass recorded when it has one.
+ */
+function aheadOf(view: Ready, detail: NodeDetail, early: Schema<"DoneEarly">): Piece[] {
+  const days = daysWords(early.days);
+  const reason = detail.overrides?.bypass?.reason.replace(/\.+$/, "");
+  const because = reason === undefined || reason === "" ? [] : [`, with the reason "${reason}"`];
+  const { source } = early;
+  if ("dependency" in source) {
+    const { requires, via } = source.dependency;
+    if (typeof via === "object" && "stage_opening" in via && nodeOf(view, via.stage_opening.group)?.gates === false) {
+      return [`, ${days} before `, { node: requires }, ", which ", { node: via.stage_opening.group }, " does not wait for"];
+    }
+    const dated = nodeOf(view, requires)?.kind === "milestone" || view.derived.nodes[requires]?.display_state === "done";
+    return [...(dated ? [`, ${days} before `, { node: requires }] : [", before ", { node: requires }, " is done"]), ...because];
+  }
+  if ("containment" in source) {
+    const child = source.containment.child;
+    const dated = view.derived.nodes[child]?.display_state === "done";
+    return [...(dated ? [`, ${days} before `, { node: child }] : [", before ", { node: child }, " is done"]), ...because];
+  }
+  return [`, ${days} before its not-before date, ${dateWords(early.date, view.derived.today)}`, ...because];
+}
+
 /** D4: why a finished node is stale, in words. */
 function staleWords(view: Ready, failures: Schema<"GuardFailure">[]): Piece[] {
   const name = namer(view);
@@ -225,7 +251,9 @@ function stateSentence(view: Ready, detail: NodeDetail, rank: RankFacts): Piece[
     case "done": {
       const verb = node.kind === "decision" ? `Decided${detail.answer === undefined ? "" : ` ${answerText(view, detail.answer, node)}`}` : "Done";
       const unanswered = derived.relevance.value === "undecided" ? ([" May not apply: depends on ", ...undecidedNames(view, node.key), "."] satisfies Piece[]) : [];
-      return [`${verb}${finished}.`, ...staleWords(view, derived.stale ?? []), ...unanswered];
+      const early = derived.dates.done_early ?? undefined;
+      const opening: Piece[] = early === undefined ? [`${verb}${finished}.`] : [`${verb} early${finished}`, ...aheadOf(view, detail, early), "."];
+      return [...opening, ...staleWords(view, derived.stale ?? []), ...unanswered];
     }
     case "skipped": {
       const through = detail.ancestors.find((ancestor) => view.journey.graph.state?.nodes?.[ancestor.key]?.state === "skipped");

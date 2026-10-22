@@ -281,7 +281,7 @@ impl Pass {
 
     /// The best value the slot's neighbours give it, ignoring its own seed, with the
     /// constraint that gives it: what a fixed slot is held to by the constraints it is never
-    /// relaxed through.
+    /// relaxed through. Exempt constraints hold nothing.
     #[must_use]
     pub(crate) fn pulled(
         &self,
@@ -291,7 +291,7 @@ impl Pass {
     ) -> Option<(i32, u32)> {
         let mut best: Option<(i32, u32)> = None;
         for &at in direction.pulling(network, slot) {
-            let Some(constraint) = network.constraint(at) else {
+            let Some(constraint) = network.constraint(at).filter(|found| !found.exempt) else {
                 continue;
             };
             let (_, from) = direction.ends(constraint);

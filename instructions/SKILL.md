@@ -174,7 +174,8 @@ Say each kind of date with the field made for it:
 - **A structural not-until** is `not_before`: the work, or the decision, cannot happen before
   that date. While its date is ahead the node is `scheduled` and off the next list; it can
   still be started early, and finishing it before the date is refused with the
-  `date_arrived` guard unless the person gives a reason to bypass it.
+  `date_arrived` guard unless the person gives a reason to bypass it; finished that way,
+  it reads done early.
 - **A personal not-now** is a snooze: someone sets the node aside until a date or another
   node is done. It changes no plan date.
 - **An event** is a milestone. Pinned, it is `scheduled` until its day, then ready to mark
@@ -191,11 +192,13 @@ contents (they wait for the milestone) unless `gates: false`; `closes_at` bounds
 group's finish, and so its contents' due dates, unless `closes: false`. Consecutive
 stages share a milestone: one stage's `closes_at` is the next stage's `opens_at`.
 
-Put inside a stage only the work done during it. Prep belongs before it: in an earlier
-stage, or outside any stage with a `due_by` before the opening milestone. `gates: false`
-lets the contents start before the stage opens, but the opening still bounds their dates,
-so work finished before the milestone reports a shortfall. Move the work out of the stage
-rather than switching the gate off.
+Put inside a stage the work done during it. Work that can as well be done ahead of time
+can sit in a stage with `gates: false`: its contents can start and finish before the stage
+opens, and the opening dates only contents not yet started. Starting work early is never a
+shortfall, and neither is finishing it ahead of the opening, or ahead of any dependency with
+a reason (a guard bypass): its `dates.done_early` says, on today's dates, how many days
+early and ahead of what. Its other dates, such as its deadline, still apply. Prep that must
+be done before the stage belongs outside it, with a `due_by` before the opening milestone.
 
 ## Reuse a segment
 

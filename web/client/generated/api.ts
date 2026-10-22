@@ -1995,6 +1995,26 @@ export interface components {
         };
         /** @description A domain: `deployment`, `journey:<id>`, or `route:<id>`. */
         DomainName: string;
+        /** @description How early a node finished, and ahead of what. */
+        DoneEarly: {
+            /**
+             * Format: date
+             * @description The date it was finished ahead of: the requirement's or opening's earliest date today
+             *     (its recorded date once it has one; a milestone's date as shown, its actual, pin or
+             *     due, when that is later), or its own not-before date.
+             */
+            date: string;
+            /**
+             * Format: uint32
+             * @description Days between its finish and the date it was finished ahead of.
+             */
+            days: number;
+            /**
+             * @description What it was finished ahead of: a dependency, with how it arose (a stage opening
+             *     among them), or its own not-before rule.
+             */
+            source: components["schemas"]["ConstraintSource"];
+        };
         /** @description Where a route draft comes from. */
         DraftSource: "edit" | "import" | {
             save_as_route: {
@@ -3403,6 +3423,13 @@ export interface components {
         } & (unknown & unknown & unknown & unknown & unknown & unknown & unknown & unknown & unknown & unknown & unknown & unknown & unknown);
         /** @description A node's derived dates. Every bound is null when nothing reaches it. */
         NodeDates: {
+            /**
+             * @description Finished before something it was finished ahead of on purpose, on today's dates: a
+             *     dependency or its own date its guard bypass accepted, a stage opening that does not
+             *     gate, or a milestone's own not-before rule. None when none of those would have put
+             *     its finish later. Other shortfalls still apply.
+             */
+            done_early?: components["schemas"]["DoneEarly"] | null;
             /** @description The latest it can finish. */
             due?: components["schemas"]["Bound"] | null;
             /** @description The earliest it can start. */

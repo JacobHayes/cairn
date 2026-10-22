@@ -479,16 +479,20 @@ fn every_shortfall_move_resolves_it() {
             "j_launch",
             "n_code_freeze",
         ),
-        // Review round 3: today, through the work's start, still holds its pinned finish.
+        // Work reopened under a milestone marked done: today, through its start, still holds
+        // its pinned finish, so the milestone's fact is earlier than the work can finish.
         (
             support::accepted(
-                &support::journey(&add(&[
-                    "{key: n_work, id: work, kind: action, title: Work, estimate: 3}",
-                    "{key: n_after, id: after, kind: milestone, title: After, requires: [n_work]}",
-                ])),
-                "- op: set_pin\n  node: n_work\n  date: \"2026-10-10\"\n\
-- op: transition\n  node: n_after\n  transition: complete\n\
-- op: apply_override\n  node: n_after\n  override: {guard_bypass: {guards: [deps_done], reason: Done ahead of the work.}}\n",
+                &support::accepted(
+                    &support::journey(&add(&[
+                        "{key: n_work, id: work, kind: action, title: Work, estimate: 3}",
+                        "{key: n_after, id: after, kind: milestone, title: After, requires: [n_work]}",
+                    ])),
+                    "- op: set_pin\n  node: n_work\n  date: \"2026-10-10\"\n\
+- op: transition\n  node: n_work\n  transition: complete\n\
+- op: transition\n  node: n_after\n  transition: complete\n",
+                ),
+                "- op: transition\n  node: n_work\n  transition: reopen\n",
             ),
             support::JOURNEY,
             "n_work",
@@ -515,25 +519,32 @@ fn every_shortfall_move_resolves_it() {
 // Review round 2 regression.
 
 /// F6: a fact earlier than a rule from `created_at` or a date answer allows is short, shown
-/// on the node whose fact it is, since neither source is a node of its own.
+/// on the node whose fact it is, since neither source is a node of its own. Started work is
+/// held at its finish, so it is the finish that is short, not the start.
 #[test]
 fn a_fact_too_early_for_created_at_or_an_answer_is_short() {
     let records = support::journey(&add(&[
         "{key: n_date, id: date, kind: decision, title: Date, prompt: When?, answer_type: date}",
-        "{key: n_settled, id: settled, kind: milestone, title: Settled, not_before: {after: journey.created_at, offset: 3}}",
-        "{key: n_answered, id: answered, kind: milestone, title: Answered, not_before: {after: n_date}}",
+        "{key: n_settled, id: settled, kind: action, title: Settled, not_before: {after: journey.created_at}}",
+        "{key: n_answered, id: answered, kind: action, title: Answered, not_before: {after: n_date}}",
     ]));
     let finished = support::accepted(
         &records,
-        "- op: answer\n  decision: n_date\n  value: {date: \"2026-10-10\"}\n\
+        "- op: answer\n  decision: n_date\n  value: {date: \"2026-10-05\"}\n\
+- op: transition\n  node: n_settled\n  transition: start\n\
 - op: transition\n  node: n_settled\n  transition: complete\n\
-- op: transition\n  node: n_answered\n  transition: complete\n",
+- op: transition\n  node: n_answered\n  transition: start\n\
+- op: transition\n  node: n_answered\n  transition: complete\n\
+- op: set_recorded_date\n  node: n_settled\n  end: start\n  date: \"2026-10-01\"\n\
+- op: set_recorded_date\n  node: n_settled\n  end: finish\n  date: \"2026-10-04\"\n\
+- op: set_recorded_date\n  node: n_answered\n  end: start\n  date: \"2026-10-01\"\n\
+- op: set_recorded_date\n  node: n_answered\n  end: finish\n  date: \"2026-10-02\"\n",
     );
     for (node, days, source) in [
-        ("n_settled", 3, Instant::CreatedAt),
+        ("n_settled", 2, Instant::CreatedAt),
         (
             "n_answered",
-            4,
+            3,
             Instant::Answer {
                 decision: key("n_date"),
             },

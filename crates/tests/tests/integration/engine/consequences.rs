@@ -13,7 +13,7 @@ use support::{add_nodes as add, key};
 
 /// D7 over the test journey: `before` against `before` with `patch` applied, both sides
 /// derived at `today`.
-fn caused(before: &Records, patch: &str, today: &str) -> Consequences {
+pub(crate) fn caused(before: &Records, patch: &str, today: &str) -> Consequences {
     let after = support::accepted(before, patch);
     let side = |records: &Records| {
         let graph = support::journey_graph(records, support::JOURNEY);

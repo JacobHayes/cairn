@@ -118,6 +118,12 @@ impl Explain<'_> {
         shown
     }
 
+    /// Where the constraint at a position comes from, read on its own.
+    pub(crate) fn source_of(&self, at: u32) -> ConstraintSource {
+        let constraint = self.constraint(at);
+        self.source(constraint, constraint.after)
+    }
+
     /// Where a constraint comes from; for a folded entry hop, `first` is the hop's first
     /// constraint and `to` the instant it ends at.
     fn source(&self, first: &Constraint, to: Slot) -> ConstraintSource {

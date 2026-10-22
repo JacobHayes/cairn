@@ -19,6 +19,7 @@ mod derived_values;
 mod display_state;
 mod document;
 mod domains;
+mod early;
 mod explanations;
 mod fixture_readme;
 mod format;

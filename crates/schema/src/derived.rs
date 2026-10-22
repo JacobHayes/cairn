@@ -9,7 +9,7 @@ use std::fmt;
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
-use crate::chain::{Chain, DependencyVia, ShortChain};
+use crate::chain::{Chain, ConstraintSource, DependencyVia, ShortChain};
 use crate::collections::{BoundedVec, ByDocumentSize, CollectionError};
 use crate::domain::{Deployment, Journey};
 use crate::id::{IdentityKey, KindKey, NodeKey, RoleKey};
@@ -507,6 +507,29 @@ pub struct NodeDates {
     /// when it has no such rule, or no source has a date.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub not_before: Option<Date>,
+    // PRD: F6, D8.
+    /// Finished before something it was finished ahead of on purpose, on today's dates: a
+    /// dependency or its own date its guard bypass accepted, a stage opening that does not
+    /// gate, or a milestone's own not-before rule. None when none of those would have put
+    /// its finish later. Other shortfalls still apply.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub done_early: Option<DoneEarly>,
+}
+
+// PRD: F6, D8.
+/// How early a node finished, and ahead of what.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+#[serde(deny_unknown_fields)]
+pub struct DoneEarly {
+    /// Days between its finish and the date it was finished ahead of.
+    pub days: u32,
+    /// The date it was finished ahead of: the requirement's or opening's earliest date today
+    /// (its recorded date once it has one; a milestone's date as shown, its actual, pin or
+    /// due, when that is later), or its own not-before date.
+    pub date: Date,
+    /// What it was finished ahead of: a dependency, with how it arose (a stage opening
+    /// among them), or its own not-before rule.
+    pub source: ConstraintSource,
 }
 
 // PRD: E2.

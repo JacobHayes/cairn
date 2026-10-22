@@ -35,6 +35,9 @@
 //! | actual: a recorded start, or the finish of done or decided work (execution only) | none: fixes the instant, never moved | both |
 //! | `created_on` of a journey (execution only) | none: fixes `created_at` | both |
 //! | today (execution only) | none: open decision, unstarted work's start, started work's finish no earlier than today | holds back |
+//! | started work (a recorded start, execution only) | each constraint above that would end at its start ends at its finish instead: dependencies, inherited ones, condition gates, entries, containment, its own `not_before` | holds its finish back |
+//! | stage opening with `gates: false` (execution only) | M.finish >= each node's start, for each node of the stage that is not a container (instead of G's anchor >= M); exempt for work begun or finished | holds unstarted contents back |
+//! | what finished work was finished ahead of on purpose (execution only) | exempt: kept, disabled, read by the node's own date and `done_early`, by no bound and no shortfall | none |
 //!
 //! A node's anchor is its requirement entry if it is a container, else its start; its
 //! condition anchor is its condition entry, or its start. Constraints touching a not-relevant
@@ -62,6 +65,17 @@
 //! constraint that set it, and a chain is walked back from it when asked, at most one step
 //! per instant. The cost test (`crates/tests/tests/integration/engine/cost_dates.rs`) counts these operations at
 //! the limits.
+//!
+//! The execution layer adds two things. A stage opening that does not gate gives one
+//! constraint per node of the stage that is not a container, at most nodes x depth: 32,000.
+//! And where finished work's guard bypass accepted a requirement that reaches it through an
+//! entry, that hop is replaced by one constraint per requirement it carries, at most
+//! `containment_depth_max` x (`edge_count_per_node_max` + 1 + `condition_clause_count_max`) =
+//! 16 x 81 = 1,296 per node, 2,592,000 at the node limit (every node finished under a bypass
+//! of everything it inherits). At 36 bytes and two adjacency slots each, that is 44 bytes a
+//! constraint: 114 MB at the bound. The cost test builds a worst case of 1.73 million
+//! constraints (76 MB), solved in two operations per constraint, with no cycle to pay
+//! Bellman-Ford for.
 
 mod execution;
 mod explain;
@@ -72,7 +86,7 @@ mod solve;
 use std::collections::BTreeSet;
 
 use cairn_schema::{
-    AnswerSpec, AnswerValue, Bound, BoundedVec, ChainList, Date, DateOrigin, Deployment,
+    AnswerSpec, AnswerValue, Bound, BoundedVec, ChainList, Date, DateOrigin, Deployment, DoneEarly,
     EffectiveDate, FixedBy, NodeDates, NodeKey, NodeKind, Payload, ShortChain, State, Subject,
     Violation, ViolationCode,
 };
@@ -83,7 +97,7 @@ use super::{Early, stored_state};
 use crate::graph::{Document, Graph};
 use execution::Solved;
 use explain::{Explain, Found};
-use network::{Layer, Network, Origin, Rule, Scope, Slot};
+use network::{Layer, Network, Origin, Place, Rule, Scope, Slot};
 
 /// A date fixed on a slot, and what fixed it.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -557,10 +571,12 @@ impl Dates {
     }
 
     /// A8, F3: the earliest the node's own `not_before` rules let it start: the latest, over
-    /// those rules' constraints into its start, of each source's earliest date plus the
-    /// rule's offset. Read off the node's own rules alone, never off the chain that binds its
-    /// earliest start, so an earlier dependency's date never reads as its own. None when it
-    /// has no such rule in scope, or no source has a date.
+    /// those rules' constraints into the instant that holds it, of each source's earliest
+    /// date plus the rule's offset. Read off the node's own rules alone, never off the chain
+    /// that binds its earliest start, so an earlier dependency's date never reads as its own.
+    /// Started work is held at its finish, and finished work may be exempt from its rule; both
+    /// are read here, so the date still guards started work and goes stale when it moves
+    /// later. None when it has no such rule in scope, or no source has a date.
     #[must_use]
     pub fn not_before(&self, key: &NodeKey) -> Option<Date> {
         let at = self.index(key)?;
@@ -568,10 +584,7 @@ impl Dates {
             node: at,
             rule: Rule::NotBefore,
         };
-        self.network
-            .incoming(self.network.start(at))
-            .iter()
-            .filter_map(|&position| self.network.constraint(position))
+        self.incoming_at(at)
             .filter(|constraint| constraint.origin == own)
             .filter_map(|constraint| {
                 let source = self.solved.earliest(constraint.before)?;
@@ -579,6 +592,63 @@ impl Dates {
             })
             .max()
             .map(date)
+    }
+
+    /// The constraints into the node's start and its finish (once, for a decision or
+    /// milestone).
+    fn incoming_at(&self, at: NodeIndex) -> impl Iterator<Item = &network::Constraint> {
+        let (start, finish) = (self.network.start(at), self.network.finish(at));
+        let finish = (finish != start).then_some(finish);
+        std::iter::once(start)
+            .chain(finish)
+            .flat_map(|slot| self.network.incoming(slot))
+            .filter_map(|&position| self.network.constraint(position))
+    }
+
+    /// F6: for finished work, how early it finished, on today's dates: over the constraints
+    /// its finish was exempt from (what its guard bypass accepted, a stage opening that does
+    /// not gate, a milestone's own not-before rule), the one that would have put its finish
+    /// furthest past the recorded one. A constraint counts when its source's earliest date
+    /// would have; the date it is counted to is a milestone's date as shown (actual, pin or
+    /// due) when that is later, so the days match the date the person sees. The days, that
+    /// date, and the constraint's position. None when no constraint would have.
+    fn done_early_found(&self, at: NodeIndex) -> Option<(u32, i32, u32)> {
+        let finish = self.seeds.actual(self.network.finish(at))?.day;
+        let (start, end) = (self.network.start(at), self.network.finish(at));
+        let end = (end != start).then_some(end);
+        let mut best: Option<(u32, i32, u32)> = None;
+        for slot in std::iter::once(start).chain(end) {
+            for &position in self.network.incoming(slot) {
+                let Some(constraint) = self.network.constraint(position).filter(|c| c.exempt)
+                else {
+                    continue;
+                };
+                let Some(earliest) = self.solved.earliest(constraint.before) else {
+                    continue;
+                };
+                let shown = match self.network.place(constraint.before) {
+                    Place::Node(instant) => self.shown_date(instant.node),
+                    Place::CreatedAt | Place::Answer(_) => None,
+                };
+                let asks = earliest
+                    .max(shown.unwrap_or(earliest))
+                    .saturating_add(constraint.offset_days);
+                if earliest.saturating_add(constraint.offset_days) <= finish {
+                    continue;
+                }
+                let days = u32::try_from(asks.saturating_sub(finish)).unwrap_or(u32::MAX);
+                if best.is_none_or(|(most, _, _)| days > most) {
+                    best = Some((days, asks, position));
+                }
+            }
+        }
+        best
+    }
+
+    /// A milestone's date as shown, in days: its actual, pin or due.
+    fn shown_date(&self, node: NodeIndex) -> Option<i32> {
+        let key = self.keys.get(node.get())?;
+        self.effective_date(key).map(|found| day(found.date))
     }
 
     /// F3: the earliest the node can finish.
@@ -691,6 +761,12 @@ impl Dates {
         (self.network.slot_count(), self.network.constraints().len())
     }
 
+    /// The bytes the network holds, for the cost test.
+    #[must_use]
+    pub fn network_bytes(&self) -> usize {
+        self.network.bytes()
+    }
+
     /// F3, F6, F7: the node's dates with the chain behind each bound and its shortfall with
     /// its resolution moves, read against `graph`, the graph these dates were derived from.
     ///
@@ -740,6 +816,13 @@ impl Dates {
             shortfall,
             effective_date: self.effective_date(key),
             not_before: self.not_before(key),
+            done_early: self
+                .done_early_found(at)
+                .map(|(days, asks, position)| DoneEarly {
+                    days,
+                    date: date(asks),
+                    source: explain.source_of(position),
+                }),
         }
     }
 }

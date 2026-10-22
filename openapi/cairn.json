@@ -3150,6 +3150,33 @@
         "pattern": "^(deployment|journey:.+|route:.+)$",
         "type": "string"
       },
+      "DoneEarly": {
+        "additionalProperties": false,
+        "description": "How early a node finished, and ahead of what.",
+        "properties": {
+          "date": {
+            "description": "The date it was finished ahead of: the requirement's or opening's earliest date today\n(its recorded date once it has one; a milestone's date as shown, its actual, pin or\ndue, when that is later), or its own not-before date.",
+            "format": "date",
+            "type": "string"
+          },
+          "days": {
+            "description": "Days between its finish and the date it was finished ahead of.",
+            "format": "uint32",
+            "minimum": 0,
+            "type": "integer"
+          },
+          "source": {
+            "$ref": "#/components/schemas/ConstraintSource",
+            "description": "What it was finished ahead of: a dependency, with how it arose (a stage opening\namong them), or its own not-before rule."
+          }
+        },
+        "required": [
+          "days",
+          "date",
+          "source"
+        ],
+        "type": "object"
+      },
       "DraftSource": {
         "description": "Where a route draft comes from.",
         "oneOf": [
@@ -8417,6 +8444,17 @@
         "additionalProperties": false,
         "description": "A node's derived dates. Every bound is null when nothing reaches it.",
         "properties": {
+          "done_early": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/DoneEarly"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Finished before something it was finished ahead of on purpose, on today's dates: a\ndependency or its own date its guard bypass accepted, a stage opening that does not\ngate, or a milestone's own not-before rule. None when none of those would have put\nits finish later. Other shortfalls still apply."
+          },
           "due": {
             "anyOf": [
               {

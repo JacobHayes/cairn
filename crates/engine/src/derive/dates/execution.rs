@@ -32,7 +32,11 @@ pub(crate) struct Solved {
 #[must_use]
 pub(crate) fn solve(network: &Network, seeds: &Seeds) -> Solved {
     let slots: Vec<Slot> = (0..network.slot_count()).map(Slot::at).collect();
-    let enabled = vec![true; network.constraints().len()];
+    let enabled: Vec<bool> = network
+        .constraints()
+        .iter()
+        .map(|constraint| !constraint.exempt)
+        .collect();
     let mut cost = Cost::default();
     let components = solve::components(network, &slots, &enabled, &mut cost);
     let fixed: Vec<bool> = slots.iter().map(|&s| seeds.actual(s).is_some()).collect();
@@ -111,7 +115,8 @@ impl Solved {
     /// it allows. A fact earlier than the chain before it requires shows at that chain's
     /// upstream end, as an earliest bound past its latest or a fact too late, wherever it
     /// lies; where that end is `created_at` or a date answer, no node's instant, the fact
-    /// shows it.
+    /// shows it. Exceptions are in the network, not here: work that started is held at its
+    /// finish, and a finished node's exempt constraints are disabled.
     #[must_use]
     pub(crate) fn shortfall(&self, network: &Network, seeds: &Seeds, slot: Slot) -> Option<Found> {
         let Some(actual) = seeds.actual(slot) else {
@@ -179,7 +184,7 @@ impl Solved {
 fn too_early(network: &Network, seeds: &Seeds, slot: Slot, actual: i32) -> Option<Found> {
     let mut worst: Option<Found> = None;
     for &at in network.incoming(slot) {
-        let Some(constraint) = network.constraint(at) else {
+        let Some(constraint) = network.constraint(at).filter(|found| !found.exempt) else {
             continue;
         };
         let fixed = match network.place(constraint.before) {

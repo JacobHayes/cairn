@@ -3,14 +3,16 @@
 //! as the translation table in [`super`] lays out. Pins, answers, actuals, and today are not
 //! constraints; the layers seed them onto slots.
 
-use cairn_schema::limits::NODE_COUNT_MAX;
+use std::collections::{BTreeMap, BTreeSet};
+
+use cairn_schema::limits::{CONTAINMENT_DEPTH_MAX, NODE_COUNT_MAX};
 use cairn_schema::{
-    AnswerSpec, DateRule, DateSource, Direction, KeyRefs, Node, NodeKey, NodeKind, Payload,
-    Relevance, State,
+    AnswerSpec, DateRule, DateSource, Direction, GuardFailure, KeyRefs, Node, NodeKey, NodeKind,
+    Payload, Relevance, State,
 };
 
 use crate::derive::dependencies::{
-    Dependencies, Edge, EdgeSet, EdgeSource, Instant, NodeIndex, Point,
+    Dependencies, Edge, EdgeClass, EdgeSet, EdgeSource, Instant, NodeIndex, Point,
 };
 use crate::derive::relevance::Relevances;
 use crate::derive::skip::Skips;
@@ -91,6 +93,9 @@ pub(crate) struct Constraint {
     pub origin: Origin,
     /// It passes through an undecided node (F2).
     pub conditional: bool,
+    /// Kept for the node's own date and `done_early`, but read by no bound, chain or
+    /// shortfall: what finished work was finished ahead of on purpose (execution layer only).
+    pub exempt: bool,
 }
 
 /// Which layer a network is built for (F5, F6).
@@ -104,16 +109,33 @@ pub(crate) enum Layer {
 }
 
 /// Per node, what the network needs from the earlier passes: relevance, whether it is
-/// skipped (itself, or effectively), and whether its own work counts no days.
+/// skipped (itself, or effectively), whether its own work counts no days, and in the
+/// execution layer how far along it is.
 pub(crate) struct Scope {
+    layer: Layer,
     relevance: Vec<Relevance>,
     skipped: Vec<bool>,
     zero: Vec<bool>,
+    /// Stored `active` or `done` with a recorded start: exactly when the layer seeds an
+    /// actual start. Not skipped.
+    started: Vec<bool>,
+    /// Stored `active`, `done` or `decided`: the work was begun or finished. Not skipped.
+    underway: Vec<bool>,
+    /// Stored `done` or `decided`. Not skipped. A milestone done by its date is not: it has
+    /// no recorded finish and no deliberate completion.
+    finished: Vec<bool>,
+    /// Finished, and either a milestone (marking one done is never guarded by its date) or
+    /// its guard bypass accepted a failure to wait for its own date.
+    own_date_exempt: Vec<bool>,
+    /// For a finished node with a stored guard bypass, the requirements the bypass recorded
+    /// as open dependencies.
+    accepted: BTreeMap<NodeIndex, BTreeSet<NodeIndex>>,
 }
 
 impl Scope {
     /// Reads relevance and skips for every node of the dependency graph. Skipped work has
-    /// zero duration (F2); in the execution layer so has done work.
+    /// zero duration (F2); in the execution layer so has done work, and how far along each
+    /// node is, and what its guard bypass accepted, is read too.
     #[must_use]
     pub(crate) fn new(
         document: &Document,
@@ -124,23 +146,91 @@ impl Scope {
     ) -> Self {
         let keys = (0..dependencies.node_count()).filter_map(|at| dependencies.key(index(at)));
         let mut scope = Scope {
+            layer,
             relevance: Vec::new(),
             skipped: Vec::new(),
             zero: Vec::new(),
+            started: Vec::new(),
+            underway: Vec::new(),
+            finished: Vec::new(),
+            own_date_exempt: Vec::new(),
+            accepted: BTreeMap::new(),
         };
-        for key in keys {
-            scope.relevance.push(relevance.value(key));
-            let state = document
-                .nodes
-                .get(key)
-                .map(|node| stored_state(document, node));
-            let skipped = state == Some(State::Skipped) || skips.skipped_by(key).is_some();
-            let done = layer == Layer::Execution && state == Some(State::Done);
-            scope.skipped.push(skipped);
-            scope.zero.push(skipped || done);
+        for (at, key) in keys.enumerate() {
+            scope.read(document, dependencies, relevance, skips, at, key);
         }
         assert_eq!(scope.relevance.len(), dependencies.node_count());
+        assert!(
+            scope
+                .started
+                .iter()
+                .zip(&scope.finished)
+                .zip(&scope.underway)
+                .all(|((started, finished), underway)| (!started && !finished) || *underway),
+            "started and finished work is underway"
+        );
         scope
+    }
+
+    /// Reads one node: relevance, skip, how far along it is, and what its bypass accepted.
+    fn read(
+        &mut self,
+        document: &Document,
+        dependencies: &Dependencies,
+        relevance: &Relevances,
+        skips: &Skips,
+        at: usize,
+        key: &NodeKey,
+    ) {
+        let layer = self.layer;
+        self.relevance.push(relevance.value(key));
+        let node = document.nodes.get(key);
+        let state = node.map(|node| stored_state(document, node));
+        let skipped = state == Some(State::Skipped) || skips.skipped_by(key).is_some();
+        let done = layer == Layer::Execution && state == Some(State::Done);
+        self.skipped.push(skipped);
+        self.zero.push(skipped || done);
+        let counted = layer == Layer::Execution && !skipped;
+        let begun = counted && matches!(state, Some(State::Active | State::Done));
+        let recorded = document
+            .state
+            .nodes
+            .get(key)
+            .is_some_and(|stored| stored.started_on.is_some());
+        let finished = counted && matches!(state, Some(State::Done | State::Decided));
+        self.started.push(begun && recorded);
+        self.underway
+            .push(finished || (counted && state == Some(State::Active)));
+        self.finished.push(finished);
+        let bypass = document
+            .state
+            .overrides
+            .get(key)
+            .and_then(|overrides| overrides.bypass.as_ref())
+            .filter(|_| finished);
+        let milestone = node.is_some_and(|node| node.kind() == NodeKind::Milestone);
+        let too_early = bypass.is_some_and(|bypass| {
+            bypass
+                .failures
+                .iter()
+                .any(|failure| matches!(failure, GuardFailure::TooEarly(_)))
+        });
+        self.own_date_exempt
+            .push(finished && (milestone || too_early));
+        let open: BTreeSet<NodeIndex> = bypass
+            .into_iter()
+            .flat_map(|bypass| &bypass.failures)
+            .filter_map(|failure| match failure {
+                GuardFailure::OpenDependency(required) => dependencies.node_index(required),
+                GuardFailure::MissingArtifact
+                | GuardFailure::MissingNote
+                | GuardFailure::NotBrokenDown
+                | GuardFailure::TooEarly(_) => None,
+            })
+            .collect();
+        if !open.is_empty() {
+            self.accepted.insert(index(at), open);
+        }
     }
 
     /// The node's relevance.
@@ -168,6 +258,36 @@ impl Scope {
     #[must_use]
     pub(crate) fn zero(&self, node: NodeIndex) -> bool {
         self.zero.get(node.get()).copied().unwrap_or(false)
+    }
+
+    /// A recorded start (execution layer): held at its finish, as starting is never guarded.
+    #[must_use]
+    pub(crate) fn started(&self, node: NodeIndex) -> bool {
+        self.started.get(node.get()).copied().unwrap_or(false)
+    }
+
+    /// Begun or finished, whether or not a start was recorded (execution layer).
+    #[must_use]
+    pub(crate) fn underway(&self, node: NodeIndex) -> bool {
+        self.underway.get(node.get()).copied().unwrap_or(false)
+    }
+
+    /// Finished, and not held by its own `not_before` rules (execution layer).
+    #[must_use]
+    pub(crate) fn own_date_exempt(&self, node: NodeIndex) -> bool {
+        self.own_date_exempt
+            .get(node.get())
+            .copied()
+            .unwrap_or(false)
+    }
+
+    /// What the finished node's guard bypass recorded as open dependencies.
+    fn accepted(&self, node: NodeIndex) -> Option<&BTreeSet<NodeIndex>> {
+        self.accepted.get(&node)
+    }
+
+    fn execution(&self) -> bool {
+        self.layer == Layer::Execution
     }
 }
 
@@ -213,6 +333,7 @@ impl Network {
         for edge in dependencies.edges(EdgeSet::Pruned) {
             network.push_edge(document, dependencies, scope, *edge, &mut constraints);
         }
+        network.push_openings(document, dependencies, scope, &mut constraints);
         for node in document.nodes.values() {
             let Some(at) = dependencies.node_index(&node.key) else {
                 continue;
@@ -229,6 +350,12 @@ impl Network {
 
     /// A dependency edge as a constraint: the requirement's instant before the dependent's,
     /// by the node's estimate for its own work edge and by nothing otherwise.
+    ///
+    /// In the execution layer a date-only stage opening is not an edge of the network (see
+    /// [`Network::push_openings`]), and an edge into the start of work that is underway ends at
+    /// the node's held instant instead (see [`Network::held`]): a finished node's edges from
+    /// what its guard bypass accepted are exempt, and an entry or chain hop that carries one
+    /// is replaced by one constraint per requirement it carries, each keeping its source.
     fn push_edge(
         &self,
         document: &Document,
@@ -237,13 +364,20 @@ impl Network {
         edge: Edge,
         out: &mut Vec<Constraint>,
     ) {
+        if scope.execution()
+            && edge.class == EdgeClass::DateOnly
+            && edge.source == EdgeSource::StageOpening
+        {
+            return;
+        }
+        let node = edge.dependent.node;
         let offset_days = match edge.source {
             EdgeSource::Work => {
-                let node = dependencies
-                    .key(edge.dependent.node)
+                let found = dependencies
+                    .key(node)
                     .and_then(|key| document.nodes.get(key));
-                let zero = scope.zero(edge.dependent.node);
-                node.filter(|_| !zero).map_or(0, estimate_days)
+                let zero = scope.zero(node);
+                found.filter(|_| !zero).map_or(0, estimate_days)
             }
             EdgeSource::Entry
             | EdgeSource::Chain
@@ -252,18 +386,152 @@ impl Network {
             | EdgeSource::Condition
             | EdgeSource::StageOpening => 0,
         };
-        let conditional =
-            undecided(scope, edge.dependent.node) || undecided(scope, edge.requirement.node);
+        let conditional = undecided(scope, node) || undecided(scope, edge.requirement.node);
+        let underway = edge.dependent.point == Point::Start && scope.underway(node);
+        if !underway {
+            self.push(
+                out,
+                Constraint {
+                    before: self.slot(edge.requirement),
+                    after: self.slot(edge.dependent),
+                    offset_days,
+                    origin: Origin::Dependency(edge),
+                    conditional,
+                    exempt: false,
+                },
+            );
+            return;
+        }
+        let after = self.held(scope, node);
+        let accepted = scope.accepted(node);
+        let hop = matches!(edge.source, EdgeSource::Entry | EdgeSource::Chain);
+        if hop
+            && let Some(accepted) = accepted
+            && self.push_carried(dependencies, scope, &edge, after, accepted, out)
+        {
+            return;
+        }
+        let exempt = !hop && accepted.is_some_and(|set| set.contains(&edge.requirement.node));
         self.push(
             out,
             Constraint {
                 before: self.slot(edge.requirement),
-                after: self.slot(edge.dependent),
+                after,
                 offset_days,
                 origin: Origin::Dependency(edge),
                 conditional,
+                exempt,
             },
         );
+    }
+
+    /// Replaces a hop through an entry or chain with one constraint per gate it carries when
+    /// the node's bypass accepted one of them, each exempt only if accepted itself. False,
+    /// with nothing pushed, when it accepted none of them.
+    fn push_carried(
+        &self,
+        dependencies: &Dependencies,
+        scope: &Scope,
+        edge: &Edge,
+        after: Slot,
+        accepted: &BTreeSet<NodeIndex>,
+        out: &mut Vec<Constraint>,
+    ) -> bool {
+        let mut carried = Vec::new();
+        dependencies.carried(
+            &[(edge.requirement, undecided(scope, edge.dependent.node))],
+            EdgeSet::Pruned,
+            |at| undecided(scope, at),
+            |found, path| {
+                if found.class == EdgeClass::Gate {
+                    carried.push((*found, path));
+                }
+            },
+        );
+        if !carried
+            .iter()
+            .any(|(found, _)| accepted.contains(&found.requirement.node))
+        {
+            return false;
+        }
+        for (found, conditional) in carried {
+            self.push(
+                out,
+                Constraint {
+                    before: self.slot(found.requirement),
+                    after,
+                    offset_days: 0,
+                    origin: Origin::Dependency(found),
+                    conditional,
+                    exempt: accepted.contains(&found.requirement.node),
+                },
+            );
+        }
+        true
+    }
+
+    /// F4: in the execution layer, a stage opening that does not gate holds each node of its
+    /// stage that is not a container directly, rather than through the stage's entry: a
+    /// container waits for its contents, so it is held exactly while some content is. The
+    /// opening's constraint into work that is underway is exempt: the work was begun or
+    /// finished ahead of an opening that does not gate.
+    fn push_openings(
+        &self,
+        document: &Document,
+        dependencies: &Dependencies,
+        scope: &Scope,
+        out: &mut Vec<Constraint>,
+    ) {
+        if !scope.execution() {
+            return;
+        }
+        let mut openings: BTreeMap<NodeIndex, Edge> = BTreeMap::new();
+        for edge in dependencies.edges(EdgeSet::Pruned) {
+            if edge.class == EdgeClass::DateOnly && edge.source == EdgeSource::StageOpening {
+                openings.insert(edge.dependent.node, *edge);
+            }
+        }
+        if openings.is_empty() {
+            return;
+        }
+        for node in document.nodes.values() {
+            let Some(at) = dependencies.node_index(&node.key) else {
+                continue;
+            };
+            if !scope.in_scope(at) || dependencies.is_container(at) {
+                continue;
+            }
+            let after = self.held(scope, at);
+            let exempt = scope.underway(at);
+            let mut conditional = false;
+            let mut current = Some(node);
+            let mut steps = 0_u32;
+            while let Some(found) = current {
+                let Some(owner) = dependencies.node_index(&found.key) else {
+                    break;
+                };
+                conditional |= undecided(scope, owner);
+                if let Some(edge) = openings.get(&owner) {
+                    self.push(
+                        out,
+                        Constraint {
+                            before: self.slot(edge.requirement),
+                            after,
+                            offset_days: 0,
+                            origin: Origin::Dependency(*edge),
+                            conditional: conditional || undecided(scope, edge.requirement.node),
+                            exempt,
+                        },
+                    );
+                }
+                steps += 1;
+                assert!(steps <= CONTAINMENT_DEPTH_MAX + 1, "containment is bounded");
+                current = found
+                    .parent
+                    .as_ref()
+                    .and_then(|parent| document.nodes.get(parent));
+            }
+        }
     }
 
     /// A8: each source of the node's `due_by` caps its finish, and each source of its
@@ -295,8 +563,9 @@ impl Network {
                 }
                 let (before, after, offset_days) = match rule {
                     Rule::DueBy => (self.finish(at), source, -signed),
-                    Rule::NotBefore => (source, self.start(at), signed),
+                    Rule::NotBefore => (source, self.held(scope, at), signed),
                 };
+                let exempt = rule == Rule::NotBefore && scope.own_date_exempt(at);
                 let conditional = undecided(scope, at) || from.is_some_and(|f| undecided(scope, f));
                 let origin = Origin::Rule { node: at, rule };
                 self.push(
@@ -307,6 +576,7 @@ impl Network {
                         offset_days,
                         origin,
                         conditional,
+                        exempt,
                     },
                 );
             }
@@ -350,6 +620,7 @@ impl Network {
                 offset_days: 0,
                 origin: Origin::StageClose { group: at },
                 conditional,
+                exempt: false,
             },
         );
     }
@@ -426,6 +697,17 @@ impl Network {
         self.node_count * (POINTS + 1) + 1
     }
 
+    /// The bytes the network holds: its constraints, their two adjacency orders, and the
+    /// per-slot offsets. For the cost test.
+    #[must_use]
+    pub(crate) fn bytes(&self) -> usize {
+        use std::mem::size_of;
+        self.constraints.len() * size_of::<Constraint>()
+            + (self.outgoing.len() + self.incoming.len()) * size_of::<u32>()
+            + (self.outgoing_at.len() + self.incoming_at.len()) * size_of::<usize>()
+            + self.single.len() * size_of::<bool>()
+    }
+
     /// How many nodes the network covers.
     #[must_use]
     pub(crate) fn node_count(&self) -> usize {
@@ -481,6 +763,18 @@ impl Network {
     #[must_use]
     pub(crate) fn finish(&self, node: NodeIndex) -> Slot {
         self.slot(Instant::new(node, Point::Finish))
+    }
+
+    /// The instant that holds a node back in the execution layer: its finish once work has
+    /// started, since starting is never guarded, else its start (a decision's or milestone's
+    /// one instant either way).
+    #[must_use]
+    pub(crate) fn held(&self, scope: &Scope, node: NodeIndex) -> Slot {
+        if scope.started(node) {
+            self.finish(node)
+        } else {
+            self.start(node)
+        }
     }
 
     /// The `created_at` slot.

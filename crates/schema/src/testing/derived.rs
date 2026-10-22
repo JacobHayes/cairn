@@ -14,9 +14,9 @@ use crate::chain::{
 };
 use crate::derived::{
     Blocker, Bound, Consequences, Contribution, DateOrigin, DeriveInputs, Derived, DisplayState,
-    DomainDocument, EffectiveDate, EffectiveParticipation, Explained, NodeDates, NodeDerived,
-    ParticipationOrigin, Progress, RankConstants, Real, Relevance, RelevanceExplanation, Score,
-    StaleConsequence, StallCause, Stalled,
+    DomainDocument, DoneEarly, EffectiveDate, EffectiveParticipation, Explained, NodeDates,
+    NodeDerived, ParticipationOrigin, Progress, RankConstants, Real, Relevance,
+    RelevanceExplanation, Score, StaleConsequence, StallCause, Stalled,
 };
 use crate::limits::Limit;
 use crate::rejection::{
@@ -272,9 +272,18 @@ fn arb_node_dates() -> BoxedStrategy<NodeDates> {
             )),
             prop::option::of(arb_date()),
         ),
+        prop::option::of((1u32..60, arb_date(), arb_constraint_source())),
     )
         .prop_map(
-            |(earliest_start, latest_start, due, days, shortfall, (effective, not_before))| {
+            |(
+                earliest_start,
+                latest_start,
+                due,
+                days,
+                shortfall,
+                (effective, not_before),
+                early,
+            )| {
                 NodeDates {
                     earliest_start,
                     latest_start,
@@ -284,6 +293,7 @@ fn arb_node_dates() -> BoxedStrategy<NodeDates> {
                     shortfall,
                     effective_date: effective.map(|(date, origin)| EffectiveDate { date, origin }),
                     not_before,
+                    done_early: early.map(|(days, date, source)| DoneEarly { days, date, source }),
                 }
             },
         )

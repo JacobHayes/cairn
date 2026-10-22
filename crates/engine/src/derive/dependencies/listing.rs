@@ -11,7 +11,7 @@ use std::collections::BTreeSet;
 use cairn_schema::limits::CONTAINMENT_DEPTH_MAX;
 use cairn_schema::{DependencyVia, NodeKey};
 
-use super::{Dependencies, EdgeSet, EdgeSource, EffectiveDependency, Instant};
+use super::{Dependencies, Edge, EdgeSet, EdgeSource, EffectiveDependency, Instant, NodeIndex};
 
 impl Dependencies {
     /// The node's effective dependencies in the set, each with how it arose: its own
@@ -54,25 +54,20 @@ impl Dependencies {
     /// The dependencies reached from `from` along the entry chains.
     fn walk(&self, key: &NodeKey, from: Vec<Instant>, set: EdgeSet) -> Vec<EffectiveDependency> {
         let mut found = BTreeSet::new();
-        let mut visited: BTreeSet<Instant> = BTreeSet::new();
-        let mut stack = from;
-        while let Some(instant) = stack.pop() {
-            if !visited.insert(instant) {
-                continue;
-            }
-            for edge in self.waits(instant, set) {
-                let Some(owner) = self.key(edge.dependent.node) else {
-                    continue;
-                };
-                let Some(required) = self.key(edge.requirement.node) else {
-                    continue;
+        let from: Vec<(Instant, bool)> = from.into_iter().map(|at| (at, false)).collect();
+        self.carried(
+            &from,
+            set,
+            |_| false,
+            |edge, _| {
+                let (Some(owner), Some(required)) = (
+                    self.key(edge.dependent.node),
+                    self.key(edge.requirement.node),
+                ) else {
+                    return;
                 };
                 let via = match edge.source {
-                    EdgeSource::Work => continue,
-                    EdgeSource::Entry | EdgeSource::Chain => {
-                        stack.push(edge.requirement);
-                        continue;
-                    }
+                    EdgeSource::Work | EdgeSource::Entry | EdgeSource::Chain => return,
                     EdgeSource::Containment => DependencyVia::Containment,
                     EdgeSource::Explicit if owner == key => DependencyVia::Explicit,
                     EdgeSource::Explicit => DependencyVia::Inherited {
@@ -90,11 +85,44 @@ impl Dependencies {
                     via,
                     class: edge.class,
                 });
+            },
+        );
+        found.into_iter().collect()
+    }
+
+    /// The one walk of the entry chains: from each instant in `from` (with whether the path
+    /// to it is already conditional), follows the entry and chain links up through the
+    /// ancestors and calls `visit` for each other edge waiting on the way (a requirement,
+    /// opening, condition gate, or containment link), with whether the path it came by
+    /// passes through a node `undecided` names, the edge's own two nodes included.
+    pub(crate) fn carried(
+        &self,
+        from: &[(Instant, bool)],
+        set: EdgeSet,
+        undecided: impl Fn(NodeIndex) -> bool,
+        mut visit: impl FnMut(&Edge, bool),
+    ) {
+        let mut visited: BTreeSet<Instant> = BTreeSet::new();
+        let mut stack: Vec<(Instant, bool)> = from.to_vec();
+        while let Some((instant, conditional)) = stack.pop() {
+            if !visited.insert(instant) {
+                continue;
+            }
+            let conditional = conditional || undecided(instant.node);
+            for edge in self.waits(instant, set) {
+                let path = conditional || undecided(edge.requirement.node);
+                match edge.source {
+                    EdgeSource::Work => {}
+                    EdgeSource::Entry | EdgeSource::Chain => stack.push((edge.requirement, path)),
+                    EdgeSource::Containment
+                    | EdgeSource::Explicit
+                    | EdgeSource::Condition
+                    | EdgeSource::StageOpening => visit(edge, path),
+                }
             }
         }
-        // The node's start and its two entries, then two per ancestor.
-        let bound = 3 + 2 * CONTAINMENT_DEPTH_MAX as usize;
+        // The walk's first instants and a container's two entries, then two per ancestor.
+        let bound = from.len() + 2 + 2 * CONTAINMENT_DEPTH_MAX as usize;
         assert!(visited.len() <= bound, "the walk stays on the entry chains");
-        found.into_iter().collect()
     }
 }

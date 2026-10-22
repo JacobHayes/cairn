@@ -1645,7 +1645,8 @@ button.tree-fold[aria-expanded="true"] .tree-chevron {
 
 /* The chip of done work is the green one on every surface that lists a node (a card, a row, an inspector line): hollow, in the success colour, with the check (DESIGN, One status language). */
 .node-done .badge.done,
-[data-state="done"] .badge.done {
+[data-state="done"] .badge.done,
+.badge.done[data-testid="detail-state"] {
   background: transparent;
   border-color: var(--color-success);
   color: var(--color-success);
