@@ -16,15 +16,19 @@ async function expectNoOrphanHeading(menu: Locator): Promise<void> {
       const edge = body.getBoundingClientRect().bottom;
       return [...panel.querySelectorAll<HTMLElement>(".label, legend")].flatMap((heading) => {
         const top = heading.getBoundingClientRect().top;
-        if (heading.getBoundingClientRect().width <= 1) {
-          return [];
-        }
         const next = [...panel.querySelectorAll<HTMLElement>("input, button, select")].find((control) => control.getBoundingClientRect().top >= heading.getBoundingClientRect().bottom - 1);
         return top < edge && next !== undefined && next.getBoundingClientRect().top + 22 > edge ? [heading.textContent] : [];
       });
     }),
   );
   expect(orphans, "headings whose options are out of view").toEqual([]);
+  // A body that scrolls shows it at its cut edge.
+  const cue = await whenSettled(menu.page(), () => menu.evaluate((panel) => {
+    const body = panel.closest(".popover-body");
+    const style = body === null ? undefined : getComputedStyle(body);
+    return { scrolls: body !== null && body.scrollHeight > body.clientHeight, shadow: style?.backgroundImage.includes("gradient") === true && style.backgroundAttachment.includes("scroll") };
+  }));
+  expect(cue.scrolls ? cue.shadow : true, "a scrolling menu shows its cut edge").toBe(true);
 }
 
 test.use({ viewport: { width: 390, height: 844 }, hasTouch: true });

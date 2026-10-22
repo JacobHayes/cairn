@@ -498,12 +498,6 @@ button.route-list-title {
   margin: 0;
 }
 
-/* The flags' heading is for a screen reader: the checks under the owner are plain without it, and a menu that scrolls never ends on a heading. */
 [data-testid="controls-panel-phone"] legend {
-  position: absolute;
-  width: 1px;
-  height: 1px;
-  overflow: hidden;
-  clip-path: inset(50%);
-  white-space: nowrap;
+  padding: 0;
 }

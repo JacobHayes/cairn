@@ -54,7 +54,28 @@ function useInWindow(popover: RefObject<HTMLDivElement | null>, body: RefObject<
     popover.current.dataset["side"] = at.side;
     // DESIGN, Popover and menu: the body scrolls within the room; the stylesheet's cap (--popover-body-max) holds it to that room or less.
     body.current?.style.setProperty("--popover-room", `${String(Math.max(at.room, 0))}px`);
+    if (body.current !== null) {
+      cutBeforeHeading(body.current);
+    }
   }, [popover, body, align, open]);
+}
+
+/** The room a heading needs under it to be worth showing: one option, a touch target tall. */
+const HEADING_ROOM_PX = 44;
+
+/** A body that scrolls is cut above a heading that would be its last visible row without an option under it, so a section is never shown by its name alone. */
+function cutBeforeHeading(body: HTMLElement): void {
+  if (body.scrollHeight <= body.clientHeight) {
+    return;
+  }
+  const box = body.getBoundingClientRect();
+  for (const heading of body.querySelectorAll<HTMLElement>(".label, legend")) {
+    const at = heading.getBoundingClientRect();
+    if (at.top > box.top + HEADING_ROOM_PX && at.top < box.bottom && at.bottom + HEADING_ROOM_PX > box.bottom) {
+      body.style.setProperty("--popover-room", `${String(Math.floor(at.top - box.top))}px`);
+      return;
+    }
+  }
 }
 
 /** The items of a menu of actions that can take the focus (a disabled button cannot), in the order drawn. */
