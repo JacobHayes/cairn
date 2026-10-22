@@ -52,6 +52,7 @@ mod rank;
 mod rationale;
 mod relevance;
 mod requires_note;
+mod restore;
 mod save_relink;
 mod scenarios;
 mod scheduled;
