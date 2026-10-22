@@ -127,6 +127,11 @@ export function DateConflictResolver({ view, write, violations, onResolved, onRe
 
 type Bypassed = { node: string; guards: Guard[] }[];
 
+/** D4: the rejected patch with one bypass per node the refusal names, each for its own guards and all on one reason, so one confirmation finishes every node. */
+export function withBypass(attempt: Attempt, entries: { node: string; guards: Guard[] }[], reason: string): Mutation[] {
+  return [...entries.map(({ node, guards }) => guardBypass(node, guards, reason)), ...attempt.mutations];
+}
+
 /** The completions a retried patch carries, in words: "mark done", "mark both done", "mark all 3 done". */
 function completionWords(attempt: Attempt): string {
   const completing = attempt.mutations.filter((mutation) => mutation.op === "transition" && mutation.transition === "complete").length;
@@ -143,7 +148,6 @@ function Bypass({ write, entries, onResolved, onResent }: Resolving & { entries:
   if (failed === undefined) {
     return null;
   }
-  const overrides = entries.map(({ node, guards }) => guardBypass(node, guards, reason));
   const verb = completionWords(failed.attempt).replace(/^./, (first) => first.toUpperCase());
   const without = [...new Set(entries.flatMap(({ guards }) => guards))].map(guardWords).join(" and ");
   if (!chosen && reason === "") {
@@ -165,7 +169,7 @@ function Bypass({ write, entries, onResolved, onResent }: Resolving & { entries:
         <Button
           disabled={write.disabled || !bypassReady(reason)}
           onClick={() => {
-            retry(write, failed, [...overrides, ...failed.attempt.mutations], failed.attempt, {
+            retry(write, failed, withBypass(failed.attempt, entries, reason), failed.attempt, {
               onResolved: () => {
                 setReason(undefined);
                 onResolved?.();

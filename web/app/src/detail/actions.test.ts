@@ -8,7 +8,7 @@ import { resolvedAnswer } from "./AnswerEditor.tsx";
 import { isComplete } from "./contributions.ts";
 import { answerInEffect } from "./editors.tsx";
 import type { Mutation } from "./model.ts";
-import { bypassable, bypassReady, untickedIn, withMove, withTicks } from "./Rejected.tsx";
+import { bypassable, bypassReady, untickedIn, withBypass, withMove, withTicks } from "./Rejected.tsx";
 import { identityName } from "./sections.tsx";
 import { testView } from "./view.test-support.ts";
 
@@ -29,6 +29,16 @@ describe("resolving a rejection", () => {
   it("names the node each violation of a patch over several nodes is on (C9)", () => {
     expect(violationNode(violation("n_final_report"))).toBe("n_final_report");
     expect(violationNode({ code: "duplicate_key", at: {}, message: "no subject" })).toBeUndefined();
+  });
+
+  it("bypasses every node a refusal names at once, each for its own guards, on one reason (D4)", () => {
+    const completes: Mutation[] = [{ op: "transition", node: "n_a", transition: "complete" }, { op: "transition", node: "n_b", transition: "complete" }];
+    const sent = withBypass({ mutations: completes, base: 4, deployment: 2 }, [{ node: "n_a", guards: ["all_ticked"] }, { node: "n_b", guards: ["has_note", "all_ticked"] }], "Reviewed");
+    expect(sent.slice(2)).toEqual(completes);
+    expect(sent.slice(0, 2)).toEqual([
+      { op: "apply_override", node: "n_a", override: { guard_bypass: { guards: ["all_ticked"], reason: "Reviewed" } } },
+      { op: "apply_override", node: "n_b", override: { guard_bypass: { guards: ["has_note", "all_ticked"], reason: "Reviewed" } } },
+    ]);
   });
 
   it("takes a reason before finishing past a guard (D4)", () => {
