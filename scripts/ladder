@@ -22,8 +22,10 @@
 # with no web build embedded and no binary built or tested, unless the change touches the
 # server side of the web app. The full check and CI skip nothing. The integration step runs when the
 # change touches the crates its tests build, with their dependencies, derived from the manifests
-# (scripts/changed; decisions/2026-10-21-check-fast-runs-the-integration-tests-their-inputs-touch.md);
-# cost and advisories, which needs the network, are left out of --fast.
+# (scripts/changed; decisions/2026-10-21-check-fast-runs-the-integration-tests-their-inputs-touch.md),
+# and so does the cost step, whose tests are modules of that same test binary
+# (decisions/2026-10-22-check-fast-runs-the-cost-tests-with-the-integration-tests.md);
+# advisories, which needs the network, is left out of --fast.
 #
 # CI runs the full check in parts, one runner each and side by side: --part NAME runs the steps
 # of that part, in the order above, building only what they need. A part is the steps that
@@ -137,7 +139,7 @@ else
   if [ "$rust" = 1 ]; then first+=(unit); fi
   if [ "$rust" = 1 ] || [ "$web" = 1 ]; then first+=(web-unit); fi
   if [ "$rust" = 1 ]; then side+=(property); fi
-  if [ "$integration" = 1 ]; then side+=(integration); fi
+  if [ "$integration" = 1 ]; then side+=(integration cost); fi
   if [ "$web" = 1 ]; then side+=(browser); fi
 fi
 
