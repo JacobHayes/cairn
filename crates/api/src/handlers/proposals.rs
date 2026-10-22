@@ -16,7 +16,7 @@ use crate::error::ApiError;
 use crate::extract::{JsonBody, Path, segment};
 use crate::observe;
 use crate::query::{self, Params};
-use crate::wire::{
+use cairn_service::wire::{
     PatchAnswer, ProposalAnswer, ProposalApply, ProposalCreate, ProposalEdit, ProposalList,
     ProposalReview, ProposalStep,
 };

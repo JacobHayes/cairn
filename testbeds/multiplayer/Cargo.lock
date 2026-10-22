@@ -332,6 +332,7 @@ dependencies = [
  "jiff",
  "metrics",
  "patina-dst",
+ "schemars 1.2.3",
  "serde",
 ]
 

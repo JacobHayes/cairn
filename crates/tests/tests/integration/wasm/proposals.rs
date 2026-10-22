@@ -4,9 +4,10 @@
 //! through the wasm build.
 #![cfg(test)]
 
-use cairn_api::wire;
 use cairn_schema::{Rejection, ReviewItem, RouteFile, from_yaml};
-use cairn_wasm::{BrowserRoot, HostError, ProposalAnswer, ProposalReview, read_document};
+use cairn_service::wire;
+use cairn_service::wire::{ProposalAnswer, ProposalReview};
+use cairn_wasm::{BrowserRoot, HostError, read_document};
 use serde_json::json;
 
 /// After every fixture scenario's last step.

@@ -9,17 +9,14 @@
 //! takes its ticks when its host's loop asks, as the SSE stream does on the server.
 
 use std::cell::Cell;
-use std::collections::{BTreeMap, BTreeSet};
+use std::collections::BTreeSet;
 use std::sync::Arc;
 use std::sync::atomic::{AtomicU32, Ordering};
 use std::time::Duration;
 
-use cairn_schema::{
-    Actor, AppliedOver, Consequences, JourneyId, JourneyStatus, Lineage, Markdown, NodeKey, Notice,
-    Patch, PatchEvents, PatchReceipt, RankConstants, Revision, RevisionOf, RouteId, Timestamp,
-    Title, VersionNumber,
-};
-use cairn_service::{Call, Capabilities, DeploymentSettings, DomainPatch, Parts, Service, Written};
+use cairn_schema::{Actor, JourneyId, NodeKey, RankConstants, RouteId, VersionNumber};
+use cairn_service::wire::{History, JourneyPage, PatchAnswer, PatchRequest, Tick};
+use cairn_service::{Call, Capabilities, DeploymentSettings, DomainPatch, Parts, Service};
 use cairn_store::{InProcessNotifier, MemoryStore, Store, Subscription, Take, Watch};
 use jiff::tz::TimeZone;
 use serde::{Deserialize, Serialize};
@@ -28,106 +25,6 @@ use wasm_bindgen::prelude::wasm_bindgen;
 use crate::error::{HostError, json, read};
 use crate::fixtures::{seed, sign_in_local};
 use crate::now_or_never;
-
-/// `POST /api/{domain}/patches`'s body: a patch and the note its events carry (J1).
-#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(deny_unknown_fields)]
-pub struct PatchRequest {
-    /// The patch.
-    pub patch: Patch,
-    /// A note for each of its events.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub note: Option<Markdown>,
-}
-
-/// What an accepted patch answers (A17, H5, D7), as the API's `PatchAnswer`.
-#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(tag = "outcome", rename_all = "snake_case", deny_unknown_fields)]
-pub enum PatchAnswer {
-    /// Committed now.
-    Applied {
-        /// The receipt.
-        receipt: PatchReceipt,
-        /// D7: what it newly caused, by journey.
-        #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
-        consequences: BTreeMap<JourneyId, Consequences>,
-        /// A20: advisory notices about the route graph an import or publish leaves.
-        #[serde(default, skip_serializing_if = "Vec::is_empty")]
-        notices: Vec<Notice>,
-        /// H5: set when the patch was applied past revisions others' writes had moved.
-        #[serde(default, skip_serializing_if = "Option::is_none")]
-        over: Option<AppliedOver>,
-    },
-    /// The patch id was committed before with the same content (H5).
-    AlreadyApplied {
-        /// The original receipt.
-        receipt: PatchReceipt,
-    },
-}
-
-impl From<Written> for PatchAnswer {
-    fn from(written: Written) -> Self {
-        match written {
-            Written::Applied {
-                receipt,
-                consequences,
-                notices,
-                over,
-            } => PatchAnswer::Applied {
-                receipt,
-                consequences,
-                notices,
-                over,
-            },
-            Written::AlreadyApplied { receipt } => PatchAnswer::AlreadyApplied { receipt },
-        }
-    }
-}
-
-/// A journey in the index (C16), as the API's `JourneySummary`.
-#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(deny_unknown_fields)]
-pub struct JourneySummary {
-    /// The journey.
-    pub id: JourneyId,
-    /// Its name.
-    pub name: Title,
-    /// Its status.
-    pub status: JourneyStatus,
-    /// The route version it follows.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub lineage: Option<Lineage>,
-    /// Its revision.
-    pub revision: Revision,
-    /// When it was created.
-    pub created_at: Timestamp,
-    /// The latest version its route has published.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub latest_version: Option<VersionNumber>,
-    /// Whether its route has published a version newer than its own (C16).
-    pub upgrade_available: bool,
-}
-
-/// A page of the journey index, as the API's `JourneyPage`.
-#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(deny_unknown_fields)]
-pub struct JourneyPage {
-    /// The journeys, in id order.
-    pub items: Vec<JourneySummary>,
-    /// Pass as `after` for the next page.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub next: Option<JourneyId>,
-}
-
-/// One revision announcement (H6), as the API's `Tick`.
-#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(deny_unknown_fields)]
-pub struct Tick {
-    /// The domain or proposal.
-    pub of: RevisionOf,
-    /// Its revision; 0 for one that does not exist.
-    pub revision: Revision,
-}
 
 /// What a subscriber takes (H6).
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
@@ -159,18 +56,6 @@ pub(crate) fn failed(error: impl std::fmt::Display) -> HostError {
     HostError::Failed {
         message: error.to_string(),
     }
-}
-
-/// J4: `GET /api/journeys/{id}/history`'s answer, the API's `History`: a page of events grouped
-/// by patch, and where the next page starts.
-#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(deny_unknown_fields)]
-pub struct HistoryAnswer {
-    /// At most a page of events, grouped by patch, in log order.
-    pub patches: Vec<PatchEvents>,
-    /// Pass as `after` for the next page.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub next: Option<u64>,
 }
 
 /// A log position from JavaScript's number: none when negative, else a whole number within
@@ -298,12 +183,9 @@ impl BrowserRoot {
         journey: &JourneyId,
         node: Option<&NodeKey>,
         after: Option<u64>,
-    ) -> Result<HistoryAnswer, HostError> {
+    ) -> Result<History, HostError> {
         match now_or_never(self.service.history(journey, node, after)) {
-            Ok(history) => Ok(HistoryAnswer {
-                patches: history.patches,
-                next: history.next,
-            }),
+            Ok(history) => Ok(history.into()),
             Err(cairn_service::ReadError::JourneyMissing(id)) => Err(HostError::Missing {
                 message: format!("no journey {id}"),
             }),
@@ -336,7 +218,9 @@ impl BrowserRoot {
     /// The capabilities document: one local sign-in, no assistant, MCP, or SSE.
     #[must_use]
     pub fn capabilities(&self) -> String {
-        json(self.service.capabilities())
+        json(&cairn_service::wire::Capabilities::from(
+            self.service.capabilities(),
+        ))
     }
 
     /// The journey index (C16), as `GET /api/journeys` answers it.
@@ -500,15 +384,7 @@ impl RootSubscription {
             ));
         }
         self.latest.set(now);
-        let ticks = |ticks: Vec<cairn_store::Tick>| {
-            ticks
-                .into_iter()
-                .map(|tick| Tick {
-                    of: tick.of,
-                    revision: tick.revision,
-                })
-                .collect()
-        };
+        let ticks = |ticks: Vec<cairn_store::Tick>| ticks.into_iter().map(Tick::from).collect();
         Ok(match self.subscription.take(now) {
             Take::Current(found) => Taken::Current {
                 ticks: ticks(found),

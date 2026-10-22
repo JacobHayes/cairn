@@ -20,7 +20,9 @@ use crate::Api;
 use crate::error::ApiError;
 use crate::extract::{JsonBody, Path, segment};
 use crate::observe;
-use crate::wire::{Capabilities, Health, HealthStatus, PatchAnswer, PatchRequest, ProblemCode};
+use cairn_service::wire::{
+    Capabilities, Health, HealthStatus, PatchAnswer, PatchRequest, ProblemCode,
+};
 
 /// A handler's answer: its JSON body, or what went wrong.
 pub type Answer<T> = Result<Json<T>, ApiError>;

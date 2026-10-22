@@ -105,18 +105,16 @@ pub enum ProposalAnswer {
     },
 }
 
-impl From<cairn_service::ProposalWritten> for ProposalAnswer {
-    fn from(written: cairn_service::ProposalWritten) -> Self {
+impl From<crate::ProposalWritten> for ProposalAnswer {
+    fn from(written: crate::ProposalWritten) -> Self {
         match written {
-            cairn_service::ProposalWritten::Saved { receipt, proposal } => {
+            crate::ProposalWritten::Saved { receipt, proposal } => {
                 ProposalAnswer::Saved { receipt, proposal }
             }
-            cairn_service::ProposalWritten::AlreadySaved { receipt } => {
+            crate::ProposalWritten::AlreadySaved { receipt } => {
                 ProposalAnswer::AlreadySaved { receipt }
             }
-            cairn_service::ProposalWritten::Existing { proposal } => {
-                ProposalAnswer::Existing { proposal }
-            }
+            crate::ProposalWritten::Existing { proposal } => ProposalAnswer::Existing { proposal },
         }
     }
 }
@@ -172,9 +170,9 @@ pub struct StaleBase {
     pub intervening: TouchedSet,
 }
 
-impl From<cairn_service::ProposalReview> for ProposalReview {
-    fn from(review: cairn_service::ProposalReview) -> Self {
-        let cairn_service::ProposalReview {
+impl From<crate::ProposalReview> for ProposalReview {
+    fn from(review: crate::ProposalReview) -> Self {
+        let crate::ProposalReview {
             proposal,
             preview,
             after,

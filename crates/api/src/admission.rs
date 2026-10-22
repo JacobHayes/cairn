@@ -14,7 +14,7 @@ use tokio::sync::Semaphore;
 
 use crate::error::ApiError;
 use crate::limits::{REQUEST_BYTES_MAX, REQUEST_DURATION_MAX, REQUEST_IN_FLIGHT_COUNT_MAX};
-use crate::wire::ProblemCode;
+use cairn_service::wire::ProblemCode;
 
 /// `router` with the body and in-flight limits applied to every request.
 pub fn limited(router: Router) -> Router {

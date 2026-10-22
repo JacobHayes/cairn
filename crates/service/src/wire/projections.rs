@@ -34,8 +34,8 @@ pub struct Projected<T> {
 
 impl<T> Projected<T> {
     /// The service's projection, its value given its wire shape.
-    pub fn from_service<U: Into<T>>(projected: cairn_service::Projected<U>) -> Self {
-        let cairn_service::Projected {
+    pub fn from_service<U: Into<T>>(projected: crate::Projected<U>) -> Self {
+        let crate::Projected {
             revision,
             deployment_revision,
             today,
@@ -139,9 +139,9 @@ pub struct ChildEntry {
     pub display_state: DisplayState,
 }
 
-impl From<cairn_service::NodeDetail> for NodeDetail {
-    fn from(detail: cairn_service::NodeDetail) -> Self {
-        let cairn_service::NodeDetail {
+impl From<crate::NodeDetail> for NodeDetail {
+    fn from(detail: crate::NodeDetail) -> Self {
+        let crate::NodeDetail {
             node,
             path,
             parent,
@@ -158,7 +158,7 @@ impl From<cairn_service::NodeDetail> for NodeDetail {
             answer_effects,
         } = detail;
         let children = children.into_iter().map(|child| {
-            let cairn_service::ChildEntry {
+            let crate::ChildEntry {
                 key,
                 title,
                 kind,
@@ -204,8 +204,8 @@ pub struct History {
     pub next: Option<u64>,
 }
 
-impl From<cairn_service::History> for History {
-    fn from(history: cairn_service::History) -> Self {
+impl From<crate::History> for History {
+    fn from(history: crate::History) -> Self {
         Self {
             patches: history.patches,
             next: history.next,

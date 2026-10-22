@@ -22,6 +22,20 @@ pub struct Caller {
     pub logins: Vec<LinkedLogin>,
 }
 
+impl Caller {
+    /// The caller as the service knows them, acting through `agent` when a token carried the
+    /// request.
+    #[must_use]
+    pub fn of(caller: crate::Caller, agent: Option<AgentId>) -> Self {
+        Self {
+            user: caller.user,
+            agent,
+            identities: caller.identities,
+            logins: caller.logins.into_iter().map(Into::into).collect(),
+        }
+    }
+}
+
 // ARCHITECTURE: Auth: users and logins.
 /// One login a user signs in with.
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
@@ -66,62 +80,11 @@ pub struct UserName {
     pub name: Title,
 }
 
-impl From<cairn_service::UserName> for UserName {
-    fn from(name: cairn_service::UserName) -> Self {
+impl From<crate::UserName> for UserName {
+    fn from(name: crate::UserName) -> Self {
         Self {
             user: name.user,
             name: name.name,
-        }
-    }
-}
-
-/// `POST /api/users/me/tokens`: what to call the new agent token.
-#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
-#[serde(deny_unknown_fields)]
-pub struct TokenRequest {
-    /// Its name, as the user's list shows it.
-    pub name: Title,
-}
-
-// PRD: H2.
-/// A token just minted: the one time its secret is seen.
-#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
-#[serde(deny_unknown_fields)]
-pub struct MintedToken {
-    /// The agent the token acts as.
-    pub agent: AgentId,
-    /// The bearer token; Cairn keeps only its digest.
-    pub token: String,
-}
-
-/// An agent token as its user's list shows it: never the secret.
-#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
-#[serde(deny_unknown_fields)]
-pub struct AgentToken {
-    /// The agent the token acts as.
-    pub agent: AgentId,
-    /// What the user called it.
-    pub name: Title,
-    /// When it was minted.
-    pub created_at: Timestamp,
-    /// When it was revoked, if it was.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub revoked_at: Option<Timestamp>,
-}
-
-impl From<cairn_auth::AgentToken> for AgentToken {
-    fn from(token: cairn_auth::AgentToken) -> Self {
-        let cairn_auth::AgentToken {
-            agent,
-            name,
-            created_at,
-            revoked_at,
-        } = token;
-        Self {
-            agent,
-            name,
-            created_at,
-            revoked_at,
         }
     }
 }
@@ -178,8 +141,8 @@ pub struct Tour {
     pub today: Date,
 }
 
-impl From<cairn_service::TourView> for Tour {
-    fn from(view: cairn_service::TourView) -> Self {
+impl From<crate::TourView> for Tour {
+    fn from(view: crate::TourView) -> Self {
         Self {
             state: view.record.as_ref().map(|record| record.state).into(),
             practice_journey: view.record.and_then(|record| record.practice_journey),

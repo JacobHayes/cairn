@@ -28,6 +28,7 @@ mod proposals;
 mod reads;
 mod routes;
 mod tour;
+pub mod wire;
 mod write;
 
 pub use call::Call;

@@ -114,6 +114,7 @@ dependencies = [
  "jiff",
  "metrics",
  "patina-dst",
+ "schemars",
  "serde",
 ]
 

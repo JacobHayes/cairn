@@ -15,7 +15,8 @@ use super::Answer;
 use crate::Api;
 use crate::error::ApiError;
 use crate::extract::{JsonBody, Path, segment};
-use crate::wire::{AssistantRequest, Conversation, ProblemCode, TurnReply};
+use crate::wire::{AssistantRequest, Conversation, TurnReply};
+use cairn_service::wire::ProblemCode;
 
 /// The conversation reads and their handlers, held to the request duration.
 pub fn reads() -> crate::Served {

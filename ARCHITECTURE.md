@@ -83,9 +83,9 @@ cairn/
     schema/        serde types shared by engine and shell: document, patch, API payloads; JSON Schema export
     store/         Store and Notifier traits; memory backend; the store conformance test suite. No delta types of its own: it persists the change set from schema
     store-sqlite/  SQLite backend (rusqlite: embedded, WAL mode, one writer)
-    service/       service layer: load, call engine, commit; capabilities; composition root types. Runtime-free: no tokio, database driver, or transport dependency, so it builds for wasm32-unknown-unknown
+    service/       service layer: load, call engine, commit; capabilities; composition root types; the wire types both hosts answer with (`wire`). Runtime-free: no tokio, database driver, or transport dependency, so it builds for wasm32-unknown-unknown
     auth/          AuthProvider trait; dev, oidc, builtin-oauth, tailscale, Google Cloud IAP providers; users and logins
-    api/           axum endpoints, the generated OpenAPI document, SSE, the Rust client
+    api/           axum endpoints, the generated OpenAPI document, SSE, the Rust client; the wire types only the API has (assistant, agent tokens)
     mcp/           rmcp server: tools, prompt metadata, instructions
     assistant/     provider trait, tool loop, proposal drafting
     cairn/         the binary: CLI, config, composition root, embedded assets

@@ -13,16 +13,15 @@ use crate::Api;
 use crate::error::ApiError;
 use crate::extract::{Path, segment};
 use crate::query::{self, Params};
-use crate::wire::{EventPage, IdentityReferences, JourneyPage, RouteDetail, RoutePage, SearchPage};
+use cairn_service::wire::{
+    EventPage, IdentityReferences, JourneyPage, RouteDetail, RoutePage, SearchPage,
+};
 
 /// `GET /api/journeys` (C16).
 pub async fn journeys(State(api): State<Api>, RawQuery(raw): RawQuery) -> Answer<JourneyPage> {
     let params = Params::parse(raw.as_deref(), query::JOURNEY_PARAMS)?;
     let page = api.service.journeys(&query::journeys(&params)?).await?;
-    Ok(Json(JourneyPage {
-        items: page.items.into_iter().map(Into::into).collect(),
-        next: page.next,
-    }))
+    Ok(Json(page.into()))
 }
 
 /// `GET /api/journeys/{id}`.
@@ -52,10 +51,7 @@ pub async fn routes(State(api): State<Api>, RawQuery(raw): RawQuery) -> Answer<R
     let params = Params::parse(raw.as_deref(), query::ROUTE_PARAMS)?;
     let (kind, after, size) = query::routes(&params)?;
     let page = api.service.routes(kind, after.as_ref(), size).await?;
-    Ok(Json(RoutePage {
-        items: page.items.into_iter().map(Into::into).collect(),
-        next: page.next,
-    }))
+    Ok(Json(page.into()))
 }
 
 /// `GET /api/routes/{id}`.

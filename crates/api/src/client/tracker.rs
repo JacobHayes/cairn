@@ -11,7 +11,7 @@ use std::collections::BTreeMap;
 
 use cairn_schema::{Revision, RevisionOf};
 
-use crate::wire::Tick;
+use cairn_service::wire::Tick;
 
 /// What a view holds, and what it has asked to refetch.
 #[derive(Clone, Debug, Default, PartialEq, Eq)]

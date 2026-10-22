@@ -7,7 +7,7 @@ mod in_process {
     use axum::body::Bytes;
     use axum::http::{HeaderValue, Method, StatusCode};
     use cairn_api::error::status_of;
-    use cairn_api::wire::{Capabilities, PatchAnswer, Problem, ProblemCode};
+    use cairn_service::wire::{Capabilities, PatchAnswer, Problem, ProblemCode};
     use std::collections::BTreeSet;
 
     use cairn_schema::{Rejection, UndecidedConsequence, ViolationCode};

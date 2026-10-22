@@ -10,9 +10,10 @@ mod mcp_in_process {
 
     use axum::http::header::WWW_AUTHENTICATE;
     use axum::http::{Method, StatusCode};
-    use cairn_api::wire::{MintedToken, Problem, ProblemCode};
+    use cairn_api::wire::MintedToken;
     use cairn_mcp::instructions;
     use cairn_schema::{Mutation, NextQuery};
+    use cairn_service::wire::{Problem, ProblemCode};
     use serde_json::{Value, json};
 
     use crate::api::support::mcp::Agent;

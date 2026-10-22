@@ -9,11 +9,11 @@
 mod in_process {
     use axum::http::{Method, StatusCode};
     use cairn_api::client::{Reply, Transport};
-    use cairn_api::wire::{
-        Caller, EventPage, MintedToken, PatchAnswer, Problem, ProblemCode, ProposalAnswer,
-        ProposalReview,
-    };
+    use cairn_api::wire::MintedToken;
     use cairn_schema::{Proposal, ProposalStatus, Rejection, RevisionOf};
+    use cairn_service::wire::{
+        Caller, EventPage, PatchAnswer, Problem, ProblemCode, ProposalAnswer, ProposalReview,
+    };
     use serde_json::{Value, json};
 
     use crate::api::support::{World, get, ok, post};
@@ -297,7 +297,7 @@ mod in_process {
     /// found under this one, for a read and for a write.
     #[tokio::test]
     async fn open_proposals_are_listed_under_their_destination_and_nowhere_else() {
-        use cairn_api::wire::ProposalList;
+        use cairn_service::wire::ProposalList;
 
         let world = World::start().await;
         let agent = drafted_by_agent(&world).await;
@@ -339,7 +339,7 @@ mod in_process {
     /// would create a journey or a route, and none whose destination exists.
     #[tokio::test]
     async fn the_proposals_creating_a_journey_or_a_route_are_listed_by_kind() {
-        use cairn_api::wire::ProposalList;
+        use cairn_service::wire::ProposalList;
 
         let world = World::start().await;
         let ann = world.vendor_after(3).await;

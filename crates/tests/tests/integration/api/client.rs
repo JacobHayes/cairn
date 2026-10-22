@@ -6,8 +6,8 @@
 mod in_process {
     use cairn_api::client::{Client, Refused, Subscription, Tracker};
     use cairn_api::query::WatchName;
-    use cairn_api::wire::{PatchAnswer, Tick};
     use cairn_schema::{Domain, JourneyId, Patch, Rejection, RevisionOf};
+    use cairn_service::wire::{PatchAnswer, Tick};
 
     use crate::api::support::{self, World};
 

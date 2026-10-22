@@ -15,12 +15,10 @@ mod in_process {
     use axum::http::{Request, StatusCode};
     use cairn_api::client::Reply;
     use cairn_api::endpoints::{self as at, Endpoint};
-    use cairn_api::wire::{
-        Capabilities, Conversation, ConversationAuthor, MintedToken, Problem, ProblemCode,
-        TurnReply,
-    };
+    use cairn_api::wire::{Conversation, ConversationAuthor, MintedToken, TurnReply};
     use cairn_assistant::scripted::{ScriptedProvider, Step};
     use cairn_assistant::{Action, Ended, Provider, Reply as ModelReply};
+    use cairn_service::wire::{Capabilities, Problem, ProblemCode};
     use serde_json::{Value, json};
     use tower::ServiceExt;
 

@@ -40,18 +40,9 @@ pub use local::{
     AppliedLocally, ApplyRequest, PreviewRequest, RouteApplyRequest, apply, apply_locally,
     apply_route, apply_route_locally, preview, preview_locally,
 };
-pub use proposals::{
-    ProposalAnswer, ProposalApply, ProposalCreate, ProposalEdit, ProposalListRequest,
-    ProposalReview, ProposalStep, RelinkRequest, SaveAsRouteRequest, StaleBase, UpgradeRequest,
-};
-pub use reads::{
-    Caller, IdentityReferences, JourneyIndexQuery, LinkedLogin, RouteDetail, RouteImport,
-    RoutePage, RouteReference, RouteSummary, VersionJourneys,
-};
-pub use root::{
-    BrowserRoot, HistoryAnswer, JourneyPage, JourneySummary, PatchAnswer, PatchRequest,
-    RootSubscription, Taken, Tick,
-};
+pub use proposals::ProposalListRequest;
+pub use reads::JourneyIndexQuery;
+pub use root::{BrowserRoot, RootSubscription, Taken};
 pub use route::{
     RouteDerivation, RouteDeriveRequest, RouteNoticesRequest, route_notices, route_notices_of,
 };

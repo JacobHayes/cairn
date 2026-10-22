@@ -36,6 +36,15 @@ pub struct JourneySummary {
     pub upgrade_available: bool,
 }
 
+impl From<cairn_store::Page<cairn_store::JourneySummary, JourneyId>> for JourneyPage {
+    fn from(page: cairn_store::Page<cairn_store::JourneySummary, JourneyId>) -> Self {
+        Self {
+            items: page.items.into_iter().map(Into::into).collect(),
+            next: page.next,
+        }
+    }
+}
+
 impl From<cairn_store::JourneySummary> for JourneySummary {
     fn from(summary: cairn_store::JourneySummary) -> Self {
         let upgrade_available = summary.upgrade_available();
@@ -88,9 +97,18 @@ pub struct RouteSummary {
     pub draft_open: bool,
 }
 
-impl From<cairn_service::RouteSummary> for RouteSummary {
-    fn from(summary: cairn_service::RouteSummary) -> Self {
-        let cairn_service::RouteSummary {
+impl From<cairn_store::Page<crate::RouteSummary, RouteId>> for RoutePage {
+    fn from(page: cairn_store::Page<crate::RouteSummary, RouteId>) -> Self {
+        Self {
+            items: page.items.into_iter().map(Into::into).collect(),
+            next: page.next,
+        }
+    }
+}
+
+impl From<crate::RouteSummary> for RouteSummary {
+    fn from(summary: crate::RouteSummary) -> Self {
+        let crate::RouteSummary {
             header,
             revision,
             latest_version,
@@ -362,8 +380,8 @@ pub struct IdentityReferences {
     pub routes: Vec<RouteReference>,
 }
 
-impl From<cairn_service::IdentityReferences> for IdentityReferences {
-    fn from(references: cairn_service::IdentityReferences) -> Self {
+impl From<crate::IdentityReferences> for IdentityReferences {
+    fn from(references: crate::IdentityReferences) -> Self {
         Self {
             journeys: references.journeys.into_iter().map(Into::into).collect(),
             routes: references

@@ -7,8 +7,8 @@ mod in_process {
     use cairn_api::client::{EventStream, Opened, SseEvent, Transport};
     use cairn_api::limits::SSE_SUBSCRIBER_COUNT_MAX;
     use cairn_api::stream::TICK_EVENT;
-    use cairn_api::wire::{Problem, ProblemCode, Tick};
     use cairn_schema::{Domain, RevisionOf};
+    use cairn_service::wire::{Problem, ProblemCode, Tick};
 
     use crate::api::support::{self, World, post, request};
 

@@ -10,11 +10,11 @@ mod in_process {
 
     use axum::http::{Method, StatusCode};
     use cairn_api::client::{Reply, Transport};
-    use cairn_api::wire::{PatchAnswer, Problem, ProblemCode, ProposalAnswer, ProposalReview};
     use cairn_schema::{
         Conflict, ConflictResolution, Domain, Journey, Kept, Proposal, ProposalDraft, Rejection,
         ReviewItem, Route, RouteFile, Subject, ViolationCode, from_yaml,
     };
+    use cairn_service::wire::{PatchAnswer, Problem, ProblemCode, ProposalAnswer, ProposalReview};
     use serde_json::json;
 
     use crate::api::support::{self, World, get, ok, post};

@@ -19,11 +19,11 @@ use tokio::sync::watch;
 
 use axum::http::StatusCode;
 use cairn_api::client::{self as api, ClientError, Refused, Transport};
-use cairn_api::wire::PatchAnswer;
 use cairn_schema::{
     Actor, Deployment, Domain, Journey, Patch, PatchId, PatchReceipt, Rejection, Revision,
     Timestamp, UserId,
 };
+use cairn_service::wire::PatchAnswer;
 use cairn_service::{Call, DomainPatch, Service, WriteError};
 
 use crate::Stop;

@@ -12,21 +12,14 @@ use crate::Api;
 use crate::error::ApiError;
 use crate::extract::{JsonBody, Path, segment};
 use crate::query::{self, Params};
-use crate::wire::{
-    AgentToken, Caller, MintedToken, ProblemCode, TokenRequest, Tour, TourWrite, TourWriteState,
-    UserName,
-};
+use crate::wire::{AgentToken, MintedToken, TokenRequest};
+use cairn_service::wire::{Caller, ProblemCode, Tour, TourWrite, TourWriteState, UserName};
 
 /// `GET /api/users/me` (H2, H3).
 pub async fn caller(State(api): State<Api>, Extension(actor): Extension<Actor>) -> Answer<Caller> {
     let agent = actor.agent.clone();
     let caller = api.service.caller(&api.call(actor)).await?;
-    Ok(Json(Caller {
-        user: caller.user,
-        agent,
-        identities: caller.identities,
-        logins: caller.logins.into_iter().map(Into::into).collect(),
-    }))
+    Ok(Json(Caller::of(caller, agent)))
 }
 
 /// `GET /api/users` (H3): the names of the users asked for, at most a page of them.

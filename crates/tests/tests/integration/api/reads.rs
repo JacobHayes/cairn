@@ -8,12 +8,13 @@ mod in_process {
     use axum::http::{Method, StatusCode};
     use cairn_api::client::{Reply, Transport};
     use cairn_api::error::status_of;
-    use cairn_api::wire::{
-        AgentToken, Caller, Capabilities, EventPage, JourneyPage, MintedToken, Problem,
-        ProblemCode, RouteDetail, RoutePage, SearchHit, SearchPage, Tour, TourStanding, UserName,
-    };
+    use cairn_api::wire::{AgentToken, MintedToken};
     use cairn_engine::{Graph, derive};
     use cairn_schema::{Deployment, DomainDocument, Journey, Route, RouteVersion};
+    use cairn_service::wire::{
+        Caller, Capabilities, EventPage, JourneyPage, Problem, ProblemCode, RouteDetail, RoutePage,
+        SearchHit, SearchPage, Tour, TourStanding, UserName,
+    };
 
     use crate::api::support::{self, World, get, post};
 
@@ -101,7 +102,7 @@ mod in_process {
         let world = World::start().await;
         let ann = world.vendor_after(2).await;
         let eli = "who_e7h2jv3nxc4yaw6t";
-        let references: cairn_api::wire::IdentityReferences = get(
+        let references: cairn_service::wire::IdentityReferences = get(
             &ann,
             &format!("/api/deployment/identities/{eli}/references"),
         )

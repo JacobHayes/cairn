@@ -15,7 +15,7 @@ use super::Answer;
 use crate::Api;
 use crate::extract::{Path, segment};
 use crate::query::{self, Params};
-use crate::wire::{History, Mine, NodeDetail, Projected};
+use cairn_service::wire::{History, Mine, NodeDetail, Projected};
 
 /// The derived reads' endpoints and handlers.
 pub fn served() -> crate::Served {

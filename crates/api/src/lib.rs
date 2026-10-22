@@ -131,7 +131,7 @@ async fn users_only(
         .is_some_and(|actor| actor.agent.is_some())
     {
         return error::ApiError::problem(
-            wire::ProblemCode::UserOnly,
+            cairn_service::wire::ProblemCode::UserOnly,
             "only a user may do this, not an agent acting for one; an agent calls the tools \
              over MCP",
         )

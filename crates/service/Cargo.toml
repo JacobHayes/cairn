@@ -15,6 +15,7 @@ cairn-store.workspace = true
 jiff.workspace = true
 metrics.workspace = true
 patina-dst.workspace = true
+schemars.workspace = true
 serde.workspace = true
 
 [dev-dependencies]

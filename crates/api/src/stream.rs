@@ -31,7 +31,7 @@ use crate::Api;
 use crate::error::ApiError;
 use crate::limits::{SSE_HEARTBEAT_INTERVAL, SSE_WRITE_STALL};
 use crate::query::{self, Params};
-use crate::wire::Tick;
+use cairn_service::wire::Tick;
 
 /// The SSE event name of a revision tick.
 pub const TICK_EVENT: &str = "tick";

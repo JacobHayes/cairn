@@ -7,9 +7,7 @@
 use std::collections::BTreeSet;
 
 use cairn_schema::{
-    AgentId, Domain, Email, GraphId, IdentityKey, InsertionKey, JourneyId, JourneyStatus, Markdown,
-    PatchId, Revision, RouteFile, RouteHeader, RouteId, RouteKind, Slug, Timestamp, Title, UserId,
-    VersionNumber,
+    IdentityKey, JourneyId, JourneyStatus, RouteId, RouteKind, UserId, VersionNumber,
 };
 use cairn_service::ReadError;
 use cairn_store::{JourneyQuery, PageSize};
@@ -18,7 +16,11 @@ use wasm_bindgen::prelude::wasm_bindgen;
 
 use crate::error::{HostError, json, read};
 use crate::now_or_never;
-use crate::root::{BrowserRoot, JourneyPage, JourneySummary, PatchAnswer, failed};
+use crate::root::{BrowserRoot, failed};
+use cairn_service::wire::{
+    Caller, IdentityReferences, JourneyPage, PatchAnswer, RouteDetail, RouteImport, RoutePage,
+    UserName,
+};
 
 /// `GET /api/journeys`'s query (C16) as JSON: the statuses, the lineage route and version, the
 /// identities referred to (E6), whether an upgrade is available, and the page.
@@ -63,180 +65,6 @@ impl JourneyIndexQuery {
     }
 }
 
-/// A journey of the store's index as the API's `JourneySummary`.
-fn summarized(summary: cairn_store::JourneySummary) -> JourneySummary {
-    let upgrade_available = summary.upgrade_available();
-    let cairn_store::JourneySummary {
-        id,
-        name,
-        status,
-        lineage,
-        revision,
-        created_at,
-        latest_version,
-    } = summary;
-    JourneySummary {
-        id,
-        name,
-        status,
-        lineage,
-        revision,
-        created_at,
-        latest_version,
-        upgrade_available,
-    }
-}
-
-/// Where a route refers to an identity, as the API's `RouteReference` (E6).
-#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(deny_unknown_fields)]
-pub struct RouteReference {
-    /// The route's fields.
-    pub header: RouteHeader,
-    /// Whether its draft refers to the identity.
-    pub draft: bool,
-    /// The published versions that refer to it.
-    pub versions: Vec<VersionNumber>,
-}
-
-/// What refers to an identity, as the API's `IdentityReferences` (E6).
-#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(deny_unknown_fields)]
-pub struct IdentityReferences {
-    /// The journeys, in id order.
-    pub journeys: Vec<JourneySummary>,
-    /// The routes, in id order.
-    pub routes: Vec<RouteReference>,
-}
-
-/// A route in the route index, as the API's `RouteSummary`.
-#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(deny_unknown_fields)]
-pub struct RouteSummary {
-    /// The route's fields.
-    pub header: RouteHeader,
-    /// Its revision.
-    pub revision: Revision,
-    /// Its latest published version.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub latest_version: Option<VersionNumber>,
-    /// Whether it has an open draft.
-    pub draft_open: bool,
-}
-
-/// A page of the route index, as the API's `RoutePage`.
-#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(deny_unknown_fields)]
-pub struct RoutePage {
-    /// The routes, in id order.
-    pub items: Vec<RouteSummary>,
-    /// Pass as `after` for the next page.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub next: Option<RouteId>,
-}
-
-/// One published version and the journeys on it, as the API's `VersionJourneys`.
-#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(deny_unknown_fields)]
-pub struct VersionJourneys {
-    /// The version.
-    pub version: VersionNumber,
-    /// When it was published.
-    pub published_at: Timestamp,
-    /// The journeys whose lineage is this version.
-    pub journeys: BTreeSet<JourneyId>,
-    /// Where this version of a segment is inserted (C19).
-    #[serde(default, skip_serializing_if = "Vec::is_empty")]
-    pub insertions: Vec<InsertionUse>,
-}
-
-/// One insertion of a segment version, as the API's `InsertionUse` (C19).
-#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(deny_unknown_fields)]
-pub struct InsertionUse {
-    /// The domain holding it.
-    pub host: Domain,
-    /// The graph holding it.
-    pub graph: GraphId,
-    /// The insertion.
-    pub insertion: InsertionKey,
-    /// The root member's current title.
-    pub title: Title,
-    /// Whether the segment has a later published version.
-    pub upgrade_available: bool,
-}
-
-/// C17: a route's versions with the journeys on each, as the API's `RouteDetail`.
-#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(deny_unknown_fields)]
-pub struct RouteDetail {
-    /// The route's fields.
-    pub header: RouteHeader,
-    /// Its revision.
-    pub revision: Revision,
-    /// Its versions, oldest first.
-    pub versions: Vec<VersionJourneys>,
-    // PRD: A19.
-    /// Whether anything uses it: a journey following one of its versions, or an insertion of
-    /// one anywhere. A route in use cannot be deleted.
-    pub in_use: bool,
-}
-
-/// `POST /api/routes/{id}/import`'s body (A13), as the API's `RouteImport`.
-#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(deny_unknown_fields)]
-pub struct RouteImport {
-    /// The import's patch id (H5).
-    pub patch_id: PatchId,
-    /// The file, as JSON; its route is the one imported into.
-    pub file: RouteFile,
-    /// A note for each of its events (J1).
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub note: Option<Markdown>,
-}
-
-/// One login the caller signs in with, as the API's `LinkedLogin`.
-#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(deny_unknown_fields)]
-pub struct LinkedLogin {
-    /// The provider, by its configured name.
-    pub provider: Slug,
-    /// The provider's subject for the account.
-    pub subject: Title,
-    /// The name the provider gave the account, if it gave one.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub name: Option<Title>,
-    /// The emails the provider marked verified at the last sign-in (H3).
-    pub verified_emails: BTreeSet<Email>,
-    /// When it was linked.
-    pub linked_at: Timestamp,
-}
-
-/// The caller (H2) and the identities their verified emails name (H3), as the API's `Caller`.
-#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(deny_unknown_fields)]
-pub struct Caller {
-    /// The user.
-    pub user: UserId,
-    /// The agent acting for them: never, in the browser.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub agent: Option<AgentId>,
-    /// Their identities, which "mine" covers together.
-    pub identities: BTreeSet<IdentityKey>,
-    /// The logins they sign in with, by provider and subject.
-    pub logins: Vec<LinkedLogin>,
-}
-
-/// A user and the name people see for them (H3), as the API's `UserName`.
-#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(deny_unknown_fields)]
-pub struct UserName {
-    /// The user.
-    pub user: UserId,
-    /// Their name.
-    pub name: Title,
-}
-
 impl BrowserRoot {
     /// C16: the journey index `query` asks for, as `GET /api/journeys` answers it.
     ///
@@ -245,11 +73,7 @@ impl BrowserRoot {
     /// When the store fails.
     pub fn journey_index(&self, query: &JourneyIndexQuery) -> Result<JourneyPage, HostError> {
         let page = now_or_never(self.service().journeys(&query.store_query())).map_err(failed)?;
-        let items = page.items.into_iter().map(summarized);
-        Ok(JourneyPage {
-            items: items.collect(),
-            next: page.next,
-        })
+        Ok(page.into())
     }
 
     /// E6: what refers to identity `identity`, as
@@ -266,18 +90,7 @@ impl BrowserRoot {
                 message: format!("no identity {identity}"),
             });
         };
-        Ok(IdentityReferences {
-            journeys: found.journeys.into_iter().map(summarized).collect(),
-            routes: found
-                .routes
-                .into_iter()
-                .map(|route| RouteReference {
-                    header: route.header,
-                    draft: route.draft,
-                    versions: route.versions,
-                })
-                .collect(),
-        })
+        Ok(found.into())
     }
 
     /// The route index: the routes and segments of `kind` (both when none), in id order, as
@@ -293,16 +106,7 @@ impl BrowserRoot {
     ) -> Result<RoutePage, HostError> {
         let page =
             now_or_never(self.service().routes(kind, after, PageSize::MAX)).map_err(failed)?;
-        let items = page.items.into_iter().map(|summary| RouteSummary {
-            header: summary.header,
-            revision: summary.revision,
-            latest_version: summary.latest_version,
-            draft_open: summary.draft_open,
-        });
-        Ok(RoutePage {
-            items: items.collect(),
-            next: page.next,
-        })
+        Ok(page.into())
     }
 
     /// C17: route `id`'s versions with the journeys on each.
@@ -316,28 +120,7 @@ impl BrowserRoot {
                 message: format!("no route {id}"),
             });
         };
-        let versions = detail.versions.into_iter().map(|version| VersionJourneys {
-            version: version.version,
-            published_at: version.published_at,
-            journeys: version.journeys,
-            insertions: version
-                .insertions
-                .into_iter()
-                .map(|held| InsertionUse {
-                    host: held.host,
-                    graph: held.graph,
-                    insertion: held.insertion,
-                    title: held.title,
-                    upgrade_available: held.upgrade_available,
-                })
-                .collect(),
-        });
-        Ok(RouteDetail {
-            header: detail.header,
-            revision: detail.revision,
-            versions: versions.collect(),
-            in_use: detail.in_use,
-        })
+        Ok(detail.into())
     }
 
     /// The caller: the local user, its login, and the identities its emails name (H3).
@@ -348,19 +131,7 @@ impl BrowserRoot {
     pub fn caller_now(&self, now: &str) -> Result<Caller, HostError> {
         let call = self.call(now)?;
         let caller = now_or_never(self.service().caller(&call)).map_err(failed)?;
-        let logins = caller.logins.into_iter().map(|record| LinkedLogin {
-            provider: record.provider,
-            subject: record.subject,
-            name: record.name,
-            verified_emails: record.verified_emails,
-            linked_at: record.linked_at,
-        });
-        Ok(Caller {
-            user: caller.user,
-            agent: None,
-            identities: caller.identities,
-            logins: logins.collect(),
-        })
+        Ok(Caller::of(caller, None))
     }
 
     /// H3: the names of `users`; one that does not exist is left out.
@@ -376,13 +147,7 @@ impl BrowserRoot {
                 },
                 error => failed(error),
             })?;
-        Ok(names
-            .into_iter()
-            .map(|found| UserName {
-                user: found.user,
-                name: found.name,
-            })
-            .collect())
+        Ok(names.into_iter().map(Into::into).collect())
     }
 
     /// A13: `request`'s file imported as the local user at `now`.

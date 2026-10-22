@@ -22,7 +22,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::error::ApiError;
 use crate::extract::parse_text;
-use crate::wire::ProblemCode;
+use cairn_service::wire::ProblemCode;
 
 /// One query parameter an endpoint takes.
 #[derive(Clone, Copy, Debug)]

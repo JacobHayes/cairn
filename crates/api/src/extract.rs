@@ -9,7 +9,7 @@ use axum::http::request::Parts;
 use serde::de::DeserializeOwned;
 
 use crate::error::ApiError;
-use crate::wire::ProblemCode;
+use cairn_service::wire::ProblemCode;
 
 /// A JSON request body. It must say it is `application/json`: a browser cannot send that
 /// cross-site without the site's consent (CORS), so a session cookie alone never carries a

@@ -12,7 +12,7 @@ use cairn_service::{ProposeError, ReadError, ServiceError, WriteError};
 use cairn_store::StoreError;
 
 use crate::observe;
-use crate::wire::{Problem, ProblemCode};
+use cairn_service::wire::{Problem, ProblemCode};
 
 /// Seconds a client waits before retrying an answer that names a limit.
 const RETRY_AFTER_SECONDS: &str = "1";

@@ -10,8 +10,8 @@ use std::time::Duration;
 
 use cairn_api::client::Tracker;
 use cairn_api::query::WatchName;
-use cairn_api::wire::Tick;
 use cairn_schema::{Domain, Revision, RevisionOf};
+use cairn_service::wire::Tick;
 use cairn_store::limits::SSE_COALESCING_INTERVAL;
 use tokio::sync::watch;
 use tokio::task::JoinHandle;

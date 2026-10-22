@@ -6,11 +6,12 @@
 
 use std::time::Duration;
 
-use cairn_api::wire;
 use cairn_schema::limits::PAGE_ITEM_COUNT_MAX;
 use cairn_schema::{DomainDocument, Rejection, RevisionOf, UserId};
+use cairn_service::wire;
+use cairn_service::wire::{PatchAnswer, Tick};
 use cairn_store::limits::SSE_COALESCING_INTERVAL;
-use cairn_wasm::{BrowserRoot, HostError, PatchAnswer, Taken, Tick, read_document};
+use cairn_wasm::{BrowserRoot, HostError, Taken, read_document};
 
 /// The clock reads and writes are made at: after every fixture scenario's last step.
 const NOW: &str = "2026-10-12T12:00:00Z";
@@ -252,7 +253,7 @@ fn history_answers_as_the_api_for_the_journey_and_for_one_node() {
             expected
         );
     }
-    let page: cairn_wasm::HistoryAnswer =
+    let page: wire::History =
         serde_json::from_str(&root.history("j_vendor_eval", "n_access", -1.0).unwrap()).unwrap();
     let events = page.patches.iter().flat_map(|patch| &patch.events);
     assert!(events.clone().count() > 0);

@@ -11,13 +11,13 @@ mod in_process {
 
     use axum::http::Method;
     use cairn_api::client::Transport;
-    use cairn_api::wire::{Caller, History, Mine, NodeDetail, Problem, ProblemCode, Projected};
     use cairn_schema::limits::{EXPLANATION_ENTRY_COUNT_MAX, PAGE_ITEM_COUNT_MAX};
     use cairn_schema::{
         Actor, ExplainedField, ExplanationPage, LevelDisplay, LevelQuery, ListFlag, ListPage,
         ListQuery, NextQuery, NodeKey, NodeKind, RemovalRead, Snapshot, SnapshotScope, SortBy,
     };
     use cairn_service::Call;
+    use cairn_service::wire::{Caller, History, Mine, NodeDetail, Problem, ProblemCode, Projected};
 
     use crate::api::support::{self, World, get, post};
 

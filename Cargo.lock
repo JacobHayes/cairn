@@ -561,6 +561,7 @@ dependencies = [
  "patina-dst",
  "patina-dst-proptest",
  "proptest",
+ "schemars 1.2.3",
  "serde",
  "serde_json",
  "tokio",

@@ -13,7 +13,7 @@ use super::transport::{Reply, Transport, TransportError};
 use crate::endpoints::{self, Endpoint};
 use crate::query::WatchName;
 use crate::stream::TICK_EVENT;
-use crate::wire::{PatchAnswer, PatchRequest, Problem, Tick};
+use cairn_service::wire::{PatchAnswer, PatchRequest, Problem, Tick};
 
 /// A request that did not get the answer it asked for (a rejected patch is a
 /// [`Refused::Rejected`], not this).

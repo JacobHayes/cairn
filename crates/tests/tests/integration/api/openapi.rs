@@ -112,8 +112,12 @@ mod in_process {
     fn service_methods() -> BTreeSet<String> {
         let sources = Path::new(env!("CARGO_MANIFEST_DIR")).join("../service/src");
         let mut methods = BTreeSet::new();
-        for entry in std::fs::read_dir(sources).unwrap() {
-            let text = std::fs::read_to_string(entry.unwrap().path()).unwrap();
+        let files = std::fs::read_dir(sources)
+            .unwrap()
+            .map(|entry| entry.unwrap().path())
+            .filter(|path| path.extension().is_some_and(|extension| extension == "rs"));
+        for path in files {
+            let text = std::fs::read_to_string(path).unwrap();
             let mut inside = false;
             for line in text.lines() {
                 if line.starts_with("impl Service") {

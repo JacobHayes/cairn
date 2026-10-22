@@ -13,18 +13,20 @@ use serde_json::{Map, Value, json};
 use crate::endpoints::{self, Endpoint};
 use crate::query::{self, ParamSpec, schema_of};
 use crate::wire::{
-    AgentToken, AssistantRequest, Caller, Capabilities, Conversation, EventPage, Health, History,
-    IdentityReferences, JourneyPage, Mine, MintedToken, NodeDetail, PatchAnswer, PatchRequest,
-    Problem, Projected, ProposalAnswer, ProposalApply, ProposalCreate, ProposalEdit, ProposalList,
-    ProposalReview, ProposalStep, RelinkRequest, RouteDetail, RouteImport, RoutePage,
-    SaveAsRouteRequest, SearchPage, Tick, TokenRequest, Tour, TourWrite, TurnReply, UpgradeRequest,
-    UserName,
+    AgentToken, AssistantRequest, Conversation, MintedToken, TokenRequest, TurnReply,
 };
 use cairn_schema::{
     AgentId, DecisionView, Deployment, Derived, DomainDocument, ExplainedField, ExplanationPage,
     IdentityKey, Journey, JourneyId, Level, ListPage, Next, NodeKey, Proposal, ProposalId,
     Rejection, RemovalRead, Route, RouteFile, RouteId, RouteVersion, Snapshot, StatusSummary,
     Timeline, Trace, VersionNumber,
+};
+use cairn_service::wire::{
+    Caller, Capabilities, EventPage, Health, History, IdentityReferences, JourneyPage, Mine,
+    NodeDetail, PatchAnswer, PatchRequest, Problem, Projected, ProposalAnswer, ProposalApply,
+    ProposalCreate, ProposalEdit, ProposalList, ProposalReview, ProposalStep, RelinkRequest,
+    RouteDetail, RouteImport, RoutePage, SaveAsRouteRequest, SearchPage, Tick, Tour, TourWrite,
+    UpgradeRequest, UserName,
 };
 
 type SchemaFn = fn(&mut SchemaGenerator) -> Schema;
