@@ -16,9 +16,10 @@ use crate::derived::{
 };
 use crate::domain::JourneyStatus;
 use crate::event::Event;
+use crate::field::NodeField;
 use crate::id::{IdentityKey, KindKey, NodeKey, PatchId, Path, RoleKey, Slug};
 use crate::node::{AnswerType, NodeKind};
-use crate::patch::Removal;
+use crate::patch::{Mutation, Removal};
 use crate::state::{AnswerValue, SnoozeTarget, State};
 use crate::text::{Markdown, Title};
 
@@ -1344,6 +1345,20 @@ pub enum ReferenceField {
 }
 
 impl ReferenceField {
+    /// The reference field a node field is, when it is one.
+    #[must_use]
+    pub const fn of(field: NodeField) -> Option<ReferenceField> {
+        match field {
+            NodeField::RelevantWhen => Some(ReferenceField::RelevantWhen),
+            NodeField::DueBy => Some(ReferenceField::DueBy),
+            NodeField::NotBefore => Some(ReferenceField::NotBefore),
+            NodeField::OpensAt => Some(ReferenceField::OpensAt),
+            NodeField::ClosesAt => Some(ReferenceField::ClosesAt),
+            NodeField::FeedsMilestone => Some(ReferenceField::FeedsMilestone),
+            _ => None,
+        }
+    }
+
     /// Every reference field.
     pub const ALL: [ReferenceField; 8] = [
         ReferenceField::RelevantWhen,
@@ -1409,4 +1424,79 @@ pub struct RemovalRead {
     pub next: Option<Cursor>,
     /// How many outside references there are in all.
     pub total: u32,
+}
+
+// PRD: A18.
+/// What a removal leaves dangling, by where the reference sits.
+#[derive(
+    Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize, JsonSchema,
+)]
+#[serde(rename_all = "snake_case")]
+pub enum DanglingKind {
+    /// A relevance condition reads what is removed.
+    RelevantWhen,
+    /// A due-by rule measures from it.
+    DueBy,
+    /// A not-before rule measures from it.
+    NotBefore,
+    /// A stage's opening milestone.
+    OpensAt,
+    /// A stage's closing milestone.
+    ClosesAt,
+    /// A date decision feeds it.
+    FeedsMilestone,
+    /// A decision fills the removed role.
+    FillsRole,
+    /// A participation names the removed role, or is of the removed kind.
+    Participation,
+    /// The graph's default owner is the removed role.
+    DefaultOwner,
+    /// A snooze waits on it.
+    Snooze,
+    /// A message draft quotes it.
+    MessageDraft,
+}
+
+// PRD: A18.
+/// One reference that would dangle, outside what a removal takes, with the mutation that
+/// rewrites or removes it. It is sent in the same patch, before the removal.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+#[serde(deny_unknown_fields)]
+pub struct Dangling {
+    /// The node holding the reference; none for the graph's default owner.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub node: Option<NodeKey>,
+    /// Where it sits.
+    pub what: DanglingKind,
+    /// The mutation that rewrites or removes it.
+    pub mutation: Mutation,
+}
+
+// PRD: A18.
+/// What to remove.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+#[serde(rename_all = "snake_case", deny_unknown_fields)]
+pub enum RemovalTarget {
+    /// A node with everything beneath it.
+    Node(NodeKey),
+    /// A role.
+    Role(RoleKey),
+    /// A participation kind.
+    Kind(KindKey),
+}
+
+// PRD: A18.
+/// A removal and its cascade: what is removed and the rewrites to send first.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+#[serde(deny_unknown_fields)]
+pub struct RemovalPlan {
+    /// The removal of a node, naming everything it takes; none for a role or a kind.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub removal: Option<Removal>,
+    /// The nodes removed, the removed one first; none for a role or a kind.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub nodes: Vec<NodeKey>,
+    /// The references that would dangle, each with its fix.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub dangling: Vec<Dangling>,
 }

@@ -8,10 +8,13 @@ import init, {
   apply,
   applyRoute,
   conditionProblem,
+  draftStored,
+  draftWritten,
   exportRoute,
   importRoute,
   preview,
   readRouteFile,
+  removalPlan,
   routeFileText,
   routeNotices,
 } from "../generated/cairn_wasm.js";
@@ -176,6 +179,21 @@ export class Engine {
   /** A5: what keeps `clause` from being a condition, as the module wrote it (`null` when nothing does). */
   conditionProblemText(clause: Schema<"ConditionResolved">): string {
     return hosted(() => conditionProblem(JSON.stringify(clause)));
+  }
+
+  /** A18: what removing `target` from `graph` takes and leaves dangling, as the module wrote it (`null` when a node asked for is not there). */
+  removalPlanText(graph: Schema<"Graph">, target: Schema<"RemovalTarget">): string {
+    return hosted(() => removalPlan(JSON.stringify(graph), JSON.stringify(target)));
+  }
+
+  /** A10: a stored message draft as an author reads it, as the module wrote it (a JSON string). */
+  draftWrittenText(graph: Schema<"Graph">, stored: string): string {
+    return hosted(() => draftWritten(JSON.stringify(graph), stored));
+  }
+
+  /** A10: a written message draft stored with keys, or why it cannot be, as the module wrote it. */
+  draftStoredText(graph: Schema<"Graph">, written: string): string {
+    return hosted(() => draftStored(JSON.stringify(graph), written));
   }
 
   /** A13: a route version or draft as its file, as the module wrote it. */

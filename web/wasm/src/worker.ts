@@ -205,6 +205,12 @@ async function answer(request: WorkerRequest): Promise<string> {
       return ready().routeFileText(request.file);
     case "condition_problem":
       return ready().conditionProblemText(request.clause);
+    case "removal_plan":
+      return ready().removalPlanText(request.graph, request.target);
+    case "draft_written":
+      return ready().draftWrittenText(request.graph, request.stored);
+    case "draft_stored":
+      return ready().draftStoredText(request.graph, request.written);
     case "memory":
       return String(ready().memoryBytes());
   }

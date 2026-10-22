@@ -8,7 +8,7 @@ import { useEffect, useRef, useState } from "react";
 
 import { ConditionEditor } from "../authoring/ConditionEditor.tsx";
 import { useConditionProblem } from "../authoring/condition-problem.ts";
-import { planRemoval, removalMutations } from "../authoring/cascade.ts";
+import { removalMutations, useRemovalPlan } from "../authoring/removal.ts";
 import { DateRuleEditor } from "../authoring/DateRuleEditor.tsx";
 import { draftOf, draftProblems, nodeFrom, valueOf, type FormField, type NodeDraft } from "../authoring/fields.ts";
 import { canHoldChildren, kindOption, moveTargets, newNode, nodesByPath, nodesFor, pathOf, rolesForFill, type GraphNode, type Mutation, type NodeField, type NodeKind, type ReferenceField, type Role, type Tree } from "../authoring/graph.ts";
@@ -275,7 +275,7 @@ function AddNode({ context }: { context: ChangesContext }) {
 /** A18: a node removed in the proposal, with the rewrites its removal needs. */
 function RemoveNode({ context }: { context: ChangesContext }) {
   const [key, setKey] = useState("");
-  const plan = key === "" ? undefined : planRemoval(context.tree, key);
+  const plan = useRemovalPlan(context.tree.graph, context.tree, key === "" ? undefined : { node: key });
   return (
     <span className="row" data-testid="proposal-remove-node">
       <Picker aria-label="Remove" value={key} none="Remove a node" options={nodesByPath(context.tree).map((node) => ({ value: node.key, label: `${node.title} (${pathOf(context.tree, node.key)})` }))} onChange={(event) => { setKey(event.target.value); }} />

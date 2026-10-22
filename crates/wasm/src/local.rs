@@ -10,12 +10,13 @@
 
 use std::collections::BTreeSet;
 
-use cairn_engine::{ApplyInputs, Graph, Records, consequences, derive};
+use cairn_engine::format::placeholders;
+use cairn_engine::{ApplyInputs, Graph as EngineGraph, Records, consequences, derive};
 use cairn_schema::condition::ConditionError;
 use cairn_schema::{
-    Actor, Clause, Condition, Consequences, Date, Deployment, Domain, DomainDocument, KeyRefs,
-    Limit, Lineage, Markdown, Patch, PatchTarget, Proposal, Route, RouteId, RouteVersion,
-    Timestamp,
+    Actor, Clause, Condition, Consequences, Date, Deployment, Domain, DomainDocument, Graph,
+    KeyRefs, Limit, Lineage, Markdown, Patch, PatchTarget, Proposal, RemovalTarget, Route, RouteId,
+    RouteVersion, Timestamp,
 };
 use serde::{Deserialize, Serialize};
 use wasm_bindgen::prelude::wasm_bindgen;
@@ -209,7 +210,7 @@ fn own_journey(document: &DomainDocument, target: &Domain) -> Result<(), HostErr
 fn caused(before: &DomainDocument, after: &DomainDocument) -> Consequences {
     let side = |document: &DomainDocument| {
         let deployment = &document.inputs.deployment;
-        let graph = match Graph::new(document.journey.graph.clone(), deployment) {
+        let graph = match EngineGraph::new(document.journey.graph.clone(), deployment) {
             Ok(graph) => graph,
             Err(violations) => panic!("an accepted journey is valid: {violations:?}"),
         };
@@ -388,4 +389,45 @@ pub fn condition_problem(clause: &str) -> String {
             reason: error.to_string(),
         })),
     }
+}
+
+/// A18: the JSON of a `RemovalPlan`: what removing `target` (a `RemovalTarget`) from `graph`
+/// (a `Graph`, with its state for a journey) takes and leaves dangling, with the mutations
+/// that rewrite what dangles; `null` when a node asked for is not in the graph.
+///
+/// # Errors
+///
+/// The JSON of a [`HostError`] when either input does not read.
+#[wasm_bindgen(js_name = removalPlan)]
+pub fn removal_plan(graph: &str, target: &str) -> Result<String, String> {
+    let graph: Graph = read("graph", graph)?;
+    let target: RemovalTarget = read("removal target", target)?;
+    Ok(json(&cairn_engine::plan_removal(&graph, &target)))
+}
+
+/// A10: a stored message draft as an author reads it (roles by id, decisions by path), as
+/// the JSON of a string.
+///
+/// # Errors
+///
+/// The JSON of a [`HostError`] when the graph does not read.
+#[wasm_bindgen(js_name = draftWritten)]
+pub fn draft_written(graph: &str, stored: &str) -> Result<String, String> {
+    let graph: Graph = read("graph", graph)?;
+    Ok(json(&placeholders::written(&graph, stored)))
+}
+
+/// A10: a draft an author wrote, stored with keys: `{"stored": text}`, or `{"problem":
+/// {"unreadable": words}}` or `{"problem": {"unknown": [placeholders]}}`.
+///
+/// # Errors
+///
+/// The JSON of a [`HostError`] when the graph does not read.
+#[wasm_bindgen(js_name = draftStored)]
+pub fn draft_stored(graph: &str, written: &str) -> Result<String, String> {
+    let graph: Graph = read("graph", graph)?;
+    Ok(match placeholders::stored(&graph, written) {
+        Ok(stored) => json(&serde_json::json!({ "stored": stored })),
+        Err(problem) => json(&serde_json::json!({ "problem": problem })),
+    })
 }

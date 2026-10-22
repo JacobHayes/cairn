@@ -11,7 +11,7 @@ import { RejectionView } from "../screens/RejectionView.tsx";
 import { WriteStatus } from "../screens/WriteStatus.tsx";
 import { Button, Field } from "../ui/kit.tsx";
 import { CascadeDialog } from "./CascadeDialog.tsx";
-import { planRemoval, removalMutations } from "./cascade.ts";
+import { removalMutations, useRemovalPlan } from "./removal.ts";
 import { useConnecting } from "./connect.tsx";
 import { overBytes } from "./limits.ts";
 import { canHoldChildren, childrenOf, kindOption, moveTargets, nodesByPath, pathOf, rolesForSlot, titleIn, type GraphNode, type Mutation, type NodeKind } from "./graph.ts";
@@ -215,8 +215,11 @@ export function Breakdown({ authored, node }: NodeEditorProps) {
 /** A18: removing the node, with its cascade shown and previewed before it is sent. */
 export function RemoveNode({ authored, node, onRemoved }: NodeEditorProps & { onRemoved: () => void }) {
   const [open, setOpen] = useState(false);
-  const plan = open ? planRemoval(authored.tree, node.key) : undefined;
+  const plan = useRemovalPlan(authored.graph, authored.tree, open ? { node: node.key } : undefined);
   if (plan === undefined) {
+    if (open) {
+      return <span className="muted small">Working out what else changes...</span>;
+    }
     return (
       <span className="row">
         <Button onClick={() => { setOpen(true); }} data-testid="remove-node">

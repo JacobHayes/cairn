@@ -4,6 +4,7 @@
 //! patch comes back as a change set for the host to commit.
 #![forbid(unsafe_code)]
 
+mod cascade;
 pub mod derive;
 mod edit;
 pub mod format;
@@ -25,6 +26,7 @@ pub mod transition;
 pub mod upgrade;
 mod validate;
 
+pub use cascade::plan_removal;
 pub use derive::{Derived, check_plan, consequences, derive};
 pub use format::{export, from_file, import};
 pub use graph::{Document, Graph, Tree};

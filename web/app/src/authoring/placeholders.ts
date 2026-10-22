@@ -2,14 +2,18 @@
 // them as a route file does (`{{roles.eval_owner.name}}`, `{{answers.testing/scope}}`, roles
 // by id and decisions by path) and picks them from what the graph holds; the draft is stored
 // with keys (`{{roles.r_eval_owner.name}}`, `{{answers.n_scope}}`), so renaming or moving a
-// role or decision breaks nothing. A placeholder that names nothing the graph holds is caught
-// here, before sending.
+// role or decision breaks nothing. The grammar is the engine's (`format::placeholders`), asked
+// through the derive worker; a placeholder that names nothing the graph holds is caught before
+// sending. What is here is the list an author picks from and the words for a refusal.
 import { JOURNEY_FIELDS } from "@cairn/client";
+import type { Schema } from "@cairn/client";
+import type { DraftProblem } from "@cairn/wasm";
 
+import { DERIVE, type ReadKey, type ReadSource } from "../data/keyed-read.ts";
+import { useKeyedRead, useSession } from "../data/react.ts";
+import type { Deriver } from "../data/host.ts";
 import type { Role, Tree } from "./graph.ts";
 import { nodesByPath, pathOf } from "./graph.ts";
-
-const PLACEHOLDER = /\{\{\s*([^}]*?)\s*\}\}/g;
 
 /** A placeholder an author can pick, as written and what it means. */
 export interface PlaceholderOption {
@@ -26,48 +30,32 @@ export function placeholderOptions(tree: Tree, roles: readonly Role[]): Placehol
   ];
 }
 
-/** A stored draft as an author reads it: roles by id, decisions by path. */
-export function toWritten(stored: string, tree: Tree, roles: readonly Role[]): string {
-  return stored.replace(PLACEHOLDER, (whole, inner: string) => {
-    const role = /^roles\.(.+)\.name$/.exec(inner)?.[1];
-    if (role !== undefined) {
-      const found = roles.find((each) => each.key === role);
-      return found === undefined ? whole : `{{roles.${found.id}.name}}`;
-    }
-    const answer = /^answers\.(.+)$/.exec(inner)?.[1];
-    if (answer !== undefined && tree.byKey.has(answer)) {
-      return `{{answers.${pathOf(tree, answer)}}}`;
-    }
-    return whole;
-  });
+/** Why a written draft cannot be stored, in words (the engine decides; this only phrases it). */
+export function draftProblemWords(problem: DraftProblem): string {
+  return "unreadable" in problem ? problem.unreadable : `Nothing in the graph answers ${problem.unknown.join(", ")}: pick a placeholder from the list.`;
 }
 
-/** What an author wrote, stored with keys, or why it cannot be. */
-export function toStored(written: string, tree: Tree, roles: readonly Role[]): { stored: string } | { problem: string } {
-  const opened = written.split("{{").length - 1;
-  const closed = written.split("}}").length - 1;
-  if (opened !== closed) {
-    return { problem: "A '{{' has no closing '}}'." };
+interface Args {
+  deriver: Deriver;
+  graph: Schema<"Graph">;
+  written: string;
+}
+
+const STORED: ReadSource<Args, { stored: string } | { problem: string }> = {
+  policy: DERIVE,
+  read: async ({ deriver, graph, written }) => {
+    const answer = await deriver.draftStored(graph, written);
+    return "stored" in answer ? answer : { problem: draftProblemWords(answer.problem) };
+  },
+};
+
+/** What the engine makes of a draft as written: stored with keys, or why it cannot be; unchecked until it answers. */
+export function useDraftStored(graph: Schema<"Graph">, written: string | undefined): { checked: boolean; result: { stored: string } | { problem: string } | undefined } {
+  const { deriver } = useSession();
+  const key: ReadKey<Args> | undefined = written === undefined ? undefined : { of: ["draft-stored"], freshness: [JSON.stringify(graph), written], args: { deriver, graph, written } };
+  const { view } = useKeyedRead(STORED, key);
+  if (written === undefined) {
+    return { checked: true, result: undefined };
   }
-  const decisions = new Map(nodesByPath(tree, "decision").map((decision) => [pathOf(tree, decision.key), decision.key]));
-  const unknown: string[] = [];
-  const stored = written.replace(PLACEHOLDER, (whole, inner: string) => {
-    const field = /^journey\.(.+)$/.exec(inner)?.[1];
-    if (field !== undefined && JOURNEY_FIELDS.includes(field)) {
-      return `{{journey.${field}}}`;
-    }
-    const role = /^roles\.(.+)\.name$/.exec(inner)?.[1];
-    const roleKey = roles.find((each) => each.id === role || each.key === role)?.key;
-    if (roleKey !== undefined) {
-      return `{{roles.${roleKey}.name}}`;
-    }
-    const answer = /^answers\.(.+)$/.exec(inner)?.[1];
-    const decision = answer === undefined ? undefined : (decisions.get(answer) ?? (tree.byKey.get(answer)?.kind === "decision" ? answer : undefined));
-    if (decision !== undefined) {
-      return `{{answers.${decision}}}`;
-    }
-    unknown.push(whole);
-    return whole;
-  });
-  return unknown.length === 0 ? { stored } : { problem: `Nothing in the graph answers ${unknown.join(", ")}: pick a placeholder from the list.` };
+  return view.status === "current" ? { checked: true, result: view.value } : { checked: false, result: undefined };
 }

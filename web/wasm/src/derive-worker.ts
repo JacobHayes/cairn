@@ -10,6 +10,7 @@ import {
   type AppliedLocally,
   type ApplyRequest,
   type ConditionProblem,
+  type DraftStored,
   type DerivationHandle,
   type DerivationKey,
   type Derived,
@@ -191,6 +192,21 @@ export class DeriveWorker {
   /** A5: what keeps `clause` from being a condition (the engine's size and shape rule), or none. */
   async conditionProblem(clause: Schema<"ConditionResolved">): Promise<ConditionProblem | undefined> {
     return parsed<ConditionProblem | null>(await this.#ask({ op: "condition_problem", clause })) ?? undefined;
+  }
+
+  /** A18: what removing `target` from `graph` takes and leaves dangling, with the rewrites to send first; none when a node asked for is not in it. */
+  async removalPlan(graph: Schema<"Graph">, target: Schema<"RemovalTarget">): Promise<Schema<"RemovalPlan"> | undefined> {
+    return parsed<Schema<"RemovalPlan"> | null>(await this.#ask({ op: "removal_plan", graph, target })) ?? undefined;
+  }
+
+  /** A10: a stored message draft as an author reads it: roles by id, decisions by path. */
+  async draftWritten(graph: Schema<"Graph">, stored: string): Promise<string> {
+    return parsed<string>(await this.#ask({ op: "draft_written", graph, stored }));
+  }
+
+  /** A10: a written message draft stored with keys, or why it cannot be. */
+  async draftStored(graph: Schema<"Graph">, written: string): Promise<DraftStored> {
+    return parsed<DraftStored>(await this.#ask({ op: "draft_stored", graph, written }));
   }
 
   /** The worker module's linear memory in bytes: its peak so far. */

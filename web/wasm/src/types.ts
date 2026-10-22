@@ -180,6 +180,12 @@ export interface ApplyRequest {
   actor: Schema<"Actor">;
 }
 
+/** `crates/engine` `DraftProblem`: why a written message draft cannot be stored. */
+export type DraftProblem = { unreadable: string } | { unknown: string[] };
+
+/** What storing a written message draft answers. */
+export type DraftStored = { stored: string } | { problem: DraftProblem };
+
 /** `crates/wasm` `ConditionProblem`: what keeps a clause from being a condition. */
 export type ConditionProblem = { too_large: { limit: Schema<"Limit">; count: number } } | "empty_combination" | { unreadable: { reason: string } };
 

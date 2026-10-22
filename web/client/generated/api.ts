@@ -1814,6 +1814,20 @@ export interface components {
          *     same journey revision and derive inputs; a page read at another revision starts over.
          */
         Cursor: number;
+        /**
+         * @description One reference that would dangle, outside what a removal takes, with the mutation that
+         *     rewrites or removes it. It is sent in the same patch, before the removal.
+         */
+        Dangling: {
+            /** @description The mutation that rewrites or removes it. */
+            mutation: components["schemas"]["Mutation"];
+            /** @description The node holding the reference; none for the graph's default owner. */
+            node?: components["schemas"]["NodeKey"] | null;
+            /** @description Where it sits. */
+            what: components["schemas"]["DanglingKind"];
+        };
+        /** @description What a removal leaves dangling, by where the reference sits. */
+        DanglingKind: "relevant_when" | "due_by" | "not_before" | "opens_at" | "closes_at" | "feeds_milestone" | "fills_role" | "participation" | "default_owner" | "snooze" | "message_draft";
         /** @description One authored date relationship between two nodes. */
         DateLink: {
             /** @description The node whose rule, bound or answer it is: the rule's node, the stage, the decision. */
@@ -4868,6 +4882,15 @@ export interface components {
             /** @description Their resources. */
             resources?: components["schemas"]["AttachmentKey"][];
         };
+        /** @description A removal and its cascade: what is removed and the rewrites to send first. */
+        RemovalPlan: {
+            /** @description The references that would dangle, each with its fix. */
+            dangling?: components["schemas"]["Dangling"][];
+            /** @description The nodes removed, the removed one first; none for a role or a kind. */
+            nodes?: components["schemas"]["NodeKey"][];
+            /** @description The removal of a node, naming everything it takes; none for a role or a kind. */
+            removal?: components["schemas"]["Removal"] | null;
+        };
         /**
          * @description What removing a node needs right now: the exact removal, and the references from
          *     outside its subtree that the same patch must also rewrite or remove.
@@ -4888,6 +4911,14 @@ export interface components {
              * @description How many outside references there are in all.
              */
             total: number;
+        };
+        /** @description What to remove. */
+        RemovalTarget: {
+            node: components["schemas"]["NodeKey"];
+        } | {
+            role: components["schemas"]["RoleKey"];
+        } | {
+            kind: components["schemas"]["KindKey"];
         };
         /** @description The kinds of resolution a conflict can offer: [`ConflictResolution`] without its payload. */
         ResolutionKind: "keep_journey" | "take_route" | "map_choices" | "clear_state" | "reopen" | "remap_role" | "remap_kind" | "remove";

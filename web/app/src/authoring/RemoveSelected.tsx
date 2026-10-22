@@ -6,7 +6,7 @@ import { useState } from "react";
 
 import { Button } from "../ui/kit.tsx";
 import { CascadeDialog } from "./CascadeDialog.tsx";
-import { planRemoval, removalMutations } from "./cascade.ts";
+import { removalMutations, useRemovalPlan } from "./removal.ts";
 import { ancestorsOf, titleIn } from "./graph.ts";
 import type { Authored } from "./target.ts";
 
@@ -18,8 +18,11 @@ export function outermost(authored: Authored, keys: readonly string[]): string[]
 export function RemoveSelected({ authored, keys }: { authored: Authored; keys: readonly string[] }) {
   const [asking, setAsking] = useState(false);
   const [first] = outermost(authored, keys);
-  const plan = asking && first !== undefined ? planRemoval(authored.tree, first) : undefined;
+  const plan = useRemovalPlan(authored.graph, authored.tree, asking && first !== undefined ? { node: first } : undefined);
   if (plan === undefined || first === undefined) {
+    if (asking && first !== undefined) {
+      return <span className="muted small">Working out what else changes...</span>;
+    }
     return (
       <Button disabled={first === undefined} data-testid="remove-selected" onClick={() => { setAsking(true); }}>
         Remove {keys.length === 1 ? "it" : `${String(keys.length)} nodes`}...

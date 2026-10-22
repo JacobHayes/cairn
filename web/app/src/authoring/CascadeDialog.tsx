@@ -8,7 +8,7 @@
 
 import { Failed } from "../ui/Failed.tsx";
 import { Button } from "../ui/kit.tsx";
-import type { Dangling, RemovalPlan } from "./cascade.ts";
+import type { Dangling, Removal, RemovalPlan } from "./removal.ts";
 import type { Mutation } from "./graph.ts";
 import { titleIn } from "./graph.ts";
 import type { Authored } from "./target.ts";
@@ -39,8 +39,7 @@ function count(items: readonly unknown[] | undefined, one: string, many: string)
 }
 
 /** The subtree, its edges, and what hangs on it. */
-function Removed({ authored, plan }: { authored: Authored; plan: RemovalPlan }) {
-  const { removal } = plan;
+function Removed({ authored, plan, removal }: { authored: Authored; plan: RemovalPlan; removal: Removal }) {
   const attached = [count(removal.resources, "resource", "resources"), count(removal.participations, "participation", "participations"), count(removal.annotations, "note or link", "notes and links")].filter(
     (part) => part !== undefined,
   );
@@ -101,7 +100,7 @@ export function CascadeDialog({ authored, scope, title, plan, dangling, mutation
   return (
     <div className="callout stack" role="dialog" aria-label={title} data-testid="cascade-dialog">
       <strong>{title}</strong>
-      {plan === undefined ? null : <Removed authored={authored} plan={plan} />}
+      {plan?.removal === undefined ? null : <Removed authored={authored} plan={plan} removal={plan.removal} />}
       {dangling.length === 0 ? null : (
         <div className="stack">
           <strong>Also changes, in the same patch</strong>

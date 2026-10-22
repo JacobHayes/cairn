@@ -7,13 +7,16 @@
 import { BODY_BYTES_MAX, RESOURCE_COUNT_PER_NODE_MAX, TITLE_BYTES_MAX } from "@cairn/client";
 import type { Schema } from "@cairn/client";
 import { useDraft } from "../data/drafts.ts";
+import { useState } from "react";
+import { useSession } from "../data/react.ts";
 
+import type { Deriver } from "../data/host.ts";
 import { Button, Field } from "../ui/kit.tsx";
 import type { Resource } from "./graph.ts";
 import { mintKey } from "./keys.ts";
 import { overBytes, urlProblem } from "./limits.ts";
 import { Picker } from "./parts.tsx";
-import { placeholderOptions, toStored, toWritten } from "./placeholders.ts";
+import { placeholderOptions, useDraftStored } from "./placeholders.ts";
 import { Refusal, type NodeEditorProps } from "./StructureEditors.tsx";
 import { domainOf, type Authored } from "./target.ts";
 import { useAuthorWrite } from "./write.ts";
@@ -43,15 +46,16 @@ export function typeOf(resource: Resource): ResourceType {
   return resource.tip !== undefined ? "tip" : resource.message_draft !== undefined ? "message_draft" : resource.template !== undefined ? "template" : resource.example !== undefined ? "example" : "reference";
 }
 
-function formOf(resource: Resource, authored: Authored): ResourceForm {
+/** A resource's form; a draft's text is shown as an author writes it (the engine's reading of it). */
+async function formOf(resource: Resource, authored: Authored, deriver: Deriver): Promise<ResourceForm> {
   const type = typeOf(resource);
   const raw = resource[type] ?? "";
-  const body = type === "message_draft" ? toWritten(raw, authored.tree, authored.graph.roles ?? []) : raw;
+  const body = type === "message_draft" ? await deriver.draftWritten(authored.graph, raw) : raw;
   return { key: resource.key, type, title: resource.title ?? "", body };
 }
 
-/** The resource a form makes, or why it cannot be sent. */
-export function resourceOf(form: ResourceForm, authored: Authored): { resource: Schema<"Resource"> } | { problem: string } {
+/** The resource a form makes, or why it cannot be sent; `draft` is the engine's answer for a draft's text. */
+export function resourceOf(form: ResourceForm, draft: { stored: string } | { problem: string } | undefined): { resource: Schema<"Resource"> } | { problem: string } {
   const titleProblem = overBytes(form.title, TITLE_BYTES_MAX, "The title");
   if (titleProblem !== undefined) {
     return { problem: titleProblem };
@@ -61,11 +65,13 @@ export function resourceOf(form: ResourceForm, authored: Authored): { resource: 
   }
   let content = form.body;
   if (form.type === "message_draft") {
-    const stored = toStored(form.body, authored.tree, authored.graph.roles ?? []);
-    if ("problem" in stored) {
-      return stored;
+    if (draft === undefined) {
+      return { problem: "Checking the placeholders..." };
     }
-    content = stored.stored;
+    if ("problem" in draft) {
+      return draft;
+    }
+    content = draft.stored;
   }
   const problem = form.type === "tip" || form.type === "message_draft" ? overBytes(content, BODY_BYTES_MAX, "The text") : urlProblem(content);
   if (problem !== undefined) {
@@ -118,7 +124,8 @@ function ResourceFormView({ authored, node, editing, setEditing }: NodeEditorPro
   const onClose = () => {
     setEditing(undefined);
   };
-  const made = resourceOf(form, authored);
+  const checked = useDraftStored(authored.graph, form.type === "message_draft" ? form.body : undefined);
+  const made = resourceOf(form, checked.result);
   const save = (from = base) => {
     if ("problem" in made) {
       return;
@@ -136,7 +143,7 @@ function ResourceFormView({ authored, node, editing, setEditing }: NodeEditorPro
   return (
     <div className="stack" data-testid="resource-form">
       <ResourceFields form={form} setForm={setForm} authored={authored} />
-      {"problem" in made && form.body !== "" ? <span className="author-problem" role="alert" data-testid="problem">{made.problem}</span> : null}
+      {"problem" in made && form.body !== "" && checked.checked ? <span className="author-problem" role="alert" data-testid="problem">{made.problem}</span> : null}
       <span className="row">
         <Button primary disabled={write.disabled || "problem" in made} onClick={() => { save(); }}>
           {form.key === undefined ? "Add the resource" : "Save the resource"}
@@ -150,6 +157,9 @@ function ResourceFormView({ authored, node, editing, setEditing }: NodeEditorPro
 
 export function ResourceEditor({ authored, node }: NodeEditorProps) {
   const write = useAuthorWrite(authored, `resources:${node.key}`, node.title);
+  const { deriver } = useSession();
+  // A draft is read before its form opens; nothing else opens one meanwhile, so a late answer cannot replace it.
+  const [opening, setOpening] = useState(false);
   const [editing, setEditing] = useDraft<Editing>(`resource-form:${domainOf(authored)}:${node.key}`);
   const resources = node.resources ?? [];
   const full = resources.length >= RESOURCE_COUNT_PER_NODE_MAX;
@@ -162,7 +172,7 @@ export function ResourceEditor({ authored, node }: NodeEditorProps) {
             <span>
               {resource.title ?? TYPES.find((each) => each.value === typeOf(resource))?.label} <span className="muted small">({typeOf(resource).replace("_", " ")})</span>
             </span>
-            <Button onClick={() => { setEditing({ form: formOf(resource, authored), base: authored.revision }); }}>Edit</Button>
+            <Button disabled={opening} onClick={() => { setOpening(true); void formOf(resource, authored, deriver).then((form) => { setEditing({ form, base: authored.revision }); }).finally(() => { setOpening(false); }); }}>Edit</Button>
             <Button aria-label={`Remove the resource ${resource.title ?? resource.key}`} disabled={write.disabled} onClick={() => void write.run([{ op: "remove_resource", node: node.key, resource: resource.key }])}>
               Remove
             </Button>
@@ -171,7 +181,7 @@ export function ResourceEditor({ authored, node }: NodeEditorProps) {
       </ul>
       {editing === undefined ? (
         <span className="row">
-          <Button disabled={full} onClick={() => { setEditing({ form: { key: undefined, type: "tip", title: "", body: "" }, base: authored.revision }); }}>Add a resource</Button>
+          <Button disabled={full || opening} onClick={() => { setEditing({ form: { key: undefined, type: "tip", title: "", body: "" }, base: authored.revision }); }}>Add a resource</Button>
           {full ? <span className="muted small">A node holds at most {String(RESOURCE_COUNT_PER_NODE_MAX)} resources.</span> : null}
         </span>
       ) : (

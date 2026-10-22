@@ -11,8 +11,7 @@ import { FLAG_DEFAULTS, OWNER_KIND, type Schema } from "@cairn/client";
 
 import { fieldWords } from "../status/words.ts";
 
-import { withoutDecisions, withoutPlaceholders } from "./cascade.ts";
-import { childrenOfClause, decisionOf, type Clause } from "./condition.ts";
+import { childrenOfClause, decisionOf, operatorOf, type Clause } from "./condition.ts";
 import { partsOf, ruleOf } from "./dates.ts";
 import type { DateRule } from "./fields.ts";
 import { childrenOf, descendantsOf, pathOf, titleIn, treeOf, type Graph, type GraphNode, type Mutation, type NodeField, type Tree } from "./graph.ts";
@@ -109,6 +108,34 @@ export function tombstonesOf(journey: Graph, version: Graph): Tombstoned[] {
     const beneath = descendantsOf(route, key).filter((each) => stones.has(each.key)).length;
     return [{ node, path, beneath, occupied: paths.has(path) }];
   });
+}
+
+/** A condition without the clauses naming any of `gone`; undefined when nothing is left. */
+function withoutDecisions(clause: Clause, gone: ReadonlySet<string>): Clause | undefined {
+  const decision = decisionOf(clause);
+  if (decision !== undefined) {
+    return gone.has(decision) ? undefined : clause;
+  }
+  const kept = childrenOfClause(clause).flatMap((child) => {
+    const next = withoutDecisions(child, gone);
+    return next === undefined ? [] : [next];
+  });
+  if (kept.length === 0) {
+    return undefined;
+  }
+  switch (operatorOf(clause)) {
+    case "not":
+      return { not: kept[0] as Clause };
+    case "any":
+      return { any: kept };
+    default:
+      return { all: kept };
+  }
+}
+
+/** A message draft's answer placeholders naming any of `gone` (by key, as stored), dropped. */
+function withoutPlaceholders(template: string, gone: ReadonlySet<string>): string {
+  return template.replace(/\{\{\s*answers\.([^}\s]+)\s*\}\}/g, (whole, answer: string) => (gone.has(answer) ? "" : whole));
 }
 
 /** A condition with every decision renamed by `rename`, or dropped where it gives none. */

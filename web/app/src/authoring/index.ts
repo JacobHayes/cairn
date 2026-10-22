@@ -7,5 +7,5 @@ export { DateRuleEditor, StageBoundsEditor } from "./DateRuleEditor.tsx";
 export { NodeForm } from "./NodeForm.tsx";
 export { ResourceEditor } from "./ResourceEditor.tsx";
 export { RolesAndKindsPanel } from "./RolesAndKindsPanel.tsx";
-export { planKindRemoval, planRemoval, planRoleRemoval, removalMutations } from "./cascade.ts";
+export { removalMutations, useRemovalPlan } from "./removal.ts";
 export { journeyAuthored, routeAuthored, type Authored } from "./target.ts";

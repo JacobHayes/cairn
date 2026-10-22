@@ -323,6 +323,18 @@ export class FakeDeriver implements Deriver {
     return Promise.reject(new Error("no condition checks in the fake"));
   }
 
+  removalPlan(): Promise<never> {
+    return Promise.reject(new Error("no removal plans in the fake"));
+  }
+
+  draftWritten(): Promise<never> {
+    return Promise.reject(new Error("no draft text in the fake"));
+  }
+
+  draftStored(): Promise<never> {
+    return Promise.reject(new Error("no draft text in the fake"));
+  }
+
   release(handle: DerivationHandle): Promise<void> {
     this.released.push(handle);
     if (this.held.get(handle.journey) === handle.load) {

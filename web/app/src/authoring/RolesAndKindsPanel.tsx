@@ -10,7 +10,7 @@ import { useState } from "react";
 import { useDraft } from "../data/drafts.ts";
 import { Button, Field } from "../ui/kit.tsx";
 import { CascadeDialog } from "./CascadeDialog.tsx";
-import { planKindRemoval, planRoleRemoval } from "./cascade.ts";
+import { useRemovalPlan } from "./removal.ts";
 import { rolesForSlot, type Kind, type Mutation, type Role } from "./graph.ts";
 import { isSlug, mintKey, slugOf, uniqueId } from "./keys.ts";
 import { overBytes } from "./limits.ts";
@@ -120,7 +120,7 @@ function SlotList({ authored, kind, slots }: { authored: Authored; kind: SlotKin
   const write = useAuthorWrite(authored, `slots:${kind.name}`);
   const [editing, setEditing] = useDraft<Editing>(`slot-form:${domainOf(authored)}:${kind.name}`);
   const [removing, setRemoving] = useState<Slot | undefined>(undefined);
-  const plan = removing === undefined ? [] : kind.name === "role" ? planRoleRemoval(authored.tree, removing.key) : planKindRemoval(authored.tree, removing.key);
+  const plan = useRemovalPlan(authored.graph, authored.tree, removing === undefined ? undefined : kind.name === "role" ? { role: removing.key } : { kind: removing.key });
   return (
     <div className="stack" data-testid={`${kind.name}s`}>
       <ul className="detail-list">
@@ -133,13 +133,15 @@ function SlotList({ authored, kind, slots }: { authored: Authored; kind: SlotKin
           </li>
         ))}
       </ul>
-      {removing === undefined ? null : (
+      {removing === undefined ? null : plan === undefined ? (
+        <span className="muted small">Working out what else changes...</span>
+      ) : (
         <CascadeDialog
           authored={authored}
           scope={`remove-${kind.name}`}
           title={`Remove the ${kind.words} ${named(removing)}`}
-          dangling={plan}
-          mutations={[...plan.map((each) => each.mutation), kind.remove(removing.key)]}
+          dangling={plan.dangling}
+          mutations={[...plan.dangling.map((each) => each.mutation), kind.remove(removing.key)]}
           onDone={() => { setRemoving(undefined); }}
           onCancel={() => { setRemoving(undefined); }}
         />

@@ -377,6 +377,26 @@ export function applyRoute(request: string): string;
 export function conditionProblem(clause: string): string;
 
 /**
+ * A10: a draft an author wrote, stored with keys: `{"stored": text}`, or `{"problem":
+ * {"unreadable": words}}` or `{"problem": {"unknown": [placeholders]}}`.
+ *
+ * # Errors
+ *
+ * The JSON of a [`HostError`] when the graph does not read.
+ */
+export function draftStored(graph: string, written: string): string;
+
+/**
+ * A10: a stored message draft as an author reads it (roles by id, decisions by path), as
+ * the JSON of a string.
+ *
+ * # Errors
+ *
+ * The JSON of a [`HostError`] when the graph does not read.
+ */
+export function draftWritten(graph: string, stored: string): string;
+
+/**
  * Exports a route version or draft: `request` is the JSON of an [`ExportRequest`]; the
  * answer is the JSON of the `RouteFile`, as `GET /api/routes/{id}/export` answers it.
  *
@@ -416,6 +436,17 @@ export function preview(document: string, request: string): string;
  * The JSON of a [`HostError::Unreadable`] when the text is not a route file.
  */
 export function readRouteFile(text: string): string;
+
+/**
+ * A18: the JSON of a `RemovalPlan`: what removing `target` (a `RemovalTarget`) from `graph`
+ * (a `Graph`, with its state for a journey) takes and leaves dangling, with the mutations
+ * that rewrite what dangles; `null` when a node asked for is not in the graph.
+ *
+ * # Errors
+ *
+ * The JSON of a [`HostError`] when either input does not read.
+ */
+export function removalPlan(graph: string, target: string): string;
 
 /**
  * A13: the file document (the JSON of a `RouteFile`, as an export answers it) written as
@@ -488,10 +519,13 @@ export interface InitOutput {
     readonly derivation_new: (a: number, b: number, c: number) => void;
     readonly derivation_project: (a: number, b: number, c: number, d: number) => void;
     readonly derivation_renderDraft: (a: number, b: number, c: number, d: number) => void;
+    readonly draftStored: (a: number, b: number, c: number, d: number, e: number) => void;
+    readonly draftWritten: (a: number, b: number, c: number, d: number, e: number) => void;
     readonly exportRoute: (a: number, b: number, c: number) => void;
     readonly importRoute: (a: number, b: number, c: number) => void;
     readonly preview: (a: number, b: number, c: number, d: number, e: number) => void;
     readonly readRouteFile: (a: number, b: number, c: number) => void;
+    readonly removalPlan: (a: number, b: number, c: number, d: number, e: number) => void;
     readonly rootsubscription_take: (a: number, b: number, c: number) => void;
     readonly routeFileText: (a: number, b: number, c: number) => void;
     readonly routeNotices: (a: number, b: number, c: number) => void;

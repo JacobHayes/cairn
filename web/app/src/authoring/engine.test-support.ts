@@ -37,6 +37,20 @@ function outcomeOf(call: () => unknown): Outcome {
   }
 }
 
+/** The engine's plan for removing `target` from `graph`, or fails when a node asked for is not there. */
+export function removalPlan(host: InBrowserHost, graph: Graph, target: Schema<"RemovalTarget">): Schema<"RemovalPlan"> {
+  const plan = JSON.parse(host.engine.removalPlanText(graph, target)) as Schema<"RemovalPlan"> | null;
+  if (plan === null) {
+    throw new Error(`no ${JSON.stringify(target)} to remove`);
+  }
+  return plan;
+}
+
+/** What the plan sends, in order: the rewrites first, then the removal of a node. */
+export function planMutations(plan: Schema<"RemovalPlan">): Mutation[] {
+  return [...(plan.dangling ?? []).map((each) => each.mutation), ...(plan.removal == null ? [] : [{ op: "remove_node" as const, removal: plan.removal }])];
+}
+
 /** A route whose draft holds `graph`, at revision 1, as a route read answers it. */
 export function routeHolding(graph: Graph, id = "authored"): Schema<"Route"> {
   return { header: { id, name: "Authored" }, revision: 1, draft: { graph } };

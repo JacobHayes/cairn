@@ -5,9 +5,7 @@ import type { Patch, Rejection, Schema } from "@cairn/client";
 import type { InBrowserHost } from "@cairn/wasm";
 import { beforeAll, describe, expect, it } from "vitest";
 
-import { planRemoval, removalMutations } from "../authoring/cascade.ts";
-import { applyToJourney, journeyAfter, seeded } from "../authoring/engine.test-support.ts";
-import { treeOf } from "../authoring/graph.ts";
+import { applyToJourney, journeyAfter, planMutations, removalPlan, seeded } from "../authoring/engine.test-support.ts";
 import { goneOf } from "./write-machine.ts";
 
 const JOURNEY = "j_vendor_eval";
@@ -20,8 +18,7 @@ describe("goneOf", () => {
   beforeAll(async () => {
     host = await seeded();
     const text = host.documentText(JOURNEY);
-    const plan = planRemoval(treeOf((JSON.parse(text) as Schema<"DomainDocument">).journey.graph), "n_partner_led");
-    removed = journeyAfter(host, JOURNEY, plan === undefined ? [] : removalMutations(plan));
+    removed = journeyAfter(host, JOURNEY, planMutations(removalPlan(host, (JSON.parse(text) as Schema<"DomainDocument">).journey.graph, { node: "n_partner_led" })));
   });
 
   /** The patch for `mutations` and the rejection the engine answers it with, on the document `removed`. */

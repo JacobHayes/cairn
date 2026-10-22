@@ -6,8 +6,7 @@ import type { Schema } from "@cairn/client";
 import type { InBrowserHost } from "@cairn/wasm";
 import { beforeAll, describe, expect, it } from "vitest";
 
-import { planRemoval, removalMutations } from "./cascade.ts";
-import { journeyAfter, seeded } from "./engine.test-support.ts";
+import { journeyAfter, planMutations, removalPlan, seeded } from "./engine.test-support.ts";
 import { pathOf, treeOf, type Graph, type GraphNode } from "./graph.ts";
 import { resetMutations, restoreMutations, tombstonesOf, type LocalEdit } from "./local-edits.ts";
 
@@ -59,8 +58,7 @@ describe("tombstones and restore (B4)", () => {
   beforeAll(async () => {
     host = await seeded();
     version = host.routeVersion("vendor-evaluation", 1).graph;
-    const plan = planRemoval(treeOf(graphOf(host.documentText(JOURNEY))), "n_partner_led");
-    removed = journeyAfter(host, JOURNEY, plan === undefined ? [] : removalMutations(plan));
+    removed = journeyAfter(host, JOURNEY, planMutations(removalPlan(host, graphOf(host.documentText(JOURNEY)), { node: "n_partner_led" })));
   });
 
   it("lists what was removed by its top, with how much went beneath it", () => {

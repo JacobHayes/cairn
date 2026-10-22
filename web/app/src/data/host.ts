@@ -6,6 +6,7 @@ import type {
   AppliedLocally,
   ApplyRequest,
   ConditionProblem,
+  DraftStored,
   DerivationHandle,
   JourneyIndexQuery,
   Derived,
@@ -183,4 +184,10 @@ export interface Deriver {
   routeFileText(file: RouteFile): Promise<string>;
   /** A5: what keeps a clause from being a condition (too deep, too many comparisons, an empty combination), or none. */
   conditionProblem(clause: Schema<"ConditionResolved">): Promise<ConditionProblem | undefined>;
+  /** A18: what removing a node, role or kind from a graph takes and leaves dangling, with the rewrites to send first; none when the node is not in it. */
+  removalPlan(graph: Schema<"Graph">, target: Schema<"RemovalTarget">): Promise<Schema<"RemovalPlan"> | undefined>;
+  /** A10: a stored message draft as an author reads it. */
+  draftWritten(graph: Schema<"Graph">, stored: string): Promise<string>;
+  /** A10: a written message draft stored with keys, or why it cannot be. */
+  draftStored(graph: Schema<"Graph">, written: string): Promise<DraftStored>;
 }

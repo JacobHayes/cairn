@@ -396,6 +396,72 @@ impl<R: References> Condition<R> {
     }
 }
 
+impl<R: References> Condition<R> {
+    /// The condition without the clauses that name a decision `gone` answers true for, and
+    /// without the combinations that leave empty; none when nothing is left. Built bottom up
+    /// with an explicit stack (PRACTICES, No recursion).
+    ///
+    /// # Panics
+    ///
+    /// Never: a pruned condition is no larger than the one it prunes.
+    #[must_use]
+    pub fn without_decisions(&self, gone: impl Fn(&R::Node) -> bool) -> Option<Self> {
+        enum Frame<'c, R: References> {
+            Visit(&'c Clause<R>),
+            Build(&'c Clause<R>),
+        }
+        let leaf =
+            |clause: &Clause<R>, decision: &R::Node| (!gone(decision)).then(|| clause.clone());
+        let mut frames = vec![Frame::Visit(&self.0)];
+        let mut built: Vec<Option<Clause<R>>> = Vec::new();
+        while let Some(frame) = frames.pop() {
+            match frame {
+                Frame::Visit(clause) => match clause {
+                    Clause::All(children) | Clause::Any(children) => {
+                        frames.push(Frame::Build(clause));
+                        frames.extend(children.iter().rev().map(Frame::Visit));
+                    }
+                    Clause::Not(child) => {
+                        frames.push(Frame::Build(clause));
+                        frames.push(Frame::Visit(child));
+                    }
+                    Clause::Equals(comparison)
+                    | Clause::NotEquals(comparison)
+                    | Clause::Contains(comparison) => {
+                        built.push(leaf(clause, &comparison.decision));
+                    }
+                    Clause::In(membership) => built.push(leaf(clause, &membership.decision)),
+                    Clause::Answered(decision) => built.push(leaf(clause, decision)),
+                },
+                Frame::Build(clause) => {
+                    let count = match clause {
+                        Clause::All(children) | Clause::Any(children) => children.len(),
+                        _ => 1,
+                    };
+                    assert!(built.len() >= count, "children are built first");
+                    let mut kept: Vec<Clause<R>> = built
+                        .split_off(built.len() - count)
+                        .into_iter()
+                        .flatten()
+                        .collect();
+                    built.push(match clause {
+                        _ if kept.is_empty() => None,
+                        Clause::All(_) => Some(Clause::All(kept)),
+                        Clause::Any(_) => Some(Clause::Any(kept)),
+                        _ => kept.pop().map(|child| Clause::Not(Box::new(child))),
+                    });
+                }
+            }
+        }
+        let root = built.pop().flatten()?;
+        assert!(built.is_empty(), "every clause folds into the root");
+        match Condition::new(root) {
+            Ok(condition) => Some(condition),
+            Err(error) => panic!("a pruned condition keeps its shape and limits: {error}"),
+        }
+    }
+}
+
 fn map_comparison<R: References, B: References>(
     comparison: &Comparison<R>,
     map: &mut impl FnMut(&R::Node) -> Option<B::Node>,

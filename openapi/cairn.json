@@ -2428,6 +2428,96 @@
         "minimum": 0,
         "type": "integer"
       },
+      "Dangling": {
+        "additionalProperties": false,
+        "description": "One reference that would dangle, outside what a removal takes, with the mutation that\nrewrites or removes it. It is sent in the same patch, before the removal.",
+        "properties": {
+          "mutation": {
+            "$ref": "#/components/schemas/Mutation",
+            "description": "The mutation that rewrites or removes it."
+          },
+          "node": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/NodeKey"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The node holding the reference; none for the graph's default owner."
+          },
+          "what": {
+            "$ref": "#/components/schemas/DanglingKind",
+            "description": "Where it sits."
+          }
+        },
+        "required": [
+          "what",
+          "mutation"
+        ],
+        "type": "object"
+      },
+      "DanglingKind": {
+        "description": "What a removal leaves dangling, by where the reference sits.",
+        "oneOf": [
+          {
+            "const": "relevant_when",
+            "description": "A relevance condition reads what is removed.",
+            "type": "string"
+          },
+          {
+            "const": "due_by",
+            "description": "A due-by rule measures from it.",
+            "type": "string"
+          },
+          {
+            "const": "not_before",
+            "description": "A not-before rule measures from it.",
+            "type": "string"
+          },
+          {
+            "const": "opens_at",
+            "description": "A stage's opening milestone.",
+            "type": "string"
+          },
+          {
+            "const": "closes_at",
+            "description": "A stage's closing milestone.",
+            "type": "string"
+          },
+          {
+            "const": "feeds_milestone",
+            "description": "A date decision feeds it.",
+            "type": "string"
+          },
+          {
+            "const": "fills_role",
+            "description": "A decision fills the removed role.",
+            "type": "string"
+          },
+          {
+            "const": "participation",
+            "description": "A participation names the removed role, or is of the removed kind.",
+            "type": "string"
+          },
+          {
+            "const": "default_owner",
+            "description": "The graph's default owner is the removed role.",
+            "type": "string"
+          },
+          {
+            "const": "snooze",
+            "description": "A snooze waits on it.",
+            "type": "string"
+          },
+          {
+            "const": "message_draft",
+            "description": "A message draft quotes it.",
+            "type": "string"
+          }
+        ]
+      },
       "DateLink": {
         "description": "One authored date relationship between two nodes.",
         "oneOf": [
@@ -12776,6 +12866,38 @@
         ],
         "type": "object"
       },
+      "RemovalPlan": {
+        "additionalProperties": false,
+        "description": "A removal and its cascade: what is removed and the rewrites to send first.",
+        "properties": {
+          "dangling": {
+            "description": "The references that would dangle, each with its fix.",
+            "items": {
+              "$ref": "#/components/schemas/Dangling"
+            },
+            "type": "array"
+          },
+          "nodes": {
+            "description": "The nodes removed, the removed one first; none for a role or a kind.",
+            "items": {
+              "$ref": "#/components/schemas/NodeKey"
+            },
+            "type": "array"
+          },
+          "removal": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Removal"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The removal of a node, naming everything it takes; none for a role or a kind."
+          }
+        },
+        "type": "object"
+      },
       "RemovalRead": {
         "additionalProperties": false,
         "description": "What removing a node needs right now: the exact removal, and the references from\noutside its subtree that the same patch must also rewrite or remove.",
@@ -12815,6 +12937,50 @@
           "total"
         ],
         "type": "object"
+      },
+      "RemovalTarget": {
+        "description": "What to remove.",
+        "oneOf": [
+          {
+            "additionalProperties": false,
+            "description": "A node with everything beneath it.",
+            "properties": {
+              "node": {
+                "$ref": "#/components/schemas/NodeKey"
+              }
+            },
+            "required": [
+              "node"
+            ],
+            "type": "object"
+          },
+          {
+            "additionalProperties": false,
+            "description": "A role.",
+            "properties": {
+              "role": {
+                "$ref": "#/components/schemas/RoleKey"
+              }
+            },
+            "required": [
+              "role"
+            ],
+            "type": "object"
+          },
+          {
+            "additionalProperties": false,
+            "description": "A participation kind.",
+            "properties": {
+              "kind": {
+                "$ref": "#/components/schemas/KindKey"
+              }
+            },
+            "required": [
+              "kind"
+            ],
+            "type": "object"
+          }
+        ]
       },
       "ResolutionKind": {
         "description": "The kinds of resolution a conflict can offer: [`ConflictResolution`] without its payload.",
