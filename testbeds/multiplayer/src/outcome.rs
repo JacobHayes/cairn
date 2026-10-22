@@ -29,7 +29,7 @@ pub const INVARIANTS: [&str; 9] = [
     "surfaced-not-applied",
     "only-conflicts-refused",
     "revisions-gap-free",
-    "retried-only-when-safe",
+    "applied-over-only-when-safe",
     "replay-equals-state",
     "views-caught-up",
 ];
@@ -211,8 +211,8 @@ impl Outcome {
     }
 
     /// What the log says of each patch against what its client was told: applied at most
-    /// once, acknowledged ones where their receipts say, nothing else applied, and an
-    /// automatic resubmission only over commits that do not touch what it touches (H5).
+    /// once, acknowledged ones where their receipts say, nothing else applied, and a stale
+    /// patch applied past other commits only over ones that do not touch what it touches (H5).
     fn patch_violations(&self, logged: &[Logged]) -> Vec<(&'static str, String)> {
         let mut violations = Vec::new();
         let mut at: BTreeMap<&PatchId, Vec<&Logged>> = BTreeMap::new();
@@ -255,7 +255,7 @@ impl Outcome {
                     receipt.revision.get(),
                     patch.patch
                 );
-                violations.push(("retried-only-when-safe", detail));
+                violations.push(("applied-over-only-when-safe", detail));
             }
         }
         violations.extend(self.unacknowledged(at.keys().copied()));
@@ -344,12 +344,11 @@ impl Outcome {
             .max()
             .map_or(0, Duration::as_micros);
         let detail = format!(
-            "acknowledged={} surfaced={} surfaced_exhausted={} resubmitted={} receipts={} transport_retries={} \
+            "acknowledged={} surfaced={} applied_over={} receipts={} transport_retries={} \
              journey_revision={} deployment_revision={} events={} writes_us={} caught_up_us={caught_up_us}",
             report.acks.len(),
             report.surfaced.len(),
-            report.surfaced_exhausted,
-            report.resubmissions,
+            report.applied_over,
             report.receipts,
             report.transport_retries,
             self.truth.journey.revision.get(),
@@ -454,7 +453,7 @@ mod tests {
         }
 
         /// Lands `draft` on the journey as it is now, acknowledged as drafted at `drafted`:
-        /// a draft from before the current revision landed by automatic resubmission.
+        /// a draft from before the current revision, applied past the commits since by the server.
         fn draft(&mut self, id: &str, draft: &Draft, drafted: u32) -> PatchReceipt {
             let current = self.records.journeys[&patches::journey()].revision;
             let patch = draft.patch(id, &patches::journey(), current);
@@ -490,7 +489,7 @@ mod tests {
         }
     }
 
-    /// Two renames of different nodes and a note, the second rename resubmitted on its own
+    /// Two renames of different nodes and a note, the second rename applied by the server
     /// over the first: every invariant holds.
     fn clean() -> History {
         let mut history = History::new();
@@ -573,13 +572,13 @@ mod tests {
     }
 
     /// H5: a rename that landed over another rename of the same node, after it was drafted,
-    /// was retried when it was not safe to.
+    /// was applied past it when that was not safe.
     #[test]
-    fn a_resubmission_over_an_overlapping_commit_is_unsafe() {
+    fn a_write_applied_over_an_overlapping_commit_is_unsafe() {
         let mut history = History::new();
         history.draft("p_one", &rename(0, "One"), 1);
         history.draft("p_two", &rename(0, "Two"), 1);
-        assert!(labels(&history.outcome()).contains("retried-only-when-safe"));
+        assert!(labels(&history.outcome()).contains("applied-over-only-when-safe"));
     }
 
     /// J3: a state the log does not replay to.

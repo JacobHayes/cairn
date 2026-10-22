@@ -7,15 +7,15 @@
 //! when what intervened cannot overlap it and surfaces it when it can, and a transport
 //! retry resends a patch whose answer was lost, which the server answers from its receipt.
 //! Each client also keeps a view current through its SSE subscription and H6's tracking.
-//! One more client is an agent calling the service in process, with the same retry logic
-//! (4.2's `client::retry`), as an agent host does.
+//! One more client is an agent calling the service in process, with the same transport
+//! retry, as an agent host does.
 //!
 //! When every client is done the run checks each invariant (`outcome.rs`): every
 //! acknowledged patch was visible in its client's next snapshot and sits in the log at its
 //! revision; no patch was applied twice; nothing unacknowledged or surfaced as a conflict
 //! was applied; nothing but conflicts was refused; every domain's revisions are gap-free; a
-//! patch resubmitted on its own landed only over commits that do not touch what it
-//! touches; replaying the log equals the state; and every view reached the store's
+//! stale patch the server applied past other commits landed only over commits that do not
+//! touch what it touches; replaying the log equals the state; and every view reached the store's
 //! revisions within the catch-up deadline after writes stopped. `sometimes!` oracles show
 //! the interesting paths ran (`client.rs`, `view.rs`), and fault sites in the store make
 //! commits overlap (`faults.rs`).

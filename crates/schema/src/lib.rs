@@ -107,7 +107,8 @@ pub use proposal::{
 pub use record::{GraphKey, GraphRecord, Record, RecordKey, RetiredKey, Write};
 pub use refs::{FileRefs, KeyRefs, KeySlot, Reference, References};
 pub use rejection::{
-    Location, Rejection, RevisionConflict, RevisionOf, Violation, ViolationCode, Violations,
+    AppliedOver, Location, Rejection, RevisionConflict, RevisionOf, Violation, ViolationCode,
+    Violations,
 };
 pub use scenario::{Scenario, ScenarioStep};
 pub use state::{

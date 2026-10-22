@@ -11,12 +11,11 @@ import init, {
   importRoute,
   preview,
   readRouteFile,
-  rebased,
   routeFileText,
   routeNotices,
 } from "../generated/cairn_wasm.js";
 
-import type { Schema, Stale } from "@cairn/client";
+import type { Schema } from "@cairn/client";
 
 import {
   hosted,
@@ -171,11 +170,6 @@ export class Engine {
   /** Previews a proposal against the document's journey (C14): the preview and the destination after. */
   preview(documentText: string, request: PreviewRequest): PreviewAnswer {
     return parsed<PreviewAnswer>(this.previewText(documentText, request));
-  }
-
-  /** H5's safe retry: the patch to resubmit after it was answered `stale`, as the module wrote it (`null` when a resubmission is not safe). */
-  rebasedText(patch: Schema<"Patch">, stale: Stale): string {
-    return hosted(() => rebased(JSON.stringify(patch), JSON.stringify(stale)));
   }
 
   /** A13: a route version or draft as its file, as the module wrote it. */

@@ -1,14 +1,13 @@
-//! The Rust client against a server in process (H5, H6): a stale patch retried on its own
-//! when what intervened cannot overlap it and surfaced when it can, the same retry against
-//! the service with no transport, and views kept current by their subscriptions.
+//! The Rust client against a server in process (H5, H6): a stale patch the server applies
+//! past what intervened when that cannot overlap it and answers stale when it can, and views
+//! kept current by their subscriptions.
 #![cfg(test)]
 
 mod in_process {
-    use cairn_api::client::{Client, Landed, Refused, Subscription, Tracker, in_process};
+    use cairn_api::client::{Client, Refused, Subscription, Tracker};
     use cairn_api::query::WatchName;
     use cairn_api::wire::{PatchAnswer, Tick};
     use cairn_schema::{Domain, JourneyId, Patch, Rejection, RevisionOf};
-    use cairn_service::Call;
 
     use crate::api::support::{self, World};
 
@@ -27,16 +26,16 @@ mod in_process {
         );
         landed(
             client
-                .patch(journey_patch("p_create", 0, &mutations), None)
+                .submit(journey_patch("p_create", 0, &mutations), None)
                 .await,
         );
     }
 
-    fn landed<E: std::fmt::Debug>(answer: Result<Landed, Refused<E>>) -> Landed {
+    fn landed<E: std::fmt::Debug>(answer: Result<PatchAnswer, Refused<E>>) -> PatchAnswer {
         answer.unwrap_or_else(|refused| panic!("not landed: {refused:#?}"))
     }
 
-    fn rejected<E: std::fmt::Debug>(answer: Result<Landed, Refused<E>>) -> Rejection {
+    fn rejected<E: std::fmt::Debug>(answer: Result<PatchAnswer, Refused<E>>) -> Rejection {
         match answer {
             Err(Refused::Rejected(rejection)) => rejection,
             other => panic!("not rejected: {other:#?}"),
@@ -50,21 +49,30 @@ mod in_process {
     }
 
     /// H5: two people note the same journey from the same revision; the second is stale,
-    /// what intervened cannot overlap it, and the client resubmits it at the new revision.
+    /// what intervened cannot overlap it, and the server applies it at the new revision and
+    /// says what it moved past.
     #[tokio::test]
-    async fn a_non_overlapping_conflict_is_retried_on_its_own() {
+    async fn a_non_overlapping_conflict_is_applied_over_by_the_server() {
         let world = World::start().await;
         let (ann, bob) = (world.client("ann"), world.client("bob"));
         tree(&ann).await;
-        landed(bob.patch(note("p_bob", "a_bob", 1), None).await);
-        let retried = landed(ann.patch(note("p_ann", "a_ann", 1), None).await);
-        assert_eq!(retried.resubmitted, 1);
-        assert_eq!(retried.answer.receipt().revision.get(), 3);
+        landed(bob.submit(note("p_bob", "a_bob", 1), None).await);
+        let applied = landed(ann.submit(note("p_ann", "a_ann", 1), None).await);
+        let PatchAnswer::Applied { receipt, over, .. } = applied else {
+            panic!("applied, not {applied:#?}")
+        };
+        assert_eq!(receipt.revision.get(), 3);
+        let over = over.expect("applied past bob's note");
+        assert_eq!(
+            over.conflicts
+                .iter()
+                .map(|conflict| (conflict.expected.get(), conflict.current.get()))
+                .collect::<Vec<_>>(),
+            [(1, 2)]
+        );
         let journey = ann.journey(&"j_tree".parse().unwrap()).await.unwrap();
         assert_eq!(journey.graph.state.annotations.len(), 2);
-        let mut again = note("p_ann", "a_ann", 1);
-        again.base_revision = 2.try_into().unwrap();
-        let answer = ann.submit(again, None).await.unwrap();
+        let answer = ann.submit(note("p_ann", "a_ann", 1), None).await.unwrap();
         assert!(
             matches!(answer, PatchAnswer::AlreadyApplied { .. }),
             "{answer:#?}"
@@ -72,15 +80,18 @@ mod in_process {
     }
 
     /// H5: a subtree removal drafted before an edit inside the subtree overlaps it, so the
-    /// client surfaces the conflict rather than resubmitting.
+    /// server answers stale rather than applying it.
     #[tokio::test]
     async fn an_overlapping_conflict_is_surfaced() {
         let world = World::start().await;
         let (ann, bob) = (world.client("ann"), world.client("bob"));
         tree(&ann).await;
         let edit = "- op: set_node_field\n  node: n_c\n  value: {title: Renamed}\n";
-        landed(bob.patch(journey_patch("p_edit", 1, edit), None).await);
-        let rejection = rejected(ann.patch(journey_patch("p_remove", 1, REMOVAL), None).await);
+        landed(bob.submit(journey_patch("p_edit", 1, edit), None).await);
+        let rejection = rejected(
+            ann.submit(journey_patch("p_remove", 1, REMOVAL), None)
+                .await,
+        );
         let Rejection::Stale { conflicts, .. } = rejection else {
             panic!("stale, not {rejection:#?}")
         };
@@ -91,8 +102,7 @@ mod in_process {
 
     /// H5, A18: after an insertion beneath the subtree the removal would remove more than its
     /// author saw, so it would not apply at the new revision; the stale answer says it
-    /// touches the whole journey and the client surfaces the conflict rather than
-    /// resubmitting it, never widening it.
+    /// touches the whole journey and the server answers stale, never widening it.
     #[tokio::test]
     async fn a_removal_made_stale_beneath_it_is_surfaced_not_widened() {
         let world = World::start().await;
@@ -100,41 +110,17 @@ mod in_process {
         tree(&ann).await;
         let insert =
             "- op: add_node\n  node: {key: n_d, id: d, kind: action, title: D, parent: n_g}\n";
-        landed(bob.patch(journey_patch("p_insert", 1, insert), None).await);
-        let rejection = rejected(ann.patch(journey_patch("p_remove", 1, REMOVAL), None).await);
+        landed(bob.submit(journey_patch("p_insert", 1, insert), None).await);
+        let rejection = rejected(
+            ann.submit(journey_patch("p_remove", 1, REMOVAL), None)
+                .await,
+        );
         let Rejection::Stale { conflicts, .. } = rejection else {
             panic!("stale, not {rejection:#?}")
         };
         assert_eq!(conflicts.len(), 1);
         let journey = ann.journey(&"j_tree".parse().unwrap()).await.unwrap();
         assert_eq!(journey.graph.nodes.len(), 3, "nothing was removed");
-    }
-
-    /// H5 with no transport: the same retry, driven against the service in process.
-    #[tokio::test]
-    async fn the_retry_runs_against_the_service_in_process() {
-        let world = World::start().await;
-        tree(&world.client("ann")).await;
-        let call = |user: &str| Call {
-            actor: cairn_schema::Actor {
-                user: user.parse().unwrap(),
-                agent: None,
-            },
-            now: "2026-10-01T15:00:00Z".parse().unwrap(),
-        };
-        let (bob, ann) = (call("u_bob"), call("u_ann"));
-        let service = &world.service;
-        landed(in_process::patch(service, &bob, note("p_bob", "a_bob", 1), None).await);
-        let retried = in_process::patch(service, &ann, note("p_ann", "a_ann", 1), None).await;
-        assert_eq!(landed(retried).resubmitted, 1);
-        let edit = "- op: set_node_field\n  node: n_c\n  value: {title: Renamed}\n";
-        landed(in_process::patch(service, &bob, journey_patch("p_edit", 3, edit), None).await);
-        let removal = journey_patch("p_remove", 3, REMOVAL);
-        let rejection = rejected(in_process::patch(service, &ann, removal, None).await);
-        assert!(
-            matches!(rejection, Rejection::Stale { .. }),
-            "{rejection:#?}"
-        );
     }
 
     /// A view: what it holds, and its subscription.
@@ -198,7 +184,7 @@ mod in_process {
         world.client("bob").deployment().await.unwrap();
         let mut ann = View::open(world.client("ann"), "j_tree").await;
         let mut bob = View::open(world.client("bob"), "j_tree").await;
-        landed(ann.client.patch(note("p_ann", "a_ann", 1), None).await);
+        landed(ann.client.submit(note("p_ann", "a_ann", 1), None).await);
         assert_eq!(bob.follow().await.of, journey_of("j_tree"));
         assert_eq!(bob.tracker.held(&journey_of("j_tree")).unwrap().get(), 2);
         let own = ann.follow().await;
@@ -207,7 +193,7 @@ mod in_process {
             2,
             "her own commit, which her view refetches too"
         );
-        landed(bob.client.patch(note("p_bob", "a_bob", 2), None).await);
+        landed(bob.client.submit(note("p_bob", "a_bob", 2), None).await);
         let heard = ann.follow().await;
         assert_eq!((heard.of, heard.revision.get()), (journey_of("j_tree"), 3));
         let journey = ann
@@ -231,7 +217,7 @@ mod in_process {
         landed(
             world
                 .client("bob")
-                .patch(note("p_bob", "a_bob", 1), None)
+                .submit(note("p_bob", "a_bob", 1), None)
                 .await,
         );
         let watching = ["journey:j_tree".parse().unwrap()];
@@ -255,7 +241,7 @@ mod in_process {
             1,
             "- op: merge_identities\n  survivor: who_d4m6uk2eqf5rbhzs\n  merged: [who_e7h2jv3nxc4yaw6t]\n  journeys: {j_vendor_eval: 2}\n",
         );
-        landed(view.client.patch(merge, None).await);
+        landed(view.client.submit(merge, None).await);
         let heard = view.follow().await;
         assert_eq!(
             (heard.of, heard.revision.get()),

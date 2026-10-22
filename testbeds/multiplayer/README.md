@@ -19,16 +19,16 @@ Setup creates journey `j_shared` with three nodes and one pair of identities. Th
 
 - **Clients** (`--clients`, default 4; `src/client.rs`): each drafts `--actions` patches
   (default 8), a seeded pause apart, against the journey or deployment as it last fetched
-  it: a note (touches only its own annotation, so a stale one is always safe to resubmit), a
+  it: a note (touches only its own annotation, so a stale one is always safe to apply), a
   rename of one of the three nodes (two renames of one node overlap, so some conflicts are
   surfaced), and, for client 0 halfway through, an identity merge (moves the deployment). Each
-  patch goes through 4.2's `client::retry::submit` (H5: a stale patch is rebased and
-  resubmitted when what intervened cannot overlap it, surfaced otherwise) over a transport
+  patch is sent once to the server (H5: it applies a stale patch at the current revisions
+  when what intervened cannot overlap it, and answers it stale otherwise), over a transport
   retry that resends a request whose answer did not arrive within 200 ms, unchanged, so a
   patch that landed is answered from its receipt. After each acknowledgement the client
   fetches the domain again: the next snapshot must hold the patch.
 - **The agent** (one more client, numbered after the others): the same drafts and the same
-  retry logic, calling the service in process as an agent host (MCP, the assistant) does.
+  transport retry, calling the service in process as an agent host (MCP, the assistant) does.
   Each attempt runs on its own task, so an attempt the agent stops waiting for keeps going.
   An HTTP client cannot do this: the server drops a request whose connection closes, so a
   resubmission over HTTP never meets its original in the server (DECISIONS.md, 6.1).
@@ -56,21 +56,18 @@ under `multiplayer-outcome` carries the counts, echoed as `MULTIPLAYER_RESULT`.
 | `surfaced-not-applied` | no patch surfaced as a conflict is in the log |
 | `only-conflicts-refused` | no patch got any rejection but stale, or a server error |
 | `revisions-gap-free` | each domain's revision equals the number of its patches in the log (A17) |
-| `retried-only-when-safe` | a patch that landed past the revision it was drafted at landed over no commit touching what it touches (H5) |
+| `applied-over-only-when-safe` | a patch that landed past the revision it was drafted at landed over no commit touching what it touches (H5) |
 | `replay-equals-state` | replaying the whole log from nothing gives the store's journey and deployment (J3) |
 | `views-caught-up` | every view holds the store's revisions within 450 ms after writes stop: the coalescing interval plus one attempt's budget for the tick and the refetch (H6) |
 
-Coverage oracles (`sometimes!`, plus the `reachable!` sites in `cairn_api::client::retry` and
-`cairn_service`'s write path, which the campaign also requires): a stale patch retried on its
-own and landed, an overlapping conflict surfaced, a resubmission answered from its receipt
+Coverage oracles (`sometimes!`, plus the `reachable!` sites in `cairn_service`'s write path,
+which the campaign also requires): a stale patch applied by the server past other commits, an overlapping conflict surfaced, a resubmission answered from its receipt
 (client and service), a coalesced tick, a deployment tick after the merge, a stale patch
-completed with what intervened, a patch that lost at commit, and a resubmission that raced its
+completed with what intervened, a stale patch whose original committed meanwhile, a patch that lost at commit, and a resubmission that raced its
 original to commit. Some of `cairn_service`'s sites are out of this testbed's reach and
 listed in `sim.sh` (`out_of_reach`): the announce fallback when the deployment's revision
 cannot be read back after an identity create riding in a journey patch (the testbed rides none
-and fails no read); the receipt recheck after the engine answers stale (it needs the original
-to commit between a resubmission's receipt lookup and its load, and no site delays a load);
-the derived-read memo (the views refetch the journey document, never a derived read); the
+and fails no read); the derived-read memo (the views refetch the journey document, never a derived read); the
 proposal and route-import paths (the testbed drafts no proposal and imports no route); and
 the assistant's tool loop, turn limits, and write wrapper (the testbed never drives the
 assistant).
@@ -148,7 +145,7 @@ one out, so the network sweep is explicit (`decisions/2026-10-18-patina-campaign
 
 - One agent, four HTTP clients, eight patches each, three nodes: enough contention for every
   oracle within 16 generations, and short enough to stay under patina's trace event limit,
-  which one early version (32 resubmissions per patch during every long stall) exceeded.
+  which one early version (32 client resubmissions per patch during every long stall, since replaced by the server's own loop) exceeded.
 - The long faults are rationed per run (four waits, one stall): each long stall surfaces
   nearly every patch drafted during it (the finding above), so more add nothing.
 - The catch-up deadline covers the network as well as coalescing; under the sweep's faults

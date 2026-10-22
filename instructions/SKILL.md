@@ -31,7 +31,9 @@ and that user.
    `get_level` shows the graph at one level of containment.
 3. **Write in small, named steps.** Each write is one patch. Give it a new `patch_id` you
    make up (`p_` and a short slug, unique per write) and the `base_revision` you read.
-   The answer's `receipt.revision` is the base of your next write on that journey.
+   The answer's `receipt.revision` is the base of your next write on that journey, unless the
+   answer says `over` or `already_applied`: then read again first (see Revisions, retries, and
+   errors).
 4. **Offer to walk open decisions.** Whenever a journey has open decisions (you just
    created it, or you are back at it later), offer to walk them with the person
    (walk-decisions): they gate what depends on them.
@@ -66,12 +68,18 @@ out, though its relevance reads `not_relevant` and counts for nothing until then
 
 ## Revisions, retries, and errors
 
-- **Stale.** A write against a revision that moved is refused as `stale`, naming what
-  moved. Read again (`get_snapshot` or `get_node`), check the change still makes sense, and
-  write again against the new revision with a new `patch_id`.
+- **Stale.** A write against a revision that moved is applied anyway when nothing changed
+  since touches what it changes. Its answer then carries `over`, naming the revisions that
+  moved and what others changed. Your view is behind by those changes: read again
+  (`get_snapshot` or `get_node`) before your next write, because the receipt's revision
+  includes changes you have not seen. Otherwise the write is refused as `stale`, naming what
+  moved. Read again, check the change still makes sense, and write again against the new
+  revision with a new `patch_id`.
 - **Lost response.** If a call fails without an answer, resubmit it unchanged with the same
   `patch_id`. A write that already landed answers `already_applied` from its receipt; it is
-  never applied twice. Never reuse a `patch_id` for a different write.
+  never applied twice. That answer cannot say whether the write was applied over others'
+  changes, so read again before your next write, as after `over`. Never reuse a `patch_id`
+  for a different write.
 - **Rejected.** An invalid write is refused with every violation, each with its path, a
   code, and a message. Fix all of them at once; nothing was written.
 - **Arguments.** A call whose arguments do not match the tool's schema is refused with the

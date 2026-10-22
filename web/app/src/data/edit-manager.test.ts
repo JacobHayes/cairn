@@ -99,10 +99,8 @@ describe("a rejection that arrives after the control is gone, then a reload", ()
     expect(first.storage.length).toBe(0);
   });
 
-  it("keeps a stale rejection that could not be rebased with where it happened, as a conflict", async () => {
+  it("keeps a stale rejection with where it happened, as a conflict", async () => {
     const host = new FakeHost();
-    // What intervened overlaps what the write touches, so the safe retry does not rebase it.
-    host.overlapping = true;
     const first = await startRoot({ host });
     first.host.answers = [refusal({ rejection: "stale", conflicts: [{ of: { domain: { journey: "j_one" } }, expected: 3, current: 4 }], intervening: [], touched: [] })];
     first.submit(renaming("p_a"));
@@ -122,7 +120,6 @@ describe("the kept records", () => {
     command: { kind: "patch", patch: renaming(id) },
     about: aboutNode(),
     delivery: { state: "rejected", rejection: invalid },
-    resubmitted: 0,
   });
 
   it("are dropped with one note when they are of another version, and nothing is started from them", async () => {
@@ -179,7 +176,7 @@ describe("the kept records", () => {
 });
 
 describe("what the chip says of a write", () => {
-  const base = { id: "p_a", about: aboutNode(), command: { kind: "patch" as const, patch: renaming("p_a") }, resubmitted: 0 };
+  const base = { id: "p_a", about: aboutNode(), command: { kind: "patch" as const, patch: renaming("p_a") } };
   const stale: Rejection = { rejection: "stale", conflicts: [], intervening: [], touched: [] };
 
   it("calls a stale rejection a conflict and another refusal not saved, offers Retry only where a resend can help, and says nothing of a write still trying", () => {

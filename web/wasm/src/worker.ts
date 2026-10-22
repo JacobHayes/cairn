@@ -203,8 +203,6 @@ async function answer(request: WorkerRequest): Promise<string> {
       return ready().readRouteFileText(request.text);
     case "route_file_text":
       return ready().routeFileText(request.file);
-    case "rebased":
-      return ready().rebasedText(request.patch, request.stale);
     case "memory":
       return String(ready().memoryBytes());
   }

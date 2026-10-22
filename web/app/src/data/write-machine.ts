@@ -18,25 +18,13 @@
 // landed, and a normal answer settles it either way. It resends at once on restore after a
 // reload, and otherwise after a backoff; each attempt waits for the connection, so time
 // offline uses none; it stops after `RESEND_COUNT_MAX` attempts and asks the person to
-// Retry. Version skew stops it, as it stops all new work. Only a patch is rebased when it is
-// answered stale: a proposal or an import that goes stale is rejected, for a person to review
-// again.
-import {
-  RESUBMISSION_COUNT_MAX,
-  backoffDelayMs,
-  networkFailure,
-  sameDomain,
-  submit,
-  targetDomain,
-  type HttpFailure,
-  type Patch,
-  type Rebase,
-  type Rejection,
-  type Send,
-} from "@cairn/client";
+// Retry. Version skew stops it, as it stops all new work. A patch is sent as it is: the server
+// applies a stale one past what intervened when that is safe, and answers it stale otherwise,
+// as it does a proposal or an import that goes stale, for a person to review again.
+import { backoffDelayMs, networkFailure, sameDomain, targetDomain, type HttpFailure, type Patch, type Rejection } from "@cairn/client";
 import { and, assign, fromPromise, setup, type ActorRefFrom, type SnapshotFrom } from "xstate";
 
-import type { About, Answer, Command, Delivery, EditRecord, OperationId, PatchCommand, ProposalCall, Removed } from "./edit-record.ts";
+import type { About, Answer, Command, Delivery, EditRecord, OperationId, ProposalCall, Removed } from "./edit-record.ts";
 import { EDIT_RECORD_VERSION } from "./edit-record.ts";
 import type { Host } from "./host.ts";
 import type { ProposalHost, ProposalWritten } from "./proposals.ts";
@@ -61,8 +49,6 @@ export type Check = () => Promise<Rejection | undefined>;
 /** What a write reads and does outside itself; the session supplies it. */
 export interface WriteEnv {
   host: WriteHost;
-  /** H5: the engine's safe retry (the derive worker's). */
-  rebase: Rebase;
   /** Counts a write being sent (D7: a save made before a screen opened is not that screen's). */
   began(): number;
   /** Records a landed write as a save (D7). */
@@ -79,7 +65,7 @@ export interface WriteInput {
   about: About;
   env: WriteEnv;
   /** What a kept record says, when the write is restored after a reload. */
-  restored: { delivery: Delivery; resubmitted: number } | undefined;
+  restored: { delivery: Delivery } | undefined;
 }
 
 interface WriteContext {
@@ -91,8 +77,6 @@ interface WriteContext {
   began: number | undefined;
   /** Automatic resends so far in this stretch of uncertainty. */
   resent: number;
-  /** Stale answers rebased and resubmitted by the safe retry, across every send of this write. */
-  resubmitted: number;
   restored: Delivery["state"] | undefined;
   rejection: Rejection | undefined;
   failure: HttpFailure | undefined;
@@ -107,9 +91,7 @@ type WriteEvent =
   | { type: "retry" }
   | { type: "discard" }
   /** The connection came back or the tab went into skew: whatever waits looks again. */
-  | { type: "wake" }
-  /** The safe retry rebased the patch: the write now holds, and the record keeps, what it sent last. */
-  | { type: "dispatched"; patch: Patch };
+  | { type: "wake" };
 
 /** How a delivery ended: its answer, the rejection, or why there is none. */
 type Outcome =
@@ -119,12 +101,10 @@ type Outcome =
 
 interface DeliverInput {
   command: Command;
-  resubmitted: number;
   env: WriteEnv;
-  dispatched: (patch: Patch) => void;
 }
 
-/** A proposal write, sent as its call says: one request, never rebased. */
+/** A proposal write, sent as its call says: one request. */
 function callOf(proposals: ProposalHost, call: ProposalCall): Promise<ProposalWritten<Answer>> {
   switch (call.op) {
     case "create":
@@ -146,36 +126,16 @@ function callOf(proposals: ProposalHost, call: ProposalCall): Promise<ProposalWr
   }
 }
 
-/** H5: sends the patch through the client's safe retry; the retry bound is the write's (below). */
-function deliverPatch(input: DeliverInput, command: PatchCommand, signal: AbortSignal): Promise<Outcome> {
-  let resubmitted = input.resubmitted;
-  let first = true;
-  const send: Send<HttpFailure> = (next) => {
-    if (!first) {
-      resubmitted += 1;
-      input.dispatched(next);
-    }
-    first = false;
-    return input.env.host.send(next, command.note);
-  };
-  return submit(command.patch, send, {
-    rebase: input.env.rebase,
-    mayRetry: () => !signal.aborted && input.env.compatible() && resubmitted < RESUBMISSION_COUNT_MAX,
-  });
-}
-
 /**
- * H5: delivers the command. A patch goes through the client's safe retry: the retry bound is
- * the write's, not the call's (it carries across resends and reloads), and nothing is rebased
- * once the write stopped waiting or the tab is in skew; a rebased patch is reported before it
- * goes out, so the record keeps what may have committed. A proposal write or an import is
- * sent once as it is: a stale answer to it is a rejection, never rebased.
+ * H5: delivers the command, once as it is. The server decides a stale patch: it applies it past
+ * what intervened when that is safe, and answers it stale otherwise, as it does a stale proposal
+ * write or import, for a person to review again.
  */
-const deliver = fromPromise<Outcome, DeliverInput>(async ({ input, signal }) => {
+const deliver = fromPromise<Outcome, DeliverInput>(async ({ input }) => {
   const { command, env } = input;
   switch (command.kind) {
     case "patch":
-      return deliverPatch(input, command, signal);
+      return answered(await env.host.send(command.patch, command.note));
     case "import":
       return answered(await env.host.importRoute(command.request));
     case "proposal":
@@ -197,16 +157,9 @@ function answered(written: ProposalWritten<Answer>): Outcome {
 /** The pre-send check, run as an actor so it is stopped with the write. */
 const runCheck = fromPromise<Rejection | undefined, { check: Check }>(({ input }) => input.check());
 
-/** What the delivery is given: the write's last command, and how to report a patch it rebases. */
-function deliverInput({ context, self }: { context: WriteContext; self: { send: (event: WriteEvent) => void } }): DeliverInput {
-  return {
-    command: context.command,
-    resubmitted: context.resubmitted,
-    env: context.env,
-    dispatched: (patch) => {
-      self.send({ type: "dispatched", patch });
-    },
-  };
+/** What the delivery is given: the write's last command. */
+function deliverInput({ context }: { context: WriteContext }): DeliverInput {
+  return { command: context.command, env: context.env };
 }
 
 /**
@@ -300,10 +253,6 @@ export const writeMachine = setup({
     keepCheck: assign({ check: ({ event }) => (event.type === "submit" ? event.check : undefined) }),
     dropCheck: assign({ check: undefined }),
     takeError: assign({ failure: (_, thrown: unknown) => networkFailure(thrown) }),
-    rebased: assign(({ context }, patch: Patch) => ({
-      command: { ...context.command, patch },
-      resubmitted: context.resubmitted + 1,
-    })),
     save: ({ context }) => {
       if (context.answer !== undefined && context.began !== undefined) {
         context.env.saved(context.command, context.answer, context.began);
@@ -319,7 +268,6 @@ export const writeMachine = setup({
     env: input.env,
     began: undefined,
     resent: 0,
-    resubmitted: input.restored?.resubmitted ?? 0,
     restored: input.restored?.delivery.state,
     rejection: input.restored?.delivery.state === "rejected" ? input.restored.delivery.rejection : undefined,
     failure: input.restored?.delivery.state === "unconfirmed" || input.restored?.delivery.state === "stopped" ? input.restored.delivery.failure : undefined,
@@ -328,7 +276,6 @@ export const writeMachine = setup({
     check: undefined,
   }),
   initial: "start",
-  on: { dispatched: { actions: { type: "rebased", params: ({ event }: { event: Extract<WriteEvent, { type: "dispatched" }> }) => event.patch } } },
   states: {
     start: {
       always: [
@@ -455,8 +402,6 @@ export type WriteView = {
   id: OperationId;
   about: About;
   command: Command;
-  /** Stale answers rebased and resubmitted so far (retry.ts's bound, kept per write). */
-  resubmitted: number;
 } & (
   | { state: "idle" | "sending" | "discarded" }
   | { state: "gone"; removed: Removed }
@@ -469,7 +414,7 @@ export type WriteView = {
 /** The tagged view of a write's snapshot. */
 export function writeView(snapshot: WriteSnapshot): WriteView {
   const { context } = snapshot;
-  const common = { id: context.id, about: context.about, command: context.command, resubmitted: context.resubmitted };
+  const common = { id: context.id, about: context.about, command: context.command };
   // A write in its pre-send check is out as far as a control or a reload is concerned.
   if (snapshot.matches("sending") || snapshot.matches("checking")) {
     return { ...common, state: "sending" };
@@ -494,7 +439,7 @@ export function writeView(snapshot: WriteSnapshot): WriteView {
 
 /** What the tab keeps of a write: nothing for one that has not been sent, has landed or is discarded. */
 export function recordOf(view: WriteView): EditRecord | undefined {
-  const base: Omit<EditRecord, "delivery"> = { version: EDIT_RECORD_VERSION, id: view.id, command: view.command, about: view.about, resubmitted: view.resubmitted };
+  const base: Omit<EditRecord, "delivery"> = { version: EDIT_RECORD_VERSION, id: view.id, command: view.command, about: view.about };
   switch (view.state) {
     case "sending":
       return { ...base, delivery: { state: "sending" } };

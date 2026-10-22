@@ -411,18 +411,6 @@ export function preview(document: string, request: string): string;
 export function readRouteFile(text: string): string;
 
 /**
- * H5's safe retry: the JSON of the patch to resubmit after `patch` was answered `stale`
- * (the JSON of that rejection), or `null` when a resubmission is not safe
- * ([`Patch::rebased`], the one rule every client asks).
- *
- * # Errors
- *
- * The JSON of a [`HostError`] when either input does not read, or `stale` is another
- * rejection.
- */
-export function rebased(patch: string, stale: string): string;
-
-/**
  * A13: the file document (the JSON of a `RouteFile`, as an export answers it) written as
  * the canonical YAML a route file is kept in on disk: sorted, in a stable field order.
  *
@@ -496,7 +484,6 @@ export interface InitOutput {
     readonly importRoute: (a: number, b: number, c: number) => void;
     readonly preview: (a: number, b: number, c: number, d: number, e: number) => void;
     readonly readRouteFile: (a: number, b: number, c: number) => void;
-    readonly rebased: (a: number, b: number, c: number, d: number, e: number) => void;
     readonly rootsubscription_take: (a: number, b: number, c: number) => void;
     readonly routeFileText: (a: number, b: number, c: number) => void;
     readonly routeNotices: (a: number, b: number, c: number) => void;

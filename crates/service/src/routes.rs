@@ -17,7 +17,7 @@ use cairn_schema::{
 };
 use cairn_store::{EventQuery, PageSize};
 
-use crate::write::{engine, violation};
+use crate::write::{OnStale, engine, violation};
 use crate::{Call, DomainPatch, Service, ServiceError, WriteError, Written};
 
 impl Service {
@@ -159,7 +159,7 @@ impl Service {
             Ok(submitted) => submitted,
             Err(error) => unreachable!("a route patch is a domain patch: {error}"),
         };
-        self.patch(call, &submitted).await
+        self.patch_on(call, &submitted, OnStale::Refuse).await
     }
 
     /// A13: the patch importing `file` at route revision `base_revision` (0 creates the

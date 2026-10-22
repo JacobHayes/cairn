@@ -205,6 +205,20 @@ pub async fn what_intervened_since_a_revision_is_reported_on_request<B: Backend>
             .as_set()
             .is_empty()
     );
+    // No upper bound: a commit landing after the revision the conflict names as current is
+    // reported too. The service applies a stale patch past what it reads here, after its
+    // load, so a commit that lands between the two must not be missing from the answer.
+    let third = add_node_builder("p_three", "j_one", 2, action("n_c", "c", None)).commit();
+    applied(&store, third.clone()).await;
+    let mut later = second.change_set.touched();
+    later.extend(third.change_set.touched());
+    assert_eq!(
+        store
+            .intervening(&[conflict(journey_of("j_one"), 1, 2)])
+            .await
+            .unwrap(),
+        later
+    );
 }
 
 /// A17, J2: a failure after the state rows are written and before the events are leaves

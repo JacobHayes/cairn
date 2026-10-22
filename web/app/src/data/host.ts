@@ -1,7 +1,7 @@
 // What the shell's one data layer reads and writes through (ARCHITECTURE, Web UI): a host,
 // either the server over HTTP (server-host.ts) or the in-browser host with no server
 // (browser-host.ts). Both answer the API's JSON, so everything above this reads either.
-import type { Answered, HttpFailure, OpenTicks, Rebase, Schema } from "@cairn/client";
+import type { Answered, HttpFailure, OpenTicks, Schema } from "@cairn/client";
 import type {
   AppliedLocally,
   ApplyRequest,
@@ -180,6 +180,4 @@ export interface Deriver {
   readRouteFile(text: string): Promise<RouteFile>;
   /** A13: the file document as the canonical YAML kept on disk. */
   routeFileText(file: RouteFile): Promise<string>;
-  /** H5: the engine's safe retry, the patch to resubmit after a stale answer or none. */
-  rebased(...stale: Parameters<Rebase>): ReturnType<Rebase>;
 }

@@ -1,7 +1,7 @@
 // The page's side of the derive worker (./worker.ts): requests by id, each answered by a
 // promise that resolves to the module's JSON text or parsed value, or rejects with a
 // HostFailure.
-import type { Schema, Stale } from "@cairn/client";
+import type { Schema } from "@cairn/client";
 
 import type { Envelope, Reply, WorkerRequest } from "./protocol.ts";
 import {
@@ -185,11 +185,6 @@ export class DeriveWorker {
   /** A13: the file document as the canonical YAML a route file is kept in on disk. */
   routeFileText(file: Schema<"RouteFile">): Promise<string> {
     return this.#ask({ op: "route_file_text", file });
-  }
-
-  /** H5's safe retry: the patch to resubmit after it was answered `stale`, or none when that is not safe. */
-  async rebased(patch: Schema<"Patch">, stale: Stale): Promise<Schema<"Patch"> | undefined> {
-    return parsed<Schema<"Patch"> | null>(await this.#ask({ op: "rebased", patch, stale })) ?? undefined;
   }
 
   /** The worker module's linear memory in bytes: its peak so far. */

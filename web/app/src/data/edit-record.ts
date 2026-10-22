@@ -12,7 +12,7 @@ import type { ProposalAsk } from "../proposals/write.ts";
 import type { Rejection } from "./writes.ts";
 
 /** The record schema version; the only one `readRecord` accepts. */
-export const EDIT_RECORD_VERSION = 4;
+export const EDIT_RECORD_VERSION = 5;
 
 /** What names one edit's delivery: its patch id (H5), the same on every resend. */
 export type OperationId = string;
@@ -126,8 +126,6 @@ export interface EditRecord {
   command: Command;
   about: About;
   delivery: Delivery;
-  /** The automatic resubmissions of stale answers this write has used (retry.ts's bound, kept per write). */
-  resubmitted: number;
 }
 
 type Plain = Record<string, unknown>;
@@ -244,9 +242,7 @@ export function readRecord(value: unknown): EditRecord | undefined {
   const valid =
     readCommand(value.command, value.id) &&
     readAbout(value.about) &&
-    readDelivery(value.delivery) &&
-    Number.isInteger(value.resubmitted) &&
-    (value.resubmitted as number) >= 0;
+    readDelivery(value.delivery);
   return valid ? (value as unknown as EditRecord) : undefined;
 }
 

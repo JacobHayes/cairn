@@ -8,7 +8,7 @@ use std::time::Duration;
 
 use cairn_api::wire;
 use cairn_schema::limits::PAGE_ITEM_COUNT_MAX;
-use cairn_schema::{DomainDocument, Patch, Rejection, RevisionOf, UserId};
+use cairn_schema::{DomainDocument, Rejection, RevisionOf, UserId};
 use cairn_store::limits::SSE_COALESCING_INTERVAL;
 use cairn_wasm::{BrowserRoot, HostError, PatchAnswer, Taken, Tick, read_document};
 
@@ -55,7 +55,7 @@ fn the_root_loads_every_fixture_journey() {
 }
 
 #[test]
-fn a_patch_applies_and_notifies_and_a_stale_one_is_rejected_with_what_intervened() {
+fn a_patch_applies_and_notifies() {
     let root = BrowserRoot::seeded().unwrap();
     let base = document(&root).journey.revision.get();
     let watching = root
@@ -88,46 +88,55 @@ fn a_patch_applies_and_notifies_and_a_stale_one_is_rejected_with_what_intervened
             .iter()
             .any(|tick| tick.of == vendor && tick.revision == receipt.revision)
     );
-
-    // Two more patches from the same base are stale (H5). One writes the note the first
-    // wrote, so what intervened overlaps it and it surfaces; the other writes its own note,
-    // so it is safe to resubmit as is, which a client does without asking.
-    let overlapping = note("p_second", base, "a_first");
-    let separate = note("p_third", base, "a_third");
-    for (request, overlaps) in [(&overlapping, true), (&separate, false)] {
-        let stale = thrown(&root.patch(request, NOW).unwrap_err());
-        let HostError::Rejected { rejection } = &stale else {
-            panic!("expected a stale rejection, got {stale:?}");
-        };
-        let Rejection::Stale { conflicts, .. } = rejection else {
-            panic!("expected a stale rejection, got {stale:?}");
-        };
-        assert_eq!(
-            conflicts.first().map(|conflict| conflict.current),
-            Some(receipt.revision)
-        );
-        let patch: serde_json::Value = serde_json::from_str(request).unwrap();
-        let rebased = cairn_wasm::rebased(
-            &patch["patch"].to_string(),
-            &serde_json::to_string(rejection).unwrap(),
-        )
-        .unwrap();
-        let rebased: Option<Patch> = serde_json::from_str(&rebased).unwrap();
-        assert_eq!(
-            rebased.map(|patch| patch.base_revision),
-            (!overlaps).then_some(receipt.revision),
-            "{request}"
-        );
-    }
-    assert_eq!(
-        document(&root).journey.revision,
-        receipt.revision,
-        "nothing more landed"
-    );
     assert_eq!(
         watching.taken(std::time::Duration::from_secs(2)).unwrap(),
         Taken::Empty
     );
+}
+
+/// H5: two patches drafted at the same base after another landed are stale. One writes the
+/// note the first wrote, so what intervened overlaps it and it surfaces; the other writes its
+/// own note, so the root applies it at the current revision and says what it moved past.
+#[test]
+fn a_stale_patch_is_applied_over_a_disjoint_change_and_rejected_over_an_overlapping_one() {
+    let root = BrowserRoot::seeded().unwrap();
+    let base = document(&root).journey.revision.get();
+    let first: PatchAnswer =
+        serde_json::from_str(&root.patch(&note("p_first", base, "a_first"), NOW).unwrap()).unwrap();
+    let PatchAnswer::Applied { receipt, .. } = first else {
+        panic!("a new patch applies now");
+    };
+    let overlapping = note("p_second", base, "a_first");
+    let stale = thrown(&root.patch(&overlapping, NOW).unwrap_err());
+    let HostError::Rejected { rejection } = &stale else {
+        panic!("expected a stale rejection, got {stale:?}");
+    };
+    let Rejection::Stale { conflicts, .. } = rejection else {
+        panic!("expected a stale rejection, got {stale:?}");
+    };
+    assert_eq!(
+        conflicts.first().map(|conflict| conflict.current),
+        Some(receipt.revision)
+    );
+    assert_eq!(document(&root).journey.revision, receipt.revision);
+    let separate: PatchAnswer =
+        serde_json::from_str(&root.patch(&note("p_third", base, "a_third"), NOW).unwrap()).unwrap();
+    let PatchAnswer::Applied {
+        receipt: third,
+        over: Some(over),
+        ..
+    } = separate
+    else {
+        panic!("a patch that overlaps nothing is applied over what intervened: {separate:?}");
+    };
+    assert_eq!(third.revision.get(), base + 2);
+    assert_eq!(
+        over.conflicts
+            .first()
+            .map(|conflict| conflict.expected.get()),
+        Some(base)
+    );
+    assert_eq!(document(&root).journey.revision, third.revision);
 }
 
 /// H6: two commits between a subscriber's takes reach it as one tick naming the latest

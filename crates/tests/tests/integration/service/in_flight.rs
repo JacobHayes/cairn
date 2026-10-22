@@ -266,3 +266,141 @@ fn a_stale_answer_beside_a_commit_in_flight_carries_what_it_touches_on_sqlite() 
         a_stale_answer_beside_a_commit_in_flight_carries_what_it_touches(service, gate).await;
     });
 }
+
+/// A service over a fresh store holding journey `j_race`, with no gate armed yet.
+async fn unarmed(on_sqlite: bool) -> (Service, Faults) {
+    let faults = Faults::default();
+    let store: Arc<dyn cairn_store::Store> = if on_sqlite {
+        let path = support::sqlite_path(TMP.as_ref());
+        Arc::new(SqliteStore::open_with_faults(&path, faults.clone()).unwrap())
+    } else {
+        Arc::new(MemoryStore::with_faults(faults.clone()))
+    };
+    let (service, _) = support::service_over(store);
+    created(&service).await;
+    (service, faults)
+}
+
+/// A node `n_x` added to `j_race`, drafted at `base`.
+fn node(id: &str, base: u32, key: &str) -> Patch {
+    let mutations =
+        format!("- op: add_node\n  node: {{key: {key}, id: {key}, kind: action, title: {key}}}\n");
+    patch(id, "{journey: j_race}", base, &mutations)
+}
+
+/// What a patch's events touched, from the journey's log.
+async fn touched_by(service: &Service, patch_id: &str) -> TouchedSet {
+    let query = cairn_store::EventQuery {
+        log: Some(Domain::Journey("j_race".parse().unwrap())),
+        patch: Some(patch_id.parse().unwrap()),
+        ..cairn_store::EventQuery::default()
+    };
+    let mut touched = TouchedSet::default();
+    for logged in service.events(&query).await.unwrap().items {
+        touched.extend(logged.event.touched());
+    }
+    touched
+}
+
+/// H5: a stale write that loses the race at commit is loaded and decided again against
+/// everything since the revision it names, not since the load it lost with. Patch A (a
+/// rename of `n_a`) is drafted at revision 1. C lands first (revision 2), so A loads at 2
+/// and applies over C. While A's commit is held, D lands (revision 3), so the commit is
+/// stale and A is decided again at 3, against C and D both.
+async fn a_stale_write_racing_a_commit_is_decided_against_everything_since_its_base(
+    on_sqlite: bool,
+    d_overlaps: bool,
+) {
+    let (service, faults) = unarmed(on_sqlite).await;
+    applied(
+        service
+            .patch(&call("u_lead", AT), &domain(node("p_c", 1, "n_c")))
+            .await,
+    );
+    let gate = Gate::on(&faults, CommitPoint::BeforeBegin);
+    let d = if d_overlaps {
+        rename("p_d", 2, "D")
+    } else {
+        node("p_d", 2, "n_d")
+    };
+    let (a, d) = beside_held(&service, &gate, rename("p_a", 1, "A"), d).await;
+    applied(d);
+    let journey = service
+        .journey(&"j_race".parse().unwrap())
+        .await
+        .unwrap()
+        .unwrap();
+    let title = |journey: &cairn_schema::Journey| {
+        journey
+            .graph
+            .nodes
+            .get(&"n_a".parse().unwrap())
+            .map(|node| node.title.to_string())
+    };
+    if d_overlaps {
+        let Err(WriteError::Rejected(Rejection::Stale {
+            intervening,
+            touched,
+            ..
+        })) = a
+        else {
+            panic!("D wrote what A writes: stale, not {a:#?}");
+        };
+        assert!(intervening.overlaps(&touched_by(&service, "p_d").await));
+        assert!(intervening.overlaps(&touched));
+        assert_eq!(journey.revision.get(), 3);
+        assert_eq!(title(&journey).as_deref(), Some("D"), "D's title is kept");
+    } else {
+        let Ok(Written::Applied {
+            receipt,
+            over: Some(over),
+            ..
+        }) = a
+        else {
+            panic!("A overlaps neither C nor D: applied over them, not {a:#?}");
+        };
+        assert_eq!(receipt.revision.get(), 4);
+        let moved: Vec<_> = over
+            .conflicts
+            .iter()
+            .map(|conflict| (conflict.expected.get(), conflict.current.get()))
+            .collect();
+        assert_eq!(moved, [(1, 3)], "decided at the revision the race left");
+        for other in ["p_c", "p_d"] {
+            assert!(
+                over.intervening
+                    .overlaps(&touched_by(&service, other).await),
+                "{other} intervened"
+            );
+        }
+        assert_eq!(journey.revision.get(), 4);
+        assert_eq!(title(&journey).as_deref(), Some("A"));
+        assert_eq!(journey.graph.nodes.len(), 3, "C and D are kept");
+    }
+}
+
+#[test]
+fn a_stale_write_racing_a_commit_is_decided_against_everything_since_its_base_on_memory() {
+    support::run(async {
+        for overlapping in [false, true] {
+            a_stale_write_racing_a_commit_is_decided_against_everything_since_its_base(
+                false,
+                overlapping,
+            )
+            .await;
+        }
+    });
+}
+
+#[test]
+fn a_stale_write_racing_a_commit_is_decided_against_everything_since_its_base_on_sqlite() {
+    support::run(async {
+        for overlapping in [false, true] {
+            a_stale_write_racing_a_commit_is_decided_against_everything_since_its_base(
+                true,
+                overlapping,
+            )
+            .await;
+        }
+    });
+}

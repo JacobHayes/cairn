@@ -362,6 +362,10 @@ async fn applying_after_the_destination_moved_is_stale_with_what_intervened(stor
     };
     assert_eq!(conflicts, vec![stale.conflict.clone()]);
     assert_eq!(intervening, stale.intervening);
+    // Unlike a plain patch, which a disjoint change does not stop, an apply is never carried
+    // past the destination's move: the reviewer sees what intervened first.
+    let held = service.journey(&j_p()).await.unwrap().unwrap();
+    assert_eq!(held.revision, revision(3), "the proposal was not applied");
 }
 
 /// I6, A17: a proposal can create a journey that does not exist yet, at revision 0; its

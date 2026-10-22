@@ -11,7 +11,6 @@ const record = (id: string, delivery: EditRecord["delivery"] = { state: "sending
   command: { kind: "patch", patch: { id, target: { journey: "j_one" }, base_revision: 3, mutations: [{ op: "set_node_field", node: "n_a", value: { title: "Renamed" } }] } },
   about: { edit: "title:j_one:n_a", label: "Draft the plan", address: "/journeys/j_one/n_a" },
   delivery,
-  resubmitted: 2,
 });
 
 describe("the tab's edit records", () => {
@@ -119,7 +118,6 @@ describe("readRecord", () => {
       { ...record("p_a"), delivery: { state: "landed" } },
       { ...record("p_a"), delivery: { state: "rejected", rejection: { rejection: "unknown" } } },
       { ...record("p_a"), command: { kind: "proposal" } },
-      { ...record("p_a"), resubmitted: -1 },
       { ...record("p_a"), about: { edit: 3 } },
     ];
     expect(cases.map(readRecord)).toEqual(cases.map(() => undefined));

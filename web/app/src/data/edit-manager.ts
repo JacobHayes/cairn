@@ -96,7 +96,7 @@ export const editManager = setup({
         const ref = spawn("write", {
           id: record.id,
           syncSnapshot: true,
-          input: { id: record.id, command: record.command, about: record.about, env: context.env, restored: { delivery: record.delivery, resubmitted: record.resubmitted } },
+          input: { id: record.id, command: record.command, about: record.about, env: context.env, restored: { delivery: record.delivery } },
         });
         writes[record.id] = { ref, snapshot: ref.getSnapshot() };
       }
@@ -119,7 +119,7 @@ export const editManager = setup({
       const sent = event as Extract<EditsEvent, { type: "submit" }>;
       // The record is kept before the request goes out (the write sends it on the submit that
       // follows), or a crash between the two would lose the id of an edit that may have committed.
-      const kept = context.store.keep({ version: EDIT_RECORD_VERSION, id: sent.id, command: sent.command, about: sent.about, delivery: { state: "sending" }, resubmitted: 0 });
+      const kept = context.store.keep({ version: EDIT_RECORD_VERSION, id: sent.id, command: sent.command, about: sent.about, delivery: { state: "sending" } });
       const ref = spawn("write", { id: sent.id, syncSnapshot: true, input: { id: sent.id, command: sent.command, about: sent.about, env: context.env, restored: undefined } });
       if (!kept && !context.unstored) {
         context.notes.unstored();

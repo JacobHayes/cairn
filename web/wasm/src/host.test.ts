@@ -78,16 +78,14 @@ it("the in-browser root loads each fixture, applies a patch, refuses stale ones,
   expect(host.patch(note("p_browser_first", base, "a_browser_first"))).toMatchObject({ outcome: "applied", receipt: { revision: base + 1 } });
   const overlapping = note("p_browser_second", base, "a_browser_first");
   const separate = note("p_browser_third", base, "a_browser_third");
-  const rebased = [];
-  for (const request of [overlapping, separate]) {
-    const reason = await reasonOf(started, () => host.patch(request));
-    expect(reason).toMatchObject({ error: "rejected", rejection: { rejection: "stale" } });
-    const stale = reason?.error === "rejected" && reason.rejection.rejection === "stale" ? reason.rejection : undefined;
-    rebased.push(stale && (await worker.rebased(request.patch, stale)));
-  }
-  // H5: the overlapping one is not safe to resubmit; the separate one is, at the revision the rejection named.
-  expect(rebased).toEqual([undefined, { ...separate.patch, base_revision: base + 1 }]);
-  expect(host.patch({ patch: rebased[1] ?? separate.patch })).toMatchObject({ outcome: "applied", receipt: { revision: base + 2 } });
+  // H5: the overlapping one is answered stale; the separate one is applied at the current revision, and says what it moved past.
+  const reason = await reasonOf(started, () => host.patch(overlapping));
+  expect(reason).toMatchObject({ error: "rejected", rejection: { rejection: "stale" } });
+  expect(host.patch(separate)).toMatchObject({
+    outcome: "applied",
+    receipt: { revision: base + 2 },
+    over: { conflicts: [{ expected: base, current: base + 1 }] },
+  });
   await settle(400);
   const vendor = { domain: { journey: "j_vendor_eval" } };
   expect(heard[0]).toMatchObject({ first: true, ticks: [{ of: vendor, revision: base }] });

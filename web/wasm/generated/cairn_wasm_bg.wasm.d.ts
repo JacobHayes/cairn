@@ -46,7 +46,6 @@ export const exportRoute: (a: number, b: number, c: number) => void;
 export const importRoute: (a: number, b: number, c: number) => void;
 export const preview: (a: number, b: number, c: number, d: number, e: number) => void;
 export const readRouteFile: (a: number, b: number, c: number) => void;
-export const rebased: (a: number, b: number, c: number, d: number, e: number) => void;
 export const rootsubscription_take: (a: number, b: number, c: number) => void;
 export const routeFileText: (a: number, b: number, c: number) => void;
 export const routeNotices: (a: number, b: number, c: number) => void;

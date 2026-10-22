@@ -56,7 +56,7 @@ interface Picked {
   user: string;
 }
 
-/** A pick handed to the edit manager: what the drawing watches and shows. The manager may rebase the command, so it is not kept. */
+/** A pick handed to the edit manager: what the drawing watches and shows. The manager sends the command as it is; a pick is not kept. */
 export interface Sent {
   to: string;
   id: OperationId;

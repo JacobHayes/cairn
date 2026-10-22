@@ -133,10 +133,11 @@ mod in_process {
         );
     }
 
-    /// H5: a patch drafted before another landed is answered 409 with the revision it named,
-    /// the current one, and what the intervening events touched.
+    /// H5: a patch drafted before another landed, which writes nothing the other wrote, is
+    /// applied at the current revision and answered 200 with the revisions it moved past and
+    /// what the intervening events touched.
     #[tokio::test]
-    async fn a_stale_patch_is_answered_with_what_intervened() {
+    async fn a_stale_patch_beside_a_disjoint_change_is_applied_over_it() {
         let world = World::start().await;
         let ann = world.vendor_after(2).await;
         let bob = world.signed_in("bob");
@@ -145,18 +146,54 @@ mod in_process {
                 format!("- op: add_annotation\n  annotation: {{key: {key}, note: Seen.}}\n");
             support::patch(id, "{journey: j_vendor_eval}", 2, &mutations)
         };
+        let post_note = |who, id: &str, key: &str| {
+            let target = format!("{JOURNEY}/patches");
+            let sent = request(&note(id, key));
+            async move { post(who, &target, &sent).await }
+        };
+        ok::<PatchAnswer>(&post_note(&bob, "p_bob", "a_bob").await);
+        let reply = post_note(&ann, "p_ann", "a_ann").await;
+        let PatchAnswer::Applied { receipt, over, .. } = ok(&reply) else {
+            panic!("applied")
+        };
+        assert_eq!(receipt.revision.get(), 4);
+        let over = over.expect("applied past Bob's note");
+        assert_eq!(
+            (
+                over.conflicts[0].expected.get(),
+                over.conflicts[0].current.get()
+            ),
+            (2, 3)
+        );
+        assert!(!over.intervening.is_empty());
+        assert_eq!(world.revision("j_vendor_eval").await, 4);
+    }
+
+    /// H5: a patch drafted before another landed, which writes what the other wrote, is
+    /// answered 409 with the revision it named, the current one, and what the intervening
+    /// events touched and the patch would write.
+    #[tokio::test]
+    async fn a_stale_patch_beside_an_overlapping_change_is_answered_with_what_intervened() {
+        let world = World::start().await;
+        let ann = world.vendor_after(2).await;
+        let bob = world.signed_in("bob");
+        let rename = |id: &str, title: &str| {
+            let mutations =
+                format!("- op: set_node_field\n  node: n_plan\n  value: {{title: {title}}}\n");
+            support::patch(id, "{journey: j_vendor_eval}", 2, &mutations)
+        };
         ok::<PatchAnswer>(
             &post(
                 &bob,
                 &format!("{JOURNEY}/patches"),
-                &request(&note("p_bob", "a_bob")),
+                &request(&rename("p_bob", "Bob's")),
             )
             .await,
         );
         let reply = post(
             &ann,
             &format!("{JOURNEY}/patches"),
-            &request(&note("p_ann", "a_ann")),
+            &request(&rename("p_ann", "Ann's")),
         )
         .await;
         assert_eq!(reply.status, StatusCode::CONFLICT);
@@ -174,8 +211,13 @@ mod in_process {
         );
         assert!(!intervening.is_empty());
         assert!(
-            !intervening.overlaps(&touched),
-            "Ann's note is safe to resubmit beside Bob's"
+            intervening.overlaps(&touched),
+            "Ann's rename writes what Bob's did"
+        );
+        assert_eq!(
+            world.revision("j_vendor_eval").await,
+            3,
+            "nothing was applied"
         );
     }
 

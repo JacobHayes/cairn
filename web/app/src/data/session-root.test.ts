@@ -26,7 +26,6 @@ const record = (id: string, delivery: EditRecord["delivery"], node = "n_a"): Edi
   command: { kind: "patch", patch: renaming(id, node) },
   about: aboutNode(node),
   delivery,
-  resubmitted: 0,
 });
 
 describe("restoring the kept edits", () => {
@@ -219,7 +218,7 @@ describe("shutdown", () => {
     const sentBefore = host.sent.length;
     const refs = Object.values(writes()).map((entry) => entry.ref);
     root.stop();
-    // A late answer a live write would rebase and send again, and a connection that is back.
+    // A late answer a live write would send again, and a connection that is back.
     host.answers = [applied, applied, applied];
     switches.connected = true;
     held.resolve(stale);

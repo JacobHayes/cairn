@@ -1,7 +1,7 @@
 // A host and a deriver for the data layer's unit tests: journeys held in memory at the
 // revisions a test sets, documents that count their fetches, and a tick stream the test
 // drives by hand. Shapes are the API's, cut to what the data layer reads.
-import type { Answered, HttpFailure, Patch, Rebase, Tick, TickHandlers } from "@cairn/client";
+import type { Answered, HttpFailure, Patch, Tick, TickHandlers } from "@cairn/client";
 import type { DerivationHandle, Derived, Loaded } from "@cairn/wasm";
 import { SimulatedClock } from "xstate";
 
@@ -37,17 +37,6 @@ export class FakeHost implements Host {
   holdNext: Promise<void> | undefined;
   /** A read of the named journey's document that waits for the promise, once (others answer meanwhile). */
   readonly holdDocument = new Map<string, Promise<void>>();
-
-  /** Whether what intervened overlaps every write, so the safe retry rebases none. */
-  overlapping = false;
-
-  /** A stand-in for the engine's safe retry: onto the newest revision a conflict reports, unless what intervened overlaps or a conflict did not move forward. */
-  readonly rebase: Rebase = (patch, { conflicts }) =>
-    Promise.resolve(
-      this.overlapping || conflicts.length === 0 || conflicts.some((conflict) => conflict.current <= conflict.expected)
-        ? undefined
-        : { ...patch, base_revision: Math.max(...conflicts.map((conflict) => conflict.current)) },
-    );
 
   /** Whether the capabilities offer the assistant, and the assistant the host has. */
   offersAssistant = false;
@@ -330,10 +319,6 @@ export class FakeDeriver implements Deriver {
     return Promise.resolve(JSON.stringify(file));
   }
 
-  rebased(): Promise<never> {
-    return Promise.reject(new Error("no safe retry in the fake deriver: a write's is the fake host's"));
-  }
-
   release(handle: DerivationHandle): Promise<void> {
     this.released.push(handle);
     if (this.held.get(handle.journey) === handle.load) {
@@ -430,7 +415,6 @@ export function writeEnv(host: FakeHost) {
   // What the session root supplies is the build check; a write alone is given it here.
   const parts: Omit<WriteEnv, "compatible"> = {
     host,
-    rebase: host.rebase,
     began: () => ++began,
     saved: (command, answer, at) => {
       saves.push({ command, answer, began: at });

@@ -1,13 +1,11 @@
 //! A virtual client: the real Rust client (`cairn_api::client`) over HTTP, with a transport
-//! retry under H5's safe retry, drafting patches against the journey or deployment it last
-//! fetched.
+//! retry, drafting patches against the journey or deployment it last fetched.
 //!
-//! Two retries stack, as a real client's would. Inside, a request whose answer did not
-//! arrive (a reset, a refused connect, a timeout, or the `client-loses-response` fault site)
-//! is sent again unchanged: the same patch id with the same content, which the server
-//! answers from its receipt if the first copy landed (H5). Outside, `retry::submit`
-//! resubmits a stale patch at the revisions its rejection reports when what intervened
-//! cannot overlap it, and surfaces it when it can.
+//! A request whose answer did not arrive (a reset, a refused connect, a timeout, or the
+//! `client-loses-response` fault site) is sent again unchanged: the same patch id with the
+//! same content, which the server answers from its receipt if the first copy landed (H5).
+//! A stale patch is not resubmitted: the server applies it past what intervened when that
+//! cannot overlap it, and answers stale when it can, which the client surfaces.
 
 use std::fmt;
 use std::future::Future;
@@ -20,7 +18,7 @@ use std::time::Duration;
 use tokio::sync::watch;
 
 use axum::http::StatusCode;
-use cairn_api::client::{self as api, ClientError, Landed, Refused, Transport, retry};
+use cairn_api::client::{self as api, ClientError, Refused, Transport};
 use cairn_api::wire::PatchAnswer;
 use cairn_schema::{
     Actor, Deployment, Domain, Journey, Patch, PatchId, PatchReceipt, Rejection, Revision,
@@ -69,7 +67,7 @@ pub enum Failure {
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct Ack {
     pub receipt: PatchReceipt,
-    /// The revision it was drafted at, before any automatic resubmission.
+    /// The revision it was drafted at, which the server may have moved it past.
     pub drafted: Revision,
     /// The next snapshot of its domain held it: at or past its revision, with its effect.
     pub visible: bool,
@@ -79,17 +77,15 @@ pub struct Ack {
 #[derive(Clone, Debug, Default, PartialEq, Eq)]
 pub struct Report {
     pub acks: Vec<Ack>,
-    /// Patches answered stale where retrying was not safe: surfaced, so never applied.
+    /// Patches answered stale, where the server could not apply them past what intervened:
+    /// surfaced, so never applied.
     pub surfaced: Vec<PatchId>,
-    /// Of those, the ones surfaced only because the resubmission bound ran out: what
-    /// intervened did not overlap them.
-    pub surfaced_exhausted: u64,
     /// Any other rejection or server error, which none of the testbed's patches should get.
     pub unexpected: Vec<(PatchId, String)>,
     /// Requests sent again because an answer did not arrive.
     pub transport_retries: u64,
-    /// Stale patches resubmitted on their own (H5).
-    pub resubmissions: u64,
+    /// Stale patches the server applied past what intervened (H5).
+    pub applied_over: u64,
     /// Answers from a receipt: a resent patch had already landed.
     pub receipts: u64,
 }
@@ -99,10 +95,9 @@ impl Report {
     pub fn absorb(&mut self, other: Report) {
         self.acks.extend(other.acks);
         self.surfaced.extend(other.surfaced);
-        self.surfaced_exhausted += other.surfaced_exhausted;
         self.unexpected.extend(other.unexpected);
         self.transport_retries += other.transport_retries;
-        self.resubmissions += other.resubmissions;
+        self.applied_over += other.applied_over;
         self.receipts += other.receipts;
     }
 }
@@ -331,20 +326,14 @@ impl Client {
         }
     }
 
-    /// H5: submits `patch`, resubmitting it while it is stale and safe to retry, each
-    /// submission with the transport retry.
-    async fn patch(&self, patch: Patch, counts: &Counts) -> Result<Landed, Refused<Failure>> {
-        retry::submit(patch, |patch| self.submit(patch, counts)).await
-    }
-
     /// Lands a setup patch, which nothing can conflict with.
     ///
     /// # Errors
     ///
     /// A liveness miss when it does not land.
     pub async fn land(&self, patch: Patch) -> Result<PatchReceipt, Stop> {
-        match self.patch(patch, &Counts::default()).await {
-            Ok(landed) => Ok(landed.answer.receipt().clone()),
+        match self.submit(patch, &Counts::default()).await {
+            Ok(answer) => Ok(answer.receipt().clone()),
             Err(Refused::Failed(Failure::GaveUp(gave_up))) => Err(gave_up.into()),
             Err(Refused::Failed(Failure::Server(error))) => {
                 Err(Stop::Liveness(format!("setup failed: {error}")))
@@ -376,17 +365,15 @@ impl Client {
             let id = format!("p_c{}_{sequence}", self.index);
             let patch = draft.patch(&id, &setup.journey, base);
             let counts = Counts::default();
-            let answer = self.patch(patch.clone(), &counts).await;
+            let answer = self.submit(patch.clone(), &counts).await;
             report.transport_retries += counts.transport_retries.load(Ordering::Relaxed);
             report.receipts += counts.receipts.load(Ordering::Relaxed);
             match answer {
-                Ok(landed) => {
-                    patina_dst::sometimes!(
-                        landed.resubmitted > 0,
-                        "client-stale-patch-retried-and-landed"
-                    );
-                    report.resubmissions += u64::from(landed.resubmitted);
-                    let receipt = landed.answer.receipt().clone();
+                Ok(answer) => {
+                    let over = matches!(&answer, PatchAnswer::Applied { over: Some(_), .. });
+                    patina_dst::sometimes!(over, "stale-patch-applied-over");
+                    report.applied_over += u64::from(over);
+                    let receipt = answer.receipt().clone();
                     let visible = self.next_snapshot_holds(setup, &draft, &receipt).await?;
                     report.acks.push(Ack {
                         receipt,
@@ -399,11 +386,10 @@ impl Client {
                     touched,
                     ..
                 })) => {
-                    let overlapping = intervening.overlaps(&touched);
-                    patina_dst::sometimes!(overlapping, "client-overlapping-conflict-surfaced");
-                    if !overlapping {
-                        report.surfaced_exhausted += 1;
-                    }
+                    patina_dst::sometimes!(
+                        intervening.overlaps(&touched),
+                        "client-overlapping-conflict-surfaced"
+                    );
                     report.surfaced.push(patch.id);
                 }
                 Err(Refused::Rejected(rejection)) => {

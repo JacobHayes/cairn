@@ -1,20 +1,22 @@
 //! Domain patches (A17; ARCHITECTURE, Service layer and composition): receipt first, load,
-//! apply, consequences, commit, notify. The service never retries: a stale patch is answered
-//! with the revisions that moved, what their events touched, and what the patch would write
-//! at the current revisions, and the client decides (H5).
+//! apply, consequences, commit, notify. A stale domain patch is decided here, once, for every
+//! surface and both hosts (H5): applied at the current revisions when what intervened since
+//! the revisions it names overlaps nothing it writes there, and answered stale, with what
+//! moved and what intervened, otherwise. No client retries.
 
 use std::collections::{BTreeMap, BTreeSet};
 use std::fmt;
 use std::panic::{AssertUnwindSafe, catch_unwind};
 
-use cairn_engine::{Applied, ApplyInputs, Records, apply};
+use cairn_engine::{Applied, AppliedAt, ApplyInputs, Records, apply, apply_over};
 use cairn_schema::{
-    Consequences, Domain, EventType, IdentityKey, JourneyId, Location, Markdown, Mutation, Notice,
-    Patch, PatchReceipt, PatchTarget, ProposalId, Record, Rejection, Revision, RevisionConflict,
+    AppliedOver, Consequences, Domain, EventType, IdentityKey, JourneyId, Location, Markdown,
+    Mutation, Notice, Patch, PatchReceipt, PatchTarget, ProposalId, Record, Rejection, Revision,
     RevisionOf, Subject, TouchedSet, Violation, ViolationCode, Violations, Write,
 };
 use cairn_store::{Commit, CommitError, Committed, EventQuery, PageSize};
 
+use crate::limits::STALE_ATTEMPT_COUNT_MAX;
 use crate::{Call, Service, ServiceError, consequence, load, notices};
 
 /// A patch to a journey, a route with its draft, or the deployment (A17), with the note its
@@ -77,9 +79,14 @@ pub enum Written {
         /// A20: the notices of the graph a route import or publish leaves; none for any
         /// other patch. Advisory: the patch was accepted.
         notices: Vec<Notice>,
+        /// H5: set when the patch named revisions that others' writes had moved and was
+        /// applied past them: which, and what those writes changed. The receipt's revision
+        /// then includes changes the writer has not seen.
+        over: Option<AppliedOver>,
     },
     /// The patch id was committed before with the same content (H5): answered from its
-    /// receipt, with no consequences, which are reported only the first time.
+    /// receipt, with no consequences and no word of whether it was applied past others'
+    /// changes, which are reported only the first time.
     AlreadyApplied {
         /// The original receipt.
         receipt: PatchReceipt,
@@ -134,6 +141,17 @@ impl fmt::Display for WriteError {
 
 impl std::error::Error for WriteError {}
 
+/// What to do with a patch whose named revisions moved before it landed.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub(crate) enum OnStale {
+    /// H5: apply it at the current revisions when what intervened overlaps nothing it writes.
+    ApplyOver,
+    /// Answer it stale: a proposal's own operations (a renewed review is due once the
+    /// destination moved) and a route import (built at the current revision, so stale only
+    /// by a race, and its resubmission is rebuilt from the receipt).
+    Refuse,
+}
+
 impl Service {
     /// A17: applies a domain patch as `call`'s actor (H2), at `call`'s today in the
     /// deployment's zone, and commits it. In order: a patch id already committed is answered
@@ -142,13 +160,24 @@ impl Service {
     /// records it reads, including any proposal it applies, are loaded;
     /// `apply` validates it (A15, D4); its consequences are derived (D7); the commit rechecks
     /// every revision it read (H5, E6); and every revision the commit moved is announced
-    /// (H6).
+    /// (H6). A patch whose named revisions moved is applied at the current revisions when
+    /// nothing written since overlaps what it writes there, and the answer says so (H5).
     ///
     /// # Errors
     ///
     /// [`WriteError::Rejected`] for a stale, reused, or invalid patch;
     /// [`WriteError::Failed`] when the store fails or the engine panics.
     pub async fn patch(&self, call: &Call, submitted: &DomainPatch) -> Result<Written, WriteError> {
+        self.patch_on(call, submitted, OnStale::ApplyOver).await
+    }
+
+    /// [`Service::patch`], with what to do when a revision the patch names has moved.
+    pub(crate) async fn patch_on(
+        &self,
+        call: &Call,
+        submitted: &DomainPatch,
+        on_stale: OnStale,
+    ) -> Result<Written, WriteError> {
         let patch = submitted.patch();
         if let Some(answer) = self.answer_from_receipt(patch).await? {
             patina_dst::reachable!("service-resubmission-answered-from-receipt");
@@ -157,7 +186,8 @@ impl Service {
         if let Some(rejection) = unconfirmed(patch) {
             return Err(WriteError::Rejected(rejection));
         }
-        self.write(call, patch, submitted.note.clone()).await
+        self.write(call, patch, submitted.note.clone(), on_stale)
+            .await
     }
 
     // PRD: H5, I5.
@@ -192,98 +222,139 @@ impl Service {
         })?)
     }
 
+    // PRD: H5.
     /// The write path after the receipt lookup, for a domain patch and a patch to a proposal
     /// alike: load, apply, consequences, commit, announce.
+    ///
+    /// A patch whose named revisions moved is, under [`OnStale::ApplyOver`], applied at the
+    /// current revisions when what intervened since the revisions *it names* overlaps nothing
+    /// it writes there. The intervening events are read after the load whose records are
+    /// applied, so they cover every commit up to it; one landing later makes the commit
+    /// stale. A commit that loses to another is loaded and decided again from the start,
+    /// against the same submitted patch and a fresh read of what intervened, never the
+    /// earlier one: the earlier read does not cover what landed since.
     pub(crate) async fn write(
         &self,
         call: &Call,
         patch: &Patch,
         note: Option<Markdown>,
+        on_stale: OnStale,
     ) -> Result<Written, WriteError> {
         let today = self.settings.today(call.now);
-        let loaded = load::records(&*self.store, patch).await?;
-        let inputs = ApplyInputs {
-            today,
-            at: call.now,
-            actor: call.actor.clone(),
-            note,
-        };
-        let accepted = engine(&patch.target.domain(), || {
-            apply(&loaded.records, patch, &inputs).map(|applied| {
+        let domain = patch.target.domain();
+        let mut attempts = 0_u32;
+        loop {
+            let loaded = load::records(&*self.store, patch).await?;
+            let inputs = ApplyInputs {
+                today,
+                at: call.now,
+                actor: call.actor.clone(),
+                note: note.clone(),
+            };
+            let decided = self.decide(&loaded, patch, &inputs, on_stale).await?;
+            let accepted = match decided {
+                Ok(at) => at,
+                Err(rejection) => return self.rejected(patch, rejection).await,
+            };
+            let (caused, noticed) = engine(&domain, || {
                 let caused = consequence::of(
                     &patch.target,
                     &loaded.records,
-                    applied.records(),
+                    accepted.applied.records(),
                     today,
                     &self.settings,
                 );
-                let noticed = notices::of(patch, &loaded.records, &applied);
-                (applied, caused, noticed)
-            })
-        })?;
-        match accepted {
-            Ok((applied, caused, noticed)) => {
-                let committed = self
-                    .commit(patch, &loaded, &applied, (caused, noticed))
-                    .await;
-                match committed {
-                    Err(WriteError::Rejected(stale @ Rejection::Stale { .. })) => {
-                        self.stale_at_commit(patch, &inputs, stale).await
-                    }
-                    other => other,
-                }
+                (
+                    caused,
+                    notices::of(&accepted.at, &loaded.records, &accepted.applied),
+                )
+            })?;
+            let over = accepted.over.clone();
+            if over.is_some() {
+                patina_dst::reachable!("service-stale-patch-applied-over");
             }
-            Err(Rejection::Stale {
-                conflicts, touched, ..
-            }) => self.stale(patch, conflicts, touched).await,
-            Err(rejection) => Err(WriteError::Rejected(rejection)),
+            let committed = self
+                .commit(
+                    &accepted.at,
+                    &loaded,
+                    &accepted.applied,
+                    (caused, noticed),
+                    over,
+                )
+                .await;
+            match committed {
+                Err(WriteError::Rejected(Rejection::Stale { .. }))
+                    if on_stale == OnStale::ApplyOver && attempts < STALE_ATTEMPT_COUNT_MAX =>
+                {
+                    patina_dst::reachable!("service-stale-patch-raced-at-commit");
+                    attempts += 1;
+                }
+                other => return other,
+            }
         }
     }
 
-    /// H5: the answer for a patch the engine found stale: what intervened since the
-    /// revisions it named, beside what it would write at the current ones (the engine's).
-    async fn stale(
+    /// What the engine makes of `patch` over `loaded`: accepted as it is, accepted past the
+    /// revisions it named that others moved (under [`OnStale::ApplyOver`]), or rejected.
+    async fn decide(
         &self,
+        loaded: &load::Loaded,
         patch: &Patch,
-        conflicts: Vec<RevisionConflict>,
-        touched: TouchedSet,
-    ) -> Result<Written, WriteError> {
-        // H5: the same patch may have committed since the receipt was looked up, and its own
-        // commit is what moved the revision; the receipt answers it then.
-        if let Some(answer) = self.answer_from_receipt(patch).await? {
+        inputs: &ApplyInputs,
+        on_stale: OnStale,
+    ) -> Result<Result<AppliedAt, Rejection>, WriteError> {
+        let domain = patch.target.domain();
+        let first = engine(&domain, || apply(&loaded.records, patch, inputs))?;
+        let (conflicts, touched) = match first {
+            Ok(applied) => {
+                return Ok(Ok(AppliedAt {
+                    applied,
+                    at: patch.clone(),
+                    over: None,
+                }));
+            }
+            Err(Rejection::Stale {
+                conflicts, touched, ..
+            }) => (conflicts, touched),
+            Err(other) => return Ok(Err(other)),
+        };
+        // After the load, so that this covers every commit up to it: the order is what makes
+        // the comparison complete.
+        let intervening = self.store.intervening(&conflicts).await?;
+        if on_stale == OnStale::Refuse {
+            return Ok(Err(Rejection::Stale {
+                conflicts,
+                intervening,
+                touched,
+            }));
+        }
+        let over = engine(&domain, || {
+            apply_over(&loaded.records, patch, inputs, &intervening)
+        })?;
+        Ok(over.map_err(|rejection| match rejection {
+            Rejection::Stale {
+                conflicts, touched, ..
+            } => Rejection::Stale {
+                conflicts,
+                intervening: intervening.clone(),
+                touched,
+            },
+            other => other,
+        }))
+    }
+
+    /// H5: the answer for a patch the engine rejected. A stale one first checks for the
+    /// receipt: the same patch may have committed since the receipt was looked up, and its
+    /// own commit is what moved the revision.
+    async fn rejected(&self, patch: &Patch, rejection: Rejection) -> Result<Written, WriteError> {
+        if matches!(rejection, Rejection::Stale { .. })
+            && let Some(answer) = self.answer_from_receipt(patch).await?
+        {
             patina_dst::reachable!("service-duplicate-original-committed-meanwhile");
             return answer;
         }
         patina_dst::reachable!("service-stale-patch-completed-with-intervening");
-        let intervening = self.store.intervening(&conflicts).await?;
-        Err(WriteError::Rejected(Rejection::Stale {
-            conflicts,
-            intervening,
-            touched,
-        }))
-    }
-
-    /// H5: a patch the commit found stale, a revision having moved after it was loaded. The
-    /// store cannot say what the patch would write at the current revisions, so it is
-    /// applied once more over what is loaded now, only to be answered stale as the engine
-    /// finds it there, with what it would write. The store's answer stands when the reload
-    /// finds nothing stale (only a precondition the commit alone checks moved).
-    async fn stale_at_commit(
-        &self,
-        patch: &Patch,
-        inputs: &ApplyInputs,
-        stale: Rejection,
-    ) -> Result<Written, WriteError> {
-        let loaded = load::records(&*self.store, patch).await?;
-        let reapplied = engine(&patch.target.domain(), || {
-            apply(&loaded.records, patch, inputs).map(drop)
-        })?;
-        match reapplied {
-            Err(Rejection::Stale {
-                conflicts, touched, ..
-            }) => self.stale(patch, conflicts, touched).await,
-            Ok(()) | Err(_) => Err(WriteError::Rejected(stale)),
-        }
+        Err(WriteError::Rejected(rejection))
     }
 
     /// H5: the answer for a patch id already committed: the receipt for the same content,
@@ -359,6 +430,8 @@ impl Service {
     }
 
     /// Commits what `apply` accepted, rechecking every revision it read, and announces it.
+    /// `patch` is the patch as applied: its base and deployment revisions are the ones the
+    /// commit names.
     ///
     /// # Panics
     ///
@@ -369,6 +442,7 @@ impl Service {
         loaded: &load::Loaded,
         applied: &Applied,
         (caused, noticed): (BTreeMap<JourneyId, Consequences>, Vec<Notice>),
+        over: Option<AppliedOver>,
     ) -> Result<Written, WriteError> {
         let commit = Commit {
             target: patch.target.clone(),
@@ -397,6 +471,7 @@ impl Service {
                     receipt,
                     consequences: caused,
                     notices: noticed,
+                    over,
                 })
             }
             Ok(Committed::AlreadyApplied(receipt)) => {

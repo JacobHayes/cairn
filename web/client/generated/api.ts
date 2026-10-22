@@ -1232,6 +1232,18 @@ export interface components {
             identity_list: components["schemas"]["IdentityKey"][];
         };
         /**
+         * @description What a write that was applied past other people's changes tells its writer: the revisions
+         *     it named that others' writes had moved, and what those writes changed, none of which this
+         *     write changes. The writer's view is behind by exactly those changes, so it reads again
+         *     before its next write.
+         */
+        AppliedOver: {
+            /** @description The revisions the write named that had moved on. */
+            conflicts: components["schemas"]["RevisionConflict"][];
+            /** @description What the commits since those revisions changed. */
+            intervening: components["schemas"]["TouchedSet"];
+        };
+        /**
          * @description `POST /api/journeys/{id}/assistant` and `POST /api/routes/{id}/draft/assistant`: one message of
          *     the caller's conversation about that journey or draft.
          */
@@ -3951,6 +3963,13 @@ export interface components {
             notices?: components["schemas"]["Notice"][];
             /** @constant */
             outcome: "applied";
+            /**
+             * @description Present when the patch named revisions that other people's writes had moved and
+             *     was applied past them: which revisions, and what those writes changed, none of
+             *     which this write changes. The receipt's revision then includes changes the
+             *     writer has not seen, so read again before the next write.
+             */
+            over?: components["schemas"]["AppliedOver"] | null;
             /** @description The receipt: patch id, domain, content hash, and the revision produced. */
             receipt: components["schemas"]["PatchReceipt"];
         } | {
@@ -4653,9 +4672,10 @@ export interface components {
             /** @constant */
             rejection: "stale";
             /**
-             * @description What the patch would write resubmitted at the current revisions, as applying it
-             *     there writes it; its whole domain when it would not apply there or that is not
-             *     known.
+             * @description What the patch would write at the current revisions, as applying it there writes
+             *     it; its whole domain when it would not apply there, or when the write is one that
+             *     is never applied over others' changes (a proposal's apply or edit, a route
+             *     import).
              */
             touched: components["schemas"]["TouchedSet"];
         } | {

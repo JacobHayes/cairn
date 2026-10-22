@@ -9,7 +9,9 @@ mod writes;
 
 use std::collections::BTreeMap;
 
-use cairn_schema::{Consequences, Cursor, Date, JourneyId, Notice, PatchReceipt, Revision};
+use cairn_schema::{
+    AppliedOver, Consequences, Cursor, Date, JourneyId, Notice, PatchReceipt, Revision,
+};
 use cairn_service::{Projected, Written};
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
@@ -153,8 +155,16 @@ pub struct WriteOutput {
     /// `applied` now, or `already_applied`: the patch id was committed before with the same
     /// content and is answered from its receipt, with no consequences.
     status: WriteStatus,
-    /// The receipt: the revision the patch produced is the base of the next write.
+    /// The receipt. Its revision is the base of your next write when the status is
+    /// `applied` and there is no `over`. After `over` or `already_applied`, read again
+    /// first: the revision includes changes you have not seen.
     receipt: PatchReceipt,
+    // PRD: H5.
+    /// Present when your write named revisions that other people's writes had moved and was
+    /// applied past them anyway, because nothing they changed is anything it changes: the
+    /// revisions it moved past, and what those writes changed.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    over: Option<AppliedOver>,
     // PRD: D7, D4.
     /// What it caused in each journey it changed: newly stale nodes, shortfalls,
     /// finished work that may not apply while a decision is unanswered, relevance
@@ -192,15 +202,18 @@ impl From<Written> for WriteOutput {
                 receipt,
                 consequences,
                 notices,
+                over,
             } => Self {
                 status: WriteStatus::Applied,
                 receipt,
+                over,
                 consequences,
                 notices,
             },
             Written::AlreadyApplied { receipt } => Self {
                 status: WriteStatus::AlreadyApplied,
                 receipt,
+                over: None,
                 consequences: BTreeMap::new(),
                 notices: Vec::new(),
             },

@@ -1,7 +1,7 @@
 // H5: a write is delivered once however many times it is sent, and resent with its patch id
 // until it is answered. The write's states, its resends (the backoff, the wait for the
 // connection, the limit, the restore), and what each answer makes of it (A18, A19).
-import { RESUBMISSION_COUNT_MAX, backoffDelayMs, type Answered, type HttpFailure, type Patch, type PatchAnswer, type Rejection } from "@cairn/client";
+import { backoffDelayMs, type Answered, type HttpFailure, type Patch, type PatchAnswer, type Rejection } from "@cairn/client";
 import { SimulatedClock, createActor } from "xstate";
 import { describe, expect, it } from "vitest";
 
@@ -20,13 +20,12 @@ const stale = (current: number): Answered<HttpFailure> => ({
   outcome: "rejected",
   rejection: { rejection: "stale", conflicts: [{ of: { domain: { journey: "j_one" } }, expected: 3, current }], intervening: [], touched: [] },
 });
-const stales = (count: number) => Array.from({ length: count }, (_, at) => stale(5 + at));
 
 const patch: Patch = patchOf({ target: { journey: "j_one" }, baseRevision: 3, mutations: [{ op: "set_node_field", node: "n_a", value: { title: "Renamed" } }] }, "p_one");
 const about = { edit: "title:j_one:n_a", label: "Draft the plan", address: "/journeys/j_one/n_a" };
 
 /** A write over a fake host and a simulated clock, started with `restored` when given. */
-function setup(restored?: { delivery: Delivery; resubmitted: number }, answers: Answered<HttpFailure>[] = [], command: Command = { kind: "patch", patch }) {
+function setup(restored?: { delivery: Delivery }, answers: Answered<HttpFailure>[] = [], command: Command = { kind: "patch", patch }) {
   const host = new FakeHost();
   host.answers = answers;
   const { env, switches, saves } = writeEnv(host);
@@ -68,15 +67,14 @@ describe("a write's delivery", () => {
     expect(view().state).toBe("landed");
   });
 
-  it("retries a safe stale answer on the reported revision, lands once, and records one save", async () => {
+  it("sends a patch as it is: a stale answer is a rejection, never resent rebased", async () => {
     const { host, saves, actor, view } = setup();
     host.answers = [stale(5), applied];
     actor.send({ type: "submit" });
     await settled();
-    expect(host.sent.map((sent) => [sent.id, sent.base_revision])).toEqual([["p_one", 3], ["p_one", 5]]);
-    expect(view()).toMatchObject({ state: "landed", resubmitted: 1 });
-    expect(saves).toHaveLength(1);
-    expect(saves[0]?.command).toMatchObject({ kind: "patch", patch: { base_revision: 5 } });
+    expect(host.sent.map((sent) => [sent.id, sent.base_revision])).toEqual([["p_one", 3]]);
+    expect(view()).toMatchObject({ state: "rejected", rejection: { rejection: "stale" } });
+    expect(saves).toHaveLength(0);
   });
 
   it("resends a lost write with its id and content after the first wait, and settles on already_applied", async () => {
@@ -93,16 +91,6 @@ describe("a write's delivery", () => {
     expect(view().state).toBe("landed");
     expect(saves).toHaveLength(1);
   });
-
-  it("resends the patch it last sent, rebased, not the original", async () => {
-    const { host, actor, advance } = setup();
-    host.answers = [stale(5), lost, applied];
-    actor.send({ type: "submit" });
-    await settled();
-    await advance(backoffDelayMs(0));
-    expect(host.sent.map((sent) => sent.base_revision)).toEqual([3, 5, 5]);
-  });
-
 });
 
 describe("a write that got no answer", () => {
@@ -124,24 +112,6 @@ describe("a write that got no answer", () => {
     actor.send({ type: "retry" });
     await settled();
     expect(host.sent).toHaveLength(2 + RESEND_COUNT_MAX);
-  });
-
-  it("counts the safe retry across resends: a resend does not start the bound again", async () => {
-    const { host, actor, view, advance } = setup();
-    host.answers = [...stales(20), lost, ...stales(40)];
-    actor.send({ type: "submit" });
-    await settled();
-    await advance(backoffDelayMs(0));
-    // The original, its 20 rebased sends, the resend, then the rest of the 32 allowed in all.
-    expect(host.sent).toHaveLength(1 + 20 + 1 + (RESUBMISSION_COUNT_MAX - 20));
-    expect(view()).toMatchObject({ state: "rejected", resubmitted: RESUBMISSION_COUNT_MAX });
-  });
-
-  it("carries the bound across a reload", async () => {
-    const { host, view } = setup({ delivery: { state: "unconfirmed" }, resubmitted: 20 }, stales(40));
-    await settled();
-    expect(host.sent).toHaveLength(1 + (RESUBMISSION_COUNT_MAX - 20));
-    expect(view().state).toBe("rejected");
   });
 });
 
@@ -171,7 +141,7 @@ describe("a write waiting for the connection", () => {
 describe("a write restored after a reload", () => {
   it("resends what may have committed at once, with the id and content it kept", async () => {
     for (const delivery of [{ state: "sending" }, { state: "unconfirmed", failure: { status: 0, message: "down" } }] as const) {
-      const { host, view } = setup({ delivery, resubmitted: 0 }, [alreadyApplied]);
+      const { host, view } = setup({ delivery }, [alreadyApplied]);
       await settled();
       expect(host.sent).toEqual([patch]);
       expect(view().state).toBe("landed");
@@ -180,10 +150,10 @@ describe("a write restored after a reload", () => {
 
   it("holds a rejection and a stop without sending anything", async () => {
     const rejection: Rejection = { rejection: "invalid", violations: [] };
-    const held = setup({ delivery: { state: "rejected", rejection }, resubmitted: 0 });
+    const held = setup({ delivery: { state: "rejected", rejection } });
     await held.advance(60_000);
     expect(held.view()).toMatchObject({ state: "rejected", rejection });
-    const stopped = setup({ delivery: { state: "stopped" }, resubmitted: 0 });
+    const stopped = setup({ delivery: { state: "stopped" } });
     await stopped.advance(60_000);
     expect(stopped.view().state).toBe("stopped");
     expect(held.host.sent.length + stopped.host.sent.length).toBe(0);
@@ -262,7 +232,7 @@ describe("version skew", () => {
     expect(view().state).toBe("landed");
   });
 
-  it("gives up waiting at once, without a resend, and does not rebase a stale answer", async () => {
+  it("gives up waiting at once, without a resend", async () => {
     const waiting = setup();
     waiting.switches.connected = false;
     waiting.host.answers = [lost];
@@ -272,17 +242,6 @@ describe("version skew", () => {
     waiting.switches.compatible = false;
     waiting.actor.send({ type: "wake" });
     expect(waiting.view()).toMatchObject({ state: "unconfirmed", retrying: false });
-
-    const rebasing = setup();
-    const held = deferred<Answered<HttpFailure>>();
-    rebasing.host.answers = [held.promise];
-    rebasing.actor.send({ type: "submit" });
-    await settled();
-    rebasing.switches.compatible = false;
-    held.resolve(stale(5));
-    await settled();
-    expect(rebasing.host.sent).toHaveLength(1);
-    expect(rebasing.view().state).toBe("rejected");
   });
 });
 
@@ -314,9 +273,8 @@ const saved = { outcome: "already_saved" } as never;
 const proposalLanded = { outcome: "answered", answer: saved } as const;
 
 describe("a proposal write or an import", () => {
-  it("is never rebased: a stale answer is a rejection even where a patch would be resent on the new revision", async () => {
+  it("is sent once: a stale answer is a rejection, for a person to review again", async () => {
     const { host, actor, view } = setup(undefined, [], applyCommand);
-    host.overlapping = true;
     host.proposed = [{ outcome: "rejected", rejection: { rejection: "stale", conflicts: [], intervening: [], touched: [] } }];
     actor.send({ type: "submit" });
     await settled();

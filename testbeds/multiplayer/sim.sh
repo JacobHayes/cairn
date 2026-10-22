@@ -32,9 +32,6 @@ command -v cargo-patina >/dev/null || fail "cargo-patina is missing: run mise in
 # 6.1 integration). The campaign's own gate is waived for these alone: any other oracle that
 # never fires fails leg 4, and one of these firing is reported so it can leave the list.
 out_of_reach=(
-  # 4.1's receipt recheck after the engine answers stale: needs the original to commit
-  # between a resubmission's receipt lookup and its load, and no site delays a load.
-  service-duplicate-original-committed-meanwhile
   # 4.8's derived-read memo: the views refetch the journey document, never a derived read.
   service-derived-read-answered-from-memo
   # 4.8's and 4.9's proposal and route-import paths: the testbed drafts no proposal and

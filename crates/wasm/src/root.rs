@@ -15,9 +15,9 @@ use std::sync::atomic::{AtomicU32, Ordering};
 use std::time::Duration;
 
 use cairn_schema::{
-    Actor, Consequences, Domain, JourneyId, JourneyStatus, Lineage, Markdown, NodeKey, Notice,
-    Patch, PatchEvents, PatchReceipt, ProposalId, RankConstants, Revision, RevisionOf, RouteId,
-    Timestamp, Title, VersionNumber,
+    Actor, AppliedOver, Consequences, Domain, JourneyId, JourneyStatus, Lineage, Markdown, NodeKey,
+    Notice, Patch, PatchEvents, PatchReceipt, ProposalId, RankConstants, Revision, RevisionOf,
+    RouteId, Timestamp, Title, VersionNumber,
 };
 use cairn_service::{Call, Capabilities, DeploymentSettings, DomainPatch, Parts, Service, Written};
 use cairn_store::{InProcessNotifier, MemoryStore, Store, Subscription, Take, Watch};
@@ -54,6 +54,9 @@ pub enum PatchAnswer {
         /// A20: advisory notices about the route graph an import or publish leaves.
         #[serde(default, skip_serializing_if = "Vec::is_empty")]
         notices: Vec<Notice>,
+        /// H5: set when the patch was applied past revisions others' writes had moved.
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        over: Option<AppliedOver>,
     },
     /// The patch id was committed before with the same content (H5).
     AlreadyApplied {
@@ -69,10 +72,12 @@ impl From<Written> for PatchAnswer {
                 receipt,
                 consequences,
                 notices,
+                over,
             } => PatchAnswer::Applied {
                 receipt,
                 consequences,
                 notices,
+                over,
             },
             Written::AlreadyApplied { receipt } => PatchAnswer::AlreadyApplied { receipt },
         }

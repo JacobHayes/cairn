@@ -1,10 +1,10 @@
-// The API's side of the safe retry: one patch sent over HTTP (`POST /api/{domain}/patches`),
-// answered as `retry.ts` reads it. A 409 or 422 carries the rejection unchanged (A15); any
+// The API's side of a patch: one patch sent over HTTP (`POST /api/{domain}/patches`),
+// answered as `patch.ts` reads it. A 409 or 422 carries the rejection unchanged (A15); any
 // other refusal is a failure with the server's problem or text.
 import type { Client } from "openapi-fetch";
 
 import type { components, paths } from "../generated/api.ts";
-import type { Answered, Patch, Rejection, Send } from "./retry.ts";
+import type { Answered, Patch, Rejection, Send } from "./patch.ts";
 
 type Markdown = components["schemas"]["Markdown"];
 

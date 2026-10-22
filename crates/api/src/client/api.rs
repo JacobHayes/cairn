@@ -1,4 +1,4 @@
-//! The typed client: reads, domain patches with H5's safe retry, and subscriptions whose
+//! The typed client: reads, domain patches, and subscriptions whose
 //! ticks feed H6's tracking, over the HTTP transport and the same endpoint table the router
 //! serves.
 
@@ -8,7 +8,6 @@ use axum::http::{Method, StatusCode};
 use cairn_schema::{Deployment, Journey, JourneyId, Markdown, Patch, PatchTarget, Rejection};
 use serde::de::DeserializeOwned;
 
-use super::retry::{self, Landed, Refused};
 use super::sse::{EventStream, Opened};
 use super::transport::{Reply, Transport, TransportError};
 use crate::endpoints::{self, Endpoint};
@@ -75,6 +74,16 @@ fn unexpected(reply: &Reply) -> ClientError {
     }
 }
 
+/// Why a patch did not land.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub enum Refused<E> {
+    /// It was rejected: invalid, a reused id, or stale where the server could not apply it
+    /// past what intervened.
+    Rejected(Rejection),
+    /// The transport or the server failed.
+    Failed(E),
+}
+
 /// A client of one server, as one caller.
 #[derive(Clone, Debug)]
 pub struct Client {
@@ -136,7 +145,8 @@ impl Client {
         self.read(&endpoints::DEPLOYMENT, &[], "").await
     }
 
-    /// Submits a domain patch once.
+    /// H5: submits a domain patch. The server applies a stale one past what intervened when
+    /// that is safe, and its answer says so; this client does not resubmit.
     ///
     /// # Errors
     ///
@@ -171,21 +181,6 @@ impl Client {
             }
             _ => Err(Refused::Failed(unexpected(&reply))),
         }
-    }
-
-    /// H5: submits a domain patch, resubmitting it on its own while it is stale and safe
-    /// to retry.
-    ///
-    /// # Errors
-    ///
-    /// Its rejection (a stale one when retrying was not safe), or why it could not be
-    /// submitted.
-    pub async fn patch(
-        &self,
-        patch: Patch,
-        note: Option<Markdown>,
-    ) -> Result<Landed, Refused<ClientError>> {
-        retry::submit(patch, |patch| self.submit(patch, note.clone())).await
     }
 
     /// H6: subscribes to the revision ticks of what `watching` names.

@@ -31,7 +31,8 @@ pub use users::{
 use std::collections::BTreeMap;
 
 use cairn_schema::{
-    Consequences, JourneyId, Markdown, Notice, Patch, PatchReceipt, Revision, RevisionOf, Slug,
+    AppliedOver, Consequences, JourneyId, Markdown, Notice, Patch, PatchReceipt, Revision,
+    RevisionOf, Slug,
 };
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
@@ -67,10 +68,18 @@ pub enum PatchAnswer {
         /// rejection, and absent for any other patch.
         #[serde(default, skip_serializing_if = "Vec::is_empty")]
         notices: Vec<Notice>,
+        // PRD: H5.
+        /// Present when the patch named revisions that other people's writes had moved and
+        /// was applied past them: which revisions, and what those writes changed, none of
+        /// which this write changes. The receipt's revision then includes changes the
+        /// writer has not seen, so read again before the next write.
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        over: Option<AppliedOver>,
     },
     // PRD: H5.
     /// The patch id was committed before with the same content: its receipt, and no
-    /// consequences, which are reported only the first time.
+    /// consequences, which are reported only the first time. It cannot say whether the
+    /// patch was applied past other people's changes, so read again before the next write.
     AlreadyApplied {
         /// The original receipt.
         receipt: PatchReceipt,
@@ -96,10 +105,12 @@ impl From<cairn_service::Written> for PatchAnswer {
                 receipt,
                 consequences,
                 notices,
+                over,
             } => PatchAnswer::Applied {
                 receipt,
                 consequences,
                 notices,
+                over,
             },
             cairn_service::Written::AlreadyApplied { receipt } => {
                 PatchAnswer::AlreadyApplied { receipt }

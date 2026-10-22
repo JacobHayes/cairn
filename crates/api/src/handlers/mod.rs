@@ -129,7 +129,8 @@ pub(crate) async fn committed<T: Send + 'static>(
 /// A domain write's outcome, as the patch count and logs name it.
 pub(crate) fn written_outcome(answer: &Result<Written, WriteError>) -> &'static str {
     match answer {
-        Ok(Written::Applied { .. }) => "applied",
+        Ok(Written::Applied { over: None, .. }) => "applied",
+        Ok(Written::Applied { over: Some(_), .. }) => "applied_over",
         Ok(Written::AlreadyApplied { .. }) => "already_applied",
         Err(error) => refused_outcome(error),
     }

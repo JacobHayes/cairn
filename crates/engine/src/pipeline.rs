@@ -14,9 +14,9 @@
 use std::collections::{BTreeMap, BTreeSet};
 
 use cairn_schema::{
-    Actor, ChangeSet, Date, Domain, Event, GraphRecord, GuardFailure, Markdown, Mutation, NodeKey,
-    Patch, PatchReceipt, PatchTarget, Record, Rejection, Revision, RevisionConflict, RevisionOf,
-    Timestamp, TouchedSet, Violations, Write,
+    Actor, AppliedOver, ChangeSet, Date, Domain, Event, GraphRecord, GuardFailure, Markdown,
+    Mutation, NodeKey, Patch, PatchReceipt, PatchTarget, Record, Rejection, Revision,
+    RevisionConflict, RevisionOf, Timestamp, TouchedSet, Violations, Write,
 };
 
 use crate::mutate::{self, Session};
@@ -94,11 +94,9 @@ impl Applied {
 pub fn apply(records: &Records, patch: &Patch, inputs: &ApplyInputs) -> Result<Applied, Rejection> {
     let conflicts = base_conflicts(records, patch);
     if !conflicts.is_empty() {
-        // A patch that would not apply at the current revisions touches its whole domain, so
-        // no client resubmits it on its own.
-        let touched = touched(records, patch, inputs)
-            .unwrap_or_else(|_| TouchedSet::whole(patch.target.domain()));
-        return Err(stale(conflicts, touched));
+        // What the patch would write at the current revisions is worked out by `apply_over`,
+        // for the callers that apply a stale patch there.
+        return Err(stale(conflicts, TouchedSet::whole(patch.target.domain())));
     }
     let mut session = Session::new(patch, inputs, records.clone());
     let mut events = Vec::with_capacity(patch.mutations.len());
@@ -109,8 +107,8 @@ pub fn apply(records: &Records, patch: &Patch, inputs: &ApplyInputs) -> Result<A
         events.push(event(&session, mutation, delta));
     }
     if !session.conflicts.is_empty() {
-        // A revision a mutation names moved (a merge's journeys, a reviewed proposal's): no
-        // client rebases those, so what the patch would write is not worked out.
+        // A revision a mutation names moved (a merge's journeys, a reviewed proposal's):
+        // those are never moved, so what the patch would write is not worked out.
         let whole = TouchedSet::whole(patch.target.domain());
         return Err(stale(std::mem::take(&mut session.conflicts), whole));
     }
@@ -261,11 +259,129 @@ fn stale(conflicts: Vec<RevisionConflict>, touched: TouchedSet) -> Rejection {
 }
 
 // PRD: H5.
+/// A stale patch applied at the current revisions, and the patch as it was applied there.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct AppliedAt {
+    /// The accepted application. Its receipt keeps the content hash of the patch as
+    /// submitted, so resubmitting that patch is answered from the receipt.
+    pub applied: Applied,
+    /// The patch as committed: its base and deployment revisions are the ones `applied` was
+    /// built at, which the commit's preconditions name.
+    pub at: Patch,
+    /// The revisions the patch had named that had moved, and what moved them; none when the
+    /// patch was current.
+    pub over: Option<AppliedOver>,
+}
+
+// PRD: H5.
+/// A17, H5: applies `patch` to `records`, past the revisions it named that others' writes
+/// moved, when that is safe. It is safe when the revisions moved forward (its domain's, and
+/// the deployment's when it names one), it applies no proposal, it is accepted at the current
+/// revisions, and what it writes there overlaps nothing in `intervening`, the touched set of
+/// every commit since the revisions the patch named (a patch's writes depend on what it
+/// finds, so only applying it says). A revision named inside a mutation (the journeys a
+/// merge or delete was checked against) is never moved: if one moved, the patch is stale.
+///
+/// # Errors
+///
+/// [`Rejection::Stale`] when a revision the patch names has moved and it cannot be applied
+/// past it: with its whole domain as `touched` when it is not accepted at the current
+/// revisions, or with what it would write and `intervening` when they overlap; otherwise
+/// the rejections of [`apply`].
+///
+/// # Panics
+///
+/// When the engine's own accounting breaks (see [`apply`]).
+pub fn apply_over(
+    records: &Records,
+    patch: &Patch,
+    inputs: &ApplyInputs,
+    intervening: &TouchedSet,
+) -> Result<AppliedAt, Rejection> {
+    let conflicts = base_conflicts(records, patch);
+    if conflicts.is_empty() {
+        return apply(records, patch, inputs).map(|applied| AppliedAt {
+            applied,
+            at: patch.clone(),
+            over: None,
+        });
+    }
+    let whole = || TouchedSet::whole(patch.target.domain());
+    let Some(at) = moved(patch, &conflicts) else {
+        return Err(stale(conflicts, whole()));
+    };
+    let Ok(mut applied) = apply(records, &at, inputs) else {
+        return Err(stale(conflicts, whole()));
+    };
+    let touched = applied.change_set().touched();
+    if intervening.overlaps(&touched) {
+        return Err(Rejection::Stale {
+            conflicts,
+            intervening: intervening.clone(),
+            touched,
+        });
+    }
+    assert_eq!(
+        applied.revision(),
+        at.base_revision.next(),
+        "the application advances the revision it was built at"
+    );
+    assert!(
+        base_conflicts(records, &at).is_empty(),
+        "the patch was moved onto these records"
+    );
+    // The receipt is for the patch as submitted: it is what a resubmission carries.
+    applied.change_set.receipt.content_hash = patch.content_hash();
+    Ok(AppliedAt {
+        applied,
+        at,
+        over: Some(AppliedOver {
+            conflicts,
+            intervening: intervening.clone(),
+        }),
+    })
+}
+
+/// H5: `patch` with the revisions it named moved to the current ones in `conflicts`, or
+/// none when it is not safe to move: nothing moved, a conflict whose current revision is not
+/// past the one named (moving would go backward), a proposal's revision, another domain, a
+/// deployment the patch does not name, or a patch that applies a proposal (a reviewer
+/// confirmed the destination as it was).
+fn moved(patch: &Patch, conflicts: &[RevisionConflict]) -> Option<Patch> {
+    if conflicts.is_empty()
+        || patch
+            .mutations
+            .as_slice()
+            .iter()
+            .any(|mutation| matches!(mutation, Mutation::ApplyProposal { .. }))
+    {
+        return None;
+    }
+    let target = patch.target.domain();
+    let mut moved = patch.clone();
+    for conflict in conflicts {
+        if conflict.current <= conflict.expected {
+            return None;
+        }
+        match &conflict.of {
+            RevisionOf::Domain(domain) if *domain == target => {
+                moved.base_revision = conflict.current;
+            }
+            RevisionOf::Domain(Domain::Deployment) if patch.deployment_revision.is_some() => {
+                moved.deployment_revision = Some(conflict.current);
+            }
+            RevisionOf::Domain(_) | RevisionOf::Proposal(_) => return None,
+        }
+    }
+    Some(moved)
+}
+
+// PRD: H5, I5.
 /// What `patch` writes applied to `records` at their revisions (its base and deployment
-/// revisions moved to theirs, as a client's resubmission names them): the touched set of
-/// the change set apply builds there, from the handlers that write it (a role's fill, a
-/// node's bypass), never a prediction. A stale answer carries it, so a client compares
-/// what intervened with what its resubmission would really write.
+/// revisions moved to theirs, whichever way they differ: this asks what the change would do
+/// now, where [`apply_over`] decides whether a stale patch may land): the touched set of the
+/// change set apply builds there, from the handlers that write it (a role's fill, a node's
+/// bypass), never a prediction.
 ///
 /// # Errors
 ///

@@ -126,7 +126,6 @@ describe("the connection", () => {
       command: { kind: "patch", patch: renaming("p_kept") },
       about: aboutNode(),
       delivery: { state: "sending" },
-      resubmitted: 0,
     });
     const host = new FakeHost();
     host.answers = [alreadyApplied];
