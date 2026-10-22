@@ -131,6 +131,22 @@ mod property {
             .and_then(|o| o.bypass.as_ref())
             .filter(|_| finished);
         let failures = bypass.map(|b| &b.failures);
+        // A pending `auto_done` milestone whose date is ahead is accepted by finished work.
+        let pending_auto = document
+            .nodes
+            .as_map()
+            .iter()
+            .filter(|_| finished)
+            .filter(|(other, node)| {
+                matches!(&node.payload, Payload::Milestone(m) if m.auto_done)
+                    && document.state.nodes.get(*other).map(|s| s.state) == Some(State::Pending)
+                    && !skipped(graph, derived, other)
+                    && derived
+                        .dates()
+                        .earliest_finish(other)
+                        .is_some_and(|earliest| day(earliest) > today())
+            })
+            .map(|(other, _)| other.clone());
         Progress {
             started,
             underway: finished || (counted && state == Some(State::Active)),
@@ -141,6 +157,7 @@ mod property {
                     GuardFailure::OpenDependency(required) => Some(required.clone()),
                     _ => None,
                 })
+                .chain(pending_auto)
                 .collect(),
             own_date_exempt: finished
                 && (graph.node(key).unwrap().kind() == NodeKind::Milestone

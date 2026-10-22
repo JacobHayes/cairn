@@ -130,6 +130,13 @@ pub(crate) struct Scope {
     /// For a finished node with a stored guard bypass, the requirements the bypass recorded
     /// as open dependencies.
     accepted: BTreeMap<NodeIndex, BTreeSet<NodeIndex>>,
+    /// Pending `auto_done` milestones (execution layer).
+    auto: BTreeSet<NodeIndex>,
+    /// The ones whose date is still ahead, which finished work is early of whether or not a
+    /// bypass recorded it: held, finishing the work would fix such a milestone's latest date
+    /// at the finish, so it would read reached and the guard would see nothing open to
+    /// record. Set from a first solve, by [`Scope::accept_auto_ahead`].
+    auto_ahead: BTreeSet<NodeIndex>,
 }
 
 impl Scope {
@@ -155,6 +162,8 @@ impl Scope {
             finished: Vec::new(),
             own_date_exempt: Vec::new(),
             accepted: BTreeMap::new(),
+            auto: BTreeSet::new(),
+            auto_ahead: BTreeSet::new(),
         };
         for (at, key) in keys.enumerate() {
             scope.read(document, dependencies, relevance, skips, at, key);
@@ -231,6 +240,12 @@ impl Scope {
         if !open.is_empty() {
             self.accepted.insert(index(at), open);
         }
+        let pending_auto = node.is_some_and(
+            |node| matches!(&node.payload, Payload::Milestone(milestone) if milestone.auto_done),
+        );
+        if counted && pending_auto && state == Some(State::Pending) {
+            self.auto.insert(index(at));
+        }
     }
 
     /// The node's relevance.
@@ -281,9 +296,37 @@ impl Scope {
             .unwrap_or(false)
     }
 
-    /// What the finished node's guard bypass recorded as open dependencies.
-    fn accepted(&self, node: NodeIndex) -> Option<&BTreeSet<NodeIndex>> {
-        self.accepted.get(&node)
+    /// The pending `auto_done` milestones, when finished work exists that could be early of
+    /// one.
+    pub(crate) fn auto_candidates(&self) -> Vec<NodeIndex> {
+        if self.finished.iter().any(|&finished| finished) {
+            self.auto.iter().copied().collect()
+        } else {
+            Vec::new()
+        }
+    }
+
+    /// Takes these pending `auto_done` milestones, whose date is ahead, as accepted by
+    /// every finished node that waited on them.
+    pub(crate) fn accept_auto_ahead(&mut self, ahead: BTreeSet<NodeIndex>) {
+        self.auto_ahead = ahead;
+    }
+
+    /// Whether finished `node` is early of requirement `by`: its guard bypass recorded it as
+    /// open, or it is a pending `auto_done` milestone.
+    fn accepts(&self, node: NodeIndex, by: NodeIndex) -> bool {
+        self.finished.get(node.get()).copied().unwrap_or(false)
+            && (self.auto_ahead.contains(&by)
+                || self
+                    .accepted
+                    .get(&node)
+                    .is_some_and(|accepted| accepted.contains(&by)))
+    }
+
+    /// Whether finished `node` can be early of something at all.
+    fn accepting(&self, node: NodeIndex) -> bool {
+        self.finished.get(node.get()).copied().unwrap_or(false)
+            && (!self.auto_ahead.is_empty() || self.accepted.contains_key(&node))
     }
 
     fn execution(&self) -> bool {
@@ -403,15 +446,12 @@ impl Network {
             return;
         }
         let after = self.held(scope, node);
-        let accepted = scope.accepted(node);
         let hop = matches!(edge.source, EdgeSource::Entry | EdgeSource::Chain);
-        if hop
-            && let Some(accepted) = accepted
-            && self.push_carried(dependencies, scope, &edge, after, accepted, out)
+        if hop && scope.accepting(node) && self.push_carried(dependencies, scope, &edge, after, out)
         {
             return;
         }
-        let exempt = !hop && accepted.is_some_and(|set| set.contains(&edge.requirement.node));
+        let exempt = !hop && scope.accepts(node, edge.requirement.node);
         self.push(
             out,
             Constraint {
@@ -434,7 +474,6 @@ impl Network {
         scope: &Scope,
         edge: &Edge,
         after: Slot,
-        accepted: &BTreeSet<NodeIndex>,
         out: &mut Vec<Constraint>,
     ) -> bool {
         let mut carried = Vec::new();
@@ -448,9 +487,10 @@ impl Network {
                 }
             },
         );
+        let node = edge.dependent.node;
         if !carried
             .iter()
-            .any(|(found, _)| accepted.contains(&found.requirement.node))
+            .any(|(found, _)| scope.accepts(node, found.requirement.node))
         {
             return false;
         }
@@ -463,7 +503,7 @@ impl Network {
                     offset_days: 0,
                     origin: Origin::Dependency(found),
                     conditional,
-                    exempt: accepted.contains(&found.requirement.node),
+                    exempt: scope.accepts(node, found.requirement.node),
                 },
             );
         }

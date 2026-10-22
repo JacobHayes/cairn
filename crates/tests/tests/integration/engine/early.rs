@@ -414,3 +414,67 @@ fn the_days_are_counted_to_the_milestones_date_as_shown() {
     let found = early(&records, "n_prep").unwrap();
     assert_eq!((found.days, found.date), (14, date("2026-10-20")));
 }
+
+/// F6: work finished ahead of a milestone that completes by its date is early, not the
+/// milestone short. Left held, finishing the work would cap the milestone's latest date at the
+/// finish, so it would read reached, the guard would see nothing open to record, and the
+/// milestone would read short; the work is done early instead, by the days to the milestone's
+/// date as shown.
+#[test]
+fn work_finished_ahead_of_an_auto_done_milestone_is_done_early() {
+    let records = support::accepted(
+        &support::journey(&add(&[
+            "{key: n_s, id: s, kind: milestone, title: S}",
+            "{key: n_m, id: m, kind: milestone, title: M, auto_done: true, not_before: {after: n_s, offset: 2}}",
+            "{key: n_end, id: end, kind: milestone, title: End}",
+            "{key: n_g, id: g, kind: group, title: G, opens_at: n_m, closes_at: n_end}",
+            "{key: n_x, id: x, parent: n_g, kind: action, title: X, estimate: 1}",
+        ])),
+        &format!(
+            "{}{}{}{}",
+            transition("n_s", "complete"),
+            pin("n_end", "2026-10-20"),
+            bypass("n_x", "deps_done"),
+            transition("n_x", "complete"),
+        ),
+    );
+    for node in ["n_x", "n_m", "n_s"] {
+        assert_eq!(short(&records, node), None, "{node}");
+    }
+    let found = early(&records, "n_x").expect("done early");
+    assert_eq!(
+        found.days, 14,
+        "from the completion on Oct 6 to M as shown, Oct 20"
+    );
+    assert_eq!(found.date, date("2026-10-20"));
+    assert_eq!(
+        found.source,
+        dependency(
+            "n_x",
+            "n_m",
+            DependencyVia::StageOpening { group: key("n_g") }
+        )
+    );
+}
+
+/// F6: an `auto_done` milestone that already reads reached (its only date is the due its
+/// dependent gives it, passed) stays reached when the dependent is completed: finishing the
+/// work is not early of it, and completing needs no bypass.
+#[test]
+fn work_after_a_reached_auto_done_milestone_is_completed_without_a_bypass() {
+    let records = support::accepted(
+        &support::journey(&add(&[
+            "{key: n_m, id: m, kind: milestone, title: M, auto_done: true}",
+            "{key: n_x, id: x, kind: action, title: X, requires: [n_m]}",
+        ])),
+        &format!(
+            "{}{}",
+            pin("n_x", "2026-10-05"),
+            transition("n_x", "complete")
+        ),
+    );
+    for node in ["n_x", "n_m"] {
+        assert_eq!(short(&records, node), None, "{node}");
+    }
+    assert_eq!(early(&records, "n_x"), None);
+}

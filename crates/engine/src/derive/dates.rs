@@ -68,7 +68,8 @@
 //!
 //! The execution layer adds two things. A stage opening that does not gate gives one
 //! constraint per node of the stage that is not a container, at most nodes x depth: 32,000.
-//! And where finished work's guard bypass accepted a requirement that reaches it through an
+//! And where finished work's guard bypass accepted a requirement (a pending `auto_done` milestone
+//! with its date ahead always counts as accepted, found by a first solve) that reaches it through an
 //! entry, that hop is replaced by one constraint per requirement it carries, at most
 //! `containment_depth_max` x (`edge_count_per_node_max` + 1 + `condition_clause_count_max`) =
 //! 16 x 81 = 1,296 per node, 2,592,000 at the node limit (every node finished under a bypass
@@ -473,24 +474,43 @@ impl Dates {
     ) -> Self {
         let document = graph.document();
         let dependencies = &early.dependencies;
-        let scope = Scope::new(
+        let mut scope = Scope::new(
             document,
             dependencies,
             &early.relevance,
             &early.skips,
             Layer::Execution,
         );
-        let network = Network::build(document, dependencies, &scope);
-        let seeds = Seeds::execution(
-            document,
-            dependencies,
-            &early.relevance,
-            &network,
-            &scope,
-            today,
-            created_on,
-        );
-        let solved = execution::solve(&network, &seeds);
+        let solve = |scope: &Scope| {
+            let network = Network::build(document, dependencies, scope);
+            let seeds = Seeds::execution(
+                document,
+                dependencies,
+                &early.relevance,
+                &network,
+                scope,
+                today,
+                created_on,
+            );
+            let solved = execution::solve(&network, &seeds);
+            (network, seeds, solved)
+        };
+        let (mut network, mut seeds, mut solved) = solve(&scope);
+        // Finished work held by a pending `auto_done` milestone whose date is still ahead
+        // (earliest bound after today) is early of it: solved again with that accepted.
+        let ahead: BTreeSet<NodeIndex> = scope
+            .auto_candidates()
+            .into_iter()
+            .filter(|&at| {
+                solved
+                    .earliest(network.finish(at))
+                    .is_some_and(|earliest| earliest > day(today))
+            })
+            .collect();
+        if !ahead.is_empty() {
+            scope.accept_auto_ahead(ahead);
+            (network, seeds, solved) = solve(&scope);
+        }
         let keys = dependencies.keys().to_vec();
         let milestone = keys
             .iter()
