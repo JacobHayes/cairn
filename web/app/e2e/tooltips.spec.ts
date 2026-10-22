@@ -194,6 +194,15 @@ test("a timeline title cut short shows whole in a tip that is not itself cut", a
   expect(cut.length, "the stress journey cuts some timeline titles").toBeGreaterThan(0);
   const long = links.nth(cut[0] ?? 0);
   const whole = (await whenSettled(page, () => long.textContent()))?.trim() ?? "";
+  // Scrolled into view first and the scroll let to land: a scroll event arriving after the pointer is over the title closes a tip, as it should, so the pointer must not be put over it while the page is still moving.
+  await long.scrollIntoViewIfNeeded();
+  let last = "";
+  await expect.poll(async () => {
+    const now = JSON.stringify(await long.boundingBox());
+    const still = now === last;
+    last = now;
+    return still;
+  }).toBe(true);
   await long.hover();
   await expect(openTip(page)).toHaveText(whole);
   await expect.poll(() => openTip(page).evaluate((tip) => tip.scrollWidth - tip.clientWidth)).toBeLessThanOrEqual(1);
