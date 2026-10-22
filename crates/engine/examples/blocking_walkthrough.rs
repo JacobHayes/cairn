@@ -295,7 +295,12 @@ fn cause(cause: &StallCause) -> String {
         } => {
             format!("`{node}` snoozed until {}", until(target))
         }
-        StallCause::AutoDone { node, date } => format!("`{node}` marks itself done on {date}"),
+        StallCause::Scheduled {
+            node,
+            date,
+            marks_itself_done: true,
+        } => format!("`{node}` marks itself done on {date}"),
+        StallCause::Scheduled { node, date, .. } => format!("`{node}` is scheduled for {date}"),
     }
 }
 

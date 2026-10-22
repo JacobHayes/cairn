@@ -3,9 +3,10 @@
 //! on, as data:
 //!
 //! - each frontier node held off the acting frontier: by a snooze that holds, with its target
-//!   (`unsnooze` is offered), or, for an `auto_done` milestone, by its date still ahead
-//!   (`mark done now` is offered); a node held through containers names the snooze of each
-//!   container above it that holds, once, however many nodes it holds (B6);
+//!   (`unsnooze` is offered), or by a date ahead (D8 scheduled: a milestone's date, or the own
+//!   not-before date of work or a decision), with whether it marks itself done then; a node
+//!   held through containers names the snooze of each container above it that holds, once,
+//!   however many nodes it holds (B6);
 //! - each gating node: the unfinished target of such a node snooze, which lifts the snooze
 //!   when it satisfies dependencies; a surface follows it to its own blocking.
 //!
@@ -103,12 +104,13 @@ fn holds(blocking: &Blocking, sweep: &Sweep<'_>) -> BTreeMap<NodeKey, StallCause
             }
             above = tree.parent(container);
         }
-        if let (None, None, Some(date)) = (own, via, sweep.date_ahead(key)) {
+        if let (None, None, Some(held)) = (own, via, blocking.scheduled(key)) {
             causes.insert(
                 key.clone(),
-                StallCause::AutoDone {
+                StallCause::Scheduled {
                     node: key.clone(),
-                    date,
+                    date: held.date,
+                    marks_itself_done: held.marks_itself_done,
                 },
             );
         }

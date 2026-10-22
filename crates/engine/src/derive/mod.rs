@@ -180,11 +180,22 @@ impl Derived {
             &self.relevance,
             &self.dependencies,
             &self.blocking,
+            &self.dates,
             &annotated,
             key,
         );
         assert_eq!(reasons.is_empty(), !self.is_stale(key), "the graph derived");
         reasons
+    }
+
+    /// A8, D4: the date the node's own not-before rules hold it to while that date is after
+    /// today, for work or a decision: what its `date_arrived` guard fails on. `graph` is the
+    /// one derived.
+    #[must_use]
+    pub fn too_early(&self, graph: &Graph, key: &NodeKey) -> Option<Date> {
+        graph
+            .node(key)
+            .and_then(|node| stale::too_early(node, &self.dates))
     }
 
     /// D4's `deps_done` failures: each hard dependency of the node, its own and inherited,
@@ -350,13 +361,18 @@ impl Derived {
         nearest_first
     }
 
-    /// The unsatisfied gate dependencies among `listed`, with how each arose.
+    /// The unsatisfied gate dependencies among `listed`, with how each arose and, for one a
+    /// date ahead holds (D8 scheduled), that date.
     fn unsatisfied(&self, listed: Vec<EffectiveDependency>) -> impl Iterator<Item = Blocker> + '_ {
         listed
             .into_iter()
             .filter(|dependency| dependency.class == dependencies::EdgeClass::Gate)
             .filter(|dependency| !self.blocking.satisfies(&dependency.node))
             .map(|dependency| Blocker {
+                date: self
+                    .blocking
+                    .scheduled(&dependency.node)
+                    .map(|held| held.date),
                 node: dependency.node,
                 via: dependency.via,
             })
@@ -419,7 +435,13 @@ pub(crate) fn derive_at(
     let ranking = Ranking::pass(&priority, &dates, &blocking, rank, |key| {
         priority.unlocks(key)
     });
-    let stale = stale::Staleness::pass(journey, &early.relevance, &early.dependencies, &blocking);
+    let stale = stale::Staleness::pass(
+        journey,
+        &early.relevance,
+        &early.dependencies,
+        &blocking,
+        &dates,
+    );
     let Early {
         relevance,
         dependencies,

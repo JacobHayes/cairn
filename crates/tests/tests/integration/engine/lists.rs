@@ -146,11 +146,7 @@ fn each_state_filter_keeps_what_it_names() {
         (
             Derive::vendor(7),
             ListFlag::NextUp,
-            vec![
-                "n_decision_meeting",
-                "n_workload_ingest",
-                "n_workload_query",
-            ],
+            vec!["n_workload_ingest", "n_workload_query"],
         ),
         (Derive::vendor(7), ListFlag::Snoozed, vec!["n_baseline"]),
         (
@@ -331,7 +327,8 @@ fn next_is_the_ranked_acting_frontier_with_breadcrumbs() {
         .next(&NextQuery::default(), &BTreeSet::new())
         .unwrap();
     let keys: Vec<&str> = next.items.iter().map(|row| row.key.as_str()).collect();
-    assert_eq!(keys, ["n_access", "n_decision_meeting", "n_workload"]);
+    // The decision meeting is pinned to a day ahead: scheduled, off the acting frontier.
+    assert_eq!(keys, ["n_access", "n_workload"]);
     assert_eq!(next.items[0].ancestors, [key("n_setup")]);
     let rank = next.items[0].rank.unwrap().rank.get();
     assert_eq!(
@@ -364,13 +361,13 @@ fn next_is_the_ranked_acting_frontier_with_breadcrumbs() {
     let decided = Derive::vendor(2);
     assert_eq!(
         decided.next(&mine, &["who_k3d7qm2xw5tn6pfa"]),
-        ["n_kickoff", "n_decision_meeting"]
+        ["n_kickoff"]
     );
     assert_eq!(decided.next(&mine, &["who_d4m6uk2eqf5rbhzs"]).len(), 0);
 }
 
 /// C10: re-sorting by one signal: a heavy action with no deadline outranks nothing urgent, but
-/// a milestone pinned to tomorrow ranks first; by gravity the heavy action leads, by slack the
+/// a milestone pinned to today ranks first; by gravity the heavy action leads, by slack the
 /// milestone.
 #[test]
 fn next_re_sorts_by_one_signal() {
@@ -379,7 +376,7 @@ fn next_re_sorts_by_one_signal() {
             "{key: n_heavy, id: heavy, kind: action, title: Heavy, weight: 10}",
             "{key: n_soon, id: soon, kind: milestone, title: Soon}",
         ])),
-        "- op: set_pin\n  node: n_soon\n  date: \"2026-10-07\"\n",
+        "- op: set_pin\n  node: n_soon\n  date: \"2026-10-06\"\n",
     );
     let derive = Derive::test(&records);
     let by = |sort| {
@@ -397,8 +394,9 @@ fn next_re_sorts_by_one_signal() {
 }
 
 /// C10: the product launch at the scenario tests' day, where every slack is past the urgency
-/// window: gravity and unlocks rank, so the launch leads, then the work feeding it, and the
-/// retrospective, with no deadline, sorts last by slack too.
+/// window: the pinned launch and the announcement, held by its own not-before date, wait for
+/// their dates off the next list; gravity and unlocks rank the rest, so the documentation
+/// leads, and the retrospective, with no deadline, sorts last by slack too.
 #[test]
 fn the_launch_ranks_by_gravity_at_the_scenario_day_and_re_sorts_by_slack() {
     let launch = Derive::on(
@@ -408,13 +406,7 @@ fn the_launch_ranks_by_gravity_at_the_scenario_day_and_re_sorts_by_slack() {
     );
     assert_eq!(
         launch.next(&NextQuery::default(), &[]),
-        [
-            "n_launch",
-            "n_docs",
-            "n_announcement",
-            "n_beta_end",
-            "n_retro"
-        ]
+        ["n_docs", "n_beta_end", "n_retro"]
     );
     let by_slack = NextQuery {
         sort: SortBy::Slack,
@@ -422,13 +414,7 @@ fn the_launch_ranks_by_gravity_at_the_scenario_day_and_re_sorts_by_slack() {
     };
     assert_eq!(
         launch.next(&by_slack, &[]),
-        [
-            "n_docs",
-            "n_announcement",
-            "n_beta_end",
-            "n_launch",
-            "n_retro"
-        ]
+        ["n_docs", "n_beta_end", "n_retro"]
     );
 }
 

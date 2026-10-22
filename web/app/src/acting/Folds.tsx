@@ -90,7 +90,7 @@ function AddNote({ write, node }: { write: NodeWrite; node: string }) {
 
 /** D4: a guard failure that makes finished work stale, as a sentence. */
 function staleWords(view: Ready, failure: NonNullable<ReturnType<typeof firstStale>>): string {
-  return upperFirst(guardFailureText(failure, namer(view)));
+  return upperFirst(guardFailureText(failure, namer(view), view.derived.today));
 }
 
 function firstStale(view: Ready, key: string) {

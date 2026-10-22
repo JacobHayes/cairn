@@ -6,7 +6,7 @@
 import { Link, useLocation } from "react-router";
 
 import type { DecisionRow } from "../decisions/model.ts";
-import { nodeOf, type Ready, titleOf } from "../detail/model.ts";
+import { nodeOf, scheduledDate, type Ready, titleOf } from "../detail/model.ts";
 import { screenSwitched, useNodeAddresses } from "../journeys/address.ts";
 import { useJourneyTarget } from "../journeys/useJourneyTarget.ts";
 import { ownerWords, UNASSIGNED } from "../detail/sections.tsx";
@@ -63,13 +63,23 @@ function Return({ view, line }: { view: Ready; line: Line }) {
   );
 }
 
-/** A phone drops the Due column, so the row says its due words under the title (a snoozed row says where the snooze ends instead). */
+/** D8: the date a scheduled row waits for, as its one secondary fact (the Due column stays its due date). */
+function Scheduled({ view, line }: { view: Ready; line: Line }) {
+  const date = scheduledDate(view, line.key);
+  return date === undefined ? null : (
+    <span className="muted small" data-testid="list-scheduled">
+      {nodeOf(view, line.key)?.kind === "milestone" ? "On" : "Not before"} {dateWords(date, view.derived.today)}
+    </span>
+  );
+}
+
+/** A phone drops the Due column, so the row says its due words under the title (a snoozed row says where the snooze ends instead, and a scheduled row the date it waits for: one secondary fact each). */
 export function PhoneDue({ view, line, fact }: { view: Ready; line: Line; fact: string | undefined }) {
   const derived = view.derived.nodes[line.key];
   const node = nodeOf(view, line.key);
   const state = line.row?.display_state ?? derived?.display_state;
   const due = derived?.dates.due?.date;
-  const open = state !== undefined && state !== "done" && state !== "skipped" && state !== "not_relevant" && state !== "snoozed";
+  const open = state !== undefined && state !== "done" && state !== "skipped" && state !== "not_relevant" && state !== "snoozed" && state !== "scheduled";
   if (!open || due == null || node === undefined) {
     return null;
   }
@@ -129,6 +139,7 @@ function Title({ line, context }: { line: Line; context: CellContext }) {
         <NodeLink view={view} node={line.key} />
         {acting ? <Acting line={line} context={context} /> : tree ? (line.container ? <Progress view={view} line={line} /> : null) : <Under view={view} line={line} />}
         <Return view={view} line={line} />
+        <Scheduled view={view} line={line} />
         <PhoneDue view={view} line={line} fact={acting && line.row !== undefined ? factOf(view, line.row, context.sort ?? "rank")?.words : undefined} />
       </div>
     </div>

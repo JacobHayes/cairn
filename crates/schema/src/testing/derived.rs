@@ -164,6 +164,7 @@ pub fn arb_violation() -> BoxedStrategy<Violation> {
             Guard::HasArtifact,
             Guard::HasNote,
             Guard::BrokenDown,
+            Guard::DateArrived,
         ])),
         prop::collection::btree_set(arb_guard_failure(), 0..2),
         (
@@ -264,20 +265,26 @@ fn arb_node_dates() -> BoxedStrategy<NodeDates> {
         bound(),
         (prop::option::of(-60i32..60), prop::option::of(1u32..60)),
         prop::option::of(arb_short_chain()),
-        prop::option::of((
-            arb_date(),
-            prop::sample::select(vec![DateOrigin::Actual, DateOrigin::Pin, DateOrigin::Due]),
-        )),
+        (
+            prop::option::of((
+                arb_date(),
+                prop::sample::select(vec![DateOrigin::Actual, DateOrigin::Pin, DateOrigin::Due]),
+            )),
+            prop::option::of(arb_date()),
+        ),
     )
         .prop_map(
-            |(earliest_start, latest_start, due, days, shortfall, effective)| NodeDates {
-                earliest_start,
-                latest_start,
-                due,
-                slack_days: days.0,
-                overdue_days: days.1,
-                shortfall,
-                effective_date: effective.map(|(date, origin)| EffectiveDate { date, origin }),
+            |(earliest_start, latest_start, due, days, shortfall, (effective, not_before))| {
+                NodeDates {
+                    earliest_start,
+                    latest_start,
+                    due,
+                    slack_days: days.0,
+                    overdue_days: days.1,
+                    shortfall,
+                    effective_date: effective.map(|(date, origin)| EffectiveDate { date, origin }),
+                    not_before,
+                }
             },
         )
         .boxed()
@@ -387,17 +394,12 @@ fn arb_derived_extras() -> BoxedStrategy<(
             Guard::HasArtifact,
             Guard::HasNote,
             Guard::BrokenDown,
+            Guard::DateArrived,
         ]),
         0..3,
     );
-    let waits = (
-        prop::collection::vec(
-            (arb_node_key(), arb_dependency_via()).prop_map(|(node, via)| Blocker { node, via }),
-            0..3,
-        ),
-        0u32..5,
-    )
-        .prop_map(|(entries, extra)| {
+    let waits =
+        (prop::collection::vec(arb_blocker(), 0..3), 0u32..5).prop_map(|(entries, extra)| {
             let total = u32::try_from(entries.len()).unwrap_or(0) + extra;
             Explained {
                 entries: bounded_vec(entries),
@@ -407,13 +409,21 @@ fn arb_derived_extras() -> BoxedStrategy<(
     (progress, guards, any::<bool>(), waits).boxed()
 }
 
+/// A blocker, with a date or none.
+fn arb_blocker() -> BoxedStrategy<Blocker> {
+    (
+        arb_node_key(),
+        arb_dependency_via(),
+        prop::option::of(arb_date()),
+    )
+        .prop_map(|(node, via, date)| Blocker { node, via, date })
+        .boxed()
+}
+
 /// One node's derived values.
 pub fn arb_node_derived() -> BoxedStrategy<NodeDerived> {
     let flags = prop::collection::vec(any::<bool>(), 7);
-    let blockers = prop::collection::vec(
-        (arb_node_key(), arb_dependency_via()).prop_map(|(node, via)| Blocker { node, via }),
-        0..2,
-    );
+    let blockers = prop::collection::vec(arb_blocker(), 0..2);
     (
         arb_relevance(),
         flags,
@@ -483,7 +493,13 @@ fn arb_stalled() -> BoxedStrategy<Stalled> {
         arb_node_key().prop_map(StallCause::Gate),
         (arb_node_key(), arb_snooze_target())
             .prop_map(|(node, until)| StallCause::Snooze { node, until }),
-        (arb_node_key(), arb_date()).prop_map(|(node, date)| StallCause::AutoDone { node, date }),
+        (arb_node_key(), arb_date(), any::<bool>()).prop_map(|(node, date, marks_itself_done)| {
+            StallCause::Scheduled {
+                node,
+                date,
+                marks_itself_done,
+            }
+        }),
     ];
     (prop::collection::vec(cause, 1..3), any::<bool>())
         .prop_map(|(waiting_on, all_blocked)| Stalled {

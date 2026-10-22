@@ -122,7 +122,7 @@ function Unlocks({ view, detail, open }: { view: Ready; detail: NodeDetail; open
             {waiting.held.map((held) => (
               <li key={held.node} data-node={held.node}>
                 <NodeLink view={view} node={held.node} /> <span className="muted small">also waits on </span>
-                <Pieces view={view} pieces={held.also_waits_on.flatMap((blocker, at) => [...(at === 0 ? [] : [", "]), ...holdingPhrase(view, { node: blocker.node, via: blocker.via, holder: undefined })])} />
+                <Pieces view={view} pieces={held.also_waits_on.flatMap((blocker, at) => [...(at === 0 ? [] : [", "]), ...holdingPhrase(view, { node: blocker.node, via: blocker.via, holder: undefined, date: blocker.date ?? undefined })])} />
               </li>
             ))}
           </ul>

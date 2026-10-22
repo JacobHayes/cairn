@@ -27,7 +27,7 @@ test("C10, C18, E1: a row's title opens that node on the graph; Done on a row of
   const left = page.getByTestId("summary-left");
   const before = Number(await whenSettled(page, () => left.getAttribute("data-remaining")));
   const doneBefore = Number(await whenSettled(page, () => page.locator('[data-testid="summary-states"] [data-state="done"]').getAttribute("data-count")));
-  const row = yours.locator('[data-testid="summary-item"][data-node="n_announcement"]');
+  const row = yours.locator('[data-testid="summary-item"][data-node="n_retro"]');
   await row.hover();
   await row.getByRole("button", { name: "Mark done", exact: true }).click();
   await expect(row).toHaveCount(0);

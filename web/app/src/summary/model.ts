@@ -13,7 +13,7 @@ import { unblockersOf } from "../acting/waiting.ts";
 import type { FactTone } from "../acting/reasons.ts";
 import type { NodeRow } from "../acting/why.ts";
 import { guardFailureText, namer } from "../detail/explain.ts";
-import { feedingDecision, milestonesFirst, nodeOf, recordOf, titleOf, type GraphNode, type Ready } from "../detail/model.ts";
+import { feedingDecision, milestonesFirst, nodeOf, recordOf, scheduledDate, titleOf, type GraphNode, type Ready } from "../detail/model.ts";
 import { snoozeEndWords } from "../status/snooze.ts";
 import { isOpen } from "../status/state.ts";
 import { dateWords, daysWords } from "../status/when.ts";
@@ -67,7 +67,7 @@ function overdueOf(ready: Ready, key: string): SummaryModel["overdue"][number] {
 
 function staleOf(ready: Ready, key: string): SummaryModel["stale"][number] {
   const name = namer(ready);
-  return { ...listed(ready, key), reasons: (ready.derived.nodes[key]?.stale ?? []).map((failure) => guardFailureText(failure, name)) };
+  return { ...listed(ready, key), reasons: (ready.derived.nodes[key]?.stale ?? []).map((failure) => guardFailureText(failure, name, ready.derived.today)) };
 }
 
 /** C18: the projected summary with what a reader needs to read it. */
@@ -202,17 +202,28 @@ export interface WaitingDecision {
   fact: string | undefined;
 }
 
-/** What a waiting decision waits on, in words: that it may not apply, a snooze's date, or its first unblocker, milestones first. */
+/** D8: the date a scheduled node waits for, in words: `Not before Nov 1`, or a milestone's `On Nov 1`; none for one no date holds. */
+export function scheduledFact(ready: Ready, node: GraphNode): string | undefined {
+  const date = scheduledDate(ready, node.key);
+  return date === undefined ? undefined : `${node.kind === "milestone" ? "On" : "Not before"} ${dateWords(date, ready.derived.today)}`;
+}
+
+/** What a waiting decision waits on, in words: that it may not apply, its own date, a snooze's date, or its first unblocker, milestones first, with the date it is scheduled for. */
 export function waitingFact(ready: Ready, node: GraphNode): string | undefined {
   if (ready.derived.nodes[node.key]?.display_state === "conditional") {
     return "May not apply";
+  }
+  const scheduled = scheduledFact(ready, node);
+  if (scheduled !== undefined) {
+    return scheduled;
   }
   const { unblockers, snoozedUntil } = unblockersOf(ready, node);
   const [first, ...rest] = milestonesFirst(ready, unblockers, (each) => each.node);
   if (first === undefined) {
     return snoozedUntil === undefined ? undefined : `Snoozed until ${snoozeEndWords(ready, { date: snoozedUntil })}`;
   }
-  return `Waiting for ${titleOf(ready, first.node)}${rest.length === 0 ? "" : ` and ${String(rest.length)} more`}`;
+  const on = first.date === undefined ? "" : ` on ${dateWords(first.date, ready.derived.today)}`;
+  return `Waiting for ${titleOf(ready, first.node)}${on}${rest.length === 0 ? "" : ` and ${String(rest.length)} more`}`;
 }
 
 /** The sets of action rows the page lists, each node in one (C10, C11, E1, E4). */
@@ -317,6 +328,17 @@ export function underWay(ready: Ready, claimed: ReadonlySet<string>): Held[] {
         return progress == null || progress.total === 0 ? undefined : `${String(progress.total - progress.done)} of ${String(progress.total)} inside still open`;
       },
     }));
+}
+
+/**
+ * C18, D8: the work and decisions waiting for their own date (scheduled) and not already on an
+ * action list, in graph order, each with that date. A milestone is left out: the dates panel
+ * lists every milestone ahead with its date.
+ */
+export function scheduledRows(ready: Ready, claimed: ReadonlySet<string>): Held[] {
+  return (ready.journey.graph.nodes ?? [])
+    .filter((node) => node.kind !== "milestone" && ready.derived.nodes[node.key]?.display_state === "scheduled" && !claimed.has(node.key))
+    .map((node) => ({ key: node.key, owners: ownersOf(ready, node.key), fact: () => scheduledFact(ready, node) }));
 }
 
 /**

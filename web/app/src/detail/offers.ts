@@ -13,7 +13,7 @@ export interface Offered {
   /** The one primary, none when the node is finished, does not apply, or is a stage. */
   primary: Act | undefined;
   secondary: Act[];
-  /** The primary would be refused: something it waits on is not done (the `⋯` menu answers anyway). */
+  /** The primary would be refused: something it waits on is not done, or its own date has not come (the `⋯` menu answers anyway). */
   waiting: boolean;
 }
 
@@ -42,7 +42,7 @@ export function offered(view: Ready, key: string): Offered {
     return { primary: undefined, secondary: snooze, waiting: false };
   }
   const moves = movesFrom(node.kind, record.state);
-  const waiting = failingGuards(derived).includes("deps_done");
+  const waiting = failingGuards(derived).some((guard) => guard === "deps_done" || guard === "date_arrived");
   if (derived.needs_breakdown === true) {
     return { primary: "break-down", secondary: ["mark-atomic", ...snooze], waiting: false };
   }
@@ -130,7 +130,8 @@ export function menuOf(view: Ready, detail: NodeDetail, writable: boolean): Menu
   const kind = node.kind;
   // A container holds other nodes; an empty group holds none yet, though a segment may go into it.
   const container = detail.children.length > 0;
-  const blocked = failingGuards(derived).includes("deps_done");
+  // A completion refused until what it waits on is done or its own date comes.
+  const held = failingGuards(derived).some((guard) => guard === "deps_done" || guard === "date_arrived");
   const guardFails = failingGuards(derived).length > 0 || derived.needs_breakdown === true;
   const keptUnder = derived.effectively_skipped === true && state !== "skipped";
   const member = (view.journey.graph.insertions ?? []).some((insertion) => node.key in insertion.nodes);
@@ -156,8 +157,8 @@ export function menuOf(view: Ready, detail: NodeDetail, writable: boolean): Menu
         "snooze",
         "skip",
         state === "active" && "stop",
-        kind === "decision" && blocked && "answer-anyway",
-        (kind === "milestone" ? blocked : isWork(node) && guardFails) && "done-anyway",
+        kind === "decision" && held && "answer-anyway",
+        (kind === "milestone" ? held : isWork(node) && guardFails) && "done-anyway",
         keptUnder && "keep",
       ],
       branch ? { snooze: "Snooze branch…", skip: "Skip branch…" } : {},

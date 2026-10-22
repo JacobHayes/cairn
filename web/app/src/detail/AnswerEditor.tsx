@@ -19,7 +19,7 @@ import { choiceId, choiceLabel } from "../status/answer.ts";
 import { Button, Field } from "../ui/kit.tsx";
 import { Markdown } from "../ui/markdown.tsx";
 import { effectOf, effectOfOption, outgoing, sameAnswer } from "./answer.ts";
-import { answerable, failingGuards, guardBypass, titleOf, type AnswerValue, type GraphNode, type NodeDetail, type Ready } from "./model.ts";
+import { answerable, failingGuards, guardBypass, titleOf, type AnswerValue, type GraphNode, type NodeDerived, type NodeDetail, type Ready } from "./model.ts";
 import { IdentityOptions, NodeLink, Rationale } from "./parts.tsx";
 import { useSavePreview } from "./preview.ts";
 import { bypassReady, Rejected } from "./Rejected.tsx";
@@ -363,9 +363,18 @@ function useChoiceEffects(view: Ready, node: string, open: boolean) {
   return projected?.applies === true ? projected.choices : undefined;
 }
 
-/** D4: answering past the guard that blocks the decision records why. */
-function bypassOverride(node: string, reason: string | undefined): Mutation[] {
-  return reason === undefined ? [] : [guardBypass(node, ["deps_done"], reason)];
+/** D4, D8: the guards a first answer can be refused by: what it waits on, and its own date. */
+const ANSWER_GUARDS: readonly Schema<"Guard">[] = ["deps_done", "date_arrived"];
+
+/** D4: the guards that hold the decision's answer now. */
+function answerHolds(derived: NodeDerived): Schema<"Guard">[] {
+  return failingGuards(derived).filter((guard) => ANSWER_GUARDS.includes(guard));
+}
+
+/** D4: answering past every guard that holds the decision records why: none without a reason, or with nothing holding it. */
+export function answerBypass(node: string, derived: NodeDerived, reason: string | undefined): Mutation[] {
+  const guards = answerHolds(derived);
+  return reason === undefined || guards.length === 0 ? [] : [guardBypass(node, guards, reason)];
 }
 
 /** What the form holds, and what it would do: the drafts, what Save would send, and Save itself. */
@@ -392,7 +401,7 @@ function useAnswerForm(view: Ready, detail: NodeDetail, anyway: Anyway | undefin
   const caused = useSavePreview(view, mutations);
   const bypass = anyway?.reason;
   const newAnswer = form.draft !== undefined && !sameAnswer(form.draft.value, stored);
-  const blocked = failingGuards(detail.derived).includes("deps_done");
+  const blocked = answerHolds(detail.derived).length > 0;
   const canSave = sending !== undefined && !write.disabled && (!blocked || (bypass !== undefined && bypassReady(bypass)));
   const close = () => {
     setNamed(undefined);
@@ -433,7 +442,7 @@ function useAnswerForm(view: Ready, detail: NodeDetail, anyway: Anyway | undefin
         return;
       }
       const id = newPatchId();
-      const landed = write.run([...bypassOverride(node.key, bypass), ...mutations], form.draft ?? why.draft ?? write.seen, id);
+      const landed = write.run([...answerBypass(node.key, detail.derived, bypass), ...mutations], form.draft ?? why.draft ?? write.seen, id);
       if (write.holds(id)) {
         anyway?.sent(id);
       }

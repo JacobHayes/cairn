@@ -11,7 +11,7 @@ import { isOpen } from "../status/state.ts";
 import { upperFirst } from "../status/words.ts";
 import { dateWords, daysUntil, daysWords, relativeDays } from "../status/when.ts";
 import { guardFailureText, namer } from "./explain.ts";
-import { nodeOf, rankPlaces, titleOf, waitsOn, type Holding, type NodeDetail, type NodeDerived, type Ready } from "./model.ts";
+import { nodeOf, rankPlaces, scheduledDate, titleOf, waitsOn, type Holding, type NodeDetail, type NodeDerived, type Ready } from "./model.ts";
 import { answerText, identityName, ownersOf, ownerWords } from "./sections.tsx";
 import { listParts, plural } from "../ui/words.ts";
 
@@ -47,20 +47,48 @@ function namedWithOwner(view: Ready, node: string): Piece[] {
   return [{ node }, ...(owner === undefined ? [] : [` (${owner})`])];
 }
 
-/** One thing the node waits on, as a phrase with its link and owner. */
-export function holdingPhrase(view: Ready, held: Holding): Piece[] {
-  if (typeof held.via === "object" && "stage_opening" in held.via) {
-    return ["the ", { node: held.via.stage_opening.group }, " stage opening"];
-  }
-  return namedWithOwner(view, held.node);
+/** When a scheduled thing it waits on comes, after its name: " on Nov 1"; nothing for one no date holds. */
+function onDate(view: Ready, held: Holding): Piece[] {
+  return held.date === undefined ? [] : [` on ${dateWords(held.date, view.derived.today)}`];
 }
 
-/** The things the node waits on, as a phrase: "A (Ben) and the B stage opening". */
+/** One thing the node waits on, as a phrase with its link and owner, and its date when a date holds it. */
+export function holdingPhrase(view: Ready, held: Holding): Piece[] {
+  if (typeof held.via === "object" && "stage_opening" in held.via) {
+    return ["the ", { node: held.via.stage_opening.group }, " stage opening", ...onDate(view, held)];
+  }
+  return [...namedWithOwner(view, held.node), ...onDate(view, held)];
+}
+
+/** The things the node waits on, as a phrase: "A (Ben) and the B stage opening", "Launch on Nov 1". */
 export function waitingPhrase(view: Ready, key: string): Piece[] {
   const held = waitsOn(view, key);
   // A stage's own opening is what holds it: name the milestone, not the stage itself.
   const own = (each: Holding) => each.holder === undefined && typeof each.via === "object" && "stage_opening" in each.via && each.via.stage_opening.group === key;
-  return held.length === 0 ? ["earlier work"] : listed(held.map((each) => (own(each) ? namedWithOwner(view, each.node) : holdingPhrase(view, each))));
+  return held.length === 0 ? ["earlier work"] : listed(held.map((each) => (own(each) ? [...namedWithOwner(view, each.node), ...onDate(view, each)] : holdingPhrase(view, each))));
+}
+
+/** D8: what a scheduled node waits for, in a sentence: a milestone marks itself done on its day or is marked done once it comes; work or a decision waits for its own date. */
+function scheduledSentence(view: Ready, detail: NodeDetail): Piece[] {
+  const { node } = detail;
+  const date = scheduledDate(view, node.key);
+  const on = date === undefined ? "its date" : dateWords(date, view.derived.today);
+  if (node.kind === "milestone") {
+    return [node.auto_done === true ? `Scheduled for ${on}; it marks itself done that day.` : `Scheduled for ${on}; mark it done when it happens.`];
+  }
+  if (node.kind === "decision") {
+    return [`Scheduled: to be decided from ${on}. To answer sooner, choose Answer anyway and give a reason.`];
+  }
+  return [`Scheduled: not before ${on}. It can be started now; to finish sooner, choose Done anyway and give a reason.`];
+}
+
+/** Why work started early is early: what it still waits on, and its own date when that is ahead. */
+function earlyPhrase(view: Ready, detail: NodeDetail): Piece[] {
+  const { derived, node } = detail;
+  const own = derived.dates.not_before ?? undefined;
+  const ahead = own !== undefined && own > view.derived.today ? [`its own date is ${dateWords(own, view.derived.today)}`] : [];
+  const waits = waitsOn(view, node.key).length > 0 || ahead.length === 0 ? ["still waits on ", ...waitingPhrase(view, node.key)] : [];
+  return waits.length > 0 && ahead.length > 0 ? [...waits, ", and ", ...ahead] : [...waits, ...ahead];
 }
 
 
@@ -85,7 +113,9 @@ export function appliesIf(view: Ready, detail: NodeDetail): string | undefined {
 function staleWords(view: Ready, failures: Schema<"GuardFailure">[]): Piece[] {
   const name = namer(view);
   return failures.flatMap((failure): Piece[] =>
-    typeof failure === "object" ? [" Stale: ", { node: failure.open_dependency }, " was reopened."] : [` Stale: ${guardFailureText(failure, name)}.`],
+    typeof failure === "object" && "open_dependency" in failure
+      ? [" Stale: ", { node: failure.open_dependency }, " was reopened."]
+      : [` Stale: ${guardFailureText(failure, name, view.derived.today)}.`],
   );
 }
 
@@ -165,9 +195,7 @@ function stateSentence(view: Ready, detail: NodeDetail, rank: RankFacts): Piece[
       return [`${node.kind === "decision" ? "Ready to decide." : "Ready."}${rankClause(view, derived, rank)}`];
     case "active": {
       const since = `${record.started_on == null ? "In progress." : `In progress since ${on(record.started_on)}.`}${rankClause(view, derived, rank)}`;
-      return derived.started_early === true
-        ? [`${since} Started early: still waits on `, ...waitingPhrase(view, node.key), "."]
-        : [since];
+      return derived.started_early === true ? [`${since} Started early: `, ...earlyPhrase(view, detail), "."] : [since];
     }
     case "blocked":
       return ["Waiting on ", ...waitingPhrase(view, node.key), "."];
@@ -186,10 +214,8 @@ function stateSentence(view: Ready, detail: NodeDetail, rank: RankFacts): Piece[
       }
       return ["May not apply: depends on ", ...undecidedNames(view, node.key), `.${tail}`];
     }
-    case "scheduled": {
-      const date = derived.dates.effective_date?.date ?? derived.dates.due?.date;
-      return [date === undefined ? "Waiting for its date, then it marks itself done." : `Scheduled for ${on(date)}; it marks itself done that day.`];
-    }
+    case "scheduled":
+      return scheduledSentence(view, detail);
     case "snoozed": {
       const via = derived.snoozed_via ?? undefined;
       const target = derived.snoozed;

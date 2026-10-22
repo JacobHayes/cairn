@@ -83,7 +83,7 @@ use super::{Early, stored_state};
 use crate::graph::{Document, Graph};
 use execution::Solved;
 use explain::{Explain, Found};
-use network::{Layer, Network, Scope, Slot};
+use network::{Layer, Network, Origin, Rule, Scope, Slot};
 
 /// A date fixed on a slot, and what fixed it.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -499,6 +499,12 @@ impl Dates {
         }
     }
 
+    /// The today the dates were derived for.
+    #[must_use]
+    pub(crate) fn today(&self) -> Date {
+        date(self.today)
+    }
+
     fn index(&self, key: &NodeKey) -> Option<NodeIndex> {
         let at = self.keys.binary_search(key).ok()?;
         Some(NodeIndex::from_position(at))
@@ -548,6 +554,31 @@ impl Dates {
     pub fn earliest_start(&self, key: &NodeKey) -> Option<Date> {
         let at = self.index(key)?;
         self.solved.earliest(self.network.start(at)).map(date)
+    }
+
+    /// A8, F3: the earliest the node's own `not_before` rules let it start: the latest, over
+    /// those rules' constraints into its start, of each source's earliest date plus the
+    /// rule's offset. Read off the node's own rules alone, never off the chain that binds its
+    /// earliest start, so an earlier dependency's date never reads as its own. None when it
+    /// has no such rule in scope, or no source has a date.
+    #[must_use]
+    pub fn not_before(&self, key: &NodeKey) -> Option<Date> {
+        let at = self.index(key)?;
+        let own = Origin::Rule {
+            node: at,
+            rule: Rule::NotBefore,
+        };
+        self.network
+            .incoming(self.network.start(at))
+            .iter()
+            .filter_map(|&position| self.network.constraint(position))
+            .filter(|constraint| constraint.origin == own)
+            .filter_map(|constraint| {
+                let source = self.solved.earliest(constraint.before)?;
+                Some(source.saturating_add(constraint.offset_days))
+            })
+            .max()
+            .map(date)
     }
 
     /// F3: the earliest the node can finish.
@@ -708,6 +739,7 @@ impl Dates {
             overdue_days: self.overdue_days(key),
             shortfall,
             effective_date: self.effective_date(key),
+            not_before: self.not_before(key),
         }
     }
 }

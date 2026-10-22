@@ -1,8 +1,9 @@
 // C10, D5: when the acting frontier is empty, what the journey waits on, with the actions the
-// diagnostic offers where they are allowed: unsnooze a snoozed node (B6), or confirm an
-// `auto_done` milestone marked done before its date. Each is one patch.
+// diagnostic offers where they are allowed: unsnooze a snoozed node (B6); for a node waiting for
+// its date (D8 scheduled), mark a milestone done before its day, or start work early (finishing
+// it early needs a reason, so it is not offered here). Each is one patch.
 
-import { transition, type Ready } from "../detail/model.ts";
+import { nodeOf, transition, type Ready } from "../detail/model.ts";
 import { ACT_LABELS } from "../detail/offers.ts";
 import { Rejected } from "../detail/Rejected.tsx";
 import { useNodeWrite, type NodeWrite } from "../detail/write.ts";
@@ -48,13 +49,17 @@ function CauseLine({ view, write, cause, reach }: { view: Ready; write: NodeWrit
       </li>
     );
   }
-  const { node, date } = cause.auto_done;
+  const { node, date, marks_itself_done: marks } = cause.scheduled;
+  const kind = nodeOf(view, node)?.kind;
+  // A milestone is marked done whenever it happens; work may start before its date; a decision waits.
+  const act = kind === "milestone" ? "done" : kind === "deliverable" || kind === "action" ? "start" : undefined;
+  const when = kind === "milestone" ? `${marks === true ? "marks itself done " : ""}${whenWords(date, undefined, today)}` : `not before ${dateWords(date, today)}`;
   return (
-    <li className="stall-cause" data-testid="stall-cause" data-status="auto_done" data-node={node}>
-      <span>{title(node)} <span className={inkOf(date) ?? "muted"}>· {whenWords(date, undefined, today)}</span></span>
-      {!write.writable ? null : (
-        <Button disabled={write.disabled} onClick={() => void write.run([transition(node, "complete")])}>
-          {ACT_LABELS.done}
+    <li className="stall-cause" data-testid="stall-cause" data-status="scheduled" data-node={node}>
+      <span>{title(node)} <span className={inkOf(date) ?? "muted"}>· {when}</span></span>
+      {!write.writable || act === undefined ? null : (
+        <Button disabled={write.disabled} onClick={() => void write.run([transition(node, act === "done" ? "complete" : "start")])}>
+          {ACT_LABELS[act]}
         </Button>
       )}
     </li>

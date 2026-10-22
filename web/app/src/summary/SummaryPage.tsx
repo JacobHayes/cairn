@@ -37,6 +37,7 @@ import {
   lifecycleLine,
   milestoneLine,
   recentlyFinished,
+  scheduledRows,
   shortfallWords,
   summaryModel,
   underWay,
@@ -253,6 +254,7 @@ function entriesOf(ready: Ready, model: SummaryModel, frontier: NodeRow[], owned
     underWay: underWay(ready, taken).map(held),
     waiting: claimed.waiting.map((each): Entry => ({ ...plain, key: each.key, fact: each.fact, owners: each.owners })),
     blocked: blockedRows(ready, taken).map(held),
+    scheduled: scheduledRows(ready, taken).map(held),
     attention,
     recent: recentlyFinished(ready).map((each): Entry => ({ ...plain, key: each.key, fact: each.fact, owners: undefined })),
     milestoneSkip: line?.key,
@@ -285,7 +287,7 @@ function Waiting({ ready, error }: { ready: Ready; error: string | undefined }) 
 
 type Entries = ReturnType<typeof entriesOf>;
 
-/** The action sections, in reading order: what waits on the viewer, the decisions to make, the rest of what is next, the work under way, then what waits (folded). */
+/** The action sections, in reading order: what waits on the viewer, the decisions to make, the rest of what is next, the work under way, then what waits (folded): decisions, blocked work, and work waiting for its date. */
 function Actions({ ready, entries, model, owned }: { ready: Ready; entries: Entries; model: SummaryModel; owned: MineEntry[] }) {
   const actions = useWritable(ready);
   // A completed or archived journey holds no current work: it lists what it left, not what to do next.
@@ -301,6 +303,7 @@ function Actions({ ready, entries, model, owned }: { ready: Ready; entries: Entr
       {panel("In progress", "summary-underway", entries.underWay)}
       {panel("Decisions waiting", "summary-waiting", entries.waiting, { fold: true })}
       {panel("Blocked", "summary-blocked", entries.blocked, { fold: true })}
+      {panel("Scheduled", "summary-scheduled", entries.scheduled, { fold: true })}
       {open && entries.waiting.length === 0 && entries.blocked.length === 0 && model.remaining === 0 ? <p className="muted summary-nothing" data-testid="summary-nothing">Nothing left to do.</p> : null}
     </div>
   );

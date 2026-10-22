@@ -46,7 +46,7 @@ fn the_snapshot_holds_answers_nodes_frontier_and_counts() {
     );
     assert_eq!(
         names(whole.acting_frontier.iter().map(|row| row.key.clone())),
-        ["n_access", "n_decision_meeting", "n_workload"]
+        ["n_access", "n_workload"]
     );
     assert_eq!(
         names(whole.open_decisions.clone()),
@@ -63,7 +63,7 @@ fn the_snapshot_holds_answers_nodes_frontier_and_counts() {
         usize::try_from(counts.in_scope + counts.not_relevant).unwrap(),
         graph.document().nodes.len()
     );
-    assert_eq!(counts.acting_frontier, 3);
+    assert_eq!(counts.acting_frontier, 2);
     let access = whole
         .nodes
         .iter()

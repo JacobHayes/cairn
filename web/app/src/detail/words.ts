@@ -20,6 +20,8 @@ export function guardWords(guard: Schema<"Guard">): string {
       return "a note";
     case "broken_down":
       return "a breakdown";
+    case "date_arrived":
+      return "waiting for its date";
   }
 }
 

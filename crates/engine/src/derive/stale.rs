@@ -1,7 +1,9 @@
 //! `stale` (D4; ARCHITECTURE, Read path: derive, pass 7): a terminal node whose completing
 //! guards would now fail, checked against the transition it used: `done` was completed
-//! (`deps_done`, `has_artifact`, `has_note`, `broken_down`), and `decided` answered
-//! (`deps_done`), and a `skipped` node is never stale, since its skip required nothing. The
+//! (`deps_done`, `has_artifact`, `has_note`, `broken_down`, and for work `date_arrived`), and
+//! `decided` answered (`deps_done`, `date_arrived`), and a `skipped` node is never stale,
+//! since its skip required nothing. A milestone is never held by its date: marking it done
+//! records when it happened. The
 //! failures a guard bypass recorded are accepted (D4: a bypass records the specific failures
 //! present), so only a later, distinct failure makes the node stale. Visible, never blocking.
 //! Only nodes in scope are judged: a node that is not relevant is out of the journey.
@@ -18,10 +20,11 @@
 use std::collections::BTreeSet;
 
 use cairn_schema::{
-    DependencyVia, GuardFailure, KeyRefs, Node, NodeKey, Payload, Relevance, State,
+    Date, DependencyVia, GuardFailure, KeyRefs, Node, NodeKey, Payload, Relevance, State,
 };
 
 use super::blocking::Blocking;
+use super::dates::Dates;
 use super::dependencies::{Dependencies, EdgeClass, EdgeSet};
 use super::relevance::Relevances;
 use super::stored_state;
@@ -41,6 +44,7 @@ impl Staleness {
         relevance: &Relevances,
         dependencies: &Dependencies,
         blocking: &Blocking,
+        dates: &Dates,
     ) -> Self {
         let annotated = annotated_nodes(graph.document());
         let nodes: BTreeSet<NodeKey> = graph
@@ -53,6 +57,7 @@ impl Staleness {
                     relevance,
                     dependencies,
                     blocking,
+                    dates,
                     &annotated,
                     &node.key,
                 );
@@ -80,6 +85,7 @@ pub(crate) fn reasons(
     relevance: &Relevances,
     dependencies: &Dependencies,
     blocking: &Blocking,
+    dates: &Dates,
     annotated: &Annotated<'_>,
     key: &NodeKey,
 ) -> BTreeSet<GuardFailure> {
@@ -112,6 +118,7 @@ pub(crate) fn reasons(
                 .map(GuardFailure::OpenDependency),
         );
     }
+    failures.extend(too_early(node, dates).map(GuardFailure::TooEarly));
     let accepted = document
         .state
         .overrides
@@ -122,6 +129,21 @@ pub(crate) fn reasons(
         failures.retain(|failure| !accepted.contains(failure));
     }
     failures
+}
+
+/// A8, D4: the `date_arrived` guard's failure: the date a deliverable's, action's, or
+/// decision's own not-before rules hold it to ([`Dates::not_before`]), while that date is
+/// after today. None for a milestone (marking it done records when it happened, whatever its
+/// pin) and for a group (it has no completing transition).
+#[must_use]
+pub(crate) fn too_early(node: &Node<KeyRefs>, dates: &Dates) -> Option<Date> {
+    match node.payload {
+        Payload::Deliverable(_) | Payload::Action(_) | Payload::Decision(_) => {}
+        Payload::Milestone(_) | Payload::Group(_) => return None,
+    }
+    dates
+        .not_before(&node.key)
+        .filter(|date| *date > dates.today())
 }
 
 /// D4's `deps_done` failures: each relevant or undecided hard dependency of the node, its own

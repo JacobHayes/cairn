@@ -54,7 +54,7 @@ both over the in-scope nodes.
 | `active` | active | started, or a container with work beneath it started |
 | `blocked` | blocked | a gate it waits on is unsatisfied |
 | `conditional` | conditional | it may apply, once a decision is answered |
-| `scheduled` | scheduled | a milestone that marks itself done on its date, which is ahead |
+| `scheduled` | scheduled | waits for a date ahead: a milestone's day, or work's own not-before date |
 | `snoozed` | snoozed | set aside until a date or a node |
 | `done` | done (a decision: decided) | finished |
 | `skipped` | skipped | skipped, or under a skipped container |
@@ -155,6 +155,25 @@ a state change, when there is one, is simpler). Several edits are one patch, one
   tools.
 - **Leave to Cairn:** `set_provenance` and `mark_local_edit` record lineage for upgrades
   and are written by upgrades and re-linking, not by hand.
+
+## Dates
+
+Say each kind of date with the field made for it:
+
+- **A deadline** is `due_by`: the node finishes by a milestone, a date answer, or the
+  journey's start, give or take an offset. It never holds work back.
+- **A structural not-until** is `not_before`: the work, or the decision, cannot happen before
+  that date. While its date is ahead the node is `scheduled` and off the next list; it can
+  still be started early, and finishing it before the date is refused with the
+  `date_arrived` guard unless the person gives a reason to bypass it.
+- **A personal not-now** is a snooze: someone sets the node aside until a date or another
+  node is done. It changes no plan date.
+- **An event** is a milestone. Pinned, it is `scheduled` until its day, then ready to mark
+  done; with `auto_done`, it marks itself done on its date; with no pin, it is ready, and
+  someone marks it done on the day it happens. Marking a milestone done early is allowed and
+  records when it happened.
+
+Whatever waits on a `scheduled` node is `blocked`, and its `waits_on` entry carries the date.
 
 ## Stages
 

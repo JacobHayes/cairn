@@ -519,9 +519,11 @@ table.data.list-table .badge {
   background-image: linear-gradient(var(--color-hover), var(--color-hover)), linear-gradient(var(--row-paper), var(--row-paper));
 }
 
-/* A selected row under the pointer keeps its blue tint (selection and focus are the accent's). */
-.list-table tbody tr[data-state][aria-selected="true"]:hover td:not(.list-pinned) {
-  background-image: linear-gradient(var(--color-tint), var(--color-tint)), linear-gradient(var(--color-hover), var(--color-hover)), linear-gradient(var(--row-paper), var(--row-paper));
+/* A selected row under the pointer keeps its blue tint (selection and focus are the accent's), across every cell. */
+.list-table tbody tr[data-state][aria-selected="true"]:hover td:not(.list-pinned),
+.list-table tbody tr[data-selected="true"]:hover td.list-pinned,
+.list-table tbody tr[aria-selected="true"]:hover td.list-pinned {
+  background: linear-gradient(var(--color-tint), var(--color-tint)), linear-gradient(var(--color-hover), var(--color-hover)), var(--row-paper, var(--color-surface));
 }
 
 /* Under the Frontier lens the Rank column comes first and is held with them. */
@@ -722,6 +724,12 @@ table.data.list-table .badge {
   background: linear-gradient(var(--color-tint), var(--color-tint)), var(--row-paper, var(--color-band));
 }
 
+.list-table tbody tr[data-container="true"][aria-selected="true"]:hover td,
+.list-table tbody tr[data-container="true"][aria-selected="true"]:hover td:not(.list-pinned),
+.list-table tbody tr[data-container="true"][aria-selected="true"]:hover td.list-pinned {
+  background: linear-gradient(var(--color-tint), var(--color-tint)), linear-gradient(var(--color-hover), var(--color-hover)), var(--row-paper, var(--color-band));
+}
+
 .list-table tr[data-container="true"] td[data-column="title"] {
   font-weight: 600;
 }
@@ -823,7 +831,7 @@ button.list-sort {
   container: rows / inline-size;
 }
 
-@container rows (max-width: 760px) {
+@container rows (max-width: 940px) {
   .rows-page .node-row {
     display: grid;
     grid-template-columns: auto minmax(0, 1fr);

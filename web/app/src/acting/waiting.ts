@@ -17,6 +17,8 @@ export interface Unblocker {
   via: Schema<"DependencyVia"> | "snooze";
   /** The ancestor whose own dependency it is, when the decision waits on it through containment. */
   through?: string;
+  /** The date it is scheduled for, while a date ahead holds it (D8). */
+  date?: string;
 }
 
 /** An open decision the walkthrough cannot offer yet, and what would unblock it. */
@@ -36,15 +38,15 @@ export const WAITING_SHOWN_MAX = 5;
 export function unblockersOf(view: Ready, decision: GraphNode): { unblockers: Unblocker[]; snoozedUntil: string | undefined } {
   const derived = view.derived.nodes[decision.key];
   const found = new Map<string, Unblocker>();
-  const add = (node: string, via: Unblocker["via"], through?: string) => {
+  const add = (node: string, via: Unblocker["via"], through?: string, date?: string) => {
     const held = nodeOf(view, node);
     if (held !== undefined && !found.has(node)) {
       const base = { node, kind: held.kind, stage: isStage(held), via };
-      found.set(node, through === undefined ? base : { ...base, through });
+      found.set(node, { ...base, ...(through === undefined ? {} : { through }), ...(date === undefined ? {} : { date }) });
     }
   };
   for (const held of waitsOn(view, decision.key)) {
-    add(held.node, held.via, held.holder);
+    add(held.node, held.via, held.holder, held.date);
   }
   const snooze = derived?.snoozed;
   let snoozedUntil: string | undefined;

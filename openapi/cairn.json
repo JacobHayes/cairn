@@ -641,6 +641,14 @@
         "additionalProperties": false,
         "description": "A dependency that blocks a node (Gating: Blocked).",
         "properties": {
+          "date": {
+            "description": "The date the dependency is scheduled for, while it is held for a date ahead, so what\nwaits on it can say when.",
+            "format": "date",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
           "node": {
             "$ref": "#/components/schemas/NodeKey",
             "description": "The unsatisfied dependency."
@@ -2995,7 +3003,7 @@
           },
           {
             "const": "scheduled",
-            "description": "An `auto_done` milestone, unblocked, whose date is ahead.",
+            "description": "Unblocked and held for a date ahead: an `auto_done` milestone whose effective date is\nahead, another milestone whose pinned date is ahead, or unstarted work or a decision\nwhose own not-before date is ahead.",
             "type": "string"
           },
           {
@@ -4537,6 +4545,11 @@
             "const": "broken_down",
             "description": "A placeholder has children or is atomic.",
             "type": "string"
+          },
+          {
+            "const": "date_arrived",
+            "description": "Work or a decision whose own not-before rules hold it: that date has arrived.",
+            "type": "string"
           }
         ]
       },
@@ -4570,6 +4583,20 @@
             "const": "not_broken_down",
             "description": "A placeholder with no children that is not atomic.",
             "type": "string"
+          },
+          {
+            "additionalProperties": false,
+            "description": "Before the date its own not-before rules hold it to: the date, so a bypass for one\ndate leaves a later date a distinct failure.",
+            "properties": {
+              "too_early": {
+                "format": "date",
+                "type": "string"
+              }
+            },
+            "required": [
+              "too_early"
+            ],
+            "type": "object"
           }
         ]
       },
@@ -8309,6 +8336,14 @@
               }
             ],
             "description": "The latest it can start."
+          },
+          "not_before": {
+            "description": "The earliest its own not-before rules let it start: the latest of each source's\nearliest date plus the rule's offset. Work or a decision whose date this is, while it\nis after today, is scheduled and must wait for it to finish without a bypass. None\nwhen it has no such rule, or no source has a date.",
+            "format": "date",
+            "type": [
+              "string",
+              "null"
+            ]
           },
           "overdue_days": {
             "description": "How many days its due is before today, for an overdue node; none when it is\nnot overdue.",
@@ -14104,19 +14139,23 @@
           },
           {
             "additionalProperties": false,
-            "description": "An auto-done milestone whose date is ahead.",
+            "description": "A node held off the acting frontier until a date: a milestone whose date is ahead\n(one that marks itself done then, or a pinned one), or work or a decision whose own\nnot-before date is ahead.",
             "properties": {
-              "auto_done": {
+              "scheduled": {
                 "additionalProperties": false,
                 "properties": {
                   "date": {
-                    "description": "Its effective date.",
+                    "description": "The date it waits for.",
                     "format": "date",
                     "type": "string"
                   },
+                  "marks_itself_done": {
+                    "description": "It marks itself done on that date; otherwise someone finishes it once the date\nhas come.",
+                    "type": "boolean"
+                  },
                   "node": {
                     "$ref": "#/components/schemas/NodeKey",
-                    "description": "The milestone."
+                    "description": "The node."
                   }
                 },
                 "required": [
@@ -14127,7 +14166,7 @@
               }
             },
             "required": [
-              "auto_done"
+              "scheduled"
             ],
             "type": "object"
           }

@@ -180,6 +180,7 @@ pub fn arb_guard_failure() -> impl Strategy<Value = GuardFailure> {
         Just(GuardFailure::MissingArtifact),
         Just(GuardFailure::MissingNote),
         Just(GuardFailure::NotBrokenDown),
+        arb_date().prop_map(GuardFailure::TooEarly),
     ]
 }
 
@@ -190,6 +191,7 @@ pub fn arb_guard() -> impl Strategy<Value = Guard> {
         Guard::HasArtifact,
         Guard::HasNote,
         Guard::BrokenDown,
+        Guard::DateArrived,
     ])
 }
 

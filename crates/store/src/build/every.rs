@@ -196,7 +196,8 @@ pub fn bypass() -> Bypass {
         Guard::DepsDone => Some(Guard::HasArtifact),
         Guard::HasArtifact => Some(Guard::HasNote),
         Guard::HasNote => Some(Guard::BrokenDown),
-        Guard::BrokenDown => None,
+        Guard::BrokenDown => Some(Guard::DateArrived),
+        Guard::DateArrived => None,
     });
     let failures = chain(
         GuardFailure::OpenDependency(node_key(1)),
@@ -204,7 +205,8 @@ pub fn bypass() -> Bypass {
             GuardFailure::OpenDependency(_) => Some(GuardFailure::MissingArtifact),
             GuardFailure::MissingArtifact => Some(GuardFailure::MissingNote),
             GuardFailure::MissingNote => Some(GuardFailure::NotBrokenDown),
-            GuardFailure::NotBrokenDown => None,
+            GuardFailure::NotBrokenDown => Some(GuardFailure::TooEarly(day(2))),
+            GuardFailure::TooEarly(_) => None,
         },
     );
     Bypass {

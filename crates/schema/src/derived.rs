@@ -89,7 +89,9 @@ pub enum DisplayState {
     /// It may apply: relevance is `undecided` and it is unfinished, or relevance is
     /// `not_relevant` but pending on an undecided decision (`pending_on`).
     Conditional,
-    /// An `auto_done` milestone, unblocked, whose date is ahead.
+    /// Unblocked and held for a date ahead: an `auto_done` milestone whose effective date is
+    /// ahead, another milestone whose pinned date is ahead, or unstarted work or a decision
+    /// whose own not-before date is ahead.
     Scheduled,
     /// A snooze holds.
     Snoozed,
@@ -150,6 +152,11 @@ pub struct Blocker {
     pub node: NodeKey,
     /// How the dependency arose.
     pub via: DependencyVia,
+    // PRD: D8.
+    /// The date the dependency is scheduled for, while it is held for a date ahead, so what
+    /// waits on it can say when.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub date: Option<Date>,
 }
 
 /// A derived weight sum (Priority: gravity, unlocks, and their contributions) in millionths
@@ -493,6 +500,13 @@ pub struct NodeDates {
     /// A milestone's effective date; none for other kinds, or when nothing gives one.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub effective_date: Option<EffectiveDate>,
+    // PRD: A8, D8.
+    /// The earliest its own not-before rules let it start: the latest of each source's
+    /// earliest date plus the rule's offset. Work or a decision whose date this is, while it
+    /// is after today, is scheduled and must wait for it to finish without a bypass. None
+    /// when it has no such rule, or no source has a date.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub not_before: Option<Date>,
 }
 
 // PRD: E2.
@@ -711,12 +725,18 @@ pub enum StallCause {
         /// What it waits for.
         until: SnoozeTarget,
     },
-    /// An auto-done milestone whose date is ahead.
-    AutoDone {
-        /// The milestone.
+    /// A node held off the acting frontier until a date: a milestone whose date is ahead
+    /// (one that marks itself done then, or a pinned one), or work or a decision whose own
+    /// not-before date is ahead.
+    Scheduled {
+        /// The node.
         node: NodeKey,
-        /// Its effective date.
+        /// The date it waits for.
         date: Date,
+        /// It marks itself done on that date; otherwise someone finishes it once the date
+        /// has come.
+        #[serde(default, skip_serializing_if = "crate::serde_util::is_false")]
+        marks_itself_done: bool,
     },
 }
 

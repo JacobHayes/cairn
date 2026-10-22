@@ -99,8 +99,8 @@ async fn reference(
 }
 
 /// C10, I3, I1: the vendor evaluation after kickoff, read through the service, ranks its next
-/// list as the engine alone does (fixtures/README.md: `n_access`, `n_decision_meeting`,
-/// `n_workload`), and the snapshot's acting frontier is that list.
+/// list as the engine alone does (fixtures/README.md: `n_access`, `n_workload`), and the
+/// snapshot's acting frontier is that list.
 async fn a_journey_reads_as_the_engine_alone_projects_it(store: Arc<dyn Store>) {
     let (service, _) = service_over(store);
     vendor_after(&service, 3).await;
@@ -118,10 +118,7 @@ async fn a_journey_reads_as_the_engine_alone_projects_it(store: Arc<dyn Store>) 
             .unwrap()
     );
     let listed: BTreeSet<NodeKey> = next.value.items.iter().map(|row| row.key.clone()).collect();
-    let documented: BTreeSet<NodeKey> = ["n_access", "n_decision_meeting", "n_workload"]
-        .into_iter()
-        .map(key)
-        .collect();
+    let documented: BTreeSet<NodeKey> = ["n_access", "n_workload"].into_iter().map(key).collect();
     assert_eq!(listed, documented);
     let journey = service.journey(&vendor()).await.unwrap().unwrap();
     assert_eq!(next.revision, journey.revision);

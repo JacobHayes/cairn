@@ -175,8 +175,8 @@ export function targetText(target: EditTarget, name: Namer): string {
   }
 }
 
-/** Why finished work is stale (D4), as the clause after the node's name: "needs a note", "Kickoff was reopened". */
-export function guardFailureText(failure: Schema<"GuardFailure">, name: Namer): string {
+/** Why finished work is stale (D4), as the clause after the node's name: "needs a note", "Kickoff was reopened", "was finished before its date, Oct 12" (a date in `today`'s year leaves the year out). */
+export function guardFailureText(failure: Schema<"GuardFailure">, name: Namer, today?: string): string {
   if (failure === "missing_artifact") {
     return "needs a link";
   }
@@ -185,6 +185,9 @@ export function guardFailureText(failure: Schema<"GuardFailure">, name: Namer): 
   }
   if (failure === "not_broken_down") {
     return "was not broken down";
+  }
+  if ("too_early" in failure) {
+    return `was finished before its date, ${dateWords(failure.too_early, today)}`;
   }
   return `${name(failure.open_dependency)} was reopened`;
 }

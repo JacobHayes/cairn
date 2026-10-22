@@ -86,7 +86,7 @@ function derivedNodes(): Ready["derived"]["nodes"] {
       unlocks: 2,
       unlocks_from: { entries: [{ node: "n_report", score: 1.5, other_owner: true }], total: 1 },
     },
-    n_meeting: { ...relevant, display_state: "ready", actionable: true, waits_on: none, dates: { due: meetingDue, effective_date: { date: "2026-11-20", origin: "pin" } }, gravity_from: none, unlocks_from: none },
+    n_meeting: { ...relevant, display_state: "scheduled", actionable: true, waits_on: none, dates: { due: meetingDue, effective_date: { date: "2026-11-20", origin: "pin" } }, gravity_from: none, unlocks_from: none },
     n_when: { ...relevant, display_state: "done", actionable: false, waits_on: none, dates: {}, gravity_from: none, unlocks_from: none },
     n_pick: { ...relevant, display_state: "ready", actionable: true, waits_on: none, dates: {}, gravity_from: none, unlocks_from: none },
   };

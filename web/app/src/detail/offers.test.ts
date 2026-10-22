@@ -105,3 +105,36 @@ describe("the inspector's offers", () => {
     expect(say(made("n_report", { dates: { slack_days: -2 } }))).toBe("0 of 2 done; 2 days past the latest start of Report. In progress.");
   });
 });
+
+describe("D8: a node waiting for its date", () => {
+  it("leaves finishing work before its own date to Done anyway, and still offers Start (D8)", () => {
+    const view = made("n_findings", { display_state: "scheduled", failing_guards: ["date_arrived"], dates: { not_before: "2026-11-02" } });
+    const acts = contextMenuOf(view, detailOf(view, "n_findings"), true).flat().map((item) => item.id);
+    expect(acts).not.toContain("done");
+    expect(acts).toContain("start");
+    expect(acts).toContain("done-anyway");
+  });
+
+  it("offers Answer anyway for a decision before its own date (D8)", () => {
+    const view = made("n_when", { display_state: "scheduled", failing_guards: ["date_arrived"], dates: { not_before: "2026-11-02" } });
+    expect(menuOf(view, detailOf(view, "n_when"), true).flat().map((item) => item.id)).toContain("answer-anyway");
+  });
+
+  it("says the date a scheduled node waits for, by kind (D8)", () => {
+    const say = (view: Ready, key: string) => plainSentence(view, sentenceOf(view, detailOf(view, key), { position: undefined, row: undefined }));
+    const work = made("n_findings", { display_state: "scheduled", dates: { not_before: "2026-11-02" } });
+    expect(say(work, "n_findings")).toContain("Nov 2");
+    const meeting = made("n_meeting", { display_state: "scheduled" });
+    expect(say(meeting, "n_meeting")).toContain("Nov 20");
+    expect(say(meeting, "n_meeting")).not.toBe(say(work, "n_findings"));
+  });
+
+  it("names the date of a scheduled node a blocked node waits on, and the own date of work started early (D8)", () => {
+    const say = (view: Ready, key: string) => plainSentence(view, sentenceOf(view, detailOf(view, key), { position: undefined, row: undefined }));
+    const blocked = made("n_report", { display_state: "blocked", waits_on: { entries: [{ node: "n_findings", via: "explicit", date: "2026-11-02" }], total: 1 } });
+    expect(say(blocked, "n_report")).toContain("Nov 2");
+    const early = made("n_findings", { display_state: "active", started_early: true, dates: { not_before: "2026-11-02" } });
+    expect(say(early, "n_findings")).toContain("Nov 2");
+    expect(say(early, "n_findings")).not.toContain("earlier work");
+  });
+});

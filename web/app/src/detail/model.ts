@@ -215,6 +215,8 @@ export interface Holding {
   node: string;
   via: Schema<"DependencyVia">;
   holder: string | undefined;
+  /** The date it is scheduled for, while a date ahead holds it (D8). */
+  date: string | undefined;
 }
 
 /**
@@ -226,8 +228,20 @@ export function waitsOn(view: Ready, key: string): Holding[] {
   return (view.derived.nodes[key]?.waits_on.entries ?? []).map((blocker) => {
     const via = blocker.via;
     const holder = typeof via !== "object" ? undefined : "inherited" in via ? via.inherited.ancestor : "condition" in via ? via.condition.condition_on : "stage_opening" in via ? via.stage_opening.group : undefined;
-    return { node: blocker.node, via, holder: holder === key ? undefined : holder };
+    return { node: blocker.node, via, holder: holder === key ? undefined : holder, date: blocker.date ?? undefined };
   });
+}
+
+/**
+ * D8: the date a scheduled node waits for: a milestone's effective date (its pin, or the date it
+ * marks itself done), else its own not-before date. None for a node no date holds.
+ */
+export function scheduledDate(view: Ready, key: string): string | undefined {
+  const derived = view.derived.nodes[key];
+  if (derived?.display_state !== "scheduled") {
+    return undefined;
+  }
+  return nodeOf(view, key)?.kind === "milestone" ? derived.dates.effective_date?.date : (derived.dates.not_before ?? undefined);
 }
 
 /** Gating, D8: how many more the node waits on than `waitsOn` lists (the engine cuts the list at its explanation limit and says the total). */

@@ -114,19 +114,20 @@ values.
 
 What can be acted on after each step (brief 2.4): the frontier (every actionable node: relevant,
 open, not blocked, not a group) and, where it differs, the acting frontier (without snoozed
-nodes and `auto_done` milestones whose date is ahead). Nothing in this route marks itself done, so
-the values do not depend on the day they are read. `fixture_readme.rs` checks them.
+nodes and nodes a date ahead holds). Once the meeting date is answered, the decision meeting is
+pinned to it and waits for that day, scheduled, off the acting frontier; the steps are read
+before it, and nothing in this route marks itself done. `fixture_readme.rs` checks them.
 
 | After step | Frontier | Off the acting frontier |
 |---|---|---|
 | 1 (created) | `n_decision_meeting`, `n_kickoff`, `n_meeting_date`, `n_partner_runs`, `n_purpose`, `n_who_informed`, `n_who_owns` | |
-| 2 (up-front decisions) | `n_decision_meeting`, `n_kickoff` | |
-| 3 (kickoff done) | `n_access`, `n_decision_meeting`, `n_workload` | |
-| 4 (access started) | `n_access`, `n_decision_meeting`, `n_workload` | |
-| 5 (access done, workload broken down) | `n_decision_meeting`, `n_plan_draft`, `n_workload_ingest`, `n_workload_query` | |
-| 6 (plan done, comparison set answered) | `n_baseline`, `n_decision_meeting`, `n_workload_ingest`, `n_workload_query` | |
-| 7 (baseline snoozed) | `n_baseline`, `n_decision_meeting`, `n_workload_ingest`, `n_workload_query` | `n_baseline` |
-| 8 (testing and findings done) | `n_decision_meeting`, `n_review_opens` | |
+| 2 (up-front decisions) | `n_decision_meeting`, `n_kickoff` | `n_decision_meeting` |
+| 3 (kickoff done) | `n_access`, `n_decision_meeting`, `n_workload` | `n_decision_meeting` |
+| 4 (access started) | `n_access`, `n_decision_meeting`, `n_workload` | `n_decision_meeting` |
+| 5 (access done, workload broken down) | `n_decision_meeting`, `n_plan_draft`, `n_workload_ingest`, `n_workload_query` | `n_decision_meeting` |
+| 6 (plan done, comparison set answered) | `n_baseline`, `n_decision_meeting`, `n_workload_ingest`, `n_workload_query` | `n_decision_meeting` |
+| 7 (baseline snoozed) | `n_baseline`, `n_decision_meeting`, `n_workload_ingest`, `n_workload_query` | `n_baseline`, `n_decision_meeting` |
+| 8 (testing and findings done) | `n_decision_meeting`, `n_review_opens` | `n_decision_meeting` |
 
 Setup is not actionable until kickoff (steps 1 and 2: its contents wait on the stage's opening);
 the plan reaches the frontier only after its two actions, and the comparison set only after the
@@ -175,7 +176,7 @@ up into a visible node as its checklist (C4), and the first three items of the n
 
 - `vendor-evaluation`, after step 3, visible with actions hidden: `n_decision_meeting`, `n_kickoff`, `n_meeting_date`, `n_partner_runs`, `n_purpose`, `n_reporting`, `n_final_review` (in `n_reporting`), `n_final_report` (in `n_final_review`), `n_findings` (in `n_reporting`), `n_findings_reviewer` (in `n_reporting`), `n_review_opens` (in `n_reporting`), `n_setup`, `n_access` (in `n_setup`), `n_plan` (in `n_setup`), `n_workload` (in `n_setup`), `n_testing`, `n_baseline` (in `n_testing`), `n_comparison_set` (in `n_testing`), `n_partner_led` (in `n_testing`), `n_who_informed`, `n_who_owns`.
 - `vendor-evaluation`, after step 3, actions rolled up: `n_plan` holds `n_plan_draft`, `n_plan_review`; `n_partner_led` holds `n_criteria`, `n_partner_results`.
-- `vendor-evaluation`, after step 3, next: `n_access`, `n_decision_meeting`, `n_workload`.
+- `vendor-evaluation`, after step 3, next: `n_access`, `n_workload`.
 
 Version 2 (brief 2.7), `route-v2.yaml`, extends version 1: the access deliverable is renamed
 ("Environment and data access"), the workload placeholder is removed, a sign-off action is added
@@ -219,14 +220,18 @@ multi-valued role, A7). The scenario pins the launch date, completes kickoff,
 shifts the launch pin a week when feature work slips, and records a code-freeze actual
 date later than the plan's chain allows: a shortfall, which is reported, never rejected.
 Derived (brief 2.3): with the launch pinned to 2026-11-23, the freeze is due 21 days before it,
-on 2026-11-02; done on 2026-11-04, it is short by 2 days, and so is the launch.
+on 2026-11-02; done on 2026-11-04, it is short by 2 days, and so is the launch. At the end
+three nodes wait for a date, scheduled and off the next list: the launch for its pinned day,
+the beta's start, which marks itself done on its date, and the announcement for its own
+not-before date, the beta's end. The retrospective, a milestone with no pin, is not held by
+its rule: an unpinned milestone is confirmed on the day.
 
 Projected at the end of the scenario (brief 2.6), read at 2026-10-06: the level with actions
 hidden, what rolls up, and the first three items of the next list.
 
 - `product-launch`, after step 4, visible with actions hidden: `n_beta`, `n_beta_end`, `n_beta_start`, `n_build`, `n_features` (in `n_build`), `n_code_freeze`, `n_kickoff`, `n_launch`, `n_materials`, `n_announcement` (in `n_materials`), `n_docs` (in `n_materials`), `n_retro`.
 - `product-launch`, after step 4, actions rolled up: `n_beta` holds `n_beta_feedback`; `n_build` holds `n_hardening`.
-- `product-launch`, after step 4, next: `n_launch`, `n_docs`, `n_announcement`.
+- `product-launch`, after step 4, next: `n_docs`, `n_beta_end`, `n_retro`.
 
 ## `bake-off/`
 
@@ -268,7 +273,7 @@ done with their effective dates, and the open decisions in rank order. Nothing i
 overdue on that day; the product launch's late code freeze leaves it and the launch short
 (F6). The engine's tests (`crates/tests/tests/integration/engine/fixture_readme.rs`) check these lines.
 
-- `vendor-evaluation`, status summary: active 1, ready 2, blocked 2, done 19; remaining 5; overdue none; short none; stale none; upcoming `n_review_opens` 2026-10-30, `n_decision_meeting` 2026-11-20; open decisions none.
+- `vendor-evaluation`, status summary: active 1, ready 1, blocked 2, scheduled 1, done 19; remaining 5; overdue none; short none; stale none; upcoming `n_review_opens` 2026-10-30, `n_decision_meeting` 2026-11-20; open decisions none.
 - `hiring-loop`, status summary: ready 1, done 11, skipped 1; remaining 1; overdue none; short none; stale none; upcoming none; open decisions none.
-- `product-launch`, status summary: ready 6, blocked 3, scheduled 1, done 5; remaining 10; overdue none; short `n_code_freeze`, `n_launch`; stale none; upcoming `n_beta_start` 2026-11-13, `n_beta_end` 2026-11-18, `n_launch` 2026-11-23; open decisions none.
+- `product-launch`, status summary: ready 4, blocked 3, scheduled 3, done 5; remaining 10; overdue none; short `n_code_freeze`, `n_launch`; stale none; upcoming `n_beta_start` 2026-11-13, `n_beta_end` 2026-11-18, `n_launch` 2026-11-23; open decisions none.
 - `bake-off`, status summary: active 2, ready 1, blocked 3, done 2; remaining 6; overdue none; short none; stale none; upcoming `n_wrap_up` 2026-10-19; open decisions `n_winner`.

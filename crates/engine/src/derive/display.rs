@@ -17,13 +17,15 @@
 //!    decision (`pending_on`), which relevance itself leaves unchanged.
 //! 7. `blocked`: in scope, unfinished, and its own or an inherited gate is unsatisfied; for a
 //!    container only its own gates count, never its children.
-//! 8. `scheduled`: an `auto_done` milestone, unblocked, whose date is ahead.
+//! 8. `scheduled`: unblocked and held off the acting frontier by a date ahead (pass 5's
+//!    [`super::blocking::Scheduled`]): an `auto_done` milestone's effective date, another
+//!    milestone's pinned date, or the own not-before date of unstarted work or a decision.
 //! 9. `ready`: everything else.
 //!
 //! Cost at `node_count_max`: a node reads its passes' flags; a container also reads its
 //! descendants, 2,000 x 2,000 at worst over every node, O(nodes) per container.
 
-use cairn_schema::{DisplayState, NodeKey, NodeKind, Payload, Relevance, State};
+use cairn_schema::{DisplayState, NodeKey, NodeKind, Relevance, State};
 
 use super::dependencies::{Instant, Point};
 use super::{Derived, stored_state};
@@ -78,7 +80,7 @@ impl Derived {
         if self.waiting(graph, key) {
             return DisplayState::Blocked;
         }
-        if self.date_is_ahead(graph, key) {
+        if blocking.scheduled(key).is_some() {
             return DisplayState::Scheduled;
         }
         DisplayState::Ready
@@ -134,21 +136,5 @@ impl Derived {
                     && matches!(stored_state(document, node), State::Active | State::Done)
             })
         })
-    }
-
-    /// F1: an unblocked, pending `auto_done` milestone whose effective date is ahead.
-    fn date_is_ahead(&self, graph: &Graph, key: &NodeKey) -> bool {
-        let Some(node) = graph.node(key) else {
-            return false;
-        };
-        let Payload::Milestone(milestone) = &node.payload else {
-            return false;
-        };
-        milestone.auto_done
-            && self.blocking.actionable(key)
-            && self
-                .dates
-                .effective_date(key)
-                .is_some_and(|effective| effective.date > self.today)
     }
 }

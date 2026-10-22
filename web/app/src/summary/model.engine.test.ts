@@ -8,7 +8,8 @@ import { afterEach, beforeAll, describe, expect, it } from "vitest";
 import { derivedJourney, journeyAfter, seeded, type DerivedJourney } from "../authoring/engine.test-support.ts";
 import type { Mutation } from "../authoring/graph.ts";
 import { transition } from "../detail/model.ts";
-import { attentionRows, blockedRows, claimActions, claimedKeys, lifecycleLine, milestoneLine, recentlyFinished, summaryModel, underWay } from "./model.ts";
+import { dateWords } from "../status/when.ts";
+import { attentionRows, blockedRows, claimActions, claimedKeys, lifecycleLine, milestoneLine, recentlyFinished, scheduledRows, summaryModel, underWay } from "./model.ts";
 
 let host: InBrowserHost;
 const held: DerivedJourney[] = [];
@@ -173,10 +174,10 @@ describe("C10, C11, E1, E4: one action row per node", () => {
 
   it("does not claim another person's or an informed participant's item", () => {
     const informed = (node: string): Mutation => ({ op: "set_participation", node, kind: "k_informed", source: ["who_k3d7qm2xw5tn6pfa"] });
-    const journey = open("j_vendor_eval", [owner("n_review_opens", "who_j5v2nx6cwr4tdkq7"), owner("n_decision_meeting", "who_d4m6uk2eqf5rbhzs"), informed("n_review_opens"), informed("n_decision_meeting")]);
+    const journey = open("j_vendor_eval", [owner("n_review_opens", "who_j5v2nx6cwr4tdkq7"), informed("n_review_opens")]);
     const { actions } = pageOf(journey, ["who_k3d7qm2xw5tn6pfa"]);
     expect(keys(actions.yours)).toEqual([]);
-    expect(keys(actions.nextUp)).toEqual(["n_review_opens", "n_decision_meeting"]);
+    expect(keys(actions.nextUp)).toEqual(["n_review_opens"]);
   });
 
   it("claims an item owned through a merged identity", () => {
@@ -287,9 +288,37 @@ describe("D8, C18: what is under way and what is blocked", () => {
       const journey = open(name);
       const { actions } = pageOf(journey);
       const taken = claimedKeys(actions);
-      const all = [...taken, ...keys(underWay(journey.ready, taken)), ...keys(blockedRows(journey.ready, taken))];
+      const all = [...taken, ...keys(underWay(journey.ready, taken)), ...keys(blockedRows(journey.ready, taken)), ...keys(scheduledRows(journey.ready, taken))];
       expect(new Set(all).size, name).toBe(all.length);
     }
+  });
+});
+
+describe("D8, C18: what waits for a date", () => {
+  /** The effective date of a milestone in `journey`, in the words the page says dates in. */
+  const dayOf = (journey: DerivedJourney, milestone: string) => dateWords(journey.ready.derived.nodes[milestone]?.dates.effective_date?.date ?? "", journey.ready.derived.today);
+  /** The earliest a milestone in `journey` can be, in those words: what a rule measured from it waits for. */
+  const earliestOf = (journey: DerivedJourney, milestone: string) => dateWords(journey.ready.derived.nodes[milestone]?.dates.earliest_start?.date ?? "", journey.ready.derived.today);
+
+  it("lists work waiting for its own date with that date, and leaves milestones to the dates panel", () => {
+    const journey = open("j_launch");
+    const { actions } = pageOf(journey);
+    const rows = scheduledRows(journey.ready, claimedKeys(actions));
+    expect(keys(rows)).toEqual(["n_announcement"]);
+    expect(journey.ready.derived.nodes.n_launch?.display_state).toBe("scheduled");
+    // The announcement is no sooner than the beta's end, which is not dated yet: the earliest it can be.
+    expect(rows[0]?.fact()).toContain(earliestOf(journey, "n_beta_end"));
+  });
+
+  it("names the date of the scheduled node a waiting decision waits for", () => {
+    const journey = open("j_launch", [
+      { op: "add_node", node: { key: "n_debrief", id: "debrief", kind: "decision", title: "Debrief format", prompt: "Which?", answer_type: "text" } },
+      { op: "add_edge", edge: { node: "n_debrief", requires: "n_launch" } },
+    ]);
+    const { actions } = pageOf(journey);
+    const fact = actions.waiting.find((each) => each.key === "n_debrief")?.fact;
+    expect(fact).toContain(journey.ready.journey.graph.nodes?.find((node) => node.key === "n_launch")?.title ?? "missing");
+    expect(fact).toContain(dayOf(journey, "n_launch"));
   });
 });
 

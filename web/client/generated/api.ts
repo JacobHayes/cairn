@@ -1256,6 +1256,12 @@ export interface components {
         };
         /** @description A dependency that blocks a node (Gating: Blocked). */
         Blocker: {
+            /**
+             * Format: date
+             * @description The date the dependency is scheduled for, while it is held for a date ahead, so what
+             *     waits on it can say when.
+             */
+            date?: string | null;
             /** @description The unsatisfied dependency. */
             node: components["schemas"]["NodeKey"];
             /** @description How the dependency arose. */
@@ -2347,14 +2353,17 @@ export interface components {
             annotation: components["schemas"]["Annotation"];
         };
         /** @description A transition guard. */
-        Guard: "deps_done" | "has_artifact" | "has_note" | "broken_down";
+        Guard: "deps_done" | "has_artifact" | "has_note" | "broken_down" | "date_arrived";
         /**
          * @description One specific guard failure: what a bypass records, so a later distinct failure
          *     still produces `stale`, and what `stale` lists.
          */
         GuardFailure: {
             open_dependency: components["schemas"]["NodeKey"];
-        } | "missing_artifact" | "missing_note" | "not_broken_down";
+        } | "missing_artifact" | "missing_note" | "not_broken_down" | {
+            /** Format: date */
+            too_early: string;
+        };
         /**
          * @description `GET /healthz`: whether the server is serving. Answered 200 when it is, and 503 when its
          *     store has failed closed and answers nothing until the process is restarted.
@@ -3353,6 +3362,14 @@ export interface components {
             effective_date?: components["schemas"]["EffectiveDate"] | null;
             /** @description The latest it can start. */
             latest_start?: components["schemas"]["Bound"] | null;
+            /**
+             * Format: date
+             * @description The earliest its own not-before rules let it start: the latest of each source's
+             *     earliest date plus the rule's offset. Work or a decision whose date this is, while it
+             *     is after today, is scheduled and must wait for it to finish without a bypass. None
+             *     when it has no such rule, or no source has a date.
+             */
+            not_before?: string | null;
             /**
              * Format: uint32
              * @description How many days its due is before today, for an overdue node; none when it is
@@ -5222,13 +5239,18 @@ export interface components {
                 until: components["schemas"]["SnoozeTarget"];
             };
         } | {
-            auto_done: {
+            scheduled: {
                 /**
                  * Format: date
-                 * @description Its effective date.
+                 * @description The date it waits for.
                  */
                 date: string;
-                /** @description The milestone. */
+                /**
+                 * @description It marks itself done on that date; otherwise someone finishes it once the date
+                 *     has come.
+                 */
+                marks_itself_done?: boolean;
+                /** @description The node. */
                 node: components["schemas"]["NodeKey"];
             };
         };

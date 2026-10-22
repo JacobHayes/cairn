@@ -6,7 +6,10 @@
 //! is the escape hatch); an undecided node passes, and neither do its condition gates hold it
 //! (`deps_done` as a guard reads it), so finishing undecided work is accepted and reported as
 //! a consequence (D7) that it may not apply. A `deps_done` bypass applied in the same patch
-//! accepts the open dependencies present, and they are recorded on it. A snooze the patch made must sit on a node in scope that is not closed: not
+//! accepts the open dependencies present, and they are recorded on it. Work or a decision
+//! whose own not-before date is after the patch's today fails `date_arrived` (A8); a bypass
+//! accepts that date and records it, so a later date is a distinct failure. A milestone is
+//! never held by its date: marking it done records when it happened. A snooze the patch made must sit on a node in scope that is not closed: not
 //! effectively skipped and not a milestone that reads as done (B6; a blocked node may be
 //! snoozed, Gating); a group has work left beneath it. An unsnooze of a node with no snooze of
 //! its own is refused while a container's snooze still holds over it on that graph, naming the
@@ -26,8 +29,8 @@
 use std::collections::BTreeSet;
 
 use cairn_schema::{
-    DependencyVia, Event, GraphKey, GraphRecord, Guard, GuardFailure, NodeKey, NodeKind, Record,
-    RecordKey, Relevance, Subject, ViolationCode, Write,
+    DateSource, DependencyVia, Event, GraphKey, GraphRecord, Guard, GuardFailure, NodeKey,
+    NodeKind, Record, RecordKey, Relevance, Subject, ViolationCode, Write,
 };
 
 use super::Check;
@@ -84,6 +87,7 @@ pub(super) fn check(check: &mut Check<'_, '_>) {
     for (key, ordinal) in &session.guarded {
         relevance(check, &graph, &derived, key, *ordinal);
         deps_done(check, &graph, &derived, key, *ordinal);
+        date_arrived(check, &graph, &derived, key, *ordinal);
     }
     snoozes(check, &graph, &derived);
     unsnoozes_through(check, &tree, &derived);
@@ -130,16 +134,7 @@ fn deps_done(check: &mut Check<'_, '_>, graph: &Graph, derived: &Derived, key: &
         .cloned()
         .map(GuardFailure::OpenDependency)
         .collect();
-    let session = check.session;
-    let covered = session.bypassed.contains_key(key)
-        && graph
-            .document()
-            .state
-            .overrides
-            .get(key)
-            .and_then(|overrides| overrides.bypass.as_ref())
-            .is_some_and(|bypass| bypass.guards.contains(&Guard::DepsDone));
-    if covered {
+    if bypasses(check, graph, key, Guard::DepsDone) {
         check
             .bypassed
             .entry(key.clone())
@@ -187,6 +182,75 @@ fn deps_done(check: &mut Check<'_, '_>, graph: &Graph, derived: &Derived, key: &
     violation.failures = failures;
     violation.caused_by = causes(check.events, at, &involved);
     check.violations.push(violation);
+}
+
+/// A8, D4: a guarded transition of work or a decision needs the date its own not-before rules
+/// hold it to to have arrived, on the graph the patch produces, or a bypass in the patch that
+/// accepts that date.
+fn date_arrived(
+    check: &mut Check<'_, '_>,
+    graph: &Graph,
+    derived: &Derived,
+    key: &NodeKey,
+    at: u32,
+) {
+    let Some(date) = derived.too_early(graph, key) else {
+        return;
+    };
+    let failure = GuardFailure::TooEarly(date);
+    if bypasses(check, graph, key, Guard::DateArrived) {
+        check
+            .bypassed
+            .entry(key.clone())
+            .or_default()
+            .insert(failure);
+        return;
+    }
+    // The node's own rules and the dates of their sources: its structure, and the state,
+    // pins, and answers of the nodes its rules measure from.
+    let mut involved = Involved::default();
+    involved.structure.insert(key);
+    let sources: Vec<&NodeKey> = graph
+        .node(key)
+        .and_then(|node| node.not_before.as_ref())
+        .map(|rule| {
+            rule.sources
+                .as_set()
+                .iter()
+                .filter_map(|source| match source {
+                    DateSource::Node(node) => Some(node),
+                    DateSource::CreatedAt => None,
+                })
+                .collect()
+        })
+        .unwrap_or_default();
+    involved.state.extend(sources);
+    let mut violation = at_node(
+        graph.tree(),
+        key,
+        ViolationCode::GuardFailed,
+        format!(
+            "this node waits for its own not-before date, {date}, which has not arrived; \
+             bypass date_arrived with a reason to go ahead anyway"
+        ),
+    );
+    violation.at.mutation = Some(at);
+    violation.bypassable = Some(Guard::DateArrived);
+    violation.failures = BTreeSet::from([failure]);
+    violation.caused_by = causes(check.events, at, &involved);
+    check.violations.push(violation);
+}
+
+/// A bypass of `guard` on the node, applied in this patch.
+fn bypasses(check: &Check<'_, '_>, graph: &Graph, key: &NodeKey, guard: Guard) -> bool {
+    check.session.bypassed.contains_key(key)
+        && graph
+            .document()
+            .state
+            .overrides
+            .get(key)
+            .and_then(|overrides| overrides.bypass.as_ref())
+            .is_some_and(|bypass| bypass.guards.contains(&guard))
 }
 
 /// B6: a snooze the patch made sits on a node in scope that is not closed.

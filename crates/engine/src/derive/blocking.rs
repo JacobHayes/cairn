@@ -31,9 +31,18 @@
 //! relevant, not a group, not closed, `deps_done`), `needs_breakdown` (B10), and whether its
 //! snooze holds (B6, from current state: a date snooze while today is before the date, a node
 //! snooze while its target is in scope and does not satisfy dependencies), its own or a
-//! container's over its subtree. The frontier is every actionable node; the acting frontier
-//! leaves out snoozed nodes and `auto_done` milestones whose date is still ahead; `stalled` (D5) is an empty acting frontier with
-//! in-scope work still open, with what it waits on ([`stalled`]).
+//! container's over its subtree, and whether a date holds it ([`Scheduled`]). The frontier is
+//! every actionable node; the acting frontier leaves out snoozed and scheduled nodes;
+//! `stalled` (D5) is an empty acting frontier with in-scope work still open, with what it
+//! waits on ([`stalled`]).
+//!
+//! Scheduled (D8): an actionable node not stored `active` that a date ahead holds: an
+//! `auto_done` milestone by its effective date; another milestone by its pinned date (a pin,
+//! or a fed date answer), never by a derived due, which is a deadline and not the event's
+//! date; a deliverable, action, or decision by its own not-before date
+//! ([`Dates::not_before`]). A group never is, and a container's date holds only its own
+//! work: its children hang off its entries, not its start. Work started early stays active
+//! and on the acting frontier.
 //!
 //! Cost at `node_count_max` (2,000 nodes, about 110,000 edges, 8,000 instants): the
 //! topological order is Kahn's algorithm over the full set's gate edges, O(instants + edges);
@@ -49,7 +58,8 @@ use std::cell::Cell;
 
 use cairn_schema::limits::CONTAINMENT_DEPTH_MAX;
 use cairn_schema::{
-    Date, KeyRefs, Node, NodeKey, NodeKind, Payload, Relevance, SnoozeTarget, Stalled, State,
+    Date, DateOrigin, KeyRefs, Node, NodeKey, NodeKind, Payload, Relevance, SnoozeTarget, Stalled,
+    State,
 };
 
 use super::dates::Dates;
@@ -86,6 +96,17 @@ struct Flags {
     /// B6: the nearest container whose snooze holds over the node, which is open and in
     /// scope; set even when the node's own snooze holds as well.
     snoozed_via: Option<NodeKey>,
+    /// D8: the date that holds an actionable node off the acting frontier.
+    scheduled: Option<Scheduled>,
+}
+
+/// D8: what holds an actionable node off the acting frontier until a date.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct Scheduled {
+    /// The date it waits for.
+    pub date: Date,
+    /// An `auto_done` milestone: it marks itself done on that date.
+    pub marks_itself_done: bool,
 }
 
 /// Pass 5's output: per node, its blocking flags; for the journey, the frontier, the acting
@@ -156,20 +177,20 @@ impl Blocking {
             operations: ordering + sweep.operations.get(),
             ..Blocking::default()
         };
-        blocking.fronts(&sweep);
+        blocking.fronts();
         blocking.stalled = stalled::diagnose(&blocking, &sweep);
         blocking.assert_frontier(&sweep);
         blocking
     }
 
     /// The frontier and the acting frontier, in key order (2.5 ranks them).
-    fn fronts(&mut self, sweep: &Sweep<'_>) {
+    fn fronts(&mut self) {
         for (key, flags) in self.keys.iter().zip(&self.flags) {
             if !flags.actionable {
                 continue;
             }
             self.frontier.push(key.clone());
-            if flags.snoozed.is_none() && sweep.date_ahead(key).is_none() {
+            if flags.snoozed.is_none() && flags.scheduled.is_none() {
                 self.acting_frontier.push(key.clone());
             }
         }
@@ -302,8 +323,14 @@ impl Blocking {
         &self.frontier
     }
 
-    /// PRD Acting frontier: the frontier without snoozed nodes and `auto_done` milestones
-    /// whose date is still ahead, in key order.
+    /// D8: the date that holds an actionable node off the acting frontier, when one does.
+    #[must_use]
+    pub fn scheduled(&self, key: &NodeKey) -> Option<Scheduled> {
+        self.flags_of(key).and_then(|flags| flags.scheduled)
+    }
+
+    /// PRD Acting frontier: the frontier without snoozed nodes and nodes a date ahead holds,
+    /// in key order.
     #[must_use]
     pub fn acting_frontier(&self) -> &[NodeKey] {
         &self.acting_frontier
@@ -402,14 +429,29 @@ impl Sweep<'_> {
         milestone.auto_done && pending && relevant && due.is_some_and(|due| due.date <= self.today)
     }
 
-    /// PRD Acting frontier: an `auto_done` milestone's effective date, while it is ahead.
-    fn date_ahead(&self, key: &NodeKey) -> Option<Date> {
-        let node = self.graph.node(key)?;
-        let Payload::Milestone(milestone) = &node.payload else {
-            return None;
+    /// D8: the date ahead that holds the node, whatever its other flags: an `auto_done`
+    /// milestone's effective date, another milestone's pinned date, or the own not-before
+    /// date of work or a decision. Never a group's.
+    fn date_ahead(&self, node: &Node<KeyRefs>) -> Option<Scheduled> {
+        let key = &node.key;
+        let (date, marks_itself_done) = match &node.payload {
+            Payload::Milestone(milestone) => {
+                let effective = self.dates.effective_date(key)?;
+                let dated = milestone.auto_done || effective.origin == DateOrigin::Pin;
+                if !dated {
+                    return None;
+                }
+                (effective.date, milestone.auto_done)
+            }
+            Payload::Deliverable(_) | Payload::Action(_) | Payload::Decision(_) => {
+                (self.dates.not_before(key)?, false)
+            }
+            Payload::Group(_) => return None,
         };
-        let date = self.dates.effective_date(key)?.date;
-        (milestone.auto_done && date > self.today).then_some(date)
+        (date > self.today).then_some(Scheduled {
+            date,
+            marks_itself_done,
+        })
     }
 
     /// One node's flags, from the sweep's instants.
@@ -428,17 +470,23 @@ impl Sweep<'_> {
         let deps_done = value(Point::Start);
         let open = in_scope && !closed;
         let own = self.holding(key, satisfied);
+        let actionable = open && deps_done && !group && relevance == Relevance::Relevant;
+        // Work started early stays on the acting frontier.
+        let scheduled = (actionable && state != State::Active)
+            .then(|| self.date_ahead(node))
+            .flatten();
         Flags {
             closed,
             deps_done,
             blocked: open && !deps_done,
-            actionable: open && deps_done && !group && relevance == Relevance::Relevant,
+            actionable,
             done_by_date: by_date,
             done_when_unblocked: self.reads_as_done(node),
             needs_breakdown: open && self.unexpanded(node),
             snoozed: own.clone(),
             snoozed_own: own,
             snoozed_via: None,
+            scheduled,
         }
     }
 

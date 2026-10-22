@@ -44,6 +44,7 @@ mod property {
             for key in blocking.acting_frontier() {
                 prop_assert!(blocking.frontier().contains(key));
                 prop_assert!(blocking.snoozed(key).is_none(), "{}", key);
+                prop_assert!(blocking.scheduled(key).is_none(), "{}", key);
             }
         }
 
@@ -64,7 +65,7 @@ mod property {
                 prop_assert!(!stalled.all_blocked);
                 let named = |key: &_| stalled.waiting_on.iter().any(|cause| matches!(
                     cause,
-                    StallCause::Snooze { node, .. } | StallCause::AutoDone { node, .. } if node == key
+                    StallCause::Snooze { node, .. } | StallCause::Scheduled { node, .. } if node == key
                 ));
                 for key in blocking.frontier() {
                     prop_assert!(

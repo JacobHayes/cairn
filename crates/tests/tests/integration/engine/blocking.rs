@@ -440,9 +440,10 @@ fn stalled_names_a_gate_a_snooze_and_an_auto_done_date() {
     assert_eq!(
         found.waiting_on,
         [
-            StallCause::AutoDone {
+            StallCause::Scheduled {
                 node: key("n_kickoff"),
                 date: date("2026-10-10"),
+                marks_itself_done: true,
             },
             StallCause::Snooze {
                 node: key("n_plan"),
@@ -626,12 +627,7 @@ fn a_container_snooze_holds_over_its_subtree() {
     );
     assert_eq!(
         acting(&support::derived(&records, VENDOR)),
-        [
-            "n_decision_meeting",
-            "n_partner_runs",
-            "n_workload_ingest",
-            "n_workload_query"
-        ]
+        ["n_partner_runs", "n_workload_ingest", "n_workload_query"]
     );
     for target in ["n_baseline", "n_final_report"] {
         let again = format!("- op: snooze\n  node: n_testing\n  until: {{node: {target}}}\n");

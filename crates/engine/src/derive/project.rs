@@ -157,8 +157,8 @@ impl Derived {
     }
 
     /// D8: stored `active` while its own or an inherited gate is unsatisfied (a container's
-    /// children are not a gate); an undecided node held only by its own condition gate counts,
-    /// since an undecided gate blocks like an open one.
+    /// children are not a gate), or before its own not-before date; an undecided node held
+    /// only by its own condition gate counts, since an undecided gate blocks like an open one.
     fn started_early(&self, graph: &Graph, key: &NodeKey) -> bool {
         let Some(node) = graph.node(key) else {
             panic!("the graph holds {key}");
@@ -166,7 +166,7 @@ impl Derived {
         stored_state(graph.document(), node) == State::Active
             && self.relevance.in_scope(key)
             && !self.blocking.closed(key)
-            && self.waiting(graph, key)
+            && (self.waiting(graph, key) || self.too_early(graph, key).is_some())
     }
 
     /// D4: the bypassable guards the node's completing transition would fail if attempted
@@ -198,6 +198,9 @@ impl Derived {
         }
         if !self.blocking.deps_done(key) && !self.guard_open_dependencies(key).is_empty() {
             guards.insert(Guard::DepsDone);
+        }
+        if self.too_early(graph, key).is_some() {
+            guards.insert(Guard::DateArrived);
         }
         guards.extend(
             static_failures(document, graph.tree(), node, annotated)

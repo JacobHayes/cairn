@@ -8,6 +8,7 @@ import { foldKey } from "./folds.ts";
 import { waitsMore, waitsOn, type NodeDetail, type Ready } from "./model.ts";
 import { NodeLink, Section } from "./parts.tsx";
 import { appliesIf, ownerName } from "./sentence.ts";
+import { dateWords } from "../status/when.ts";
 
 /** Gating: why the node is, or is not, in scope, in words; nothing when nothing conditions it. */
 function relevanceWords(view: Ready, detail: NodeDetail): React.ReactNode {
@@ -49,6 +50,11 @@ export function Connections({ view, detail }: { view: Ready; detail: NodeDetail 
                 <NodeLink view={view} node={held.node} />{" "}
                 <span className="muted small">
                   {ownerName(view, held.node) ?? ""} {held.via === "explicit" || (typeof held.via === "object" && "stage_opening" in held.via) ? "" : viaText(held.via, name)}
+                  {held.date === undefined ? null : (
+                    <span data-testid="waits-date">
+                      {ownerName(view, held.node) === undefined ? "" : " · "}scheduled for {dateWords(held.date, view.derived.today)}
+                    </span>
+                  )}
                 </span>
               </li>
             ))}

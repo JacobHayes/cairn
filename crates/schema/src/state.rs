@@ -281,6 +281,9 @@ pub enum Guard {
     HasNote,
     /// A placeholder has children or is atomic.
     BrokenDown,
+    // PRD: A8, D4.
+    /// Work or a decision whose own not-before rules hold it: that date has arrived.
+    DateArrived,
 }
 
 // PRD: D4.
@@ -300,6 +303,10 @@ pub enum GuardFailure {
     MissingNote,
     /// A placeholder with no children that is not atomic.
     NotBrokenDown,
+    // PRD: A8, D4.
+    /// Before the date its own not-before rules hold it to: the date, so a bypass for one
+    /// date leaves a later date a distinct failure.
+    TooEarly(Date),
 }
 
 impl GuardFailure {
@@ -311,6 +318,7 @@ impl GuardFailure {
             GuardFailure::MissingArtifact => Guard::HasArtifact,
             GuardFailure::MissingNote => Guard::HasNote,
             GuardFailure::NotBrokenDown => Guard::BrokenDown,
+            GuardFailure::TooEarly(_) => Guard::DateArrived,
         }
     }
 }
