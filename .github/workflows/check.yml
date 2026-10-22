@@ -113,6 +113,36 @@ jobs:
           path: web/app/dist/playwright*.json
           if-no-files-found: ignore
 
+  # GitHub keeps 10 GB of caches per repository and evicts the least recently used past it. Every
+  # Cargo.lock change saves a whole new set of entries and leaves the superseded one until then, so
+  # three generations once sat at 8.8 GB and an eviction took main's live entries. After the parts
+  # have saved, keep the newest entry of each kind (a part's rust-cache entry, the mise entry per
+  # platform) on this ref and delete the rest, in the one job that can delete caches. Entries left
+  # on a tag ref are never restored by main, so they all go
+  # (decisions/2026-10-22-ci-keeps-only-the-newest-cache-entry-of-each-kind.md).
+  prune-caches:
+    needs: part
+    if: always() && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    permissions:
+      actions: write
+    env:
+      GH_TOKEN: ${{ github.token }}
+      GH_REPO: ${{ github.repository }}
+    steps:
+      - name: Delete the superseded caches
+        run: |
+          gh cache list --limit 1000 --json id,key,ref,createdAt >caches.json
+          jq -r --arg ref "$GITHUB_REF" '
+            def kind: sub("-[0-9a-f]{64}$"; "") | sub("^(?<part>v0-rust-check-[^-]+)-.*"; "\(.part)");
+            ([.[] | select(.ref | contains("refs/tags/")) | .id]
+             + ([.[] | select(.ref == $ref)] | group_by(.key | kind)
+                | map(sort_by(.createdAt) | reverse | .[1:][].id))) | .[]
+          ' caches.json | while read -r id; do
+            gh cache delete "$id"
+          done
+          gh cache list --limit 1000
+
   # The gate: green only when every part ran and passed. A part that was skipped because the
   # list of parts failed counts as a failure here, not as a success.
   check:
