@@ -22,7 +22,7 @@ Dark, and a window under 1100px, where the inspector is a sheet raised to the an
 | --- | --- | --- | --- |
 | <img src="dark-2-spotlight.png" width="230"> | <img src="dark-4-reveal.png" width="230"> | <img src="tablet-1-reveal.png" width="230"> | <img src="tablet-2-spotlight.png" width="230"> |
 
-A phone, 390px: the callout docks across the foot above the sheet and never over the hole. Steps 1 and 2, Controls opened for Frontier, its reveal, and step 4's reveal (docked at the head so the freed rows stay clear).
+A phone, 390px: the callout docks across the foot above the sheet and never over the hole. Steps 1 and 2, Controls opened for Frontier (the callout steps aside while the menu is open and the hole holds the whole menu), its reveal, and step 4's reveal (docked at the head so the freed rows stay clear).
 
 | 1 | 2 | 3 | 3 reveal | 4 reveal |
 | --- | --- | --- | --- | --- |
@@ -35,4 +35,3 @@ A phone, 390px: the callout docks across the foot above the sheet and never over
 Known limits:
 
 - On a phone the room above the callout holds one card at a readable size, so step 2 shows the decision and leaves the review card to the reveal.
-- On a phone an open menu is taller than the room above the callout, so the callout covers its lower part; the control the step is about stays in the hole above it.

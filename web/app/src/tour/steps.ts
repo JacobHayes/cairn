@@ -43,6 +43,9 @@ export interface WindowKind {
   short: boolean;
 }
 
+/** The phone's Controls menu, which holds the Frontier switch. */
+const CONTROLS_MENU = '[data-testid="controls-button-menu"]';
+
 export interface Step {
   id: StepId;
   /** The callout's title. */
@@ -67,6 +70,10 @@ export interface Step {
   reveal: Reveal;
   /** Disclosures the tour opens on arrival so what the step is about is in view (CSS selectors of `details`). */
   opens?: string[];
+  /** A menu the step has the person open: while it is open the callout steps aside, so nothing of the menu is under it. */
+  aside?: string;
+  /** The sheet height a state of the step opens at where the inspector is a sheet and the step's menu needs the room above it. */
+  menuSheet?: "peek";
   /** On reveal, an element to press if it is there (a menu the action left open). */
   revealClose?: string;
   /** On reveal, the height the sheet takes where the inspector is one: up to show the inspector's change, down to show the graph's. */
@@ -182,7 +189,9 @@ const STEPS: Record<StepId, Step> = {
     screen: "graph",
     frame: [draft, decision, review, comments],
     // On a phone the chip is in the Controls menu: the button, then the menu's item once it is open.
-    area: () => ['[data-tour="frontier"]', '[data-tour="controls"]'],
+    area: () => ['[data-tour="frontier"]', '[data-tour="controls"]', CONTROLS_MENU],
+    aside: CONTROLS_MENU,
+    menuSheet: "peek",
     side: "bottom",
     reveal: "lift",
     // The emphasis is the whole graph: the first of what can move now is the one to look at.

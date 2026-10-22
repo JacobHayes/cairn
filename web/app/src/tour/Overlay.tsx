@@ -79,12 +79,14 @@ interface Snap {
   floor: number;
   /** Why there is no anchor, once there is none. */
   absence: Absence | undefined;
+  /** The step's menu is open. */
+  aside: boolean;
 }
 
 const sameSize = (a: Size, b: Size): boolean => a.width === b.width && a.height === b.height;
 
 const sameSnap = (a: Snap | undefined, b: Snap): boolean =>
-  a !== undefined && sameRect(a.hole, b.hole) && sameRect(a.anchor, b.anchor) && a.named.length === b.named.length && a.named.every((each, at) => sameRect(each, b.named[at])) && a.scrolledOut === b.scrolledOut && sameSize(a.size, b.size) && sameSize(a.docked, b.docked) && sameSize(a.viewport, b.viewport) && a.floor === b.floor && a.absence === b.absence;
+  a !== undefined && sameRect(a.hole, b.hole) && sameRect(a.anchor, b.anchor) && a.named.length === b.named.length && a.named.every((each, at) => sameRect(each, b.named[at])) && a.scrolledOut === b.scrolledOut && sameSize(a.size, b.size) && sameSize(a.docked, b.docked) && sameSize(a.viewport, b.viewport) && a.floor === b.floor && a.absence === b.absence && a.aside === b.aside;
 
 /** What the overlay reads for a state: the selectors of the hole and the anchor, and what is asked of the canvas. */
 interface Targets {
@@ -173,6 +175,12 @@ function withHandle(rect: Rect, elements: readonly HTMLElement[]): Rect {
   return inSheet && globalThis.matchMedia(SHEET).matches && handle !== null && handle.checkVisibility() ? (union([rect, rectOf(handle)]) ?? rect) : rect;
 }
 
+/** A hole on the page ends where the sheet begins (a menu can reach under it); one in the sheet is the sheet's own. */
+function aboveSheet(rect: Rect, elements: readonly HTMLElement[], floor: number): Rect {
+  const inSheet = elements.some((each) => each.closest("aside.inspector") !== null);
+  return inSheet || rect.top >= floor ? rect : { ...rect, height: Math.min(rect.height, floor - rect.top) };
+}
+
 /** What the page shows of a state's targets now. */
 function readSnap(now: Targets, element: HTMLElement, absentFor: number): { snap: Snap; anchored: ReturnType<typeof match> } {
   const holes = match(now.hole);
@@ -182,13 +190,14 @@ function readSnap(now: Targets, element: HTMLElement, absentFor: number): { snap
   return {
     anchored,
     snap: {
-      hole: holes.rect === undefined ? undefined : grow(withHandle(holes.rect, holes.elements), HOLE_PAD),
+      hole: holes.rect === undefined ? undefined : aboveSheet(grow(withHandle(holes.rect, holes.elements), HOLE_PAD), holes.elements, floorOf(viewport)),
       anchor: anchored.rect === undefined ? undefined : grow(anchored.rect, now.phase === "spotlight" ? HOLE_PAD : 6),
       named: visibleRects(now.names),
       scrolledOut: holes.scrolledOut || anchored.scrolledOut,
       ...sizesOf(element, viewport),
       viewport: { width: viewport.width, height: viewport.height },
       floor: floorOf(viewport),
+      aside: now.step.aside !== undefined && visibleRects([now.step.aside]).length > 0,
       absence: anchored.rect === undefined ? diagnose({ loaded: true, closed: peeking && now.step.pane === true, absentFor }) : undefined,
     },
   };
@@ -394,12 +403,13 @@ function useRevealEffects(shown: Shown | undefined, steps: readonly Step[], shee
   }, [phase, id]);
 }
 
-/** A step that needs the inspector's pane raises the sheet when a state of it begins (a first arrival, a Back, a reload), so the action is in view without a tap. */
+/** A step that needs the inspector's pane raises the sheet when a state of it begins (a first arrival, a Back, a reload), so the action is in view without a tap; one whose menu needs the room lowers it. */
 function useArrivalSheet(targets: Targets | undefined, sheet: boolean, actions: FrameActions | undefined): void {
   const key = targets?.key;
   useEffect(() => {
-    if (targets?.phase === "spotlight" && targets.step.pane === true && sheet) {
-      actions?.snap("half");
+    const to = targets?.step.pane === true ? "half" : targets?.step.menuSheet;
+    if (targets?.phase === "spotlight" && to !== undefined && sheet) {
+      actions?.snap(to);
     }
     // Once per state, whatever else the render changes.
   }, [key]);
@@ -574,7 +584,7 @@ export function Overlay({ api, run }: { api: TourApi; run: string }) {
         absence={absence}
         scrolledOut={snap?.scrolledOut === true}
         at={at}
-        ready={current && at !== undefined}
+        ready={current && at !== undefined && snap?.aside !== true}
         revealed={revealed}
         gliding={gliding}
         blocking={!lifted}

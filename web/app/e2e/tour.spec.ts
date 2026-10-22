@@ -415,6 +415,15 @@ test.describe("on a phone", () => {
     // The hole holds Controls and, once opened, the menu with Frontier in it.
     await expect(page.getByTestId("controls-button")).toBeVisible();
     await clear();
+    // While the menu is open the callout steps aside, and the hole holds the whole menu; it returns when the menu closes.
+    await page.getByTestId("controls-button").click();
+    const menu = page.getByTestId("controls-button-menu");
+    await expect(menu).toBeVisible();
+    await expect(callout(page)).toBeHidden();
+    await expect.poll(async () => holds(await settledBox(ring(page)), await settledBox(menu), 8)).toBe(true);
+    await page.keyboard.press("Escape");
+    await expect(menu).toHaveCount(0);
+    await expect(callout(page)).toBeVisible();
     await setFrontier(page, true);
     await expectAt(page, "frontier", "reveal");
     await next(page);
