@@ -1,21 +1,47 @@
 // PRD: C20. A phone's screens: every control a finger taps has a hit area of at least the touch
 // target in each direction (DESIGN, Sizing), on Home, the graph with the inspector's sheet, the
 // list, the inspector's forms, an open menu and the tour's step. In-browser host, fresh on every load.
-import { expect, test } from "./test.ts";
+import type { Locator } from "@playwright/test";
+
+import { checkpoint, expect, test } from "./test.ts";
 
 import { nodePanel, open, openAt, openFromCanvas, openSheet, whenSettled } from "./shell.ts";
 import { expectTouchTargets } from "./touch.ts";
+
+/** A scrolled menu never ends on a section's heading with its options out of view. */
+async function expectNoOrphanHeading(menu: Locator): Promise<void> {
+  const orphans = await whenSettled(menu.page(), () =>
+    menu.evaluate((panel) => {
+      const body = panel.closest(".popover-body") ?? panel;
+      const edge = body.getBoundingClientRect().bottom;
+      return [...panel.querySelectorAll<HTMLElement>(".label, legend")].flatMap((heading) => {
+        const top = heading.getBoundingClientRect().top;
+        if (heading.getBoundingClientRect().width <= 1) {
+          return [];
+        }
+        const next = [...panel.querySelectorAll<HTMLElement>("input, button, select")].find((control) => control.getBoundingClientRect().top >= heading.getBoundingClientRect().bottom - 1);
+        return top < edge && next !== undefined && next.getBoundingClientRect().top + 22 > edge ? [heading.textContent] : [];
+      });
+    }),
+  );
+  expect(orphans, "headings whose options are out of view").toEqual([]);
+}
 
 test.use({ viewport: { width: 390, height: 844 }, hasTouch: true });
 
 test("every control on a phone's main screens has a touch-sized hit area", async ({ page }) => {
   await open(page, "browser", "/");
   await expectTouchTargets(page, "Home");
+  // The tour's offer is compact: the person's own work starts on the first screen, and a touch screen is not told about keys.
+  await expect(page.locator(".tour-keys")).toBeHidden();
+  const waiting = await whenSettled(page, () => page.getByRole("heading", { name: "Waiting on you" }).boundingBox());
+  expect(waiting?.y ?? Infinity).toBeLessThan(844 - 120);
 
   await openAt(page, "browser", "j_launch", "graph");
   await expectTouchTargets(page, "the graph");
   await page.getByTestId("controls-button").click();
   await expectTouchTargets(page, "the graph's Controls menu");
+  await expectNoOrphanHeading(page.getByTestId("controls-panel-phone"));
   await page.keyboard.press("Escape");
   await page.getByTestId("view-picker").click();
   await expectTouchTargets(page, "the View picker");
@@ -39,6 +65,9 @@ test("every control on a phone's main screens has a touch-sized hit area", async
 
   await openAt(page, "browser", "j_launch", "list");
   await expectTouchTargets(page, "the list");
+  await checkpoint(page);
+  const wrapped = await whenSettled(page, () => page.locator(".badge").evaluateAll((all) => all.filter((each) => each.getBoundingClientRect().height > 24 || each.scrollWidth > each.clientWidth + 1).map((each) => each.textContent)));
+  expect(wrapped, "chips that wrap or are cut").toEqual([]);
 
   await openAt(page, "browser", "j_launch", "list", { node: "n_go_no_go" });
   await expectTouchTargets(page, "the inspector's peek");

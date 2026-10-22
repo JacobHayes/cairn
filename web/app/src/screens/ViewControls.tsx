@@ -356,7 +356,7 @@ function PhoneControls({ subject, screen, badges, end }: { subject: ViewSubject;
       >
         {(close) => (
           <div className="stack" data-testid="controls-panel-phone">
-            <span className="muted small">Depth</span>
+            <span className="label">Depth</span>
             <DepthOptions subject={subject} screen={screen} close={close} />
             <hr className="menu-rule" />
             {subject.offers.frontier ? (

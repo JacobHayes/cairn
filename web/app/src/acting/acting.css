@@ -548,7 +548,7 @@ table.data.list-table .badge {
 /* A phone gives the status chip a narrower column: the chip is tightened and wraps a two-word state onto two lines, so the longest single word ("conditional", 95px) sets the width, and the title's pin follows it. */
 @media (max-width: 719px) {
   .list-table {
-    --status-width: 92px;
+    --status-width: 108px;
   }
 
   .list-table {
@@ -559,13 +559,17 @@ table.data.list-table .badge {
     padding-inline: var(--space-1);
   }
 
+  /* The Title heading starts where the root rows' titles do: after the tree's fold column. */
+  table.data.list-table th[data-column="title"] {
+    padding-inline-start: calc(var(--space-2) + 2 * var(--space-5));
+  }
+
   table.data.list-table .badge {
     max-width: 100%;
     gap: 2px;
     padding: 0 3px;
     letter-spacing: 0;
     line-height: 1.3;
-    white-space: normal;
   }
 }
 

@@ -1029,6 +1029,12 @@ svg.chart .datum-line {
   max-height: min(var(--popover-room, 100dvh), 60dvh, 480px); /* --popover-room: the room Menu.tsx finds for it */
   overflow-y: auto;
   padding: var(--space-3);
+  /* A body that scrolls shows it: a soft shadow at an edge with more beyond it (the paper-coloured covers move with the content and hide the shadow at its end). */
+  background:
+    linear-gradient(var(--color-surface) 30%, transparent) center top / 100% 32px no-repeat local,
+    linear-gradient(transparent, var(--color-surface) 70%) center bottom / 100% 32px no-repeat local,
+    linear-gradient(color-mix(in srgb, var(--color-text) 20%, transparent), transparent) center top / 100% 10px no-repeat scroll,
+    linear-gradient(transparent, color-mix(in srgb, var(--color-text) 20%, transparent)) center bottom / 100% 10px no-repeat scroll;
 }
 /* Bottom sheet handle: a 24px drag target with a short bar, on chrome. */
 .sheet-handle {

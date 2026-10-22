@@ -280,14 +280,13 @@ function Welcome({ api }: { api: TourApi }) {
   return (
     <Card title="See what Cairn works out for you" testId="tour-welcome">
       <p>
-        A route is a reusable process. A journey is one real run of it: its answers, its progress, its dates. Cairn works out what is ready, what is blocked, what applies and when things are due, so people and their agents share one picture of what to do next.
+        A route is a reusable process and a journey is one real run of it. The practice journey is deleted when the tour ends; yours do not change.
       </p>
-      <p>Try it on a small practice journey. It is made for you now and deleted when the tour ends; your own journeys do not change.</p>
       <div className="row">
         <Button primary data-testid="tour-start" onClick={() => { send({ type: "start" }); }}>Start the tour</Button>
         <Button data-testid="tour-not-now" onClick={decline}>Not now</Button>
       </div>
-      <p className="muted small">Tab moves between the guidance and the step's control.</p>
+      <p className="muted small tour-keys">Tab moves between the guidance and the step's control.</p>
     </Card>
   );
 }

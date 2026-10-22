@@ -51,11 +51,18 @@
   }
 
   .tour-card {
-    margin-inline: var(--space-3);
+    margin-inline: var(--space-4);
     width: auto;
   }
 
   .tour-paused {
-    margin-inline: var(--space-3);
+    margin-inline: var(--space-4);
+  }
+}
+
+/* A touch screen has no keys to hint at. */
+@media (pointer: coarse) {
+  .tour-keys {
+    display: none;
   }
 }

@@ -7,13 +7,13 @@ Dense rows keep their rhythm where they can: a pick box stays drawn as it was an
 | Before | After |
 | --- | --- |
 | ![Home, before](before-home.png) | ![Home, after](after-home.png) |
-| Mark done 34px tall, row titles 26px | Every button and title link 44px |
+| Mark done 34px tall, row titles 26px; the tour offer fills the first screen | Every button and title link 44px; the offer is two sentences and two buttons, and Waiting on you starts on the first screen |
 | ![Graph with the sheet, before](before-graph-sheet.png) | ![Graph with the sheet, after](after-graph-sheet.png) |
 | Grip 24px, hide 30px, Controls and Signal 34px, zoom 44px | Grip, hide, Controls and Signal 44px; the peek grew by the grip and hide button's extra height |
 | ![Controls menu, before](before-controls-menu-tall.png) | ![Controls menu, after](after-controls-menu-tall.png) |
-| Rows 22-36px at uneven gaps | Rows 44px, one gap |
+| Rows 22-36px at uneven gaps; group heading in body type | Rows 44px, one gap; group headings in the label style; a soft shadow at the cut shows the menu scrolls |
 | ![List, before](before-list.png) | ![List, after](after-list.png) |
-| Pick boxes 12px, title links 24px | 44px hit areas, rows as tall as before |
+| Pick boxes 12px, title links 24px, NOT STARTED wraps and is clipped | 44px hit areas, rows as tall as before, status chips on one line |
 | ![Inspector, before](before-inspector.png) | ![Inspector, after](after-inspector.png) |
 | Mark done, Start, menu 34px | 44px |
 | ![Desktop, before](before-desktop.png) | ![Desktop, after](after-desktop.png) |

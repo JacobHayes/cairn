@@ -55,7 +55,7 @@ export function Checks<T extends string>({
 }) {
   return (
     <fieldset className={stacked ? "checks checks-stacked stack" : "checks row"} data-testid={testId}>
-      <legend className="muted small">{legend}</legend>
+      <legend className="label">{legend}</legend>
       {options.map((option) => (
         <Check
           key={option}
