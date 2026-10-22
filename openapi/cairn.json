@@ -12259,8 +12259,19 @@
         "additionalProperties": false,
         "description": "What removing a node needs right now: the exact removal, and the references from\noutside its subtree that the same patch must also rewrite or remove.",
         "properties": {
+          "next": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Cursor"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Where the next page of outside references starts, when there is one."
+          },
           "outside_references": {
-            "description": "Conditions, date rules, stage bounds, fed milestones, message drafts, and snoozes\nelsewhere that name a node being removed. Edges into the subtree are already in\nthe removal.",
+            "description": "A page of the conditions, date rules, stage bounds, fed milestones, message drafts,\nand snoozes elsewhere that name a node being removed. Edges into the subtree are\nalready in the removal.",
             "items": {
               "$ref": "#/components/schemas/OutsideReference"
             },
@@ -12269,11 +12280,18 @@
           "removal": {
             "$ref": "#/components/schemas/Removal",
             "description": "The removal to send in a `remove_node` mutation."
+          },
+          "total": {
+            "description": "How many outside references there are in all.",
+            "format": "uint32",
+            "minimum": 0,
+            "type": "integer"
           }
         },
         "required": [
           "removal",
-          "outside_references"
+          "outside_references",
+          "total"
         ],
         "type": "object"
       },
@@ -18625,6 +18643,28 @@
             "schema": {
               "$ref": "#/components/schemas/NodeKey"
             }
+          },
+          {
+            "description": "Where the page starts: the previous page's `next`. A cursor is a position in the order at one journey revision, so a cursor past the start needs `revision`.",
+            "explode": true,
+            "in": "query",
+            "name": "cursor",
+            "required": false,
+            "schema": {
+              "$ref": "#/components/schemas/Cursor"
+            },
+            "style": "form"
+          },
+          {
+            "description": "The journey revision the previous page was read at (its `revision`); needed with a cursor past the start. When the journey has moved since, the page is refused 409 `page_moved`: start again from the first page.",
+            "explode": true,
+            "in": "query",
+            "name": "revision",
+            "required": false,
+            "schema": {
+              "$ref": "#/components/schemas/Revision"
+            },
+            "style": "form"
           }
         ],
         "responses": {
@@ -18678,6 +18718,16 @@
             },
             "description": "No such resource."
           },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "The journey moved since the page the cursor came from: start again from the first page."
+          },
           "500": {
             "content": {
               "application/json": {
@@ -18704,7 +18754,7 @@
             "description": "A limit was reached or the request timed out; retry after `Retry-After`. Or: The auth layer could not ask a sign-in provider (in text, without `Retry-After`)."
           }
         },
-        "summary": "The exact removal of a node as the journey stands, and the references elsewhere that the same patch must rewrite or remove."
+        "summary": "The exact removal of a node as the journey stands, and the references elsewhere that the same patch must rewrite or remove, a page at a time."
       }
     },
     "/api/journeys/{id}/patches": {

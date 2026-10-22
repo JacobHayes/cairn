@@ -192,8 +192,8 @@ fn node_reads() -> Vec<Operation> {
             ..projection::<RemovalRead>(
                 &at::NODE_REMOVAL,
                 "The exact removal of a node as the journey stands, and the references \
-                 elsewhere that the same patch must rewrite or remove.",
-                &[],
+                 elsewhere that the same patch must rewrite or remove, a page at a time.",
+                query::EXPLANATION_PARAMS,
             )
         },
         Operation {

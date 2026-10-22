@@ -335,7 +335,8 @@ pub const MINE_PARAMS: &[ParamSpec] = &[ParamSpec::many::<KindKey>(
     "Only these participation kinds; every kind when none.",
 )];
 
-/// `GET /api/journeys/{id}/nodes/{key}/explanations/{field}`.
+/// `GET /api/journeys/{id}/nodes/{key}/explanations/{field}` and `.../removal`: a page of a
+/// node's list.
 pub const EXPLANATION_PARAMS: &[ParamSpec] = &[CURSOR, REVISION];
 
 /// `GET /api/journeys/{id}/history` (J4).

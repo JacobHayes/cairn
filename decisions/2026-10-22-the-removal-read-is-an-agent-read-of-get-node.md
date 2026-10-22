@@ -6,9 +6,10 @@ reference?
 
 Call: the engine projects it (`DerivedJourney::removal`, built on the existing full
 removal), the service exposes it, and the agent tool `get_node` returns it when `removal`
-is true, instead of the node, never in an ordinary answer (paged by `references_cursor`).
-The REST API serves the same read at `nodes/{key}/removal`, whole, because every service
-operation has an endpoint; the browser does not use it. Outside references are the
+is true, instead of the node, never in an ordinary answer. The REST API serves the same
+read at `nodes/{key}/removal`, because every service operation has an endpoint; the browser
+does not use it. Both take the same cursor and answer the same page of outside references
+with `next` and `total`, from one service call (the removal itself is always whole). Outside references are the
 places a patch is refused for if left alone: conditions, date rules, stage bounds, fed
 milestones, message drafts, and snooze targets. Edges are already in the removal. A
 role filled by a removed decision is not listed, because the role stays valid unfilled.

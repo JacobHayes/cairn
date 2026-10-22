@@ -7,21 +7,23 @@
 
 use std::collections::BTreeSet;
 
+use cairn_schema::limits::PAGE_ITEM_COUNT_MAX;
 use cairn_schema::{
-    AnswerSpec, DateSource, KeyRefs, Node, NodeKey, OutsideReference, Payload, ReferenceField,
-    RemovalRead, ResourceContent, Segment, SnoozeTarget,
+    AnswerSpec, Cursor, DateSource, KeyRefs, Node, NodeKey, OutsideReference, Payload,
+    ReferenceField, RemovalRead, ResourceContent, Segment, SnoozeTarget,
 };
 
+use super::rows::{count, page};
 use super::{DerivedJourney, ProjectionError};
 use crate::edit::full_removals;
 
 impl DerivedJourney<'_> {
-    /// A18: the removal of `key` and the outside references to what it removes.
+    /// A18: the removal of `key` and a page of the outside references to what it removes.
     ///
     /// # Errors
     ///
     /// When the node is not in the journey.
-    pub fn removal(&self, key: &NodeKey) -> Result<RemovalRead, ProjectionError> {
+    pub fn removal(&self, key: &NodeKey, cursor: Cursor) -> Result<RemovalRead, ProjectionError> {
         self.known(key)?;
         let document = self.graph.document();
         let Some(removal) = full_removals(document, std::slice::from_ref(key)).pop() else {
@@ -52,9 +54,13 @@ impl DerivedJourney<'_> {
                 name(holder, ReferenceField::Snooze, target);
             }
         }
+        let found: Vec<OutsideReference> = found.into_iter().collect();
+        let (kept, next) = page(&found, cursor, PAGE_ITEM_COUNT_MAX);
         Ok(RemovalRead {
-            removal: removal.clone(),
-            outside_references: found.into_iter().collect(),
+            removal,
+            outside_references: kept,
+            next,
+            total: count(found.len()),
         })
     }
 }

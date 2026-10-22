@@ -357,8 +357,9 @@ impl Service {
         call: &Call,
         id: &JourneyId,
         key: &NodeKey,
+        cursor: Cursor,
     ) -> Result<Projected<RemovalRead>, ReadError> {
-        self.project(call, id, |journey, _| journey.removal(key))
+        self.project(call, id, |journey, _| journey.removal(key, cursor))
             .await
     }
 

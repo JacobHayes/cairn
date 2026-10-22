@@ -9,8 +9,8 @@ use cairn_schema::{
     Annotation, AnswerEffects, AnswerValue, Cursor, Date, DisplayState, ExplainedField,
     ExplanationPage, JourneyId, KeyRefs, Level, LevelDisplay, LevelEdge, LevelNode, LevelQuery,
     ListFlag, ListQuery, LocalEdit, Markdown, Next, NextQuery, Node, NodeDerived, NodeKey,
-    NodeKind, NodeRow, NodeState, OutsideReference, Overrides, Path, Removal, Snapshot,
-    SnapshotScope, SortBy, Stalled, StillWaiting,
+    NodeKind, NodeRow, NodeState, Overrides, Path, RemovalRead, Snapshot, SnapshotScope, SortBy,
+    Stalled, StillWaiting,
 };
 use cairn_service::{Call, ChildEntry, NodeDetail};
 use schemars::JsonSchema;
@@ -212,20 +212,7 @@ pub(crate) struct NodeOutput {
     explanations: Option<ExplanationPage>,
     /// The removal of the node and what else a patch removing it must change.
     #[serde(skip_serializing_if = "Option::is_none")]
-    removal: Option<RemovalOutput>,
-}
-
-/// The removal of a node, whole, with a page of the references elsewhere that name what it
-/// removes.
-#[derive(Debug, Serialize, JsonSchema)]
-pub(crate) struct RemovalOutput {
-    /// The removal to send in a `remove_node` mutation.
-    removal: Removal,
-    /// Conditions, date rules, stage bounds, fed milestones, message drafts, and snoozes
-    /// elsewhere that name a node being removed, which the same patch must rewrite or
-    /// remove; edges into the subtree are in the removal. Pass `next` as
-    /// `references_cursor` for the rest.
-    outside_references: Paged<OutsideReference>,
+    removal: Option<RemovalRead>,
 }
 
 // PRD: C8.
@@ -486,15 +473,15 @@ impl ToolSet {
             });
         }
         if arguments.removal {
-            let projected = self.service.node_removal(call, journey, node).await?;
             let cursor = arguments.references_cursor;
+            let projected = self
+                .service
+                .node_removal(call, journey, node, cursor)
+                .await?;
             return Ok(At::of(projected, |read| NodeOutput {
                 detail: None,
                 explanations: None,
-                removal: Some(RemovalOutput {
-                    removal: read.removal,
-                    outside_references: page(read.outside_references, cursor),
-                }),
+                removal: Some(read),
             }));
         }
         let Some(more) = arguments.explanations else {

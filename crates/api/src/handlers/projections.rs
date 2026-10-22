@@ -195,12 +195,16 @@ pub async fn node_removal(
     State(api): State<Api>,
     Extension(actor): Extension<Actor>,
     Path((id, key)): Path<(String, String)>,
+    RawQuery(raw): RawQuery,
 ) -> Projection<RemovalRead> {
     let (id, key) = (journey(&id)?, node(&key)?);
+    let params = Params::parse(raw.as_deref(), query::EXPLANATION_PARAMS)?;
+    let cursor = params.cursor()?;
     let projected = api
         .service
-        .node_removal(&api.call(actor), &id, &key)
+        .node_removal(&api.call(actor), &id, &key, cursor)
         .await?;
+    params.page_at(projected.revision)?;
     Ok(Json(Projected::from_service(projected)))
 }
 

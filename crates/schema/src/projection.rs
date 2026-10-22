@@ -1231,8 +1231,13 @@ pub struct OutsideReference {
 pub struct RemovalRead {
     /// The removal to send in a `remove_node` mutation.
     pub removal: Removal,
-    /// Conditions, date rules, stage bounds, fed milestones, message drafts, and snoozes
-    /// elsewhere that name a node being removed. Edges into the subtree are already in
-    /// the removal.
+    /// A page of the conditions, date rules, stage bounds, fed milestones, message drafts,
+    /// and snoozes elsewhere that name a node being removed. Edges into the subtree are
+    /// already in the removal.
     pub outside_references: Vec<OutsideReference>,
+    /// Where the next page of outside references starts, when there is one.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub next: Option<Cursor>,
+    /// How many outside references there are in all.
+    pub total: u32,
 }

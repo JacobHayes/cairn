@@ -15,7 +15,7 @@ mod in_process {
     use cairn_schema::limits::{EXPLANATION_ENTRY_COUNT_MAX, PAGE_ITEM_COUNT_MAX};
     use cairn_schema::{
         Actor, ExplainedField, ExplanationPage, LevelDisplay, LevelQuery, ListFlag, ListPage,
-        ListQuery, NextQuery, NodeKey, NodeKind, Snapshot, SnapshotScope, SortBy,
+        ListQuery, NextQuery, NodeKey, NodeKind, RemovalRead, Snapshot, SnapshotScope, SortBy,
     };
     use cairn_service::Call;
 
@@ -308,6 +308,55 @@ mod in_process {
         }
         let distinct: BTreeSet<&NodeKey> = entries.iter().collect();
         assert_eq!((entries.len(), distinct.len()), (count, count));
+    }
+
+    /// A18: the removal read pages the references outside the subtree over HTTP as it does
+    /// for agents, `page_item_count_max` at a time with a total, every reference once, while
+    /// the removal itself stays whole.
+    #[tokio::test]
+    async fn the_removal_read_pages_its_outside_references() {
+        let world = World::start().await;
+        let ann = world.signed_in("ann");
+        let count = usize::try_from(PAGE_ITEM_COUNT_MAX).unwrap() + 3;
+        let mut mutations = String::from(
+            "- op: create_journey\n  name: Gated\n- op: add_node\n  node: {key: n_gate, id: gate, kind: decision, title: Gate, prompt: Go?, answer_type: boolean}\n",
+        );
+        for index in 0..count {
+            writeln!(
+                mutations,
+                "- op: add_node\n  node: {{key: n_item_{index}, id: item-{index}, kind: action, title: Item {index}, relevant_when: {{answered: n_gate}}}}"
+            )
+            .unwrap();
+        }
+        let created = support::patch("p_gated", "{journey: j_gated}", 0, &mutations);
+        let patches = "/api/journeys/j_gated/patches";
+        support::ok::<serde_json::Value>(&post(&ann, patches, &support::request(&created)).await);
+
+        let mut seen = Vec::new();
+        let mut target = "/api/journeys/j_gated/nodes/n_gate/removal".to_owned();
+        loop {
+            let page: Projected<RemovalRead> = get(&ann, &target).await;
+            assert_eq!(usize::try_from(page.value.total).unwrap(), count);
+            assert!(
+                page.value.outside_references.len()
+                    <= usize::try_from(PAGE_ITEM_COUNT_MAX).unwrap()
+            );
+            assert_eq!(page.value.removal.node.as_str(), "n_gate");
+            seen.extend(
+                page.value
+                    .outside_references
+                    .into_iter()
+                    .map(|found| found.holder),
+            );
+            let Some(next) = page.value.next else { break };
+            target = format!(
+                "/api/journeys/j_gated/nodes/n_gate/removal?cursor={}&revision={}",
+                next.position(),
+                page.revision
+            );
+        }
+        let distinct: BTreeSet<&NodeKey> = seen.iter().collect();
+        assert_eq!((seen.len(), distinct.len()), (count, count));
     }
 
     /// I3, C9: a cursor names a place in the order at one journey revision, so a page past the

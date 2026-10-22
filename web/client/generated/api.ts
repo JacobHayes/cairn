@@ -439,7 +439,7 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** The exact removal of a node as the journey stands, and the references elsewhere that the same patch must rewrite or remove. */
+        /** The exact removal of a node as the journey stands, and the references elsewhere that the same patch must rewrite or remove, a page at a time. */
         get: operations["getNodeRemoval"];
         put?: never;
         post?: never;
@@ -4633,14 +4633,21 @@ export interface components {
          *     outside its subtree that the same patch must also rewrite or remove.
          */
         RemovalRead: {
+            /** @description Where the next page of outside references starts, when there is one. */
+            next?: components["schemas"]["Cursor"] | null;
             /**
-             * @description Conditions, date rules, stage bounds, fed milestones, message drafts, and snoozes
-             *     elsewhere that name a node being removed. Edges into the subtree are already in
-             *     the removal.
+             * @description A page of the conditions, date rules, stage bounds, fed milestones, message drafts,
+             *     and snoozes elsewhere that name a node being removed. Edges into the subtree are
+             *     already in the removal.
              */
             outside_references: components["schemas"]["OutsideReference"][];
             /** @description The removal to send in a `remove_node` mutation. */
             removal: components["schemas"]["Removal"];
+            /**
+             * Format: uint32
+             * @description How many outside references there are in all.
+             */
+            total: number;
         };
         /** @description Route-authored guidance on a node, keyed so upgrades diff it. */
         Resource: {
@@ -8044,7 +8051,12 @@ export interface operations {
     };
     getNodeRemoval: {
         parameters: {
-            query?: never;
+            query?: {
+                /** @description Where the page starts: the previous page's `next`. A cursor is a position in the order at one journey revision, so a cursor past the start needs `revision`. */
+                cursor?: components["schemas"]["Cursor"];
+                /** @description The journey revision the previous page was read at (its `revision`); needed with a cursor past the start. When the journey has moved since, the page is refused 409 `page_moved`: start again from the first page. */
+                revision?: components["schemas"]["Revision"];
+            };
             header?: never;
             path: {
                 /** @description The journey. */
@@ -8094,6 +8106,15 @@ export interface operations {
             };
             /** @description No such resource. */
             404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description The journey moved since the page the cursor came from: start again from the first page. */
+            409: {
                 headers: {
                     [name: string]: unknown;
                 };

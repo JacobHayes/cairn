@@ -332,7 +332,7 @@ async fn the_removal_read_is_what_a_patch_needs_to_remove_a_node() {
         json!([{ "node": "n_after", "requires": "n_phase" }])
     );
     assert_eq!(
-        read["outside_references"]["items"],
+        read["outside_references"],
         json!([{ "holder": "n_extra", "field": "relevant_when", "target": "n_ask" }])
     );
 
