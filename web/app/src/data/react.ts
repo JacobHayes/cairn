@@ -1,7 +1,7 @@
 // The data layer as React hooks: every screen reads through these, never the host directly.
 import { streamStatus, type StreamStatus } from "@cairn/client";
 import { useActorRef, useSelector } from "@xstate/react";
-import { createContext, useCallback, useContext, useEffect, useLayoutEffect, useMemo, useRef, useSyncExternalStore } from "react";
+import { createContext, useCallback, useContext, useEffect, useId, useLayoutEffect, useMemo, useRef, useSyncExternalStore } from "react";
 
 import type { Capabilities, Deployment, Caller } from "./host.ts";
 import { derivationOf, journeyView, sameDerivation, type Derivation, type JourneyView } from "./journeys.ts";
@@ -11,7 +11,7 @@ import type { SaveEvent } from "./activity.ts";
 import { aboutOf, inFlightOf, problemsOf, submitWrite, writeOf } from "./edit-manager.ts";
 import { idOf, type Answer, type Command, type OperationId } from "./edit-record.ts";
 import { currentAddress, type Session } from "./session.ts";
-import { savedAnnouncement, syncInputOf, syncSummary, type Problem, type SyncSummary } from "./sync.ts";
+import { savedAnnouncement, settled, syncInputOf, syncSummary, type Problem, type SyncSummary } from "./sync.ts";
 import { writeView, type Check, type WriteSnapshot, type WriteView } from "./write-machine.ts";
 import { isPatchAnswer, landedWarning, type Rejection } from "./writes.ts";
 import { useReceipt } from "../ui/Receipt.tsx";
@@ -134,6 +134,30 @@ export function useSync(): SyncSummary {
   const latest = useSaves()[0];
   const demo = host.kind === "browser";
   return useMemo(() => syncSummary(syncInputOf(timing, { stream, online, demo, skew, revision, count, problems, latest })), [timing, stream, online, demo, skew, revision, count, problems, latest]);
+}
+
+/** Whether nothing the tab has under way will change what it shows (`settled`), as the sync chip carries it. */
+export function useSettled(): boolean {
+  const { root, edits } = useSession();
+  const working = useSelector(root, (snapshot) => Object.keys(snapshot.context.working).length);
+  const inFlight = useSelector(edits, (snapshot) => inFlightOf(snapshot.context.writes));
+  const stream = useStreamStatus();
+  return settled({ working, inFlight, stream });
+}
+
+/**
+ * Counts as work for as long as it is mounted: a Suspense fallback, shown while a screen's code is
+ * on its way, so the tab is not settled before the screen that will read is drawn.
+ */
+export function useWorking(): void {
+  const { root } = useSession();
+  const id = `pending-${useId()}`;
+  useEffect(() => {
+    root.send({ type: "working", id });
+    return () => {
+      root.send({ type: "rested", id });
+    };
+  }, [root, id]);
 }
 
 /** The save the chip announces as it lands, for as long as its SAVED time runs. */

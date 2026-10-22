@@ -13,7 +13,7 @@ import { checkpoint, expect, test } from "./test.ts";
 import { openRoute, routeMenuItem, savedText } from "./around.ts";
 import { TOAST_MS } from "../src/data/toasts.ts";
 import { SYNC_POPOVER_LEAVE_MS } from "../src/shell/sync-popover.ts";
-import { derivedRevision, expectAddress, fresh, goTo, goWithin, openJourney, recentSaves, rename, syncChip, visit } from "./shell.ts";
+import { derivedRevision, expectAddress, fresh, goTo, goWithin, openJourney, recentSaves, rename, syncChip, visit, whenSettled } from "./shell.ts";
 
 const rail = (page: Page) => page.getByRole("navigation", { name: "Screens", exact: true });
 const current = (page: Page) => rail(page).locator("[aria-current=page]");
@@ -43,9 +43,9 @@ async function opensOnHome(page: Page): Promise<void> {
   await expect(page.getByTestId("home")).toBeVisible();
   await expect(page.getByTestId("home-journey").first()).toBeVisible();
   await expect(current(page)).toHaveText(["Home"]);
-  // Once the host has settled (its sync state is shown), past the point where a data-driven redirect would have moved the page.
+  // Once the host has settled, past the point where a data-driven redirect would have moved the page.
   await expect(syncChip(page)).toHaveAttribute("data-state", "demo");
-  const painted = await page.evaluate(() => (window as unknown as { painted: string[] }).painted);
+  const painted = await whenSettled(page, () => page.evaluate(() => (window as unknown as { painted: string[] }).painted));
   const address = new URL(page.url()).pathname + new URL(page.url()).search;
   // Home's heading is in the first paint of the page, at the address it was opened at, and nothing after changes either.
   expect(painted).toEqual([`${address} @ ${address} # Waiting on you`]);
@@ -97,8 +97,7 @@ test("the in-browser host boots, derives in the worker, applies a patch, and sur
   await rename(page, "n_docs", fresh("Docs"));
   expect(await recentSaves(page)).toEqual([expect.stringContaining("Edited")]);
   await expect.poll(() => derivedRevision(page)).toBe(before + 1);
-  await page.evaluate(() => new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve))));
-  expect(await page.evaluate(() => (window as unknown as { seenErrors: string[] }).seenErrors)).toEqual([]);
+  expect(await whenSettled(page, () => page.evaluate(() => (window as unknown as { seenErrors: string[] }).seenErrors))).toEqual([]);
 
   await rail(page).getByRole("link", { name: "Routes" }).click();
   await expect(current(page)).toHaveText(["Routes"]);
@@ -117,7 +116,7 @@ test("the sync dot shows its popover on hover and focus, inside the window; it o
   await chip.hover();
   await expect(popover).toBeVisible();
   // Inside the window, and shown again from the keyboard's focus.
-  const inside = await popover.boundingBox();
+  const inside = await whenSettled(page, () => popover.boundingBox());
   const viewport = page.viewportSize();
   expect(inside !== null && viewport !== null && inside.x >= 0 && inside.x + inside.width <= viewport.width).toBe(true);
   await page.keyboard.press("Escape");
@@ -132,11 +131,8 @@ test("the sync dot shows its popover on hover and focus, inside the window; it o
   await expect(popover).toHaveCount(0);
   await chip.hover();
   await expect(popover).toBeVisible();
-  // Once it has settled (it rises in), where it is.
-  await popover.evaluate((element) => Promise.all(element.getAnimations().map((animation) => animation.finished)));
   await page.clock.pauseAt(new Date(Date.now() + 60_000));
-  const dot = await chip.boundingBox();
-  const sheet = await popover.boundingBox();
+  const [dot, sheet] = await whenSettled(page, () => Promise.all([chip.boundingBox(), popover.boundingBox()]));
   if (dot === null || sheet === null) {
     throw new Error("the dot and its popover have boxes");
   }
@@ -192,7 +188,7 @@ test("a toast stays while the pointer is on it, the next one replaces it, and it
   await expect(toast).toHaveCount(1);
   await pointerOn(true);
   // A new element under a still pointer is entered at the browser's next pointer move, which a loaded machine may take late: move within the toast, so its enter has come before the pointer leaves.
-  const box = (await toast.boundingBox()) ?? { x: 0, y: 0, width: 0, height: 0 };
+  const box = (await whenSettled(page, () => toast.boundingBox())) ?? { x: 0, y: 0, width: 0, height: 0 };
   await page.mouse.move(box.x + box.width / 2 + 2, box.y + box.height / 2 + 2);
   await page.clock.runFor(TOAST_MS.confirm + 1000);
   await expect(toast).toBeVisible();

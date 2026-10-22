@@ -9,12 +9,12 @@ import { checkpoint, expect, test } from "./test.ts";
 
 import { expectTitleLinesAsLaidOut, lineBetween, pointOn, viewportOf, viewportSettled } from "./canvas.ts";
 import { journeyName, startJourney } from "./around.ts";
-import { goWithin, nodeCard, nodePanel, openJourney, setDepth, setFade, visit } from "./shell.ts";
+import { goWithin, nodeCard, nodePanel, openJourney, setDepth, setFade, visit, whenSettled } from "./shell.ts";
 
 /** The open Filter counts what it hides beside its box, and showing the not relevant removes the count. */
 async function filterCountsWhatItHides(page: Page): Promise<void> {
   const cards = page.getByTestId("node-card");
-  const resting = await cards.count();
+  const resting = await whenSettled(page, () => cards.count());
   await page.getByTestId("filter-button").click();
   await expect(page.getByTestId("show-not-relevant-count")).toBeVisible();
   await page.getByTestId("show-not-relevant").click();
@@ -60,7 +60,7 @@ async function followsAnEdge(page: Page): Promise<void> {
   await page.mouse.move(at.x, at.y);
   await expect(page.getByTestId("edge-hover")).toContainText("Test plan needs Environment access");
   // The styled hover is the only one: the element under the pointer and its ancestors carry no native title (the browser's tooltip would cover it).
-  const native = await page.evaluate(({ x, y }) => {
+  const native = await whenSettled(page, () => page.evaluate(({ x, y }) => {
     const found: string[] = [];
     for (let each = document.elementFromPoint(x, y); each !== null; each = each.parentElement) {
       if (each.hasAttribute("title") || each.querySelector(":scope > title") !== null) {
@@ -68,7 +68,7 @@ async function followsAnEdge(page: Page): Promise<void> {
       }
     }
     return found;
-  }, at);
+  }, at));
   expect(native).toEqual([]);
   await page.mouse.click(at.x, at.y);
   await expect(page.getByTestId("edge-card")).toBeVisible();
@@ -108,14 +108,13 @@ async function depthCountsHiddenFrontier(page: Page): Promise<void> {
   const cards = page.getByTestId("node-card");
   const id = await startJourney(page, "browser", journeyName("Depth"), { route: "vendor-evaluation", version: 1 });
   await openJourney(page, "browser", id, "?frontier=1");
-  const drawn = await cards.count();
   const frontierCards = page.locator('[data-testid="node-card"][data-here*="actionable now"]');
-  const frontier = await frontierCards.evaluateAll((found) => found.map((card) => card.getAttribute("data-node") ?? ""));
+  const [drawn, frontier] = await whenSettled(page, () => Promise.all([cards.count(), frontierCards.evaluateAll((found) => found.map((card) => card.getAttribute("data-node") ?? ""))]));
   expect(frontier.length).toBeGreaterThan(0);
   await expect(page.getByTestId("depth-badge")).toHaveCount(0);
   await setDepth(page, "Stages");
   await expect.poll(() => cards.count()).toBeLessThan(drawn);
-  const left = await frontierCards.evaluateAll((found) => found.map((card) => card.getAttribute("data-node") ?? ""));
+  const left = await whenSettled(page, () => frontierCards.evaluateAll((found) => found.map((card) => card.getAttribute("data-node") ?? "")));
   const hidden = frontier.filter((key) => !left.includes(key));
   expect(hidden.length).toBeGreaterThan(0);
   await expect(page.getByTestId("depth-badge")).toHaveText(String(hidden.length));
@@ -180,7 +179,7 @@ async function clearsAndBoxSelects(page: Page): Promise<void> {
   await expect(page.getByTestId("selection-panel")).toHaveCount(0);
   await expect(page.getByTestId("node-detail")).toBeVisible();
   await viewportSettled(page);
-  const [from, to] = [await nodeCard(page, "n_purpose").boundingBox(), await nodeCard(page, "n_who_owns").boundingBox()];
+  const [from, to] = await whenSettled(page, () => Promise.all([nodeCard(page, "n_purpose").boundingBox(), nodeCard(page, "n_who_owns").boundingBox()]));
   if (from === null || to === null) {
     throw new Error("the cards have no box");
   }
@@ -191,14 +190,14 @@ async function clearsAndBoxSelects(page: Page): Promise<void> {
   await page.mouse.up();
   await page.keyboard.up("Shift");
   await expect(page.getByTestId("selection-panel")).toBeVisible();
-  expect(await page.getByTestId("selection-member").count()).toBeGreaterThanOrEqual(2);
+  expect(await whenSettled(page, () => page.getByTestId("selection-member").count())).toBeGreaterThanOrEqual(2);
 }
 
 /** A click on the empty canvas deselects, and a drag that pans does not. */
 async function emptyCanvasDeselects(page: Page): Promise<void> {
   await nodeCard(page, "n_reporting").getByTestId("card-open").click();
   await expect(page).toHaveURL(/\/nodes\/n_reporting/);
-  const pane = (await page.locator(".react-flow__pane").boundingBox()) ?? { x: 0, y: 0, width: 0, height: 0 };
+  const pane = (await whenSettled(page, () => page.locator(".react-flow__pane").boundingBox())) ?? { x: 0, y: 0, width: 0, height: 0 };
   const corner = { x: pane.x + pane.width - 12, y: pane.y + pane.height - 60 };
   await page.mouse.move(corner.x, corner.y);
   await page.mouse.down();
@@ -225,13 +224,13 @@ async function menuArrowsSkipDisabled(page: Page): Promise<void> {
   const menu = page.getByTestId("selection-status-menu");
   await expect(menu.getByRole("menuitem", { name: "Start" })).toBeDisabled();
   const enabled = menu.locator('[role="menuitem"]:not(:disabled)');
-  const count = await enabled.count();
+  const [count, names] = await whenSettled(page, () => Promise.all([enabled.count(), enabled.allInnerTexts()]));
   expect(count).toBeGreaterThan(1);
   // Opened from the keyboard, the focus is on the first enabled item; down all the way round returns to it.
   for (let step = 0; step <= count; step += 1) {
     await expect(menu.locator('[role="menuitem"]:focus')).toHaveCount(1);
     await expect(menu.locator('[role="menuitem"]:disabled:focus')).toHaveCount(0);
-    await expect(menu.locator('[role="menuitem"]:focus')).toHaveText(await enabled.nth(step % count).innerText());
+    await expect(menu.locator('[role="menuitem"]:focus')).toHaveText(names[step % count] ?? "");
     await page.keyboard.press("ArrowDown");
   }
   await page.keyboard.press("Escape");
@@ -252,7 +251,7 @@ test("selection is one set with no mode: click selects, shift-click adds, the in
 /** Under Fade the cards below the depth are 0.3 whatever their state, a container holding a decision stays clear, and Frontier's dimming joins it without multiplying. */
 async function fadeAndFrontierLevels(page: Page): Promise<void> {
   const read = () =>
-    page.getByTestId("node-card").evaluateAll((found) =>
+    whenSettled(page, () => page.getByTestId("node-card").evaluateAll((found) =>
       found.map((card) => ({
         key: card.getAttribute("data-node") ?? "",
         kind: card.getAttribute("data-kind") ?? "",
@@ -261,7 +260,7 @@ async function fadeAndFrontierLevels(page: Page): Promise<void> {
         here: card.getAttribute("data-here") ?? "",
         opacity: Number(getComputedStyle(card).opacity),
       })),
-    );
+    ));
   const cards = await read();
   const held = new Set(cards.filter((card) => card.kind === "decision").flatMap((card) => {
     const above: string[] = [];
@@ -312,7 +311,7 @@ async function stageHeadsAndTracedOpacity(page: Page): Promise<void> {
   await expect(nodeCard(page, "n_testing")).toHaveCSS("opacity", "0.5");
   const chip = nodeCard(page, "n_testing").getByTestId("card-head-chip");
   await expect(chip).toBeVisible();
-  const [chipBox, cardBox] = [await chip.boundingBox(), await nodeCard(page, "n_testing").boundingBox()];
+  const [chipBox, cardBox] = await whenSettled(page, () => Promise.all([chip.boundingBox(), nodeCard(page, "n_testing").boundingBox()]));
   if (chipBox === null || cardBox === null) {
     throw new Error("the stage and its chip are drawn");
   }

@@ -252,6 +252,23 @@ export function nextDeadline(timing: SyncTiming): number | undefined {
   return due.length === 0 ? undefined : Math.min(...due);
 }
 
+/** What the settled fact reads: the work under way in the tab, the writes in flight, and the stream. */
+export interface Underway {
+  /** Reads working (settling or reading) and screens whose code is loading. */
+  working: number;
+  inFlight: number;
+  stream: StreamStatus;
+}
+
+/**
+ * Whether nothing the tab has under way will change what it shows: no read or screen at work,
+ * no write in flight, and no stream opening (its first ticks may ask for more). It reads the
+ * facts, never the time, so it holds the moment the last work ends; what changes by the clock
+ * alone (SAVED fading, a toast, a failed read's retry) is not work.
+ */
+export const settled = (underway: Underway): boolean =>
+  underway.working === 0 && underway.inFlight === 0 && underway.stream !== "connecting" && underway.stream !== "reconnecting";
+
 /** What the scheduler is told. */
 export type SyncEvent =
   /** The worst lag of the reads the chip counts changed (or there is none). */

@@ -7,7 +7,7 @@ import { expect, type Locator, type Page } from "@playwright/test";
 
 import { fixtureRoute } from "./around.ts";
 import { publishDraft, versionSelect } from "./around.ts";
-import { derivedRevision, fresh, importRoute, openAt, type HostKind } from "./shell.ts";
+import { derivedRevision, fresh, importRoute, openAt, whenSettled, type HostKind } from "./shell.ts";
 
 /** Opens journey `journey`'s projection at `path` (`list?frontier=1`, `walk`, with a query) on `host`, once derived. */
 export async function openActing(page: Page, host: HostKind, journey: string, path: string): Promise<void> {
@@ -17,14 +17,14 @@ export async function openActing(page: Page, host: HostKind, journey: string, pa
 /** The keys of the rows or items `testId` marks, in the order shown, once there are some. */
 export async function keysOf(page: Page, testId: string): Promise<string[]> {
   await expect(page.getByTestId(testId).first()).toBeVisible();
-  return page.getByTestId(testId).evaluateAll((rows) => rows.map((row) => row.getAttribute("data-node") ?? ""));
+  return whenSettled(page, () => page.getByTestId(testId).evaluateAll((rows) => rows.map((row) => row.getAttribute("data-node") ?? "")));
 }
 
 /** Runs `read` with the Frontier chip in reach: on a phone it lives in the Controls menu, opened for the read and closed after. */
 export async function withFrontier<T>(page: Page, read: (chip: Locator) => Promise<T>): Promise<T> {
   const chip = page.getByTestId("chip-frontier");
   const controls = page.getByTestId("controls-button");
-  const folded = (await controls.count()) > 0;
+  const folded = (await whenSettled(page, () => controls.count())) > 0;
   if (folded) {
     await controls.click();
   }
@@ -38,7 +38,7 @@ export async function withFrontier<T>(page: Page, read: (chip: Locator) => Promi
 /** Turns the Frontier chip on or off, on the list or any other view that has it. */
 export async function setFrontier(page: Page, on: boolean): Promise<void> {
   await withFrontier(page, async (chip) => {
-    if ((await chip.getAttribute("aria-pressed")) !== String(on)) {
+    if ((await whenSettled(page, () => chip.getAttribute("aria-pressed"))) !== String(on)) {
       await chip.click();
     }
     await expect(chip).toHaveAttribute("aria-pressed", String(on));
@@ -49,7 +49,7 @@ export async function setFrontier(page: Page, on: boolean): Promise<void> {
 export async function frontierKeys(page: Page): Promise<string[]> {
   const rows = page.locator('[data-testid="list-row"][data-frontier="true"]');
   await expect(rows.first()).toBeVisible();
-  return rows.evaluateAll((each) => each.map((row) => row.getAttribute("data-node") ?? ""));
+  return whenSettled(page, () => rows.evaluateAll((each) => each.map((row) => row.getAttribute("data-node") ?? "")));
 }
 
 /** The list's rows, in order. */
@@ -66,7 +66,7 @@ export function frontierItem(page: Page, node: string): Locator {
 export async function passOrder(page: Page): Promise<string[]> {
   const triage = page.getByTestId("triage");
   await expect(triage).toHaveAttribute("data-order", /\S/);
-  const order = await triage.getAttribute("data-order");
+  const order = await whenSettled(page, () => triage.getAttribute("data-order"));
   return (order ?? "").split(" ").filter(Boolean);
 }
 

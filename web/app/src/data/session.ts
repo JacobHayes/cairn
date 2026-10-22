@@ -19,6 +19,7 @@ import {
   deploymentOf,
   editsOf,
   journeysOf,
+  landedEvents,
   readEnvOf,
   sessionRoot,
   subscriptionOf,
@@ -32,7 +33,6 @@ import {
   type ToastsRef,
 } from "./session-root.ts";
 import { todayIn } from "./today.ts";
-import { saveEventOf, saveOf } from "./writes.ts";
 
 import { plural } from "../ui/words.ts";
 import { nodeTitle } from "../ui/gone.ts";
@@ -184,9 +184,8 @@ export class Session {
             rebase: (patch, stale) => parts.deriver.rebased(patch, stale),
             began: this.begin,
             saved: (command, answer, began) => {
-              const save = saveOf(command, answer, began, this.titleOf);
-              if (save !== undefined) {
-                this.root.send({ type: "saved", save: saveEventOf(save, this.titleOf, new Date()) });
+              for (const event of landedEvents(command, answer, began, this.titleOf, new Date())) {
+                this.root.send(event);
               }
             },
             connected: () => (page?.navigator.onLine ?? true) && streamStatus(this.subscription.getSnapshot()) === "live",

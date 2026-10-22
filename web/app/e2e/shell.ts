@@ -11,11 +11,12 @@ const DEMO = `http://127.0.0.1:${process.env["CAIRN_DEMO_PORT"] ?? ""}`;
  * Opens the screen at `path` (`/journeys/<id>?view=...`) on `host`, once the shell is up:
  * within the page when it already runs on `host`, as a link would, so the in-browser host's
  * store (which lives only as long as the page) is kept; by loading the page otherwise. The
- * sync chip says which host it is on (`data-host`).
+ * sync chip says which host it is on (`data-host`). Returns once the page has settled.
  */
 export async function open(page: Page, host: HostKind, path: string): Promise<void> {
   const nav = page.getByRole("navigation", { name: "Screens", exact: true });
   const onDemo = page.url().startsWith(`${DEMO}/`);
+  // eslint-disable-next-line e2e/settled-reads -- whether the app runs in this tab at all: a blank tab has nothing to settle
   if ((await nav.count()) === 1 && onDemo === (host === "browser")) {
     await goWithin(page, path);
   } else {
@@ -23,6 +24,7 @@ export async function open(page: Page, host: HostKind, path: string): Promise<vo
   }
   await expect(nav).toBeVisible();
   await expect(syncChip(page)).toHaveAttribute("data-host", host);
+  await settled(page);
 }
 
 /** From the new-route form (`/routes/new`), imports a route file: a new route, or a new draft of the one it names. */
@@ -36,10 +38,52 @@ export function syncChip(page: Page): Locator {
   return page.getByTestId("sync");
 }
 
-/** Waits until the screen's journey is derived: its name is up, and the chip knows its revision. */
+/**
+ * Whether the page is settled now and still is after two more turns of its event loop: the
+ * render that settled it may run effects that start more work (a screen keys its reads in one).
+ * Runs in the page; a turn is a message, which no fake clock holds back.
+ */
+async function stillSettled(): Promise<boolean> {
+  const quiet = () => document.querySelector('[data-testid="sync"]')?.getAttribute("data-settled") === "true";
+  const turn = () =>
+    new Promise((resolve) => {
+      const channel = new MessageChannel();
+      channel.port1.onmessage = resolve;
+      channel.port2.postMessage(null);
+    });
+  if (!quiet()) {
+    return false;
+  }
+  await turn();
+  await turn();
+  return quiet();
+}
+
+/**
+ * Waits until nothing the page has under way will change what it shows: no read or screen at
+ * work, no write in flight, the stream open (the sync dot's `data-settled`). What changes by the
+ * clock alone (SAVED fading, a toast) is not waited for: a test that needs it runs the page's
+ * clock (`page.clock`).
+ */
+export async function settled(page: Page): Promise<void> {
+  await expect.poll(() => page.evaluate(stillSettled), { intervals: [16] }).toBe(true);
+}
+
+/**
+ * `read` of the page once it has settled. A value read from the page at any other moment may be
+ * one it is about to replace; eslint allows a read that does not retry only here, in
+ * `expect.poll` and in `toPass`.
+ */
+export async function whenSettled<T>(page: Page, read: () => Promise<T>): Promise<T> {
+  await settled(page);
+  return await read();
+}
+
+/** Waits until the screen's journey is derived: its name is up, the chip knows its revision, and the page has settled. */
 export async function derived(page: Page): Promise<void> {
   await expect(page.getByTestId("journey-name")).toBeVisible();
   await expect(syncChip(page)).toHaveAttribute("data-revision", /^\d+$/);
+  await settled(page);
 }
 
 /** Waits until the stream is live and nothing is pending: the chip says "In sync, live". */
@@ -50,21 +94,22 @@ export async function live(page: Page): Promise<void> {
 /** The popover's Recent, newest first, once it lists a save; the popover is closed again. */
 export async function recentSaves(page: Page): Promise<string[]> {
   const chip = syncChip(page);
-  if ((await chip.getAttribute("aria-expanded")) !== "true") {
+  if ((await whenSettled(page, () => chip.getAttribute("aria-expanded"))) !== "true") {
     await chip.click();
   }
   const recent = page.getByTestId("sync-popover").getByTestId("sync-recent");
   await expect(recent.first()).toBeVisible();
-  const saves = await recent.allTextContents();
+  const saves = await whenSettled(page, () => recent.allTextContents());
   await page.keyboard.press("Escape");
   await expect(page.getByTestId("sync-popover")).toHaveCount(0);
   return saves;
 }
 
-/** Loads the screen at `path` afresh on `host`, as a bookmark or a posted link does, and returns once the shell is up. */
+/** Loads the screen at `path` afresh on `host`, as a bookmark or a posted link does, and returns once the shell is up and the page has settled. */
 export async function visit(page: Page, host: HostKind, path: string): Promise<void> {
   await page.goto(host === "browser" ? `${DEMO}${path}` : path);
   await expect(page.getByRole("navigation", { name: "Screens", exact: true })).toBeVisible();
+  await settled(page);
 }
 
 /** Moves the tab to `path` as a link does, without loading the page again, and without waiting for where it lands. */
@@ -77,13 +122,14 @@ export async function follow(page: Page, path: string): Promise<void> {
 
 /**
  * Moves the tab to the screen at `path` without loading the page again, as the app's links do,
- * and returns once the router has rendered it (the shell's `data-screen`). Data the screen
- * derives may still be on its way; read it with a web-first assertion.
+ * and returns once the router has rendered it (the shell's `data-screen`) and the page has
+ * settled on it.
  */
 export async function goWithin(page: Page, path: string): Promise<void> {
   await follow(page, path);
   const main = page.locator("main[data-screen]");
   await expect.poll(async () => screenOf((await main.getAttribute("data-screen")) ?? "")).toBe(screenOf(path));
+  await settled(page);
 }
 
 /** Waits until the tab is at `address`, whatever the order of its query parameters. */
@@ -146,7 +192,7 @@ export async function openAt(page: Page, host: HostKind, journey: string, addres
 
 /** Opens the toolbar's filter, unless it is open. */
 export async function openFilter(page: Page): Promise<void> {
-  if (!(await page.getByTestId("filter-panel").isVisible())) {
+  if (!(await whenSettled(page, () => page.getByTestId("filter-panel").isVisible()))) {
     await page.getByTestId("filter-button").click();
   }
   await expect(page.getByTestId("filter-panel")).toBeVisible();
@@ -163,7 +209,7 @@ export async function setDepth(page: Page, word: string): Promise<void> {
 export async function setFade(page: Page, on: boolean): Promise<void> {
   await page.getByTestId("depth-button").click();
   const check = page.getByTestId("depth-fade").getByRole("checkbox");
-  if ((await check.isChecked()) !== on) {
+  if ((await whenSettled(page, () => check.isChecked())) !== on) {
     await check.click();
   }
   // The new state comes back from the address.
@@ -175,7 +221,7 @@ export async function setFade(page: Page, on: boolean): Promise<void> {
 /** Goes to the view `view` (`graph`, `list`, `timeline`, `summary` or `walk`) from the header's View picker, as a person does. */
 export async function goTo(page: Page, view: string): Promise<void> {
   const frame = page.getByTestId("journey-frame");
-  if ((await frame.getAttribute("data-screen")) !== view) {
+  if ((await whenSettled(page, () => frame.getAttribute("data-screen"))) !== view) {
     await page.getByTestId("view-picker").click();
     await page.getByTestId(`view-${view}`).click();
   }
@@ -195,7 +241,7 @@ export function nodePanel(page: Page, node: string) {
 /** Opens `node`'s detail from its card on the canvas, unless it is open already. */
 export async function openFromCanvas(page: Page, node: string) {
   const panel = nodePanel(page, node);
-  if (!(await panel.isVisible())) {
+  if (!(await whenSettled(page, () => panel.isVisible()))) {
     await nodeCard(page, node).getByTestId("card-open").click();
   }
   await expect(panel).toBeVisible();
@@ -224,16 +270,17 @@ export async function save(page: Page, node: string): Promise<void> {
   await renameOf(page, node).getByRole("button", { name: "Save" }).click();
 }
 
-/** Renames `node` to `text` and waits for its card to show it. */
+/** Renames `node` to `text` and waits for its card to show it and the page to settle. */
 export async function rename(page: Page, node: string, text: string): Promise<void> {
   await startRename(page, node, text);
   await save(page, node);
   await expect(nodeCard(page, node).getByTestId("title")).toHaveText(text);
+  await settled(page);
 }
 
-/** The revision the page's derivation is at. */
+/** The revision the page's derivation is at, once it has settled. */
 export async function derivedRevision(page: Page): Promise<number> {
-  return Number(await syncChip(page).getAttribute("data-revision"));
+  return Number(await whenSettled(page, () => syncChip(page).getAttribute("data-revision")));
 }
 
 /** A title no earlier run used. */
@@ -255,6 +302,8 @@ export function countDocumentFetches(page: Page, journey: string): () => number 
 /** On a phone the inspector opens at its peek, which shows its tabs and not its forms: opens it to full first, where it is a sheet at its peek. */
 export async function openSheet(page: Page): Promise<void> {
   const handle = page.getByRole("button", { name: "Resize the inspector" });
+  // The frame's own layout, drawn with what the caller waited for, not data: a test holding a read open opens the sheet too.
+  // eslint-disable-next-line e2e/settled-reads
   if ((await handle.isVisible()) && (await page.locator(".frame").getAttribute("data-sheet")) === "peek") {
     await handle.click();
     await expect(page.locator(".frame")).toHaveAttribute("data-sheet", "full");

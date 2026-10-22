@@ -11,7 +11,7 @@ import { Link, useNavigate } from "react-router";
 
 import { pathTo } from "../address.ts";
 import type { SaveEvent } from "../data/activity.ts";
-import { useDerivation, useProblems, useSaves, useSavedAnnouncement, useSession, useSkew, useStreamStatus, useSync } from "../data/react.ts";
+import { useDerivation, useProblems, useSaves, useSavedAnnouncement, useSession, useSettled, useSkew, useStreamStatus, useSync } from "../data/react.ts";
 import { dateWords } from "../status/when.ts";
 import type { Problem, SyncSummary } from "../data/sync.ts";
 import { Button } from "../ui/kit.tsx";
@@ -206,6 +206,7 @@ function usePopover() {
 export function SyncChip() {
   const session = useSession();
   const summary = useSync();
+  const quiet = useSettled();
   const derivation = useDerivation();
   const { ref, shown, pinned, anchor, wrap, chip } = usePopover();
   const saved = useSavedAnnouncement();
@@ -232,6 +233,7 @@ export function SyncChip() {
         data-revision={derivation?.revision}
         data-deployment={derivation?.deployment}
         data-today={derivation?.today}
+        data-settled={quiet}
         aria-label={`${summary.label}. ${summary.sentence}`}
         aria-haspopup="dialog"
         aria-expanded={shown}

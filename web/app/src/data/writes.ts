@@ -3,7 +3,7 @@
 // for a refusal or an answer that never came; and the save a landed write records, with the
 // warnings it caused. Committed state always comes from the host: the tick that follows
 // refetches it.
-import type { Schema } from "@cairn/client";
+import type { Schema, Tick } from "@cairn/client";
 
 import type { Markdown, Patch } from "./host.ts";
 import { consequenceLines, warningOf, type ConsequenceLine, type SaveEvent, type TitleOf, type Unlocked } from "./activity.ts";
@@ -141,6 +141,11 @@ export function describe(intent: Pick<WriteIntent, "target" | "mutations">, titl
 /** Whether `answer` is a patch's (an apply, an import), which notes what it caused (D7); a proposal's does not. */
 export function isPatchAnswer(answer: Answer): answer is Schema<"PatchAnswer"> {
   return answer.outcome === "applied" || answer.outcome === "already_applied";
+}
+
+/** The commit a landed write made, as the tick the stream will send for it: its domain at the revision it produced. */
+export function committedTick(answer: Answer): Tick | undefined {
+  return isPatchAnswer(answer) ? { of: { domain: answer.receipt.domain }, revision: answer.receipt.revision } : undefined;
 }
 
 /** The sentence a receipt shows for a landed write's consequences (D7), if it has any. */

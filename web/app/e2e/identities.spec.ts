@@ -2,7 +2,7 @@
 // alone and the checkboxes make a set, merged or deleted from the inspector; Delete is off while
 // anything names an identity. The open proposals are the inspector's Proposals tab (server.spec).
 import { addIdentity, identityRow, mergeIdentities, selectIdentities } from "./around.ts";
-import { fresh, open, openSheet } from "./shell.ts";
+import { fresh, open, openSheet, whenSettled } from "./shell.ts";
 import { checkpoint, expect, test } from "./test.ts";
 
 /** Ana Ruiz and Dara Singh of the fixtures' people: named by journeys. */
@@ -13,7 +13,7 @@ test("E6: a row opens that identity alone, the checkboxes make a set the inspect
   await open(page, "browser", "/identities");
   // The search keeps the identities whose name or email holds it, and says how many.
   await expect(page.getByTestId("identity").first()).toBeVisible();
-  const all = await page.getByTestId("identity").count();
+  const all = await whenSettled(page, () => page.getByTestId("identity").count());
   expect(all).toBeGreaterThan(2);
   await page.getByLabel("Search").fill("ben@");
   await expect(page.getByTestId("identity")).toHaveCount(1);
@@ -49,7 +49,7 @@ test("E6: a row opens that identity alone, the checkboxes make a set the inspect
   await openSheet(page);
   const references = page.locator("[data-rows-panel]").first();
   await expect(references).toBeVisible();
-  const before = (await references.getAttribute("data-count")) ?? "";
+  const before = (await whenSettled(page, () => references.getAttribute("data-count"))) ?? "";
   expect(Number(before)).toBeGreaterThan(0);
   const keeper = await addIdentity(page, fresh("Keeper"));
   await expect(page.getByTestId("delete-identities")).toHaveAttribute("data-deletion", "allowed");

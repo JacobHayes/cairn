@@ -11,7 +11,7 @@ import { openRoute, pickVersion, publishDraft, routeMenuItem, versionSelect } fr
 import { formField, saveForm } from "./authoring.ts";
 import { publishVersionTwo } from "./proposals.ts";
 import { lineBetween, pointOn, viewportSettled } from "./canvas.ts";
-import { expectAddress, follow, goWithin, importRoute, nodeCard, open, setDepth } from "./shell.ts";
+import { expectAddress, follow, goWithin, importRoute, nodeCard, open, setDepth, whenSettled } from "./shell.ts";
 import { search } from "./view-state.ts";
 
 /** Opens a draft on the route being shown (a version) and waits for the draft view. */
@@ -25,7 +25,7 @@ const view = (page: Page) => page.getByTestId("route-frame");
 
 /** Goes to `to` from the header's View picker. */
 async function goToView(page: Page, to: "graph" | "list" | "timeline"): Promise<void> {
-  if ((await view(page).getAttribute("data-screen")) !== to) {
+  if ((await whenSettled(page, () => view(page).getAttribute("data-screen"))) !== to) {
     await page.getByTestId("view-picker").click();
     await page.getByTestId(`view-${to}`).click();
   }
@@ -34,7 +34,7 @@ async function goToView(page: Page, to: "graph" | "list" | "timeline"): Promise<
 
 /** The first tick's day on the timeline's axis: it moves when the axis pans. */
 async function firstTickDay(page: Page): Promise<string> {
-  return (await page.getByTestId("timeline-tick").first().getAttribute("data-day")) ?? "";
+  return (await whenSettled(page, () => page.getByTestId("timeline-tick").first().getAttribute("data-day"))) ?? "";
 }
 
 /** Selects `key` on the route canvas, as a click on its card does. */
@@ -123,8 +123,9 @@ async function timelineLaysFromDayZero(page: Page): Promise<void> {
   const features = page.locator('[data-testid="timeline-entry"][data-node="n_features"]');
   await expect(features).toBeVisible();
   // Its bar starts on the start line (day 0): the bar's left edge is the line's.
-  const line = await page.locator("line.timeline-today").first().boundingBox();
-  const bar = await page.locator('[data-testid="timeline-track"][data-node="n_features"] .timeline-mark').first().boundingBox();
+  const [line, bar] = await whenSettled(page, () =>
+    Promise.all([page.locator("line.timeline-today").first().boundingBox(), page.locator('[data-testid="timeline-track"][data-node="n_features"] .timeline-mark').first().boundingBox()]),
+  );
   expect(line).not.toBeNull();
   expect(bar).not.toBeNull();
   expect(Math.abs((bar?.x ?? -99) - (line?.x ?? 99))).toBeLessThan(3);
@@ -184,7 +185,7 @@ test("C7: selecting a node on a route draft traces it, as on a journey, through 
   await page.getByTestId("trace-reveal").click();
   await expect(page.getByTestId("trace-reveal")).toContainText("Reveal");
   // The empty canvas clears the selection and its marks.
-  const pane = (await page.locator(".react-flow__pane").boundingBox()) ?? { x: 0, y: 0, width: 0, height: 0 };
+  const pane = (await whenSettled(page, () => page.locator(".react-flow__pane").boundingBox())) ?? { x: 0, y: 0, width: 0, height: 0 };
   await page.mouse.click(pane.x + pane.width - 12, pane.y + pane.height - 60);
   await expect(page).not.toHaveURL(/\/nodes\//);
   await expect(page.getByTestId("card-mark")).toHaveCount(0);
@@ -267,7 +268,7 @@ async function versionLineOpensCard(page: Page): Promise<void> {
   await expect(page).toHaveURL(/\/routes\/vendor-evaluation\/nodes\/n_comparison_set\?.*version=1/);
   await expect(page.getByTestId("version-node")).toBeVisible();
   await page.goBack();
-  const pane = (await page.locator(".react-flow__pane").boundingBox()) ?? { x: 0, y: 0, width: 0, height: 0 };
+  const pane = (await whenSettled(page, () => page.locator(".react-flow__pane").boundingBox())) ?? { x: 0, y: 0, width: 0, height: 0 };
   await page.mouse.click(pane.x + pane.width - 12, pane.y + pane.height - 60);
   await expect(page).toHaveURL(/\/routes\/vendor-evaluation\?.*version=1/);
   await expect(card).toHaveCount(0);
@@ -299,7 +300,7 @@ test("C1: a line that stands for many links lists the first of them and shows th
   await goWithin(page, "/routes/many-links/edges/n_a~n_b?depth=stages");
   const rows = page.getByTestId("edge-card").locator("[data-requirement]");
   await expect(rows.first()).toBeVisible();
-  const first = await rows.count();
+  const first = await whenSettled(page, () => rows.count());
   expect(first).toBeLessThan(60);
   await page.getByTestId("edge-links-all").click();
   await expect(rows).toHaveCount(60);

@@ -8,7 +8,7 @@ import { expect, test } from "./test.ts";
 
 import { openJourneyCard } from "./around.ts";
 import { apply, blockers, editWhereVersionTwoChanges, graphRoom, marginIn, pickNode, publishVersionTwo, resolve, reviewItem, reviewOpen, saveEdits, scrollsOnce } from "./proposals.ts";
-import { expectAddress, goTo, nodeCard, open, setDepth, syncChip } from "./shell.ts";
+import { expectAddress, goTo, nodeCard, open, setDepth, syncChip, whenSettled } from "./shell.ts";
 
 /** Drafts the upgrade of the scenario journey to version 2 (after the edits version 2 also touches) and returns the review's address. */
 async function draftUpgrade(page: Page): Promise<string> {
@@ -160,20 +160,20 @@ async function firstChangeFramed(page: Page, layered: string, size: { width: num
   await open(page, "browser", `${layered}?depth=actions`);
   await reviewOpen(page);
   // The first change in the rail's order is the first conflict waiting on a choice.
-  const first = await page.getByTestId("to-decide-item").first().evaluate((row) => row.querySelector("button")?.textContent ?? "");
+  const first = await whenSettled(page, () => page.getByTestId("to-decide-item").first().evaluate((row) => row.querySelector("button")?.textContent ?? ""));
   const card = page.locator('[data-testid="node-card"][data-diff]').filter({ has: page.getByTestId("title").filter({ hasText: first }) });
   await expect(card.first()).toBeVisible();
-  const node = (await card.first().getAttribute("data-node")) ?? "";
+  const node = (await whenSettled(page, () => card.first().getAttribute("data-node"))) ?? "";
   await expect.poll(async () => (await marginIn(page, node, await graphRoom(page))) >= 8).toBe(true);
   expect((await graphRoom(page)).zoom).toBeGreaterThanOrEqual(LEGIBLE - 0.001);
   await changeReads(page, node);
   if (size.width < 720) {
     // At the sheet's peek the rail already says what holds Apply.
-    const [holds, sheet] = [await page.getByTestId("apply-waits").boundingBox(), await page.locator(".inspector").locator("xpath=..").boundingBox()];
+    const [holds, sheet] = await whenSettled(page, () => Promise.all([page.getByTestId("apply-waits").boundingBox(), page.locator(".inspector").locator("xpath=..").boundingBox()]));
     expect((holds?.y ?? 0) + (holds?.height ?? 0)).toBeLessThanOrEqual((sheet?.y ?? 0) + (sheet?.height ?? 0));
   } else {
     // The sync dot stays at the right edge of the brand row.
-    const [chip, rail] = [await syncChip(page).boundingBox(), await page.locator(".rail-head").boundingBox()];
+    const [chip, rail] = await whenSettled(page, () => Promise.all([syncChip(page).boundingBox(), page.locator(".rail-head").boundingBox()]));
     expect((rail?.x ?? 0) + (rail?.width ?? 0) - ((chip?.x ?? 0) + (chip?.width ?? 0))).toBeLessThanOrEqual(24);
   }
 }
@@ -181,19 +181,19 @@ async function firstChangeFramed(page: Page, layered: string, size: { width: num
 /** What the layer's first view shows reads: the change's word whole on the card, the kind whole or cut with an ellipsis, and the title in full ink though the node is done. */
 async function changeReads(page: Page, node: string): Promise<void> {
   const word = nodeCard(page, node).getByTestId("card-diff");
-  expect(await word.evaluate((element) => element.scrollWidth <= element.clientWidth + 1 && element.parentElement !== null && element.getBoundingClientRect().right <= element.parentElement.getBoundingClientRect().right + 1)).toBe(true);
+  expect(await whenSettled(page, () => word.evaluate((element) => element.scrollWidth <= element.clientWidth + 1 && element.parentElement !== null && element.getBoundingClientRect().right <= element.parentElement.getBoundingClientRect().right + 1))).toBe(true);
   // The kind either shows whole or keeps room for the ellipsis that says it is cut (never a bare letter).
   const kind = nodeCard(page, node).locator(".node-kind").first();
-  expect(await kind.evaluate((element) => element.scrollWidth <= element.clientWidth + 1 || element.clientWidth >= 3 * parseFloat(getComputedStyle(element).fontSize) * 0.6)).toBe(true);
-  expect(await kind.evaluate((element) => element.getBoundingClientRect().right <= (element.closest(".node-head-label")?.getBoundingClientRect().right ?? 0) + 1)).toBe(true);
-  expect(await nodeCard(page, node).getByTestId("title").evaluate((element) => {
+  expect(await whenSettled(page, () => kind.evaluate((element) => element.scrollWidth <= element.clientWidth + 1 || element.clientWidth >= 3 * parseFloat(getComputedStyle(element).fontSize) * 0.6))).toBe(true);
+  expect(await whenSettled(page, () => kind.evaluate((element) => element.getBoundingClientRect().right <= (element.closest(".node-head-label")?.getBoundingClientRect().right ?? 0) + 1))).toBe(true);
+  expect(await whenSettled(page, () => nodeCard(page, node).getByTestId("title").evaluate((element) => {
     const probe = Object.assign(document.createElement("span"), { textContent: "x" });
     probe.style.color = "var(--color-text)";
     element.append(probe);
     const ink = getComputedStyle(probe).color;
     probe.remove();
     return getComputedStyle(element).color === ink;
-  })).toBe(true);
+  }))).toBe(true);
 }
 
 test("C14: on a desktop and then a phone the layer opens the graph on its first change, framed with a margin and legible", async ({ page }) => {

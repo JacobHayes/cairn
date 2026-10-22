@@ -9,7 +9,7 @@ import { expect, test } from "./test.ts";
 import { expectTitleLinesAsLaidOut, viewportOf, viewportSettled } from "./canvas.ts";
 import { NEAR_ZOOM } from "../src/canvas/gestures.ts";
 import { containmentProblems } from "./containment.ts";
-import { nodeCard, open, openAt } from "./shell.ts";
+import { nodeCard, open, openAt, whenSettled } from "./shell.ts";
 import { STRESS, publishStressJourney } from "./stress.ts";
 
 /** The walk's reach: every screen is looked at and every problem listed with the screen it is on, so one run shows them all. */
@@ -49,7 +49,7 @@ async function graphs({ page, look, check }: Walk): Promise<void> {
   // Folded, a stage is a card of the usual width: its head holds the kind, CURRENT, the chip and the control.
   for (const stage of STRESS.stages) {
     const fold = nodeCard(page, stage).getByTestId("card-collapse");
-    if ((await fold.count()) > 0) {
+    if ((await whenSettled(page, () => fold.count())) > 0) {
       await fold.click();
     }
   }
@@ -125,7 +125,7 @@ async function widths(walk: Walk): Promise<void> {
       }
     }
     const name = page.getByTestId("journey-name");
-    const clamped = await name.getByRole("button").evaluate((toggle) => toggle.scrollHeight > toggle.clientHeight);
+    const clamped = await whenSettled(page, () => name.getByRole("button").evaluate((toggle) => toggle.scrollHeight > toggle.clientHeight));
     expect(clamped || width > 390, "the stress name is long enough to be clamped on a phone").toBe(true);
     // A name cut by its clamp wears a mark, and a tap opens the name and leaves the mark.
     if (width === 390) {

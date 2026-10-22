@@ -30,6 +30,7 @@ import {
   save,
   startRename,
   syncChip,
+  whenSettled,
 } from "./shell.ts";
 
 const patchId = () => `p_${crypto.randomUUID().replaceAll("-", "")}`;
@@ -147,7 +148,7 @@ test("a deployment tick refetches the deployment context and re-derives: a merge
   const journey = await journeyOwnedBy(one.request, first);
   await openJourney(two, "server", journey);
   await live(two);
-  const survivor = (await identityRow(one, second).getByTestId("identity-name").textContent()) ?? "";
+  const survivor = (await whenSettled(one, () => identityRow(one, second).getByTestId("identity-name").textContent())) ?? "";
   // The card names an owner only when it is the viewer or missing: the node's detail names this one.
   const owners = await section(await openFromCanvas(two, "n_task"), "participations");
   await expect(owners).not.toContainText(survivor);
@@ -166,7 +167,7 @@ async function nameless(page: Page): Promise<void> {
   await open(page, "server", `/identities/${key}`);
   const detail = page.getByTestId("identity-detail");
   await expect(detail.getByTestId("yours")).toBeVisible();
-  const name = (await detail.getByTestId("detail-title").textContent()) ?? "";
+  const name = (await whenSettled(page, () => detail.getByTestId("detail-title").textContent())) ?? "";
   await detail.getByRole("button", { name: "Edit" }).click();
   await detail.getByLabel("Name").fill("");
   await detail.getByRole("button", { name: "Save" }).click();

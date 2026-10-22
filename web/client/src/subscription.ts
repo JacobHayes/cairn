@@ -49,7 +49,12 @@ export type SubscriptionEvent =
   | { type: "watch"; id: string; names: readonly string[]; to: AnyActorRef }
   | { type: "unwatch"; id: string }
   /** Reopens the stream now, so its current revisions ask every view again (a refetch failed). */
-  | { type: "reopen" };
+  | { type: "reopen" }
+  /**
+   * A commit the page made, from its receipt: sent to every watcher as the stream's tick for it
+   * would be, so the views fetch it at once; the stream's own tick then asks for nothing more.
+   */
+  | { type: "heard"; tick: Tick };
 
 /** What the stream callback sends back, and the reconcile the subscription raises for itself. */
 type Internal = StreamEvent | { type: "stream.dropped"; closed: boolean } | { type: "reconcile" };
@@ -130,6 +135,12 @@ export const subscription = setup({
         enqueue.sendTo(to, event);
       }
     }),
+    echo: enqueueActions(({ context, event, enqueue }) => {
+      const { tick } = event as Extract<SubscriptionEvent, { type: "heard" }>;
+      for (const { to } of Object.values(context.watchers)) {
+        enqueue.sendTo(to, { type: "stream.tick", tick } satisfies StreamEvent);
+      }
+    }),
   },
 }).createMachine({
   id: "subscription",
@@ -138,6 +149,7 @@ export const subscription = setup({
   on: {
     watch: { actions: ["watch", "reconcileSoon"] },
     unwatch: { actions: ["unwatch", "reconcileSoon"] },
+    heard: { actions: "echo" },
   },
   states: {
     closed: {

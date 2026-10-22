@@ -11,7 +11,7 @@ import { checkpoint, expect, test } from "./test.ts";
 import { answerCard, card, frontierItem, openActing, passOrder, publishFollowUpRoute, revisionAfter, select } from "./acting.ts";
 import { journeyName, startJourney } from "./around.ts";
 import { expectContained } from "./containment.ts";
-import { derivedRevision, expectAddress, goTo, nodeCard, nodePanel, open, openAt, setDepth } from "./shell.ts";
+import { derivedRevision, expectAddress, goTo, nodeCard, nodePanel, open, openAt, setDepth, whenSettled } from "./shell.ts";
 import { FIXED_TODAY } from "./views.ts";
 
 test("C9, B6: a bulk snooze is one patch; the snoozed leave the frontier and an unsnooze returns them", async ({ page }) => {
@@ -42,7 +42,7 @@ test("C9, B6: a bulk snooze is one patch; the snoozed leave the frontier and an 
   // Frontier, on from the list, fades every card off the frontier, so it is off while the states themselves are read.
   await goTo(page, "graph");
   await page.keyboard.press("Shift+F");
-  const opacityOf = (target: Locator) => target.evaluate((element) => Number(getComputedStyle(element).opacity));
+  const opacityOf = (target: Locator) => whenSettled(page, () => target.evaluate((element) => Number(getComputedStyle(element).opacity)));
   const snoozed = nodeCard(page, "n_docs");
   const onCard = await opacityOf(snoozed.locator(".node-title"));
   expect(onCard).toBeLessThan(1);
@@ -52,12 +52,12 @@ test("C9, B6: a bulk snooze is one patch; the snoozed leave the frontier and an 
   await expect(snoozed.getByTestId("card-foot")).toHaveText(/^Until /);
   expect(await opacityOf(nodeCard(page, "n_beta_end").locator(".node-title"))).toBe(1);
   await expectContained(page);
-  const footWords = await snoozed.getByTestId("card-foot").innerText();
+  const footWords = await whenSettled(page, () => snoozed.getByTestId("card-foot").innerText());
   await goTo(page, "list");
   const row = page.locator('[data-testid="list-row"][data-node="n_docs"]');
   // Under its title the row says where the snooze ends, in the words of the card's foot; an unsnoozed row says nothing.
   await expect(row.getByTestId("list-return")).toHaveText(footWords);
-  expect(await row.getByTestId("list-return").evaluate((element) => Number(getComputedStyle(element.closest(".list-content") ?? element).opacity))).toBe(1);
+  expect(await whenSettled(page, () => row.getByTestId("list-return").evaluate((element) => Number(getComputedStyle(element.closest(".list-content") ?? element).opacity)))).toBe(1);
   await expect(page.locator('[data-testid="list-row"][data-node="n_beta_end"]').getByTestId("list-return")).toHaveCount(0);
   expect(await opacityOf(row.locator('[data-column="title"] .list-node > a'))).toBe(onCard);
   expect(await opacityOf(row.locator('[data-column="status"] .list-content'))).toBe(1);
@@ -65,7 +65,7 @@ test("C9, B6: a bulk snooze is one patch; the snoozed leave the frontier and an 
   await goTo(page, "list");
   await page.keyboard.press("Shift+F");
   await expect(fold).toHaveAttribute("data-count", "2");
-  if ((await fold.getAttribute("open")) === null) {
+  if ((await whenSettled(page, () => fold.getAttribute("open"))) === null) {
     await fold.locator("summary").click();
   }
   await fold.locator('[data-testid="fold-item"][data-node="n_docs"]').getByRole("button", { name: "Unsnooze" }).click();
@@ -91,7 +91,7 @@ test("C11: the walkthrough's card sits in the middle of the canvas area at every
   }
   await checkpoint(page);
   // Opened at a node's own address, the card is that node's one editor; the inspector does not open a second one.
-  const first = ((await page.getByTestId("triage").getAttribute("data-order")) ?? "").split(" ")[0] ?? "";
+  const first = ((await whenSettled(page, () => page.getByTestId("triage").getAttribute("data-order"))) ?? "").split(" ")[0] ?? "";
   const at = `/journeys/j_launch/nodes/${first}?view=walk`;
   await open(page, "browser", at);
   await expect(page.getByTestId("triage")).toBeVisible();

@@ -4,12 +4,12 @@
 // is ui/chips.test.ts's.
 import type { Page } from "@playwright/test";
 
-import { open, openSheet } from "./shell.ts";
+import { open, openSheet, whenSettled } from "./shell.ts";
 import { checkpoint, expect, test } from "./test.ts";
 
 const field = (page: Page) => page.getByTestId("create-identity").getByLabel("Emails");
 const chips = (page: Page) => page.getByTestId("create-identity").getByTestId("chip-value");
-const fitsTheWindow = (page: Page) => page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth);
+const fitsTheWindow = (page: Page) => whenSettled(page, () => page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth));
 
 test("H3: emails are chips taken from the keyboard, refused with a reason, replaced by a paste, and saved as a list, on a desktop and a phone", async ({ page }) => {
   await page.setViewportSize({ width: 1280, height: 800 });

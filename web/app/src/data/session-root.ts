@@ -6,27 +6,31 @@
 // write, the sync scheduler (the facts that carry a deadline, and a wake at the next), the
 // toast, and the conversation manager (one conversation per assistant target). The root
 // forwards what reads send the stream, tells the scheduler what only it sees (a save landed,
-// the count of writes in flight), and keeps the shown reads (the ones the sync chip counts
-// when they fall behind).
+// the count of writes in flight), keeps the shown reads (the ones the sync chip counts
+// when they fall behind) and the work under way (each read working and each screen whose code is
+// on its way, which the chip's settled fact reads), and tells the stream each commit a write of
+// this tab made, so the reads fetch it without waiting for the server's tick.
 //
 // Skew never lifts, so `skewed` is not final: a final root would stop its children, and the
 // kept writes with them. In skew the tab derives, previews, writes and retries nothing (the
 // old engine's overlap check may be wrong) and asks for a reload; unsent edits are records in
 // session storage, so the reload keeps them. Stopping the root stops every child: the stream
 // closes, the timers cancel, and the derivations held are released.
-import { streamStatus, subscription, type OpenTicks, type StreamStatus, type SubscriptionEvent } from "@cairn/client";
+import { streamStatus, subscription, type OpenTicks, type StreamStatus, type SubscriptionEvent, type Tick } from "@cairn/client";
 import { assign, enqueueActions, sendTo, setup, type ActorRefFrom, type AnyActorRef } from "xstate";
 
 import { conversationManager, type ConversationsInput, type ConversationsRef } from "../assistant/conversations.ts";
-import { NO_SAVES, recorded, type Recent, type SaveEvent } from "./activity.ts";
+import { NO_SAVES, recorded, type Recent, type SaveEvent, type TitleOf } from "./activity.ts";
 import { editManager, inFlightOf, type EditsInput, type EditsRef } from "./edit-manager.ts";
 import type { Deriver, Host } from "./host.ts";
 import { journeyManager } from "./journeys.ts";
-import { keyedRead, type ReadEnv } from "./keyed-read.ts";
+import { keyedRead, type ReadEnv, type WorkEvent } from "./keyed-read.ts";
 import { DEPLOYMENT_KEY, deploymentSource, callerKey, callerSource } from "./session-reads.ts";
 import { syncMachine, type SyncRef } from "./sync.ts";
 import { toastMachine, type ToastsRef } from "./toasts.ts";
+import type { Answer, Command } from "./edit-record.ts";
 import type { WriteEnv } from "./write-machine.ts";
+import { committedTick, saveEventOf, saveOf } from "./writes.ts";
 
 /** What the root is started with: the host, and the manager's input less what the root itself answers. */
 export interface RootInput {
@@ -48,6 +52,8 @@ export interface RootContext extends RootInput {
   shown: Readonly<Record<string, AnyActorRef>>;
   /** The stream's state as last seen, so a change wakes the waiting writes. */
   stream: StreamStatus;
+  /** The work under way, by registration: reads settling or reading, and screens whose code is loading. */
+  working: Readonly<Record<string, true>>;
 }
 
 export type RootEvent =
@@ -58,6 +64,9 @@ export type RootEvent =
   | { type: "restore" }
   /** A write landed and left this save. */
   | { type: "saved"; save: Omit<SaveEvent, "id"> }
+  /** A write of this tab committed: its receipt is a tick the reads hear before the stream's. */
+  | { type: "committed"; tick: Tick }
+  | WorkEvent
   | SubscriptionEvent
   /** A shown read is keyed; `hidden` when it stops or changes its `of`. */
   | { type: "shown"; id: string; read: AnyActorRef }
@@ -82,6 +91,10 @@ export const sessionRoot = setup({
       return { shown: { ...context.shown, [shown.id]: shown.read } };
     }),
     hideRead: assign(({ context, event }) => ({ shown: without(context.shown, (event as Extract<RootEvent, { type: "hidden" }>).id) })),
+    work: assign(({ context, event }) => ({ working: { ...context.working, [(event as Extract<RootEvent, { type: "working" }>).id]: true as const } })),
+    rest: assign(({ context, event }) => ({ working: without(context.working, (event as Extract<RootEvent, { type: "rested" }>).id) })),
+    // The stream's watchers hear the commit as they would the server's tick for it, which then asks for nothing.
+    hear: sendTo("subscription", ({ event }) => ({ type: "heard" as const, tick: (event as Extract<RootEvent, { type: "committed" }>).tick })),
     // A save landed: the tab keeps it.
     keepSave: assign({ recent: ({ context, event }) => recorded(context.recent, (event as Extract<RootEvent, { type: "saved" }>).save) }),
     // The edit manager moved: the scheduler hears how many writes are in flight (and ignores a repeat).
@@ -100,7 +113,7 @@ export const sessionRoot = setup({
   },
 }).createMachine({
   id: "session",
-  context: ({ input }) => ({ ...input, recent: NO_SAVES, shown: {}, stream: "idle" }),
+  context: ({ input }) => ({ ...input, recent: NO_SAVES, shown: {}, stream: "idle", working: {} }),
   // The scheduler and the toast are first: the others' relays and notes reach them.
   invoke: [
     { id: "sync", src: "sync", input: ({ context }) => ({ monotonic: context.now }) },
@@ -147,6 +160,9 @@ export const sessionRoot = setup({
     reopen: { actions: "forward" },
     shown: { actions: "showRead" },
     hidden: { actions: "hideRead" },
+    working: { actions: "work" },
+    rested: { actions: "rest" },
+    committed: { actions: "hear" },
   },
 });
 
@@ -156,6 +172,19 @@ export type JourneysRef = ActorRefFrom<typeof journeyManager>;
 export type SubscriptionRef = ActorRefFrom<typeof subscription>;
 export type { ConversationsRef, SyncRef, ToastsRef };
 export type ReadRef = ActorRefFrom<typeof keyedRead>;
+
+/**
+ * What the root is told of a write that landed at `at`: the commit it made, which the reads fetch
+ * now rather than when the server's coalesced tick for it arrives, and the save it leaves.
+ */
+export function landedEvents(command: Command, answer: Answer, began: number, titleOf: TitleOf, at: Date): RootEvent[] {
+  const tick = committedTick(answer);
+  const save = saveOf(command, answer, began, titleOf);
+  return [
+    ...(tick === undefined ? [] : [{ type: "committed" as const, tick }]),
+    ...(save === undefined ? [] : [{ type: "saved" as const, save: saveEventOf(save, titleOf, at) }]),
+  ];
+}
 
 /** The part of the root a read's environment uses. */
 interface RootPort {

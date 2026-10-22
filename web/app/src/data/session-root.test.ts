@@ -1,7 +1,8 @@
 // ARCHITECTURE, Web UI: the session root. Restoring the kept edits once it runs, version skew
 // stopping new work, what the sync chip is told (the saves, the writes in flight), and shutdown
 // leaving nothing running.
-import { backoffDelayMs, type Answered, type HttpFailure, type Rejection } from "@cairn/client";
+import { backoffDelayMs, type Answered, type HttpFailure, type Rejection, type StreamEvent } from "@cairn/client";
+import { createActor, fromCallback } from "xstate";
 import { describe, expect, it } from "vitest";
 
 import { SAVE_COUNT_MAX } from "./activity.ts";
@@ -173,6 +174,32 @@ describe("the writes in flight the sync chip is told of", () => {
     submit(renaming("p_a"));
     await settled();
     expect(chipOf(root).state).toBe("not-saved");
+  });
+});
+
+describe("what the settled fact reads", () => {
+  it("counts a read as work while it is out, and not once it has its answer", async () => {
+    const host = new FakeHost();
+    const answer = deferred<{ revision: number }>();
+    host.deployment = () => answer.promise;
+    const { root } = await startRoot({ host });
+    expect(Object.keys(root.getSnapshot().context.working)).toHaveLength(1);
+    answer.resolve({ revision: 1 });
+    await settled();
+    expect(root.getSnapshot().context.working).toEqual({});
+  });
+
+  it("tells the stream's watchers of a landed write's commit at once, as the stream's tick for it would", async () => {
+    const { host, root, submit } = await startRoot();
+    const heard: StreamEvent[] = [];
+    const watcher = createActor(fromCallback<StreamEvent>(({ receive }) => {
+      receive((event) => heard.push(event));
+    })).start();
+    root.send({ type: "watch", id: "probe", names: ["journey:j_one"], to: watcher });
+    host.answers = [applied];
+    submit(renaming("p_a"));
+    await settled();
+    expect(heard).toEqual([{ type: "stream.tick", tick: { of: { domain: { journey: "j_one" } }, revision: receipt.revision } }]);
   });
 });
 

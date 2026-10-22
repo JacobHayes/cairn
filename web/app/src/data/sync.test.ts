@@ -13,6 +13,7 @@ import {
   SYNC_SHOW_AFTER_MS,
   nextDeadline,
   savedAnnouncement,
+  settled,
   summarize,
   syncInputOf,
   syncMachine,
@@ -278,5 +279,18 @@ describe("the scheduler's writes in flight and its quiet", () => {
     expect(clock.pending).not.toEqual([]);
     actor.stop();
     expect(clock.pending).toEqual([]);
+  });
+});
+
+describe("the settled fact", () => {
+  it.each([
+    ["nothing under way, the stream live", { working: 0, inFlight: 0, stream: "live" }, true],
+    ["nothing under way, nothing watched", { working: 0, inFlight: 0, stream: "idle" }, true],
+    ["a read or a screen at work", { working: 1, inFlight: 0, stream: "live" }, false],
+    ["a write in flight", { working: 0, inFlight: 1, stream: "live" }, false],
+    ["the stream opening", { working: 0, inFlight: 0, stream: "connecting" }, false],
+    ["the stream opening again", { working: 0, inFlight: 0, stream: "reconnecting" }, false],
+  ] as const)("with %s", (_case, underway, expected) => {
+    expect(settled(underway)).toBe(expected);
   });
 });

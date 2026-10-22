@@ -2,7 +2,7 @@
 // person does (from its card on the journey's canvas), and its sections, forms, and dates.
 import type { Locator, Page } from "@playwright/test";
 
-import { openFromCanvas, openJourney, type HostKind } from "./shell.ts";
+import { openFromCanvas, openJourney, whenSettled, type HostKind } from "./shell.ts";
 
 /** Opens journey `journey` on `host`, then node `node`'s detail from its card on the canvas. */
 export async function openNode(page: Page, host: HostKind, journey: string, node: string): Promise<Locator> {
@@ -13,7 +13,7 @@ export async function openNode(page: Page, host: HostKind, journey: string, node
 /** A section of the panel, unfolded. */
 export async function section(panel: Locator, testId: string): Promise<Locator> {
   const found = panel.getByTestId(testId);
-  if ((await found.getAttribute("open")) === null) {
+  if ((await whenSettled(panel.page(), () => found.getAttribute("open"))) === null) {
     await found.locator("summary").first().click();
   }
   return found;
@@ -23,7 +23,7 @@ export async function section(panel: Locator, testId: string): Promise<Locator> 
 export async function pin(panel: Locator, date: string): Promise<void> {
   const editor = (await section(panel, "dates")).getByTestId("pin");
   // The form may be open already (a draft kept across a reload).
-  if ((await editor.getByTestId("pin-form").count()) === 0) {
+  if ((await whenSettled(panel.page(), () => editor.getByTestId("pin-form").count())) === 0) {
     await editor.getByRole("button", { name: /^(Pin a date|Change the pin)$/ }).click();
   }
   await editor.getByLabel("Pin date").fill(date);

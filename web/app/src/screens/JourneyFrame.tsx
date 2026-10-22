@@ -41,6 +41,7 @@ import { useWritable } from "./writable.ts";
 import { CanvasBars, ProjectionBody, type ProjectionProps } from "./Projections.tsx";
 import "./screens.css";
 import { Failed } from "../ui/Failed.tsx";
+import { Pending } from "../ui/Pending.tsx";
 
 const InsertionCanvas = lazy(() => import("../segments/Preview.tsx").then((module) => ({ default: module.InsertionCanvas })));
 
@@ -154,7 +155,7 @@ function InspectorSlot({
 function Workspace({ ready, view, screen, selected, edge, authored, drawing, selection, preview, onCard }: Pick<FrameProps, "screen" | "selected" | "edge"> & { onCard: ProjectionProps["onCard"]; ready: Ready; view: GraphView; authored: ProjectionProps["authored"]; drawing: ProjectionProps["drawing"]; selection: Selection; preview: InsertPreview | undefined }) {
   if (preview !== undefined) {
     return (
-      <Suspense fallback={<p className="muted small">Drawing the preview...</p>}>
+      <Suspense fallback={<Pending>Drawing the preview...</Pending>}>
         <InsertionCanvas preview={preview} domain={ready.journey.header.id} />
       </Suspense>
     );

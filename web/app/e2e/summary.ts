@@ -4,7 +4,7 @@ import { expect, type Locator, type Page } from "@playwright/test";
 
 import { journeyName, startJourney } from "./around.ts";
 import { select } from "./acting.ts";
-import { goWithin, goTo, openAt } from "./shell.ts";
+import { goTo, goWithin, openAt, whenSettled } from "./shell.ts";
 import { FIXED_TODAY } from "./views.ts";
 
 /** A list panel of the Summary (`summary-next`, `summary-yours`, ...). */
@@ -13,11 +13,8 @@ export function panelOf(page: Page, testId: string): Locator {
 }
 
 /** How many rows the Summary list `testId` holds, drawn or not: its wrapper carries the count. */
-export function countOf(page: Page, testId: string): Promise<number> {
-  return panelOf(page, testId)
-    .locator("xpath=ancestor-or-self::*[@data-count][1]")
-    .getAttribute("data-count")
-    .then(Number);
+export async function countOf(page: Page, testId: string): Promise<number> {
+  return Number(await whenSettled(page, () => panelOf(page, testId).locator("xpath=ancestor-or-self::*[@data-count][1]").getAttribute("data-count")));
 }
 
 /** The rows of the Summary list `testId`, in the order they are drawn, drawn or not. */
@@ -27,7 +24,7 @@ export function rowsOf(page: Page, testId: string): Locator {
 
 /** The keys of the rows `locator` finds. */
 export function keysOf(locator: Locator): Promise<string[]> {
-  return locator.evaluateAll((rows) => rows.map((row) => row.getAttribute("data-node") ?? ""));
+  return whenSettled(locator.page(), () => locator.evaluateAll((rows) => rows.map((row) => row.getAttribute("data-node") ?? "")));
 }
 
 /** Starts a journey from `route`'s first version (or with no node, with none) on the in-browser host and opens its Summary. */

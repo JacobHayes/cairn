@@ -44,7 +44,8 @@ export default defineConfig({
   // A CI runner has four cores: one worker per core was a quarter faster than the default of half of them.
   ...(process.env["CI"] === undefined ? {} : { workers: "100%" }),
   // A trace is kept only for a failure: a flake in a long run leaves what happened (no measurable cost on green runs).
-  use: { baseURL: `http://127.0.0.1:${serverPort}`, trace: "retain-on-failure" },
+  // Reduced motion turns the app's motion off (DESIGN, Motion), so nothing a test reads is mid-animation.
+  use: { baseURL: `http://127.0.0.1:${serverPort}`, trace: "retain-on-failure", contextOptions: { reducedMotion: "reduce" } },
   // The tests tagged @server are the ones only the server host can run: pages meeting through
   // the server (live updates, conflicts), sign-in, and the assistant. Most make a journey or
   // route of their own (e2e/shell.ts ownJourney) and run in parallel on the one binary. The ones

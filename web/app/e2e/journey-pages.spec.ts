@@ -14,7 +14,7 @@ import { checkpoint, expect, test } from "./test.ts";
 import { journeyName, setStatus, startJourney } from "./around.ts";
 import { viewportOf, viewportSettled } from "./canvas.ts";
 import { daysAfter, frontierKeys, listKeys, passOrder, select, setFrontier, withFrontier } from "./acting.ts";
-import { expectAddress, fresh, goTo, nodeCard, nodePanel, openAt, openFilter, openJourney, setDepth, setFade } from "./shell.ts";
+import { expectAddress, fresh, goTo, nodeCard, nodePanel, openAt, openFilter, openJourney, setDepth, setFade, whenSettled } from "./shell.ts";
 import { closePopover, filterOf, ownAndPin, search, setCheck, setViewState, VIEWER } from "./view-state.ts";
 import { FIXED_TODAY } from "./views.ts";
 
@@ -27,13 +27,15 @@ const UP_FRONT = ["n_meeting_date", "n_partner_runs", "n_purpose", "n_who_inform
 
 /** Computed opacity is not inherited, so the effective one is the product up the ancestors. */
 function effective(target: Locator): Promise<number> {
-  return target.evaluate((element) => {
-    let product = 1;
-    for (let at: Element | null = element; at !== null; at = at.parentElement) {
-      product *= Number(getComputedStyle(at).opacity);
-    }
-    return product;
-  });
+  return whenSettled(target.page(), () =>
+    target.evaluate((element) => {
+      let product = 1;
+      for (let at: Element | null = element; at !== null; at = at.parentElement) {
+        product *= Number(getComputedStyle(at).opacity);
+      }
+      return product;
+    }),
+  );
 }
 
 /** Sorts the list by rank as a person does: the Rank column from Columns, then its header. */
@@ -303,7 +305,7 @@ test("C10: Frontier highlights the list: every row stays, the frontier's rows ca
   await setFrontier(page, true);
   await expectAddress(page, `${journeyBase(page)}?view=list&frontier=1`);
   expect(await listKeys(page)).toEqual(everything);
-  const counted = /(\d+) can move now/.exec((await withFrontier(page, (chip) => chip.getAttribute("title"))) ?? "")?.[1];
+  const counted = /(\d+) can move now/.exec((await whenSettled(page, () => withFrontier(page, (chip) => chip.getAttribute("title")))) ?? "")?.[1];
   const frontier = await frontierKeys(page);
   expect(String(frontier.length)).toBe(counted);
   // A frontier row says what to do under its title, at a phone's width too.
@@ -311,13 +313,13 @@ test("C10: Frontier highlights the list: every row stays, the frontier's rows ca
   const title = listRow(page, moving).locator('td[data-column="title"]');
   const acting = title.getByTestId("list-acting");
   await expect(acting).toBeVisible();
-  const [named, act] = await Promise.all([title.locator("a").first().boundingBox(), acting.boundingBox()]);
+  const [named, act] = await whenSettled(page, () => Promise.all([title.locator("a").first().boundingBox(), acting.boundingBox()]));
   expect(act?.y ?? 0).toBeGreaterThan(named?.y ?? 0);
   // A row the frontier does not light fades its content, and stays faded when selected.
   const still = page.locator('[data-testid="list-row"][data-faded="true"]').first();
   const content = still.locator('td[data-column="title"] .list-content');
   expect(await effective(content)).toBeCloseTo(0.3);
-  await select(page, (await still.getAttribute("data-node")) ?? "");
+  await select(page, (await whenSettled(page, () => still.getAttribute("data-node"))) ?? "");
   expect(await effective(content)).toBeCloseTo(0.3);
   // Sorting by Rank is the frontier's order: the rank column counts up.
   await page.setViewportSize({ width: 1280, height: 800 });
@@ -334,7 +336,7 @@ test("C10: Frontier highlights the list: every row stays, the frontier's rows ca
 test("C2, C9: a search narrows the graph to its matches and fits them; nothing matching offers Reset the view, which clears the search and the collapses", async ({ page }) => {
   await openJourney(page, "browser", "j_vendor_eval", "");
   await viewportSettled(page);
-  const whole = await page.getByTestId("node-card").count();
+  const whole = await whenSettled(page, () => page.getByTestId("node-card").count());
   const fitted = await viewportOf(page);
   await search(page, "Partner");
   await expect(nodeCard(page, "n_partner_runs")).toBeVisible();
@@ -363,7 +365,7 @@ test("C2, C9: a search narrows the graph to its matches and fits them; nothing m
 
 test("C1, C9: the Filter's badge counts the rows its settings take off the list and never the not relevant; the open Filter counts what a setting hides beside it", async ({ page }) => {
   await openAt(page, "browser", "j_vendor_eval", "list", { fixedToday: FIXED_TODAY });
-  const total = async () => Number(await page.getByTestId("list-total").getAttribute("data-total"));
+  const total = async () => Number(await whenSettled(page, () => page.getByTestId("list-total").getAttribute("data-total")));
   const badge = page.getByTestId("filter-badge");
   await expect(badge).toHaveCount(0);
   const before = await total();
@@ -403,9 +405,9 @@ test("C2: a fold holds until a depth is picked: back at Actions after another de
   await expect(fold()).toHaveAttribute("aria-expanded", "true");
   // A folded container stays folded across Show not relevant.
   await expect(page.getByTestId("list-total")).toHaveAttribute("data-total", /\d/);
-  const total = Number(await page.getByTestId("list-total").getAttribute("data-total"));
+  const total = Number(await whenSettled(page, () => page.getByTestId("list-total").getAttribute("data-total")));
   const container = page.getByTestId("list-fold").first();
-  const folded = await container.locator("xpath=ancestor::tr").getAttribute("data-node");
+  const folded = await whenSettled(page, () => container.locator("xpath=ancestor::tr").getAttribute("data-node"));
   await container.click();
   const row = page.locator(`[data-testid="list-row"][data-node="${folded ?? ""}"] [data-testid="list-fold"]`);
   await expect(row).toHaveAttribute("aria-expanded", "false");
@@ -429,20 +431,20 @@ test("the window does not scroll: the head stays, a popover scrolls inside itsel
   for (const address of ["list?frontier=1", "list"]) {
     await openAt(page, "browser", "j_vendor_eval", address, { fixedToday: FIXED_TODAY });
     await expect(page.getByTestId("journey-header")).toBeVisible();
-    expect(await page.evaluate(() => document.documentElement.scrollHeight), address).toBe(800);
+    expect(await whenSettled(page, () => page.evaluate(() => document.documentElement.scrollHeight)), address).toBe(800);
   }
   // A popover taller than the room below it scrolls inside itself, not the window.
   await page.setViewportSize({ width: 1280, height: 500 });
   await openAt(page, "browser", "j_vendor_eval", "list", { fixedToday: FIXED_TODAY });
   await openFilter(page);
-  expect(await page.evaluate(() => document.documentElement.scrollHeight)).toBe(500);
+  expect(await whenSettled(page, () => page.evaluate(() => document.documentElement.scrollHeight))).toBe(500);
   // The View picker sits on the title's row, at the same right edge on every view, between 720 and 1100px.
   await page.setViewportSize({ width: 1024, height: 700 });
   const edges: Record<string, number> = {};
   for (const address of ["walk", "graph", "list", "timeline", "summary"]) {
     await openAt(page, "browser", "j_vendor_eval", address, { fixedToday: FIXED_TODAY });
-    const title = await page.getByTestId("journey-name").boundingBox();
-    const picker = await page.getByTestId("view-picker").boundingBox();
+    const title = await whenSettled(page, () => page.getByTestId("journey-name").boundingBox());
+    const picker = await whenSettled(page, () => page.getByTestId("view-picker").boundingBox());
     expect(picker?.y, address).toBeLessThan((title?.y ?? 0) + (title?.height ?? 0));
     edges[address] = Math.round((picker?.x ?? 0) + (picker?.width ?? 0));
   }
@@ -452,12 +454,12 @@ test("the window does not scroll: the head stays, a popover scrolls inside itsel
   for (const address of ["graph", "graph?depth=decisions"]) {
     await openAt(page, "browser", "j_vendor_eval", address, { fixedToday: FIXED_TODAY });
     await expect(page.getByTestId("canvas")).toBeVisible();
-    const [scrolls, shown] = await body.evaluate((region) => [region.scrollHeight, region.clientHeight]);
+    const [scrolls, shown] = await whenSettled(page, () => body.evaluate((region) => [region.scrollHeight, region.clientHeight]));
     expect(scrolls, address).toBe(shown);
   }
   await openAt(page, "browser", "j_vendor_eval", "list", { fixedToday: FIXED_TODAY });
   await expect(page.getByTestId("list-row").first()).toBeVisible();
-  expect(await body.evaluate((region) => region.scrollWidth <= region.clientWidth)).toBe(true);
+  expect(await whenSettled(page, () => body.evaluate((region) => region.scrollWidth <= region.clientWidth))).toBe(true);
   await openAt(page, "browser", "j_vendor_eval", "summary", { fixedToday: FIXED_TODAY });
   await expect(page.getByTestId("summary-milestones")).toBeVisible();
 });
@@ -466,7 +468,7 @@ test("the window does not scroll: the head stays, a popover scrolls inside itsel
 async function fadeTicked(page: Page): Promise<boolean | undefined> {
   await page.getByTestId("depth-button").click();
   const check = page.getByTestId("depth-fade");
-  const ticked = (await check.count()) === 0 ? undefined : await check.getByRole("checkbox").isChecked();
+  const ticked = await whenSettled(page, async () => ((await check.count()) === 0 ? undefined : await check.getByRole("checkbox").isChecked()));
   await page.keyboard.press("Escape");
   await expect(page.getByTestId("depth-panel")).toHaveCount(0);
   return ticked;
@@ -476,8 +478,8 @@ test("C2: Fade moves nothing: stepping the depth with Fade on keeps every card a
   await openJourney(page, "browser", "j_vendor_eval", "");
   await viewportSettled(page);
   const cards = page.getByTestId("node-card");
-  const place = () => nodeCard(page, "n_kickoff").evaluate((card) => [card.getAttribute("data-x"), card.getAttribute("data-y")]);
-  const [count, there, camera] = [await cards.count(), await place(), await viewportOf(page)];
+  const place = () => whenSettled(page, () => nodeCard(page, "n_kickoff").evaluate((card) => [card.getAttribute("data-x"), card.getAttribute("data-y")]));
+  const [count, there, camera] = [await whenSettled(page, () => cards.count()), await place(), await viewportOf(page)];
   await setFade(page, true);
   await setDepth(page, "Decisions");
   await expect(cards).toHaveCount(count);
@@ -494,7 +496,7 @@ test("C2: Fade moves nothing: stepping the depth with Fade on keeps every card a
   await nodeCard(page, "n_setup").getByTestId("card-collapse").dispatchEvent("click");
   await expect(page).toHaveURL(/shut=n_setup/);
   await expect.poll(() => cards.count()).toBeLessThan(count);
-  const collapsed = await cards.count();
+  const collapsed = await whenSettled(page, () => cards.count());
   await setFade(page, false);
   await setFade(page, true);
   await expect(cards).toHaveCount(collapsed);

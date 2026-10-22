@@ -3,6 +3,8 @@
 // (crates/cairn/src/demo.rs), and the panel opened and a message sent the way a person does.
 import { expect, type Locator, type Page } from "@playwright/test";
 
+import { whenSettled } from "./shell.ts";
+
 /** One step of the model's script: words, tool calls, or both, optionally slow. */
 export interface ScriptStep {
   say?: string;
@@ -24,7 +26,7 @@ export function patchId(): string {
 /** Opens the panel from the inspector column's Assistant tab, unless it is open already. */
 export async function openPanel(page: Page): Promise<Locator> {
   const panel = page.getByTestId("assistant-panel");
-  if (!(await panel.isVisible())) {
+  if (!(await whenSettled(page, () => panel.isVisible()))) {
     await page.getByTestId("tab-assistant").click();
   }
   await expect(panel).toBeVisible();

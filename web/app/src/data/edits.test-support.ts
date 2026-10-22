@@ -6,10 +6,10 @@ import { SimulatedClock, createActor } from "xstate";
 import type { About } from "./edit-record.ts";
 import { tabEditStore } from "./edit-record.ts";
 import { FakeDeriver, FakeHost, memoryStorage, memoryTurns, settled, writeEnv } from "./fake.test-support.ts";
-import { editsOf, sessionRoot, subscriptionOf, syncOf, type SessionRootRef } from "./session-root.ts";
+import { editsOf, landedEvents, sessionRoot, subscriptionOf, syncOf, type SessionRootRef } from "./session-root.ts";
 import { inFlightOf, problemsOf } from "./edit-manager.ts";
 import { syncInputOf, syncSummary, type SyncReading, type SyncSummary } from "./sync.ts";
-import { patchOf, saveEventOf, saveOf } from "./writes.ts";
+import { patchOf } from "./writes.ts";
 
 /** A patch renaming `node` of journey `j_one`, with the id given. */
 export function renaming(id: string, node = "n_a", base = 3): Patch {
@@ -52,9 +52,8 @@ export async function startRoot(options: StartOptions = {}) {
           ...parts,
           saved: (command, answer, began) => {
             parts.saved(command, answer, began);
-            const save = saveOf(command, answer, began, (_journey, node) => node);
-            if (save !== undefined) {
-              root.send({ type: "saved", save: saveEventOf(save, (_journey, node) => node, new Date("2026-10-06T14:02:11Z")) });
+            for (const event of landedEvents(command, answer, began, (_journey, node) => node, new Date("2026-10-06T14:02:11Z"))) {
+              root.send(event);
             }
           },
         },

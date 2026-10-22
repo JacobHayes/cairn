@@ -97,9 +97,12 @@ export interface ReadSource<A, T> {
 /** A source with its types erased, as the machine holds it. */
 type AnySource = ReadSource<never, unknown>;
 
-/** Where the machine sends its watches and its shown reads: the session root, which forwards them to the stream. */
+/** That something in the tab started or ended work it owes the page: a read, or a screen's code on its way. */
+export type WorkEvent = { type: "working"; id: string } | { type: "rested"; id: string };
+
+/** Where the machine sends its watches, its shown reads and its work: the session root, which forwards the watches to the stream. */
 export interface StreamPort {
-  send(event: SubscriptionEvent | { type: "shown"; id: string; read: AnyActorRef } | { type: "hidden"; id: string }): void;
+  send(event: SubscriptionEvent | { type: "shown"; id: string; read: AnyActorRef } | { type: "hidden"; id: string } | WorkEvent): void;
 }
 
 /** What the session gives every read. */
@@ -360,6 +363,16 @@ export const keyedRead = setup({
         input.stream.send({ type: "hidden", id });
       };
     }),
+    // Tells the session the read is working (settling or reading) for as long as it runs. Waiting out a
+    // failure is not work: the page shows the failure until the clock starts the next read.
+    work: fromCallback<StreamEvent, { stream: StreamPort }>(({ input }) => {
+      registrations += 1;
+      const id = `work-${String(registrations)}`;
+      input.stream.send({ type: "working", id });
+      return () => {
+        input.stream.send({ type: "rested", id });
+      };
+    }),
     // Owns one held value; stopping it frees the value.
     owner: fromCallback<StreamEvent, { source: AnySource; value: unknown }>(({ input }) => () => {
       input.source.release?.(input.value);
@@ -570,6 +583,7 @@ export const keyedRead = setup({
         },
         settling: {
           tags: "busy",
+          invoke: { src: "work", input: ({ context }) => ({ stream: context.env.stream }) },
           after: { settle: { target: "deciding", actions: "settle" } },
           on: { want: { guard: "newFreshness", target: "settling", reenter: true, actions: "wantMore" } },
         },
@@ -581,22 +595,25 @@ export const keyedRead = setup({
             // The deletion of a domain this read does not hold may be missed by the answer on its way.
             "stream.tick": { guard: "deletedUnheld", actions: "owe" },
           },
-          invoke: {
-            id: "read",
-            src: "read",
-            input: ({ context }) => ({ source: context.source, args: context.want?.args, held: context.held?.value, compatible: context.env.compatible }),
-            onDone: [
-              { guard: "undershot", target: "backoff", actions: ["releaseReplaced", "land"] },
-              { target: "deciding", actions: ["releaseReplaced", "land"] },
-            ],
-            onError: [
-              { guard: "isGone", target: "gone" },
-              { guard: "isSkew", target: "stopped", actions: ["failed", "latch"] },
-              { guard: "obsolete", target: "deciding", actions: "forgetAnswering" },
-              { guard: "isTransient", target: "backoff", actions: "failed" },
-              { target: "resting", actions: "failed" },
-            ],
-          },
+          invoke: [
+            { src: "work", input: ({ context }) => ({ stream: context.env.stream }) },
+            {
+              id: "read",
+              src: "read",
+              input: ({ context }) => ({ source: context.source, args: context.want?.args, held: context.held?.value, compatible: context.env.compatible }),
+              onDone: [
+                { guard: "undershot", target: "backoff", actions: ["releaseReplaced", "land"] },
+                { target: "deciding", actions: ["releaseReplaced", "land"] },
+              ],
+              onError: [
+                { guard: "isGone", target: "gone" },
+                { guard: "isSkew", target: "stopped", actions: ["failed", "latch"] },
+                { guard: "obsolete", target: "deciding", actions: "forgetAnswering" },
+                { guard: "isTransient", target: "backoff", actions: "failed" },
+                { target: "resting", actions: "failed" },
+              ],
+            },
+          ],
         },
         // Waiting out a failed read, or an answer short of what was announced.
         backoff: {

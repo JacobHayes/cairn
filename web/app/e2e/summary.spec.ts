@@ -9,7 +9,7 @@ import { expect, test } from "./test.ts";
 
 import { setStatus } from "./around.ts";
 import { countOf, keysOf, panelOf, rowsOf, stall, startOnSummary } from "./summary.ts";
-import { goTo, nodePanel, openAt } from "./shell.ts";
+import { goTo, nodePanel, openAt, whenSettled } from "./shell.ts";
 import { FIXED_TODAY } from "./views.ts";
 
 const fixed = { fixedToday: FIXED_TODAY };
@@ -25,8 +25,8 @@ test("C10, C18, E1: a row's title opens that node on the graph; Done on a row of
   await expect(page.getByTestId("summary-lead")).toBeVisible();
   const yours = panelOf(page, "summary-yours");
   const left = page.getByTestId("summary-left");
-  const before = Number(await left.getAttribute("data-remaining"));
-  const doneBefore = Number(await page.locator('[data-testid="summary-states"] [data-state="done"]').getAttribute("data-count"));
+  const before = Number(await whenSettled(page, () => left.getAttribute("data-remaining")));
+  const doneBefore = Number(await whenSettled(page, () => page.locator('[data-testid="summary-states"] [data-state="done"]').getAttribute("data-count")));
   const row = yours.locator('[data-testid="summary-item"][data-node="n_announcement"]');
   await row.hover();
   await row.getByRole("button", { name: "Mark done", exact: true }).click();
@@ -58,18 +58,18 @@ async function phoneFitsFirstScreen(page: Page): Promise<void> {
   await openAt(page, "browser", "j_vendor_eval", "summary", fixed);
   const first = rowsOf(page, "summary-yours").first();
   await expect(first).toBeVisible();
-  const box = await first.boundingBox();
+  const box = await whenSettled(page, () => first.boundingBox());
   expect((box?.y ?? 9999) + (box?.height ?? 0)).toBeLessThanOrEqual(844);
-  const beyond = await page.evaluate(() => [...document.querySelectorAll(".summary *")].filter((each) => each.getBoundingClientRect().right > innerWidth + 1).map((each) => each.getAttribute("class") ?? ""));
+  const beyond = await whenSettled(page, () => page.evaluate(() => [...document.querySelectorAll(".summary *")].filter((each) => each.getBoundingClientRect().right > innerWidth + 1).map((each) => each.getAttribute("class") ?? "")));
   expect(beyond).toEqual([]);
-  expect(await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth)).toBeLessThanOrEqual(0);
+  expect(await whenSettled(page, () => page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth))).toBeLessThanOrEqual(0);
   // Who has it and what to do stay visible and reachable, the owner under the title in its column.
   await expect(first.locator(".row-owner")).toBeVisible();
-  const [owner, title] = await Promise.all([first.locator(".row-owner").boundingBox(), first.locator(".node-title").boundingBox()]);
+  const [owner, title] = await whenSettled(page, () => Promise.all([first.locator(".row-owner").boundingBox(), first.locator(".node-title").boundingBox()]));
   expect(Math.abs((owner?.x ?? 0) - (title?.x ?? 99))).toBeLessThanOrEqual(1);
   expect(owner?.y ?? 0).toBeGreaterThan(title?.y ?? 9999);
   await first.locator(".row-act button").first().scrollIntoViewIfNeeded();
-  expect(await first.locator(".row-act button").first().boundingBox()).not.toBeNull();
+  expect(await whenSettled(page, () => first.locator(".row-act button").first().boundingBox())).not.toBeNull();
 }
 
 test("C18, D8: on a phone the first action row is in the first screen and nothing runs off the side; beside the sheet at 1024px the Summary is one column and nothing is clipped; work under way and blocked work are listed, each blocked node saying what it waits for", async ({ page }) => {
@@ -77,12 +77,14 @@ test("C18, D8: on a phone the first action row is in the first screen and nothin
   await page.setViewportSize({ width: 1024, height: 700 });
   await openAt(page, "browser", "j_vendor_eval", "summary", { ...fixed, node: "n_plan" });
   await expect(nodePanel(page, "n_plan")).toBeVisible();
-  const columns = await page.locator(".summary-grid").evaluate((grid) => getComputedStyle(grid).gridTemplateColumns.split(" ").length);
+  const columns = await whenSettled(page, () => page.locator(".summary-grid").evaluate((grid) => getComputedStyle(grid).gridTemplateColumns.split(" ").length));
   expect(columns).toBe(1);
-  const clipped = await page.evaluate(() => {
-    const scroller = document.querySelector(".ws-body");
-    return scroller === null ? 0 : scroller.scrollWidth - scroller.clientWidth;
-  });
+  const clipped = await whenSettled(page, () =>
+    page.evaluate(() => {
+      const scroller = document.querySelector(".ws-body");
+      return scroller === null ? 0 : scroller.scrollWidth - scroller.clientWidth;
+    }),
+  );
   expect(clipped).toBeLessThanOrEqual(0);
   await expect(panelOf(page, "summary-underway")).toBeVisible();
   const blocked = page.locator('details[data-testid="summary-blocked"]');
@@ -121,7 +123,7 @@ test("C18, H6: a list past five rows shows five and Show all reveals the rest wi
   // A foot holds only controls, so it is no empty box on paper.
   await expect(page.locator(".summary .node-panel-foot").first()).toBeHidden();
   await expect(page.locator(".summary-asof")).toBeVisible();
-  const painted = await page.getByTestId("summary-lead").evaluate((lead) => `${getComputedStyle(lead).backgroundColor} ${getComputedStyle(lead).color}`);
+  const painted = await whenSettled(page, () => page.getByTestId("summary-lead").evaluate((lead) => `${getComputedStyle(lead).backgroundColor} ${getComputedStyle(lead).color}`));
   expect(painted).toBe("rgb(255, 255, 255) rgb(0, 0, 0)");
 });
 
@@ -149,9 +151,9 @@ test("D5: the graph's stalled panel offers the same actions, and an unsnooze act
   const causes = page.getByTestId("stall-cause");
   await expect(causes.first()).toBeVisible();
   // Each cause is one row: its action sits beside the title, not under it.
-  const [title, action] = await Promise.all([causes.first().locator("a").first().boundingBox(), causes.first().getByRole("button").boundingBox()]);
+  const [title, action] = await whenSettled(page, () => Promise.all([causes.first().locator("a").first().boundingBox(), causes.first().getByRole("button").boundingBox()]));
   expect(action?.y ?? 0).toBeLessThan((title?.y ?? 0) + (title?.height ?? 0));
-  const before = await causes.count();
+  const before = await whenSettled(page, () => causes.count());
   await page.getByRole("button", { name: "Unsnooze" }).first().click();
   // The unsnoozed node can be acted on again, so nothing is stalled.
   await expect(page.getByTestId("stalled")).toHaveCount(0);
@@ -163,7 +165,7 @@ test("C18: a journey with no node invites planning and offers no completion", as
   await expect(page.getByTestId("summary-empty")).toBeVisible();
   await expect(page.getByTestId("completion-suggested")).toHaveCount(0);
   // The invitation leads and the description sits beside it, not as wide as it.
-  const [invite, about] = await Promise.all([page.getByTestId("summary-empty").boundingBox(), page.getByTestId("summary-about").boundingBox()]);
+  const [invite, about] = await whenSettled(page, () => Promise.all([page.getByTestId("summary-empty").boundingBox(), page.getByTestId("summary-about").boundingBox()]));
   expect(about?.width ?? 9999).toBeLessThan(invite?.width ?? 0);
   await page.getByTestId("summary-plan").click();
   await expect(page).toHaveURL(/view=graph.*edit=on|edit=on.*view=graph/);
@@ -176,7 +178,7 @@ test("B11, C18: a completed journey still says what is left, has no Waiting on y
   await expect(page.getByTestId("summary-left")).toHaveAttribute("data-remaining", /^[1-9]/);
   await expect(panelOf(page, "summary-yours")).toHaveCount(0);
   // It says it is closed and what it left, and lists that as left unfinished, not as next.
-  const remaining = await page.getByTestId("summary-left").getAttribute("data-remaining");
+  const remaining = await whenSettled(page, () => page.getByTestId("summary-left").getAttribute("data-remaining"));
   await expect(page.getByTestId("summary-lifecycle")).toContainText(String(remaining));
   await expect(panelOf(page, "summary-next")).toHaveAttribute("aria-label", /ready or active/i);
   await goTo(page, "list");

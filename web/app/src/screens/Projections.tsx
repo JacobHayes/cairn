@@ -19,6 +19,7 @@ import type { Screen } from "../journeys/address.ts";
 import { useReviewing } from "../proposals/layer.ts";
 import { useViewState } from "../journeys/view.ts";
 import { ProjectedTimeline } from "../timeline/TimelineView.tsx";
+import { Pending } from "../ui/Pending.tsx";
 
 /** The graph and its library load with the graph alone: the other views open without them. */
 const JourneyCanvas = lazy(() => import("../canvas/JourneyCanvas.tsx").then((module) => ({ default: module.JourneyCanvas })));
@@ -66,7 +67,7 @@ export function ProjectionBody({ ready, view, screen, selected, edge, authored, 
     return <ProjectedTimeline ready={ready} state={state} picks={picks} selected={selected} />;
   }
   return (
-    <Suspense fallback={<p className="muted small">Drawing the graph...</p>}>
+    <Suspense fallback={<Pending>Drawing the graph...</Pending>}>
       <JourneyCanvas ready={ready} view={view} selected={selected} edge={edge} onPick={authored === undefined ? undefined : drawing.pick} selection={selection} />
     </Suspense>
   );

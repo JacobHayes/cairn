@@ -17,6 +17,7 @@ import { LoadFailure } from "./LoadFailure.tsx";
 import { SyncChip } from "./SyncChip.tsx";
 import { Toast } from "./Toast.tsx";
 import { useFrame } from "./useFrame.ts";
+import { Pending } from "../ui/Pending.tsx";
 
 /** The screens, as links; the one the viewer is on is marked. */
 function Rail({ pathname }: { pathname: string }) {
@@ -66,7 +67,7 @@ export function Shell() {
           <main className="workspace" data-screen={`${pathname}${search}`}>
             <div className="ws-body">
               <LoadFailure screen={pathname}>
-                <Suspense fallback={<p className="muted small">Loading...</p>}>
+                <Suspense fallback={<Pending>Loading...</Pending>}>
                   <Outlet />
                 </Suspense>
               </LoadFailure>

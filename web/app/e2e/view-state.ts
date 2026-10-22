@@ -5,7 +5,7 @@ import { expect, type Locator, type Page } from "@playwright/test";
 
 import { setFrontier } from "./acting.ts";
 import { pin } from "./detail.ts";
-import { menuItem, nodePanel, openFilter, openFromCanvas, rename, setDepth } from "./shell.ts";
+import { menuItem, nodePanel, openFilter, openFromCanvas, rename, setDepth, settled, whenSettled } from "./shell.ts";
 
 /** The viewer's identity on the in-browser host, as the vendor evaluation names it. */
 export const VIEWER = "who_k3d7qm2xw5tn6pfa";
@@ -29,13 +29,13 @@ export async function search(page: Page, text: string): Promise<void> {
 /** Turns the checkbox inside `check` on or off, once its new state has come back from the address. */
 export async function setCheck(check: Locator, on: boolean): Promise<void> {
   const box = check.locator("input");
-  if ((await box.isChecked()) !== on) {
+  if ((await whenSettled(check.page(), () => box.isChecked())) !== on) {
     await box.click();
   }
   await (on ? expect(box).toBeChecked() : expect(box).not.toBeChecked());
 }
 
-/** On the journey's graph, at every depth: retitles `node` to `title` and pins it to `date`, from its detail as a person does; leaves it closed. */
+/** On the journey's graph, at every depth: retitles `node` to `title` and pins it to `date`, from its detail as a person does; leaves it closed and the page settled. */
 export async function retitleAndPin(page: Page, node: string, title: string, date: string, assign = false): Promise<void> {
   await rename(page, node, title);
   const panel = await openFromCanvas(page, node);
@@ -48,6 +48,7 @@ export async function retitleAndPin(page: Page, node: string, title: string, dat
   await expect(panel.getByTestId("date").first()).toHaveAttribute("data-origin", /pin/);
   await page.keyboard.press("Escape");
   await expect(nodePanel(page, node)).toHaveCount(0);
+  await settled(page);
 }
 
 /** As `retitleAndPin`, and makes the viewer the node's owner from its detail first. */

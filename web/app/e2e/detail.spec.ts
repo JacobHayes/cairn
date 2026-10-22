@@ -9,7 +9,7 @@ import type { Page } from "@playwright/test";
 import { checkpoint, expect, test } from "./test.ts";
 
 import { openNode, pin, section } from "./detail.ts";
-import { fresh, goWithin, menuItem, nodeCard, nodePanel, openAt, openFromCanvas, openSheet, syncChip } from "./shell.ts";
+import { fresh, goWithin, menuItem, nodeCard, nodePanel, openAt, openFromCanvas, openSheet, syncChip, whenSettled } from "./shell.ts";
 
 async function discardClearsRejection(page: Page) {
   const panel = await openNode(page, "browser", "j_vendor_eval", "n_final_report");
@@ -90,12 +90,12 @@ async function historyNamesWhoDidWhat(page: Page) {
   const panel = nodePanel(page, "n_announcement");
   const details = panel.getByTestId("details");
   await expect(details).not.toHaveAttribute("open", "");
-  expect(await panel.locator(".detail-folds > details").last().getAttribute("data-testid")).toBe("details");
+  expect(await whenSettled(page, () => panel.locator(".detail-folds > details").last().getAttribute("data-testid"))).toBe("details");
   const history = (await section(panel, "details")).getByTestId("history-patch");
   await expect(history.first().getByTestId("history-sentence")).not.toBeEmpty();
   await expect(history.first()).toHaveAttribute("data-actor", /^u_/);
   await expect(history.first().getByTestId("history-sentence")).not.toContainText("u_");
-  const before = await history.count();
+  const before = await whenSettled(page, () => history.count());
   await panel.getByRole("button", { name: "Start" }).click();
   await expect(history).toHaveCount(before + 1);
   await expect(history.last().getByTestId("history-sentence")).toHaveText(/^You /);
@@ -146,8 +146,8 @@ test("a milestone done on a phone: an empty date says what to choose and blocks 
   await expect(panel.getByRole("button", { name: "Mark done", exact: true })).toBeEnabled();
   await panel.getByRole("button", { name: "Mark done", exact: true }).click();
   await expect(panel.getByTestId("receipt")).toBeVisible();
-  const lead = (await panel.locator(".detail-lead").boundingBox())?.width ?? 0;
-  const sentence = (await panel.locator(".detail-lead > :first-child").boundingBox())?.width ?? 0;
+  const [leadBox, sentenceBox] = await whenSettled(page, () => Promise.all([panel.locator(".detail-lead").boundingBox(), panel.locator(".detail-lead > :first-child").boundingBox()]));
+  const [lead, sentence] = [leadBox?.width ?? 0, sentenceBox?.width ?? 0];
   expect(sentence).toBeGreaterThan(lead / 2);
   await checkpoint(page);
   await menuItem(panel, "edit-date");

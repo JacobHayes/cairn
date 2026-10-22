@@ -21,6 +21,7 @@ import {
   type ReadPolicy,
   type ReadSource,
   type Ticks,
+  type WorkEvent,
 } from "./keyed-read.ts";
 
 /** What a fake read answers: a label, and the revisions it holds. */
@@ -39,14 +40,20 @@ const answer = (label: string, ...holds: [RevisionOf, number][]): Answer => ({ l
 function fakeStream() {
   const watchers = new Map<string, { names: readonly string[]; to: AnyActorRef }>();
   const shown = new Map<string, AnyActorRef>();
+  const working = new Set<string>();
   const events: string[] = [];
   return {
     watchers,
     shown,
+    working,
     events,
-    send(event: SubscriptionEvent | { type: "shown"; id: string; read: AnyActorRef } | { type: "hidden"; id: string }) {
+    send(event: SubscriptionEvent | { type: "shown"; id: string; read: AnyActorRef } | { type: "hidden"; id: string } | WorkEvent) {
       events.push(event.type);
-      if (event.type === "watch") {
+      if (event.type === "working") {
+        working.add(event.id);
+      } else if (event.type === "rested") {
+        working.delete(event.id);
+      } else if (event.type === "watch") {
         watchers.set(event.id, { names: event.names, to: event.to });
       } else if (event.type === "unwatch") {
         watchers.delete(event.id);
@@ -541,6 +548,39 @@ describe("a settle policy", () => {
     expect(h.view("C", [])).toEqual({ status: "loading" });
     h.clock.increment(1);
     expect(h.calls.map((call) => call.args)).toEqual(["C"]);
+  });
+});
+
+describe("the work it reports", () => {
+  it("is under way while the read settles and reads, and over while it waits out a failure and once it rests", async () => {
+    const h = harness({ policy: previewPolicy(250) });
+    h.want(h.keyed("A"));
+    expect(h.stream.working.size).toBe(1);
+    h.clock.increment(250);
+    expect(h.calls).toHaveLength(1);
+    expect(h.stream.working.size).toBe(1);
+    h.calls[0]?.reject(failed503());
+    await h.flush();
+    expect(h.view("A", [])).toMatchObject({ status: "failed", retrying: true });
+    expect(h.stream.working.size).toBe(0);
+    h.clock.increment(backoffDelayMs(0));
+    expect(h.stream.working.size).toBe(1);
+    h.calls[1]?.resolve(answer("a"));
+    await h.flush();
+    expect(h.view("A", [])).toEqual({ status: "current", value: answer("a") });
+    expect(h.stream.working.size).toBe(0);
+  });
+
+  it("is under way again for a tick that asks for a newer revision, and ends with the read stopped mid-way", async () => {
+    const h = harness({ ticks: {} });
+    h.want(h.keyed("K"));
+    h.calls[0]?.resolve(answer("v", [journey, 1]));
+    await h.flush();
+    expect(h.stream.working.size).toBe(0);
+    h.tick(at(2));
+    expect(h.stream.working.size).toBe(1);
+    h.ref.stop();
+    expect(h.stream.working.size).toBe(0);
   });
 });
 

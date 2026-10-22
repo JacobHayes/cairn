@@ -5,7 +5,7 @@ import type { Page } from "@playwright/test";
 
 import { checkpoint, expect, test } from "./test.ts";
 
-import { expectAddress, nodeCard, nodePanel, openAt, openJourney, openSheet } from "./shell.ts";
+import { expectAddress, nodeCard, nodePanel, openAt, openJourney, openSheet, whenSettled } from "./shell.ts";
 
 /** Opens Details (with the History in it) in `node`'s inspector and scrolls it to its end the way a person does: the wheel over it. */
 async function reachHistory(page: Page, node: string, height: number): Promise<void> {
@@ -14,17 +14,17 @@ async function reachHistory(page: Page, node: string, height: number): Promise<v
   await history.locator("summary").click();
   await expect(history.getByText("Reading...")).toHaveCount(0);
   const body = page.locator('.inspector-body[data-pane="inspector"]');
-  const box = await body.boundingBox();
+  const box = await whenSettled(page, () => body.boundingBox());
   expect(box).not.toBeNull();
   await page.mouse.move((box?.x ?? 0) + (box?.width ?? 0) / 2, (box?.y ?? 0) + (box?.height ?? 0) / 2);
   for (let step = 0; step < 12; step += 1) {
     await page.mouse.wheel(0, 600);
   }
   await expect.poll(() => body.evaluate((element) => element.scrollHeight - element.clientHeight - element.scrollTop)).toBeLessThanOrEqual(1);
-  const shown = await history.boundingBox();
+  const shown = await whenSettled(page, () => history.boundingBox());
   expect(shown?.y).toBeGreaterThanOrEqual(0);
   expect((shown?.y ?? 0) + (shown?.height ?? 0)).toBeLessThanOrEqual(height);
-  expect(await page.evaluate(() => document.scrollingElement?.scrollTop)).toBe(0);
+  expect(await whenSettled(page, () => page.evaluate(() => document.scrollingElement?.scrollTop))).toBe(0);
 }
 
 // The inspector is one component and the CSS lint holds each region to one scroller, so one
@@ -63,13 +63,13 @@ test("the inspector scrolls to the end of Details at 1440 and 1024px, a node ope
   await openAt(page, "browser", "j_vendor_eval", "graph?depth=decisions");
   const canvas = page.getByTestId("canvas");
   const viewport = canvas.locator(".react-flow__viewport");
-  const before = await viewport.evaluate((element) => (element as HTMLElement).style.transform);
-  const box = await canvas.boundingBox();
+  const before = await whenSettled(page, () => viewport.evaluate((element) => (element as HTMLElement).style.transform));
+  const box = await whenSettled(page, () => canvas.boundingBox());
   await page.mouse.move((box?.x ?? 0) + (box?.width ?? 0) / 2, (box?.y ?? 0) + (box?.height ?? 0) / 2);
   await page.mouse.wheel(0, 300);
   await expect.poll(() => viewport.evaluate((element) => (element as HTMLElement).style.transform)).not.toBe(before);
   const region = page.locator(".ws-body");
-  expect(await region.evaluate((element) => element.scrollHeight - element.clientHeight)).toBeLessThanOrEqual(1);
+  expect(await whenSettled(page, () => region.evaluate((element) => element.scrollHeight - element.clientHeight))).toBeLessThanOrEqual(1);
 
   // On a tablet the summary's inspector reaches History, the screen's end is above the sheet, and Esc closes it.
   await page.setViewportSize({ width: 1024, height: 700 });
@@ -80,8 +80,8 @@ test("the inspector scrolls to the end of Details at 1440 and 1024px, a node ope
   await page.locator(".ws-body").evaluate((element) => {
     element.scrollTop = element.scrollHeight;
   });
-  const sheet = await page.locator(".inspector").boundingBox();
-  const last = await page.locator(".journey-scroll > *").last().boundingBox();
+  const sheet = await whenSettled(page, () => page.locator(".inspector").boundingBox());
+  const last = await whenSettled(page, () => page.locator(".journey-scroll > *").last().boundingBox());
   expect((last?.y ?? 0) + (last?.height ?? 0)).toBeLessThanOrEqual((sheet?.y ?? 0) + 1);
   await page.keyboard.press("Escape");
   await expect(nodePanel(page, "n_plan")).toHaveCount(0);
@@ -111,15 +111,15 @@ async function swipe(page: Page, at: { x: number; y: number }, by: { dx: number;
 }
 
 const sheet = (page: Page) => page.locator(".inspector");
-const snapOf = (page: Page) => page.locator(".frame").getAttribute("data-sheet");
-const heightOf = async (page: Page) => (await sheet(page).boundingBox())?.height ?? 0;
+const snapOf = (page: Page) => whenSettled(page, () => page.locator(".frame").getAttribute("data-sheet"));
+const heightOf = async (page: Page) => (await whenSettled(page, () => sheet(page).boundingBox()))?.height ?? 0;
 const handle = (page: Page) => page.getByRole("button", { name: "Resize the inspector" });
 /** The canvas's pan and zoom, as React Flow writes it. */
-const transform = (page: Page) => page.locator('[data-testid="canvas"] .react-flow__viewport').evaluate((element) => (element as HTMLElement).style.transform);
+const transform = (page: Page) => whenSettled(page, () => page.locator('[data-testid="canvas"] .react-flow__viewport').evaluate((element) => (element as HTMLElement).style.transform));
 
 /** Drags the handle by `dy` with a mouse pointer, in steps like a hand. */
 async function dragHandle(page: Page, dy: number): Promise<void> {
-  const box = await handle(page).boundingBox();
+  const box = await whenSettled(page, () => handle(page).boundingBox());
   const [x, y] = [(box?.x ?? 0) + (box?.width ?? 0) / 2, (box?.y ?? 0) + (box?.height ?? 0) / 2];
   await page.mouse.move(x, y);
   await page.mouse.down();
@@ -128,13 +128,13 @@ async function dragHandle(page: Page, dy: number): Promise<void> {
   await page.mouse.up();
 }
 
-const scrolled = (page: Page) => page.evaluate(() => document.scrollingElement?.scrollTop ?? 0);
+const scrolled = (page: Page) => whenSettled(page, () => page.evaluate(() => document.scrollingElement?.scrollTop ?? 0));
 const hiringNode = (page: Page) => page.locator('[data-testid="canvas"] [data-testid="node-card"][data-node="n_make_offer"]');
 
 /** Every drawn card lies whole inside the canvas's own box. */
 async function expectCardsInside(page: Page): Promise<void> {
-  const canvas = await page.getByTestId("canvas").boundingBox();
-  const cards = await page.getByTestId("node-card").evaluateAll((all) => all.map((each) => each.getBoundingClientRect().toJSON() as { x: number; y: number; right: number; bottom: number }));
+  const canvas = await whenSettled(page, () => page.getByTestId("canvas").boundingBox());
+  const cards = await whenSettled(page, () => page.getByTestId("node-card").evaluateAll((all) => all.map((each) => each.getBoundingClientRect().toJSON() as { x: number; y: number; right: number; bottom: number })));
   expect(cards.length).toBeGreaterThan(0);
   for (const card of cards) {
     expect(card.x).toBeGreaterThanOrEqual((canvas?.x ?? 0) - 1);
@@ -148,11 +148,11 @@ async function phoneGraphFills(page: Page): Promise<void> {
   await openJourney(page, "browser", "j_vendor_eval");
   await expect(sheet(page)).toBeVisible();
   expect(await snapOf(page)).toBe("peek");
-  const peek = await sheet(page).boundingBox();
+  const peek = await whenSettled(page, () => sheet(page).boundingBox());
   expect((peek?.y ?? 0) + (peek?.height ?? 0)).toBeCloseTo(844, 0);
   await expect(page.locator(".inspector-head")).toBeInViewport();
   // The graph has the room the bars leave, with the inspector's head peeking under it; nothing of it lies under the peek, so the whole canvas is a gesture surface.
-  const canvas = await page.getByTestId("canvas").boundingBox();
+  const canvas = await whenSettled(page, () => page.getByTestId("canvas").boundingBox());
   expect(canvas?.height).toBeGreaterThan(400);
   expect((canvas?.y ?? 0) + (canvas?.height ?? 0)).toBeLessThanOrEqual(peek?.y ?? 0);
   expect(await scrolled(page)).toBe(0);
@@ -171,10 +171,10 @@ async function phoneGraphFills(page: Page): Promise<void> {
   await page.evaluate(() => {
     window.scrollTo(0, document.documentElement.scrollHeight);
   });
-  const shown = await page.locator(".ws-body").boundingBox();
-  const top = (await sheet(page).boundingBox())?.y ?? 0;
+  const shown = await whenSettled(page, () => page.locator(".ws-body").boundingBox());
+  const top = (await whenSettled(page, () => sheet(page).boundingBox()))?.y ?? 0;
   expect((shown?.y ?? 0) + (shown?.height ?? 0)).toBeGreaterThan(top);
-  const last = await page.locator(".ws-body *:visible").last().boundingBox();
+  const last = await whenSettled(page, () => page.locator(".ws-body *:visible").last().boundingBox());
   expect((last?.y ?? 0) + (last?.height ?? 0)).toBeLessThanOrEqual(top + 1);
 }
 
@@ -184,7 +184,7 @@ async function phoneSheetSnaps(page: Page): Promise<void> {
   const zoom = page.getByRole("button", { name: "Zoom in" });
   // The graph's bottom controls clear the sheet at every height it leaves room at.
   const expectControlsClear = async () => {
-    const top = (await sheet(page).boundingBox())?.y ?? 0;
+    const top = (await whenSettled(page, () => sheet(page).boundingBox()))?.y ?? 0;
     await expect.poll(async () => ((await zoom.boundingBox())?.y ?? 0) + ((await zoom.boundingBox())?.height ?? 0)).toBeLessThanOrEqual(top + 1);
   };
   await hiringNode(page).getByTestId("card-open").click();
@@ -195,8 +195,8 @@ async function phoneSheetSnaps(page: Page): Promise<void> {
   const peek = await heightOf(page);
   // Picking a node keeps the cards in view above the peek.
   await expectCardsInside(page);
-  const picked = await nodeCard(page, "n_make_offer").boundingBox();
-  expect((picked?.y ?? 0) + (picked?.height ?? 0)).toBeLessThanOrEqual((await sheet(page).boundingBox())?.y ?? 0);
+  const picked = await whenSettled(page, () => nodeCard(page, "n_make_offer").boundingBox());
+  expect((picked?.y ?? 0) + (picked?.height ?? 0)).toBeLessThanOrEqual((await whenSettled(page, () => sheet(page).boundingBox()))?.y ?? 0);
   await expectControlsClear();
   // Esc closes an open menu and leaves the sheet where it is.
   await page.getByTestId("controls-button").click();
@@ -208,7 +208,7 @@ async function phoneSheetSnaps(page: Page): Promise<void> {
   await checkpoint(page);
 
   // A finger's drag up opens it to full, and a drag from there down settles on half.
-  const grip = await handle(page).boundingBox();
+  const grip = await whenSettled(page, () => handle(page).boundingBox());
   await swipe(page, { x: (grip?.x ?? 0) + (grip?.width ?? 0) / 2, y: (grip?.y ?? 0) + 10 }, { dx: 0, dy: -600 });
   await expect.poll(() => snapOf(page)).toBe("full");
   const full = await heightOf(page);
@@ -238,13 +238,13 @@ async function phoneSheetFoldsAndReturns(page: Page): Promise<void> {
   await expect(page.locator(".frame")).toHaveAttribute("data-inspector", "folded");
   const pill = page.getByRole("button", { name: "Show inspector" });
   await expect(pill).toBeInViewport();
-  expect((await sheet(page).boundingBox())?.width).toBeLessThan(250);
-  expect((await sheet(page).boundingBox())?.height).toBeLessThan(64);
+  expect((await whenSettled(page, () => sheet(page).boundingBox()))?.width).toBeLessThan(250);
+  expect((await whenSettled(page, () => sheet(page).boundingBox()))?.height).toBeLessThan(64);
   // Under no sheet the graph fills the window to its foot: no blank strip where the sheet was.
-  const canvas = await page.getByTestId("canvas").boundingBox();
+  const canvas = await whenSettled(page, () => page.getByTestId("canvas").boundingBox());
   expect((canvas?.y ?? 0) + (canvas?.height ?? 0)).toBeGreaterThan(844 - 24);
-  expect(await page.evaluate(() => document.documentElement.scrollHeight <= window.innerHeight + 1)).toBe(true);
-  expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
+  expect(await whenSettled(page, () => page.evaluate(() => document.documentElement.scrollHeight <= window.innerHeight + 1))).toBe(true);
+  expect(await whenSettled(page, () => page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth))).toBe(true);
   await checkpoint(page);
   // The pill brings it back at the peek.
   await pill.click();
@@ -270,9 +270,9 @@ async function phoneSheetFoldsAndReturns(page: Page): Promise<void> {
 }
 
 
-const sheetBox = async (page: Page) => (await sheet(page).boundingBox()) ?? { y: 0, height: 0 };
+const sheetBox = async (page: Page) => (await whenSettled(page, () => sheet(page).boundingBox())) ?? { y: 0, height: 0 };
 const graphShare = async (page: Page, height: number) => {
-  const canvas = (await page.getByTestId("canvas").boundingBox()) ?? { y: 0, height: 0 };
+  const canvas = (await whenSettled(page, () => page.getByTestId("canvas").boundingBox())) ?? { y: 0, height: 0 };
   return (Math.min(canvas.y + canvas.height, (await sheetBox(page)).y) - canvas.y) / height;
 };
 
