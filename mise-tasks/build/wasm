@@ -28,4 +28,12 @@ fi
 rm -rf "$out"
 mkdir -p "$out"
 wasm-bindgen --target web --out-dir "$out" --out-name cairn_wasm "$module"
+# The shipped module is also shrunk by wasm-opt (-Oz): about 20% off its size and, with level
+# "s", about 12 MB off a tab's memory. The features are the ones rustc's wasm32 target emits
+# by default. The development build skips it: the pass takes seconds and nothing there
+# measures size.
+if [ "$profile" = wasm ]; then
+  wasm-opt -Oz --enable-bulk-memory --enable-sign-ext --enable-nontrapping-float-to-int --enable-mutable-globals \
+    "$out/cairn_wasm_bg.wasm" -o "$out/cairn_wasm_bg.wasm"
+fi
 echo "$profile" >"$out/profile"

@@ -147,11 +147,16 @@ opt-level = 0
 [profile.dev.package."*"]
 debug = false
 
-# The browser host's build (brief 4.5): the release profile, its symbols stripped and linked
-# as one unit, so the module the page downloads is small. The wasm build task uses it for the
-# release build and in CI (CAIRN_WASM_PROFILE=wasm); the link takes most of a minute.
+# The browser host's build (brief 4.5): the release profile built for size, its symbols
+# stripped and linked as one unit, so the module the page downloads is small and the tab
+# holds less memory (the build task also runs wasm-opt over it). Level "s" rather than 3
+# costs nothing a person feels and saves about 12 MB of a tab
+# (decisions/2026-10-21-a-tabs-memory-is-cut-only-where-it-costs-no-time.md). The wasm build
+# task uses it for the release build and in CI (CAIRN_WASM_PROFILE=wasm); the link takes
+# most of a minute.
 [profile.wasm]
 inherits = "release"
+opt-level = "s"
 strip = true
 lto = true
 codegen-units = 1

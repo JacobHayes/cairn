@@ -8,6 +8,9 @@ rust = { version = "1.99.0", profile = "minimal", components = "clippy,rustfmt",
 # The wasm tool, as prebuilt release binaries: `mise run build:wasm` binds crates/wasm with
 # it. Its version must equal the `wasm-bindgen` crate version pinned in Cargo.toml.
 "github:wasm-bindgen/wasm-bindgen" = "0.2.129"
+# The wasm optimizer: `mise run build:wasm` runs it over the optimized (wasm profile) module
+# to shrink it (decisions/2026-10-21-a-tabs-memory-is-cut-only-where-it-costs-no-time.md).
+"github:WebAssembly/binaryen" = "version_133"
 # The simulation track's runner (PRACTICES, Simulation with patina: Tooling), built from
 # source once at the same revision as the SDK git dependencies in Cargo.toml. Only
 # `mise run sim` uses it; the check ladder never does.
