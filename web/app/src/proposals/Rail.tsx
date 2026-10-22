@@ -210,7 +210,7 @@ function useContexts(layer: Layer, model: LayerModel) {
   const edit = reviewing?.edit ?? (() => undefined);
   const setInvalid = reviewing?.setInvalid ?? (() => undefined);
   return {
-    items: { draft: model.draft, edit, names: model.names, roles, kinds, unresolved: model.unresolved, editable: model.editable },
+    items: { draft: model.draft, edit, names: model.names, roles, kinds, unresolved: model.unresolved, conflicts: model.conflicts, editable: model.editable },
     changes: {
       draft: model.draft,
       edit,

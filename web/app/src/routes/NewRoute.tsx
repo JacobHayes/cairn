@@ -3,7 +3,7 @@
 // first draft, then its draft's canvas), or a route file imported. A new one's id is a slug from
 // its name, editable (folded) before it is made, and unique in the deployment (the engine refuses
 // one in use) and not `new`, which the form's own address shadows.
-import { TITLE_BYTES_MAX } from "@cairn/client";
+import { RESERVED_ROUTE_ID, TITLE_BYTES_MAX } from "@cairn/client";
 import type { Schema } from "@cairn/client";
 import { Link, useNavigate, useSearchParams } from "react-router";
 
@@ -20,15 +20,12 @@ import { openDraft } from "./model.ts";
 
 type Kind = Schema<"RouteKind">;
 
-/** The id the form refuses: `/routes/new` is the form, so a route called that would have no canvas address. */
-const RESERVED_ID = "new";
-
 /** The form a kind opens: its name, and its id (a slug from the name) folded away until it needs changing. */
 function NewForm({ kind, disabled, refused, onStart }: { kind: Kind; disabled: boolean; refused: boolean; onStart: (name: string, id: string) => void }) {
   const [kept, setKept] = useDraft<{ name: string; id?: string }>("new-route");
   const name = kept?.name ?? "";
   const routeId = kept?.id ?? slugOf(name, "route");
-  const problem = name.trim() === "" ? undefined : (overBytes(name, TITLE_BYTES_MAX, "The name") ?? (isSlug(routeId) && routeId !== RESERVED_ID ? undefined : "An id is lowercase letters, digits, '_' and '-', and not 'new'."));
+  const problem = name.trim() === "" ? undefined : (overBytes(name, TITLE_BYTES_MAX, "The name") ?? (isSlug(routeId) && routeId !== RESERVED_ROUTE_ID ? undefined : `An id is lowercase letters, digits, '_' and '-', and not '${RESERVED_ROUTE_ID}'.`));
   const word = kind === "segment" ? "segment" : "route";
   return (
     <form className="stack" onSubmit={(event) => { event.preventDefault(); onStart(name.trim(), routeId); }}>

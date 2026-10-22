@@ -9,6 +9,7 @@ import {
   parsed,
   type AppliedLocally,
   type ApplyRequest,
+  type ConditionProblem,
   type DerivationHandle,
   type DerivationKey,
   type Derived,
@@ -185,6 +186,11 @@ export class DeriveWorker {
   /** A13: the file document as the canonical YAML a route file is kept in on disk. */
   routeFileText(file: Schema<"RouteFile">): Promise<string> {
     return this.#ask({ op: "route_file_text", file });
+  }
+
+  /** A5: what keeps `clause` from being a condition (the engine's size and shape rule), or none. */
+  async conditionProblem(clause: Schema<"ConditionResolved">): Promise<ConditionProblem | undefined> {
+    return parsed<ConditionProblem | null>(await this.#ask({ op: "condition_problem", clause })) ?? undefined;
   }
 
   /** The worker module's linear memory in bytes: its peak so far. */

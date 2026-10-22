@@ -4,7 +4,6 @@
 // host commits it. Strict validation stays the engine's, at preview and at apply.
 import type { Schema } from "@cairn/client";
 
-import { choiceId, type Choice } from "../status/answer.ts";
 import { violationNode } from "../data/writes.ts";
 import type { Edge, Graph, GraphNode, Mutation } from "../authoring/graph.ts";
 
@@ -19,7 +18,8 @@ export type AnswerValue = Schema<"AnswerValue">;
 export type UnresolvedReason = Schema<"UnresolvedReason">;
 
 /** The kinds of resolution a conflict can offer (B7). */
-export type ResolutionKind = "keep_journey" | "take_route" | "clear_state" | "reopen" | "remove" | "remap_role" | "remap_kind" | "map_choices";
+export type ResolutionKind = Schema<"ResolutionKind">;
+export type ConflictReview = Schema<"ConflictReview">;
 
 /** Which kind of resolution `resolution` is. */
 export function kindOf(resolution: Resolution): ResolutionKind {
@@ -30,75 +30,6 @@ export function kindOf(resolution: Resolution): ResolutionKind {
     return "remap_role";
   }
   return "remap_kind" in resolution ? "remap_kind" : "map_choices";
-}
-
-/** B7: the choices an answer names that `choices` no longer has. */
-export function removedChoices(answer: AnswerValue, choices: readonly Choice[]): string[] {
-  const remaining = new Set(choices.map(choiceId));
-  const named = "single_choice" in answer ? [answer.single_choice] : "multi_choice" in answer ? answer.multi_choice : [];
-  return [...new Set(named)].filter((choice) => !remaining.has(choice)).sort();
-}
-
-/** A6: a single-valued role cannot hold a direct fill of several identities. */
-function tooNarrow(conflict: Extract<Conflict, { about: "role" }>): boolean {
-  const route = conflict.route;
-  return route != null && route.multi !== true && (conflict.references ?? []).some((reference) => typeof reference === "object" && "fill" in reference && reference.fill.identities.length > 1);
-}
-
-/** B13: an insertion maps a segment role or kind onto what the route removed, so it can only be kept or removed. */
-function mapped(conflict: Extract<Conflict, { about: "role" | "kind" }>): boolean {
-  return (conflict.insertions ?? []).length > 0;
-}
-
-/**
- * B7: the kinds of resolution `conflict` offers, in the order a reviewer reads them. Every
- * conflict keeps the journey's side; an edit also takes the route's unless the route's names a
- * node the journey does not hold; a shape change clears the state; an invalidated answer
- * maps, clears, or reopens; a removed role or kind the journey still uses is remapped or
- * removed (only removed when an insertion maps onto it); a role too narrow for the journey's
- * direct fill clears it. The engine's `Conflict::offers` is the rule; a test checks this
- * against it.
- */
-export function offered(conflict: Conflict): ResolutionKind[] {
-  switch (conflict.about) {
-    case "field":
-    case "resource":
-      return conflict.dangling === true ? ["keep_journey"] : ["keep_journey", "take_route"];
-    case "edge":
-    case "participation":
-    case "default_owner":
-      return ["keep_journey", "take_route"];
-    case "shape":
-      return conflict.dangling === true ? ["keep_journey"] : ["keep_journey", "clear_state"];
-    case "answer":
-      return ["keep_journey", "map_choices", "clear_state", "reopen"];
-    case "role":
-      if (conflict.route == null) {
-        return mapped(conflict) ? ["keep_journey", "remove"] : ["keep_journey", "remap_role", "remove"];
-      }
-      return ["keep_journey", tooNarrow(conflict) ? "clear_state" : "take_route"];
-    case "kind":
-      if (conflict.route == null) {
-        return mapped(conflict) ? ["keep_journey", "remove"] : ["keep_journey", "remap_kind", "remove"];
-      }
-      return ["keep_journey", "take_route"];
-  }
-}
-
-/** B7: whether `conflict` offers `resolution` as given: its kind, and a choice map that sends every removed choice to a remaining one. */
-export function offers(conflict: Conflict, resolution: Resolution): boolean {
-  const kind = kindOf(resolution);
-  if (!offered(conflict).includes(kind)) {
-    return false;
-  }
-  if (typeof resolution === "object" && "map_choices" in resolution && conflict.about === "answer") {
-    const removed = removedChoices(conflict.answer, conflict.choices);
-    const remaining = new Set(conflict.choices.map(choiceId));
-    const map = resolution.map_choices.map;
-    const keys = Object.keys(map).sort();
-    return removed.length > 0 && keys.length === removed.length && keys.every((key, at) => key === removed[at] && remaining.has(map[key] ?? ""));
-  }
-  return true;
 }
 
 /** The node a conflict is about, when it is about one. */
@@ -406,28 +337,6 @@ export function reviewEntries(diff: GraphDiff, marks: Record<string, DiffMark>, 
   const order: DiffKind[] = ["added", "changed", "removed"];
   const roots = entries.filter((entry) => entry.cause === undefined).sort((left, right) => order.indexOf(left.mark.kind) - order.indexOf(right.mark.kind) || left.key.localeCompare(right.key));
   return roots.flatMap((root) => [root, ...entries.filter((entry) => entry.cause === root.key).sort((left, right) => left.key.localeCompare(right.key))]);
-}
-
-/**
- * C14: the items still needing a choice as the review itself can tell, for edits no preview
- * has seen yet: a conflict with no resolution or one it does not offer, an identity with no
- * mapping. The engine's preview also finds mappings that cannot hold together; this never
- * replaces it, it only stands in until the edits are previewed.
- */
-export function unresolvedHere(reviewItems: readonly ReviewItem[]): Map<number, UnresolvedReason> {
-  const found = new Map<number, UnresolvedReason>();
-  reviewItems.forEach((item, index) => {
-    if (item.item === "conflict") {
-      if (item.resolution == null) {
-        found.set(index, "no_choice");
-      } else if (!offers(item.conflict, item.resolution)) {
-        found.set(index, "not_offered");
-      }
-    } else if (item.item === "participation" && item.mapping == null) {
-      found.set(index, "no_choice");
-    }
-  });
-  return found;
 }
 
 /**

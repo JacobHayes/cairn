@@ -20,6 +20,7 @@ import {
   leaf,
   leavesFor,
   operatorOf,
+  insideNode,
   referableDecisions,
   replaceAt,
   valueInput,
@@ -42,7 +43,7 @@ export interface ConditionEditorProps {
   value: Schema<"ConditionResolved"> | null;
   onChange: (next: Schema<"ConditionResolved"> | null) => void;
   tree: Tree;
-  /** The node the condition is on; its own subtree's decisions are never offered. */
+  /** The node the condition is on; its own subtree's decisions are offered last, marked. */
   node: string | undefined;
   identities: readonly Identity[];
   today: string;
@@ -125,7 +126,7 @@ function LeafClause({ context, clause, path }: { context: Context; clause: Claus
       <Picker
         aria-label="Decision"
         value={decisionKey}
-        options={context.decisions.map((each) => ({ value: each.key, label: each.title }))}
+        options={context.decisions.map((each) => ({ value: each.key, label: insideNode(context.tree, context.node, each.key) ? `${each.title} (inside this node)` : each.title }))}
         onChange={(event) => {
           const picked = context.tree.byKey.get(event.target.value);
           if (picked !== undefined) {
@@ -205,7 +206,7 @@ export function ConditionEditor(props: ConditionEditorProps) {
       <div className="stack" data-testid="condition-editor">
         <span className="muted small">No condition: relevant whenever its ancestors are.</span>
         {first === undefined ? (
-          <span className="muted small">There is no decision outside this node to make it depend on.</span>
+          <span className="muted small">There is no decision to make it depend on.</span>
         ) : (
           <span className="row">
             <Button onClick={() => { props.onChange(newLeaf(first, props)); }}>Add a condition</Button>

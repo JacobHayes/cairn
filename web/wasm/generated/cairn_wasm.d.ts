@@ -370,6 +370,13 @@ export function apply(document: string, request: string): string;
 export function applyRoute(request: string): string;
 
 /**
+ * A5: the JSON of what keeps the clause (the JSON of a `Clause`) from being a condition: a
+ * `{"too_large": {"limit", "count"}}`, `"empty_combination"`, `{"unreadable": {"reason"}}`, or
+ * `null` when it can be one.
+ */
+export function conditionProblem(clause: string): string;
+
+/**
  * Exports a route version or draft: `request` is the JSON of an [`ExportRequest`]; the
  * answer is the JSON of the `RouteFile`, as `GET /api/routes/{id}/export` answers it.
  *
@@ -475,6 +482,7 @@ export interface InitOutput {
     readonly browserroot_routes: (a: number, b: number, c: number, d: number, e: number, f: number) => void;
     readonly browserroot_subscribe: (a: number, b: number, c: number, d: number) => void;
     readonly browserroot_userNames: (a: number, b: number, c: number, d: number) => void;
+    readonly conditionProblem: (a: number, b: number, c: number) => void;
     readonly derivation_derived: (a: number, b: number) => void;
     readonly derivation_key: (a: number, b: number) => void;
     readonly derivation_new: (a: number, b: number, c: number) => void;

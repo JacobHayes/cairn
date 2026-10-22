@@ -31,14 +31,9 @@ listen = "127.0.0.1:8080"
 public_url = "https://cairn.example.com/" # links, OAuth redirects, and the Host served
 timezone = "America/New_York"            # what "today" is, for everyone
 
-[rank]                                   # optional: the PRD's defaults otherwise
-urgency = 0.40
-late = 0.15
-gravity = 0.25
-unlocks = 0.20
-horizon_days = 14
-undecided_discount = 0.5
-other_owner_factor = 2.0
+# [rank]                               # optional: any of urgency, late, gravity, unlocks,
+#                                        # horizon_days, undecided_discount, other_owner_factor;
+#                                        # each left out takes its default
 
 [[auth]]                                 # one or more, asked in this order
 kind = "oidc"                            # or dev, builtin_oauth, tailscale, gcp_iap

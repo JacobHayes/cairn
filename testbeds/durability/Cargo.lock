@@ -89,6 +89,8 @@ version = "0.0.0"
 dependencies = [
  "cairn-schema",
  "jiff",
+ "serde",
+ "serde_json",
 ]
 
 [[package]]

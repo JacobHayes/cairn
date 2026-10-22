@@ -38,8 +38,23 @@ pub struct RankTerms {
     pub gravity_norm: f64,
     /// Unlocks over the largest in the normalization set.
     pub unlocks_norm: f64,
-    /// The blend of the four under the rank constants.
+    /// What each term adds to the rank: the term times its constant.
+    pub adds: RankAdds,
+    /// The blend of the four under the rank constants: the sum of what they add.
     pub rank: f64,
+}
+
+/// What each of the four terms adds to a rank (C10).
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct RankAdds {
+    /// Urgency times its constant.
+    pub urgency: f64,
+    /// Running late times its constant.
+    pub late: f64,
+    /// Gravity's share times its constant.
+    pub gravity: f64,
+    /// Unlocks' share times its constant.
+    pub unlocks: f64,
 }
 
 /// One ranked node: its terms and the signals its ties break on.
@@ -85,16 +100,19 @@ impl Ranking {
                 let (urgency, late) = urgency(slack_days, constants.horizon_days);
                 let gravity_norm = normalized(gravity, gravity_max.unwrap_or_default());
                 let unlocks_norm = normalized(unlocks, unlocks_max.unwrap_or_default());
-                let rank = constants.urgency.get() * urgency
-                    + constants.late.get() * late
-                    + constants.gravity.get() * gravity_norm
-                    + constants.unlocks.get() * unlocks_norm;
+                let adds = RankAdds {
+                    urgency: constants.urgency.get() * urgency,
+                    late: constants.late.get() * late,
+                    gravity: constants.gravity.get() * gravity_norm,
+                    unlocks: constants.unlocks.get() * unlocks_norm,
+                };
                 let terms = RankTerms {
                     urgency,
                     late,
                     gravity_norm,
                     unlocks_norm,
-                    rank,
+                    adds,
+                    rank: adds.urgency + adds.late + adds.gravity + adds.unlocks,
                 };
                 assert_terms(&terms, constants);
                 let ranked = Ranked {

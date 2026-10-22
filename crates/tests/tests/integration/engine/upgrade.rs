@@ -495,11 +495,12 @@ fn a_violation_is_an_item_never_a_silent_apply() {
             _ => None,
         })
         .collect();
-    assert_eq!(codes, [ViolationCode::DuplicateSiblingId]);
+    // The two siblings sharing the id are each reported.
+    assert_eq!(codes, [ViolationCode::DuplicateSiblingId; 2]);
     let proposed = support::propose(&records, "pr_upgrade", JOURNEY, &draft);
     assert_eq!(
         support::codes(support::apply_proposal(&proposed, "pr_upgrade")),
-        [ViolationCode::DuplicateSiblingId]
+        [ViolationCode::DuplicateSiblingId; 2]
     );
 }
 
@@ -817,6 +818,42 @@ fn a_dangling_field_conflict_offers_only_the_journeys_side() {
         .map(|item| item.reason)
         .collect();
     assert_eq!(reasons, [cairn_schema::UnresolvedReason::NotOffered; 2]);
+}
+
+/// B7: the preview serves each conflict item's offers, so a client lists them without its own
+/// copy of the rule: a dangling field conflict offers only the journey's side, and what the
+/// preview serves is what `offers` accepts.
+#[test]
+fn the_preview_serves_what_each_conflict_offers() {
+    let records = dated_after_a_removed_node();
+    let draft = upgrade_to_two(&records);
+    let shown = cairn_engine::preview(
+        &records,
+        &cairn_schema::Domain::Journey(journey_id()),
+        &draft,
+        &support::fixed_inputs(),
+        &support::derive_inputs_of(&records),
+    );
+    assert_eq!(shown.conflicts.len(), conflicts(&draft).len());
+    for review in &shown.conflicts {
+        assert_eq!(review.offers, [cairn_schema::ResolutionKind::KeepJourney]);
+        assert_eq!(review.removed_choices, [] as [cairn_schema::Slug; 0]);
+    }
+    assert_eq!(
+        shown
+            .conflicts
+            .iter()
+            .map(|review| review.item)
+            .collect::<Vec<_>>(),
+        draft
+            .items
+            .as_slice()
+            .iter()
+            .enumerate()
+            .filter(|(_, item)| matches!(item, ReviewItem::Conflict { .. }))
+            .map(|(at, _)| u32::try_from(at).unwrap())
+            .collect::<Vec<_>>()
+    );
 }
 
 /// The vendor evaluation with a segment inserted whose role maps onto the route's `r_spare`,

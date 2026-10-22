@@ -6,11 +6,12 @@
 // what Frontier lights at full strength with the rest faded, as is what Depth's Fade dims (the
 // level is then the Actions one, so nothing moves). A card opens the
 // node's detail (5.1) beside the canvas, or joins the selection; a line opens its card (LineCard.tsx).
+import { OWNER_KIND } from "@cairn/client";
 import { Panel } from "@xyflow/react";
 import { useCallback, useEffect, useMemo } from "react";
 import { useLocation, useNavigate } from "react-router";
 
-import { nodeDetail, nodeOf, OWNER_KIND, type GraphNode, type Ready, titleOf } from "../detail/model.ts";
+import { nodeDetail, nodeOf, type GraphNode, type Ready, titleOf } from "../detail/model.ts";
 import { contextMenuOf } from "../detail/offers.ts";
 import { screenSwitched } from "../journeys/address.ts";
 import { useJourneyTarget } from "../journeys/useJourneyTarget.ts";
@@ -61,7 +62,7 @@ function useGraph(ready: Ready, view: GraphView, selected: string | undefined, a
       return undefined;
     }
     const entries = mine ?? [];
-    const extras = { mine: entries.map((entry) => entry.node), owned: entries.filter((entry) => entry.kinds.includes(OWNER_KIND)).map((entry) => entry.node) };
+    const extras = { mine: entries.map((entry) => entry.node), owned: entries.filter((entry) => entry.kinds.includes(OWNER_KIND.key)).map((entry) => entry.node) };
     return (level: Level) => journeyModel(ready, level, extras);
   }, [ready, mine, answered]);
   const side = useMemo(() => ({ held: ready, nodes, model }), [ready, nodes, model]);

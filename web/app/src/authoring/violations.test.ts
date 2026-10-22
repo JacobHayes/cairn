@@ -18,15 +18,15 @@ const on = (node: string, code: Schema<"ViolationCode">, at: Partial<Violation["
 describe("byPlace (A15)", () => {
   it("puts three violations of one node at three fields", () => {
     const places = byPlace(
-      [on("n_stage", "duplicate_sibling_id"), on("n_stage", "edge_to_ancestor_or_descendant", { field: "opens_at" }), on("n_stage", "edge_to_ancestor_or_descendant", { field: "closes_at" })],
+      [on("n_stage", "duplicate_sibling_id", { field: "id" }), on("n_stage", "edge_to_ancestor_or_descendant", { field: "opens_at" }), on("n_stage", "edge_to_ancestor_or_descendant", { field: "closes_at" })],
       "n_stage",
     );
     expect([...places.keys()].sort()).toEqual(["closes_at", "id", "opens_at"]);
   });
 
-  it("finds the node of a rule two nodes break together among the related nodes", () => {
-    const second = on("n_first", "several_final_milestones", {}, [{ node: "n_second" }]);
-    expect([...byPlace([second], "n_second").keys()]).toEqual(["final"]);
+  it("puts a violation that names an edge at the node's requirements", () => {
+    const edge = on("n_mine", "edge_to_ancestor_or_descendant", {}, [{ edge: { node: "n_mine", requires: "n_up" } }]);
+    expect([...byPlace([edge], "n_mine").keys()]).toEqual(["requires"]);
   });
 
   it("keeps a violation about another node, or none, with the form as a whole", () => {

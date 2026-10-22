@@ -2,9 +2,9 @@
 // (Which actions a node offers is detail/offers.ts's, for every surface.) Each is one patch: a bulk
 // action is one patch with one mutation, so one event, per node (C9), and a guard failure on
 // any node rejects it whole and names which (A15, D4).
-import type { Schema } from "@cairn/client";
+import { OWNER_KIND, type Schema } from "@cairn/client";
 
-import { type GraphNode, movesFrom, type Mutation, type NodeDerived, nodeOf, OWNER_KIND, type Ready, recordOf, type State, storedSnooze, transition } from "../detail/model.ts";
+import { type GraphNode, movesFrom, type Mutation, type NodeDerived, nodeOf, type Ready, recordOf, type State, storedSnooze, transition } from "../detail/model.ts";
 import { namedList } from "../ui/words.ts";
 
 /** What the acting surfaces read about one node. */
@@ -77,7 +77,7 @@ export function doneMutations(key: string, evidence: Evidence = {}): Mutation[] 
 
 /** D2, E2: make `identity` the owner of `key`, explicitly. */
 export function assignOwner(key: string, identity: string): Mutation {
-  return { op: "set_participation", node: key, kind: OWNER_KIND, source: [identity] };
+  return { op: "set_participation", node: key, kind: OWNER_KIND.key, source: [identity] };
 }
 
 /** C9: an action over every selected node. */

@@ -17,13 +17,14 @@ testing = ["dep:proptest", "cairn-schema/testing"]
 cairn-schema.workspace = true
 jiff.workspace = true
 proptest = { workspace = true, optional = true }
+serde.workspace = true
+serde_json.workspace = true
 
 [dev-dependencies]
 cairn-engine = { workspace = true, features = ["testing"] }
 patina-dst-proptest.workspace = true
 proptest.workspace = true
 schemars.workspace = true
-serde_json.workspace = true
 
 [lints]
 workspace = true

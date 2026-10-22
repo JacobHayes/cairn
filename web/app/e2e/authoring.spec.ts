@@ -55,7 +55,7 @@ test("A12, A1a: a route authored by hand from an empty draft, published, exporte
   const route = await newRoute(page, "browser", routeName("Onboarding"));
   const keys = await authorRoute(page);
   await expect(nodeCard(page, keys["Training plan"] ?? "")).toBeVisible();
-  // A requirement is drawn on the canvas by clicking cards, and one on its own container is refused with the reason (A3).
+  // A requirement is drawn on the canvas by clicking cards, and one on its own container is refused with the engine's reason (A3).
   const [handbook, setup, accounts] = [keys["Handbook"] ?? "", keys["Setup"] ?? "", keys["Accounts"] ?? ""];
   await expect(nodeCard(page, handbook).getByTestId("card-notice")).toBeVisible();
   await openNode(page, handbook);
@@ -63,7 +63,7 @@ test("A12, A1a: a route authored by hand from an empty draft, published, exporte
   const banner = page.getByTestId("drawing-edge");
   await expect(banner).toHaveAttribute("data-from", handbook);
   await nodeCard(page, setup).getByTestId("card-open").click();
-  await expect(page.getByTestId("edge-refused")).toBeVisible();
+  await expect(page.locator(`[data-testid="violation"][data-code="edge_to_ancestor_or_descendant"]`)).toBeVisible();
   await nodeCard(page, accounts).getByTestId("card-open").click();
   await expect(page.getByTestId("drawing-edge")).toHaveCount(0);
   await expect(structure(page).locator(`[data-testid="requirement"][data-node="${accounts}"]`)).toBeVisible();

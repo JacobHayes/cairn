@@ -2030,6 +2030,37 @@
           }
         ]
       },
+      "ConflictReview": {
+        "additionalProperties": false,
+        "description": "What the engine offers for one conflict item.",
+        "properties": {
+          "item": {
+            "description": "The item's position in the proposal.",
+            "format": "uint32",
+            "minimum": 0,
+            "type": "integer"
+          },
+          "offers": {
+            "description": "The kinds of resolution the conflict offers, in the order a reviewer reads them.",
+            "items": {
+              "$ref": "#/components/schemas/ResolutionKind"
+            },
+            "type": "array"
+          },
+          "removed_choices": {
+            "description": "For an answer conflict, the choices the answer names that the route no longer offers.",
+            "items": {
+              "$ref": "#/components/schemas/Slug"
+            },
+            "type": "array"
+          }
+        },
+        "required": [
+          "item",
+          "offers"
+        ],
+        "type": "object"
+      },
       "Consequences": {
         "additionalProperties": false,
         "description": "What an accepted patch or a proposal preview newly caused in derived state,\nreported with the result and never stored.",
@@ -3373,7 +3404,7 @@
             "type": "object"
           },
           {
-            "description": "The provider did not answer within `assistant_provider_call` (120 s).",
+            "description": "The provider did not answer in time.",
             "properties": {
               "status": {
                 "const": "provider_timed_out",
@@ -3404,7 +3435,7 @@
             "type": "object"
           },
           {
-            "description": "The model was still calling tools after `assistant_tool_loop_iterations` (32) calls.",
+            "description": "The model was still calling tools past the tool-loop limit.",
             "properties": {
               "status": {
                 "const": "iteration_limit",
@@ -3417,7 +3448,7 @@
             "type": "object"
           },
           {
-            "description": "The turn ran past `assistant_turn` (10 min).",
+            "description": "The turn ran past the turn's time limit.",
             "properties": {
               "status": {
                 "const": "turn_timed_out",
@@ -11482,6 +11513,13 @@
         "additionalProperties": false,
         "description": "What a proposal would do to its destination now, for review: the items still\nunresolved, and the candidate the resolved mutations produce, with every violation strict\nvalidation finds in it.",
         "properties": {
+          "conflicts": {
+            "description": "What each conflict item offers.",
+            "items": {
+              "$ref": "#/components/schemas/ConflictReview"
+            },
+            "type": "array"
+          },
           "consequences": {
             "anyOf": [
               {
@@ -11717,6 +11755,35 @@
           }
         ]
       },
+      "RankAdds": {
+        "additionalProperties": false,
+        "description": "What each of the four terms adds to a rank.",
+        "properties": {
+          "gravity": {
+            "$ref": "#/components/schemas/Real",
+            "description": "Gravity's share times its constant."
+          },
+          "late": {
+            "$ref": "#/components/schemas/Real",
+            "description": "Running late times its constant."
+          },
+          "unlocks": {
+            "$ref": "#/components/schemas/Real",
+            "description": "Unlocks' share times its constant."
+          },
+          "urgency": {
+            "$ref": "#/components/schemas/Real",
+            "description": "Urgency times its constant."
+          }
+        },
+        "required": [
+          "urgency",
+          "late",
+          "gravity",
+          "unlocks"
+        ],
+        "type": "object"
+      },
       "RankConstants": {
         "additionalProperties": false,
         "description": "The rank constants (Priority: normative formulas, configurable constants, defaults\nshown). The four coefficients sum to a finite number, so every rank is finite.",
@@ -11760,6 +11827,10 @@
         "additionalProperties": false,
         "description": "Why a node ranks where it does: its rank and the terms it blends.",
         "properties": {
+          "adds": {
+            "$ref": "#/components/schemas/RankAdds",
+            "description": "What each term adds to the rank: the term times its constant."
+          },
           "gravity_norm": {
             "$ref": "#/components/schemas/Real",
             "description": "Gravity over the largest in the normalization set."
@@ -11770,7 +11841,7 @@
           },
           "rank": {
             "$ref": "#/components/schemas/Real",
-            "description": "The blend."
+            "description": "The blend: the sum of what the terms add."
           },
           "unlocks_norm": {
             "$ref": "#/components/schemas/Real",
@@ -11786,6 +11857,7 @@
           "late",
           "gravity_norm",
           "unlocks_norm",
+          "adds",
           "rank"
         ],
         "type": "object"
@@ -12528,6 +12600,51 @@
           "total"
         ],
         "type": "object"
+      },
+      "ResolutionKind": {
+        "description": "The kinds of resolution a conflict can offer: [`ConflictResolution`] without its payload.",
+        "oneOf": [
+          {
+            "const": "keep_journey",
+            "description": "Keep the journey's value or definition.",
+            "type": "string"
+          },
+          {
+            "const": "take_route",
+            "description": "Take the route's value.",
+            "type": "string"
+          },
+          {
+            "const": "map_choices",
+            "description": "Map each removed choice to one that remains.",
+            "type": "string"
+          },
+          {
+            "const": "clear_state",
+            "description": "Take the route's value and clear the state it makes invalid.",
+            "type": "string"
+          },
+          {
+            "const": "reopen",
+            "description": "Take the route's value and reopen the node.",
+            "type": "string"
+          },
+          {
+            "const": "remap_role",
+            "description": "Point references at another role, then remove the role.",
+            "type": "string"
+          },
+          {
+            "const": "remap_kind",
+            "description": "Move participations to another kind, then remove the kind.",
+            "type": "string"
+          },
+          {
+            "const": "remove",
+            "description": "Clear every reference, then remove the role or kind.",
+            "type": "string"
+          }
+        ]
       },
       "Resource": {
         "additionalProperties": false,

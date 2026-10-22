@@ -4,14 +4,14 @@
 // a kind shows its cascade first (A18): every participation, filling decision, default owner,
 // and message draft placeholder naming it is rewritten in the same patch. Limits are checked
 // before sending.
-import { KIND_COUNT_MAX, ROLE_COUNT_MAX, TITLE_BYTES_MAX } from "@cairn/client";
+import { KIND_COUNT_MAX, OWNER_KIND, ROLE_COUNT_MAX, TITLE_BYTES_MAX } from "@cairn/client";
 import { useState } from "react";
 
 import { useDraft } from "../data/drafts.ts";
 import { Button, Field } from "../ui/kit.tsx";
 import { CascadeDialog } from "./CascadeDialog.tsx";
 import { planKindRemoval, planRoleRemoval } from "./cascade.ts";
-import type { Kind, Mutation, Role } from "./graph.ts";
+import { rolesForSlot, type Kind, type Mutation, type Role } from "./graph.ts";
 import { isSlug, mintKey, slugOf, uniqueId } from "./keys.ts";
 import { overBytes } from "./limits.ts";
 import { Picker } from "./parts.tsx";
@@ -155,10 +155,10 @@ function SlotList({ authored, kind, slots }: { authored: Authored; kind: SlotKin
   );
 }
 
-/** A6: the role that owns nodes no ancestor gives an owner; single valued only. */
+/** A6: the role that owns nodes no ancestor gives an owner; the owner kind takes the roles that fit it. */
 function DefaultOwner({ authored }: { authored: Authored }) {
   const write = useAuthorWrite(authored, "default-owner");
-  const single = (authored.graph.roles ?? []).filter((role) => role.multi !== true);
+  const single = rolesForSlot(authored.graph.roles ?? [], OWNER_KIND.multi);
   return (
     <span className="row" data-testid="default-owner">
       <span>Default owner</span>

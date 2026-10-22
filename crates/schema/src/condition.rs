@@ -18,6 +18,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::collections::{BoundedVec, CollectionError, IdentityCountPerFill};
 use crate::limits::Limit;
+use crate::node::AnswerType;
 use crate::refs::References;
 use crate::text::TextError;
 
@@ -221,6 +222,23 @@ impl From<CollectionError> for ConditionError {
 #[serde(try_from = "Clause<R>", into = "Clause<R>", bound = "")]
 #[schemars(bound = "R: References", rename = "Condition{R}")]
 pub struct Condition<R: References>(Clause<R>);
+
+impl<R: References> Clause<R> {
+    /// A5: whether this leaf operator can ask about a decision with `answer`: `equals`,
+    /// `not_equals` and `in` compare whole answers, `contains` looks inside a list or text,
+    /// `answered` asks of any. `None` for `all`, `any` and `not`, which are not leaves.
+    #[must_use]
+    pub fn operator_fits(&self, answer: AnswerType) -> Option<bool> {
+        match self {
+            Clause::Equals(_) | Clause::NotEquals(_) | Clause::In(_) => {
+                Some(answer.compares_equal())
+            }
+            Clause::Contains(_) => Some(answer.compares_member()),
+            Clause::Answered(_) => Some(true),
+            Clause::All(_) | Clause::Any(_) | Clause::Not(_) => None,
+        }
+    }
+}
 
 impl<R: References> Condition<R> {
     /// Checks the tree's size (A5; PRACTICES, Explicit limits).

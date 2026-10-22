@@ -11,7 +11,7 @@ import { PhoneDue } from "./ListCells.tsx";
 import type { Line } from "./listModel.ts";
 import type { NodeRow } from "./why.ts";
 
-const RANK = { rank: 0, urgency: 0, late: 0, gravity_norm: 0, unlocks_norm: 0 };
+const RANK = { rank: 0, urgency: 0, late: 0, gravity_norm: 0, unlocks_norm: 0, adds: { urgency: 0, late: 0, gravity: 0, unlocks: 0 } };
 
 const row = (extra: Partial<NodeRow>): NodeRow => ({ key: "n_work", kind: "deliverable", path: "n_work", title: "Write it", state: "todo", display_state: "ready", relevance: "relevant", gravity: 1, unlocks: 0, ...extra });
 
@@ -28,14 +28,14 @@ function dueLine(each: NodeRow): string {
 
 describe("a phone's due line under a row's title", () => {
   it("is not said again when the row's fact is how late it is", () => {
-    const late = row({ overdue: true, due: "2026-10-01", rank: { ...RANK, late: 1, rank: 0.4 } });
+    const late = row({ overdue: true, due: "2026-10-01", rank: { ...RANK, late: 1, adds: { ...RANK.adds, late: 0.15 }, rank: 0.15 } });
     const view = actingView();
     expect(factOf(view, late, "rank")?.words).toBe(dueWords("2026-10-01", view.derived.today, false));
     expect(dueLine(late)).toBe("");
   });
 
   it("is kept under a row whose fact is something else", () => {
-    const gated = row({ due: "2026-10-30", slack_days: 12, rank: { ...RANK, urgency: 0.1, gravity_norm: 1, rank: 0.29 } });
+    const gated = row({ due: "2026-10-30", slack_days: 12, rank: { ...RANK, urgency: 0.1, gravity_norm: 1, adds: { ...RANK.adds, urgency: 0.04, gravity: 0.25 }, rank: 0.29 } });
     expect(dueLine(gated)).toContain(dueWords("2026-10-30", actingView().derived.today, false));
   });
 });

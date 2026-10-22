@@ -6,6 +6,7 @@
 //! constants.
 
 use std::fmt;
+use std::time::Duration;
 
 /// Nodes per graph: 10x headroom over a large journey.
 pub const NODE_COUNT_MAX: u32 = 2_000;
@@ -67,6 +68,12 @@ pub const GRAPH_BYTES_MAX: u32 = 16 * 1024 * 1024;
 /// Bytes in a request body: the graph cap plus envelope, so a domain at its cap still fits
 /// one request. Every document parse checks it first.
 pub const REQUEST_BYTES_MAX: u32 = 24 * 1024 * 1024;
+/// How long an API request may take before it is answered as timed out (not the SSE
+/// stream, whose response starts at once): typical requests take tens of milliseconds, the
+/// heaviest about a second, so past five something is stuck. It lives here beside the
+/// request body cap because a turn of the assistant keeps this much of its own limit to
+/// save its conversation.
+pub const REQUEST_DURATION_MAX: Duration = Duration::from_secs(5);
 /// Contradictory chains listed in one rejection; the rejection says when there were more.
 pub const CHAIN_COUNT_PER_REJECTION_MAX: u32 = 16;
 /// Explanation entries per derived value in a server response; the rest is a total.

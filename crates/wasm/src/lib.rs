@@ -38,7 +38,8 @@ pub use files::{
 };
 pub use local::{
     AppliedLocally, ApplyRequest, PreviewRequest, RouteApplyRequest, apply, apply_locally,
-    apply_route, apply_route_locally, preview, preview_locally,
+    apply_route, apply_route_locally, condition_problem, condition_problem_of, preview,
+    preview_locally,
 };
 pub use proposals::ProposalListRequest;
 pub use reads::JourneyIndexQuery;

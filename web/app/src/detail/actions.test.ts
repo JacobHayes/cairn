@@ -11,7 +11,6 @@ import type { Mutation } from "./model.ts";
 import { bypassable, bypassReady, withMove } from "./Rejected.tsx";
 import { identityName } from "./sections.tsx";
 import { testView } from "./view.test-support.ts";
-import { writesIdentities } from "./write.ts";
 
 const violation = (node: string, bypass?: Schema<"Guard">): Schema<"Violation"> => ({
   code: "guard_failed",
@@ -39,19 +38,6 @@ describe("resolving a rejection", () => {
   it("offers a bypass for each node's bypassable guards, each once", () => {
     const offered = bypassable([violation("n_a", "deps_done"), violation("n_a", "deps_done"), violation("n_a", "has_artifact"), violation("n_b")]);
     expect(offered).toEqual([{ node: "n_a", guards: ["deps_done", "has_artifact"] }]);
-  });
-});
-
-describe("writesIdentities (E6)", () => {
-  const cases: [string, Mutation[], boolean][] = [
-    ["an identity answer", [{ op: "answer", decision: "n_d", value: { identity: "who_one" } }], true],
-    ["explicit participants", [{ op: "set_participation", node: "n_a", kind: "k_owner", source: ["who_one"] }], true],
-    ["a role participation", [{ op: "set_participation", node: "n_a", kind: "k_owner", source: "r_owner" }], false],
-    ["a date answer", [{ op: "answer", decision: "n_d", value: { date: "2026-11-20" } }], false],
-    ["a pin", [{ op: "set_pin", node: "n_a", date: "2026-11-20" }], false],
-  ];
-  it.each(cases)("%s: %s", (_, mutations, expected) => {
-    expect(writesIdentities(mutations)).toBe(expected);
   });
 });
 

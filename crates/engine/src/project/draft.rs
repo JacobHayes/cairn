@@ -51,7 +51,7 @@ impl DerivedJourney<'_> {
                     Segment::Answer(decision) => self.answer_text(decision, context.deployment),
                 }
                 .map_or_else(
-                    || RenderedSegment::Missing(self.placeholder(segment)),
+                    || RenderedSegment::missing(self.placeholder(segment)),
                     RenderedSegment::Text,
                 )
             })

@@ -468,6 +468,7 @@ impl From<ProposalReview> for Review {
         } = review;
         let ProposalPreview {
             unresolved,
+            conflicts: _,
             violations,
             frontier,
             consequences: _,

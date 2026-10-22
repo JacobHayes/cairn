@@ -150,9 +150,10 @@ describe("every way of stopping the drawing is one reset (A3)", () => {
   async function dirty(d: Awaited<ReturnType<typeof drawing>>) {
     d.start("n_a");
     d.pick("n_group");
-    expect(d.actor.getSnapshot().context.refused?.by).toBe("containment");
+    await d.answerPreview(rejected, 0);
+    expect(d.actor.getSnapshot().context.refused?.by).toBe("preview");
     d.pick("n_d");
-    await d.answerPreview(accepted);
+    await d.answerPreview(accepted, 1);
     expect(d.view()).toMatchObject({ state: "choosing", sent: { to: "n_d" } });
   }
 
@@ -270,14 +271,12 @@ describe("stopping while the pick is being checked sends nothing", () => {
 });
 
 describe("a pick the rules refuse stays choosing (A3)", () => {
-  it("refuses containment before any check, and a failed check before any send, and a valid pick clears the reason", async () => {
+  it("asks the engine about every pick, refuses on its violations before any send, and a valid pick clears the reason", async () => {
     const d = await drawing();
     d.host.answers = [applied];
     d.start("n_a");
     d.pick("n_group");
-    expect(d.view()).toMatchObject({ state: "choosing", from: "n_a", refused: { by: "containment" } });
-    expect(d.previews).toHaveLength(0);
-    d.pick("n_c");
+    expect(d.previews).toHaveLength(1);
     await d.answerPreview(rejected, 0);
     expect(d.view()).toMatchObject({ state: "choosing", from: "n_a", refused: { by: "preview", rejection: invalid } });
     expect(d.host.sent).toEqual([]);

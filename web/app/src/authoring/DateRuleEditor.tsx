@@ -55,7 +55,7 @@ function Sources({ parts, set, options }: { parts: RuleParts; set: (next: RulePa
 }
 
 export function DateRuleEditor({ which, value, onChange, tree, node }: DateRuleEditorProps) {
-  const options = sourceOptions(tree, node);
+  const options = sourceOptions(tree, node, which);
   const label = (source: string) => options.find((option) => option.source === source)?.label ?? source;
   if (value === null) {
     return (
@@ -114,12 +114,12 @@ export interface StageBoundsEditorProps {
 }
 
 export function StageBoundsEditor({ opensAt, closesAt, gates, closes, onChange, tree, group, notes = {} }: StageBoundsEditorProps) {
-  const options = boundOptions(tree, group).map(({ node, inside }) => ({ value: node.key, label: inside ? `${node.title} (inside this stage)` : node.title }));
+  const optionsFor = (bound: "opens_at" | "closes_at") => boundOptions(tree, group, bound).map(({ node, inside }) => ({ value: node.key, label: inside ? `${node.title} (inside this stage)` : node.title }));
   return (
     <div className="stack" data-testid="stage-bounds">
       <FieldBox label="Opens at" place="opens_at" notes={notes.opens_at}>
         <span className="row">
-          <Picker aria-label="Opens at" value={opensAt} none="No opening" options={options} onChange={(event) => { onChange({ opens_at: event.target.value }); }} />
+          <Picker aria-label="Opens at" value={opensAt} none="No opening" options={optionsFor("opens_at")} onChange={(event) => { onChange({ opens_at: event.target.value }); }} />
           <label className="row">
             <input type="checkbox" checked={gates} disabled={opensAt === ""} onChange={(event) => { onChange({ gates: event.target.checked }); }} />
             Its contents wait for it
@@ -128,7 +128,7 @@ export function StageBoundsEditor({ opensAt, closesAt, gates, closes, onChange, 
       </FieldBox>
       <FieldBox label="Closes at" place="closes_at" notes={notes.closes_at}>
         <span className="row">
-          <Picker aria-label="Closes at" value={closesAt} none="No closing" options={options} onChange={(event) => { onChange({ closes_at: event.target.value }); }} />
+          <Picker aria-label="Closes at" value={closesAt} none="No closing" options={optionsFor("closes_at")} onChange={(event) => { onChange({ closes_at: event.target.value }); }} />
           <label className="row">
             <input type="checkbox" checked={closes} disabled={closesAt === ""} onChange={(event) => { onChange({ closes: event.target.checked }); }} />
             It finishes by then

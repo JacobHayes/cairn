@@ -7,7 +7,7 @@
 // the route's node and its removed subtree under fresh keys, its references to what the
 // journey still holds kept
 // (decisions/2026-10-07-restoring-a-tombstone-adds-a-local-copy-under-fresh-keys.md).
-import type { Schema } from "@cairn/client";
+import { FLAG_DEFAULTS, OWNER_KIND, type Schema } from "@cairn/client";
 
 import { fieldWords } from "../status/words.ts";
 
@@ -17,7 +17,6 @@ import { partsOf, ruleOf } from "./dates.ts";
 import type { DateRule } from "./fields.ts";
 import { childrenOf, descendantsOf, pathOf, titleIn, treeOf, type Graph, type GraphNode, type Mutation, type NodeField, type Tree } from "./graph.ts";
 import { mintKey, uniqueId } from "./keys.ts";
-import { OWNER_KIND } from "../detail/model.ts";
 import { kindNamed } from "../detail/sections.tsx";
 
 export type LocalEdit = Schema<"LocalEdit">;
@@ -41,20 +40,9 @@ export function editWords(edit: LocalEdit, tree: Tree): string {
   return title == null ? "a resource" : `the resource "${title}"`;
 }
 
-/** Defaults a field reads as when a node leaves it out (A1a). */
-const FIELD_DEFAULTS: Partial<Record<NodeField, unknown>> = {
-  placeholder: false,
-  requires_artifact: false,
-  requires_note: false,
-  final: false,
-  auto_done: false,
-  gates: true,
-  closes: true,
-};
-
-/** The route node's value of `field`, as `set_node_field` writes it. */
+/** The route node's value of `field`, as `set_node_field` writes it: a flag it leaves out reads as the engine's default (A1a). */
 export function routeValue(route: GraphNode, field: NodeField): Schema<"NodeFieldValueResolved"> {
-  const value = (route as Record<string, unknown>)[field] ?? FIELD_DEFAULTS[field] ?? null;
+  const value = (route as Record<string, unknown>)[field] ?? (FLAG_DEFAULTS as Partial<Record<string, boolean>>)[field] ?? null;
   return { [field]: value } as Schema<"NodeFieldValueResolved">;
 }
 
@@ -158,7 +146,7 @@ function mapRule(rule: DateRule | null | undefined, rename: (key: string) => str
 function restoredNode(node: GraphNode, keys: ReadonlyMap<string, string>, journey: Tree, parent: string | undefined, id: string): GraphNode {
   const rename = (key: string) => keys.get(key) ?? (journey.byKey.has(key) ? key : undefined);
   const roles = new Set((journey.graph.roles ?? []).map((role) => role.key));
-  const kinds = new Set([OWNER_KIND, ...(journey.graph.participation_kinds ?? []).map((kind) => kind.key)]);
+  const kinds = new Set<string>([OWNER_KIND.key, ...(journey.graph.participation_kinds ?? []).map((kind) => kind.key)]);
   const references: Record<string, unknown> = {
     parent,
     requires: (node.requires ?? []).flatMap((key) => rename(key) ?? []),

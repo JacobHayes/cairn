@@ -1,6 +1,9 @@
 // What a write is made of: H5's patch with a fresh id, and D7's consequences recorded as a save
 // with its warning. The delivery is write-machine.test.ts's.
+import { KEY_PREFIX } from "@cairn/client";
 import { describe, expect, it } from "vitest";
+
+import { isKey } from "../authoring/keys.ts";
 
 import { consequenceLines, warningOf } from "./activity.ts";
 import type { Command } from "./edit-record.ts";
@@ -21,8 +24,7 @@ describe("patchOf", () => {
     const patch = patchOf(intent);
     expect(patch).toMatchObject({ target: { journey: "j_one" }, base_revision: 3, mutations: intent.mutations });
     expect(patch).not.toHaveProperty("deployment_revision");
-    expect(patch.id).toMatch(/^p_[a-z0-9][a-z0-9_-]*$/);
-    expect(patch.id.length).toBeLessThanOrEqual(64);
+    expect(isKey(KEY_PREFIX.PatchId, patch.id)).toBe(true);
     expect(newPatchId()).not.toBe(newPatchId());
     expect(patchOf({ ...intent, deploymentRevision: 2 })).toMatchObject({ deployment_revision: 2 });
   });

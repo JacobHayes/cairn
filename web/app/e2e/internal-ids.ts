@@ -9,11 +9,14 @@
 // key or digest is matched in any case: a screen that capitalises with CSS still shows it.
 import type { Page } from "@playwright/test";
 
-import { DOCUMENT_NAME_PATTERN, KEY_PREFIXES, REQUIREMENT_ID_PATTERN } from "../../client/generated/rules.ts";
+import { DOCUMENT_NAME_PATTERN, KEY_PREFIXES, REQUIREMENT_ID_PATTERN, SLUG_PATTERN } from "../../client/generated/rules.ts";
+
+/** The slug pattern without its anchors, to find a slug inside text. */
+const SLUG_WORD = SLUG_PATTERN.slice(1, -1);
 
 /** One kind of key, and the pattern that finds it. */
 const KEYS: { what: string; pattern: RegExp }[] = [
-  { what: "an id", pattern: new RegExp(`\\b(?:${KEY_PREFIXES.join("|")})[a-z0-9][a-z0-9_-]*\\b`, "gi") },
+  { what: "an id", pattern: new RegExp(`\\b(?:${KEY_PREFIXES.join("|")})${SLUG_WORD}\\b`, "gi") },
   { what: "a digest", pattern: /\b[0-9a-f]{32,}\b/gi },
   { what: "a revision number", pattern: /\brev(?:ision)?s?\.? ?#?\d+/gi },
   { what: "a requirement id", pattern: new RegExp(REQUIREMENT_ID_PATTERN, "g") },

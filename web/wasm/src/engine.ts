@@ -7,6 +7,7 @@ import init, {
   RouteDerivation,
   apply,
   applyRoute,
+  conditionProblem,
   exportRoute,
   importRoute,
   preview,
@@ -170,6 +171,11 @@ export class Engine {
   /** Previews a proposal against the document's journey (C14): the preview and the destination after. */
   preview(documentText: string, request: PreviewRequest): PreviewAnswer {
     return parsed<PreviewAnswer>(this.previewText(documentText, request));
+  }
+
+  /** A5: what keeps `clause` from being a condition, as the module wrote it (`null` when nothing does). */
+  conditionProblemText(clause: Schema<"ConditionResolved">): string {
+    return hosted(() => conditionProblem(JSON.stringify(clause)));
   }
 
   /** A13: a route version or draft as its file, as the module wrote it. */

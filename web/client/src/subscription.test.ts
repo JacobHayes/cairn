@@ -5,8 +5,6 @@ import { describe, expect, it } from "vitest";
 
 import {
   backoffDelayMs,
-  REOPEN_DELAY_FIRST_MS,
-  REOPEN_DELAY_MAX_MS,
   eventSourceTicks,
   streamStatus,
   subscription,
@@ -15,6 +13,7 @@ import {
   type StreamEvent,
   type TickHandlers,
 } from "./subscription.ts";
+import { SSE_COALESCING_INTERVAL_MS, SSE_WRITE_STALL_MS } from "../generated/rules.ts";
 import { UNTRACKED, fetched, reopened, ticked, type Tick, type Tracked } from "./tracker.ts";
 
 /** A transport that records each stream opened and lets the test drive the latest. */
@@ -136,9 +135,9 @@ describe("subscription", () => {
 
 describe("subscription after a drop", () => {
   it("backs off from the first wait, doubling, to the longest, whatever the attempt count", () => {
-    expect([0, 1, 2, 3].map(backoffDelayMs)).toEqual([REOPEN_DELAY_FIRST_MS, 2 * REOPEN_DELAY_FIRST_MS, 4 * REOPEN_DELAY_FIRST_MS, 8 * REOPEN_DELAY_FIRST_MS]);
-    expect(backoffDelayMs(6)).toBe(REOPEN_DELAY_MAX_MS);
-    expect(backoffDelayMs(10_000)).toBe(REOPEN_DELAY_MAX_MS);
+    expect([0, 1, 2, 3].map(backoffDelayMs)).toEqual([SSE_COALESCING_INTERVAL_MS, 2 * SSE_COALESCING_INTERVAL_MS, 4 * SSE_COALESCING_INTERVAL_MS, 8 * SSE_COALESCING_INTERVAL_MS]);
+    expect(backoffDelayMs(6)).toBe(SSE_WRITE_STALL_MS);
+    expect(backoffDelayMs(10_000)).toBe(SSE_WRITE_STALL_MS);
   });
 
   it("reopens a closed stream after a wait that doubles up to the bound, and starts over once one opens", () => {
@@ -156,11 +155,11 @@ describe("subscription after a drop", () => {
       clock.increment(1);
       expect(opened).toHaveLength(before + 1);
     }
-    expect(backoffDelayMs(7)).toBe(REOPEN_DELAY_MAX_MS);
+    expect(backoffDelayMs(7)).toBe(SSE_WRITE_STALL_MS);
     latest().handlers.opened();
     const before = opened.length;
     latest().handlers.dropped(true);
-    clock.increment(REOPEN_DELAY_FIRST_MS);
+    clock.increment(SSE_COALESCING_INTERVAL_MS);
     expect(opened).toHaveLength(before + 1);
   });
 
@@ -173,7 +172,7 @@ describe("subscription after a drop", () => {
     actor.send({ type: "reopen" });
     expect(opened).toHaveLength(2);
     // The wait that was cancelled opens nothing more.
-    clock.increment(REOPEN_DELAY_MAX_MS);
+    clock.increment(SSE_WRITE_STALL_MS);
     expect(opened).toHaveLength(2);
   });
 
@@ -205,7 +204,7 @@ describe("subscription over a transport that refuses", () => {
     watch("a", ["deployment"]);
     flush();
     expect(status()).toBe("reconnecting");
-    clock.increment(REOPEN_DELAY_FIRST_MS);
+    clock.increment(SSE_COALESCING_INTERVAL_MS);
     expect(attempts).toBe(2);
     expect(status()).toBe("live");
   });
@@ -222,7 +221,7 @@ describe("a stopped subscription", () => {
     stream.handlers.dropped(true);
     actor.stop();
     expect(stream.closed).toBe(true);
-    clock.increment(REOPEN_DELAY_MAX_MS);
+    clock.increment(SSE_WRITE_STALL_MS);
     stream.handlers.tick(journeyTick(1));
     expect(opened).toHaveLength(1);
     expect(view.heard).toEqual([]);

@@ -57,7 +57,7 @@ function rankReason(view: Ready, row: NodeRow): string | undefined {
   if (row.rank == null) {
     return dateReason(view, row);
   }
-  const parts = rankParts(row.rank, view.inputs.rank);
+  const parts = rankParts(row.rank);
   const top = parts[0];
   if (top === undefined) {
     return undefined;

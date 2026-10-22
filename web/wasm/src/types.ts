@@ -87,7 +87,7 @@ export interface DraftRequest {
 }
 
 /** `cairn_schema::RenderedSegment`: text, or a placeholder with no value, as written. */
-export type RenderedSegment = { text: string } | { missing: string };
+export type RenderedSegment = { text: string } | { missing: { placeholder: string; text: string } };
 
 /** `cairn_schema::RenderedDraft`: a message draft rendered with journey context (A10, G3). */
 export interface RenderedDraft {
@@ -179,6 +179,9 @@ export interface ApplyRequest {
   at: string;
   actor: Schema<"Actor">;
 }
+
+/** `crates/wasm` `ConditionProblem`: what keeps a clause from being a condition. */
+export type ConditionProblem = { too_large: { limit: Schema<"Limit">; count: number } } | "empty_combination" | { unreadable: { reason: string } };
 
 /** `crates/wasm` `AppliedLocally`: the document a local apply leaves, and what it causes. */
 export interface AppliedLocally {

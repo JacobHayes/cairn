@@ -97,9 +97,6 @@ export function nodeOf(view: Ready, key: string): GraphNode | undefined {
   return index.get(key);
 }
 
-/** The participation kind every journey has: who owns a node (E2). */
-export const OWNER_KIND = "k_owner";
-
 /** A node's title, or words for a node the journey does not hold. */
 export function titleOf(view: Ready, key: string): string {
   return nodeTitle(nodeOf(view, key)?.title);

@@ -1,16 +1,17 @@
 // B1, B11, A19: what starting a journey sends, which routes it can start from, the status
 // changes each status accepts, what a hard delete of several sends and when it is offered, and
 // when completion is suggested.
+import { KEY_PREFIX } from "@cairn/client";
 import { describe, expect, it } from "vitest";
 
-import { createMutation, deleteBlocked, deleteMutations, newJourneyId, type Doomed } from "./lifecycle.ts";
+import { isKey } from "../authoring/keys.ts";
 
-const JOURNEY_ID = /^j_[a-z0-9][a-z0-9_-]*$/;
+import { createMutation, deleteBlocked, deleteMutations, newJourneyId, type Doomed } from "./lifecycle.ts";
 
 describe("starting a journey (B1)", () => {
   it.each(["Vendor evaluation, round 2", "  ", "Évaluation à l'étranger", "x".repeat(300)])("mints an id the host accepts from %j", (name) => {
     const id = newJourneyId(name, () => "abc123");
-    expect(id).toMatch(JOURNEY_ID);
+    expect(isKey(KEY_PREFIX.JourneyId, id)).toBe(true);
     expect(id.length).toBeLessThanOrEqual(64);
     expect(id.endsWith("_abc123")).toBe(true);
   });

@@ -203,6 +203,8 @@ async function answer(request: WorkerRequest): Promise<string> {
       return ready().readRouteFileText(request.text);
     case "route_file_text":
       return ready().routeFileText(request.file);
+    case "condition_problem":
+      return ready().conditionProblemText(request.clause);
     case "memory":
       return String(ready().memoryBytes());
   }

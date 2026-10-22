@@ -42,6 +42,31 @@ pub enum ProposalStatus {
     Discarded,
 }
 
+// PRD: B7.
+/// The kinds of resolution a conflict can offer: [`ConflictResolution`] without its payload.
+#[derive(
+    Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize, JsonSchema,
+)]
+#[serde(rename_all = "snake_case")]
+pub enum ResolutionKind {
+    /// Keep the journey's value or definition.
+    KeepJourney,
+    /// Take the route's value.
+    TakeRoute,
+    /// Map each removed choice to one that remains.
+    MapChoices,
+    /// Take the route's value and clear the state it makes invalid.
+    ClearState,
+    /// Take the route's value and reopen the node.
+    Reopen,
+    /// Point references at another role, then remove the role.
+    RemapRole,
+    /// Move participations to another kind, then remove the kind.
+    RemapKind,
+    /// Clear every reference, then remove the role or kind.
+    Remove,
+}
+
 // PRD: B7, B9.
 /// How a reviewer resolves a conflict. Which resolutions a conflict offers depends
 /// on what it is about ([`Conflict::offers`]); each becomes ordinary mutations when the
@@ -287,7 +312,101 @@ pub enum Conflict {
     },
 }
 
+impl ConflictResolution {
+    /// Which kind of resolution this is.
+    #[must_use]
+    pub fn kind(&self) -> ResolutionKind {
+        match self {
+            Self::KeepJourney => ResolutionKind::KeepJourney,
+            Self::TakeRoute => ResolutionKind::TakeRoute,
+            Self::MapChoices { .. } => ResolutionKind::MapChoices,
+            Self::ClearState => ResolutionKind::ClearState,
+            Self::Reopen => ResolutionKind::Reopen,
+            Self::RemapRole { .. } => ResolutionKind::RemapRole,
+            Self::RemapKind { .. } => ResolutionKind::RemapKind,
+            Self::Remove => ResolutionKind::Remove,
+        }
+    }
+}
+
 impl Conflict {
+    /// B7: the kinds of resolution this conflict offers, in the order a reviewer reads them.
+    /// Every conflict keeps the journey's side; an edit also takes the route's, unless the
+    /// route's names a node the journey does not hold; a shape change clears the state; an
+    /// invalidated answer maps its removed choices, clears, or reopens; a removed role or kind
+    /// the journey still uses is remapped or removed, unless an insertion maps onto it, which
+    /// leaves keeping or removing it; a role too narrow for the journey's direct fill clears
+    /// it.
+    #[must_use]
+    pub fn offered(&self) -> Vec<ResolutionKind> {
+        use ResolutionKind as K;
+        let keep = K::KeepJourney;
+        match self {
+            Conflict::Field { dangling, .. } | Conflict::Resource { dangling, .. } => {
+                if *dangling {
+                    vec![keep]
+                } else {
+                    vec![keep, K::TakeRoute]
+                }
+            }
+            Conflict::Edge { .. }
+            | Conflict::Participation { .. }
+            | Conflict::DefaultOwner { .. }
+            | Conflict::Kind { route: Some(_), .. } => vec![keep, K::TakeRoute],
+            Conflict::Shape { dangling, .. } => {
+                if *dangling {
+                    vec![keep]
+                } else {
+                    vec![keep, K::ClearState]
+                }
+            }
+            Conflict::Answer {
+                answer, choices, ..
+            } => {
+                let mut offered = vec![keep];
+                if !removed_choices(answer, choices).is_empty() {
+                    offered.push(K::MapChoices);
+                }
+                offered.extend([K::ClearState, K::Reopen]);
+                offered
+            }
+            Conflict::Role {
+                route: None,
+                insertions,
+                ..
+            } => {
+                if insertions.is_empty() {
+                    vec![keep, K::RemapRole, K::Remove]
+                } else {
+                    vec![keep, K::Remove]
+                }
+            }
+            Conflict::Kind {
+                route: None,
+                insertions,
+                ..
+            } => {
+                if insertions.is_empty() {
+                    vec![keep, K::RemapKind, K::Remove]
+                } else {
+                    vec![keep, K::Remove]
+                }
+            }
+            Conflict::Role {
+                route: Some(route),
+                references,
+                ..
+            } => vec![
+                keep,
+                if too_narrow(route, references) {
+                    K::ClearState
+                } else {
+                    K::TakeRoute
+                },
+            ],
+        }
+    }
+
     /// B7: whether this conflict offers `resolution`. Every conflict offers keeping the
     /// journey's side; an edit also offers taking the route's, unless the route's names a node
     /// the journey does not hold; a shape change clears the
@@ -297,64 +416,17 @@ impl Conflict {
     /// it.
     #[must_use]
     pub fn offers(&self, resolution: &ConflictResolution) -> bool {
-        use ConflictResolution as R;
+        if !self.offered().contains(&resolution.kind()) {
+            return false;
+        }
         match (self, resolution) {
-            (_, R::KeepJourney)
-            | (
-                Conflict::Field {
-                    dangling: false, ..
-                }
-                | Conflict::Edge { .. }
-                | Conflict::Participation { .. }
-                | Conflict::Resource {
-                    dangling: false, ..
-                }
-                | Conflict::DefaultOwner { .. }
-                | Conflict::Kind { route: Some(_), .. },
-                R::TakeRoute,
-            )
-            | (
-                Conflict::Shape {
-                    dangling: false, ..
-                },
-                R::ClearState,
-            )
-            | (Conflict::Answer { .. }, R::ClearState | R::Reopen)
-            | (
-                Conflict::Role { route: None, .. } | Conflict::Kind { route: None, .. },
-                R::Remove,
-            ) => true,
-            (
-                Conflict::Role {
-                    route: None,
-                    insertions,
-                    ..
-                },
-                R::RemapRole { .. },
-            )
-            | (
-                Conflict::Kind {
-                    route: None,
-                    insertions,
-                    ..
-                },
-                R::RemapKind { .. },
-            ) => insertions.is_empty(),
-            (
-                Conflict::Role {
-                    route: Some(route),
-                    references,
-                    ..
-                },
-                R::TakeRoute | R::ClearState,
-            ) => too_narrow(route, references) == (*resolution == R::ClearState),
             (
                 Conflict::Answer {
                     answer, choices, ..
                 },
-                R::MapChoices { map },
+                ConflictResolution::MapChoices { map },
             ) => maps_every_removed_choice(answer, choices, map),
-            _ => false,
+            _ => true,
         }
     }
 }
@@ -536,6 +608,20 @@ pub struct UnresolvedItem {
     pub reason: UnresolvedReason,
 }
 
+// PRD: B7.
+/// What the engine offers for one conflict item.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+#[serde(deny_unknown_fields)]
+pub struct ConflictReview {
+    /// The item's position in the proposal.
+    pub item: u32,
+    /// The kinds of resolution the conflict offers, in the order a reviewer reads them.
+    pub offers: Vec<ResolutionKind>,
+    /// For an answer conflict, the choices the answer names that the route no longer offers.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub removed_choices: Vec<Slug>,
+}
+
 // PRD: C14, I6.
 /// What a proposal would do to its destination now, for review: the items still
 /// unresolved, and the candidate the resolved mutations produce, with every violation strict
@@ -546,6 +632,9 @@ pub struct ProposalPreview {
     /// Items that still need a choice; the preview leaves their effect out.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub unresolved: Vec<UnresolvedItem>,
+    /// What each conflict item offers.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub conflicts: Vec<ConflictReview>,
     /// Every violation of the candidate; empty when the resolved proposal would apply.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub violations: Vec<Violation>,

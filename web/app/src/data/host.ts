@@ -5,6 +5,7 @@ import type { Answered, HttpFailure, OpenTicks, Schema } from "@cairn/client";
 import type {
   AppliedLocally,
   ApplyRequest,
+  ConditionProblem,
   DerivationHandle,
   JourneyIndexQuery,
   Derived,
@@ -180,4 +181,6 @@ export interface Deriver {
   readRouteFile(text: string): Promise<RouteFile>;
   /** A13: the file document as the canonical YAML kept on disk. */
   routeFileText(file: RouteFile): Promise<string>;
+  /** A5: what keeps a clause from being a condition (too deep, too many comparisons, an empty combination), or none. */
+  conditionProblem(clause: Schema<"ConditionResolved">): Promise<ConditionProblem | undefined>;
 }

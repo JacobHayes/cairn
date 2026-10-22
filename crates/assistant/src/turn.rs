@@ -65,16 +65,16 @@ pub struct TurnReply {
 pub enum Ended {
     /// The assistant answered.
     Replied,
-    /// The provider did not answer within `assistant_provider_call` (120 s).
+    /// The provider did not answer in time.
     ProviderTimedOut,
     /// The provider answered with an error.
     ProviderFailed {
         /// What it said.
         message: String,
     },
-    /// The model was still calling tools after `assistant_tool_loop_iterations` (32) calls.
+    /// The model was still calling tools past the tool-loop limit.
     IterationLimit,
-    /// The turn ran past `assistant_turn` (10 min).
+    /// The turn ran past the turn's time limit.
     TurnTimedOut,
 }
 

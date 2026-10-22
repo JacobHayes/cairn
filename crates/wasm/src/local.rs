@@ -11,9 +11,11 @@
 use std::collections::BTreeSet;
 
 use cairn_engine::{ApplyInputs, Graph, Records, consequences, derive};
+use cairn_schema::condition::ConditionError;
 use cairn_schema::{
-    Actor, Consequences, Date, Deployment, Domain, DomainDocument, Lineage, Markdown, Patch,
-    PatchTarget, Proposal, Route, RouteId, RouteVersion, Timestamp,
+    Actor, Clause, Condition, Consequences, Date, Deployment, Domain, DomainDocument, KeyRefs,
+    Limit, Lineage, Markdown, Patch, PatchTarget, Proposal, Route, RouteId, RouteVersion,
+    Timestamp,
 };
 use serde::{Deserialize, Serialize};
 use wasm_bindgen::prelude::wasm_bindgen;
@@ -337,4 +339,53 @@ pub fn preview(document: &str, request: &str) -> Result<String, String> {
     let document = read_document(document)?;
     let request: PreviewRequest = read("preview request", request)?;
     Ok(json(&preview_locally(&document, &request)?))
+}
+
+/// What is wrong with a condition's size or shape.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize)]
+#[serde(rename_all = "snake_case")]
+pub enum ConditionProblem {
+    /// Deeper than the depth limit or holding more comparisons than the clause limit.
+    TooLarge {
+        /// The limit passed.
+        limit: Limit,
+        /// The depth or count that passed it.
+        count: u64,
+    },
+    /// An `all` or `any` with nothing in it.
+    EmptyCombination,
+    /// The clause does not read as one a condition holds (a list of values past its limit,
+    /// say), in the words the reader gave.
+    Unreadable {
+        /// What the reader said.
+        reason: String,
+    },
+}
+
+/// A5: what keeps `clause` from being a condition, in the one place the rule lives
+/// ([`Condition::new`]); `None` when it can be one.
+#[must_use]
+pub fn condition_problem_of(clause: Clause<KeyRefs>) -> Option<ConditionProblem> {
+    match Condition::new(clause) {
+        Ok(_) => None,
+        Err(ConditionError::TooLarge(exceeded)) => Some(ConditionProblem::TooLarge {
+            limit: exceeded.limit,
+            count: exceeded.count,
+        }),
+        Err(ConditionError::EmptyCombination) => Some(ConditionProblem::EmptyCombination),
+    }
+}
+
+/// A5: the JSON of what keeps the clause (the JSON of a `Clause`) from being a condition: a
+/// `{"too_large": {"limit", "count"}}`, `"empty_combination"`, `{"unreadable": {"reason"}}`, or
+/// `null` when it can be one.
+#[wasm_bindgen(js_name = conditionProblem)]
+#[must_use]
+pub fn condition_problem(clause: &str) -> String {
+    match serde_json::from_str::<Clause<KeyRefs>>(clause) {
+        Ok(clause) => json(&condition_problem_of(clause)),
+        Err(error) => json(&Some(ConditionProblem::Unreadable {
+            reason: error.to_string(),
+        })),
+    }
 }

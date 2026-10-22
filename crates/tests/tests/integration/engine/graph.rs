@@ -367,10 +367,44 @@ fn three_independent_violations_report_three() {
         }
     }
     assert_eq!(expected.len(), independent.len());
+    // A rule broken together by two nodes is reported once at each of them.
+    expected.extend([
+        ViolationCode::DuplicateSiblingId,
+        ViolationCode::SeveralFinalMilestones,
+    ]);
     let mut found = codes(document);
     found.sort();
     expected.sort();
     assert_eq!(found, expected);
+}
+
+/// A rule two nodes break together is reported at each of them, at the field that is at fault,
+/// with the other holder related; not once for the pair, and not once per other holder.
+#[test]
+fn a_rule_broken_together_names_each_holder_and_its_field() {
+    let mut document = vendor();
+    let (_, breakage, _) = BREAKAGES
+        .iter()
+        .find(|(name, _, _)| *name == "two final milestones")
+        .unwrap();
+    breakage(&mut document);
+    let violations = Graph::new(document, &cairn_schema::Deployment::default()).unwrap_err();
+    let holders: Vec<_> = violations
+        .as_slice()
+        .iter()
+        .filter(|found| found.code == ViolationCode::SeveralFinalMilestones)
+        .collect();
+    assert_eq!(holders.len(), 2);
+    for found in &holders {
+        assert_eq!(found.at.field, Some(cairn_schema::NodeField::Final));
+        let [cairn_schema::Subject::Node(other)] = &found.related[..] else {
+            panic!("one other holder, got {:?}", found.related)
+        };
+        let Some(cairn_schema::Subject::Node(held)) = &found.at.subject else {
+            panic!("a node subject")
+        };
+        assert_ne!(other, held);
+    }
 }
 
 #[test]

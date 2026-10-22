@@ -1499,6 +1499,32 @@ export function applyRoute(request) {
 }
 
 /**
+ * A5: the JSON of what keeps the clause (the JSON of a `Clause`) from being a condition: a
+ * `{"too_large": {"limit", "count"}}`, `"empty_combination"`, `{"unreadable": {"reason"}}`, or
+ * `null` when it can be one.
+ * @param {string} clause
+ * @returns {string}
+ */
+export function conditionProblem(clause) {
+    let deferred2_0;
+    let deferred2_1;
+    try {
+        const retptr = wasm.__wbindgen_add_to_stack_pointer(-16);
+        const ptr0 = passStringToWasm0(clause, wasm.__wbindgen_export, wasm.__wbindgen_export2);
+        const len0 = WASM_VECTOR_LEN;
+        wasm.conditionProblem(retptr, ptr0, len0);
+        var r0 = getDataViewMemory0().getInt32(retptr + 4 * 0, true);
+        var r1 = getDataViewMemory0().getInt32(retptr + 4 * 1, true);
+        deferred2_0 = r0;
+        deferred2_1 = r1;
+        return getStringFromWasm0(r0, r1);
+    } finally {
+        wasm.__wbindgen_add_to_stack_pointer(16);
+        wasm.__wbindgen_export3(deferred2_0, deferred2_1, 1);
+    }
+}
+
+/**
  * Exports a route version or draft: `request` is the JSON of an [`ExportRequest`]; the
  * answer is the JSON of the `RouteFile`, as `GET /api/routes/{id}/export` answers it.
  *

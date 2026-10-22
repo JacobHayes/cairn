@@ -319,6 +319,10 @@ export class FakeDeriver implements Deriver {
     return Promise.resolve(JSON.stringify(file));
   }
 
+  conditionProblem(): Promise<never> {
+    return Promise.reject(new Error("no condition checks in the fake"));
+  }
+
   release(handle: DerivationHandle): Promise<void> {
     this.released.push(handle);
     if (this.held.get(handle.journey) === handle.load) {

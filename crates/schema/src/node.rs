@@ -128,6 +128,47 @@ impl AnswerType {
         AnswerType::IdentityList,
     ];
 
+    /// Whether a condition can ask if an answer of this type equals a value (`equals`,
+    /// `not_equals`, `in`).
+    #[must_use]
+    pub const fn compares_equal(self) -> bool {
+        match self {
+            AnswerType::Boolean
+            | AnswerType::SingleChoice
+            | AnswerType::Text
+            | AnswerType::Date
+            | AnswerType::Identity => true,
+            AnswerType::MultiChoice | AnswerType::IdentityList => false,
+        }
+    }
+
+    /// Whether a condition can ask if an answer of this type holds a value (`contains`).
+    #[must_use]
+    pub const fn compares_member(self) -> bool {
+        match self {
+            AnswerType::MultiChoice | AnswerType::IdentityList | AnswerType::Text => true,
+            AnswerType::Boolean
+            | AnswerType::SingleChoice
+            | AnswerType::Date
+            | AnswerType::Identity => false,
+        }
+    }
+
+    /// A6: whether a decision of this type fills a multi-valued role (`Some(true)`), a
+    /// single-valued one (`Some(false)`), or no role (`None`).
+    #[must_use]
+    pub const fn fills_role_multi(self) -> Option<bool> {
+        match self {
+            AnswerType::Identity => Some(false),
+            AnswerType::IdentityList => Some(true),
+            AnswerType::Boolean
+            | AnswerType::SingleChoice
+            | AnswerType::MultiChoice
+            | AnswerType::Text
+            | AnswerType::Date => None,
+        }
+    }
+
     /// The answer type as written.
     #[must_use]
     pub const fn name(self) -> &'static str {
@@ -378,10 +419,18 @@ impl<R: References> Default for Group<R> {
         Self {
             opens_at: None,
             closes_at: None,
-            gates: true,
-            closes: true,
+            gates: flag_default(KindField::Gates),
+            closes: flag_default(KindField::Closes),
         }
     }
+}
+
+/// The value of a flag field a node does not write (see [`KindField::default_flag`]).
+fn flag_default(field: KindField) -> bool {
+    let Some(flag) = field.default_flag() else {
+        unreachable!("only flag fields have a default")
+    };
+    flag
 }
 
 /// The kind-specific part of a node.
@@ -830,9 +879,9 @@ impl KindField {
     /// Every kind-restricted field.
     pub const ALL: [KindField; 16] = [
         KindField::Estimate,
-        KindField::Placeholder,
         KindField::RequiresArtifact,
         KindField::RequiresNote,
+        KindField::Placeholder,
         KindField::Final,
         KindField::AutoDone,
         KindField::OpensAt,
@@ -867,6 +916,29 @@ impl KindField {
             KindField::Choices => "choices",
             KindField::FillsRole => "fills_role",
             KindField::FeedsMilestone => "feeds_milestone",
+        }
+    }
+
+    /// The value a flag field has when a node does not write it: `gates` and `closes` are on,
+    /// every other flag off. `None` for a field that is not a flag.
+    #[must_use]
+    pub const fn default_flag(self) -> Option<bool> {
+        match self {
+            KindField::Gates | KindField::Closes => Some(true),
+            KindField::Placeholder
+            | KindField::RequiresArtifact
+            | KindField::RequiresNote
+            | KindField::Final
+            | KindField::AutoDone => Some(false),
+            KindField::Estimate
+            | KindField::OpensAt
+            | KindField::ClosesAt
+            | KindField::Prompt
+            | KindField::Help
+            | KindField::AnswerType
+            | KindField::Choices
+            | KindField::FillsRole
+            | KindField::FeedsMilestone => None,
         }
     }
 
@@ -1314,9 +1386,9 @@ impl<R: References> KindColumns<R> {
         } = self;
         [
             (KindField::Estimate, estimate.is_some()),
-            (KindField::Placeholder, placeholder.is_some()),
             (KindField::RequiresArtifact, requires_artifact.is_some()),
             (KindField::RequiresNote, requires_note.is_some()),
+            (KindField::Placeholder, placeholder.is_some()),
             (KindField::Final, is_final.is_some()),
             (KindField::AutoDone, auto_done.is_some()),
             (KindField::OpensAt, opens_at.is_some()),
@@ -1397,24 +1469,34 @@ impl<R: References> KindColumns<R> {
             NodeKind::Decision => Payload::Decision(self.into_decision()?),
             NodeKind::Deliverable => Payload::Deliverable(Deliverable {
                 estimate: self.estimate,
-                placeholder: self.placeholder.unwrap_or(false),
-                requires_artifact: self.requires_artifact.unwrap_or(false),
-                requires_note: self.requires_note.unwrap_or(false),
+                placeholder: self
+                    .placeholder
+                    .unwrap_or(flag_default(KindField::Placeholder)),
+                requires_artifact: self
+                    .requires_artifact
+                    .unwrap_or(flag_default(KindField::RequiresArtifact)),
+                requires_note: self
+                    .requires_note
+                    .unwrap_or(flag_default(KindField::RequiresNote)),
             }),
             NodeKind::Action => Payload::Action(Action {
                 estimate: self.estimate,
-                placeholder: self.placeholder.unwrap_or(false),
-                requires_note: self.requires_note.unwrap_or(false),
+                placeholder: self
+                    .placeholder
+                    .unwrap_or(flag_default(KindField::Placeholder)),
+                requires_note: self
+                    .requires_note
+                    .unwrap_or(flag_default(KindField::RequiresNote)),
             }),
             NodeKind::Milestone => Payload::Milestone(Milestone {
-                is_final: self.is_final.unwrap_or(false),
-                auto_done: self.auto_done.unwrap_or(false),
+                is_final: self.is_final.unwrap_or(flag_default(KindField::Final)),
+                auto_done: self.auto_done.unwrap_or(flag_default(KindField::AutoDone)),
             }),
             NodeKind::Group => Payload::Group(Group {
                 opens_at: self.opens_at,
                 closes_at: self.closes_at,
-                gates: self.gates.unwrap_or(true),
-                closes: self.closes.unwrap_or(true),
+                gates: self.gates.unwrap_or(flag_default(KindField::Gates)),
+                closes: self.closes.unwrap_or(flag_default(KindField::Closes)),
             }),
         })
     }

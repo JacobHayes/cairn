@@ -44,7 +44,8 @@ pub enum JourneyField {
 }
 
 impl JourneyField {
-    const ALL: [JourneyField; 5] = [
+    /// Every journey field.
+    pub const ALL: [JourneyField; 5] = [
         JourneyField::Name,
         JourneyField::Description,
         JourneyField::CreatedAt,
@@ -52,7 +53,9 @@ impl JourneyField {
         JourneyField::Status,
     ];
 
-    fn name(self) -> &'static str {
+    /// The field as written in a template.
+    #[must_use]
+    pub const fn name(self) -> &'static str {
         match self {
             JourneyField::Name => "name",
             JourneyField::Description => "description",

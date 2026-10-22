@@ -60,6 +60,12 @@ impl DerivedJourney<'_> {
                 late: real(terms.late),
                 gravity_norm: real(terms.gravity_norm),
                 unlocks_norm: real(terms.unlocks_norm),
+                adds: cairn_schema::RankAdds {
+                    urgency: real(terms.adds.urgency),
+                    late: real(terms.adds.late),
+                    gravity: real(terms.adds.gravity),
+                    unlocks: real(terms.adds.unlocks),
+                },
                 rank: real(terms.rank),
             }),
         }

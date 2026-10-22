@@ -16,7 +16,7 @@ use crate::derived::{
 };
 use crate::event::Event;
 use crate::id::{IdentityKey, KindKey, NodeKey, PatchId, Path, RoleKey, Slug};
-use crate::node::NodeKind;
+use crate::node::{AnswerType, NodeKind};
 use crate::patch::Removal;
 use crate::state::{AnswerValue, SnoozeTarget, State};
 use crate::text::{Markdown, Title};
@@ -530,8 +530,25 @@ pub struct RankTerms {
     pub gravity_norm: Real,
     /// Unlocks over the largest in the normalization set.
     pub unlocks_norm: Real,
-    /// The blend.
+    /// What each term adds to the rank: the term times its constant.
+    pub adds: RankAdds,
+    /// The blend: the sum of what the terms add.
     pub rank: Real,
+}
+
+// PRD: C10.
+/// What each of the four terms adds to a rank.
+#[derive(Clone, Copy, Debug, PartialEq, Serialize, Deserialize, JsonSchema)]
+#[serde(deny_unknown_fields)]
+pub struct RankAdds {
+    /// Urgency times its constant.
+    pub urgency: Real,
+    /// Running late times its constant.
+    pub late: Real,
+    /// Gravity's share times its constant.
+    pub gravity: Real,
+    /// Unlocks' share times its constant.
+    pub unlocks: Real,
 }
 
 // PRD: C9, C10, I3.
@@ -1148,8 +1165,36 @@ pub enum RenderedSegment {
     /// Text, literal or filled in from the journey.
     Text(String),
     /// A placeholder with nothing to fill it (an unfilled role, an unanswered decision, a
-    /// journey field with no value), as written (`roles.eval_owner.name`): shown as a marker.
-    Missing(String),
+    /// journey field with no value): shown as a marker.
+    Missing(MissingPlaceholder),
+}
+
+/// A10, G3: a placeholder nothing fills, and the marker text that stands for it.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+#[serde(deny_unknown_fields)]
+pub struct MissingPlaceholder {
+    /// The placeholder as written (`roles.eval_owner.name`).
+    pub placeholder: String,
+    /// The marker shown and copied in its place: `[missing: roles.eval_owner.name]`.
+    pub text: String,
+}
+
+impl RenderedSegment {
+    /// A segment standing for the unfilled `placeholder`, as written.
+    #[must_use]
+    pub fn missing(placeholder: String) -> Self {
+        let text = format!("[missing: {placeholder}]");
+        RenderedSegment::Missing(MissingPlaceholder { placeholder, text })
+    }
+
+    /// The text the segment shows and copies.
+    #[must_use]
+    pub fn text(&self) -> &str {
+        match self {
+            RenderedSegment::Text(text) => text,
+            RenderedSegment::Missing(missing) => &missing.text,
+        }
+    }
 }
 
 /// A10, G3: a message draft rendered with journey context. Rendering never fails: what cannot
@@ -1170,17 +1215,11 @@ impl RenderedDraft {
             .all(|segment| matches!(segment, RenderedSegment::Text(_)))
     }
 
-    /// The text to copy, each missing placeholder written as a marker: `[missing:
+    /// The text to copy, each missing placeholder written as its marker: `[missing:
     /// roles.eval_owner.name]`.
     #[must_use]
     pub fn text(&self) -> String {
-        self.segments
-            .iter()
-            .map(|segment| match segment {
-                RenderedSegment::Text(text) => text.clone(),
-                RenderedSegment::Missing(placeholder) => format!("[missing: {placeholder}]"),
-            })
-            .collect()
+        self.segments.iter().map(RenderedSegment::text).collect()
     }
 }
 
@@ -1207,6 +1246,41 @@ pub enum ReferenceField {
     MessageDraft,
     /// The node is snoozed until a node inside is done.
     Snooze,
+}
+
+impl ReferenceField {
+    /// Every reference field.
+    pub const ALL: [ReferenceField; 8] = [
+        ReferenceField::RelevantWhen,
+        ReferenceField::DueBy,
+        ReferenceField::NotBefore,
+        ReferenceField::OpensAt,
+        ReferenceField::ClosesAt,
+        ReferenceField::FeedsMilestone,
+        ReferenceField::MessageDraft,
+        ReferenceField::Snooze,
+    ];
+
+    /// Whether the field may name a node of `kind` (a decision of `answer`): a condition
+    /// and a message draft name decisions; a date rule a milestone or a date decision; a
+    /// stage bound and a fed milestone a milestone; a snooze any node.
+    #[must_use]
+    pub const fn takes(self, kind: NodeKind, answer: Option<AnswerType>) -> bool {
+        match self {
+            ReferenceField::RelevantWhen | ReferenceField::MessageDraft => {
+                matches!(kind, NodeKind::Decision)
+            }
+            ReferenceField::DueBy | ReferenceField::NotBefore => match kind {
+                NodeKind::Milestone => true,
+                NodeKind::Decision => matches!(answer, Some(AnswerType::Date)),
+                NodeKind::Deliverable | NodeKind::Action | NodeKind::Group => false,
+            },
+            ReferenceField::OpensAt | ReferenceField::ClosesAt | ReferenceField::FeedsMilestone => {
+                matches!(kind, NodeKind::Milestone)
+            }
+            ReferenceField::Snooze => true,
+        }
+    }
 }
 
 // PRD: A18.

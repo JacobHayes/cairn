@@ -2,6 +2,7 @@
 // condition's "if" sentence, a snooze's target, a container's progress. Pure and apart from the
 // components, so the unit tests read the same sentences the canvas draws.
 import { conditionWords, decisionOf, decisionsIn, type ConditionNames } from "../authoring/condition.ts";
+import { isLeaf } from "../authoring/graph.ts";
 import type { GraphNode, NodeKind } from "../detail/model.ts";
 import { dateWords, daysUntil, daysWords, dueWords, isSoon, NEAR_DAYS, SOON_DAYS } from "../status/when.ts";
 import type { DisplayState } from "../status/words.ts";
@@ -40,7 +41,7 @@ export function footWords(facts: FootFacts): { words: string; tone: Tone } | und
     return { words: `${daysWords(overdueDays)} late`, tone: "bad" };
   }
   const started = state === "active";
-  if (latestStart !== undefined && !started && kind !== "decision" && kind !== "milestone" && daysUntil(latestStart, today) <= NEAR_DAYS) {
+  if (latestStart !== undefined && !started && !isLeaf(kind) && daysUntil(latestStart, today) <= NEAR_DAYS) {
     const left = daysUntil(latestStart, today);
     return { words: `Start by ${dateWords(latestStart, today)}`, tone: left < 0 ? "bad" : left <= SOON_DAYS ? "warn" : "plain" };
   }

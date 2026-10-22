@@ -66,24 +66,18 @@ export interface NodeWrite {
   receipt: ReceiptState | undefined;
 }
 
-/** E6: whether a patch writes an identity reference, so it names the deployment revision it saw. */
-export function writesIdentities(mutations: Mutation[]): boolean {
-  return mutations.some(
-    (mutation) =>
-      (mutation.op === "answer" && ("identity" in mutation.value || "identity_list" in mutation.value)) ||
-      (mutation.op === "set_participation" && Array.isArray(mutation.source)) ||
-      mutation.op === "fill_role",
-  );
-}
-
 /** The edit a section's writes are, found again by it wherever the section is shown: one write of it is out at a time. */
 export function nodeEdit(journey: string, scope: string): string {
   return `node:${journey}:${scope}`;
 }
 
-/** The patch a section sends: `mutations` of `journey` drafted against `seen`, under the patch id `id`. */
+/**
+ * The patch a section sends: `mutations` of `journey` drafted against `seen`, under the patch id `id`.
+ * Every journey patch names the deployment revision it saw (E6): the service holds a patch that
+ * leaves an identity reference to it, and which writes do is its rule, not the page's.
+ */
 export function nodeCommand(journey: string, mutations: Mutation[], seen: Seen, id: OperationId = newPatchId()): Command {
-  const patch = patchOf({ target: { journey }, baseRevision: seen.base, mutations, ...(writesIdentities(mutations) ? { deploymentRevision: seen.deployment } : {}) }, id);
+  const patch = patchOf({ target: { journey }, baseRevision: seen.base, mutations, deploymentRevision: seen.deployment }, id);
   return { kind: "patch", patch };
 }
 

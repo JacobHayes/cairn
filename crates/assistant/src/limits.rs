@@ -29,7 +29,7 @@ pub const TURN_DURATION_MAX: Duration = Duration::from_mins(10);
 /// What a turn keeps of its limit to save its conversation: its work ends this far before
 /// the turn limit. The API's request duration, borrowed: a store write past it is stuck
 /// (decisions/2026-10-07-every-wait-in-a-turn-is-held-to-the-turns-limit.md).
-pub const TURN_SAVE_RESERVE: Duration = Duration::from_secs(5);
+pub const TURN_SAVE_RESERVE: Duration = cairn_schema::limits::REQUEST_DURATION_MAX;
 
 /// Turns in flight per process: each is an open request waiting on the provider, whose rate
 /// limit binds well before this. Overflow is refused, to be tried again.

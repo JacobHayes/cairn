@@ -8,6 +8,7 @@
 // API (`eventSourceTicks`) or the in-browser host's subscriptions, behind `OpenTicks`.
 import { assign, enqueueActions, fromCallback, setup, type ActorRefFrom, type AnyActorRef, type SnapshotFrom } from "xstate";
 
+import { SSE_COALESCING_INTERVAL_MS, SSE_WRITE_STALL_MS } from "../generated/rules.ts";
 import type { Tick } from "./tracker.ts";
 
 /** What a tick stream tells whoever opened it. */
@@ -25,20 +26,15 @@ export type OpenTicks = (watching: readonly string[], handlers: TickHandlers) =>
 export type StreamStatus = "idle" | "connecting" | "live" | "reconnecting";
 
 /**
- * The first wait before reopening a stream that closed, and the longest: PRACTICES' SSE
- * coalescing interval and SSE write stall, the stream's own named limits, so a closed
- * stream is retried no faster than ticks come and no slower than a stalled one is cut.
- */
-export const REOPEN_DELAY_FIRST_MS = 250;
-export const REOPEN_DELAY_MAX_MS = 15_000;
-
-/**
  * The wait before retry number `attempt` (counted from 0) of anything that backs off: the
  * first wait, doubling, at most the longest. The stream's reopening, the reads' retries
- * and a write's resends share it, so there is one backoff.
+ * and a write's resends share it, so there is one backoff. The first wait and the longest
+ * are PRACTICES' SSE coalescing interval and SSE write stall, the stream's own named limits,
+ * so a closed stream is retried no faster than ticks come and no slower than a stalled one
+ * is cut.
  */
 export function backoffDelayMs(attempt: number): number {
-  return Math.min(REOPEN_DELAY_FIRST_MS * 2 ** Math.min(attempt, 16), REOPEN_DELAY_MAX_MS);
+  return Math.min(SSE_COALESCING_INTERVAL_MS * 2 ** Math.min(attempt, 16), SSE_WRITE_STALL_MS);
 }
 
 /** What a watcher is sent: the stream opened (its first ticks are the current revisions), and each tick. */

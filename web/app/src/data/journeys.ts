@@ -10,10 +10,11 @@
 // A derivation is owned by the load that made it (the worker numbers loads): the read that
 // derived a document holds its handle, and the handle is released when the read drops the value,
 // so an owner that was evicted and a successor that replaced it never free each other's.
-import type { RevisionOf, Schema } from "@cairn/client";
+import { KEY_PREFIX, type RevisionOf, type Schema } from "@cairn/client";
 import type { DerivationHandle, DerivationKey, Derived } from "@cairn/wasm";
 import { assign, enqueueActions, setup, type ActorRefFrom, type SnapshotFrom } from "xstate";
 
+import { isKey } from "../authoring/keys.ts";
 import type { Deriver, DomainDocument, Host } from "./host.ts";
 import {
   DERIVE,
@@ -70,8 +71,8 @@ export interface Derivation {
   today: string;
 }
 
-/** The schema's `JourneyId`: what an address must name to be a journey at all. */
-export const JOURNEY_ID = /^j_[a-z0-9][a-z0-9_-]{0,61}$/;
+/** Whether `id` is what an address must name to be a journey at all: a journey id (the schema's `JourneyId`). */
+const isJourneyId = (id: string): boolean => isKey(KEY_PREFIX.JourneyId, id);
 
 export const journeyOf = (id: string): RevisionOf => ({ domain: { journey: id } });
 
@@ -165,7 +166,7 @@ export const journeyManager = setup({
   types: { context: {} as JourneysContext, events: {} as JourneysEvent, input: {} as JourneysInput },
   actors: { read: keyedRead },
   guards: {
-    valid: ({ event }) => JOURNEY_ID.test(idOf(event)),
+    valid: ({ event }) => isJourneyId(idOf(event)),
   },
   actions: {
     // The journey is shown once more: its read is started on the first mount.
@@ -307,7 +308,7 @@ function viewOf(snapshot: ReadSnapshot, id: string): JourneyView {
 
 /** What journey `id`'s view shows. A malformed id names no journey, and nothing watches it. */
 export function journeyView(snapshot: JourneysSnapshot, id: string): JourneyView {
-  if (!JOURNEY_ID.test(id)) {
+  if (!isJourneyId(id)) {
     return MISSING;
   }
   const entry = snapshot.context.entries[id];

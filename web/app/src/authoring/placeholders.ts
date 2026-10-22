@@ -4,11 +4,10 @@
 // with keys (`{{roles.r_eval_owner.name}}`, `{{answers.n_scope}}`), so renaming or moving a
 // role or decision breaks nothing. A placeholder that names nothing the graph holds is caught
 // here, before sending.
+import { JOURNEY_FIELDS } from "@cairn/client";
+
 import type { Role, Tree } from "./graph.ts";
 import { nodesByPath, pathOf } from "./graph.ts";
-
-/** A10: the journey fields a draft may name. */
-export const JOURNEY_FIELDS = ["name", "description", "created_at", "url", "status"] as const;
 
 const PLACEHOLDER = /\{\{\s*([^}]*?)\s*\}\}/g;
 
@@ -54,7 +53,7 @@ export function toStored(written: string, tree: Tree, roles: readonly Role[]): {
   const unknown: string[] = [];
   const stored = written.replace(PLACEHOLDER, (whole, inner: string) => {
     const field = /^journey\.(.+)$/.exec(inner)?.[1];
-    if (field !== undefined && (JOURNEY_FIELDS as readonly string[]).includes(field)) {
+    if (field !== undefined && JOURNEY_FIELDS.includes(field)) {
       return `{{journey.${field}}}`;
     }
     const role = /^roles\.(.+)\.name$/.exec(inner)?.[1];

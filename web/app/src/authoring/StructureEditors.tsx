@@ -1,9 +1,9 @@
 // The edits to a node's place in the graph, each one patch sent at once and previewed first:
-// its requirements (A3: drawn on the canvas or picked, an ancestor or descendant refused with
-// the reason; removed), where it sits (A2: moved into another container), who participates
+// its requirements (A3: drawn on the canvas or picked, the engine refusing what it cannot take;
+// removed), where it sits (A2: moved into another container), who participates
 // by role (A6, A7, E2), its breakdown by hand (B10: children added; a journey's placeholder
 // marked atomic), and its removal with the cascade shown first (A18).
-import { EDGE_COUNT_PER_NODE_MAX, TITLE_BYTES_MAX } from "@cairn/client";
+import { EDGE_COUNT_PER_NODE_MAX, OWNER_KIND, TITLE_BYTES_MAX } from "@cairn/client";
 import { useState } from "react";
 
 import { useDraft } from "../data/drafts.ts";
@@ -14,12 +14,12 @@ import { CascadeDialog } from "./CascadeDialog.tsx";
 import { planRemoval, removalMutations } from "./cascade.ts";
 import { useConnecting } from "./connect.tsx";
 import { overBytes } from "./limits.ts";
-import { canHoldChildren, childrenOf, edgeRefusal, kindOption, moveTargets, nodesByPath, pathOf, titleIn, type GraphNode, type Mutation, type NodeKind } from "./graph.ts";
+import { canHoldChildren, childrenOf, kindOption, moveTargets, nodesByPath, pathOf, rolesForSlot, titleIn, type GraphNode, type Mutation, type NodeKind } from "./graph.ts";
 import { mintKey, slugOf, uniqueId } from "./keys.ts";
 import { Picker } from "./parts.tsx";
 import { domainOf, isJourney, named, type Authored } from "./target.ts";
 import { useAuthorWrite, type AuthorWrite } from "./write.ts";
-import { OWNER_KIND, PIECE_KINDS } from "../detail/model.ts";
+import { PIECE_KINDS } from "../detail/model.ts";
 
 export interface NodeEditorProps {
   authored: Authored;
@@ -51,7 +51,6 @@ export function EdgesEditor({ authored, node }: NodeEditorProps) {
   const connecting = useConnecting();
   const [picked, setPicked] = useState("");
   const requires = node.requires ?? [];
-  const refusal = picked === "" ? undefined : edgeRefusal(authored.tree, node.key, picked);
   const full = edgeCount(authored, node.key) >= EDGE_COUNT_PER_NODE_MAX;
   const candidates = nodesByPath(authored.tree).filter((each) => each.key !== node.key && !requires.includes(each.key));
   return (
@@ -70,7 +69,7 @@ export function EdgesEditor({ authored, node }: NodeEditorProps) {
       <span className="row">
         <Picker aria-label="Require" value={picked} none="Require..." options={candidates.map((each) => ({ value: each.key, label: `${each.title} (${pathOf(authored.tree, each.key)})` }))} onChange={(event) => { setPicked(event.target.value); }} />
         <Button
-          disabled={write.disabled || picked === "" || refusal !== undefined || full}
+          disabled={write.disabled || picked === "" || full}
           onClick={() => void write.run([{ op: "add_edge", edge: { node: node.key, requires: picked } }]).then((landed) => { if (landed) { setPicked(""); } })}
         >
           Add the requirement
@@ -81,7 +80,6 @@ export function EdgesEditor({ authored, node }: NodeEditorProps) {
           </Button>
         )}
       </span>
-      {refusal === undefined ? null : <span className="author-problem" role="alert" data-testid="edge-refused">{refusal}</span>}
       {full ? <span className="author-problem">At most {EDGE_COUNT_PER_NODE_MAX} explicit edges touch one node.</span> : null}
       <Refusal write={write} />
     </div>
@@ -114,12 +112,12 @@ export function PlaceEditor({ authored, node }: NodeEditorProps) {
 export function ParticipationWiring({ authored, node }: NodeEditorProps) {
   const write = useAuthorWrite(authored, `participation:${node.key}`, node.title);
   const roles = authored.graph.roles ?? [];
-  const kinds = [{ key: OWNER_KIND, id: "owner", title: "Owner", multi: false }, ...(authored.graph.participation_kinds ?? [])];
+  const kinds = [{ ...OWNER_KIND, title: "Owner" }, ...(authored.graph.participation_kinds ?? [])];
   return (
     <div className="stack" data-testid="participation-wiring">
       {kinds.map((kind) => {
         const source = node.participations?.[kind.key];
-        const offered = roles.filter((role) => (kind.multi ?? false) || role.multi !== true);
+        const offered = rolesForSlot(roles, kind.multi ?? false);
         const value = source === undefined ? "" : Array.isArray(source) ? "explicit" : source;
         const set = (next: string) => {
           const mutation: Mutation = next === "" ? { op: "clear_participation", node: node.key, kind: kind.key } : { op: "set_participation", node: node.key, kind: kind.key, source: next };

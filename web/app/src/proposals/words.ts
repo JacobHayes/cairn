@@ -10,7 +10,7 @@ import { SNOOZE_NODE_TAIL } from "../status/snooze.ts";
 import { dateWords } from "../status/when.ts";
 import { fieldWords, upperFirst } from "../status/words.ts";
 import { nodeTitle } from "../ui/gone.ts";
-import { removedChoices, type Conflict, type ResolutionKind, type ReviewItem } from "./model.ts";
+import type { Conflict, ResolutionKind, ReviewItem } from "./model.ts";
 import { plural } from "../ui/words.ts";
 import { identityNamed, kindNamed, roleNamed, type Slot } from "../detail/sections.tsx";
 import type { Deployment } from "../data/host.ts";
@@ -207,7 +207,7 @@ export function mutationWords(mutation: Mutation, names: Names): string {
 }
 
 /** B7: what a conflict is about, in words. */
-export function conflictWords(conflict: Conflict, names: Names): string {
+export function conflictWords(conflict: Conflict, names: Names, removed: readonly string[] = []): string {
   const node = (key: string) => quoted(names.node(key));
   switch (conflict.about) {
     case "field": {
@@ -224,7 +224,7 @@ export function conflictWords(conflict: Conflict, names: Names): string {
     case "shape":
       return `${node(conflict.journey.key)}: a ${conflict.journey.kind} here, a ${conflict.route.kind} in the route${conflict.answered === true ? "; its answer would be cleared" : ""}`;
     case "answer":
-      return `${node(conflict.decision)}: its answer names ${removedChoices(conflict.answer, conflict.choices).map(quoted).join(", ")}, which the route no longer offers`;
+      return `${node(conflict.decision)}: its answer names ${removed.map(quoted).join(", ")}, which the route no longer offers`;
     case "role":
       return conflict.route == null
         ? `The role ${quoted(names.role(conflict.role))}: the route removed it, and this journey still uses it`

@@ -292,7 +292,8 @@ fn a_route_draft_is_authored_locally_and_refused_with_its_violations() {
         .iter()
         .map(|violation| violation.code)
         .collect();
-    assert_eq!(codes, [ViolationCode::DuplicateSiblingId]);
+    // The two siblings sharing the id are each reported.
+    assert_eq!(codes, [ViolationCode::DuplicateSiblingId; 2]);
     let elsewhere = route_apply(
         Some(created),
         r#"{"id": "p_x", "target": {"route": "other"}, "base_revision": 1, "mutations": [{"op": "publish_draft"}]}"#,

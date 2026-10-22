@@ -3,6 +3,8 @@
 // it is on the acting frontier. Continue with everything turns the walkthrough off and keeps
 // the pass.
 
+import { OWNER_KIND } from "@cairn/client";
+
 import { useProjected } from "../canvas/hooks.ts";
 import { valueOf } from "../data/keyed-read.ts";
 import { namer, viaText } from "../detail/explain.ts";
@@ -44,7 +46,7 @@ export function WaitingDecisions({ view, onContinue }: { view: Ready; onContinue
     return null;
   }
   const waiting = waitingDecisions(view, summary);
-  const owned = new Set(mine.entries.filter((entry) => entry.kinds.includes("k_owner")).map((entry) => entry.node));
+  const owned = new Set(mine.entries.filter((entry) => entry.kinds.includes(OWNER_KIND.key)).map((entry) => entry.node));
   if (waiting.length === 0) {
     return (
       <div className="callout stack" data-testid="no-decisions">

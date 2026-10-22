@@ -37,6 +37,7 @@ export const browserroot_routeVersion: (a: number, b: number, c: number, d: numb
 export const browserroot_routes: (a: number, b: number, c: number, d: number, e: number, f: number) => void;
 export const browserroot_subscribe: (a: number, b: number, c: number, d: number) => void;
 export const browserroot_userNames: (a: number, b: number, c: number, d: number) => void;
+export const conditionProblem: (a: number, b: number, c: number) => void;
 export const derivation_derived: (a: number, b: number) => void;
 export const derivation_key: (a: number, b: number) => void;
 export const derivation_new: (a: number, b: number, c: number) => void;

@@ -4,10 +4,12 @@
 // what the engine said about it, at the field (A15).
 import { useState } from "react";
 
+import { ANSWER_TYPES, DEFAULT_WEIGHT } from "@cairn/client";
+
 import { choiceId, choiceLabel, type Choice } from "../status/answer.ts";
 import { Button, Field } from "../ui/kit.tsx";
 import { fieldsOf, type FormField, type NodeDraft } from "./fields.ts";
-import { nodesByPath, type AnswerType, type NodeKind, type Role, type Tree } from "./graph.ts";
+import { nodesFor, rolesForFill, type AnswerType, type NodeKind, type Role, type Tree } from "./graph.ts";
 import { slugOf, uniqueId } from "./keys.ts";
 import { FieldBox, Picker, type FieldNotes } from "./parts.tsx";
 import { StageBoundsEditor } from "./DateRuleEditor.tsx";
@@ -23,15 +25,16 @@ export interface FieldsProps {
   roles: readonly Role[];
 }
 
-const ANSWER_TYPES: { value: AnswerType; label: string }[] = [
-  { value: "boolean", label: "Yes or no" },
-  { value: "single_choice", label: "One choice" },
-  { value: "multi_choice", label: "Several choices" },
-  { value: "text", label: "Text" },
-  { value: "date", label: "A date" },
-  { value: "identity", label: "A person or team" },
-  { value: "identity_list", label: "People or teams" },
-];
+const ANSWER_TYPE_WORDS: Record<AnswerType, string> = {
+  boolean: "Yes or no",
+  single_choice: "One choice",
+  multi_choice: "Several choices",
+  text: "Text",
+  date: "A date",
+  identity: "A person or team",
+  identity_list: "People or teams",
+};
+const ANSWER_TYPE_OPTIONS = ANSWER_TYPES.map((value) => ({ value, label: ANSWER_TYPE_WORDS[value] }));
 
 /** Whether the kind (and answer type) has `field`, so its control is offered (A1a). */
 export function has(props: Pick<FieldsProps, "kind" | "draft">, field: FormField): boolean {
@@ -90,7 +93,7 @@ export function BasicsFields({ props }: { props: FieldsProps }) {
 export function WeightFields({ props }: { props: FieldsProps }) {
   return (
     <>
-      <Days props={props} field="weight" label="Weight" hint={props.kind === "group" ? "0 (a group's default)" : "1 (the default)"} />
+      <Days props={props} field="weight" label="Weight" hint={`${String(DEFAULT_WEIGHT[props.kind])} (the default)`} />
       {has(props, "estimate") ? <Days props={props} field="estimate" label="Estimate (days)" hint="none" /> : null}
     </>
   );
@@ -162,15 +165,14 @@ function AddChoice({ choices, onAdd }: { choices: readonly Choice[]; onAdd: (cho
 
 /** A4, A6, E3: a decision's prompt, help, answer type, choices, and the role it fills or the milestone it pins. */
 export function DecisionFields({ props }: { props: FieldsProps }) {
-  const multi = props.draft.answer_type === "identity_list";
-  const roles = props.roles.filter((role) => (role.multi ?? false) === multi);
-  const milestones = nodesByPath(props.tree, "milestone");
+  const roles = rolesForFill(props.roles, props.draft.answer_type);
+  const milestones = nodesFor(props.tree, "feeds_milestone");
   return (
     <>
       <Text props={props} field="prompt" label="Prompt" area />
       <Text props={props} field="help" label="Help" area />
       <FieldBox label="Answer type" place="answer_type" notes={props.notes("answer_type")}>
-        <Picker aria-label="Answer type" value={props.draft.answer_type} options={ANSWER_TYPES} onChange={(event) => { props.change({ answer_type: event.target.value as AnswerType }); }} />
+        <Picker aria-label="Answer type" value={props.draft.answer_type} options={ANSWER_TYPE_OPTIONS} onChange={(event) => { props.change({ answer_type: event.target.value as AnswerType }); }} />
       </FieldBox>
       {has(props, "choices") ? <ChoicesEditor props={props} /> : null}
       {has(props, "fills_role") ? (

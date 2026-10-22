@@ -16,7 +16,7 @@ import type { Deployment } from "../data/host.ts";
 import type { Domain, ProposalReview } from "../data/proposals.ts";
 import type { Ready } from "../detail/model.ts";
 import type { Shown } from "../screens/route-reads.ts";
-import { diffMarks, graphDiff, reviewEntries, type DiffKind, type DiffMark, type GraphDiff, type ProposalDraft, type ProposalPreview, type ReviewEntry, type ReviewItem, type UnresolvedReason } from "./model.ts";
+import { diffMarks, graphDiff, reviewEntries, type DiffKind, type ConflictReview, type DiffMark, type GraphDiff, type ProposalDraft, type ProposalPreview, type ReviewEntry, type ReviewItem, type UnresolvedReason } from "./model.ts";
 import type { Blocker } from "./model.ts";
 import type { Names } from "./words.ts";
 import type { ProposalWrite } from "./write.ts";
@@ -67,6 +67,8 @@ export interface LayerModel {
   names: Names;
   /** The unresolved items by index, as the preview of the edits or the items themselves say. */
   unresolved: ReadonlyMap<number, UnresolvedReason>;
+  /** What the engine offers for each conflict item, by position (the preview's). */
+  conflicts: ReadonlyMap<number, ConflictReview>;
   today: string;
   editable: boolean;
 }

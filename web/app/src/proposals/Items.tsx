@@ -13,13 +13,12 @@ import { choiceId, choiceLabel } from "../status/answer.ts";
 import { Badge, Button, Field } from "../ui/kit.tsx";
 import {
   kindOf,
-  offered,
-  removedChoices,
   withExclusion,
   withMapping,
   withOrphanKept,
   withResolution,
   type Conflict,
+  type ConflictReview,
   type Mapping,
   type ProposalDraft,
   type Resolution,
@@ -38,6 +37,8 @@ export interface ItemsContext {
   kinds: readonly Kind[];
   /** Items still needing a choice, by position, with why (the preview's). */
   unresolved: ReadonlyMap<number, UnresolvedReason>;
+  /** What each conflict offers, by position (the preview's). */
+  conflicts: ReadonlyMap<number, ConflictReview>;
   /** The proposal is open and the tab may write. */
   editable: boolean;
 }
@@ -50,14 +51,14 @@ const UNRESOLVED_WORDS: Record<UnresolvedReason, string> = {
 };
 
 /** B7: an answer's removed choices, each mapped to one that remains. */
-function ChoiceMap({ conflict, value, onChange, disabled }: { conflict: Extract<Conflict, { about: "answer" }>; value: Record<string, string>; onChange: (map: Record<string, string>) => void; disabled: boolean }) {
+function ChoiceMap({ conflict, removed, value, onChange, disabled }: { conflict: Extract<Conflict, { about: "answer" }>; removed: readonly string[]; value: Record<string, string>; onChange: (map: Record<string, string>) => void; disabled: boolean }) {
   const remaining = conflict.choices;
   return (
     <span className="stack">
-      {removedChoices(conflict.answer, conflict.choices).map((removed) => (
-        <span key={removed} className="row">
-          {removed} becomes
-          <Picker aria-label={`Map ${removed} to`} disabled={disabled} value={value[removed] ?? ""} none="Choose" options={remaining.map((choice) => ({ value: choiceId(choice), label: choiceLabel(choice) }))} onChange={(event) => { onChange({ ...value, [removed]: event.target.value }); }} />
+      {removed.map((choice) => (
+        <span key={choice} className="row">
+          {choice} becomes
+          <Picker aria-label={`Map ${choice} to`} disabled={disabled} value={value[choice] ?? ""} none="Choose" options={remaining.map((choice) => ({ value: choiceId(choice), label: choiceLabel(choice) }))} onChange={(event) => { onChange({ ...value, [choice]: event.target.value }); }} />
         </span>
       ))}
     </span>
@@ -82,7 +83,8 @@ function ConflictControls({ index, conflict, resolution, context }: { index: num
   const chosen = resolution == null ? undefined : kindOf(resolution);
   const [role, setRole] = useState(resolution != null && typeof resolution === "object" && "remap_role" in resolution ? resolution.remap_role.role : "");
   const [kind, setKind] = useState(resolution != null && typeof resolution === "object" && "remap_kind" in resolution ? resolution.remap_kind.kind : "");
-  const removed = conflict.about === "answer" ? removedChoices(conflict.answer, conflict.choices) : [];
+  const review = context.conflicts.get(index);
+  const removed = review?.removed_choices ?? [];
   const [map, setMap] = useState<Record<string, string>>(
     resolution != null && typeof resolution === "object" && "map_choices" in resolution ? resolution.map_choices.map : Object.fromEntries(removed.map((choice) => [choice, ""])),
   );
@@ -93,7 +95,7 @@ function ConflictControls({ index, conflict, resolution, context }: { index: num
   const otherKinds = context.kinds.filter((each) => conflict.about !== "kind" || each.key !== conflict.kind);
   return (
     <div className="opts" role="radiogroup" aria-label="Resolution">
-      {offered(conflict).map((option) => (
+      {(review?.offers ?? []).map((option) => (
         <label key={option} className="opt">
           <input type="radio" name={`resolution-${String(index)}`} disabled={!context.editable} checked={chosen === option} onChange={() => { choose(option); }} data-testid="resolution" data-resolution={option} />
           {RESOLUTION_WORDS[option]}
@@ -105,7 +107,7 @@ function ConflictControls({ index, conflict, resolution, context }: { index: num
             <Picker aria-label="Move its participations to" disabled={!context.editable} value={kind} none="Choose a kind" options={otherKinds.map((each) => ({ value: each.key, label: each.title ?? each.id }))} onChange={(event) => { setKind(event.target.value); choose("remap_kind", { role, kind: event.target.value, map }); }} />
           ) : null}
           {option === "map_choices" && conflict.about === "answer" ? (
-            <ChoiceMap conflict={conflict} value={map} disabled={!context.editable} onChange={(next) => { setMap(next); choose("map_choices", { role, kind, map: next }); }} />
+            <ChoiceMap conflict={conflict} removed={removed} value={map} disabled={!context.editable} onChange={(next) => { setMap(next); choose("map_choices", { role, kind, map: next }); }} />
           ) : null}
         </label>
       ))}
@@ -182,7 +184,7 @@ function ItemBody({ index, item, context }: { index: number; item: ReviewItem; c
     case "conflict":
       return (
         <>
-          <span>{conflictWords(item.conflict, names)}</span>
+          <span>{conflictWords(item.conflict, names, context.conflicts.get(index)?.removed_choices)}</span>
           <ConflictControls index={index} conflict={item.conflict} resolution={item.resolution} context={context} />
         </>
       );

@@ -1,10 +1,10 @@
 // Keys and references: what a new node, role, kind, or resource is called. Its key is
 // minted once in the tab, with its type's prefix and random, so it never collides with a key
 // the graph holds or retired; its id is a slug from its title, unique among its siblings.
-import { ID_BYTES_MAX } from "@cairn/client";
+import { ID_BYTES_MAX, KEY_PREFIX, SLUG_PATTERN } from "@cairn/client";
 
-/** The key prefixes (crates/schema `id.rs`). */
-export type KeyPrefix = "n_" | "r_" | "k_" | "a_" | "i_";
+/** The key prefixes (the generated table, by key type). */
+export type KeyPrefix = (typeof KEY_PREFIX)[keyof typeof KEY_PREFIX];
 
 /** Random key bodies: twelve base-36 digits from the browser's random UUID. */
 function randomBody(): string {
@@ -18,12 +18,17 @@ export function mintKey(prefix: KeyPrefix, random: () => string = randomBody): s
   return `${prefix}${random()}`;
 }
 
-/** The id slug pattern (crates/schema `id.rs`): lowercase letters, digits, `_`, and `-`, led by a letter or digit. */
-export const SLUG = /^[a-z0-9][a-z0-9_-]*$/;
+/** The id slug pattern: lowercase letters, digits, `_`, and `-`, led by a letter or digit. */
+export const SLUG = new RegExp(SLUG_PATTERN);
 
 /** Whether `text` is an id slug within the id limit. */
 export function isSlug(text: string): boolean {
   return SLUG.test(text) && text.length <= ID_BYTES_MAX;
+}
+
+/** Whether `text` is a key of the type with `prefix`: the prefix, then a slug, within the id limit. */
+export function isKey(prefix: KeyPrefix, text: string): boolean {
+  return text.startsWith(prefix) && isSlug(text.slice(prefix.length)) && text.length <= ID_BYTES_MAX;
 }
 
 /** A title as a slug: lowercase ASCII words joined by `-`, or `node` when nothing is left. */

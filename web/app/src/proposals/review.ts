@@ -16,7 +16,7 @@ import type { Ready } from "../detail/model.ts";
 import { addedRoles, insertionMembers } from "../segments/model.ts";
 import { useSegmentNames } from "../segments/read.ts";
 import { applyRevision, layerMarks, type Kept, type LayerModel, type ProposalOutline, type Reviewing } from "./layer.ts";
-import { applyBlockers, unresolvedHere, type DiffMark, type Proposal, type ProposalDraft, type ProposalPreview } from "./model.ts";
+import { applyBlockers, type DiffMark, type Proposal, type ProposalDraft, type ProposalPreview, type UnresolvedReason } from "./model.ts";
 import { namesOf } from "./words.ts";
 import { useProposalWrite } from "./write.ts";
 
@@ -267,7 +267,9 @@ export function useLayerModel(args: ModelArgs): LayerModel {
   const nameOf = useSegmentNames();
   const members = useMemo(() => insertionMembers(before, after, nameOf), [before, after, nameOf]);
   const current = previewOfEdits || kept === undefined;
-  const unresolved = useMemo(() => (current ? new Map((preview.unresolved ?? []).map((item) => [item.item, item.reason])) : unresolvedHere(draft.items ?? [])), [current, preview.unresolved, draft.items]);
+  const unresolved = useMemo(() => (current ? new Map((preview.unresolved ?? []).map((item) => [item.item, item.reason])) : new Map<number, UnresolvedReason>()), [current, preview.unresolved]);
+  // What a conflict offers is the conflict's own, which the reviewer's edits do not change.
+  const conflicts = useMemo(() => new Map((preview.conflicts ?? []).map((review) => [review.item, review])), [preview.conflicts]);
   const open = useMemo(() => new Set(unresolved.keys()), [unresolved]);
   const marked = useMemo(() => layerMarks({ before, after, items: draft.items ?? [], unresolved: open, known, members }), [before, after, draft.items, open, known, members]);
   const added = useMemo<Graph>(() => ({ nodes: (draft.mutations ?? []).flatMap((mutation) => (mutation.op === "add_node" ? [mutation.node] : [])) }), [draft.mutations]);
@@ -292,6 +294,7 @@ export function useLayerModel(args: ModelArgs): LayerModel {
     entries: marked.entries,
     names,
     unresolved,
+    conflicts,
     today,
     editable: proposal.status === "open" && !writing,
   };

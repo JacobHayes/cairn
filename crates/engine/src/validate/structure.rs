@@ -2,11 +2,12 @@
 //! PRACTICES, Explicit limits). Cost at the limits: one pass over nodes, their edges, and
 //! their resources, plus one serialization of the graph to measure it (at most 16 MiB).
 
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, BTreeSet};
 
 use cairn_schema::limits::EDGE_COUNT_PER_NODE_MAX;
 use cairn_schema::{
-    AttachmentKey, KindKey, Limit, NodeKey, RetiredKey, Subject, Violation, ViolationCode,
+    AttachmentKey, KindKey, Limit, NodeField, NodeKey, RetiredKey, Subject, Violation,
+    ViolationCode,
 };
 
 use super::{GraphCheck, at_node, missing_node_code, violation};
@@ -25,6 +26,8 @@ pub(super) fn check(check: &GraphCheck<'_>, out: &mut Vec<Violation>) {
 
 fn tree_issues(check: &GraphCheck<'_>, out: &mut Vec<Violation>) {
     let tree = check.tree;
+    // Siblings sharing a path, by the first that took it: every holder is reported at its own id.
+    let mut duplicates: BTreeMap<&NodeKey, BTreeSet<&NodeKey>> = BTreeMap::new();
     for issue in tree.issues() {
         let found = match issue {
             TreeIssue::MissingParent { node, parent } => {
@@ -54,6 +57,7 @@ fn tree_issues(check: &GraphCheck<'_>, out: &mut Vec<Violation>) {
                     "these nodes contain each other; containment is a tree",
                 );
                 found.at.subject = members.first().cloned().map(Subject::Node);
+                found.at.field = Some(NodeField::Parent);
                 found.related = members.iter().cloned().map(Subject::Node).collect();
                 found
             }
@@ -68,17 +72,29 @@ fn tree_issues(check: &GraphCheck<'_>, out: &mut Vec<Violation>) {
                 found
             }
             TreeIssue::DuplicateId { first, second } => {
-                let mut found = at_node(
-                    tree,
-                    second,
-                    ViolationCode::DuplicateSiblingId,
-                    "two siblings share this id, so they share a path",
-                );
-                found.related.push(Subject::Node(first.clone()));
-                found
+                duplicates.entry(first).or_default().insert(second);
+                continue;
             }
         };
         out.push(found);
+    }
+    for (first, seconds) in duplicates {
+        let holders: BTreeSet<&NodeKey> = seconds.into_iter().chain([first]).collect();
+        for holder in &holders {
+            // One other holder, the first by key, so the list never grows as the square.
+            let Some(other) = holders.iter().find(|other| other != &holder) else {
+                continue;
+            };
+            let mut found = at_node(
+                tree,
+                holder,
+                ViolationCode::DuplicateSiblingId,
+                "two siblings share this id, so they share a path",
+            );
+            found.at.field = Some(NodeField::Id);
+            found.related.push(Subject::Node((*other).clone()));
+            out.push(found);
+        }
     }
 }
 

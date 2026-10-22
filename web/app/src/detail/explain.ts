@@ -4,6 +4,7 @@
 // screen that explains a value (5.2's trace, 5.4's timeline) says it the same way.
 import type { Schema } from "@cairn/client";
 
+import { isLeaf } from "../authoring/graph.ts";
 import { feedingDecision, nodeOf, titleOf, type Ready } from "./model.ts";
 import { dateWords, originWord } from "../status/when.ts";
 import { fieldWords, upperFirst } from "../status/words.ts";
@@ -27,7 +28,7 @@ export type Namer = (key: string, point?: "start" | "finish") => string;
 export function namer(view: Ready): Namer {
   return (key, point) => {
     const kind = nodeOf(view, key)?.kind;
-    const single = kind === "decision" || kind === "milestone";
+    const single = kind !== undefined && isLeaf(kind);
     return point === undefined || single ? titleOf(view, key) : `the ${point} of ${titleOf(view, key)}`;
   };
 }

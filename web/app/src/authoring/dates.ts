@@ -2,10 +2,11 @@
 // sooner), measured before or after one or more sources by an offset in days, where a source
 // is a milestone, a date decision's answer, or the journey's `created_at`; several sources
 // are several constraints. F4: a stage's bounds are milestones outside it. The editors offer
-// only what a rule may measure from, so a source of the wrong kind cannot be entered.
+// only what the engine's table says a rule may measure from, so a source of the wrong kind
+// cannot be entered.
 import { OFFSET_DAYS_MAX } from "@cairn/client";
 import type { DateRule } from "./fields.ts";
-import { descendantsOf, nodesByPath, pathOf, titleIn, type GraphNode, type Tree } from "./graph.ts";
+import { descendantsOf, nodesFor, pathOf, titleIn, type GraphNode, type Tree } from "./graph.ts";
 import { outOfRange } from "./limits.ts";
 import { plural } from "../ui/words.ts";
 
@@ -27,11 +28,9 @@ export interface SourceOption {
   label: string;
 }
 
-/** A8: what `node`'s rules may measure from: `created_at`, every milestone, and every date decision, other than itself. */
-export function sourceOptions(tree: Tree, node: string | undefined): SourceOption[] {
-  const nodes = nodesByPath(tree).filter(
-    (each) => each.key !== node && (each.kind === "milestone" || (each.kind === "decision" && each.answer_type === "date")),
-  );
+/** A8: what `node`'s `which` rule may measure from: `created_at`, and the nodes the engine's table allows (milestones and date decisions), other than itself. */
+export function sourceOptions(tree: Tree, node: string | undefined, which: "due_by" | "not_before"): SourceOption[] {
+  const nodes = nodesFor(tree, which).filter((each) => each.key !== node);
   return [
     { source: CREATED_AT, label: "When the journey started" },
     ...nodes.map((each) => ({ source: each.key, label: `${each.title} (${pathOf(tree, each.key)})` })),
@@ -81,12 +80,12 @@ export function ruleFoot(node: GraphNode, tree: Tree): string | undefined {
 }
 
 /**
- * F4: the milestones a stage may name as its bounds, those outside it first. One inside it is
- * offered too, marked: a bound sits outside the stage, and the engine says so at the field
- * (A15) rather than the editor hiding why it is not there.
+ * F4: the nodes a stage may name as its `bound` (the engine's table: milestones), those outside it
+ * first. One inside it is offered too, marked: a bound sits outside the stage, and the engine says
+ * so at the field (A15) rather than the editor hiding why it is not there.
  */
-export function boundOptions(tree: Tree, group: string): { node: GraphNode; inside: boolean }[] {
+export function boundOptions(tree: Tree, group: string, bound: "opens_at" | "closes_at"): { node: GraphNode; inside: boolean }[] {
   const inside = new Set(descendantsOf(tree, group).map((node) => node.key));
-  const milestones = nodesByPath(tree, "milestone").map((node) => ({ node, inside: inside.has(node.key) }));
+  const milestones = nodesFor(tree, bound).map((node) => ({ node, inside: inside.has(node.key) }));
   return [...milestones.filter((each) => !each.inside), ...milestones.filter((each) => each.inside)];
 }

@@ -5,7 +5,7 @@ import { describe, expect, it } from "vitest";
 
 import { contentOf, designated, newAttachmentKey, withContent } from "./Attachments.tsx";
 import { Reads, appended } from "./History.tsx";
-import { draftText, journeyUrl } from "./Resources.tsx";
+import { journeyUrl } from "./Resources.tsx";
 
 describe("annotations (G1, G2)", () => {
   const link: Schema<"AnnotationBody"> = { key: "a_one", node: "n_a", title: "Draft", reference: "https://example.org/r" };
@@ -35,11 +35,6 @@ describe("annotations (G1, G2)", () => {
 });
 
 describe("message drafts (G3)", () => {
-  it("copies text with each missing placeholder written as a marker", () => {
-    const text = draftText({ segments: [{ text: "Hi " }, { missing: "roles.owner.name" }, { text: "." }] });
-    expect(text).toBe("Hi [missing: roles.owner.name].");
-  });
-
   it("links to the journey's address on this origin", () => {
     expect(journeyUrl("j_one", "https://cairn.example")).toBe("https://cairn.example/journeys/j_one");
   });

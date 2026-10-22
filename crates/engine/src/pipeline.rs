@@ -117,7 +117,7 @@ pub fn apply(records: &Records, patch: &Patch, inputs: &ApplyInputs) -> Result<A
     let mut violations = std::mem::take(&mut session.violations);
     violations.extend(found);
     if !violations.is_empty() {
-        locate(&mut violations, records, &session);
+        locate(&mut violations, records, &session, patch);
     }
     if let Ok(violations) = Violations::new(violations) {
         return Err(Rejection::Invalid { violations });
@@ -183,9 +183,27 @@ fn accept(records: &Records, patch: &Patch, events: Vec<Event>, candidate: Recor
 }
 
 /// A15: every violation about a node carries the node's path, from the graph the patch
-/// would produce, or the graph before it for a node the patch removed. One tree each, however
-/// many violations.
-fn locate(violations: &mut [cairn_schema::Violation], records: &Records, session: &Session<'_>) {
+/// would produce, or the graph before it for a node the patch removed, and, when a check of
+/// the whole graph found it, the position of the last mutation that touched the node (the edge
+/// a mutation draws is touched at its dependent), so a client shows it where it was written.
+/// One tree each, however many violations.
+fn locate(
+    violations: &mut [cairn_schema::Violation],
+    records: &Records,
+    session: &Session<'_>,
+    patch: &Patch,
+) {
+    let mut touched: std::collections::BTreeMap<cairn_schema::NodeKey, u32> =
+        std::collections::BTreeMap::new();
+    for (ordinal, mutation) in patch.mutations.as_slice().iter().enumerate() {
+        let (cairn_schema::Subject::Node(node)
+        | cairn_schema::Subject::Edge(cairn_schema::Edge { node, .. })) =
+            mutation.subject(&patch.target)
+        else {
+            continue;
+        };
+        touched.insert(node, u32::try_from(ordinal).unwrap_or(u32::MAX));
+    }
     let Some(id) = session.graph_id() else {
         return;
     };
@@ -202,6 +220,15 @@ fn locate(violations: &mut [cairn_schema::Violation], records: &Records, session
             continue;
         };
         found.at.path = trees.iter().find_map(|tree| tree.path(node).cloned());
+    }
+    for found in violations
+        .iter_mut()
+        .filter(|found| found.at.mutation.is_none())
+    {
+        let Some(cairn_schema::Subject::Node(node)) = &found.at.subject else {
+            continue;
+        };
+        found.at.mutation = touched.get(node).copied();
     }
     assert!(trees.len() <= 2);
 }

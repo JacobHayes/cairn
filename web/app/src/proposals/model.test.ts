@@ -13,8 +13,6 @@ import {
   intervening,
   carryIds,
   withFieldValue,
-  removedChoices,
-  unresolvedHere,
   withExclusion,
   withMapping,
   withMutation,
@@ -96,13 +94,6 @@ describe("intervening (I6)", () => {
   });
 });
 
-describe("removedChoices (B7)", () => {
-  it("names the choices an answer holds that the route no longer has", () => {
-    expect(removedChoices({ multi_choice: ["a", "b", "c"] }, ["a", { id: "c", title: "C" }])).toEqual(["b"]);
-    expect(removedChoices({ single_choice: "a" }, ["a"])).toEqual([]);
-    expect(removedChoices({ boolean: true }, [])).toEqual([]);
-  });
-});
 
 describe("a reviewer's edits (C14)", () => {
   const draft: ProposalDraft = {
@@ -179,25 +170,6 @@ describe("reviewEntries (C14)", () => {
       ["a", undefined],
       ["b", "a"],
       ["c", "a"],
-    ]);
-  });
-});
-
-describe("unresolvedHere (C14)", () => {
-  it("finds a conflict with no choice or one it does not offer, and an unmapped identity", () => {
-    const conflict = { about: "default_owner", journey: "r_a", route: "r_b" } as const;
-    const found = unresolvedHere([
-      { item: "conflict", conflict },
-      { item: "conflict", conflict, resolution: "reopen" },
-      { item: "conflict", conflict, resolution: "take_route" },
-      { item: "participation", identity: "who_a", uses: [] },
-      { item: "participation", identity: "who_b", uses: [], mapping: "drop" },
-      { item: "orphan", node: "n_a", keep: true, removal: { node: "n_a" } },
-    ]);
-    expect([...found]).toEqual([
-      [0, "no_choice"],
-      [1, "not_offered"],
-      [3, "no_choice"],
     ]);
   });
 });

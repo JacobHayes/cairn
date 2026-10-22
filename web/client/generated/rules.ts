@@ -5,6 +5,9 @@ type NodeKind = components["schemas"]["NodeKind"];
 type State = components["schemas"]["State"];
 type DisplayState = components["schemas"]["DisplayState"];
 type JourneyStatus = components["schemas"]["JourneyStatus"];
+type NodeField = components["schemas"]["NodeField"];
+type AnswerType = components["schemas"]["AnswerType"];
+type ReferenceField = components["schemas"]["ReferenceField"];
 
 // PRACTICES, Explicit limits: the engine rejects a patch past any of these.
 /** The `node_count_max` limit. */
@@ -140,6 +143,108 @@ export const STATUS_HOLDS_CURRENT_WORK: Record<JourneyStatus, boolean> = {
   completed: false,
   archived: false,
 };
+
+/** A1a: the name of a field only some kinds have, which a node's form shows beyond the shared ones. */
+export type KindFieldName = "estimate" | "requires_artifact" | "requires_note" | "placeholder" | "final" | "auto_done" | "opens_at" | "closes_at" | "gates" | "closes" | "prompt" | "help" | "answer_type" | "choices" | "fills_role" | "feeds_milestone";
+
+/** Every node field, in the order a node form shows the shared ones. */
+export const NODE_FIELDS: readonly NodeField[] = ["id", "parent", "title", "description", "weight", "relevant_when", "due_by", "not_before", "estimate", "placeholder", "requires_artifact", "requires_note", "final", "auto_done", "opens_at", "closes_at", "gates", "closes", "prompt", "help", "choices", "fills_role", "feeds_milestone"];
+
+/** A4: every answer type. */
+export const ANSWER_TYPES: readonly AnswerType[] = ["boolean", "single_choice", "multi_choice", "text", "date", "identity", "identity_list"];
+
+/** A1a: the fields each kind has beyond the shared ones, in the order its form shows them (a decision's depend on its answer type). */
+export const KIND_FIELDS: Record<NodeKind, readonly KindFieldName[]> = {
+  decision: ["prompt", "help", "answer_type", "choices", "fills_role", "feeds_milestone"],
+  deliverable: ["estimate", "requires_artifact", "requires_note", "placeholder"],
+  action: ["estimate", "requires_note", "placeholder"],
+  milestone: ["final", "auto_done"],
+  group: ["opens_at", "closes_at", "gates", "closes"],
+};
+
+/** A1a: the fields a decision of each answer type has beyond the shared ones. */
+export const ANSWER_TYPE_FIELDS: Record<AnswerType, readonly KindFieldName[]> = {
+  boolean: ["prompt", "help", "answer_type"],
+  single_choice: ["prompt", "help", "answer_type", "choices"],
+  multi_choice: ["prompt", "help", "answer_type", "choices"],
+  text: ["prompt", "help", "answer_type"],
+  date: ["prompt", "help", "answer_type", "feeds_milestone"],
+  identity: ["prompt", "help", "answer_type", "fills_role"],
+  identity_list: ["prompt", "help", "answer_type", "fills_role"],
+};
+
+/** A9: the weight a node of each kind has when it names none. */
+export const DEFAULT_WEIGHT: Record<NodeKind, number> = {
+  decision: 1,
+  deliverable: 1,
+  action: 1,
+  milestone: 1,
+  group: 0,
+};
+
+/** A1a: the value of each flag a node does not write. */
+export const FLAG_DEFAULTS: Record<"requires_artifact" | "requires_note" | "placeholder" | "final" | "auto_done" | "gates" | "closes", boolean> = { requires_artifact: false, requires_note: false, placeholder: false, final: false, auto_done: false, gates: true, closes: true };
+
+/** A2: the kinds that hold no children. */
+export const LEAF_KINDS: readonly NodeKind[] = ["decision", "milestone"];
+
+/** A5: a condition's leaf operators. */
+export type ConditionLeaf = "equals" | "not_equals" | "in" | "contains" | "answered";
+
+/** A5: the leaf operators a condition can ask of a decision of each answer type. */
+export const CONDITION_LEAVES: Record<AnswerType, readonly ConditionLeaf[]> = {
+  boolean: ["equals", "not_equals", "in", "answered"],
+  single_choice: ["equals", "not_equals", "in", "answered"],
+  multi_choice: ["contains", "answered"],
+  text: ["equals", "not_equals", "in", "contains", "answered"],
+  date: ["equals", "not_equals", "in", "answered"],
+  identity: ["equals", "not_equals", "in", "answered"],
+  identity_list: ["contains", "answered"],
+};
+
+/** The kinds each reference field may name, and for a decision the answer types (null: any). */
+export const REFERENCE_TARGETS: Record<ReferenceField, { kinds: readonly NodeKind[]; answer_types: readonly AnswerType[] | null }> = {
+  relevant_when: { kinds: ["decision"], answer_types: null },
+  due_by: { kinds: ["decision", "milestone"], answer_types: ["date"] },
+  not_before: { kinds: ["decision", "milestone"], answer_types: ["date"] },
+  opens_at: { kinds: ["milestone"], answer_types: null },
+  closes_at: { kinds: ["milestone"], answer_types: null },
+  feeds_milestone: { kinds: ["milestone"], answer_types: null },
+  message_draft: { kinds: ["decision"], answer_types: null },
+  snooze: { kinds: ["decision", "deliverable", "action", "milestone", "group"], answer_types: null },
+};
+
+/** A6, A7: whether a role of the second cardinality fits a slot of the first. */
+export const SLOT_TAKES_ROLE: Record<"single" | "multi", Record<"single" | "multi", boolean>> = {
+  single: { single: true, multi: false },
+  multi: { single: true, multi: true },
+};
+
+/** A6: the cardinality of the role a decision of each answer type fills; none for the rest. */
+export const FILLED_ROLE: Partial<Record<AnswerType, "single" | "multi">> = {
+  identity: "single",
+  identity_list: "multi",
+};
+
+/** A7: the built-in owner kind. */
+export const OWNER_KIND = { key: "k_owner", id: "owner", multi: false } as const;
+
+/** The pattern an id slug matches. */
+export const SLUG_PATTERN = "^[a-z0-9][a-z0-9_-]*$";
+
+/** The route id the app's addresses keep for the new-route form. */
+export const RESERVED_ROUTE_ID = "new";
+
+/** Each key type's prefix, by the type's name. */
+export const KEY_PREFIX = { NodeKey: "n_", RoleKey: "r_", KindKey: "k_", InsertionKey: "i_", IdentityKey: "who_", AttachmentKey: "a_", JourneyId: "j_", PatchId: "p_", ProposalId: "pr_", UserId: "u_", AgentId: "ag_", ConversationId: "cv_" } as const;
+
+/** A10: the journey fields a message draft can show. */
+export const JOURNEY_FIELDS: readonly string[] = ["name", "description", "created_at", "url", "status"];
+
+/** The shortest wait before a closed change stream is reopened: the coalescing interval. */
+export const SSE_COALESCING_INTERVAL_MS = 250;
+/** The longest wait: the time a stalled subscriber is cut after. */
+export const SSE_WRITE_STALL_MS = 15000;
 
 // What text a person or an agent reads never cites, from the repository's documents.
 /** A requirement id: a section letter, one or two digits, an optional lowercase letter. */

@@ -4,13 +4,8 @@
 
 use std::time::Duration;
 
-pub use cairn_schema::limits::REQUEST_BYTES_MAX;
+pub use cairn_schema::limits::{REQUEST_BYTES_MAX, REQUEST_DURATION_MAX};
 pub use cairn_store::limits::{SSE_COALESCING_INTERVAL, SSE_SUBSCRIBER_COUNT_MAX};
-
-/// How long an API request may take before it is answered as timed out (not the SSE
-/// stream, whose response starts at once): typical requests take tens of milliseconds, the
-/// heaviest about a second, so past five something is stuck.
-pub const REQUEST_DURATION_MAX: Duration = Duration::from_secs(5);
 
 /// Requests in flight per process: tens of users with a few tabs and agents; past this a
 /// client is looping. Overflow is answered 503 with `Retry-After`.

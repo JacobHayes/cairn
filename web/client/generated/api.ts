@@ -1670,6 +1670,18 @@ export interface components {
                 kind: components["schemas"]["KindKey"];
             };
         } | "remove";
+        /** @description What the engine offers for one conflict item. */
+        ConflictReview: {
+            /**
+             * Format: uint32
+             * @description The item's position in the proposal.
+             */
+            item: number;
+            /** @description The kinds of resolution the conflict offers, in the order a reviewer reads them. */
+            offers: components["schemas"]["ResolutionKind"][];
+            /** @description For an answer conflict, the choices the answer names that the route no longer offers. */
+            removed_choices?: components["schemas"]["Slug"][];
+        };
         /**
          * @description What an accepted patch or a proposal preview newly caused in derived state,
          *     reported with the result and never stored.
@@ -4446,6 +4458,8 @@ export interface components {
          *     validation finds in it.
          */
         ProposalPreview: {
+            /** @description What each conflict item offers. */
+            conflicts?: components["schemas"]["ConflictReview"][];
             /** @description For a journey, what the change does to derived state. */
             consequences?: components["schemas"]["Consequences"] | null;
             /** @description For a journey, its frontier after, in rank order. */
@@ -4537,6 +4551,17 @@ export interface components {
         };
         /** @description A node's origin in a journey. */
         Provenance: "from_route" | "local" | "orphaned" | "from_segment";
+        /** @description What each of the four terms adds to a rank. */
+        RankAdds: {
+            /** @description Gravity's share times its constant. */
+            gravity: components["schemas"]["Real"];
+            /** @description Running late times its constant. */
+            late: components["schemas"]["Real"];
+            /** @description Unlocks' share times its constant. */
+            unlocks: components["schemas"]["Real"];
+            /** @description Urgency times its constant. */
+            urgency: components["schemas"]["Real"];
+        };
         /**
          * @description The rank constants (Priority: normative formulas, configurable constants, defaults
          *     shown). The four coefficients sum to a finite number, so every rank is finite.
@@ -4553,11 +4578,13 @@ export interface components {
         };
         /** @description Why a node ranks where it does: its rank and the terms it blends. */
         RankTerms: {
+            /** @description What each term adds to the rank: the term times its constant. */
+            adds: components["schemas"]["RankAdds"];
             /** @description Gravity over the largest in the normalization set. */
             gravity_norm: components["schemas"]["Real"];
             /** @description From negative slack over the horizon. */
             late: components["schemas"]["Real"];
-            /** @description The blend. */
+            /** @description The blend: the sum of what the terms add. */
             rank: components["schemas"]["Real"];
             /** @description Unlocks over the largest in the normalization set. */
             unlocks_norm: components["schemas"]["Real"];
@@ -4769,6 +4796,8 @@ export interface components {
              */
             total: number;
         };
+        /** @description The kinds of resolution a conflict can offer: [`ConflictResolution`] without its payload. */
+        ResolutionKind: "keep_journey" | "take_route" | "map_choices" | "clear_state" | "reopen" | "remap_role" | "remap_kind" | "remove";
         /** @description Route-authored guidance on a node, keyed so upgrades diff it. */
         Resource: {
             example?: components["schemas"]["Url"];

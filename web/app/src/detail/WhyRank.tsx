@@ -150,7 +150,7 @@ export function WhyRank({ view, detail, position, row }: { view: Ready; detail: 
     );
   }
   const constants = view.inputs.rank;
-  const parts = row?.rank == null ? [] : rankParts(row.rank, constants);
+  const parts = row?.rank == null ? [] : rankParts(row.rank);
   const sentence = position === undefined ? "Not ranked yet: it can't start until what it waits on is done." : rankClause(view, derived, { position, row }).trim();
   return (
     <Section title="Why this rank" open={false} fold={fold} testId="rank">

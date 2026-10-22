@@ -57,7 +57,7 @@ pub use dates::{Dates, PlanCheck, check_plan};
 pub use dependencies::{Dependencies, EdgeSet, EffectiveDependency};
 pub use participation::Participation;
 pub use priority::Priority;
-pub use rank::{RankTerms, Ranking};
+pub use rank::{RankAdds, RankTerms, Ranking};
 pub use relevance::{NodeRelevance, Producer, Relevances};
 pub use skip::Skips;
 

@@ -58,6 +58,12 @@ impl std::error::Error for IdError {}
 /// published patterns are built from it, and [`is_slug`] is its parser.
 const SLUG_BODY: &str = "[a-z0-9][a-z0-9_-]";
 
+/// The pattern an id slug matches (ECMAScript and JSON Schema).
+#[must_use]
+pub fn slug_pattern() -> String {
+    format!("^{SLUG_BODY}*$")
+}
+
 fn is_slug(text: &str) -> bool {
     text.starts_with(|first: char| first.is_ascii_lowercase() || first.is_ascii_digit())
         && text
@@ -93,7 +99,7 @@ string_serde!(
     Slug,
     "Slug",
     "An id: lowercase letters, digits, '_' and '-', at most id_bytes_max (64) bytes.",
-    Some(format!("^{SLUG_BODY}*$")),
+    Some(slug_pattern()),
     Some(Limit::IdBytes)
 );
 
@@ -259,6 +265,9 @@ macro_rules! prefixed {
 
         /// Every key type's prefix: what a key looks like wherever one might be shown.
         pub const KEY_PREFIXES: &[&str] = &[$($prefix),*];
+
+        /// Every key type's name and prefix, for a client that builds or checks one.
+        pub const KEY_TYPE_PREFIXES: &[(&str, &str)] = &[$((stringify!($name), $prefix)),*];
     };
 }
 
@@ -367,13 +376,13 @@ impl FromStr for RouteId {
 
 /// The one route id the app's addresses keep: `/routes/new` is the new-route form, so a route
 /// with this id would have no address.
-const RESERVED_ROUTE_ID: &str = "new";
+pub const RESERVED_ROUTE_ID: &str = "new";
 
 string_serde!(
     RouteId,
     "RouteId",
     "A route id: a slug, unique in the deployment.",
-    Some(format!("^{SLUG_BODY}*$")),
+    Some(slug_pattern()),
     Some(Limit::IdBytes)
 );
 

@@ -10,7 +10,7 @@ import { Button } from "../ui/kit.tsx";
 import { WriteStatus } from "../screens/WriteStatus.tsx";
 import { Receipt } from "../ui/Receipt.tsx";
 import { ConditionEditor } from "./ConditionEditor.tsx";
-import { conditionProblem } from "./condition.ts";
+import { useConditionProblem } from "./condition-problem.ts";
 import { DateRuleEditor } from "./DateRuleEditor.tsx";
 import { partsOf, ruleProblem } from "./dates.ts";
 import { changesOf, draftOf, draftProblems, type FormField, type NodeDraft } from "./fields.ts";
@@ -32,13 +32,9 @@ interface Kept {
   base: number;
 }
 
-/** Every problem that stops the draft being sent, by field: limits, and a condition's or rule's own. */
+/** Every problem that stops the draft being sent, by field: limits, and a rule's own. A condition's is the engine's, read by `useConditionProblem`. */
 export function problemsOf(node: GraphNode, draft: NodeDraft): Partial<Record<FormField, string>> {
   const problems = draftProblems(node.kind, draft);
-  const condition = draft.relevant_when === null ? undefined : conditionProblem(draft.relevant_when);
-  if (condition !== undefined) {
-    problems.relevant_when = condition;
-  }
   for (const which of ["due_by", "not_before"] as const) {
     const rule = draft[which];
     const problem = rule === null ? undefined : ruleProblem(partsOf(rule));
@@ -149,8 +145,9 @@ export function NodeForm({ authored, node }: NodeFormProps) {
   const edits = kept?.edits ?? {};
   const draft: NodeDraft = { ...draftOf(node), ...edits };
   const changes = changesOf(node, draft, new Set(Object.keys(edits) as FormField[]));
-  const problems = problemsOf(node, draft);
-  const sendable = changes.length > 0 && Object.keys(problems).length === 0;
+  const condition = useConditionProblem(draft.relevant_when);
+  const problems = { ...problemsOf(node, draft), ...(condition.problem === undefined ? {} : { relevant_when: condition.problem }) };
+  const sendable = changes.length > 0 && condition.checked && Object.keys(problems).length === 0;
   const preview = useLivePreview(authored, sendable ? changes.map((change) => change.mutation) : undefined);
   const { violations, places: sent } = shownViolations(preview, write);
   const places = byPlace(violations, node.key, sent);

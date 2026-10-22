@@ -4,7 +4,7 @@
 // editors and the removal cascade share one reading of the tree.
 //
 // Cost: an index is one pass over the nodes; every walk is bounded by the graph's size.
-import type { Schema } from "@cairn/client";
+import { FILLED_ROLE, LEAF_KINDS, REFERENCE_TARGETS, SLOT_TAKES_ROLE, type Schema } from "@cairn/client";
 
 import { mintKey, slugOf, uniqueId } from "./keys.ts";
 import { nodeTitle } from "../ui/gone.ts";
@@ -14,6 +14,7 @@ export type GraphNode = Schema<"Node">;
 export type NodeKind = Schema<"NodeKind">;
 export type NodeField = Schema<"NodeField">;
 export type AnswerType = Schema<"AnswerType">;
+export type ReferenceField = Schema<"ReferenceField">;
 export type Mutation = Schema<"Mutation">;
 export type Role = Schema<"RoleResolved">;
 export type Kind = Schema<"ParticipationKindResolved">;
@@ -25,9 +26,33 @@ export function kindOption(kind: NodeKind): { value: NodeKind; label: string } {
   return { value: kind, label: `${kind.charAt(0).toUpperCase()}${kind.slice(1)}` };
 }
 
-/** A2: decisions and milestones are leaves; every other kind may hold children of any kind. */
+/** A2: whether a node of `kind` holds no children (the engine's table): it is one instant, not a span. */
+export function isLeaf(kind: NodeKind): boolean {
+  return LEAF_KINDS.includes(kind);
+}
+
+/** A2: every kind but the leaves may hold children of any kind. */
 export function canHoldChildren(kind: NodeKind): boolean {
-  return kind !== "decision" && kind !== "milestone";
+  return !isLeaf(kind);
+}
+
+const cardinality = (multi: boolean | undefined): "single" | "multi" => (multi === true ? "multi" : "single");
+
+/** A6, A7: the roles that fit a slot of the cardinality `slotMulti` (a participation kind, the default owner), by the engine's table. */
+export function rolesForSlot(roles: readonly Role[], slotMulti: boolean): Role[] {
+  return roles.filter((role) => SLOT_TAKES_ROLE[cardinality(slotMulti)][cardinality(role.multi)]);
+}
+
+/** A6: the roles a decision of `answer` may fill, by the engine's table: none for an answer that fills no role. */
+export function rolesForFill(roles: readonly Role[], answer: AnswerType): Role[] {
+  const wanted = FILLED_ROLE[answer];
+  return roles.filter((role) => cardinality(role.multi) === wanted);
+}
+
+/** Nodes in path order that `field` may name (the engine's table of reference targets), for a picker. */
+export function nodesFor(tree: Tree, field: ReferenceField): GraphNode[] {
+  const { kinds, answer_types: answers } = REFERENCE_TARGETS[field];
+  return nodesByPath(tree).filter((node) => kinds.includes(node.kind) && (node.kind !== "decision" || answers === null || answers.includes(node.answer_type ?? "boolean")));
 }
 
 /** A graph's nodes by key and by parent, built once per graph. */
@@ -109,23 +134,6 @@ export function nodesByPath(tree: Tree, kind?: NodeKind): GraphNode[] {
   const nodes = [...tree.byKey.values()].filter((node) => kind === undefined || node.kind === kind);
   const paths = new Map(nodes.map((node) => [node.key, pathOf(tree, node.key)]));
   return nodes.sort((left, right) => (paths.get(left.key) ?? "").localeCompare(paths.get(right.key) ?? ""));
-}
-
-/** Why `node` cannot require `requires` (A3), or undefined when the edge may be drawn. */
-export function edgeRefusal(tree: Tree, node: string, requires: string): string | undefined {
-  if (node === requires) {
-    return "A node cannot require itself.";
-  }
-  if (isAncestor(tree, requires, node)) {
-    return "It sits inside that node: containment already relates them, so an explicit edge to an ancestor is refused.";
-  }
-  if (isAncestor(tree, node, requires)) {
-    return "That node sits inside it: a parent already requires its children, so an explicit edge to a descendant is refused.";
-  }
-  if ((tree.byKey.get(node)?.requires ?? []).includes(requires)) {
-    return "It already requires that node.";
-  }
-  return undefined;
 }
 
 /** A2: where `key` may move: the root or a container that is neither it nor inside it. */

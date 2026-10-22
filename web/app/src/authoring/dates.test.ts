@@ -19,7 +19,7 @@ describe("date rules (A8)", () => {
   it("offers `created_at`, the milestones, and the date decisions, each accepted as a source", () => {
     // A lone action, so no other constraint can make a rule on it contradictory.
     const lone: GraphNode = { key: "n_lone", id: "lone", kind: "action", title: "Lone" };
-    const options = sourceOptions(treeOf(graph), lone.key);
+    const options = sourceOptions(treeOf(graph), lone.key, "due_by");
     expect(options[0]?.source).toBe(CREATED_AT);
     expect(options.map((option) => option.source)).toEqual(expect.arrayContaining(["n_kickoff", "n_decision_meeting", "n_meeting_date"]));
     for (const { source } of options) {
@@ -30,7 +30,7 @@ describe("date rules (A8)", () => {
   });
 
   it("never offers the node itself, or a node that is neither a milestone nor a date decision", () => {
-    const sources = new Set(sourceOptions(treeOf(graph), "n_kickoff").map((option) => option.source));
+    const sources = new Set(sourceOptions(treeOf(graph), "n_kickoff", "due_by").map((option) => option.source));
     expect(sources.has("n_kickoff")).toBe(false);
     expect(sources.has("n_purpose")).toBe(false);
     expect(sources.has("n_plan")).toBe(false);
@@ -57,7 +57,7 @@ describe("stage bounds (F4)", () => {
       { key: "n_outside", id: "outside", kind: "milestone", title: "Outside" },
       { key: "n_work", id: "work", kind: "action", title: "Work" },
     ];
-    expect(boundOptions(treeOf({ nodes }), "n_stage").map(({ node, inside }) => [node.key, inside])).toEqual([
+    expect(boundOptions(treeOf({ nodes }), "n_stage", "opens_at").map(({ node, inside }) => [node.key, inside])).toEqual([
       ["n_outside", false],
       ["n_inside", true],
     ]);

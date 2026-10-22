@@ -6,9 +6,10 @@
 use std::collections::BTreeMap;
 
 use cairn_schema::{
-    AnswerSpec, Clause, ConditionValue, Date, DateSource, IdentityKey, KeyRefs, Node, NodeField,
-    NodeKey, NodeKind, ParticipationSource, Payload, ResourceContent, RoleKey, Segment, Subject,
-    Violation, ViolationCode,
+    AnswerSpec, AnswerType, Clause, ConditionValue, Date, DateSource, Edge, IdentityKey, KeyRefs,
+    Node, NodeField, NodeKey, NodeKind, OWNER_KIND_MULTI, ParticipationSource, Payload,
+    ReferenceField, ResourceContent, RoleKey, Segment, Subject, Violation, ViolationCode,
+    role_fits_slot,
 };
 
 use super::{GraphCheck, at_node, missing_kind_code, missing_node_code, missing_role_code};
@@ -89,11 +90,12 @@ fn requires(check: &GraphCheck<'_>, node: &GraphNode, out: &mut Vec<Violation>) 
         } else {
             continue;
         };
-        out.push(related_to(
-            at_node(tree, &node.key, code, message),
-            None,
-            requirement,
-        ));
+        let mut found = related_to(at_node(tree, &node.key, code, message), None, requirement);
+        found.related.push(Subject::Edge(Edge {
+            node: node.key.clone(),
+            requires: requirement.clone(),
+        }));
+        out.push(found);
     }
 }
 
@@ -131,26 +133,27 @@ fn condition(check: &GraphCheck<'_>, node: &GraphNode, out: &mut Vec<Violation>)
         let Some(target) = resolve(check, node, decision, field, out) else {
             continue;
         };
+        let answer = answer_spec_of(target);
         let problem = if *decision == node.key || check.tree.is_ancestor(&node.key, decision) {
             Some((
                 ViolationCode::ConditionOnOwnSubtree,
                 "a node's condition cannot reference a decision inside its own subtree",
             ))
+        } else if !ReferenceField::RelevantWhen.takes(
+            target.kind(),
+            answer.map(cairn_schema::AnswerSpec::answer_type),
+        ) {
+            Some((
+                ViolationCode::WrongReferenceKind,
+                "a condition references a decision",
+            ))
+        } else if answer.is_some_and(|spec| !comparable.fits(spec)) {
+            Some((
+                ViolationCode::ConditionAnswerTypeMismatch,
+                "the clause compares a value the decision's answer type cannot hold",
+            ))
         } else {
-            match &target.payload {
-                Payload::Decision(spec) if comparable.fits(&spec.answer) => None,
-                Payload::Decision(_) => Some((
-                    ViolationCode::ConditionAnswerTypeMismatch,
-                    "the clause compares a value the decision's answer type cannot hold",
-                )),
-                Payload::Deliverable(_)
-                | Payload::Action(_)
-                | Payload::Milestone(_)
-                | Payload::Group(_) => Some((
-                    ViolationCode::WrongReferenceKind,
-                    "a condition references a decision",
-                )),
-            }
+            None
         };
         if let Some((code, message)) = problem {
             out.push(related_to(
@@ -159,6 +162,17 @@ fn condition(check: &GraphCheck<'_>, node: &GraphNode, out: &mut Vec<Violation>)
                 decision,
             ));
         }
+    }
+}
+
+/// The answer a node's decision takes, when the node is a decision.
+fn answer_spec_of(node: &GraphNode) -> Option<&AnswerSpec<KeyRefs>> {
+    match &node.payload {
+        Payload::Decision(decision) => Some(&decision.answer),
+        Payload::Deliverable(_)
+        | Payload::Action(_)
+        | Payload::Milestone(_)
+        | Payload::Group(_) => None,
     }
 }
 
@@ -199,36 +213,49 @@ fn parses<T: std::str::FromStr>(value: &ConditionValue) -> bool {
     }
 }
 
+/// Whether an answer type can be compared for equality at all (the schema's table of
+/// operators decides), then whether `value` is one it can hold.
 fn equal_fits(spec: &AnswerSpec<KeyRefs>, value: &ConditionValue) -> bool {
-    match spec {
-        AnswerSpec::Boolean => matches!(value, ConditionValue::Boolean(_)),
-        AnswerSpec::SingleChoice(choices) => is_choice(choices, value),
-        AnswerSpec::Text => matches!(value, ConditionValue::Text(_)),
-        AnswerSpec::Date { .. } => parses::<Date>(value),
-        AnswerSpec::Identity { .. } => parses::<IdentityKey>(value),
-        AnswerSpec::MultiChoice(_) | AnswerSpec::IdentityList { .. } => false,
-    }
+    spec.answer_type().compares_equal()
+        && match spec {
+            AnswerSpec::Boolean => matches!(value, ConditionValue::Boolean(_)),
+            AnswerSpec::SingleChoice(choices) => is_choice(choices, value),
+            AnswerSpec::Text => matches!(value, ConditionValue::Text(_)),
+            AnswerSpec::Date { .. } => parses::<Date>(value),
+            AnswerSpec::Identity { .. } => parses::<IdentityKey>(value),
+            AnswerSpec::MultiChoice(_) | AnswerSpec::IdentityList { .. } => false,
+        }
 }
 
+/// The same for `contains`: the answer type must hold values, then `value` must be one.
 fn member_fits(spec: &AnswerSpec<KeyRefs>, value: &ConditionValue) -> bool {
-    match spec {
-        AnswerSpec::MultiChoice(choices) => is_choice(choices, value),
-        AnswerSpec::IdentityList { .. } => parses::<IdentityKey>(value),
-        AnswerSpec::Text => matches!(value, ConditionValue::Text(_)),
-        AnswerSpec::Boolean
-        | AnswerSpec::SingleChoice(_)
-        | AnswerSpec::Date { .. }
-        | AnswerSpec::Identity { .. } => false,
-    }
+    spec.answer_type().compares_member()
+        && match spec {
+            AnswerSpec::MultiChoice(choices) => is_choice(choices, value),
+            AnswerSpec::IdentityList { .. } => parses::<IdentityKey>(value),
+            AnswerSpec::Text => matches!(value, ConditionValue::Text(_)),
+            AnswerSpec::Boolean
+            | AnswerSpec::SingleChoice(_)
+            | AnswerSpec::Date { .. }
+            | AnswerSpec::Identity { .. } => false,
+        }
 }
 
 /// A8: a date rule's sources are milestones, date decisions, or `created_at`.
 fn date_rules(check: &GraphCheck<'_>, node: &GraphNode, out: &mut Vec<Violation>) {
     let rules = [
-        (NodeField::DueBy, node.due_by.as_ref()),
-        (NodeField::NotBefore, node.not_before.as_ref()),
+        (
+            ReferenceField::DueBy,
+            NodeField::DueBy,
+            node.due_by.as_ref(),
+        ),
+        (
+            ReferenceField::NotBefore,
+            NodeField::NotBefore,
+            node.not_before.as_ref(),
+        ),
     ];
-    for (field, rule) in rules {
+    for (takes, field, rule) in rules {
         let sources = rule.into_iter().flat_map(|rule| rule.sources.as_set());
         for source in sources {
             let DateSource::Node(source) = source else {
@@ -237,12 +264,8 @@ fn date_rules(check: &GraphCheck<'_>, node: &GraphNode, out: &mut Vec<Violation>
             let Some(target) = resolve(check, node, source, Some(field), out) else {
                 continue;
             };
-            let fits = match &target.payload {
-                Payload::Milestone(_) => true,
-                Payload::Decision(decision) => matches!(decision.answer, AnswerSpec::Date { .. }),
-                Payload::Deliverable(_) | Payload::Action(_) | Payload::Group(_) => false,
-            };
-            if !fits {
+            let answer = answer_spec_of(target).map(AnswerSpec::answer_type);
+            if !takes.takes(target.kind(), answer) {
                 let found = at_node(
                     check.tree,
                     &node.key,
@@ -261,17 +284,25 @@ fn stage_bounds(check: &GraphCheck<'_>, node: &GraphNode, out: &mut Vec<Violatio
         return;
     };
     let bounds = [
-        (NodeField::OpensAt, group.opens_at.as_ref()),
-        (NodeField::ClosesAt, group.closes_at.as_ref()),
+        (
+            ReferenceField::OpensAt,
+            NodeField::OpensAt,
+            group.opens_at.as_ref(),
+        ),
+        (
+            ReferenceField::ClosesAt,
+            NodeField::ClosesAt,
+            group.closes_at.as_ref(),
+        ),
     ];
-    for (field, bound) in bounds {
+    for (takes, field, bound) in bounds {
         let Some(bound) = bound else {
             continue;
         };
         let Some(target) = resolve(check, node, bound, Some(field), out) else {
             continue;
         };
-        let problem = if target.kind() != NodeKind::Milestone {
+        let problem = if !takes.takes(target.kind(), None) {
             Some((
                 ViolationCode::StageBoundNotMilestone,
                 "a stage bound is a milestone",
@@ -300,10 +331,10 @@ fn answer_spec(check: &GraphCheck<'_>, node: &GraphNode, out: &mut Vec<Violation
     match &decision.answer {
         AnswerSpec::Identity {
             fills_role: Some(role),
-        } => fills_role(check, node, role, false, out),
+        } => fills_role(check, node, role, AnswerType::Identity, out),
         AnswerSpec::IdentityList {
             fills_role: Some(role),
-        } => fills_role(check, node, role, true, out),
+        } => fills_role(check, node, role, AnswerType::IdentityList, out),
         AnswerSpec::Date {
             feeds_milestone: Some(milestone),
         } => {
@@ -311,7 +342,7 @@ fn answer_spec(check: &GraphCheck<'_>, node: &GraphNode, out: &mut Vec<Violation
             let Some(target) = resolve(check, node, milestone, field, out) else {
                 return;
             };
-            if target.kind() != NodeKind::Milestone {
+            if !ReferenceField::FeedsMilestone.takes(target.kind(), None) {
                 let found = at_node(
                     check.tree,
                     &node.key,
@@ -337,7 +368,7 @@ fn fills_role(
     check: &GraphCheck<'_>,
     node: &GraphNode,
     role: &RoleKey,
-    list: bool,
+    answer: AnswerType,
     out: &mut Vec<Violation>,
 ) {
     let (code, message) = match check.document.roles.get(role) {
@@ -345,7 +376,7 @@ fn fills_role(
             missing_role_code(check.document, role),
             "the role this decision fills does not exist",
         ),
-        Some(found) if found.multi != list => (
+        Some(found) if Some(found.multi) != answer.fills_role_multi() => (
             ViolationCode::FillsRoleCardinality,
             "an identity decision fills a single role, an identity-list decision a multi role",
         ),
@@ -362,7 +393,7 @@ fn participations(check: &GraphCheck<'_>, node: &GraphNode, out: &mut Vec<Violat
     let document = check.document;
     for (kind, source) in node.participations.as_map() {
         let multi_kind = if *kind == cairn_schema::KindKey::owner() {
-            false
+            OWNER_KIND_MULTI
         } else if let Some(declared) = document.participation_kinds.get(kind) {
             declared.multi
         } else {
@@ -383,7 +414,7 @@ fn participations(check: &GraphCheck<'_>, node: &GraphNode, out: &mut Vec<Violat
                     "the role this participation names does not exist",
                     Subject::Role(role.clone()),
                 ),
-                Some(found) if found.multi && !multi_kind => (
+                Some(found) if !role_fits_slot(multi_kind, found.multi) => (
                     ViolationCode::SingleKindOnMultiRole,
                     "a single-valued kind cannot take a multi-valued role",
                     Subject::Role(role.clone()),
@@ -479,30 +510,38 @@ fn one_per_graph(check: &GraphCheck<'_>, out: &mut Vec<Violation>) {
             | Payload::Group(_) => {}
         }
     }
-    let groups = std::iter::once((ViolationCode::SeveralFinalMilestones, finals))
-        .chain(
-            fillers
-                .into_values()
-                .map(|keys| (ViolationCode::SeveralFillingDecisions, keys)),
+    let groups = std::iter::once((
+        ViolationCode::SeveralFinalMilestones,
+        NodeField::Final,
+        finals,
+    ))
+    .chain(fillers.into_values().map(|keys| {
+        (
+            ViolationCode::SeveralFillingDecisions,
+            NodeField::FillsRole,
+            keys,
         )
-        .chain(
-            feeders
-                .into_values()
-                .map(|keys| (ViolationCode::SeveralFeedingDecisions, keys)),
-        );
-    for (code, keys) in groups {
-        let Some((first, rest)) = keys.split_first() else {
-            continue;
-        };
-        if rest.is_empty() {
+    }))
+    .chain(feeders.into_values().map(|keys| {
+        (
+            ViolationCode::SeveralFeedingDecisions,
+            NodeField::FeedsMilestone,
+            keys,
+        )
+    }));
+    for (code, field, keys) in groups {
+        if keys.len() < 2 {
             continue;
         }
-        let mut found = at_node(check.tree, first, code, "at most one per graph");
-        found.related = rest
-            .iter()
-            .map(|key| Subject::Node((*key).clone()))
-            .collect();
-        out.push(found);
+        // Each holder is reported at its own field, with one other holder (the first by
+        // key), so the list never grows as the square.
+        for holder in &keys {
+            let Some(other) = keys.iter().find(|other| other != &holder) else {
+                continue;
+            };
+            let found = at_node(check.tree, holder, code, "at most one per graph");
+            out.push(related_to(found, Some(field), other));
+        }
     }
 }
 
@@ -516,7 +555,7 @@ fn default_owner(check: &GraphCheck<'_>, out: &mut Vec<Violation>) {
             missing_role_code(check.document, role),
             "the default owner role does not exist",
         ),
-        Some(found) if found.multi => (
+        Some(found) if !role_fits_slot(OWNER_KIND_MULTI, found.multi) => (
             ViolationCode::SingleKindOnMultiRole,
             "the default owner is single-valued and cannot take a multi-valued role",
         ),

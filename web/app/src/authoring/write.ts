@@ -18,7 +18,6 @@ import { useKeyedRead, useSession, useCaller, useWrite } from "../data/react.ts"
 import type { WriteView } from "../data/write-machine.ts";
 import type { ReceiptState } from "../ui/receipt.ts";
 import { newPatchId, type Rejection } from "../data/writes.ts";
-import { writesIdentities } from "../detail/write.ts";
 import type { Mutation } from "./graph.ts";
 import { domainOf, type Authored } from "./target.ts";
 import { placesOf, type Place } from "./violations.ts";
@@ -62,10 +61,14 @@ export interface AuthorWrite {
 /** Who a preview is made as when the caller is not known yet. */
 export const LOCAL_USER = "u_local";
 
-/** The patch `mutations` make of `authored`'s graph, drafted against `base` and named `id`. */
+/**
+ * The patch `mutations` make of `authored`'s graph, drafted against `base` and named `id`. A
+ * journey's patch names the deployment revision it saw (E6): the service holds the patch that
+ * leaves an identity reference to it, so the page does not decide which writes do.
+ */
 export function authoredPatchOf(authored: Authored, mutations: Mutation[], base = authored.revision, id = newPatchId()): Schema<"Patch"> {
   const patch: Schema<"Patch"> = { id, target: authored.target, base_revision: base, mutations };
-  return "journey" in authored.target && writesIdentities(mutations) ? { ...patch, deployment_revision: authored.deploymentRevision } : patch;
+  return "journey" in authored.target ? { ...patch, deployment_revision: authored.deploymentRevision } : patch;
 }
 
 /** A local apply's failure as a preview: the engine's rejection, or why there is no preview. */

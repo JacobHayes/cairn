@@ -3,8 +3,8 @@
 //
 //   inactive -> choosing -> submitting -> inactive
 //
-// `choosing` takes a pick: one the rules refuse stays in `choosing` with the reason, a valid
-// one is previewed (unless the tab is in version skew, which previews nothing) and handed to the
+// `choosing` takes a pick: the engine's preview refuses an edge it cannot take, and the pick stays
+// in `choosing` with its words; any other is previewed (unless the tab is in version skew, which previews nothing) and handed to the
 // edit manager as a write. From then on the write is the manager's: the drawing only watches it
 // by its id. Stopping the drawing (the button, Escape, leaving edit mode) stops the drawing
 // waiting for the answer and never touches the write, which goes on to land or to ask the person
@@ -18,7 +18,7 @@ import { assign, fromCallback, fromPromise, setup, type SnapshotFrom } from "xst
 import type { EditsRef } from "../data/session-root.ts";
 import type { About, OperationId, PatchCommand } from "../data/edit-record.ts";
 import type { Rejection } from "../data/writes.ts";
-import { edgeRefusal, titleIn, type Mutation } from "./graph.ts";
+import { titleIn, type Mutation } from "./graph.ts";
 import type { Authored } from "./target.ts";
 import type { Preview } from "./write.ts";
 import { authoredPatchOf } from "./write.ts";
@@ -39,8 +39,6 @@ export interface DrawingInput {
 
 /** Why a pick sent nothing. */
 export type Refusal =
-  /** The rules of containment (A3), before any preview. */
-  | { by: "containment"; message: string }
   /** The engine refused the edge locally. */
   | { by: "preview"; rejection: Rejection }
   /** This edge's earlier write is still out. */
@@ -161,21 +159,12 @@ export const edgeDrawing = setup({
     ),
   },
   guards: {
-    refusedHere: ({ context, event }) => {
-      const { authored, to } = pickOf(event);
-      return edgeRefusal(authored.tree, context.from ?? "", to) !== undefined;
-    },
     incompatible: ({ context }) => !context.compatible(),
     previewRefused: (_, preview: Preview) => preview.outcome === "rejected",
   },
   actions: {
     forget: assign(FORGOTTEN),
     begin: assign(({ event }) => ({ ...FORGOTTEN, from: startOf(event).from })),
-    refuse: assign(({ context, event }) => {
-      const { authored, to } = pickOf(event);
-      // A new pick replaces the write the banner showed, even a refused one; the write itself stays with the manager.
-      return { refused: { by: "containment" as const, message: edgeRefusal(authored.tree, context.from ?? "", to) ?? "" }, sent: undefined };
-    }),
     take: assign(({ context, event }) => {
       const { authored, to, user, address } = pickOf(event);
       const from = context.from ?? "";
@@ -212,7 +201,6 @@ export const edgeDrawing = setup({
           on: {
             start: { target: ".fresh", actions: "begin" },
             pick: [
-              { guard: "refusedHere", target: ".fresh", actions: "refuse" },
               { guard: "incompatible", target: "submitting.awaiting", actions: ["take", "submit", "handOver"] },
               { target: "submitting", actions: "take" },
             ],

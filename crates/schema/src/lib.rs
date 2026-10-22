@@ -67,7 +67,8 @@ pub use domain::{
 pub use event::{Actor, ChangeSet, ContentHash, Event, EventType, PatchReceipt, Subject};
 pub use field::{NodeField, NodeFieldValue};
 pub use graph::{
-    Edge, FormatVersion, Graph, Insertion, ParticipationKind, RetiredKeys, Role, RouteFile,
+    Edge, FormatVersion, Graph, Insertion, OWNER_KIND_MULTI, ParticipationKind, RetiredKeys, Role,
+    RouteFile, role_fits_slot,
 };
 pub use id::{
     AgentId, AttachmentKey, ConversationId, IdError, IdentityKey, InsertionKey, JourneyId,
@@ -93,16 +94,17 @@ pub use patch::{
 pub use projection::{
     AffectedNodes, AnswerEffects, ChoiceEffect, Cursor, DecisionEntry, DecisionView, EdgeOrigin,
     ExplainedField, ExplanationPage, HiddenByFilter, HistoryPage, Level, LevelDisplay, LevelEdge,
-    LevelNode, LevelQuery, ListFlag, ListPage, ListQuery, MineEntry, Next, NextQuery, NodeRow,
-    OpenDecision, OutsideReference, PatchEvents, RankTerms, ReferenceField, RemovalRead,
-    RenderedDraft, RenderedSegment, RollUp, RouteSchedule, ScheduleEntry, Snapshot, SnapshotCounts,
-    SnapshotNode, SnapshotScope, SortBy, StatusSummary, Timeline, TimelineEntry, Trace,
-    UndatedEntry, UnderlyingEdge, UpcomingMilestone,
+    LevelNode, LevelQuery, ListFlag, ListPage, ListQuery, MineEntry, MissingPlaceholder, Next,
+    NextQuery, NodeRow, OpenDecision, OutsideReference, PatchEvents, RankAdds, RankTerms,
+    ReferenceField, RemovalRead, RenderedDraft, RenderedSegment, RollUp, RouteSchedule,
+    ScheduleEntry, Snapshot, SnapshotCounts, SnapshotNode, SnapshotScope, SortBy, StatusSummary,
+    Timeline, TimelineEntry, Trace, UndatedEntry, UnderlyingEdge, UpcomingMilestone,
 };
 pub use proposal::{
-    Conflict, ConflictResolution, DestinationAfter, Kept, OutlineFact, ParticipationMapping,
-    Proposal, ProposalDraft, ProposalOutline, ProposalPreview, ProposalStatus, ReviewItem,
-    RoleReference, UnresolvedItem, UnresolvedReason, removed_choices,
+    Conflict, ConflictResolution, ConflictReview, DestinationAfter, Kept, OutlineFact,
+    ParticipationMapping, Proposal, ProposalDraft, ProposalOutline, ProposalPreview,
+    ProposalStatus, ResolutionKind, ReviewItem, RoleReference, UnresolvedItem, UnresolvedReason,
+    removed_choices,
 };
 pub use record::{GraphKey, GraphRecord, Record, RecordKey, RetiredKey, Write};
 pub use refs::{FileRefs, KeyRefs, KeySlot, MapReferences, Reference, References};

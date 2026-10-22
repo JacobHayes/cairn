@@ -1,17 +1,18 @@
 // A5: a `relevant_when` condition as a tree an editor builds clause by clause (ARCHITECTURE,
 // Engine > Conditions: a structured predicate tree, a fixed operator set, no parser). Every
 // operator is reachable: `all`, `any`, and `not` compose; the leaves compare a decision's
-// answer. Which leaves a decision offers follows its answer type exactly as the engine checks
-// it (crates/engine validate/references.rs, `Comparable::fits`), and a value is picked from
-// what that type holds (a choice, yes or no, a date, an identity), so a type mismatch cannot be
-// entered. A condition cannot name a decision in its own node's subtree (Invariants), so the
-// editor never offers one. Rendering to a sentence is for display and never parsed back.
-import { CONDITION_CLAUSE_COUNT_MAX, CONDITION_DEPTH_MAX } from "@cairn/client";
+// answer. Which leaves a decision offers is the engine's table for its answer type, and a value
+// is picked from what that type holds (a choice, yes or no, a date, an identity), so a type
+// mismatch cannot be entered. A condition cannot name a decision in its own node's subtree
+// (Invariants): the editor offers those last and marks them, and the engine refuses one at the
+// field. Whether the whole condition is too big or has an empty combination is the engine's too
+// (condition-problem.ts). Rendering to a sentence is for display and never parsed back.
+import { CONDITION_LEAVES, type ConditionLeaf } from "@cairn/client";
 import { choiceId, choiceLabel, choiceNamed } from "../status/answer.ts";
 import { dateWords } from "../status/when.ts";
 
 import type { AnswerType, GraphNode, Tree } from "./graph.ts";
-import { descendantsOf, nodesByPath } from "./graph.ts";
+import { isAncestor, nodesFor } from "./graph.ts";
 import type { Condition } from "./fields.ts";
 import { nodeTitle } from "../ui/gone.ts";
 
@@ -19,27 +20,16 @@ export type Clause = Condition;
 export type Value = boolean | string;
 
 /** A leaf operator: it compares one decision's answer. */
-export type Leaf = "equals" | "not_equals" | "in" | "contains" | "answered";
+export type Leaf = ConditionLeaf;
 /** A combinator: it composes clauses. */
 export type Combinator = "all" | "any" | "not";
 export type Operator = Leaf | Combinator;
 
 export const COMBINATORS: readonly Combinator[] = ["all", "any", "not"];
 
-/** A5: the leaves each answer type can be compared by (the engine's `equal_fits` and `member_fits`). */
-const LEAVES: Record<AnswerType, readonly Leaf[]> = {
-  boolean: ["equals", "not_equals", "in", "answered"],
-  single_choice: ["equals", "not_equals", "in", "answered"],
-  text: ["equals", "not_equals", "in", "contains", "answered"],
-  date: ["equals", "not_equals", "in", "answered"],
-  identity: ["equals", "not_equals", "in", "answered"],
-  multi_choice: ["contains", "answered"],
-  identity_list: ["contains", "answered"],
-};
-
-/** A5: the leaf operators a decision of `answer` offers. */
+/** A5: the leaf operators a decision of `answer` offers (the engine's table). */
 export function leavesFor(answer: AnswerType): readonly Leaf[] {
-  return LEAVES[answer];
+  return CONDITION_LEAVES[answer];
 }
 
 /** The words for an operator, as an editor's select shows them. */
@@ -96,10 +86,15 @@ export function firstValue(input: ValueInput, today: string, identity: string | 
   }
 }
 
-/** The decisions `node`'s condition may name: every decision outside its own subtree (Invariants). */
+/** Whether `decision` is `node` or inside it: a condition on `node` cannot read it (Invariants). */
+export function insideNode(tree: Tree, node: string | undefined, decision: string): boolean {
+  return node !== undefined && (decision === node || isAncestor(tree, node, decision));
+}
+
+/** The decisions `node`'s condition may name (the engine's table), those outside its own subtree first. */
 export function referableDecisions(tree: Tree, node: string | undefined): GraphNode[] {
-  const own = new Set(node === undefined ? [] : [node, ...descendantsOf(tree, node).map((each) => each.key)]);
-  return nodesByPath(tree, "decision").filter((decision) => !own.has(decision.key));
+  const decisions = nodesFor(tree, "relevant_when");
+  return [...decisions.filter((each) => !insideNode(tree, node, each.key)), ...decisions.filter((each) => insideNode(tree, node, each.key))];
 }
 
 /** The operator a clause uses. */
@@ -225,31 +220,6 @@ export function appendAt(root: Clause, path: ClausePath, clause: Clause): Clause
     return root;
   }
   return replaceAt(root, path, combinator(operatorOf(parent) as Combinator, [...childrenOfClause(parent), clause])) ?? root;
-}
-
-/** The condition's depth (a leaf is 1) and clause count, which the limits bound. */
-export function sizeOf(clause: Clause): { depth: number; clauses: number } {
-  const children = childrenOfClause(clause).map(sizeOf);
-  return {
-    depth: 1 + Math.max(0, ...children.map((child) => child.depth)),
-    clauses: 1 + children.reduce((sum, child) => sum + child.clauses, 0),
-  };
-}
-
-/** Why the condition cannot be sent: past a limit, an empty combinator, or a leaf with nothing to compare. */
-export function conditionProblem(clause: Clause): string | undefined {
-  const { depth, clauses } = sizeOf(clause);
-  if (depth > CONDITION_DEPTH_MAX) {
-    return `A condition is at most ${String(CONDITION_DEPTH_MAX)} levels deep.`;
-  }
-  if (clauses > CONDITION_CLAUSE_COUNT_MAX) {
-    return `A condition has at most ${String(CONDITION_CLAUSE_COUNT_MAX)} clauses.`;
-  }
-  const empty = (each: Clause): boolean =>
-    (("all" in each || "any" in each) && childrenOfClause(each).length === 0) ||
-    ("in" in each && each.in.values.length === 0) ||
-    childrenOfClause(each).some(empty);
-  return empty(clause) ? "Every 'all of', 'any of', and 'is one of' needs something in it." : undefined;
 }
 
 /** Every decision a condition names. */

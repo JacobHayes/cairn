@@ -22,13 +22,27 @@ fn main() -> ExitCode {
             return ExitCode::FAILURE;
         }
     };
-    let text = cairn_engine::rules::typescript() + &citations;
+    let text = cairn_engine::rules::typescript() + &stream_limits() + &citations;
     if let Err(error) = std::fs::write(&path, text) {
         eprintln!("cairn-rules: writing {}: {error}", path.display());
         return ExitCode::FAILURE;
     }
     println!("cairn-rules: wrote {}", path.display());
     ExitCode::SUCCESS
+}
+
+/// The limits of the server's change stream the page backs off by, in milliseconds: how
+/// often a subscriber is handed ticks, and how long a write may go untaken. The engine crate
+/// cannot see them.
+fn stream_limits() -> String {
+    format!(
+        "\n/** The shortest wait before a closed change stream is reopened: the coalescing interval. */\n\
+         export const SSE_COALESCING_INTERVAL_MS = {};\n\
+         /** The longest wait: the time a stalled subscriber is cut after. */\n\
+         export const SSE_WRITE_STALL_MS = {};\n",
+        cairn_api::limits::SSE_COALESCING_INTERVAL.as_millis(),
+        cairn_api::limits::SSE_WRITE_STALL.as_millis()
+    )
 }
 
 /// The patterns of what a reader cannot follow, as regular expressions both test suites

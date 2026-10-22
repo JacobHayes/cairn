@@ -5,10 +5,9 @@ import { answerWords, choiceNamed } from "../status/answer.ts";
 import { dateWords } from "../status/when.ts";
 import type { NodeDetail, Ready } from "./model.ts";
 import { IDENTITY_GONE, KIND_GONE, ROLE_GONE, slotName } from "../ui/gone.ts";
-import type { Schema } from "@cairn/client";
+import { OWNER_KIND, type Schema } from "@cairn/client";
 import { namedList } from "../ui/words.ts";
 import { identityLabel } from "../people/label.ts";
-import { OWNER_KIND } from "./model.ts";
 
 export type Slot = { key: string; id: string; title?: string | null | undefined };
 type Deployment = Schema<"Deployment">;
@@ -20,7 +19,7 @@ export function roleNamed(roles: readonly Slot[] | undefined, role: string): str
 
 /** A participation kind by its title among `kinds`; the built-in owner kind has none in a graph. */
 export function kindNamed(kinds: readonly Slot[] | undefined, kind: string): string {
-  return kind === OWNER_KIND ? "Owner" : slotName(kinds?.find((each) => each.key === kind), KIND_GONE);
+  return kind === OWNER_KIND.key ? "Owner" : slotName(kinds?.find((each) => each.key === kind), KIND_GONE);
 }
 
 /** A journey's role by its title. */
@@ -70,7 +69,7 @@ export function ownedBy(view: Ready, owners: readonly string[] | undefined, iden
 
 /** E2: the keys of a node's effective owners. */
 export function ownersOf(view: Ready, key: string): string[] {
-  return view.derived.nodes[key]?.participations?.[OWNER_KIND]?.identities ?? [];
+  return view.derived.nodes[key]?.participations?.[OWNER_KIND.key]?.identities ?? [];
 }
 
 /** What a surface says for the viewer among a node's owners. */

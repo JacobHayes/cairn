@@ -41,6 +41,17 @@ pub struct Role<R: References> {
     pub multi: bool,
 }
 
+/// Whether the built-in `owner` kind is held by several identities (A7): it is single-valued.
+pub const OWNER_KIND_MULTI: bool = false;
+
+/// A6, A7: whether a role of cardinality `role_multi` can fill a slot (a participation kind,
+/// or the default owner) of cardinality `slot_multi`: a single-valued slot cannot take a
+/// multi-valued role, and a multi-valued slot takes either.
+#[must_use]
+pub const fn role_fits_slot(slot_multi: bool, role_multi: bool) -> bool {
+    slot_multi || !role_multi
+}
+
 // PRD: A7.
 /// A participation kind a graph declares beyond the built-in `owner`.
 #[derive(

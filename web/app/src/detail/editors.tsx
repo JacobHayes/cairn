@@ -2,14 +2,14 @@
 // through the decision that feeds it when one does; the snooze form (what to set aside, until
 // when) the actions open; a force include lifted; its weight; and its participations. Each is
 // one patch whose rejection shows here, a pin's with the moves that resolve a contradictory chain.
-import type { Schema } from "@cairn/client";
+import { OWNER_KIND, type Schema } from "@cairn/client";
 import { useId, type ReactNode } from "react";
 
 import { snoozeEndWords } from "../status/snooze.ts";
 import { dateWords } from "../status/when.ts";
 import { Button, Field } from "../ui/kit.tsx";
 import { Saving, type Sending } from "../ui/Receipt.tsx";
-import { type Mutation, type NodeDetail, nodeOf, OWNER_KIND, type Ready, titleOf, transition } from "./model.ts";
+import { type Mutation, type NodeDetail, nodeOf, type Ready, titleOf, transition } from "./model.ts";
 import { NodeLink } from "./parts.tsx";
 import { Rejected } from "./Rejected.tsx";
 import { identityName } from "./sections.tsx";
@@ -309,7 +309,7 @@ export function ParticipationEditor({ view, detail }: { view: Ready; detail: Nod
   const write = useNodeWrite(view, `participation:${detail.node.key}`, detail.node.key);
   const key = detail.node.key;
   const form = useFormDraft<{ kind: string; chosen: string[] }>(write.journey, key, "participation");
-  const kinds = [OWNER_KIND, ...(view.journey.graph.participation_kinds ?? []).map((each) => each.key)];
+  const kinds: string[] = [OWNER_KIND.key, ...(view.journey.graph.participation_kinds ?? []).map((each) => each.key)];
   const own = Object.keys(nodeOf(view, key)?.participations ?? {});
   const identities = view.inputs.deployment.identities ?? [];
   const draft = form.draft;

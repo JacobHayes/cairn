@@ -157,7 +157,7 @@ export function rankClause(view: Ready, derived: NodeDerived, facts: RankFacts):
   if (position === undefined) {
     return "";
   }
-  const parts = row?.rank == null ? [] : rankParts(row.rank, view.inputs.rank).slice(0, 2);
+  const parts = row?.rank == null ? [] : rankParts(row.rank).slice(0, 2);
   const slack = derived.dates.slack_days;
   const due = derived.dates.due?.date;
   const phrases = parts.flatMap((part): string[] => {

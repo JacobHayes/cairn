@@ -20,10 +20,8 @@ import { Tip } from "../ui/Tip.tsx";
 
 type Resource = Schema<"Resource">;
 
-/** G3: the text a rendered draft copies as, each missing placeholder written as a marker. */
-export function draftText(draft: RenderedDraft): string {
-  return draft.segments.map((segment) => ("text" in segment ? segment.text : `[missing: ${segment.missing}]`)).join("");
-}
+/** G3: the text a segment shows and a rendered draft copies as: a missing placeholder is the engine's marker. */
+const shown = (segment: RenderedDraft["segments"][number]): string => ("text" in segment ? segment.text : segment.missing.text);
 
 /** The page's link to the journey (`{{journey.url}}`): its address on this origin (the journey, which opens on its Summary). */
 export function journeyUrl(journey: string, origin: string): string {
@@ -49,16 +47,16 @@ function MessageDraft({ view, node, resource }: { view: Ready; node: string; res
       <blockquote className="draft" data-testid="draft-text">
         {rendered.segments.map((segment, at) =>
           "text" in segment ? (
-            <span key={at}>{segment.text}</span>
+            <span key={at}>{shown(segment)}</span>
           ) : (
             <Tip key={at} tip="Nothing fills this yet" tap>
-              <mark data-testid="draft-missing">[missing: {segment.missing}]</mark>
+              <mark data-testid="draft-missing">{shown(segment)}</mark>
             </Tip>
           ),
         )}
       </blockquote>
       <span className="row">
-        <CopyButton what="the message" text={draftText(rendered)} />
+        <CopyButton what="the message" text={rendered.segments.map(shown).join("")} />
       </span>
     </div>
   );

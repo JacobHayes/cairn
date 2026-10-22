@@ -5,7 +5,7 @@
 // local derivation already gives (model.ts), kept current as it moves (H6). The lead and the
 // sections are read in that order at every width; a wide page only places the last three in a
 // side column. Printed, every list is whole and the page is dated (it is the report, C18).
-import { STATUS_HOLDS_CURRENT_WORK } from "@cairn/client";
+import { OWNER_KIND, STATUS_HOLDS_CURRENT_WORK } from "@cairn/client";
 import type { ReactNode } from "react";
 import { Link } from "react-router";
 
@@ -48,7 +48,6 @@ import { EntriesPanel, type Entry } from "./Entries.tsx";
 import "./summary.css";
 import { Failed } from "../ui/Failed.tsx";
 import { ownersOf } from "../detail/sections.tsx";
-import { OWNER_KIND } from "../detail/model.ts";
 import { Tip } from "../ui/Tip.tsx";
 
 /** The date of a milestone line in words, where it comes from on hover, and its own shortfall as a sentence of its own. */
@@ -322,7 +321,7 @@ export function SummaryPage({ ready, note }: { ready: Ready; note?: ReactNode })
     return <Waiting ready={ready} error={errorWords(read) ?? errorWords(next) ?? (mine.status === "failed" ? mine.message : undefined)} />;
   }
   // E4, C18: "yours" is the engine's "mine", the entries where the viewer's identities own it; a journey that holds no current work has none (B11).
-  const owned = STATUS_HOLDS_CURRENT_WORK[status] ? mine.entries.filter((entry) => entry.kinds.includes(OWNER_KIND)) : [];
+  const owned = STATUS_HOLDS_CURRENT_WORK[status] ? mine.entries.filter((entry) => entry.kinds.includes(OWNER_KIND.key)) : [];
   const model = summaryModel(ready, summary);
   const entries = entriesOf(ready, model, frontier, new Set(owned.map((entry) => entry.node)));
   return (

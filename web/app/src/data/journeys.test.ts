@@ -1,7 +1,7 @@
 // H6 for a derived journey: refetched only for a tick newer than what is held, for a newer
 // deployment, and when the date passes; never shown older; skew stops it; and a derivation is
 // freed only by the load that made it (ARCHITECTURE, Web UI: data flow, version skew).
-import { REOPEN_DELAY_FIRST_MS } from "@cairn/client";
+import { SSE_COALESCING_INTERVAL_MS } from "@cairn/client";
 import { describe, expect, it } from "vitest";
 
 import { CountingClock, FakeDeriver, FakeHost, deferred, settled } from "./fake.test-support.ts";
@@ -196,7 +196,7 @@ describe("a journey's faults", () => {
     edit(host, "j_one", 4);
     await turn();
     expect(revisionShown(session, "j_one")).toEqual([3, 1, TODAY]);
-    clock.increment(REOPEN_DELAY_FIRST_MS);
+    clock.increment(SSE_COALESCING_INTERVAL_MS);
     await turn();
     expect(revisionShown(session, "j_one")).toEqual([4, 1, TODAY]);
   });
@@ -345,7 +345,7 @@ describe("a retry that is no longer owed", () => {
     host.failNext = true;
     edit(host, "j_one", 4);
     await turn();
-    expect(clock.pending).toContain(REOPEN_DELAY_FIRST_MS);
+    expect(clock.pending).toContain(SSE_COALESCING_INTERVAL_MS);
     host.open();
     await turn();
     expect(clock.pending).toEqual([ROLLOVER_CHECK_MS]);

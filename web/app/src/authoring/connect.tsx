@@ -104,12 +104,7 @@ function RefusalLines({ refused }: { refused: Refusal }) {
   if (refused.by === "preview" && refused.rejection.rejection === "invalid") {
     return <ViolationLines violations={refused.rejection.violations} />;
   }
-  const words =
-    refused.by === "containment"
-      ? refused.message
-      : refused.by === "preview"
-        ? reasonOf(refused.rejection)
-        : "This requirement was already sent and is not confirmed yet; see the sync chip.";
+  const words = refused.by === "preview" ? reasonOf(refused.rejection) : "This requirement was already sent and is not confirmed yet; see the sync chip.";
   return (
     <span className="author-problem" role="alert" data-testid="edge-refused">
       {words}

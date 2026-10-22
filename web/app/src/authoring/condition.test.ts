@@ -8,7 +8,6 @@ import {
   COMBINATORS,
   appendAt,
   combinator,
-  conditionProblem,
   decisionsIn,
   firstValue,
   leaf,
@@ -19,10 +18,11 @@ import {
   type Clause,
   type Leaf,
 } from "./condition.ts";
+import { ANSWER_TYPES } from "@cairn/client";
+
 import { applyToDraft, seeded } from "./engine.test-support.ts";
 import { treeOf, type AnswerType, type GraphNode } from "./graph.ts";
 
-const ANSWER_TYPES: AnswerType[] = ["boolean", "single_choice", "multi_choice", "text", "date", "identity", "identity_list"];
 const LEAVES: Leaf[] = ["equals", "not_equals", "in", "contains", "answered"];
 
 const decision = (answer: AnswerType): GraphNode => ({
@@ -84,23 +84,23 @@ describe("editing the tree", () => {
     expect(decisionsIn({ any: [yes, { not: answered }] })).toEqual(["n_boolean", "n_text"]);
   });
 
-  it("is refused before sending past its limits or with an empty combinator", () => {
-    let deep: Clause = yes;
-    for (let level = 0; level < 8; level += 1) {
-      deep = { not: deep };
-    }
-    expect(conditionProblem(deep)).toBeDefined();
-    expect(conditionProblem({ all: Array.from({ length: 16 }, () => yes) })).toBeDefined();
-    expect(conditionProblem({ any: [] })).toBeDefined();
-    expect(conditionProblem({ all: [yes, { not: answered }] })).toBeUndefined();
+  it("is counted by the engine in comparisons, so sixteen comparisons under combinators are sent and a seventeenth is not", async () => {
+    const host = await seeded();
+    const problem = (clause: Clause): unknown => JSON.parse(host.engine.conditionProblemText(clause));
+    const sixteen: Clause = { all: [...Array.from({ length: 8 }, () => yes), { not: { any: Array.from({ length: 8 }, () => yes) } }] };
+    expect(problem(sixteen)).toBeNull();
+    expect(problem({ all: [sixteen, yes] })).toEqual({ too_large: { limit: "condition_clause_count_max", count: 17 } });
+    expect(problem({ any: [] })).toBe("empty_combination");
+    // A list of values past its limit does not read as a clause: it is a problem to show, not a failed check.
+    expect(problem(leaf("in", "n_text", Array.from({ length: 101 }, (_, at) => `v${String(at)}`)))).toHaveProperty("unreadable");
   });
 
-  it("never offers a decision inside the node's own subtree (Invariants)", () => {
+  it("offers a decision inside the node's own subtree last and marked, for the engine to refuse (Invariants)", () => {
     const group: GraphNode = { key: "n_group", id: "group", kind: "group", title: "Group" };
     const inside = { ...decision("boolean"), parent: "n_group" };
     const outside = decision("text");
     const tree = treeOf({ nodes: [group, inside, outside] });
-    expect(referableDecisions(tree, "n_group").map((node) => node.key)).toEqual([outside.key]);
+    expect(referableDecisions(tree, "n_group").map((node) => node.key)).toEqual([outside.key, inside.key]);
     expect(referableDecisions(tree, undefined).map((node) => node.key).sort()).toEqual([inside.key, outside.key].sort());
   });
 });

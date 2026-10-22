@@ -6,6 +6,7 @@
 // Domain-free: the words are filler, not a use case.
 import { expect, type Page } from "@playwright/test";
 
+import { TITLE_BYTES_MAX } from "../../client/generated/rules.ts";
 import { publishDraft, startJourney, versionSelect, journeyName } from "./around.ts";
 import { addIdentity } from "./around.ts";
 import { daysAfter } from "./acting.ts";
@@ -36,7 +37,7 @@ export const STRESS = {
   stages: ["n_stage_a", "n_stage_b", "n_stage_c", "n_stage_d", "n_stage_e", "n_stage_f"],
 } as const;
 
-const title = (text: string) => JSON.stringify(text.slice(0, 256));
+const title = (text: string) => JSON.stringify(text.slice(0, TITLE_BYTES_MAX));
 
 /** One node of the route file. */
 function node(key: string, kind: string, text: string, extra: string[] = []): string {

@@ -7,10 +7,11 @@
 import { useEffect, useRef, useState } from "react";
 
 import { ConditionEditor } from "../authoring/ConditionEditor.tsx";
+import { useConditionProblem } from "../authoring/condition-problem.ts";
 import { planRemoval, removalMutations } from "../authoring/cascade.ts";
 import { DateRuleEditor } from "../authoring/DateRuleEditor.tsx";
 import { draftOf, draftProblems, nodeFrom, valueOf, type FormField, type NodeDraft } from "../authoring/fields.ts";
-import { canHoldChildren, kindOption, edgeRefusal, moveTargets, newNode, nodesByPath, pathOf, type GraphNode, type Mutation, type NodeField, type NodeKind, type Role, type Tree } from "../authoring/graph.ts";
+import { canHoldChildren, kindOption, moveTargets, newNode, nodesByPath, nodesFor, pathOf, rolesForFill, type GraphNode, type Mutation, type NodeField, type NodeKind, type ReferenceField, type Role, type Tree } from "../authoring/graph.ts";
 import { BasicsFields, ChoicesEditor, CompletionFields, DecisionFields, StageFields, WeightFields, has } from "../authoring/NodeFields.tsx";
 import { problemsOf } from "../authoring/NodeForm.tsx";
 import { FieldBox, Picker } from "../authoring/parts.tsx";
@@ -20,6 +21,7 @@ import { Input as AnswerInput } from "../detail/AnswerEditor.tsx";
 import type { Ready } from "../detail/model.ts";
 import { Section } from "../detail/parts.tsx";
 import { fieldWords } from "../status/words.ts";
+import { NODE_FIELDS } from "@cairn/client";
 import { Button, Field } from "../ui/kit.tsx";
 import { carryIds, withFieldValue, withMutation, withMutationsAdded, withoutMutation, type ProposalDraft } from "./model.ts";
 import { mutationWords, type Names } from "./words.ts";
@@ -81,8 +83,9 @@ function useSyncedDraft<T>(source: unknown, make: () => T): { draft: T; set: (dr
 function AddedNode({ editor, node, onChange, context }: { editor: string; node: GraphNode; onChange: (node: GraphNode) => void; context: ChangesContext }) {
   const synced = useSyncedDraft<NodeDraft>(node, () => draftOf(node));
   const draft = synced.draft;
-  const problems = problemsOf(node, draft);
-  useInvalid(context, editor, Object.keys(problems).length > 0);
+  const condition = useConditionProblem(draft.relevant_when);
+  const problems = { ...problemsOf(node, draft), ...(condition.problem === undefined ? {} : { relevant_when: condition.problem }) };
+  useInvalid(context, editor, Object.keys(problems).length > 0 || !condition.checked);
   const change = (next: Partial<NodeDraft>) => {
     const merged = { ...draft, ...next };
     synced.set(merged);
@@ -132,15 +135,12 @@ function nodeOf(context: ChangesContext, key: string): GraphNode | undefined {
   return added?.op === "add_node" ? added.node : context.tree.byKey.get(key);
 }
 
-/** The fields a set field's editor offers here: every node field (A1a). */
-export const EDITABLE_FIELDS: ReadonlySet<string> = new Set(["id", "title", "description", "prompt", "help", "weight", "estimate", "placeholder", "requires_artifact", "requires_note", "final", "auto_done", "gates", "closes", "parent", "opens_at", "closes_at", "feeds_milestone", "fills_role", "choices", "relevant_when", "due_by", "not_before"]);
-
 const LINE_FIELDS = ["id", "title"] as const;
 /** Markdown, which keeps its line breaks: a textarea. */
 const MARKDOWN_FIELDS = ["description", "prompt", "help"] as const;
 const NUMBER_FIELDS = ["weight", "estimate"] as const;
 const FLAG_FIELDS = ["placeholder", "requires_artifact", "requires_note", "final", "auto_done", "gates", "closes"] as const;
-const MILESTONE_FIELDS = ["opens_at", "closes_at", "feeds_milestone"] as const;
+const MILESTONE_FIELDS = ["opens_at", "closes_at", "feeds_milestone"] as const satisfies readonly ReferenceField[];
 const includes = <T extends string>(list: readonly T[], field: string): field is T => (list as readonly string[]).includes(field);
 
 /** A field the proposal sets, edited with authoring's controls for that field; a value with a problem is held here, not written. */
@@ -149,8 +149,9 @@ function FieldValue({ editor, mutation, onChange, context }: { editor: string; m
   const node = nodeOf(context, mutation.node);
   const synced = useSyncedDraft<NodeDraft | undefined>(mutation.value, () => (node === undefined ? undefined : draftOf(withFieldValue(node, mutation.value))));
   const draft = synced.draft;
-  const problem = node === undefined || draft === undefined ? undefined : draftProblems(node.kind, draft)[field];
-  useInvalid(context, editor, problem !== undefined);
+  const condition = useConditionProblem(field === "relevant_when" ? (draft?.relevant_when ?? null) : null);
+  const problem = node === undefined || draft === undefined ? undefined : (draftProblems(node.kind, draft)[field] ?? condition.problem);
+  useInvalid(context, editor, problem !== undefined || !condition.checked);
   if (node === undefined || draft === undefined) {
     return <span className="muted small">Its node is not in the graph, so its value cannot be edited here.</span>;
   }
@@ -164,15 +165,15 @@ function FieldValue({ editor, mutation, onChange, context }: { editor: string; m
     }
   };
   const props = { kind: node.kind, nodeKey: node.key, draft, change, notes: () => ({ problem }), tree: context.tree, roles: context.roles };
-  const milestones = nodesByPath(context.tree, "milestone").map((each) => ({ value: each.key, label: each.title }));
+  const targets = includes(MILESTONE_FIELDS, field) ? nodesFor(context.tree, field).map((each) => ({ value: each.key, label: each.title })) : [];
   return (
     <FieldBox label={fieldWords(field)} place={field} notes={{ problem }}>
       {includes(LINE_FIELDS, field) ? <Field aria-label={fieldWords(field)} value={draft[field]} onChange={(event) => { change({ [field]: event.target.value }); }} /> : null}
       {includes(MARKDOWN_FIELDS, field) ? <textarea aria-label={fieldWords(field)} value={draft[field]} onChange={(event) => { change({ [field]: event.target.value }); }} /> : null}
       {includes(NUMBER_FIELDS, field) ? <Field type="number" min={0} aria-label={fieldWords(field)} value={draft[field]} onChange={(event) => { change({ [field]: event.target.value }); }} /> : null}
       {includes(FLAG_FIELDS, field) ? <input type="checkbox" aria-label={fieldWords(field)} checked={draft[field]} onChange={(event) => { change({ [field]: event.target.checked }); }} /> : null}
-      {includes(MILESTONE_FIELDS, field) ? <Picker aria-label={fieldWords(field)} value={draft[field]} none="None" options={milestones} onChange={(event) => { change({ [field]: event.target.value }); }} /> : null}
-      {field === "fills_role" ? <Picker aria-label={fieldWords(field)} value={draft.fills_role} none="No role" options={context.roles.map((role) => ({ value: role.key, label: role.title ?? role.id }))} onChange={(event) => { change({ fills_role: event.target.value }); }} /> : null}
+      {includes(MILESTONE_FIELDS, field) ? <Picker aria-label={fieldWords(field)} value={draft[field]} none="None" options={targets} onChange={(event) => { change({ [field]: event.target.value }); }} /> : null}
+      {field === "fills_role" ? <Picker aria-label={fieldWords(field)} value={draft.fills_role} none="No role" options={rolesForFill(context.roles, draft.answer_type).map((role) => ({ value: role.key, label: role.title ?? role.id }))} onChange={(event) => { change({ fills_role: event.target.value }); }} /> : null}
       {field === "parent" ? <ParentValue mutation={mutation} onChange={onChange} context={context} /> : null}
       {field === "choices" ? <ChoicesEditor props={props} /> : null}
       {field === "relevant_when" ? <ConditionEditor value={draft.relevant_when} onChange={(next) => { change({ relevant_when: next }); }} tree={context.tree} node={mutation.node} identities={context.deployment.identities ?? []} today={context.today} /> : null}
@@ -219,7 +220,7 @@ function editable(mutation: Mutation, context: ChangesContext): boolean {
     case "set_pin":
       return true;
     case "set_node_field":
-      return EDITABLE_FIELDS.has(Object.keys(mutation.value)[0] ?? "");
+      return (NODE_FIELDS as readonly string[]).includes(Object.keys(mutation.value)[0] ?? "");
     case "answer":
       return context.ready !== undefined && context.tree.byKey.has(mutation.decision);
     default:
@@ -291,21 +292,19 @@ function RemoveNode({ context }: { context: ChangesContext }) {
   );
 }
 
-/** A3: an edge added in the proposal, refused before it is added when it cannot be drawn. */
+/** A3: an edge added in the proposal; the proposal's preview refuses one that cannot be drawn. */
 function AddEdge({ context }: { context: ChangesContext }) {
   const [node, setNode] = useState("");
   const [requires, setRequires] = useState("");
   const options = nodesByPath(context.tree).map((each) => ({ value: each.key, label: `${each.title} (${pathOf(context.tree, each.key)})` }));
-  const refusal = node === "" || requires === "" ? undefined : edgeRefusal(context.tree, node, requires);
   return (
     <span className="row" data-testid="proposal-add-edge">
       <Picker aria-label="Node" value={node} none="A node" options={options} onChange={(event) => { setNode(event.target.value); }} />
       requires
       <Picker aria-label="Requires" value={requires} none="another" options={options} onChange={(event) => { setRequires(event.target.value); }} />
-      <Button disabled={node === "" || requires === "" || refusal !== undefined} onClick={() => { context.edit(withMutationsAdded(context.draft, [{ op: "add_edge", edge: { node, requires } }])); setNode(""); setRequires(""); }}>
+      <Button disabled={node === "" || requires === ""} onClick={() => { context.edit(withMutationsAdded(context.draft, [{ op: "add_edge", edge: { node, requires } }])); setNode(""); setRequires(""); }}>
         Add the edge
       </Button>
-      {refusal === undefined ? null : <span className="author-problem">{refusal}</span>}
     </span>
   );
 }
