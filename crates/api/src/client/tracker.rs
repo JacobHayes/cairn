@@ -1,4 +1,5 @@
-//! H6's subscription tracking, as logic that knows no transport: a view holds the revision
+//! H6's subscription tracking, as logic that knows no transport (the TypeScript client has
+//! its own, and both run the cases in `web/client/src/tracker-cases.json`): a view holds the revision
 //! it fetched of each domain it shows, and a tick asks it to refetch only when the tick is
 //! newer than what it holds and than a refetch it already asked for. The current
 //! revisions a stream starts with, again on every reconnect, ask for nothing the view
@@ -76,51 +77,75 @@ impl Tracker {
 mod tests {
     use super::*;
     use cairn_schema::Domain;
+    use serde::Deserialize;
 
-    fn tick(number: u32) -> Tick {
-        Tick {
-            of: RevisionOf::Domain(Domain::Deployment),
-            revision: number.try_into().unwrap(),
+    /// A named run of moves with what each must show: the cases the TypeScript client runs
+    /// too (`web/client/src/tracker-cases.json`), so the two cannot drift.
+    #[derive(Deserialize)]
+    struct Case {
+        name: String,
+        steps: Vec<Step>,
+    }
+
+    #[derive(Deserialize)]
+    #[serde(tag = "op", rename_all = "snake_case")]
+    enum Step {
+        Fetched {
+            of: Option<RevisionOf>,
+            revision: u32,
+        },
+        Ticked {
+            of: Option<RevisionOf>,
+            revision: u32,
+            asks: bool,
+        },
+        RefetchFailed {
+            of: Option<RevisionOf>,
+        },
+        Reopened,
+        Held {
+            of: Option<RevisionOf>,
+            holds: Option<u32>,
+        },
+    }
+
+    fn deployment() -> RevisionOf {
+        RevisionOf::Domain(Domain::Deployment)
+    }
+
+    #[test]
+    fn the_shared_cases_hold() {
+        let cases: Vec<Case> = serde_json::from_str(include_str!(
+            "../../../../web/client/src/tracker-cases.json"
+        ))
+        .unwrap();
+        assert!(!cases.is_empty());
+        for case in cases {
+            let mut tracker = Tracker::new();
+            for (index, step) in case.steps.into_iter().enumerate() {
+                let at = format!("{}, step {index}", case.name);
+                match step {
+                    Step::Fetched { of, revision } => {
+                        tracker
+                            .fetched(&of.unwrap_or_else(deployment), revision.try_into().unwrap());
+                    }
+                    Step::Ticked { of, revision, asks } => {
+                        let tick = Tick {
+                            of: of.unwrap_or_else(deployment),
+                            revision: revision.try_into().unwrap(),
+                        };
+                        assert_eq!(tracker.ticked(&tick), asks, "{at}");
+                    }
+                    Step::RefetchFailed { of } => {
+                        tracker.refetch_failed(&of.unwrap_or_else(deployment));
+                    }
+                    Step::Reopened => tracker.reopened(),
+                    Step::Held { of, holds } => {
+                        let held = tracker.held(&of.unwrap_or_else(deployment));
+                        assert_eq!(held, holds.map(|number| number.try_into().unwrap()), "{at}");
+                    }
+                }
+            }
         }
-    }
-
-    #[test]
-    fn only_a_newer_tick_asks_for_a_refetch_and_only_once() {
-        let mut tracker = Tracker::new();
-        let of = tick(0).of;
-        assert!(tracker.ticked(&tick(2)), "nothing held: fetch it");
-        assert!(!tracker.ticked(&tick(2)), "already asked");
-        tracker.fetched(&of, 3.try_into().unwrap());
-        assert!(
-            !tracker.ticked(&tick(2)),
-            "a reconnect's current revision, older"
-        );
-        assert!(!tracker.ticked(&tick(3)), "held");
-        assert!(tracker.ticked(&tick(4)));
-        tracker.fetched(&of, 2.try_into().unwrap());
-        assert_eq!(
-            tracker.held(&of),
-            Some(3.try_into().unwrap()),
-            "never older"
-        );
-        assert!(!tracker.ticked(&tick(4)), "still asked for");
-        tracker.fetched(&of, 4.try_into().unwrap());
-        assert!(tracker.ticked(&tick(5)));
-    }
-
-    #[test]
-    fn a_failed_refetch_or_a_reopened_stream_asks_again() {
-        let mut tracker = Tracker::new();
-        let of = tick(0).of;
-        tracker.fetched(&of, 4.try_into().unwrap());
-        assert!(tracker.ticked(&tick(5)));
-        tracker.refetch_failed(&of);
-        assert!(
-            tracker.ticked(&tick(5)),
-            "the reconnect's current revision asks again"
-        );
-        tracker.reopened();
-        assert!(tracker.ticked(&tick(5)), "a reopened stream asks again");
-        assert_eq!(tracker.held(&of), Some(4.try_into().unwrap()));
     }
 }

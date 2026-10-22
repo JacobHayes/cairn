@@ -1,7 +1,9 @@
-// H6: revision tracking, case for case with the Rust client's
-// (crates/api/src/client/tracker.rs), the failed-refetch fix included.
+// H6: revision tracking. The cases are tracker-cases.json, which the Rust client's tracker
+// (crates/api/src/client/tracker.rs) runs too, so the two cannot drift; `forget` is this
+// client's alone.
 import { describe, expect, it } from "vitest";
 
+import cases from "./tracker-cases.json" with { type: "json" };
 import { UNTRACKED, fetched, forget, heldOf, refetchFailed, reopened, ticked, watchName, type RevisionOf, type Tick, type Tracked } from "./tracker.ts";
 
 const deployment: RevisionOf = { domain: "deployment" };
@@ -13,41 +15,47 @@ const hear = (tracked: Tracked, received: Tick): { tracked: Tracked; asks: boole
   return { tracked: next ?? tracked, asks: next !== undefined };
 };
 
+/** One step of a shared case: the move, where it applies (the deployment unless named), and what it must show. */
+interface Step {
+  op: "fetched" | "ticked" | "refetch_failed" | "reopened" | "held";
+  of?: RevisionOf;
+  revision?: number;
+  asks?: boolean;
+  holds?: number | null;
+}
+
 describe("tracking", () => {
-  it("asks for a refetch only for a newer tick, and only once", () => {
+  it.each(cases as { name: string; steps: Step[] }[])("$name", ({ steps }) => {
     let tracked = UNTRACKED;
-    const heard = (revision: number): boolean => {
-      const result = hear(tracked, tick(revision));
-      tracked = result.tracked;
-      return result.asks;
-    };
-    expect(heard(2)).toBe(true);
-    expect(heard(2)).toBe(false);
-    tracked = fetched(tracked, deployment, 3);
-    expect(heard(2)).toBe(false);
-    expect(heard(3)).toBe(false);
-    expect(heard(4)).toBe(true);
-    tracked = fetched(tracked, deployment, 2);
-    expect(heldOf(tracked, deployment)).toBe(3);
-    expect(heard(4)).toBe(false);
-    tracked = fetched(tracked, deployment, 4);
-    expect(heard(5)).toBe(true);
+    for (const [index, step] of steps.entries()) {
+      const of = step.of ?? deployment;
+      const at = `step ${String(index)} (${step.op})`;
+      switch (step.op) {
+        case "fetched":
+          tracked = fetched(tracked, of, step.revision ?? 0);
+          break;
+        case "ticked": {
+          const result = hear(tracked, tick(step.revision ?? 0, of));
+          tracked = result.tracked;
+          expect(result.asks, at).toBe(step.asks);
+          break;
+        }
+        case "refetch_failed":
+          tracked = refetchFailed(tracked, of);
+          break;
+        case "reopened":
+          tracked = reopened(tracked);
+          break;
+        case "held":
+          expect(heldOf(tracked, of) ?? null, at).toBe(step.holds);
+          break;
+      }
+    }
   });
 
-  it("asks again after a failed refetch or a reopened stream", () => {
-    const asked = hear(fetched(UNTRACKED, deployment, 4), tick(5));
-    expect(asked.asks).toBe(true);
-    const failed = refetchFailed(asked.tracked, deployment);
-    expect(hear(failed, tick(5)).asks).toBe(true);
-    expect(hear(reopened(asked.tracked), tick(5)).asks).toBe(true);
-    expect(heldOf(reopened(asked.tracked), deployment)).toBe(4);
-  });
-
-  it("keeps each domain apart, and forgets one it no longer shows", () => {
+  it("forgets a domain it no longer shows", () => {
     const journey: RevisionOf = { domain: { journey: "j_one" } };
     const tracked = fetched(fetched(UNTRACKED, journey, 7), deployment, 2);
-    expect(hear(tracked, tick(7, journey)).asks).toBe(false);
-    expect(hear(tracked, tick(3)).asks).toBe(true);
     const forgotten = forget(tracked, journey);
     expect(heldOf(forgotten, journey)).toBeUndefined();
     expect(heldOf(forgotten, deployment)).toBe(2);

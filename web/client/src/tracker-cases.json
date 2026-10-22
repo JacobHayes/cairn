@@ -1,0 +1,50 @@
+[
+  {
+    "name": "asks for a refetch only for a newer tick, and only once",
+    "steps": [
+      { "op": "ticked", "revision": 2, "asks": true },
+      { "op": "ticked", "revision": 2, "asks": false },
+      { "op": "fetched", "revision": 3 },
+      { "op": "ticked", "revision": 2, "asks": false },
+      { "op": "ticked", "revision": 3, "asks": false },
+      { "op": "ticked", "revision": 4, "asks": true },
+      { "op": "fetched", "revision": 2 },
+      { "op": "held", "holds": 3 },
+      { "op": "ticked", "revision": 4, "asks": false },
+      { "op": "fetched", "revision": 4 },
+      { "op": "ticked", "revision": 5, "asks": true }
+    ]
+  },
+  {
+    "name": "asks again after a failed refetch",
+    "steps": [
+      { "op": "fetched", "revision": 4 },
+      { "op": "ticked", "revision": 5, "asks": true },
+      { "op": "refetch_failed" },
+      { "op": "ticked", "revision": 5, "asks": true },
+      { "op": "held", "holds": 4 }
+    ]
+  },
+  {
+    "name": "asks again after a reopened stream",
+    "steps": [
+      { "op": "fetched", "revision": 4 },
+      { "op": "ticked", "revision": 5, "asks": true },
+      { "op": "ticked", "revision": 5, "asks": false },
+      { "op": "reopened" },
+      { "op": "ticked", "revision": 5, "asks": true },
+      { "op": "held", "holds": 4 }
+    ]
+  },
+  {
+    "name": "keeps each domain apart",
+    "steps": [
+      { "op": "fetched", "of": { "domain": { "journey": "j_one" } }, "revision": 7 },
+      { "op": "fetched", "revision": 2 },
+      { "op": "ticked", "of": { "domain": { "journey": "j_one" } }, "revision": 7, "asks": false },
+      { "op": "ticked", "revision": 3, "asks": true },
+      { "op": "held", "of": { "domain": { "journey": "j_one" } }, "holds": 7 },
+      { "op": "held", "of": { "proposal": "pr_one" }, "holds": null }
+    ]
+  }
+]
