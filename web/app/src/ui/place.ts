@@ -32,7 +32,12 @@ export interface Placement {
   side: Side;
   /** The room the box has on that side, inside the margin (px): what a scrolling body may be capped to. */
   room: number;
+  /** Where the anchor's centre falls along the box's near edge, from the box's leading edge, kept `CORNER` inside both ends (px): where a pointer notch toward the anchor is drawn. */
+  anchorOffset: number;
 }
+
+/** The space an anchor offset keeps from each end of the box's near edge, so a notch clears the corner radius (px). */
+export const CORNER = 14;
 
 const OPPOSITE: Record<Side, Side> = { top: "bottom", bottom: "top", left: "right", right: "left" };
 
@@ -75,12 +80,12 @@ export function place(anchor: Rect, size: { width: number; height: number }, bou
   const [start, span, own] = vertical ? [anchor.left, anchor.width, size.width] : [anchor.top, anchor.height, size.height];
   const crossAt = options.align === "start" ? start : options.align === "end" ? start + span - own : start + (span - own) / 2;
   const [left, top] = vertical ? [crossAt, mainAt] : [mainAt, crossAt];
-  return {
+  const placed = {
     left: slide(left, size.width, bounds.left, bounds.width, margin),
     top: slide(top, size.height, bounds.top, bounds.height, margin),
-    side,
-    room: side === options.side ? room : other,
   };
+  const [boxStart, centre] = vertical ? [placed.left, anchor.left + anchor.width / 2] : [placed.top, anchor.top + anchor.height / 2];
+  return { ...placed, side, room: side === options.side ? room : other, anchorOffset: Math.min(Math.max(centre - boxStart, CORNER), Math.max(own - CORNER, CORNER)) };
 }
 
 /** `at` moved the least that keeps `length` inside the span less the margin; a box too long for it pins to the leading margin. */

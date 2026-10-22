@@ -10,14 +10,14 @@ import { expect, test } from "./test.ts";
 import { setFrontier } from "./acting.ts";
 import { nodePanel, open, openFromCanvas } from "./shell.ts";
 
-const band = (page: Page) => page.getByTestId("tour-band");
+const callout = (page: Page) => page.getByTestId("tour-callout");
 
 /** Opens the tour from You, which offers it whatever the record says. */
 async function begin(page: Page): Promise<void> {
   await open(page, "server", "/me");
   await page.getByTestId("you-tour").click();
   await page.getByTestId("tour-start").click();
-  await expect(band(page)).toHaveAttribute("data-step", "map");
+  await expect(callout(page)).toHaveAttribute("data-step", "map");
 }
 
 test("the assistant step is an example, and a second tab shares the run", { tag: ["@server", "@serial"] }, async ({ page, context }) => {
@@ -41,22 +41,28 @@ test("the assistant step is an example, and a second tab shares the run", { tag:
   const panel = nodePanel(page, "n_outside");
   await panel.getByRole("radio", { name: /^yes\b/i }).check();
   await panel.getByRole("button", { name: "Save", exact: true }).click();
-  await expect(page.getByTestId("tour-result")).toContainText("applies now");
+  await expect(callout(page)).toHaveAttribute("data-phase", "reveal");
   await page.getByTestId("tour-next").click();
   await setFrontier(page, true);
   await page.getByTestId("tour-next").click();
   await page.locator('tr[data-node="n_draft"]').getByRole("button", { name: /done/i }).click();
-  await expect(page.getByTestId("tour-result")).toContainText("ready now");
+  await expect(callout(page)).toHaveAttribute("data-phase", "reveal");
   await page.getByTestId("tour-next").click();
-  await expect(band(page)).toHaveAttribute("data-step", "dates");
+  await expect(callout(page)).toHaveAttribute("data-step", "dates");
   await page.getByTestId("tour-next").click();
-  await expect(band(page)).toHaveAttribute("data-step", "assistant");
+  await expect(callout(page)).toHaveAttribute("data-step", "assistant");
   await expect(page.getByTestId("tour-next")).toHaveAttribute("aria-disabled", "true");
   await page.getByTestId("tab-assistant").click();
   const example = page.getByTestId("tour-assistant-example");
-  await expect(example).toContainText("Example only. No message is sent.");
   await example.getByTestId("tour-assistant-show").click();
-  await expect(example.getByTestId("assistant-reply")).toBeVisible();
+  const reply = example.getByTestId("assistant-reply");
+  await expect(reply).toBeVisible();
+  // The reply grows the example's pane, and the hole grows with it: the whole reply is inside it.
+  await expect(callout(page)).toHaveAttribute("data-phase", "reveal");
+  await expect.poll(async () => {
+    const [hole, shown] = [await page.getByTestId("tour-ring").boundingBox(), await reply.boundingBox()];
+    return hole !== null && shown !== null && shown.y >= hole.y - 1 && shown.y + shown.height <= hole.y + hole.height + 1;
+  }).toBe(true);
   await expect(page.getByTestId("tour-next")).toHaveText("Finish the tour");
   await page.getByTestId("tour-next").click();
   await expect(page.getByTestId("tour-end")).toBeVisible();

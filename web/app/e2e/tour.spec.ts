@@ -1,22 +1,51 @@
 // PRD: C20. A guided first run on the in-browser host: the welcome opens on Home
 // and never over a deep link; a practice journey is made on Start, walked through the ordinary
-// screens, and deleted when the tour ends. What each step says is composed from the state the
-// engine derived (steps.test.ts); here the oracle is the screen: which rows became ready, which
-// card became conditional, where the person is.
-import type { Page } from "@playwright/test";
+// screens under a spotlight, and deleted when the tour ends. What each step says is composed from
+// the state the engine derived (steps.test.ts); here the oracle is the screen: where the hole and
+// the callout are, what stays dim and what lifts after the action, which rows became ready, where
+// the person is.
+import type { Locator, Page } from "@playwright/test";
 
 import { checkpoint, expect, test } from "./test.ts";
 
 import { setFrontier } from "./acting.ts";
-import { nodePanel, open, openFromCanvas, visit, whenSettled } from "./shell.ts";
+import { goWithin, nodeCard, nodePanel, open, openFromCanvas, visit, whenSettled } from "./shell.ts";
 
-const band = (page: Page) => page.getByTestId("tour-band");
+const callout = (page: Page) => page.getByTestId("tour-callout");
+const scrim = (page: Page) => page.getByTestId("tour-scrim");
+const ring = (page: Page) => page.getByTestId("tour-ring");
+
+interface Box {
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+}
+
+/** A locator's box once it has stopped moving (the callout glides, the canvas pans). */
+async function settledBox(target: Locator): Promise<Box> {
+  const seen: { box: Box | null } = { box: null };
+  await expect
+    .poll(async () => {
+      const [before, now] = [seen.box, await target.boundingBox()];
+      seen.box = now;
+      return before !== null && now !== null && Math.abs(before.x - now.x) < 0.5 && Math.abs(before.y - now.y) < 0.5 && Math.abs(before.width - now.width) < 0.5 && Math.abs(before.height - now.height) < 0.5;
+    })
+    .toBe(true);
+  if (seen.box === null) {
+    throw new Error("no box");
+  }
+  return seen.box;
+}
+
+const meets = (a: Box, b: Box): boolean => a.x < b.x + b.width && b.x < a.x + a.width && a.y < b.y + b.height && b.y < a.y + a.height;
+const holds = (outer: Box, inner: Box, slack = 1): boolean => inner.x >= outer.x - slack && inner.y >= outer.y - slack && inner.x + inner.width <= outer.x + outer.width + slack && inner.y + inner.height <= outer.y + outer.height + slack;
 
 /** Starts the tour from Home and returns the practice journey's id. */
 async function start(page: Page): Promise<string> {
   await open(page, "browser", "/");
   await page.getByTestId("tour-start").click();
-  await expect(band(page)).toHaveAttribute("data-step", "map");
+  await expect(callout(page)).toHaveAttribute("data-step", "map");
   const match = /\/journeys\/(j_[^/?]+)/.exec(page.url());
   expect(match).not.toBeNull();
   return match?.[1] ?? "";
@@ -29,10 +58,42 @@ async function decide(page: Page, option: "yes" | "no"): Promise<void> {
   await panel.getByRole("button", { name: "Save", exact: true }).click();
 }
 
+/** Goes on once Next is no longer held. */
 async function next(page: Page): Promise<void> {
   const button = page.getByTestId("tour-next");
   await expect(button).not.toHaveAttribute("aria-disabled", "true");
   await button.click();
+}
+
+const markDraftDone = (page: Page) => page.locator('tr[data-node="n_draft"]').getByRole("button", { name: /done/i }).click();
+
+/** The tour is at `step`, showing its spotlight or its reveal. */
+async function expectAt(page: Page, step: string, phase: "spotlight" | "reveal"): Promise<void> {
+  await expect(callout(page)).toHaveAttribute("data-step", step);
+  await expect(callout(page)).toHaveAttribute("data-phase", phase);
+  await expect(scrim(page)).toHaveAttribute("data-lifted", String(phase === "reveal"));
+}
+
+/** Walks from Home to the step that asks `step`'s action, doing the earlier steps' actions. */
+async function walkTo(page: Page, step: "answer" | "frontier" | "finish" | "dates"): Promise<void> {
+  await start(page);
+  await openFromCanvas(page, "n_outside");
+  await next(page);
+  if (step === "answer") {
+    return;
+  }
+  await decide(page, "yes");
+  await next(page);
+  if (step === "frontier") {
+    return;
+  }
+  await setFrontier(page, true);
+  await next(page);
+  if (step === "finish") {
+    return;
+  }
+  await markDraftDone(page);
+  await next(page);
 }
 
 test("the welcome opens on Home and never over a deep link", async ({ page }) => {
@@ -61,44 +122,49 @@ test("the tour walks a practice journey, and the journey is gone at the end", as
   await open(page, "browser", "/journeys?status=any");
   const journeyCount = await whenSettled(page, () => page.getByTestId("journey-row").count());
   const id = await start(page);
-  // Step 1: nothing is selected; Next waits for the decision to be selected.
+  // Step 1: dimmed but for the decision; Next waits for it to be selected.
+  await expectAt(page, "map", "spotlight");
   await expect(page.getByTestId("tour-next")).toHaveAttribute("aria-disabled", "true");
-  await expect(band(page)).toContainText("Write the draft");
+  await expect(page.getByTestId("tour-waits")).toBeVisible();
   await checkpoint(page);
   await openFromCanvas(page, "n_outside");
-  await expect(page.getByTestId("tour-result")).not.toBeEmpty();
+  await expectAt(page, "map", "reveal");
+  await expect(page.getByTestId("tour-waits")).toHaveCount(0);
   await next(page);
-  // Step 2: the answer decides whether the review applies.
-  await expect(band(page)).toHaveAttribute("data-step", "answer");
+  // Step 2: the answer decides whether the review applies; the scrim lifts once it is saved.
+  await expectAt(page, "answer", "spotlight");
   await expect(page.getByTestId("tour-next")).toHaveAttribute("aria-disabled", "true");
   await decide(page, "yes");
-  await expect(page.getByTestId("tour-result")).toContainText("applies now");
+  await expectAt(page, "answer", "reveal");
+  await checkpoint(page);
   await next(page);
   // Step 3: Frontier.
-  await expect(band(page)).toHaveAttribute("data-step", "frontier");
+  await expectAt(page, "frontier", "spotlight");
   await expect(page.getByTestId("tour-next")).toHaveAttribute("aria-disabled", "true");
   await setFrontier(page, true);
-  await expect(page.getByTestId("tour-result")).toContainText("can move now");
+  await expectAt(page, "frontier", "reveal");
   await next(page);
   // Step 4: finish the draft in the list; the work that waited for it is ready.
-  await expect(band(page)).toHaveAttribute("data-step", "finish");
+  await expectAt(page, "finish", "spotlight");
   await expect(page).toHaveURL(/view=list/);
   await expect(page.getByTestId("tour-next")).toHaveAttribute("aria-disabled", "true");
   // The due date is said once: the Due column has it, so the fact under the title does not repeat it.
   await expect(page.locator('tr[data-node="n_draft"] [data-testid="list-due"]')).toBeVisible();
   await expect(page.locator('tr[data-node="n_draft"] [data-testid="fact"]')).toBeHidden();
-  await page.locator('tr[data-node="n_draft"]').getByRole("button", { name: /done/i }).click();
-  await expect(page.getByTestId("tour-result")).toContainText("ready now");
+  await markDraftDone(page);
+  await expectAt(page, "finish", "reveal");
   await checkpoint(page);
-  // Going back keeps what was done; the earlier step says what is true now.
+  // Going back keeps what was done; the earlier step arrives showing what is true now.
   await page.getByTestId("tour-back").click();
-  await expect(band(page)).toHaveAttribute("data-step", "frontier");
+  await expectAt(page, "frontier", "reveal");
   await expect(page.getByTestId("tour-next")).not.toHaveAttribute("aria-disabled", "true");
   await next(page);
   await next(page);
   // Step 5: dates, then the end.
-  await expect(band(page)).toHaveAttribute("data-step", "dates");
+  await expectAt(page, "dates", "spotlight");
   await expect(page).toHaveURL(/view=timeline/);
+  // The section the sentence is about is open inside the hole.
+  await expect(page.getByTestId("dates")).toBeVisible();
   await checkpoint(page);
   await page.getByTestId("tour-next").click();
   await expect(page).toHaveURL(/\/$/);
@@ -114,18 +180,133 @@ test("the tour walks a practice journey, and the journey is gone at the end", as
   await expect(page.getByTestId("tour-welcome")).toHaveCount(0);
 });
 
-test("the answer No leaves one newly ready row", async ({ page }) => {
+test("a press on the dimmed page does nothing, and the editor inside the hole saves", async ({ page }) => {
+  await walkTo(page, "answer");
+  const chip = await settledBox(page.getByTestId("chip-frontier"));
+  // Where the Frontier chip really is: the scrim takes the press.
+  await page.mouse.click(chip.x + chip.width / 2, chip.y + chip.height / 2);
+  await expect(page.getByTestId("chip-frontier")).toHaveAttribute("aria-pressed", "false");
+  await expect(callout(page)).toHaveAttribute("data-phase", "spotlight");
+  // The hole holds the whole editor, so the person can choose and save without leaving it.
+  const hole = await settledBox(ring(page));
+  const editor = await settledBox(nodePanel(page, "n_outside").getByTestId("answer-editor"));
+  expect(holds(hole, editor, 6)).toBe(true);
+  await decide(page, "yes");
+  await expectAt(page, "answer", "reveal");
+});
+
+// The change an answer makes, as the sentence names it: Yes brings the review in; No drops it and the summary is what moves.
+for (const [option, named] of [["yes", "n_review"], ["no", "n_summary"]] as const) {
+  test(`after the answer ${option} the scrim lifts and the callout covers nothing its sentence names`, async ({ page }) => {
+    await walkTo(page, "answer");
+    await decide(page, option);
+    await expectAt(page, "answer", "reveal");
+    const box = await settledBox(callout(page));
+    expect(meets(box, await settledBox(nodeCard(page, named)))).toBe(false);
+  });
+}
+
+test("after Done the scrim is lifted and the callout is clear of the rows it freed", async ({ page }) => {
+  await walkTo(page, "finish");
+  await markDraftDone(page);
+  await expectAt(page, "finish", "reveal");
+  const box = await settledBox(callout(page));
+  for (const node of ["n_comments", "n_review"]) {
+    expect(meets(box, await settledBox(page.locator(`tr[data-node="${node}"]`)))).toBe(false);
+  }
+  // Back and forth: Back onto the finished step arrives in its reveal, Back onto the first in its spotlight.
+  await next(page);
+  await expectAt(page, "dates", "spotlight");
+  await page.getByTestId("tour-back").click();
+  await expectAt(page, "finish", "reveal");
+  for (const step of ["frontier", "answer"]) {
+    await page.getByTestId("tour-back").click();
+    await expect(callout(page)).toHaveAttribute("data-step", step);
+  }
+  await page.getByTestId("tour-back").click();
+  await expectAt(page, "map", "spotlight");
+});
+
+test("the hole follows what it holds: a pan of the canvas, a scroll of the inspector", async ({ page }) => {
   await start(page);
+  const card = nodeCard(page, "n_outside");
+  const before = await settledBox(card);
+  expect(holds(await settledBox(ring(page)), before, 8)).toBe(true);
+  // Drag the canvas by the card the ring is on.
+  await page.mouse.move(before.x + before.width / 2, before.y + before.height / 2);
+  await page.mouse.down();
+  await page.mouse.move(before.x + before.width / 2 - 60, before.y + before.height / 2 + 30, { steps: 6 });
+  await page.mouse.up();
+  const after = await settledBox(card);
+  expect(Math.abs(after.x - before.x) + Math.abs(after.y - before.y)).toBeGreaterThan(20);
+  await expect.poll(async () => holds(await settledBox(ring(page)), await settledBox(card), 8)).toBe(true);
   await openFromCanvas(page, "n_outside");
   await next(page);
-  await decide(page, "no");
-  await expect(page.getByTestId("tour-result")).toContainText("does not apply");
-  await next(page);
-  await setFrontier(page, true);
-  await next(page);
-  await page.locator('tr[data-node="n_draft"]').getByRole("button", { name: /done/i }).click();
-  await expect(page.getByTestId("tour-result")).toContainText("ready now");
-  await expect(page.getByTestId("tour-result")).not.toContainText("Outside review");
+  // Scroll the inspector under the hole: the ring stays on the editor.
+  const editor = nodePanel(page, "n_outside").getByTestId("answer-editor");
+  const at = await settledBox(editor);
+  await page.mouse.move(at.x + at.width / 2, at.y + at.height / 2);
+  await page.mouse.wheel(0, 60);
+  await expect.poll(async () => holds(await settledBox(ring(page)), await settledBox(editor), 8)).toBe(true);
+});
+
+test("a card panned out of the canvas is brought back by Show the control", async ({ page }) => {
+  await start(page);
+  const card = nodeCard(page, "n_outside");
+  // Drag the card's visible edge to the window's edge until it has all but left.
+  for (let round = 0; round < 6; round += 1) {
+    const at = await settledBox(card);
+    if (at.x > 1200) {
+      break;
+    }
+    await page.mouse.move(at.x + 5, at.y + at.height / 2);
+    await page.mouse.down();
+    await page.mouse.move(1279, at.y + at.height / 2, { steps: 6 });
+    await page.mouse.up();
+  }
+  await expect(page.getByTestId("tour-show")).toBeVisible();
+  await page.getByTestId("tour-show").click();
+  await expect.poll(async () => (await settledBox(card)).x + (await settledBox(card)).width).toBeLessThan(1280);
+  await expect(page.getByTestId("tour-show")).toHaveCount(0);
+});
+
+test("keys under the dim do nothing, and Escape never ends the tour", async ({ page }) => {
+  await start(page);
+  const url = page.url();
+  await page.keyboard.press("f");
+  await page.keyboard.press("?");
+  await expect(page.locator("dialog[open]")).toHaveCount(0);
+  expect(page.url()).toBe(url);
+  await page.keyboard.press("Escape");
+  await expect(callout(page)).toBeVisible();
+  await expect(page.getByTestId("tour-title")).toBeFocused();
+});
+
+test("with a menu open, Escape closes the menu and only that", async ({ page }) => {
+  await walkTo(page, "answer");
+  const menu = page.locator('[data-popover]:not([data-testid="tour-callout"])');
+  await nodePanel(page, "n_outside").getByTestId("more-actions").click();
+  await expect(menu).toBeVisible();
+  await page.keyboard.press("Escape");
+  await expect(menu).toHaveCount(0);
+  await expect(callout(page)).toBeVisible();
+  await expect(callout(page)).toHaveAttribute("data-phase", "spotlight");
+});
+
+test("a dialog over the tour has the focus, and the tour does not take it back", async ({ page }) => {
+  await start(page);
+  await page.evaluate(() => {
+    const dialog = document.createElement("dialog");
+    dialog.id = "over-the-tour";
+    dialog.innerHTML = '<input aria-label="Name" /><button>Close</button>';
+    document.body.append(dialog);
+    dialog.showModal();
+  });
+  await expect(page.getByLabel("Name")).toBeFocused();
+  await page.keyboard.press("Tab");
+  await expect.poll(() => page.evaluate(() => document.activeElement?.closest("#over-the-tour") !== null)).toBe(true);
+  await page.evaluate(() => { document.querySelector("#over-the-tour")?.remove(); });
+  await expect(callout(page)).toBeVisible();
 });
 
 test("Skip returns Home and the practice journey is deleted", async ({ page }) => {
@@ -134,7 +315,7 @@ test("Skip returns Home and the practice journey is deleted", async ({ page }) =
   await next(page);
   await page.getByTestId("tour-skip").click();
   await expect(page).toHaveURL(/\/$/);
-  await expect(page.getByTestId("tour-band")).toHaveCount(0);
+  await expect(callout(page)).toHaveCount(0);
   await expect(page.getByTestId("tour-end")).toHaveCount(0);
   await open(page, "browser", "/journeys?status=any");
   await expect(page.locator(`[data-testid="journey-row"][data-journey="${id}"]`)).toHaveCount(0);
@@ -144,38 +325,136 @@ test("leaving the practice journey pauses the tour, and Continue returns to the 
   const id = await start(page);
   await openFromCanvas(page, "n_outside");
   await next(page);
-  await page.getByRole("link", { name: "Journeys", exact: true }).click();
+  // The dimmed rail takes no press, so the person leaves the way the app's own links do.
+  await goWithin(page, "/journeys");
   await expect(page.getByTestId("tour-paused")).toBeVisible();
-  await expect(page.getByTestId("tour-band")).toHaveCount(0);
+  await expect(callout(page)).toHaveCount(0);
+  await page.getByRole("link", { name: "Home", exact: true }).click();
+  await expect(page.getByTestId("tour-continue")).toBeVisible();
+  // Escape on the card puts it away for now; it does not end the tour, and Home brings it back.
+  await page.keyboard.press("Escape");
+  await expect(page.getByTestId("tour-continue")).toHaveCount(0);
+  await page.getByRole("link", { name: "Journeys", exact: true }).click();
   await page.getByRole("link", { name: "Home", exact: true }).click();
   await expect(page.getByTestId("tour-continue")).toBeVisible();
   await page.getByTestId("tour-resume").click();
   await expect(page).toHaveURL(new RegExp(`/journeys/${id}`));
-  await expect(band(page)).toHaveAttribute("data-step", "answer");
+  await expect(callout(page)).toHaveAttribute("data-step", "answer");
+});
+
+test.describe("under 1100px, where the inspector is a sheet", () => {
+  test.use({ viewport: { width: 900, height: 820 } });
+
+  test("arriving at a step raises the sheet to its action, every time", async ({ page }) => {
+    await start(page);
+    await openFromCanvas(page, "n_outside");
+    await next(page);
+    const frame = page.locator(".frame");
+    await expect(frame).toHaveAttribute("data-sheet", "half");
+    await decide(page, "yes");
+    await expectAt(page, "answer", "reveal");
+    await expect(frame).toHaveAttribute("data-sheet", "peek");
+    // Back onto the step arrives in its reveal; the step before and then forward again puts the sheet up for the action.
+    await page.getByTestId("tour-back").click();
+    await openFromCanvas(page, "n_outside");
+    await next(page);
+    await expect(callout(page)).toHaveAttribute("data-step", "answer");
+    await expect(frame).toHaveAttribute("data-sheet", "half");
+    await checkpoint(page);
+  });
+
+  test("an action scrolled out of the sheet is brought back by Show the control", async ({ page }) => {
+    await walkTo(page, "answer");
+    const editor = nodePanel(page, "n_outside").getByTestId("answer-editor");
+    await expect.poll(async () => holds(await settledBox(ring(page)), await settledBox(editor), 8)).toBe(true);
+    // Scroll the inspector's own scroller until the editor is wholly above its view.
+    await editor.evaluate((element) => {
+      for (let each: HTMLElement | null = element.parentElement; each !== null; each = each.parentElement) {
+        if (each.scrollHeight > each.clientHeight && getComputedStyle(each).overflowY !== "visible") {
+          each.scrollTop = each.scrollHeight;
+        }
+      }
+    });
+    await expect(page.getByTestId("tour-show")).toBeVisible();
+    await page.getByTestId("tour-show").click();
+    await expect(page.getByTestId("tour-show")).toHaveCount(0);
+    await expect.poll(async () => holds(await settledBox(ring(page)), await settledBox(editor), 8)).toBe(true);
+  });
+
+  test("the callout sits clear of the sheet and of the hole", async ({ page }) => {
+    await walkTo(page, "answer");
+    const box = await settledBox(callout(page));
+    const sheet = await settledBox(page.locator("aside.inspector"));
+    expect(box.y + box.height).toBeLessThanOrEqual(sheet.y + 1);
+    expect(meets(box, await settledBox(ring(page)))).toBe(false);
+  });
 });
 
 test.describe("on a phone", () => {
-  test.use({ viewport: { width: 390, height: 844 } });
+  test.use({ viewport: { width: 390, height: 844 }, hasTouch: true, isMobile: true });
 
-  test("the band is compact, the sheet is raised for the answer, and Frontier is reached through Controls", async ({ page }) => {
+  test("the callout is docked clear of the hole, the sheet rises for the answer, and Frontier is reached through Controls", async ({ page }) => {
     await start(page);
     await checkpoint(page);
+    const clear = async () => {
+      const box = await settledBox(callout(page));
+      expect(meets(box, await settledBox(ring(page)))).toBe(false);
+      expect(box.x).toBeGreaterThanOrEqual(0);
+      expect(box.x + box.width).toBeLessThanOrEqual(390);
+    };
+    await clear();
     await openFromCanvas(page, "n_outside");
     await next(page);
     await expect(page.locator(".frame")).toHaveAttribute("data-sheet", "half");
+    await clear();
     await decide(page, "yes");
-    // The pane is inert at the peek: the sheet lowers and the band takes the focus.
+    // The pane is inert at the peek: the sheet lowers and the reveal is on the screen.
     await expect(page.locator(".frame")).toHaveAttribute("data-sheet", "peek");
-    await expect(page.getByTestId("tour-result")).toContainText("applies now");
-    await expect(page.getByTestId("tour-instruction")).toHaveCount(0);
-    await checkpoint(page);
+    await expectAt(page, "answer", "reveal");
     await next(page);
+    // The hole holds Controls and, once opened, the menu with Frontier in it.
     await expect(page.getByTestId("controls-button")).toBeVisible();
+    await clear();
     await setFrontier(page, true);
+    await expectAt(page, "frontier", "reveal");
     await next(page);
-    await page.locator('tr[data-node="n_draft"]').getByRole("button", { name: /done/i }).click();
-    await expect(page.getByTestId("tour-result")).toContainText("ready now");
+    await clear();
+    await markDraftDone(page);
+    await expectAt(page, "finish", "reveal");
+    // Everything the sentence names is clear of the callout, which docks at the head when the foot would cover it.
+    const box = await settledBox(callout(page));
+    for (const node of ["n_comments", "n_review"]) {
+      expect(meets(box, await settledBox(page.locator(`tr[data-node="${node}"]`)))).toBe(false);
+    }
     await expect(page.getByTestId("tour-next")).toBeVisible();
     await expect.poll(() => page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
+  });
+
+  test("when the sheet is lowered the callout says so and offers to raise it", async ({ page }) => {
+    await walkTo(page, "answer");
+    await expect(page.locator(".frame")).toHaveAttribute("data-sheet", "half");
+    // The handle is inside the hole, so the person can lower the sheet; the arrow keys step it down.
+    await page.getByRole("button", { name: "Resize the inspector" }).focus();
+    await page.keyboard.press("ArrowDown");
+    await expect(page.locator(".frame")).toHaveAttribute("data-sheet", "peek");
+    await expect(page.getByTestId("tour-show")).toBeVisible();
+    await page.getByTestId("tour-show").click();
+    await expect(page.locator(".frame")).toHaveAttribute("data-sheet", "half");
+    await expect(page.getByTestId("tour-show")).toHaveCount(0);
+  });
+});
+
+test.describe("on a phone on its side", () => {
+  test.use({ viewport: { width: 844, height: 390 }, hasTouch: true, isMobile: true });
+
+  test("the callout is beside the card it is about, clear of it and inside the window", async ({ page }) => {
+    await start(page);
+    // The canvas frames the card once the callout has taken its side; the two settle together.
+    await expect.poll(async () => meets(await settledBox(callout(page)), await settledBox(ring(page)))).toBe(false);
+    const box = await settledBox(callout(page));
+    expect(box.y).toBeGreaterThanOrEqual(0);
+    expect(box.y + box.height).toBeLessThanOrEqual(390);
+    // The card is large enough to read what it says: its title is not a smudge.
+    expect((await settledBox(nodeCard(page, "n_outside"))).width).toBeGreaterThan(150);
   });
 });

@@ -1,0 +1,179 @@
+/* The tour's spotlight: a scrim of four rectangles around the hole (so the hole is truly open to
+   the page), a ring around the hole that is unlike selection (a filled chip) and focus (the
+   offset outline), and the callout beside it. Fixed to the window and placed from measured
+   rectangles (tour/Overlay.tsx), above the sheet and everything else but the top layer's tips. */
+.tour-scrim-layer {
+  position: fixed;
+  inset: 0;
+  z-index: 50;
+  pointer-events: none;
+}
+
+/* The scrim takes presses, the wheel and touch and does nothing with them. */
+.tour-scrim {
+  position: absolute;
+  background: var(--tour-scrim);
+  pointer-events: auto;
+  touch-action: none;
+  overscroll-behavior: contain;
+  transition: opacity var(--motion-duration) var(--motion-easing);
+}
+
+.tour-ring {
+  position: absolute;
+  border-radius: var(--radius-md);
+  box-shadow:
+    0 0 0 2px var(--color-surface),
+    0 0 0 4px var(--color-accent);
+  pointer-events: none;
+  transition: opacity var(--motion-duration) var(--motion-easing);
+}
+
+/* Lifted: the whole screen is the app's again. */
+.tour-scrim-layer[data-lifted="true"] .tour-scrim,
+.tour-scrim-layer[data-lifted="true"] .tour-ring {
+  opacity: 0;
+  pointer-events: none;
+}
+
+/* A hole that widens, glides; a hole dragged along by a pan does not. */
+.tour-scrim-layer[data-gliding="true"] :is(.tour-scrim, .tour-ring) {
+  transition:
+    opacity var(--motion-duration) var(--motion-easing),
+    left var(--motion-duration) var(--motion-easing),
+    top var(--motion-duration) var(--motion-easing),
+    width var(--motion-duration) var(--motion-easing),
+    height var(--motion-duration) var(--motion-easing);
+}
+
+.tour-callout {
+  position: fixed;
+  z-index: 52;
+  box-sizing: border-box;
+  width: min(360px, calc(100vw - 2 * var(--space-3)));
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  padding: var(--space-4);
+  background: var(--color-surface);
+  color: var(--color-text);
+  border: 1px solid var(--color-frame);
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-md);
+  font: 400 15px / 1.5 var(--font-body);
+  letter-spacing: 0;
+}
+
+/* Measured at its content while it is not shown. */
+.tour-callout[data-ready="false"] {
+  visibility: hidden;
+}
+
+.tour-callout[data-gliding="true"] {
+  transition:
+    left var(--motion-duration) var(--motion-easing),
+    top var(--motion-duration) var(--motion-easing);
+}
+
+.tour-callout .label {
+  white-space: nowrap;
+}
+
+.tour-callout .tour-title {
+  outline-offset: 4px;
+}
+
+.tour-callout p {
+  margin: 0;
+}
+
+/* The body scrolls inside a limit, so a long sentence never pushes the buttons off the window. */
+.tour-body {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  max-height: 40dvh;
+  overflow-y: auto;
+}
+
+.tour-callout .tour-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.tour-callout .tour-actions > .ghost {
+  margin-left: auto;
+}
+
+.tour-callout [aria-disabled="true"] {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+/* The notch points at what the callout sits beside: a square turned on its corner, on the edge it hangs from. */
+.tour-callout::before {
+  content: "";
+  display: none;
+  position: absolute;
+  width: 10px;
+  height: 10px;
+  box-sizing: border-box;
+  background: var(--color-surface);
+  border: 0 solid var(--color-frame);
+  transform: translate(-50%, -50%) rotate(45deg);
+}
+
+.tour-callout[data-side="right"]::before {
+  display: block;
+  left: 0;
+  top: var(--notch-at);
+  border-width: 0 0 1px 1px;
+}
+
+.tour-callout[data-side="left"]::before {
+  display: block;
+  left: 100%;
+  top: var(--notch-at);
+  border-width: 1px 1px 0 0;
+}
+
+.tour-callout[data-side="bottom"]::before {
+  display: block;
+  top: 0;
+  left: var(--notch-at);
+  border-width: 1px 0 0 1px;
+}
+
+.tour-callout[data-side="top"]::before {
+  display: block;
+  top: 100%;
+  left: var(--notch-at);
+  border-width: 0 1px 1px 0;
+}
+
+/* Docked (a phone, a short window, a target in the sheet): compact, across the foot of the room above the sheet. */
+.tour-callout[data-side="dock"] {
+  gap: var(--space-1);
+  padding: var(--space-3);
+}
+
+.tour-callout[data-side="dock"] .tour-actions > * {
+  min-height: 44px;
+}
+
+/* A short window has little room above the callout for what it is about: two lines of the body, the rest scrolls. */
+@media (max-height: 479px) {
+  .tour-callout[data-side="dock"] .tour-body {
+    max-height: 3em;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .tour-scrim,
+  .tour-ring,
+  .tour-callout {
+    transition: none !important;
+  }
+}

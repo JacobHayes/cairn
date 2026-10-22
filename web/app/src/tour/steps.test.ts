@@ -6,9 +6,10 @@ import type { InBrowserHost } from "@cairn/wasm";
 import { derivedJourney, journeyAfter, seeded } from "../authoring/engine.test-support.ts";
 import { transition } from "../detail/model.ts";
 import { PRACTICE, practiceMutations } from "./practice.ts";
-import { clampCursor, exampleReply, factsOf, stepDone, stepsFor, type Facts, type StepId, type Where } from "./steps.ts";
+import { cardOf, clampCursor, exampleReply, factsOf, rowOf, stepDone, stepsFor, type Facts, type StepId, type Where, type WindowKind } from "./steps.ts";
 
 const { decision, draft, comments, review, summary } = PRACTICE;
+const wide: WindowKind = { phone: false, short: false };
 
 let host: InBrowserHost;
 beforeAll(async () => {
@@ -82,10 +83,17 @@ describe("the copy names what is true now", () => {
   const titles = (facts: Facts, keys: string[]) => keys.map((key) => facts.title(key));
 
   it("the map says the review waits for a decision until it is answered", () => {
-    const text = step("map").instruction(factsAt("created"), false);
+    const text = step("map").instruction(factsAt("created"), wide);
     expect(text).toContain(factsAt("created").title(review));
     expect(text).toContain("waits for a decision");
-    expect(step("map").instruction(factsAt("no"), false)).not.toContain("waits for a decision");
+    expect(step("map").instruction(factsAt("no"), wide)).not.toContain("waits for a decision");
+  });
+
+  it("the map in a short window leaves out the cards that window cannot show beside the decision", () => {
+    const text = step("map").instruction(factsAt("created"), { phone: false, short: true });
+    expect(text).toContain(factsAt("created").title(decision));
+    expect(text).not.toContain(factsAt("created").title(review));
+    expect(text).not.toContain(factsAt("created").title(draft));
   });
 
   it("the answer's result says whether the review applies", () => {
@@ -118,8 +126,47 @@ describe("the copy names what is true now", () => {
 
   it("the phone's instruction sends the person to Controls", () => {
     const facts = factsAt("yes");
-    expect(step("frontier").instruction(facts, true)).toContain("Controls");
-    expect(step("frontier").instruction(facts, false)).not.toContain("Controls");
+    expect(step("frontier").instruction(facts, { phone: true, short: false })).toContain("Controls");
+    expect(step("frontier").instruction(facts, wide)).not.toContain("Controls");
+  });
+});
+
+describe("what a step points at once its action is done", () => {
+  const anchored = (id: StepId, facts: Facts) => step(id).anchor?.(facts, none);
+
+  it("the answer's change is the review card after a Yes and the summary card after a No, where the review has left the graph", () => {
+    expect(anchored("answer", factsAt("yes"))).toEqual([cardOf(review)]);
+    expect(anchored("answer", factsAt("no"))).toEqual([cardOf(summary)]);
+    // The canvas frames the first card always: the one the change is about.
+    expect(step("answer").revealFrame?.(factsAt("no"))[0]).toBe(summary);
+    expect(step("answer").revealFrame?.(factsAt("yes"))[0]).toBe(review);
+  });
+
+  it("Frontier's change is the first card that can move, whichever it is", () => {
+    const facts = factsAt("yes");
+    expect(anchored("frontier", facts)).toEqual([cardOf(facts.frontier[0] ?? "")]);
+    expect(anchored("frontier", { ...facts, frontier: [comments, draft] })).toEqual([cardOf(comments)]);
+    expect(anchored("frontier", { ...facts, frontier: [] })).toEqual([]);
+  });
+
+  it("finishing's change is the row of the first freed item: the comments after a No, in the list's own order", () => {
+    expect(anchored("finish", factsAt("no-draft-done"))).toEqual([rowOf(comments)]);
+    expect(anchored("finish", factsAt("yes-draft-done"))).toEqual([rowOf(comments)]);
+    expect(anchored("finish", factsAt("yes"))).toEqual([]);
+  });
+
+  it("a step with no action reveals nothing, and every other step has somewhere to point once done", () => {
+    for (const each of stepsFor(true)) {
+      expect(each.reveal === "none").toBe(each.done === undefined);
+      if (each.reveal !== "none") {
+        expect(anchored(each.id, factsAt("yes-draft-done")), each.id).not.toEqual([]);
+      }
+    }
+  });
+
+  it("the answer's result says the review is ready when the draft is already done (Back after finishing)", () => {
+    expect(step("answer").result?.(factsAt("yes-draft-done"))).toContain("is ready");
+    expect(step("answer").result?.(factsAt("yes"))).toContain("waits for the draft");
   });
 });
 

@@ -72,6 +72,7 @@
   --color-rule: light-dark(rgba(20, 24, 30, 0.045), rgba(255, 255, 255, 0.06)); /* 24px ruling */
   --color-tick: var(--color-secondary); /* corner registration ticks */
   --ruling: linear-gradient(90deg, var(--color-rule) 1px, transparent 1px) 0 0 / 24px 24px, linear-gradient(0deg, var(--color-rule) 1px, transparent 1px) 0 0 / 24px 24px;
+  --tour-scrim: rgba(8, 12, 18, 0.55); /* the tour's dimming around its spotlight, the same over light paper and dark */
   --color-hover: light-dark(rgba(20, 24, 30, 0.07), rgba(255, 255, 255, 0.07));
   --color-tint: light-dark(rgba(47, 111, 255, 0.12), rgba(47, 111, 255, 0.16)); /* behind a selected row */
   --color-add: light-dark(color-mix(in srgb, var(--color-success) 8%, transparent), color-mix(in srgb, var(--color-success) 10%, transparent)); /* success at 8% (light) or 10% (dark) */

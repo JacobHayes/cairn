@@ -64,10 +64,10 @@ export function viaText(via: DependencyVia, name: Namer): string {
 /** Where a constraint comes from (F2), in words. */
 export function sourceText(source: ConstraintSource, name: Namer): string {
   if ("due_by" in source) {
-    return `the due_by rule of ${name(source.due_by.node)}`;
+    return `the due date rule of ${name(source.due_by.node)}`;
   }
   if ("not_before" in source) {
-    return `the not_before rule of ${name(source.not_before.node)}`;
+    return `the earliest start rule of ${name(source.not_before.node)}`;
   }
   if ("dependency" in source) {
     const { node, requires, via } = source.dependency;
@@ -85,7 +85,8 @@ export function sourceText(source: ConstraintSource, name: Namer): string {
 /** One constraint as the chain shows it: `after` at least `offset` days after `before`. */
 export function constraintText(constraint: Constraint, name: Namer): string {
   const days = constraint.offset_days;
-  const offset = days === 0 ? "" : days > 0 ? ` + ${String(days)} days` : ` - ${String(-days)} days`;
+  const count = (n: number) => `${String(n)} ${n === 1 ? "day" : "days"}`;
+  const offset = days === 0 ? "" : days > 0 ? ` + ${count(days)}` : ` - ${count(-days)}`;
   return `${upperFirst(instantText(constraint.after, name))} no earlier than ${instantText(constraint.before, name)}${offset}`;
 }
 

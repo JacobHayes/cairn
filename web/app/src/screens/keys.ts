@@ -15,7 +15,7 @@ import { STEPS, type Step } from "../canvas/model.ts";
 import { nextProjection, PROJECTIONS, screenSwitched, unavailableScreens, useNodeAddresses, type NodeAddresses, type Screen } from "../journeys/address.ts";
 import { useJourneyTarget } from "../journeys/useJourneyTarget.ts";
 import { JOURNEY_OFFERS, SCREEN_VIEWS, type ViewOffers, type ViewState } from "../journeys/view.ts";
-import { typing } from "../ui/typing.ts";
+import { overlayOpen, typing } from "../ui/typing.ts";
 
 /** One binding the sheet lists, with its words; `group` heads the run of rows it starts, and `needs` is what the page must offer for it to act (`keyBindingsFor`). */
 export interface KeyBinding {
@@ -215,6 +215,10 @@ function heardKey(event: KeyboardEvent, heard: Heard): void {
     return;
   }
   const { selected, sheetOpen, setSheetOpen } = heard;
+  // Behind an open popover, menu or the tour's callout, nothing but that layer hears a key (the key sheet, itself a dialog, takes its own keys below).
+  if (overlayOpen() && !sheetOpen) {
+    return;
+  }
   // The sheet is modal: behind it, only the keys that close it act.
   if (sheetOpen && event.key !== "Escape" && event.key !== "?") {
     return;

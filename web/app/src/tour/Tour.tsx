@@ -1,11 +1,11 @@
 // PRD: C20.
-// The tour of Cairn on screen: the provider that owns the tour's machine and the cursor, the
-// welcome, continue, failure and end panels, and the band that carries a step. What is true
+// The tour of Cairn on screen: the provider that owns the tour's machine and the cursor, and the
+// welcome, continue, failure and end panels; a step is the spotlight overlay (Overlay.tsx). What is true
 // (the record, the practice journey, which phase the run is in) is the machine's (machine.ts);
 // what is shown for it is a pure choice (model.ts, `surfaceOf`); what a step says and when it is
-// done are steps.ts. This file only draws those and moves the person between steps.
+// done are steps.ts. This file only draws the panels and moves the person between steps.
 import { useActorRef, useSelector } from "@xstate/react";
-import { createContext, useCallback, useContext, useEffect, useMemo, useRef, type ReactNode } from "react";
+import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { Link, useLocation, useNavigate } from "react-router";
 
 import { assistantOffered } from "../assistant/model.ts";
@@ -14,14 +14,14 @@ import { useDraft } from "../data/drafts.ts";
 import type { Tour as TourRecord } from "../data/host.ts";
 import { pathTo } from "../address.ts";
 import { HOME_PATH, journeyPath } from "../journeys/address.ts";
-import { viewStateFrom } from "../journeys/view.ts";
-import { PHONE_WIDTH, SHEET, useFrameActions, useMedia } from "../shell/frame.tsx";
 import { overlayOpen, typing } from "../ui/typing.ts";
 import { Button } from "../ui/kit.tsx";
 import { tourMachine, type TourEvent, type TourSnapshot } from "./machine.ts";
-import { eligible, phaseOf, surfaceOf, type Phase, type Surface } from "./model.ts";
+import { eligible, phaseOf, surfaceOf, type Phase, type Surface, type SurfaceInput } from "./model.ts";
 import { tourPorts } from "./ports.ts";
-import { clampCursor, factsOf, stepDone, stepsFor, type Step, type StepId } from "./steps.ts";
+import { Overlay } from "./Overlay.tsx";
+import { FramingContext, type Framing } from "./presentation.ts";
+import { clampCursor, stepsFor, type Step } from "./steps.ts";
 import { locate, underJourney } from "./where.ts";
 import "./tour.css";
 
@@ -41,10 +41,8 @@ export interface TourApi {
   reading: boolean;
   steps: Step[];
   index: number;
-  /** The step the band shows, for the frame to name. */
-  activeStep: StepId | undefined;
-  /** The nodes the canvas opens framed on, on a graph step of the practice journey. */
-  frame: readonly string[] | undefined;
+  /** The overlay's request of the canvas (cards to keep in view, in what room), or none to take it back. */
+  setFraming: (request: Framing | undefined) => void;
   /** The example assistant reply has been shown. */
   replied: boolean;
   setReplied: (replied: boolean) => void;
@@ -54,11 +52,13 @@ export interface TourApi {
   youLabel: string | undefined;
   /** A closing write did not land: this tab keeps the offer shut. */
   unsaved: boolean;
+  /** Puts the continue card away until the person is next on Home: nothing is stored and nothing ends. */
+  putAway: () => void;
   /** Opens the tour from a link: Home, with the welcome (or the continue form) shown. */
   take: () => void;
   /** Goes to step `index`: its view, its node, its sheet height. */
   arrive: (index: number) => void;
-  /** Ends the run from the band or the paused line: Home first, then the practice journey goes. */
+  /** Ends the run from the callout or the paused line: Home first, then the practice journey goes. */
   end: (how: "finish" | "skip") => void;
 }
 
@@ -97,7 +97,6 @@ function useRunSteps(run: string | undefined, confirming: boolean) {
   const session = useSession();
   const { search } = useLocation();
   const navigate = useNavigate();
-  const actions = useFrameActions();
   const steps = useMemo(() => stepsFor(assistantOffered(session)), [session]);
   const [cursor, setCursor] = useDraft<number>(`tour:${run ?? ""}`);
   const [replied, setReplied] = useDraft<boolean>(`tour-replied:${run ?? ""}`);
@@ -114,12 +113,9 @@ function useRunSteps(run: string | undefined, confirming: boolean) {
         params.delete("frontier");
       }
       void navigate(journeyPath({ journey: run, node: step.node }, step.screen, params.toString()));
-      if (step.pane === true) {
-        actions?.snap("half");
-      }
       setCursor(to);
     },
-    [steps, run, search, navigate, actions, setCursor],
+    [steps, run, search, navigate, setCursor],
   );
   // A tour just made opens on its first step.
   const arriveRef = useRef(arrive);
@@ -137,8 +133,26 @@ function useRunSteps(run: string | undefined, confirming: boolean) {
   return { steps, index: clampCursor(cursor, steps), arrive, replied: replied === true, forget, setReplied: reply };
 }
 
-/** A record that could not be read is read again on the next visit to Home. */
-function useReadAgain(unreadable: boolean, home: boolean, send: (event: TourEvent) => void): void {
+/** What stands over the workspace (model.ts), less the continue card while the person has put it away for now (Escape): nothing is stored, the rail still offers the way back, and the card returns on the next visit to Home. */
+function useSurface(input: SurfaceInput): [Surface, () => void, () => void] {
+  const [declined, setDeclined] = useState(false);
+  const { home } = input;
+  useEffect(() => {
+    if (!home) {
+      setDeclined(false);
+    }
+  }, [home]);
+  const putAway = useCallback(() => { setDeclined(true); }, []);
+  const bringBack = useCallback(() => { setDeclined(false); }, []);
+  const shown = surfaceOf(input);
+  return [shown === "continue" && declined ? "none" : shown, putAway, bringBack];
+}
+
+/** Tells the machine whether the location is under the practice journey, and reads a record that could not be read again on the next visit to Home. */
+function useReadAgain(unreadable: boolean, home: boolean, send: (event: TourEvent) => void, under: boolean): void {
+  useEffect(() => {
+    send({ type: "where", under });
+  }, [send, under]);
   const wasHome = useRef(home);
   useEffect(() => {
     if (unreadable && home && !wasHome.current) {
@@ -159,14 +173,12 @@ export function TourProvider({ nameSettled, children }: { nameSettled: boolean; 
   const { run, tour: record, failure, invited, unsaved } = snapshot.context;
   const home = locate(pathname).home;
   const under = underJourney(pathname, run);
-  useEffect(() => {
-    send({ type: "where", under });
-  }, [send, under]);
-  useReadAgain(snapshot.matches("unreadable"), home, send);
+  useReadAgain(snapshot.matches("unreadable"), home, send, under);
   const { steps, index, arrive, replied, setReplied, forget } = useRunSteps(run, snapshot.matches({ running: "confirming" }));
+  const [framing, setFraming] = useState<Framing | undefined>(undefined);
   const phase = phaseOf(snapshot);
   const offerable = record?.state === "none" || record?.state === "started";
-  const surface = surfaceOf({ phase, failure, offerable, invited, unsaved, run, pathname, home, nameSettled });
+  const [surface, putAway, bringBack] = useSurface({ phase, failure, offerable, invited, unsaved, run, pathname, home, nameSettled });
   const end = useCallback(
     (how: "finish" | "skip") => {
       forget();
@@ -176,11 +188,12 @@ export function TourProvider({ nameSettled, children }: { nameSettled: boolean; 
     [send, navigate, forget],
   );
   const take = useCallback(() => {
+    bringBack();
     void navigate(HOME_PATH);
     if (actor.getSnapshot().matches("idle")) {
       send({ type: "invite" });
     }
-  }, [actor, send, navigate]);
+  }, [actor, send, navigate, bringBack]);
   const open = eligible(phase, offerable, unsaved);
   const running = phase === "running";
   const api = useMemo<TourApi>(
@@ -195,8 +208,8 @@ export function TourProvider({ nameSettled, children }: { nameSettled: boolean; 
       reading: snapshot.matches("reading"),
       steps,
       index,
-      activeStep: surface === "band" ? steps[index]?.id : undefined,
-      frame: surface === "band" ? steps[index]?.frame : undefined,
+      setFraming,
+      putAway,
       replied,
       setReplied,
       railLabel: !under && open && surface !== "welcome" && surface !== "continue" ? (running ? "Continue the tour" : "Take the tour") : undefined,
@@ -206,17 +219,19 @@ export function TourProvider({ nameSettled, children }: { nameSettled: boolean; 
       arrive,
       end,
     }),
-    [snapshot, send, surface, phase, record, run, steps, index, replied, setReplied, under, open, running, offerable, unsaved, take, arrive, end],
+    [snapshot, send, surface, phase, record, run, steps, index, replied, setReplied, setFraming, putAway, under, open, running, offerable, unsaved, take, arrive, end],
   );
   return (
     <TourContext value={api}>
-      {run === undefined ? null : <RunFeed run={run} send={send} waiting={snapshot.matches({ checking: "pending" })} />}
-      {children}
+      <FramingContext value={framing}>
+        {run === undefined ? null : <RunFeed run={run} send={send} waiting={snapshot.matches({ checking: "pending" })} />}
+        {children}
+      </FramingContext>
     </TourContext>
   );
 }
 
-/** Escape closes a card that has no target: Not now on the welcome, Close on the end card. */
+/** Escape closes a card that has no target: Not now on the welcome (and on the continue card, which stays one visit away), Close on the end card. */
 function useEscape(onEscape: () => void): void {
   useEffect(() => {
     const onKey = (event: KeyboardEvent) => {
@@ -249,7 +264,8 @@ function Welcome({ api }: { api: TourApi }) {
     send(record?.state === "none" || record?.state === "started" ? { type: "dismiss" } : { type: "uninvite" });
   }, [send, record]);
   const skip = useCallback(() => { api.end("skip"); }, [api]);
-  useEscape(waiting ? skip : decline);
+  // Escape declines for now, on the continue card as on the welcome: only the named button skips, which deletes the practice journey.
+  useEscape(waiting ? api.putAway : decline);
   if (waiting && api.run !== undefined) {
     return (
       <Card title="Your tour is waiting" testId="tour-continue">
@@ -271,6 +287,7 @@ function Welcome({ api }: { api: TourApi }) {
         <Button primary data-testid="tour-start" onClick={() => { send({ type: "start" }); }}>Start the tour</Button>
         <Button data-testid="tour-not-now" onClick={decline}>Not now</Button>
       </div>
+      <p className="muted small">Tab moves between the guidance and the step's control.</p>
     </Card>
   );
 }
@@ -320,98 +337,6 @@ function Paused({ api }: { api: TourApi }) {
   );
 }
 
-/** On a sheet the answer form is brought to the top of the inspector, so the action the step teaches is in view and not under the node's header. */
-function useAnswerInView(wanted: boolean): void {
-  useEffect(() => {
-    if (!wanted) {
-      return undefined;
-    }
-    let frames = 0;
-    let frame = 0;
-    const look = () => {
-      const form = document.querySelector('[data-testid="node-detail"] input[type="radio"]');
-      if (form !== null) {
-        // The question above the choices leads, so the question, both answers and Save show together.
-        const choices = form.closest("fieldset, [role=radiogroup]") ?? form.closest("label")?.parentElement ?? form;
-        (choices.previousElementSibling ?? choices).scrollIntoView({ block: "start" });
-      } else if ((frames += 1) < 60) {
-        frame = requestAnimationFrame(look);
-      }
-    };
-    frame = requestAnimationFrame(look);
-    return () => { cancelAnimationFrame(frame); };
-  }, [wanted]);
-}
-
-/** The band: the step the person is on, what to do, and the way on. */
-function Band({ api, run }: { api: TourApi; run: string }) {
-  const { steps, index } = api;
-  const { pathname, search } = useLocation();
-  const phone = useMedia(PHONE_WIDTH);
-  const sheet = useMedia(SHEET);
-  const actions = useFrameActions();
-  const view = useJourney(run);
-  const title = useRef<HTMLHeadingElement>(null);
-  const step = steps[index];
-  const facts = view.status === "ready" ? factsOf(view) : undefined;
-  const where = { selected: locate(pathname).node, frontier: viewStateFrom(new URLSearchParams(search)).frontier, replied: api.replied };
-  const done = step !== undefined && facts !== undefined && stepDone(step, facts, where);
-  // Moving to another step puts the reader at its title; the first step shown keeps the focus where it was.
-  const shown = useRef(index);
-  useEffect(() => {
-    if (shown.current !== index) {
-      title.current?.focus();
-    }
-    shown.current = index;
-  }, [index]);
-  // The answer saved on a sheet: the pane goes inert at the peek, so the sheet lowers and the focus comes to the band.
-  const id = step?.id;
-  const seen = useRef({ id, done });
-  useEffect(() => {
-    if (seen.current.id === id && !seen.current.done && done && id === "answer" && sheet) {
-      actions?.snap("peek");
-      title.current?.focus();
-    }
-    seen.current = { id, done };
-  }, [id, done, sheet, actions]);
-  useAnswerInView(id === "answer" && sheet);
-  if (step === undefined) {
-    return null;
-  }
-  const last = index === steps.length - 1;
-  const result = done ? step.result?.(facts) : undefined;
-  const instruction = facts === undefined ? "Reading the practice journey..." : step.instruction(facts, phone);
-  const next = () => {
-    if (!done) {
-      return;
-    }
-    if (last) {
-      api.end("finish");
-    } else {
-      api.arrive(index + 1);
-    }
-  };
-  return (
-    <section className="panel tour-band" aria-label="Tour" data-testid="tour-band" data-step={step.id} data-done={done}>
-      <div className="tour-text">
-        <div className="tour-head">
-          <span className="label" data-testid="tour-label">{`Tour · step ${String(index + 1)} of ${String(steps.length)}`}</span>
-          <h2 ref={title} tabIndex={-1} className="tour-title" data-testid="tour-title">{step.title}</h2>
-        </div>
-        {phone && result !== undefined ? null : <p className="tour-instruction" data-testid="tour-instruction">{instruction}</p>}
-        <p className="tour-result" role="status" aria-live="polite" data-testid="tour-result">{result ?? ""}</p>
-      </div>
-      <div className="tour-actions">
-        {index === 0 ? null : <Button data-testid="tour-back" onClick={() => { api.arrive(index - 1); }}>Back</Button>}
-        <Button primary aria-disabled={!done} held={done ? undefined : step.waits} data-testid="tour-next" onClick={next}>
-          {last ? "Finish the tour" : "Next"}
-        </Button>
-        <Button ghost data-testid="tour-skip" onClick={() => { api.end("skip"); }}>Skip the tour</Button>
-      </div>
-    </section>
-  );
-}
-
 /** Whatever the tour puts above the workspace now. */
 export function Tour() {
   const api = useTour();
@@ -432,7 +357,7 @@ export function Tour() {
       return <End api={api} />;
     case "paused":
       return <Paused api={api} />;
-    case "band":
-      return api.run === undefined ? null : <Band api={api} run={api.run} />;
+    case "overlay":
+      return api.run === undefined ? null : <Overlay api={api} run={api.run} />;
   }
 }

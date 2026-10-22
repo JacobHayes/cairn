@@ -3,7 +3,7 @@
 // column on the right (INSPECTOR | ASSISTANT; a bottom sheet below 1100px; a rail when hidden). The sync dot sits
 // beside the brand at the top of the rail. The frame is one `100dvh` grid with one scroller per
 // region (app.css); below 720px it is one scrolling column.
-import { Suspense, type ReactNode } from "react";
+import { Suspense } from "react";
 import { Link, Outlet, useLocation } from "react-router";
 
 import { pathTo, sectionOf } from "../address.ts";
@@ -71,16 +71,6 @@ function Rail({ pathname }: { pathname: string }) {
   );
 }
 
-/** The frame element, which names the tour's step so the controls it points at can be outlined (tour.css). */
-function Frame({ inspector, sheet, children }: { inspector: string; sheet: string; children: ReactNode }) {
-  const step = useTour()?.activeStep;
-  return (
-    <div className="frame" data-inspector={inspector} data-sheet={sheet} {...(step === undefined ? {} : { "data-tour-step": step })}>
-      {children}
-    </div>
-  );
-}
-
 export function Shell() {
   // The screen the router shows, for the browser tests to wait on after an in-page navigation.
   const { pathname, search } = useLocation();
@@ -91,7 +81,7 @@ export function Shell() {
     <FrameActionsContext value={frame.actions}>
       <FrameStateContext value={frame.state}>
         <TourProvider nameSettled={ask.settled}>
-        <Frame inspector={frame.folded ? "folded" : frame.open ? "on" : "off"} sheet={frame.snap}>
+        <div className="frame" data-inspector={frame.folded ? "folded" : frame.open ? "on" : "off"} data-sheet={frame.snap}>
           <Rail pathname={pathname} />
           <NamePrompt ask={ask} />
           <main className="workspace" data-screen={`${pathname}${search}`}>
@@ -119,7 +109,7 @@ export function Shell() {
             assistantRef={frame.setAssistant}
             proposalsRef={frame.setProposals}
           />
-        </Frame>
+        </div>
         </TourProvider>
       </FrameStateContext>
     </FrameActionsContext>

@@ -22,8 +22,8 @@ export interface Source {
   text: string;
 }
 
-/** The only elements that scroll (design 3.2): the rail, the workspace body, and the inspector's, sheet's, popover's and modal's bodies. */
-const SCROLLERS = [".rail", ".ws-body", ".inspector-body", ".sheet-body", ".popover-body", ".modal-body"];
+/** The only elements that scroll (design 3.2): the rail, the workspace body, and the inspector's, sheet's, popover's, modal's and tour callout's bodies. */
+const SCROLLERS = [".rail", ".ws-body", ".inspector-body", ".sheet-body", ".popover-body", ".modal-body", ".tour-body"];
 /** Elements that may stick: table headers, the Plan list's pinned columns, the timeline's axis, the inspector's way back to the pass. */
 const STICKY = ["th", ".list-pinned", ".timeline-axis", ".back-to-pass"];
 /** The design's own limits, read from design/tokens.css: the largest radius there is (`--radius-lg`) and what a rem is (`--type-base-size`), in px. */

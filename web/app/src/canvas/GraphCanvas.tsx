@@ -18,7 +18,8 @@ import { useFrameState } from "../shell/frame.tsx";
 import { useResolvedTheme } from "../ui/theme.ts";
 import { ContextMenu } from "../ui/ContextMenu.tsx";
 import { Tip, usePointTip, type PointTip } from "../ui/Tip.tsx";
-import { typing } from "../ui/typing.ts";
+import { overlayOpen, typing } from "../ui/typing.ts";
+import { useFraming, type Framing } from "../tour/presentation.ts";
 import { headHeight } from "./cards.ts";
 import { DateEdgeLine, EdgeLine, elbow, type Box, type DateEdge, type LineEdge } from "./EdgeLine.tsx";
 import { NEAR_ZOOM, firstFrame, fitZoom, listenPinch, minZoomOf, roomOf, shiftInto } from "./gestures.ts";
@@ -401,7 +402,7 @@ function useCanvasKeys(props: GraphCanvasProps): void {
   useEffect(() => {
     const onKey = (event: KeyboardEvent) => {
       // Not behind the key sheet (a modal dialog), where only its own keys act.
-      if (event.defaultPrevented || event.metaKey || event.ctrlKey || event.altKey || typing(event.target) || (event.target instanceof Element && event.target.closest("dialog[open]") !== null)) {
+      if (event.defaultPrevented || event.metaKey || event.ctrlKey || event.altKey || typing(event.target) || overlayOpen()) {
         return;
       }
       if (event.key === "f") {
@@ -534,6 +535,49 @@ function useFirstFit(props: GraphCanvasProps, fit: number): void {
     }
     work(flow.fitView({ ...FIT, padding: { ...FIT_PADDING, bottom: px(PAD.bottom + covered) }, minZoom: minZoomOf(fit) }));
   }, [initialized, sized, flow, fit, target, sheet, store, work]);
+}
+
+/**
+ * The tour's request (tour/presentation.ts): its cards framed in the part of the canvas the request
+ * leaves, less the zones the floating controls keep and the sheet's cover. Once per request, as
+ * soon as the first card is drawn; a card not yet drawn (a relayout under way) is waited for.
+ */
+function useTourFraming(framing: Framing | undefined, layout: Layout): void {
+  const flow = useReactFlow();
+  const store = useStoreApi();
+  const [initialized, sized] = [useNodesInitialized(), useStore((state) => state.width > 0 && state.height > 0)];
+  const sheet = useFrameState()?.inspector?.parentElement;
+  const done = useRef<number | undefined>(undefined);
+  const work = useWork();
+  useEffect(() => {
+    if (framing === undefined || !initialized || !sized || done.current === framing.id) {
+      return undefined;
+    }
+    const boxes = framing.cards.flatMap((id) => {
+      const card = flow.getInternalNode(id);
+      return card === undefined ? [] : [{ ...card.internals.positionAbsolute, width: card.measured.width ?? 0, height: card.measured.height ?? 0 }];
+    });
+    const first = framing.cards[0];
+    if (first === undefined || flow.getInternalNode(first) === undefined) {
+      return undefined;
+    }
+    return onNextFrame(work, () => {
+      done.current = framing.id;
+      measureCanvas(store);
+      const { width, height, domNode } = store.getState();
+      const canvas = domNode?.getBoundingClientRect();
+      if (canvas === undefined) {
+        return undefined;
+      }
+      const room = roomOf({ width, height }, PAD, coveredBy(sheet, domNode));
+      // The request's room, in the canvas's own coordinates, inside what the controls and the sheet leave.
+      const asked = { left: framing.room.left - canvas.left, right: framing.room.left + framing.room.width - canvas.left, top: framing.room.top - canvas.top, bottom: framing.room.top + framing.room.height - canvas.top };
+      // The tour frames its cards as far down as the near zoom, where a card still shows what it is and its state.
+      const frame = firstFrame(boxes, { left: Math.max(room.left, asked.left), right: Math.min(room.right, asked.right), top: Math.max(room.top, asked.top), bottom: Math.min(room.bottom, asked.bottom) }, NEAR_ZOOM);
+      return frame === undefined ? undefined : flow.setViewport(frame).then(() => { framing.applied(); });
+    });
+    // A card drawn later (the layout of a revision) is a reason to look again; the camera's own moves are not.
+  }, [framing, layout, initialized, sized, flow, store, sheet, work]);
 }
 
 /** The zoom, as `--z` on the canvas root, so a zoomed-out head can set its title to a readable size on screen without the cards re-rendering. */
@@ -712,6 +756,7 @@ function Flow(props: GraphCanvasProps) {
   const near = useStore((state) => state.transform[2] >= NEAR_ZOOM);
   const { minZoom, fit } = useZoomRange(props, root);
   useFirstFit(props, fit);
+  useTourFraming(useFraming(), props.layout);
   useZoomVariable(root);
   useCenterAboveSheet(props.selected, props.firstFit !== undefined);
   useReveal(props.reveal, props.model);

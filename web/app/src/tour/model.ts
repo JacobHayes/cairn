@@ -24,8 +24,8 @@ export function phaseOf(snapshot: TourSnapshot): Phase {
   return snapshot.matches("ended") ? "ended" : "busy";
 }
 
-/** What stands over the workspace: a panel with no target, the band of a step, or one line saying the tour is paused. */
-export type Surface = "none" | "welcome" | "continue" | "start-failed" | "cleanup-failed" | "end" | "band" | "paused";
+/** What stands over the workspace: a panel with no target, the overlay of a step, or one line saying the tour is paused. */
+export type Surface = "none" | "welcome" | "continue" | "start-failed" | "cleanup-failed" | "end" | "overlay" | "paused";
 
 export interface SurfaceInput {
   phase: Phase;
@@ -48,7 +48,7 @@ export interface SurfaceInput {
 /**
  * What to show. The welcome opens on Home only, and only once the name prompt is out of the
  * way, so what a person came to a link for is never covered and the tour never competes with
- * the first question. A started run shows its step under the practice journey and one line
+ * the first question. A started run shows its step over the practice journey and one line
  * anywhere else, so practice instructions never sit over real work.
  */
 export function surfaceOf(input: SurfaceInput): Surface {
@@ -63,7 +63,7 @@ export function surfaceOf(input: SurfaceInput): Surface {
       return home ? "end" : "none";
     case "running":
       if (underJourney(input.pathname, input.run)) {
-        return "band";
+        return "overlay";
       }
       if (home) {
         return input.nameSettled ? "continue" : "none";

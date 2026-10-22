@@ -26,17 +26,19 @@ function Example({ journey }: { journey: string }) {
         <Transcript entries={entries} titleOf={view.status === "ready" ? journeyTitles(view) : undefined} />
         {replied ? <p className="muted small">When you ask, the assistant reads your real journey. It can update progress and answers directly; changes to structure it proposes for you to review.</p> : null}
       </div>
-      <form className="stack" onSubmit={(event) => { event.preventDefault(); }}>
-        <div className="stack assistant-ask">
-          <span>Example question</span>
-          <p className="assistant-said" data-testid="tour-assistant-question">{EXAMPLE_QUESTION}</p>
-        </div>
-        <span className="row">
-          <Button primary type="button" disabled={replied || view.status !== "ready"} data-testid="tour-assistant-show" onClick={() => { tour?.setReplied(true); }}>
-            Show example reply
-          </Button>
-        </span>
-      </form>
+      {replied ? null : (
+        <form className="stack" onSubmit={(event) => { event.preventDefault(); }}>
+          <div className="stack assistant-ask">
+            <span>Example question</span>
+            <p className="assistant-said" data-testid="tour-assistant-question">{EXAMPLE_QUESTION}</p>
+          </div>
+          <span className="row">
+            <Button primary type="button" disabled={view.status !== "ready"} data-testid="tour-assistant-show" onClick={() => { tour?.setReplied(true); }}>
+              Show example reply
+            </Button>
+          </span>
+        </form>
+      )}
     </section>
   );
 }

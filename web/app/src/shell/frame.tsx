@@ -27,6 +27,8 @@ export const PHONE_WIDTH = "(max-width: 719px)";
 
 /** Windows where the sheet opens at its peek: a phone's width, or any window too short to give up half its height to it. */
 export const PEEK_FIRST = `${PHONE_WIDTH}, (max-height: 599px)`;
+/** A window too short for the tour's guidance to sit above or below a card and leave the card room: it sits beside it. */
+export const SHORT = "(max-height: 479px)";
 
 /** Whether the window matches `query` now, and as it changes. */
 export function useMedia(query: string): boolean {

@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { place, pointerRect, type PlaceOptions, type Rect } from "./place.ts";
+import { CORNER, place, pointerRect, type PlaceOptions, type Rect } from "./place.ts";
 
 const bounds: Rect = { left: 0, top: 0, width: 400, height: 300 };
 const size = { width: 100, height: 40 };
@@ -9,7 +9,7 @@ const anchorAt = (left: number, top: number): Rect => ({ left, top, width: 60, h
 
 describe("place", () => {
   it("puts the box on its side, centred, a gap away", () => {
-    expect(place(anchorAt(100, 100), size, bounds, below)).toEqual({ left: 80, top: 126, side: "bottom", room: 300 - 8 - 126 });
+    expect(place(anchorAt(100, 100), size, bounds, below)).toMatchObject({ left: 80, top: 126, side: "bottom", room: 300 - 8 - 126 });
   });
 
   it("flips to the other side when its own lacks the room and the other has more", () => {
@@ -43,7 +43,21 @@ describe("place", () => {
 
   it("places beside an anchor with the bottom edges level", () => {
     const beside: PlaceOptions = { side: "right", align: "end", gap: 0, margin: 12 };
-    expect(place(anchorAt(20, 200), size, bounds, beside)).toEqual({ left: 80, top: 180, side: "right", room: 400 - 12 - 80 });
+    expect(place(anchorAt(20, 200), size, bounds, beside)).toMatchObject({ left: 80, top: 180, side: "right", room: 400 - 12 - 80 });
+  });
+
+  it("reports where the anchor's centre falls along the box's near edge, kept clear of the corners", () => {
+    // Centred below the anchor: the centre is the box's middle.
+    expect(place(anchorAt(100, 100), size, bounds, below).anchorOffset).toBe(50);
+    // Aligned on the anchor's start, the centre is half the anchor in.
+    expect(place(anchorAt(100, 100), size, bounds, { ...below, align: "start" }).anchorOffset).toBe(30);
+    // An anchor beyond the end of a box slid to the margin: the notch stops at the corner.
+    expect(place(anchorAt(380, 100), size, bounds, { ...below, align: "start" }).anchorOffset).toBe(100 - CORNER);
+    // Beside the anchor the offset runs down the box's side.
+    const beside: PlaceOptions = { side: "right", align: "center", gap: 0, margin: 12 };
+    expect(place(anchorAt(20, 200), size, bounds, beside).anchorOffset).toBe(20);
+    // A centre nearer the box's leading edge than the corner is held at the corner.
+    expect(place(anchorAt(20, 200), size, bounds, { ...beside, align: "start" }).anchorOffset).toBe(CORNER);
   });
 
   it("takes a pointer as an anchor", () => {

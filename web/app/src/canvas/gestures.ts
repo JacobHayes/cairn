@@ -142,13 +142,13 @@ function unionOf(left: Box, right: Box): Box {
 }
 
 /**
- * C14: the view a proposal's layer opens on. The boxes are the changed cards in the rail's order. The first is always framed; each later one is framed with it when all of them still fit `room` at or above LEGIBLE_ZOOM (never zoomed in past 1), so a change next to the first is in view with it, and the others, too far off to read together, are reached from the rail's rows. A first change alone is as large as the room holds it, never below LEGIBLE_ZOOM.
+ * C14: the view a proposal's layer opens on. The boxes are the changed cards in the rail's order. The first is always framed; each later one is framed with it when all of them still fit `room` at or above `legible` (LEGIBLE_ZOOM unless the caller reads at a lower floor; never zoomed in past 1), so a change next to the first is in view with it, and the others, too far off to read together, are reached from the rail's rows. A first change alone is as large as the room holds it, never below LEGIBLE_ZOOM.
  */
-export function firstFrame(boxes: readonly Box[], room: Room): { x: number; y: number; zoom: number } | undefined {
+export function firstFrame(boxes: readonly Box[], room: Room, legible: number = LEGIBLE_ZOOM): { x: number; y: number; zoom: number } | undefined {
   const first = boxes[0];
   if (first === undefined) {
     return undefined;
   }
-  const framed = boxes.slice(1).reduce((held, box) => (zoomFitting(unionOf(held, box), room) >= LEGIBLE_ZOOM ? unionOf(held, box) : held), first);
-  return viewportAround(framed, Math.max(LEGIBLE_ZOOM, zoomFitting(framed, room)), room);
+  const framed = boxes.slice(1).reduce((held, box) => (zoomFitting(unionOf(held, box), room) >= legible ? unionOf(held, box) : held), first);
+  return viewportAround(framed, Math.max(legible, zoomFitting(framed, room)), room);
 }

@@ -33,8 +33,8 @@ describe("a run in progress", () => {
   const running = { phase: "running" as const, run: "j_practice" };
 
   it("shows its step under the practice journey and its nodes", () => {
-    expect(surfaceOf(input("/journeys/j_practice", running))).toBe("band");
-    expect(surfaceOf(input("/journeys/j_practice/nodes/n_a", running))).toBe("band");
+    expect(surfaceOf(input("/journeys/j_practice", running))).toBe("overlay");
+    expect(surfaceOf(input("/journeys/j_practice/nodes/n_a", running))).toBe("overlay");
   });
 
   it("offers to continue on Home, and says it is paused anywhere else", () => {

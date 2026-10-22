@@ -19,7 +19,6 @@ import { useReviewing } from "../proposals/layer.ts";
 import { useWritable } from "../screens/writable.ts";
 import { EmptyPanel, journeySubject, NothingMatches, ResetView, ViewControls } from "../screens/ViewControls.tsx";
 import { useFrameActions } from "../shell/frame.tsx";
-import { useTour } from "../tour/Tour.tsx";
 import { overlayOpen, typing } from "../ui/typing.ts";
 import { RevealBox, SignalMenu } from "./Chrome.tsx";
 import { GraphCanvas } from "./GraphCanvas.tsx";
@@ -168,7 +167,6 @@ function CanvasFailed({ ready, badges, error }: { ready: Ready; badges: ReturnTy
 
 /** The journey's canvas, laid out, with the selected node's trace. */
 export function JourneyCanvas({ ready, view, selected, edge, onPick, selection }: JourneyCanvasProps) {
-  const tour = useTour();
   const navigate = useNavigate();
   const location = useLocation();
   const journey = ready.journey.header.id;
@@ -216,7 +214,7 @@ export function JourneyCanvas({ ready, view, selected, edge, onPick, selection }
           }
         }}
         selection={graph.layer === undefined ? { picked: new Set(others.length === 0 ? [] : selection.members), members: selection.members, toggle: selection.toggle, set: selection.set } : { picked: new Set(), members: selection.members, toggle: () => undefined, set: () => undefined }}
-        firstFit={graph.layer === undefined ? (tour?.run === ready.journey.header.id ? tour.frame : undefined) : changedKeys(graph.layer)}
+        firstFit={graph.layer === undefined ? undefined : changedKeys(graph.layer)}
         reveal={reveal}
         held={
           <>
