@@ -18,6 +18,7 @@ pub mod project;
 pub mod proposal;
 pub mod records;
 pub mod replay;
+mod restore;
 pub mod rules;
 mod stages;
 #[cfg(feature = "testing")]
@@ -38,4 +39,5 @@ pub use proposal::{
 };
 pub use records::Records;
 pub use replay::replay;
+pub use restore::restore_nodes;
 pub use upgrade::{DraftError, relink, save_as_route, upgrade};

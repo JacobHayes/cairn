@@ -15,8 +15,8 @@ use cairn_engine::{ApplyInputs, Graph as EngineGraph, Records, consequences, der
 use cairn_schema::condition::ConditionError;
 use cairn_schema::{
     Actor, Clause, Condition, Consequences, Date, Deployment, Domain, DomainDocument, Graph,
-    KeyRefs, Limit, Lineage, Markdown, Patch, PatchTarget, Proposal, RemovalTarget, Route, RouteId,
-    RouteVersion, Timestamp,
+    KeyRefs, Limit, Lineage, Markdown, NodeKey, Patch, PatchTarget, Proposal, RemovalTarget, Route,
+    RouteId, RouteVersion, Timestamp,
 };
 use serde::{Deserialize, Serialize};
 use wasm_bindgen::prelude::wasm_bindgen;
@@ -403,6 +403,28 @@ pub fn removal_plan(graph: &str, target: &str) -> Result<String, String> {
     let graph: Graph = read("graph", graph)?;
     let target: RemovalTarget = read("removal target", target)?;
     Ok(json(&cairn_engine::plan_removal(&graph, &target)))
+}
+
+/// B4: the mutations that restore tombstoned node `key` of a route version (`version`, a
+/// `Graph`) into a journey's graph, with fresh keys built from `seed`; `null` when the node
+/// is not in the version or a message draft would not fit under the new keys.
+///
+/// # Errors
+///
+/// The JSON of a [`HostError`] when an input does not read.
+#[wasm_bindgen(js_name = restoreNodes)]
+pub fn restore_nodes(
+    journey: &str,
+    version: &str,
+    key: &str,
+    seed: &str,
+) -> Result<String, String> {
+    let journey: Graph = read("journey graph", journey)?;
+    let version: Graph = read("route graph", version)?;
+    let key: NodeKey = read("node key", &serde_json::json!(key).to_string())?;
+    Ok(json(&cairn_engine::restore_nodes(
+        &journey, &version, &key, seed,
+    )))
 }
 
 /// A10: a stored message draft as an author reads it (roles by id, decisions by path), as

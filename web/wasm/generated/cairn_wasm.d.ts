@@ -449,6 +449,17 @@ export function readRouteFile(text: string): string;
 export function removalPlan(graph: string, target: string): string;
 
 /**
+ * B4: the mutations that restore tombstoned node `key` of a route version (`version`, a
+ * `Graph`) into a journey's graph, with fresh keys built from `seed`; `null` when the node
+ * is not in the version or a message draft would not fit under the new keys.
+ *
+ * # Errors
+ *
+ * The JSON of a [`HostError`] when an input does not read.
+ */
+export function restoreNodes(journey: string, version: string, key: string, seed: string): string;
+
+/**
  * A13: the file document (the JSON of a `RouteFile`, as an export answers it) written as
  * the canonical YAML a route file is kept in on disk: sorted, in a stable field order.
  *
@@ -526,6 +537,7 @@ export interface InitOutput {
     readonly preview: (a: number, b: number, c: number, d: number, e: number) => void;
     readonly readRouteFile: (a: number, b: number, c: number) => void;
     readonly removalPlan: (a: number, b: number, c: number, d: number, e: number) => void;
+    readonly restoreNodes: (a: number, b: number, c: number, d: number, e: number, f: number, g: number, h: number, i: number) => void;
     readonly rootsubscription_take: (a: number, b: number, c: number) => void;
     readonly routeFileText: (a: number, b: number, c: number) => void;
     readonly routeNotices: (a: number, b: number, c: number) => void;

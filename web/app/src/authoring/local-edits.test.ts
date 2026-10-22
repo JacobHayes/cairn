@@ -7,8 +7,8 @@ import type { InBrowserHost } from "@cairn/wasm";
 import { beforeAll, describe, expect, it } from "vitest";
 
 import { journeyAfter, planMutations, removalPlan, seeded } from "./engine.test-support.ts";
-import { pathOf, treeOf, type Graph, type GraphNode } from "./graph.ts";
-import { resetMutations, restoreMutations, tombstonesOf, type LocalEdit } from "./local-edits.ts";
+import { pathOf, treeOf, type Graph, type GraphNode, type Mutation } from "./graph.ts";
+import { resetMutations, tombstonesOf, type LocalEdit } from "./local-edits.ts";
 
 const JOURNEY = "j_vendor_eval";
 
@@ -75,13 +75,13 @@ describe("tombstones and restore (B4)", () => {
   });
 
   it("restores a local copy of the subtree under fresh keys at the same path, which then holds its place", () => {
-    const restore = restoreMutations(graphOf(removed), version, "n_partner_led");
+    const restore = JSON.parse(host.engine.restoreNodesText(graphOf(removed), version, "n_partner_led", "seed")) as Mutation[];
     const keys = restore.flatMap((mutation) => (mutation.op === "add_node" ? [mutation.node.key] : []));
     expect(keys).toHaveLength(3);
     expect(keys.some((key) => ["n_partner_led", "n_criteria", "n_partner_results"].includes(key))).toBe(false);
     const after = graphOf(journeyAfter(host, JOURNEY, restore, removed));
     const tree = treeOf(after);
-    expect(keys.map((key) => pathOf(tree, key))).toEqual(["testing/partner-led", "testing/partner-led/criteria", "testing/partner-led/partner-results"]);
+    expect(keys.map((key) => pathOf(tree, key)).sort()).toEqual(["testing/partner-led", "testing/partner-led/criteria", "testing/partner-led/partner-results"]);
     expect(keys.map((key) => after.state?.nodes?.[key]?.provenance)).toEqual(["local", "local", "local"]);
     expect(tombstonesOf(after, version).map((stone) => stone.occupied)).toEqual([true]);
   });

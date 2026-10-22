@@ -65,6 +65,33 @@ impl MapReferences<KeyRefs, KeyRefs> for Dropping {
     }
 }
 
+/// A message draft after its placeholders that name something gone are dropped.
+pub(crate) enum Pruned {
+    /// It names nothing gone.
+    Unchanged,
+    /// Nothing else was left: it is no draft.
+    Emptied,
+    /// The draft without them.
+    To(MessageTemplate<KeyRefs>),
+}
+
+/// The draft without the placeholders `gone` says are, keeping its other text.
+pub(crate) fn pruned_draft(
+    template: &MessageTemplate<KeyRefs>,
+    gone: impl Fn(&Segment<KeyRefs>) -> bool,
+) -> Pruned {
+    if !template.segments().iter().any(&gone) {
+        return Pruned::Unchanged;
+    }
+    let text: String = template
+        .segments()
+        .iter()
+        .filter(|segment| !gone(segment))
+        .map(MessageTemplate::<KeyRefs>::render_segment)
+        .collect();
+    text.parse().map_or(Pruned::Emptied, Pruned::To)
+}
+
 /// The edit of a message draft to leave out the placeholders `dropping` removes, or its
 /// removal when nothing else is left; none when it names none of them.
 fn draft_without(
@@ -78,30 +105,21 @@ fn draft_without(
         Segment::RoleName(role) => dropping.role.as_ref() == Some(role),
         Segment::Text(_) | Segment::Journey(_) => false,
     };
-    if !template.segments().iter().any(gone) {
-        return None;
-    }
-    let text: String = template
-        .segments()
-        .iter()
-        .filter(|segment| !gone(segment))
-        .map(MessageTemplate::<KeyRefs>::render_segment)
-        .collect();
-    // A draft of nothing else is no draft.
-    Some(match text.parse() {
-        Ok(template) => {
+    match pruned_draft(template, gone) {
+        Pruned::Unchanged => None,
+        Pruned::To(template) => {
             let mut next = resource.clone();
             next.content = ResourceContent::MessageDraft(template);
-            Mutation::EditResource {
+            Some(Mutation::EditResource {
                 node: node.clone(),
                 resource: next,
-            }
+            })
         }
-        Err(_) => Mutation::RemoveResource {
+        Pruned::Emptied => Some(Mutation::RemoveResource {
             node: node.clone(),
             resource: resource.key.clone(),
-        },
-    })
+        }),
+    }
 }
 
 fn field(node: &NodeKey, value: NodeFieldValue<KeyRefs>) -> Mutation {

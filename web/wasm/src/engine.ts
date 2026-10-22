@@ -15,6 +15,7 @@ import init, {
   preview,
   readRouteFile,
   removalPlan,
+  restoreNodes,
   routeFileText,
   routeNotices,
 } from "../generated/cairn_wasm.js";
@@ -184,6 +185,11 @@ export class Engine {
   /** A18: what removing `target` from `graph` takes and leaves dangling, as the module wrote it (`null` when a node asked for is not there). */
   removalPlanText(graph: Schema<"Graph">, target: Schema<"RemovalTarget">): string {
     return hosted(() => removalPlan(JSON.stringify(graph), JSON.stringify(target)));
+  }
+
+  /** B4: the mutations restoring tombstoned node `key` of `version` into `journey`, as the module wrote them (`null` when it is not in the version). */
+  restoreNodesText(journey: Schema<"Graph">, version: Schema<"Graph">, key: string, seed: string): string {
+    return hosted(() => restoreNodes(JSON.stringify(journey), JSON.stringify(version), key, seed));
   }
 
   /** A10: a stored message draft as an author reads it, as the module wrote it (a JSON string). */

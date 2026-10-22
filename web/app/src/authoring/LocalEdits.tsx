@@ -4,6 +4,7 @@
 // (decisions/2026-10-07-restoring-a-tombstone-adds-a-local-copy-under-fresh-keys.md). Both
 // read the route version the journey follows, which never changes once published, so it is
 // fetched once per tab.
+import { useState } from "react";
 import type { Host, RouteVersion } from "../data/host.ts";
 import { HOST_READ, valueOf, type ReadSource } from "../data/keyed-read.ts";
 import { useKeyedRead, useSession } from "../data/react.ts";
@@ -79,6 +80,8 @@ export function LocalEdits({ authored, node }: { authored: Authored; node: Graph
 export function Tombstones({ authored }: { authored: Authored }) {
   const write = useAuthorWrite(authored, "tombstones");
   const version = useLineageVersion(authored.lineage);
+  const { deriver } = useSession();
+  const [blocked, setBlocked] = useState(false);
   if (authored.lineage === undefined || (authored.graph.state?.tombstones ?? []).length === 0) {
     return null;
   }
@@ -99,13 +102,14 @@ export function Tombstones({ authored }: { authored: Authored }) {
             {stone.occupied ? (
               <span className="muted small" data-testid="restored">Something holds its place now.</span>
             ) : (
-              <Button disabled={write.disabled || version === undefined} onClick={() => void write.run(restoreMutations(authored.graph, version?.graph ?? {}, stone.node.key))}>
+              <Button disabled={write.disabled || version === undefined} onClick={() => void restoreMutations(deriver, authored.graph, version?.graph ?? {}, stone.node.key).then((mutations) => { setBlocked(mutations === undefined); return mutations === undefined ? false : write.run(mutations); })}>
                 Restore as a local copy
               </Button>
             )}
           </li>
         ))}
       </ul>
+      {blocked ? <span className="author-problem" role="alert">It cannot be restored whole: a message draft would pass its size limit.</span> : null}
       <Refusal write={write} />
     </details>
   );

@@ -30,6 +30,7 @@ export type WorkerRequest =
   | { op: "read_route_file"; text: string }
   | { op: "route_file_text"; file: Schema<"RouteFile"> }
   | { op: "condition_problem"; clause: Schema<"ConditionResolved"> }
+  | { op: "restore_nodes"; journey: Schema<"Graph">; version: Schema<"Graph">; key: string; seed: string }
   | { op: "removal_plan"; graph: Schema<"Graph">; target: Schema<"RemovalTarget"> }
   | { op: "draft_written"; graph: Schema<"Graph">; stored: string }
   | { op: "draft_stored"; graph: Schema<"Graph">; written: string }

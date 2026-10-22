@@ -199,6 +199,11 @@ export class DeriveWorker {
     return parsed<Schema<"RemovalPlan"> | null>(await this.#ask({ op: "removal_plan", graph, target })) ?? undefined;
   }
 
+  /** B4: the mutations restoring tombstoned node `key` of `version` into `journey`, parents first; none when it is not in the version. */
+  async restoreNodes(journey: Schema<"Graph">, version: Schema<"Graph">, key: string, seed: string): Promise<Schema<"Mutation">[] | undefined> {
+    return parsed<Schema<"Mutation">[] | null>(await this.#ask({ op: "restore_nodes", journey, version, key, seed })) ?? undefined;
+  }
+
   /** A10: a stored message draft as an author reads it: roles by id, decisions by path. */
   async draftWritten(graph: Schema<"Graph">, stored: string): Promise<string> {
     return parsed<string>(await this.#ask({ op: "draft_written", graph, stored }));

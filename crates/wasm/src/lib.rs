@@ -39,7 +39,7 @@ pub use files::{
 pub use local::{
     AppliedLocally, ApplyRequest, PreviewRequest, RouteApplyRequest, apply, apply_locally,
     apply_route, apply_route_locally, condition_problem, condition_problem_of, draft_stored,
-    draft_written, preview, preview_locally, removal_plan,
+    draft_written, preview, preview_locally, removal_plan, restore_nodes,
 };
 pub use proposals::ProposalListRequest;
 pub use reads::JourneyIndexQuery;
