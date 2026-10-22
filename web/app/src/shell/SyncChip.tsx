@@ -11,7 +11,7 @@ import { Link, useNavigate } from "react-router";
 
 import { pathTo } from "../address.ts";
 import type { SaveEvent } from "../data/activity.ts";
-import { useDerivation, useProblems, useSaves, useSavedAnnouncement, useSession, useSettled, useSkew, useStreamStatus, useSync } from "../data/react.ts";
+import { useCapabilities, useDerivation, useProblems, useSaves, useSavedAnnouncement, useSession, useSettled, useSkew, useStreamStatus, useSync } from "../data/react.ts";
 import { dateWords } from "../status/when.ts";
 import type { Problem, SyncSummary } from "../data/sync.ts";
 import { Button } from "../ui/kit.tsx";
@@ -112,6 +112,7 @@ function Popover({ summary, anchor, onClose }: { summary: SyncSummary; anchor: A
   const saves = useSaves();
   const derivation = useDerivation();
   const skew = useSkew();
+  const offersMcp = useCapabilities().mcp != null;
   const heading = useId();
   return (
     <div className="popover sync-popover" role="dialog" aria-labelledby={heading} tabIndex={-1} data-popover="" data-overhang="" data-testid="sync-popover" style={anchor}>
@@ -132,6 +133,11 @@ function Popover({ summary, anchor, onClose }: { summary: SyncSummary; anchor: A
         <Link to={pathTo("me")} className="sync-you" onClick={onClose}>
           You: who you are here &rsaquo;
         </Link>
+        {offersMcp ? (
+          <Link to={pathTo("agents")} className="sync-you" onClick={onClose}>
+            Connect an agent &rsaquo;
+          </Link>
+        ) : null}
         {skew && (
           <p className="stack" data-testid="sync-skew">
             <span>Cairn was updated. Reload to keep saving; your unsent edits are kept.</span>

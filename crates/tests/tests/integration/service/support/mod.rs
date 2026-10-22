@@ -13,7 +13,8 @@ use cairn_schema::{
     RouteFile, Scenario, ScenarioStep, SequentialKeys, Timestamp, from_yaml,
 };
 use cairn_service::{
-    Call, Capabilities, DeploymentSettings, DomainPatch, Parts, Service, WriteError, Written,
+    Call, Capabilities, DeploymentSettings, DomainPatch, McpAccess, Parts, Service, WriteError,
+    Written,
 };
 use cairn_store::{InProcessNotifier, MemoryStore, Store};
 use cairn_store_sqlite::SqliteStore;
@@ -33,7 +34,11 @@ pub fn service_over(store: Arc<dyn Store>) -> (Service, Arc<InProcessNotifier>) 
         store,
         notifier: notifier.clone(),
         settings: settings(),
-        capabilities: Capabilities::server(Vec::new(), false),
+        capabilities: Capabilities::server(
+            Vec::new(),
+            false,
+            McpAccess::closed("http://127.0.0.1/api/mcp"),
+        ),
     });
     (service, notifier)
 }

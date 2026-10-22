@@ -134,11 +134,40 @@ pub struct Capabilities {
     /// Whether the in-app assistant is available.
     pub assistant: bool,
     // PRD: I2.
-    /// Whether the host serves MCP at `/api/mcp`.
-    pub mcp: bool,
+    /// How an agent reaches this host's MCP server; null where the host serves none.
+    pub mcp: Option<McpAccess>,
     // PRD: H6.
     /// Whether the host streams revision ticks over SSE.
     pub sse: bool,
+}
+
+/// How an agent reaches this host's MCP server.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+#[serde(deny_unknown_fields)]
+pub struct McpAccess {
+    /// The MCP endpoint's absolute address: the public URL joined with the MCP path.
+    pub url: String,
+    /// How an agent signs in, in the order the providers are asked; empty when it cannot.
+    pub sign_in: Vec<AgentSignIn>,
+    /// Whether a person can make agent tokens here, and list and revoke theirs.
+    pub tokens: bool,
+}
+
+/// One way an agent signs in to the MCP server.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+#[serde(rename_all = "snake_case")]
+pub enum AgentSignIn {
+    /// The built-in OAuth server: a browser step on first use; the agent is recorded beside
+    /// the person.
+    Oauth,
+    /// Behind IAP, the relay to Google: a browser step with Google, the client signing in on
+    /// the machine it runs on.
+    GoogleOauth,
+    /// Tailscale, either mode: no sign-in step, from a machine in the tailnet signed in as a
+    /// person.
+    Tailnet,
+    /// The dev provider without a token: every request it accepts is its dev user.
+    DevUser,
 }
 
 // PRD: H1.
@@ -194,7 +223,20 @@ impl From<&cairn_service::Capabilities> for Capabilities {
         Self {
             auth: auth.collect(),
             assistant: *assistant,
-            mcp: *mcp,
+            mcp: mcp.as_ref().map(|access| McpAccess {
+                url: access.url.clone(),
+                sign_in: access
+                    .sign_in
+                    .iter()
+                    .map(|how| match how {
+                        cairn_service::AgentSignIn::Oauth => AgentSignIn::Oauth,
+                        cairn_service::AgentSignIn::GoogleOauth => AgentSignIn::GoogleOauth,
+                        cairn_service::AgentSignIn::Tailnet => AgentSignIn::Tailnet,
+                        cairn_service::AgentSignIn::DevUser => AgentSignIn::DevUser,
+                    })
+                    .collect(),
+                tokens: access.tokens,
+            }),
             sse: *sse,
         }
     }
@@ -266,6 +308,9 @@ pub enum ProblemCode {
     // PRD: H2.
     /// Only a user may do this, not an agent acting for one.
     UserOnly,
+    // PRD: H2.
+    /// This deployment has no sign-in that accepts agent tokens, so one cannot be made.
+    TokensNotAccepted,
     /// The process is at its in-flight request limit; retry after the `Retry-After` delay.
     Overloaded,
     /// The process is at its SSE subscriber limit; retry after the `Retry-After` delay.

@@ -7,6 +7,7 @@ import { Suspense } from "react";
 import { Link, Outlet, useLocation } from "react-router";
 
 import { pathTo, sectionOf } from "../address.ts";
+import { useCapabilities } from "../data/react.ts";
 import { HOME_PATH, indexPath } from "../journeys/address.ts";
 import { ROUTES_INDEX_PATH } from "../routes/address.ts";
 import { FrameActionsContext, FrameStateContext } from "./frame.tsx";
@@ -22,6 +23,7 @@ import { Pending } from "../ui/Pending.tsx";
 /** The screens, as links; the one the viewer is on is marked. */
 function Rail({ pathname }: { pathname: string }) {
   const section = sectionOf(pathname);
+  const offersMcp = useCapabilities().mcp != null;
   const screens = [
     { to: HOME_PATH, label: "Home", on: section === "home" },
     { to: indexPath(), label: "Journeys", on: section === "journeys" },
@@ -43,6 +45,11 @@ function Rail({ pathname }: { pathname: string }) {
           </Link>
         ))}
         <span className="spacer" />
+        {offersMcp ? (
+          <Link to={pathTo("agents")} className="agents-link" title="Connect an AI agent such as Claude Code or Codex" {...(section === "agents" ? { "aria-current": "page" as const } : {})}>
+            Connect an agent
+          </Link>
+        ) : null}
         <span className="rail-foot">
           <Link to={pathTo("me")} {...(section === "me" ? { "aria-current": "page" as const } : {})}>
             You

@@ -340,6 +340,7 @@ dependencies = [
  "cairn-assistant",
  "cairn-auth",
  "cairn-engine",
+ "cairn-mcp",
  "cairn-schema",
  "cairn-service",
  "cairn-store",

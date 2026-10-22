@@ -203,6 +203,50 @@ mod in_process {
         }
     }
 
+    /// I2: on the demo, with no cookie, a token a person made and presented as the only
+    /// credential signs in as its agent for that person: the built-in OAuth server is asked
+    /// before the dev provider that would otherwise name every request, the person alone.
+    #[tokio::test]
+    async fn a_demo_agent_token_acts_as_its_agent() {
+        let free = std::net::TcpListener::bind("127.0.0.1:0").unwrap();
+        let listen = free.local_addr().unwrap();
+        drop(free);
+        let config = cairn::demo::config(listen).unwrap();
+        let app = root::app(
+            &config,
+            support::assembly(Arc::new(InProcessNotifier::new())),
+        )
+        .unwrap();
+        let address = support::serve(app).await;
+        let host = listen.to_string();
+        let made = support::send(
+            address,
+            "POST",
+            &host,
+            "/api/users/me/tokens",
+            &[("content-type", "application/json")],
+            Some(r#"{"name":"nightly"}"#),
+        )
+        .await;
+        assert_eq!(made.status, 201, "{}", made.text());
+        let minted = made.json();
+        let bearer = format!("Bearer {}", minted["token"].as_str().unwrap());
+        let by_agent = support::send(
+            address,
+            "GET",
+            &host,
+            "/api/users/me",
+            &[("authorization", &bearer)],
+            None,
+        )
+        .await;
+        let by_person = support::send(address, "GET", &host, "/api/users/me", &[], None).await;
+        assert_eq!(by_agent.status, 200, "{}", by_agent.text());
+        assert_eq!(by_agent.json()["agent"], minted["agent"]);
+        assert_eq!(by_agent.json()["user"], by_person.json()["user"]);
+        assert_eq!(by_person.json()["agent"], json!(null));
+    }
+
     /// Behind an authenticating proxy on another machine (Tailscale proxy mode listing the
     /// proxy's address): through the real listener, the proxy's headers sign its user in
     /// at the public host, the same headers from a peer the list does not name (this
@@ -276,7 +320,10 @@ mod in_process {
             let address = support::serve(app).await;
             let capabilities = get(address, PUBLIC_HOST, "/api/capabilities").await.json();
             assert_eq!(capabilities["assistant"], json!(offered));
-            assert_eq!(capabilities["mcp"], json!(true));
+            assert_eq!(
+                capabilities["mcp"],
+                json!({ "url": format!("https://{PUBLIC_HOST}/api/mcp"), "sign_in": ["dev_user"], "tokens": false })
+            );
             assert_eq!(capabilities["sse"], json!(true));
             assert_eq!(
                 capabilities["auth"],

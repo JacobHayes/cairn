@@ -14,7 +14,9 @@ use cairn_schema::{
     Actor, DraftSource, Mutation, Mutations, Patch, PatchTarget, RankConstants, Revision,
     RouteFile, Scenario, SequentialKeys, Timestamp, from_yaml,
 };
-use cairn_service::{Call, Capabilities, DeploymentSettings, DomainPatch, Parts, Service};
+use cairn_service::{
+    Call, Capabilities, DeploymentSettings, DomainPatch, McpAccess, Parts, Service,
+};
 use cairn_store::{InProcessNotifier, MemoryStore};
 use jiff::tz::{Offset, TimeZone};
 use serde_json::Value;
@@ -37,7 +39,11 @@ impl World {
             store: Arc::new(MemoryStore::new()),
             notifier: Arc::new(InProcessNotifier::new()),
             settings,
-            capabilities: Capabilities::server(Vec::new(), false),
+            capabilities: Capabilities::server(
+                Vec::new(),
+                false,
+                McpAccess::closed("http://127.0.0.1/api/mcp"),
+            ),
         });
         let now = Arc::new(AtomicI64::new(0));
         let seconds = Arc::clone(&now);

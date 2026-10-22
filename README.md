@@ -101,6 +101,8 @@ draft, then start a journey from it.
 Agents get the same abilities as people, through an HTTP API under `/api/` and an MCP
 server at `/api/mcp`. Point a coding agent or chat assistant at a running Cairn and it can
 start a journey, walk the open decisions, record progress, and answer "what's next?".
+A running Cairn's Connect an agent page gives the address and the command for Claude Code,
+Codex or any MCP client.
 [`instructions/`](instructions/SKILL.md) teaches an agent how. Cairn can also run its own
 in-app assistant when one is configured.
 

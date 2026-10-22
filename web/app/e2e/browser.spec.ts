@@ -102,6 +102,15 @@ test("the in-browser host boots, derives in the worker, applies a patch, and sur
   await rail(page).getByRole("link", { name: "Routes" }).click();
   await expect(current(page)).toHaveText(["Routes"]);
   expect(new URL(page.url()).pathname).toBe("/routes");
+  // No agent connects to a copy of Cairn that runs in the browser: no link to the page, which says so when typed.
+  await expect(rail(page).getByRole("link", { name: "Connect an agent" })).toHaveCount(0);
+  await syncChip(page).click();
+  await expect(page.getByTestId("sync-popover")).toBeVisible();
+  await expect(page.getByTestId("sync-popover").getByRole("link", { name: /Connect an agent/ })).toHaveCount(0);
+  await page.keyboard.press("Escape");
+  await visit(page, "browser", "/agents");
+  await expect(page.getByTestId("agents-screen")).toContainText("runs in your browser");
+  await expect(page.getByTestId("agent-clients")).toHaveCount(0);
   await checkpoint(page);
   await survivesMissingScreen(page);
   await saysOffline(page, context);

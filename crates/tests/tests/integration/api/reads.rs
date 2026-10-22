@@ -190,7 +190,7 @@ mod in_process {
         );
         let capabilities: Capabilities = get(&ann, "/api/capabilities").await;
         assert_eq!(capabilities, Capabilities::from(service.capabilities()));
-        assert!(capabilities.sse && capabilities.mcp && !capabilities.assistant);
+        assert!(capabilities.sse && capabilities.mcp.is_some() && !capabilities.assistant);
     }
 
     /// PRACTICES, Explicit limits: arrival is part of the request, so a create that stalls
@@ -384,6 +384,18 @@ mod in_process {
             .await
             .unwrap();
         assert_eq!(missing.status, StatusCode::NOT_FOUND);
+    }
+
+    /// H2: where no provider accepts agent tokens, minting one is refused and stores nothing.
+    #[tokio::test]
+    async fn an_agent_token_is_not_made_where_none_is_accepted() {
+        let world = World::start_without_mcp().await;
+        let ann = world.signed_in("ann");
+        let named = serde_json::json!({ "name": "nightly report" });
+        let reply = post(&ann, "/api/users/me/tokens", &named).await;
+        assert_eq!(reply.status, StatusCode::FORBIDDEN);
+        let listed: Vec<AgentToken> = get(&ann, "/api/users/me/tokens").await;
+        assert_eq!(listed, [] as [cairn_api::wire::AgentToken; 0]);
     }
 
     /// Each malformed read is answered with its problem at its status.

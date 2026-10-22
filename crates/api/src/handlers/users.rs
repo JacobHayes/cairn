@@ -10,7 +10,7 @@ use crate::Api;
 use crate::error::ApiError;
 use crate::extract::{JsonBody, Path, segment};
 use crate::query::{self, Params};
-use crate::wire::{AgentToken, Caller, MintedToken, TokenRequest, UserName};
+use crate::wire::{AgentToken, Caller, MintedToken, ProblemCode, TokenRequest, UserName};
 
 /// `GET /api/users/me` (H2, H3).
 pub async fn caller(State(api): State<Api>, Extension(actor): Extension<Actor>) -> Answer<Caller> {
@@ -47,6 +47,18 @@ pub async fn mint_token(
     Extension(actor): Extension<Actor>,
     JsonBody(request): JsonBody<TokenRequest>,
 ) -> Result<(StatusCode, Json<MintedToken>), ApiError> {
+    if !api
+        .service
+        .capabilities()
+        .mcp
+        .as_ref()
+        .is_some_and(|mcp| mcp.tokens)
+    {
+        return Err(ApiError::problem(
+            ProblemCode::TokensNotAccepted,
+            "this deployment does not accept agent tokens",
+        ));
+    }
     let minted = api.auth.accounts().mint_token(&actor, request.name).await?;
     let token = MintedToken {
         agent: minted.agent,

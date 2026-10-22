@@ -25,6 +25,7 @@ import { Shell } from "./shell/Shell.tsx";
 
 const NewJourney = lazy(() => import("./journeys/NewJourney.tsx").then((module) => ({ default: module.NewJourney })));
 const Identities = lazy(() => import("./people/Identities.tsx").then((module) => ({ default: module.Identities })));
+const Agents = lazy(() => import("./people/Agents.tsx").then((module) => ({ default: module.Agents })));
 const You = lazy(() => import("./people/You.tsx").then((module) => ({ default: module.You })));
 const NewRoutePage = lazy(() => import("./routes/NewRoute.tsx").then((module) => ({ default: module.NewRoutePage })));
 const RouteIndex = lazy(() => import("./routes/RouteIndex.tsx").then((module) => ({ default: module.RouteIndex })));
@@ -55,6 +56,7 @@ const SCREENS: Record<AddressName, ReactElement> = {
   deploymentProposals: <Identities />,
   deploymentProposal: <Identities />,
   me: <You />,
+  agents: <Agents />,
 };
 
 function App({ session, layouts }: { session: Session; layouts: Layouts }) {

@@ -42,6 +42,9 @@ export type RouteImport = Schema<"RouteImport">;
 export type IdentityReferences = Schema<"IdentityReferences">;
 export type Caller = Schema<"Caller">;
 export type UserName = Schema<"UserName">;
+export type McpAccess = Schema<"McpAccess">;
+export type AgentToken = Schema<"AgentToken">;
+export type MintedToken = Schema<"MintedToken">;
 export type { JourneyIndexQuery };
 
 export type HostKind = "server" | "browser";
@@ -76,6 +79,16 @@ export class ReadFailed extends Error {
   }
 }
 
+/** The caller's agent tokens: the calls the Connect an agent page makes (people/agent-tokens.ts). */
+export interface AgentTokenHost {
+  /** The tokens not revoked, newest first. */
+  list(): Promise<AgentToken[]>;
+  /** Makes a token named `name`; its secret is in the answer and nowhere else. */
+  mint(name: string): Promise<MintedToken>;
+  /** Revokes the token of `agent`. */
+  revoke(agent: string): Promise<void>;
+}
+
 /** One of the two hosts. */
 export interface Host {
   readonly kind: HostKind;
@@ -94,6 +107,11 @@ export interface Host {
   caller(): Promise<Caller>;
   /** H3: the names of `users` (at most a page of them); one that does not exist is left out. */
   userNames(users: readonly string[]): Promise<UserName[]>;
+  /**
+   * H2: the caller's agent tokens, on a host that serves them (the server; the in-browser host has no
+   * agents). Auth state, not domain writes: a mint is never resent, for it would make a second secret.
+   */
+  readonly agentTokens: AgentTokenHost | undefined;
   /** A journey's domain document as the host wrote it; `Missing` when there is none, `Skewed` when another engine wrote it. */
   documentText(journey: string): Promise<string>;
   /** The deployment context (E6). */

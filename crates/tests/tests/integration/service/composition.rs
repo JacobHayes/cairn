@@ -8,7 +8,7 @@ mod composition {
     use std::sync::Arc;
 
     use cairn_schema::{Date, Domain, Email, RevisionOf, Slug, Timestamp};
-    use cairn_service::{AuthKind, AuthMethod, Capabilities};
+    use cairn_service::{AgentSignIn, AuthKind, AuthMethod, Capabilities, McpAccess};
     use cairn_store::build::{create_identity, create_journey, deployment_patch, identity};
     use cairn_store::{AuthStore, LoginRecord, MemoryStore, Store, Take, Tick, UserRecord, Watch};
 
@@ -38,11 +38,17 @@ mod composition {
             name: "dev".parse::<Slug>().unwrap(),
             kind: AuthKind::Dev,
         };
-        let server = Capabilities::server(vec![dev.clone()], true);
-        assert!(server.mcp && server.sse && server.assistant);
+        let access = McpAccess {
+            url: "http://127.0.0.1/api/mcp".to_owned(),
+            sign_in: vec![AgentSignIn::DevUser],
+            tokens: false,
+        };
+        let server = Capabilities::server(vec![dev.clone()], true, access.clone());
+        assert!(server.sse && server.assistant);
+        assert_eq!(server.mcp, Some(access));
         assert_eq!(server.auth, vec![dev]);
         let browser = Capabilities::browser();
-        assert!(!browser.mcp && !browser.sse && !browser.assistant);
+        assert!(browser.mcp.is_none() && !browser.sse && !browser.assistant);
         assert_eq!(
             browser
                 .auth

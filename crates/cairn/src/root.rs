@@ -23,7 +23,8 @@ use cairn_auth::{
     Accounts, Auth, AuthProvider, Clock, DevProvider, GcpIapProvider, OAuthServer, OidcProvider,
     TailscaleProvider,
 };
-use cairn_service::{AuthKind, AuthMethod, Capabilities, Parts, Service};
+use cairn_mcp::MCP_PATH;
+use cairn_service::{AgentSignIn, AuthKind, AuthMethod, Capabilities, McpAccess, Parts, Service};
 use cairn_store::{InProcessNotifier, Notifier, Store, StoreError};
 use metrics_exporter_prometheus::PrometheusHandle;
 use tokio::net::TcpListener;
@@ -117,7 +118,41 @@ pub fn capabilities(config: &Config) -> Capabilities {
             }
         })
         .collect();
-    Capabilities::server(auth, config.assistant.is_some())
+    Capabilities::server(auth, config.assistant.is_some(), mcp_access(config))
+}
+
+/// How an agent reaches the MCP server this configuration serves (I2): the public URL joined
+/// with the MCP path, and each way the providers let an agent in, in the order they are asked.
+/// A dev provider with a token, an OIDC provider, and an IAP provider without a relay add
+/// nothing: an agent has no sign-in through them. Tokens are accepted only by the built-in
+/// OAuth server.
+fn mcp_access(config: &Config) -> McpAccess {
+    let mut sign_in = Vec::new();
+    let mut tokens = false;
+    for provider in &config.auth {
+        let how = match provider {
+            Provider::BuiltinOauth(_) => {
+                tokens = true;
+                Some(AgentSignIn::Oauth)
+            }
+            Provider::GcpIap(iap) if iap.relay.is_some() => Some(AgentSignIn::GoogleOauth),
+            Provider::Tailscale(_) => Some(AgentSignIn::Tailnet),
+            Provider::Dev(dev) if dev.token.is_none() => Some(AgentSignIn::DevUser),
+            Provider::Dev(_) | Provider::Oidc(_) | Provider::GcpIap(_) => None,
+        };
+        if let Some(how) = how
+            && !sign_in.contains(&how)
+        {
+            sign_in.push(how);
+        }
+    }
+    // The public URL's own path, if it had one, stays in front of the MCP path.
+    let base = config.public_url.as_str().trim_end_matches('/');
+    McpAccess {
+        url: format!("{base}{MCP_PATH}"),
+        sign_in,
+        tokens,
+    }
 }
 
 /// The configured auth providers over `accounts`, in order, each checked against the

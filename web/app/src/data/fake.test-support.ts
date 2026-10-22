@@ -10,7 +10,7 @@ import type { KeptTurns } from "../assistant/conversation.ts";
 import type { AssistantHost } from "./assistant.ts";
 import type { Answer, Command } from "./edit-record.ts";
 import type { Domain, ProposalHost, ProposalWritten } from "./proposals.ts";
-import { Missing, ReadFailed, Skewed, type Deriver, type Host, type JourneyIndexQuery, type JourneyPage, type Route, type RouteFile, type RouteImport, type RouteVersion, type Caller } from "./host.ts";
+import { Missing, ReadFailed, Skewed, type Deriver, type Host, type JourneyIndexQuery, type JourneyPage, type Route, type RouteFile, type RouteImport, type RouteVersion, type Caller, type AgentTokenHost } from "./host.ts";
 import type { WriteEnv } from "./write-machine.ts";
 
 export interface FakeJourney {
@@ -51,9 +51,10 @@ export class FakeHost implements Host {
   /** Whether the capabilities offer the assistant, and the assistant the host has. */
   offersAssistant = false;
   assistant: AssistantHost | undefined = undefined;
+  agentTokens: AgentTokenHost | undefined = undefined;
 
   capabilities() {
-    return Promise.resolve({ auth: [], assistant: this.offersAssistant, mcp: false, sse: true });
+    return Promise.resolve({ auth: [], assistant: this.offersAssistant, mcp: null, sse: true });
   }
 
   /** The index queries asked, in turn. */

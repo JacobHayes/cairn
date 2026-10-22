@@ -202,7 +202,7 @@ pub fn router_beside(
         }
         routes.with_state(api.clone())
     });
-    let mcp = api.service.capabilities().mcp.then(|| {
+    let mcp = api.service.capabilities().mcp.is_some().then(|| {
         let tools = cairn_mcp::ToolSet::new(api.service.clone(), auth.accounts().clock().clone());
         cairn_mcp::router(tools, version)
     });

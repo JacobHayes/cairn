@@ -169,7 +169,11 @@ fn two_quick_commits_reach_a_subscriber_as_one_tick() {
 fn the_root_offers_one_local_sign_in_and_nothing_else() {
     let root = BrowserRoot::seeded().unwrap();
     let capabilities: wire::Capabilities = serde_json::from_str(&root.capabilities()).unwrap();
-    let offered = (capabilities.assistant, capabilities.mcp, capabilities.sse);
+    let offered = (
+        capabilities.assistant,
+        capabilities.mcp.is_some(),
+        capabilities.sse,
+    );
     assert_eq!(offered, (false, false, false));
     let auth: Vec<(&str, wire::AuthKind)> = capabilities
         .auth

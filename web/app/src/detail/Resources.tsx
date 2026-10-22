@@ -4,12 +4,12 @@
 // is out of scope. The draft re-renders whenever the journey's derivation moves.
 import type { Schema } from "@cairn/client";
 import type { RenderedDraft } from "@cairn/wasm";
-import { useState } from "react";
 
 import type { Deriver } from "../data/host.ts";
 import { PROJECTION, valueOf, type ReadSource } from "../data/keyed-read.ts";
 import { useKeyedRead, useSession } from "../data/react.ts";
-import { Badge, Button } from "../ui/kit.tsx";
+import { Badge } from "../ui/kit.tsx";
+import { CopyButton } from "../ui/CopyButton.tsx";
 import { Markdown, safeHref } from "../ui/markdown.tsx";
 import { foldKey } from "./folds.ts";
 import { journeyPath } from "../journeys/address.ts";
@@ -38,15 +38,11 @@ const DRAFT: ReadSource<{ deriver: Deriver; journey: string; node: string; resou
 function MessageDraft({ view, node, resource }: { view: Ready; node: string; resource: string }) {
   const { deriver } = useSession();
   const journey = view.journey.header.id;
-  const [copied, setCopied] = useState(false);
   const read = useKeyedRead(DRAFT, { of: [journey, node, resource], freshness: [JSON.stringify(view.key)], args: { deriver, journey, node, resource } }).view;
   const rendered = valueOf(read);
   if (rendered === undefined) {
     return read.status === "failed" ? <span className="callout callout-bad"><Failed what="The draft" verb="rendered" error={read.error} /></span> : <span className="muted small">Rendering...</span>;
   }
-  const copy = () => {
-    void navigator.clipboard.writeText(draftText(rendered)).then(() => { setCopied(true); });
-  };
   return (
     <div className="stack" data-testid="message-draft">
       <blockquote className="draft" data-testid="draft-text">
@@ -61,8 +57,7 @@ function MessageDraft({ view, node, resource }: { view: Ready; node: string; res
         )}
       </blockquote>
       <span className="row">
-        <Button onClick={copy}>Copy</Button>
-        {copied ? <span className="muted small" data-testid="copied">Copied.</span> : null}
+        <CopyButton what="the message" text={draftText(rendered)} />
       </span>
     </div>
   );

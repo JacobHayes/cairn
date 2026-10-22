@@ -10,7 +10,9 @@ use std::time::Duration;
 
 use cairn_auth::{Accounts, Auth, AuthProvider, Clock, DevConfig, DevProvider, Listener};
 use cairn_schema::{IdentityKey, JourneyId, NodeKey, PatchReceipt, RankConstants, Revision};
-use cairn_service::{AuthKind, AuthMethod, Capabilities, DeploymentSettings, Parts, Service};
+use cairn_service::{
+    AuthKind, AuthMethod, Capabilities, DeploymentSettings, McpAccess, Parts, Service,
+};
 use cairn_store::InProcessNotifier;
 use cairn_store_sqlite::SqliteStore;
 use tokio::sync::oneshot;
@@ -80,7 +82,11 @@ impl Server {
             store: Arc::<SqliteStore>::clone(&store),
             notifier: Arc::new(InProcessNotifier::new()),
             settings,
-            capabilities: Capabilities::server(methods, false),
+            capabilities: Capabilities::server(
+                methods,
+                false,
+                McpAccess::closed("http://127.0.0.1/api/mcp"),
+            ),
         });
         let app = cairn_api::router(service.clone(), &auth)
             .into_make_service_with_connect_info::<SocketAddr>();

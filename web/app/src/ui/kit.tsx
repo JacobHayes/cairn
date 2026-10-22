@@ -82,7 +82,7 @@ export function Segmented<T extends string>({
 }: {
   label: string;
   value: T;
-  options: readonly { value: T; label: string }[];
+  options: readonly { value: T; label: string; title?: string }[];
   onChange: (value: T) => void;
   "data-testid"?: string;
 }) {
@@ -90,7 +90,7 @@ export function Segmented<T extends string>({
   return (
     <div className="segmented" role="radiogroup" aria-label={label} {...rest}>
       {options.map((option) => (
-        <label key={option.value}>
+        <label key={option.value} {...(option.title === undefined ? {} : { title: option.title })}>
           <input
             type="radio"
             name={name}

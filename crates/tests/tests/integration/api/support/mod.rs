@@ -24,7 +24,9 @@ use cairn_schema::{
     DraftSource, Login, Mutation, Mutations, Patch, PatchTarget, RankConstants, Revision,
     RouteFile, Scenario, SequentialKeys, Slug, Timestamp, from_yaml,
 };
-use cairn_service::{AuthKind, AuthMethod, Capabilities, DeploymentSettings, Parts, Service};
+use cairn_service::{
+    AgentSignIn, AuthKind, AuthMethod, Capabilities, DeploymentSettings, McpAccess, Parts, Service,
+};
 use cairn_store::{Faults, InProcessNotifier, MemoryStore};
 use jiff::tz::{Offset, TimeZone};
 use serde::de::DeserializeOwned;
@@ -177,13 +179,18 @@ impl World {
         let accounts = Accounts::new(Arc::<MemoryStore>::clone(&store), clock.clock());
         let (providers, methods) = front.providers(&accounts, &base, clock.clock());
         let auth = Auth::new(accounts, Listener::Tcp(address), &base, providers);
+        let access = McpAccess {
+            url: format!("http://{address}/api/mcp"),
+            sign_in: vec![AgentSignIn::Oauth],
+            tokens: true,
+        };
         let service = Service::new(Parts {
             store: Arc::<MemoryStore>::clone(&store),
             notifier: notifier.clone(),
             settings: settings(),
             capabilities: Capabilities {
-                mcp,
-                ..Capabilities::server(methods, assistant.is_some())
+                mcp: mcp.then(|| access.clone()),
+                ..Capabilities::server(methods, assistant.is_some(), access)
             },
         });
         let assistant = assistant.map(|provider| {

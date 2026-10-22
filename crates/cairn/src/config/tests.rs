@@ -379,3 +379,41 @@ fn a_file_that_cannot_be_read_is_one_problem_naming_it() {
     assert_eq!(problems.problems.len(), 1);
     assert_eq!(problems.problems[0].key, "file");
 }
+
+/// I2: what an agent needs to connect follows the providers: the address is the public URL
+/// joined with the MCP path, each provider that lets an agent in adds its way once and in
+/// the order asked, and agent tokens are offered only with the built-in OAuth server.
+#[test]
+fn the_mcp_access_follows_the_providers() {
+    use crate::root::capabilities;
+    use cairn_service::AgentSignIn::{DevUser, GoogleOauth, Oauth, Tailnet};
+
+    let head = "database = \"cairn.db\"\nlisten = \"127.0.0.1:8080\"\ntimezone = \"UTC\"\n";
+    let dev = "[[auth]]\nkind = \"dev\"\nname = \"dev\"\nuser = \"Dev\"\nverified_emails = [\"dev@example.org\"]\n";
+    let tailscale = "[[auth]]\nkind = \"tailscale\"\nname = \"tailnet\"\nmode = \"proxy\"\n";
+    let builtin = "[[auth]]\nkind = \"builtin_oauth\"\nname = \"agents\"\n";
+    let oidc = "[[auth]]\nkind = \"oidc\"\nname = \"corp\"\nissuer = \"https://issuer.example/\"\nclient_id = \"c\"\n";
+    let iap = IAP_RELAY.replace(
+        "client_id = \"relay\"\nclient_secret = \"relay-secret\"\n",
+        "",
+    );
+    let dev_token = format!("{dev}token = \"cairn_dev_secret_000000000000000000000000\"\n");
+    let cases: [(String, Vec<_>, bool); 9] = [
+        (tailscale.to_owned(), vec![Tailnet], false),
+        (format!("{oidc}{builtin}"), vec![Oauth], true),
+        (IAP_RELAY.to_owned(), vec![GoogleOauth], false),
+        (iap, vec![], false),
+        (oidc.to_owned(), vec![], false),
+        (dev_token, vec![], false),
+        (dev.to_owned(), vec![DevUser], false),
+        (format!("{tailscale}{builtin}"), vec![Tailnet, Oauth], true),
+        (format!("{builtin}{dev}"), vec![Oauth, DevUser], true),
+    ];
+    for (providers, sign_in, tokens) in cases {
+        let text = format!("{head}public_url = \"https://cairn.example.org/\"\n{providers}");
+        let config = parsed(&text).unwrap_or_else(|problems| panic!("{problems:?}\n{text}"));
+        let mcp = capabilities(&config).mcp.unwrap();
+        assert_eq!((mcp.sign_in, mcp.tokens), (sign_in, tokens), "{providers}");
+        assert_eq!(mcp.url, "https://cairn.example.org/api/mcp");
+    }
+}

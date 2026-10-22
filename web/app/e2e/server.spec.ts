@@ -9,7 +9,7 @@
 // their own (ownJourney, newRoute) and run side by side.
 import type { APIRequestContext, Page } from "@playwright/test";
 
-import { expect, test } from "./test.ts";
+import { checkpoint, expect, test } from "./test.ts";
 
 import { addIdentity, identityRow, mergeIdentities } from "./around.ts";
 import { addNode, newRoute, routeName } from "./authoring.ts";
@@ -276,4 +276,68 @@ test("C14: the deployment's open proposals are the Identities inspector's Propos
   // The identities page, with the new identity marked as added in place.
   await expect(page.getByTestId("layer-band")).toHaveAttribute("data-mode", "reviewing");
   await expect(page.locator('[data-testid="identity"][data-diff="added"]')).toContainText("Nina Alvarez");
+});
+
+test("Connect an agent shows this server's address, makes a token that acts as its agent until it is revoked, and is one tap away on a phone", { tag: "@server" }, async ({ page, context, playwright, baseURL }) => {
+  await context.grantPermissions(["clipboard-read", "clipboard-write"]);
+  await open(page, "server", "/");
+  await page.getByRole("navigation", { name: "Screens", exact: true }).getByRole("link", { name: "Connect an agent" }).click();
+  await expect(page.getByRole("heading", { name: "Connect an agent" })).toBeVisible();
+  // The address is the one the server says, and Copy puts exactly it on the clipboard.
+  const capabilities = (await (await context.request.get("/api/capabilities")).json()) as { mcp: { url: string } };
+  const steps = page.getByTestId("client-steps");
+  await expect(steps.locator("pre").first()).toContainText(`claude mcp add --transport http --scope user cairn ${capabilities.mcp.url}`);
+  await page.getByRole("radio", { name: "Codex" }).check();
+  await expect(steps.locator("pre").first()).toContainText(`codex mcp add cairn --url ${capabilities.mcp.url}`);
+  // Another client takes the address itself, and Copy puts exactly it on the clipboard.
+  await page.getByRole("radio", { name: "Other agent" }).check();
+  await expect(steps.locator("pre").first()).toHaveText(capabilities.mcp.url);
+  await page.getByRole("button", { name: "Copy the address" }).click();
+  await expect(page.getByRole("button", { name: "Copy the address" })).toHaveText("Copied");
+  await expect.poll(() => page.evaluate(() => navigator.clipboard.readText())).toBe(capabilities.mcp.url);
+  await page.getByRole("radio", { name: "Claude Code" }).check();
+
+  // A token is shown once, and acts as its agent for the person when it is the only credential.
+  const name = fresh("Nightly");
+  const panel = page.getByTestId("agent-tokens");
+  await panel.getByRole("button", { name: "New token" }).click();
+  await panel.getByLabel("Token name").fill(name);
+  await panel.getByRole("button", { name: "Make token" }).click();
+  const minted = page.getByTestId("minted-token");
+  await expect(minted).toContainText("Copy this token now");
+  await expect(panel.getByRole("button", { name: "New token" })).toHaveCount(0);
+  await page.getByRole("radio", { name: "Other agent" }).check();
+  await expect(minted.locator("pre").first()).toContainText("cairn_agent_");
+  const token = (await whenSettled(page, () => minted.locator("pre").first().innerText())).trim();
+  const bare = await playwright.request.newContext({ baseURL: baseURL ?? "" });
+  const asAgent = await bare.get("/api/users/me", { headers: { authorization: `Bearer ${token}` } });
+  const asPerson = await bare.get("/api/users/me");
+  expect(asAgent.status()).toBe(200);
+  const [agent, person] = [(await asAgent.json()) as { user: string; agent: string | null }, (await asPerson.json()) as { user: string; agent: string | null }];
+  expect(agent.agent ?? null).not.toBeNull();
+  expect(person.agent ?? null).toBeNull();
+  expect(agent.user).toBe(person.user);
+  await checkpoint(page);
+
+  // Hidden, and after a reload, the token is listed and its secret is gone.
+  await page.getByRole("button", { name: "Hide token" }).click();
+  await expect(minted).toHaveCount(0);
+  await page.reload();
+  const row = panel.getByTestId("agent-token").filter({ hasText: name });
+  await expect(row).toBeVisible();
+  await expect(page.getByText(token)).toHaveCount(0);
+  // Revoking removes the row and the token stops signing in as its agent.
+  await row.getByRole("button", { name: `Revoke ${name}` }).click();
+  await expect(row).toHaveCount(0);
+  await expect.poll(async () => (await bare.get("/api/users/me", { headers: { authorization: `Bearer ${token}` } })).status()).toBe(401);
+  await bare.dispose();
+
+  // On a phone the rail is a top bar of four screens: the page is a link in the sync popover.
+  await page.setViewportSize({ width: 390, height: 844 });
+  await open(page, "server", "/journeys");
+  await expect(page.getByRole("navigation", { name: "Screens", exact: true }).getByRole("link", { name: "Connect an agent" })).toBeHidden();
+  await syncChip(page).click();
+  await page.getByTestId("sync-popover").getByRole("link", { name: /Connect an agent/ }).click();
+  await expect(page.getByRole("heading", { name: "Connect an agent" })).toBeVisible();
+  await checkpoint(page);
 });

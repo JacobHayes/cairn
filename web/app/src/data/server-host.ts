@@ -15,6 +15,7 @@ import {
   type Patch,
 } from "@cairn/client";
 import { serverAssistant } from "./assistant.ts";
+import type { AgentToken } from "./host.ts";
 import { serverProposals } from "./proposals.ts";
 import { Missing, ReadFailed, Skewed, type Host, type JourneyIndexQuery, type Markdown, type RouteImport } from "./host.ts";
 
@@ -80,6 +81,46 @@ async function importOver(client: CairnClient, request: RouteImport): Promise<An
   return { outcome: "failed", error: answerFailure(response.status, error) };
 }
 
+/** The status and body of a call that answered no data, as a failed read. */
+function refused<T>(reply: Reply<T>): ReadFailed {
+  return new ReadFailed(answerFailure(reply.response.status, reply.error));
+}
+
+/** H2: the caller's agent tokens over the server's endpoints; a call that cannot be made is a failed read. */
+function serverAgentTokens(client: CairnClient): NonNullable<Host["agentTokens"]> {
+  const attempt = async <T>(call: () => Promise<Reply<T>>): Promise<Reply<T>> => {
+    try {
+      return await call();
+    } catch (thrown) {
+      throw new ReadFailed(networkFailure(thrown));
+    }
+  };
+  return {
+    async list() {
+      const reply = await attempt(() => client.GET("/api/users/me/tokens"));
+      if (reply.data === undefined) {
+        throw refused(reply);
+      }
+      // Newest first; a revoked token is gone from the page, though the API still lists it.
+      const live: AgentToken[] = reply.data.filter((token) => token.revoked_at === undefined || token.revoked_at === null);
+      return live.sort((one, other) => other.created_at.localeCompare(one.created_at));
+    },
+    async mint(name) {
+      const reply = await attempt(() => client.POST("/api/users/me/tokens", { body: { name } }));
+      if (reply.data === undefined) {
+        throw refused(reply);
+      }
+      return reply.data;
+    },
+    async revoke(agent) {
+      const reply = await attempt(() => client.DELETE("/api/users/me/tokens/{agent}", { params: { path: { agent } } }));
+      if (!reply.response.ok) {
+        throw refused(reply);
+      }
+    },
+  };
+}
+
 /** The server at `origin`, with the build the page was loaded from (none on a page Vite's dev server served, which is never in skew). */
 export function serverHost(origin: string, build: string | undefined): Host {
   const client: CairnClient = createCairnClient(origin);
@@ -125,6 +166,7 @@ export function serverHost(origin: string, build: string | undefined): Host {
     send: (patch: Patch, note?: Markdown) => sendOver(client, note)(patch),
     proposals: serverProposals(client),
     assistant: serverAssistant(client),
+    agentTokens: serverAgentTokens(client),
     openTicks: eventSourceTicks(origin),
   };
 }

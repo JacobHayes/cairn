@@ -10,7 +10,8 @@ use std::sync::{Arc, Mutex, MutexGuard, PoisonError};
 
 use cairn_schema::{Actor, RankConstants};
 use cairn_service::{
-    Call, Capabilities, DeploymentSettings, DomainPatch, Parts, Service, WriteError, Written,
+    Call, Capabilities, DeploymentSettings, DomainPatch, McpAccess, Parts, Service, WriteError,
+    Written,
 };
 use cairn_store::{CommitPoint, Faults, InProcessNotifier, PauseHook, Store};
 use cairn_store_sqlite::SqliteStore;
@@ -216,7 +217,11 @@ impl Open {
             store: Arc::<SqliteStore>::clone(&store),
             notifier: Arc::new(InProcessNotifier::new()),
             settings,
-            capabilities: Capabilities::server(Vec::new(), false),
+            capabilities: Capabilities::server(
+                Vec::new(),
+                false,
+                McpAccess::closed("http://127.0.0.1/api/mcp"),
+            ),
         });
         Ok(Open { store, service })
     }

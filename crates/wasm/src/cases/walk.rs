@@ -14,7 +14,9 @@ use cairn_schema::{
     PatchId, ProposalDraft, RankConstants, RouteFile, SnapshotScope, State, Timestamp,
     VersionNumber, from_yaml, to_yaml,
 };
-use cairn_service::{Call, Capabilities, DeploymentSettings, DomainPatch, Parts, Service, Written};
+use cairn_service::{
+    Call, Capabilities, DeploymentSettings, DomainPatch, McpAccess, Parts, Service, Written,
+};
 use cairn_store::{InProcessNotifier, MemoryStore, Store};
 use jiff::tz::TimeZone;
 
@@ -68,7 +70,11 @@ fn server() -> Service {
         store: Arc::clone(&store),
         notifier: Arc::new(InProcessNotifier::new()),
         settings,
-        capabilities: Capabilities::server(Vec::new(), false),
+        capabilities: Capabilities::server(
+            Vec::new(),
+            false,
+            McpAccess::closed("http://127.0.0.1/api/mcp"),
+        ),
     });
     served(now_or_never(seed(&service)), "seeding");
     let actor = served(now_or_never(sign_in_local(&*store, now())), "sign-in");

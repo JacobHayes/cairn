@@ -90,6 +90,8 @@ export function browserHost(root: InBrowserHost): Host {
     proposals: browserProposals(root),
     // Its root assembles no assistant (ARCHITECTURE, Service layer and composition).
     assistant: undefined,
+    // No agent connects to a copy of Cairn that runs in the browser.
+    agentTokens: undefined,
     openTicks: ticksOf(root),
   };
 }

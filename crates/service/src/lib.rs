@@ -30,7 +30,9 @@ mod write;
 
 pub use call::Call;
 pub use caller::{Caller, UserName};
-pub use compose::{AuthKind, AuthMethod, Capabilities, DeploymentSettings, Parts};
+pub use compose::{
+    AgentSignIn, AuthKind, AuthMethod, Capabilities, DeploymentSettings, McpAccess, Parts,
+};
 pub use drafting::ProposeError;
 pub use error::ServiceError;
 pub use observe::{DERIVE_DURATION, engine_call_active};

@@ -1065,6 +1065,108 @@ table.data {
 .node-rows > .you-row:last-child {
   border-bottom: 0;
 }
+/* Connect an agent (people/Agents.tsx): one column of node panels; a value to copy is mono on the band fill with its Copy beside it; the address is the one value on paper with an edge border. */
+.agents {
+  max-width: 880px;
+  gap: var(--space-5);
+}
+.agents > h1 {
+  margin: 0;
+}
+.agents .lead {
+  margin: 0;
+  font-size: 17px;
+  line-height: 1.5;
+}
+.agents .panel-body,
+.agents .client-pick {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  padding: var(--space-4);
+  background: var(--color-surface);
+}
+.agents .client-pick {
+  padding-bottom: 0;
+}
+.agents .panel-body p {
+  margin: 0;
+  font-size: 15px;
+  line-height: 1.55;
+}
+.agents details > p {
+  margin: var(--space-2) 0 0;
+}
+.agents details > summary {
+  cursor: pointer;
+}
+.agents .minted {
+  border-top: 1px solid var(--color-edge);
+}
+.agents .warn-ink {
+  color: var(--color-warning);
+}
+.agents .fold-count {
+  font-variant-numeric: tabular-nums;
+}
+.agents code {
+  white-space: nowrap;
+  padding: 0 var(--space-1);
+  background: var(--color-band);
+}
+.copyable {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-2);
+}
+.copyable pre {
+  flex: 1;
+  min-width: 0;
+  margin: 0;
+  /* One line is exactly the control height, so Copy beside it lines up; more lines grow it. */
+  padding: calc((var(--control-h) - 2px - 1.5em) / 2) var(--space-2);
+  box-sizing: border-box;
+  border: 1px solid var(--color-border);
+  background: var(--color-band);
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  font-size: 13px;
+  font-variant-numeric: tabular-nums;
+  line-height: 1.5;
+}
+.copyable > button {
+  flex: none;
+}
+.token-row {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  min-height: 44px;
+  padding: var(--space-2) var(--space-4);
+  border-bottom: 1px solid var(--color-edge);
+  background: var(--color-surface);
+}
+.token-row .name {
+  flex: 1;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+.form-col {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  max-width: 360px;
+}
+/* The top bar of a phone keeps its four screens: Connect an agent is a link in the sync popover there. */
+@media (max-width: 719px) {
+  .rail nav a.agents-link {
+    display: none;
+  }
+}
+/* The Identities table (DESIGN, Table; Multi-select): a row is one line, the name and then its emails as plain mono text, and a checkbox that waits for hover, a checked row or a selection under way (on touch it is always there). */
+.identities-table table.data tbody tr {
+  height: auto;
+}
 /* A table whose rows are picked (the Identities, the Journeys; DESIGN, Multi-select): a checkbox column whose box waits for hover, a checked row or a selection under way (on touch it is always there), and a picked row tinted with the accent line on its left edge (DESIGN, Selection). */
 .picks th.pick,
 .picks td.pick {

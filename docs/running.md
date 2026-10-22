@@ -98,13 +98,8 @@ nothing for it; IAP still decides who reaches Cairn on every call.
    `/api/oauth/token`. They return no Cairn data and change nothing. Everything else,
    including `/api/oauth/authorize` and `/api/oauth/callback`, stays behind IAP.
 
-Each person then adds Cairn once and signs in with Google in the browser:
-
-```sh
-claude mcp add --transport http --scope user cairn https://<host>/api/mcp
-claude mcp login cairn --no-browser   # on a machine without a browser: open the URL
-                                      # elsewhere, then paste back where it lands
-```
+Each person then connects their agent from the app's Connect an agent page, which shows
+the address and the commands for it, and signs in with Google in the browser.
 
 The client refreshes the hour-long ID token by itself for as long as Google's grant lasts.
 Only clients on the person's own machine can sign in this way (their redirects go to
@@ -119,7 +114,7 @@ set `public_url` to the address people use. Requests naming any other host are r
 no credential, for the proxy's health check: it answers 200 while the server is serving and
 503 once its database has failed closed, when the process also exits non-zero for its
 supervisor to restart. Logs are JSON lines on standard error; metrics are at `/api/metrics`
-in Prometheus's format, behind the same auth as the API (a scraper uses an agent token). An OIDC provider's redirect URI is
+in Prometheus's format, behind the same auth as the API (a scraper uses an agent token, made on the Connect an agent page). An OIDC provider's redirect URI is
 `<public_url>api/auth/<name>/callback`.
 
 ## Upgrades and backups

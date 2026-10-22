@@ -104,8 +104,8 @@ pub struct Capabilities {
     pub auth: Vec<AuthMethod>,
     /// Whether the in-app assistant is available (I5: the UI is fully usable without it).
     pub assistant: bool,
-    /// Whether the host serves MCP at `/api/mcp` (I2).
-    pub mcp: bool,
+    /// How an agent reaches this host's MCP server (I2); `None` where the host serves none.
+    pub mcp: Option<McpAccess>,
     /// Whether the host streams revision ticks over SSE (H6).
     pub sse: bool,
 }
@@ -114,11 +114,11 @@ impl Capabilities {
     /// The server's: MCP and SSE always (they are not optional on the server), the
     /// configured sign-in methods, and the assistant when one is configured.
     #[must_use]
-    pub fn server(auth: Vec<AuthMethod>, assistant: bool) -> Self {
+    pub fn server(auth: Vec<AuthMethod>, assistant: bool, mcp: McpAccess) -> Self {
         Self {
             auth,
             assistant,
-            mcp: true,
+            mcp: Some(mcp),
             sse: true,
         }
     }
@@ -137,10 +137,54 @@ impl Capabilities {
                 kind: AuthKind::Local,
             }],
             assistant: false,
-            mcp: false,
+            mcp: None,
             sse: false,
         }
     }
+}
+
+/// How an agent reaches this host's MCP server (I2): what the Connect an agent page tells a
+/// person. The host's root works it out from its configuration, so the UI reads facts and
+/// never reasons about providers or builds an address.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct McpAccess {
+    /// The MCP endpoint's absolute address: the public URL joined with the MCP path.
+    pub url: String,
+    /// How an agent signs in, in the order the providers are asked; empty when it cannot.
+    pub sign_in: Vec<AgentSignIn>,
+    /// Whether a person can make agent tokens here: some provider accepts them.
+    pub tokens: bool,
+}
+
+impl McpAccess {
+    /// The MCP server at `url` with no way for an agent to sign in and no tokens: what a host
+    /// that configures no provider an agent can use offers.
+    #[must_use]
+    pub fn closed(url: impl Into<String>) -> Self {
+        Self {
+            url: url.into(),
+            sign_in: Vec::new(),
+            tokens: false,
+        }
+    }
+}
+
+/// One way an agent signs in to the MCP server (I2).
+#[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum AgentSignIn {
+    /// The built-in OAuth server: a browser step on first use; the agent is recorded beside
+    /// the person.
+    Oauth,
+    /// Behind IAP, the relay to Google: a browser step with Google, the client signing in on
+    /// the machine it runs on.
+    GoogleOauth,
+    /// Tailscale, either mode: no sign-in step, from a machine in the tailnet signed in as a
+    /// person.
+    Tailnet,
+    /// The dev provider without a token: every request it accepts is its dev user.
+    DevUser,
 }
 
 /// One way to sign in (H1).

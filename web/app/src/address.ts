@@ -12,7 +12,7 @@ import { generatePath, matchPath, useParams } from "react-router";
 import type { Schema } from "@cairn/client";
 
 /** The rail entry a page belongs to. */
-export type Section = "home" | "journeys" | "routes" | "identities" | "me";
+export type Section = "home" | "journeys" | "routes" | "identities" | "me" | "agents";
 
 /** Each pattern; the router ranks the static pages (`new`, `proposals`) above the ones with a parameter in their place: no identity key is `new` or `proposals`, for keys start `who_`. */
 export const ADDRESSES = [
@@ -39,6 +39,7 @@ export const ADDRESSES = [
   { name: "deploymentProposals", path: "/identities/proposals", section: "identities" },
   { name: "deploymentProposal", path: "/identities/proposals/:proposal", section: "identities" },
   { name: "me", path: "/me", section: "me" },
+  { name: "agents", path: "/agents", section: "agents" },
 ] as const;
 
 export type AddressName = (typeof ADDRESSES)[number]["name"];

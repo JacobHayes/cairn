@@ -157,6 +157,31 @@
         "pattern": "^ag_[a-z0-9][a-z0-9_-]*$",
         "type": "string"
       },
+      "AgentSignIn": {
+        "description": "One way an agent signs in to the MCP server.",
+        "oneOf": [
+          {
+            "const": "oauth",
+            "description": "The built-in OAuth server: a browser step on first use; the agent is recorded beside\nthe person.",
+            "type": "string"
+          },
+          {
+            "const": "google_oauth",
+            "description": "Behind IAP, the relay to Google: a browser step with Google, the client signing in on\nthe machine it runs on.",
+            "type": "string"
+          },
+          {
+            "const": "tailnet",
+            "description": "Tailscale, either mode: no sign-in step, from a machine in the tailnet signed in as a\nperson.",
+            "type": "string"
+          },
+          {
+            "const": "dev_user",
+            "description": "The dev provider without a token: every request it accepts is its dev user.",
+            "type": "string"
+          }
+        ]
+      },
       "AgentToken": {
         "additionalProperties": false,
         "description": "An agent token as its user's list shows it: never the secret.",
@@ -773,8 +798,15 @@
             "type": "array"
           },
           "mcp": {
-            "description": "Whether the host serves MCP at `/api/mcp`.",
-            "type": "boolean"
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/McpAccess"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "How an agent reaches this host's MCP server; null where the host serves none."
           },
           "sse": {
             "description": "Whether the host streams revision ticks over SSE.",
@@ -784,7 +816,6 @@
         "required": [
           "auth",
           "assistant",
-          "mcp",
           "sse"
         ],
         "type": "object"
@@ -5956,6 +5987,33 @@
         "minLength": 1,
         "type": "string"
       },
+      "McpAccess": {
+        "additionalProperties": false,
+        "description": "How an agent reaches this host's MCP server.",
+        "properties": {
+          "sign_in": {
+            "description": "How an agent signs in, in the order the providers are asked; empty when it cannot.",
+            "items": {
+              "$ref": "#/components/schemas/AgentSignIn"
+            },
+            "type": "array"
+          },
+          "tokens": {
+            "description": "Whether a person can make agent tokens here, and list and revoke theirs.",
+            "type": "boolean"
+          },
+          "url": {
+            "description": "The MCP endpoint's absolute address: the public URL joined with the MCP path.",
+            "type": "string"
+          }
+        },
+        "required": [
+          "url",
+          "sign_in",
+          "tokens"
+        ],
+        "type": "object"
+      },
       "Membership": {
         "additionalProperties": false,
         "description": "`{decision, values}`: the operand of `in`.",
@@ -10462,6 +10520,11 @@
           {
             "const": "user_only",
             "description": "Only a user may do this, not an agent acting for one.",
+            "type": "string"
+          },
+          {
+            "const": "tokens_not_accepted",
+            "description": "This deployment has no sign-in that accepts agent tokens, so one cannot be made.",
             "type": "string"
           },
           {

@@ -6,7 +6,9 @@ use std::path::Path;
 use std::sync::Arc;
 
 use cairn_schema::RankConstants;
-use cairn_service::{AuthKind, AuthMethod, Capabilities, DeploymentSettings, Parts, Service};
+use cairn_service::{
+    AuthKind, AuthMethod, Capabilities, DeploymentSettings, McpAccess, Parts, Service,
+};
 use cairn_store::InProcessNotifier;
 use cairn_store_sqlite::SqliteStore;
 use jiff::tz::TimeZone;
@@ -29,6 +31,7 @@ pub async fn seed_fixtures(path: &Path) -> Result<(), String> {
                 kind: AuthKind::Dev,
             }],
             false,
+            McpAccess::closed("http://127.0.0.1/api/mcp"),
         ),
     });
     cairn_wasm::fixtures::seed(&service)

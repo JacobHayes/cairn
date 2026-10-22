@@ -1115,6 +1115,8 @@ export interface components {
         };
         /** @description Starts with "ag_"; at most id_bytes_max (64) bytes. */
         AgentId: string;
+        /** @description One way an agent signs in to the MCP server. */
+        AgentSignIn: "oauth" | "google_oauth" | "tailnet" | "dev_user";
         /** @description An agent token as its user's list shows it: never the secret. */
         AgentToken: {
             /** @description The agent the token acts as. */
@@ -1306,8 +1308,8 @@ export interface components {
             assistant: boolean;
             /** @description How people sign in, in the order the host asks. */
             auth: components["schemas"]["AuthMethod"][];
-            /** @description Whether the host serves MCP at `/api/mcp`. */
-            mcp: boolean;
+            /** @description How an agent reaches this host's MCP server; null where the host serves none. */
+            mcp?: components["schemas"]["McpAccess"] | null;
             /** @description Whether the host streams revision ticks over SSE. */
             sse: boolean;
         };
@@ -2865,6 +2867,15 @@ export interface components {
         };
         /** @description Markdown, at most body_bytes_max (64 KiB) bytes. */
         Markdown: string;
+        /** @description How an agent reaches this host's MCP server. */
+        McpAccess: {
+            /** @description How an agent signs in, in the order the providers are asked; empty when it cannot. */
+            sign_in: components["schemas"]["AgentSignIn"][];
+            /** @description Whether a person can make agent tokens here, and list and revoke theirs. */
+            tokens: boolean;
+            /** @description The MCP endpoint's absolute address: the public URL joined with the MCP path. */
+            url: string;
+        };
         /** @description `{decision, values}`: the operand of `in`. */
         Membership: {
             /** @description The decision whose answer is tested. */
@@ -3964,7 +3975,7 @@ export interface components {
          * @description The kinds of error that are not patch rejections. A rejected patch answers its `Rejection`
          *     instead.
          */
-        ProblemCode: "bad_request" | "unsupported_media_type" | "payload_too_large" | "target_mismatch" | "cannot_draft" | "not_found" | "page_moved" | "no_such_endpoint" | "method_not_allowed" | "user_only" | "overloaded" | "subscriber_limit" | "store_busy" | "timed_out" | "engine_panic" | "internal";
+        ProblemCode: "bad_request" | "unsupported_media_type" | "payload_too_large" | "target_mismatch" | "cannot_draft" | "not_found" | "page_moved" | "no_such_endpoint" | "method_not_allowed" | "user_only" | "tokens_not_accepted" | "overloaded" | "subscriber_limit" | "store_busy" | "timed_out" | "engine_panic" | "internal";
         /**
          * @description A container's progress over the work beneath it, counted over every proper
          *     descendant that is an item: not a group, in scope (relevant or undecided), and neither

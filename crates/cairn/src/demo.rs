@@ -3,8 +3,9 @@
 //! request in; and, only here, a stub OIDC issuer and a scripted assistant answer under
 //! `/demo/` on the same port, so sign-in and the assistant can be tried and tested with no
 //! provider, account, or credential. They are configured as any deployment would configure
-//! them (an `oidc` provider and a `chat_completions` assistant, both at this address), so
-//! the server runs its ordinary code against them.
+//! them (a `builtin_oauth` provider, listed first so an agent's token acts as that agent and
+//! not as the dev user alone, an `oidc` provider and a `chat_completions` assistant, both at
+//! this address), so the server runs its ordinary code against them.
 //!
 //! The stub issuer signs in whoever types an email, as that person, with the email verified.
 //! The assistant plays what `PUT /demo/assistant/script` last set: a list of steps, each
@@ -62,6 +63,11 @@ database = "in-memory"
 listen = "{listen}"
 public_url = "http://{listen}/"
 timezone = "UTC"
+
+[[auth]]
+kind = "builtin_oauth"
+name = "agents"
+sign_in_with = "stub"
 
 [[auth]]
 kind = "dev"

@@ -62,7 +62,7 @@ pub fn status_of(code: ProblemCode) -> StatusCode {
         ProblemCode::NotFound | ProblemCode::NoSuchEndpoint => StatusCode::NOT_FOUND,
         ProblemCode::MethodNotAllowed => StatusCode::METHOD_NOT_ALLOWED,
         ProblemCode::PageMoved => StatusCode::CONFLICT,
-        ProblemCode::UserOnly => StatusCode::FORBIDDEN,
+        ProblemCode::UserOnly | ProblemCode::TokensNotAccepted => StatusCode::FORBIDDEN,
         ProblemCode::Overloaded
         | ProblemCode::SubscriberLimit
         | ProblemCode::StoreBusy
