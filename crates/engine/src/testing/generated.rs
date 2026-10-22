@@ -597,11 +597,23 @@ impl Shape {
     fn state(&self, document: &mut Document, index: usize, seed: &NodeSeed) {
         let kind = self.kinds[index];
         let mut stored = NodeState::initial(kind, Provenance::Local);
-        // D1: the states the kind's machine has, which the schema owns.
-        let options: Vec<State> = State::ALL
-            .into_iter()
-            .filter(|state| state.legal_for(kind))
-            .collect();
+        // A weighted mix, not a copy of the kind's machine: repeats make decided decisions and
+        // derived groups likelier, so generated graphs carry the open and active work the cost
+        // and priority tests rely on. The schema owns which states are legal (D1).
+        let options: &[State] = match kind {
+            NodeKind::Decision => &[State::Open, State::Decided, State::Decided, State::Skipped],
+            NodeKind::Deliverable | NodeKind::Action => {
+                &[State::Todo, State::Active, State::Done, State::Skipped]
+            }
+            NodeKind::Milestone => &[State::Pending, State::Done, State::Skipped],
+            NodeKind::Group => &[
+                State::Derived,
+                State::Derived,
+                State::Derived,
+                State::Skipped,
+            ],
+        };
+        assert!(options.iter().all(|state| state.legal_for(kind)));
         stored.state = options[usize::from(seed.state) % options.len()];
         if stored.state == State::Skipped {
             stored.skip_reason = Some(parse("Generated."));
