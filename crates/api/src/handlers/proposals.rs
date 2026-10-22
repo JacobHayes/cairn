@@ -315,7 +315,8 @@ pub async fn apply(
             .apply_proposal(&call, patch_id, &destination, &id, reviewed_revision, note)
             .await
     })
-    .await?;
+    .await?
+    .map_err(ApiError::from);
     let outcome = written_outcome(&answer);
     tracing::info!(patch_id = %logged_patch, proposal = %logged_id, outcome, "proposal apply");
     observe::patch_outcome(outcome);

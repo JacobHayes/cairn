@@ -27,8 +27,15 @@ export function answerFailure(status: number, body: unknown): HttpFailure {
   return { status, message: typeof body === "string" ? body : `HTTP ${String(status)}` };
 }
 
-function isRejection(body: unknown): body is Rejection {
-  return typeof body === "object" && body !== null && "rejection" in body;
+/**
+ * The rejection an answer carries (A15): the body of a 409 or a 422 that has one, else none. The
+ * one reading of "a refusal the server decided" from "a request that failed".
+ */
+export function rejectionOf(status: number, body: unknown): Rejection | undefined {
+  if ((status === 409 || status === 422) && typeof body === "object" && body !== null && "rejection" in body) {
+    return body as Rejection;
+  }
+  return undefined;
 }
 
 async function post(client: Client<paths>, patch: Patch, note: Markdown | undefined) {
@@ -62,8 +69,9 @@ export function sendOver(client: Client<paths>, note?: Markdown): Send<HttpFailu
     if (data !== undefined) {
       return { outcome: "answered", answer: data };
     }
-    if ((response.status === 409 || response.status === 422) && isRejection(error)) {
-      return { outcome: "rejected", rejection: error };
+    const rejection = rejectionOf(response.status, error);
+    if (rejection !== undefined) {
+      return { outcome: "rejected", rejection };
     }
     return { outcome: "failed", error: answerFailure(response.status, error) };
   };

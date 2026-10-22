@@ -4,9 +4,10 @@
 // `/api/journeys/{id}/{upgrade,save-as-route,relink}`); the in-browser host answers the same JSON
 // from its root. Each write names a client patch id (H5) and a client proposal id (I6), so a
 // lost answer is resubmitted rather than guessed at; nothing retries on its own.
-import { answerFailure, networkFailure, type CairnClient, type HttpFailure, type Schema } from "@cairn/client";
+import { answerFailure, networkFailure, rejectionOf, type CairnClient, type HttpFailure, type Schema } from "@cairn/client";
 import { HostFailure, type InBrowserHost } from "@cairn/wasm";
 
+import { hostFailure } from "./host-failure.ts";
 import { Missing, ReadFailed } from "./host.ts";
 
 export type Proposal = Schema<"Proposal">;
@@ -73,10 +74,6 @@ interface Reply<T> {
   response: Response;
 }
 
-function isRejection(body: unknown): body is Rejection {
-  return typeof body === "object" && body !== null && "rejection" in body;
-}
-
 /** A write over HTTP, answered as a proposal write: answered, rejected, or failed. */
 async function written<A>(call: () => Promise<Reply<A>>): Promise<ProposalWritten<A>> {
   let reply: Reply<A>;
@@ -89,8 +86,9 @@ async function written<A>(call: () => Promise<Reply<A>>): Promise<ProposalWritte
   if (data !== undefined) {
     return { outcome: "answered", answer: data };
   }
-  if ((response.status === 409 || response.status === 422) && isRejection(error)) {
-    return { outcome: "rejected", rejection: error };
+  const rejection = rejectionOf(response.status, error);
+  if (rejection !== undefined) {
+    return { outcome: "rejected", rejection };
   }
   return { outcome: "failed", error: answerFailure(response.status, error) };
 }
@@ -210,15 +208,6 @@ export function serverProposals(client: CairnClient): ProposalHost {
   return { ...serverReads(client), ...serverWrites(client) };
 }
 
-/** A failure of the root as a proposal write reads one: what it says, with no HTTP status. */
-function rootFailure(thrown: unknown): HttpFailure {
-  if (thrown instanceof HostFailure) {
-    const reason = thrown.reason;
-    return { status: 0, message: "message" in reason ? reason.message : reason.error };
-  }
-  return { status: 0, message: thrown instanceof Error ? thrown.message : String(thrown) };
-}
-
 /** A write to the root, answered as a server's would be. */
 function writtenBy<A>(call: () => A): Promise<ProposalWritten<A>> {
   try {
@@ -227,7 +216,7 @@ function writtenBy<A>(call: () => A): Promise<ProposalWritten<A>> {
     if (thrown instanceof HostFailure && thrown.reason.error === "rejected") {
       return Promise.resolve({ outcome: "rejected", rejection: thrown.reason.rejection });
     }
-    return Promise.resolve({ outcome: "failed", error: rootFailure(thrown) });
+    return Promise.resolve({ outcome: "failed", error: hostFailure(thrown) });
   }
 }
 
@@ -239,7 +228,7 @@ function readBy<T>(what: string, call: () => T): Promise<T> {
     if (thrown instanceof HostFailure && thrown.reason.error === "missing") {
       return Promise.reject(new Missing(what));
     }
-    return Promise.reject(new ReadFailed(rootFailure(thrown)));
+    return Promise.reject(new ReadFailed(hostFailure(thrown)));
   }
 }
 

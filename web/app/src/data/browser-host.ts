@@ -7,17 +7,8 @@ import { HostFailure, type InBrowserHost } from "@cairn/wasm";
 
 import { Missing, ReadFailed, type Host, type Markdown, type Patch, type RouteImport } from "./host.ts";
 import { browserTour } from "./browser-tour.ts";
+import { hostFailure } from "./host-failure.ts";
 import { browserProposals } from "./proposals.ts";
-
-/** A failure of the root as the data layer reads one: what it says, with no HTTP status. */
-function failure(thrown: unknown): HttpFailure {
-  if (thrown instanceof HostFailure) {
-    const reason = thrown.reason;
-    const message = "message" in reason ? reason.message : reason.error;
-    return { status: 0, message };
-  }
-  return { status: 0, message: thrown instanceof Error ? thrown.message : String(thrown) };
-}
 
 /** A read of the root, in the shape a server read takes. */
 function read<T>(what: string, call: () => T): Promise<T> {
@@ -27,7 +18,7 @@ function read<T>(what: string, call: () => T): Promise<T> {
     if (thrown instanceof HostFailure && thrown.reason.error === "missing") {
       return Promise.reject(new Missing(what));
     }
-    return Promise.reject(new ReadFailed(failure(thrown)));
+    return Promise.reject(new ReadFailed(hostFailure(thrown)));
   }
 }
 
@@ -39,7 +30,7 @@ function send(root: InBrowserHost, patch: Patch, note?: Markdown): Promise<Answe
     if (thrown instanceof HostFailure && thrown.reason.error === "rejected") {
       return Promise.resolve({ outcome: "rejected", rejection: thrown.reason.rejection });
     }
-    return Promise.resolve({ outcome: "failed", error: failure(thrown) });
+    return Promise.resolve({ outcome: "failed", error: hostFailure(thrown) });
   }
 }
 
@@ -51,7 +42,7 @@ function importInto(root: InBrowserHost, request: RouteImport): Promise<Answered
     if (thrown instanceof HostFailure && thrown.reason.error === "rejected") {
       return Promise.resolve({ outcome: "rejected", rejection: thrown.reason.rejection });
     }
-    return Promise.resolve({ outcome: "failed", error: failure(thrown) });
+    return Promise.resolve({ outcome: "failed", error: hostFailure(thrown) });
   }
 }
 

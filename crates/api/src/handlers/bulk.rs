@@ -124,8 +124,9 @@ pub async fn import(
     }
     let (service, call) = (api.service.clone(), api.call(actor));
     let logged_patch = patch_id.clone();
-    let answer =
-        committed(async move { service.import_route(&call, patch_id, &file, note).await }).await?;
+    let answer = committed(async move { service.import_route(&call, patch_id, &file, note).await })
+        .await?
+        .map_err(ApiError::from);
     let outcome = written_outcome(&answer);
     tracing::info!(patch_id = %logged_patch, %route, outcome, "route import");
     observe::patch_outcome(outcome);

@@ -10,6 +10,7 @@ import {
   createCairnClient,
   eventSourceTicks,
   networkFailure,
+  rejectionOf,
   sendOver,
   type CairnClient,
   type Patch,
@@ -75,8 +76,9 @@ async function importOver(client: CairnClient, request: RouteImport): Promise<An
   if (data !== undefined) {
     return { outcome: "answered", answer: data };
   }
-  if ((response.status === 409 || response.status === 422) && typeof error === "object" && "rejection" in error) {
-    return { outcome: "rejected", rejection: error };
+  const rejection = rejectionOf(response.status, error);
+  if (rejection !== undefined) {
+    return { outcome: "rejected", rejection };
   }
   return { outcome: "failed", error: answerFailure(response.status, error) };
 }

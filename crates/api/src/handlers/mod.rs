@@ -14,7 +14,7 @@ use axum::extract::{Extension, State};
 use axum::http::StatusCode;
 use axum::response::{IntoResponse, Response};
 use cairn_schema::{Actor, Domain, JourneyId, PatchTarget, Rejection, RouteId};
-use cairn_service::{DomainPatch, WriteError, Written};
+use cairn_service::{DomainPatch, Written};
 
 use crate::Api;
 use crate::error::ApiError;
@@ -103,7 +103,9 @@ async fn submit(
     let submitted = DomainPatch::new(patch, note)
         .map_err(|error| ApiError::problem(ProblemCode::TargetMismatch, error.to_string()))?;
     let (service, call) = (api.service.clone(), api.call(actor));
-    let answer = committed(async move { service.patch(&call, &submitted).await }).await?;
+    let answer = committed(async move { service.patch(&call, &submitted).await })
+        .await?
+        .map_err(ApiError::from);
     let outcome = written_outcome(&answer);
     tracing::info!(patch_id = %patch_id, %domain, outcome, "patch");
     observe::patch_outcome(outcome);
@@ -126,13 +128,15 @@ pub(crate) async fn committed<T: Send + 'static>(
     })
 }
 
-/// A domain write's outcome, as the patch count and logs name it.
-pub(crate) fn written_outcome(answer: &Result<Written, WriteError>) -> &'static str {
+/// A domain write's outcome, as the patch count and logs name it. The write's error is
+/// converted to the API's once, by the handler, which answers with that same result: the
+/// conversion logs and counts an engine panic, so a second one would count it twice.
+pub(crate) fn written_outcome(answer: &Result<Written, ApiError>) -> &'static str {
     match answer {
         Ok(Written::Applied { over: None, .. }) => "applied",
         Ok(Written::Applied { over: Some(_), .. }) => "applied_over",
         Ok(Written::AlreadyApplied { .. }) => "already_applied",
-        Err(error) => refused_outcome(error),
+        Err(error) => refusal_outcome(error),
     }
 }
 
@@ -153,17 +157,6 @@ pub(crate) fn refusal_outcome(error: &ApiError) -> &'static str {
             ..
         } => "not_drafted",
         ApiError::Problem { .. } => "failed",
-    }
-}
-
-/// A refused write's outcome, as the patch count and logs name it.
-pub(crate) fn refused_outcome(error: &WriteError) -> &'static str {
-    match error {
-        WriteError::Rejected(Rejection::Invalid { .. }) => "invalid",
-        WriteError::Rejected(Rejection::Stale { .. }) => "stale",
-        WriteError::Rejected(Rejection::PatchIdReused { .. }) => "patch_id_reused",
-        WriteError::ProposalMissing(_) => "not_found",
-        WriteError::Failed(_) => "failed",
     }
 }
 
