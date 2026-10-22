@@ -181,7 +181,7 @@ async function phoneGraphFills(page: Page): Promise<void> {
 async function phoneSheetSnaps(page: Page): Promise<void> {
   await openAt(page, "browser", "j_hiring", "graph?depth=decisions");
   await expectCardsInside(page);
-  const zoom = page.getByRole("button", { name: "Zoom in" });
+  const zoom = page.locator(".canvas .react-flow__controls");
   // The graph's bottom controls clear the sheet at every height it leaves room at.
   const expectControlsClear = async () => {
     const top = (await whenSettled(page, () => sheet(page).boundingBox()))?.y ?? 0;

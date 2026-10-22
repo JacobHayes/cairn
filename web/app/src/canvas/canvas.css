@@ -74,6 +74,11 @@
     width: 44px;
     height: 44px;
   }
+
+  /* A raised sheet leaves the canvas too little height for the zoom stack under the Controls button: Fit stays, and a pinch zooms. */
+  .frame:is([data-sheet="half"], [data-sheet="full"]):not([data-inspector="off"]) .canvas .react-flow__controls-button:not(.react-flow__controls-fitview) {
+    display: none;
+  }
 }
 
 /* From a tablet up, what floats at the canvas's sides starts where the header's title and the other views' toolbar do. */

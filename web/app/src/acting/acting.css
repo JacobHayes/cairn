@@ -1086,3 +1086,10 @@ button.list-sort {
   font-weight: 600;
 }
 
+
+/* A fact that is the row's due words is the Due column's to say; a phone has no such column and keeps it under the title. */
+@media (min-width: 720px) {
+  .list-fact-due {
+    display: none;
+  }
+}

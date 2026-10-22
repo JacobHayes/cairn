@@ -46,17 +46,17 @@ function Rail({ pathname }: { pathname: string }) {
             {label}
           </Link>
         ))}
+        {tour?.railLabel === undefined ? null : (
+          <button type="button" className="rail-tour" data-testid="rail-tour" onClick={tour.take}>
+            {tour.railLabel}
+          </button>
+        )}
         <span className="spacer" />
         {offersMcp ? (
           <Link to={pathTo("agents")} className="agents-link" title="Connect an AI agent such as Claude Code or Codex" {...(section === "agents" ? { "aria-current": "page" as const } : {})}>
             Connect an agent
           </Link>
         ) : null}
-        {tour?.railLabel === undefined ? null : (
-          <button type="button" className="rail-tour" data-testid="rail-tour" onClick={tour.take}>
-            {tour.railLabel}
-          </button>
-        )}
         <span className="rail-foot">
           <Link to={pathTo("me")} {...(section === "me" ? { "aria-current": "page" as const } : {})}>
             You

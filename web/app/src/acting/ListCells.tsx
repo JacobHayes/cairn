@@ -103,11 +103,14 @@ function Progress({ view, line }: { view: Ready; line: Line }) {
   );
 }
 
-/** C10: the one fact that says why a row is on the frontier, in words. */
+/** C10: the one fact that says why a row is on the frontier, in words. When the fact is the row's due words, the Due column already says it beside the row, so only a phone (which has no such column, `PhoneDue`) shows it under the title. */
 function Fact({ line, context }: { line: Line; context: CellContext }) {
-  const fact = line.row === undefined ? undefined : factOf(context.view, line.row, context.sort ?? "rank");
+  const { view } = context;
+  const fact = line.row === undefined ? undefined : factOf(view, line.row, context.sort ?? "rank");
+  const due = line.row?.due;
+  const saidByColumn = fact !== undefined && due != null && fact.words === dueWords(due, view.derived.today, line.row?.kind === "decision");
   return fact === undefined ? null : (
-    <span className={fact.tone === undefined ? "muted small" : `small ink-${fact.tone}`} data-testid="fact">
+    <span className={`${fact.tone === undefined ? "muted small" : `small ink-${fact.tone}`}${saidByColumn ? " list-fact-due" : ""}`} data-testid="fact">
       {fact.words}
     </span>
   );

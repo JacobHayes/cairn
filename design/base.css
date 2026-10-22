@@ -129,7 +129,8 @@ h3 {
   gap: 2px;
   flex: 1;
 }
-.rail nav a {
+.rail nav a,
+.rail nav button.rail-tour {
   display: flex;
   justify-content: space-between;
   align-items: baseline;
@@ -143,7 +144,8 @@ h3 {
   border-left: 2px solid transparent;
   transition: color var(--motion-duration) var(--motion-easing);
 }
-.rail nav a:hover {
+.rail nav a:hover,
+.rail nav button.rail-tour:hover {
   color: var(--chrome-ink);
 }
 .rail nav a[aria-current="page"] {

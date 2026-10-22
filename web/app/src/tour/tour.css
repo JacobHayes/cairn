@@ -104,27 +104,21 @@
   outline-offset: 2px;
 }
 
-/* The rail's link is quiet: it is an offer, not a screen. */
-.rail-tour {
-  align-self: flex-start;
-  margin: var(--space-2) 10px 0;
-  padding: 0;
+/* The rail's tour item is a rail item in the rail's own style (design/base.css); a button only needs the browser's button look cleared. */
+.rail nav button.rail-tour {
+  width: 100%;
   min-height: 0;
-  border: 0;
+  border-top: 0;
+  border-right: 0;
+  border-bottom: 0;
+  border-radius: 0;
   background: none;
-  font: 500 12.5px / 1.4 var(--font-mono);
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
-  color: var(--chrome-muted);
-  text-decoration: underline;
-}
-
-.rail-tour:hover {
-  color: var(--chrome-ink);
+  text-align: left;
+  cursor: pointer;
 }
 
 @media (max-width: 719px) {
-  .rail-tour {
+  .rail nav button.rail-tour {
     display: none;
   }
 

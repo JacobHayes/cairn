@@ -43,6 +43,8 @@ export interface TourApi {
   index: number;
   /** The step the band shows, for the frame to name. */
   activeStep: StepId | undefined;
+  /** The nodes the canvas opens framed on, on a graph step of the practice journey. */
+  frame: readonly string[] | undefined;
   /** The example assistant reply has been shown. */
   replied: boolean;
   setReplied: (replied: boolean) => void;
@@ -194,6 +196,7 @@ export function TourProvider({ nameSettled, children }: { nameSettled: boolean; 
       steps,
       index,
       activeStep: surface === "band" ? steps[index]?.id : undefined,
+      frame: surface === "band" ? steps[index]?.frame : undefined,
       replied,
       setReplied,
       railLabel: !under && open && surface !== "welcome" && surface !== "continue" ? (running ? "Continue the tour" : "Take the tour") : undefined,
@@ -328,7 +331,9 @@ function useAnswerInView(wanted: boolean): void {
     const look = () => {
       const form = document.querySelector('[data-testid="node-detail"] input[type="radio"]');
       if (form !== null) {
-        form.closest("fieldset, [role=radiogroup], label")?.scrollIntoView({ block: "start" });
+        // The question above the choices leads, so the question, both answers and Save show together.
+        const choices = form.closest("fieldset, [role=radiogroup]") ?? form.closest("label")?.parentElement ?? form;
+        (choices.previousElementSibling ?? choices).scrollIntoView({ block: "start" });
       } else if ((frames += 1) < 60) {
         frame = requestAnimationFrame(look);
       }

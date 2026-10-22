@@ -84,6 +84,9 @@ test("the tour walks a practice journey, and the journey is gone at the end", as
   await expect(band(page)).toHaveAttribute("data-step", "finish");
   await expect(page).toHaveURL(/view=list/);
   await expect(page.getByTestId("tour-next")).toHaveAttribute("aria-disabled", "true");
+  // The due date is said once: the Due column has it, so the fact under the title does not repeat it.
+  await expect(page.locator('tr[data-node="n_draft"] [data-testid="list-due"]')).toBeVisible();
+  await expect(page.locator('tr[data-node="n_draft"] [data-testid="fact"]')).toBeHidden();
   await page.locator('tr[data-node="n_draft"]').getByRole("button", { name: /done/i }).click();
   await expect(page.getByTestId("tour-result")).toContainText("ready now");
   await checkpoint(page);

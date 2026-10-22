@@ -43,6 +43,8 @@ export interface Step {
   node?: string;
   /** Arrives with Frontier on (the List shows a row's own action only on the frontier) or off (a step about dates wants nothing faded). */
   frontier?: boolean;
+  /** The nodes a graph step opens the canvas framed on, the first always, the rest while they stay readable together (the canvas's first fit). */
+  frame?: readonly string[];
   /** The sheet is raised on arrival where the inspector is one: the step needs its pane. */
   pane?: boolean;
   /** Whether its action is done. Gates are predicates on the current state, never remembered clicks. */
@@ -72,9 +74,13 @@ const STEPS: Record<StepId, Step> = {
     id: "map",
     title: "Read the map",
     screen: "graph",
+    frame: [decision, draft, review, comments],
     done: (_facts, where) => where.selected === decision,
     waits: "Select the decision first",
-    instruction: (facts) => {
+    instruction: (facts, phone) => {
+      if (phone) {
+        return `Select ${said(facts, decision)}. Cairn works out each item's state from what depends on what.`;
+      }
       const waiting = facts.state(review);
       const reviewIs = waiting === "conditional" || waiting === undefined ? "conditional: it waits for a decision" : stateWord(waiting);
       const draftState = facts.state(draft);
@@ -87,6 +93,7 @@ const STEPS: Record<StepId, Step> = {
     title: "Answer the decision",
     screen: "graph",
     node: decision,
+    frame: [decision, review, draft],
     pane: true,
     done: (facts) => facts.answer !== undefined,
     waits: "Choose Yes or No and save first",
@@ -100,6 +107,7 @@ const STEPS: Record<StepId, Step> = {
     id: "frontier",
     title: "What can move now",
     screen: "graph",
+    frame: [draft, decision, review, comments],
     done: (_facts, where) => where.frontier,
     waits: "Turn Frontier on first",
     instruction: (_facts, phone) => `Frontier highlights what you can act on right now. ${phone ? "Open Controls and turn it on." : "Turn it on."}`,
