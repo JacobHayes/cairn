@@ -102,7 +102,7 @@ flate2 = "1"
 # database pages with at open (already in the tree under other crates).
 rusqlite = { version = "0.40.2", default-features = false, features = ["bundled", "cache"] }
 rustix = { version = "1.1.5", default-features = false, features = ["fs", "std"] }
-tokio ={ version = "1.53.2", default-features = false }
+tokio ={ version = "1.54.1", default-features = false }
 # The browser host (ARCHITECTURE, Web UI): the Rust half of the wasm bindings. Pinned exactly,
 # because the `wasm-bindgen` CLI in mise.toml must be this same version to generate them.
 wasm-bindgen = "=0.2.129"

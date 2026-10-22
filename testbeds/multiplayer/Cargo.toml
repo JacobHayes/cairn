@@ -35,7 +35,7 @@ jiff = { version = "0.2.37", default-features = false, features = ["std"] }
 url = "2.5.8"
 # The SDK at the revision the root Cargo.toml and mise.toml pin.
 patina-dst = { git = "https://github.com/JacobHayes/patina", rev = "1dee57b448d57c390af26a9d5af5f2d3a8820cc8" }
-tokio = { version = "1.53.2", features = ["macros", "net", "rt", "rt-multi-thread", "sync", "time"] }
+tokio = { version = "1.54.1", features = ["macros", "net", "rt", "rt-multi-thread", "sync", "time"] }
 
 # The crate-wide lints of the root workspace (Cargo.toml [workspace.lints]); this
 # workspace cannot inherit them. `mise run sim` runs clippy with warnings denied.
