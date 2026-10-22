@@ -101,6 +101,92 @@ async fn completing_a_placeholder_not_broken_down_is_refused_until_bypassed() {
     assert_eq!(applied["receipt"]["revision"], 5);
 }
 
+/// Gives the access node two items and the requirement to tick them, at revision 4.
+async fn give_access_a_checklist(world: &World, ann: &cairn_schema::Actor) {
+    let given = json!({
+        "id": "p_items",
+        "target": { "journey": "j_vendor_eval" },
+        "base_revision": 4,
+        "mutations": [
+            { "op": "set_node_field", "node": "n_access", "value": { "checklist": [
+                { "id": "request", "title": "Request sent" },
+                { "id": "granted", "title": "Access granted" } ] } },
+            { "op": "set_node_field", "node": "n_access", "value": { "requires_checklist": true } },
+        ],
+    });
+    world
+        .ok(ann, "apply_patch", json!({ "patch": given }))
+        .await;
+}
+
+/// A16, D4, G5: work with a required checklist is refused through the tool once per unticked
+/// item; the ticks and the completion sent as one patch apply, and the node reads back with its
+/// ticks and count.
+#[tokio::test]
+async fn completing_work_with_a_checklist_needs_its_ticks_in_the_same_patch() {
+    let world = World::new();
+    let ann = user("u_ann");
+    world.vendor_journey(&ann).await;
+    world.vendor_after(&ann, 4).await;
+    give_access_a_checklist(&world, &ann).await;
+    let complete = json!({
+        "journey": "j_vendor_eval", "node": "n_access", "transition": "complete",
+        "patch_id": "p_access_done", "base_revision": 5,
+    });
+    let refused = world.call(&ann, "transition_node", complete).await;
+    let Err(ToolError::Rejected {
+        rejection: Rejection::Invalid { violations },
+    }) = refused
+    else {
+        panic!("{refused:?}");
+    };
+    let failures: BTreeSet<GuardFailure> = violations
+        .as_slice()
+        .iter()
+        .flat_map(|violation| violation.failures.clone())
+        .collect();
+    assert_eq!(
+        failures,
+        BTreeSet::from([
+            GuardFailure::Unticked("request".parse().unwrap()),
+            GuardFailure::Unticked("granted".parse().unwrap()),
+        ])
+    );
+    assert!(
+        violations
+            .as_slice()
+            .iter()
+            .all(|violation| violation.bypassable == Some(Guard::AllTicked))
+    );
+
+    let ticked = json!({
+        "id": "p_access_ticked",
+        "target": { "journey": "j_vendor_eval" },
+        "base_revision": 5,
+        "mutations": [
+            { "op": "set_ticked", "node": "n_access", "item": "request", "ticked": true },
+            { "op": "set_ticked", "node": "n_access", "item": "granted", "ticked": true },
+            { "op": "transition", "node": "n_access", "transition": "complete" },
+        ],
+    });
+    let applied = world
+        .ok(&ann, "apply_patch", json!({ "patch": ticked }))
+        .await;
+    assert_eq!(applied["receipt"]["revision"], 6);
+    let node = world
+        .ok(
+            &ann,
+            "get_node",
+            json!({ "journey": "j_vendor_eval", "node": "n_access" }),
+        )
+        .await;
+    assert_eq!(node["detail"]["ticks"], json!(["granted", "request"]));
+    assert_eq!(
+        node["detail"]["derived"]["checklist_count"],
+        json!({ "ticked": 2, "total": 2 })
+    );
+}
+
 /// D4, D7: completing work whose relevance waits on an unanswered decision applies through
 /// the tool, answered with the warning naming that decision.
 #[tokio::test]

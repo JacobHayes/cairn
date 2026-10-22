@@ -6,6 +6,7 @@ mod support;
 mod apply;
 mod apply_over;
 mod blocking;
+mod checklists;
 mod consequences;
 mod cost_blocking;
 mod cost_dates;

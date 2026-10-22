@@ -21,8 +21,8 @@ use serde::{Deserialize, Serialize};
 
 use crate::attachment::Resource;
 use crate::collections::{
-    BoundedSet, BoundedVec, ChoiceCountPerDecision, CollectionError, EdgeCountPerNode,
-    IdentityCountPerFill, OneOrMany, ResourceCountPerNode,
+    BoundedSet, BoundedVec, ChecklistItemCountPerNode, ChoiceCountPerDecision, CollectionError,
+    EdgeCountPerNode, IdentityCountPerFill, OneOrMany, ResourceCountPerNode,
 };
 use crate::condition::Condition;
 use crate::id::{IdentityKey, Slug};
@@ -297,6 +297,101 @@ impl From<Choices> for BoundedVec<Choice, ChoiceCountPerDecision> {
     }
 }
 
+// PRD: G5.
+/// One item of a checklist.
+#[derive(
+    Clone, Debug, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize, JsonSchema,
+)]
+#[serde(deny_unknown_fields)]
+pub struct ChecklistItem {
+    /// The id a tick names; unique within the checklist.
+    pub id: Slug,
+    /// What the item says.
+    pub title: Title,
+}
+
+// PRD: G5.
+/// A deliverable's or action's checklist: items in order, ids unique, at most
+/// `checklist_item_count_per_node_max`. Empty is no checklist.
+#[derive(Clone, Debug, Default, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
+#[serde(
+    try_from = "BoundedVec<ChecklistItem, ChecklistItemCountPerNode>",
+    into = "BoundedVec<ChecklistItem, ChecklistItemCountPerNode>"
+)]
+pub struct Checklist(BoundedVec<ChecklistItem, ChecklistItemCountPerNode>);
+
+impl JsonSchema for Checklist {
+    fn schema_name() -> std::borrow::Cow<'static, str> {
+        "Checklist".into()
+    }
+
+    fn json_schema(generator: &mut schemars::SchemaGenerator) -> schemars::Schema {
+        schemars::json_schema!({
+            "type": "array",
+            "items": generator.subschema_for::<ChecklistItem>(),
+            "maxItems": Limit::ChecklistItemCountPerNode.max(),
+        })
+    }
+}
+
+impl Checklist {
+    /// The items, in order.
+    #[must_use]
+    pub fn items(&self) -> &[ChecklistItem] {
+        self.0.as_slice()
+    }
+
+    /// The item ids, in order.
+    pub fn ids(&self) -> impl Iterator<Item = &Slug> {
+        self.items().iter().map(|item| &item.id)
+    }
+
+    /// Whether an item has the id.
+    #[must_use]
+    pub fn contains(&self, id: &Slug) -> bool {
+        self.ids().any(|item| item == id)
+    }
+
+    /// The title of the item with the id.
+    #[must_use]
+    pub fn title(&self, id: &Slug) -> Option<&Title> {
+        self.items()
+            .iter()
+            .find(|item| &item.id == id)
+            .map(|item| &item.title)
+    }
+
+    /// Whether there are no items.
+    #[must_use]
+    pub fn is_empty(&self) -> bool {
+        self.items().is_empty()
+    }
+
+    /// The number of items.
+    #[must_use]
+    pub fn len(&self) -> usize {
+        self.items().len()
+    }
+}
+
+impl TryFrom<BoundedVec<ChecklistItem, ChecklistItemCountPerNode>> for Checklist {
+    type Error = CollectionError;
+
+    fn try_from(
+        items: BoundedVec<ChecklistItem, ChecklistItemCountPerNode>,
+    ) -> Result<Self, CollectionError> {
+        let ids: Vec<&Slug> = items.as_slice().iter().map(|item| &item.id).collect();
+        BoundedSet::<&Slug, ChecklistItemCountPerNode>::new(ids)?;
+        Ok(Self(items))
+    }
+}
+
+impl From<Checklist> for BoundedVec<ChecklistItem, ChecklistItemCountPerNode> {
+    fn from(checklist: Checklist) -> Self {
+        checklist.0
+    }
+}
+
 /// A decision's answer type with the fields only that type may carry (A1a, A6, E3).
 #[derive(Clone, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub enum AnswerSpec<R: References> {
@@ -369,6 +464,7 @@ pub struct Decision<R: References> {
 }
 
 /// A deliverable's own fields.
+#[allow(clippy::struct_excessive_bools)]
 #[derive(Clone, Debug, Default, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct Deliverable {
     /// Days of its own work (A9).
@@ -379,6 +475,10 @@ pub struct Deliverable {
     pub requires_artifact: bool,
     /// A journey note on the node itself is required before `done` (G4).
     pub requires_note: bool,
+    /// Items to tick through (G5).
+    pub checklist: Checklist,
+    /// Every checklist item ticked is required before `done` (G5).
+    pub requires_checklist: bool,
 }
 
 /// An action's own fields.
@@ -390,6 +490,10 @@ pub struct Action {
     pub placeholder: bool,
     /// A journey note on the node itself is required before `done` (G4).
     pub requires_note: bool,
+    /// Items to tick through (G5).
+    pub checklist: Checklist,
+    /// Every checklist item ticked is required before `done` (G5).
+    pub requires_checklist: bool,
 }
 
 /// A milestone's own fields.
@@ -480,6 +584,30 @@ impl<R: References> Payload<R> {
             Payload::Deliverable(Deliverable { estimate, .. })
             | Payload::Action(Action { estimate, .. }) => *estimate,
             Payload::Decision(_) | Payload::Milestone(_) | Payload::Group(_) => None,
+        }
+    }
+
+    /// The checklist, for a deliverable or an action.
+    #[must_use]
+    pub fn checklist(&self) -> Option<&Checklist> {
+        match self {
+            Payload::Deliverable(Deliverable { checklist, .. })
+            | Payload::Action(Action { checklist, .. }) => Some(checklist),
+            Payload::Decision(_) | Payload::Milestone(_) | Payload::Group(_) => None,
+        }
+    }
+
+    /// True for a deliverable or an action that needs every checklist item ticked before `done`.
+    #[must_use]
+    pub fn requires_checklist(&self) -> bool {
+        match self {
+            Payload::Deliverable(Deliverable {
+                requires_checklist, ..
+            })
+            | Payload::Action(Action {
+                requires_checklist, ..
+            }) => *requires_checklist,
+            Payload::Decision(_) | Payload::Milestone(_) | Payload::Group(_) => false,
         }
     }
 
@@ -849,6 +977,10 @@ pub enum KindField {
     RequiresArtifact,
     /// `requires_note`: deliverables and actions.
     RequiresNote,
+    /// `checklist`: deliverables and actions.
+    Checklist,
+    /// `requires_checklist`: deliverables and actions.
+    RequiresChecklist,
     /// `final`: milestones.
     Final,
     /// `auto_done`: milestones.
@@ -877,10 +1009,12 @@ pub enum KindField {
 
 impl KindField {
     /// Every kind-restricted field.
-    pub const ALL: [KindField; 16] = [
+    pub const ALL: [KindField; 18] = [
         KindField::Estimate,
         KindField::RequiresArtifact,
         KindField::RequiresNote,
+        KindField::Checklist,
+        KindField::RequiresChecklist,
         KindField::Placeholder,
         KindField::Final,
         KindField::AutoDone,
@@ -904,6 +1038,8 @@ impl KindField {
             KindField::Placeholder => "placeholder",
             KindField::RequiresArtifact => "requires_artifact",
             KindField::RequiresNote => "requires_note",
+            KindField::Checklist => "checklist",
+            KindField::RequiresChecklist => "requires_checklist",
             KindField::Final => "final",
             KindField::AutoDone => "auto_done",
             KindField::OpensAt => "opens_at",
@@ -928,6 +1064,7 @@ impl KindField {
             KindField::Placeholder
             | KindField::RequiresArtifact
             | KindField::RequiresNote
+            | KindField::RequiresChecklist
             | KindField::Final
             | KindField::AutoDone => Some(false),
             KindField::Estimate
@@ -936,6 +1073,7 @@ impl KindField {
             | KindField::Prompt
             | KindField::Help
             | KindField::AnswerType
+            | KindField::Checklist
             | KindField::Choices
             | KindField::FillsRole
             | KindField::FeedsMilestone => None,
@@ -947,7 +1085,11 @@ impl KindField {
     #[must_use]
     pub const fn allowed_on(self, kind: NodeKind) -> bool {
         match self {
-            KindField::Estimate | KindField::Placeholder | KindField::RequiresNote => {
+            KindField::Estimate
+            | KindField::Placeholder
+            | KindField::RequiresNote
+            | KindField::Checklist
+            | KindField::RequiresChecklist => {
                 matches!(kind, NodeKind::Deliverable | NodeKind::Action)
             }
             KindField::RequiresArtifact => matches!(kind, NodeKind::Deliverable),
@@ -991,6 +1133,8 @@ impl KindField {
             | KindField::Placeholder
             | KindField::RequiresArtifact
             | KindField::RequiresNote
+            | KindField::Checklist
+            | KindField::RequiresChecklist
             | KindField::Final
             | KindField::AutoDone
             | KindField::OpensAt
@@ -1153,6 +1297,20 @@ struct NodeWire<R: References> {
     #[schemars(with = "bool")]
     requires_note: Option<bool>,
     #[serde(
+        default,
+        deserialize_with = "crate::serde_util::present",
+        skip_serializing_if = "Option::is_none"
+    )]
+    #[schemars(with = "Checklist")]
+    checklist: Option<Checklist>,
+    #[serde(
+        default,
+        deserialize_with = "crate::serde_util::present",
+        skip_serializing_if = "Option::is_none"
+    )]
+    #[schemars(with = "bool")]
+    requires_checklist: Option<bool>,
+    #[serde(
         rename = "final",
         default,
         deserialize_with = "crate::serde_util::present",
@@ -1235,6 +1393,8 @@ pub struct KindColumns<R: References> {
     pub placeholder: Option<bool>,
     pub requires_artifact: Option<bool>,
     pub requires_note: Option<bool>,
+    pub checklist: Option<Checklist>,
+    pub requires_checklist: Option<bool>,
     pub is_final: Option<bool>,
     pub auto_done: Option<bool>,
     pub opens_at: Option<R::Node>,
@@ -1256,6 +1416,8 @@ impl<R: References> Default for KindColumns<R> {
             placeholder: None,
             requires_artifact: None,
             requires_note: None,
+            checklist: None,
+            requires_checklist: None,
             is_final: None,
             auto_done: None,
             opens_at: None,
@@ -1273,56 +1435,67 @@ impl<R: References> Default for KindColumns<R> {
 }
 
 impl<R: References> KindColumns<R> {
+    /// The columns a decision fills: its question, help, and the fields of its answer type.
+    fn of_decision(decision: &Decision<R>) -> Self {
+        let Decision {
+            prompt,
+            help,
+            answer,
+        } = decision;
+        let mut columns = Self {
+            prompt: Some(prompt.clone()),
+            help: help.clone(),
+            answer_type: Some(answer.answer_type()),
+            ..Self::default()
+        };
+        match answer {
+            AnswerSpec::Boolean | AnswerSpec::Text => {}
+            AnswerSpec::SingleChoice(choices) | AnswerSpec::MultiChoice(choices) => {
+                columns.choices = Some(choices.clone());
+            }
+            AnswerSpec::Date { feeds_milestone } => {
+                columns.feeds_milestone.clone_from(feeds_milestone);
+            }
+            AnswerSpec::Identity { fills_role } | AnswerSpec::IdentityList { fills_role } => {
+                columns.fills_role.clone_from(fills_role);
+            }
+        }
+        columns
+    }
+
     /// The columns a payload fills: every field its kind has, flags written explicitly.
     #[must_use]
     pub fn of(payload: &Payload<R>) -> Self {
         match payload {
-            Payload::Decision(Decision {
-                prompt,
-                help,
-                answer,
-            }) => {
-                let mut columns = Self {
-                    prompt: Some(prompt.clone()),
-                    help: help.clone(),
-                    answer_type: Some(answer.answer_type()),
-                    ..Self::default()
-                };
-                match answer {
-                    AnswerSpec::Boolean | AnswerSpec::Text => {}
-                    AnswerSpec::SingleChoice(choices) | AnswerSpec::MultiChoice(choices) => {
-                        columns.choices = Some(choices.clone());
-                    }
-                    AnswerSpec::Date { feeds_milestone } => {
-                        columns.feeds_milestone.clone_from(feeds_milestone);
-                    }
-                    AnswerSpec::Identity { fills_role }
-                    | AnswerSpec::IdentityList { fills_role } => {
-                        columns.fills_role.clone_from(fills_role);
-                    }
-                }
-                columns
-            }
+            Payload::Decision(decision) => Self::of_decision(decision),
             Payload::Deliverable(Deliverable {
                 estimate,
                 placeholder,
                 requires_artifact,
                 requires_note,
+                checklist,
+                requires_checklist,
             }) => Self {
                 estimate: *estimate,
                 placeholder: Some(*placeholder),
                 requires_artifact: Some(*requires_artifact),
                 requires_note: Some(*requires_note),
+                checklist: Some(checklist.clone()),
+                requires_checklist: Some(*requires_checklist),
                 ..Self::default()
             },
             Payload::Action(Action {
                 estimate,
                 placeholder,
                 requires_note,
+                checklist,
+                requires_checklist,
             }) => Self {
                 estimate: *estimate,
                 placeholder: Some(*placeholder),
                 requires_note: Some(*requires_note),
+                checklist: Some(checklist.clone()),
+                requires_checklist: Some(*requires_checklist),
                 ..Self::default()
             },
             Payload::Milestone(Milestone {
@@ -1356,6 +1529,8 @@ impl<R: References> KindColumns<R> {
         self.placeholder = set(self.placeholder, false);
         self.requires_artifact = set(self.requires_artifact, false);
         self.requires_note = set(self.requires_note, false);
+        self.requires_checklist = set(self.requires_checklist, false);
+        self.checklist = self.checklist.filter(|checklist| !checklist.is_empty());
         self.is_final = set(self.is_final, false);
         self.auto_done = set(self.auto_done, false);
         self.gates = set(self.gates, true);
@@ -1371,6 +1546,8 @@ impl<R: References> KindColumns<R> {
             placeholder,
             requires_artifact,
             requires_note,
+            checklist,
+            requires_checklist,
             is_final,
             auto_done,
             opens_at,
@@ -1388,6 +1565,8 @@ impl<R: References> KindColumns<R> {
             (KindField::Estimate, estimate.is_some()),
             (KindField::RequiresArtifact, requires_artifact.is_some()),
             (KindField::RequiresNote, requires_note.is_some()),
+            (KindField::Checklist, checklist.is_some()),
+            (KindField::RequiresChecklist, requires_checklist.is_some()),
             (KindField::Placeholder, placeholder.is_some()),
             (KindField::Final, is_final.is_some()),
             (KindField::AutoDone, auto_done.is_some()),
@@ -1478,6 +1657,10 @@ impl<R: References> KindColumns<R> {
                 requires_note: self
                     .requires_note
                     .unwrap_or(flag_default(KindField::RequiresNote)),
+                checklist: self.checklist.unwrap_or_default(),
+                requires_checklist: self
+                    .requires_checklist
+                    .unwrap_or(flag_default(KindField::RequiresChecklist)),
             }),
             NodeKind::Action => Payload::Action(Action {
                 estimate: self.estimate,
@@ -1487,6 +1670,10 @@ impl<R: References> KindColumns<R> {
                 requires_note: self
                     .requires_note
                     .unwrap_or(flag_default(KindField::RequiresNote)),
+                checklist: self.checklist.unwrap_or_default(),
+                requires_checklist: self
+                    .requires_checklist
+                    .unwrap_or(flag_default(KindField::RequiresChecklist)),
             }),
             NodeKind::Milestone => Payload::Milestone(Milestone {
                 is_final: self.is_final.unwrap_or(flag_default(KindField::Final)),
@@ -1511,6 +1698,8 @@ impl<R: References> TryFrom<NodeWire<R>> for Node<R> {
             placeholder: wire.placeholder,
             requires_artifact: wire.requires_artifact,
             requires_note: wire.requires_note,
+            checklist: wire.checklist,
+            requires_checklist: wire.requires_checklist,
             is_final: wire.is_final,
             auto_done: wire.auto_done,
             opens_at: wire.opens_at,
@@ -1550,6 +1739,8 @@ impl<R: References> From<Node<R>> for NodeWire<R> {
             placeholder,
             requires_artifact,
             requires_note,
+            checklist,
+            requires_checklist,
             is_final,
             auto_done,
             opens_at,
@@ -1581,6 +1772,8 @@ impl<R: References> From<Node<R>> for NodeWire<R> {
             placeholder,
             requires_artifact,
             requires_note,
+            checklist,
+            requires_checklist,
             is_final,
             auto_done,
             opens_at,

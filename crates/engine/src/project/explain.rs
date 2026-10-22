@@ -114,6 +114,15 @@ impl DerivedJourney<'_> {
     }
 }
 
+/// G5: a tick or untick that found the item already so wrote nothing, and is no line of
+/// history: it would say something happened when nothing did.
+fn changed_nothing(event: &Event) -> bool {
+    matches!(
+        event.event_type,
+        cairn_schema::EventType::ItemTicked | cairn_schema::EventType::ItemUnticked
+    ) && event.delta.is_empty()
+}
+
 /// J4: a page of a journey's history, or of one node's (the events naming it), from the
 /// cursor: at most `page_item_count_max` events in log order, grouped by patch. `events` is
 /// the journey's log in order; a patch's events are contiguous in it.
@@ -121,6 +130,7 @@ impl DerivedJourney<'_> {
 pub fn history(events: &[Event], node: Option<&NodeKey>, cursor: Cursor) -> HistoryPage {
     let named: Vec<&Event> = events
         .iter()
+        .filter(|event| !changed_nothing(event))
         .filter(|event| node.is_none_or(|node| event.nodes().contains(node)))
         .collect();
     let (kept, next) = page(&named, cursor, PAGE_ITEM_COUNT_MAX);

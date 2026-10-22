@@ -171,7 +171,39 @@ fn set_field(
         node: key.clone(),
         value: value.clone(),
     };
-    marked(session, key, LocalEdit::Field(field), session.put(record))
+    let mut writes = marked(session, key, LocalEdit::Field(field), session.put(record));
+    // G5: an item the new list drops loses its tick in the same write.
+    if let NodeFieldValue::Checklist(checklist) = value {
+        writes.extend(dropped_ticks(session, key, Some(checklist)));
+    }
+    writes
+}
+
+/// G5: what leaves with the items that are not in `checklist`: the node's ticks for them,
+/// and the bypass failures recorded for them, so neither attaches to a later item that takes
+/// the id.
+fn dropped_ticks(
+    session: &Session<'_>,
+    node: &NodeKey,
+    checklist: Option<&cairn_schema::Checklist>,
+) -> Vec<Write> {
+    let Some(journey) = session.journey() else {
+        return Vec::new();
+    };
+    let state = &journey.graph.state;
+    let mut writes: Vec<Write> = crate::edit::ticks_dropped(state, node, checklist)
+        .into_iter()
+        .map(|key| session.remove(key))
+        .collect();
+    if let Some(mut overrides) = state.overrides.get(node).cloned()
+        && crate::edit::prune_bypass(&mut overrides, checklist)
+    {
+        writes.push(session.put(GraphRecord::Overrides {
+            node: node.clone(),
+            overrides,
+        }));
+    }
+    writes
 }
 
 /// B7: a node replaced whole, as a kind or answer-type change does. Every field, edge,
@@ -189,6 +221,9 @@ fn replace_node(session: &mut Session<'_>, node: &Node<KeyRefs>) -> Vec<Write> {
     for edit in crate::edit::differences(&old, node) {
         writes.extend(session.marker(&node.key, edit));
     }
+    // G5: an item the new node does not have (every item, for a kind with no checklist)
+    // loses its tick in the same write.
+    writes.extend(dropped_ticks(session, &node.key, node.payload.checklist()));
     let stored = session
         .journey()
         .and_then(|journey| journey.graph.state.nodes.get(&node.key).cloned());

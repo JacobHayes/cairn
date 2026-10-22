@@ -229,9 +229,10 @@ pub(crate) fn annotated_nodes(document: &Document) -> Annotated<'_> {
     annotated
 }
 
-/// The guards that need no derived state (D4, A16, G2, G4, B10), for a completed node: a
+/// The guards that need no derived state (D4, A16, G2, G4, G5, B10), for a completed node: a
 /// deliverable that requires an artifact has an artifact link, a deliverable or action that
-/// requires a note has a note (both among `annotated`, from [`annotated_nodes`]), and a
+/// requires a note has a note (both among `annotated`, from [`annotated_nodes`]), one that
+/// requires its checklist has every item ticked (one failure per unticked item), and a
 /// placeholder has children or is atomic.
 #[must_use]
 pub(crate) fn static_failures(
@@ -254,6 +255,16 @@ pub(crate) fn static_failures(
     if requires_note && !annotated.notes.contains(&node.key) {
         found.insert(GuardFailure::MissingNote);
     }
+    if node.payload.requires_checklist()
+        && let Some(checklist) = node.payload.checklist()
+    {
+        let ticks = document.state.ticks.get(&node.key);
+        for id in checklist.ids() {
+            if !ticks.is_some_and(|ticks| ticks.contains(id)) {
+                found.insert(GuardFailure::Unticked(id.clone()));
+            }
+        }
+    }
     if unexpanded(document, tree, node) {
         found.insert(GuardFailure::NotBrokenDown);
     }
@@ -261,6 +272,12 @@ pub(crate) fn static_failures(
     assert!(
         found.is_empty() || matches!(node.payload, Payload::Deliverable(_) | Payload::Action(_))
     );
-    assert!(found.len() <= 3);
+    assert!(
+        found.len()
+            <= 3 + node
+                .payload
+                .checklist()
+                .map_or(0, cairn_schema::Checklist::len)
+    );
     found
 }

@@ -46,6 +46,8 @@ limit_markers! {
     KindCount => KindCount,
     /// `choice_count_per_decision_max`.
     ChoiceCountPerDecision => ChoiceCountPerDecision,
+    /// `checklist_item_count_per_node_max`.
+    ChecklistItemCountPerNode => ChecklistItemCountPerNode,
     /// `identity_count_per_fill_max`.
     IdentityCountPerFill => IdentityCountPerFill,
     /// `email_count_per_identity_max`.

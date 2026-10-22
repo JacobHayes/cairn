@@ -107,6 +107,8 @@ pub struct NodeDetail {
     pub record: NodeState,
     /// What the journey edited on it, for a route-copied node (B4).
     pub local_edits: BTreeSet<LocalEdit>,
+    /// The checklist items ticked (G5).
+    pub ticks: BTreeSet<cairn_schema::Slug>,
     /// A decision's answer, as recorded.
     pub answer: Option<AnswerValue>,
     /// The rationale the recorded answer was given with (B2).
@@ -534,6 +536,7 @@ fn detail(
         children,
         record: stored(key, node.kind()),
         local_edits: state.local_edits.get(key).cloned().unwrap_or_default(),
+        ticks: state.ticks.get(key).cloned().unwrap_or_default(),
         answer: state.answers.get(key).cloned(),
         rationale: state.rationales.get(key).cloned(),
         pin: state.pins.get(key).copied(),

@@ -68,6 +68,10 @@ fn the_kind_fields_are_the_kind_columns() {
         placeholder: Some(true),
         requires_artifact: Some(true),
         requires_note: Some(true),
+        checklist: Some(
+            serde_json::from_value(serde_json::json!([{"id": "a", "title": "A"}])).unwrap(),
+        ),
+        requires_checklist: Some(true),
         is_final: Some(true),
         auto_done: Some(true),
         opens_at: Some(node()),

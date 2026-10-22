@@ -76,9 +76,37 @@ fn put(record: GraphRecord) -> Change {
     Change::Put(Box::new(record))
 }
 
+/// G5: the removal of each tick whose item the merge removed, and the overrides whose bypass
+/// lost the failures for those items.
+fn checklist_changes(journey: &Document, merged: &Document) -> Vec<Change> {
+    let mut changes = Vec::new();
+    for (key, items) in &journey.state.ticks {
+        let kept = merged.state.ticks.get(key);
+        for item in items
+            .iter()
+            .filter(|item| kept.is_none_or(|kept| !kept.contains(*item)))
+        {
+            changes.push(Change::Remove(GraphKey::Tick {
+                node: key.clone(),
+                item: item.clone(),
+            }));
+        }
+    }
+    for (key, overrides) in &merged.state.overrides {
+        if journey.state.overrides.get(key) != Some(overrides) {
+            changes.push(put(GraphRecord::Overrides {
+                node: key.clone(),
+                overrides: overrides.clone(),
+            }));
+        }
+    }
+    changes
+}
+
 /// B7: the record writes that take a journey graph to the merged one: changed and new
 /// nodes, changed states, cleared markers, roles, kinds, and the default owner. A merge
-/// removes no node and changes no answer, pin, or fill.
+/// removes no node and changes no answer, pin, or fill (a bypass loses only the failures for
+/// checklist items the merge removed).
 pub(crate) fn changes(journey: &Document, merged: &Document) -> Vec<Change> {
     let mut changes = Vec::new();
     for node in merged.nodes.values() {
@@ -106,6 +134,7 @@ pub(crate) fn changes(journey: &Document, merged: &Document) -> Vec<Change> {
             }));
         }
     }
+    changes.extend(checklist_changes(journey, merged));
     for role in merged.roles.values() {
         if journey.roles.get(&role.key) != Some(role) {
             changes.push(put(GraphRecord::Role(role.clone())));

@@ -17,7 +17,16 @@ const RENAME_B: &str = "- op: set_node_field\n  node: n_b\n  value: {title: Rena
 /// A journey at revision 2 with two nodes, the patch `mutations` drafted there, and the
 /// records and touched set after `meanwhile` landed on top (revision 3).
 fn drafted_then_moved(mutations: &str, meanwhile: &str) -> (Records, Patch, TouchedSet) {
-    let drafted = support::journey(NODES);
+    drafted_then_moved_over(NODES, mutations, meanwhile)
+}
+
+/// [`drafted_then_moved`] over a journey of `nodes`.
+fn drafted_then_moved_over(
+    nodes: &str,
+    mutations: &str,
+    meanwhile: &str,
+) -> (Records, Patch, TouchedSet) {
+    let drafted = support::journey(nodes);
     let patch = support::patch_to(
         &drafted,
         &format!("{{journey: {}}}", support::JOURNEY),
@@ -146,4 +155,37 @@ fn a_current_patch_is_applied_as_it_is() {
     .unwrap();
     assert_eq!(applied.over, None);
     assert_eq!(applied.at, patch);
+}
+
+const CHECKLIST: &str = "- op: add_node\n  node: {key: n_a, id: a, kind: action, title: A, checklist: [{id: x, title: X}, {id: y, title: Y}]}\n";
+const TICK_X: &str = "- op: set_ticked\n  node: n_a\n  item: x\n  ticked: true\n";
+const TICK_Y: &str = "- op: set_ticked\n  node: n_a\n  item: y\n  ticked: true\n";
+const REPLACE_LIST: &str =
+    "- op: set_node_field\n  node: n_a\n  value: {checklist: [{id: x, title: Another X}]}\n";
+
+/// G5: a tick drafted before an edit of its node's checklist is stale. The edit can drop the
+/// item and a later one reuse its id, so the tick could land on a different item.
+#[test]
+fn a_tick_is_stale_past_an_edit_of_its_nodes_checklist() {
+    let (records, patch, intervening) = drafted_then_moved_over(CHECKLIST, TICK_X, REPLACE_LIST);
+    let answer = apply_over(&records, &patch, &support::fixed_inputs(), &intervening);
+    assert!(
+        matches!(answer, Err(Rejection::Stale { .. })),
+        "{answer:#?}"
+    );
+}
+
+/// G5: ticks of two items of one node are different records, and are applied past each other.
+#[test]
+fn a_tick_is_applied_past_a_tick_of_another_item() {
+    let (records, patch, intervening) = drafted_then_moved_over(CHECKLIST, TICK_X, TICK_Y);
+    let applied = apply_over(&records, &patch, &support::fixed_inputs(), &intervening).unwrap();
+    let ticked: Vec<_> = support::graph(applied.applied.records())
+        .state
+        .ticks
+        .values()
+        .flatten()
+        .map(ToString::to_string)
+        .collect();
+    assert_eq!(ticked, ["x", "y"]);
 }

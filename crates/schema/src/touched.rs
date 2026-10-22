@@ -16,6 +16,7 @@ use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
 use crate::domain::{Domain, GraphId};
+use crate::field::NodeField;
 use crate::id::NodeKey;
 use crate::record::{GraphKey, RecordKey};
 
@@ -81,6 +82,7 @@ struct Covers<'a> {
     graphs: BTreeSet<&'a GraphId>,
     nodes: BTreeSet<(&'a GraphId, &'a NodeKey)>,
     annotations: BTreeSet<(&'a GraphId, &'a crate::id::AttachmentKey)>,
+    checklists: BTreeSet<(&'a GraphId, &'a NodeKey)>,
 }
 
 impl<'a> Covers<'a> {
@@ -106,6 +108,16 @@ impl<'a> Covers<'a> {
                 } => {
                     covers.annotations.insert((graph, annotation));
                 }
+                RecordKey::InGraph {
+                    graph,
+                    key:
+                        GraphKey::NodeField {
+                            node,
+                            field: NodeField::Checklist,
+                        },
+                } => {
+                    covers.checklists.insert((graph, node));
+                }
                 _ => {}
             }
         }
@@ -114,7 +126,7 @@ impl<'a> Covers<'a> {
 
     /// Whether `key` lies under one of the covering addresses (by [`RecordKey::overlaps`]'s
     /// rules: a domain holds everything in it, a graph everything in it, a node everything
-    /// on it and both ends of its edges).
+    /// on it and both ends of its edges, a checklist field the ticks of its node).
     fn contains(&self, key: &RecordKey) -> bool {
         if self.domains.contains(&key.domain()) {
             return true;
@@ -127,6 +139,7 @@ impl<'a> Covers<'a> {
             || key.node_scope().is_some_and(on_node)
             || matches!(key, GraphKey::Edge(edge) if on_node(&edge.requires))
             || matches!(key, GraphKey::Annotation { annotation, .. } if self.annotations.contains(&(graph, annotation)))
+            || matches!(key, GraphKey::Tick { node, .. } if self.checklists.contains(&(graph, node)))
     }
 }
 

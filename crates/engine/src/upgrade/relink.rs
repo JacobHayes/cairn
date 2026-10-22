@@ -5,7 +5,7 @@
 //! nodes' provenance, and exactly the markers their differences call for, in one event.
 //!
 //! Cost: one pass over the journey's nodes, each compared with its version node field by
-//! field (22 fields, its edges, participations, and resources): O(n x (22 + 64 + 33)).
+//! field (24 fields, its edges, participations, and resources): O(n x (24 + 64 + 33)).
 
 use std::collections::BTreeSet;
 

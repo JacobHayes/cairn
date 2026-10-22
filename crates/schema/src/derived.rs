@@ -584,6 +584,17 @@ pub struct Progress {
     pub decisions_needed: u32,
 }
 
+// PRD: D3, G5.
+/// How much of a checklist is ticked.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+#[serde(deny_unknown_fields)]
+pub struct ChecklistCount {
+    /// Items ticked.
+    pub ticked: u32,
+    /// Items in the checklist.
+    pub total: u32,
+}
+
 // PRD: D3.
 /// Every derived value for one node, with the inputs that explain it. The flags are its own,
 /// each independent of the others, so they stay booleans rather than a state enum.
@@ -647,6 +658,10 @@ pub struct NodeDerived {
     /// children.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub progress: Option<Progress>,
+    // PRD: D3, G5.
+    /// How many checklist items are ticked; none for a node with no items.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub checklist_count: Option<ChecklistCount>,
     // PRD: D4.
     /// The bypassable guards its completing transition (complete a deliverable or
     /// action, answer an open decision, complete a pending milestone) would fail if attempted

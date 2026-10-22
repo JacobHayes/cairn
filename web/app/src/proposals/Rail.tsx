@@ -94,7 +94,7 @@ function BeforeAfter({ node, mark, model }: { node: string; mark: DiffMark | und
   );
 }
 
-const STATE_WORDS: Record<string, string> = { nodes: "progress", answers: "answer", rationales: "reason", overrides: "override", pins: "pin", snoozes: "snooze" };
+const STATE_WORDS: Record<string, string> = { nodes: "progress", answers: "answer", rationales: "reason", overrides: "override", pins: "pin", snoozes: "snooze", ticks: "ticked" };
 
 /** The change's word, in the tone its kind takes. */
 function MarkWord({ mark }: { mark: DiffMark }) {

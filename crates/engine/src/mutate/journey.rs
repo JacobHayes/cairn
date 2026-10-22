@@ -4,7 +4,7 @@
 
 use cairn_schema::{
     AnswerValue, GraphKey, GraphRecord, Limit, LocalEdit, Markdown, Mutation, NodeKey, NodeKind,
-    NodeState, OverrideKind, Overrides, RecordedEnd, RoleKey, SignedDays, State, Subject,
+    NodeState, OverrideKind, Overrides, RecordedEnd, RoleKey, SignedDays, Slug, State, Subject,
     Transition, ViolationCode, Write,
 };
 
@@ -49,6 +49,7 @@ pub(super) fn apply(session: &mut Session<'_>, mutation: &Mutation) -> Vec<Write
         Mutation::ApplyOverride { node, applied } => apply_override(session, node, applied),
         Mutation::RemoveOverride { node, kind } => remove_override(session, node, *kind),
         Mutation::SetAtomic { node, atomic } => set_atomic(session, node, *atomic),
+        Mutation::SetTicked { node, item, ticked } => set_ticked(session, node, item, *ticked),
         other => super::annotations::apply(session, other),
     }
 }
@@ -544,6 +545,46 @@ fn set_atomic(session: &mut Session<'_>, node: &NodeKey, atomic: bool) -> Vec<Wr
         node: node.clone(),
         state: NodeState { atomic, ..next },
     })]
+}
+
+// PRD: G5.
+/// Ticks or unticks one checklist item, in any state of the node. An item not on the node's
+/// checklist is refused; setting an item to the state it has writes nothing.
+fn set_ticked(session: &mut Session<'_>, node: &NodeKey, item: &Slug, ticked: bool) -> Vec<Write> {
+    if !session.require(node) {
+        return Vec::new();
+    }
+    let on_list = session
+        .node(node)
+        .and_then(|found| found.payload.checklist())
+        .is_some_and(|checklist| checklist.contains(item));
+    if !on_list {
+        session.reject(
+            ViolationCode::UnresolvedReference,
+            Some(node),
+            format!("the node's checklist has no item \"{item}\""),
+        );
+        return Vec::new();
+    }
+    let present = session.journey().is_some_and(|journey| {
+        journey
+            .graph
+            .state
+            .ticks
+            .get(node)
+            .is_some_and(|ticks| ticks.contains(item))
+    });
+    match (ticked, present) {
+        (true, false) => vec![session.put(GraphRecord::Tick {
+            node: node.clone(),
+            item: item.clone(),
+        })],
+        (false, true) => vec![session.remove(GraphKey::Tick {
+            node: node.clone(),
+            item: item.clone(),
+        })],
+        (true, true) | (false, false) => Vec::new(),
+    }
 }
 
 /// The marker a reset to the route clears (B4), or an explicit marker.

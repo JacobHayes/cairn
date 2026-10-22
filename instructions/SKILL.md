@@ -140,6 +140,16 @@ transition); `transition_node` alone is refused with the `has_note` guard. Bypas
 `override` only when the person says no note is needed. Removing the last note later marks
 a finished node `stale` with "missing note".
 
+A deliverable or action can carry a `checklist` (items with an `id` and a `title`, at
+most 50), and with `requires_checklist` it cannot be completed until every item is ticked.
+Tick with the `set_ticked` mutation (`node`, `item`, `ticked`) and send the ticks and the
+completion as one `apply_patch`; `transition_node` alone is refused with the `all_ticked`
+guard, one failure per unticked item. Ticking or unticking sets the item's state; sending
+the state it already has changes nothing. An item not on the checklist is refused. Bypass
+the guard with `override` only when the person says the items need not be ticked. Unticking
+an item later, or adding one, marks a finished node `stale` with "unticked item". Ticks are
+kept when a node is reopened, and removing an item removes its tick.
+
 ## Editing structure
 
 Structural edits are mutations, in a proposal's `mutations` or, when the person asked for
@@ -151,6 +161,8 @@ a state change, when there is one, is simpler). Several edits are one patch, one
 - **A node rewritten whole:** `replace_node` with the full node, `requires` included. Use
   it to change a node's kind or answer type, or many fields at once; send everything, it
   replaces rather than merges.
+  A `checklist` field value replaces the whole list, and a tick whose item is gone from the
+  list is dropped with it.
 - **Edges:** `add_edge` and `remove_edge`, each `{node, requires}`.
 - **Removing a node:** `remove_node` takes a removal object that names the node, its
   descendants, every edge into or out of that subtree, and the resources, notes, and

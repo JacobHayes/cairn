@@ -86,6 +86,8 @@ export function fieldValueWords(field: string, value: unknown, names: Names): st
       return typeof value === "string" ? quoted(names.role(value)) : JSON.stringify(value);
     case "choices":
       return Array.isArray(value) ? value.map((choice: Parameters<typeof choiceLabel>[0]) => quoted(choiceLabel(choice))).join(", ") : JSON.stringify(value);
+    case "checklist":
+      return Array.isArray(value) ? (value.length === 0 ? "no items" : value.map((item: { title: string }) => quoted(item.title)).join(", ")) : JSON.stringify(value);
     default:
       return typeof value === "boolean" ? (value ? "yes" : "no") : typeof value === "string" ? quoted(value) : typeof value === "number" ? String(value) : JSON.stringify(value);
   }
@@ -115,6 +117,8 @@ export function stateValueWords(field: string, value: unknown, node: string, nam
       return typeof value === "string" ? quoted(briefly(value)) : "a reason";
     case "pins":
       return typeof value === "string" ? names.date(value) : "a date";
+    case "ticks":
+      return Array.isArray(value) && value.length > 0 ? value.map((item) => quoted(String(item))).join(", ") : "nothing ticked";
     case "snoozes":
       return "date" in record && typeof record["date"] === "string" ? `until ${names.date(record["date"])}` : typeof record["node"] === "string" ? `until ${quoted(names.node(record["node"]))}${SNOOZE_NODE_TAIL}` : "set aside";
     case "overrides":
@@ -186,6 +190,8 @@ export function mutationWords(mutation: Mutation, names: Names): string {
       return `Upgrade to version ${String(mutation.to)}, with every change the merge applies cleanly`;
     case "relink":
       return `Follow ${mutation.lineage.route} version ${String(mutation.lineage.version)}`;
+    case "set_ticked":
+      return `${mutation.ticked ? "Tick" : "Untick"} the item ${quoted(mutation.item)} of ${node(mutation.node)}`;
     case "set_atomic":
       return mutation.atomic ? `Mark ${node(mutation.node)} atomic` : `${node(mutation.node)} needs breaking down`;
     case "set_participation":

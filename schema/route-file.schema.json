@@ -48,6 +48,32 @@
       "pattern": "^a_[a-z0-9][a-z0-9_-]*$",
       "type": "string"
     },
+    "Checklist": {
+      "items": {
+        "$ref": "#/$defs/ChecklistItem"
+      },
+      "maxItems": 50,
+      "type": "array"
+    },
+    "ChecklistItem": {
+      "additionalProperties": false,
+      "description": "One item of a checklist.",
+      "properties": {
+        "id": {
+          "$ref": "#/$defs/Slug",
+          "description": "The id a tick names; unique within the checklist."
+        },
+        "title": {
+          "$ref": "#/$defs/Title",
+          "description": "What the item says."
+        }
+      },
+      "required": [
+        "id",
+        "title"
+      ],
+      "type": "object"
+    },
     "Choice": {
       "anyOf": [
         {
@@ -499,6 +525,7 @@
           "then": {
             "properties": {
               "auto_done": false,
+              "checklist": false,
               "closes": false,
               "closes_at": false,
               "estimate": false,
@@ -507,6 +534,7 @@
               "opens_at": false,
               "placeholder": false,
               "requires_artifact": false,
+              "requires_checklist": false,
               "requires_note": false
             }
           }
@@ -573,6 +601,7 @@
           "then": {
             "properties": {
               "answer_type": false,
+              "checklist": false,
               "choices": false,
               "closes": false,
               "closes_at": false,
@@ -585,6 +614,7 @@
               "placeholder": false,
               "prompt": false,
               "requires_artifact": false,
+              "requires_checklist": false,
               "requires_note": false
             }
           }
@@ -601,6 +631,7 @@
             "properties": {
               "answer_type": false,
               "auto_done": false,
+              "checklist": false,
               "choices": false,
               "estimate": false,
               "feeds_milestone": false,
@@ -610,6 +641,7 @@
               "placeholder": false,
               "prompt": false,
               "requires_artifact": false,
+              "requires_checklist": false,
               "requires_note": false
             }
           }
@@ -772,6 +804,9 @@
         "auto_done": {
           "type": "boolean"
         },
+        "checklist": {
+          "$ref": "#/$defs/Checklist"
+        },
         "choices": {
           "$ref": "#/$defs/Choices"
         },
@@ -886,6 +921,9 @@
           "uniqueItems": true
         },
         "requires_artifact": {
+          "type": "boolean"
+        },
+        "requires_checklist": {
           "type": "boolean"
         },
         "requires_note": {

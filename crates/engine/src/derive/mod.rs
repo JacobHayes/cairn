@@ -28,6 +28,7 @@
 //! (decisions/2026-10-06-derive-returns-the-engines-own-derived-growing-a-field-per.md).
 
 pub mod blocking;
+mod checklist;
 mod condition;
 pub mod consequences;
 pub mod dates;
@@ -53,6 +54,7 @@ use cairn_schema::{
 
 use crate::graph::{Document, Graph, Tree};
 pub use blocking::Blocking;
+pub use checklist::checklist_count;
 pub use consequences::consequences;
 pub use dates::{Dates, PlanCheck, check_plan};
 pub use dependencies::{Dependencies, EdgeSet, EffectiveDependency};

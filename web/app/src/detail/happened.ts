@@ -367,6 +367,8 @@ const SAY: Record<EventType, (c: Context) => Said> = {
   override_applied: (c) => overrides(c, false),
   guard_bypassed: (c) => ({ what: `bypassed a check on ${it(c)}` }),
   override_removed: (c) => overrides(c, true),
+  item_ticked: (c) => ({ what: `ticked a checklist item of ${it(c)}` }),
+  item_unticked: (c) => ({ what: `unticked a checklist item of ${it(c)}` }),
   atomic_changed: (c) => {
     const atomic = stateRecord(c)?.state.atomic;
     return { what: atomic === true ? `allowed ${it(c)} to finish without breaking it down` : `asked for ${it(c)} to be broken down` };

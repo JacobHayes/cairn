@@ -69,6 +69,12 @@ nodes:
   placeholder: true
   requires_artifact: true
   requires_note: true
+  checklist:
+  - id: outline
+    title: Outline written
+  - id: review
+    title: Reviewed
+  requires_checklist: true
   requires:
   - kickoff
   relevant_when:
@@ -108,6 +114,12 @@ nodes:
   estimate: 1
   placeholder: true
   requires_note: true
+  checklist:
+  - id: outline
+    title: Outline written
+  - id: review
+    title: Reviewed
+  requires_checklist: true
   relevant_when:
     equals:
       decision: scope

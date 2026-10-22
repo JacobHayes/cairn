@@ -699,6 +699,17 @@ pub enum Mutation {
         /// Atomic or not.
         atomic: bool,
     },
+    // PRD: G5.
+    /// Tick or untick one checklist item. Setting an item to the state it has changes
+    /// nothing.
+    SetTicked {
+        /// The node.
+        node: NodeKey,
+        /// The item's id.
+        item: Slug,
+        /// Ticked or not.
+        ticked: bool,
+    },
     // PRD: G1.
     /// Add a note or link.
     AddAnnotation {
@@ -900,6 +911,7 @@ impl Mutation {
             | Mutation::ApplyOverride { node, .. }
             | Mutation::RemoveOverride { node, .. }
             | Mutation::SetAtomic { node, .. }
+            | Mutation::SetTicked { node, .. }
             | Mutation::SetProvenance { node, .. }
             | Mutation::MarkLocalEdit { node, .. }
             | Mutation::Answer { decision: node, .. } => Some(node),
@@ -1001,6 +1013,7 @@ impl Mutation {
             | Mutation::ApplyOverride { .. }
             | Mutation::RemoveOverride { .. }
             | Mutation::SetAtomic { .. }
+            | Mutation::SetTicked { .. }
             | Mutation::AddAnnotation { .. }
             | Mutation::EditAnnotation { .. }
             | Mutation::RemoveAnnotation { .. }

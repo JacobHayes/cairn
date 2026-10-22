@@ -26,7 +26,7 @@ use crate::sql::{
 /// The nodes table's columns after `graph_id`, in the order [`node_values`] writes them and
 /// [`node_from_row`] reads them (A1a): the fields every kind shares, then [`KindColumns`].
 /// A node's `requires`, `participations`, and `resources` are rows of their own tables.
-pub(crate) const NODE_COLUMNS: [&str; 26] = [
+pub(crate) const NODE_COLUMNS: [&str; 28] = [
     "key",
     "parent_key",
     "id",
@@ -41,6 +41,8 @@ pub(crate) const NODE_COLUMNS: [&str; 26] = [
     "placeholder",
     "requires_artifact",
     "requires_note",
+    "checklist",
+    "requires_checklist",
     "is_final",
     "auto_done",
     "opens_at",
@@ -103,6 +105,8 @@ fn kind_values(payload: &Payload<KeyRefs>) -> Result<Vec<Value>, StoreError> {
         placeholder,
         requires_artifact,
         requires_note,
+        checklist,
+        requires_checklist,
         is_final,
         auto_done,
         opens_at,
@@ -122,6 +126,8 @@ fn kind_values(payload: &Payload<KeyRefs>) -> Result<Vec<Value>, StoreError> {
         opt_flag(placeholder),
         opt_flag(requires_artifact),
         opt_flag(requires_note),
+        opt_json(checklist.as_ref().filter(|list| !list.is_empty()))?,
+        opt_flag(requires_checklist),
         opt_flag(is_final),
         opt_flag(auto_done),
         opt_text(opens_at),
@@ -150,21 +156,23 @@ fn payload_from_row(row: &Row, kind: NodeKind) -> Result<Payload<KeyRefs>, Store
         placeholder: row.opt_flag(at(1))?,
         requires_artifact: row.opt_flag(at(2))?,
         requires_note: row.opt_flag(at(3))?,
-        is_final: row.opt_flag(at(4))?,
-        auto_done: row.opt_flag(at(5))?,
-        opens_at: row.opt_parse(at(6))?,
-        closes_at: row.opt_parse(at(7))?,
-        gates: row.opt_flag(at(8))?,
-        closes: row.opt_flag(at(9))?,
-        prompt: row.opt_parse(at(10))?,
+        checklist: row.opt_json(at(4))?,
+        requires_checklist: row.opt_flag(at(5))?,
+        is_final: row.opt_flag(at(6))?,
+        auto_done: row.opt_flag(at(7))?,
+        opens_at: row.opt_parse(at(8))?,
+        closes_at: row.opt_parse(at(9))?,
+        gates: row.opt_flag(at(10))?,
+        closes: row.opt_flag(at(11))?,
+        prompt: row.opt_parse(at(12))?,
         answer_type: row
-            .opt_text(at(11))?
+            .opt_text(at(13))?
             .map(|name| answer_type_from(&name))
             .transpose()?,
-        choices: row.opt_json(at(12))?,
-        fills_role: row.opt_parse(at(13))?,
-        feeds_milestone: row.opt_parse(at(14))?,
-        help: row.opt_parse(at(15))?,
+        choices: row.opt_json(at(14))?,
+        fills_role: row.opt_parse(at(15))?,
+        feeds_milestone: row.opt_parse(at(16))?,
+        help: row.opt_parse(at(17))?,
     };
     columns
         .into_payload(kind)

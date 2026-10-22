@@ -272,6 +272,8 @@ fn walk_journey(records: &Records, ops: &mut BTreeSet<String>) -> Records {
 - op: add_annotation\n  annotation: {key: a_link, node: n_findings, reference: \"https://example.org/notes\"}\n\
 - op: edit_annotation\n  annotation: {key: a_link, node: n_findings, reference: \"https://example.org/notes-v2\"}\n\
 - op: remove_annotation\n  annotation: a_link\n\
+- op: set_node_field\n  node: n_findings\n  value: {checklist: [{id: load, title: Load test}]}\n\
+- op: set_ticked\n  node: n_findings\n  item: load\n  ticked: true\n\
 - op: set_journey_status\n  status: completed\n\
 - op: set_journey_status\n  status: active\n";
     let records = accept(records, JOURNEY, changes, ops);

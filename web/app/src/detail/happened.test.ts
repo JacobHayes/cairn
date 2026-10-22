@@ -83,6 +83,8 @@ const CASES: Record<EventType, Case> = {
   guard_bypassed: { event: event("guard_bypassed", plan) },
   override_removed: { event: event("override_removed", plan, [put({ overrides: { node: "n_plan", overrides: {} } })]) },
   atomic_changed: { event: event("atomic_changed", plan, [state("n_plan", { state: "todo", atomic: true })]) },
+  item_ticked: { event: event("item_ticked", plan) },
+  item_unticked: { event: event("item_unticked", plan) },
   annotation_added: { event: event("annotation_added", { attachment: "a_note" }) },
   annotation_edited: { event: event("annotation_edited", { attachment: "a_note" }) },
   annotation_removed: { event: event("annotation_removed", { attachment: "a_note" }) },

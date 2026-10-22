@@ -179,6 +179,7 @@ pub fn arb_guard_failure() -> impl Strategy<Value = GuardFailure> {
         arb_node_key().prop_map(GuardFailure::OpenDependency),
         Just(GuardFailure::MissingArtifact),
         Just(GuardFailure::MissingNote),
+        arb_slug().prop_map(GuardFailure::Unticked),
         Just(GuardFailure::NotBrokenDown),
         arb_date().prop_map(GuardFailure::TooEarly),
     ]
@@ -190,6 +191,7 @@ pub fn arb_guard() -> impl Strategy<Value = Guard> {
         Guard::DepsDone,
         Guard::HasArtifact,
         Guard::HasNote,
+        Guard::AllTicked,
         Guard::BrokenDown,
         Guard::DateArrived,
     ])
@@ -237,6 +239,11 @@ pub fn arb_journey_state() -> impl Strategy<Value = JourneyState> {
                 prop::collection::btree_set(arb_local_edit(), 1..3),
                 0..2,
             ),
+            prop::collection::btree_map(
+                arb_node_key(),
+                prop::collection::btree_set(arb_slug(), 1..3),
+                0..2,
+            ),
         ),
         // A rationale is held only beside its answer (B2).
         prop::collection::btree_map(
@@ -253,7 +260,7 @@ pub fn arb_journey_state() -> impl Strategy<Value = JourneyState> {
     )
         .prop_map(
             |(
-                (nodes, local_edits),
+                (nodes, local_edits, ticks),
                 answered,
                 role_fills,
                 pins,
@@ -271,6 +278,7 @@ pub fn arb_journey_state() -> impl Strategy<Value = JourneyState> {
                 JourneyState {
                     nodes,
                     local_edits,
+                    ticks,
                     answers,
                     rationales,
                     role_fills,

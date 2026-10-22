@@ -17,9 +17,10 @@
 //! for their resolutions to change.
 //!
 //! Cost at the limits (2,000 nodes per graph, 64 edges per node, 32 roles and kinds): three
-//! key-indexed graphs already in memory; per node shared by base and journey, 22 field
-//! comparisons, its edges (up to 64 each side), its participations (up to 33 kinds) and
-//! resources, each O(log n): about 2,000 x (22 + 128 + 66) = 4.3e5 comparisons. Adding nodes
+//! key-indexed graphs already in memory; per node shared by base and journey, 24 field
+//! comparisons (a checklist is one, a list of at most 50), its edges (up to 64 each side), its participations (up to 33 kinds) and
+//! resources, each O(log n): about 2,000 x (24 + 128 + 66) = 4.4e5 comparisons. A last pass prunes each ticked node's
+//! ticks against its merged checklist, a set lookup per tick. Adding nodes
 //! builds one tree of the target, O(n log n). Role and kind references scan the merged nodes
 //! once per removed role or kind: at most 64 x 2,000. Memory: one clone of the journey graph
 //! (at most 16 MiB serialized) plus the lists.
@@ -75,6 +76,7 @@ pub(crate) fn merge(base: &Document, target: &Document, journey: &Document) -> M
     merger.default_owner();
     merger.roles();
     merger.kinds();
+    merger.prune_ticks();
     assert!(
         merger.found.merged.nodes.len() >= journey.nodes.len(),
         "a merge removes no node"
@@ -114,6 +116,28 @@ impl Merger<'_> {
                 state.remove(key);
             }
         }
+    }
+
+    // PRD: G5.
+    /// A tick and a bypass failure go with their item: the merged state keeps only the
+    /// ticks and the bypass failures for items the merged checklists still have.
+    fn prune_ticks(&mut self) {
+        let merged = &mut self.found.merged;
+        for (key, overrides) in &mut merged.state.overrides {
+            let checklist = merged
+                .nodes
+                .get(key)
+                .and_then(|node| node.payload.checklist());
+            crate::edit::prune_bypass(overrides, checklist);
+        }
+        merged.state.ticks.retain(|key, items| {
+            let checklist = merged
+                .nodes
+                .get(key)
+                .and_then(|node| node.payload.checklist());
+            items.retain(|item| checklist.is_some_and(|checklist| checklist.contains(item)));
+            !items.is_empty()
+        });
     }
 
     fn put(&mut self, node: Node<KeyRefs>) {
@@ -241,8 +265,10 @@ impl Merger<'_> {
     ) {
         let state = self.journey.state.nodes.get(&held.key);
         let answered = self.journey.state.answers.contains_key(&held.key);
-        let fresh =
-            state.is_none_or(|state| *state == NodeState::initial(held.kind(), state.provenance));
+        // A node holding ticks is not as copied: taking the route's shape would drop them.
+        let fresh = state
+            .is_none_or(|state| *state == NodeState::initial(held.kind(), state.provenance))
+            && !self.journey.state.ticks.contains_key(&held.key);
         let whole = !node_dangles(target, present);
         if markers.is_empty() && fresh && !answered && whole {
             if let Some(state) = state.filter(|_| held.kind() != target.kind()) {
@@ -619,6 +645,8 @@ fn named(value: &NodeFieldValue<KeyRefs>) -> Vec<&NodeKey> {
         | NodeFieldValue::Placeholder(_)
         | NodeFieldValue::RequiresArtifact(_)
         | NodeFieldValue::RequiresNote(_)
+        | NodeFieldValue::Checklist(_)
+        | NodeFieldValue::RequiresChecklist(_)
         | NodeFieldValue::Final(_)
         | NodeFieldValue::AutoDone(_)
         | NodeFieldValue::Gates(_)
@@ -694,6 +722,8 @@ fn cleared(field: NodeField) -> Option<NodeFieldValue<KeyRefs>> {
         | NodeField::Placeholder
         | NodeField::RequiresArtifact
         | NodeField::RequiresNote
+        | NodeField::Checklist
+        | NodeField::RequiresChecklist
         | NodeField::Final
         | NodeField::AutoDone
         | NodeField::Gates

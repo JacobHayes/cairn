@@ -11,8 +11,8 @@ use super::{
 use crate::collections::OneOrMany;
 use crate::field::{NodeField, NodeFieldValue};
 use crate::node::{
-    Action, AnswerSpec, Choice, Choices, DateRule, DateSource, Decision, Deliverable, Direction,
-    Group, Milestone, Node, ParticipationSource, Participations, Payload,
+    Action, AnswerSpec, Checklist, ChecklistItem, Choice, Choices, DateRule, DateSource, Decision,
+    Deliverable, Direction, Group, Milestone, Node, ParticipationSource, Participations, Payload,
 };
 
 /// A date rule.
@@ -52,6 +52,24 @@ pub(crate) fn arb_choices() -> impl Strategy<Value = Choices> {
     )
 }
 
+/// A checklist of up to three items, ids distinct.
+pub(crate) fn arb_checklist() -> impl Strategy<Value = Checklist> {
+    prop::collection::btree_map(arb_slug(), arb_title(), 0..4).prop_map(|items| {
+        let list = items
+            .into_iter()
+            .map(|(id, title)| ChecklistItem { id, title })
+            .collect();
+        match Checklist::try_from(bounded_vec::<
+            ChecklistItem,
+            crate::collections::ChecklistItemCountPerNode,
+        >(list))
+        {
+            Ok(checklist) => checklist,
+            Err(error) => panic!("strategy produced a bad checklist: {error}"),
+        }
+    })
+}
+
 fn arb_answer_spec<R: ArbRefs>() -> impl Strategy<Value = AnswerSpec<R>> {
     prop_oneof![
         Just(AnswerSpec::Boolean),
@@ -67,6 +85,57 @@ fn arb_answer_spec<R: ArbRefs>() -> impl Strategy<Value = AnswerSpec<R>> {
     ]
 }
 
+/// A deliverable's own fields.
+fn arb_deliverable() -> impl Strategy<Value = Deliverable> {
+    (
+        prop::option::of(arb_days()),
+        any::<bool>(),
+        any::<bool>(),
+        any::<bool>(),
+        arb_checklist(),
+        any::<bool>(),
+    )
+        .prop_map(
+            |(
+                estimate,
+                placeholder,
+                requires_artifact,
+                requires_note,
+                checklist,
+                requires_checklist,
+            )| {
+                Deliverable {
+                    estimate,
+                    placeholder,
+                    requires_artifact,
+                    requires_note,
+                    checklist,
+                    requires_checklist,
+                }
+            },
+        )
+}
+
+/// An action's own fields.
+fn arb_action() -> impl Strategy<Value = Action> {
+    (
+        prop::option::of(arb_days()),
+        any::<bool>(),
+        any::<bool>(),
+        arb_checklist(),
+        any::<bool>(),
+    )
+        .prop_map(
+            |(estimate, placeholder, requires_note, checklist, requires_checklist)| Action {
+                estimate,
+                placeholder,
+                requires_note,
+                checklist,
+                requires_checklist,
+            },
+        )
+}
+
 /// A node's kind-specific payload.
 pub fn arb_payload<R: ArbRefs>() -> impl Strategy<Value = Payload<R>> {
     prop_oneof![
@@ -80,31 +149,8 @@ pub fn arb_payload<R: ArbRefs>() -> impl Strategy<Value = Payload<R>> {
                 help,
                 answer
             })),
-        (
-            prop::option::of(arb_days()),
-            any::<bool>(),
-            any::<bool>(),
-            any::<bool>()
-        )
-            .prop_map(
-                |(estimate, placeholder, requires_artifact, requires_note)| {
-                    Payload::Deliverable(Deliverable {
-                        estimate,
-                        placeholder,
-                        requires_artifact,
-                        requires_note,
-                    })
-                }
-            ),
-        (prop::option::of(arb_days()), any::<bool>(), any::<bool>()).prop_map(
-            |(estimate, placeholder, requires_note)| {
-                Payload::Action(Action {
-                    estimate,
-                    placeholder,
-                    requires_note,
-                })
-            }
-        ),
+        arb_deliverable().prop_map(Payload::Deliverable),
+        arb_action().prop_map(Payload::Action),
         (any::<bool>(), any::<bool>()).prop_map(|(is_final, auto_done)| Payload::Milestone(
             Milestone {
                 is_final,
@@ -209,6 +255,8 @@ pub fn arb_node_field_value<R: ArbRefs>() -> impl Strategy<Value = NodeFieldValu
         any::<bool>().prop_map(NodeFieldValue::Placeholder),
         any::<bool>().prop_map(NodeFieldValue::RequiresArtifact),
         any::<bool>().prop_map(NodeFieldValue::RequiresNote),
+        arb_checklist().prop_map(NodeFieldValue::Checklist),
+        any::<bool>().prop_map(NodeFieldValue::RequiresChecklist),
         any::<bool>().prop_map(NodeFieldValue::Final),
         any::<bool>().prop_map(NodeFieldValue::AutoDone),
         optional_node().prop_map(NodeFieldValue::OpensAt),

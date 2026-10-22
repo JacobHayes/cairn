@@ -139,7 +139,7 @@ const LINE_FIELDS = ["id", "title"] as const;
 /** Markdown, which keeps its line breaks: a textarea. */
 const MARKDOWN_FIELDS = ["description", "prompt", "help"] as const;
 const NUMBER_FIELDS = ["weight", "estimate"] as const;
-const FLAG_FIELDS = ["placeholder", "requires_artifact", "requires_note", "final", "auto_done", "gates", "closes"] as const;
+const FLAG_FIELDS = ["placeholder", "requires_artifact", "requires_note", "requires_checklist", "final", "auto_done", "gates", "closes"] as const;
 const MILESTONE_FIELDS = ["opens_at", "closes_at", "feeds_milestone"] as const satisfies readonly ReferenceField[];
 const includes = <T extends string>(list: readonly T[], field: string): field is T => (list as readonly string[]).includes(field);
 

@@ -54,6 +54,11 @@ describe("graphDiff (C14)", () => {
     });
   });
 
+  it("lists a node whose only difference is a tick as a change of its state", () => {
+    const ticked = (items: string[]): Graph => ({ ...before, state: { ...before.state, ticks: items.length === 0 ? {} : { n_a: items } } });
+    expect(graphDiff(ticked([]), ticked(["load"])).changed).toEqual({ n_a: ["state"] });
+  });
+
   it("is empty between a graph and itself", () => {
     const diff = graphDiff(before, before);
     expect([diff.added, diff.removed, diff.edgesAdded, diff.edgesRemoved, Object.keys(diff.changed)]).toEqual([[], [], [], [], []]);

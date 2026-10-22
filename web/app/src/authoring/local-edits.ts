@@ -41,7 +41,8 @@ export function editWords(edit: LocalEdit, tree: Tree): string {
 
 /** The route node's value of `field`, as `set_node_field` writes it: a flag it leaves out reads as the engine's default (A1a). */
 export function routeValue(route: GraphNode, field: NodeField): Schema<"NodeFieldValueResolved"> {
-  const value = (route as Record<string, unknown>)[field] ?? (FLAG_DEFAULTS as Partial<Record<string, boolean>>)[field] ?? null;
+  const empty = field === "checklist" ? [] : null;
+  const value = (route as Record<string, unknown>)[field] ?? (FLAG_DEFAULTS as Partial<Record<string, boolean>>)[field] ?? empty;
   return { [field]: value } as Schema<"NodeFieldValueResolved">;
 }
 

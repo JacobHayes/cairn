@@ -41,6 +41,8 @@ export interface NodeDraft {
   estimate: string;
   requires_artifact: boolean;
   requires_note: boolean;
+  requires_checklist: boolean;
+  checklist: Schema<"ChecklistItem">[];
   placeholder: boolean;
   final: boolean;
   auto_done: boolean;
@@ -69,6 +71,8 @@ export function draftOf(node: GraphNode): NodeDraft {
     estimate: node.estimate === undefined ? "" : String(node.estimate),
     requires_artifact: node.requires_artifact ?? FLAG_DEFAULTS.requires_artifact,
     requires_note: node.requires_note ?? FLAG_DEFAULTS.requires_note,
+    requires_checklist: node.requires_checklist ?? FLAG_DEFAULTS.requires_checklist,
+    checklist: node.checklist ?? [],
     placeholder: node.placeholder ?? FLAG_DEFAULTS.placeholder,
     final: node.final ?? FLAG_DEFAULTS.final,
     auto_done: node.auto_done ?? FLAG_DEFAULTS.auto_done,
@@ -107,6 +111,8 @@ export function valueOf(field: NodeField, draft: NodeDraft): Schema<"NodeFieldVa
     placeholder: draft.placeholder,
     requires_artifact: draft.requires_artifact,
     requires_note: draft.requires_note,
+    requires_checklist: draft.requires_checklist,
+    checklist: draft.checklist,
     final: draft.final,
     auto_done: draft.auto_done,
     opens_at: key(draft.opens_at),

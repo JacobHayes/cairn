@@ -11,9 +11,9 @@ use std::collections::{BTreeMap, BTreeSet};
 
 use cairn_schema::{
     Action, Annotation, AnnotationBody, AnnotationContent, AnswerSpec, AnswerType, AnswerValue,
-    BoundedSet, Bypass, Choices, Date, Days, Decision, Deliverable, Domain, Graph, Group, Guard,
-    GuardFailure, Identity, Insertion, JourneyHeader, JourneyState, JourneyStatus, Keyed, Lineage,
-    LocalEdit, Milestone, Node, NodeField, NodeKey, NodeKind, NodeState, Overrides,
+    BoundedSet, Bypass, Checklist, Choices, Date, Days, Decision, Deliverable, Domain, Graph,
+    Group, Guard, GuardFailure, Identity, Insertion, JourneyHeader, JourneyState, JourneyStatus,
+    Keyed, Lineage, LocalEdit, Milestone, Node, NodeField, NodeKey, NodeKind, NodeState, Overrides,
     ParticipationKind, ParticipationSource, Participations, Payload, Proposal, ProposalDraft,
     ProposalStatus, Provenance, Resource, ResourceContent, RetiredKeys, Role, RouteHeader,
     RouteKind, SnoozeTarget, State, Weight, refs::KeyRefs,
@@ -195,7 +195,8 @@ pub fn bypass() -> Bypass {
     let guards = chain(Guard::DepsDone, |guard| match guard {
         Guard::DepsDone => Some(Guard::HasArtifact),
         Guard::HasArtifact => Some(Guard::HasNote),
-        Guard::HasNote => Some(Guard::BrokenDown),
+        Guard::HasNote => Some(Guard::AllTicked),
+        Guard::AllTicked => Some(Guard::BrokenDown),
         Guard::BrokenDown => Some(Guard::DateArrived),
         Guard::DateArrived => None,
     });
@@ -204,7 +205,8 @@ pub fn bypass() -> Bypass {
         |failure| match failure {
             GuardFailure::OpenDependency(_) => Some(GuardFailure::MissingArtifact),
             GuardFailure::MissingArtifact => Some(GuardFailure::MissingNote),
-            GuardFailure::MissingNote => Some(GuardFailure::NotBrokenDown),
+            GuardFailure::MissingNote => Some(GuardFailure::Unticked(id("load"))),
+            GuardFailure::Unticked(_) => Some(GuardFailure::NotBrokenDown),
             GuardFailure::NotBrokenDown => Some(GuardFailure::TooEarly(day(2))),
             GuardFailure::TooEarly(_) => None,
         },
@@ -247,6 +249,19 @@ pub fn message_authors() -> Vec<MessageAuthor> {
     })
 }
 
+/// A checklist of two items, or none when cleared.
+fn checklist(fill: Fill) -> Checklist {
+    if fill.on() {
+        serde_json::from_value(json!([
+            {"id": "load", "title": "Load test"},
+            {"id": "rollback", "title": "Rollback plan"},
+        ]))
+        .unwrap()
+    } else {
+        Checklist::default()
+    }
+}
+
 /// A decision of each answer type, then a node of each other kind.
 fn payloads(fill: Fill) -> Vec<Payload<KeyRefs>> {
     let choices: Choices =
@@ -283,11 +298,15 @@ fn payloads(fill: Fill) -> Vec<Payload<KeyRefs>> {
                 placeholder: fill.on(),
                 requires_artifact: fill.on(),
                 requires_note: fill.on(),
+                checklist: checklist(fill),
+                requires_checklist: fill.on(),
             })),
             NodeKind::Action => payloads.push(Payload::Action(Action {
                 estimate: fill.some(Days::try_from(2).unwrap()),
                 placeholder: fill.on(),
                 requires_note: fill.on(),
+                checklist: checklist(fill),
+                requires_checklist: fill.on(),
             })),
             NodeKind::Milestone => payloads.push(Payload::Milestone(Milestone {
                 is_final: fill.on(),
@@ -464,6 +483,9 @@ pub fn state(fill: Fill) -> JourneyState {
     JourneyState {
         nodes: nodes.collect(),
         local_edits: BTreeMap::from([(node_key(0), local_edits())]),
+        // A tick is a record of its own, so a put over the graph leaves it as it is, like a
+        // local edit; the removal at the end of the conformance run takes it by key.
+        ticks: BTreeMap::from([(node_key(0), BTreeSet::from([id("load"), id("rollback")]))]),
         answers: by_node(fill.rotate(answer_values())),
         // Cleared drops every rationale: an overwrite must clear the stored column.
         rationales: if fill.on() {

@@ -10,7 +10,7 @@ use std::collections::BTreeSet;
 use cairn_schema::{Cursor, IdentityKey, KindKey, NodeKey, NodeRow, Real, SortBy};
 
 use super::DerivedJourney;
-use crate::derive::Ranking;
+use crate::derive::{Ranking, checklist_count};
 
 impl DerivedJourney<'_> {
     /// The node's row (C9, C10), its unlocks and rank from `ranking`: the global one, or a
@@ -47,6 +47,7 @@ impl DerivedJourney<'_> {
             snoozed_via: blocking.snoozed_via(key).cloned(),
             overdue: dates.overdue(key),
             stale: derived.is_stale(key),
+            checklist_count: checklist_count(self.graph.document(), node),
             needs_breakdown: blocking.needs_breakdown(key),
             shortfall_days: dates.shortfall_days(key),
             slack_days: dates.slack_days(key),

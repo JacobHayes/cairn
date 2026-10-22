@@ -13,7 +13,7 @@ use crate::field::{NodeField, NodeFieldValue};
 use crate::graph::{Edge, Insertion, ParticipationKind, Role};
 use crate::id::{
     AttachmentKey, IdentityKey, InsertionKey, JourneyId, KindKey, NodeKey, ProposalId, RoleKey,
-    RouteId,
+    RouteId, Slug,
 };
 use crate::node::{IdentitySet, Node, ParticipationSource};
 use crate::number::VersionNumber;
@@ -95,6 +95,14 @@ pub enum GraphRecord {
         node: NodeKey,
         /// The marker.
         edit: LocalEdit,
+    },
+    // PRD: G5.
+    /// A ticked checklist item.
+    Tick {
+        /// The node.
+        node: NodeKey,
+        /// The item's id.
+        item: Slug,
     },
     // PRD: B2.
     /// An answer, with the rationale it was given with.
@@ -246,6 +254,13 @@ pub enum GraphKey {
         /// The marker.
         edit: LocalEdit,
     },
+    /// A ticked checklist item.
+    Tick {
+        /// The node.
+        node: NodeKey,
+        /// The item's id.
+        item: Slug,
+    },
     /// An answer.
     Answer(NodeKey),
     /// A direct role fill.
@@ -355,6 +370,10 @@ impl GraphRecord {
                 node: node.clone(),
                 edit: edit.clone(),
             },
+            GraphRecord::Tick { node, item } => GraphKey::Tick {
+                node: node.clone(),
+                item: item.clone(),
+            },
             GraphRecord::Answer { decision, .. } => GraphKey::Answer(decision.clone()),
             GraphRecord::RoleFill { role, .. } => GraphKey::RoleFill(role.clone()),
             GraphRecord::Pin { node, .. } => GraphKey::Pin(node.clone()),
@@ -382,6 +401,7 @@ impl GraphKey {
             | GraphKey::Resource { node, .. }
             | GraphKey::NodeState(node)
             | GraphKey::LocalEdit { node, .. }
+            | GraphKey::Tick { node, .. }
             | GraphKey::Answer(node)
             | GraphKey::Pin(node)
             | GraphKey::Snooze(node)
@@ -402,15 +422,29 @@ impl GraphKey {
     }
 
     /// Whether two addresses in one graph can name a common record: equal, the same
-    /// annotation however addressed, or a whole node and something on it (an edge is on
-    /// both its ends).
+    /// annotation however addressed, a whole node and something on it (an edge is on both
+    /// its ends), or a tick and its node's `checklist` field (an edit of the list can drop
+    /// or reuse the item the tick names, so neither is applied past the other).
     #[must_use]
     pub fn overlaps(&self, other: &GraphKey) -> bool {
         let same_annotation = matches!(
             (self, other),
             (GraphKey::Annotation { annotation: first, .. }, GraphKey::Annotation { annotation: second, .. }) if first == second
         );
-        self == other || same_annotation || self.contains(other) || other.contains(self)
+        self == other
+            || same_annotation
+            || self.contains(other)
+            || other.contains(self)
+            || self.is_tick_of_checklist(other)
+            || other.is_tick_of_checklist(self)
+    }
+
+    /// Whether this is a tick and `other` is the checklist field of its node.
+    fn is_tick_of_checklist(&self, other: &GraphKey) -> bool {
+        matches!((self, other), (
+            GraphKey::Tick { node, .. },
+            GraphKey::NodeField { node: field_node, field: NodeField::Checklist },
+        ) if node == field_node)
     }
 
     fn contains(&self, other: &GraphKey) -> bool {

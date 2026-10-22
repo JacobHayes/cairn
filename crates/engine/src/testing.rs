@@ -131,6 +131,22 @@ pub enum Op {
         /// The node, by index.
         node: u16,
     },
+    /// Tick or untick item `item` (from 0, wrapping) of node `node`'s checklist.
+    Tick {
+        /// The node, by index.
+        node: u16,
+        /// The item, by position.
+        item: u8,
+        /// Ticked or not.
+        ticked: bool,
+    },
+    /// Give node `node` a checklist of `count` items (wrapping at 4), replacing its list.
+    Checklist {
+        /// The node, by index.
+        node: u16,
+        /// How many items.
+        count: u8,
+    },
     /// Move node `node` under node `parent`.
     Move {
         /// The node, by index.
@@ -163,6 +179,8 @@ pub fn arb_ops() -> impl Strategy<Value = Op> {
         1 => (any::<u16>(), 0..30_u8).prop_map(|(node, day)| Op::Pin { node, day }),
         1 => (any::<u16>(), any::<u16>()).prop_map(|(node, until)| Op::Snooze { node, until }),
         1 => any::<u16>().prop_map(|node| Op::Artifact { node }),
+        1 => (any::<u16>(), any::<u8>(), any::<bool>()).prop_map(|(node, item, ticked)| Op::Tick { node, item, ticked }),
+        1 => (any::<u16>(), any::<u8>()).prop_map(|(node, count)| Op::Checklist { node, count }),
         1 => any::<u16>().prop_map(|node| Op::Remove { node }),
     ]
 }
@@ -302,6 +320,8 @@ impl Op {
                 | Op::Pin { .. }
                 | Op::Snooze { .. }
                 | Op::Artifact { .. }
+                | Op::Tick { .. }
+                | Op::Checklist { .. }
                 | Op::Move { .. }
                 | Op::Remove { .. },
                 None,
@@ -330,6 +350,12 @@ impl Op {
                 "op: add_annotation\nannotation: {{key: a_g{fresh}, node: {}, artifact: \"https://example.org/{fresh}\"}}\n",
                 key_text(pick(*node))
             )),
+            (Op::Tick { node, item, ticked }, Some(_)) => tick(graph, pick(*node), *item, *ticked),
+            (Op::Checklist { node, count }, Some(_)) => yaml(&format!(
+                "op: set_node_field\nnode: {}\nvalue: {{checklist: {}}}\n",
+                key_text(pick(*node)),
+                checklist_text(*count)
+            )),
             (Op::Move { node, parent }, Some(_)) => yaml(&format!(
                 "op: set_node_field\nnode: {}\nvalue: {{parent: {}}}\n",
                 key_text(pick(*node)),
@@ -340,12 +366,36 @@ impl Op {
     }
 }
 
+/// Ticks or unticks one of the node's checklist items, picked by `item`; `i0` when it has none.
+fn tick(graph: &cairn_schema::Graph, node: Option<&NodeKey>, item: u8, ticked: bool) -> Mutation {
+    let items: Vec<String> = node
+        .and_then(|key| graph.nodes.get(key))
+        .and_then(|found| found.payload.checklist())
+        .map(|list| list.ids().map(ToString::to_string).collect())
+        .unwrap_or_default();
+    let id = items
+        .get(usize::from(item) % items.len().max(1))
+        .map_or("i0", String::as_str);
+    let key = key_text(node);
+    yaml(&format!(
+        "op: set_ticked\nnode: {key}\nitem: {id}\nticked: {ticked}\n"
+    ))
+}
+
 fn yaml(text: &str) -> Mutation {
     from_yaml(text).unwrap_or_else(|error| panic!("{error}\n{text}"))
 }
 
 fn key_text(key: Option<&NodeKey>) -> &str {
     key.map_or("n_missing", NodeKey::as_str)
+}
+
+/// A checklist of `count % 4` items, `i0` upward, as flow YAML.
+fn checklist_text(count: u8) -> String {
+    let items: Vec<String> = (0..count % 4)
+        .map(|index| format!("{{id: i{index}, title: Item {index}}}"))
+        .collect();
+    format!("[{}]", items.join(", "))
 }
 
 fn add_child(
@@ -364,8 +414,16 @@ fn add_child(
         .map(|parent| format!("\n  parent: {parent}"))
         .unwrap_or_default();
     let decision = match kind {
-        NodeKind::Decision => "\n  prompt: Yes?\n  answer_type: boolean",
-        NodeKind::Deliverable | NodeKind::Action | NodeKind::Milestone | NodeKind::Group => "",
+        NodeKind::Decision => "\n  prompt: Yes?\n  answer_type: boolean".to_owned(),
+        // G5: some work carries a checklist, and some of it requires the checklist.
+        NodeKind::Deliverable | NodeKind::Action if fresh.is_multiple_of(3) => format!(
+            "\n  checklist: {}\n  requires_checklist: {}",
+            checklist_text(u8::try_from(fresh % 4 + 1).unwrap_or(1)),
+            fresh.is_multiple_of(2)
+        ),
+        NodeKind::Deliverable | NodeKind::Action | NodeKind::Milestone | NodeKind::Group => {
+            String::new()
+        }
     };
     yaml(&format!(
         "op: add_node\nnode:\n  key: n_g{fresh}\n  id: g{fresh}\n  kind: {}\n  title: Generated {fresh}{parent}{decision}\n",

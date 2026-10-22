@@ -1,6 +1,7 @@
-//! Transition guards that need no derived state (D4, A16, G2, G4, B10): a completed deliverable
+//! Transition guards that need no derived state (D4, A16, G2, G4, G5, B10): a completed deliverable
 //! that requires an artifact has an artifact link, a completed deliverable or action that
-//! requires a note has a note of its own, and a completed placeholder has children or is
+//! requires a note has a note of its own, one that requires its checklist has every item
+//! ticked, and a completed placeholder has children or is
 //! atomic, each on the graph the patch produces, so a guard is never satisfied only for
 //! a moment. A guard bypass applied in the same patch accepts the failures of the guards it
 //! names, and those specific failures are recorded on it; a bypass covers a guarded
@@ -9,7 +10,7 @@
 
 use std::collections::BTreeSet;
 
-use cairn_schema::ViolationCode;
+use cairn_schema::{GuardFailure, ViolationCode};
 
 use super::Check;
 use crate::derive::stale::{annotated_nodes, static_failures};
@@ -48,15 +49,23 @@ pub(super) fn check(check: &mut Check<'_, '_>) {
                     .insert(failure);
                 continue;
             }
-            let mut found = at_node(
-                &tree,
-                key,
-                ViolationCode::GuardFailed,
-                format!(
+            let message = match &failure {
+                GuardFailure::Unticked(item) => {
+                    let title = node
+                        .payload
+                        .checklist()
+                        .and_then(|checklist| checklist.title(item))
+                        .map_or_else(|| item.to_string(), ToString::to_string);
+                    format!(
+                        "completing this node needs its checklist item \"{title}\" ticked; tick it in the same patch, or bypass it with a reason to complete anyway"
+                    )
+                }
+                _ => format!(
                     "completing this node fails {:?}; bypass it with a reason to complete anyway",
                     failure.guard()
                 ),
-            );
+            };
+            let mut found = at_node(&tree, key, ViolationCode::GuardFailed, message);
             found.at.mutation = Some(*ordinal);
             found.bypassable = Some(failure.guard());
             found.failures.insert(failure);

@@ -286,6 +286,9 @@ pub enum Guard {
     // PRD: G4.
     /// A `requires_note` deliverable or action has a note of its own.
     HasNote,
+    // PRD: G5.
+    /// A `requires_checklist` deliverable or action has every checklist item ticked.
+    AllTicked,
     /// A placeholder has children or is atomic.
     BrokenDown,
     // PRD: A8, D4.
@@ -308,6 +311,9 @@ pub enum GuardFailure {
     // PRD: G4.
     /// No note on a `requires_note` deliverable or action.
     MissingNote,
+    // PRD: G5.
+    /// A checklist item not ticked, on a `requires_checklist` deliverable or action.
+    Unticked(Slug),
     /// A placeholder with no children that is not atomic.
     NotBrokenDown,
     // PRD: A8, D4.
@@ -324,6 +330,7 @@ impl GuardFailure {
             GuardFailure::OpenDependency(_) => Guard::DepsDone,
             GuardFailure::MissingArtifact => Guard::HasArtifact,
             GuardFailure::MissingNote => Guard::HasNote,
+            GuardFailure::Unticked(_) => Guard::AllTicked,
             GuardFailure::NotBrokenDown => Guard::BrokenDown,
             GuardFailure::TooEarly(_) => Guard::DateArrived,
         }
@@ -408,6 +415,17 @@ pub struct JourneyState {
     )]
     #[schemars(extend("maxProperties" = crate::limits::NODE_COUNT_MAX))]
     pub local_edits: BTreeMap<NodeKey, BTreeSet<LocalEdit>>,
+    // PRD: G5.
+    /// Each node's ticked checklist items. Each tick is its own record, kept apart from the
+    /// node's state so that ticking two items, or ticking and a transition, touch different
+    /// records. A node with no ticks has no entry.
+    #[serde(
+        default,
+        skip_serializing_if = "BTreeMap::is_empty",
+        deserialize_with = "crate::serde_util::unique_map_per_node"
+    )]
+    #[schemars(extend("maxProperties" = crate::limits::NODE_COUNT_MAX))]
+    pub ticks: BTreeMap<NodeKey, BTreeSet<Slug>>,
     /// Answers by decision.
     #[serde(
         default,
@@ -525,6 +543,7 @@ impl JourneyState {
     pub fn is_empty(&self) -> bool {
         self.nodes.is_empty()
             && self.local_edits.is_empty()
+            && self.ticks.is_empty()
             && self.answers.is_empty()
             && self.rationales.is_empty()
             && self.role_fills.is_empty()

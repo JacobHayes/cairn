@@ -24,6 +24,8 @@ const SAMPLE: Record<NodeField, unknown> = {
   placeholder: false,
   requires_artifact: false,
   requires_note: false,
+  checklist: [],
+  requires_checklist: false,
   final: false,
   auto_done: false,
   opens_at: null,

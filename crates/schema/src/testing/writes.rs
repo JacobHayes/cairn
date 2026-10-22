@@ -287,6 +287,8 @@ fn arb_state_mutation() -> BoxedStrategy<Mutation> {
             .prop_map(|(node, kind)| Mutation::RemoveOverride { node, kind }),
         (arb_node_key(), any::<bool>())
             .prop_map(|(node, atomic)| Mutation::SetAtomic { node, atomic }),
+        (arb_node_key(), arb_slug(), any::<bool>())
+            .prop_map(|(node, item, ticked)| Mutation::SetTicked { node, item, ticked }),
         arb_annotation_body().prop_map(|annotation| Mutation::AddAnnotation { annotation }),
         arb_annotation_body().prop_map(|annotation| Mutation::EditAnnotation { annotation }),
         arb_attachment_key().prop_map(|annotation| Mutation::RemoveAnnotation { annotation }),
@@ -705,6 +707,7 @@ fn arb_state_record() -> BoxedStrategy<GraphRecord> {
             .prop_map(|(node, state)| GraphRecord::NodeState { node, state }),
         (arb_node_key(), arb_local_edit())
             .prop_map(|(node, edit)| GraphRecord::LocalEdit { node, edit }),
+        (arb_node_key(), arb_slug()).prop_map(|(node, item)| GraphRecord::Tick { node, item }),
         (
             arb_node_key(),
             arb_answer_value(),

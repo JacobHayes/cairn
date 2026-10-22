@@ -23,6 +23,8 @@ pub const ROLE_COUNT_MAX: u32 = 32;
 pub const KIND_COUNT_MAX: u32 = 32;
 /// Choices per decision.
 pub const CHOICE_COUNT_PER_DECISION_MAX: u32 = 32;
+/// Checklist items per node: a list someone ticks through in one sitting.
+pub const CHECKLIST_ITEM_COUNT_PER_NODE_MAX: u32 = 50;
 /// Identities per role fill or identity-list answer.
 pub const IDENTITY_COUNT_PER_FILL_MAX: u32 = 100;
 /// Condition tree depth: a lone clause is depth 1.
@@ -111,6 +113,8 @@ pub enum Limit {
     KindCount,
     /// [`CHOICE_COUNT_PER_DECISION_MAX`].
     ChoiceCountPerDecision,
+    /// [`CHECKLIST_ITEM_COUNT_PER_NODE_MAX`].
+    ChecklistItemCountPerNode,
     /// [`IDENTITY_COUNT_PER_FILL_MAX`].
     IdentityCountPerFill,
     /// [`CONDITION_DEPTH_MAX`].
@@ -159,7 +163,7 @@ pub enum Limit {
 
 impl Limit {
     /// Every limit, for tests that walk them all.
-    pub const ALL: [Limit; 29] = [
+    pub const ALL: [Limit; 30] = [
         Limit::NodeCount,
         Limit::ContainmentDepth,
         Limit::EdgeCountPerNode,
@@ -167,6 +171,7 @@ impl Limit {
         Limit::RoleCount,
         Limit::KindCount,
         Limit::ChoiceCountPerDecision,
+        Limit::ChecklistItemCountPerNode,
         Limit::IdentityCountPerFill,
         Limit::ConditionDepth,
         Limit::ConditionClauseCount,
@@ -202,6 +207,7 @@ impl Limit {
             Limit::RoleCount => ROLE_COUNT_MAX,
             Limit::KindCount => KIND_COUNT_MAX,
             Limit::ChoiceCountPerDecision => CHOICE_COUNT_PER_DECISION_MAX,
+            Limit::ChecklistItemCountPerNode => CHECKLIST_ITEM_COUNT_PER_NODE_MAX,
             Limit::IdentityCountPerFill => IDENTITY_COUNT_PER_FILL_MAX,
             Limit::ConditionDepth => CONDITION_DEPTH_MAX,
             Limit::ConditionClauseCount => CONDITION_CLAUSE_COUNT_MAX,
@@ -238,6 +244,7 @@ impl Limit {
             Limit::RoleCount => "role_count_max",
             Limit::KindCount => "kind_count_max",
             Limit::ChoiceCountPerDecision => "choice_count_per_decision_max",
+            Limit::ChecklistItemCountPerNode => "checklist_item_count_per_node_max",
             Limit::IdentityCountPerFill => "identity_count_per_fill_max",
             Limit::ConditionDepth => "condition_depth_max",
             Limit::ConditionClauseCount => "condition_clause_count_max",

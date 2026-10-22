@@ -32,6 +32,7 @@ pub(super) fn check(check: &GraphCheck<'_>, out: &mut Vec<Violation>) {
     role_fills(check, out);
     pins_and_snoozes(check, out);
     attached_records(check, out);
+    ticks(check, out);
     annotation_counts(check, out);
 }
 
@@ -255,6 +256,29 @@ fn attached_records(check: &GraphCheck<'_>, out: &mut Vec<Violation>) {
     for key in keys.chain(notes) {
         if document.nodes.get(key).is_none() {
             out.push(state_without_node(check, key));
+        }
+    }
+}
+
+/// G5: every tick names an item of its node's checklist. A backstop: the mutations that
+/// change a checklist remove the ticks of the items it drops in the same write.
+fn ticks(check: &GraphCheck<'_>, out: &mut Vec<Violation>) {
+    let document = check.document;
+    for (key, items) in &document.state.ticks {
+        let Some(node) = document.nodes.get(key) else {
+            out.push(state_without_node(check, key));
+            continue;
+        };
+        let checklist = node.payload.checklist();
+        for item in items {
+            if !checklist.is_some_and(|checklist| checklist.contains(item)) {
+                out.push(at_node(
+                    check.tree,
+                    key,
+                    ViolationCode::StateNotOnKind,
+                    format!("tick \"{item}\" names no item of the node's checklist"),
+                ));
+            }
         }
     }
 }

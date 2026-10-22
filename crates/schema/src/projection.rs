@@ -11,8 +11,8 @@ use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
 use crate::derived::{
-    Blocker, Contribution, DateOrigin, DisplayState, EffectiveDate, HeldDependent, Progress, Real,
-    Relevance, Score, Stalled,
+    Blocker, ChecklistCount, Contribution, DateOrigin, DisplayState, EffectiveDate, HeldDependent,
+    Progress, Real, Relevance, Score, Stalled,
 };
 use crate::domain::JourneyStatus;
 use crate::event::Event;
@@ -686,6 +686,10 @@ pub struct NodeRow {
     /// A terminal node whose completing guards would now fail.
     #[serde(default, skip_serializing_if = "crate::serde_util::is_false")]
     pub stale: bool,
+    // PRD: D3, G5.
+    /// How many checklist items are ticked; none for a node with no items.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub checklist_count: Option<ChecklistCount>,
     // PRD: B10.
     /// Whether it is a placeholder that still needs to be broken down into children.
     #[serde(default, skip_serializing_if = "crate::serde_util::is_false")]

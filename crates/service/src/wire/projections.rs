@@ -88,6 +88,10 @@ pub struct NodeDetail {
     /// What the journey edited on it, for a route-copied node.
     #[serde(default, skip_serializing_if = "BTreeSet::is_empty")]
     pub local_edits: BTreeSet<LocalEdit>,
+    // PRD: G5.
+    /// The checklist items ticked.
+    #[serde(default, skip_serializing_if = "BTreeSet::is_empty")]
+    pub ticks: BTreeSet<cairn_schema::Slug>,
     /// A decision's answer, as recorded.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub answer: Option<AnswerValue>,
@@ -148,6 +152,7 @@ impl From<crate::NodeDetail> for NodeDetail {
             children,
             record,
             local_edits,
+            ticks,
             answer,
             rationale,
             pin,
@@ -180,6 +185,7 @@ impl From<crate::NodeDetail> for NodeDetail {
             children: children.collect(),
             record,
             local_edits,
+            ticks,
             answer,
             rationale,
             pin,

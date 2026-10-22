@@ -148,7 +148,7 @@ function fieldsDiffering(before: GraphNode, after: GraphNode): string[] {
 }
 
 /** The journey state kept per node, which a proposal's pins, answers, transitions and snoozes change without touching the node's definition. */
-const STATE_FIELDS = ["nodes", "answers", "rationales", "overrides", "pins", "snoozes"] as const;
+const STATE_FIELDS = ["nodes", "answers", "rationales", "overrides", "pins", "snoozes", "ticks"] as const;
 
 /** What a journey's graph holds of node `key` in its state, as one comparable text; none for a graph with no state. */
 export function stateOf(graph: Graph | null | undefined, key: string): Record<string, unknown> {

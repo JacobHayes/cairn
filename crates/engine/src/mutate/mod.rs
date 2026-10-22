@@ -120,6 +120,7 @@ fn scope(mutation: &Mutation) -> Scope {
         | Mutation::ApplyOverride { .. }
         | Mutation::RemoveOverride { .. }
         | Mutation::SetAtomic { .. }
+        | Mutation::SetTicked { .. }
         | Mutation::AddAnnotation { .. }
         | Mutation::EditAnnotation { .. }
         | Mutation::RemoveAnnotation { .. }

@@ -4,10 +4,55 @@
 use std::collections::{BTreeMap, BTreeSet};
 
 use cairn_schema::{
-    AttachmentKey, BoundedSet, Edge, Graph, KeyRefs, KindKey, LocalEdit, Node, NodeField,
-    NodeFieldValue, NodeKey, ParticipationRef, ParticipationSource, Participations, Removal,
-    Resource,
+    AttachmentKey, BoundedSet, Checklist, Edge, Graph, GraphKey, GuardFailure, JourneyState,
+    KeyRefs, KindKey, LocalEdit, Node, NodeField, NodeFieldValue, NodeKey, Overrides,
+    ParticipationRef, ParticipationSource, Participations, Removal, Resource, Slug,
 };
+
+// PRD: G5.
+/// The addresses of the ticks of `node` whose item is not in `checklist` (none: a node with
+/// no checklist): what a write that changes the node's checklist removes in the same event,
+/// so a tick never outlives its item. One pass over the node's ticks against a set of the
+/// list's ids.
+pub(crate) fn ticks_dropped(
+    state: &JourneyState,
+    node: &NodeKey,
+    checklist: Option<&Checklist>,
+) -> Vec<GraphKey> {
+    let kept: BTreeSet<&Slug> = checklist
+        .map(Checklist::ids)
+        .into_iter()
+        .flatten()
+        .collect();
+    state
+        .ticks
+        .get(node)
+        .into_iter()
+        .flatten()
+        .filter(|item| !kept.contains(item))
+        .map(|item| GraphKey::Tick {
+            node: node.clone(),
+            item: item.clone(),
+        })
+        .collect()
+}
+
+// PRD: G5.
+/// Takes the bypass failures for items that `checklist` (none: a node with no checklist) does
+/// not have out of `overrides`; true when any went. A bypass covers the items that were
+/// unticked when it was recorded, so an item added later under a removed item's id is not
+/// covered by it.
+pub(crate) fn prune_bypass(overrides: &mut Overrides, checklist: Option<&Checklist>) -> bool {
+    let Some(bypass) = overrides.bypass.as_mut() else {
+        return false;
+    };
+    let before = bypass.failures.len();
+    bypass.failures.retain(|failure| match failure {
+        GuardFailure::Unticked(item) => checklist.is_some_and(|list| list.contains(item)),
+        _ => true,
+    });
+    bypass.failures.len() != before
+}
 
 /// Runs `edit` on the node with `key` and puts it back.
 ///
@@ -315,6 +360,7 @@ impl RemovalIndex {
                     | GraphRecord::Insertion(_)
                     | GraphRecord::NodeState { .. }
                     | GraphRecord::LocalEdit { .. }
+                    | GraphRecord::Tick { .. }
                     | GraphRecord::Answer { .. }
                     | GraphRecord::RoleFill { .. }
                     | GraphRecord::Pin { .. }

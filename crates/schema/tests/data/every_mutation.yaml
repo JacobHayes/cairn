@@ -187,6 +187,14 @@ mutations:
 - op: set_atomic
   node: n_workload
   atomic: true
+- op: set_ticked
+  node: n_workload
+  item: outline
+  ticked: true
+- op: set_ticked
+  node: n_workload
+  item: review
+  ticked: false
 - op: add_annotation
   annotation:
     key: a_note

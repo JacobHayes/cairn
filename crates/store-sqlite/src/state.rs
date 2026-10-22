@@ -58,6 +58,7 @@ pub(crate) fn load(connection: &Connection, id: &str) -> Result<JourneyState, St
     Ok(JourneyState {
         nodes,
         local_edits: local_edits(connection, id)?,
+        ticks: ticks(connection, id)?,
         answers,
         rationales,
         role_fills: role_fills(connection, id)?,
@@ -120,6 +121,21 @@ fn local_edits(
         edits.entry(row.parse(0)?).or_default().insert(edit);
     }
     Ok(edits)
+}
+
+fn ticks(
+    connection: &Connection,
+    id: &str,
+) -> Result<BTreeMap<cairn_schema::NodeKey, BTreeSet<cairn_schema::Slug>>, StoreError> {
+    let mut ticks: BTreeMap<_, BTreeSet<_>> = BTreeMap::new();
+    let select = "SELECT node, item FROM ticks WHERE graph_id = ?1";
+    for row in rows(connection, select, vec![text(id)])? {
+        ticks
+            .entry(row.parse(0)?)
+            .or_default()
+            .insert(row.parse(1)?);
+    }
+    Ok(ticks)
 }
 
 fn role_fills(

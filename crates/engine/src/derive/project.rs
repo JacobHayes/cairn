@@ -21,6 +21,7 @@ use cairn_schema::{
     RelevanceExplanation, State,
 };
 
+use super::checklist::checklist_count;
 use super::dependencies::EdgeSet;
 use super::links::date_links_by_node;
 use super::relevance::Producer;
@@ -136,6 +137,9 @@ impl Derived {
                 ..self.dates.node(graph, key)
             },
             progress,
+            checklist_count: graph
+                .node(key)
+                .and_then(|node| checklist_count(graph.document(), node)),
             failing_guards: self.failing_guards(graph, key, annotated),
             started_early: self.started_early(graph, key),
             waits_on,

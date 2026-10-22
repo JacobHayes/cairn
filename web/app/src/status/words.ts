@@ -83,6 +83,8 @@ const FIELD_NAMES: Record<string, string> = {
   placeholder: "placeholder setting",
   requires_artifact: "artifact requirement",
   requires_note: "note requirement",
+  checklist: "checklist",
+  requires_checklist: "checklist requirement",
   final: "final setting",
   auto_done: "marks-itself-done setting",
   opens_at: "opening date",

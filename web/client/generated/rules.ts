@@ -24,6 +24,8 @@ export const ROLE_COUNT_MAX = 32;
 export const KIND_COUNT_MAX = 32;
 /** The `choice_count_per_decision_max` limit. */
 export const CHOICE_COUNT_PER_DECISION_MAX = 32;
+/** The `checklist_item_count_per_node_max` limit. */
+export const CHECKLIST_ITEM_COUNT_PER_NODE_MAX = 50;
 /** The `identity_count_per_fill_max` limit. */
 export const IDENTITY_COUNT_PER_FILL_MAX = 100;
 /** The `condition_depth_max` limit. */
@@ -145,10 +147,10 @@ export const STATUS_HOLDS_CURRENT_WORK: Record<JourneyStatus, boolean> = {
 };
 
 /** A1a: the name of a field only some kinds have, which a node's form shows beyond the shared ones. */
-export type KindFieldName = "estimate" | "requires_artifact" | "requires_note" | "placeholder" | "final" | "auto_done" | "opens_at" | "closes_at" | "gates" | "closes" | "prompt" | "help" | "answer_type" | "choices" | "fills_role" | "feeds_milestone";
+export type KindFieldName = "estimate" | "requires_artifact" | "requires_note" | "checklist" | "requires_checklist" | "placeholder" | "final" | "auto_done" | "opens_at" | "closes_at" | "gates" | "closes" | "prompt" | "help" | "answer_type" | "choices" | "fills_role" | "feeds_milestone";
 
 /** Every node field, in the order a node form shows the shared ones. */
-export const NODE_FIELDS: readonly NodeField[] = ["id", "parent", "title", "description", "weight", "relevant_when", "due_by", "not_before", "estimate", "placeholder", "requires_artifact", "requires_note", "final", "auto_done", "opens_at", "closes_at", "gates", "closes", "prompt", "help", "choices", "fills_role", "feeds_milestone"];
+export const NODE_FIELDS: readonly NodeField[] = ["id", "parent", "title", "description", "weight", "relevant_when", "due_by", "not_before", "estimate", "placeholder", "requires_artifact", "requires_note", "checklist", "requires_checklist", "final", "auto_done", "opens_at", "closes_at", "gates", "closes", "prompt", "help", "choices", "fills_role", "feeds_milestone"];
 
 /** A4: every answer type. */
 export const ANSWER_TYPES: readonly AnswerType[] = ["boolean", "single_choice", "multi_choice", "text", "date", "identity", "identity_list"];
@@ -156,8 +158,8 @@ export const ANSWER_TYPES: readonly AnswerType[] = ["boolean", "single_choice", 
 /** A1a: the fields each kind has beyond the shared ones, in the order its form shows them (a decision's depend on its answer type). */
 export const KIND_FIELDS: Record<NodeKind, readonly KindFieldName[]> = {
   decision: ["prompt", "help", "answer_type", "choices", "fills_role", "feeds_milestone"],
-  deliverable: ["estimate", "requires_artifact", "requires_note", "placeholder"],
-  action: ["estimate", "requires_note", "placeholder"],
+  deliverable: ["estimate", "requires_artifact", "requires_note", "checklist", "requires_checklist", "placeholder"],
+  action: ["estimate", "requires_note", "checklist", "requires_checklist", "placeholder"],
   milestone: ["final", "auto_done"],
   group: ["opens_at", "closes_at", "gates", "closes"],
 };
@@ -183,7 +185,7 @@ export const DEFAULT_WEIGHT: Record<NodeKind, number> = {
 };
 
 /** A1a: the value of each flag a node does not write. */
-export const FLAG_DEFAULTS: Record<"requires_artifact" | "requires_note" | "placeholder" | "final" | "auto_done" | "gates" | "closes", boolean> = { requires_artifact: false, requires_note: false, placeholder: false, final: false, auto_done: false, gates: true, closes: true };
+export const FLAG_DEFAULTS: Record<"requires_artifact" | "requires_note" | "requires_checklist" | "placeholder" | "final" | "auto_done" | "gates" | "closes", boolean> = { requires_artifact: false, requires_note: false, requires_checklist: false, placeholder: false, final: false, auto_done: false, gates: true, closes: true };
 
 /** A2: the kinds that hold no children. */
 export const LEAF_KINDS: readonly NodeKind[] = ["decision", "milestone"];

@@ -888,6 +888,55 @@
         ],
         "type": "object"
       },
+      "Checklist": {
+        "items": {
+          "$ref": "#/components/schemas/ChecklistItem"
+        },
+        "maxItems": 50,
+        "type": "array"
+      },
+      "ChecklistCount": {
+        "additionalProperties": false,
+        "description": "How much of a checklist is ticked.",
+        "properties": {
+          "ticked": {
+            "description": "Items ticked.",
+            "format": "uint32",
+            "minimum": 0,
+            "type": "integer"
+          },
+          "total": {
+            "description": "Items in the checklist.",
+            "format": "uint32",
+            "minimum": 0,
+            "type": "integer"
+          }
+        },
+        "required": [
+          "ticked",
+          "total"
+        ],
+        "type": "object"
+      },
+      "ChecklistItem": {
+        "additionalProperties": false,
+        "description": "One item of a checklist.",
+        "properties": {
+          "id": {
+            "$ref": "#/components/schemas/Slug",
+            "description": "The id a tick names; unique within the checklist."
+          },
+          "title": {
+            "$ref": "#/components/schemas/Title",
+            "description": "What the item says."
+          }
+        },
+        "required": [
+          "id",
+          "title"
+        ],
+        "type": "object"
+      },
       "ChildEntry": {
         "additionalProperties": false,
         "description": "One child in a node's detail.",
@@ -3819,6 +3868,8 @@
           "guard_bypassed",
           "override_removed",
           "atomic_changed",
+          "item_ticked",
+          "item_unticked",
           "annotation_added",
           "annotation_edited",
           "annotation_removed",
@@ -4343,6 +4394,34 @@
           },
           {
             "additionalProperties": false,
+            "description": "A ticked checklist item.",
+            "properties": {
+              "tick": {
+                "additionalProperties": false,
+                "properties": {
+                  "item": {
+                    "$ref": "#/components/schemas/Slug",
+                    "description": "The item's id."
+                  },
+                  "node": {
+                    "$ref": "#/components/schemas/NodeKey",
+                    "description": "The node."
+                  }
+                },
+                "required": [
+                  "node",
+                  "item"
+                ],
+                "type": "object"
+              }
+            },
+            "required": [
+              "tick"
+            ],
+            "type": "object"
+          },
+          {
+            "additionalProperties": false,
             "description": "An answer.",
             "properties": {
               "answer": {
@@ -4696,6 +4775,34 @@
           },
           {
             "additionalProperties": false,
+            "description": "A ticked checklist item.",
+            "properties": {
+              "tick": {
+                "additionalProperties": false,
+                "properties": {
+                  "item": {
+                    "$ref": "#/components/schemas/Slug",
+                    "description": "The item's id."
+                  },
+                  "node": {
+                    "$ref": "#/components/schemas/NodeKey",
+                    "description": "The node."
+                  }
+                },
+                "required": [
+                  "node",
+                  "item"
+                ],
+                "type": "object"
+              }
+            },
+            "required": [
+              "tick"
+            ],
+            "type": "object"
+          },
+          {
+            "additionalProperties": false,
             "description": "An answer, with the rationale it was given with.",
             "properties": {
               "answer": {
@@ -4898,6 +5005,11 @@
             "type": "string"
           },
           {
+            "const": "all_ticked",
+            "description": "A `requires_checklist` deliverable or action has every checklist item ticked.",
+            "type": "string"
+          },
+          {
             "const": "broken_down",
             "description": "A placeholder has children or is atomic.",
             "type": "string"
@@ -4934,6 +5046,19 @@
             "const": "missing_note",
             "description": "No note on a `requires_note` deliverable or action.",
             "type": "string"
+          },
+          {
+            "additionalProperties": false,
+            "description": "A checklist item not ticked, on a `requires_checklist` deliverable or action.",
+            "properties": {
+              "unticked": {
+                "$ref": "#/components/schemas/Slug"
+              }
+            },
+            "required": [
+              "unticked"
+            ],
+            "type": "object"
           },
           {
             "const": "not_broken_down",
@@ -5584,6 +5709,21 @@
             "patternProperties": {
               "^n_[a-z0-9][a-z0-9_-]*$": {
                 "$ref": "#/components/schemas/SnoozeTarget"
+              }
+            },
+            "type": "object"
+          },
+          "ticks": {
+            "additionalProperties": false,
+            "description": "Each node's ticked checklist items. Each tick is its own record, kept apart from the\nnode's state so that ticking two items, or ticking and a transition, touch different\nrecords. A node with no ticks has no entry.",
+            "maxProperties": 2000,
+            "patternProperties": {
+              "^n_[a-z0-9][a-z0-9_-]*$": {
+                "items": {
+                  "$ref": "#/components/schemas/Slug"
+                },
+                "type": "array",
+                "uniqueItems": true
               }
             },
             "type": "object"
@@ -7509,6 +7649,35 @@
           },
           {
             "additionalProperties": false,
+            "description": "Tick or untick one checklist item. Setting an item to the state it has changes\nnothing.",
+            "properties": {
+              "item": {
+                "$ref": "#/components/schemas/Slug",
+                "description": "The item's id."
+              },
+              "node": {
+                "$ref": "#/components/schemas/NodeKey",
+                "description": "The node."
+              },
+              "op": {
+                "const": "set_ticked",
+                "type": "string"
+              },
+              "ticked": {
+                "description": "Ticked or not.",
+                "type": "boolean"
+              }
+            },
+            "required": [
+              "op",
+              "node",
+              "item",
+              "ticked"
+            ],
+            "type": "object"
+          },
+          {
+            "additionalProperties": false,
             "description": "Add a note or link.",
             "properties": {
               "annotation": {
@@ -7929,6 +8098,7 @@
             "then": {
               "properties": {
                 "auto_done": false,
+                "checklist": false,
                 "closes": false,
                 "closes_at": false,
                 "estimate": false,
@@ -7937,6 +8107,7 @@
                 "opens_at": false,
                 "placeholder": false,
                 "requires_artifact": false,
+                "requires_checklist": false,
                 "requires_note": false
               }
             }
@@ -8003,6 +8174,7 @@
             "then": {
               "properties": {
                 "answer_type": false,
+                "checklist": false,
                 "choices": false,
                 "closes": false,
                 "closes_at": false,
@@ -8015,6 +8187,7 @@
                 "placeholder": false,
                 "prompt": false,
                 "requires_artifact": false,
+                "requires_checklist": false,
                 "requires_note": false
               }
             }
@@ -8031,6 +8204,7 @@
               "properties": {
                 "answer_type": false,
                 "auto_done": false,
+                "checklist": false,
                 "choices": false,
                 "estimate": false,
                 "feeds_milestone": false,
@@ -8040,6 +8214,7 @@
                 "placeholder": false,
                 "prompt": false,
                 "requires_artifact": false,
+                "requires_checklist": false,
                 "requires_note": false
               }
             }
@@ -8201,6 +8376,9 @@
           },
           "auto_done": {
             "type": "boolean"
+          },
+          "checklist": {
+            "$ref": "#/components/schemas/Checklist"
           },
           "choices": {
             "$ref": "#/components/schemas/Choices"
@@ -8311,6 +8489,9 @@
           "requires_artifact": {
             "type": "boolean"
           },
+          "requires_checklist": {
+            "type": "boolean"
+          },
           "requires_note": {
             "type": "boolean"
           },
@@ -8357,6 +8538,7 @@
             "then": {
               "properties": {
                 "auto_done": false,
+                "checklist": false,
                 "closes": false,
                 "closes_at": false,
                 "estimate": false,
@@ -8365,6 +8547,7 @@
                 "opens_at": false,
                 "placeholder": false,
                 "requires_artifact": false,
+                "requires_checklist": false,
                 "requires_note": false
               }
             }
@@ -8431,6 +8614,7 @@
             "then": {
               "properties": {
                 "answer_type": false,
+                "checklist": false,
                 "choices": false,
                 "closes": false,
                 "closes_at": false,
@@ -8443,6 +8627,7 @@
                 "placeholder": false,
                 "prompt": false,
                 "requires_artifact": false,
+                "requires_checklist": false,
                 "requires_note": false
               }
             }
@@ -8459,6 +8644,7 @@
               "properties": {
                 "answer_type": false,
                 "auto_done": false,
+                "checklist": false,
                 "choices": false,
                 "estimate": false,
                 "feeds_milestone": false,
@@ -8468,6 +8654,7 @@
                 "placeholder": false,
                 "prompt": false,
                 "requires_artifact": false,
+                "requires_checklist": false,
                 "requires_note": false
               }
             }
@@ -8629,6 +8816,9 @@
           },
           "auto_done": {
             "type": "boolean"
+          },
+          "checklist": {
+            "$ref": "#/components/schemas/Checklist"
           },
           "choices": {
             "$ref": "#/components/schemas/Choices"
@@ -8744,6 +8934,9 @@
             "uniqueItems": true
           },
           "requires_artifact": {
+            "type": "boolean"
+          },
+          "requires_checklist": {
             "type": "boolean"
           },
           "requires_note": {
@@ -8903,6 +9096,17 @@
               "$ref": "#/components/schemas/NodeKey"
             },
             "type": "array"
+          },
+          "checklist_count": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ChecklistCount"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "How many checklist items are ticked; none for a node with no items."
           },
           "dates": {
             "$ref": "#/components/schemas/NodeDates",
@@ -9184,6 +9388,14 @@
           "still_waiting": {
             "$ref": "#/components/schemas/StillWaiting",
             "description": "The direct dependents completing it would not yet free, each with what else it waits\non (Priority: Unlocks): the largest entries with the total; page the rest with\nthe explanations endpoint, field `still_waiting`."
+          },
+          "ticks": {
+            "description": "The checklist items ticked.",
+            "items": {
+              "$ref": "#/components/schemas/Slug"
+            },
+            "type": "array",
+            "uniqueItems": true
           }
         },
         "required": [
@@ -9256,6 +9468,16 @@
           {
             "const": "requires_note",
             "description": "A deliverable's or action's `requires_note` flag.",
+            "type": "string"
+          },
+          {
+            "const": "checklist",
+            "description": "A deliverable's or action's checklist.",
+            "type": "string"
+          },
+          {
+            "const": "requires_checklist",
+            "description": "A deliverable's or action's `requires_checklist` flag.",
             "type": "string"
           },
           {
@@ -9525,6 +9747,32 @@
           },
           {
             "additionalProperties": false,
+            "description": "A new checklist; empty clears it.",
+            "properties": {
+              "checklist": {
+                "$ref": "#/components/schemas/Checklist"
+              }
+            },
+            "required": [
+              "checklist"
+            ],
+            "type": "object"
+          },
+          {
+            "additionalProperties": false,
+            "description": "The `requires_checklist` flag.",
+            "properties": {
+              "requires_checklist": {
+                "type": "boolean"
+              }
+            },
+            "required": [
+              "requires_checklist"
+            ],
+            "type": "object"
+          },
+          {
+            "additionalProperties": false,
             "description": "The `final` flag.",
             "properties": {
               "final": {
@@ -9754,6 +10002,17 @@
               "$ref": "#/components/schemas/NodeKey"
             },
             "type": "array"
+          },
+          "checklist_count": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ChecklistCount"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "How many checklist items are ticked; none for a node with no items."
           },
           "display_state": {
             "$ref": "#/components/schemas/DisplayState",

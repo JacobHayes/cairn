@@ -8,7 +8,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::condition::Condition;
 use crate::id::Slug;
-use crate::node::{Choices, DateRule, KindField, Node, Payload};
+use crate::node::{Checklist, Choices, DateRule, KindField, Node, Payload};
 use crate::number::{Days, Weight};
 use crate::refs::References;
 use crate::text::{Markdown, Title};
@@ -44,6 +44,10 @@ pub enum NodeField {
     RequiresArtifact,
     /// A deliverable's or action's `requires_note` flag.
     RequiresNote,
+    /// A deliverable's or action's checklist.
+    Checklist,
+    /// A deliverable's or action's `requires_checklist` flag.
+    RequiresChecklist,
     /// A milestone's `final` flag.
     Final,
     /// A milestone's `auto_done` flag.
@@ -85,6 +89,8 @@ impl NodeField {
             NodeField::Placeholder => KindField::Placeholder,
             NodeField::RequiresArtifact => KindField::RequiresArtifact,
             NodeField::RequiresNote => KindField::RequiresNote,
+            NodeField::Checklist => KindField::Checklist,
+            NodeField::RequiresChecklist => KindField::RequiresChecklist,
             NodeField::Final => KindField::Final,
             NodeField::AutoDone => KindField::AutoDone,
             NodeField::OpensAt => KindField::OpensAt,
@@ -107,7 +113,7 @@ impl NodeField {
     }
 
     /// Every field, in declaration order.
-    pub const ALL: [NodeField; 23] = [
+    pub const ALL: [NodeField; 25] = [
         NodeField::Id,
         NodeField::Parent,
         NodeField::Title,
@@ -120,6 +126,8 @@ impl NodeField {
         NodeField::Placeholder,
         NodeField::RequiresArtifact,
         NodeField::RequiresNote,
+        NodeField::Checklist,
+        NodeField::RequiresChecklist,
         NodeField::Final,
         NodeField::AutoDone,
         NodeField::OpensAt,
@@ -165,6 +173,10 @@ pub enum NodeFieldValue<R: References> {
     RequiresArtifact(bool),
     /// The `requires_note` flag.
     RequiresNote(bool),
+    /// A new checklist; empty clears it.
+    Checklist(Checklist),
+    /// The `requires_checklist` flag.
+    RequiresChecklist(bool),
     /// The `final` flag.
     Final(bool),
     /// The `auto_done` flag.
@@ -206,6 +218,8 @@ impl<R: References> NodeFieldValue<R> {
             NodeFieldValue::Placeholder(_) => NodeField::Placeholder,
             NodeFieldValue::RequiresArtifact(_) => NodeField::RequiresArtifact,
             NodeFieldValue::RequiresNote(_) => NodeField::RequiresNote,
+            NodeFieldValue::Checklist(_) => NodeField::Checklist,
+            NodeFieldValue::RequiresChecklist(_) => NodeField::RequiresChecklist,
             NodeFieldValue::Final(_) => NodeField::Final,
             NodeFieldValue::AutoDone(_) => NodeField::AutoDone,
             NodeFieldValue::OpensAt(_) => NodeField::OpensAt,
@@ -236,6 +250,8 @@ impl<R: References> NodeFieldValue<R> {
             | NodeField::Placeholder
             | NodeField::RequiresArtifact
             | NodeField::RequiresNote
+            | NodeField::Checklist
+            | NodeField::RequiresChecklist
             | NodeField::Final
             | NodeField::AutoDone
             | NodeField::OpensAt
@@ -250,11 +266,8 @@ impl<R: References> NodeFieldValue<R> {
         })
     }
 
-    fn read_payload(field: NodeField, payload: &Payload<R>) -> Option<Self> {
-        use crate::node::AnswerSpec;
-        if !field.allowed_on(payload) {
-            return None;
-        }
+    /// The value of a field that deliverables and actions carry; none for any other field.
+    fn read_work(field: NodeField, payload: &Payload<R>) -> Option<Self> {
         match (field, payload) {
             (NodeField::Estimate, Payload::Deliverable(work)) => {
                 Some(NodeFieldValue::Estimate(work.estimate))
@@ -277,6 +290,31 @@ impl<R: References> NodeFieldValue<R> {
             (NodeField::RequiresNote, Payload::Action(work)) => {
                 Some(NodeFieldValue::RequiresNote(work.requires_note))
             }
+            (NodeField::Checklist, Payload::Deliverable(work)) => {
+                Some(NodeFieldValue::Checklist(work.checklist.clone()))
+            }
+            (NodeField::Checklist, Payload::Action(work)) => {
+                Some(NodeFieldValue::Checklist(work.checklist.clone()))
+            }
+            (NodeField::RequiresChecklist, Payload::Deliverable(work)) => {
+                Some(NodeFieldValue::RequiresChecklist(work.requires_checklist))
+            }
+            (NodeField::RequiresChecklist, Payload::Action(work)) => {
+                Some(NodeFieldValue::RequiresChecklist(work.requires_checklist))
+            }
+            _ => None,
+        }
+    }
+
+    fn read_payload(field: NodeField, payload: &Payload<R>) -> Option<Self> {
+        use crate::node::AnswerSpec;
+        if !field.allowed_on(payload) {
+            return None;
+        }
+        if let Some(value) = Self::read_work(field, payload) {
+            return Some(value);
+        }
+        match (field, payload) {
             (NodeField::Final, Payload::Milestone(milestone)) => {
                 Some(NodeFieldValue::Final(milestone.is_final))
             }
@@ -340,11 +378,8 @@ impl<R: References> NodeFieldValue<R> {
         true
     }
 
-    fn write_payload(self, payload: &mut Payload<R>) -> bool {
-        use crate::node::AnswerSpec;
-        if !self.field().allowed_on(payload) {
-            return false;
-        }
+    /// Writes a field that deliverables and actions carry; any other field is handed back.
+    fn write_work(self, payload: &mut Payload<R>) -> Result<(), Self> {
         match (self, payload) {
             (NodeFieldValue::Estimate(days), Payload::Deliverable(work)) => work.estimate = days,
             (NodeFieldValue::Estimate(days), Payload::Action(work)) => work.estimate = days,
@@ -361,6 +396,32 @@ impl<R: References> NodeFieldValue<R> {
             (NodeFieldValue::RequiresNote(flag), Payload::Action(work)) => {
                 work.requires_note = flag;
             }
+            (NodeFieldValue::Checklist(checklist), Payload::Deliverable(work)) => {
+                work.checklist = checklist;
+            }
+            (NodeFieldValue::Checklist(checklist), Payload::Action(work)) => {
+                work.checklist = checklist;
+            }
+            (NodeFieldValue::RequiresChecklist(flag), Payload::Deliverable(work)) => {
+                work.requires_checklist = flag;
+            }
+            (NodeFieldValue::RequiresChecklist(flag), Payload::Action(work)) => {
+                work.requires_checklist = flag;
+            }
+            (other, _) => return Err(other),
+        }
+        Ok(())
+    }
+
+    fn write_payload(self, payload: &mut Payload<R>) -> bool {
+        use crate::node::AnswerSpec;
+        if !self.field().allowed_on(payload) {
+            return false;
+        }
+        let Err(this) = self.write_work(payload) else {
+            return true;
+        };
+        match (this, payload) {
             (NodeFieldValue::Final(flag), Payload::Milestone(milestone)) => {
                 milestone.is_final = flag;
             }

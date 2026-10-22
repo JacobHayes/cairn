@@ -82,6 +82,10 @@ fn puts(id: &str, record: &GraphRecord) -> Result<Vec<Statement>, CommitError> {
                 vec![graph, text(node), text(aspect), text(&target)],
             )]
         }
+        GraphRecord::Tick { node, item } => vec![statement(
+            "INSERT OR IGNORE INTO ticks (graph_id, node, item) VALUES (?1, ?2, ?3)",
+            vec![graph, text(node), text(item)],
+        )],
         GraphRecord::Answer { .. } => answer_puts(id, record)?,
         GraphRecord::RoleFill { role, identities } => role_fill_puts(id, role, identities),
         GraphRecord::Pin { node, date: day } => vec![statement(
@@ -280,6 +284,10 @@ fn removal(id: &str, key: &GraphKey) -> Result<Vec<Statement>, CommitError> {
                 vec![graph(), text(node), text(aspect), text(&target)],
             )]
         }
+        GraphKey::Tick { node, item } => vec![(
+            "DELETE FROM ticks WHERE graph_id = ?1 AND node = ?2 AND item = ?3".to_owned(),
+            vec![graph(), text(node), text(item)],
+        )],
         GraphKey::Role(_)
         | GraphKey::Kind(_)
         | GraphKey::Insertion(_)
@@ -332,7 +340,8 @@ fn keyed_removal(id: &str, key: &GraphKey) -> Vec<Statement> {
         | GraphKey::DefaultOwner
         | GraphKey::Participation { .. }
         | GraphKey::Resource { .. }
-        | GraphKey::LocalEdit { .. } => Vec::new(),
+        | GraphKey::LocalEdit { .. }
+        | GraphKey::Tick { .. } => Vec::new(),
     };
     tables
         .into_iter()
@@ -359,6 +368,7 @@ fn node_removal(id: &str, node: &NodeKey) -> Vec<Statement> {
         ("nodes", "key"),
         ("node_states", "node"),
         ("local_edits", "node"),
+        ("ticks", "node"),
         ("answer_identities", "decision"),
         ("answers", "decision"),
         ("pins", "node"),

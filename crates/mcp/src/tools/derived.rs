@@ -246,6 +246,10 @@ pub(crate) struct Detail {
     /// What the journey edited on it.
     #[serde(default, skip_serializing_if = "BTreeSet::is_empty")]
     local_edits: BTreeSet<LocalEdit>,
+    // PRD: G5.
+    /// The checklist items ticked.
+    #[serde(default, skip_serializing_if = "BTreeSet::is_empty")]
+    ticks: BTreeSet<cairn_schema::Slug>,
     /// A decision's answer.
     #[serde(skip_serializing_if = "Option::is_none")]
     answer: Option<AnswerValue>,
@@ -303,6 +307,7 @@ impl Detail {
             children,
             record,
             local_edits,
+            ticks,
             answer,
             rationale,
             pin,
@@ -335,6 +340,7 @@ impl Detail {
             children: page(children.collect(), children_cursor),
             record,
             local_edits,
+            ticks,
             answer,
             rationale,
             pin,

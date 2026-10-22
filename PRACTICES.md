@@ -115,6 +115,7 @@ Hard-coded named constants; validation rejects a patch that would exceed one, an
 | mutations per patch | 8,000 | An import of a full graph is roughly four mutations per node (node, edges, participations, resources); 4 x the node limit, enforced by a `const` assertion. |
 | roles, participation kinds per graph | 32 each | A process with more than a couple dozen distinct roles is several processes. A node has at most one participation per kind, so this bounds a node's participations too. |
 | choices per decision | 32 | A single-choice question with more options is a text or identity answer in disguise. |
+| checklist items per node | 50 | A list someone ticks through in one sitting; past 50 the items are pieces of work of their own, which belong in child actions. |
 | identities per role fill, identity-list answer, explicit participation, or journey's owners; values per `in` clause | 100 | A stakeholder list; past 100 it is a team, which the PRD does not model. An `in` clause compares against such a list. |
 | emails per identity | 16 | Work, personal, and a few former addresses, with room for a merge to join two people's lists. |
 | aliases per identity | 32 | Each merge of a duplicate adds one; a person imported from several sources gathers a handful. |

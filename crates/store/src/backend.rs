@@ -651,6 +651,7 @@ fn state_records(state: &JourneyState) -> Vec<GraphRecord> {
     let JourneyState {
         nodes,
         local_edits,
+        ticks,
         answers,
         rationales,
         role_fills,
@@ -669,6 +670,12 @@ fn state_records(state: &JourneyState) -> Vec<GraphRecord> {
         for edit in edits {
             let (node, edit) = (node.clone(), edit.clone());
             records.push(GraphRecord::LocalEdit { node, edit });
+        }
+    }
+    for (node, items) in ticks {
+        for item in items {
+            let (node, item) = (node.clone(), item.clone());
+            records.push(GraphRecord::Tick { node, item });
         }
     }
     for (decision, value) in answers {

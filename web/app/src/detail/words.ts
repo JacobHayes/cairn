@@ -18,6 +18,8 @@ export function guardWords(guard: Schema<"Guard">): string {
       return "a link";
     case "has_note":
       return "a note";
+    case "all_ticked":
+      return "its checklist ticked";
     case "broken_down":
       return "a breakdown";
     case "date_arrived":

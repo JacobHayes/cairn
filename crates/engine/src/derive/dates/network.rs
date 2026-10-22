@@ -261,6 +261,7 @@ impl Scope {
                 GuardFailure::OpenDependency(required) => dependencies.node_index(required),
                 GuardFailure::MissingArtifact
                 | GuardFailure::MissingNote
+                | GuardFailure::Unticked(_)
                 | GuardFailure::NotBrokenDown
                 | GuardFailure::TooEarly(_) => None,
             })

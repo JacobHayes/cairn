@@ -1360,6 +1360,27 @@ export interface components {
             /** @description The search was cut short at the limit. */
             more?: boolean;
         };
+        Checklist: components["schemas"]["ChecklistItem"][];
+        /** @description How much of a checklist is ticked. */
+        ChecklistCount: {
+            /**
+             * Format: uint32
+             * @description Items ticked.
+             */
+            ticked: number;
+            /**
+             * Format: uint32
+             * @description Items in the checklist.
+             */
+            total: number;
+        };
+        /** @description One item of a checklist. */
+        ChecklistItem: {
+            /** @description The id a tick names; unique within the checklist. */
+            id: components["schemas"]["Slug"];
+            /** @description What the item says. */
+            title: components["schemas"]["Title"];
+        };
         /** @description One child in a node's detail. */
         ChildEntry: {
             /** @description The state every surface shows for it. */
@@ -2208,7 +2229,7 @@ export interface components {
          *     their content ([`Mutation::event_type`]).
          * @enum {string}
          */
-        EventType: "journey_created" | "journey_edited" | "journey_status_changed" | "journey_deleted" | "route_created" | "route_edited" | "route_retired" | "route_unretired" | "draft_opened" | "route_version_imported" | "saved_as_route" | "draft_discarded" | "route_published" | "route_deleted" | "node_added" | "node_changed" | "weight_changed" | "node_removed" | "edge_changed" | "role_changed" | "participation_kind_changed" | "default_owner_changed" | "participation_changed" | "resource_changed" | "segment_inserted" | "node_transitioned" | "answer_set" | "recorded_date_changed" | "role_fill_changed" | "date_pinned" | "date_shifted" | "date_unpinned" | "snooze_set" | "unsnoozed" | "override_applied" | "guard_bypassed" | "override_removed" | "atomic_changed" | "annotation_added" | "annotation_edited" | "annotation_removed" | "journey_upgraded" | "relinked" | "provenance_changed" | "local_edit_changed" | "identity_created" | "identity_edited" | "identities_merged" | "identity_deleted" | "proposal_created" | "proposal_edited" | "proposal_applied" | "proposal_discarded";
+        EventType: "journey_created" | "journey_edited" | "journey_status_changed" | "journey_deleted" | "route_created" | "route_edited" | "route_retired" | "route_unretired" | "draft_opened" | "route_version_imported" | "saved_as_route" | "draft_discarded" | "route_published" | "route_deleted" | "node_added" | "node_changed" | "weight_changed" | "node_removed" | "edge_changed" | "role_changed" | "participation_kind_changed" | "default_owner_changed" | "participation_changed" | "resource_changed" | "segment_inserted" | "node_transitioned" | "answer_set" | "recorded_date_changed" | "role_fill_changed" | "date_pinned" | "date_shifted" | "date_unpinned" | "snooze_set" | "unsnoozed" | "override_applied" | "guard_bypassed" | "override_removed" | "atomic_changed" | "item_ticked" | "item_unticked" | "annotation_added" | "annotation_edited" | "annotation_removed" | "journey_upgraded" | "relinked" | "provenance_changed" | "local_edit_changed" | "identity_created" | "identity_edited" | "identities_merged" | "identity_deleted" | "proposal_created" | "proposal_edited" | "proposal_applied" | "proposal_discarded";
         /**
          * @description A list of explanation entries with its total: complete inside
          *     the engine and the browser; a server response keeps the largest entries up to
@@ -2360,6 +2381,13 @@ export interface components {
                 node: components["schemas"]["NodeKey"];
             };
         } | {
+            tick: {
+                /** @description The item's id. */
+                item: components["schemas"]["Slug"];
+                /** @description The node. */
+                node: components["schemas"]["NodeKey"];
+            };
+        } | {
             answer: components["schemas"]["NodeKey"];
         } | {
             role_fill: components["schemas"]["RoleKey"];
@@ -2432,6 +2460,13 @@ export interface components {
                 node: components["schemas"]["NodeKey"];
             };
         } | {
+            tick: {
+                /** @description The item's id. */
+                item: components["schemas"]["Slug"];
+                /** @description The node. */
+                node: components["schemas"]["NodeKey"];
+            };
+        } | {
             answer: {
                 /** @description The decision. */
                 decision: components["schemas"]["NodeKey"];
@@ -2477,14 +2512,16 @@ export interface components {
             annotation: components["schemas"]["Annotation"];
         };
         /** @description A transition guard. */
-        Guard: "deps_done" | "has_artifact" | "has_note" | "broken_down" | "date_arrived";
+        Guard: "deps_done" | "has_artifact" | "has_note" | "all_ticked" | "broken_down" | "date_arrived";
         /**
          * @description One specific guard failure: what a bypass records, so a later distinct failure
          *     still produces `stale`, and what `stale` lists.
          */
         GuardFailure: {
             open_dependency: components["schemas"]["NodeKey"];
-        } | "missing_artifact" | "missing_note" | "not_broken_down" | {
+        } | "missing_artifact" | "missing_note" | {
+            unticked: components["schemas"]["Slug"];
+        } | "not_broken_down" | {
             /** Format: date */
             too_early: string;
         };
@@ -2758,6 +2795,14 @@ export interface components {
             /** @description Snoozes by node. */
             snoozes?: {
                 [key: string]: components["schemas"]["SnoozeTarget"];
+            };
+            /**
+             * @description Each node's ticked checklist items. Each tick is its own record, kept apart from the
+             *     node's state so that ticking two items, or ticking and a transition, touch different
+             *     records. A node with no ticks has no entry.
+             */
+            ticks?: {
+                [key: string]: components["schemas"]["Slug"][];
             };
             /** @description Route-copied nodes the journey removed, so an upgrade does not re-add them. */
             tombstones?: components["schemas"]["NodeKey"][];
@@ -3350,6 +3395,15 @@ export interface components {
             /** @constant */
             op: "set_atomic";
         } | {
+            /** @description The item's id. */
+            item: components["schemas"]["Slug"];
+            /** @description The node. */
+            node: components["schemas"]["NodeKey"];
+            /** @constant */
+            op: "set_ticked";
+            /** @description Ticked or not. */
+            ticked: boolean;
+        } | {
             /** @description What its author wrote. */
             annotation: components["schemas"]["AnnotationBody"];
             /** @constant */
@@ -3476,6 +3530,7 @@ export interface components {
         Node: {
             answer_type?: components["schemas"]["AnswerType"];
             auto_done?: boolean;
+            checklist?: components["schemas"]["Checklist"];
             choices?: components["schemas"]["Choices"];
             closes?: boolean;
             closes_at?: components["schemas"]["NodeKey"];
@@ -3499,6 +3554,7 @@ export interface components {
             relevant_when?: components["schemas"]["ConditionResolved"] | null;
             requires?: components["schemas"]["NodeKey"][];
             requires_artifact?: boolean;
+            requires_checklist?: boolean;
             requires_note?: boolean;
             resources?: components["schemas"]["Resource"][];
             title: components["schemas"]["Title"];
@@ -3508,6 +3564,7 @@ export interface components {
         Node2: {
             answer_type?: components["schemas"]["AnswerType"];
             auto_done?: boolean;
+            checklist?: components["schemas"]["Checklist"];
             choices?: components["schemas"]["Choices"];
             closes?: boolean;
             closes_at?: components["schemas"]["Path"];
@@ -3531,6 +3588,7 @@ export interface components {
             relevant_when?: components["schemas"]["Condition"] | null;
             requires?: components["schemas"]["Path"][];
             requires_artifact?: boolean;
+            requires_checklist?: boolean;
             requires_note?: boolean;
             resources?: components["schemas"]["Resource2"][];
             title: components["schemas"]["Title"];
@@ -3600,6 +3658,8 @@ export interface components {
              *     conditions block it through containment; each lists them in its own `blocked_by`.
              */
             blocked_through?: components["schemas"]["NodeKey"][];
+            /** @description How many checklist items are ticked; none for a node with no items. */
+            checklist_count?: components["schemas"]["ChecklistCount"] | null;
             /** @description Dates. */
             dates: components["schemas"]["NodeDates"];
             /**
@@ -3740,9 +3800,11 @@ export interface components {
              *     the explanations endpoint, field `still_waiting`.
              */
             still_waiting: components["schemas"]["StillWaiting"];
+            /** @description The checklist items ticked. */
+            ticks?: components["schemas"]["Slug"][];
         };
         /** @description A node field, by name. */
-        NodeField: "id" | "parent" | "title" | "description" | "weight" | "relevant_when" | "due_by" | "not_before" | "estimate" | "placeholder" | "requires_artifact" | "requires_note" | "final" | "auto_done" | "opens_at" | "closes_at" | "gates" | "closes" | "prompt" | "help" | "choices" | "fills_role" | "feeds_milestone";
+        NodeField: "id" | "parent" | "title" | "description" | "weight" | "relevant_when" | "due_by" | "not_before" | "estimate" | "placeholder" | "requires_artifact" | "requires_note" | "checklist" | "requires_checklist" | "final" | "auto_done" | "opens_at" | "closes_at" | "gates" | "closes" | "prompt" | "help" | "choices" | "fills_role" | "feeds_milestone";
         /** @description A new value for one node field. */
         NodeFieldValueResolved: {
             id: components["schemas"]["Slug"];
@@ -3768,6 +3830,10 @@ export interface components {
             requires_artifact: boolean;
         } | {
             requires_note: boolean;
+        } | {
+            checklist: components["schemas"]["Checklist"];
+        } | {
+            requires_checklist: boolean;
         } | {
             final: boolean;
         } | {
@@ -3804,6 +3870,8 @@ export interface components {
             actionable?: boolean;
             /** @description Its ancestors, root first: the breadcrumb. */
             ancestors?: components["schemas"]["NodeKey"][];
+            /** @description How many checklist items are ticked; none for a node with no items. */
+            checklist_count?: components["schemas"]["ChecklistCount"] | null;
             /** @description The state every surface shows for the node. */
             display_state: components["schemas"]["DisplayState"];
             /**

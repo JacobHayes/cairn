@@ -885,6 +885,7 @@ fn tally_other(outline: &mut ProposalOutline, mutation: &Mutation) -> bool {
         | Mutation::ApplyOverride { .. }
         | Mutation::RemoveOverride { .. }
         | Mutation::SetAtomic { .. }
+        | Mutation::SetTicked { .. }
         | Mutation::SetProvenance { .. }
         | Mutation::MarkLocalEdit { .. } => return false,
     }

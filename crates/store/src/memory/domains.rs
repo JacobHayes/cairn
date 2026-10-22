@@ -12,10 +12,10 @@
 use std::collections::{BTreeMap, BTreeSet};
 
 use cairn_schema::{
-    BoundedSet, DeletedId, Deployment, Domain, Graph, GraphId, GraphKey, GraphRecord, Journey,
-    JourneyHeader, JourneyId, Node, Proposal, ProposalId, Record, RecordKey, RetiredKey, Revision,
-    Route, RouteDraft, RouteHeader, RouteId, RouteVersion, Timestamp, VersionNumber, Write,
-    refs::KeyRefs,
+    AnswerValue, BoundedSet, DeletedId, Deployment, Domain, Graph, GraphId, GraphKey, GraphRecord,
+    Journey, JourneyHeader, JourneyId, JourneyState, Markdown, Node, NodeKey, Proposal, ProposalId,
+    Record, RecordKey, Resource, RetiredKey, Revision, Route, RouteDraft, RouteHeader, RouteId,
+    RouteVersion, Timestamp, VersionNumber, Write, refs::KeyRefs,
 };
 
 use crate::commit::StoreError;
@@ -329,6 +329,18 @@ fn put_node(graph: &mut Graph, node: Node<KeyRefs>) -> Result<(), StoreError> {
         .map_err(|error| StoreError::Malformed(format!("nodes: {error}")))
 }
 
+/// Replaces the resource of the same key, or appends it.
+fn put_resource(node: &mut Node<KeyRefs>, resource: &Resource<KeyRefs>) {
+    match node
+        .resources
+        .iter_mut()
+        .find(|held| held.key == resource.key)
+    {
+        Some(held) => *held = resource.clone(),
+        None => node.resources.push(resource.clone()),
+    }
+}
+
 fn put_graph_record(graph: &mut Graph, record: &GraphRecord) -> Result<(), StoreError> {
     let collection =
         |error: cairn_schema::CollectionError| StoreError::Malformed(error.to_string());
@@ -372,14 +384,7 @@ fn put_graph_record(graph: &mut Graph, record: &GraphRecord) -> Result<(), Store
         }
         GraphRecord::Resource { node, resource } => {
             let mut changed = node_copy(graph, node)?;
-            match changed
-                .resources
-                .iter_mut()
-                .find(|held| held.key == resource.key)
-            {
-                Some(held) => *held = resource.clone(),
-                None => changed.resources.push(resource.clone()),
-            }
+            put_resource(&mut changed, resource);
             put_node(graph, changed)?;
         }
         GraphRecord::Insertion(insertion) => {
@@ -391,6 +396,7 @@ fn put_graph_record(graph: &mut Graph, record: &GraphRecord) -> Result<(), Store
         GraphRecord::RetiredKey(_)
         | GraphRecord::NodeState { .. }
         | GraphRecord::LocalEdit { .. }
+        | GraphRecord::Tick { .. }
         | GraphRecord::Answer { .. }
         | GraphRecord::RoleFill { .. }
         | GraphRecord::Pin { .. }
@@ -400,6 +406,20 @@ fn put_graph_record(graph: &mut Graph, record: &GraphRecord) -> Result<(), Store
         | GraphRecord::Annotation(_) => put_state_record(graph, record)?,
     }
     Ok(())
+}
+
+/// Stores an answer, and its rationale or the absence of one.
+fn put_answer(
+    state: &mut JourneyState,
+    decision: &NodeKey,
+    value: &AnswerValue,
+    rationale: Option<&Markdown>,
+) {
+    state.answers.insert(decision.clone(), value.clone());
+    match rationale {
+        Some(rationale) => state.rationales.insert(decision.clone(), rationale.clone()),
+        None => state.rationales.remove(decision),
+    };
 }
 
 fn put_state_record(graph: &mut Graph, record: &GraphRecord) -> Result<(), StoreError> {
@@ -424,17 +444,18 @@ fn put_state_record(graph: &mut Graph, record: &GraphRecord) -> Result<(), Store
                 .or_default()
                 .insert(edit.clone());
         }
+        GraphRecord::Tick { node, item } => {
+            state
+                .ticks
+                .entry(node.clone())
+                .or_default()
+                .insert(item.clone());
+        }
         GraphRecord::Answer {
             decision,
             value,
             rationale,
-        } => {
-            state.answers.insert(decision.clone(), value.clone());
-            match rationale {
-                Some(rationale) => state.rationales.insert(decision.clone(), rationale.clone()),
-                None => state.rationales.remove(decision),
-            };
-        }
+        } => put_answer(state, decision, value, rationale.as_ref()),
         GraphRecord::RoleFill { role, identities } => {
             state.role_fills.insert(role.clone(), identities.clone());
         }
@@ -521,6 +542,7 @@ fn remove_graph_key(graph: &mut Graph, key: &GraphKey) -> Result<(), StoreError>
         GraphKey::RetiredKey(_)
         | GraphKey::NodeState(_)
         | GraphKey::LocalEdit { .. }
+        | GraphKey::Tick { .. }
         | GraphKey::Answer(_)
         | GraphKey::RoleFill(_)
         | GraphKey::Pin(_)
@@ -552,6 +574,14 @@ fn remove_state_key(graph: &mut Graph, key: &GraphKey) {
                 edits.remove(edit);
                 if edits.is_empty() {
                     state.local_edits.remove(node);
+                }
+            }
+        }
+        GraphKey::Tick { node, item } => {
+            if let Some(ticked) = state.ticks.get_mut(node) {
+                ticked.remove(item);
+                if ticked.is_empty() {
+                    state.ticks.remove(node);
                 }
             }
         }
@@ -612,6 +642,7 @@ fn remove_node(graph: &mut Graph, node: &cairn_schema::NodeKey) -> Result<(), St
     let state = &mut graph.state;
     state.nodes.remove(node);
     state.local_edits.remove(node);
+    state.ticks.remove(node);
     state.answers.remove(node);
     state.rationales.remove(node);
     state.pins.remove(node);

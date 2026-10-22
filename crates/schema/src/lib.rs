@@ -51,11 +51,12 @@ pub use chain::{
 pub use collections::{BoundedSet, BoundedVec, CollectionError, HasKey, Keyed, OneOrMany};
 pub use condition::{Clause, Comparison, Condition, ConditionValue, Membership};
 pub use derived::{
-    Blocker, Bound, Consequences, Contribution, DateOrigin, DeriveInputs, Derived, DisplayState,
-    DomainDocument, DoneEarly, EffectiveDate, EffectiveParticipation, Explained, HeldDependent,
-    NodeDates, NodeDerived, OwnerFactor, ParticipationOrigin, Progress, RankConstants, Real,
-    Relevance, RelevanceExplanation, Score, ShortfallConsequence, StaleConsequence, StallCause,
-    Stalled, StillWaiting, Thousandths, TimeZoneName, UndecidedConsequence, UndecidedDiscount,
+    Blocker, Bound, ChecklistCount, Consequences, Contribution, DateOrigin, DeriveInputs, Derived,
+    DisplayState, DomainDocument, DoneEarly, EffectiveDate, EffectiveParticipation, Explained,
+    HeldDependent, NodeDates, NodeDerived, OwnerFactor, ParticipationOrigin, Progress,
+    RankConstants, Real, Relevance, RelevanceExplanation, Score, ShortfallConsequence,
+    StaleConsequence, StallCause, Stalled, StillWaiting, Thousandths, TimeZoneName,
+    UndecidedConsequence, UndecidedDiscount,
 };
 pub use document::{
     ParseError, WriteError, from_json, from_yaml, to_json, to_json_pretty, to_yaml,
@@ -81,9 +82,10 @@ pub use limits::{Limit, LimitExceeded};
 pub use login::Login;
 pub use mention::{Mention, condition_identities};
 pub use node::{
-    Action, AnswerSpec, AnswerType, Choice, Choices, DateRule, DateSource, Decision, Deliverable,
-    Direction, Group, IdentitySet, KindColumns, KindField, LabeledChoice, Milestone, Node,
-    NodeKind, NodeShapeError, ParticipationSource, Participations, Payload,
+    Action, AnswerSpec, AnswerType, Checklist, ChecklistItem, Choice, Choices, DateRule,
+    DateSource, Decision, Deliverable, Direction, Group, IdentitySet, KindColumns, KindField,
+    LabeledChoice, Milestone, Node, NodeKind, NodeShapeError, ParticipationSource, Participations,
+    Payload,
 };
 pub use notice::{Notice, NoticeCode};
 pub use number::{Days, NumberError, Revision, SignedDays, VersionNumber, Weight};

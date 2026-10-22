@@ -45,6 +45,13 @@ describe("reset to route (B4)", () => {
     expect([back?.title, back?.estimate, back?.requires, back?.resources]).toEqual([route?.title, route?.estimate, route?.requires, route?.resources]);
   });
 
+  it("resets a checklist the route does not have to the empty list, not to nothing", () => {
+    const local: GraphNode = { key: "n_mine", id: "mine", kind: "action", title: "Mine", checklist: [{ id: "load", title: "Load test" }] };
+    const route: GraphNode = { key: "n_mine", id: "mine", kind: "action", title: "Mine" };
+    const reset = resetMutations(local, route, { field: "checklist" });
+    expect(reset?.[0]).toEqual({ op: "set_node_field", node: "n_mine", value: { checklist: [] } });
+  });
+
   it("offers no reset where the route has no such node to reset to", () => {
     const local: GraphNode = { key: "n_mine", id: "mine", kind: "action", title: "Mine" };
     expect(resetMutations(local, undefined, { field: "title" })).toBeUndefined();

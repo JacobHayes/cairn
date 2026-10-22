@@ -188,6 +188,9 @@ export function guardFailureText(failure: Schema<"GuardFailure">, name: Namer, t
   if (failure === "not_broken_down") {
     return "was not broken down";
   }
+  if ("unticked" in failure) {
+    return `has an unticked checklist item, ${failure.unticked}`;
+  }
   if ("too_early" in failure) {
     return `was finished before its date, ${dateWords(failure.too_early, today)}`;
   }

@@ -389,6 +389,13 @@ fn put_state(graph: &mut Graph, record: &GraphRecord) {
                 .or_default()
                 .insert(edit.clone());
         }
+        GraphRecord::Tick { node, item } => {
+            state
+                .ticks
+                .entry(node.clone())
+                .or_default()
+                .insert(item.clone());
+        }
         GraphRecord::Answer {
             decision,
             value,
@@ -482,6 +489,14 @@ fn remove_state(graph: &mut Graph, key: &GraphKey) {
                 }
             }
         }
+        GraphKey::Tick { node, item } => {
+            if let Some(ticked) = state.ticks.get_mut(node) {
+                ticked.remove(item);
+                if ticked.is_empty() {
+                    state.ticks.remove(node);
+                }
+            }
+        }
         GraphKey::Answer(node) => {
             state.answers.remove(node);
             state.rationales.remove(node);
@@ -536,6 +551,7 @@ fn remove_node(graph: &mut Graph, key: &NodeKey) {
     let state = &mut graph.state;
     state.nodes.remove(key);
     state.local_edits.remove(key);
+    state.ticks.remove(key);
     state.answers.remove(key);
     state.rationales.remove(key);
     state.pins.remove(key);

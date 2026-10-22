@@ -28,7 +28,7 @@ const FIRST: u32 = 13;
 /// Every migration, numbered from [`FIRST`], in order. A migration is never edited once
 /// released; a change is a new one. It is a list of steps run in one transaction with its
 /// number.
-pub(crate) const MIGRATIONS: [(u32, &[Step]); 7] = [
+pub(crate) const MIGRATIONS: [(u32, &[Step]); 8] = [
     (
         FIRST,
         &[Step::Sql(include_str!("migrations/0013_schema.sql"))],
@@ -66,6 +66,10 @@ pub(crate) const MIGRATIONS: [(u32, &[Step]); 7] = [
             Step::Reason,
             Step::Sql(include_str!("migrations/0019_reason.sql")),
         ],
+    ),
+    (
+        20,
+        &[Step::Sql(include_str!("migrations/0020_checklists.sql"))],
     ),
 ];
 

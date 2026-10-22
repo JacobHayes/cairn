@@ -1,6 +1,8 @@
 //! The file document and the graph document: parsing with paths, kind restrictions (A1a),
 //! deterministic writing, and the document-level limits.
 
+use std::fmt::Write as _;
+
 use cairn_schema::{
     FileRefs, Graph, KindField, Limit, Node, NodeKind, RouteFile, from_json, from_yaml, to_json,
     to_yaml,
@@ -54,6 +56,7 @@ fn field_line(field: KindField) -> String {
         KindField::Placeholder
         | KindField::RequiresArtifact
         | KindField::RequiresNote
+        | KindField::RequiresChecklist
         | KindField::Final
         | KindField::AutoDone
         | KindField::Gates
@@ -62,6 +65,7 @@ fn field_line(field: KindField) -> String {
         KindField::Prompt | KindField::Help => "Some text",
         KindField::AnswerType => "text",
         KindField::Choices => "[one]",
+        KindField::Checklist => "[{id: one, title: One}]",
         KindField::FillsRole => "owner_role",
     };
     format!("  {}: {value}\n", field.name())
@@ -140,6 +144,28 @@ fn node_count_at_and_past_its_limit() {
     let error = from_yaml::<RouteFile>(&format!("{header}{}", nodes(2001))).unwrap_err();
     assert_eq!(error.path, "nodes");
     assert!(error.message.contains(Limit::NodeCount.name()), "{error}");
+}
+
+#[test]
+fn checklist_items_at_and_past_their_limit_and_unique() {
+    let route = |items: &[String]| {
+        let mut list = String::new();
+        for id in items {
+            writeln!(list, "  - {{id: {id}, title: Item}}").unwrap();
+        }
+        format!(
+            "format: 1\nroute: list\nname: List\nnodes:\n- id: work\n  kind: action\n  title: Work\n  checklist:\n{list}"
+        )
+    };
+    let ids = |count: u32| -> Vec<String> { (0..count).map(|index| format!("i{index}")).collect() };
+    let limit = Limit::ChecklistItemCountPerNode;
+    assert!(from_yaml::<RouteFile>(&route(&ids(limit.max()))).is_ok());
+    let error = from_yaml::<RouteFile>(&route(&ids(limit.max() + 1))).unwrap_err();
+    assert_eq!(error.path, "nodes[0].checklist");
+    assert!(error.message.contains(limit.name()), "{error}");
+    let repeated = vec!["same".to_owned(), "same".to_owned()];
+    let error = from_yaml::<RouteFile>(&route(&repeated)).unwrap_err();
+    assert_eq!(error.path, "nodes[0].checklist");
 }
 
 #[test]

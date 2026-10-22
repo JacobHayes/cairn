@@ -164,6 +164,10 @@ mod open {
             "Required note",
             &["nodes.requires_note", "annotations.type"],
         ),
+        (
+            "Checklist",
+            &["nodes.checklist", "nodes.requires_checklist", "ticks"],
+        ),
         ("Action", &["nodes.kind"]),
         ("Milestone", &["nodes.is_final", "nodes.auto_done"]),
         (

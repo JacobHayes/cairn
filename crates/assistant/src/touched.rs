@@ -70,6 +70,7 @@ fn node_of(key: &GraphKey, journey: Option<&Graph>) -> Option<NodeKey> {
         | GraphKey::Resource { node, .. }
         | GraphKey::NodeState(node)
         | GraphKey::LocalEdit { node, .. }
+        | GraphKey::Tick { node, .. }
         | GraphKey::Answer(node)
         | GraphKey::Pin(node)
         | GraphKey::Snooze(node)

@@ -13,9 +13,9 @@ use crate::chain::{
     InstantPoint, ShortChain,
 };
 use crate::derived::{
-    Blocker, Bound, Consequences, Contribution, DateOrigin, DeriveInputs, Derived, DisplayState,
-    DomainDocument, DoneEarly, EffectiveDate, EffectiveParticipation, Explained, NodeDates,
-    NodeDerived, ParticipationOrigin, Progress, RankConstants, Real, Relevance,
+    Blocker, Bound, ChecklistCount, Consequences, Contribution, DateOrigin, DeriveInputs, Derived,
+    DisplayState, DomainDocument, DoneEarly, EffectiveDate, EffectiveParticipation, Explained,
+    NodeDates, NodeDerived, ParticipationOrigin, Progress, RankConstants, Real, Relevance,
     RelevanceExplanation, Score, StaleConsequence, StallCause, Stalled,
 };
 use crate::limits::Limit;
@@ -165,6 +165,7 @@ pub fn arb_violation() -> BoxedStrategy<Violation> {
             Guard::DepsDone,
             Guard::HasArtifact,
             Guard::HasNote,
+            Guard::AllTicked,
             Guard::BrokenDown,
             Guard::DateArrived,
         ])),
@@ -431,6 +432,7 @@ fn arb_derived_extras() -> BoxedStrategy<(
             Guard::DepsDone,
             Guard::HasArtifact,
             Guard::HasNote,
+            Guard::AllTicked,
             Guard::BrokenDown,
             Guard::DateArrived,
         ]),
@@ -458,14 +460,32 @@ fn arb_blocker() -> BoxedStrategy<Blocker> {
         .boxed()
 }
 
+/// The ticked and total items of a checklist, when the node has one.
+fn arb_checklist_count() -> BoxedStrategy<Option<ChecklistCount>> {
+    prop::option::of(
+        (0u32..20, 0u32..20).prop_map(|(ticked, extra)| ChecklistCount {
+            ticked,
+            total: ticked + extra,
+        }),
+    )
+    .boxed()
+}
+
+/// What blocks a node, and the nodes it is blocked through.
+fn arb_blocked() -> BoxedStrategy<(Vec<Blocker>, Vec<crate::NodeKey>)> {
+    (
+        prop::collection::vec(arb_blocker(), 0..2),
+        prop::collection::vec(arb_node_key(), 0..2),
+    )
+        .boxed()
+}
+
 /// One node's derived values.
 pub fn arb_node_derived() -> BoxedStrategy<NodeDerived> {
-    let flags = prop::collection::vec(any::<bool>(), 7);
-    let blockers = prop::collection::vec(arb_blocker(), 0..2);
     (
         arb_relevance(),
-        flags,
-        (blockers, prop::collection::vec(arb_node_key(), 0..2)),
+        prop::collection::vec(any::<bool>(), 7),
+        arb_blocked(),
         prop::collection::btree_map(arb_kind_key(), arb_participation(), 0..2),
         prop::collection::btree_set(arb_guard_failure(), 0..2),
         arb_node_dates(),
@@ -479,6 +499,7 @@ pub fn arb_node_derived() -> BoxedStrategy<NodeDerived> {
         arb_display_state(),
         prop::option::of(arb_score()),
         arb_derived_extras(),
+        arb_checklist_count(),
     )
         .prop_map(
             |(
@@ -493,6 +514,7 @@ pub fn arb_node_derived() -> BoxedStrategy<NodeDerived> {
                 shown,
                 subtree,
                 (progress, failing_guards, started_early, waits_on),
+                checklist_count,
             )| {
                 let flag = |index: usize| flags.get(index).copied().unwrap_or(false);
                 NodeDerived {
@@ -510,6 +532,7 @@ pub fn arb_node_derived() -> BoxedStrategy<NodeDerived> {
                     overdue: flag(4),
                     dates,
                     progress,
+                    checklist_count,
                     failing_guards,
                     started_early,
                     waits_on,
