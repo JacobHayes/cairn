@@ -294,6 +294,13 @@ pub static NODES: Endpoint = endpoint(Method::GET, "/api/journeys/{id}/nodes", "
 pub static MINE: Endpoint = endpoint(Method::GET, "/api/journeys/{id}/mine", "getMine");
 /// `GET /api/journeys/{id}/nodes/{key}`: one node in full, explanations capped (C8).
 pub static NODE: Endpoint = endpoint(Method::GET, "/api/journeys/{id}/nodes/{key}", "getNode");
+/// `GET /api/journeys/{id}/nodes/{key}/removal`: the removal of a node and the references
+/// elsewhere that removing it must also change (A18).
+pub static NODE_REMOVAL: Endpoint = endpoint(
+    Method::GET,
+    "/api/journeys/{id}/nodes/{key}/removal",
+    "getNodeRemoval",
+);
 /// `GET /api/journeys/{id}/nodes/{key}/explanations/{field}`: a page of one explanation list.
 pub static EXPLANATIONS: Endpoint = endpoint(
     Method::GET,
@@ -376,7 +383,7 @@ pub static ASSISTANT_ROUTE_DRAFT_CONVERSATION: Endpoint = for_users(
 );
 
 /// Every endpoint, in the order the OpenAPI document lists them.
-pub static ALL: [&Endpoint; 69] = [
+pub static ALL: [&Endpoint; 70] = [
     &HEALTH,
     &CAPABILITIES,
     &PATCH_JOURNEY,
@@ -426,6 +433,7 @@ pub static ALL: [&Endpoint; 69] = [
     &NODES,
     &MINE,
     &NODE,
+    &NODE_REMOVAL,
     &EXPLANATIONS,
     &HISTORY,
     &ROUTES,

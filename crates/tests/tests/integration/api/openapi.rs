@@ -63,6 +63,7 @@ mod in_process {
             ("list", vec![&at::NODES]),
             ("mine", vec![&at::MINE]),
             ("node_detail", vec![&at::NODE]),
+            ("node_removal", vec![&at::NODE_REMOVAL]),
             ("explanations", vec![&at::EXPLANATIONS]),
             ("history", vec![&at::HISTORY]),
             (

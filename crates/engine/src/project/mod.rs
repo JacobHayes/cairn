@@ -14,6 +14,7 @@ mod effects;
 mod explain;
 mod level;
 mod next;
+mod removal;
 mod rows;
 mod snapshot;
 mod trace;

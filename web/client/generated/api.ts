@@ -432,6 +432,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/journeys/{id}/nodes/{key}/removal": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** The exact removal of a node as the journey stands, and the references elsewhere that the same patch must rewrite or remove. */
+        get: operations["getNodeRemoval"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/journeys/{id}/patches": {
         parameters: {
             query?: never;
@@ -3714,6 +3731,18 @@ export interface components {
             /** @constant */
             fact: "inserts_segment";
         };
+        /**
+         * @description One place outside a removed subtree that names a node inside it, and so must be
+         *     rewritten or removed in the same patch.
+         */
+        OutsideReference: {
+            /** @description Where it holds it. */
+            field: components["schemas"]["ReferenceField"];
+            /** @description The node outside that holds the reference. */
+            holder: components["schemas"]["NodeKey"];
+            /** @description The node inside the subtree it names. */
+            target: components["schemas"]["NodeKey"];
+        };
         /** @description An override to apply. */
         Override: {
             force_include: {
@@ -4042,6 +4071,20 @@ export interface components {
             today: string;
             /** @description The projection. */
             value: components["schemas"]["NodeDetail"];
+        };
+        /** @description A projection with what it was derived from (computed per read, never stored). */
+        ProjectedRemovalRead: {
+            /** @description The deployment revision it was derived over. */
+            deployment_revision: components["schemas"]["Revision"];
+            /** @description The journey's revision it was derived from: a tick newer than this means refetch. */
+            revision: components["schemas"]["Revision"];
+            /**
+             * Format: date
+             * @description The today it was derived for, in the deployment's zone.
+             */
+            today: string;
+            /** @description The projection. */
+            value: components["schemas"]["RemovalRead"];
         };
         /** @description A projection with what it was derived from (computed per read, never stored). */
         ProjectedSnapshot: {
@@ -4499,6 +4542,8 @@ export interface components {
         };
         /** @description Which recorded date a [`Mutation::SetRecordedDate`] edits. */
         RecordedEnd: "start" | "finish";
+        /** @description Which field of a node outside a removed subtree names a node inside it. */
+        ReferenceField: "relevant_when" | "due_by" | "not_before" | "opens_at" | "closes_at" | "feeds_milestone" | "message_draft" | "snooze";
         /** @description Why a patch was not applied. */
         Rejection: {
             /** @description The revisions that moved on. */
@@ -4582,6 +4627,20 @@ export interface components {
             participations?: components["schemas"]["ParticipationRef"][];
             /** @description Their resources. */
             resources?: components["schemas"]["AttachmentKey"][];
+        };
+        /**
+         * @description What removing a node needs right now: the exact removal, and the references from
+         *     outside its subtree that the same patch must also rewrite or remove.
+         */
+        RemovalRead: {
+            /**
+             * @description Conditions, date rules, stage bounds, fed milestones, message drafts, and snoozes
+             *     elsewhere that name a node being removed. Edges into the subtree are already in
+             *     the removal.
+             */
+            outside_references: components["schemas"]["OutsideReference"][];
+            /** @description The removal to send in a `remove_node` mutation. */
+            removal: components["schemas"]["Removal"];
         };
         /** @description Route-authored guidance on a node, keyed so upgrades diff it. */
         Resource: {
@@ -7955,6 +8014,86 @@ export interface operations {
             };
             /** @description The journey moved since the page the cursor came from: start again from the first page. */
             409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description The server failed; the request id names it in the logs. */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description A limit was reached or the request timed out; retry after `Retry-After`. Or: The auth layer could not ask a sign-in provider (in text, without `Retry-After`). */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Problem"];
+                    "text/plain": string;
+                };
+            };
+        };
+    };
+    getNodeRemoval: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The journey. */
+                id: components["schemas"]["JourneyId"];
+                /** @description The node. */
+                key: components["schemas"]["NodeKey"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Answered. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ProjectedRemovalRead"];
+                };
+            };
+            /** @description The request is malformed. */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description No credential, or one that is refused (the auth layer, in text). */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "text/plain": string;
+                };
+            };
+            /** @description The auth layer refused the peer: a local-only provider and a remote peer, or login headers from a peer no proxy-mode provider trusts (in text). */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "text/plain": string;
+                };
+            };
+            /** @description No such resource. */
+            404: {
                 headers: {
                     [name: string]: unknown;
                 };

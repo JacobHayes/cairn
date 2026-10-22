@@ -17,6 +17,7 @@ use crate::derived::{
 use crate::event::Event;
 use crate::id::{IdentityKey, KindKey, NodeKey, PatchId, Path, RoleKey, Slug};
 use crate::node::NodeKind;
+use crate::patch::Removal;
 use crate::state::{AnswerValue, SnoozeTarget, State};
 use crate::text::{Markdown, Title};
 
@@ -1181,4 +1182,57 @@ impl RenderedDraft {
             })
             .collect()
     }
+}
+
+// PRD: A18.
+/// Which field of a node outside a removed subtree names a node inside it.
+#[derive(
+    Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize, JsonSchema,
+)]
+#[serde(rename_all = "snake_case")]
+pub enum ReferenceField {
+    /// The node's relevance condition reads a decision inside.
+    RelevantWhen,
+    /// The node's due-by rule measures from a node inside.
+    DueBy,
+    /// The node's not-before rule measures from a node inside.
+    NotBefore,
+    /// A stage's opening milestone is inside.
+    OpensAt,
+    /// A stage's closing milestone is inside.
+    ClosesAt,
+    /// A date decision feeds a milestone inside.
+    FeedsMilestone,
+    /// A message draft on the node quotes the answer of a decision inside.
+    MessageDraft,
+    /// The node is snoozed until a node inside is done.
+    Snooze,
+}
+
+// PRD: A18.
+/// One place outside a removed subtree that names a node inside it, and so must be
+/// rewritten or removed in the same patch.
+#[derive(Clone, Debug, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize, JsonSchema)]
+#[serde(deny_unknown_fields)]
+pub struct OutsideReference {
+    /// The node outside that holds the reference.
+    pub holder: NodeKey,
+    /// Where it holds it.
+    pub field: ReferenceField,
+    /// The node inside the subtree it names.
+    pub target: NodeKey,
+}
+
+// PRD: A18.
+/// What removing a node needs right now: the exact removal, and the references from
+/// outside its subtree that the same patch must also rewrite or remove.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+#[serde(deny_unknown_fields)]
+pub struct RemovalRead {
+    /// The removal to send in a `remove_node` mutation.
+    pub removal: Removal,
+    /// Conditions, date rules, stage bounds, fed milestones, message drafts, and snoozes
+    /// elsewhere that name a node being removed. Edges into the subtree are already in
+    /// the removal.
+    pub outside_references: Vec<OutsideReference>,
 }

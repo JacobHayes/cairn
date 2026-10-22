@@ -8,7 +8,7 @@ use axum::extract::{Extension, RawQuery, State};
 use axum::routing::get;
 use cairn_schema::{
     Actor, DecisionView, Derived, ExplainedField, ExplanationPage, JourneyId, Level, ListPage,
-    Next, NodeKey, Snapshot, StatusSummary, Timeline, Trace,
+    Next, NodeKey, RemovalRead, Snapshot, StatusSummary, Timeline, Trace,
 };
 
 use super::Answer;
@@ -32,6 +32,7 @@ pub fn served() -> crate::Served {
         (&at::NODES, get(nodes)),
         (&at::MINE, get(mine)),
         (&at::NODE, get(node_detail)),
+        (&at::NODE_REMOVAL, get(node_removal)),
         (&at::EXPLANATIONS, get(explanations)),
         (&at::HISTORY, get(history)),
     ]
@@ -185,6 +186,21 @@ pub async fn node_detail(
 ) -> Projection<NodeDetail> {
     let (id, key) = (journey(&id)?, node(&key)?);
     let projected = api.service.node_detail(&api.call(actor), &id, &key).await?;
+    Ok(Json(Projected::from_service(projected)))
+}
+
+/// `GET /api/journeys/{id}/nodes/{key}/removal` (A18): the node's removal as the journey
+/// stands, with the references elsewhere that the same patch must change.
+pub async fn node_removal(
+    State(api): State<Api>,
+    Extension(actor): Extension<Actor>,
+    Path((id, key)): Path<(String, String)>,
+) -> Projection<RemovalRead> {
+    let (id, key) = (journey(&id)?, node(&key)?);
+    let projected = api
+        .service
+        .node_removal(&api.call(actor), &id, &key)
+        .await?;
     Ok(Json(Projected::from_service(projected)))
 }
 

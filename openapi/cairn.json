@@ -9644,6 +9644,30 @@
           }
         ]
       },
+      "OutsideReference": {
+        "additionalProperties": false,
+        "description": "One place outside a removed subtree that names a node inside it, and so must be\nrewritten or removed in the same patch.",
+        "properties": {
+          "field": {
+            "$ref": "#/components/schemas/ReferenceField",
+            "description": "Where it holds it."
+          },
+          "holder": {
+            "$ref": "#/components/schemas/NodeKey",
+            "description": "The node outside that holds the reference."
+          },
+          "target": {
+            "$ref": "#/components/schemas/NodeKey",
+            "description": "The node inside the subtree it names."
+          }
+        },
+        "required": [
+          "holder",
+          "field",
+          "target"
+        ],
+        "type": "object"
+      },
       "Override": {
         "description": "An override to apply.",
         "oneOf": [
@@ -10650,6 +10674,36 @@
           },
           "value": {
             "$ref": "#/components/schemas/NodeDetail",
+            "description": "The projection."
+          }
+        },
+        "required": [
+          "revision",
+          "deployment_revision",
+          "today",
+          "value"
+        ],
+        "type": "object"
+      },
+      "ProjectedRemovalRead": {
+        "additionalProperties": false,
+        "description": "A projection with what it was derived from (computed per read, never stored).",
+        "properties": {
+          "deployment_revision": {
+            "$ref": "#/components/schemas/Revision",
+            "description": "The deployment revision it was derived over."
+          },
+          "revision": {
+            "$ref": "#/components/schemas/Revision",
+            "description": "The journey's revision it was derived from: a tick newer than this means refetch."
+          },
+          "today": {
+            "description": "The today it was derived for, in the deployment's zone.",
+            "format": "date",
+            "type": "string"
+          },
+          "value": {
+            "$ref": "#/components/schemas/RemovalRead",
             "description": "The projection."
           }
         },
@@ -11930,6 +11984,51 @@
           }
         ]
       },
+      "ReferenceField": {
+        "description": "Which field of a node outside a removed subtree names a node inside it.",
+        "oneOf": [
+          {
+            "const": "relevant_when",
+            "description": "The node's relevance condition reads a decision inside.",
+            "type": "string"
+          },
+          {
+            "const": "due_by",
+            "description": "The node's due-by rule measures from a node inside.",
+            "type": "string"
+          },
+          {
+            "const": "not_before",
+            "description": "The node's not-before rule measures from a node inside.",
+            "type": "string"
+          },
+          {
+            "const": "opens_at",
+            "description": "A stage's opening milestone is inside.",
+            "type": "string"
+          },
+          {
+            "const": "closes_at",
+            "description": "A stage's closing milestone is inside.",
+            "type": "string"
+          },
+          {
+            "const": "feeds_milestone",
+            "description": "A date decision feeds a milestone inside.",
+            "type": "string"
+          },
+          {
+            "const": "message_draft",
+            "description": "A message draft on the node quotes the answer of a decision inside.",
+            "type": "string"
+          },
+          {
+            "const": "snooze",
+            "description": "The node is snoozed until a node inside is done.",
+            "type": "string"
+          }
+        ]
+      },
       "Rejection": {
         "description": "Why a patch was not applied.",
         "oneOf": [
@@ -12153,6 +12252,28 @@
         },
         "required": [
           "node"
+        ],
+        "type": "object"
+      },
+      "RemovalRead": {
+        "additionalProperties": false,
+        "description": "What removing a node needs right now: the exact removal, and the references from\noutside its subtree that the same patch must also rewrite or remove.",
+        "properties": {
+          "outside_references": {
+            "description": "Conditions, date rules, stage bounds, fed milestones, message drafts, and snoozes\nelsewhere that name a node being removed. Edges into the subtree are already in\nthe removal.",
+            "items": {
+              "$ref": "#/components/schemas/OutsideReference"
+            },
+            "type": "array"
+          },
+          "removal": {
+            "$ref": "#/components/schemas/Removal",
+            "description": "The removal to send in a `remove_node` mutation."
+          }
+        },
+        "required": [
+          "removal",
+          "outside_references"
         ],
         "type": "object"
       },
@@ -18481,6 +18602,109 @@
           }
         },
         "summary": "A page of a node's explanation list, largest first."
+      }
+    },
+    "/api/journeys/{id}/nodes/{key}/removal": {
+      "get": {
+        "operationId": "getNodeRemoval",
+        "parameters": [
+          {
+            "description": "The journey.",
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/JourneyId"
+            }
+          },
+          {
+            "description": "The node.",
+            "in": "path",
+            "name": "key",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/NodeKey"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProjectedRemovalRead"
+                }
+              }
+            },
+            "description": "Answered."
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "The request is malformed."
+          },
+          "401": {
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "description": "No credential, or one that is refused (the auth layer, in text)."
+          },
+          "403": {
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "description": "The auth layer refused the peer: a local-only provider and a remote peer, or login headers from a peer no proxy-mode provider trusts (in text)."
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "No such resource."
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "The server failed; the request id names it in the logs."
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              },
+              "text/plain": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "description": "A limit was reached or the request timed out; retry after `Retry-After`. Or: The auth layer could not ask a sign-in provider (in text, without `Retry-After`)."
+          }
+        },
+        "summary": "The exact removal of a node as the journey stands, and the references elsewhere that the same patch must rewrite or remove."
       }
     },
     "/api/journeys/{id}/patches": {

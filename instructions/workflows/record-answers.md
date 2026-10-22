@@ -18,9 +18,10 @@ description: Record answers a person gives in conversation as decision answers, 
    (markdown): the reason this answer was given, in the person's terms. It belongs to
    that answer alone, so repeat it when you revise an answer for the same reason, and
    leave it off when the person gave none; never write one the person did not give.
-4. **One answer per write.** Each `answer_decision` is one patch with its own `patch_id`,
-   against the journey's current revision. Several answers given at once can go in one
-   `apply_patch` with an `answer` mutation each.
+4. **Batch what is already given.** Answers the person has given together go in one
+   `apply_patch` with an `answer` mutation each (one `patch_id`, the journey's current
+   revision); a single answer can use `answer_decision`. Answers the person has not given
+   yet wait for their question.
 5. **Changing an answer** is another `answer_decision`. Cairn re-evaluates what is relevant;
    work already done under the old answer is kept and reported if it no longer applies.
    The new answer has only the `rationale` you send with it: the previous reason is not

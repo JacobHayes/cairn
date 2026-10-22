@@ -22,8 +22,8 @@ use crate::wire::{
 use cairn_schema::{
     AgentId, DecisionView, Deployment, Derived, DomainDocument, ExplainedField, ExplanationPage,
     IdentityKey, Journey, JourneyId, Level, ListPage, Next, NodeKey, Proposal, ProposalId,
-    Rejection, Route, RouteFile, RouteId, RouteVersion, Snapshot, StatusSummary, Timeline, Trace,
-    VersionNumber,
+    Rejection, RemovalRead, Route, RouteFile, RouteId, RouteVersion, Snapshot, StatusSummary,
+    Timeline, Trace, VersionNumber,
 };
 
 type SchemaFn = fn(&mut SchemaGenerator) -> Schema;
@@ -184,6 +184,15 @@ fn node_reads() -> Vec<Operation> {
                 &at::NODE,
                 "One node in full; each explanation list carries its largest entries up to \
                  the response limit and its total.",
+                &[],
+            )
+        },
+        Operation {
+            path: &[JOURNEY_ID, NODE_KEY],
+            ..projection::<RemovalRead>(
+                &at::NODE_REMOVAL,
+                "The exact removal of a node as the journey stands, and the references \
+                 elsewhere that the same patch must rewrite or remove.",
                 &[],
             )
         },

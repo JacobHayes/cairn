@@ -32,7 +32,10 @@ and that user.
 3. **Write in small, named steps.** Each write is one patch. Give it a new `patch_id` you
    make up (`p_` and a short slug, unique per write) and the `base_revision` you read.
    The answer's `receipt.revision` is the base of your next write on that journey.
-4. **Report consequences.** A write answers what it newly caused (nodes that went stale,
+4. **Offer to walk open decisions.** Whenever a journey has open decisions (you just
+   created it, or you are back at it later), offer to walk them with the person
+   (walk-decisions): they gate what depends on them.
+5. **Report consequences.** A write answers what it newly caused (nodes that went stale,
    shortfalls, relevance changes, and finished work that may not apply because the decision
    its relevance reads is unanswered). Tell the person what changed, not just that it worked.
 
@@ -107,15 +110,51 @@ journey as a route, and re-linking are always proposals (`upgrade`, `save_as_rou
 under a destination, the ones waiting on the caller, or the ones that would create a journey
 or route); a proposal stays listed until it is applied or discarded.
 
-`apply_patch` takes any patch to a journey, a route's draft, or the deployment, when no
-other tool fits.
-
 Work marked `requires_note` cannot be completed until it has a note of its own (a link,
 or a note on a child or the journey, does not count). Send the note and the completion as
 one `apply_patch` (`add_annotation` with the node and the text, then the `complete`
 transition); `transition_node` alone is refused with the `has_note` guard. Bypass it with
 `override` only when the person says no note is needed. Removing the last note later marks
 a finished node `stale` with "missing note".
+
+## Editing structure
+
+Structural edits are mutations, in a proposal's `mutations` or, when the person asked for
+the change, in `apply_patch` (a journey, a route's draft, or the deployment; the tool for
+a state change, when there is one, is simpler). Several edits are one patch, one revision.
+
+- **One field of a node:** `set_node_field` with the field and its new value. Prefer it
+  for any small edit. It does not take `requires`.
+- **A node rewritten whole:** `replace_node` with the full node, `requires` included. Use
+  it to change a node's kind or answer type, or many fields at once; send everything, it
+  replaces rather than merges.
+- **Edges:** `add_edge` and `remove_edge`, each `{node, requires}`.
+- **Removing a node:** `remove_node` takes a removal object that names the node, its
+  descendants, every edge into or out of that subtree, and the resources, notes, and
+  participations on it. One that leaves any of it out is refused (never widened). In a
+  journey do not build it by hand: `get_node` with `removal` true returns the exact
+  `removal` for now, and the `outside_references` the same patch must also change (a
+  page at a time; `next` goes back as `references_cursor`). Each names a `holder` node
+  outside, the `field` that mentions a node being removed, and the `target`. Clear or
+  rewrite it with `set_node_field` (`relevant_when`, `due_by`, `not_before`, `opens_at`,
+  `closes_at`, or `feeds_milestone`), `edit_resource` for a message draft, or `unsnooze`.
+  Read again if the revision moved. A route's draft has no such read: assemble the removal
+  from `get_route`, and expect the refusal to list anything missed.
+- **Roles and kinds:** `add_role`, `edit_role`, `remove_role` (refused while a
+  participation or `fills_role` names it), the matching `..._participation_kind` ops, and
+  `set_default_owner`. `assign` is the tool for who does a node; a role no decision
+  fills is filled with `fill_role` and emptied with `clear_role_fill`.
+- **Resources and notes:** `add_resource`, `edit_resource`, `remove_resource`; and
+  `add_annotation`, `edit_annotation`, `remove_annotation`.
+- **A placeholder's breakdown flag:** `set_atomic`.
+- **The journey:** `edit_journey` (name, description) and `set_journey_status` (completing
+  or archiving is the person's call). `delete_journey` is permanent; only when the
+  person asks. Also `discard_proposal` for a proposal nobody will apply.
+- **Routes:** `create_route`, `edit_route`, `set_route_retired` (hides it from new
+  journeys), and a draft's `discard_draft`; `open_draft` and `publish_draft` are also
+  tools.
+- **Leave to Cairn:** `set_provenance` and `mark_local_edit` record lineage for upgrades
+  and are written by upgrades and re-linking, not by hand.
 
 ## Stages
 

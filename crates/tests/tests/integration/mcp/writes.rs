@@ -293,3 +293,69 @@ async fn a_merge_resubmitted_after_its_journeys_moved_is_answered_from_its_recei
     );
     assert!(reused, "{other:?}");
 }
+
+/// A18: the removal `get_node` returns removes a node with a child, an incoming edge and a note
+/// in one patch once the outside condition it names is cleared in that patch; the removal alone
+/// is refused for the condition it leaves dangling.
+#[tokio::test]
+async fn the_removal_read_is_what_a_patch_needs_to_remove_a_node() {
+    let world = World::new();
+    let ann = user("u_ann");
+    let nodes = [
+        json!({ "key": "n_phase", "id": "phase", "kind": "group", "title": "Phase" }),
+        json!({ "key": "n_ask", "id": "ask", "kind": "decision", "title": "Ask",
+            "parent": "n_phase", "prompt": "Go?", "answer_type": "boolean" }),
+        json!({ "key": "n_after", "id": "after", "kind": "action", "title": "After",
+            "requires": ["n_phase"] }),
+        json!({ "key": "n_extra", "id": "extra", "kind": "action", "title": "Extra",
+            "relevant_when": { "equals": { "decision": "n_ask", "value": true } } }),
+    ];
+    let mut setup = vec![json!({ "op": "create_journey", "name": "Removal" })];
+    setup.extend(nodes.map(|node| json!({ "op": "add_node", "node": node })));
+    setup.push(json!({ "op": "add_annotation",
+        "annotation": { "key": "a_note", "node": "n_phase", "note": "Seen." } }));
+    let patch = |id: &str, base: u32, mutations: Vec<serde_json::Value>| {
+        json!({ "patch": { "id": id, "target": { "journey": "j_removal" },
+            "base_revision": base, "mutations": mutations } })
+    };
+    let created = world
+        .ok(&ann, "apply_patch", patch("p_setup", 0, setup))
+        .await;
+    let revision = u32::try_from(created["receipt"]["revision"].as_u64().unwrap()).unwrap();
+
+    let read = json!({ "journey": "j_removal", "node": "n_phase", "removal": true });
+    let read = world.ok(&ann, "get_node", read).await["removal"].clone();
+    assert_eq!(read["removal"]["descendants"], json!(["n_ask"]));
+    assert_eq!(read["removal"]["annotations"], json!(["a_note"]));
+    assert_eq!(
+        read["removal"]["edges"],
+        json!([{ "node": "n_after", "requires": "n_phase" }])
+    );
+    assert_eq!(
+        read["outside_references"]["items"],
+        json!([{ "holder": "n_extra", "field": "relevant_when", "target": "n_ask" }])
+    );
+
+    let remove = json!({ "op": "remove_node", "removal": read["removal"] });
+    let alone = patch("p_alone", revision, vec![remove.clone()]);
+    let refused = world.call(&ann, "apply_patch", alone).await;
+    assert!(
+        matches!(refused, Err(ToolError::Rejected { .. })),
+        "the removal alone leaves the condition dangling: {refused:?}"
+    );
+
+    let clear = json!({ "op": "set_node_field", "node": "n_extra",
+        "value": { "relevant_when": null } });
+    let both = patch("p_both", revision, vec![remove, clear]);
+    world.ok(&ann, "apply_patch", both).await;
+    let snapshot = world
+        .ok(&ann, "get_snapshot", json!({ "journey": "j_removal" }))
+        .await;
+    let left: Vec<&str> = snapshot["snapshot"]["nodes"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .map(|node| node["row"]["key"].as_str().unwrap())
+        .collect();
+    assert_eq!(left, ["n_after", "n_extra"]);
+}

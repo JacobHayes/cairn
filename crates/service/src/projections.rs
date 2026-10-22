@@ -17,8 +17,9 @@ use cairn_schema::{
     Annotation, AnswerEffects, AnswerValue, Cursor, Date, DecisionView, Deployment, DisplayState,
     Domain, ExplainedField, ExplanationPage, IdentityKey, JourneyId, KeyRefs, KindKey, Level,
     LevelQuery, ListPage, ListQuery, LocalEdit, Markdown, MineEntry, Next, NextQuery, Node,
-    NodeDerived, NodeKey, NodeKind, NodeState, Overrides, PatchEvents, Path, ProposalId, Revision,
-    Snapshot, SnapshotScope, State, StatusSummary, StillWaiting, Timeline, Title, Trace,
+    NodeDerived, NodeKey, NodeKind, NodeState, Overrides, PatchEvents, Path, ProposalId,
+    RemovalRead, Revision, Snapshot, SnapshotScope, State, StatusSummary, StillWaiting, Timeline,
+    Title, Trace,
 };
 use cairn_store::{EventQuery, PageSize};
 
@@ -343,6 +344,22 @@ impl Service {
             journey.explanations(key, field, cursor)
         })
         .await
+    }
+
+    /// A18: the removal of a node as the journey stands now, with the references from outside
+    /// its subtree that the same patch must rewrite or remove.
+    ///
+    /// # Errors
+    ///
+    /// When the journey or the node does not exist, or the store fails.
+    pub async fn node_removal(
+        &self,
+        call: &Call,
+        id: &JourneyId,
+        key: &NodeKey,
+    ) -> Result<Projected<RemovalRead>, ReadError> {
+        self.project(call, id, |journey, _| journey.removal(key))
+            .await
     }
 
     /// J4: a page of the journey's history, or of the events naming `node`, from the store's

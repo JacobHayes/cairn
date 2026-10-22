@@ -9,8 +9,8 @@ use cairn_schema::{
     Annotation, AnswerEffects, AnswerValue, Cursor, Date, DisplayState, ExplainedField,
     ExplanationPage, JourneyId, KeyRefs, Level, LevelDisplay, LevelEdge, LevelNode, LevelQuery,
     ListFlag, ListQuery, LocalEdit, Markdown, Next, NextQuery, Node, NodeDerived, NodeKey,
-    NodeKind, NodeRow, NodeState, Overrides, Path, Snapshot, SnapshotScope, SortBy, Stalled,
-    StillWaiting,
+    NodeKind, NodeRow, NodeState, OutsideReference, Overrides, Path, Removal, Snapshot,
+    SnapshotScope, SortBy, Stalled, StillWaiting,
 };
 use cairn_service::{Call, ChildEntry, NodeDetail};
 use schemars::JsonSchema;
@@ -59,7 +59,10 @@ pub(crate) const SPECS: &[Spec] = &[
             the stored state. For a decision, `answer_effects`: per choice, the nodes it \
             brings in, drops, and leaves to be decided later, and what it pins or fills. \
             Explanation lists hold their largest entries; pass `explanations` to page the \
-            rest.",
+            rest. Pass `removal` instead to get the exact `removal` for a `remove_node` \
+            mutation removing the node now, and the `outside_references` (conditions, date \
+            rules, stage bounds, fed milestones, message drafts, snoozes elsewhere, paged by \
+            `references_cursor`) the same patch must rewrite or remove.",
         writes: Writes::Nothing,
         destructive: false,
         schema: schema::<GetNode>,
@@ -172,6 +175,14 @@ pub(crate) struct GetNode {
     /// node's detail cuts to its largest entries.
     #[serde(default)]
     explanations: Option<MoreExplanations>,
+    /// Instead of the node, the exact removal for removing it now, and the references
+    /// elsewhere that the same patch must rewrite or remove.
+    #[serde(default)]
+    removal: bool,
+    /// With `removal`, where the page of outside references starts: the `next` of the page
+    /// before.
+    #[serde(default)]
+    references_cursor: Cursor,
     /// Where the page of its children starts: the `next` of their page before.
     #[serde(default)]
     children_cursor: Cursor,
@@ -190,7 +201,7 @@ pub(crate) struct MoreExplanations {
     cursor: Cursor,
 }
 
-/// One node in full, or a page of an explanation list: exactly one is present.
+/// One node in full, a page of an explanation list, or its removal: exactly one is present.
 #[derive(Debug, Serialize, JsonSchema)]
 pub(crate) struct NodeOutput {
     /// The node's detail.
@@ -199,6 +210,22 @@ pub(crate) struct NodeOutput {
     /// A page of an explanation list.
     #[serde(skip_serializing_if = "Option::is_none")]
     explanations: Option<ExplanationPage>,
+    /// The removal of the node and what else a patch removing it must change.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    removal: Option<RemovalOutput>,
+}
+
+/// The removal of a node, whole, with a page of the references elsewhere that name what it
+/// removes.
+#[derive(Debug, Serialize, JsonSchema)]
+pub(crate) struct RemovalOutput {
+    /// The removal to send in a `remove_node` mutation.
+    removal: Removal,
+    /// Conditions, date rules, stage bounds, fed milestones, message drafts, and snoozes
+    /// elsewhere that name a node being removed, which the same patch must rewrite or
+    /// remove; edges into the subtree are in the removal. Pass `next` as
+    /// `references_cursor` for the rest.
+    outside_references: Paged<OutsideReference>,
 }
 
 // PRD: C8.
@@ -452,12 +479,31 @@ impl ToolSet {
     /// `get_node`, or a page of one of its explanation lists.
     async fn get_node(&self, call: &Call, arguments: GetNode) -> Result<At<NodeOutput>, ToolError> {
         let (journey, node) = (&arguments.journey, &arguments.node);
+        if arguments.removal && arguments.explanations.is_some() {
+            return Err(ToolError::Arguments {
+                path: "removal".into(),
+                message: "ask for `removal` or `explanations`, not both".into(),
+            });
+        }
+        if arguments.removal {
+            let projected = self.service.node_removal(call, journey, node).await?;
+            let cursor = arguments.references_cursor;
+            return Ok(At::of(projected, |read| NodeOutput {
+                detail: None,
+                explanations: None,
+                removal: Some(RemovalOutput {
+                    removal: read.removal,
+                    outside_references: page(read.outside_references, cursor),
+                }),
+            }));
+        }
         let Some(more) = arguments.explanations else {
             let projected = self.service.node_detail(call, journey, node).await?;
             let (children, annotations) = (arguments.children_cursor, arguments.annotations_cursor);
             return Ok(At::of(projected, |detail| NodeOutput {
                 detail: Some(Box::new(Detail::of(detail, children, annotations))),
                 explanations: None,
+                removal: None,
             }));
         };
         let projected = self
@@ -467,6 +513,7 @@ impl ToolSet {
         Ok(At::of(projected, |page| NodeOutput {
             detail: None,
             explanations: Some(page),
+            removal: None,
         }))
     }
 
