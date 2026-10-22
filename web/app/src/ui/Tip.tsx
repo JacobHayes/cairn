@@ -390,6 +390,11 @@ function moveListeners({ actor, presenter, signal }: Listening): void {
     if (event.target instanceof Element && event.target.closest(".tip") !== null) {
       return;
     }
+    // A scroll moves what is under the pointer only when the scroller holds the thing: another scroller's (a column resetting to its top, a list loading in) leaves it where it was.
+    const held = actor.getSnapshot().context.target?.element;
+    if (event.type === "scroll" && held !== undefined && event.target instanceof Node && !event.target.contains(held)) {
+      return;
+    }
     if (actor.getSnapshot().context.via === "pointer") {
       actor.send({ type: "dismiss" });
     } else {

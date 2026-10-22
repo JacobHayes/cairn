@@ -190,20 +190,28 @@ test("a timeline title cut short shows whole in a tip that is not itself cut", a
   const journey = await publishStressJourney(page);
   await openAt(page, "browser", journey, "timeline");
   const links = page.locator(".timeline-text a");
-  const cut = await whenSettled(page, () => links.evaluateAll((all) => all.flatMap((each, at) => (each.scrollWidth > each.clientWidth + 1 ? [at] : []))));
-  expect(cut.length, "the stress journey cuts some timeline titles").toBeGreaterThan(0);
+  // A title that is cut and already in the window: the pointer goes straight to it, and nothing has to scroll (a scroll under the pointer closes a tip, as it should).
+  const cut = await whenSettled(page, () => links.evaluateAll((all) => all.flatMap((each, at) => (each.scrollWidth > each.clientWidth + 1 && each.getBoundingClientRect().top >= 0 && each.getBoundingClientRect().bottom <= window.innerHeight ? [at] : []))));
+  expect(cut.length, "the stress journey cuts some timeline titles inside the window").toBeGreaterThan(0);
   const long = links.nth(cut[0] ?? 0);
   const whole = (await whenSettled(page, () => long.textContent()))?.trim() ?? "";
-  // Scrolled into view first and the scroll let to land: a scroll event arriving after the pointer is over the title closes a tip, as it should, so the pointer must not be put over it while the page is still moving.
-  await long.scrollIntoViewIfNeeded();
-  let last = "";
-  await expect.poll(async () => {
-    const now = JSON.stringify(await long.boundingBox());
-    const still = now === last;
-    last = now;
-    return still;
-  }).toBe(true);
   await long.hover();
   await expect(openTip(page)).toHaveText(whole);
   await expect.poll(() => openTip(page).evaluate((tip) => tip.scrollWidth - tip.clientWidth)).toBeLessThanOrEqual(1);
+});
+
+test("a scroll in another scroller does not take a tip from a pointer resting on its control", async ({ page }) => {
+  await page.clock.install();
+  await openAt(page, "browser", FIXTURE, "graph");
+  await page.getByTestId("chip-frontier").hover();
+  await expect(openTip(page)).toHaveCount(0);
+  await page.evaluate(() => {
+    const other = document.createElement("div");
+    other.style.cssText = "position:fixed;left:0;bottom:0;width:20px;height:20px;overflow:auto";
+    other.innerHTML = '<div style="height:200px"></div>';
+    document.body.append(other);
+    other.scrollTop = 40;
+  });
+  await page.clock.runFor(TIP_SHOW_MS);
+  await expect(openTip(page)).toBeVisible();
 });
