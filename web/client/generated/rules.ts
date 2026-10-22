@@ -145,4 +145,4 @@ export const STATUS_HOLDS_CURRENT_WORK: Record<JourneyStatus, boolean> = {
 /** A requirement id: a section letter, one or two digits, an optional lowercase letter. */
 export const REQUIREMENT_ID_PATTERN = "(?<![A-Za-z0-9_`])[ABCDEFGHIJ][0-9]{1,2}[a-z]?(?![A-Za-z0-9_`])";
 /** The name of one of the repository's documents, as a word. */
-export const DOCUMENT_NAME_PATTERN = "(?<![A-Za-z0-9_])(?:AGENTS|ARCHITECTURE|CLAUDE|DESIGN|PRACTICES|PRD|README)(?![A-Za-z0-9_])";
+export const DOCUMENT_NAME_PATTERN = "(?<![A-Za-z0-9_])(?:AGENTS|ARCHITECTURE|DESIGN|PRACTICES|PRD|README)(?![A-Za-z0-9_])";
