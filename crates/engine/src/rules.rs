@@ -14,17 +14,6 @@ use cairn_schema::{DisplayState, JourneyStatus, NodeKind, State};
 
 use crate::transition::{Move, rows};
 
-/// The kind's name as the API writes it.
-fn kind_name(kind: NodeKind) -> &'static str {
-    match kind {
-        NodeKind::Decision => "decision",
-        NodeKind::Deliverable => "deliverable",
-        NodeKind::Action => "action",
-        NodeKind::Milestone => "milestone",
-        NodeKind::Group => "group",
-    }
-}
-
 /// The state's name as the API writes it.
 fn state_name(state: State) -> &'static str {
     match state {
@@ -133,7 +122,7 @@ fn moves(out: &mut String) {
                 parts.push(format!("{}: [{}]", move_name(step), from.join(", ")));
             }
         }
-        let _ = writeln!(out, "  {}: {{ {} }},", kind_name(kind), parts.join(", "));
+        let _ = writeln!(out, "  {}: {{ {} }},", kind.name(), parts.join(", "));
     }
     out.push_str("};\n\n");
 }
@@ -146,7 +135,7 @@ fn initial_states(out: &mut String) {
         let _ = writeln!(
             out,
             "  {}: \"{}\",",
-            kind_name(kind),
+            kind.name(),
             state_name(State::initial(kind))
         );
     }
@@ -210,12 +199,7 @@ fn display_states(out: &mut String) {
             })
             .collect();
         if !differing.is_empty() {
-            let _ = writeln!(
-                out,
-                "  {}: {{ {} }},",
-                kind_name(kind),
-                differing.join(", ")
-            );
+            let _ = writeln!(out, "  {}: {{ {} }},", kind.name(), differing.join(", "));
         }
     }
     out.push_str("};\n");
@@ -292,7 +276,7 @@ mod tests {
     fn names_follow_the_api_and_the_text_is_complete() {
         for kind in NodeKind::ALL {
             let written = serde_json::to_string(&kind).unwrap();
-            assert_eq!(written, format!("\"{}\"", kind_name(kind)));
+            assert_eq!(written, format!("\"{}\"", kind.name()));
         }
         for state in State::ALL {
             let written = serde_json::to_string(&state).unwrap();
@@ -329,7 +313,7 @@ mod tests {
             )));
         }
         for kind in NodeKind::ALL {
-            assert!(text.contains(&format!("  {}: ", kind_name(kind))));
+            assert!(text.contains(&format!("  {}: ", kind.name())));
         }
     }
 

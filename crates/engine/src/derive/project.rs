@@ -17,8 +17,7 @@ use std::collections::{BTreeMap, BTreeSet};
 
 use cairn_schema::{
     Blocker, Contribution, DependencyVia, EffectiveParticipation, Explained, Guard, GuardFailure,
-    KindKey, NodeDerived, NodeKey, NodeKind, Progress, Real, Relevance, RelevanceExplanation,
-    State,
+    KindKey, NodeDerived, NodeKey, Progress, Real, Relevance, RelevanceExplanation, State,
 };
 
 use super::dependencies::EdgeSet;
@@ -26,6 +25,7 @@ use super::relevance::Producer;
 use super::stale::{Annotated, annotated_nodes, static_failures};
 use super::{Derived, held_by, stored_state};
 use crate::graph::Graph;
+use crate::transition::{self, Move};
 
 impl Derived {
     /// The schema's `Derived` for `graph`, the graph derived (ARCHITECTURE, Read path; D3):
@@ -184,14 +184,10 @@ impl Derived {
         let Some(node) = graph.node(key) else {
             panic!("the graph holds {key}");
         };
-        let completes = matches!(
-            (node.kind(), stored_state(document, node)),
-            (
-                NodeKind::Deliverable | NodeKind::Action,
-                State::Todo | State::Active
-            ) | (NodeKind::Decision, State::Open)
-                | (NodeKind::Milestone, State::Pending)
-        );
+        let (kind, state) = (node.kind(), stored_state(document, node));
+        let completes = Move::ALL
+            .into_iter()
+            .any(|step| transition::is_guarded(kind, state, step));
         let mut guards = BTreeSet::new();
         if !completes || !self.relevance.in_scope(key) || self.blocking.closed(key) {
             return guards;

@@ -8,7 +8,7 @@
 //! counts of unsatisfied waits are taken once from pass 5's instants and each simulation
 //! counts down from them, then puts back what it touched.
 
-use cairn_schema::{NodeKind, State};
+use cairn_schema::NodeKind;
 
 use super::super::Early;
 use super::super::blocking::Blocking;
@@ -111,10 +111,9 @@ impl<'a> Simulation<'a> {
                     .filter(|edge| edge.class == EdgeClass::Gate)
                     .filter(|edge| unsatisfied(edge.requirement))
                     .count();
-                let skipped = graph
-                    .node(key)
-                    .is_some_and(|stored| stored_state(graph.document(), stored) == State::Skipped)
-                    || skips.skipped_by(key).is_some();
+                let skipped = graph.node(key).is_some_and(|stored| {
+                    skips.skipped(stored_state(graph.document(), stored), key)
+                });
                 let group = graph
                     .node(key)
                     .is_some_and(|stored| stored.kind() == NodeKind::Group);

@@ -51,7 +51,7 @@ impl Derived {
         if relevance.value == Relevance::NotRelevant && !pending {
             return DisplayState::NotRelevant;
         }
-        if stored == State::Skipped || self.skips.skipped_by(key).is_some() {
+        if self.skips.skipped(stored, key) {
             return DisplayState::Skipped;
         }
         let group = node.kind() == NodeKind::Group;

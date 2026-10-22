@@ -14,8 +14,8 @@ use std::collections::{BTreeMap, BTreeSet};
 
 use cairn_schema::limits::PAGE_ITEM_COUNT_MAX;
 use cairn_schema::{
-    DisplayState, KindKey, NextQuery, NodeKey, NodeKind, Relevance, Snapshot, SnapshotCounts,
-    SnapshotNode, SnapshotScope, State,
+    DisplayState, KindKey, NextQuery, NodeKey, Relevance, Snapshot, SnapshotCounts, SnapshotNode,
+    SnapshotScope, State,
 };
 
 use super::rows::{count, page};
@@ -61,8 +61,7 @@ impl DerivedJourney<'_> {
             .collect();
         let open_decisions: Vec<NodeKey> = in_scope
             .iter()
-            .filter(|key| self.node(key).kind() == NodeKind::Decision)
-            .filter(|key| self.state(key) == State::Open && !blocking.closed(key))
+            .filter(|key| self.open_decision(key))
             .map(|key| (*key).clone())
             .collect();
         let pick = |test: &dyn Fn(&NodeKey) -> bool| -> Vec<NodeKey> {

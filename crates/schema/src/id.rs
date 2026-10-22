@@ -54,7 +54,9 @@ impl fmt::Display for IdError {
 
 impl std::error::Error for IdError {}
 
-const SLUG_PATTERN: &str = "^[a-z0-9][a-z0-9_-]*$";
+/// The slug grammar as a regular expression, one character of the body at a time: the
+/// published patterns are built from it, and [`is_slug`] is its parser.
+const SLUG_BODY: &str = "[a-z0-9][a-z0-9_-]";
 
 fn is_slug(text: &str) -> bool {
     text.starts_with(|first: char| first.is_ascii_lowercase() || first.is_ascii_digit())
@@ -91,7 +93,7 @@ string_serde!(
     Slug,
     "Slug",
     "An id: lowercase letters, digits, '_' and '-', at most id_bytes_max (64) bytes.",
-    Some(SLUG_PATTERN),
+    Some(format!("^{SLUG_BODY}*$")),
     Some(Limit::IdBytes)
 );
 
@@ -214,7 +216,7 @@ impl schemars::JsonSchema for Path {
             // Each segment within id_bytes_max, at most containment_depth_max segments.
             "pattern": format!(
                 "^{segment}(/{segment}){{0,{more}}}$",
-                segment = format!("[a-z0-9][a-z0-9_-]{{0,{}}}", crate::limits::ID_BYTES_MAX - 1),
+                segment = format!("{SLUG_BODY}{{0,{}}}", crate::limits::ID_BYTES_MAX - 1),
                 more = CONTAINMENT_DEPTH_MAX - 1,
             ),
             "maxLength": CONTAINMENT_DEPTH_MAX * (crate::limits::ID_BYTES_MAX + 1) - 1,
@@ -291,7 +293,7 @@ macro_rules! prefixed_key {
             $name,
             stringify!($name),
             concat!("Starts with \"", $prefix, "\"; at most id_bytes_max (64) bytes."),
-            Some(concat!("^", $prefix, "[a-z0-9][a-z0-9_-]*$")),
+            Some(format!("^{}{SLUG_BODY}*$", $prefix)),
             Some(Limit::IdBytes)
         );
     };
@@ -371,7 +373,7 @@ string_serde!(
     RouteId,
     "RouteId",
     "A route id: a slug, unique in the deployment.",
-    Some(SLUG_PATTERN),
+    Some(format!("^{SLUG_BODY}*$")),
     Some(Limit::IdBytes)
 );
 

@@ -20,7 +20,7 @@
 use std::cmp::Ordering;
 use std::collections::BTreeMap;
 
-use cairn_schema::{NodeKey, Payload, RankConstants, Score};
+use cairn_schema::{NodeKey, RankConstants, Score};
 
 use super::blocking::Blocking;
 use super::dates::Dates;
@@ -178,11 +178,7 @@ impl Ranking {
     #[must_use]
     pub fn by_effort(&self, graph: &Graph, priority: &Priority, keys: &[NodeKey]) -> Vec<NodeKey> {
         let estimate = |key: &NodeKey| {
-            let days = graph.node(key).and_then(|node| match &node.payload {
-                Payload::Deliverable(deliverable) => deliverable.estimate,
-                Payload::Action(action) => action.estimate,
-                Payload::Decision(_) | Payload::Milestone(_) | Payload::Group(_) => None,
-            });
+            let days = graph.node(key).and_then(|node| node.payload.estimate());
             days.map(|days| u128::from(days.get()))
                 .filter(|days| *days > 0)
         };

@@ -333,31 +333,10 @@ impl Mutation {
             Mutation::DeleteRoute { route, .. } => Subject::Route(route.clone()),
             Mutation::ApplyProposal { proposal, .. } => Subject::Proposal(proposal.clone()),
             Mutation::InsertSegment { insertion, .. } => Subject::Insertion(insertion.clone()),
-            other => other
-                .node_subject()
-                .unwrap_or_else(|| domain_subject(target)),
-        }
-    }
-
-    /// The node a state or field mutation is about; none for a mutation about its domain.
-    fn node_subject(&self) -> Option<Subject> {
-        match self {
-            Mutation::SetNodeField { node, .. }
-            | Mutation::SetParticipation { node, .. }
-            | Mutation::ClearParticipation { node, .. }
-            | Mutation::Transition { node, .. }
-            | Mutation::SetRecordedDate { node, .. }
-            | Mutation::SetPin { node, .. }
-            | Mutation::ShiftPin { node, .. }
-            | Mutation::ClearPin { node }
-            | Mutation::Snooze { node, .. }
-            | Mutation::Unsnooze { node }
-            | Mutation::ApplyOverride { node, .. }
-            | Mutation::RemoveOverride { node, .. }
-            | Mutation::SetAtomic { node, .. }
-            | Mutation::SetProvenance { node, .. }
-            | Mutation::MarkLocalEdit { node, .. } => Some(Subject::Node(node.clone())),
-            _ => None,
+            other => other.node().map_or_else(
+                || domain_subject(target),
+                |node| Subject::Node(node.clone()),
+            ),
         }
     }
 }

@@ -42,6 +42,12 @@ impl Skips {
         self.effective.get(key)
     }
 
+    /// D1a: whether the node is skipped, by its own stored state `stored` or by an ancestor.
+    #[must_use]
+    pub fn skipped(&self, stored: State, key: &NodeKey) -> bool {
+        stored == State::Skipped || self.effective.contains_key(key)
+    }
+
     /// Every effectively skipped node, with the ancestor its skip comes from, in key order.
     pub fn effective(&self) -> impl Iterator<Item = (&NodeKey, &NodeKey)> {
         self.effective.iter()
@@ -118,8 +124,7 @@ pub(crate) fn pass(
             let skipped = document
                 .nodes
                 .get(ancestor)
-                .is_some_and(|found| stored_state(document, found) == State::Skipped)
-                || skips.effective.contains_key(ancestor);
+                .is_some_and(|found| skips.skipped(stored_state(document, found), ancestor));
             if skipped {
                 let work = skips.kept_work.entry(ancestor.clone()).or_default();
                 work.insert(node.key.clone());

@@ -285,6 +285,22 @@ pub enum AnswerSpec<R: References> {
 }
 
 impl<R: References> AnswerSpec<R> {
+    /// A4: whether `answer` is of this answer type and, for a choice, names only its choices.
+    #[must_use]
+    pub fn accepts(&self, answer: &crate::state::AnswerValue) -> bool {
+        self.answer_type() == answer.answer_type()
+            && match self {
+                AnswerSpec::SingleChoice(choices) | AnswerSpec::MultiChoice(choices) => {
+                    crate::proposal::removed_choices(answer, choices).is_empty()
+                }
+                AnswerSpec::Boolean
+                | AnswerSpec::Text
+                | AnswerSpec::Date { .. }
+                | AnswerSpec::Identity { .. }
+                | AnswerSpec::IdentityList { .. } => true,
+            }
+    }
+
     /// The answer type.
     #[must_use]
     pub fn answer_type(&self) -> AnswerType {
@@ -393,6 +409,38 @@ impl<R: References> Payload<R> {
             Payload::Action(_) => NodeKind::Action,
             Payload::Milestone(_) => NodeKind::Milestone,
             Payload::Group(_) => NodeKind::Group,
+        }
+    }
+
+    /// The answer type, for a decision.
+    #[must_use]
+    pub fn answer_type(&self) -> Option<AnswerType> {
+        match self {
+            Payload::Decision(decision) => Some(decision.answer.answer_type()),
+            Payload::Deliverable(_)
+            | Payload::Action(_)
+            | Payload::Milestone(_)
+            | Payload::Group(_) => None,
+        }
+    }
+
+    /// Days of its own work, for a deliverable or an action with an estimate.
+    #[must_use]
+    pub fn estimate(&self) -> Option<Days> {
+        match self {
+            Payload::Deliverable(Deliverable { estimate, .. })
+            | Payload::Action(Action { estimate, .. }) => *estimate,
+            Payload::Decision(_) | Payload::Milestone(_) | Payload::Group(_) => None,
+        }
+    }
+
+    /// True for a deliverable or an action to be broken down in each journey.
+    #[must_use]
+    pub fn placeholder(&self) -> bool {
+        match self {
+            Payload::Deliverable(Deliverable { placeholder, .. })
+            | Payload::Action(Action { placeholder, .. }) => *placeholder,
+            Payload::Decision(_) | Payload::Milestone(_) | Payload::Group(_) => false,
         }
     }
 }
@@ -844,6 +892,17 @@ impl KindField {
         }
     }
 
+    /// A1a: whether a node of `kind`, and for a decision its answer type, may carry the
+    /// field: the one table every read and write of a kind field asks.
+    #[must_use]
+    pub const fn allowed(self, kind: NodeKind, answer: Option<AnswerType>) -> bool {
+        self.allowed_on(kind)
+            && match answer {
+                Some(answer) => self.allowed_for_answer(answer),
+                None => true,
+            }
+    }
+
     /// A1a: whether a decision with `answer` may carry the field (true for every field not
     /// tied to an answer type).
     #[must_use]
@@ -1091,39 +1150,231 @@ fn node_resources<'de, D: serde::Deserializer<'de>, R: References>(
         .map(BoundedVec::into_vec)
 }
 
-impl<R: References> NodeWire<R> {
-    /// The kind-restricted fields this node carries.
-    fn present(&self) -> Vec<KindField> {
-        let flags = [
-            (KindField::Estimate, self.estimate.is_some()),
-            (KindField::Placeholder, self.placeholder.is_some()),
-            (
-                KindField::RequiresArtifact,
-                self.requires_artifact.is_some(),
-            ),
-            (KindField::RequiresNote, self.requires_note.is_some()),
-            (KindField::Final, self.is_final.is_some()),
-            (KindField::AutoDone, self.auto_done.is_some()),
-            (KindField::OpensAt, self.opens_at.is_some()),
-            (KindField::ClosesAt, self.closes_at.is_some()),
-            (KindField::Gates, self.gates.is_some()),
-            (KindField::Closes, self.closes.is_some()),
-            (KindField::Prompt, self.prompt.is_some()),
-            (KindField::Help, self.help.is_some()),
-            (KindField::AnswerType, self.answer_type.is_some()),
-            (KindField::Choices, self.choices.is_some()),
-            (KindField::FillsRole, self.fills_role.is_some()),
-            (KindField::FeedsMilestone, self.feeds_milestone.is_some()),
-        ];
-        flags
-            .into_iter()
-            .filter(|(_, present)| *present)
-            .map(|(field, _)| field)
-            .collect()
+// PRD: A1a.
+/// A node's kind-specific fields as flat optional columns: the file and wire form's fields
+/// and the store's columns. Each is empty unless the node's kind (and for a decision, its
+/// answer type) has it. The one conversion between a payload and its flat fields, made once
+/// per node by the wire form and the store; it clones a decision's text, so it is not an
+/// access path for a single field.
+#[derive(Clone, Debug, PartialEq, Eq)]
+#[allow(clippy::struct_field_names, missing_docs)]
+pub struct KindColumns<R: References> {
+    pub estimate: Option<Days>,
+    pub placeholder: Option<bool>,
+    pub requires_artifact: Option<bool>,
+    pub requires_note: Option<bool>,
+    pub is_final: Option<bool>,
+    pub auto_done: Option<bool>,
+    pub opens_at: Option<R::Node>,
+    pub closes_at: Option<R::Node>,
+    pub gates: Option<bool>,
+    pub closes: Option<bool>,
+    pub prompt: Option<Markdown>,
+    pub answer_type: Option<AnswerType>,
+    pub choices: Option<Choices>,
+    pub fills_role: Option<R::Role>,
+    pub feeds_milestone: Option<R::Node>,
+    pub help: Option<Markdown>,
+}
+
+impl<R: References> Default for KindColumns<R> {
+    fn default() -> Self {
+        Self {
+            estimate: None,
+            placeholder: None,
+            requires_artifact: None,
+            requires_note: None,
+            is_final: None,
+            auto_done: None,
+            opens_at: None,
+            closes_at: None,
+            gates: None,
+            closes: None,
+            prompt: None,
+            answer_type: None,
+            choices: None,
+            fills_role: None,
+            feeds_milestone: None,
+            help: None,
+        }
+    }
+}
+
+impl<R: References> KindColumns<R> {
+    /// The columns a payload fills: every field its kind has, flags written explicitly.
+    #[must_use]
+    pub fn of(payload: &Payload<R>) -> Self {
+        match payload {
+            Payload::Decision(Decision {
+                prompt,
+                help,
+                answer,
+            }) => {
+                let mut columns = Self {
+                    prompt: Some(prompt.clone()),
+                    help: help.clone(),
+                    answer_type: Some(answer.answer_type()),
+                    ..Self::default()
+                };
+                match answer {
+                    AnswerSpec::Boolean | AnswerSpec::Text => {}
+                    AnswerSpec::SingleChoice(choices) | AnswerSpec::MultiChoice(choices) => {
+                        columns.choices = Some(choices.clone());
+                    }
+                    AnswerSpec::Date { feeds_milestone } => {
+                        columns.feeds_milestone.clone_from(feeds_milestone);
+                    }
+                    AnswerSpec::Identity { fills_role }
+                    | AnswerSpec::IdentityList { fills_role } => {
+                        columns.fills_role.clone_from(fills_role);
+                    }
+                }
+                columns
+            }
+            Payload::Deliverable(Deliverable {
+                estimate,
+                placeholder,
+                requires_artifact,
+                requires_note,
+            }) => Self {
+                estimate: *estimate,
+                placeholder: Some(*placeholder),
+                requires_artifact: Some(*requires_artifact),
+                requires_note: Some(*requires_note),
+                ..Self::default()
+            },
+            Payload::Action(Action {
+                estimate,
+                placeholder,
+                requires_note,
+            }) => Self {
+                estimate: *estimate,
+                placeholder: Some(*placeholder),
+                requires_note: Some(*requires_note),
+                ..Self::default()
+            },
+            Payload::Milestone(Milestone {
+                is_final,
+                auto_done,
+            }) => Self {
+                is_final: Some(*is_final),
+                auto_done: Some(*auto_done),
+                ..Self::default()
+            },
+            Payload::Group(Group {
+                opens_at,
+                closes_at,
+                gates,
+                closes,
+            }) => Self {
+                opens_at: opens_at.clone(),
+                closes_at: closes_at.clone(),
+                gates: Some(*gates),
+                closes: Some(*closes),
+                ..Self::default()
+            },
+        }
     }
 
-    fn check_fields(&self) -> Result<(), NodeShapeError> {
-        let kind = self.kind;
+    /// The columns with every flag at its default left out, so a canonical file has one
+    /// spelling per node.
+    #[must_use]
+    pub fn without_defaults(mut self) -> Self {
+        let set = |flag: Option<bool>, default: bool| flag.filter(|flag| *flag != default);
+        self.placeholder = set(self.placeholder, false);
+        self.requires_artifact = set(self.requires_artifact, false);
+        self.requires_note = set(self.requires_note, false);
+        self.is_final = set(self.is_final, false);
+        self.auto_done = set(self.auto_done, false);
+        self.gates = set(self.gates, true);
+        self.closes = set(self.closes, true);
+        self
+    }
+
+    /// The kind-restricted fields with a value.
+    #[must_use]
+    pub fn present(&self) -> Vec<KindField> {
+        let Self {
+            estimate,
+            placeholder,
+            requires_artifact,
+            requires_note,
+            is_final,
+            auto_done,
+            opens_at,
+            closes_at,
+            gates,
+            closes,
+            prompt,
+            answer_type,
+            choices,
+            fills_role,
+            feeds_milestone,
+            help,
+        } = self;
+        [
+            (KindField::Estimate, estimate.is_some()),
+            (KindField::Placeholder, placeholder.is_some()),
+            (KindField::RequiresArtifact, requires_artifact.is_some()),
+            (KindField::RequiresNote, requires_note.is_some()),
+            (KindField::Final, is_final.is_some()),
+            (KindField::AutoDone, auto_done.is_some()),
+            (KindField::OpensAt, opens_at.is_some()),
+            (KindField::ClosesAt, closes_at.is_some()),
+            (KindField::Gates, gates.is_some()),
+            (KindField::Closes, closes.is_some()),
+            (KindField::Prompt, prompt.is_some()),
+            (KindField::Help, help.is_some()),
+            (KindField::AnswerType, answer_type.is_some()),
+            (KindField::Choices, choices.is_some()),
+            (KindField::FillsRole, fills_role.is_some()),
+            (KindField::FeedsMilestone, feeds_milestone.is_some()),
+        ]
+        .into_iter()
+        .filter_map(|(field, present)| present.then_some(field))
+        .collect()
+    }
+
+    /// A decision's own fields: its prompt and answer type are required, and the answer type
+    /// requires its choices.
+    fn into_decision(self) -> Result<Decision<R>, NodeShapeError> {
+        let missing = |field| NodeShapeError::Missing {
+            field,
+            kind: NodeKind::Decision,
+        };
+        let prompt = self.prompt.ok_or_else(|| missing(KindField::Prompt))?;
+        let answer = self
+            .answer_type
+            .ok_or_else(|| missing(KindField::AnswerType))?;
+        let choices = self.choices.ok_or_else(|| missing(KindField::Choices));
+        let answer = match answer {
+            AnswerType::Boolean => AnswerSpec::Boolean,
+            AnswerType::SingleChoice => AnswerSpec::SingleChoice(choices?),
+            AnswerType::MultiChoice => AnswerSpec::MultiChoice(choices?),
+            AnswerType::Text => AnswerSpec::Text,
+            AnswerType::Date => AnswerSpec::Date {
+                feeds_milestone: self.feeds_milestone,
+            },
+            AnswerType::Identity => AnswerSpec::Identity {
+                fills_role: self.fills_role,
+            },
+            AnswerType::IdentityList => AnswerSpec::IdentityList {
+                fills_role: self.fills_role,
+            },
+        };
+        Ok(Decision {
+            prompt,
+            help: self.help,
+            answer,
+        })
+    }
+
+    /// The payload of a node of `kind`. A missing flag is its default.
+    ///
+    /// # Errors
+    ///
+    /// A field the kind or answer type cannot have, or a missing required one (A1a).
+    pub fn into_payload(self, kind: NodeKind) -> Result<Payload<R>, NodeShapeError> {
         for field in self.present() {
             if !field.allowed_on(kind) {
                 return Err(NodeShapeError::NotAllowed {
@@ -1142,57 +1393,8 @@ impl<R: References> NodeWire<R> {
                 });
             }
         }
-        Ok(())
-    }
-
-    fn take_answer(&mut self) -> Result<AnswerSpec<R>, NodeShapeError> {
-        let missing = |field| NodeShapeError::Missing {
-            field,
-            kind: NodeKind::Decision,
-        };
-        let answer = self
-            .answer_type
-            .ok_or_else(|| missing(KindField::AnswerType))?;
-        Ok(match answer {
-            AnswerType::Boolean => AnswerSpec::Boolean,
-            AnswerType::SingleChoice => AnswerSpec::SingleChoice(
-                self.choices
-                    .take()
-                    .ok_or_else(|| missing(KindField::Choices))?,
-            ),
-            AnswerType::MultiChoice => AnswerSpec::MultiChoice(
-                self.choices
-                    .take()
-                    .ok_or_else(|| missing(KindField::Choices))?,
-            ),
-            AnswerType::Text => AnswerSpec::Text,
-            AnswerType::Date => AnswerSpec::Date {
-                feeds_milestone: self.feeds_milestone.take(),
-            },
-            AnswerType::Identity => AnswerSpec::Identity {
-                fills_role: self.fills_role.take(),
-            },
-            AnswerType::IdentityList => AnswerSpec::IdentityList {
-                fills_role: self.fills_role.take(),
-            },
-        })
-    }
-
-    fn take_payload(&mut self) -> Result<Payload<R>, NodeShapeError> {
-        self.check_fields()?;
-        Ok(match self.kind {
-            NodeKind::Decision => {
-                let prompt = self.prompt.take().ok_or(NodeShapeError::Missing {
-                    field: KindField::Prompt,
-                    kind: NodeKind::Decision,
-                })?;
-                let answer = self.take_answer()?;
-                Payload::Decision(Decision {
-                    prompt,
-                    help: self.help.take(),
-                    answer,
-                })
-            }
+        Ok(match kind {
+            NodeKind::Decision => Payload::Decision(self.into_decision()?),
             NodeKind::Deliverable => Payload::Deliverable(Deliverable {
                 estimate: self.estimate,
                 placeholder: self.placeholder.unwrap_or(false),
@@ -1209,65 +1411,38 @@ impl<R: References> NodeWire<R> {
                 auto_done: self.auto_done.unwrap_or(false),
             }),
             NodeKind::Group => Payload::Group(Group {
-                opens_at: self.opens_at.take(),
-                closes_at: self.closes_at.take(),
+                opens_at: self.opens_at,
+                closes_at: self.closes_at,
                 gates: self.gates.unwrap_or(true),
                 closes: self.closes.unwrap_or(true),
             }),
         })
-    }
-
-    fn write_payload(&mut self, payload: Payload<R>) {
-        // Flags are written only when they differ from their defaults, so a canonical file
-        // has one spelling per node.
-        let set = |flag: bool, default: bool| (flag != default).then_some(flag);
-        match payload {
-            Payload::Decision(decision) => {
-                self.prompt = Some(decision.prompt);
-                self.help = decision.help;
-                self.answer_type = Some(decision.answer.answer_type());
-                match decision.answer {
-                    AnswerSpec::SingleChoice(choices) | AnswerSpec::MultiChoice(choices) => {
-                        self.choices = Some(choices);
-                    }
-                    AnswerSpec::Date { feeds_milestone } => self.feeds_milestone = feeds_milestone,
-                    AnswerSpec::Identity { fills_role }
-                    | AnswerSpec::IdentityList { fills_role } => {
-                        self.fills_role = fills_role;
-                    }
-                    AnswerSpec::Boolean | AnswerSpec::Text => {}
-                }
-            }
-            Payload::Deliverable(deliverable) => {
-                self.estimate = deliverable.estimate;
-                self.placeholder = set(deliverable.placeholder, false);
-                self.requires_artifact = set(deliverable.requires_artifact, false);
-                self.requires_note = set(deliverable.requires_note, false);
-            }
-            Payload::Action(action) => {
-                self.estimate = action.estimate;
-                self.placeholder = set(action.placeholder, false);
-                self.requires_note = set(action.requires_note, false);
-            }
-            Payload::Milestone(milestone) => {
-                self.is_final = set(milestone.is_final, false);
-                self.auto_done = set(milestone.auto_done, false);
-            }
-            Payload::Group(group) => {
-                self.opens_at = group.opens_at;
-                self.closes_at = group.closes_at;
-                self.gates = set(group.gates, true);
-                self.closes = set(group.closes, true);
-            }
-        }
     }
 }
 
 impl<R: References> TryFrom<NodeWire<R>> for Node<R> {
     type Error = NodeShapeError;
 
-    fn try_from(mut wire: NodeWire<R>) -> Result<Self, NodeShapeError> {
-        let payload = wire.take_payload()?;
+    fn try_from(wire: NodeWire<R>) -> Result<Self, NodeShapeError> {
+        let payload = KindColumns {
+            estimate: wire.estimate,
+            placeholder: wire.placeholder,
+            requires_artifact: wire.requires_artifact,
+            requires_note: wire.requires_note,
+            is_final: wire.is_final,
+            auto_done: wire.auto_done,
+            opens_at: wire.opens_at,
+            closes_at: wire.closes_at,
+            gates: wire.gates,
+            closes: wire.closes,
+            prompt: wire.prompt,
+            answer_type: wire.answer_type,
+            choices: wire.choices,
+            fills_role: wire.fills_role,
+            feeds_milestone: wire.feeds_milestone,
+            help: wire.help,
+        }
+        .into_payload(wire.kind)?;
         Ok(Self {
             key: wire.key,
             id: wire.id,
@@ -1288,7 +1463,25 @@ impl<R: References> TryFrom<NodeWire<R>> for Node<R> {
 
 impl<R: References> From<Node<R>> for NodeWire<R> {
     fn from(node: Node<R>) -> Self {
-        let mut wire = NodeWire {
+        let KindColumns {
+            estimate,
+            placeholder,
+            requires_artifact,
+            requires_note,
+            is_final,
+            auto_done,
+            opens_at,
+            closes_at,
+            gates,
+            closes,
+            prompt,
+            answer_type,
+            choices,
+            fills_role,
+            feeds_milestone,
+            help,
+        } = KindColumns::of(&node.payload).without_defaults();
+        NodeWire {
             key: node.key,
             id: node.id,
             parent: node.parent,
@@ -1296,31 +1489,29 @@ impl<R: References> From<Node<R>> for NodeWire<R> {
             title: node.title,
             description: node.description,
             weight: node.weight,
-            prompt: None,
-            answer_type: None,
-            choices: None,
-            fills_role: None,
-            feeds_milestone: None,
-            help: None,
-            estimate: None,
-            placeholder: None,
-            requires_artifact: None,
-            requires_note: None,
-            is_final: None,
-            auto_done: None,
-            opens_at: None,
-            closes_at: None,
-            gates: None,
-            closes: None,
+            prompt,
+            answer_type,
+            choices,
+            fills_role,
+            feeds_milestone,
+            help,
+            estimate,
+            placeholder,
+            requires_artifact,
+            requires_note,
+            is_final,
+            auto_done,
+            opens_at,
+            closes_at,
+            gates,
+            closes,
             requires: node.requires,
             relevant_when: node.relevant_when,
             due_by: node.due_by,
             not_before: node.not_before,
             participations: node.participations,
             resources: node.resources,
-        };
-        wire.write_payload(node.payload);
-        wire
+        }
     }
 }
 

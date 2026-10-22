@@ -4,7 +4,7 @@
 #[cfg(test)]
 mod property {
     use cairn_schema::testing::*;
-    use cairn_schema::{FileRefs, KeyRefs, NodeFieldValue};
+    use cairn_schema::{FileRefs, KeyRefs, NodeField, NodeFieldValue};
     use patina_dst_proptest::prelude::*;
     use serde::Serialize;
     use serde::de::DeserializeOwned;
@@ -44,6 +44,30 @@ mod property {
         fn nodes_round_trip(file in arb_node::<FileRefs>(), resolved in arb_node::<KeyRefs>()) {
             json_round_trip(&file)?;
             json_round_trip(&resolved)?;
+        }
+
+        /// A field is read and written exactly where the kind field table says the node's
+        /// kind (and answer type) has it, and reading then writing it back changes nothing.
+        #[test]
+        fn a_field_applies_where_the_kind_table_allows_it(
+            node in arb_node::<KeyRefs>(),
+            field in arb_node_field(),
+            value in arb_node_field_value::<KeyRefs>(),
+        ) {
+            let has = |field: NodeField| {
+                field.kind_field().is_none_or(|kind_field| {
+                    kind_field.allowed(node.kind(), node.payload.answer_type())
+                })
+            };
+            let read = NodeFieldValue::read(field, &node);
+            prop_assert_eq!(read.is_some(), has(field));
+            if let Some(read) = read {
+                let mut same = node.clone();
+                prop_assert!(read.write(&mut same));
+                prop_assert_eq!(&same, &node);
+            }
+            let mut written = node.clone();
+            prop_assert_eq!(value.clone().write(&mut written), has(value.field()));
         }
 
         #[test]

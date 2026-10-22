@@ -9,8 +9,8 @@
 use std::collections::BTreeMap;
 
 use cairn_schema::{
-    AnswerSpec, AnswerValue, Choices, JourneyState, KeyRefs, Node, NodeKey, Payload, RoleKey,
-    SnoozeTarget, State, Subject, Violation, ViolationCode,
+    AnswerSpec, JourneyState, NodeKey, Payload, RoleKey, SnoozeTarget, State, Subject, Violation,
+    ViolationCode,
 };
 
 use super::{GraphCheck, at_node, missing_node_code, missing_role_code, violation};
@@ -44,7 +44,7 @@ fn node_states(check: &GraphCheck<'_>, out: &mut Vec<Violation>) {
             Some(stored) if !stored.state.legal_for(node.kind()) => {
                 "the stored state is not one the node's kind has"
             }
-            Some(stored) if stored.atomic && !is_placeholder(node) => {
+            Some(stored) if stored.atomic && !node.payload.placeholder() => {
                 "only a placeholder is marked atomic"
             }
             Some(stored) if stored.skip_reason.is_some() != (stored.state == State::Skipped) => {
@@ -63,14 +63,6 @@ fn node_states(check: &GraphCheck<'_>, out: &mut Vec<Violation>) {
         if document.nodes.get(key).is_none() {
             out.push(state_without_node(check, key));
         }
-    }
-}
-
-fn is_placeholder(node: &Node<KeyRefs>) -> bool {
-    match &node.payload {
-        Payload::Deliverable(deliverable) => deliverable.placeholder,
-        Payload::Action(action) => action.placeholder,
-        Payload::Decision(_) | Payload::Milestone(_) | Payload::Group(_) => false,
     }
 }
 
@@ -94,7 +86,7 @@ fn answers(check: &GraphCheck<'_>, out: &mut Vec<Violation>) {
             continue;
         };
         let (code, message) = match &node.payload {
-            Payload::Decision(decision) if !answer_fits(&decision.answer, answer) => (
+            Payload::Decision(decision) if !decision.answer.accepts(answer) => (
                 ViolationCode::AnswerTypeMismatch,
                 "the answer does not match the decision's answer type or choices",
             ),
@@ -135,27 +127,6 @@ fn answers(check: &GraphCheck<'_>, out: &mut Vec<Violation>) {
                 "a decision is decided exactly when it holds an answer",
             ));
         }
-    }
-}
-
-/// A4: an answer of the decision's type, naming only its choices.
-#[must_use]
-pub(crate) fn answer_fits(spec: &AnswerSpec<KeyRefs>, answer: &AnswerValue) -> bool {
-    let has = |choices: &Choices, id: &cairn_schema::Slug| {
-        choices.as_slice().iter().any(|choice| choice.id == *id)
-    };
-    match spec {
-        AnswerSpec::SingleChoice(choices) => {
-            matches!(answer, AnswerValue::SingleChoice(id) if has(choices, id))
-        }
-        AnswerSpec::MultiChoice(choices) => {
-            matches!(answer, AnswerValue::MultiChoice(ids) if ids.iter().all(|id| has(choices, id)))
-        }
-        AnswerSpec::Boolean
-        | AnswerSpec::Text
-        | AnswerSpec::Date { .. }
-        | AnswerSpec::Identity { .. }
-        | AnswerSpec::IdentityList { .. } => spec.answer_type() == answer.answer_type(),
     }
 }
 

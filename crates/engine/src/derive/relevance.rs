@@ -312,6 +312,13 @@ fn dominant(first: Relevance, second: Relevance) -> Relevance {
     }
 }
 
+/// Gating: whether a decision's answer is still to come and would count once given: it is
+/// relevant, open, and not under a skip.
+#[must_use]
+pub(crate) fn awaiting_answer(value: Relevance, state: State, under_skip: bool) -> bool {
+    value == Relevance::Relevant && state == State::Open && !under_skip
+}
+
 /// What a decision contributes to a condition (Gating): its answer when decided and
 /// relevant; unknown when open, relevant, and not under a skip; unanswered otherwise
 /// (skipped, effectively skipped, not relevant, or itself undecided). An assumed answer
@@ -323,24 +330,20 @@ fn term<'g>(
     assume: Assumed<'g>,
     decision: &NodeKey,
 ) -> Term<'g> {
-    let found = done.get(decision);
-    assert!(
-        found.is_some(),
-        "a decision is evaluated before the conditions reading it"
-    );
-    let value = found.map(|found| found.value);
+    let Some(found) = done.get(decision) else {
+        unreachable!("a decision is evaluated before the conditions reading it")
+    };
     let Some(node) = document.nodes.get(decision) else {
         return Term::Unanswered;
     };
     let state = stored_state(document, node);
-    let under_skip = inherited_skips.contains_key(decision);
-    let open = state == State::Open && !under_skip;
-    if value != Some(Relevance::Relevant) {
+    let awaiting = awaiting_answer(found.value, state, inherited_skips.contains_key(decision));
+    if found.value != Relevance::Relevant {
         return Term::Unanswered;
     }
     if let Some((assumed, answer)) = assume
         && assumed == decision
-        && (open || state == State::Decided)
+        && (awaiting || state == State::Decided)
     {
         return Term::Answered(answer);
     }
@@ -348,7 +351,7 @@ fn term<'g>(
         State::Decided => done
             .answer_in_effect(document, decision)
             .map_or(Term::Unanswered, Term::Answered),
-        State::Open if !under_skip => Term::Unknown,
+        State::Open if awaiting => Term::Unknown,
         State::Open
         | State::Skipped
         | State::Todo

@@ -15,6 +15,19 @@ mod property {
     }
 
     proptest! {
+        /// The parser and the published pattern accept the same text: nothing else makes one
+        /// follow the other. The strategy mixes slugs, up to past the id byte limit, with
+        /// text that has uppercase, separators, whitespace, a newline, and non-ASCII.
+        #[test]
+        fn a_slug_parses_exactly_when_its_schema_matches(
+            text in prop_oneof!["[a-z0-9][a-z0-9_-]{0,70}", "[a-zA-Z0-9_./ \né-]{0,70}"],
+        ) {
+            let schema = schemars::schema_for!(cairn_schema::Slug).to_value();
+            let validator = jsonschema::draft202012::new(&schema).unwrap();
+            let published = validator.is_valid(&serde_json::Value::String(text.clone()));
+            prop_assert_eq!(text.parse::<cairn_schema::Slug>().is_ok(), published, "{:?}", text);
+        }
+
         #[test]
         fn identifiers_round_trip(
             slug in arb_slug(),

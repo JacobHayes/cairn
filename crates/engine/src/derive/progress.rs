@@ -12,7 +12,7 @@
 
 use std::collections::BTreeMap;
 
-use cairn_schema::{NodeKey, NodeKind, Progress, State};
+use cairn_schema::{NodeKey, NodeKind, Progress};
 
 use super::{Derived, stored_state};
 use crate::graph::Graph;
@@ -69,8 +69,7 @@ impl Derived {
         let state = stored_state(graph.document(), node);
         if node.kind() == NodeKind::Group
             || !self.relevance.in_scope(key)
-            || state == State::Skipped
-            || self.skips.skipped_by(key).is_some()
+            || self.skips.skipped(state, key)
         {
             return;
         }
@@ -81,7 +80,7 @@ impl Derived {
         if self.dates.overdue(key) {
             sum.overdue += 1;
         }
-        if node.kind() == NodeKind::Decision && self.blocking.actionable(key) {
+        if self.blocking.decision_needed(node.kind(), key) {
             sum.decisions_needed += 1;
         }
     }

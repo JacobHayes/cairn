@@ -50,7 +50,7 @@ use cairn_schema::{
     Node, NodeKey, RankConstants, Relevance, State,
 };
 
-use crate::graph::{Document, Graph};
+use crate::graph::{Document, Graph, Tree};
 pub use blocking::Blocking;
 pub use consequences::consequences;
 pub use dates::{Dates, PlanCheck, check_plan};
@@ -225,12 +225,16 @@ impl Derived {
     pub fn unanswered(&self, graph: &Graph, key: &NodeKey) -> BTreeSet<NodeKey> {
         let document = graph.document();
         let open = |decision: &&NodeKey| {
-            self.relevance.get(decision).map(|found| found.value) == Some(Relevance::Relevant)
-                && document
-                    .nodes
-                    .get(*decision)
-                    .is_some_and(|node| stored_state(document, node) == State::Open)
-                && self.skips.skipped_by(decision).is_none()
+            let (Some(found), Some(node)) =
+                (self.relevance.get(decision), document.nodes.get(*decision))
+            else {
+                return false;
+            };
+            relevance::awaiting_answer(
+                found.value,
+                stored_state(document, node),
+                self.skips.skipped_by(decision).is_some(),
+            )
         };
         let mut waiting = BTreeSet::new();
         // Up the tree while undecided: a relevant node (a force include among them) has
@@ -498,6 +502,17 @@ pub(crate) fn stored_state(document: &Document, node: &Node<KeyRefs>) -> State {
         .nodes
         .get(&node.key)
         .map_or(State::initial(node.kind()), |stored| stored.state)
+}
+
+/// B10: a placeholder with no children that is not marked atomic: it needs breaking down.
+#[must_use]
+pub(crate) fn unexpanded(document: &Document, tree: &Tree, node: &Node<KeyRefs>) -> bool {
+    let atomic = document
+        .state
+        .nodes
+        .get(&node.key)
+        .is_some_and(|stored| stored.atomic);
+    node.payload.placeholder() && !atomic && !tree.is_container(&node.key)
 }
 
 /// Gating: the node is force-included.

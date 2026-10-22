@@ -10,11 +10,10 @@ use std::collections::{BTreeMap, BTreeSet};
 
 use cairn_schema::collections::{InsertionCount, LimitOf};
 use cairn_schema::{
-    Action, AnswerSpec, AnswerType, BoundedSet, Choices, Days, Decision, Deliverable, Graph,
-    GraphId, Group, HasKey, IdentityKey, Insertion, Keyed, KindField, KindKey, Lineage, Markdown,
-    Milestone, Node, NodeKey, NodeKind, ParticipationKind, ParticipationSource, Participations,
-    Payload, Resource, ResourceContent, RetiredKeys, Role, RoleKey, Weight, node::Requires,
-    refs::KeyRefs,
+    AnswerType, BoundedSet, Days, Graph, GraphId, HasKey, IdentityKey, Insertion, Keyed,
+    KindColumns, KindKey, Lineage, Node, NodeKey, NodeKind, ParticipationKind, ParticipationSource,
+    Participations, Payload, Resource, ResourceContent, RetiredKeys, Role, RoleKey, Weight,
+    node::Requires, refs::KeyRefs,
 };
 use cairn_store::StoreError;
 use rusqlite::Connection;
@@ -91,291 +90,85 @@ pub(crate) fn node_values(node: &Node<KeyRefs>) -> Result<Vec<Value>, StoreError
         opt_json(due_by.as_ref())?,
         opt_json(not_before.as_ref())?,
     ];
-    values.extend(KindColumns::of(payload).values()?);
+    values.extend(kind_values(payload)?);
     Ok(values)
 }
 
-/// A node's kind-specific columns: each null unless the node's kind, and for a decision its
-/// answer type, has the field (A1a).
-struct KindColumns {
-    estimate: Option<Days>,
-    placeholder: Option<bool>,
-    requires_artifact: Option<bool>,
-    requires_note: Option<bool>,
-    is_final: Option<bool>,
-    auto_done: Option<bool>,
-    opens_at: Option<NodeKey>,
-    closes_at: Option<NodeKey>,
-    gates: Option<bool>,
-    closes: Option<bool>,
-    prompt: Option<Markdown>,
-    answer_type: Option<AnswerType>,
-    choices: Option<Choices>,
-    fills_role: Option<RoleKey>,
-    feeds_milestone: Option<NodeKey>,
-    help: Option<Markdown>,
+/// The values of a node's kind-specific columns, in [`NODE_COLUMNS`] order: each null unless
+/// the node's kind, and for a decision its answer type, has the field (A1a). Flags are
+/// always written.
+fn kind_values(payload: &Payload<KeyRefs>) -> Result<Vec<Value>, StoreError> {
+    let KindColumns {
+        estimate,
+        placeholder,
+        requires_artifact,
+        requires_note,
+        is_final,
+        auto_done,
+        opens_at,
+        closes_at,
+        gates,
+        closes,
+        prompt,
+        answer_type,
+        choices,
+        fills_role,
+        feeds_milestone,
+        help,
+    } = KindColumns::of(payload);
+    let opt_flag = |value: Option<bool>| value.map_or(Value::Null, flag);
+    Ok(vec![
+        opt_int(estimate.map(Days::get)),
+        opt_flag(placeholder),
+        opt_flag(requires_artifact),
+        opt_flag(requires_note),
+        opt_flag(is_final),
+        opt_flag(auto_done),
+        opt_text(opens_at),
+        opt_text(closes_at),
+        opt_flag(gates),
+        opt_flag(closes),
+        opt_text(prompt),
+        opt_text(answer_type.map(AnswerType::name)),
+        opt_json(choices.as_ref())?,
+        opt_text(fills_role),
+        opt_text(feeds_milestone),
+        opt_text(help),
+    ])
 }
 
-impl KindColumns {
-    const NONE: Self = Self {
-        estimate: None,
-        placeholder: None,
-        requires_artifact: None,
-        requires_note: None,
-        is_final: None,
-        auto_done: None,
-        opens_at: None,
-        closes_at: None,
-        gates: None,
-        closes: None,
-        prompt: None,
-        answer_type: None,
-        choices: None,
-        fills_role: None,
-        feeds_milestone: None,
-        help: None,
+/// The payload of a node of `kind` from the kind-specific columns of a nodes row. A null
+/// flag is its default, as the written form leaves it out.
+///
+/// # Errors
+///
+/// A column the kind or answer type cannot have, or a missing required one (A1a).
+fn payload_from_row(row: &Row, kind: NodeKind) -> Result<Payload<KeyRefs>, StoreError> {
+    let at = |offset: usize| KIND_COLUMNS_START + offset;
+    let columns = KindColumns {
+        estimate: row.opt_int(at(0))?.map(sql::number).transpose()?,
+        placeholder: row.opt_flag(at(1))?,
+        requires_artifact: row.opt_flag(at(2))?,
+        requires_note: row.opt_flag(at(3))?,
+        is_final: row.opt_flag(at(4))?,
+        auto_done: row.opt_flag(at(5))?,
+        opens_at: row.opt_parse(at(6))?,
+        closes_at: row.opt_parse(at(7))?,
+        gates: row.opt_flag(at(8))?,
+        closes: row.opt_flag(at(9))?,
+        prompt: row.opt_parse(at(10))?,
+        answer_type: row
+            .opt_text(at(11))?
+            .map(|name| answer_type_from(&name))
+            .transpose()?,
+        choices: row.opt_json(at(12))?,
+        fills_role: row.opt_parse(at(13))?,
+        feeds_milestone: row.opt_parse(at(14))?,
+        help: row.opt_parse(at(15))?,
     };
-
-    /// The columns a payload fills.
-    fn of(payload: &Payload<KeyRefs>) -> Self {
-        match payload {
-            Payload::Decision(Decision {
-                prompt,
-                help,
-                answer,
-            }) => {
-                let mut columns = Self {
-                    prompt: Some(prompt.clone()),
-                    help: help.clone(),
-                    answer_type: Some(answer.answer_type()),
-                    ..Self::NONE
-                };
-                match answer {
-                    AnswerSpec::Boolean | AnswerSpec::Text => {}
-                    AnswerSpec::SingleChoice(choices) | AnswerSpec::MultiChoice(choices) => {
-                        columns.choices = Some(choices.clone());
-                    }
-                    AnswerSpec::Date { feeds_milestone } => {
-                        columns.feeds_milestone.clone_from(feeds_milestone);
-                    }
-                    AnswerSpec::Identity { fills_role }
-                    | AnswerSpec::IdentityList { fills_role } => {
-                        columns.fills_role.clone_from(fills_role);
-                    }
-                }
-                columns
-            }
-            Payload::Deliverable(Deliverable {
-                estimate,
-                placeholder,
-                requires_artifact,
-                requires_note,
-            }) => Self {
-                estimate: *estimate,
-                placeholder: Some(*placeholder),
-                requires_artifact: Some(*requires_artifact),
-                requires_note: Some(*requires_note),
-                ..Self::NONE
-            },
-            Payload::Action(Action {
-                estimate,
-                placeholder,
-                requires_note,
-            }) => Self {
-                estimate: *estimate,
-                placeholder: Some(*placeholder),
-                requires_note: Some(*requires_note),
-                ..Self::NONE
-            },
-            Payload::Milestone(Milestone {
-                is_final,
-                auto_done,
-            }) => Self {
-                is_final: Some(*is_final),
-                auto_done: Some(*auto_done),
-                ..Self::NONE
-            },
-            Payload::Group(Group {
-                opens_at,
-                closes_at,
-                gates,
-                closes,
-            }) => Self {
-                opens_at: opens_at.clone(),
-                closes_at: closes_at.clone(),
-                gates: Some(*gates),
-                closes: Some(*closes),
-                ..Self::NONE
-            },
-        }
-    }
-
-    /// The column values, in [`NODE_COLUMNS`] order.
-    fn values(self) -> Result<Vec<Value>, StoreError> {
-        let Self {
-            estimate,
-            placeholder,
-            requires_artifact,
-            requires_note,
-            is_final,
-            auto_done,
-            opens_at,
-            closes_at,
-            gates,
-            closes,
-            prompt,
-            answer_type,
-            choices,
-            fills_role,
-            feeds_milestone,
-            help,
-        } = self;
-        let opt_flag = |value: Option<bool>| value.map_or(Value::Null, flag);
-        Ok(vec![
-            opt_int(estimate.map(Days::get)),
-            opt_flag(placeholder),
-            opt_flag(requires_artifact),
-            opt_flag(requires_note),
-            opt_flag(is_final),
-            opt_flag(auto_done),
-            opt_text(opens_at),
-            opt_text(closes_at),
-            opt_flag(gates),
-            opt_flag(closes),
-            opt_text(prompt),
-            opt_text(answer_type.map(AnswerType::name)),
-            opt_json(choices.as_ref())?,
-            opt_text(fills_role),
-            opt_text(feeds_milestone),
-            opt_text(help),
-        ])
-    }
-
-    /// The columns of a nodes row.
-    fn read(row: &Row) -> Result<Self, StoreError> {
-        let at = |offset: usize| KIND_COLUMNS_START + offset;
-        Ok(Self {
-            estimate: row.opt_int(at(0))?.map(sql::number).transpose()?,
-            placeholder: row.opt_flag(at(1))?,
-            requires_artifact: row.opt_flag(at(2))?,
-            requires_note: row.opt_flag(at(3))?,
-            is_final: row.opt_flag(at(4))?,
-            auto_done: row.opt_flag(at(5))?,
-            opens_at: row.opt_parse(at(6))?,
-            closes_at: row.opt_parse(at(7))?,
-            gates: row.opt_flag(at(8))?,
-            closes: row.opt_flag(at(9))?,
-            prompt: row.opt_parse(at(10))?,
-            answer_type: row
-                .opt_text(at(11))?
-                .map(|name| answer_type_from(&name))
-                .transpose()?,
-            choices: row.opt_json(at(12))?,
-            fills_role: row.opt_parse(at(13))?,
-            feeds_milestone: row.opt_parse(at(14))?,
-            help: row.opt_parse(at(15))?,
-        })
-    }
-
-    /// The kind-restricted fields with a value.
-    fn present(&self) -> Vec<KindField> {
-        [
-            (KindField::Estimate, self.estimate.is_some()),
-            (KindField::Placeholder, self.placeholder.is_some()),
-            (
-                KindField::RequiresArtifact,
-                self.requires_artifact.is_some(),
-            ),
-            (KindField::RequiresNote, self.requires_note.is_some()),
-            (KindField::Final, self.is_final.is_some()),
-            (KindField::AutoDone, self.auto_done.is_some()),
-            (KindField::OpensAt, self.opens_at.is_some()),
-            (KindField::ClosesAt, self.closes_at.is_some()),
-            (KindField::Gates, self.gates.is_some()),
-            (KindField::Closes, self.closes.is_some()),
-            (KindField::Prompt, self.prompt.is_some()),
-            (KindField::Help, self.help.is_some()),
-            (KindField::AnswerType, self.answer_type.is_some()),
-            (KindField::Choices, self.choices.is_some()),
-            (KindField::FillsRole, self.fills_role.is_some()),
-            (KindField::FeedsMilestone, self.feeds_milestone.is_some()),
-        ]
-        .into_iter()
-        .filter_map(|(field, present)| present.then_some(field))
-        .collect()
-    }
-
-    /// The payload of a node of `kind`. A null flag is its default, as the written form
-    /// leaves it out.
-    ///
-    /// # Errors
-    ///
-    /// A column the kind or answer type cannot have, or a missing required one (A1a).
-    fn payload(self, kind: NodeKind) -> Result<Payload<KeyRefs>, StoreError> {
-        for field in self.present() {
-            let allowed = field.allowed_on(kind)
-                && self
-                    .answer_type
-                    .is_none_or(|answer| field.allowed_for_answer(answer));
-            if !allowed {
-                return Err(corrupt(&format!(
-                    "a {} node has a {} column",
-                    kind.name(),
-                    field.name()
-                )));
-            }
-        }
-        let missing = |field: KindField| corrupt(&format!("a node has no {}", field.name()));
-        Ok(match kind {
-            NodeKind::Decision => {
-                let answer_type = self
-                    .answer_type
-                    .ok_or_else(|| missing(KindField::AnswerType))?;
-                let choices = self.choices.ok_or_else(|| missing(KindField::Choices));
-                let answer = match answer_type {
-                    AnswerType::Boolean => AnswerSpec::Boolean,
-                    AnswerType::SingleChoice => AnswerSpec::SingleChoice(choices?),
-                    AnswerType::MultiChoice => AnswerSpec::MultiChoice(choices?),
-                    AnswerType::Text => AnswerSpec::Text,
-                    AnswerType::Date => AnswerSpec::Date {
-                        feeds_milestone: self.feeds_milestone,
-                    },
-                    AnswerType::Identity => AnswerSpec::Identity {
-                        fills_role: self.fills_role,
-                    },
-                    AnswerType::IdentityList => AnswerSpec::IdentityList {
-                        fills_role: self.fills_role,
-                    },
-                };
-                Payload::Decision(Decision {
-                    prompt: self.prompt.ok_or_else(|| missing(KindField::Prompt))?,
-                    help: self.help,
-                    answer,
-                })
-            }
-            NodeKind::Deliverable => Payload::Deliverable(Deliverable {
-                estimate: self.estimate,
-                placeholder: self.placeholder.unwrap_or(false),
-                requires_artifact: self.requires_artifact.unwrap_or(false),
-                requires_note: self.requires_note.unwrap_or(false),
-            }),
-            NodeKind::Action => Payload::Action(Action {
-                estimate: self.estimate,
-                placeholder: self.placeholder.unwrap_or(false),
-                requires_note: self.requires_note.unwrap_or(false),
-            }),
-            NodeKind::Milestone => Payload::Milestone(Milestone {
-                is_final: self.is_final.unwrap_or(false),
-                auto_done: self.auto_done.unwrap_or(false),
-            }),
-            NodeKind::Group => Payload::Group(Group {
-                opens_at: self.opens_at,
-                closes_at: self.closes_at,
-                gates: self.gates.unwrap_or(true),
-                closes: self.closes.unwrap_or(true),
-            }),
-        })
-    }
+    columns
+        .into_payload(kind)
+        .map_err(|error| corrupt(&error.to_string()))
 }
 
 fn kind_from(name: &str) -> Result<NodeKind, StoreError> {
@@ -438,7 +231,7 @@ fn node_from_row(row: &Row, children: &mut Children) -> Result<Node<KeyRefs>, St
         relevant_when: row.opt_json(7)?,
         due_by: row.opt_json(8)?,
         not_before: row.opt_json(9)?,
-        payload: KindColumns::read(row)?.payload(kind)?,
+        payload: payload_from_row(row, kind)?,
     })
 }
 
@@ -676,6 +469,8 @@ pub(crate) fn load_node(
 
 #[cfg(test)]
 mod tests {
+    use cairn_schema::Group;
+
     use super::*;
 
     #[test]
@@ -688,23 +483,25 @@ mod tests {
 
     #[test]
     fn a_column_the_kind_or_answer_type_cannot_have_does_not_load() {
-        let on_action = KindColumns {
+        let on_action = KindColumns::<KeyRefs> {
             requires_artifact: Some(true),
-            ..KindColumns::NONE
+            ..KindColumns::default()
         };
-        assert!(on_action.payload(NodeKind::Action).is_err());
-        let on_text = KindColumns {
+        assert!(on_action.into_payload(NodeKind::Action).is_err());
+        let on_text = KindColumns::<KeyRefs> {
             prompt: Some(parse("Which?").unwrap()),
             answer_type: Some(AnswerType::Text),
             fills_role: Some(parse("r_lead").unwrap()),
-            ..KindColumns::NONE
+            ..KindColumns::default()
         };
-        assert!(on_text.payload(NodeKind::Decision).is_err());
+        assert!(on_text.into_payload(NodeKind::Decision).is_err());
     }
 
     #[test]
     fn a_null_flag_loads_as_its_default() {
-        let group = KindColumns::NONE.payload(NodeKind::Group).unwrap();
+        let group = KindColumns::<KeyRefs>::default()
+            .into_payload(NodeKind::Group)
+            .unwrap();
         let expected = Payload::Group(Group {
             opens_at: None,
             closes_at: None,

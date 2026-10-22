@@ -5,8 +5,8 @@ use std::collections::{BTreeMap, BTreeSet};
 
 use cairn_schema::{
     AttachmentKey, BoundedSet, Edge, Graph, KeyRefs, KindKey, LocalEdit, Node, NodeField,
-    NodeFieldValue, NodeKey, ParticipationRef, ParticipationSource, Participations, Payload,
-    Removal, Resource,
+    NodeFieldValue, NodeKey, ParticipationRef, ParticipationSource, Participations, Removal,
+    Resource,
 };
 
 /// Runs `edit` on the node with `key` and puts it back.
@@ -129,14 +129,7 @@ pub(crate) fn differences(old: &Node<KeyRefs>, new: &Node<KeyRefs>) -> BTreeSet<
             edits.insert(LocalEdit::Resource((*key).clone()));
         }
     }
-    let answer_type = |node: &Node<KeyRefs>| match &node.payload {
-        Payload::Decision(decision) => Some(decision.answer.answer_type()),
-        Payload::Deliverable(_)
-        | Payload::Action(_)
-        | Payload::Milestone(_)
-        | Payload::Group(_) => None,
-    };
-    if old.kind() != new.kind() || answer_type(old) != answer_type(new) {
+    if old.kind() != new.kind() || old.payload.answer_type() != new.payload.answer_type() {
         // B7: a replacement's change of kind or answer type has no field of its own.
         edits.insert(LocalEdit::Shape);
     }

@@ -36,6 +36,7 @@ use super::rows::count;
 use super::{DerivedJourney, ProjectionError};
 use crate::derive::Relevances;
 use crate::derive::pending::{RelevanceClass, classify, classify_assuming};
+use crate::derive::relevance::awaiting_answer;
 use crate::derive::skip;
 
 /// One answer to evaluate: the whole answer, the choice it names, whether the choice is the
@@ -109,11 +110,11 @@ impl DerivedJourney<'_> {
     /// E3: the decision's answer would be in effect: it is relevant, and open (not under a
     /// skip) or decided.
     fn answer_applies(&self, key: &NodeKey) -> bool {
-        let relevant = self.derived.relevance().value(key) == cairn_schema::Relevance::Relevant;
+        let value = self.derived.relevance().value(key);
         let state = self.state(key);
-        relevant
-            && (state == State::Decided
-                || (state == State::Open && self.derived.skips().skipped_by(key).is_none()))
+        let under_skip = self.derived.skips().skipped_by(key).is_some();
+        awaiting_answer(value, state, under_skip)
+            || (value == cairn_schema::Relevance::Relevant && state == State::Decided)
     }
 
     /// The answers to evaluate, in the decision's order: both booleans, each choice, or each

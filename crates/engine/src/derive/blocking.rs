@@ -64,7 +64,7 @@ use cairn_schema::{
 
 use super::dates::Dates;
 use super::dependencies::{Dependencies, EdgeClass, EdgeSet, Instant, NodeIndex, Point};
-use super::{Early, stored_state};
+use super::{Early, stored_state, unexpanded};
 use crate::graph::Graph;
 
 /// What pass 5 decides about one node.
@@ -266,6 +266,12 @@ impl Blocking {
         self.flags_of(key).is_some_and(|flags| flags.actionable)
     }
 
+    /// D2: a decision of `kind` waiting to be decided: actionable.
+    #[must_use]
+    pub(crate) fn decision_needed(&self, kind: NodeKind, key: &NodeKey) -> bool {
+        kind == NodeKind::Decision && self.actionable(key)
+    }
+
     /// Nothing is left to do on the node: terminal, effectively skipped, done by its date, or a
     /// group that is done or skipped (D5: not "effectively unfinished").
     #[must_use]
@@ -394,7 +400,7 @@ impl Sweep<'_> {
         let key = &node.key;
         let state = stored_state(document, node);
         let skips = &self.early.skips;
-        if state == State::Skipped || skips.skipped_by(key).is_some() {
+        if skips.skipped(state, key) {
             // D1a: a skip satisfies once the kept work beneath it does.
             return skips.kept_work(key).iter().all(|kept| {
                 self.dependencies().node_index(kept).is_some_and(|at| {
@@ -463,7 +469,7 @@ impl Sweep<'_> {
         let value = |point| satisfied.get(Instant::new(at, point).slot()) == Some(&true);
         let state = stored_state(document, node);
         let group = node.kind() == NodeKind::Group;
-        let skipped = state == State::Skipped || self.early.skips.skipped_by(key).is_some();
+        let skipped = self.early.skips.skipped(state, key);
         let closed = skipped || state.is_terminal() || by_date || (group && value(Point::Finish));
         let relevance = self.early.relevance.value(key);
         let in_scope = relevance != Relevance::NotRelevant;
@@ -482,7 +488,7 @@ impl Sweep<'_> {
             actionable,
             done_by_date: by_date,
             done_when_unblocked: self.reads_as_done(node),
-            needs_breakdown: open && self.unexpanded(node),
+            needs_breakdown: open && unexpanded(self.graph.document(), self.graph.tree(), node),
             snoozed: own.clone(),
             snoozed_own: own,
             snoozed_via: None,
@@ -533,23 +539,6 @@ impl Sweep<'_> {
                 ancestor = tree.parent(above);
             }
         }
-    }
-
-    /// B10: a placeholder with no children that is not marked atomic.
-    fn unexpanded(&self, node: &Node<KeyRefs>) -> bool {
-        let placeholder = match &node.payload {
-            Payload::Deliverable(deliverable) => deliverable.placeholder,
-            Payload::Action(action) => action.placeholder,
-            Payload::Decision(_) | Payload::Milestone(_) | Payload::Group(_) => false,
-        };
-        let atomic = self
-            .graph
-            .document()
-            .state
-            .nodes
-            .get(&node.key)
-            .is_some_and(|stored| stored.atomic);
-        placeholder && !atomic && !self.graph.tree().is_container(&node.key)
     }
 
     /// B6: the node's stored snooze, when it holds from current state.

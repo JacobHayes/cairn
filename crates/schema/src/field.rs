@@ -8,7 +8,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::condition::Condition;
 use crate::id::Slug;
-use crate::node::{Choices, DateRule, Node, Payload};
+use crate::node::{Choices, DateRule, KindField, Node, Payload};
 use crate::number::{Days, Weight};
 use crate::refs::References;
 use crate::text::{Markdown, Title};
@@ -69,6 +69,43 @@ pub enum NodeField {
 }
 
 impl NodeField {
+    /// The kind-restricted field this is, or none for a field every node has.
+    #[must_use]
+    pub const fn kind_field(self) -> Option<KindField> {
+        Some(match self {
+            NodeField::Id
+            | NodeField::Parent
+            | NodeField::Title
+            | NodeField::Description
+            | NodeField::Weight
+            | NodeField::RelevantWhen
+            | NodeField::DueBy
+            | NodeField::NotBefore => return None,
+            NodeField::Estimate => KindField::Estimate,
+            NodeField::Placeholder => KindField::Placeholder,
+            NodeField::RequiresArtifact => KindField::RequiresArtifact,
+            NodeField::RequiresNote => KindField::RequiresNote,
+            NodeField::Final => KindField::Final,
+            NodeField::AutoDone => KindField::AutoDone,
+            NodeField::OpensAt => KindField::OpensAt,
+            NodeField::ClosesAt => KindField::ClosesAt,
+            NodeField::Gates => KindField::Gates,
+            NodeField::Closes => KindField::Closes,
+            NodeField::Prompt => KindField::Prompt,
+            NodeField::Help => KindField::Help,
+            NodeField::Choices => KindField::Choices,
+            NodeField::FillsRole => KindField::FillsRole,
+            NodeField::FeedsMilestone => KindField::FeedsMilestone,
+        })
+    }
+
+    /// Whether a payload has this field, by the kind field table; false for a field every
+    /// node has, which the payload does not hold.
+    fn allowed_on<R: References>(self, payload: &Payload<R>) -> bool {
+        self.kind_field()
+            .is_some_and(|field| field.allowed(payload.kind(), payload.answer_type()))
+    }
+
     /// Every field, in declaration order.
     pub const ALL: [NodeField; 23] = [
         NodeField::Id,
@@ -215,6 +252,9 @@ impl<R: References> NodeFieldValue<R> {
 
     fn read_payload(field: NodeField, payload: &Payload<R>) -> Option<Self> {
         use crate::node::AnswerSpec;
+        if !field.allowed_on(payload) {
+            return None;
+        }
         match (field, payload) {
             (NodeField::Estimate, Payload::Deliverable(work)) => {
                 Some(NodeFieldValue::Estimate(work.estimate))
@@ -263,21 +303,21 @@ impl<R: References> NodeFieldValue<R> {
                 AnswerSpec::SingleChoice(choices) | AnswerSpec::MultiChoice(choices) => {
                     Some(NodeFieldValue::Choices(choices.clone()))
                 }
-                _ => None,
+                _ => unreachable!("the kind field table allows choices only on a choice"),
             },
             (NodeField::FillsRole, Payload::Decision(decision)) => match &decision.answer {
                 AnswerSpec::Identity { fills_role } | AnswerSpec::IdentityList { fills_role } => {
                     Some(NodeFieldValue::FillsRole(fills_role.clone()))
                 }
-                _ => None,
+                _ => unreachable!("the kind field table allows fills_role only on an identity"),
             },
             (NodeField::FeedsMilestone, Payload::Decision(decision)) => match &decision.answer {
                 AnswerSpec::Date { feeds_milestone } => {
                     Some(NodeFieldValue::FeedsMilestone(feeds_milestone.clone()))
                 }
-                _ => None,
+                _ => unreachable!("the kind field table allows feeds_milestone only on a date"),
             },
-            _ => None,
+            _ => unreachable!("the kind field table allows only the fields read above"),
         }
     }
 
@@ -302,6 +342,9 @@ impl<R: References> NodeFieldValue<R> {
 
     fn write_payload(self, payload: &mut Payload<R>) -> bool {
         use crate::node::AnswerSpec;
+        if !self.field().allowed_on(payload) {
+            return false;
+        }
         match (self, payload) {
             (NodeFieldValue::Estimate(days), Payload::Deliverable(work)) => work.estimate = days,
             (NodeFieldValue::Estimate(days), Payload::Action(work)) => work.estimate = days,
@@ -337,7 +380,7 @@ impl<R: References> NodeFieldValue<R> {
                     AnswerSpec::SingleChoice(choices) | AnswerSpec::MultiChoice(choices) => {
                         *choices = new;
                     }
-                    _ => return false,
+                    _ => unreachable!("the kind field table allows choices only on a choice"),
                 }
             }
             (NodeFieldValue::FillsRole(role), Payload::Decision(decision)) => {
@@ -346,16 +389,18 @@ impl<R: References> NodeFieldValue<R> {
                     | AnswerSpec::IdentityList { fills_role } => {
                         *fills_role = role;
                     }
-                    _ => return false,
+                    _ => unreachable!("the kind field table allows fills_role only on an identity"),
                 }
             }
             (NodeFieldValue::FeedsMilestone(milestone), Payload::Decision(decision)) => {
                 match &mut decision.answer {
-                    AnswerSpec::Date { feeds_milestone } => *feeds_milestone = milestone,
-                    _ => return false,
+                    AnswerSpec::Date { feeds_milestone } => {
+                        *feeds_milestone = milestone;
+                    }
+                    _ => unreachable!("the kind field table allows feeds_milestone only on a date"),
                 }
             }
-            _ => return false,
+            _ => unreachable!("the kind field table allows only the fields written above"),
         }
         true
     }

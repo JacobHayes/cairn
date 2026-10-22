@@ -29,7 +29,7 @@ use std::fmt;
 use cairn_schema::limits::NODE_COUNT_MAX;
 use cairn_schema::{
     AnswerValue, DeriveInputs, DomainDocument, IdentitySet, Journey, KeyRefs, Markdown, Node,
-    NodeKey, State,
+    NodeKey, NodeKind, State,
 };
 
 use crate::derive::{Derived, stored_state};
@@ -104,6 +104,13 @@ impl<'a> DerivedJourney<'a> {
     /// The node's stored state, or its kind's initial state where none is stored (a route).
     fn state(&self, key: &NodeKey) -> State {
         stored_state(self.graph.document(), self.node(key))
+    }
+
+    /// C18: a decision still open: stored open, and not closed by a skip or a date.
+    fn open_decision(&self, key: &NodeKey) -> bool {
+        self.node(key).kind() == NodeKind::Decision
+            && self.state(key) == State::Open
+            && !self.derived.blocking().closed(key)
     }
 
     /// The nodes beneath `container` (every node when none), in tree order: each node before

@@ -861,6 +861,71 @@ impl ChangeClass {
 }
 
 impl Mutation {
+    /// The node this mutation adds, changes, or removes (the decision, for an answer); none
+    /// for a mutation about an edge, a role, a kind, an annotation, or its domain.
+    #[must_use]
+    pub fn node(&self) -> Option<&NodeKey> {
+        match self {
+            Mutation::AddNode { node } | Mutation::ReplaceNode { node } => Some(&node.key),
+            Mutation::RemoveNode { removal } => Some(&removal.node),
+            Mutation::SetNodeField { node, .. }
+            | Mutation::SetParticipation { node, .. }
+            | Mutation::ClearParticipation { node, .. }
+            | Mutation::AddResource { node, .. }
+            | Mutation::EditResource { node, .. }
+            | Mutation::RemoveResource { node, .. }
+            | Mutation::Transition { node, .. }
+            | Mutation::SetRecordedDate { node, .. }
+            | Mutation::SetPin { node, .. }
+            | Mutation::ShiftPin { node, .. }
+            | Mutation::ClearPin { node }
+            | Mutation::Snooze { node, .. }
+            | Mutation::Unsnooze { node }
+            | Mutation::ApplyOverride { node, .. }
+            | Mutation::RemoveOverride { node, .. }
+            | Mutation::SetAtomic { node, .. }
+            | Mutation::SetProvenance { node, .. }
+            | Mutation::MarkLocalEdit { node, .. }
+            | Mutation::Answer { decision: node, .. } => Some(node),
+            Mutation::CreateJourney { .. }
+            | Mutation::EditJourney { .. }
+            | Mutation::SetJourneyStatus { .. }
+            | Mutation::CreateRoute { .. }
+            | Mutation::EditRoute { .. }
+            | Mutation::SetRouteRetired { .. }
+            | Mutation::OpenDraft { .. }
+            | Mutation::DiscardDraft {}
+            | Mutation::PublishDraft {}
+            | Mutation::AddEdge { .. }
+            | Mutation::RemoveEdge { .. }
+            | Mutation::AddRole { .. }
+            | Mutation::EditRole { .. }
+            | Mutation::RemoveRole { .. }
+            | Mutation::AddParticipationKind { .. }
+            | Mutation::EditParticipationKind { .. }
+            | Mutation::RemoveParticipationKind { .. }
+            | Mutation::SetDefaultOwner { .. }
+            | Mutation::InsertSegment { .. }
+            | Mutation::FillRole { .. }
+            | Mutation::ClearRoleFill { .. }
+            | Mutation::AddAnnotation { .. }
+            | Mutation::EditAnnotation { .. }
+            | Mutation::RemoveAnnotation { .. }
+            | Mutation::Upgrade { .. }
+            | Mutation::Relink { .. }
+            | Mutation::CreateIdentity { .. }
+            | Mutation::EditIdentity { .. }
+            | Mutation::MergeIdentities { .. }
+            | Mutation::DeleteIdentity { .. }
+            | Mutation::DeleteJourney { .. }
+            | Mutation::DeleteRoute { .. }
+            | Mutation::CreateProposal { .. }
+            | Mutation::EditProposal { .. }
+            | Mutation::ApplyProposal { .. }
+            | Mutation::DiscardProposal {} => None,
+        }
+    }
+
     /// PRD glossary, Structural change: what this mutation is in a journey or the
     /// deployment. Every change to a route is structural ([`Patch::change_class`]).
     #[must_use]

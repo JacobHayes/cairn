@@ -27,7 +27,7 @@ use super::blocking::Blocking;
 use super::dates::Dates;
 use super::dependencies::{Dependencies, EdgeClass, EdgeSet};
 use super::relevance::Relevances;
-use super::stored_state;
+use super::{stored_state, unexpanded};
 use crate::graph::{Document, Graph, Tree};
 
 /// The stale nodes, in key order.
@@ -236,14 +236,12 @@ pub(crate) fn static_failures(
     annotated: &Annotated<'_>,
 ) -> BTreeSet<GuardFailure> {
     let mut found = BTreeSet::new();
-    let (placeholder, requires_artifact, requires_note) = match &node.payload {
-        Payload::Deliverable(deliverable) => (
-            deliverable.placeholder,
-            deliverable.requires_artifact,
-            deliverable.requires_note,
-        ),
-        Payload::Action(action) => (action.placeholder, false, action.requires_note),
-        Payload::Decision(_) | Payload::Milestone(_) | Payload::Group(_) => (false, false, false),
+    let (requires_artifact, requires_note) = match &node.payload {
+        Payload::Deliverable(deliverable) => {
+            (deliverable.requires_artifact, deliverable.requires_note)
+        }
+        Payload::Action(action) => (false, action.requires_note),
+        Payload::Decision(_) | Payload::Milestone(_) | Payload::Group(_) => (false, false),
     };
     if requires_artifact && !annotated.artifacts.contains(&node.key) {
         found.insert(GuardFailure::MissingArtifact);
@@ -251,12 +249,7 @@ pub(crate) fn static_failures(
     if requires_note && !annotated.notes.contains(&node.key) {
         found.insert(GuardFailure::MissingNote);
     }
-    let atomic = document
-        .state
-        .nodes
-        .get(&node.key)
-        .is_some_and(|stored| stored.atomic);
-    if placeholder && !atomic && !tree.is_container(&node.key) {
+    if unexpanded(document, tree, node) {
         found.insert(GuardFailure::NotBrokenDown);
     }
     // Only deliverables and actions have these guards (A16).

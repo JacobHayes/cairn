@@ -344,11 +344,7 @@ impl DerivedJourney<'_> {
                 .cmp(&b.date.date)
                 .then_with(|| a.node.cmp(&b.node))
         });
-        let decisions = keep(&|key| {
-            self.node(key).kind() == NodeKind::Decision
-                && self.state(key) == State::Open
-                && !derived.blocking().closed(key)
-        });
+        let decisions = keep(&|key| self.open_decision(key));
         StatusSummary {
             by_state,
             by_display_state,

@@ -81,8 +81,8 @@ pub use login::Login;
 pub use mention::{Mention, condition_identities};
 pub use node::{
     Action, AnswerSpec, AnswerType, Choice, Choices, DateRule, DateSource, Decision, Deliverable,
-    Direction, Group, IdentitySet, KindField, LabeledChoice, Milestone, Node, NodeKind,
-    NodeShapeError, ParticipationSource, Participations, Payload,
+    Direction, Group, IdentitySet, KindColumns, KindField, LabeledChoice, Milestone, Node,
+    NodeKind, NodeShapeError, ParticipationSource, Participations, Payload,
 };
 pub use notice::{Notice, NoticeCode};
 pub use number::{Days, NumberError, Revision, SignedDays, VersionNumber, Weight};

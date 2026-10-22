@@ -4,7 +4,7 @@
 
 use cairn_schema::{
     AnswerValue, GraphKey, GraphRecord, Limit, LocalEdit, Markdown, Mutation, NodeKey, NodeKind,
-    NodeState, OverrideKind, Overrides, Payload, RecordedEnd, RoleKey, SignedDays, State, Subject,
+    NodeState, OverrideKind, Overrides, RecordedEnd, RoleKey, SignedDays, State, Subject,
     Transition, ViolationCode, Write,
 };
 
@@ -520,11 +520,7 @@ fn set_atomic(session: &mut Session<'_>, node: &NodeKey, atomic: bool) -> Vec<Wr
     }
     let placeholder = session
         .node(node)
-        .is_some_and(|found| match &found.payload {
-            Payload::Deliverable(deliverable) => deliverable.placeholder,
-            Payload::Action(action) => action.placeholder,
-            Payload::Decision(_) | Payload::Milestone(_) | Payload::Group(_) => false,
-        });
+        .is_some_and(|found| found.payload.placeholder());
     if !placeholder {
         session.reject(
             ViolationCode::FieldNotOnKind,

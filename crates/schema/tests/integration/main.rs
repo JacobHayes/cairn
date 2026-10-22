@@ -19,3 +19,4 @@ mod property_documents;
 mod property_model;
 mod property_text;
 mod property_writes;
+mod variants;

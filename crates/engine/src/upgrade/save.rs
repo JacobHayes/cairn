@@ -11,8 +11,8 @@ use std::collections::{BTreeMap, BTreeSet};
 
 use cairn_schema::{
     Domain, DraftSource, IdentityKey, JourneyId, Mutation, ParticipationRef, ParticipationSource,
-    Payload, ProposalDraft, Provenance, ReviewItem, Revision, RouteId, Subject, Title,
-    VersionNumber, Violation, ViolationCode,
+    ProposalDraft, Provenance, ReviewItem, Revision, RouteId, Subject, Title, VersionNumber,
+    Violation, ViolationCode,
 };
 
 use super::{DraftError, draft, trial, with_violations};
@@ -131,11 +131,7 @@ fn exclusion_items(journey: &cairn_schema::Graph) -> Vec<ReviewItem> {
         journey
             .nodes
             .get(key)
-            .is_some_and(|node| match &node.payload {
-                Payload::Deliverable(deliverable) => deliverable.placeholder,
-                Payload::Action(action) => action.placeholder,
-                Payload::Decision(_) | Payload::Milestone(_) | Payload::Group(_) => false,
-            })
+            .is_some_and(|node| node.payload.placeholder())
     };
     journey
         .nodes

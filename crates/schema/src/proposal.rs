@@ -685,34 +685,16 @@ impl ProposalOutline {
                         }
                     }
                 }
-                Mutation::SetNodeField { node, .. }
-                | Mutation::ReplaceNode {
-                    node: Node { key: node, .. },
+                // Anything else about a node changes it; what has no node was tallied by
+                // `tally_other`.
+                other => {
+                    if let Some(node) = other.node()
+                        && !added.contains(node)
+                        && !removed.contains(node)
+                    {
+                        changed.insert(node);
+                    }
                 }
-                | Mutation::SetParticipation { node, .. }
-                | Mutation::ClearParticipation { node, .. }
-                | Mutation::AddResource { node, .. }
-                | Mutation::EditResource { node, .. }
-                | Mutation::RemoveResource { node, .. }
-                | Mutation::Transition { node, .. }
-                | Mutation::SetRecordedDate { node, .. }
-                | Mutation::SetPin { node, .. }
-                | Mutation::ShiftPin { node, .. }
-                | Mutation::ClearPin { node }
-                | Mutation::Snooze { node, .. }
-                | Mutation::Unsnooze { node }
-                | Mutation::ApplyOverride { node, .. }
-                | Mutation::RemoveOverride { node, .. }
-                | Mutation::SetAtomic { node, .. }
-                | Mutation::SetProvenance { node, .. }
-                | Mutation::MarkLocalEdit { node, .. }
-                | Mutation::Answer { decision: node, .. }
-                    if !added.contains(node) && !removed.contains(node) =>
-                {
-                    changed.insert(node);
-                }
-                // Everything else was tallied by `tally_other`.
-                _ => {}
             }
         }
         outline.nodes_added = count(added.len());

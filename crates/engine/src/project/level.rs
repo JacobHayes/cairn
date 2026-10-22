@@ -514,8 +514,7 @@ impl<'a> DerivedJourney<'a> {
 
     /// D1a: a skipped, in-scope container whose kept work is not yet satisfied.
     fn kept_work_pending(&self, key: &NodeKey) -> bool {
-        let skipped =
-            self.state(key) == State::Skipped || self.derived.skips().skipped_by(key).is_some();
+        let skipped = self.derived.skips().skipped(self.state(key), key);
         skipped && self.derived.relevance().in_scope(key) && !self.derived.blocking().satisfies(key)
     }
 
