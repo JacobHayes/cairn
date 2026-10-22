@@ -64,15 +64,17 @@
   margin: var(--space-3);
 }
 
-/* On a phone the zoom buttons are 44px targets, apart from each other, so a tap lands on the one meant. */
+/* On a touch screen the zoom buttons are touch targets, and on a phone apart from each other, so a tap lands on the one meant. */
+@media (pointer: coarse) {
+  .canvas .react-flow__controls-button {
+    width: var(--touch-target);
+    height: var(--touch-target);
+  }
+}
+
 @media (max-width: 719px) {
   .canvas .react-flow__controls {
     gap: var(--space-2);
-  }
-
-  .canvas .react-flow__controls-button {
-    width: 44px;
-    height: 44px;
   }
 
   /* A raised sheet leaves the canvas too little height for the zoom stack under the Controls button: Fit stays, and a pinch zooms. */

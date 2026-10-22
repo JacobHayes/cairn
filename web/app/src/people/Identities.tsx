@@ -23,7 +23,7 @@ import { useWritable } from "../screens/writable.ts";
 import { Inspector } from "../shell/frame.tsx";
 import { useEscapeTo } from "../shell/useEscapeTo.ts";
 import { FilterSearch, IndexHead } from "../ui/IndexHead.tsx";
-import { Badge, IndexState } from "../ui/kit.tsx";
+import { Badge, IndexState, PickBox } from "../ui/kit.tsx";
 import { Receipt, useReceipt } from "../ui/Receipt.tsx";
 import { plural } from "../ui/words.ts";
 import { NewIdentity } from "./IdentityForm.tsx";
@@ -76,7 +76,7 @@ function Row({ row, yours, chosen, intoName, selection, selectable }: { row: Ide
       }}
     >
       <td className="pick">
-        {selectable ? <input type="checkbox" className="pick-box" aria-label={`Select ${label}`} checked={chosen} onChange={() => { selection.toggle(identity.key); }} /> : null}
+        {selectable ? <PickBox className="pick-box" aria-label={`Select ${label}`} checked={chosen} onChange={() => { selection.toggle(identity.key); }} /> : null}
       </td>
       <td data-column="name">
         <span className="cell-first">

@@ -182,6 +182,13 @@
   line-height: 1;
 }
 
+@media (pointer: coarse) {
+  :is(.view-controls, .canvas-signal) :is(.chip, .dropdown-button, input[type="search"]) {
+    height: var(--touch-target);
+    min-height: var(--touch-target);
+  }
+}
+
 /* The list's Columns and count ride the end of the row, the count as quiet text. */
 .view-controls-end {
   display: flex;
@@ -479,3 +486,18 @@ button.route-list-title {
   white-space: nowrap;
 }
 
+
+/* The phone's Controls menu is one column of rows (each a touch target tall) at one even gap, its groups parted by a hairline that takes the same gap on both sides, so nothing sits closer to one neighbour than the other. */
+[data-testid="controls-panel-phone"],
+[data-testid="controls-panel-phone"] .stack,
+[data-testid="controls-panel-phone"] fieldset {
+  gap: var(--space-2);
+}
+
+[data-testid="controls-panel-phone"] :is(hr, .menu-rule) {
+  margin: 0;
+}
+
+[data-testid="controls-panel-phone"] legend {
+  padding: 0;
+}

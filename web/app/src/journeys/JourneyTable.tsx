@@ -13,7 +13,7 @@ import { Link } from "react-router";
 import { useCaller, useDeployment, useRetryJourney } from "../data/react.ts";
 import { identityNames } from "../detail/sections.tsx";
 import type { JourneySummary, RouteSummary } from "../data/reads.ts";
-import { Meter } from "../ui/kit.tsx";
+import { Meter, PickBox } from "../ui/kit.tsx";
 import { routePath } from "../routes/address.ts";
 import { forYouOf, forYouWords, milestoneOf, progressOf, troubleOf, troubleWords, upgradeWords, type ForYou, type Trouble } from "./figures-model.ts";
 import { journeyPath } from "./address.ts";
@@ -217,7 +217,7 @@ function attrsOf(summary: JourneySummary, picks: Picks) {
 function PickCell({ summary, picks }: { summary: JourneySummary; picks: Picks }) {
   return (
     <td className="pick">
-      <input type="checkbox" className="pick-box" aria-label={`Select ${summary.name}`} checked={picks.picked.includes(summary.id)} onChange={() => { picks.toggle(summary.id); }} />
+      <PickBox className="pick-box" aria-label={`Select ${summary.name}`} checked={picks.picked.includes(summary.id)} onChange={() => { picks.toggle(summary.id); }} />
     </td>
   );
 }

@@ -531,6 +531,7 @@ table.data.list-table .badge {
   --rank-width: 0px;
   --status-width: 112px;
   --change-width: 0px;
+  --check-w: var(--space-6);
 }
 
 /* C14: under the proposal layer the Change column leads and is held with the others. */
@@ -539,7 +540,7 @@ table.data.list-table .badge {
 }
 
 .list-table [data-column="change"].list-pinned {
-  left: var(--space-6);
+  left: var(--check-w);
   width: var(--change-width);
   min-width: var(--change-width);
 }
@@ -550,9 +551,8 @@ table.data.list-table .badge {
     --status-width: 92px;
   }
 
-  .list-table .list-check {
-    width: var(--space-5);
-    min-width: var(--space-5);
+  .list-table {
+    --check-w: var(--space-5);
   }
 
   table.data.list-table td[data-column="status"] {
@@ -574,7 +574,7 @@ table.data.list-table .badge {
 }
 
 .list-table [data-column="rank"].list-pinned {
-  left: calc(var(--space-6) + var(--change-width));
+  left: calc(var(--check-w) + var(--change-width));
   width: var(--rank-width);
   min-width: var(--rank-width);
 }
@@ -592,11 +592,11 @@ table.data.list-table .badge {
 }
 
 .list-table [data-column="status"].list-pinned {
-  left: calc(var(--space-6) + var(--change-width) + var(--rank-width));
+  left: calc(var(--check-w) + var(--change-width) + var(--rank-width));
 }
 
 .list-table [data-column="title"].list-pinned {
-  left: calc(var(--space-6) + var(--change-width) + var(--rank-width) + var(--status-width));
+  left: calc(var(--check-w) + var(--change-width) + var(--rank-width) + var(--status-width));
 }
 
 /* The owner and the primary action of a frontier row sit in its owner column. */
@@ -633,10 +633,21 @@ table.data.list-table .badge {
 }
 
 .list-check {
-  width: var(--space-6);
-  min-width: var(--space-6);
+  width: var(--check-w);
+  min-width: var(--check-w);
   box-sizing: border-box;
   padding-inline-end: 0;
+}
+
+/* On a touch screen the pick box's cell is as wide as its hit area, and the pinned columns start after it. */
+@media (pointer: coarse) {
+  .list-table {
+    --check-w: var(--touch-target);
+  }
+
+  table.data.list-table .list-check {
+    padding-inline: 0;
+  }
 }
 
 .list-checkbox {

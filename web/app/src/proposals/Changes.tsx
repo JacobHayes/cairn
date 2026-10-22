@@ -22,7 +22,7 @@ import type { Ready } from "../detail/model.ts";
 import { Section } from "../detail/parts.tsx";
 import { fieldWords } from "../status/words.ts";
 import { NODE_FIELDS } from "@cairn/client";
-import { Button, Field } from "../ui/kit.tsx";
+import { Button, Field, PickBox } from "../ui/kit.tsx";
 import { carryIds, withFieldValue, withMutation, withMutationsAdded, withoutMutation, type ProposalDraft } from "./model.ts";
 import { mutationWords, type Names } from "./words.ts";
 import { KINDS } from "../detail/model.ts";
@@ -171,7 +171,7 @@ function FieldValue({ editor, mutation, onChange, context }: { editor: string; m
       {includes(LINE_FIELDS, field) ? <Field aria-label={fieldWords(field)} value={draft[field]} onChange={(event) => { change({ [field]: event.target.value }); }} /> : null}
       {includes(MARKDOWN_FIELDS, field) ? <textarea aria-label={fieldWords(field)} value={draft[field]} onChange={(event) => { change({ [field]: event.target.value }); }} /> : null}
       {includes(NUMBER_FIELDS, field) ? <Field type="number" min={0} aria-label={fieldWords(field)} value={draft[field]} onChange={(event) => { change({ [field]: event.target.value }); }} /> : null}
-      {includes(FLAG_FIELDS, field) ? <input type="checkbox" aria-label={fieldWords(field)} checked={draft[field]} onChange={(event) => { change({ [field]: event.target.checked }); }} /> : null}
+      {includes(FLAG_FIELDS, field) ? <PickBox aria-label={fieldWords(field)} checked={draft[field]} onChange={(event) => { change({ [field]: event.target.checked }); }} /> : null}
       {includes(MILESTONE_FIELDS, field) ? <Picker aria-label={fieldWords(field)} value={draft[field]} none="None" options={targets} onChange={(event) => { change({ [field]: event.target.value }); }} /> : null}
       {field === "fills_role" ? <Picker aria-label={fieldWords(field)} value={draft.fills_role} none="No role" options={rolesForFill(context.roles, draft.answer_type).map((role) => ({ value: role.key, label: role.title ?? role.id }))} onChange={(event) => { change({ fills_role: event.target.value }); }} /> : null}
       {field === "parent" ? <ParentValue mutation={mutation} onChange={onChange} context={context} /> : null}

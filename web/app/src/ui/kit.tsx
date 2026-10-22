@@ -58,6 +58,18 @@ export function Input({ label, ...props }: InputHTMLAttributes<HTMLInputElement>
   );
 }
 
+/**
+ * A checkbox that has no words beside it (a row's pick box), named by `aria-label`. It sits in a label of its own so
+ * a touch screen gives it a hit area of the touch target while the box is drawn at its usual size (base.css, `.pick-label`).
+ */
+export function PickBox(props: Omit<InputHTMLAttributes<HTMLInputElement>, "type"> & { "aria-label": string }) {
+  return (
+    <label className="pick-label">
+      <input type="checkbox" {...props} />
+    </label>
+  );
+}
+
 /** The input itself, kept under its old name so code written against it still builds. Use `Input`. */
 export const Field = Input;
 

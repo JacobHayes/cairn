@@ -39,6 +39,7 @@ import { addableColumns, columnsOf, columnWords, flatLines, givesWay, isDecision
 import { useRows } from "./useRows.ts";
 import "./acting.css";
 import { Failed } from "../ui/Failed.tsx";
+import { PickBox } from "../ui/kit.tsx";
 import { plural } from "../ui/words.ts";
 import { useCaller } from "../data/react.ts";
 import { useViewLevel } from "../canvas/viewLevel.ts";
@@ -135,7 +136,7 @@ function Row({ line, columns, context: shared, selection, current, faded, mark }
       }}
     >
       <td className="list-check list-pinned">
-        {row === undefined || reviewing ? null : <input type="checkbox" className="list-checkbox" aria-label={`Select ${row.title}`} checked={selection.members.includes(line.key)} onChange={() => { selection.toggle(line.key); }} />}
+        {row === undefined || reviewing ? null : <PickBox className="list-checkbox" aria-label={`Select ${row.title}`} checked={selection.members.includes(line.key)} onChange={() => { selection.toggle(line.key); }} />}
       </td>
       {columns.map((column) => (
         <td key={column} data-column={column} data-gives-way={givesWay(column)} className={[column === "title" ? "list-title-cell" : "list-cell", pinned(column, columns)].filter(Boolean).join(" ")}>
@@ -170,7 +171,7 @@ function Table({ list, lines, columns, context, selection, selected, everyLine, 
       <thead>
         <tr>
           <th scope="col" className="list-check list-pinned">
-            {marks === undefined ? <input type="checkbox" className="list-checkbox" disabled={everyLine.length === 0} aria-label="Select every row shown" checked={all} onChange={() => { selection.set(all ? [] : everyLine); }} /> : null}
+            {marks === undefined ? <PickBox className="list-checkbox" disabled={everyLine.length === 0} aria-label="Select every row shown" checked={all} onChange={() => { selection.set(all ? [] : everyLine); }} /> : null}
           </th>
           {columns.map((column) => (
             <Head key={column} column={column} columns={columns} list={list} onSort={(sort) => void navigate(`${pathname}${withListSettings(search, { ...list, sort })}`)} />

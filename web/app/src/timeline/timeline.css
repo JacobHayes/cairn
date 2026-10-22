@@ -350,3 +350,20 @@
   text-decoration-thickness: 1px;
 }
 
+
+/* On a touch screen a row's title link reaches over the whole label (a stretched link), which is a row high: the rows stay as dense as they are. */
+@media (pointer: coarse) {
+  .timeline-label {
+    position: relative;
+  }
+
+  .timeline-label .tree-fold {
+    z-index: 1;
+  }
+
+  .timeline-text > a::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+  }
+}

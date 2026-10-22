@@ -160,7 +160,7 @@
 }
 
 .tour-callout[data-side="dock"] .tour-actions > * {
-  min-height: 44px;
+  min-height: var(--touch-target);
 }
 
 /* A short window has little room above the callout for what it is about: two lines of the body, the rest scrolls. */
