@@ -11,7 +11,7 @@ import { AnnotationList } from "../detail/Attachments.tsx";
 import type { Ready } from "../detail/model.ts";
 import { NodeLink, Section } from "../detail/parts.tsx";
 import { summaryModel, type SummaryModel } from "../summary/model.ts";
-import { dateInk, inkClass, whenWords } from "../status/when.ts";
+import { dateInk, inkClass, originWord, whenWords } from "../status/when.ts";
 import { Meter } from "../ui/kit.tsx";
 import { Markdown } from "../ui/markdown.tsx";
 import { yoursOf } from "./figures-model.ts";
@@ -88,9 +88,12 @@ function NextMilestone({ ready, model }: { ready: Ready; model: SummaryModel }) 
   return (
     <section className="stack" aria-label="Next milestone" data-testid="card-next-milestone" data-node={next.key}>
       <span className="muted">{STATUS_HOLDS_CURRENT_WORK[ready.journey.header.status] ? "Next milestone" : "Planned milestone"}</span>
-      <span>
-        <NodeLink view={ready} node={next.key} /> <span className={inkClass(dateInk(next.date, ready.derived.today)) ?? "muted"}>· {whenWords(next.date, next.origin, ready.derived.today)}</span>
-      </span>
+      <div>
+        <div className="detail-clamp">
+          <NodeLink view={ready} node={next.key} />
+        </div>
+        <span className={inkClass(dateInk(next.date, ready.derived.today)) ?? "muted"} title={`This date is ${originWord(next.origin)}`}>{whenWords(next.date, next.origin, ready.derived.today)}</span>
+      </div>
     </section>
   );
 }

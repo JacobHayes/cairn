@@ -1014,9 +1014,10 @@ button.list-sort {
   font-size: 14px;
 }
 
-/* A node's title in a list row or an overview list takes two lines and ends in an ellipsis, so one of the longest a title may be is not a paragraph; the link's title holds it whole. */
+/* A node's title in a list row, an overview list or the overview's next milestone takes two lines and ends in an ellipsis, so one of the longest a title may be is not a paragraph; the link's title holds it whole. */
 .list-node > a,
-.detail-list > li > a {
+.detail-list > li > a,
+.detail-clamp > a {
   display: -webkit-box;
   -webkit-box-orient: vertical;
   -webkit-line-clamp: 2;

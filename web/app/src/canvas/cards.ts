@@ -208,7 +208,8 @@ const CHIP_EXTRA_PX = 31;
 /** Whether a chip of `letters` fits beside the title in `box` at `zoom` without the title getting smaller or taking more lines. */
 export function headChipFits(title: string, letters: number, box: { width: number; height: number }, zoom: number): boolean {
   const width = box.width - (letters * CHIP_LETTER_PX + CHIP_EXTRA_PX) / zoom;
-  if (width <= 0 || (CHIP_FONT_PX * CHIP_LEADING + 2 * CHIP_BORDER_PX) / zoom > box.height) {
+  // A title with a word wider than the head is cut on one line, whatever room is left: a chip would take what the cut word has.
+  if (titleWordOverflows(title, box.width) || width <= 0 || (CHIP_FONT_PX * CHIP_LEADING + 2 * CHIP_BORDER_PX) / zoom > box.height) {
     return false;
   }
   const size = titleSizePx(title, box, zoom);

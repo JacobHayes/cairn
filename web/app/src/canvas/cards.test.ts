@@ -50,4 +50,8 @@ describe("headChipFits", () => {
     expect(headChipFits("Setup", 4, wide, 0.3)).toBe(true);
     expect(headChipFits("Evaluate the analytics vendor stage", 11, headTitleBox(CARD_WIDTH_PX, 80, false), 0.3)).toBe(false);
   });
+
+  it("drops the chip beside a title whose one word is wider than the head, so the cut word keeps the room", () => {
+    expect(headChipFits("Unbroken".concat("x".repeat(240)), 7, wide, 0.3)).toBe(false);
+  });
 });

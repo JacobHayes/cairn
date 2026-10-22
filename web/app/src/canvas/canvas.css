@@ -870,6 +870,11 @@
   white-space: nowrap;
 }
 
+/* The cut word is one line, so it takes the reading size (or 13px on screen) rather than the fit size that is the least a head allows: a readable prefix and an ellipsis, not a hairline. */
+.react-flow[data-lod="out"] .node-container .node-title-row[data-cut] .node-title {
+  font-size: max(15px, calc(13px / var(--z, 1)));
+}
+
 /* The chip is set at 10.5px on screen, its border and radius keeping their hairline weight, laid out as on every card's head: the title left, the chip far right. */
 .react-flow[data-lod="out"] .node-container .node-head-chip.badge {
   flex: none;
