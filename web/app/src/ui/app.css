@@ -1142,7 +1142,8 @@ table.data {
   align-items: center;
   gap: var(--space-3);
   min-height: 44px;
-  padding: var(--space-2) var(--space-3);
+  padding: var(--space-2) var(--space-4);
+  font-size: 15px;
   border-bottom: 1px solid var(--color-edge);
   background: var(--color-surface);
 }
