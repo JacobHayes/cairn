@@ -118,6 +118,23 @@ fn dependency_cycles(check: &GraphCheck<'_>, graph: &Dependencies, out: &mut Vec
             .map(|key| Subject::Node((*key).clone()))
             .collect();
         assert!(found.related.len() > 1, "a cycle joins two nodes or more");
+        // The first member's own explicit requirement inside the cycle, so a form shows the
+        // cycle with its requirements; a wait the node's other fields give is not one.
+        let wait = members
+            .iter()
+            .flat_map(|instant| graph.waits(*instant, EdgeSet::Full))
+            .filter(|edge| {
+                edge.class == EdgeClass::Gate
+                    && edge.source == EdgeSource::Explicit
+                    && members.contains(&edge.requirement)
+            })
+            .find(|edge| graph.key(edge.dependent.node) == Some(first));
+        if let Some(requires) = wait.and_then(|edge| graph.key(edge.requirement.node)) {
+            found.related.push(Subject::Edge(cairn_schema::Edge {
+                node: (*first).clone(),
+                requires: requires.clone(),
+            }));
+        }
         out.push(found);
     }
 }

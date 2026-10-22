@@ -407,6 +407,31 @@ fn a_rule_broken_together_names_each_holder_and_its_field() {
     }
 }
 
+/// A cycle names the first member's own wait in it, so a form shows it with the requirements
+/// of whichever member the cycle is reported at, touched by the patch or not.
+#[test]
+fn a_dependency_cycle_names_an_edge_of_the_node_it_is_reported_at() {
+    let mut document = vendor();
+    edit(&mut document, "n_access", |n| requires(n, "n_plan"));
+    let violations = Graph::new(document, &cairn_schema::Deployment::default()).unwrap_err();
+    let cycle = violations
+        .as_slice()
+        .iter()
+        .find(|found| found.code == ViolationCode::DependencyCycle)
+        .unwrap();
+    let Some(cairn_schema::Subject::Node(at)) = &cycle.at.subject else {
+        panic!("a node subject")
+    };
+    assert!(
+        cycle.related.iter().any(|related| matches!(
+            related,
+            cairn_schema::Subject::Edge(edge) if &edge.node == at
+        )),
+        "{:?}",
+        cycle.related
+    );
+}
+
 #[test]
 fn a_violation_names_the_path_of_the_node_it_is_about() {
     let mut document = vendor();

@@ -13,6 +13,7 @@ import { choiceId, choiceLabel } from "../status/answer.ts";
 import { Badge, Button, Field } from "../ui/kit.tsx";
 import {
   kindOf,
+  needsChoice,
   withExclusion,
   withMapping,
   withOrphanKept,
@@ -37,6 +38,8 @@ export interface ItemsContext {
   kinds: readonly Kind[];
   /** Items still needing a choice, by position, with why (the preview's). */
   unresolved: ReadonlyMap<number, UnresolvedReason>;
+  /** The edits are newer than the preview: whether an item still needs a choice is being checked. */
+  checking: boolean;
   /** What each conflict offers, by position (the preview's). */
   conflicts: ReadonlyMap<number, ConflictReview>;
   /** The proposal is open and the tab may write. */
@@ -261,6 +264,7 @@ export function ItemList({ context, itemNode, only }: { context: ItemsContext; i
           <li key={index} className="panel stack proposal-item" data-testid="review-item" data-item={item.item} data-about={about} data-node={node}>
             <span className="row">
               <strong>{itemHeading(item, context.names)}</strong>
+              {reason === undefined && context.checking && needsChoice(item) ? <Badge data-testid="checking">Checking</Badge> : null}
               {reason === undefined ? null : (
                 <Badge tone="warn" data-testid="unresolved" data-status={reason}>
                   {UNRESOLVED_WORDS[reason]}

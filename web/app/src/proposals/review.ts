@@ -267,7 +267,9 @@ export function useLayerModel(args: ModelArgs): LayerModel {
   const nameOf = useSegmentNames();
   const members = useMemo(() => insertionMembers(before, after, nameOf), [before, after, nameOf]);
   const current = previewOfEdits || kept === undefined;
-  const unresolved = useMemo(() => (current ? new Map((preview.unresolved ?? []).map((item) => [item.item, item.reason])) : new Map<number, UnresolvedReason>()), [current, preview.unresolved]);
+  // Which items still need a choice is known only from a preview of the edits on screen.
+  const settled = current && previewed;
+  const unresolved = useMemo(() => (settled ? new Map((preview.unresolved ?? []).map((item) => [item.item, item.reason])) : new Map<number, UnresolvedReason>()), [settled, preview.unresolved]);
   // What a conflict offers is the conflict's own, which the reviewer's edits do not change.
   const conflicts = useMemo(() => new Map((preview.conflicts ?? []).map((review) => [review.item, review])), [preview.conflicts]);
   const open = useMemo(() => new Set(unresolved.keys()), [unresolved]);
@@ -294,6 +296,7 @@ export function useLayerModel(args: ModelArgs): LayerModel {
     entries: marked.entries,
     names,
     unresolved,
+    checking: !settled,
     conflicts,
     today,
     editable: proposal.status === "open" && !writing,

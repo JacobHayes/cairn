@@ -67,6 +67,8 @@ export interface LayerModel {
   names: Names;
   /** The unresolved items by index, as the preview of the edits or the items themselves say. */
   unresolved: ReadonlyMap<number, UnresolvedReason>;
+  /** The edits are newer than the preview that says which items still need a choice. */
+  checking: boolean;
   /** What the engine offers for each conflict item, by position (the preview's). */
   conflicts: ReadonlyMap<number, ConflictReview>;
   today: string;

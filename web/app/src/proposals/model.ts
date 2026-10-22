@@ -371,3 +371,8 @@ export function withFieldValue(node: GraphNode, value: Record<string, unknown>):
   const kept = Object.entries({ ...node, ...value }).filter(([field]) => !cleared.has(field));
   return Object.fromEntries(kept) as GraphNode;
 }
+
+/** C14: whether the reviewer may owe `item` a choice (a conflict or an identity's mapping), so that while the edits are newer than the preview it shows as being checked rather than settled. */
+export function needsChoice(item: ReviewItem): boolean {
+  return item.item === "conflict" || item.item === "participation";
+}

@@ -12,6 +12,7 @@ import {
   graphDiff,
   intervening,
   carryIds,
+  needsChoice,
   withFieldValue,
   withExclusion,
   withMapping,
@@ -171,6 +172,14 @@ describe("reviewEntries (C14)", () => {
       ["b", "a"],
       ["c", "a"],
     ]);
+  });
+});
+
+describe("needsChoice (C14)", () => {
+  it("is true for the items a reviewer resolves and false for those only shown", () => {
+    expect(needsChoice({ item: "conflict", conflict: { about: "default_owner", journey: "r_a", route: "r_b" } })).toBe(true);
+    expect(needsChoice({ item: "participation", identity: "who_a", uses: [] })).toBe(true);
+    expect(needsChoice({ item: "orphan", node: "n_a", keep: true, removal: { node: "n_a" } })).toBe(false);
   });
 });
 
