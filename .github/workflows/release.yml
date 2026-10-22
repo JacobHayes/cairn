@@ -1,0 +1,142 @@
+# Releases (ARCHITECTURE, Build, run, deploy): dispatched by hand with a version, on main. It
+# publishes only a commit whose check passed on main, builds the binaries on each Linux target
+# with that version, and one job with write access creates the tag and the GitHub release
+# (decisions/2026-10-22-releases-run-from-a-dispatch.md). Linux runners only.
+name: release
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: "The release's version, vX.Y.Z (a pre-release part such as -rc.1 makes a pre-release)"
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+# Every action is pinned by full commit SHA, its release in a comment: a tag can be moved.
+
+# Two dispatches of one version never overlap, and one in flight is never cancelled.
+concurrency:
+  group: release-${{ inputs.version }}
+  cancel-in-progress: false
+
+jobs:
+  # Refuses before anything is built unless this is main, main's own check passed on this
+  # commit, and the tag is free or already on it. A missing run or a failed API call refuses too.
+  verify:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      actions: read
+    env:
+      GH_TOKEN: ${{ github.token }}
+      GH_REPO: ${{ github.repository }}
+      REF: ${{ github.ref }}
+      SHA: ${{ github.sha }}
+      TAG: ${{ inputs.version }}
+    steps:
+      - name: Refuse a dispatch that is not on main
+        run: '[ "$REF" = refs/heads/main ] || { echo "::error::releases are dispatched on main, not $REF"; exit 1; }'
+      - name: Refuse a version that cannot be a tag name
+        # build.rs is the one semantic-version check; this only keeps the value safe to use.
+        run: '[[ $TAG =~ ^v[0-9][0-9A-Za-z.+-]*$ ]] || { echo "::error::$TAG is not a version like v1.2.3"; exit 1; }'
+      - name: Refuse unless check passed on main at this commit
+        run: |
+          runs=$(gh run list -w check.yml -b main -e push -c "$SHA" --status completed \
+            --json conclusion --jq '[.[] | select(.conclusion == "success")] | length') \
+            || { echo "::error::could not list check runs"; exit 1; }
+          [ "$runs" -gt 0 ] || { echo "::error::no successful check run on main at $SHA"; exit 1; }
+      - name: Refuse a tag on another commit
+        run: |
+          if ! out=$(gh api "repos/$GH_REPO/git/ref/tags/$TAG" 2>&1); then
+            case $out in
+              *"Not Found"*) exit 0 ;;
+              *) echo "::error::could not read the tag: $out"; exit 1 ;;
+            esac
+          fi
+          type=$(jq -r .object.type <<<"$out")
+          sha=$(jq -r .object.sha <<<"$out")
+          if [ "$type" = tag ]; then sha=$(gh api "repos/$GH_REPO/git/tags/$sha" --jq .object.sha); fi
+          [ "$sha" = "$SHA" ] || { echo "::error::$TAG already points at $sha, not $SHA"; exit 1; }
+
+  package:
+    needs: verify
+    strategy:
+      fail-fast: false
+      matrix:
+        runner: [ubuntu-latest, ubuntu-24.04-arm]
+    runs-on: ${{ matrix.runner }}
+    env:
+      MISE_DISABLE_TOOLS: "cargo:https://github.com/JacobHayes/patina"
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: jdx/mise-action@2d8d4cafcbd33be2ea37d2b6f5ad595363d1f1ca # v5.1.1
+      - run: npm ci
+      # build.rs refuses a version that is not a semantic version, before any tag exists.
+      - run: mise run build:release
+        env:
+          CAIRN_VERSION: ${{ inputs.version }}
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: release-${{ matrix.runner }}
+          path: dist/release/
+          if-no-files-found: error
+
+  # The only job that can write: no checkout, no build, only the binaries the legs made. It
+  # creates the tag itself, at the commit that was verified and built.
+  release:
+    needs: package
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          pattern: release-*
+          merge-multiple: true
+          path: dist/release
+      - name: Create the release, or add to it
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          TAG: ${{ inputs.version }}
+          SHA: ${{ github.sha }}
+        run: |
+          shopt -s nullglob
+          binaries=(dist/release/cairn-*)
+          checksums=(dist/release/cairn-*.sha256)
+          [ "${#checksums[@]}" -gt 0 ] || { echo "::error::no release binaries"; exit 1; }
+          for checksum in "${checksums[@]}"; do
+            binary=${checksum%.sha256}
+            [ -f "$binary" ] || { echo "::error::$checksum has no binary"; exit 1; }
+          done
+          for binary in "${binaries[@]}"; do
+            [[ $binary == *.sha256 || -f "$binary.sha256" ]] || { echo "::error::$binary has no .sha256"; exit 1; }
+          done
+          # GitHub ignores --target when the tag exists, so a tag on another commit is
+          # refused before anything is uploaded.
+          if out=$(gh api "repos/$GH_REPO/git/ref/tags/$TAG" 2>&1); then
+            type=$(jq -r .object.type <<<"$out")
+            sha=$(jq -r .object.sha <<<"$out")
+            if [ "$type" = tag ]; then sha=$(gh api "repos/$GH_REPO/git/tags/$sha" --jq .object.sha); fi
+            [ "$sha" = "$SHA" ] || { echo "::error::$TAG already points at $sha, not $SHA"; exit 1; }
+          else
+            case $out in
+              *"Not Found"*) ;;
+              *) echo "::error::could not read the tag: $out"; exit 1 ;;
+            esac
+          fi
+          assets=("${binaries[@]}")
+          # A pre-release part (a "-" before any "+build") makes a GitHub pre-release.
+          core=${TAG%%+*}
+          prerelease=false
+          if [[ $core == *-* ]]; then prerelease=true; fi
+          if gh release view "$TAG" >/dev/null 2>&1; then
+            gh release upload "$TAG" "${assets[@]}" --clobber
+            gh release edit "$TAG" --target "$SHA" --draft=false --prerelease="$prerelease"
+          else
+            gh release create "$TAG" --target "$SHA" --generate-notes \
+              --prerelease="$prerelease" "${assets[@]}"
+          fi
