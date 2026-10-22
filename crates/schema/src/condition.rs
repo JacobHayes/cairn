@@ -291,6 +291,103 @@ impl<R: References> Condition<R> {
     }
 }
 
+impl<R: References> Condition<R> {
+    /// The condition with every decision it names translated by `map`, or none when any
+    /// does not translate. Every decision is still visited, in tree order, so a caller
+    /// that reports an untranslated one reports each. Built bottom up with an explicit
+    /// stack (PRACTICES, No recursion).
+    ///
+    /// # Panics
+    ///
+    /// Never: a translated condition keeps the shape and size of the one it translates.
+    #[must_use]
+    pub fn map_decisions<B: References>(
+        &self,
+        mut map: impl FnMut(&R::Node) -> Option<B::Node>,
+    ) -> Option<Condition<B>> {
+        enum Frame<'c, R: References> {
+            Visit(&'c Clause<R>),
+            Build(&'c Clause<R>),
+        }
+        let mut frames = vec![Frame::Visit(&self.0)];
+        let mut built: Vec<Option<Clause<B>>> = Vec::new();
+        while let Some(frame) = frames.pop() {
+            match frame {
+                Frame::Visit(clause) => match clause {
+                    Clause::All(children) | Clause::Any(children) => {
+                        frames.push(Frame::Build(clause));
+                        frames.extend(children.iter().rev().map(Frame::Visit));
+                    }
+                    Clause::Not(child) => {
+                        frames.push(Frame::Build(clause));
+                        frames.push(Frame::Visit(child));
+                    }
+                    Clause::Equals(comparison) => {
+                        built.push(map_comparison(comparison, &mut map).map(Clause::Equals));
+                    }
+                    Clause::NotEquals(comparison) => {
+                        built.push(map_comparison(comparison, &mut map).map(Clause::NotEquals));
+                    }
+                    Clause::Contains(comparison) => {
+                        built.push(map_comparison(comparison, &mut map).map(Clause::Contains));
+                    }
+                    Clause::In(membership) => {
+                        built.push(map(&membership.decision).map(|decision| {
+                            Clause::In(Membership {
+                                decision,
+                                values: membership.values.clone(),
+                            })
+                        }));
+                    }
+                    Clause::Answered(decision) => {
+                        built.push(map(decision).map(Clause::Answered));
+                    }
+                },
+                Frame::Build(clause) => {
+                    let count = match clause {
+                        Clause::All(children) | Clause::Any(children) => children.len(),
+                        Clause::Not(_) => 1,
+                        Clause::Equals(_)
+                        | Clause::NotEquals(_)
+                        | Clause::In(_)
+                        | Clause::Contains(_)
+                        | Clause::Answered(_) => unreachable!("only combinations are built"),
+                    };
+                    assert!(built.len() >= count, "children are built first");
+                    let children = built.split_off(built.len() - count);
+                    let children: Option<Vec<Clause<B>>> = children.into_iter().collect();
+                    built.push(children.and_then(|mut children| match clause {
+                        Clause::All(_) => Some(Clause::All(children)),
+                        Clause::Any(_) => Some(Clause::Any(children)),
+                        Clause::Not(_) => children.pop().map(|child| Clause::Not(Box::new(child))),
+                        Clause::Equals(_)
+                        | Clause::NotEquals(_)
+                        | Clause::In(_)
+                        | Clause::Contains(_)
+                        | Clause::Answered(_) => unreachable!("only combinations are built"),
+                    }));
+                }
+            }
+        }
+        let root = built.pop().flatten()?;
+        assert!(built.is_empty(), "every clause folds into the root");
+        match Condition::new(root) {
+            Ok(condition) => Some(condition),
+            Err(error) => panic!("a translated condition keeps its shape and limits: {error}"),
+        }
+    }
+}
+
+fn map_comparison<R: References, B: References>(
+    comparison: &Comparison<R>,
+    map: &mut impl FnMut(&R::Node) -> Option<B::Node>,
+) -> Option<Comparison<B>> {
+    map(&comparison.decision).map(|decision| Comparison {
+        decision,
+        value: comparison.value.clone(),
+    })
+}
+
 impl<R: References> TryFrom<Clause<R>> for Condition<R> {
     type Error = ConditionError;
 

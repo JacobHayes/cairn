@@ -11,7 +11,8 @@ use std::collections::{BTreeMap, BTreeSet};
 
 use cairn_schema::{
     Domain, DraftSource, IdentityKey, JourneyId, Mutation, ParticipationRef, ParticipationSource,
-    Payload, ProposalDraft, Provenance, ReviewItem, Revision, RouteId, Title,
+    Payload, ProposalDraft, Provenance, ReviewItem, Revision, RouteId, Subject, Title,
+    VersionNumber, Violation, ViolationCode,
 };
 
 use super::{DraftError, draft, trial, with_violations};
@@ -60,92 +61,40 @@ pub fn save_as_route(
     let title = format!("Save {} as a route", held.header.name.as_str());
     let proposal = draft(&title, revision, mutations, items)?;
     let dropped = everything_dropped(&proposal);
-    let mut violations = retired_in_route(records, route, &structure);
-    let explained: BTreeSet<_> = violations
-        .iter()
-        .map(|found| found.at.subject.clone())
+    let remedy = latest_version(records, route).map(|version| {
+        format!(
+            "version {version} of route {route} retired it; upgrade the journey to version {version} first, or save it as a new route"
+        )
+    });
+    let violations = trial(records, &Domain::Route(route.clone()), &dropped, inputs)
+        .into_iter()
+        .map(|found| with_remedy(found, remedy.as_deref()))
         .collect();
-    // The trial finds the same retired keys; each is listed once, with its remedy.
-    let found = trial(records, &Domain::Route(route.clone()), &dropped, inputs);
-    violations.extend(found.into_iter().filter(|found| {
-        found.code != cairn_schema::ViolationCode::RetiredKeyReused
-            || !explained.contains(&found.at.subject)
-    }));
     with_violations(proposal, violations)
+}
+
+/// The route's latest published version, the one whose retired keys a journey behind it
+/// still uses.
+fn latest_version(records: &Records, route: &RouteId) -> Option<VersionNumber> {
+    records
+        .routes
+        .get(route)
+        .and_then(|found| found.versions.iter().next_back().copied())
 }
 
 /// Invariants (no key is ever reused): the journey's roles, kinds, and nodes whose keys the
 /// route's latest version retired (a journey behind its route) cannot come back, and only a
-/// node can be excluded; each is listed with why and what to do.
-fn retired_in_route(
-    records: &Records,
-    route: &RouteId,
-    structure: &cairn_schema::Graph,
-) -> Vec<cairn_schema::Violation> {
-    let latest = records.routes.get(route).and_then(|found| {
-        let version = *found.versions.iter().next_back()?;
-        let lineage = cairn_schema::Lineage {
-            route: route.clone(),
-            version,
-        };
-        records
-            .versions
-            .get(&lineage)
-            .map(|held| (version, &held.graph.retired_keys))
-    });
-    let Some((version, retired)) = latest else {
-        return Vec::new();
-    };
-    let remedy = format!(
-        "version {version} of route {route} retired it; upgrade the journey to version {version} first, or save it as a new route"
-    );
-    let subjects = structure
-        .roles
-        .as_map()
-        .keys()
-        .filter(|key| retired.roles.contains(*key))
-        .map(|key| {
-            (
-                cairn_schema::Subject::Role(key.clone()),
-                format!("role {key}"),
-            )
-        })
-        .chain(
-            structure
-                .participation_kinds
-                .as_map()
-                .keys()
-                .filter(|key| retired.kinds.contains(*key))
-                .map(|key| {
-                    (
-                        cairn_schema::Subject::Kind(key.clone()),
-                        format!("participation kind {key}"),
-                    )
-                }),
-        )
-        .chain(
-            structure
-                .nodes
-                .as_map()
-                .keys()
-                .filter(|key| retired.nodes.contains(*key))
-                .map(|key| {
-                    (
-                        cairn_schema::Subject::Node(key.clone()),
-                        format!("node {key} (or exclude it)"),
-                    )
-                }),
+/// node can be excluded; the trial's violation for each says what to do.
+fn with_remedy(mut found: Violation, remedy: Option<&str>) -> Violation {
+    if let (ViolationCode::RetiredKeyReused, Some(remedy)) = (found.code, remedy) {
+        let exclude = matches!(found.at.subject, Some(Subject::Node(_)));
+        found.message = format!(
+            "{}; {remedy}{}",
+            found.message,
+            if exclude { ", or exclude the node" } else { "" }
         );
-    subjects
-        .map(|(subject, what)| {
-            let mut found = crate::validate::violation(
-                cairn_schema::ViolationCode::RetiredKeyReused,
-                format!("{what} cannot be saved: {remedy}"),
-            );
-            found.at.subject = Some(subject);
-            found
-        })
-        .collect()
+    }
+    found
 }
 
 /// B8: one item per explicit identity, naming every participation that names it.

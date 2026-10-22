@@ -9,6 +9,8 @@ mod references;
 pub(crate) mod state;
 mod structure;
 
+pub(crate) use structure::{retired_key_message, retired_key_reused};
+
 use cairn_schema::{Deployment, Location, NodeKey, Subject, Violation, ViolationCode};
 
 use crate::graph::{Document, Graph, Tree};

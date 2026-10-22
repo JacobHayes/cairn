@@ -232,6 +232,31 @@ fn a_removed_key_never_comes_back() {
     );
 }
 
+/// A key added and removed again within one patch leaves a graph with nothing wrong, but the
+/// reuse still happened, so each addition is refused where it enters.
+#[test]
+fn a_retired_key_added_and_removed_in_one_patch_is_still_refused() {
+    let spare = "- op: add_role\n  role: {key: r_spare, id: spare}\n\
+        - op: add_participation_kind\n  kind: {key: k_spare, id: spare}\n";
+    let unspare = "- op: remove_role\n  role: r_spare\n\
+        - op: remove_participation_kind\n  kind: k_spare\n";
+    let retired = vendor_patch(
+        &vendor_after(1),
+        &format!("{REMOVE_PARTNER_LED}{spare}{unspare}"),
+    )
+    .unwrap();
+    let again = format!(
+        "{spare}- op: add_node\n  node: {{key: n_criteria, id: criteria-again, kind: action, title: Again}}\n\
+         - op: remove_node\n  removal: {{node: n_criteria}}\n{unspare}"
+    );
+    let found = codes(vendor_patch(retired.records(), &again));
+    let retired_again = found
+        .iter()
+        .filter(|code| **code == ViolationCode::RetiredKeyReused)
+        .count();
+    assert_eq!(retired_again, 3, "{found:?}");
+}
+
 #[test]
 fn edits_to_route_copied_nodes_set_markers_and_reset_clears_them() {
     let records = vendor_after(5);

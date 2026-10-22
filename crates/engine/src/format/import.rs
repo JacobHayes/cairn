@@ -13,11 +13,9 @@
 use std::collections::{BTreeMap, BTreeSet};
 
 use cairn_schema::{
-    AnswerSpec, AttachmentKey, Clause, Comparison, Condition, DateRule, DateSource, Decision,
-    FileRefs, Group, KeyAllocator, KeyRefs, Keyed, KindKey, Membership, MessageTemplate, Node,
-    NodeField, NodeKey, OneOrMany, ParticipationKind, ParticipationSource, Participations, Path,
-    Payload, Prefixed, Resource, ResourceContent, Role, RoleKey, RouteFile, Segment, Slug, Subject,
-    Violation, ViolationCode, Violations, mint,
+    AttachmentKey, FileRefs, KeyAllocator, KeyRefs, Keyed, KindKey, MapReferences, Node, NodeField,
+    NodeKey, ParticipationKind, Path, Prefixed, RetiredKey, Role, RoleKey, RouteFile, Slug,
+    Subject, Violation, ViolationCode, Violations, mint,
 };
 
 use crate::graph::{Document, Graph};
@@ -92,17 +90,15 @@ pub fn import(
         .default_owner
         .as_ref()
         .and_then(|role| resolver.role(role, None));
-    let mut resource_keys = std::mem::take(&mut keys.resources).into_iter();
     let nodes: Vec<Node<KeyRefs>> = file
         .nodes
         .as_slice()
         .iter()
-        .zip(&keys.nodes)
-        .map(|(node, key)| resolver.node(node, key, &mut resource_keys))
+        .map(|node| resolver.node(node))
         .collect();
     assert!(
-        resource_keys.next().is_none(),
-        "every resource key was used"
+        resolver.node_keys.next().is_none() && resolver.resource_keys.next().is_none(),
+        "every node and resource key was used"
     );
     let mut violations = keys.violations;
     if !violations.is_empty() {
@@ -179,11 +175,11 @@ impl Keys {
         refuse_retired(
             &supplied_nodes,
             &retired.nodes,
-            Subject::Node,
+            RetiredKey::Node,
             &mut violations,
         );
-        refuse_retired(&roles, &retired.roles, Subject::Role, &mut violations);
-        refuse_retired(&kinds, &retired.kinds, Subject::Kind, &mut violations);
+        refuse_retired(&roles, &retired.roles, RetiredKey::Role, &mut violations);
+        refuse_retired(&kinds, &retired.kinds, RetiredKey::Kind, &mut violations);
         let keys = Keys {
             nodes: fill(
                 supplied_nodes,
@@ -222,10 +218,10 @@ impl Keys {
 }
 
 /// Invariants (no key is ever reused): a supplied key the base retired is rejected.
-fn refuse_retired<K: Ord + Clone + std::fmt::Display>(
+fn refuse_retired<K: Ord + Clone>(
     supplied: &[Option<K>],
     retired: &BTreeSet<K>,
-    subject: fn(K) -> Subject,
+    retired_key: fn(K) -> RetiredKey,
     violations: &mut Vec<Violation>,
 ) {
     for key in supplied
@@ -233,12 +229,10 @@ fn refuse_retired<K: Ord + Clone + std::fmt::Display>(
         .flatten()
         .filter(|key| retired.contains(*key))
     {
-        let mut found = violation(
-            ViolationCode::RetiredKeyReused,
-            format!("the key {key} was retired from the route and cannot come back"),
-        );
-        found.at.subject = Some(subject(key.clone()));
-        violations.push(found);
+        violations.push(crate::validate::retired_key_reused(
+            None,
+            &retired_key(key.clone()),
+        ));
     }
 }
 
@@ -287,6 +281,10 @@ struct Resolver {
     violations: Vec<Violation>,
     /// The node being resolved, for locations.
     at: Option<Path>,
+    /// The keys of the nodes not yet resolved, in file order.
+    node_keys: std::vec::IntoIter<NodeKey>,
+    /// The keys of the resources not yet resolved, in file order.
+    resource_keys: std::vec::IntoIter<AttachmentKey>,
 }
 
 impl Resolver {
@@ -297,6 +295,8 @@ impl Resolver {
             kinds: BTreeMap::from([(cairn_schema::id::owner_kind_id(), KindKey::owner())]),
             violations: Vec::new(),
             at: None,
+            node_keys: keys.nodes.clone().into_iter(),
+            resource_keys: keys.resources.clone().into_iter(),
         };
         // A path past the depth limit or a sibling id given twice is the graph check's to
         // report (from the tree); here the first holder of a path keeps it.
@@ -356,326 +356,52 @@ impl Resolver {
     /// Resolves one node. A reference that does not resolve is reported and left out (a
     /// parent that does not resolve leaves the node a root), so the rest of the graph can
     /// still be checked (A15).
-    fn node(
-        &mut self,
-        node: &Node<FileRefs>,
-        key: &NodeKey,
-        resource_keys: &mut std::vec::IntoIter<AttachmentKey>,
-    ) -> Node<KeyRefs> {
+    fn node(&mut self, node: &Node<FileRefs>) -> Node<KeyRefs> {
         self.at = Some(match &node.parent {
             None => Path::root(node.id.clone()),
             Some(parent) => parent
                 .child(node.id.clone())
                 .unwrap_or_else(|_| parent.clone()),
         });
-        let parent = node
-            .parent
-            .as_ref()
-            .and_then(|parent| self.path(parent, Some(NodeField::Parent)));
-        let requires: Vec<NodeKey> = node
-            .requires
-            .iter()
-            .filter_map(|path| self.path(path, None))
-            .collect();
-        let relevant_when = node
-            .relevant_when
-            .as_ref()
-            .and_then(|condition| self.condition(condition));
-        let due_by = node
-            .due_by
-            .as_ref()
-            .and_then(|rule| self.rule(rule, NodeField::DueBy));
-        let not_before = node
-            .not_before
-            .as_ref()
-            .and_then(|rule| self.rule(rule, NodeField::NotBefore));
-        let participations = self.participations(&node.participations);
-        let resources = self.resources(&node.resources, resource_keys);
-        let payload = self.payload(&node.payload);
-        assert!(requires.len() <= node.requires.len() && resources.len() <= node.resources.len());
-        Node {
-            key: key.clone(),
-            id: node.id.clone(),
-            parent,
-            title: node.title.clone(),
-            description: node.description.clone(),
-            weight: node.weight,
-            requires: cairn_schema::BoundedSet::new(requires).unwrap_or_default(),
-            relevant_when,
-            due_by,
-            not_before,
-            participations: participations.unwrap_or_default(),
-            resources,
-            payload,
-        }
-    }
-
-    /// Resolves a condition tree bottom up with an explicit stack (PRACTICES, No recursion).
-    fn condition(&mut self, condition: &Condition<FileRefs>) -> Option<Condition<KeyRefs>> {
-        enum Frame<'a> {
-            Visit(&'a Clause<FileRefs>),
-            Build(&'a Clause<FileRefs>),
-        }
-        let field = Some(NodeField::RelevantWhen);
-        let mut frames = vec![Frame::Visit(condition.root())];
-        let mut built: Vec<Option<Clause<KeyRefs>>> = Vec::new();
-        while let Some(frame) = frames.pop() {
-            match frame {
-                Frame::Visit(clause) => match clause {
-                    Clause::All(children) | Clause::Any(children) => {
-                        frames.push(Frame::Build(clause));
-                        frames.extend(children.iter().rev().map(Frame::Visit));
-                    }
-                    Clause::Not(child) => {
-                        frames.push(Frame::Build(clause));
-                        frames.push(Frame::Visit(child));
-                    }
-                    Clause::Equals(_)
-                    | Clause::NotEquals(_)
-                    | Clause::In(_)
-                    | Clause::Contains(_)
-                    | Clause::Answered(_) => {
-                        let resolved = self.leaf(clause, field);
-                        built.push(resolved);
-                    }
-                },
-                Frame::Build(clause) => {
-                    let folded = fold(clause, &mut built);
-                    built.push(folded);
-                }
-            }
-        }
-        let root = built.pop().flatten()?;
-        assert!(built.is_empty(), "every clause was folded into the root");
-        match Condition::new(root) {
-            Ok(condition) => Some(condition),
-            Err(error) => panic!("a resolved condition keeps its shape and limits: {error}"),
-        }
+        node.map_references(self)
     }
 }
 
-/// Folds a combination's resolved children, the last ones built, into it.
-fn fold(
-    clause: &Clause<FileRefs>,
-    built: &mut Vec<Option<Clause<KeyRefs>>>,
-) -> Option<Clause<KeyRefs>> {
-    let count = match clause {
-        Clause::All(children) | Clause::Any(children) => children.len(),
-        Clause::Not(_) => 1,
-        Clause::Equals(_)
-        | Clause::NotEquals(_)
-        | Clause::In(_)
-        | Clause::Contains(_)
-        | Clause::Answered(_) => unreachable!("only combinations are folded"),
-    };
-    assert!(
-        built.len() >= count,
-        "a combination's children were built first"
-    );
-    let children = built.split_off(built.len() - count);
-    let mut children: Vec<Clause<KeyRefs>> = children.into_iter().collect::<Option<_>>()?;
-    match clause {
-        Clause::All(_) => Some(Clause::All(children)),
-        Clause::Any(_) => Some(Clause::Any(children)),
-        Clause::Not(_) => children.pop().map(|child| Clause::Not(Box::new(child))),
-        Clause::Equals(_)
-        | Clause::NotEquals(_)
-        | Clause::In(_)
-        | Clause::Contains(_)
-        | Clause::Answered(_) => unreachable!("only combinations are folded"),
+/// The lookups one node's translation asks of the file's paths, ids, and collected keys.
+impl MapReferences<FileRefs, KeyRefs> for Resolver {
+    fn node(&mut self, node: &Path, field: Option<NodeField>) -> Option<NodeKey> {
+        self.path(node, field)
     }
-}
 
-impl Resolver {
-    fn leaf(
-        &mut self,
-        clause: &Clause<FileRefs>,
-        field: Option<NodeField>,
-    ) -> Option<Clause<KeyRefs>> {
-        let comparison = |resolver: &mut Self, comparison: &Comparison<FileRefs>| {
-            resolver
-                .path(&comparison.decision, field)
-                .map(|decision| Comparison {
-                    decision,
-                    value: comparison.value.clone(),
-                })
-        };
-        match clause {
-            Clause::Equals(compared) => comparison(self, compared).map(Clause::Equals),
-            Clause::NotEquals(compared) => comparison(self, compared).map(Clause::NotEquals),
-            Clause::Contains(compared) => comparison(self, compared).map(Clause::Contains),
-            Clause::In(membership) => self.path(&membership.decision, field).map(|decision| {
-                Clause::In(Membership {
-                    decision,
-                    values: membership.values.clone(),
-                })
-            }),
-            Clause::Answered(decision) => self.path(decision, field).map(Clause::Answered),
-            Clause::All(_) | Clause::Any(_) | Clause::Not(_) => {
-                unreachable!("combinations are folded, not resolved as leaves")
-            }
+    fn role(&mut self, role: &Slug, field: Option<NodeField>) -> Option<RoleKey> {
+        Resolver::role(self, role, field)
+    }
+
+    fn kind(&mut self, kind: &Slug) -> Option<KindKey> {
+        Resolver::kind(self, kind)
+    }
+
+    fn own_key(&mut self, _: &Option<NodeKey>) -> NodeKey {
+        match self.node_keys.next() {
+            Some(key) => key,
+            None => unreachable!("a key was collected for every node"),
         }
     }
 
-    fn rule(&mut self, rule: &DateRule<FileRefs>, field: NodeField) -> Option<DateRule<KeyRefs>> {
-        let mut sources = Vec::new();
-        for source in rule.sources.as_set() {
-            match source {
-                DateSource::CreatedAt => sources.push(DateSource::CreatedAt),
-                DateSource::Node(path) => {
-                    sources.extend(self.path(path, Some(field)).map(DateSource::Node));
-                }
-            }
-        }
-        let sources = OneOrMany::new(sources).ok()?;
-        Some(DateRule {
-            direction: rule.direction,
-            sources,
-            offset: rule.offset,
-        })
-    }
-
-    fn participations(
-        &mut self,
-        participations: &Participations<FileRefs>,
-    ) -> Option<Participations<KeyRefs>> {
-        let mut map = BTreeMap::new();
-        for (kind, source) in participations.as_map() {
-            let kind = self.kind(kind);
-            let source = match source {
-                ParticipationSource::Role(role) => {
-                    self.role(role, None).map(ParticipationSource::Role)
-                }
-                ParticipationSource::Identities(identities) => {
-                    Some(ParticipationSource::Identities(identities.clone()))
-                }
-            };
-            if let (Some(kind), Some(source)) = (kind, source) {
-                map.insert(kind, source);
-            }
-        }
-        Participations::try_from(map).ok()
-    }
-
-    fn resources(
-        &mut self,
-        resources: &[Resource<FileRefs>],
-        keys: &mut std::vec::IntoIter<AttachmentKey>,
-    ) -> Vec<Resource<KeyRefs>> {
-        let mut resolved = Vec::with_capacity(resources.len());
-        for resource in resources {
-            let Some(key) = keys.next() else {
-                unreachable!("a key was collected for every resource")
-            };
-            let content = match &resource.content {
-                ResourceContent::Tip(text) => Some(ResourceContent::Tip(text.clone())),
-                ResourceContent::Template(url) => Some(ResourceContent::Template(url.clone())),
-                ResourceContent::Example(url) => Some(ResourceContent::Example(url.clone())),
-                ResourceContent::Reference(url) => Some(ResourceContent::Reference(url.clone())),
-                ResourceContent::MessageDraft(template) => {
-                    self.template(template).map(ResourceContent::MessageDraft)
-                }
-            };
-            if let Some(content) = content {
-                resolved.push(Resource {
-                    key,
-                    title: resource.title.clone(),
-                    content,
-                });
-            }
-        }
-        resolved
-    }
-
-    /// Resolves a message draft's placeholders, writing it in the graph form and reading it
-    /// back, so the template grammar stays the schema's.
-    fn template(
-        &mut self,
-        template: &MessageTemplate<FileRefs>,
-    ) -> Option<MessageTemplate<KeyRefs>> {
-        let mut text = String::new();
-        let mut complete = true;
-        // Every placeholder is resolved, so each one that does not resolve is reported (A15).
-        for segment in template.segments() {
-            let resolved: Option<Segment<KeyRefs>> = match segment {
-                Segment::Text(literal) => Some(Segment::Text(literal.clone())),
-                Segment::Journey(field) => Some(Segment::Journey(*field)),
-                Segment::RoleName(role) => self.role(role, None).map(Segment::RoleName),
-                Segment::Answer(path) => self.path(path, None).map(Segment::Answer),
-            };
-            match resolved {
-                Some(resolved) => {
-                    text.push_str(&MessageTemplate::<KeyRefs>::render_segment(&resolved));
-                }
-                None => complete = false,
-            }
-        }
-        if !complete {
-            return None;
-        }
-        // Keys can be longer than the paths and ids they replace, so a draft within the body
-        // limit as written can pass it resolved.
-        if cairn_schema::Limit::BodyBytes.check(text.len()).is_err() {
-            let what = format!(
-                "the message draft resolves to {} bytes, past body_bytes_max",
-                text.len()
-            );
-            self.unresolved(what, None, ViolationCode::LimitExceeded);
-            if let Some(found) = self.violations.last_mut() {
-                found.limit = Some(cairn_schema::Limit::BodyBytes);
-            }
-            return None;
-        }
-        match text.parse() {
-            Ok(template) => Some(template),
-            Err(error) => panic!("a resolved message draft within its limit reads back: {error}"),
+    fn resource_key(&mut self, _: &Option<AttachmentKey>) -> AttachmentKey {
+        match self.resource_keys.next() {
+            Some(key) => key,
+            None => unreachable!("a key was collected for every resource"),
         }
     }
 
-    fn payload(&mut self, payload: &Payload<FileRefs>) -> Payload<KeyRefs> {
-        match payload {
-            Payload::Decision(decision) => Payload::Decision(Decision {
-                prompt: decision.prompt.clone(),
-                help: decision.help.clone(),
-                answer: self.answer_spec(&decision.answer),
-            }),
-            Payload::Deliverable(deliverable) => Payload::Deliverable(deliverable.clone()),
-            Payload::Action(action) => Payload::Action(action.clone()),
-            Payload::Milestone(milestone) => Payload::Milestone(milestone.clone()),
-            Payload::Group(group) => Payload::Group(Group {
-                opens_at: self.optional_path(group.opens_at.as_ref(), NodeField::OpensAt),
-                closes_at: self.optional_path(group.closes_at.as_ref(), NodeField::ClosesAt),
-                gates: group.gates,
-                closes: group.closes,
-            }),
-        }
-    }
-
-    /// The key a reference names; none when there is no reference or it does not resolve
-    /// (reported).
-    fn optional_path(&mut self, path: Option<&Path>, field: NodeField) -> Option<NodeKey> {
-        path.and_then(|path| self.path(path, Some(field)))
-    }
-
-    fn answer_spec(&mut self, spec: &AnswerSpec<FileRefs>) -> AnswerSpec<KeyRefs> {
-        let fills = |resolver: &mut Self, role: Option<&Slug>| {
-            role.and_then(|role| resolver.role(role, Some(NodeField::FillsRole)))
-        };
-        match spec {
-            AnswerSpec::Boolean => AnswerSpec::Boolean,
-            AnswerSpec::SingleChoice(choices) => AnswerSpec::SingleChoice(choices.clone()),
-            AnswerSpec::MultiChoice(choices) => AnswerSpec::MultiChoice(choices.clone()),
-            AnswerSpec::Text => AnswerSpec::Text,
-            AnswerSpec::Date { feeds_milestone } => AnswerSpec::Date {
-                feeds_milestone: self
-                    .optional_path(feeds_milestone.as_ref(), NodeField::FeedsMilestone),
-            },
-            AnswerSpec::Identity { fills_role } => AnswerSpec::Identity {
-                fills_role: fills(self, fills_role.as_ref()),
-            },
-            AnswerSpec::IdentityList { fills_role } => AnswerSpec::IdentityList {
-                fills_role: fills(self, fills_role.as_ref()),
-            },
+    /// Keys can be longer than the paths and ids they replace, so a draft within the body
+    /// limit as written can pass it resolved.
+    fn draft_too_long(&mut self, _: &Option<AttachmentKey>, bytes: usize) {
+        let what = format!("the message draft resolves to {bytes} bytes, past body_bytes_max");
+        self.unresolved(what, None, ViolationCode::LimitExceeded);
+        if let Some(found) = self.violations.last_mut() {
+            found.limit = Some(cairn_schema::Limit::BodyBytes);
         }
     }
 }

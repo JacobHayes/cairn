@@ -271,8 +271,8 @@ fn pins_and_snoozes(check: &GraphCheck<'_>, out: &mut Vec<Violation>) {
     }
 }
 
-/// Overrides, local-edit markers, and notes hang off nodes that exist; a tombstone names a
-/// removed node, never a live one (B4).
+/// Overrides, local-edit markers, and notes hang off nodes that exist (a tombstone names a
+/// removed node, never a live one: the structure check refuses it with the retired keys, B4).
 fn attached_records(check: &GraphCheck<'_>, out: &mut Vec<Violation>) {
     let document = check.document;
     let state = &document.state;
@@ -284,16 +284,6 @@ fn attached_records(check: &GraphCheck<'_>, out: &mut Vec<Violation>) {
     for key in keys.chain(notes) {
         if document.nodes.get(key).is_none() {
             out.push(state_without_node(check, key));
-        }
-    }
-    for key in &state.tombstones {
-        if document.nodes.get(key).is_some() {
-            out.push(at_node(
-                check.tree,
-                key,
-                ViolationCode::RetiredKeyReused,
-                "a tombstoned node cannot come back",
-            ));
         }
     }
 }

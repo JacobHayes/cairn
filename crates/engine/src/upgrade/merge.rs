@@ -82,35 +82,6 @@ pub(crate) fn merge(base: &Document, target: &Document, journey: &Document) -> M
     merger.found
 }
 
-/// A node's kind and, for a decision, its answer type: what no field edit changes.
-fn shape(node: &Node<KeyRefs>) -> (cairn_schema::NodeKind, Option<cairn_schema::AnswerType>) {
-    let answer = match &node.payload {
-        Payload::Decision(decision) => Some(decision.answer.answer_type()),
-        Payload::Deliverable(_)
-        | Payload::Action(_)
-        | Payload::Milestone(_)
-        | Payload::Group(_) => None,
-    };
-    (node.kind(), answer)
-}
-
-/// Whether the route changed an aspect a marker names.
-fn changed(base: &Node<KeyRefs>, target: &Node<KeyRefs>, edit: &LocalEdit) -> bool {
-    match edit {
-        LocalEdit::Field(field) => {
-            NodeFieldValue::read(*field, base) != NodeFieldValue::read(*field, target)
-        }
-        LocalEdit::Requires(key) => {
-            base.requires.as_set().contains(key) != target.requires.as_set().contains(key)
-        }
-        LocalEdit::Participation(kind) => {
-            base.participations.as_map().get(kind) != target.participations.as_map().get(kind)
-        }
-        LocalEdit::Resource(key) => resource(base, key) != resource(target, key),
-        LocalEdit::Shape => shape(base) != shape(target),
-    }
-}
-
 fn resource<'a>(
     node: &'a Node<KeyRefs>,
     key: &cairn_schema::AttachmentKey,
@@ -237,13 +208,14 @@ impl Merger<'_> {
         present: &BTreeSet<&NodeKey>,
     ) {
         let markers = self.markers(&held.key);
-        for edit in markers.iter().filter(|edit| !changed(base, target, edit)) {
+        let differs = crate::edit::differences(base, target);
+        for edit in markers.iter().filter(|edit| !differs.contains(edit)) {
             self.found.kept.push(Kept::Node {
                 node: held.key.clone(),
                 edit: edit.clone(),
             });
         }
-        if shape(base) != shape(target) {
+        if differs.contains(&LocalEdit::Shape) {
             self.reshaped(target, held, &markers, present);
             return;
         }
@@ -632,7 +604,29 @@ fn named(value: &NodeFieldValue<KeyRefs>) -> Vec<&NodeKey> {
         NodeFieldValue::DueBy(Some(found)) | NodeFieldValue::NotBefore(Some(found)) => {
             sources(found)
         }
-        _ => Vec::new(),
+        NodeFieldValue::Parent(None)
+        | NodeFieldValue::OpensAt(None)
+        | NodeFieldValue::ClosesAt(None)
+        | NodeFieldValue::FeedsMilestone(None)
+        | NodeFieldValue::RelevantWhen(None)
+        | NodeFieldValue::DueBy(None)
+        | NodeFieldValue::NotBefore(None)
+        | NodeFieldValue::Id(_)
+        | NodeFieldValue::Title(_)
+        | NodeFieldValue::Description(_)
+        | NodeFieldValue::Weight(_)
+        | NodeFieldValue::Estimate(_)
+        | NodeFieldValue::Placeholder(_)
+        | NodeFieldValue::RequiresArtifact(_)
+        | NodeFieldValue::RequiresNote(_)
+        | NodeFieldValue::Final(_)
+        | NodeFieldValue::AutoDone(_)
+        | NodeFieldValue::Gates(_)
+        | NodeFieldValue::Closes(_)
+        | NodeFieldValue::Prompt(_)
+        | NodeFieldValue::Help(_)
+        | NodeFieldValue::Choices(_)
+        | NodeFieldValue::FillsRole(_) => Vec::new(),
     }
 }
 
@@ -663,7 +657,10 @@ fn draft_dangles(found: &cairn_schema::Resource<KeyRefs>, present: &BTreeSet<&No
                 matches!(segment, cairn_schema::Segment::Answer(key) if !present.contains(key))
             })
         }
-        _ => false,
+        cairn_schema::ResourceContent::Tip(_)
+        | cairn_schema::ResourceContent::Template(_)
+        | cairn_schema::ResourceContent::Example(_)
+        | cairn_schema::ResourceContent::Reference(_) => false,
     }
 }
 
@@ -689,7 +686,22 @@ fn cleared(field: NodeField) -> Option<NodeFieldValue<KeyRefs>> {
         NodeField::ClosesAt => NodeFieldValue::ClosesAt(None),
         NodeField::FeedsMilestone => NodeFieldValue::FeedsMilestone(None),
         NodeField::Parent => NodeFieldValue::Parent(None),
-        _ => return None,
+        NodeField::Id
+        | NodeField::Title
+        | NodeField::Description
+        | NodeField::Weight
+        | NodeField::Estimate
+        | NodeField::Placeholder
+        | NodeField::RequiresArtifact
+        | NodeField::RequiresNote
+        | NodeField::Final
+        | NodeField::AutoDone
+        | NodeField::Gates
+        | NodeField::Closes
+        | NodeField::Prompt
+        | NodeField::Help
+        | NodeField::Choices
+        | NodeField::FillsRole => return None,
     })
 }
 

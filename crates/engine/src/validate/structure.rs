@@ -5,10 +5,12 @@
 use std::collections::BTreeMap;
 
 use cairn_schema::limits::EDGE_COUNT_PER_NODE_MAX;
-use cairn_schema::{AttachmentKey, KindKey, Limit, NodeKey, Subject, Violation, ViolationCode};
+use cairn_schema::{
+    AttachmentKey, KindKey, Limit, NodeKey, RetiredKey, Subject, Violation, ViolationCode,
+};
 
 use super::{GraphCheck, at_node, missing_node_code, violation};
-use crate::graph::TreeIssue;
+use crate::graph::{Tree, TreeIssue};
 
 /// Runs the structural checks.
 pub(super) fn check(check: &GraphCheck<'_>, out: &mut Vec<Violation>) {
@@ -80,40 +82,57 @@ fn tree_issues(check: &GraphCheck<'_>, out: &mut Vec<Violation>) {
     }
 }
 
-/// PRD Invariants: a graph remembers every key it retired, so no key comes back.
+/// PRD Invariants: a graph remembers every key it retired, so no key comes back. A node a
+/// journey holds a tombstone for was removed, so it counts as retired too.
 fn retired_keys(check: &GraphCheck<'_>, out: &mut Vec<Violation>) {
     let document = check.document;
     let retired = &document.retired_keys;
     for key in document.nodes.as_map().keys() {
-        if retired.nodes.contains(key) {
-            out.push(at_node(
-                check.tree,
-                key,
-                ViolationCode::RetiredKeyReused,
-                format!("the key {key} was removed from this graph and cannot come back"),
+        if retired.nodes.contains(key) || document.state.tombstones.contains(key) {
+            out.push(retired_key_reused(
+                Some(check.tree),
+                &RetiredKey::Node(key.clone()),
             ));
         }
     }
     for key in document.roles.as_map().keys() {
         if retired.roles.contains(key) {
-            let mut found = violation(
-                ViolationCode::RetiredKeyReused,
-                format!("the role key {key} was removed from this graph and cannot come back"),
-            );
-            found.at.subject = Some(Subject::Role(key.clone()));
-            out.push(found);
+            out.push(retired_key_reused(None, &RetiredKey::Role(key.clone())));
         }
     }
     for key in document.participation_kinds.as_map().keys() {
         if retired.kinds.contains(key) {
-            let mut found = violation(
-                ViolationCode::RetiredKeyReused,
-                format!("the kind key {key} was removed from this graph and cannot come back"),
-            );
-            found.at.subject = Some(Subject::Kind(key.clone()));
-            out.push(found);
+            out.push(retired_key_reused(None, &RetiredKey::Kind(key.clone())));
         }
     }
+}
+
+/// PRD Invariants: how every refusal of a retired key says so, wherever the key enters (a
+/// mutation, an import, a document check): the one wording.
+#[must_use]
+pub(crate) fn retired_key_message(key: &RetiredKey) -> String {
+    let (what, key) = match key {
+        RetiredKey::Node(key) => ("node", key.to_string()),
+        RetiredKey::Role(key) => ("role", key.to_string()),
+        RetiredKey::Kind(key) => ("participation kind", key.to_string()),
+    };
+    format!("the {what} key {key} was removed from this graph and cannot come back")
+}
+
+/// PRD Invariants: the violation for a retired key in use, about the key, and for a node
+/// located by its path when a tree has it.
+#[must_use]
+pub(crate) fn retired_key_reused(tree: Option<&Tree>, key: &RetiredKey) -> Violation {
+    let mut found = violation(ViolationCode::RetiredKeyReused, retired_key_message(key));
+    found.at.subject = Some(match key {
+        RetiredKey::Node(key) => Subject::Node(key.clone()),
+        RetiredKey::Role(key) => Subject::Role(key.clone()),
+        RetiredKey::Kind(key) => Subject::Kind(key.clone()),
+    });
+    if let (Some(tree), RetiredKey::Node(key)) = (tree, key) {
+        found.at.path = tree.path(key).cloned();
+    }
+    found
 }
 
 /// PRD Keys and references: role and kind ids are unique in the graph, and `owner` is

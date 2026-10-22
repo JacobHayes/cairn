@@ -176,6 +176,55 @@ impl<R: References> MessageTemplate<R> {
     }
 }
 
+/// Why a message draft did not translate to another document form.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum TemplateRefusal {
+    /// A placeholder did not translate (its translator has reported it).
+    Unmapped,
+    /// Translated, the draft is this many bytes, past the body limit.
+    TooLong(usize),
+}
+
+impl<R: References> MessageTemplate<R> {
+    /// The draft with every placeholder translated by `map` (none: it does not translate),
+    /// written and read back so the template grammar stays the schema's. Every placeholder
+    /// is visited, so a caller that reports an untranslated one reports each.
+    ///
+    /// # Errors
+    ///
+    /// When a placeholder does not translate, or the translated draft passes the body limit
+    /// (keys can be longer than the paths and ids they replace).
+    ///
+    /// # Panics
+    ///
+    /// Never: a translated draft within the limit reads back.
+    pub fn map_references<B: References>(
+        &self,
+        mut map: impl FnMut(&Segment<R>) -> Option<Segment<B>>,
+    ) -> Result<MessageTemplate<B>, TemplateRefusal> {
+        let mut text = String::new();
+        let mut complete = true;
+        for segment in &self.0 {
+            match map(segment) {
+                Some(translated) => {
+                    text.push_str(&MessageTemplate::<B>::render_segment(&translated));
+                }
+                None => complete = false,
+            }
+        }
+        if !complete {
+            return Err(TemplateRefusal::Unmapped);
+        }
+        if Limit::BodyBytes.check(text.len()).is_err() {
+            return Err(TemplateRefusal::TooLong(text.len()));
+        }
+        match text.parse() {
+            Ok(template) => Ok(template),
+            Err(error) => panic!("a translated message draft within its limit reads back: {error}"),
+        }
+    }
+}
+
 impl<R: References> fmt::Display for MessageTemplate<R> {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
         for segment in &self.0 {

@@ -66,11 +66,15 @@ fn put_role(session: &mut Session<'_>, role: &Role<KeyRefs>, add: bool) -> Vec<W
         (true, false) | (false, true) => None,
     };
     if let Some(code) = problem {
-        let message = format!(
-            "cannot {} role {}",
-            if add { "add" } else { "edit" },
-            role.key
-        );
+        let message = if code == ViolationCode::RetiredKeyReused {
+            crate::validate::retired_key_message(&RetiredKey::Role(role.key.clone()))
+        } else {
+            format!(
+                "cannot {} role {}",
+                if add { "add" } else { "edit" },
+                role.key
+            )
+        };
         reject_about(
             session,
             code,
@@ -146,11 +150,15 @@ fn put_kind(session: &mut Session<'_>, kind: &ParticipationKind<KeyRefs>, add: b
         (true, false) | (false, true) => None,
     };
     if let Some(code) = problem {
-        let message = format!(
-            "cannot {} kind {}",
-            if add { "add" } else { "edit" },
-            kind.key
-        );
+        let message = if code == ViolationCode::RetiredKeyReused {
+            crate::validate::retired_key_message(&RetiredKey::Kind(kind.key.clone()))
+        } else {
+            format!(
+                "cannot {} kind {}",
+                if add { "add" } else { "edit" },
+                kind.key
+            )
+        };
         reject_about(
             session,
             code,

@@ -337,6 +337,20 @@ fn each_broken_invariant_is_reported_under_its_code() {
     }
 }
 
+/// A node both retired and tombstoned is one key in use that may not be: one violation.
+#[test]
+fn a_key_both_retired_and_tombstoned_is_reported_once() {
+    let mut document = vendor();
+    document.retired_keys.nodes.insert(key("n_access"));
+    document.state.tombstones.insert(key("n_access"));
+    let found = codes(document);
+    let retired = found
+        .iter()
+        .filter(|code| **code == ViolationCode::RetiredKeyReused)
+        .count();
+    assert_eq!(retired, 1, "{found:?}");
+}
+
 #[test]
 fn three_independent_violations_report_three() {
     let independent = [

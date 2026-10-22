@@ -248,11 +248,12 @@ fn copy_nodes(
     };
     let remap_resource =
         |key: &AttachmentKey| mint::<AttachmentKey>(request.insertion, key.as_str());
-    let remap = Remap {
+    let mut remap = Remap {
         node: &remap_node,
         role: &remap_role,
         kind: &remap_kind,
         resource: &remap_resource,
+        draft_too_long: None,
     };
     let mut nodes = BTreeMap::new();
     let mut members = BTreeMap::new();
@@ -261,7 +262,7 @@ fn copy_nodes(
         .values()
         .filter(|node| !copying.excluded.contains(&node.key));
     for original in kept {
-        let mut copy = match remap.node(original) {
+        let mut copy = match remap.copy(original) {
             Ok(copy) => copy,
             Err(message) => {
                 problems.push(Problem::past(

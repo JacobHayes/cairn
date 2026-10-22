@@ -103,16 +103,19 @@ fn add_node(session: &mut Session<'_>, node: &Node<KeyRefs>) -> Vec<Write> {
         unreachable!("a graph patch targets an existing graph")
     };
     let problem = if graph.nodes.get(&node.key).is_some() {
-        Some((ViolationCode::DuplicateKey, "a node with this key exists"))
+        Some((
+            ViolationCode::DuplicateKey,
+            "a node with this key exists".to_owned(),
+        ))
     } else if graph.retired_keys.nodes.contains(&node.key) {
         Some((
             ViolationCode::RetiredKeyReused,
-            "this key was removed from the graph and cannot come back",
+            crate::validate::retired_key_message(&RetiredKey::Node(node.key.clone())),
         ))
     } else if Limit::NodeCount.check(graph.nodes.len() + 1).is_err() {
         Some((
             ViolationCode::LimitExceeded,
-            "the graph is at node_count_max",
+            "the graph is at node_count_max".to_owned(),
         ))
     } else {
         None

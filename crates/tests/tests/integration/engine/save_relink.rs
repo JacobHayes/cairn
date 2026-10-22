@@ -361,4 +361,14 @@ fn saving_a_journey_behind_its_route_names_the_retired_keys() {
         violation.code,
         cairn_schema::ViolationCode::RetiredKeyReused
     );
+    let latest = records
+        .routes
+        .get(&"vendor-evaluation".parse().unwrap())
+        .and_then(|route| route.versions.iter().next_back().copied())
+        .unwrap();
+    assert!(
+        violation.message.contains(&latest.to_string()),
+        "the remedy names the latest version: {}",
+        violation.message
+    );
 }

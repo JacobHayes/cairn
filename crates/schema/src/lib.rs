@@ -42,7 +42,7 @@ pub mod touched;
 
 pub use attachment::{
     Annotation, AnnotationBody, AnnotationContent, AttachmentScope, JourneyField, MessageTemplate,
-    Resource, ResourceContent, Segment,
+    Resource, ResourceContent, Segment, TemplateRefusal,
 };
 pub use chain::{
     Chain, ChainList, Constraint, ConstraintSource, DependencyVia, FixedBy, FixedDate, Instant,
@@ -105,7 +105,7 @@ pub use proposal::{
     RoleReference, UnresolvedItem, UnresolvedReason, removed_choices,
 };
 pub use record::{GraphKey, GraphRecord, Record, RecordKey, RetiredKey, Write};
-pub use refs::{FileRefs, KeyRefs, KeySlot, Reference, References};
+pub use refs::{FileRefs, KeyRefs, KeySlot, MapReferences, Reference, References};
 pub use rejection::{
     AppliedOver, Location, Rejection, RevisionConflict, RevisionOf, Violation, ViolationCode,
     Violations,
