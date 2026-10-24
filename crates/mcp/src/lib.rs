@@ -13,6 +13,7 @@ mod error;
 pub mod instructions;
 pub mod limits;
 mod server;
+mod sketch;
 mod tools;
 mod toolset;
 

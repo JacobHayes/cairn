@@ -34,8 +34,8 @@ fn every_tool_has_a_name_a_description_and_object_schemas() {
     }
 }
 
-/// The mutation vocabulary is spelled out in one tool's schema, `apply_patch`'s; every other
-/// tool that takes mutations cites it, so the tool list carries it once.
+/// The mutation vocabulary is written out in one tool's schema, `apply_patch`'s, as a type
+/// sketch; every other tool that takes mutations cites it, so the tool list carries it once.
 #[test]
 fn the_mutation_vocabulary_is_spelled_out_once() {
     let definitions = ToolSet::definitions();
@@ -47,7 +47,7 @@ fn the_mutation_vocabulary_is_spelled_out_once() {
             .get("$defs")
             .map(|defs| defs["Mutation"].clone());
         match mutation {
-            Some(Value::Object(schema)) if schema.contains_key("oneOf") => {
+            Some(Value::Object(schema)) if schema.contains_key("properties") => {
                 spelled.push(tool.name);
             }
             Some(Value::Object(_)) => cited.push(tool.name),
@@ -56,6 +56,50 @@ fn the_mutation_vocabulary_is_spelled_out_once() {
     }
     assert_eq!(spelled, ["apply_patch"]);
     assert!(cited.contains(&"resolve_date_conflict"), "{cited:?}");
+}
+
+/// A mutation the sketch describes is parsed as strictly as before: a value of the wrong
+/// shape, a field the mutation does not have and an op nobody defined are each refused,
+/// naming where.
+#[tokio::test]
+async fn a_mutation_that_does_not_match_the_sketch_is_refused_by_path() {
+    let world = World::new();
+    let ann = user("u_ann");
+    let patch = |mutation: Value, base_revision: Value| {
+        json!({ "patch": {
+            "id": "p_bad", "target": { "journey": "j_x" }, "base_revision": base_revision,
+            "mutations": [mutation],
+        } })
+    };
+    let pin = json!({ "op": "set_pin", "node": "n_a", "date": "2027-01-01" });
+    let cases = [
+        (
+            json!({ "op": "add_node", "node": { "key": "n_a", "id": "a", "kind": "action",
+                "title": 5 } }),
+            json!(1),
+            "patch.mutations[0]",
+        ),
+        (
+            json!({ "op": "set_pin", "node": "n_a", "date": "2027-01-01", "colour": "blue" }),
+            json!(1),
+            "patch.mutations[0]",
+        ),
+        (
+            json!({ "op": "no_such_op" }),
+            json!(1),
+            "patch.mutations[0].op",
+        ),
+        (pin, json!("one"), "patch.base_revision"),
+    ];
+    for (mutation, base_revision, path) in cases {
+        match world
+            .call(&ann, "apply_patch", patch(mutation, base_revision))
+            .await
+        {
+            Err(ToolError::Arguments { path: at, .. }) => assert_eq!(at, path),
+            other => panic!("{path}: {other:?}"),
+        }
+    }
 }
 
 /// Arguments that do not match the schema are refused with where; a name no tool has is an

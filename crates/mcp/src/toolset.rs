@@ -94,15 +94,42 @@ pub(crate) fn schema_citing_mutations<T: JsonSchema>() -> Map<String, Value> {
     citing::<T>(&[MUTATION, REVIEW_ITEM])
 }
 
-/// The schema of `T`, a tool's arguments that carry mutations but no proposal content: its
-/// review items, which only a proposal holds and Cairn drafts, are cited.
-pub(crate) fn schema_citing_review_items<T: JsonSchema>() -> Map<String, Value> {
-    citing::<T>(&[REVIEW_ITEM])
+/// The schema of `T`, `apply_patch`'s arguments: the one place the mutation vocabulary is
+/// spelled out, as a type sketch generated from the mutation schema
+/// ([`crate::sketch`]). The `mutations` items are objects whose `op` is one of the op
+/// names, described by the sketch; parsing is by the typed schema, as strict as ever.
+pub(crate) fn schema_with_mutation_sketch<T: JsonSchema>() -> Map<String, Value> {
+    let mut schema = cited::<T>(&[REVIEW_ITEM]);
+    let Some(Value::Object(definitions)) = schema.get_mut("$defs") else {
+        unreachable!("a tool that takes mutations has shared definitions");
+    };
+    let Some(mutation) = definitions.get(MUTATION.0).cloned() else {
+        unreachable!("a tool that takes mutations reaches the mutation definition");
+    };
+    // The schemas are fixed by the types at build time: a construct the sketch cannot
+    // render is a bug the listing's tests reach, not a condition to answer.
+    let crate::sketch::MutationSketch { text: sketch, ops } =
+        crate::sketch::mutation_sketch(definitions, MUTATION.0, &mutation)
+            .unwrap_or_else(|error| unreachable!("{error}"));
+    definitions.insert(
+        MUTATION.0.to_owned(),
+        serde_json::json!({
+            "type": "object",
+            "required": ["op"],
+            "properties": { "op": { "enum": ops } },
+            "description": format!(
+                "One mutation: an object with `op` and that op's fields, as typed here (`?` \
+                 may be left out, `| null` takes null, `one of` takes exactly one):\n{sketch}"
+            ),
+        }),
+    );
+    prune_definitions(&mut schema);
+    schema
 }
 
 /// A shared definition a schema cites rather than spells out: its name and what is said
 /// in its place.
-type Citation = (&'static str, &'static str);
+pub(crate) type Citation = (&'static str, &'static str);
 
 const MUTATION: Citation = (
     "Mutation",
@@ -110,7 +137,7 @@ const MUTATION: Citation = (
      `answer`, `set_pin`, and the rest), with that mutation's fields.",
 );
 
-const REVIEW_ITEM: Citation = (
+pub(crate) const REVIEW_ITEM: Citation = (
     "ReviewItem",
     "A review item, as `get_proposal` shows them: Cairn drafts them for an upgrade, a save \
      as route, or a re-link; a proposal you draft yourself needs none.",
@@ -119,6 +146,13 @@ const REVIEW_ITEM: Citation = (
 /// The schema of `T` with each of `citations` described in a sentence, and what only they
 /// reached dropped.
 fn citing<T: JsonSchema>(citations: &[Citation]) -> Map<String, Value> {
+    let mut schema = cited::<T>(citations);
+    prune_definitions(&mut schema);
+    schema
+}
+
+/// The schema of `T` with each of `citations` described in a sentence, nothing pruned yet.
+fn cited<T: JsonSchema>(citations: &[Citation]) -> Map<String, Value> {
     let mut schema = schema::<T>();
     if let Some(Value::Object(definitions)) = schema.get_mut("$defs") {
         for (name, description) in citations {
@@ -128,7 +162,6 @@ fn citing<T: JsonSchema>(citations: &[Citation]) -> Map<String, Value> {
             }
         }
     }
-    prune_definitions(&mut schema);
     schema
 }
 

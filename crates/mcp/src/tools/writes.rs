@@ -18,7 +18,7 @@ use serde_json::Value;
 
 use super::WriteOutput;
 use crate::toolset::{
-    Spec, Writes, output, parse, schema, schema_citing_mutations, schema_citing_review_items,
+    Spec, Writes, output, parse, schema, schema_citing_mutations, schema_with_mutation_sketch,
 };
 use crate::{ToolError, ToolSet};
 
@@ -124,7 +124,7 @@ pub(crate) const SPECS: &[Spec] = &[
             when someone should review first.",
         writes: Writes::Patch,
         destructive: true,
-        schema: schema_citing_review_items::<ApplyPatch>,
+        schema: schema_with_mutation_sketch::<ApplyPatch>,
         output: schema::<WriteOutput>,
     },
     Spec {
