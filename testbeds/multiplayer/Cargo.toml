@@ -31,7 +31,7 @@ cairn-store-sqlite = { path = "../../crates/store-sqlite" }
 # What the binary's composition root will also need: axum to serve the router, jiff for
 # the deployment's time zone, url for the public base URL auth is told.
 axum = { version = "0.8.9", default-features = false, features = ["http1", "tokio"] }
-jiff = { version = "0.2.37", default-features = false, features = ["std"] }
+jiff = { version = "0.2.38", default-features = false, features = ["std"] }
 url = "2.5.8"
 # The SDK at the revision the root Cargo.toml and mise.toml pin.
 patina-dst = { git = "https://github.com/JacobHayes/patina", rev = "1dee57b448d57c390af26a9d5af5f2d3a8820cc8" }

@@ -3,8 +3,8 @@
 # ladder, `check:fast` the inner loop (the steps are scripts/steps/), `gen` every generator.
 
 [tools]
-node = "26.10.0"
-rust = { version = "1.99.0", profile = "minimal", components = "clippy,rustfmt", targets = "wasm32-unknown-unknown" }
+node = "26.12.1"
+rust = { version = "1.99.1", profile = "minimal", components = "clippy,rustfmt", targets = "wasm32-unknown-unknown" }
 # The wasm tool, as prebuilt release binaries: `mise run build:wasm` binds crates/wasm with
 # it. Its version must equal the `wasm-bindgen` crate version pinned in Cargo.toml.
 "github:wasm-bindgen/wasm-bindgen" = "0.2.129"
