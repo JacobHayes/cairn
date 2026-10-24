@@ -8,4 +8,10 @@ ignore = [
   # uses openidconnect's `rsa` only to verify RS256 signatures, with public keys. No fixed
   # release exists.
   { id = "RUSTSEC-2023-0071", reason = "no RSA private key: rsa only verifies signatures" },
+  # Secret-dependent branches in crypto-bigint 0.5's arithmetic leak secret integers through
+  # timing. Cairn holds no elliptic-curve secret: openidconnect's p256 and p384 only verify
+  # ES256 and ES384 signatures (ID tokens, IAP assertions) with published public keys, and
+  # only the tests sign, with fixed keys. The fix is in crypto-bigint 0.7, which elliptic-curve
+  # 0.13 under openidconnect 4.0.1 (the newest release) cannot take.
+  { id = "RUSTSEC-2026-0387", reason = "no elliptic-curve secret: p256 and p384 only verify signatures" },
 ]
