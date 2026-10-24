@@ -1,25 +1,36 @@
 #!/usr/bin/env -S bash -euo pipefail
-#MISE description="Review the current change: codex reviews the diff against a base and, when screenshots are given, a second codex judges them against DESIGN.md; both run side by side, and their findings are written to files"
-# usage: mise run review [--base REV] [--out DIR] [--round N] [--intent TEXT] [SCREENSHOT...]
-#   --base REV     what the change is reviewed against (default main; a later round passes the
-#                  commit the earlier round reviewed, with the fixes as new changes
-#                  on top of it, so it sees only the fixes)
-#   --out DIR      where the outputs go (default dist/review)
-#   --round N      the round number in the file names (default 1)
-#   --intent TEXT  what the change is meant to do, for the UI critique
-#   SCREENSHOT     image files; with any, the UI critique runs too
-# Writes DIR/rN.md (the code review's findings) and DIR/rN.log (the whole session, whose last
-# line is the token count), and with screenshots DIR/ui-rN.md and DIR/ui-rN.log. The models
-# come from the environment: CAIRN_REVIEW_MODEL (default gpt-6.1-sol) and CAIRN_CRITIQUE_MODEL
-# (default gpt-6-astra), both at CAIRN_REVIEW_EFFORT (default high). Exits non-zero when either
-# review failed to run; findings are for a person (or the agent) to read, not an exit status.
-# Needs the codex CLI. The working copy must be a colocated jj workspace, which codex reads as git.
+#MISE description="Review the current change with up to four jobs side by side: codex's code review, the cull skill over the change, the screen-critique skill when screenshots are given, and the acceptance-audit skill when a plan is given; findings are written to files"
+# usage: mise run review [--base REV] [--target REV] [--plan FILE [--plan-base REV]] [--out DIR]
+#                        [--round N] [--intent TEXT] [SCREENSHOT...]
+#   --base REV       what the change is reviewed against (default main; a later round passes the
+#                    commit the earlier round reviewed, so the code review and the cull see only
+#                    the fixes)
+#   --target REV     the change's last revision (default the working copy, or its parent when the
+#                    working copy is empty, the same rule scripts/changed uses)
+#   --plan FILE      the plan or brief the change was built from; with it the acceptance audit runs
+#   --plan-base REV  where the whole change began, for the audit (default --base); the audit always
+#                    judges the whole change against the whole plan
+#   --out DIR        where the outputs go (default dist/review)
+#   --round N        the round number in the file names (default 1)
+#   --intent TEXT    what the change is meant to do, for the screen critique
+#   SCREENSHOT       image files; with any, the screen critique runs
+# Base and target are resolved once, and every job reads that same pair, in a checkout of the
+# target, so a landed change is reviewed as it was and not as main has moved on.
+# Writes DIR/rN.md (the code review), DIR/cull-rN.md, DIR/ui-rN.md and DIR/accept-rN.md, each with
+# a .log beside it holding the whole session. The models come from the environment, and codex's
+# own default is used when they are unset: CAIRN_REVIEW_MODEL for the code review,
+# CAIRN_SKILL_MODEL for the skill jobs; CAIRN_REVIEW_EFFORT sets both (default high). Exits
+# non-zero when a job failed to run; findings are for a person (or the agent) to read, not an
+# exit status. Needs the codex CLI and a colocated jj workspace, which codex reads as git.
 cd "$(dirname "$0")/.."
-base=main out=dist/review round=1 intent="the change under review"
+base=main target= plan= plan_base= out=dist/review round=1 intent="the change under review"
 shots=()
 while [ $# -gt 0 ]; do
   case $1 in
     --base) base=${2:?--base needs a revision}; shift 2 ;;
+    --target) target=${2:?--target needs a revision}; shift 2 ;;
+    --plan) plan=${2:?--plan needs a file}; shift 2 ;;
+    --plan-base) plan_base=${2:?--plan-base needs a revision}; shift 2 ;;
     --out) out=${2:?--out needs a directory}; shift 2 ;;
     --round) round=${2:?--round needs a number}; shift 2 ;;
     --intent) intent=${2:?--intent needs text}; shift 2 ;;
@@ -28,38 +39,71 @@ while [ $# -gt 0 ]; do
   esac
 done
 command -v codex >/dev/null || { echo "review: the codex CLI is not installed" >&2; exit 1; }
-review_model=${CAIRN_REVIEW_MODEL:-gpt-6.1-sol}
-critique_model=${CAIRN_CRITIQUE_MODEL:-gpt-6-astra}
+if [ -n "$plan" ]; then
+  [ -f "$plan" ] || { echo "review: no such plan: $plan" >&2; exit 2; }
+  plan=$(realpath "$plan")
+elif [ -n "$plan_base" ]; then
+  echo "review: --plan-base needs --plan" >&2; exit 2
+fi
+
+commit_of() { jj log -r "$1" --no-graph -T 'commit_id' --limit 1 2>/dev/null || { echo "review: no such revision: $1" >&2; exit 2; }; }
+if [ -z "$target" ]; then
+  if [ "$(jj log -r @ --no-graph -T 'empty' --limit 1)" = true ]; then target='@-'; else target='@'; fi
+fi
+target_id=$(commit_of "$target")
+base_id=$(commit_of "$base")
+plan_base_id=$(commit_of "${plan_base:-$base}")
+# Where main has moved on since the change began, the change is the work since the point the two
+# lines of history share, which is also what codex's code review reads.
+base_id=$(git merge-base "$base_id" "$target_id")
+plan_base_id=$(git merge-base "$plan_base_id" "$target_id")
+
 effort=${CAIRN_REVIEW_EFFORT:-high}
-repo=$PWD
+review_model=(); [ -z "${CAIRN_REVIEW_MODEL:-}" ] || review_model=(-m "$CAIRN_REVIEW_MODEL")
+skill_model=(); [ -z "${CAIRN_SKILL_MODEL:-}" ] || skill_model=(-m "$CAIRN_SKILL_MODEL")
 mkdir -p "$out"
 out=$(realpath "$out")
 
-timeout 3600 codex exec review --base "$base" -m "$review_model" -c "model_reasoning_effort=$effort" \
-  -o "$out/r$round.md" </dev/null >"$out/r$round.log" 2>&1 &
-code_pid=$!
-critique_pid=
+# Every job runs in a checkout of the target, so "HEAD" is the target for all of them.
+checkout=$(mktemp -d "$out/checkout.XXXXXX")
+trap 'git worktree remove --force "$checkout" >/dev/null 2>&1 || true; rm -rf "$checkout"' EXIT
+git worktree add --detach -q "$checkout" "$target_id"
+
+# A skill is a prompt: its body without the frontmatter, then the job's inputs.
+skill_prompt() { awk '/^---$/ && n < 2 { n++; next } n >= 2' ".agents/skills/$1/SKILL.md"; }
+# run_skill NAME LOG_PREFIX INPUTS [image args...]
+run_skill() {
+  local name=$1 prefix=$2 inputs=$3
+  shift 3
+  { skill_prompt "$name"; printf '\n%s\n' "$inputs"; } >"$prefix.prompt"
+  timeout 2400 codex exec "${skill_model[@]}" -c "model_reasoning_effort=$effort" -s read-only -C "$checkout" \
+    "$@" -o "$prefix.md" - <"$prefix.prompt" >"$prefix.log" 2>&1
+}
+
+pids=() names=() files=()
+start() { names+=("$1"); files+=("$2"); shift 2; "$@" & pids+=($!); }
+
+run_code_review() {
+  (cd "$checkout" && timeout 3600 codex exec review --base "$base_id" "${review_model[@]}" \
+    -c "model_reasoning_effort=$effort" -o "$out/r$round.md" </dev/null >"$out/r$round.log" 2>&1)
+}
+start "the code review" "r$round" run_code_review
+start "the cull" "cull-r$round" run_skill cull "$out/cull-r$round" \
+  "Scope: one change. It is the difference between $base_id and $target_id; this checkout is at the target, so \`git diff $base_id $target_id\` shows it."
 if [ ${#shots[@]} -gt 0 ]; then
-  prompt=$out/ui-r$round.prompt
-  cat >"$prompt" <<PROMPT
-You are a demanding product designer. Judge the attached screenshots against DESIGN.md in this
-repository (tokens, type, spacing, alignment, hierarchy, consistency between views, phone
-width, empty and edge states) and against the intent of the change: $intent.
-List concrete problems by severity (severe, medium, minor), each naming the screenshot and
-what is wrong, and say what you would change. Do not praise. Change nothing.
-PROMPT
   image_args=()
   for shot in "${shots[@]}"; do image_args+=(-i "$shot"); done
-  # The prompt is stdin (`-`); the images are options.
-  timeout 2400 codex exec -m "$critique_model" -c "model_reasoning_effort=$effort" -s read-only -C "$repo" \
-    "${image_args[@]}" -o "$out/ui-r$round.md" - <"$prompt" >"$out/ui-r$round.log" 2>&1 &
-  critique_pid=$!
+  start "the screen critique" "ui-r$round" run_skill screen-critique "$out/ui-r$round" \
+    "The change is meant to: $intent. It is the difference between $base_id and $target_id; this checkout is at the target. The screenshots are attached." "${image_args[@]}"
+fi
+if [ -n "$plan" ]; then
+  start "the acceptance audit" "accept-r$round" run_skill acceptance-audit "$out/accept-r$round" \
+    "The plan: $plan. The change is the difference between $plan_base_id and $target_id; this checkout is at the target, so \`git diff $plan_base_id $target_id\` shows it."
 fi
 
 status=0
-wait "$code_pid" || { echo "review: the code review failed; see $out/r$round.log" >&2; status=1; }
-if [ -n "$critique_pid" ]; then
-  wait "$critique_pid" || { echo "review: the UI critique failed; see $out/ui-r$round.log" >&2; status=1; }
-fi
-echo "review: findings in $out/r$round.md${critique_pid:+ and $out/ui-r$round.md}"
+for i in "${!pids[@]}"; do
+  wait "${pids[$i]}" || { echo "review: ${names[$i]} failed; see $out/${files[$i]}.log" >&2; status=1; }
+done
+echo "review: base $base_id, target $target_id; findings in $(printf '%s ' "${files[@]/#/$out/}" | sed 's/ /.md /g')"
 exit "$status"

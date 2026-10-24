@@ -30,12 +30,13 @@ You are changing Cairn: a feature, a fix, a refactor, tests or CI, documents, or
 - One logical commit per unit of work: the change with its tests, documents, proof, and review fixes folded in.
 - Before it lands, an independent reviewer reviews the whole change. Verify each finding against the code, fix the valid ones, and record any that would change a document or a design call in `decisions/`.
 - A second round reviews only the fixes, and runs only when the first found something severe, several medium findings, or the fixes were large. A third, again only the fixes, runs only when the second found something severe.
-- Land onto current main: rebase, check for conflicts with what landed meanwhile, and pass `mise run check:fast` on the result. Main is pushed as units land, and CI runs the full check on every push: a release is tagged only on a commit whose run passed, and while the newest finished run on main is red, `mise run land` takes only the fix (`--fix`). on main a newer push waits for the run in flight instead of cancelling it (and replaces a run still waiting), so the newest run covers everything pushed before it.
+- Land onto current main: rebase, check for conflicts with what landed meanwhile, and pass `mise run check:fast` on the result. Main is pushed as units land, and CI runs the full check on every push: a release is tagged only on a commit whose run passed, and while the newest finished run on main is red, `mise run land` takes only the fix (`--fix`). On main a newer push waits for the run in flight instead of cancelling it (and replaces a run still waiting), so the newest run covers everything pushed before it.
 - Integrate as you go: once a unit passes, land it, push main, move the default workspace to the new main when its working copy is empty, and remove the unit's workspace. Do not park finished work for someone to collect or ask before landing it.
 
 ## Repository conventions
 
 - Version control is jj, not git. Commit only your own files.
+- Instructions for a recurring agent job live once, as a skill in `.agents/skills/` (`.claude/skills` links there); tasks and workflows run them.
 - Commit messages: a short imperative title (at most 72 characters, aim for 50-60), a blank line, then a body wrapped at 72 columns saying what changed and why, with notable design calls and how it was verified. No internal ids (brief, requirement, review-round, or ticket ids).
 - Generated files live only in the generated paths ARCHITECTURE lists (Generated artifacts), are marked as generated, and are never edited by hand. They are regenerated with `mise run gen` and committed in the same change as the source that changed them. Hand-written code sits beside them, never inside them.
 - A new dependency is justified in one line in the commit message that adds it (PRACTICES, Dependencies are deliberate).
@@ -43,7 +44,7 @@ You are changing Cairn: a feature, a fix, a refactor, tests or CI, documents, or
 
 ## Talking with people
 
-- **Plainly.** Give the current state, not its history; define a term the first time you use it, or pick a plainer one; check a status live before reporting it; and for a call about a screen, show the screen or a mockup of each option.
+- **Plainly.** Give the current state, not its history; define a term the first time you use it, or pick a plainer one; check a status live before reporting it; say a caveat or a status once, and after that only what changed; and for a call about a screen, show the screen or a mockup of each option.
 - **On the merits.** Weigh every proposal, the user's own included, recommend one, and push back with the concrete tradeoff when you disagree; a position moves for a better argument, never for insistence or for work already done. A question asks for an answer, not a change.
 
 ## When you are unsure
