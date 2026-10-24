@@ -5,7 +5,8 @@
 // model's tests'.
 import type { Page } from "@playwright/test";
 
-import { checkpoint, expect, test } from "./test.ts";
+import { checkpoint } from "./invariants.ts";
+import { expect, test } from "./test.ts";
 import { openTip } from "./tips.ts";
 
 import { expectTitleLinesAsLaidOut, lineBetween, pointOn, viewportOf } from "./canvas.ts";

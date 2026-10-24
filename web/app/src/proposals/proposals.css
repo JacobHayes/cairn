@@ -36,7 +36,7 @@
   font-size: 15px;
 }
 
-.layer-band > .button,
+.layer-band > button,
 .layer-band > a {
   flex: none;
 }

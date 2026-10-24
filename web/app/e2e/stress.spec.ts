@@ -9,7 +9,8 @@ import { expect, test } from "./test.ts";
 import { expectTitleLinesAsLaidOut, viewportOf } from "./canvas.ts";
 import { NEAR_ZOOM } from "../src/canvas/gestures.ts";
 import { containmentProblems } from "./containment.ts";
-import { nodeCard, open, openAt, settled, whenSettled } from "./shell.ts";
+import { indexAt, journeyAt, openCardMenu, openControlsMenu, openPopover, routeAt } from "./screenshots.ts";
+import { nodeCard, settled, whenSettled } from "./shell.ts";
 import { STRESS, publishStressJourney } from "./stress.ts";
 
 /** The walk's reach: every screen is looked at and every problem listed with the screen it is on, so one run shows them all. */
@@ -26,7 +27,7 @@ function walkOf(page: Page, journey: string): Walk {
     found.push(...(await containmentProblems(page)).map((problem) => `${where}: ${problem}`));
   };
   const check = async (address: string, node?: string) => {
-    await openAt(page, "browser", journey, address, node === undefined ? {} : { node });
+    await journeyAt(page, journey, address, node);
     await look(`${address}${node === undefined ? "" : ` with ${node}`} at ${String(page.viewportSize()?.width ?? 0)}px`);
   };
   return { page, found, look, check };
@@ -72,13 +73,13 @@ async function details({ page, look, check }: Walk): Promise<void> {
   await check("list", "n_a1");
   await page.evaluate(() => { document.querySelectorAll<HTMLDetailsElement>(".inspector details").forEach((section) => { section.open = true; }); });
   await look("the inspector with every section open");
-  for (const trigger of ["filter-button", "depth-button", "view-picker", "sync"]) {
-    await page.getByTestId(trigger).click();
+  for (const trigger of ["filter-button", "depth-button", "view-picker", "sync"] as const) {
+    await openPopover(page, trigger);
     await look(`${trigger} open`);
     await page.keyboard.press("Escape");
   }
   await check("graph");
-  await nodeCard(page, "n_a1").click({ button: "right" });
+  await openCardMenu(page, "n_a1");
   await look("a card's menu");
   await page.keyboard.press("Escape");
   await check("walk");
@@ -86,13 +87,13 @@ async function details({ page, look, check }: Walk): Promise<void> {
 
 /** The stress route's own graph, fitted and at the reading zoom in a window that holds it. */
 async function routeGraph({ page, look }: Walk): Promise<void> {
-  await open(page, "browser", `/routes/${STRESS.route}?view=graph`);
+  await routeAt(page, STRESS.route, "graph");
   await expect(page.getByTestId("node-card").first()).toBeVisible();
   await page.keyboard.press("f");
   await settled(page);
   await look("the route's graph fitted");
   await page.setViewportSize({ width: 4200, height: 3200 });
-  await open(page, "browser", `/routes/${STRESS.route}?view=graph`);
+  await routeAt(page, STRESS.route, "graph");
   await expect(page.getByTestId("node-card").first()).toBeVisible();
   await page.keyboard.press("f");
   await settled(page);
@@ -107,11 +108,11 @@ async function phoneChrome({ page, look, check }: Walk): Promise<void> {
   await check("list", "n_a1");
   await page.getByRole("button", { name: "Hide inspector" }).click();
   await look("the inspector folded at 390px");
-  await page.getByTestId("sync").click();
+  await openPopover(page, "sync");
   await look("the sync popover at 390px");
   await page.keyboard.press("Escape");
   for (const view of ["list", "timeline"]) {
-    await open(page, "browser", `/routes/${STRESS.route}?view=${view}`);
+    await routeAt(page, STRESS.route, view);
     await look(`the route's ${view} at 390px`);
   }
 }
@@ -124,7 +125,7 @@ async function widths(walk: Walk): Promise<void> {
     for (const address of ["graph", "list", "timeline", "summary", "walk"]) {
       await check(address);
       if (width === 390 && address !== "summary") {
-        await page.getByTestId("controls-button").click();
+        await openControlsMenu(page);
         await look(`the Controls menu on ${address} at 390px`);
         await page.keyboard.press("Escape");
       }
@@ -144,7 +145,7 @@ async function widths(walk: Walk): Promise<void> {
       await phoneChrome(walk);
     }
     for (const path of ["/", "/journeys", "/routes", "/identities", "/me"]) {
-      await open(page, "browser", path);
+      await indexAt(page, path);
       await look(`${path} at ${String(width)}px`);
     }
   }
@@ -158,6 +159,6 @@ test("the stress journey stays inside its boxes on every screen, and a whole nam
   await widths(walk);
   expect(walk.found).toEqual([]);
   // The viewport is a phone's: a name that fits whole wears no mark.
-  await openAt(page, "browser", "j_launch", "list");
+  await journeyAt(page, "j_launch", "list");
   await expect(page.getByTestId("journey-name-cue")).toHaveCount(0);
 });

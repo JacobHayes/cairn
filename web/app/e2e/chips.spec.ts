@@ -5,7 +5,8 @@
 import type { Page } from "@playwright/test";
 
 import { open, openSheet, whenSettled } from "./shell.ts";
-import { checkpoint, expect, test } from "./test.ts";
+import { checkpoint } from "./invariants.ts";
+import { expect, test } from "./test.ts";
 
 const field = (page: Page) => page.getByTestId("create-identity").getByLabel("Emails");
 const chips = (page: Page) => page.getByTestId("create-identity").getByTestId("chip-value");

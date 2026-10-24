@@ -6,7 +6,8 @@
 // vitest's.
 import type { Page } from "@playwright/test";
 
-import { checkpoint, expect, test } from "./test.ts";
+import { checkpoint } from "./invariants.ts";
+import { expect, test } from "./test.ts";
 
 import { frontierItem, openActing } from "./acting.ts";
 import { openEditing, openForm } from "./authoring.ts";

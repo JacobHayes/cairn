@@ -6,7 +6,8 @@
 // the person is.
 import type { Locator, Page } from "@playwright/test";
 
-import { checkpoint, expect, test } from "./test.ts";
+import { checkpoint } from "./invariants.ts";
+import { expect, test } from "./test.ts";
 
 import { setFrontier } from "./acting.ts";
 import { goWithin, nodeCard, nodePanel, open, openFromCanvas, visit, whenSettled } from "./shell.ts";

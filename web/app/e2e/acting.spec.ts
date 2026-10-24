@@ -6,7 +6,8 @@
 // (ranking, filters, guards, the pass's order) are the engine's and vitest's.
 import type { Locator } from "@playwright/test";
 
-import { checkpoint, expect, test } from "./test.ts";
+import { checkpoint } from "./invariants.ts";
+import { expect, test } from "./test.ts";
 
 import { answerCard, card, frontierItem, openActing, passOrder, publishFollowUpRoute, revisionAfter, select } from "./acting.ts";
 import { journeyName, startJourney } from "./around.ts";

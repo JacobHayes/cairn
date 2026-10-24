@@ -9,7 +9,8 @@
 // their own (ownJourney, newRoute) and run side by side.
 import type { APIRequestContext, Page } from "@playwright/test";
 
-import { checkpoint, expect, test } from "./test.ts";
+import { checkpoint } from "./invariants.ts";
+import { expect, test } from "./test.ts";
 
 import { addIdentity, identityRow, mergeIdentities } from "./around.ts";
 import { addNode, newRoute, routeName } from "./authoring.ts";

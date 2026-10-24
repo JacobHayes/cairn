@@ -3,7 +3,8 @@
 // phone's graph is in the page, with the inspector a bottom sheet over it. On the in-browser host.
 import type { Page } from "@playwright/test";
 
-import { checkpoint, expect, test } from "./test.ts";
+import { checkpoint } from "./invariants.ts";
+import { expect, test } from "./test.ts";
 
 import { expectAddress, nodeCard, nodePanel, openAt, openJourney, openSheet, whenSettled } from "./shell.ts";
 

@@ -9,7 +9,8 @@
 // every view, Fade moves nothing, and the walk through at Decisions is the decision walkthrough.
 import { type Locator, type Page } from "@playwright/test";
 
-import { checkpoint, expect, test } from "./test.ts";
+import { checkpoint } from "./invariants.ts";
+import { expect, test } from "./test.ts";
 
 import { journeyName, setStatus, startJourney } from "./around.ts";
 import { viewportOf } from "./canvas.ts";

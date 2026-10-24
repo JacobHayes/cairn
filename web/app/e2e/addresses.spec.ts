@@ -2,7 +2,8 @@
 // that is, and a selected node is drawn whatever the view hides. The address-to-page map and the
 // rail's current item are the router's (src/address.test.ts, src/journeys/address.test.ts). They run
 // on the in-browser host, whose fixtures hold the same journeys.
-import { checkpoint, expect, test } from "./test.ts";
+import { checkpoint } from "./invariants.ts";
+import { expect, test } from "./test.ts";
 
 import { expectAddress, goTo, nodeCard, nodePanel, open, visit } from "./shell.ts";
 

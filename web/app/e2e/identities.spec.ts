@@ -3,7 +3,8 @@
 // anything names an identity. The open proposals are the inspector's Proposals tab (server.spec).
 import { addIdentity, identityRow, mergeIdentities, selectIdentities } from "./around.ts";
 import { fresh, open, openSheet, whenSettled } from "./shell.ts";
-import { checkpoint, expect, test } from "./test.ts";
+import { checkpoint } from "./invariants.ts";
+import { expect, test } from "./test.ts";
 
 /** Ana Ruiz and Dara Singh of the fixtures' people: named by journeys. */
 const ANA = "who_k3d7qm2xw5tn6pfa";

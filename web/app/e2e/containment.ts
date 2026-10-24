@@ -1,7 +1,7 @@
 // The containment invariant (DESIGN, Nothing spills out of its box): on the page as it stands,
 // no visible element sticks out of the bounded box it belongs to, and no text is visibly cut
 // without an ellipsis or a clamp. Every browser test is checked after it ends (e2e/test.ts), and
-// a proof's capture is checked before it is taken (`capture`), so a spec never opts in.
+// a picture is checked before it is taken (e2e/invariants.ts, `capture`), so a spec never opts in.
 //
 // The check reads geometry only, never words. An element is checked against its nearest ancestor
 // that is a bounded box (BOUNDED); a scroll container on the way excuses the axis it scrolls, and
@@ -193,10 +193,4 @@ export async function containmentProblems(page: Page): Promise<string[]> {
 /** Fails, listing every problem, when anything sticks out of its box or is cut. */
 export async function expectContained(page: Page, where = "the page"): Promise<void> {
   expect(await containmentProblems(page), `elements outside their boxes on ${where}`).toEqual([]);
-}
-
-/** A screenshot of `page` for a proof or a picture, taken only when it passes the invariant. */
-export async function capture(page: Page, path: string, options: { fullPage?: boolean } = {}): Promise<void> {
-  await expectContained(page, path);
-  await page.screenshot({ path, ...options });
 }

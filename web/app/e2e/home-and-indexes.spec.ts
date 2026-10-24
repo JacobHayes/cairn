@@ -1,7 +1,8 @@
 // Home and the two indexes in Chromium (C16, C17): Home's rows open a node and act in place, its
 // bounded groups, the Journeys table at a phone's width, and the Routes type control. What each
 // value is belongs to the models' tests; this is what only a browser shows. In-browser host.
-import { checkpoint, expect, test } from "./test.ts";
+import { checkpoint } from "./invariants.ts";
+import { expect, test } from "./test.ts";
 
 import { nodeCard, nodePanel, open, whenSettled } from "./shell.ts";
 

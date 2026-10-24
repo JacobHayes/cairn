@@ -3,8 +3,11 @@
 // list, the inspector's forms, an open menu and the tour's step. In-browser host, fresh on every load.
 import type { Locator } from "@playwright/test";
 
-import { checkpoint, expect, test } from "./test.ts";
+import { checkpoint } from "./invariants.ts";
+import { expect, test } from "./test.ts";
 
+import { openJourneyCard } from "./around.ts";
+import { reviewOpen } from "./proposals.ts";
 import { nodePanel, open, openAt, openFromCanvas, openSheet, whenSettled } from "./shell.ts";
 import { expectTouchTargets } from "./touch.ts";
 
@@ -100,4 +103,14 @@ test("every control on the tour's step has a touch-sized hit area", async ({ pag
   await openSheet(page);
   await expect(panel.getByRole("button", { name: "Save", exact: true })).toBeVisible();
   await expectTouchTargets(page, "the tour's decision in the raised sheet");
+});
+
+test("the proposal band's Apply and Close are whole on a phone", async ({ page }) => {
+  await openJourneyCard(page, "browser", "j_vendor_eval");
+  await page.getByTestId("journey-menu").click();
+  await page.getByTestId("menu-save").click();
+  await page.getByTestId("save-as-route-flow").getByRole("button", { name: "Propose saving it as a route" }).click();
+  await reviewOpen(page);
+  // Apply once shrank to the touch-sized minimum width and cut its own label.
+  await checkpoint(page);
 });

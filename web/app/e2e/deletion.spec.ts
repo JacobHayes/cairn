@@ -3,7 +3,8 @@
 // together once every one is archived, asked once with the count. A route nothing uses is deleted
 // from its `⋯`; one a journey follows offers no delete. What the patches carry is vitest's
 // (journeys/lifecycle.test.ts).
-import { checkpoint, expect, test } from "./test.ts";
+import { checkpoint } from "./invariants.ts";
+import { expect, test } from "./test.ts";
 
 import { journeyName, openRoute, setStatus, startJourney } from "./around.ts";
 import { newRoute, routeName } from "./authoring.ts";

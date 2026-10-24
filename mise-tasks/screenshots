@@ -1,0 +1,15 @@
+#!/usr/bin/env -S bash -euo pipefail
+#MISE description="Take a picture of every screen state at desktop and phone width, light and dark, to dist/screenshots/ (or CAIRN_SCREENSHOTS_DIR), with a screenshots.json manifest"
+#MISE depends=["packages", "build:wasm"]
+# usage: mise run screenshots [playwright test args...]   (for example --grep "phone width, dark")
+# Walks the table in web/app/e2e/screenshots.ts on the in-browser host (the built demo site, no
+# binary). A run with no arguments starts from an empty folder; with arguments it adds to it.
+cd "$(dirname "$0")/.."
+repo=$PWD
+mkdir -p "${CAIRN_SCREENSHOTS_DIR:-$repo/dist/screenshots}"
+dir=$(realpath "${CAIRN_SCREENSHOTS_DIR:-$repo/dist/screenshots}")
+if [ "$#" -eq 0 ]; then
+  rm -f "$dir"/*-desktop-*.png "$dir"/*-phone-*.png "$dir"/screenshots.json "$dir"/screenshots.*.part.json
+fi
+cd web/app
+CAIRN_SCREENSHOTS_DIR=$dir exec "$repo/node_modules/.bin/playwright" test -c playwright.screenshots.config.ts "$@"
