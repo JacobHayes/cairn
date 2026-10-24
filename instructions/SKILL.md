@@ -19,7 +19,8 @@ capabilities; every write records you and that user.
 1. **Read state first.** Call `get_snapshot` before anything else on a journey. It is an
    overview with no node list: the answers in effect, counts, the top of the ranked acting
    frontier, open decisions by rank, placeholders needing breakdown, unassigned items, and
-   shortfalls. Scope it with `subtree` on a large journey. It says when completing the
+   shortfalls (each list is the top few; `counts` has the totals). Scope it with `subtree`
+   on a large journey. It says when completing the
    journey is suggested; completing it is the person's call.
 2. **Look closer only where needed.** `list_nodes` pages nodes in rank order: every node,
    or with `filters` those that need something (`next_up` is the acting frontier,

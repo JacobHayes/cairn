@@ -1028,7 +1028,7 @@ impl FrontierEntry {
 }
 
 // PRD: I3.
-/// An open decision named in the snapshot: its key and what it is asking, so the list says what
+/// A node named in one of the snapshot's lists: its key and its title, so the list says what
 /// each is without a second read.
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
 #[serde(deny_unknown_fields)]
@@ -1059,6 +1059,14 @@ pub struct SnapshotCounts {
     pub frontier: u32,
     /// The acting frontier: its top N and the rest.
     pub acting_frontier: u32,
+    /// Open decisions in all; the snapshot lists the top few.
+    pub open_decisions: u32,
+    /// Placeholders needing breakdown in all.
+    pub needs_breakdown: u32,
+    /// Open, in-scope nodes no one owns, in all.
+    pub unassigned: u32,
+    /// Nodes whose plan can no longer be met, in all.
+    pub shortfalls: u32,
 }
 
 // PRD: I3, C16.
@@ -1103,19 +1111,21 @@ pub struct Snapshot {
     /// The rest of the acting frontier, in rank order.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub acting_frontier_rest: Vec<NodeKey>,
-    /// Open, in-scope decisions, in rank order.
+    /// The top `snapshot_list_item_count_max` open, in-scope decisions, in rank order; the
+    /// counts say how many in all.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub open_decisions: Vec<NodeRef>,
     // PRD: B10.
-    /// Placeholders needing breakdown.
+    /// The top placeholders needing breakdown, in rank order.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
-    pub needs_breakdown: Vec<NodeKey>,
-    /// Open, in-scope nodes no one owns.
+    pub needs_breakdown: Vec<NodeRef>,
+    /// The top open, in-scope nodes no one owns, in rank order; `list_nodes` with the
+    /// `unassigned` filter lists the rest.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
-    pub unassigned: Vec<NodeKey>,
-    /// Nodes whose plan can no longer be met.
+    pub unassigned: Vec<NodeRef>,
+    /// The top nodes whose plan can no longer be met, in rank order.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
-    pub shortfalls: Vec<NodeKey>,
+    pub shortfalls: Vec<NodeRef>,
     /// The stalled diagnostic, when the journey is stalled.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub stalled: Option<Stalled>,

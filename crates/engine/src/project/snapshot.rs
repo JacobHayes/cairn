@@ -8,7 +8,7 @@
 
 use std::collections::{BTreeMap, BTreeSet};
 
-use cairn_schema::limits::PAGE_ITEM_COUNT_MAX;
+use cairn_schema::limits::{PAGE_ITEM_COUNT_MAX, SNAPSHOT_LIST_ITEM_COUNT_MAX};
 use cairn_schema::{
     DisplayState, FrontierEntry, IdentityKey, JourneyHeader, NextQuery, NodeKey, NodeRef,
     Relevance, Snapshot, SnapshotCounts, SnapshotJourney, SnapshotScope, State,
@@ -56,18 +56,18 @@ impl DerivedJourney<'_> {
             .skip(limit)
             .map(|row| row.key.clone())
             .collect();
-        let open_decisions: Vec<NodeKey> = in_scope
-            .iter()
-            .filter(|key| self.open_decision(key))
-            .map(|key| (*key).clone())
-            .collect();
-        let pick = |test: &dyn Fn(&NodeKey) -> bool| -> Vec<NodeKey> {
-            in_scope
-                .iter()
-                .filter(|key| test(key))
-                .map(|key| (*key).clone())
-                .collect()
-        };
+        let attention = |test: &dyn Fn(&NodeKey) -> bool| self.attention(&in_scope, test);
+        let (open_decisions, open_count) = attention(&|key| self.open_decision(key));
+        let (needs_breakdown, breakdown_count) = attention(&|key| blocking.needs_breakdown(key));
+        let (unassigned, unassigned_count) =
+            attention(&|key| derived.is_unassigned(self.graph, key));
+        let (shortfalls, shortfall_count) =
+            attention(&|key| derived.dates().shortfall_days(key).is_some());
+        let mut counts = self.counts(&scoped, &in_scope, frontier.len(), subtree);
+        counts.open_decisions = open_count;
+        counts.needs_breakdown = breakdown_count;
+        counts.unassigned = unassigned_count;
+        counts.shortfalls = shortfall_count;
         Ok(Snapshot {
             journey: self.snapshot_journey(header),
             scope: scope.clone(),
@@ -81,22 +81,41 @@ impl DerivedJourney<'_> {
                 .collect(),
             acting_frontier: frontier.iter().take(limit).map(FrontierEntry::of).collect(),
             acting_frontier_rest: rest,
-            open_decisions: derived
-                .ranking()
-                .sorted(&open_decisions)
-                .iter()
-                .map(|key| NodeRef {
-                    key: key.clone(),
-                    title: self.node(key).title.clone(),
-                })
-                .collect(),
-            needs_breakdown: pick(&|key| blocking.needs_breakdown(key)),
-            unassigned: pick(&|key| derived.is_unassigned(self.graph, key)),
-            shortfalls: pick(&|key| derived.dates().shortfall_days(key).is_some()),
+            open_decisions,
+            needs_breakdown,
+            unassigned,
+            shortfalls,
             stalled: blocking.stalled().cloned(),
             completion_suggested: self.completion_suggested(),
-            counts: self.counts(&scoped, &in_scope, frontier.len(), subtree),
+            counts,
         })
+    }
+
+    /// The top `snapshot_list_item_count_max` of the in-scope nodes `test` holds for, by rank,
+    /// and how many it holds for in all.
+    fn attention(
+        &self,
+        in_scope: &[&NodeKey],
+        test: &dyn Fn(&NodeKey) -> bool,
+    ) -> (Vec<NodeRef>, u32) {
+        let top = usize::try_from(SNAPSHOT_LIST_ITEM_COUNT_MAX).unwrap_or(usize::MAX);
+        let keys: Vec<NodeKey> = in_scope
+            .iter()
+            .filter(|key| test(key))
+            .map(|key| (*key).clone())
+            .collect();
+        let listed = self
+            .derived
+            .ranking()
+            .sorted(&keys)
+            .iter()
+            .take(top)
+            .map(|key| NodeRef {
+                key: key.clone(),
+                title: self.node(key).title.clone(),
+            })
+            .collect();
+        (listed, count(keys.len()))
     }
 
     /// The journey's facts, each owner as the identity it names now, once.
@@ -151,6 +170,7 @@ impl DerivedJourney<'_> {
             by_display_state,
             frontier: count(frontier),
             acting_frontier: count(acting),
+            ..SnapshotCounts::default()
         }
     }
 }

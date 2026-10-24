@@ -9889,7 +9889,7 @@
       },
       "NodeRef": {
         "additionalProperties": false,
-        "description": "An open decision named in the snapshot: its key and what it is asking, so the list says what\neach is without a second read.",
+        "description": "A node named in one of the snapshot's lists: its key and its title, so the list says what\neach is without a second read.",
         "properties": {
           "key": {
             "$ref": "#/components/schemas/NodeKey",
@@ -14634,14 +14634,14 @@
             "description": "The journey's name, description, status and owners."
           },
           "needs_breakdown": {
-            "description": "Placeholders needing breakdown.",
+            "description": "The top placeholders needing breakdown, in rank order.",
             "items": {
-              "$ref": "#/components/schemas/NodeKey"
+              "$ref": "#/components/schemas/NodeRef"
             },
             "type": "array"
           },
           "open_decisions": {
-            "description": "Open, in-scope decisions, in rank order.",
+            "description": "The top `snapshot_list_item_count_max` open, in-scope decisions, in rank order; the\ncounts say how many in all.",
             "items": {
               "$ref": "#/components/schemas/NodeRef"
             },
@@ -14662,9 +14662,9 @@
             "description": "What it covers, when that is not the whole journey."
           },
           "shortfalls": {
-            "description": "Nodes whose plan can no longer be met.",
+            "description": "The top nodes whose plan can no longer be met, in rank order.",
             "items": {
-              "$ref": "#/components/schemas/NodeKey"
+              "$ref": "#/components/schemas/NodeRef"
             },
             "type": "array"
           },
@@ -14680,9 +14680,9 @@
             "description": "The stalled diagnostic, when the journey is stalled."
           },
           "unassigned": {
-            "description": "Open, in-scope nodes no one owns.",
+            "description": "The top open, in-scope nodes no one owns, in rank order; `list_nodes` with the\n`unassigned` filter lists the rest.",
             "items": {
-              "$ref": "#/components/schemas/NodeKey"
+              "$ref": "#/components/schemas/NodeRef"
             },
             "type": "array"
           }
@@ -14734,8 +14734,32 @@
             "minimum": 0,
             "type": "integer"
           },
+          "needs_breakdown": {
+            "description": "Placeholders needing breakdown in all.",
+            "format": "uint32",
+            "minimum": 0,
+            "type": "integer"
+          },
           "not_relevant": {
             "description": "Not-relevant nodes.",
+            "format": "uint32",
+            "minimum": 0,
+            "type": "integer"
+          },
+          "open_decisions": {
+            "description": "Open decisions in all; the snapshot lists the top few.",
+            "format": "uint32",
+            "minimum": 0,
+            "type": "integer"
+          },
+          "shortfalls": {
+            "description": "Nodes whose plan can no longer be met, in all.",
+            "format": "uint32",
+            "minimum": 0,
+            "type": "integer"
+          },
+          "unassigned": {
+            "description": "Open, in-scope nodes no one owns, in all.",
             "format": "uint32",
             "minimum": 0,
             "type": "integer"
@@ -14747,7 +14771,11 @@
           "by_state",
           "by_display_state",
           "frontier",
-          "acting_frontier"
+          "acting_frontier",
+          "open_decisions",
+          "needs_breakdown",
+          "unassigned",
+          "shortfalls"
         ],
         "type": "object"
       },

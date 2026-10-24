@@ -9,6 +9,7 @@ use crate::engine::support;
 use std::collections::BTreeSet;
 
 use cairn_engine::{DerivedJourney, ProjectionError, Records};
+use cairn_schema::limits::SNAPSHOT_LIST_ITEM_COUNT_MAX;
 use cairn_schema::{
     AgentRow, DisplayState, FrontierEntry, ListQuery, NextQuery, NodeKey, Real, Snapshot,
     SnapshotScope,
@@ -56,7 +57,10 @@ fn the_snapshot_holds_answers_nodes_frontier_and_counts() {
         names(whole.open_decisions.iter().map(|each| each.key.clone())),
         ["n_comparison_set", "n_findings_reviewer"]
     );
-    assert_eq!(names(whole.needs_breakdown.clone()), ["n_workload"]);
+    assert_eq!(
+        names(whole.needs_breakdown.iter().map(|each| each.key.clone())),
+        ["n_workload"]
+    );
     let counts = &whole.counts;
     assert_eq!(counts.by_state.values().sum::<u32>(), counts.in_scope);
     assert_eq!(counts.not_relevant, 3, "the partner-led subset");
@@ -146,6 +150,11 @@ fn the_snapshot_cuts_the_frontier_at_its_limit() {
         (200, 5)
     );
     assert_eq!(first.counts.acting_frontier, 205);
+    assert_eq!(
+        (first.unassigned.len(), first.counts.unassigned),
+        (SNAPSHOT_LIST_ITEM_COUNT_MAX as usize, 205),
+        "a list of nodes needing attention is cut, and the count is the total"
+    );
     let graph = support::journey_graph(&records, support::JOURNEY);
     let derived = support::derived(&records, support::JOURNEY);
     let next = DerivedJourney::new(&graph, &derived)

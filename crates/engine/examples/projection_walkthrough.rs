@@ -480,9 +480,9 @@ fn agent_snapshot(vendor: &Fixture, out: &mut String) -> Result<()> {
     writeln!(
         out,
         "- needing breakdown: {}; unassigned: {}; shortfalls: {}",
-        codes(&snapshot.needs_breakdown),
-        codes(&snapshot.unassigned),
-        codes(&snapshot.shortfalls)
+        codes(snapshot.needs_breakdown.iter().map(|each| &each.key)),
+        codes(snapshot.unassigned.iter().map(|each| &each.key)),
+        codes(snapshot.shortfalls.iter().map(|each| &each.key))
     )?;
     writeln!(out)?;
     writeln!(

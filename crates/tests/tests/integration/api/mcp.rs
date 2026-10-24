@@ -430,8 +430,8 @@ mod mcp_in_process {
         let snapshot = json!({ "journey": JOURNEY });
         let snapshot = agent.ok("get_snapshot", snapshot).await;
         assert_eq!(
-            snapshot["snapshot"]["needs_breakdown"],
-            json!(["n_workload"])
+            keys(&snapshot["snapshot"]["needs_breakdown"]),
+            ["n_workload"]
         );
         let create = json!({ "proposal": "pr_workload", "destination": { "journey": JOURNEY },
             "draft": breakdown(revision, "Break the workload down"),

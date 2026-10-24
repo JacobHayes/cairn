@@ -390,6 +390,23 @@ fn unassigned_is_for_unfinished_in_scope_work() {
         .journey()
         .snapshot(&SnapshotScope::default(), &seen.header)
         .unwrap();
-    assert!(row.unassigned.contains(&key("n_plain")));
-    assert!(!row.unassigned.contains(&key("n_box")));
+    let all = seen
+        .graph
+        .document()
+        .nodes
+        .as_map()
+        .keys()
+        .filter(|node| unassigned(node.as_str()) && seen.derived.relevance().in_scope(node))
+        .count();
+    assert_eq!(
+        row.counts.unassigned as usize, all,
+        "the count is the total"
+    );
+    assert!(row.unassigned.len() <= all);
+    assert!(
+        row.unassigned
+            .iter()
+            .all(|each| unassigned(each.key.as_str())),
+        "every listed node is unassigned"
+    );
 }

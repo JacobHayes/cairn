@@ -3856,7 +3856,7 @@ export interface components {
         /** @description A node kind. */
         NodeKind: "decision" | "deliverable" | "action" | "milestone" | "group";
         /**
-         * @description An open decision named in the snapshot: its key and what it is asking, so the list says what
+         * @description A node named in one of the snapshot's lists: its key and its title, so the list says what
          *     each is without a second read.
          */
         NodeRef: {
@@ -5435,9 +5435,12 @@ export interface components {
             counts: components["schemas"]["SnapshotCounts"];
             /** @description The journey's name, description, status and owners. */
             journey: components["schemas"]["SnapshotJourney"];
-            /** @description Placeholders needing breakdown. */
-            needs_breakdown?: components["schemas"]["NodeKey"][];
-            /** @description Open, in-scope decisions, in rank order. */
+            /** @description The top placeholders needing breakdown, in rank order. */
+            needs_breakdown?: components["schemas"]["NodeRef"][];
+            /**
+             * @description The top `snapshot_list_item_count_max` open, in-scope decisions, in rank order; the
+             *     counts say how many in all.
+             */
             open_decisions?: components["schemas"]["NodeRef"][];
             /** @description The rationales those answers were given with, for the answers that have one. */
             rationales?: {
@@ -5445,12 +5448,15 @@ export interface components {
             };
             /** @description What it covers, when that is not the whole journey. */
             scope?: components["schemas"]["SnapshotScope"];
-            /** @description Nodes whose plan can no longer be met. */
-            shortfalls?: components["schemas"]["NodeKey"][];
+            /** @description The top nodes whose plan can no longer be met, in rank order. */
+            shortfalls?: components["schemas"]["NodeRef"][];
             /** @description The stalled diagnostic, when the journey is stalled. */
             stalled?: components["schemas"]["Stalled"] | null;
-            /** @description Open, in-scope nodes no one owns. */
-            unassigned?: components["schemas"]["NodeKey"][];
+            /**
+             * @description The top open, in-scope nodes no one owns, in rank order; `list_nodes` with the
+             *     `unassigned` filter lists the rest.
+             */
+            unassigned?: components["schemas"]["NodeRef"][];
         };
         /** @description What a snapshot counts in its subtree. */
         SnapshotCounts: {
@@ -5483,9 +5489,29 @@ export interface components {
             in_scope: number;
             /**
              * Format: uint32
+             * @description Placeholders needing breakdown in all.
+             */
+            needs_breakdown: number;
+            /**
+             * Format: uint32
              * @description Not-relevant nodes.
              */
             not_relevant: number;
+            /**
+             * Format: uint32
+             * @description Open decisions in all; the snapshot lists the top few.
+             */
+            open_decisions: number;
+            /**
+             * Format: uint32
+             * @description Nodes whose plan can no longer be met, in all.
+             */
+            shortfalls: number;
+            /**
+             * Format: uint32
+             * @description Open, in-scope nodes no one owns, in all.
+             */
+            unassigned: number;
         };
         /** @description The journey's own facts in its snapshot. */
         SnapshotJourney: {

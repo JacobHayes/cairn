@@ -85,6 +85,12 @@ pub const EXPLANATION_ENTRY_COUNT_MAX: u32 = 50;
 /// store pages its lists by. Callers page; the remainder is counts and keys.
 pub const PAGE_ITEM_COUNT_MAX: u32 = 200;
 
+/// Entries in each of the snapshot's lists of nodes needing attention (open decisions,
+/// placeholders to break down, unassigned work, shortfalls); the counts say how many in all and
+/// `list_nodes` with the matching filter lists the rest (`decisions_needed` for the decisions that
+/// can be answered now). Keeps the overview small at any journey size.
+pub const SNAPSHOT_LIST_ITEM_COUNT_MAX: u32 = 10;
+
 // An import is about four mutations per node (PRACTICES, Explicit limits).
 const _: () = assert!(MUTATION_COUNT_PER_PATCH_MAX == 4 * NODE_COUNT_MAX);
 // A path's segments and separators fit in a few kilobytes.

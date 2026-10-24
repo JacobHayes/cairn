@@ -10,7 +10,7 @@ return to it later.
 Open decisions gate the work behind them: until one is answered, what depends on it is
 undecided. Walking them in rank order unblocks the most first.
 
-1. **List them.** `get_snapshot` gives `open_decisions` in rank order; `list_nodes` with
+1. **List them.** `get_snapshot` gives the top `open_decisions` in rank order (`counts` the total); `list_nodes` with
    `filters` `["decisions_needed"]` gives the actionable ones with their breadcrumbs.
 2. **Take one at a time.** For each, `get_node` shows its prompt, its answer type, its
    choices, who owns it, and what its answer affects (the nodes whose relevance it
