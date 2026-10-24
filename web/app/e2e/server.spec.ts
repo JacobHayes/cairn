@@ -279,6 +279,47 @@ test("C14: the deployment's open proposals are the Identities inspector's Propos
   await expect(page.locator('[data-testid="identity"][data-diff="added"]')).toContainText("Nina Alvarez");
 });
 
+test("C14, G5: a proposal's checklist editor keeps an item typed and not added across a reload, and says saving drops a ticked item's tick", { tag: "@server" }, async ({ page, context }) => {
+  const { id } = await ownJourney(context.request, "hiring-loop");
+  await openJourney(page, "server", id);
+  // The screen has two items and the first is ticked.
+  const written = await context.request.post(`/api/journeys/${id}/patches`, {
+    data: {
+      patch: {
+        id: patchId(),
+        target: { journey: id },
+        base_revision: await derivedRevision(page),
+        mutations: [
+          { op: "set_node_field", node: "n_screen", value: { checklist: [{ id: "alpha", title: "Alpha" }, { id: "beta", title: "Beta" }] } },
+          { op: "set_ticked", node: "n_screen", item: "alpha", ticked: true },
+        ],
+      },
+    },
+  });
+  expect(written.ok(), await written.text()).toBe(true);
+  await page.reload();
+  const proposal = `pr_${crypto.randomUUID().replaceAll("-", "")}`;
+  const drafted = await context.request.post(`/api/journeys/${id}/proposals`, {
+    data: {
+      id: proposal,
+      patch_id: patchId(),
+      draft: { title: "Trim the checklist", destination_revision: await derivedRevision(page), mutations: [{ op: "set_node_field", node: "n_screen", value: { checklist: [{ id: "beta", title: "Beta" }] } }] },
+    },
+  });
+  expect(drafted.ok(), await drafted.text()).toBe(true);
+  const review = `/journeys/${id}/proposals/${proposal}/nodes/n_screen?view=graph`;
+  await open(page, "server", review);
+  const changes = page.getByTestId("item-changes");
+  await changes.getByRole("button", { name: "Edit" }).click();
+  // The saved tick on the item the proposal drops is said, as in the node form.
+  await expect(changes.getByTestId("tick-dropped")).toContainText("Alpha");
+  await checkpoint(page);
+  await changes.getByLabel("New item", { exact: true }).fill("Typed and not added");
+  await page.reload();
+  await changes.getByRole("button", { name: "Edit" }).click();
+  await expect(changes.getByLabel("New item", { exact: true })).toHaveValue("Typed and not added");
+});
+
 test("Connect an agent shows this server's address, makes a token that acts as its agent until it is revoked, and is one tap away on a phone", { tag: "@server" }, async ({ page, context, playwright, baseURL }) => {
   await context.grantPermissions(["clipboard-read", "clipboard-write"]);
   await open(page, "server", "/");

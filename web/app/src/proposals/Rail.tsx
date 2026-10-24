@@ -219,6 +219,7 @@ function useContexts(layer: Layer, model: LayerModel) {
       roles,
       deployment: deployment ?? { revision: 0, identities: [], aliases: {} },
       today: model.today,
+      proposal: layer.id,
       ready: layer.before,
       editable: model.editable,
       hasGraph: layer.kind !== "deployment",

@@ -12,14 +12,15 @@ import { removalMutations, useRemovalPlan } from "../authoring/removal.ts";
 import { DateRuleEditor } from "../authoring/DateRuleEditor.tsx";
 import { draftOf, draftProblems, nodeFrom, valueOf, type FormField, type NodeDraft } from "../authoring/fields.ts";
 import { canHoldChildren, kindOption, moveTargets, newNode, nodesByPath, nodesFor, pathOf, rolesForFill, type GraphNode, type Mutation, type NodeField, type NodeKind, type ReferenceField, type Role, type Tree } from "../authoring/graph.ts";
-import { BasicsFields, ChecklistEditor, ChoicesEditor, CompletionFields, DecisionFields, StageFields, WeightFields, has } from "../authoring/NodeFields.tsx";
+import { BasicsFields, ChecklistEditor, type NewItem, ChoicesEditor, CompletionFields, DecisionFields, StageFields, WeightFields, has } from "../authoring/NodeFields.tsx";
 import { problemsOf } from "../authoring/NodeForm.tsx";
 import { FieldBox, Picker } from "../authoring/parts.tsx";
 import type { Deployment } from "../data/host.ts";
 import { subjectOf } from "../data/writes.ts";
 import { Input as AnswerInput } from "../detail/AnswerEditor.tsx";
-import type { Ready } from "../detail/model.ts";
+import { checklistOf, type Ready } from "../detail/model.ts";
 import { Section } from "../detail/parts.tsx";
+import { useDraft } from "../data/drafts.ts";
 import { fieldWords } from "../status/words.ts";
 import { NODE_FIELDS } from "@cairn/client";
 import { Button, Input, PickBox } from "../ui/kit.tsx";
@@ -37,6 +38,8 @@ export interface ChangesContext {
   roles: readonly Role[];
   deployment: Deployment;
   today: string;
+  /** The proposal's id, which keeps what a reviewer typed and has not yet added across a reload. */
+  proposal: string;
   /** The journey the proposal is for, derived, when it is one: answers read it. */
   ready: Ready | undefined;
   editable: boolean;
@@ -79,9 +82,21 @@ function useSyncedDraft<T>(source: unknown, make: () => T): { draft: T; set: (dr
   };
 }
 
+/** The checklist's new-item text for one node of this proposal, kept across a reload. */
+function useKeptItem(context: ChangesContext, node: string): [string, (value: string) => void] {
+  const [kept, setKept] = useDraft<string>(`proposal-item:${context.proposal}:${node}`);
+  return [kept ?? "", (value) => { setKept(value === "" ? undefined : value); }];
+}
+
+/** The editor's new-item field over the kept text: adding makes the change and clears the text. */
+function newItemOf([value, set]: [string, (value: string) => void], change: (next: Partial<NodeDraft>) => void): NewItem {
+  return { value, set, add: (next) => { change(next); set(""); } };
+}
+
 /** A node the proposal adds, edited with authoring's fields; the mutation follows once nothing stops it. */
 function AddedNode({ editor, node, onChange, context }: { editor: string; node: GraphNode; onChange: (node: GraphNode) => void; context: ChangesContext }) {
   const synced = useSyncedDraft<NodeDraft>(node, () => draftOf(node));
+  const kept = useKeptItem(context, node.key);
   const draft = synced.draft;
   const condition = useConditionProblem(draft.relevant_when);
   const problems = { ...problemsOf(node, draft), ...(condition.problem === undefined ? {} : { relevant_when: condition.problem }) };
@@ -103,6 +118,7 @@ function AddedNode({ editor, node, onChange, context }: { editor: string; node: 
     notes: (field: FormField) => ({ problem: problems[field] }),
     tree: context.tree,
     roles: context.roles,
+    newItem: newItemOf(kept, change),
   };
   return (
     <div className="stack" data-testid="added-node-form">
@@ -149,6 +165,7 @@ function FieldValue({ editor, mutation, onChange, context }: { editor: string; m
   const node = nodeOf(context, mutation.node);
   const synced = useSyncedDraft<NodeDraft | undefined>(mutation.value, () => (node === undefined ? undefined : draftOf(withFieldValue(node, mutation.value))));
   const draft = synced.draft;
+  const kept = useKeptItem(context, mutation.node);
   const condition = useConditionProblem(field === "relevant_when" ? (draft?.relevant_when ?? null) : null);
   const problem = node === undefined || draft === undefined ? undefined : (draftProblems(node.kind, draft)[field] ?? condition.problem);
   useInvalid(context, editor, problem !== undefined || !condition.checked);
@@ -164,7 +181,9 @@ function FieldValue({ editor, mutation, onChange, context }: { editor: string; m
       onChange({ ...mutation, value });
     }
   };
-  const props = { kind: node.kind, nodeKey: node.key, draft, change, notes: () => ({ problem }), tree: context.tree, roles: context.roles };
+  // The items that carry a tick now, from the journey as it is, since the proposal's own graph may already have dropped them.
+  const ticked = context.ready === undefined ? [] : checklistOf(context.ready, node.key).filter((item) => item.ticked).map(({ id, title }) => ({ id, title }));
+  const props = { kind: node.kind, nodeKey: node.key, draft, change, notes: () => ({ problem }), tree: context.tree, roles: context.roles, ticked, newItem: newItemOf(kept, change) };
   const targets = includes(MILESTONE_FIELDS, field) ? nodesFor(context.tree, field).map((each) => ({ value: each.key, label: each.title })) : [];
   return (
     <FieldBox label={fieldWords(field)} place={field} notes={{ problem }}>
@@ -205,7 +224,10 @@ function MutationEditor({ editor, mutation, onChange, context }: { editor: strin
       return context.ready === undefined || decision === undefined ? null : (
         <>
           <AnswerInput view={context.ready} node={decision} value={mutation.value} onChange={(value) => { onChange({ ...mutation, value }); }} />
-          <textarea aria-label="Why" placeholder="Why (optional, markdown)" value={mutation.rationale ?? ""} onChange={(event) => { onChange({ ...mutation, rationale: event.target.value.trim() === "" ? null : event.target.value }); }} />
+          <label className="stack">
+            <span className="label">Why (optional, markdown)</span>
+            <textarea value={mutation.rationale ?? ""} onChange={(event) => { onChange({ ...mutation, rationale: event.target.value.trim() === "" ? null : event.target.value }); }} />
+          </label>
         </>
       );
     }

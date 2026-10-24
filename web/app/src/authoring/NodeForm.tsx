@@ -16,7 +16,7 @@ import { partsOf, ruleProblem } from "./dates.ts";
 import { changesOf, draftOf, draftProblems, type FormField, type NodeDraft } from "./fields.ts";
 import { Section } from "../detail/parts.tsx";
 import type { GraphNode } from "./graph.ts";
-import { BasicsFields, CompletionFields, DecisionFields, StageFields, WeightFields, has, type FieldsProps } from "./NodeFields.tsx";
+import { BasicsFields, CompletionFields, DecisionFields, StageFields, WeightFields, has, typedItem, type FieldsProps } from "./NodeFields.tsx";
 import type { Schema } from "@cairn/client";
 import type { Violation } from "../data/writes.ts";
 import { RejectionView } from "../screens/RejectionView.tsx";
@@ -153,9 +153,12 @@ export function NodeForm({ authored, node }: NodeFormProps) {
   const [kept, setKept] = useDraft<Kept>(`node-form:${domainOf(authored)}:${node.key}`);
   const edits = kept?.edits ?? {};
   const draft: NodeDraft = { ...draftOf(node), ...edits };
-  const changes = changesOf(node, draft, new Set(Object.keys(edits) as FormField[]));
+  // Text typed in the new-item field and not yet added goes with Save as an item, so one press saves it (the field itself still shows it until it is added).
+  const typed = typedItem(draft.checklist, ticked(authored, node).map((item) => item.id), kept?.newItem ?? "");
+  const sending: NodeDraft = typed === undefined || !has({ kind: node.kind, draft }, "checklist") ? draft : { ...draft, checklist: [...draft.checklist, typed] };
+  const changes = changesOf(node, sending, new Set([...Object.keys(edits), ...(sending === draft ? [] : ["checklist"])] as FormField[]));
   const condition = useConditionProblem(draft.relevant_when);
-  const problems = { ...problemsOf(node, draft), ...(condition.problem === undefined ? {} : { relevant_when: condition.problem }) };
+  const problems = { ...problemsOf(node, sending), ...(condition.problem === undefined ? {} : { relevant_when: condition.problem }) };
   const sendable = changes.length > 0 && condition.checked && Object.keys(problems).length === 0;
   const preview = useLivePreview(authored, sendable ? changes.map((change) => change.mutation) : undefined);
   const { violations, places: sent } = shownViolations(preview, write);
@@ -197,7 +200,7 @@ export function NodeForm({ authored, node }: NodeFormProps) {
       {write.failed === undefined ? <Receipt receipt={write.receipt} /> : write.failed.rejection.rejection === "invalid" ? null : <RejectionView rejection={write.failed.rejection} onRebase={() => void save(authored.revision)} onDismiss={discard} />}
       {kept === undefined && changes.length === 0 ? null : (
         <span className="row">
-          <Button type="submit" primary disabled={write.disabled || !sendable} data-testid="node-form-save">
+          <Button type="submit" primary disabled={write.disabled || !sendable} data-testid="node-form-save" onMouseDown={(event) => { event.preventDefault(); }}>
             Save {changes.length === 0 ? "" : `(${plural(changes.length, "change")})`}
           </Button>
           <Button disabled={kept === undefined} onClick={discard}>

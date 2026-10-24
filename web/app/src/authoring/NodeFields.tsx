@@ -32,8 +32,8 @@ export interface FieldsProps {
   roles: readonly Role[];
   /** A journey's form: the saved items of this node that carry a tick, so saving without one can say it drops the tick. */
   ticked?: readonly Schema<"ChecklistItem">[];
-  /** The checklist's new-item text, kept with the form's draft so a reload does not lose it; without it the editor holds the text itself. */
-  newItem?: NewItem;
+  /** The checklist's new-item text, kept with the form's draft so a reload does not lose it. */
+  newItem: NewItem;
 }
 
 const ANSWER_TYPE_WORDS: Record<AnswerType, string> = {
@@ -136,15 +136,7 @@ export function ChecklistEditor({ props, flag = true }: { props: FieldsProps; fl
       set(next);
     }
   };
-  const [local, setLocal] = useState("");
-  const pending: NewItem = props.newItem ?? {
-    value: local,
-    set: setLocal,
-    add: (next) => {
-      props.change(next);
-      setLocal("");
-    },
-  };
+  const pending = props.newItem;
   const dropped = (props.ticked ?? []).filter((item) => !items.some((each) => each.id === item.id));
   return (
     <FieldBox label="Checklist" place="checklist" notes={props.notes("checklist")}>
@@ -178,15 +170,21 @@ export function ChecklistEditor({ props, flag = true }: { props: FieldsProps; fl
   );
 }
 
+/** The item that `title` typed in the new-item field becomes: titled as typed, with an id no item of the list or reserved has; none while the field is empty. */
+export function typedItem(items: readonly Schema<"ChecklistItem">[], reserved: readonly string[], title: string): Schema<"ChecklistItem"> | undefined {
+  const trimmed = title.trim();
+  // A removed item's id stays taken until saved, so a new item never inherits its tick.
+  return trimmed === "" ? undefined : { id: uniqueId(slugOf(trimmed, "item"), new Set([...items.map((item) => item.id), ...reserved])), title: trimmed };
+}
+
 /** A new item, added to the draft only: on its button, on Enter, and on leaving the field, so text typed and not added is never dropped by Save. */
 function AddItem({ items, reserved, pending, onAdd }: { items: readonly Schema<"ChecklistItem">[]; reserved: readonly string[]; pending: NewItem; onAdd: (item: Schema<"ChecklistItem">) => void }) {
   const title = pending.value;
   const setTitle = pending.set;
   const add = () => {
-    const trimmed = title.trim();
-    if (trimmed !== "") {
-      // A removed item's id stays taken until saved, so a new item never inherits its tick.
-      onAdd({ id: uniqueId(slugOf(trimmed, "item"), new Set([...items.map((item) => item.id), ...reserved])), title: trimmed });
+    const item = typedItem(items, reserved, title);
+    if (item !== undefined) {
+      onAdd(item);
     }
   };
   return (
