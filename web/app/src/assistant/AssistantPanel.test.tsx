@@ -68,7 +68,7 @@ describe("a turn's writes in the panel (I5, D7)", () => {
       {
         outcome: "applied",
         tool: "transition_node",
-        receipt: { patch_id: "p_one", domain: { journey: "j_one" }, content_hash: "h", revision: 3 },
+        receipt: { patch_id: "p_one", domain: { journey: "j_one" }, revision: 3 },
         nodes: ["n_kickoff", "n_plan"],
         consequences: { j_one: { stale: [{ node: "n_report", reasons: [] }] } },
       },

@@ -230,8 +230,9 @@ fn actor(context: &RequestContext<RoleServer>) -> Result<Actor, ErrorData> {
         .ok_or_else(|| ErrorData::internal_error("the request reached MCP without an actor", None))
 }
 
-/// A tool error the agent can act on, as the tool's result: its message, and the error as
-/// structured content (a rejection carries every violation, A15).
+/// A tool error the agent can act on, as the tool's result: one block, the error as JSON with
+/// a message that says how to recover, and the same as structured content (a rejection
+/// carries every violation, A15).
 fn refused(error: &ToolError) -> CallToolResult {
     let structured = match serde_json::to_value(error) {
         Ok(value) => value,
@@ -240,9 +241,5 @@ fn refused(error: &ToolError) -> CallToolResult {
             Value::String(failure.to_string()),
         )])),
     };
-    let mut result = CallToolResult::structured_error(structured);
-    result
-        .content
-        .insert(0, ContentBlock::text(error.to_string()));
-    result
+    CallToolResult::structured_error(structured)
 }

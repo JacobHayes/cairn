@@ -61,8 +61,8 @@ pub(super) fn check(check: &mut Check<'_, '_>) {
                     )
                 }
                 _ => format!(
-                    "completing this node fails {:?}; bypass it in the same patch to complete anyway",
-                    failure.guard()
+                    "completing this node fails the {} guard; bypass it in the same patch to complete anyway",
+                    cairn_schema::wire_name(&failure.guard())
                 ),
             };
             let mut found = at_node(&tree, key, ViolationCode::GuardFailed, message);

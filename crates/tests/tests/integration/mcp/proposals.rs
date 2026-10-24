@@ -20,7 +20,21 @@ async fn a_proposal_is_drafted_reviewed_and_applied() {
         "draft": breakdown(), "patch_id": "p_propose" });
     let created = world.ok(&helper, "create_proposal", create.clone()).await;
     assert_eq!(created["status"], "saved");
-    assert_eq!(created["proposal"]["proposing_agent"], "ag_helper");
+    assert_eq!(created["proposal"], "pr_workload");
+    assert_eq!(created["revision"], 1);
+    assert_eq!(
+        created["destination"],
+        json!({ "journey": "j_vendor_eval" })
+    );
+    assert_eq!(
+        created["destination_revision"],
+        breakdown()["destination_revision"]
+    );
+    assert_eq!(created.get("draft"), None, "the draft is not echoed back");
+    let held = world
+        .ok(&ann, "get_proposal", json!({ "proposal": "pr_workload" }))
+        .await;
+    assert_eq!(held["proposal"]["proposing_agent"], "ag_helper");
     let again = world.ok(&helper, "create_proposal", create).await;
     assert_eq!(
         again["status"], "already_saved",
@@ -32,7 +46,7 @@ async fn a_proposal_is_drafted_reviewed_and_applied() {
     assert_eq!(review["review"].get("violations"), None);
     let apply = json!({ "proposal": "pr_workload", "reviewed_revision": 1, "patch_id": "p_apply" });
     let applied = world.ok(&ann, "apply_proposal", apply).await;
-    assert_eq!(applied["receipt"]["revision"], 2);
+    assert_eq!(applied["revision"], 2);
     let held = world
         .ok(&ann, "get_proposal", json!({ "proposal": "pr_workload" }))
         .await;
@@ -56,7 +70,7 @@ async fn a_proposal_is_discarded_against_its_revision() {
     );
     let discard = json!({ "proposal": "pr_workload", "change": "discard", "base_revision": 1, "patch_id": "p_discard" });
     let discarded = world.ok(&ann, "edit_proposal", discard).await;
-    assert_eq!(discarded["proposal"]["status"], "discarded");
+    assert_eq!(discarded["state"], "discarded");
 }
 
 /// A breakdown of the workload placeholder into two sub-deliverables (B10), drafted at

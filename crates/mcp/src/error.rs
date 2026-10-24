@@ -4,15 +4,16 @@
 
 use std::fmt;
 
-use cairn_schema::Rejection;
+use crate::touched::Touched;
+use cairn_schema::{PatchId, Rejection, RevisionConflict, RevisionOf, Violations};
 use cairn_service::{ProposeError, ReadError, ServiceError, WriteError};
 use serde::Serialize;
+use serde::ser::{SerializeMap, Serializer};
 
 /// Why a tool call did not succeed. Every variant but [`ToolError::UnknownTool`] and
 /// [`ToolError::Failed`] is the agent's to fix: it is answered as the tool's result, so the
 /// agent sees it and tries again.
-#[derive(Clone, Debug, PartialEq, Eq, Serialize)]
-#[serde(tag = "error", rename_all = "snake_case")]
+#[derive(Clone, Debug, PartialEq, Eq)]
 pub enum ToolError {
     /// No tool has this name.
     UnknownTool {
@@ -87,33 +88,106 @@ impl fmt::Display for ToolError {
 
 impl std::error::Error for ToolError {}
 
-/// A rejection in a line: each violation, or the revisions that moved.
+/// A rejection as a message that says how to recover. The structured fields beside it carry
+/// the detail: every violation with its path, the revisions that moved.
 fn rejected(rejection: &Rejection, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
     match rejection {
-        Rejection::Invalid { violations } => {
-            let violations = violations.as_slice();
-            write!(
-                formatter,
-                "rejected with {} violation(s):",
-                violations.len()
-            )?;
-            for violation in violations {
-                write!(formatter, " {violation};")?;
-            }
-            Ok(())
-        }
+        Rejection::Invalid { violations } => write!(
+            formatter,
+            "not applied: {} violation(s), each at its path in `violations`; fix them and write \
+             again",
+            violations.as_slice().len()
+        ),
         Rejection::Stale { conflicts, .. } => {
-            formatter.write_str("stale: read again and redo the write against")?;
+            formatter.write_str("stale: ")?;
             for conflict in conflicts {
-                let current = conflict.current;
-                write!(formatter, " {:?} at revision {current};", conflict.of)?;
+                let of = match &conflict.of {
+                    RevisionOf::Domain(domain) => domain.to_string(),
+                    RevisionOf::Proposal(id) => format!("proposal {id}"),
+                };
+                write!(
+                    formatter,
+                    "{of} is at revision {}, not {}; ",
+                    conflict.current, conflict.expected
+                )?;
             }
-            Ok(())
+            formatter.write_str(
+                "read it again, check the change still makes sense, and write again with a new \
+                 patch_id",
+            )
         }
         Rejection::PatchIdReused { patch_id } => write!(
             formatter,
             "patch id {patch_id} was used before for another write: choose a new one"
         ),
+    }
+}
+
+/// An error as the one JSON block an agent reads: its kind, a message that says how to
+/// recover, and the detail a rejection carries.
+impl Serialize for ToolError {
+    fn serialize<S: Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
+        let mut map = serializer.serialize_map(None)?;
+        let kind = match self {
+            ToolError::UnknownTool { .. } => "unknown_tool",
+            ToolError::Arguments { .. } => "arguments",
+            ToolError::Rejected { .. } => "rejected",
+            ToolError::NotFound { .. } => "not_found",
+            ToolError::Refused { .. } => "refused",
+            ToolError::Failed { .. } => "failed",
+        };
+        map.serialize_entry("error", kind)?;
+        match self {
+            ToolError::Arguments { path, message } => {
+                if !path.is_empty() {
+                    map.serialize_entry("path", path)?;
+                }
+                map.serialize_entry("message", message)?;
+            }
+            ToolError::Rejected { rejection } => {
+                map.serialize_entry("message", &self.to_string())?;
+                map.serialize_entry("rejection", &Lean(rejection))?;
+            }
+            other => map.serialize_entry("message", &other.to_string())?,
+        }
+        map.end()
+    }
+}
+
+/// A rejection with the touched sets grouped by graph and record kind.
+struct Lean<'a>(&'a Rejection);
+
+impl Serialize for Lean<'_> {
+    fn serialize<S: Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
+        #[derive(Serialize)]
+        #[serde(tag = "rejection", rename_all = "snake_case")]
+        enum Wire<'a> {
+            Stale {
+                conflicts: &'a [RevisionConflict],
+                intervening: Touched,
+                touched: Touched,
+            },
+            PatchIdReused {
+                patch_id: &'a PatchId,
+            },
+            Invalid {
+                violations: &'a Violations,
+            },
+        }
+        match self.0 {
+            Rejection::Stale {
+                conflicts,
+                intervening,
+                touched,
+            } => Wire::Stale {
+                conflicts,
+                intervening: Touched::of(intervening),
+                touched: Touched::of(touched),
+            },
+            Rejection::PatchIdReused { patch_id } => Wire::PatchIdReused { patch_id },
+            Rejection::Invalid { violations } => Wire::Invalid { violations },
+        }
+        .serialize(serializer)
     }
 }
 

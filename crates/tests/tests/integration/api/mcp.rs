@@ -37,7 +37,7 @@ mod mcp_in_process {
         let empty =
             json!({ "journey": "j_blank", "name": "A blank journey", "patch_id": "p_blank" });
         let created = agent.ok("create_journey", empty).await;
-        assert_eq!(created["receipt"]["revision"], 1);
+        assert_eq!(created["revision"], 1);
         let listed: BTreeSet<String> = agent
             .tools()
             .await
@@ -127,7 +127,7 @@ mod mcp_in_process {
             arguments["base_revision"] = json!(revision);
             let written = agent.ok(name, arguments).await;
             assert_eq!(written["status"], "applied", "{name}");
-            revision = written["receipt"]["revision"].as_u64().unwrap();
+            revision = written["revision"].as_u64().unwrap();
         }
         let note = json!({ "op": "add_annotation", "annotation": {
             "key": "a_access_note", "node": "n_access", "note": "Requested.",
@@ -135,7 +135,7 @@ mod mcp_in_process {
         let patch = json!({ "id": "p_note", "target": { "journey": JOURNEY },
             "base_revision": revision, "mutations": [note] });
         let written = agent.ok("apply_patch", json!({ "patch": patch })).await;
-        written["receipt"]["revision"].as_u64().unwrap()
+        written["revision"].as_u64().unwrap()
     }
 
     /// F5: a pin that contradicts a date rule is refused with its chain and moves; one move
@@ -158,7 +158,7 @@ mod mcp_in_process {
             "patch_id": "p_later_meeting", "base_revision": revision,
         });
         let written = agent.ok("resolve_date_conflict", resolved).await;
-        written["receipt"]["revision"].as_u64().unwrap()
+        written["revision"].as_u64().unwrap()
     }
 
     /// I6: a breakdown drafted, reviewed, edited, and applied by id.
@@ -167,7 +167,7 @@ mod mcp_in_process {
         let created = json!({ "proposal": "pr_workload", "destination": { "journey": JOURNEY },
             "draft": draft, "patch_id": "p_propose" });
         let created = agent.ok("create_proposal", created).await;
-        assert_eq!(created["proposal"]["revision"], 1);
+        assert_eq!(created["revision"], 1);
         let scope = json!({ "scope": "destination", "destination": { "journey": JOURNEY } });
         let listed = agent.ok("list_proposals", scope).await;
         assert_eq!(listed["count"], 1);
@@ -179,11 +179,11 @@ mod mcp_in_process {
             json!({ "replace": { "draft": breakdown(revision, "Split the workload in two") } });
         let edit = json!({ "proposal": "pr_workload", "change": replace, "base_revision": 1, "patch_id": "p_retitle" });
         let edited = agent.ok("edit_proposal", edit).await;
-        assert_eq!(edited["proposal"]["revision"], 2);
+        assert_eq!(edited["revision"], 2);
         let apply =
             json!({ "proposal": "pr_workload", "reviewed_revision": 2, "patch_id": "p_apply" });
         let applied = agent.ok("apply_proposal", apply).await;
-        assert_eq!(applied["receipt"]["revision"].as_u64(), Some(revision + 1));
+        assert_eq!(applied["revision"].as_u64(), Some(revision + 1));
         let after = json!({ "scope": "destination", "destination": { "journey": JOURNEY } });
         let listed = agent.ok("list_proposals", after).await;
         assert_eq!(
@@ -244,7 +244,7 @@ mod mcp_in_process {
         let create = json!({ "change": { "create": { "identity": { "key": "who_contact", "name": "Vendor contact" } } },
             "patch_id": "p_contact", "base_revision": 1 });
         let created = agent.ok("manage_identity", create).await;
-        let base = created["receipt"]["revision"].clone();
+        let base = created["revision"].clone();
         let merge = json!({ "change": { "merge": { "survivor": "who_d4m6uk2eqf5rbhzs", "merged": ["who_e7h2jv3nxc4yaw6t"] } },
             "patch_id": "p_merge", "base_revision": base });
         let merged = agent.ok("manage_identity", merge).await;
@@ -254,7 +254,7 @@ mod mcp_in_process {
             .await;
         assert_eq!(found["identities"]["items"][0]["key"], "who_contact");
         let delete = json!({ "change": { "delete": { "identity": "who_contact" } },
-            "patch_id": "p_delete", "base_revision": merged["receipt"]["revision"] });
+            "patch_id": "p_delete", "base_revision": merged["revision"] });
         let deleted = agent.ok("manage_identity", delete).await;
         assert_eq!(deleted["status"], "applied");
     }
@@ -333,7 +333,7 @@ mod mcp_in_process {
                 "deployment_revision": snapshot["deployment_revision"],
                 "patch_id": format!("p_answer_{}", &decision[2..]), "base_revision": revision });
             let written = agent.ok("answer_decision", answer).await;
-            revision = written["receipt"]["revision"].as_u64().unwrap();
+            revision = written["revision"].as_u64().unwrap();
         }
         revision
     }
@@ -354,6 +354,22 @@ mod mcp_in_process {
             .map(|v| v["code"].as_str().unwrap())
             .collect();
         assert_eq!(codes.len(), 2, "{refused}");
+
+        let stale = json!({ "id": "p_stale", "target": { "journey": JOURNEY },
+            "base_revision": 1, "mutations": [
+                { "op": "answer", "decision": "n_partner_runs", "value": { "single_choice": "yes" } },
+            ] });
+        let stale = agent
+            .refused("apply_patch", json!({ "patch": stale }))
+            .await;
+        let moved = &stale["rejection"]["conflicts"][0];
+        assert_eq!(stale["rejection"]["rejection"], "stale", "{stale}");
+        assert_eq!(moved["current"], revision, "{stale}");
+        let message = stale["message"].as_str().unwrap();
+        assert!(
+            message.contains(JOURNEY) && message.contains(&revision.to_string()),
+            "{message}"
+        );
     }
 
     /// B10, I6: the placeholder broken down by a proposal, reviewed, and applied.

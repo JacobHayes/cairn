@@ -98,7 +98,7 @@ async fn completing_a_placeholder_not_broken_down_is_refused_until_bypassed() {
     let applied = world
         .ok(&ann, "apply_patch", json!({ "patch": bypassed }))
         .await;
-    assert_eq!(applied["receipt"]["revision"], 5);
+    assert_eq!(applied["revision"], 5);
 }
 
 /// Gives the access node two items and the requirement to tick them, at revision 4.
@@ -172,7 +172,7 @@ async fn completing_work_with_a_checklist_needs_its_ticks_in_the_same_patch() {
     let applied = world
         .ok(&ann, "apply_patch", json!({ "patch": ticked }))
         .await;
-    assert_eq!(applied["receipt"]["revision"], 6);
+    assert_eq!(applied["revision"], 6);
     let node = world
         .ok(
             &ann,
@@ -242,23 +242,47 @@ async fn stale_and_resubmitted_writes_are_answered_as_the_service_answers() {
     };
     let applied = world.ok(&ann, "answer_decision", answer("p_purpose")).await;
     assert_eq!(applied["status"], "applied");
-    assert_eq!(applied["receipt"]["revision"], 2);
+    assert_eq!(applied["revision"], 2);
     let again = world.ok(&ann, "answer_decision", answer("p_purpose")).await;
     assert_eq!(again["status"], "already_applied");
-    assert_eq!(again["receipt"], applied["receipt"]);
+    assert_eq!(again["revision"], applied["revision"]);
+    let mut keys: Vec<&str> = applied
+        .as_object()
+        .unwrap()
+        .keys()
+        .map(String::as_str)
+        .collect();
+    keys.sort_unstable();
+    assert!(
+        keys.iter()
+            .all(|key| ["consequences", "revision", "status"].contains(key)),
+        "a write answers its revision and what it caused, not what it was sent: {keys:?}"
+    );
 
     let stale = world
         .call(&ann, "answer_decision", answer("p_purpose_again"))
         .await;
-    let Err(ToolError::Rejected {
-        rejection: Rejection::Stale { conflicts, .. },
-    }) = stale
-    else {
+    let Err(stale_error) = stale else {
         panic!("{stale:?}");
+    };
+    let ToolError::Rejected {
+        rejection: Rejection::Stale { conflicts, .. },
+    } = &stale_error
+    else {
+        panic!("{stale_error:?}");
     };
     assert_eq!(
         (conflicts[0].expected.get(), conflicts[0].current.get()),
         (1, 2)
+    );
+    let served = serde_json::to_value(&stale_error).unwrap();
+    let message = served["message"].as_str().unwrap();
+    for named in ["j_vendor_eval", "2"] {
+        assert!(message.contains(named), "{named} in {message}");
+    }
+    assert!(
+        !message.contains("Domain(") && !message.contains("JourneyId"),
+        "no debug form: {message}"
     );
 }
 
@@ -363,7 +387,7 @@ async fn a_merge_resubmitted_after_its_journeys_moved_is_answered_from_its_recei
         )
         .await;
     assert_eq!(again["status"], "already_applied");
-    assert_eq!(again["receipt"], merged["receipt"]);
+    assert_eq!(again["revision"], merged["revision"]);
     let other = world
         .call(
             &ann,
@@ -407,7 +431,7 @@ async fn the_removal_read_is_what_a_patch_needs_to_remove_a_node() {
     let created = world
         .ok(&ann, "apply_patch", patch("p_setup", 0, setup))
         .await;
-    let revision = u32::try_from(created["receipt"]["revision"].as_u64().unwrap()).unwrap();
+    let revision = u32::try_from(created["revision"].as_u64().unwrap()).unwrap();
 
     let read = json!({ "journey": "j_removal", "node": "n_phase", "removal": true });
     let read = world.ok(&ann, "get_node", read).await["removal"].clone();
@@ -568,5 +592,5 @@ async fn starting_ahead_takes_a_reasonless_bypass_in_one_patch() {
         .collect();
     assert!(errors.is_empty(), "{errors:#?}");
     let applied = world.ok(&ann, "apply_patch", arguments).await;
-    assert_eq!(applied["receipt"]["revision"], 2);
+    assert_eq!(applied["revision"], 2);
 }

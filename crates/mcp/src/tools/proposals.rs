@@ -5,8 +5,8 @@
 //! as proposals and reach their destination only when one is applied (B7, B8, B9, I7).
 
 use cairn_schema::{
-    Actor, Domain, JourneyId, Lineage, Markdown, PatchId, PatchReceipt, Proposal, ProposalDraft,
-    ProposalId, Revision, RouteId, Title, VersionNumber,
+    Actor, Domain, JourneyId, Lineage, Markdown, PatchId, Proposal, ProposalDraft, ProposalId,
+    ProposalStatus, Revision, RouteId, Title, VersionNumber,
 };
 use cairn_service::{Call, ProposalWritten};
 use schemars::JsonSchema;
@@ -278,19 +278,28 @@ pub struct ProposalCall {
     pub discards: bool,
 }
 
-/// What a proposal write answers.
+/// What a proposal write answers: where the proposal stands, not the draft that was sent.
 #[derive(Debug, Serialize, Deserialize, JsonSchema)]
 pub struct ProposalOutput {
     /// `saved` now; `already_saved`, a resubmitted patch id answered from its receipt (fetch
     /// the proposal for where it stands); or `existing`, a create of an id the caller already
     /// holds, answered with it as it stands.
     status: ProposalStatusOutput,
-    /// The receipt: its revision is the proposal's editing revision.
+    /// The proposal's id; absent when the answer is only a receipt (`already_saved`).
     #[serde(skip_serializing_if = "Option::is_none")]
-    receipt: Option<PatchReceipt>,
-    /// The proposal as it stands: review it with `get_proposal` before applying.
+    proposal: Option<ProposalId>,
+    /// Where it would land.
+    destination: Domain,
+    /// Its editing revision: review it with `get_proposal` before applying, and name this
+    /// revision in its next change.
+    revision: Revision,
+    /// The destination revision it was drafted against; absent when the answer is only a
+    /// receipt.
     #[serde(skip_serializing_if = "Option::is_none")]
-    proposal: Option<Proposal>,
+    destination_revision: Option<Revision>,
+    /// Whether it is still open; absent when the answer is only a receipt.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    state: Option<ProposalStatus>,
 }
 
 #[derive(Debug, Serialize, Deserialize, JsonSchema)]
@@ -302,42 +311,47 @@ enum ProposalStatusOutput {
 }
 
 impl ProposalOutput {
-    /// The proposal's destination: the proposal's, or, when the answer is only a receipt
-    /// (a write answered from an earlier one), the receipt's domain, which is the proposal's
-    /// destination.
+    /// The proposal's destination.
     #[must_use]
-    pub fn destination(&self) -> Option<&Domain> {
-        let held = self.proposal.as_ref().map(|proposal| &proposal.destination);
-        held.or_else(|| self.receipt.as_ref().map(|receipt| &receipt.domain))
+    pub fn destination(&self) -> &Domain {
+        &self.destination
     }
 
-    /// The proposal's editing revision, which its next change names: the proposal's own, or
-    /// its receipt's.
+    /// The proposal's editing revision, which its next change names.
     #[must_use]
-    pub fn editing_revision(&self) -> Option<Revision> {
-        let held = self.proposal.as_ref().map(|proposal| proposal.revision);
-        held.or_else(|| self.receipt.as_ref().map(|receipt| receipt.revision))
+    pub fn editing_revision(&self) -> Revision {
+        self.revision
+    }
+
+    fn held(status: ProposalStatusOutput, proposal: Proposal) -> Self {
+        Self {
+            status,
+            destination_revision: Some(proposal.draft.destination_revision),
+            state: Some(proposal.status),
+            proposal: Some(proposal.id),
+            destination: proposal.destination,
+            revision: proposal.revision,
+        }
     }
 }
 
 impl From<ProposalWritten> for ProposalOutput {
     fn from(written: ProposalWritten) -> Self {
         match written {
-            ProposalWritten::Saved { receipt, proposal } => Self {
-                status: ProposalStatusOutput::Saved,
-                receipt: Some(receipt),
-                proposal: Some(proposal),
-            },
+            ProposalWritten::Saved { proposal, .. } => {
+                Self::held(ProposalStatusOutput::Saved, proposal)
+            }
             ProposalWritten::AlreadySaved { receipt } => Self {
                 status: ProposalStatusOutput::AlreadySaved,
-                receipt: Some(receipt),
                 proposal: None,
+                destination: receipt.domain,
+                revision: receipt.revision,
+                destination_revision: None,
+                state: None,
             },
-            ProposalWritten::Existing { proposal } => Self {
-                status: ProposalStatusOutput::Existing,
-                receipt: None,
-                proposal: Some(proposal),
-            },
+            ProposalWritten::Existing { proposal } => {
+                Self::held(ProposalStatusOutput::Existing, proposal)
+            }
         }
     }
 }

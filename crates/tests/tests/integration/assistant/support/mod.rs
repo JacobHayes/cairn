@@ -188,7 +188,7 @@ impl World {
         let open = json!({ "route": "vendor-evaluation", "patch_id": "p_open_vendor_draft",
             "base_revision": base });
         let opened = self.ok(actor, "open_draft", open).await;
-        opened["receipt"]["revision"].as_u64().unwrap()
+        opened["revision"].as_u64().unwrap()
     }
 }
 

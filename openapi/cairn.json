@@ -29,8 +29,8 @@
                 "type": "string"
               },
               "receipt": {
-                "$ref": "#/components/schemas/PatchReceipt",
-                "description": "The patch's receipt."
+                "$ref": "#/components/schemas/AppliedReceipt",
+                "description": "Which patch, where, and the revision it produced."
               },
               "tool": {
                 "description": "The tool.",
@@ -533,6 +533,29 @@
         "required": [
           "conflicts",
           "intervening"
+        ],
+        "type": "object"
+      },
+      "AppliedReceipt": {
+        "description": "What the report of an applied write names: the patch, its domain, and the revision it\nproduced.",
+        "properties": {
+          "domain": {
+            "$ref": "#/components/schemas/Domain",
+            "description": "The domain it was committed to."
+          },
+          "patch_id": {
+            "$ref": "#/components/schemas/PatchId",
+            "description": "The patch id."
+          },
+          "revision": {
+            "$ref": "#/components/schemas/Revision",
+            "description": "The revision it produced."
+          }
+        },
+        "required": [
+          "patch_id",
+          "domain",
+          "revision"
         ],
         "type": "object"
       },

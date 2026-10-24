@@ -26,7 +26,7 @@ pub use provider::{
     Exchange, Message, Protocol, Provider, ProviderError, Reply, ToolCall, ToolResult, ToolSpec,
 };
 pub use turn::{ASSISTANT_AGENT, Assistant, Ended, TurnError, TurnReply, assistant_agent};
-pub use wrapper::{Action, Because};
+pub use wrapper::{Action, AppliedReceipt, Because};
 
 /// `bytes` as lowercase hex digits.
 fn hex(bytes: &[u8]) -> String {

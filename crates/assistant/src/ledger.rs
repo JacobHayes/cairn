@@ -157,7 +157,7 @@ impl Overflow {
             patch_id: patch.id.clone(),
         };
         let output = tools.create_proposal_as(actor, create).await?;
-        self.editing = output.editing_revision().unwrap_or(Revision::NONE);
+        self.editing = output.editing_revision();
         Ok(output)
     }
 
@@ -187,7 +187,7 @@ impl Overflow {
             patch_id,
         };
         let output = tools.edit_proposal_as(actor, edit).await?;
-        self.editing = output.editing_revision().unwrap_or(Revision::NONE);
+        self.editing = output.editing_revision();
         Ok(output)
     }
 }

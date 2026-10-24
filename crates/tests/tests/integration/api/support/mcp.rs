@@ -256,6 +256,19 @@ impl Agent {
         let result = self.call(name, arguments).await.unwrap();
         let error = result.structured_content.unwrap_or(Value::Null);
         assert_eq!(result.is_error, Some(true), "{name}: {error}");
+        assert_eq!(result.content.len(), 1, "{name}: an error is one block");
+        let text = result.content[0].as_text().map(|text| text.text.as_str());
+        assert_eq!(
+            text,
+            Some(error.to_string().as_str()),
+            "{name}: the block is the JSON"
+        );
+        assert!(
+            error["message"]
+                .as_str()
+                .is_some_and(|message| !message.is_empty()),
+            "{name}: a message says how to recover: {error}"
+        );
         error
     }
 }

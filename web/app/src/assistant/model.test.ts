@@ -12,7 +12,7 @@ const reply = (at: string, content: string): ConversationEntry => ({ author: "as
 const applied: AssistantAction = {
   outcome: "applied",
   tool: "transition_node",
-  receipt: { patch_id: "p_one", domain: { journey: "j_one" }, content_hash: "h", revision: 3 },
+  receipt: { patch_id: "p_one", domain: { journey: "j_one" }, revision: 3 },
   nodes: ["n_kickoff"],
 };
 const proposed: AssistantAction = { outcome: "proposed", tool: "apply_patch", proposal: "pr_one", destination: { journey: "j_one" }, because: { reason: "structural" } };

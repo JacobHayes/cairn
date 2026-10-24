@@ -1088,8 +1088,8 @@ export interface components {
             nodes?: components["schemas"]["NodeKey"][];
             /** @constant */
             outcome: "applied";
-            /** @description The patch's receipt. */
-            receipt: components["schemas"]["PatchReceipt"];
+            /** @description Which patch, where, and the revision it produced. */
+            receipt: components["schemas"]["AppliedReceipt"];
             /** @description The tool. */
             tool: string;
         } | {
@@ -1242,6 +1242,18 @@ export interface components {
             conflicts: components["schemas"]["RevisionConflict"][];
             /** @description What the commits since those revisions changed. */
             intervening: components["schemas"]["TouchedSet"];
+        };
+        /**
+         * @description What the report of an applied write names: the patch, its domain, and the revision it
+         *     produced.
+         */
+        AppliedReceipt: {
+            /** @description The domain it was committed to. */
+            domain: components["schemas"]["Domain"];
+            /** @description The patch id. */
+            patch_id: components["schemas"]["PatchId"];
+            /** @description The revision it produced. */
+            revision: components["schemas"]["Revision"];
         };
         /**
          * @description `POST /api/journeys/{id}/assistant` and `POST /api/routes/{id}/draft/assistant`: one message of

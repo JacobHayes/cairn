@@ -430,7 +430,7 @@ mod mcp_in_process {
             "key": "n_after", "id": "after", "kind": "action", "title": "After the refresh",
         }});
         let patch = json!({ "id": "p_after", "target": { "journey": "j_blank" },
-            "base_revision": created["receipt"]["revision"], "mutations": [node] });
+            "base_revision": created["revision"], "mutations": [node] });
         let written = agent.ok("apply_patch", json!({ "patch": patch })).await;
         assert_eq!(written["status"], "applied");
         let history = agent

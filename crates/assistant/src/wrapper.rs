@@ -25,8 +25,7 @@ use cairn_mcp::{
 };
 use cairn_schema::{
     Actor, BoundedVec, ChangeClass, Consequences, Domain, Graph, JourneyId, Markdown, Mutation,
-    NodeKey, Patch, PatchReceipt, PatchTarget, ProposalDraft, ProposalId, Rejection, Revision,
-    Title,
+    NodeKey, Patch, PatchId, PatchTarget, ProposalDraft, ProposalId, Rejection, Revision, Title,
 };
 use cairn_service::DomainPatch;
 use cairn_store::{Document, LoadTarget, Store};
@@ -99,6 +98,18 @@ pub enum Because {
 }
 
 // PRD: I5.
+/// What the report of an applied write names: the patch, its domain, and the revision it
+/// produced.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+pub struct AppliedReceipt {
+    /// The patch id.
+    pub patch_id: PatchId,
+    /// The domain it was committed to.
+    pub domain: Domain,
+    /// The revision it produced.
+    pub revision: Revision,
+}
+
 /// A write the assistant made, as the turn reports it (every direct write is reported
 /// with its consequences).
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
@@ -108,8 +119,8 @@ pub enum Action {
     Applied {
         /// The tool.
         tool: String,
-        /// The patch's receipt.
-        receipt: PatchReceipt,
+        /// Which patch, where, and the revision it produced.
+        receipt: AppliedReceipt,
         // PRD: I5.
         /// The nodes it wrote, in key order (a direct change is reported with the nodes
         /// it affected, which the panel links to); none for a write to no journey's nodes.
@@ -314,7 +325,7 @@ pub async fn run(
             let action = answer
                 .as_ref()
                 .ok()
-                .and_then(|output| applied(name, output, &nodes));
+                .and_then(|output| applied(name, output, &nodes, (&drafted.patch().id, &domain)));
             if action.is_some() {
                 ledger.wrote(&domain, nodes);
             }
@@ -334,7 +345,7 @@ pub async fn run(
                     Action::Proposed {
                         tool,
                         proposal,
-                        destination: output.destination()?.clone(),
+                        destination: output.destination().clone(),
                         because: Because::Asked,
                     }
                 })
@@ -467,13 +478,23 @@ pub(crate) fn title(tool: &str, note: Option<&str>, count: usize) -> Title {
         })
 }
 
-/// The applied action a direct write's output reports.
-fn applied(tool: &str, output: &Value, nodes: &BTreeSet<NodeKey>) -> Option<Action> {
+/// The applied action a direct write's output reports: the answer carries the revision and
+/// what the write caused, and the patch it drafted carries its id and domain.
+fn applied(
+    tool: &str,
+    output: &Value,
+    nodes: &BTreeSet<NodeKey>,
+    (patch_id, domain): (&PatchId, &Domain),
+) -> Option<Action> {
     let written: WriteOutput = serde_json::from_value(output.clone()).ok()?;
-    let (receipt, consequences) = written.into_parts();
+    let (revision, consequences) = written.into_parts();
     Some(Action::Applied {
         tool: tool.to_owned(),
-        receipt,
+        receipt: AppliedReceipt {
+            patch_id: patch_id.clone(),
+            domain: domain.clone(),
+            revision,
+        },
         nodes: nodes.iter().cloned().collect(),
         consequences,
     })

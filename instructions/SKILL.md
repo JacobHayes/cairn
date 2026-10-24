@@ -39,10 +39,10 @@ capabilities; every write records you and that user.
 - **A new `patch_id` per write**: `p_` and a short slug you make up. Never reuse one for a
   different write.
 - **`base_revision` is the revision you last read** of what you write: the snapshot's (or
-  `get_node`'s) `revision`, or the `receipt.revision` of your last write there.
+  `get_node`'s) `revision`, or the `revision` your last write there answered.
 - **`over` or `already_applied` in an answer: read again** (`get_snapshot` or `get_node`)
   before the next write. `over` means the write landed although the revision had moved,
-  and names what others changed; your view is behind, and the receipt's revision includes
+  and names what others changed; your view is behind, and the answer's revision includes
   changes you have not seen.
 - **No answer (a lost response): resubmit the same call with the same `patch_id`.** A write
   that landed answers `already_applied` from its receipt and is never applied twice.

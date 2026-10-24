@@ -208,7 +208,12 @@ fn set_status(session: &mut Session<'_>, status: JourneyStatus) -> Vec<Write> {
         session.reject(
             ViolationCode::IllegalTransition,
             None,
-            format!("a journey cannot move from {from:?} to {status:?}"),
+            format!(
+                "a journey cannot move from {} to {}",
+                from.as_ref()
+                    .map_or_else(|| "nothing".to_owned(), cairn_schema::wire_name),
+                cairn_schema::wire_name(&status)
+            ),
         );
         return Vec::new();
     }

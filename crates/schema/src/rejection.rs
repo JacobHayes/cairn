@@ -274,12 +274,19 @@ pub enum Rejection {
     },
 }
 
+/// A value's name as it appears in the wire format (`has_artifact`), for a message an agent
+/// reads beside the structured fields it came from; never its debug form.
+pub fn wire_name<T: Serialize>(value: &T) -> String {
+    match serde_json::to_value(value) {
+        Ok(serde_json::Value::String(name)) => name,
+        Ok(other) => other.to_string(),
+        Err(error) => unreachable!("a wire value serializes: {error}"),
+    }
+}
+
 impl fmt::Display for ViolationCode {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match serde_json::to_value(self) {
-            Ok(serde_json::Value::String(name)) => formatter.write_str(&name),
-            _ => write!(formatter, "{self:?}"),
-        }
+        formatter.write_str(&wire_name(self))
     }
 }
 

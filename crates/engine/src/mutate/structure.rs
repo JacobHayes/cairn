@@ -159,7 +159,11 @@ fn set_field(
         session.reject(
             ViolationCode::FieldNotOnKind,
             Some(key),
-            format!("a {} has no {field:?} field", kind.name()),
+            format!(
+                "a {} has no {} field",
+                kind.name(),
+                cairn_schema::wire_name(&field)
+            ),
         );
         if let Some(found) = session.violations.last_mut() {
             found.at.field = Some(field);

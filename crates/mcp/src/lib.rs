@@ -16,6 +16,7 @@ mod server;
 mod sketch;
 mod tools;
 mod toolset;
+mod touched;
 
 pub use error::ToolError;
 pub use server::{MCP_PATH, TOOL_CALL_DURATION, TOOL_CALLS, UNKNOWN_TOOL, router};

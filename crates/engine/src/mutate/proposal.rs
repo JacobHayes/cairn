@@ -184,8 +184,9 @@ fn unresolved_items(
             .and_then(|index| found.draft.items.as_slice().get(index));
         let node = item.and_then(crate::proposal::item_node);
         let message = format!(
-            "review item {} is unresolved ({:?})",
-            blocked.item, blocked.reason
+            "review item {} is unresolved ({})",
+            blocked.item,
+            cairn_schema::wire_name(&blocked.reason)
         );
         match node {
             Some(node) => session.reject(ViolationCode::UnresolvedReviewItem, Some(node), message),

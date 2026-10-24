@@ -10,7 +10,7 @@ mod writes;
 use std::collections::BTreeMap;
 
 use cairn_schema::{
-    AppliedOver, Consequences, Cursor, Date, JourneyId, Notice, PatchReceipt, Revision,
+    AppliedOver, Consequences, Cursor, Date, JourneyId, Notice, Revision, RevisionConflict,
 };
 use cairn_service::{Projected, Written};
 use schemars::JsonSchema;
@@ -20,6 +20,7 @@ pub use proposals::{CreateProposal, EditProposal, ProposalCall, ProposalChange, 
 
 use crate::limits::PAGE_ITEM_COUNT_MAX;
 use crate::toolset::Spec;
+use crate::touched::Touched;
 
 /// The tool groups, each dispatched by its own module.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -148,23 +149,24 @@ impl<T> Cut<T> {
 }
 
 // PRD: D7.
-/// What a direct write answers: its receipt and what it newly caused.
+/// What a direct write answers: the revision it produced and what it newly caused. The
+/// arguments it was sent, its domain and its content hash are not answered back.
 #[derive(Clone, Debug, Serialize, Deserialize, JsonSchema)]
 pub struct WriteOutput {
     // PRD: H5.
     /// `applied` now, or `already_applied`: the patch id was committed before with the same
     /// content and is answered from its receipt, with no consequences.
     status: WriteStatus,
-    /// The receipt. Its revision is the base of your next write when the status is
-    /// `applied` and there is no `over`. After `over` or `already_applied`, read again
-    /// first: the revision includes changes you have not seen.
-    receipt: PatchReceipt,
+    /// The journey's, route's or deployment's revision the write produced: the base of your
+    /// next write when the status is `applied` and there is no `over`. After `over` or
+    /// `already_applied`, read again first: it includes changes you have not seen.
+    revision: Revision,
     // PRD: H5.
     /// Present when your write named revisions that other people's writes had moved and was
     /// applied past them anyway, because nothing they changed is anything it changes: the
     /// revisions it moved past, and what those writes changed.
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    over: Option<AppliedOver>,
+    over: Option<Over>,
     // PRD: D7, D4.
     /// What it caused in each journey it changed: newly stale nodes, shortfalls,
     /// finished work that may not apply while a decision is unanswered, relevance
@@ -179,6 +181,24 @@ pub struct WriteOutput {
     notices: Vec<Notice>,
 }
 
+/// The revisions a write was applied past, and what the writes since changed.
+#[derive(Clone, Debug, Serialize, Deserialize, JsonSchema)]
+struct Over {
+    /// The revisions it named that had moved on.
+    conflicts: Vec<RevisionConflict>,
+    /// What the commits since changed, by graph and record kind.
+    intervening: Touched,
+}
+
+impl From<AppliedOver> for Over {
+    fn from(over: AppliedOver) -> Self {
+        Self {
+            intervening: Touched::of(&over.intervening),
+            conflicts: over.conflicts,
+        }
+    }
+}
+
 /// Whether a write was applied now or answered from its receipt.
 #[derive(Clone, Copy, Debug, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "snake_case")]
@@ -188,10 +208,10 @@ enum WriteStatus {
 }
 
 impl WriteOutput {
-    /// The receipt and what the write newly caused in each journey it changed.
+    /// The revision the write produced, and what it newly caused in each journey it changed.
     #[must_use]
-    pub fn into_parts(self) -> (PatchReceipt, BTreeMap<JourneyId, Consequences>) {
-        (self.receipt, self.consequences)
+    pub fn into_parts(self) -> (Revision, BTreeMap<JourneyId, Consequences>) {
+        (self.revision, self.consequences)
     }
 }
 
@@ -205,14 +225,14 @@ impl From<Written> for WriteOutput {
                 over,
             } => Self {
                 status: WriteStatus::Applied,
-                receipt,
-                over,
+                revision: receipt.revision,
+                over: over.map(Over::from),
                 consequences,
                 notices,
             },
             Written::AlreadyApplied { receipt } => Self {
                 status: WriteStatus::AlreadyApplied,
-                receipt,
+                revision: receipt.revision,
                 over: None,
                 consequences: BTreeMap::new(),
                 notices: Vec::new(),

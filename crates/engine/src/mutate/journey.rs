@@ -145,7 +145,12 @@ fn move_node(session: &mut Session<'_>, node: &NodeKey, transition: &Transition)
         let message = if kind == NodeKind::Group && step == Move::Complete {
             "a group is not completed: mark it done with a reason".to_owned()
         } else {
-            format!("a {} in {:?} cannot {step:?}", kind.name(), stored.state)
+            format!(
+                "a {} in {} cannot {}",
+                kind.name(),
+                cairn_schema::wire_name(&stored.state),
+                format!("{step:?}").to_lowercase()
+            )
         };
         session.reject(ViolationCode::IllegalTransition, Some(node), message);
         return Vec::new();
@@ -262,8 +267,8 @@ fn answer(
     }
     let Some(to) = transition::answered(stored.state) else {
         let message = format!(
-            "a decision in {:?} cannot be answered; reopen it first",
-            stored.state
+            "a decision in {} cannot be answered; reopen it first",
+            cairn_schema::wire_name(&stored.state)
         );
         session.reject(ViolationCode::IllegalTransition, Some(decision), message);
         return Vec::new();
@@ -312,7 +317,10 @@ fn recorded_date(
         session.reject(
             ViolationCode::IllegalTransition,
             Some(node),
-            format!("the node has no recorded {end:?} date to edit"),
+            format!(
+                "the node has no recorded {} date to edit",
+                cairn_schema::wire_name(&end)
+            ),
         );
         return Vec::new();
     }
@@ -513,7 +521,10 @@ fn remove_override(session: &mut Session<'_>, node: &NodeKey, kind: OverrideKind
         session.reject(
             ViolationCode::UnresolvedReference,
             Some(node),
-            format!("the node has no {kind:?} override"),
+            format!(
+                "the node has no {} override",
+                cairn_schema::wire_name(&kind)
+            ),
         );
         return Vec::new();
     }

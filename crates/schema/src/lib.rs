@@ -114,7 +114,7 @@ pub use record::{GraphKey, GraphRecord, Record, RecordKey, RetiredKey, Write};
 pub use refs::{FileRefs, KeyRefs, KeySlot, MapReferences, Reference, References};
 pub use rejection::{
     AppliedOver, Location, Rejection, RevisionConflict, RevisionOf, Violation, ViolationCode,
-    Violations,
+    Violations, wire_name,
 };
 pub use scenario::{Scenario, ScenarioStep};
 pub use state::{
