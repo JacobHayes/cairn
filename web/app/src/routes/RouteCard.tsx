@@ -131,14 +131,10 @@ export function VersionCard({ read, version }: { read: RouteRead; version: numbe
         )}
       </RouteFacts>
       {segment ? (
-        uses.length === 0 ? (
-          <p className="muted small">Not inserted anywhere on this version.</p>
-        ) : (
+        uses.length === 0 ? null : (
           <RowsPanel title="Inserted in" testId="insertions-panel" rows={insertionRows(uses, hostOf)} />
         )
-      ) : row === undefined || row.journeys.length === 0 ? (
-        <p className="muted small">No journeys are on this version.</p>
-      ) : (
+      ) : row === undefined || row.journeys.length === 0 ? null : (
         <RowsPanel title={`Journeys on version ${String(version)}`} testId="version-journeys" rows={journeyRows(row)} />
       )}
     </aside>

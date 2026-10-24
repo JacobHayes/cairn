@@ -67,7 +67,7 @@ export function SignalMenu({ lens, onLens }: { lens: Lens | undefined; onLens: (
               </label>
             ))}
           </div>
-          <span className="muted small">{lens === undefined ? "Put one number on each card." : LENS_MEANING[lens]}</span>
+          {lens === undefined ? null : <span className="muted small">{LENS_MEANING[lens]}</span>}
           <hr className="menu-rule" />
           <details>
             <summary>Key to the lines</summary>

@@ -51,7 +51,6 @@ export function WaitingDecisions({ view, onContinue }: { view: Ready; onContinue
     return (
       <div className="callout stack" data-testid="no-decisions">
         <strong>No more decisions can be made now.</strong>
-        <span>Every decision in scope is made or skipped.</span>
         <span>{proceed}</span>
       </div>
     );

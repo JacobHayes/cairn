@@ -44,7 +44,7 @@ export function DeleteJourneys({ journeys, onDeleted, onCancel }: DeleteProps) {
   if (blocked !== undefined || !asked) {
     return (
       <div className="stack delete-group" data-testid="delete-journeys" data-blocked={blocked !== undefined}>
-        <p className="muted" data-testid="delete-why">{blocked ?? "Deleting removes a journey and all of its history for good."}</p>
+        {blocked === undefined ? null : <p className="muted" data-testid="delete-why">{blocked}</p>}
         <span className="row">
           <Button disabled={blocked !== undefined || write.disabled} data-testid="delete-ask" onClick={() => { setAsking(true); }}>
             {deleteLabel(journeys.length)}

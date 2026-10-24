@@ -323,11 +323,6 @@
   white-space: nowrap;
 }
 
-/* The sheet's closing note is body text, at the rows' size. */
-.key-sheet-note {
-  font-size: 15px;
-}
-
 .key-sheet::backdrop,
 .modal::backdrop {
   background: color-mix(in srgb, var(--color-ground) 60%, transparent);

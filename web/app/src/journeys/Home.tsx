@@ -116,7 +116,7 @@ function NotReady({ entries, folded }: { entries: { summary: JourneySummary; rea
 }
 
 /** The panel Home shows in place of the groups when there is nothing to do or nobody to do it for. */
-function Statement({ title, children, testId }: { title: string; children: ReactNode; testId: string }) {
+function Statement({ title, children, testId }: { title: string; children?: ReactNode; testId: string }) {
   return (
     <section className="panel stack home-statement" aria-label={title} data-testid={testId}>
       <p className="home-statement-title">{title}</p>
@@ -190,9 +190,7 @@ function Said({ state }: { state: HomeState }) {
       );
     case "quiet":
       return (
-        <Statement title="Nothing needs you now." testId="home-quiet">
-          <p>What is yours is waiting on other work, or already finished.</p>
-        </Statement>
+        <Statement title="Nothing needs you now." testId="home-quiet" />
       );
     case "failed":
     case "ready":

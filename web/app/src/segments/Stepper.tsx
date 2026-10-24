@@ -64,7 +64,6 @@ function ChooseStep({ authored, onChoose }: { authored: Authored; onChoose: (seg
       <Input aria-label="Search segments" placeholder="Search segments" value={text} onChange={(event) => { setText(event.target.value); }} />
       {loading ? <p className="muted small">Reading the segments...</p> : null}
       {!loading && offers.length === 0 ? <p className="muted small">{leftOut ? "No other segments are published yet." : "There are no published segments yet. Publish one from Routes first."}</p> : null}
-      {!loading && offers.length > 0 && shown.length === 0 ? <p className="muted small">No segment is named like that.</p> : null}
       <ul className="plain-list stack segment-offers">
         {shown.map((offer) => (
           <Offer key={offer.id} offer={offer} onChoose={(version) => { onChoose(offer.id, version); }} />

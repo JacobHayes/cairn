@@ -70,7 +70,6 @@ export function KeySheet({ bindings, onClose }: { bindings: readonly KeyBinding[
           <Button onClick={onClose}>Close</Button>
         </span>
         <KeyTable bindings={bindings} />
-        <span className="muted key-sheet-note">Keys never fire while a field has focus.</span>
       </div>
     </dialog>
   );

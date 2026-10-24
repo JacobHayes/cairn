@@ -24,7 +24,6 @@ function Example({ journey }: { journey: string }) {
       <div className="assistant-scroll inspector-body">
         <p className="muted small">Example only. No message is sent.</p>
         <Transcript entries={entries} titleOf={view.status === "ready" ? journeyTitles(view) : undefined} />
-        {replied ? <p className="muted small">When you ask, the assistant reads your real journey. It can update progress and answers directly; changes to structure it proposes for you to review.</p> : null}
       </div>
       {replied ? null : (
         <form className="stack" onSubmit={(event) => { event.preventDefault(); }}>

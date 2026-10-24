@@ -66,12 +66,7 @@ function Applied({ action, titleOf }: { action: Extract<AssistantAction, { outco
           ))}
         </span>
       )}
-      {lines.length === 0 ? (
-        <span className="muted small" data-testid="assistant-caused" data-count="0">
-          Nothing became stale, short, overdue, or stalled.
-        </span>
-      ) : (
-        lines.map((line) => (
+      {lines.map((line) => (
           <span key={`${line.journey}:${line.kind}`} className="muted small" data-testid="assistant-caused" data-kind={line.kind}>
             {line.kind === "stalled" ? (
               `The journey is now stalled`
@@ -87,8 +82,7 @@ function Applied({ action, titleOf }: { action: Extract<AssistantAction, { outco
               </>
             )}
           </span>
-        ))
-      )}
+      ))}
     </div>
   );
 }

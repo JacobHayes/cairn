@@ -139,7 +139,6 @@ export function JourneyFlow({ ready, flow, onClose }: { ready: Ready; flow: Jour
         <span className="spacer" />
         <Button onClick={onClose}>Close</Button>
       </span>
-      <span className="muted small">It opens a proposal to review, edit, and apply; nothing changes until it is applied.</span>
       {flow === "upgrade" ? <Upgrade ready={ready} latest={latest} /> : null}
       {flow === "save" ? <SaveAsRoute ready={ready} /> : null}
       {flow === "relink" ? <Relink ready={ready} routes={list} /> : null}

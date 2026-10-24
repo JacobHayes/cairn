@@ -212,7 +212,6 @@ function IdentitiesPage({ deployment, rows }: { deployment: Deployment; rows: Id
         <span className="index-count" data-testid="identities-count">{countWords({ total: (deployment.identities ?? []).length, shown: shown.length, after })}</span>
       </IndexHead>
       <Band />
-      {reviewing ? null : <p className="muted index-intro">People and teams. What each does in a journey is the role it fills there.</p>}
       {listed.length === 0 ? (
         <IndexState kind="empty" action={!live ? undefined : <Link to={pathTo("newIdentity")}>Add an identity &rsaquo;</Link>} data-testid="identities-empty">
           No identities yet.

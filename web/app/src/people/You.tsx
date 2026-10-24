@@ -70,7 +70,6 @@ function YourIdentities({ caller }: { caller: Caller }) {
           </li>
         ))}
       </NodePanel>
-      {several ? <span className="muted">Each holds a verified email of yours, so all of them are yours. You are shown as the first.</span> : null}
     </section>
   );
 }
@@ -90,7 +89,6 @@ function ThemeControl() {
         onChange={setChoice}
         data-testid="theme-control"
       />
-      <span className="muted">System follows your device. The choice is kept in this browser only.</span>
     </section>
   );
 }

@@ -1271,9 +1271,6 @@ table.data {
 .identities-table table.data td {
   padding: var(--space-2) var(--space-3);
 }
-.index-intro {
-  margin: 0;
-}
 /* Delete stands apart from the identity's own controls, its reason above it. */
 .delete-group {
   padding-top: var(--space-3);

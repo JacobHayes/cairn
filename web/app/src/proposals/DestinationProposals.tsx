@@ -70,7 +70,7 @@ export function DestinationProposals({ destination }: { destination: Domain }) {
 function None() {
   return (
     <p className="proposals-none" data-testid="proposals-none">
-      Nothing is waiting for review here. A proposal stays here from when it is drafted until it is applied or discarded.
+      Nothing is waiting for review here.
     </p>
   );
 }
