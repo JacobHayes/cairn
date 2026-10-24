@@ -17,10 +17,10 @@
 # Base and target are resolved once, and every job reads that same pair, in a checkout of the
 # target, so a landed change is reviewed as it was and not as main has moved on.
 # Writes DIR/rN.md (the code review), DIR/cull-rN.md, DIR/ui-rN.md and DIR/accept-rN.md, each with
-# a .log beside it holding the whole session. The models come from the environment, and codex's
-# own default is used when they are unset: CAIRN_REVIEW_MODEL for the code review,
-# CAIRN_SKILL_MODEL for the skill jobs; CAIRN_REVIEW_EFFORT sets every job's effort (default high).
-# Each job is told only where its work is and finds the diff itself. Exits
+# a .log beside it holding the whole session. Every job runs on one model and one effort, set in
+# mise.toml (CAIRN_REVIEW_MODEL, CAIRN_REVIEW_EFFORT); codex's own default is used for either when
+# unset (the effort then defaults to high). Each job is told only where its work is and finds the
+# diff itself. Exits
 # non-zero when a job failed to run; findings are for a person (or the agent) to read, not an
 # exit status. Needs the codex CLI and a colocated jj workspace, which codex reads as git.
 cd "$(dirname "$0")/.."
@@ -60,8 +60,7 @@ base_id=$(git merge-base "$base_id" "$target_id")
 plan_base_id=$(git merge-base "$plan_base_id" "$target_id")
 
 effort=${CAIRN_REVIEW_EFFORT:-high}
-review_model=(); [ -z "${CAIRN_REVIEW_MODEL:-}" ] || review_model=(-m "$CAIRN_REVIEW_MODEL")
-skill_model=(); [ -z "${CAIRN_SKILL_MODEL:-}" ] || skill_model=(-m "$CAIRN_SKILL_MODEL")
+model=(); [ -z "${CAIRN_REVIEW_MODEL:-}" ] || model=(-m "$CAIRN_REVIEW_MODEL")
 mkdir -p "$out"
 out=$(realpath "$out")
 
@@ -77,7 +76,7 @@ run_skill() {
   local name=$1 prefix=$2 inputs=$3
   shift 3
   { skill_prompt "$name"; printf '\n%s\n' "$inputs"; } >"$prefix.prompt"
-  timeout 2400 codex exec "${skill_model[@]}" -c "model_reasoning_effort=$effort" -s read-only -C "$checkout" \
+  timeout 2400 codex exec "${model[@]}" -c "model_reasoning_effort=$effort" -s read-only -C "$checkout" \
     "$@" -o "$prefix.md" - <"$prefix.prompt" >"$prefix.log" 2>&1
 }
 
@@ -85,7 +84,7 @@ pids=() names=() files=()
 start() { names+=("$1"); files+=("$2"); shift 2; "$@" & pids+=($!); }
 
 run_code_review() {
-  (cd "$checkout" && timeout 3600 codex exec review --base "$base_id" "${review_model[@]}" \
+  (cd "$checkout" && timeout 3600 codex exec review --base "$base_id" "${model[@]}" \
     -c "model_reasoning_effort=$effort" -o "$out/r$round.md" </dev/null >"$out/r$round.log" 2>&1)
 }
 start "the code review" "r$round" run_code_review
