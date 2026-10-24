@@ -1,10 +1,10 @@
 //! Scheduled (D8, D5, D4, A8, F1): what a date ahead holds off the acting frontier. A milestone
 //! that marks itself done waits for its effective date; any other milestone for its pinned
 //! date (a pin, or a fed date answer), never for a derived due; work and decisions for their
-//! own not-before date. Work started early stays active; what waits on a scheduled node is
-//! blocked and names its date; completing work before its own date is a bypassable guard
-//! whose failure records the date; and a journey held only by dates is stalled and names
-//! each. Hand-built journeys are created on 2026-10-06 and derived at that day.
+//! own not-before date. A date holds a node off the acting frontier, never stops it: work
+//! started before its date stays active, and finished before it is accepted plainly; what
+//! waits on a scheduled node is blocked and names its date; and a journey held only by dates
+//! is stalled and names each. Hand-built journeys are created on 2026-10-06 and derived at that day.
 #![cfg(test)]
 
 use crate::engine::support;
@@ -12,9 +12,7 @@ use crate::engine::support;
 use std::collections::BTreeSet;
 
 use cairn_engine::{Derived, Records};
-use cairn_schema::{
-    Date, DisplayState, Guard, GuardFailure, NodeKey, Rejection, StallCause, ViolationCode,
-};
+use cairn_schema::{Date, DisplayState, NodeKey, StallCause};
 use support::{add_nodes as add, key};
 
 fn date(text: &str) -> Date {
@@ -27,12 +25,6 @@ fn pin(node: &str, on: &str) -> String {
 
 fn transition(node: &str, transition: &str) -> String {
     format!("- op: transition\n  node: {node}\n  transition: {transition}\n")
-}
-
-fn bypass(node: &str) -> String {
-    format!(
-        "- op: apply_override\n  node: {node}\n  override: {{guard_bypass: {{guards: [date_arrived], reason: The venue opened early.}}}}\n"
-    )
 }
 
 fn derived(records: &Records) -> Derived {
@@ -118,8 +110,8 @@ fn a_date_ahead_holds_each_kind_off_the_acting_frontier() {
     assert!(acting(&on_the_day).is_superset(&BTreeSet::from(["n_action", "n_choose", "n_report"])));
 }
 
-/// D8, A8: work started before its own date stays active, on the acting frontier, and says it
-/// started early; a container's date holds only its own work, never its children; what waits
+/// D8, A8: work started before its own date stays active, on the acting frontier; a
+/// container's date holds only its own work, never its children; what waits
 /// on a scheduled node is blocked and its blocker carries the date.
 #[test]
 fn started_work_children_and_dependents_of_a_dated_node() {
@@ -132,16 +124,14 @@ fn started_work_children_and_dependents_of_a_dated_node() {
             "{key: n_after, id: after, kind: action, title: After, requires: [n_launch]}",
         ])),
         &format!(
-            "{}{}{}",
+            "{}{}",
             pin("n_launch", "2026-11-01"),
-            "- op: apply_override\n  node: n_early\n  override: {guard_bypass: {guards: [date_arrived]}}\n",
             transition("n_early", "start")
         ),
     );
     let derived = derived(&records);
     let graph = support::journey_graph(&records, support::JOURNEY);
     assert_eq!(shown(&derived, &records, "n_early"), DisplayState::Active);
-    assert!(derived.node_derived(&graph, &key("n_early")).started_early);
     assert_eq!(
         acting(&derived),
         BTreeSet::from(["n_early", "n_part"]),
@@ -162,12 +152,11 @@ fn started_work_children_and_dependents_of_a_dated_node() {
     assert_eq!(dates, [("n_launch", Some(date("2026-11-01")))]);
 }
 
-/// D4, A8: completing work before its own not-before date is refused, naming the date; a
-/// bypass records that date, so the node is not stale; once the date moves later, the later
-/// date is a distinct failure and the node is stale for it. A milestone is never held by its
-/// pin: marking it done early records when it happened.
+/// D4, A8: work finished before its own not-before date is accepted plainly, falls short of
+/// nothing, and is not stale, before or after the date moves later; a milestone marked done
+/// before its pinned date is accepted the same way.
 #[test]
-fn completing_before_the_own_date_is_a_bypassable_guard() {
+fn completing_before_the_own_date_is_accepted() {
     let records = support::accepted(
         &support::journey(&add(&[
             "{key: n_opening, id: opening, kind: milestone, title: Opening}",
@@ -175,39 +164,21 @@ fn completing_before_the_own_date_is_a_bypassable_guard() {
         ])),
         &pin("n_opening", "2026-10-10"),
     );
-    let too_early = BTreeSet::from([GuardFailure::TooEarly(date("2026-10-10"))]);
     let graph = support::journey_graph(&records, support::JOURNEY);
-    assert_eq!(
+    assert!(
         derived(&records)
             .node_derived(&graph, &key("n_setup"))
-            .failing_guards,
-        BTreeSet::from([Guard::DateArrived])
+            .failing_guards
+            .is_empty()
     );
-    let Err(Rejection::Invalid { violations }) =
-        support::journey_patch(&records, &transition("n_setup", "complete"))
-    else {
-        panic!("completing before the date is refused");
-    };
-    let [found] = violations.as_slice() else {
-        panic!("one violation: {violations:#?}");
-    };
-    assert_eq!(found.code, ViolationCode::GuardFailed);
-    assert_eq!(found.bypassable, Some(Guard::DateArrived));
-    assert_eq!(found.failures, too_early);
-    let done = support::accepted(
-        &records,
-        &format!("{}{}", bypass("n_setup"), transition("n_setup", "complete")),
-    );
-    let recorded = &support::graph(&done).state.overrides[&key("n_setup")];
-    assert_eq!(recorded.bypass.as_ref().unwrap().failures, too_early);
-    let graph = support::journey_graph(&done, support::JOURNEY);
-    assert!(derived(&done).stale(&graph, &key("n_setup")).is_empty());
+    let done = support::accepted(&records, &transition("n_setup", "complete"));
     let moved = support::accepted(&done, &pin("n_opening", "2026-10-12"));
-    let graph = support::journey_graph(&moved, support::JOURNEY);
-    assert_eq!(
-        derived(&moved).stale(&graph, &key("n_setup")),
-        BTreeSet::from([GuardFailure::TooEarly(date("2026-10-12"))])
-    );
+    for records in [&done, &moved] {
+        let derived = derived(records);
+        assert!(!derived.is_stale(&key("n_setup")));
+        assert_eq!(derived.dates().shortfall_days(&key("n_setup")), None);
+        assert_eq!(derived.dates().shortfall_days(&key("n_opening")), None);
+    }
     assert!(
         support::journey_patch(&records, &transition("n_opening", "complete")).is_ok(),
         "a milestone done before its pinned date"

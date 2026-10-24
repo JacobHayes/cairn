@@ -37,7 +37,7 @@
 //! | today (execution only) | none: open decision, unstarted work's start, started work's finish no earlier than today | holds back |
 //! | started work (a recorded start, execution only) | each constraint above that would end at its start ends at its finish instead: dependencies, inherited ones, condition gates, entries, containment, its own `not_before` | holds its finish back |
 //! | stage opening with `gates: false` (execution only) | M.finish >= each node's start, for each node of the stage that is not a container (instead of G's anchor >= M); exempt for work begun or finished | holds unstarted contents back |
-//! | what finished work was finished ahead of on purpose (execution only) | exempt: kept, disabled, read by the node's own date and `done_early`, by no bound and no shortfall | none |
+//! | finished work (done or decided, execution only) | every constraint above that ends at the instant holding it is exempt: kept, disabled, read by the node's own date, by no bound and no shortfall, so a recorded finish never holds itself or what it went ahead of short | none |
 //!
 //! A node's anchor is its requirement entry if it is a container, else its start; its
 //! condition anchor is its condition entry, or its start. Constraints touching a not-relevant
@@ -66,17 +66,8 @@
 //! per instant. The cost test (`crates/tests/tests/integration/engine/cost_dates.rs`) counts these operations at
 //! the limits.
 //!
-//! The execution layer adds two things. A stage opening that does not gate gives one
+//! The execution layer adds one thing: a stage opening that does not gate gives one
 //! constraint per node of the stage that is not a container, at most nodes x depth: 32,000.
-//! And where finished work's guard bypass accepted a requirement (a pending `auto_done` milestone
-//! with its date ahead always counts as accepted, found by a first solve) that reaches it through an
-//! entry, that hop is replaced by one constraint per requirement it carries, at most
-//! `containment_depth_max` x (`edge_count_per_node_max` + 1 + `condition_clause_count_max`) =
-//! 16 x 81 = 1,296 per node, 2,592,000 at the node limit (every node finished under a bypass
-//! of everything it inherits). At 36 bytes and two adjacency slots each, that is 44 bytes a
-//! constraint: 114 MB at the bound. The cost test builds a worst case of 1.73 million
-//! constraints (76 MB), solved in two operations per constraint, with no cycle to pay
-//! Bellman-Ford for.
 
 mod execution;
 mod explain;
@@ -87,7 +78,7 @@ mod solve;
 use std::collections::BTreeSet;
 
 use cairn_schema::{
-    AnswerSpec, AnswerValue, Bound, BoundedVec, ChainList, Date, DateOrigin, Deployment, DoneEarly,
+    AnswerSpec, AnswerValue, Bound, BoundedVec, ChainList, Date, DateOrigin, Deployment,
     EffectiveDate, FixedBy, NodeDates, NodeKey, NodeKind, Payload, ShortChain, State, Subject,
     Violation, ViolationCode,
 };
@@ -98,7 +89,7 @@ use super::{Early, stored_state};
 use crate::graph::{Document, Graph};
 use execution::Solved;
 use explain::{Explain, Found};
-use network::{Layer, Network, Origin, Place, Rule, Scope, Slot};
+use network::{Layer, Network, Origin, Rule, Scope, Slot};
 
 /// A date fixed on a slot, and what fixed it.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -474,43 +465,24 @@ impl Dates {
     ) -> Self {
         let document = graph.document();
         let dependencies = &early.dependencies;
-        let mut scope = Scope::new(
+        let scope = Scope::new(
             document,
             dependencies,
             &early.relevance,
             &early.skips,
             Layer::Execution,
         );
-        let solve = |scope: &Scope| {
-            let network = Network::build(document, dependencies, scope);
-            let seeds = Seeds::execution(
-                document,
-                dependencies,
-                &early.relevance,
-                &network,
-                scope,
-                today,
-                created_on,
-            );
-            let solved = execution::solve(&network, &seeds);
-            (network, seeds, solved)
-        };
-        let (mut network, mut seeds, mut solved) = solve(&scope);
-        // Finished work held by a pending `auto_done` milestone whose date is still ahead
-        // (earliest bound after today) is early of it: solved again with that accepted.
-        let ahead: BTreeSet<NodeIndex> = scope
-            .auto_candidates()
-            .into_iter()
-            .filter(|&at| {
-                solved
-                    .earliest(network.finish(at))
-                    .is_some_and(|earliest| earliest > day(today))
-            })
-            .collect();
-        if !ahead.is_empty() {
-            scope.accept_auto_ahead(ahead);
-            (network, seeds, solved) = solve(&scope);
-        }
+        let network = Network::build(document, dependencies, &scope);
+        let seeds = Seeds::execution(
+            document,
+            dependencies,
+            &early.relevance,
+            &network,
+            &scope,
+            today,
+            created_on,
+        );
+        let solved = execution::solve(&network, &seeds);
         let keys = dependencies.keys().to_vec();
         let milestone = keys
             .iter()
@@ -537,12 +509,6 @@ impl Dates {
     #[must_use]
     pub(crate) fn network(&self) -> &Network {
         &self.network
-    }
-
-    /// The today the dates were derived for.
-    #[must_use]
-    pub(crate) fn today(&self) -> Date {
-        date(self.today)
     }
 
     fn index(&self, key: &NodeKey) -> Option<NodeIndex> {
@@ -629,52 +595,6 @@ impl Dates {
             .chain(finish)
             .flat_map(|slot| self.network.incoming(slot))
             .filter_map(|&position| self.network.constraint(position))
-    }
-
-    /// F6: for finished work, how early it finished, on today's dates: over the constraints
-    /// its finish was exempt from (what its guard bypass accepted, a stage opening that does
-    /// not gate, a milestone's own not-before rule), the one that would have put its finish
-    /// furthest past the recorded one. A constraint counts when its source's earliest date
-    /// would have; the date it is counted to is a milestone's date as shown (actual, pin or
-    /// due) when that is later, so the days match the date the person sees. The days, that
-    /// date, and the constraint's position. None when no constraint would have.
-    fn done_early_found(&self, at: NodeIndex) -> Option<(u32, i32, u32)> {
-        let finish = self.seeds.actual(self.network.finish(at))?.day;
-        let (start, end) = (self.network.start(at), self.network.finish(at));
-        let end = (end != start).then_some(end);
-        let mut best: Option<(u32, i32, u32)> = None;
-        for slot in std::iter::once(start).chain(end) {
-            for &position in self.network.incoming(slot) {
-                let Some(constraint) = self.network.constraint(position).filter(|c| c.exempt)
-                else {
-                    continue;
-                };
-                let Some(earliest) = self.solved.earliest(constraint.before) else {
-                    continue;
-                };
-                let shown = match self.network.place(constraint.before) {
-                    Place::Node(instant) => self.shown_date(instant.node),
-                    Place::CreatedAt | Place::Answer(_) => None,
-                };
-                let asks = earliest
-                    .max(shown.unwrap_or(earliest))
-                    .saturating_add(constraint.offset_days);
-                if earliest.saturating_add(constraint.offset_days) <= finish {
-                    continue;
-                }
-                let days = u32::try_from(asks.saturating_sub(finish)).unwrap_or(u32::MAX);
-                if best.is_none_or(|(most, _, _)| days > most) {
-                    best = Some((days, asks, position));
-                }
-            }
-        }
-        best
-    }
-
-    /// A milestone's date as shown, in days: its actual, pin or due.
-    fn shown_date(&self, node: NodeIndex) -> Option<i32> {
-        let key = self.keys.get(node.get())?;
-        self.effective_date(key).map(|found| day(found.date))
     }
 
     /// F3: the earliest the node can finish.
@@ -842,13 +762,6 @@ impl Dates {
             shortfall,
             effective_date: self.effective_date(key),
             not_before: self.not_before(key),
-            done_early: self
-                .done_early_found(at)
-                .map(|(days, asks, position)| DoneEarly {
-                    days,
-                    date: date(asks),
-                    source: explain.source_of(position),
-                }),
             links: Vec::new(),
         }
     }

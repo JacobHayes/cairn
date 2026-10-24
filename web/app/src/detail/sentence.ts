@@ -10,7 +10,7 @@ import { SNOOZE_NODE_TAIL } from "../status/snooze.ts";
 import { isOpen } from "../status/state.ts";
 import { upperFirst } from "../status/words.ts";
 import { dateWords, daysUntil, daysWords, relativeDays } from "../status/when.ts";
-import { guardFailureText, namer, parseSource } from "./explain.ts";
+import { namer, staleText } from "./explain.ts";
 import { itemTitle, nodeOf, rankPlaces, scheduledDate, skippedThrough, titleOf, waitsOn, type Holding, type NodeDetail, type NodeDerived, type Ready } from "./model.ts";
 import { answerText, identityName, ownersOf, ownerWords } from "./sections.tsx";
 import { listParts, plural } from "../ui/words.ts";
@@ -77,28 +77,9 @@ function scheduledSentence(view: Ready, detail: NodeDetail): Piece[] {
     return [node.auto_done === true ? `Scheduled for ${on}; it marks itself done that day.` : `Scheduled for ${on}; mark it done when it happens.`];
   }
   if (node.kind === "decision") {
-    return [`Scheduled: to be decided from ${on}. To answer sooner, choose Answer anyway.`];
+    return [`Scheduled: to be decided from ${on}.`];
   }
-  return [`Scheduled: not before ${on}. To start it sooner, choose Start anyway; to finish sooner, choose Done anyway.`];
-}
-
-/** The reason a guard bypass recorded, without its closing full stop, or none. */
-function bypassReason(detail: NodeDetail): string | undefined {
-  const reason = detail.overrides?.bypass?.reason?.replace(/\.+$/, "");
-  return reason === undefined || reason === "" ? undefined : reason;
-}
-
-/** Why work started early is early: what its start went ahead of, as the start recorded it (the open dependencies and its own date), with the reason it was given if any. */
-function earlyPhrase(view: Ready, detail: NodeDetail, viewer: readonly string[]): Piece[] {
-  const failures = detail.overrides?.bypass?.failures ?? [];
-  const waits = failures.flatMap((failure) => (typeof failure === "object" && "open_dependency" in failure ? [failure.open_dependency] : []));
-  const date = failures.flatMap((failure) => (typeof failure === "object" && "too_early" in failure ? [failure.too_early] : []))[0];
-  const ahead: Piece[] = [
-    ...(waits.length === 0 ? [] : ["ahead of ", ...listed(waits.map((node) => namedWithOwner(view, node, viewer)))]),
-    ...(date === undefined ? [] : [`${waits.length === 0 ? "" : ", and "}before its own date, ${dateWords(date, view.derived.today)}`]),
-  ];
-  const reason = bypassReason(detail);
-  return [...ahead, ...(reason === undefined ? [] : [`, with the reason "${reason}"`])];
+  return [`Scheduled: not before ${on}.`];
 }
 
 /** The decisions to name when a node waits on answers: those its relevance reads that are still open. */
@@ -118,39 +99,13 @@ export function appliesIf(view: Ready, detail: NodeDetail): string | undefined {
   return conditionWords(clause, conditionNames((decision) => nodeOf(view, decision), (key) => identityName(view, key)));
 }
 
-/**
- * F6, D8: how a node finished early on purpose, after "Done early on <date>": ahead of a dependency (its days when the
- * dependency has a date, else just that it is not done yet), of a child it contains, of a stage opening that does not
- * gate, or of its own not-before date, with the reason its guard bypass recorded when it has one.
- */
-function aheadOf(view: Ready, detail: NodeDetail, early: Schema<"DoneEarly">): Piece[] {
-  const days = daysWords(early.days);
-  const reason = bypassReason(detail);
-  const because = reason === undefined ? [] : [`, with the reason "${reason}"`];
-  const source = parseSource(early.source);
-  if ("dependency" in source) {
-    const { requires, via } = source.dependency;
-    if (typeof via === "object" && "stage_opening" in via && nodeOf(view, via.stage_opening.group)?.gates === false) {
-      return [`, ${days} before `, { node: requires }, ", which ", { node: via.stage_opening.group }, " does not wait for"];
-    }
-    const dated = nodeOf(view, requires)?.kind === "milestone" || view.derived.nodes[requires]?.display_state === "done";
-    return [...(dated ? [`, ${days} before `, { node: requires }] : [", before ", { node: requires }, " is done"]), ...because];
-  }
-  if ("containment" in source) {
-    const child = source.containment.child;
-    const dated = view.derived.nodes[child]?.display_state === "done";
-    return [...(dated ? [`, ${days} before `, { node: child }] : [", before ", { node: child }, " is done"]), ...because];
-  }
-  return [`, ${days} before its not-before date, ${dateWords(early.date, view.derived.today)}`, ...because];
-}
-
 /** D4: why a finished node is stale, in words. */
-function staleWords(view: Ready, key: string, failures: Schema<"GuardFailure">[]): Piece[] {
+function staleWords(view: Ready, key: string, reasons: Schema<"StaleReason">[]): Piece[] {
   const name = namer(view);
-  return failures.flatMap((failure): Piece[] =>
-    typeof failure === "object" && "open_dependency" in failure
-      ? [" Stale: ", { node: failure.open_dependency }, " was reopened."]
-      : [` Stale: ${guardFailureText(failure, name, view.derived.today, (id) => itemTitle(view, key, id))}.`],
+  return reasons.flatMap((reason): Piece[] =>
+    typeof reason === "object" && "reopened" in reason
+      ? [" Stale: ", { node: reason.reopened }, " was reopened."]
+      : [` Stale: ${staleText(reason, name, (id) => itemTitle(view, key, id))}.`],
   );
 }
 
@@ -240,8 +195,7 @@ function stateSentence(view: Ready, detail: NodeDetail, rank: RankFacts, viewer:
     case "ready":
       return [`${node.kind === "decision" ? "Ready to decide." : "Ready."}${rankClause(view, derived, rank)}`];
     case "active": {
-      const since = `${record.started_on == null ? "In progress." : `In progress since ${on(record.started_on)}.`}${rankClause(view, derived, rank)}`;
-      return derived.started_early === true ? [`${since} Started early, `, ...earlyPhrase(view, detail, viewer), "."] : [since];
+      return [`${record.started_on == null ? "In progress." : `In progress since ${on(record.started_on)}.`}${rankClause(view, derived, rank)}`];
     }
     case "blocked":
       return ["Waiting on ", ...waitingPhrase(view, node.key, viewer), "."];
@@ -276,9 +230,7 @@ function stateSentence(view: Ready, detail: NodeDetail, rank: RankFacts, viewer:
       }
       const verb = node.kind === "decision" ? `Decided${detail.answer === undefined ? "" : ` ${answerText(view, detail.answer, node)}`}` : "Done";
       const unanswered = derived.relevance.value === "undecided" ? ([" May not apply: depends on ", ...undecidedNames(view, node.key), "."] satisfies Piece[]) : [];
-      const early = derived.dates.done_early ?? undefined;
-      const opening: Piece[] = early === undefined ? [`${verb}${finished}.`] : [`${verb} early${finished}`, ...aheadOf(view, detail, early), "."];
-      return [...opening, ...staleWords(view, node.key, derived.stale ?? []), ...unanswered];
+      return [`${verb}${finished}.`, ...staleWords(view, node.key, derived.stale ?? []), ...unanswered];
     }
     case "skipped": {
       const kept = keptPending(derived);

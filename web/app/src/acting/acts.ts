@@ -70,11 +70,6 @@ export function evidenceComplete(needs: Pick<Needs, "artifact" | "note">, draft:
   return (!needs.artifact || draft.artifact.trim() !== "") && (!needs.note || draft.note.trim() !== "");
 }
 
-/** A saved done form: before notes it held the artifact address alone, as text. */
-export function evidenceDraft(saved: EvidenceDraft | string): EvidenceDraft {
-  return typeof saved === "string" ? { artifact: saved, note: "" } : saved;
-}
-
 /**
  * C11 done, with the inline artifact link (G2), note (G4) and ticks (G5) a node that requires
  * them and lacks them needs: each added, then the completion, in one patch so the guards see them.

@@ -10,15 +10,14 @@
 //! set (at most 2,000) and cut to 50, its blockers off its entry chains (about 1,300 edges at
 //! most), and its dates' chains; so about 2,000 x 3,300 steps, and 2,000 x 100 explanation
 //! entries kept; plus one pass over the tree for container progress (O(nodes)), and per node
-//! its waits (the same entry-chain walk) and failing guards (a lookup, or one walk of the
-//! entry chains for a node whose `deps_done` fails).
+//! its waits (the same entry-chain walk) and failing guards (a lookup).
 
 use std::collections::{BTreeMap, BTreeSet};
 
 use cairn_schema::{
     Blocker, Contribution, DateLink, DependencyVia, EffectiveParticipation, Explained, Guard,
     GuardFailure, KindKey, NodeDates, NodeDerived, NodeKey, Progress, Real, Relevance,
-    RelevanceExplanation, State,
+    RelevanceExplanation,
 };
 
 use super::checklist::checklist_count;
@@ -141,8 +140,6 @@ impl Derived {
                 .node(key)
                 .and_then(|node| checklist_count(graph.document(), node)),
             failing_guards: self.failing_guards(graph, key, annotated),
-            start_guards: self.start_guards(graph, key),
-            started_early: self.started_early(graph, key),
             waits_on,
             done_by_date: blocking.done_by_date(key),
             snoozed: blocking.snoozed(key).cloned(),
@@ -187,53 +184,11 @@ impl Derived {
         }
     }
 
-    /// D4: the bypassable guards starting the node would fail if attempted now with no bypass
-    /// in the patch: a deliverable or action not yet started, in scope. Empty for any other
-    /// node. A start is held to `deps_done` less the node's own children, and `date_arrived`.
-    fn start_guards(&self, graph: &Graph, key: &NodeKey) -> BTreeSet<Guard> {
-        let document = graph.document();
-        let Some(node) = graph.node(key) else {
-            panic!("the graph holds {key}");
-        };
-        let mut guards = BTreeSet::new();
-        let (kind, state) = (node.kind(), stored_state(document, node));
-        if transition::next(kind, state, Move::Start).is_none() || !self.relevance.in_scope(key) {
-            return guards;
-        }
-        if !self.start_open_dependencies(key).is_empty() {
-            guards.insert(Guard::DepsDone);
-        }
-        if self.too_early(graph, key).is_some() {
-            guards.insert(Guard::DateArrived);
-        }
-        guards
-    }
-
-    /// D8: stored `active` with a guard bypass that recorded what the start went ahead of: an
-    /// open dependency or its own not-before date. Read from the record, not from today's
-    /// blocking, so work started normally and then held by a reopened prerequisite does not
-    /// read started early, and a start ahead keeps reading so once the prerequisite is done.
-    fn started_early(&self, graph: &Graph, key: &NodeKey) -> bool {
-        let Some(node) = graph.node(key) else {
-            panic!("the graph holds {key}");
-        };
-        stored_state(graph.document(), node) == State::Active
-            && self.relevance.in_scope(key)
-            && !self.blocking.closed(key)
-            && graph
-                .document()
-                .state
-                .overrides
-                .get(key)
-                .and_then(|overrides| overrides.bypass.as_ref())
-                .is_some_and(|bypass| !bypass.failures.is_empty())
-    }
-
-    /// D4: the bypassable guards the node's completing transition would fail if attempted
-    /// now with no bypass in the patch: completing a deliverable or action, answering an open
-    /// decision, completing a pending milestone. Empty for any other node, and for one out of
-    /// scope or closed. A bypass recorded by an earlier patch removes nothing: apply accepts
-    /// only a bypass in the same patch. `annotated` is [`annotated_nodes`] of `graph`.
+    /// D4: the bypassable guards completing the node would fail if attempted now with no
+    /// bypass in the patch: the evidence a deliverable or action still lacks. Empty for any
+    /// other node, and for one out of scope or closed. A bypass recorded by an earlier patch
+    /// removes nothing: apply accepts only a bypass in the same patch. `annotated` is
+    /// [`annotated_nodes`] of `graph`.
     fn failing_guards(
         &self,
         graph: &Graph,
@@ -244,26 +199,15 @@ impl Derived {
         let Some(node) = graph.node(key) else {
             panic!("the graph holds {key}");
         };
-        let (kind, state) = (node.kind(), stored_state(document, node));
-        let completes = Move::ALL
-            .into_iter()
-            .any(|step| transition::is_guarded(kind, state, step));
-        let mut guards = BTreeSet::new();
+        let completes =
+            transition::next(node.kind(), stored_state(document, node), Move::Complete).is_some();
         if !completes || !self.relevance.in_scope(key) || self.blocking.closed(key) {
-            return guards;
+            return BTreeSet::new();
         }
-        if !self.blocking.deps_done(key) && !self.guard_open_dependencies(key).is_empty() {
-            guards.insert(Guard::DepsDone);
-        }
-        if self.too_early(graph, key).is_some() {
-            guards.insert(Guard::DateArrived);
-        }
-        guards.extend(
-            static_failures(document, graph.tree(), node, annotated)
-                .iter()
-                .map(GuardFailure::guard),
-        );
-        guards
+        static_failures(document, graph.tree(), node, annotated)
+            .iter()
+            .map(GuardFailure::guard)
+            .collect()
     }
 
     /// Gating, D8: the unsatisfied gate dependencies holding the node now, its own and those

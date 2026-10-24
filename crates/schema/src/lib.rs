@@ -52,11 +52,10 @@ pub use collections::{BoundedSet, BoundedVec, CollectionError, HasKey, Keyed, On
 pub use condition::{Clause, Comparison, Condition, ConditionValue, Membership};
 pub use derived::{
     Blocker, Bound, ChecklistCount, Consequences, Contribution, DateOrigin, DeriveInputs, Derived,
-    DisplayState, DomainDocument, DoneEarly, EffectiveDate, EffectiveParticipation, Explained,
-    HeldDependent, NodeDates, NodeDerived, OwnerFactor, ParticipationOrigin, Progress,
-    RankConstants, Real, Relevance, RelevanceExplanation, Score, ShortfallConsequence,
-    StaleConsequence, StallCause, Stalled, StillWaiting, Thousandths, TimeZoneName,
-    UndecidedConsequence, UndecidedDiscount,
+    DisplayState, DomainDocument, EffectiveDate, EffectiveParticipation, Explained, HeldDependent,
+    NodeDates, NodeDerived, OwnerFactor, ParticipationOrigin, Progress, RankConstants, Real,
+    Relevance, RelevanceExplanation, Score, ShortfallConsequence, StaleConsequence, StallCause,
+    Stalled, StillWaiting, Thousandths, TimeZoneName, UndecidedConsequence, UndecidedDiscount,
 };
 pub use document::{
     ParseError, WriteError, from_json, from_yaml, to_json, to_json_pretty, to_yaml,
@@ -119,7 +118,7 @@ pub use rejection::{
 pub use scenario::{Scenario, ScenarioStep};
 pub use state::{
     AnswerText, AnswerValue, Bypass, Guard, GuardFailure, JourneyState, LocalEdit, NodeState,
-    OverrideKind, Overrides, Provenance, SnoozeTarget, State,
+    OverrideKind, Overrides, Provenance, Reopened, SnoozeTarget, StaleReason, State,
 };
 pub use text::{Email, Markdown, Reason, TextError, Title, Url};
 pub use touched::TouchedSet;

@@ -25,16 +25,16 @@ does the rest of the engine follow?
   when it happens. This is the call the owner may most want to confirm.
 - **Not held.** A group (it has no completing move); a container's children, by their
   container's date (its date is on its own start, which comes after its children); work
-  started early, which stays active and on the acting frontier, labelled started early.
-- **Guard.** Completing work, or first answering a decision, whose own not-before date is
-  after the patch's today fails `date_arrived`, bypassable with a reason. The failure carries
-  the date, and the bypass records it, so the date moving later is a distinct failure and the
-  finished node reads stale for it. A milestone is never guarded by its date: marking it done
-  early records when it happened.
+  already started, which stays active and on the acting frontier.
+- **No guard.** A date ahead orders the work and never stops a move: work can be started or
+  completed, and a decision answered, before its own not-before date as a plain move, and the
+  date moving later never makes finished work stale
+  (`2026-10-24-recorded-dates-never-warn.md`). Marking a milestone done records when it
+  happened.
 - **Stall diagnostic.** The auto-done cause becomes one scheduled cause: the node, the date,
   and whether it marks itself done. Every node a date holds off the acting frontier is named,
-  so the diagnostic's assertion holds. The panel offers Mark done for a milestone, Start for
-  work, and nothing for a decision (answering early needs a reason).
+  so the diagnostic's assertion holds. The panel offers Mark done for a milestone and Start
+  for work; a decision is answered from its own page.
 - **Waits.** A blocker carries the date when a date holds it, so "Waiting on Launch on Nov 1".
 - **Summary** lists scheduled work and decisions with their dates (milestones stay in the
   dates panel).
@@ -49,9 +49,6 @@ does the rest of the engine follow?
 - Measure a not-before rule from its source's derived due rather than its earliest date. The
   earliest date is what the date network already uses for the node's earliest start, so the
   scheduled date and the earliest start agree.
-- Judge staleness by the recorded finish date rather than today. Every other stale reason is
-  "the guard would fail now", so this one follows; the shortfall already records that the work
-  finished before its date.
 
 ## What would change it
 

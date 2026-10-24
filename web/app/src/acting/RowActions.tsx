@@ -65,7 +65,7 @@ export function RowActions({ view, row, to, owner = true, column = false, yours 
         )}
         <span className="row-act">
           {acts.map((act) => (
-            <ActButton key={act} act={act} view={view} node={row.key} write={write} waiting={offers.waiting} open={open} />
+            <ActButton key={act} act={act} view={view} node={row.key} write={write} open={open} />
           ))}
         </span>
       </div>

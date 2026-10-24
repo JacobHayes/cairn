@@ -3,12 +3,12 @@
 //! as the translation table in [`super`] lays out. Pins, answers, actuals, and today are not
 //! constraints; the layers seed them onto slots.
 
-use std::collections::{BTreeMap, BTreeSet};
+use std::collections::BTreeMap;
 
 use cairn_schema::limits::{CONTAINMENT_DEPTH_MAX, NODE_COUNT_MAX};
 use cairn_schema::{
-    AnswerSpec, DateRule, DateSource, Direction, GuardFailure, KeyRefs, Node, NodeKey, NodeKind,
-    Payload, Relevance, State,
+    AnswerSpec, DateRule, DateSource, Direction, KeyRefs, Node, NodeKey, NodeKind, Payload,
+    Relevance, State,
 };
 
 use crate::derive::dependencies::{
@@ -93,8 +93,8 @@ pub(crate) struct Constraint {
     pub origin: Origin,
     /// It passes through an undecided node (F2).
     pub conditional: bool,
-    /// Kept for the node's own date and `done_early`, but read by no bound, chain or
-    /// shortfall: what finished work was finished ahead of on purpose (execution layer only).
+    /// Kept for the node's own date, but read by no bound, chain or shortfall: a constraint
+    /// into finished work, which a recorded finish never answers to (execution layer only).
     pub exempt: bool,
 }
 
@@ -124,27 +124,14 @@ pub(crate) struct Scope {
     /// Stored `active`, `done` or `decided`: the work was begun or finished. Not skipped.
     underway: Vec<bool>,
     /// Stored `done` or `decided`. Not skipped. A milestone done by its date is not: it has
-    /// no recorded finish and no deliberate completion.
+    /// no recorded finish.
     finished: Vec<bool>,
-    /// Finished, and either a milestone (marking one done is never guarded by its date) or
-    /// its guard bypass accepted a failure to wait for its own date.
-    own_date_exempt: Vec<bool>,
-    /// For a finished node with a stored guard bypass, the requirements the bypass recorded
-    /// as open dependencies.
-    accepted: BTreeMap<NodeIndex, BTreeSet<NodeIndex>>,
-    /// Pending `auto_done` milestones (execution layer).
-    auto: BTreeSet<NodeIndex>,
-    /// The ones whose date is still ahead, which finished work is early of whether or not a
-    /// bypass recorded it: held, finishing the work would fix such a milestone's latest date
-    /// at the finish, so it would read reached and the guard would see nothing open to
-    /// record. Set from a first solve, by [`Scope::accept_auto_ahead`].
-    auto_ahead: BTreeSet<NodeIndex>,
 }
 
 impl Scope {
     /// Reads relevance and skips for every node of the dependency graph. Skipped work has
     /// zero duration (F2); in the execution layer so has done work, and how far along each
-    /// node is, and what its guard bypass accepted, is read too.
+    /// node is is read too.
     #[must_use]
     pub(crate) fn new(
         document: &Document,
@@ -155,8 +142,8 @@ impl Scope {
     ) -> Self {
         let keys = (0..dependencies.node_count()).filter_map(|at| dependencies.key(index(at)));
         let mut scope = Scope::empty(layer, EdgeSet::Pruned);
-        for (at, key) in keys.enumerate() {
-            scope.read(document, dependencies, relevance, skips, at, key);
+        for key in keys {
+            scope.read(document, relevance, skips, key);
         }
         assert_eq!(scope.relevance.len(), dependencies.node_count());
         assert!(
@@ -184,7 +171,6 @@ impl Scope {
             started: vec![false; nodes],
             underway: vec![false; nodes],
             finished: vec![false; nodes],
-            own_date_exempt: vec![false; nodes],
             ..Scope::empty(Layer::Plan, EdgeSet::Full)
         }
     }
@@ -200,23 +186,11 @@ impl Scope {
             started: Vec::new(),
             underway: Vec::new(),
             finished: Vec::new(),
-            own_date_exempt: Vec::new(),
-            accepted: BTreeMap::new(),
-            auto: BTreeSet::new(),
-            auto_ahead: BTreeSet::new(),
         }
     }
 
-    /// Reads one node: relevance, skip, how far along it is, and what its bypass accepted.
-    fn read(
-        &mut self,
-        document: &Document,
-        dependencies: &Dependencies,
-        relevance: &Relevances,
-        skips: &Skips,
-        at: usize,
-        key: &NodeKey,
-    ) {
+    /// Reads one node: relevance, skip, and how far along it is.
+    fn read(&mut self, document: &Document, relevance: &Relevances, skips: &Skips, key: &NodeKey) {
         let layer = self.layer;
         self.relevance.push(relevance.value(key));
         let node = document.nodes.get(key);
@@ -239,42 +213,6 @@ impl Scope {
         self.underway
             .push(finished || (counted && state == Some(State::Active)));
         self.finished.push(finished);
-        let bypass = document
-            .state
-            .overrides
-            .get(key)
-            .and_then(|overrides| overrides.bypass.as_ref())
-            .filter(|_| finished);
-        let milestone = node.is_some_and(|node| node.kind() == NodeKind::Milestone);
-        let too_early = bypass.is_some_and(|bypass| {
-            bypass
-                .failures
-                .iter()
-                .any(|failure| matches!(failure, GuardFailure::TooEarly(_)))
-        });
-        self.own_date_exempt
-            .push(finished && (milestone || too_early));
-        let open: BTreeSet<NodeIndex> = bypass
-            .into_iter()
-            .flat_map(|bypass| &bypass.failures)
-            .filter_map(|failure| match failure {
-                GuardFailure::OpenDependency(required) => dependencies.node_index(required),
-                GuardFailure::MissingArtifact
-                | GuardFailure::MissingNote
-                | GuardFailure::Unticked(_)
-                | GuardFailure::NotBrokenDown
-                | GuardFailure::TooEarly(_) => None,
-            })
-            .collect();
-        if !open.is_empty() {
-            self.accepted.insert(index(at), open);
-        }
-        let pending_auto = node.is_some_and(
-            |node| matches!(&node.payload, Payload::Milestone(milestone) if milestone.auto_done),
-        );
-        if counted && pending_auto && state == Some(State::Pending) {
-            self.auto.insert(index(at));
-        }
     }
 
     /// The node's relevance.
@@ -304,7 +242,7 @@ impl Scope {
         self.zero.get(node.get()).copied().unwrap_or(false)
     }
 
-    /// A recorded start (execution layer): held at its finish, as starting is never guarded.
+    /// A recorded start (execution layer): held at its finish, as a start frees nothing.
     #[must_use]
     pub(crate) fn started(&self, node: NodeIndex) -> bool {
         self.started.get(node.get()).copied().unwrap_or(false)
@@ -316,46 +254,10 @@ impl Scope {
         self.underway.get(node.get()).copied().unwrap_or(false)
     }
 
-    /// Finished, and not held by its own `not_before` rules (execution layer).
+    /// Finished (execution layer): every constraint into the instant that holds it is exempt.
     #[must_use]
-    pub(crate) fn own_date_exempt(&self, node: NodeIndex) -> bool {
-        self.own_date_exempt
-            .get(node.get())
-            .copied()
-            .unwrap_or(false)
-    }
-
-    /// The pending `auto_done` milestones, when finished work exists that could be early of
-    /// one.
-    pub(crate) fn auto_candidates(&self) -> Vec<NodeIndex> {
-        if self.finished.iter().any(|&finished| finished) {
-            self.auto.iter().copied().collect()
-        } else {
-            Vec::new()
-        }
-    }
-
-    /// Takes these pending `auto_done` milestones, whose date is ahead, as accepted by
-    /// every finished node that waited on them.
-    pub(crate) fn accept_auto_ahead(&mut self, ahead: BTreeSet<NodeIndex>) {
-        self.auto_ahead = ahead;
-    }
-
-    /// Whether finished `node` is early of requirement `by`: its guard bypass recorded it as
-    /// open, or it is a pending `auto_done` milestone.
-    fn accepts(&self, node: NodeIndex, by: NodeIndex) -> bool {
+    pub(crate) fn finished(&self, node: NodeIndex) -> bool {
         self.finished.get(node.get()).copied().unwrap_or(false)
-            && (self.auto_ahead.contains(&by)
-                || self
-                    .accepted
-                    .get(&node)
-                    .is_some_and(|accepted| accepted.contains(&by)))
-    }
-
-    /// Whether finished `node` can be early of something at all.
-    fn accepting(&self, node: NodeIndex) -> bool {
-        self.finished.get(node.get()).copied().unwrap_or(false)
-            && (!self.auto_ahead.is_empty() || self.accepted.contains_key(&node))
     }
 
     fn execution(&self) -> bool {
@@ -437,9 +339,8 @@ impl Network {
     ///
     /// In the execution layer a date-only stage opening is not an edge of the network (see
     /// [`Network::push_openings`]), and an edge into the start of work that is underway ends at
-    /// the node's held instant instead (see [`Network::held`]): a finished node's edges from
-    /// what its guard bypass accepted are exempt, and an entry or chain hop that carries one
-    /// is replaced by one constraint per requirement it carries, each keeping its source.
+    /// the node's held instant instead (see [`Network::held`]), exempt once the node is
+    /// finished: a recorded finish never answers to what it went ahead of.
     fn push_edge(
         &self,
         document: &Document,
@@ -486,69 +387,17 @@ impl Network {
             );
             return;
         }
-        let after = self.held(scope, node);
-        let hop = matches!(edge.source, EdgeSource::Entry | EdgeSource::Chain);
-        if hop && scope.accepting(node) && self.push_carried(dependencies, scope, &edge, after, out)
-        {
-            return;
-        }
-        let exempt = !hop && scope.accepts(node, edge.requirement.node);
         self.push(
             out,
             Constraint {
                 before: self.slot(edge.requirement),
-                after,
+                after: self.held(scope, node),
                 offset_days,
                 origin: Origin::Dependency(edge),
                 conditional,
-                exempt,
+                exempt: scope.finished(node),
             },
         );
-    }
-
-    /// Replaces a hop through an entry or chain with one constraint per gate it carries when
-    /// the node's bypass accepted one of them, each exempt only if accepted itself. False,
-    /// with nothing pushed, when it accepted none of them.
-    fn push_carried(
-        &self,
-        dependencies: &Dependencies,
-        scope: &Scope,
-        edge: &Edge,
-        after: Slot,
-        out: &mut Vec<Constraint>,
-    ) -> bool {
-        let mut carried = Vec::new();
-        dependencies.carried(
-            &[(edge.requirement, undecided(scope, edge.dependent.node))],
-            EdgeSet::Pruned,
-            |at| undecided(scope, at),
-            |found, path| {
-                if found.class == EdgeClass::Gate {
-                    carried.push((*found, path));
-                }
-            },
-        );
-        let node = edge.dependent.node;
-        if !carried
-            .iter()
-            .any(|(found, _)| scope.accepts(node, found.requirement.node))
-        {
-            return false;
-        }
-        for (found, conditional) in carried {
-            self.push(
-                out,
-                Constraint {
-                    before: self.slot(found.requirement),
-                    after,
-                    offset_days: 0,
-                    origin: Origin::Dependency(found),
-                    conditional,
-                    exempt: scope.accepts(node, found.requirement.node),
-                },
-            );
-        }
-        true
     }
 
     /// F4: in the execution layer, a stage opening that does not gate holds each node of its
@@ -644,7 +493,8 @@ impl Network {
                     Rule::DueBy => (self.finish(at), source, -signed),
                     Rule::NotBefore => (source, self.held(scope, at), signed),
                 };
-                let exempt = rule == Rule::NotBefore && scope.own_date_exempt(at);
+                // A finished node's own rules no longer bind it: a recorded finish is a fact.
+                let exempt = scope.finished(at);
                 let conditional = undecided(scope, at) || from.is_some_and(|f| undecided(scope, f));
                 let origin = Origin::Rule { node: at, rule };
                 self.push(
@@ -856,7 +706,7 @@ impl Network {
     }
 
     /// The instant that holds a node back in the execution layer: its finish once work has
-    /// started, since starting is never guarded, else its start (a decision's or milestone's
+    /// started, since a start frees nothing, else its start (a decision's or milestone's
     /// one instant either way).
     #[must_use]
     pub(crate) fn held(&self, scope: &Scope, node: NodeIndex) -> Slot {

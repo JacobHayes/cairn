@@ -3346,33 +3346,6 @@
         "pattern": "^(deployment|journey:.+|route:.+)$",
         "type": "string"
       },
-      "DoneEarly": {
-        "additionalProperties": false,
-        "description": "How early a node finished, and ahead of what.",
-        "properties": {
-          "date": {
-            "description": "The date it was finished ahead of: the requirement's or opening's earliest date today\n(its recorded date once it has one; a milestone's date as shown, its actual, pin or\ndue, when that is later), or its own not-before date.",
-            "format": "date",
-            "type": "string"
-          },
-          "days": {
-            "description": "Days between its finish and the date it was finished ahead of.",
-            "format": "uint32",
-            "minimum": 0,
-            "type": "integer"
-          },
-          "source": {
-            "$ref": "#/components/schemas/ConstraintSource",
-            "description": "What it was finished ahead of: a dependency, with how it arose (a stage opening\namong them), or its own not-before rule."
-          }
-        },
-        "required": [
-          "days",
-          "date",
-          "source"
-        ],
-        "type": "object"
-      },
       "DraftSource": {
         "description": "Where a route draft comes from.",
         "oneOf": [
@@ -4949,13 +4922,8 @@
         ]
       },
       "Guard": {
-        "description": "A transition guard.",
+        "description": "A transition guard: evidence a deliverable's or action's completion needs. Order is never\na guard.",
         "oneOf": [
-          {
-            "const": "deps_done",
-            "description": "Every relevant or undecided hard dependency satisfies dependencies.",
-            "type": "string"
-          },
           {
             "const": "has_artifact",
             "description": "A `requires_artifact` deliverable has an artifact link.",
@@ -4975,30 +4943,12 @@
             "const": "broken_down",
             "description": "A placeholder has children or is atomic.",
             "type": "string"
-          },
-          {
-            "const": "date_arrived",
-            "description": "Work or a decision whose own not-before rules hold it: that date has arrived.",
-            "type": "string"
           }
         ]
       },
       "GuardFailure": {
-        "description": "One specific guard failure: what a bypass records, so a later distinct failure\nstill produces `stale`, and what `stale` lists.",
+        "description": "One specific guard failure: what a bypass records, so a later distinct failure\nstill produces `stale`.",
         "oneOf": [
-          {
-            "additionalProperties": false,
-            "description": "A dependency that does not satisfy dependencies.",
-            "properties": {
-              "open_dependency": {
-                "$ref": "#/components/schemas/NodeKey"
-              }
-            },
-            "required": [
-              "open_dependency"
-            ],
-            "type": "object"
-          },
           {
             "const": "missing_artifact",
             "description": "No artifact link on a `requires_artifact` deliverable.",
@@ -5026,20 +4976,6 @@
             "const": "not_broken_down",
             "description": "A placeholder with no children that is not atomic.",
             "type": "string"
-          },
-          {
-            "additionalProperties": false,
-            "description": "Before the date its own not-before rules hold it to: the date, so a bypass for one\ndate leaves a later date a distinct failure.",
-            "properties": {
-              "too_early": {
-                "format": "date",
-                "type": "string"
-              }
-            },
-            "required": [
-              "too_early"
-            ],
-            "type": "object"
           }
         ]
       },
@@ -8865,17 +8801,6 @@
         "additionalProperties": false,
         "description": "A node's derived dates. Every bound is null when nothing reaches it.",
         "properties": {
-          "done_early": {
-            "anyOf": [
-              {
-                "$ref": "#/components/schemas/DoneEarly"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "description": "Finished before something it was finished ahead of on purpose, on today's dates: a\ndependency or its own date its guard bypass accepted, a stage opening that does not\ngate, or a milestone's own not-before rule. None when none of those would have put\nits finish later. Other shortfalls still apply."
-          },
           "due": {
             "anyOf": [
               {
@@ -8928,7 +8853,7 @@
             "type": "array"
           },
           "not_before": {
-            "description": "The earliest its own not-before rules let it start: the latest of each source's\nearliest date plus the rule's offset. Work or a decision whose date this is, while it\nis after today, is scheduled and must wait for it to finish without a bypass. None\nwhen it has no such rule, or no source has a date.",
+            "description": "The earliest its own not-before rules let it start: the latest of each source's\nearliest date plus the rule's offset. Work or a decision whose date this is, while it\nis after today, is scheduled: off the acting frontier, though it can still be started\nor finished. None when it has no such rule, or no source has a date.",
             "format": "date",
             "type": [
               "string",
@@ -9012,7 +8937,7 @@
             "type": "boolean"
           },
           "failing_guards": {
-            "description": "The bypassable guards its completing transition (complete a deliverable or\naction, answer an open decision, complete a pending milestone) would fail if attempted\nnow with no bypass in the patch. Empty for every node with no such transition left:\nfinished, not relevant, or a group.",
+            "description": "The bypassable guards completing it (a deliverable or action) would fail if attempted\nnow with no bypass in the patch: the evidence it still lacks. Empty for every other\nnode, and for one finished or not relevant.",
             "items": {
               "$ref": "#/components/schemas/Guard"
             },
@@ -9116,24 +9041,12 @@
             "description": "The container whose snooze holds over the node, the reason a descendant names.\nSet even when the node's own snooze holds as well, so a node snoozed twice names its\ncontainer and shows its own target in `snoozed`."
           },
           "stale": {
-            "description": "Why a terminal node's completing guards would now fail.",
+            "description": "Why a finished node is stale: a dependency it relied on was reopened, or evidence its\ncompletion needed is now missing.",
             "items": {
-              "$ref": "#/components/schemas/GuardFailure"
+              "$ref": "#/components/schemas/StaleReason"
             },
             "type": "array",
             "uniqueItems": true
-          },
-          "start_guards": {
-            "description": "The bypassable guards starting the node (a deliverable or action not yet started) would\nfail if attempted now with no bypass in the patch: `deps_done` while a gate it waits\non is open (its own children and an undecided node's condition gates aside), and\n`date_arrived` while its own not-before date is ahead. Empty when a plain start is\naccepted and for every node with no start left.",
-            "items": {
-              "$ref": "#/components/schemas/Guard"
-            },
-            "type": "array",
-            "uniqueItems": true
-          },
-          "started_early": {
-            "description": "Stored `active` with a guard bypass that recorded what the start went ahead of: an\nopen dependency or its own not-before date.",
-            "type": "boolean"
           },
           "subtree_gravity": {
             "anyOf": [
@@ -10098,6 +10011,17 @@
               }
             ],
             "description": "Why the node was skipped, or why a group was marked done, while it is (both require\na reason)."
+          },
+          "reopened": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Reopened"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Its latest reopen of a finish, while it has not finished again: what finished work\nthat relied on it reads to go stale. None after reopening a skip or a mark done, which\nleft nothing to rely on."
           },
           "started_on": {
             "description": "When a deliverable or action was started; editable like an actual date.",
@@ -13165,6 +13089,27 @@
           }
         ]
       },
+      "Reopened": {
+        "additionalProperties": false,
+        "description": "A reopen of a finish: the day it happened and the finish it undid.",
+        "properties": {
+          "finished_on": {
+            "description": "The day it had finished.",
+            "format": "date",
+            "type": "string"
+          },
+          "on": {
+            "description": "The day it was reopened.",
+            "format": "date",
+            "type": "string"
+          }
+        },
+        "required": [
+          "on",
+          "finished_on"
+        ],
+        "type": "object"
+      },
       "ResolutionKind": {
         "description": "The kinds of resolution a conflict can offer: [`ConflictResolution`] without its payload.",
         "oneOf": [
@@ -14931,7 +14876,7 @@
           "reasons": {
             "description": "The reasons it gained.",
             "items": {
-              "$ref": "#/components/schemas/GuardFailure"
+              "$ref": "#/components/schemas/StaleReason"
             },
             "type": "array",
             "uniqueItems": true
@@ -14942,6 +14887,52 @@
           "reasons"
         ],
         "type": "object"
+      },
+      "StaleReason": {
+        "description": "Why a finished node is stale.",
+        "oneOf": [
+          {
+            "additionalProperties": false,
+            "description": "A dependency it relied on, done when it finished, was reopened and is not done again.",
+            "properties": {
+              "reopened": {
+                "$ref": "#/components/schemas/NodeKey"
+              }
+            },
+            "required": [
+              "reopened"
+            ],
+            "type": "object"
+          },
+          {
+            "const": "missing_artifact",
+            "description": "No artifact link on a `requires_artifact` deliverable.",
+            "type": "string"
+          },
+          {
+            "const": "missing_note",
+            "description": "No note on a `requires_note` deliverable or action.",
+            "type": "string"
+          },
+          {
+            "additionalProperties": false,
+            "description": "A checklist item not ticked, on a `requires_checklist` deliverable or action.",
+            "properties": {
+              "unticked": {
+                "$ref": "#/components/schemas/Slug"
+              }
+            },
+            "required": [
+              "unticked"
+            ],
+            "type": "object"
+          },
+          {
+            "const": "not_broken_down",
+            "description": "A placeholder with no children that is not atomic.",
+            "type": "string"
+          }
+        ]
       },
       "StallCause": {
         "description": "What a stalled journey waits on.",
@@ -15974,7 +15965,7 @@
                 "type": "null"
               }
             ],
-            "description": "The guard a bypass would accept this past, when it is a bypassable guard failure\n(`deps_done`, `has_artifact`, `broken_down`)."
+            "description": "The guard a bypass would accept this past, when it is a bypassable guard failure\n(`has_artifact`, `has_note`, `all_ticked`, `broken_down`)."
           },
           "caused_by": {
             "description": "The patch's other mutations that brought it about, beside `at.mutation` (a\ncompletion and the mutation that gave it an unfinished dependency in the same patch).",

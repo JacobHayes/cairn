@@ -8,7 +8,7 @@ use crate::engine::support;
 use std::collections::BTreeSet;
 
 use cairn_engine::{Records, consequences};
-use cairn_schema::{Consequences, GuardFailure, StaleConsequence, UndecidedConsequence};
+use cairn_schema::{Consequences, StaleConsequence, StaleReason, UndecidedConsequence};
 use support::{add_nodes as add, key};
 
 /// D7 over the test journey: `before` against `before` with `patch` applied, both sides
@@ -32,75 +32,81 @@ pub(crate) fn caused(before: &Records, patch: &str, today: &str) -> Consequences
 
 const WORK: &str = "{key: n_work, id: work, kind: action, title: Work}";
 
-/// D4, D7: an inserted dependency reports the completion it made stale, with the reason.
+/// D4, D7: reopening a dependency reports the completion that relied on it as stale, with
+/// the reason, and a node already stale reports only the reason it gained.
 #[test]
-fn an_inserted_dependency_reports_the_completion_it_made_stale() {
+fn a_reopen_reports_the_completion_it_made_stale() {
     let records = support::accepted(
-        &support::journey(&add(&[WORK])),
-        "- op: transition\n  node: n_work\n  transition: complete\n",
+        &support::journey(&add(&[
+            "{key: n_one, id: one, kind: action, title: One}",
+            "{key: n_two, id: two, kind: action, title: Two}",
+            "{key: n_work, id: work, kind: action, title: Work, requires: [n_one, n_two]}",
+        ])),
+        "- op: transition\n  node: n_one\n  transition: complete\n\
+- op: transition\n  node: n_two\n  transition: complete\n\
+- op: transition\n  node: n_work\n  transition: complete\n",
     );
-    let insert = format!(
-        "{}- op: add_edge\n  edge: {{node: n_work, requires: n_new}}\n",
-        add(&["{key: n_new, id: new, kind: action, title: New}"])
-    );
-    let found = caused(&records, &insert, "2026-10-06");
+    let reopen = |node: &str| format!("- op: transition\n  node: {node}\n  transition: reopen\n");
+    let found = caused(&records, &reopen("n_one"), "2026-10-06");
     assert_eq!(
         found.stale,
         [StaleConsequence {
             node: key("n_work"),
-            reasons: BTreeSet::from([GuardFailure::OpenDependency(key("n_new"))]),
+            reasons: BTreeSet::from([StaleReason::Reopened(key("n_one"))]),
         }]
     );
-    let again = support::accepted(&records, &insert);
-    let more = format!(
-        "{}- op: add_edge\n  edge: {{node: n_work, requires: n_more}}\n",
-        add(&["{key: n_more, id: more, kind: action, title: More}"])
-    );
-    let gained = caused(&again, &more, "2026-10-06");
+    let again = support::accepted(&records, &reopen("n_one"));
+    let gained = caused(&again, &reopen("n_two"), "2026-10-06");
     assert_eq!(
         gained.stale[0].reasons,
-        BTreeSet::from([GuardFailure::OpenDependency(key("n_more"))]),
+        BTreeSet::from([StaleReason::Reopened(key("n_two"))]),
         "a stale node reports only the reason it gained"
     );
 }
 
-/// F6, D7: correcting an actual date to one later than the chain allows reports the
-/// shortfall it caused, with its chain.
+/// F6, D7: correcting an actual date to one later than the remaining plan allows reports the
+/// shortfall it caused on the remaining work, with its chain; never on the fact itself.
 #[test]
-fn a_late_actual_reports_its_shortfall() {
+fn a_late_actual_reports_the_shortfall_of_the_work_it_holds() {
     let records = support::accepted(
         &support::journey(&add(&[
+            "{key: n_kickoff, id: kickoff, kind: milestone, title: Kickoff}",
             "{key: n_review, id: review, kind: milestone, title: Review}",
-            "{key: n_draft, id: draft, kind: action, title: Draft, due_by: {before: n_review}}",
+            "{key: n_draft, id: draft, kind: action, title: Draft, estimate: 1, not_before: {after: n_kickoff, offset: 5}, due_by: {before: n_review}}",
         ])),
-        "- op: set_pin\n  node: n_review\n  date: \"2026-10-03\"\n\
-- op: transition\n  node: n_draft\n  transition: complete\n\
-- op: set_recorded_date\n  node: n_draft\n  end: finish\n  date: \"2026-10-01\"\n",
+        "- op: set_pin\n  node: n_review\n  date: \"2026-10-10\"\n\
+- op: transition\n  node: n_kickoff\n  transition: complete\n\
+- op: set_recorded_date\n  node: n_kickoff\n  end: finish\n  date: \"2026-10-02\"\n",
     );
-    let late = "- op: set_recorded_date\n  node: n_draft\n  end: finish\n  date: \"2026-10-05\"\n";
-    let found = caused(&records, late, "2026-10-06");
+    let late = |on: &str| {
+        format!("- op: set_recorded_date\n  node: n_kickoff\n  end: finish\n  date: \"{on}\"\n")
+    };
+    let found = caused(&records, &late("2026-10-05"), "2026-10-06");
     let draft = found
         .shortfalls
         .iter()
         .find(|shortfall| shortfall.node == key("n_draft"))
         .expect("the draft's shortfall");
     assert_eq!(
-        draft.shortfall.shortfall_days, 2,
-        "finished the 5th, due the 3rd"
+        draft.shortfall.shortfall_days, 1,
+        "not before the 10th, and due to finish by the 10th with a day's work"
     );
     assert!(
         !draft.shortfall.chain.constraints.is_empty(),
         "with its chain"
     );
     assert!(
-        caused(
-            &records,
-            "- op: set_recorded_date\n  node: n_draft\n  end: finish\n  date: \"2026-10-02\"\n",
-            "2026-10-06"
-        )
-        .shortfalls
-        .is_empty(),
-        "an actual the chain allows causes none"
+        found
+            .shortfalls
+            .iter()
+            .all(|shortfall| shortfall.node != key("n_kickoff")),
+        "the fact itself is never short"
+    );
+    assert!(
+        caused(&records, &late("2026-10-03"), "2026-10-06")
+            .shortfalls
+            .is_empty(),
+        "an actual the plan allows causes none"
     );
 }
 

@@ -186,15 +186,15 @@ mod in_process {
             assert_eq!(left, (0, 0), "{id}");
             if id == "pr_charter" {
                 let caused = &review.consequences[&"j_vendor_eval".parse().unwrap()];
-                let stale: Vec<String> = caused
-                    .stale
+                let short: Vec<String> = caused
+                    .shortfalls
                     .iter()
                     .map(|found| found.node.to_string())
                     .collect();
                 assert_eq!(
-                    stale,
-                    ["n_kickoff"],
-                    "kickoff, done, now waits on the charter"
+                    short,
+                    ["n_charter"],
+                    "the charter is due a month before the kickoff that already happened"
                 );
             } else {
                 assert_eq!(review.consequences.len(), 0, "{id}");

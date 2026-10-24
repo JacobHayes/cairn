@@ -9,8 +9,8 @@ import { nodeOf, transition, type Mutation, type Ready } from "./model.ts";
 import { actLabel, unsnoozeOf, type Act } from "./offers.ts";
 import type { NodeWrite } from "./write.ts";
 
-/** What an action opens rather than sends: the done form, the start-anyway form, the break-down form, or the answer form. */
-export type Opens = "evidence" | "break-down" | "decide" | "start-anyway";
+/** What an action opens rather than sends: the done form, the break-down form, or the answer form. */
+export type Opens = "evidence" | "break-down" | "decide";
 
 /** What `act` sends for `key` as its one move, if it is one (the others open a form). */
 export function actMutation(view: Ready, act: Act, key: string): Mutation | undefined {
@@ -27,14 +27,13 @@ export function actMutation(view: Ready, act: Act, key: string): Mutation | unde
     }
     case "decide":
     case "done-with-evidence":
-    case "start-anyway":
     case "break-down":
       return undefined;
   }
 }
 
 /** F1, D1: Mark a milestone done with the date it was done on, today unless changed. */
-function MilestoneDone({ view, write, node, disabled }: { view: Ready; write: NodeWrite; node: string; disabled: boolean }) {
+function MilestoneDone({ view, write, node }: { view: Ready; write: NodeWrite; node: string }) {
   const today = view.derived.today;
   const [date, setDate] = useState(today);
   return (
@@ -45,7 +44,7 @@ function MilestoneDone({ view, write, node, disabled }: { view: Ready; write: No
       </label>
       <Button
         primary
-        disabled={disabled || write.disabled || date === ""}
+        disabled={write.disabled || date === ""}
         onClick={() => void write.run([transition(node, "complete"), ...(date === today ? [] : [{ op: "set_recorded_date" as const, node, end: "finish" as const, date }])])}
       >
         {actLabel(view, node, "done")}
@@ -55,27 +54,26 @@ function MilestoneDone({ view, write, node, disabled }: { view: Ready; write: No
 }
 
 /**
- * One of a node's action buttons. `waiting`: the action would be refused, so it is disabled.
- * `dated` lets a milestone be done on another day than today, where there is room for the date.
+ * One of a node's action buttons. `dated` lets a milestone be done on another day than today,
+ * where there is room for the date.
  */
-export function ActButton({ act, view, node, write, waiting, open, dated = false }: { act: Act; view: Ready; node: string; write: NodeWrite; waiting: boolean; open: (what: Opens) => void; dated?: boolean }) {
+export function ActButton({ act, view, node, write, open, dated = false }: { act: Act; view: Ready; node: string; write: NodeWrite; open: (what: Opens) => void; dated?: boolean }) {
   const mutation = actMutation(view, act, node);
   if (!write.writable) {
     return null;
   }
   if (act === "done" && dated && nodeOf(view, node)?.kind === "milestone") {
-    return <MilestoneDone view={view} write={write} node={node} disabled={waiting} />;
+    return <MilestoneDone view={view} write={write} node={node} />;
   }
-  const opens = act === "decide" || act === "break-down" || act === "done-with-evidence" || act === "start-anyway";
-  const refused = waiting && act === "done";
+  const opens = act === "decide" || act === "break-down" || act === "done-with-evidence";
   return (
     <Button
       primary={act === "done" || act === "done-with-evidence" || act === "decide" || act === "break-down"}
-      disabled={refused || (act !== "decide" && act !== "break-down" && write.disabled)}
+      disabled={act !== "decide" && act !== "break-down" && write.disabled}
       data-testid={act === "break-down" ? "break-down" : undefined}
       onClick={() => {
         if (opens) {
-          open(act === "done-with-evidence" ? "evidence" : act === "decide" ? "decide" : act === "start-anyway" ? "start-anyway" : "break-down");
+          open(act === "done-with-evidence" ? "evidence" : act === "decide" ? "decide" : "break-down");
         } else if (mutation !== undefined) {
           void write.run([mutation]);
         }

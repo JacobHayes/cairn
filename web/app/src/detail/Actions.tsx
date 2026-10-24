@@ -1,19 +1,19 @@
 // C11, D1, D4, B2, B5, B6: what a person does to the node (design 6.4, 6.5): its one primary
 // action (a decision's is its answer form), at most one secondary beside it, and a `⋯` menu
-// listing only what applies. Skip, Snooze, Keep, Include anyway and the guard bypasses open a
+// listing only what applies. Skip, Snooze, Keep, Include anyway and the guard bypass open a
 // small form in place of the row, never a modal; each is one patch whose rejection shows here.
 // At most one form is open at a time, owned by one machine (actions-form.ts) and kept as one
 // draft; a form that sent its write stays until that write ends, and text typed since is never
-// lost to the landing. A guard that fails disables the primary and says what it waits on;
-// starting, finishing or answering anyway is a guard bypass whose reason is optional (D4). A container holding its own
-// snooze says that moving it on lifts the snooze (B6).
+// lost to the landing. What a node waits on never disables an action: order is never a guard;
+// completing without the evidence a node needs is a guard bypass whose reason is optional
+// (D4). A container holding its own snooze says that moving it on lifts the snooze (B6).
 import { STATUS_ACCEPTS_CHANGES } from "@cairn/client";
 import { useActorRef, useSelector } from "@xstate/react";
 import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { useLocation, useNavigate } from "react-router";
 
 import { useFrameActions } from "../shell/frame.tsx";
-import { doneMutations, evidenceDraft, missingEvidence } from "../acting/acts.ts";
+import { doneMutations, missingEvidence } from "../acting/acts.ts";
 import { graphPath, graphViewFrom } from "../canvas/settings.ts";
 import { writeDraft } from "../data/drafts.ts";
 import type { OperationId } from "../data/edit-record.ts";
@@ -26,12 +26,12 @@ import { useInsertEntry } from "../segments/entry.ts";
 import { insertionRoot, memberOrigin } from "../segments/model.ts";
 import { Button, Input } from "../ui/kit.tsx";
 import { actionsDraftKey, actionsForm, changing, formView, opening, takeOpened, type Drafted, type FormCase, type FormValues, type FormView, type Opened, type PanelCase } from "./actions-form.ts";
-import { AnswerEditor, type Anyway } from "./AnswerEditor.tsx";
+import { AnswerEditor } from "./AnswerEditor.tsx";
 import { ActButton, actMutation, type Opens } from "./ActButton.tsx";
 import { EvidenceForm } from "./DoneEvidence.tsx";
 import { SnoozePanel, snoozeWords, WeightEditor } from "./editors.tsx";
 import { foldKey, setFold } from "./folds.ts";
-import { answerable, failingGuards, guardBypass, itemTitle, movesFrom, startGuards, storedSnooze, titleOf, transition, unfinishedInside, type Guard, type GraphNode, type Mutation, type NodeDetail, type Ready } from "./model.ts";
+import { answerable, failingGuards, guardBypass, itemTitle, movesFrom, storedSnooze, titleOf, transition, unfinishedInside, type Guard, type GraphNode, type Mutation, type NodeDetail, type Ready } from "./model.ts";
 import { menuOf, offered, type Act, type ContextId, type MenuId, type MenuItem } from "./offers.ts";
 import { OwnerSelect } from "./parts.tsx";
 import { Rejected } from "./Rejected.tsx";
@@ -100,12 +100,6 @@ function LiftsSnooze({ view, node, moving }: { view: Ready; node: string; moving
 /** The guards a bypass would pass, with what the node is missing in words. */
 function guardsOf(detail: NodeDetail): { guards: Guard[]; words: string } {
   const guards = failingGuards(detail.derived);
-  return { guards, words: guards.map(guardWords).join(" and ") };
-}
-
-/** The guards a start anyway would pass, with what the node waits on in words. */
-function startsOf(view: Ready, detail: NodeDetail): { guards: Guard[]; words: string } {
-  const guards = startGuards(view, detail.node.key);
   return { guards, words: guards.map(guardWords).join(" and ") };
 }
 
@@ -197,7 +191,7 @@ function runnersOf({ view, detail, write, form, onRename, onCopied, insertHere }
   const origin = memberOrigin(view.journey.graph, key);
   const journey = view.journey.header.id;
   const move = (...mutations: Mutation[]) => () => void write.run(mutations);
-  const reason = (kind: "skip" | "mark-done" | "keep" | "include" | "bypass" | "start-anyway" | "anyway") => () => { form.openForm(kind, ""); };
+  const reason = (kind: "skip" | "mark-done" | "keep" | "include" | "bypass") => () => { form.openForm(kind, ""); };
   // The view the person is on goes with them (the graph draws the node whatever it hides); the copied link is the node's own address.
   const graph = graphViewFrom(new URLSearchParams(search));
   const link = `${globalThis.location.origin}${journeyPath({ journey, node: key }, "graph")}`;
@@ -207,7 +201,6 @@ function runnersOf({ view, detail, write, form, onRename, onCopied, insertHere }
     "mark-done": reason("mark-done"),
     stop: move(transition(key, "stop")),
     "done-anyway": reason("bypass"),
-    "answer-anyway": reason("anyway"),
     reopen: move(transition(key, "reopen")),
     "edit-date": () => { form.openForm("edit-date", detail.record.finished_on ?? view.derived.today); },
     keep: reason("keep"),
@@ -306,9 +299,9 @@ interface OpenProps {
   submit: (opened: Drafted, mutations: Mutation[]) => void;
 }
 
-type ReasonKind = "skip" | "mark-done" | "keep" | "include" | "bypass" | "start-anyway";
+type ReasonKind = "skip" | "mark-done" | "keep" | "include" | "bypass";
 
-/** What sending a reason form's `reason` does to `node`: D1's skip, B5's keep and force include, D4's guard bypass with the move it was needed for. */
+/** What sending a reason form's `reason` does to `node`: D1's skip, B5's keep and force include, D4's guard bypass with the completion it covers. */
 function reasonMutations(kind: ReasonKind, node: GraphNode, guards: Guard[], reason: string): Mutation[] {
   switch (kind) {
     case "skip":
@@ -321,8 +314,6 @@ function reasonMutations(kind: ReasonKind, node: GraphNode, guards: Guard[], rea
       return [{ op: "apply_override", node: node.key, override: { force_include: { reason } } }];
     case "bypass":
       return [guardBypass(node.key, guards, reason), transition(node.key, "complete")];
-    case "start-anyway":
-      return [guardBypass(node.key, guards, reason), transition(node.key, "start")];
   }
 }
 
@@ -339,15 +330,13 @@ function reasonWords(kind: ReasonKind, node: GraphNode, without: string, inside:
       return { label: "Why include it", confirm: "Include anyway", testId: "include-form" };
     case "bypass":
       return { label: "Why (optional)", confirm: "Mark done anyway", testId: "bypass", hint: `This goes ahead without ${without}.`, optional: true };
-    case "start-anyway":
-      return { label: "Why (optional)", confirm: "Start anyway", testId: "start-anyway-form", hint: `This starts it without ${without}.`, optional: true };
   }
 }
 
 /** The forms that take a reason. */
 function ReasonCase({ view, detail, form, write, sending, submit, opened }: OpenProps & { opened: Extract<Drafted, { case: ReasonKind }> }) {
   const { node } = detail;
-  const guards = opened.case === "start-anyway" ? startsOf(view, detail) : guardsOf(detail);
+  const guards = guardsOf(detail);
   return (
     <ReasonForm
       {...reasonWords(opened.case, node, guards.words, unfinishedInside(view, node.key))}
@@ -372,11 +361,7 @@ function OpenedForm({ opened, footer, ...props }: OpenProps & { opened: Opened; 
     case "keep":
     case "include":
     case "bypass":
-    case "start-anyway":
       return <ReasonCase {...props} opened={opened} />;
-    case "anyway":
-      // The reason is typed inside the answer form, which sends it with the answer.
-      return null;
     case "snooze":
       return <SnoozePanel {...shared} view={view} detail={detail} value={opened.value} footer={footer} onChange={(next) => { form.change("snooze", next); }} onSnooze={(mutation) => { submit(opened, [mutation]); }} />;
     case "evidence": {
@@ -386,7 +371,7 @@ function OpenedForm({ opened, footer, ...props }: OpenProps & { opened: Opened; 
           {...shared}
           needs={needs}
           unticked={needs.unticked.map((item) => itemTitle(view, node.key, item))}
-          value={evidenceDraft(opened.value)}
+          value={opened.value}
           onChange={(next) => { form.change("evidence", next); }}
           onSend={(evidence) => { submit(opened, doneMutations(node.key, evidence)); }}
           onWithout={() => { form.openForm("bypass", ""); }}
@@ -465,8 +450,6 @@ function useMenu(menus: Omit<Menus, "insertHere">): { groups: MenuItem[][]; runn
     if (id === "decide") {
       form.close();
       setFocusAsked(true);
-    } else if (id === "start-anyway") {
-      form.openForm("start-anyway", "");
     } else if (id === "done-with-evidence") {
       // Opening the open case again keeps what was typed; another case takes the form's place.
       form.openForm("evidence", { artifact: "", note: "" });
@@ -483,27 +466,11 @@ function useMenu(menus: Omit<Menus, "insertHere">): { groups: MenuItem[][]; runn
   return { groups, runners, focusAnswer: focusAsked ? () => { setFocusAsked(false); } : undefined };
 }
 
-/** The answer form's bypass reason, while it is open and nothing is kept. */
-function anywayOf(form: ReturnType<typeof useActionsForm>, kept: unknown): Anyway | undefined {
-  const { open } = form;
-  return open?.case === "anyway" && kept === undefined
-    ? {
-        reason: open.value,
-        change: (next) => { form.change("anyway", next); },
-        cancel: form.close,
-        sent: (id) => { form.sent(id, open.version); },
-        resent: form.resent,
-      }
-    : undefined;
-}
-
 /** What the form's buttons open here: the done form and the break-down panel (the answer form is drawn in place of Decide). */
 function opensIn(form: ActionsForm): (what: Opens) => void {
   return (what) => {
     if (what === "evidence") {
       form.openForm("evidence", { artifact: "", note: "" });
-    } else if (what === "start-anyway") {
-      form.openForm("start-anyway", "");
     } else if (what === "break-down") {
       form.openPanel("break-down");
     }
@@ -534,8 +501,8 @@ function NodeActions({ view, detail, onRename }: { view: Ready; detail: NodeDeta
   const deciding = write.writable && answerable(node.kind, record.state);
   const { open } = form;
   const kept = form.view.state === "kept" ? form.view.opened : undefined;
-  // Open in place of the row: every form and panel but the answer form's own reason.
-  const inPlace = open !== undefined && open.case !== "anyway" && kept === undefined;
+  // Open in place of the row: every form and panel.
+  const inPlace = open !== undefined && kept === undefined;
   const showsAnswer = deciding && !inPlace && kept === undefined;
   const showsRow = !deciding && !inPlace && kept === undefined;
   const out = form.view.state === "sending" && write.pending;
@@ -548,7 +515,6 @@ function NodeActions({ view, detail, onRename }: { view: Ready; detail: NodeDeta
       form.sent(id, from.version);
     }
   };
-  const anyway = anywayOf(form, kept);
   const { groups, runners, focusAnswer } = useMenu({ view, detail, write, form, onRename, onCopied: () => { setCopied(true); } });
   const menu = <Overflow groups={groups} runners={runners} />;
   // A decision awaiting its answer has the answer form in the place of Decide; a page that takes no write has neither, and its menu says only where to find the node.
@@ -562,10 +528,10 @@ function NodeActions({ view, detail, onRename }: { view: Ready; detail: NodeDeta
   const menuOnly = showsRow && acts.length === 0 && groups.length > 0 && !showsAnswer && !copied;
   const body = (
     <div className={menuOnly ? "stack actions-menu-only" : "stack"} data-testid="actions">
-      {showsAnswer ? <AnswerEditor view={view} detail={detail} menu={menu} anyway={anyway} focus={focusAnswer} /> : null}
+      {showsAnswer ? <AnswerEditor view={view} detail={detail} menu={menu} focus={focusAnswer} /> : null}
       {showsAnswer && offers.secondary.includes("unsnooze") ? (
         <span>
-          <ActButton act="unsnooze" view={view} node={node.key} write={write} waiting={false} open={opens} />
+          <ActButton act="unsnooze" view={view} node={node.key} write={write} open={opens} />
         </span>
       ) : null}
       {showsRow && (acts.length > 0 || groups.length > 0) ? (
@@ -573,7 +539,7 @@ function NodeActions({ view, detail, onRename }: { view: Ready; detail: NodeDeta
           {offers.primary === undefined ? null : <LiftsSnooze view={view} node={node.key} moving={moving} />}
           <span className="row actions-row">
             {acts.map((act) => (
-              <ActButton key={act} act={act} view={view} node={node.key} write={write} waiting={offers.waiting} open={opens} dated />
+              <ActButton key={act} act={act} view={view} node={node.key} write={write} open={opens} dated />
             ))}
             <span className="spacer" />
             {menu}

@@ -127,15 +127,10 @@ export function withBypass(attempt: Attempt, entries: { node: string; guards: Gu
   return [...entries.map(({ node, guards }) => guardBypass(node, guards, reason)), ...attempt.mutations];
 }
 
-/** The completions (else the starts) a retried patch carries, in words: "mark done", "mark both done", "mark all 3 done", "start", "start both", "start all 3". */
+/** The completions a retried patch carries, in words: "mark done", "mark both done", "mark all 3 done" (a bypass covers only a completion). */
 function completionWords(attempt: Attempt): string {
-  const count = (step: string) => attempt.mutations.filter((mutation) => mutation.op === "transition" && mutation.transition === step).length;
-  const completing = count("complete");
-  const starting = count("start");
-  if (completing === 0 && starting > 0) {
-    return starting === 1 ? "start" : starting === 2 ? "start both" : `start all ${String(starting)}`;
-  }
-  return completing === 0 ? "go ahead" : completing === 1 ? "mark done" : completing === 2 ? "mark both done" : `mark all ${String(completing)} done`;
+  const completing = attempt.mutations.filter((mutation) => mutation.op === "transition" && mutation.transition === "complete").length;
+  return completing <= 1 ? "mark done" : completing === 2 ? "mark both done" : `mark all ${String(completing)} done`;
 }
 
 /** D4: the bypass of every node's failed guards at once, one optional reason for the lot, named by what it does; its reason field opens only when the person chooses it, after the remedy above has been offered. */

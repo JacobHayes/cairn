@@ -69,8 +69,6 @@ function derivedNodes(): Ready["derived"]["nodes"] {
       actionable: false,
       blocked_by: [{ node: "n_findings", via: "explicit" }],
       waits_on: { entries: [{ node: "n_findings", via: "explicit" }], total: 1 },
-      started_early: true,
-      failing_guards: ["deps_done"],
       dates: { due: pinnedDue, slack_days: 24 },
       gravity: 5,
       gravity_from: { entries: [{ node: "n_meeting", score: 4 }], total: 1 },

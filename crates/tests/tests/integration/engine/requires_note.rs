@@ -10,7 +10,8 @@ use std::collections::BTreeSet;
 
 use cairn_engine::{Applied, Records};
 use cairn_schema::{
-    Guard, GuardFailure, Lineage, Rejection, RouteFile, SequentialKeys, ViolationCode, from_yaml,
+    Guard, GuardFailure, Lineage, Rejection, RouteFile, SequentialKeys, StaleReason, ViolationCode,
+    from_yaml,
 };
 use support::key;
 
@@ -64,7 +65,7 @@ fn accepted(records: &Records, mutations: &str) -> Records {
 }
 
 /// The failures that make the node stale.
-fn stale(records: &Records) -> BTreeSet<GuardFailure> {
+fn stale(records: &Records) -> BTreeSet<StaleReason> {
     let graph = support::journey_graph(records, LAUNCH);
     support::derived(records, LAUNCH).stale(&graph, &key(HARDENING))
 }
@@ -80,7 +81,7 @@ fn refusal(records: &Records, mutations: &str) -> cairn_schema::Violation {
     }
 }
 
-/// Features finished, so the hardening action's only open guard is its note.
+/// Features finished, and the hardening action's one guard is its note.
 fn ready() -> Records {
     accepted(
         &launch_after(3),
@@ -108,7 +109,23 @@ fn completion_needs_a_note_of_its_own_and_loses_it_as_stale() {
     assert!(stale(&done).is_empty());
 
     let removed = accepted(&done, "- op: remove_annotation\n  annotation: a_note\n");
-    assert_eq!(stale(&removed), BTreeSet::from([GuardFailure::MissingNote]));
+    assert_eq!(stale(&removed), BTreeSet::from([StaleReason::MissingNote]));
     let restored = accepted(&removed, NOTE);
     assert!(stale(&restored).is_empty());
+}
+
+/// D4: a completion that bypassed the missing note keeps that acceptance, so a note added and
+/// removed later leaves it as it was.
+#[test]
+fn a_bypassed_note_stays_accepted_when_a_later_one_goes() {
+    let bypassed = accepted(
+        &ready(),
+        &format!(
+            "- op: apply_override\n  node: n_hardening\n  override: {{guard_bypass: {{guards: [has_note]}}}}\n{DONE}"
+        ),
+    );
+    assert!(stale(&bypassed).is_empty());
+    let noted = accepted(&bypassed, NOTE);
+    let removed = accepted(&noted, "- op: remove_annotation\n  annotation: a_note\n");
+    assert!(stale(&removed).is_empty());
 }

@@ -129,9 +129,44 @@ fn kind_of(session: &Session<'_>, node: &NodeKey) -> Option<NodeKind> {
         .map(cairn_schema::Node::kind)
 }
 
+/// D1, D4: the stored state `step` leaves, `to` on `today`: a start or a finish records its
+/// day; a reopen undoes them and records the finish it undid (the fact stale work reads),
+/// which any move that closes the node again clears.
+fn moved(stored: &NodeState, to: State, step: Move, today: cairn_schema::Date) -> NodeState {
+    let mut next = NodeState {
+        state: to,
+        ..stored.clone()
+    };
+    match step {
+        Move::Start => next.started_on = Some(today),
+        Move::Stop => next.started_on = None,
+        Move::Complete => next.finished_on = Some(today),
+        Move::Reopen => {
+            next.reopened = stored
+                .finished_on
+                .map(|finished_on| cairn_schema::Reopened {
+                    on: today,
+                    finished_on,
+                });
+            next.started_on = None;
+            next.finished_on = None;
+            next.reason = None;
+        }
+        // A group has no performed dates: a mark done records no finish, which would turn
+        // kept work that is still open into a shortfall on the group.
+        Move::Skip | Move::MarkDone | Move::Answer => {}
+    }
+    if next.state.is_terminal() {
+        next.reopened = None;
+    }
+    next
+}
+
 /// D1: a transition by the node's own table, recording or clearing the dates it moves (F1,
-/// F2); any transition lifts a snooze in the same event (B6); reopening a decision clears its
-/// answer, and with it the role fill or pin the answer produced (E3). A container's skip is
+/// F2); reopening leaves the reopen's record, which a move that closes the node again clears
+/// (D4: what finished work that relied on it reads to go stale); any transition lifts a snooze
+/// in the same event (B6); reopening a decision clears its answer, and with it the role fill or
+/// pin the answer produced (E3). A container's skip is
 /// this one event: the cascade is derived (D1a).
 fn move_node(session: &mut Session<'_>, node: &NodeKey, transition: &Transition) -> Vec<Write> {
     let Some(stored) = stored(session, node) else {
@@ -159,24 +194,7 @@ fn move_node(session: &mut Session<'_>, node: &NodeKey, transition: &Transition)
         to.legal_for(kind) && stored.state.legal_for(kind),
         "D1: within the kind's machine"
     );
-    let today = session.inputs.today;
-    let mut next = NodeState {
-        state: to,
-        ..stored.clone()
-    };
-    match step {
-        Move::Start => next.started_on = Some(today),
-        Move::Stop => next.started_on = None,
-        Move::Complete => next.finished_on = Some(today),
-        Move::Reopen => {
-            next.started_on = None;
-            next.finished_on = None;
-            next.reason = None;
-        }
-        // A group has no performed dates: a mark done records no finish, which would turn
-        // kept work that is still open into a shortfall on the group.
-        Move::Skip | Move::MarkDone | Move::Answer => {}
-    }
+    let mut next = moved(&stored, to, step, session.inputs.today);
     if let Transition::Skip { reason } | Transition::MarkDone { reason } = transition {
         // D1: the reason a skip or a mark done requires is kept with it, and goes when it is
         // reopened.
@@ -198,17 +216,14 @@ fn move_node(session: &mut Session<'_>, node: &NodeKey, transition: &Transition)
         // Reopening clears the answer and its rationale together (B2).
         writes.push(session.remove(GraphKey::Answer(node.clone())));
     }
-    // A node keeps the bypass of its latest move: a completion with none applied in this
-    // patch clears the start's, so a finished node's bypass is always its finish's.
-    let completes_unbypassed = step == Move::Complete && !session.bypassed.contains_key(node);
-    if matches!(step, Move::Reopen | Move::Stop) || completes_unbypassed {
+    if step == Move::Reopen {
         writes.extend(clear_bypass(session, node));
     }
     writes
 }
 
-/// D4: reopening or stopping a node, or completing it without a bypass, clears its guard
-/// bypass, which accepted the failures of the move it covered and of no later one.
+/// D4: reopening a node clears its guard bypass, which accepted the failures of the
+/// completion it covered and of no later one.
 fn clear_bypass(session: &Session<'_>, node: &NodeKey) -> Option<Write> {
     let mut next = overrides(session, node);
     next.bypass.take()?;
@@ -286,6 +301,7 @@ fn answer(
         let next = NodeState {
             state: to,
             finished_on: Some(session.inputs.today),
+            reopened: None,
             ..stored
         };
         writes.push(session.put(GraphRecord::NodeState {

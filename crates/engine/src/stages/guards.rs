@@ -1,16 +1,16 @@
-//! Transition guards that need no derived state (D4, A16, G2, G4, G5, B10): a completed deliverable
-//! that requires an artifact has an artifact link, a completed deliverable or action that
-//! requires a note has a note of its own, one that requires its checklist has every item
-//! ticked, and a completed placeholder has children or is
-//! atomic, each on the graph the patch produces, so a guard is never satisfied only for
-//! a moment. A guard bypass applied in the same patch accepts the failures of the guards it
-//! names, and those specific failures are recorded on it; a bypass covers a guarded
-//! transition (start, complete, a first answer) on its node in the same patch. Relevance and
-//! `deps_done` join this stage with derive (2.4).
+//! Transition guards that need no derived state (D4, A16, G2, G4, G5, B10): the evidence a
+//! deliverable's or action's completion needs. A completed deliverable that requires an
+//! artifact has an artifact link, a completed deliverable or action that requires a note has a
+//! note of its own, one that requires its checklist has every item ticked, and a completed
+//! placeholder has children or is atomic, each on the graph the patch produces, so a guard is
+//! never satisfied only for a moment. A guard bypass applied in the same patch accepts the
+//! failures of the guards it names, and those specific failures are recorded on it; a bypass
+//! covers the completion of its deliverable or action in the same patch. Order is never
+//! a guard.
 
 use std::collections::BTreeSet;
 
-use cairn_schema::{GuardFailure, ViolationCode};
+use cairn_schema::{GuardFailure, NodeKind, ViolationCode};
 
 use super::Check;
 use crate::derive::stale::{annotated_nodes, static_failures};
@@ -73,7 +73,11 @@ pub(super) fn check(check: &mut Check<'_, '_>) {
         }
     }
     for (key, ordinal) in &session.bypassed {
-        if session.guarded.contains_key(key) {
+        let work = document
+            .nodes
+            .get(key)
+            .is_some_and(|node| matches!(node.kind(), NodeKind::Deliverable | NodeKind::Action));
+        if work && session.completed.contains_key(key) {
             check.bypassed.entry(key.clone()).or_default();
             continue;
         }
@@ -81,7 +85,7 @@ pub(super) fn check(check: &mut Check<'_, '_>) {
             &tree,
             key,
             ViolationCode::IllegalTransition,
-            "a guard bypass covers a guarded transition of its node in the same patch",
+            "a guard bypass covers the completion of its deliverable or action in the same patch",
         );
         found.at.mutation = Some(*ordinal);
         check.violations.push(found);

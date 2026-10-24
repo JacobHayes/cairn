@@ -27,9 +27,9 @@ Cairn: a closed journey, and the blocking `closed` flag of a terminal node.
   beneath it (`2026-10-06-what-satisfies-dependencies-and-what-the-frontier-promises.md`): that
   still holds for a done deliverable or action, but not for a group marked done with kept work
   pending.
-- Deliverables and actions with children get no such transition. They keep Done anyway, a guard
-  bypass that completes the parent and leaves its children open, because those children are
-  work of their own. This was asked for explicitly.
+- Deliverables and actions with children get no such transition. Completing one is a plain
+  move that leaves its children open, because those children are work of their own (order is
+  never a guard, `2026-10-24-recorded-dates-never-warn.md`).
 - The screen offers Mark done in the inspector's overflow menu beside Skip, never as a primary
   action and never in bulk. A group marked done shows "Marked done" with how many items it
   skipped in place of its progress meter (a full meter over only the unskipped work would read

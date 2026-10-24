@@ -9,7 +9,7 @@ import { derivedJourney, journeyAfter, seeded, type DerivedJourney } from "../au
 import type { Mutation } from "../authoring/graph.ts";
 import { transition } from "../detail/model.ts";
 import { dateWords } from "../status/when.ts";
-import { attentionRows, blockedRows, claimActions, claimedKeys, lifecycleLine, milestoneLine, recentlyFinished, scheduledRows, summaryModel, underWay } from "./model.ts";
+import { attentionRows, blockedRows, claimActions, claimedKeys, lifecycleLine, milestoneLine, recentlyFinished, scheduledRows, shortfallWords, summaryModel, underWay } from "./model.ts";
 
 let host: InBrowserHost;
 const held: DerivedJourney[] = [];
@@ -79,12 +79,13 @@ describe("C13, F1, F6: the lead's milestone line", () => {
   });
 
   it("gives the final milestone its own shortfall and no other node's", () => {
-    const journey = open("j_launch");
+    // The launch pinned before the beta can end: the launch and the work ahead of it fall short.
+    const journey = open("j_launch", [{ op: "set_pin", node: "n_launch", date: "2026-11-10" }]);
     const { model } = pageOf(journey);
     const line = milestoneLine(journey.ready, model);
     expect(line).toMatchObject({ role: "final", key: "n_launch", shortfallDays: journey.ready.derived.nodes["n_launch"]?.dates.shortfall?.shortfall_days });
     expect(line?.shortfallDays).toBeGreaterThan(0);
-    expect(model.shortfalls.map((each) => each.key)).toContain("n_code_freeze");
+    expect(model.shortfalls.filter((each) => each.key !== "n_launch").length).toBeGreaterThan(0);
   });
 
   it("names an undated final milestone's feeding decision", () => {
@@ -134,18 +135,15 @@ describe("C18, D3, D4, F6: what needs attention", () => {
     expect(worst).toEqual([...worst].sort((a, b) => a - b));
   });
 
-  it("says a finished node's shortfall as how far off it finished, and open work's as the days it needs", () => {
-    const journey = open("j_launch");
+  it("says a shortfall only of work still ahead, as the days it needs", () => {
+    const journey = open("j_launch", [{ op: "set_pin", node: "n_launch", date: "2026-11-10" }]);
     const { model } = pageOf(journey);
-    const reasons = (key: string) => attentionRows(journey.ready, model).find((row) => row.key === key)?.reasons.join(";") ?? "";
-    const stateOf = (key: string) => journey.ready.journey.graph.state?.nodes?.[key]?.state;
-    const short = model.shortfalls.map((each) => each.key);
-    const finished = short.filter((key) => stateOf(key) === "done");
-    const open_ = short.filter((key) => stateOf(key) !== "done");
-    expect(finished.length).toBeGreaterThan(0);
-    expect(open_.length).toBeGreaterThan(0);
-    finished.forEach((key) => { expect(reasons(key)).toMatch(/Finished \d+ days? off/); });
-    open_.forEach((key) => { expect(reasons(key)).toMatch(/Needs \d+ days? more/); });
+    const reasons = (key: string) => attentionRows(journey.ready, model).find((row) => row.key === key)?.reasons ?? [];
+    expect(model.shortfalls.length).toBeGreaterThan(0);
+    model.shortfalls.forEach((each) => {
+      expect(journey.ready.journey.graph.state?.nodes?.[each.key]?.state).not.toBe("done");
+      expect(reasons(each.key)).toContain(shortfallWords(each.days));
+    });
   });
 
   it("keeps both reasons of a node that is overdue and short, the overdue one first", () => {

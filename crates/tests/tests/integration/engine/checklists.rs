@@ -11,7 +11,8 @@ use std::collections::BTreeSet;
 use cairn_engine::{Applied, DerivedJourney, Records};
 use cairn_schema::{
     ChecklistCount, Domain, GraphKey, Guard, GuardFailure, Lineage, ListQuery, RecordKey,
-    Rejection, ReviewItem, RouteFile, SequentialKeys, Violation, ViolationCode, Write, from_yaml,
+    Rejection, ReviewItem, RouteFile, SequentialKeys, StaleReason, Violation, ViolationCode, Write,
+    from_yaml,
 };
 use support::key;
 
@@ -88,7 +89,7 @@ fn violation_codes(found: &[Violation]) -> Vec<ViolationCode> {
     found.iter().map(|violation| violation.code).collect()
 }
 
-/// Features finished, so the hardening action's only open guard is its checklist.
+/// Features finished, and the hardening action's one guard is its checklist.
 fn ready(extra: &str) -> Records {
     accepted(
         &launch_after(extra, 3),
@@ -96,7 +97,7 @@ fn ready(extra: &str) -> Records {
     )
 }
 
-fn stale(records: &Records) -> BTreeSet<GuardFailure> {
+fn stale(records: &Records) -> BTreeSet<StaleReason> {
     let graph = support::journey_graph(records, LAUNCH);
     support::derived(records, LAUNCH).stale(&graph, &key(HARDENING))
 }
@@ -192,7 +193,10 @@ fn completion_needs_every_item_ticked_and_an_untick_makes_it_stale() {
     assert!(stale(&done).is_empty());
 
     let unticked = accepted(&done, &tick("load", false));
-    assert_eq!(stale(&unticked), BTreeSet::from([failure("load")]));
+    assert_eq!(
+        stale(&unticked),
+        BTreeSet::from([StaleReason::from(failure("load"))])
+    );
     assert_eq!(
         count(&unticked),
         Some(ChecklistCount {
@@ -243,7 +247,10 @@ fn a_bypass_records_the_items_and_an_added_item_is_stale() {
     let published =
         support::publish_version(&bypassed, "product-launch", graph_of(&route_text(&longer)));
     let upgraded = upgraded(&published);
-    assert_eq!(stale(&upgraded), BTreeSet::from([failure("signoff")]));
+    assert_eq!(
+        stale(&upgraded),
+        BTreeSet::from([StaleReason::from(failure("signoff"))])
+    );
     assert_eq!(
         count(&upgraded),
         Some(ChecklistCount {
@@ -289,7 +296,10 @@ fn a_removed_item_leaves_the_bypass_and_a_new_item_under_its_id_is_stale() {
     assert_eq!(recorded(&shorter), BTreeSet::from([failure("docs")]));
 
     let readded = accepted(&shorter, &list(&["rollback", "docs", "load"]));
-    assert_eq!(stale(&readded), BTreeSet::from([failure("load")]));
+    assert_eq!(
+        stale(&readded),
+        BTreeSet::from([StaleReason::from(failure("load"))])
+    );
 }
 
 /// G5: an upgrade that drops an item takes its failure out of the bypass the same way.

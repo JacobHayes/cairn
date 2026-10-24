@@ -2,7 +2,7 @@
 // stale reasons in words naming the nodes they are about.
 import { describe, expect, it } from "vitest";
 
-import { constraintText, editTargets, guardFailureText, namer, sourceText, type Chain } from "./explain.ts";
+import { constraintText, editTargets, staleText, namer, sourceText, type Chain } from "./explain.ts";
 import { testView } from "./view.test-support.ts";
 
 const view = testView();
@@ -47,7 +47,7 @@ describe("explanation words", () => {
   });
 
   it("names the reasons a node is stale", () => {
-    expect(guardFailureText({ open_dependency: "n_findings" }, name, undefined, (id) => id)).toContain("Findings");
-    expect(guardFailureText({ unticked: "load" }, name, undefined, () => "Load test")).toContain("Load test");
+    expect(staleText({ reopened: "n_findings" }, name, (id) => id)).toContain("Findings");
+    expect(staleText({ unticked: "load" }, name, () => "Load test")).toContain("Load test");
   });
 });

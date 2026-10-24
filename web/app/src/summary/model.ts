@@ -12,7 +12,7 @@ import type { Schema } from "@cairn/client";
 import { unblockersOf } from "../acting/waiting.ts";
 import type { FactTone } from "../acting/reasons.ts";
 import type { NodeRow } from "../acting/why.ts";
-import { guardFailureText, namer } from "../detail/explain.ts";
+import { namer, staleText } from "../detail/explain.ts";
 import { feedingDecision, itemTitle, milestonesFirst, nodeOf, recordOf, scheduledDate, titleOf, type GraphNode, type Ready } from "../detail/model.ts";
 import { snoozeEndWords } from "../status/snooze.ts";
 import { isOpen } from "../status/state.ts";
@@ -67,7 +67,7 @@ function overdueOf(ready: Ready, key: string): SummaryModel["overdue"][number] {
 
 function staleOf(ready: Ready, key: string): SummaryModel["stale"][number] {
   const name = namer(ready);
-  return { ...listed(ready, key), reasons: (ready.derived.nodes[key]?.stale ?? []).map((failure) => guardFailureText(failure, name, ready.derived.today, (id) => itemTitle(ready, key, id))) };
+  return { ...listed(ready, key), reasons: (ready.derived.nodes[key]?.stale ?? []).map((reason) => staleText(reason, name, (id) => itemTitle(ready, key, id))) };
 }
 
 /** C18: the projected summary with what a reader needs to read it. */
@@ -159,14 +159,9 @@ export interface Attention {
   tone: FactTone;
 }
 
-/** `Finished 2 days off what its chain allows`, or `Needs 2 days more than its chain allows`: what a shortfall of `count` days means for node `key`. */
-export function shortfallWords(ready: Ready, key: string, count: number | undefined): string {
-  if (count === undefined) {
-    return "Cannot be met as planned";
-  }
-  const finished = ready.derived.nodes[key]?.display_state === "done";
-  // A recorded date can break a chain by being too late or too early, so a finished node's shortfall says only how far off it is.
-  return finished ? `Finished ${daysWords(count)} off what its chain allows` : `Needs ${daysWords(count)} more than its chain allows`;
+/** `Needs 2 days more than its chain allows`: what a shortfall of `count` days means. Only work still ahead falls short. */
+export function shortfallWords(count: number | undefined): string {
+  return count === undefined ? "Cannot be met as planned" : `Needs ${daysWords(count)} more than its chain allows`;
 }
 
 /**
@@ -184,7 +179,7 @@ export function attentionRows(ready: Ready, model: SummaryModel): Attention[] {
     add(each.key, 0, each.lateDays === undefined ? "Overdue" : `${daysWords(each.lateDays)} late`);
   }
   for (const each of model.shortfalls) {
-    add(each.key, 1, shortfallWords(ready, each.key, each.days));
+    add(each.key, 1, shortfallWords(each.days));
   }
   for (const each of model.stale) {
     add(each.key, 2, each.reasons.length === 0 ? "Stale" : `Stale: ${each.reasons.join(", ")}`);

@@ -12,8 +12,6 @@ type Consequences = Schema<"Consequences">;
 /** What a guard waits on, in words: the thing a bypass passes the node without. */
 export function guardWords(guard: Schema<"Guard">): string {
   switch (guard) {
-    case "deps_done":
-      return "what it waits on";
     case "has_artifact":
       return "a link";
     case "has_note":
@@ -22,8 +20,6 @@ export function guardWords(guard: Schema<"Guard">): string {
       return "the checklist ticked";
     case "broken_down":
       return "a breakdown";
-    case "date_arrived":
-      return "waiting for its date";
   }
 }
 
@@ -41,10 +37,6 @@ export function keptWords(kind: FormCase): string {
     case "bypass":
     case "evidence":
       return "Marked done.";
-    case "start-anyway":
-      return "Started.";
-    case "anyway":
-      return "Answered.";
     case "snooze":
       return "Snoozed.";
     case "edit-date":

@@ -210,9 +210,23 @@ fn the_status_summary_counts_and_lists() {
     );
     assert_eq!((summary.overdue.len(), summary.stale.len()), (0, 0));
     let launch = Derive::of(support::finished("product-launch"), "j_launch");
+    assert!(
+        launch.journey().status_summary().shortfalls.is_empty(),
+        "the code freeze done late is a fact, and the launch can still be met"
+    );
+    let short = Derive::of(
+        support::journey(&format!(
+            "{}- op: set_pin\n  node: n_due\n  date: \"2026-10-08\"\n",
+            support::add_nodes(&[
+                "{key: n_prep, id: prep, kind: action, title: Prep, estimate: 3}",
+                "{key: n_due, id: due, kind: milestone, title: Due, requires: [n_prep]}",
+            ])
+        )),
+        support::JOURNEY,
+    );
     assert_eq!(
-        names(&launch.journey().status_summary().shortfalls),
-        ["n_code_freeze", "n_launch"]
+        names(&short.journey().status_summary().shortfalls),
+        ["n_due", "n_prep"]
     );
 }
 

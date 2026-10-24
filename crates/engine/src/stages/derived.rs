@@ -1,42 +1,34 @@
 //! The stage that needs derived state (D4, B6; ARCHITECTURE, Write path: apply): the final
-//! candidate is derived once, with the patch's today, and every guarded transition the patch
-//! attempted (start, complete or a first answer) is held to relevance and `deps_done` on it, so
-//! a guard is never satisfied only for a moment and a bulk completion is accepted in any
-//! order (A17). Relevance refuses a node that is not relevant and has no bypass (force include
-//! is the escape hatch); an undecided node passes, and neither do its condition gates hold it
-//! (`deps_done` as a guard reads it), so finishing undecided work is accepted and reported as
-//! a consequence (D7) that it may not apply. A `deps_done` bypass applied in the same patch
-//! accepts the open dependencies present, and they are recorded on it. Work or a decision
-//! whose own not-before date is after the patch's today fails `date_arrived` (A8); a bypass
-//! accepts that date and records it, so a later date is a distinct failure. A start is held
-//! to the same two guards, minus the node's own children, which only its finish waits on. A milestone is
-//! never held by its date: marking it done records when it happened. A snooze the patch made must sit on a node in scope that is not closed: not
-//! effectively skipped and not a milestone that reads as done (B6; a blocked node may be
-//! snoozed, Gating); a group has work left beneath it. An unsnooze of a node with no snooze of
-//! its own is refused while a container's snooze still holds over it on that graph, naming the
-//! container (B6).
+//! candidate is derived once, with the patch's today, and every transition the patch
+//! attempted that needs its node in scope (start, complete or a first answer) is held to
+//! relevance on it, so relevance is never satisfied only for a moment. Relevance refuses a
+//! node that is not relevant (force include is the escape hatch); an undecided node passes,
+//! so finishing undecided work is accepted and reported as a consequence (D7) that it may not
+//! apply. Order is never checked: a node is started, completed or answered whatever it waits
+//! on and whatever its own date. A snooze the patch made must sit on a node in scope that is
+//! not closed: not effectively skipped and not a milestone that reads as done (B6; a blocked
+//! node may be snoozed, Gating); a group has work left beneath it. An unsnooze of a node with
+//! no snooze of its own is refused while a container's snooze still holds over it on that
+//! graph, naming the container (B6).
 //!
 //! Each failure names the transition's mutation and, in `caused_by`, the patch's other
-//! mutations that brought it about: those that wrote the structure of the node, of the
-//! dependency, or of the ancestor, condition, or stage that carries it; the state, pin, or
-//! overrides of the dependency; or the answer behind a relevance that brought it or the node
-//! into or out of scope.
+//! mutations that brought it about: those that wrote the structure of the node, or of the
+//! condition behind its relevance, or the answer that decided it.
 //!
 //! Cost at the limits: one derive of the candidate (passes 1 to 5 and `stale`), skipped when
-//! the patch made no guarded transition and no snooze; then for each guarded node one walk of
-//! its entry chains (at most about 1,300 edges), and for each failure one pass over the
+//! the patch made no such transition and no snooze; then for each failure one pass over the
 //! patch's writes, at most the mutation limit's events.
 
 use std::collections::BTreeSet;
 
 use cairn_schema::{
-    DateSource, DependencyVia, Event, GraphKey, GraphRecord, Guard, GuardFailure, NodeKey,
-    NodeKind, Record, RecordKey, Relevance, Subject, ViolationCode, Write,
+    Event, GraphKey, GraphRecord, NodeKey, NodeKind, Record, RecordKey, Relevance, Subject,
+    ViolationCode, Write,
 };
 
 use super::Check;
 use crate::derive::relevance::Producer;
-use crate::derive::{Derived, EdgeSet, EffectiveDependency, derive_at};
+use crate::derive::{Derived, derive_at};
 use crate::graph::{Graph, Tree};
 use crate::validate::at_node;
 use cairn_schema::RankConstants;
@@ -87,8 +79,6 @@ pub(super) fn check(check: &mut Check<'_, '_>) {
     );
     for (key, ordinal) in &session.guarded {
         relevance(check, &graph, &derived, key, *ordinal);
-        deps_done(check, &graph, &derived, key, *ordinal);
-        date_arrived(check, &graph, &derived, key, *ordinal);
     }
     snoozes(check, &graph, &derived);
     unsnoozes_through(check, &tree, &derived);
@@ -120,145 +110,6 @@ fn relevance(check: &mut Check<'_, '_>, graph: &Graph, derived: &Derived, key: &
     violation.at.mutation = Some(at);
     violation.caused_by = causes(check.events, at, &involved);
     check.violations.push(violation);
-}
-
-/// D4: a guarded transition needs every hard dependency of its node satisfied on the graph
-/// the patch produces (an undecided node's condition gates aside), or a bypass in the patch
-/// that accepts the open ones.
-fn deps_done(check: &mut Check<'_, '_>, graph: &Graph, derived: &Derived, key: &NodeKey, at: u32) {
-    // A start is not held by the node's own children; its finish is.
-    let starting =
-        check.session.started.contains_key(key) && !check.session.completed.contains_key(key);
-    let open = if starting {
-        derived.start_open_dependencies(key)
-    } else {
-        derived.guard_open_dependencies(key)
-    };
-    if open.is_empty() {
-        return;
-    }
-    let failures: BTreeSet<GuardFailure> = open
-        .iter()
-        .cloned()
-        .map(GuardFailure::OpenDependency)
-        .collect();
-    if bypasses(check, graph, key, Guard::DepsDone) {
-        check
-            .bypassed
-            .entry(key.clone())
-            .or_default()
-            .extend(failures);
-        return;
-    }
-    // Where each open dependency comes from, whatever the node's own state: the ancestor,
-    // condition, or stage whose structure carries it.
-    let sources: Vec<EffectiveDependency> = derived
-        .dependencies()
-        .of(key, EdgeSet::Pruned)
-        .into_iter()
-        .filter(|dependency| open.contains(&dependency.node))
-        .collect();
-    let mut involved = Involved::default();
-    involved.structure.insert(key);
-    involved.structure.extend(&open);
-    involved
-        .structure
-        .extend(sources.iter().filter_map(|source| holder(&source.via)));
-    involved.state.extend(&open);
-    involved.overrides.extend(&open);
-    // An answer or condition that brought an open dependency into scope.
-    for dependency in &open {
-        if let Some(found) = derived.relevance().get(dependency)
-            && let Producer::Condition { on, decisions } = &found.producer
-        {
-            involved.structure.insert(on);
-            involved.state.extend(decisions);
-        }
-    }
-    let mut violation = at_node(
-        graph.tree(),
-        key,
-        ViolationCode::GuardFailed,
-        format!(
-            "this transition needs every hard dependency satisfied, and {} are open on the graph \
-             this patch produces; to go ahead anyway, bypass deps_done in the same patch",
-            open.len()
-        ),
-    );
-    violation.at.mutation = Some(at);
-    violation.bypassable = Some(Guard::DepsDone);
-    violation.failures = failures;
-    violation.caused_by = causes(check.events, at, &involved);
-    check.violations.push(violation);
-}
-
-/// A8, D4: a guarded transition of work or a decision needs the date its own not-before rules
-/// hold it to to have arrived, on the graph the patch produces, or a bypass in the patch that
-/// accepts that date.
-fn date_arrived(
-    check: &mut Check<'_, '_>,
-    graph: &Graph,
-    derived: &Derived,
-    key: &NodeKey,
-    at: u32,
-) {
-    let Some(date) = derived.too_early(graph, key) else {
-        return;
-    };
-    let failure = GuardFailure::TooEarly(date);
-    if bypasses(check, graph, key, Guard::DateArrived) {
-        check
-            .bypassed
-            .entry(key.clone())
-            .or_default()
-            .insert(failure);
-        return;
-    }
-    // The node's own rules and the dates of their sources: its structure, and the state,
-    // pins, and answers of the nodes its rules measure from.
-    let mut involved = Involved::default();
-    involved.structure.insert(key);
-    let sources: Vec<&NodeKey> = graph
-        .node(key)
-        .and_then(|node| node.not_before.as_ref())
-        .map(|rule| {
-            rule.sources
-                .as_set()
-                .iter()
-                .filter_map(|source| match source {
-                    DateSource::Node(node) => Some(node),
-                    DateSource::CreatedAt => None,
-                })
-                .collect()
-        })
-        .unwrap_or_default();
-    involved.state.extend(sources);
-    let mut violation = at_node(
-        graph.tree(),
-        key,
-        ViolationCode::GuardFailed,
-        format!(
-            "this node waits for its own not-before date, {date}, which has not arrived; \
-             to go ahead anyway, bypass date_arrived in the same patch"
-        ),
-    );
-    violation.at.mutation = Some(at);
-    violation.bypassable = Some(Guard::DateArrived);
-    violation.failures = BTreeSet::from([failure]);
-    violation.caused_by = causes(check.events, at, &involved);
-    check.violations.push(violation);
-}
-
-/// A bypass of `guard` on the node, applied in this patch.
-fn bypasses(check: &Check<'_, '_>, graph: &Graph, key: &NodeKey, guard: Guard) -> bool {
-    check.session.bypassed.contains_key(key)
-        && graph
-            .document()
-            .state
-            .overrides
-            .get(key)
-            .and_then(|overrides| overrides.bypass.as_ref())
-            .is_some_and(|bypass| bypass.guards.contains(&guard))
 }
 
 /// B6: a snooze the patch made sits on a node in scope that is not closed.
@@ -351,16 +202,6 @@ fn causes(events: &[Event], primary: u32, involved: &Involved<'_>) -> BTreeSet<u
     found
 }
 
-/// The node whose structure carries a dependency other than the dependent's own.
-fn holder(via: &DependencyVia) -> Option<&NodeKey> {
-    match via {
-        DependencyVia::Explicit | DependencyVia::Containment => None,
-        DependencyVia::Inherited { ancestor } => Some(ancestor),
-        DependencyVia::Condition { condition_on } => Some(condition_on),
-        DependencyVia::StageOpening { group } => Some(group),
-    }
-}
-
 /// What a write shapes: none for records no guard reads.
 fn shapes(write: &Write) -> Vec<Shape<'_>> {
     match write {
@@ -373,13 +214,11 @@ fn shapes(write: &Write) -> Vec<Shape<'_>> {
                     Shape::Structure(&edge.requires),
                 ]
             }
-            // A pin moves an `auto_done` milestone's date, so whether it reads as done.
-            GraphRecord::NodeState { node, .. } | GraphRecord::Pin { node, .. } => {
-                vec![Shape::State(node)]
-            }
+            GraphRecord::NodeState { node, .. } => vec![Shape::State(node)],
             GraphRecord::Answer { decision, .. } => vec![Shape::State(decision)],
             GraphRecord::Overrides { node, .. } => vec![Shape::Override(node)],
-            GraphRecord::Role(_)
+            GraphRecord::Pin { .. }
+            | GraphRecord::Role(_)
             | GraphRecord::Kind(_)
             | GraphRecord::DefaultOwner(_)
             | GraphRecord::Participation { .. }
@@ -403,11 +242,10 @@ fn shapes(write: &Write) -> Vec<Shape<'_>> {
                     Shape::Structure(&edge.requires),
                 ]
             }
-            GraphKey::NodeState(node) | GraphKey::Answer(node) | GraphKey::Pin(node) => {
-                vec![Shape::State(node)]
-            }
+            GraphKey::NodeState(node) | GraphKey::Answer(node) => vec![Shape::State(node)],
             GraphKey::Overrides(node) => vec![Shape::Override(node)],
-            GraphKey::Role(_)
+            GraphKey::Pin(_)
+            | GraphKey::Role(_)
             | GraphKey::Kind(_)
             | GraphKey::DefaultOwner
             | GraphKey::Participation { .. }

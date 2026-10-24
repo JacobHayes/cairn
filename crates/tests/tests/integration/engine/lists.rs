@@ -159,16 +159,12 @@ fn each_state_filter_keeps_what_it_names() {
             ListFlag::Overdue,
             vec!["n_access"],
         ),
-        (stale_findings(), ListFlag::Stale, vec!["n_findings"]),
         (
-            Derive::on(
-                &support::finished("product-launch"),
-                "j_launch",
-                "2026-10-06",
-            ),
-            ListFlag::Shortfall,
-            vec!["n_code_freeze", "n_launch"],
+            stale_findings(),
+            ListFlag::Stale,
+            vec!["n_findings", "n_findings_reviewer"],
         ),
+        (short(), ListFlag::Shortfall, vec!["n_due", "n_prep"]),
     ];
     for (derive, filter, expected) in cases {
         assert_eq!(
@@ -206,13 +202,31 @@ fn blocked_filter_lists_gated_containers_and_not_those_waiting_on_children() {
 }
 
 /// The vendor evaluation with a dependency inserted after its findings were done.
+/// The vendor evaluation the day after the findings were written, with the baseline they
+/// relied on reopened.
 fn stale_findings() -> Derive {
-    let records = support::accepted_on(
-        &support::vendor_after(8),
-        VENDOR,
-        "- op: add_node\n  node: {key: n_extra, id: extra, parent: n_reporting, kind: action, title: Extra}\n- op: add_edge\n  edge: {node: n_findings, requires: n_extra}\n",
+    let records = support::vendor_after(8);
+    let patch = support::patch_to(
+        &records,
+        &format!("{{journey: {VENDOR}}}"),
+        "- op: transition\n  node: n_baseline\n  transition: reopen\n",
     );
-    Derive::on(&records, VENDOR, "2026-10-06")
+    let mut inputs = support::fixed_inputs();
+    inputs.today = "2026-10-27".parse().unwrap();
+    inputs.at = "2026-10-27T12:00:00Z".parse().unwrap();
+    let reopened = support::apply(&records, &patch, &inputs).unwrap();
+    Derive::on(reopened.records(), VENDOR, "2026-10-27")
+}
+
+/// A journey whose milestone is pinned before the work it waits on can finish.
+fn short() -> Derive {
+    Derive::test(&support::journey(&format!(
+        "{}- op: set_pin\n  node: n_due\n  date: \"2026-10-08\"\n",
+        add(&[
+            "{key: n_prep, id: prep, kind: action, title: Prep, estimate: 3}",
+            "{key: n_due, id: due, kind: milestone, title: Due, requires: [n_prep]}",
+        ])
+    )))
 }
 
 /// C9: filters by group, kind, and state combine; text search finds a node by its title, a

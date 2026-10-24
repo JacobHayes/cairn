@@ -40,14 +40,14 @@ async function rejectionSurvivesAndResolves(page: Page) {
   await expect(syncChip(page)).toHaveAttribute("data-state", "not-saved");
   await expect(panel.locator('[data-testid="date"][data-label="Due"]')).toContainText("Nov 2");
   // The rejection and a reason typed meanwhile are kept per tab, so a reload loses neither.
-  await menuItem(panel, "done-anyway");
-  const reason = fresh("Reviewed out of band");
-  await panel.getByTestId("bypass").getByLabel("Why (optional)").fill(reason);
+  await menuItem(panel, "skip");
+  const reason = fresh("Covered elsewhere");
+  await panel.getByTestId("skip-form").getByLabel("Why skip it").fill(reason);
   await page.reload();
   panel = page.getByTestId("node-detail");
   conflict = panel.getByTestId("date-conflict");
   await expect(conflict).toBeVisible();
-  await expect(panel.getByTestId("bypass").getByLabel("Why (optional)")).toHaveValue(reason);
+  await expect(panel.getByTestId("skip-form").getByLabel("Why skip it")).toHaveValue(reason);
   // Away from the control it is still counted, and Go to it comes back to it.
   await goWithin(page, "/routes?type=routes");
   await expect(syncChip(page)).toHaveAttribute("aria-label", /^NOT SAVED · 1\./);
@@ -99,9 +99,8 @@ async function historyNamesWhoDidWhat(page: Page) {
   await expect(history.first()).toHaveAttribute("data-actor", /^u_/);
   await expect(history.first().getByTestId("history-sentence")).not.toContainText("u_");
   const before = await whenSettled(page, () => history.count());
-  // Its own date is ahead, so starting it is going ahead on purpose.
-  await panel.getByRole("button", { name: "Start anyway…" }).click();
-  await panel.getByTestId("start-anyway-form").getByRole("button", { name: "Start anyway" }).click();
+  // Its own date is ahead, and starting it is a plain move all the same.
+  await panel.getByRole("button", { name: "Start", exact: true }).click();
   await expect(history).toHaveCount(before + 1);
   await expect(history.last().getByTestId("history-sentence")).toHaveText(/^You /);
   await checkpoint(page);
@@ -320,36 +319,24 @@ test("a checklist item typed and not added survives a reload, and a replacement 
   await expect(nodeCard(page, "n_trial_a").getByTestId("card-state")).toHaveAttribute("data-state", "done");
 });
 
-test("work that waits is started anyway with no reason, and read as started early in its sentence with no chip; finishing ahead and answering ahead take no reason either (F6, D4)", async ({ page }) => {
-  // Start anyway: the form's reason is optional, so confirming with the field empty starts it.
+test("work that waits is started and finished, and a decision that waits is answered, each as a plain move (F6, D4)", async ({ page }) => {
   let panel = await openNode(page, "browser", "j_bakeoff", "n_comparison");
-  await expect(panel.getByRole("button", { name: "Start", exact: true })).toHaveCount(0);
-  await panel.getByRole("button", { name: "Start anyway…" }).click();
-  const start = panel.getByTestId("start-anyway-form");
-  await expect(start.getByLabel("Why (optional)")).toHaveValue("");
-  await start.getByRole("button", { name: "Start anyway" }).click();
+  await expect(state(panel)).toContainText(/blocked/i);
+  await panel.getByRole("button", { name: "Start", exact: true }).click();
   await settled(page);
   await expect(state(panel)).toContainText(/active/i);
-  await expect(panel.getByTestId("detail-sentence")).toContainText(/Started early, ahead of /);
-  await expect(panel.getByTestId("detail-sentence")).not.toContainText("with the reason");
-  await expect(panel.locator('[data-testid="flag"]').filter({ hasText: "started early" })).toHaveCount(0);
-  // Done anyway: the same, from the menu, and the sentence says it was done early and names the prerequisite.
+  await expect(panel.getByTestId("refused")).toHaveCount(0);
+  // A milestone whose prerequisites are open is marked done from its own button.
   panel = await openNode(page, "browser", "j_launch", "n_go_no_go");
-  await menuItem(panel, "done-anyway");
-  const done = panel.getByTestId("bypass");
-  await expect(done.getByRole("button", { name: "Mark done anyway" })).toBeEnabled();
-  await done.getByRole("button", { name: "Mark done anyway" }).click();
+  await panel.getByRole("button", { name: "Mark done", exact: true }).click();
   await settled(page);
-  await expect(panel.getByTestId("detail-sentence")).toContainText(/Done early/);
-  await expect(panel.getByTestId("detail-sentence")).not.toContainText("with the reason");
+  await expect(state(panel)).toContainText(/done/i);
   await checkpoint(page);
-  // A blocked decision is answered anyway with an empty reason.
   panel = await openNode(page, "browser", "j_bakeoff", "n_winner");
-  await menuItem(panel, "answer-anyway");
   await panel.getByRole("radio").first().check();
-  await expect(panel.getByTestId("answer-anyway").getByLabel("Why (optional)")).toHaveValue("");
-  await panel.getByRole("button", { name: "Save anyway" }).click();
+  await panel.getByRole("button", { name: "Save", exact: true }).click();
   await settled(page);
   await expect(state(panel)).toContainText(/decided/i);
   await checkpoint(page);
 });
+

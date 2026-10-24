@@ -15,8 +15,8 @@ use cairn_schema::{
     Group, Guard, GuardFailure, Identity, Insertion, JourneyHeader, JourneyState, JourneyStatus,
     Keyed, Lineage, LocalEdit, Milestone, Node, NodeField, NodeKey, NodeKind, NodeState, Overrides,
     ParticipationKind, ParticipationSource, Participations, Payload, Proposal, ProposalDraft,
-    ProposalStatus, Provenance, Resource, ResourceContent, RetiredKeys, Role, RouteHeader,
-    RouteKind, SnoozeTarget, State, Weight, refs::KeyRefs,
+    ProposalStatus, Provenance, Reopened, Resource, ResourceContent, RetiredKeys, Role,
+    RouteHeader, RouteKind, SnoozeTarget, State, Weight, refs::KeyRefs,
 };
 use serde_json::json;
 
@@ -192,25 +192,18 @@ pub fn annotation_contents() -> Vec<AnnotationContent> {
 /// Every guard and every guard failure, in one bypass.
 #[must_use]
 pub fn bypass() -> Bypass {
-    let guards = chain(Guard::DepsDone, |guard| match guard {
-        Guard::DepsDone => Some(Guard::HasArtifact),
+    let guards = chain(Guard::HasArtifact, |guard| match guard {
         Guard::HasArtifact => Some(Guard::HasNote),
         Guard::HasNote => Some(Guard::AllTicked),
         Guard::AllTicked => Some(Guard::BrokenDown),
-        Guard::BrokenDown => Some(Guard::DateArrived),
-        Guard::DateArrived => None,
+        Guard::BrokenDown => None,
     });
-    let failures = chain(
-        GuardFailure::OpenDependency(node_key(1)),
-        |failure| match failure {
-            GuardFailure::OpenDependency(_) => Some(GuardFailure::MissingArtifact),
-            GuardFailure::MissingArtifact => Some(GuardFailure::MissingNote),
-            GuardFailure::MissingNote => Some(GuardFailure::Unticked(id("load"))),
-            GuardFailure::Unticked(_) => Some(GuardFailure::NotBrokenDown),
-            GuardFailure::NotBrokenDown => Some(GuardFailure::TooEarly(day(2))),
-            GuardFailure::TooEarly(_) => None,
-        },
-    );
+    let failures = chain(GuardFailure::MissingArtifact, |failure| match failure {
+        GuardFailure::MissingArtifact => Some(GuardFailure::MissingNote),
+        GuardFailure::MissingNote => Some(GuardFailure::Unticked(id("load"))),
+        GuardFailure::Unticked(_) => Some(GuardFailure::NotBrokenDown),
+        GuardFailure::NotBrokenDown => None,
+    });
     Bypass {
         guards: guards.into_iter().collect(),
         reason: Some(id("Waived for now.")),
@@ -444,13 +437,9 @@ pub fn insertion(fill: Fill) -> Insertion {
     }
 }
 
-/// Every state record a journey holds: a node state in every state and provenance, every
-/// local edit, an answer of every type, filled and empty role fills, a pin, every snooze
-/// target, overrides with every reason and a bypass of every guard, a tombstone, and an
-/// annotation of every content.
-#[must_use]
-pub fn state(fill: Fill) -> JourneyState {
-    let nodes = (0..)
+/// A node state in every state and provenance, each with every field filled or cleared.
+fn node_states(fill: Fill) -> BTreeMap<NodeKey, NodeState> {
+    (0..)
         .zip(fill.rotate(State::ALL.to_vec()))
         .zip(fill.rotate(provenances()).into_iter().cycle())
         .map(|((index, state), provenance)| {
@@ -463,9 +452,22 @@ pub fn state(fill: Fill) -> JourneyState {
                     started_on: fill.some(day(1)),
                     finished_on: fill.some(day(2)),
                     reason: fill.some(id("Not needed here.")),
+                    reopened: fill.some(Reopened {
+                        on: day(3),
+                        finished_on: day(2),
+                    }),
                 },
             )
-        });
+        })
+        .collect()
+}
+
+/// Every state record a journey holds: a node state in every state and provenance, every
+/// local edit, an answer of every type, filled and empty role fills, a pin, every snooze
+/// target, overrides with every reason and a bypass of every guard, a tombstone, and an
+/// annotation of every content.
+#[must_use]
+pub fn state(fill: Fill) -> JourneyState {
     let annotations = (0..)
         .zip(fill.rotate(annotation_contents()))
         .map(|(index, content)| Annotation {
@@ -481,7 +483,7 @@ pub fn state(fill: Fill) -> JourneyState {
         });
     let fills = [("r_lead", vec!["who_a", "who_b"]), ("r_other", Vec::new())];
     JourneyState {
-        nodes: nodes.collect(),
+        nodes: node_states(fill),
         local_edits: BTreeMap::from([(node_key(0), local_edits())]),
         // A tick is a record of its own, so a put over the graph leaves it as it is, like a
         // local edit; the removal at the end of the conformance run takes it by key.

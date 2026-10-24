@@ -19,11 +19,11 @@ the old one?
   different names.
 - **Labels.** One label, "Mark done", for every kind and state, including a scheduled
   milestone (there is no "Mark done now" or "Confirm reached now"). The dated variant keeps
-  its date field, labelled "Done on". The bypass entry for a blocked milestone is the same
-  "Done anyway" every other kind has, so the separate act ids for reaching are folded into
+  its date field, labelled "Done on". A blocked milestone is marked done with the same plain
+  Mark done (order is never a guard), so the separate act ids for reaching are folded into
   the done act. History says "Marked done"; the Timeline, status chip and filter say "Done".
-- **A milestone's shortfall** reads "Finished N days off what its chain allows", as other
-  finished work does; the milestone-only wording is removed.
+- **A finished milestone** never reads short, like other finished work
+  (`2026-10-24-recorded-dates-never-warn.md`); the milestone-only wording is removed.
 - **Old data, migrated once** (migration 14). The tables: `node_states` is rebuilt without
   the old state (its rows become `done`), the milestone column is renamed, a journey's local
   edit of the flag names the new field, and the old event type becomes a node transition.

@@ -41,7 +41,7 @@
 //! or a fed date answer), never by a derived due, which is a deadline and not the event's
 //! date; a deliverable, action, or decision by its own not-before date
 //! ([`Dates::not_before`]). A group never is, and a container's date holds only its own
-//! work: its children hang off its entries, not its start. Work started early stays active
+//! work: its children hang off its entries, not its start. Work started before its date stays active
 //! and on the acting frontier.
 //!
 //! Cost at `node_count_max` (2,000 nodes, about 110,000 edges, 8,000 instants): the
@@ -480,7 +480,7 @@ impl Sweep<'_> {
         let open = in_scope && !closed;
         let own = self.holding(key, satisfied);
         let actionable = open && deps_done && !group && relevance == Relevance::Relevant;
-        // Work started early stays on the acting frontier.
+        // Work started before its date stays on the acting frontier.
         let scheduled = (actionable && state != State::Active)
             .then(|| self.date_ahead(node))
             .flatten();

@@ -293,31 +293,38 @@ fn a_negative_cycle_gets_bounds() {
     assert_eq!(bound(second.due.as_ref()), Some(date("2026-11-11")));
 }
 
-/// F6: two actuals that break a rule between them are a shortfall with the rule on its
-/// chain, from one fact to the other; the rule is never dropped.
+/// F6: an actual that breaks a rule of work still to do is that work's shortfall, with the
+/// rule on its chain from the fact to the pin; once the work is done too, the two facts break
+/// it between them and nothing is short.
 #[test]
-fn two_actuals_that_break_a_rule_are_a_shortfall() {
+fn an_actual_that_breaks_a_rule_of_remaining_work_is_its_shortfall() {
     let records = support::journey(&add(&[
-        "{key: n_freeze, id: freeze, kind: milestone, title: Freeze, due_by: {before: n_beta, offset: 2}}",
-        "{key: n_beta, id: beta, kind: milestone, title: Beta}",
+        "{key: n_freeze, id: freeze, kind: milestone, title: Freeze}",
+        "{key: n_beta, id: beta, kind: milestone, title: Beta, not_before: {after: n_freeze, offset: 2}}",
     ]));
-    let finished = support::accepted(
+    let frozen = support::accepted(
         &records,
-        "- op: transition\n  node: n_freeze\n  transition: complete\n\
-- op: transition\n  node: n_beta\n  transition: complete\n\
-- op: set_recorded_date\n  node: n_beta\n  end: finish\n  date: \"2026-10-05\"\n",
+        "- op: set_pin\n  node: n_beta\n  date: \"2026-10-07\"\n\
+- op: transition\n  node: n_freeze\n  transition: complete\n",
     );
-    let freeze = dates_of(&finished, "n_freeze");
-    let shortfall = freeze.shortfall.unwrap();
-    assert_eq!(shortfall.shortfall_days, 3);
-    assert_eq!(fixers(&shortfall.chain), [FixedBy::Actual, FixedBy::Actual]);
+    let shortfall = dates_of(&frozen, "n_beta").shortfall.unwrap();
+    assert_eq!(shortfall.shortfall_days, 1);
+    assert_eq!(fixers(&shortfall.chain), [FixedBy::Actual, FixedBy::Pin]);
     assert!(matches!(
         shortfall.chain.constraints[..],
         [cairn_schema::Constraint {
-            source: ConstraintSource::DueBy { .. },
+            source: ConstraintSource::NotBefore { .. },
             ..
         }]
     ));
+    assert_eq!(dates_of(&frozen, "n_freeze").shortfall, None);
+    let both = support::accepted(
+        &frozen,
+        "- op: transition\n  node: n_beta\n  transition: complete\n",
+    );
+    for node in ["n_freeze", "n_beta"] {
+        assert_eq!(dates_of(&both, node).shortfall, None, "{node}");
+    }
 }
 
 /// F1, F3: today holds back only unfinished decisions, deliverables, and actions. A pending
@@ -474,28 +481,20 @@ fn every_shortfall_move_resolves_it() {
             support::JOURNEY,
             "n_choice",
         ),
-        (
-            support::finished("product-launch"),
-            "j_launch",
-            "n_code_freeze",
-        ),
-        // Work reopened under a milestone marked done: today, through its start, still holds
-        // its pinned finish, so the milestone's fact is earlier than the work can finish.
+        // Work still to do that a late actual pushes past its deadline.
         (
             support::accepted(
-                &support::accepted(
-                    &support::journey(&add(&[
-                        "{key: n_work, id: work, kind: action, title: Work, estimate: 3}",
-                        "{key: n_after, id: after, kind: milestone, title: After, requires: [n_work]}",
-                    ])),
-                    "- op: set_pin\n  node: n_work\n  date: \"2026-10-10\"\n\
-- op: transition\n  node: n_work\n  transition: complete\n\
-- op: transition\n  node: n_after\n  transition: complete\n",
-                ),
-                "- op: transition\n  node: n_work\n  transition: reopen\n",
+                &support::journey(&add(&[
+                    "{key: n_kickoff, id: kickoff, kind: milestone, title: Kickoff}",
+                    "{key: n_review, id: review, kind: milestone, title: Review}",
+                    "{key: n_draft, id: draft, kind: action, title: Draft, estimate: 1, not_before: {after: n_kickoff, offset: 5}, due_by: {before: n_review}}",
+                ])),
+                "- op: set_pin\n  node: n_review\n  date: \"2026-10-10\"\n\
+- op: transition\n  node: n_kickoff\n  transition: complete\n\
+- op: set_recorded_date\n  node: n_kickoff\n  end: finish\n  date: \"2026-10-05\"\n",
             ),
             support::JOURNEY,
-            "n_work",
+            "n_draft",
         ),
     ];
     for (records, journey, node) in cases {
@@ -516,13 +515,11 @@ fn every_shortfall_move_resolves_it() {
     }
 }
 
-// Review round 2 regression.
-
-/// F6: a fact earlier than a rule from `created_at` or a date answer allows is short, shown
-/// on the node whose fact it is, since neither source is a node of its own. Started work is
-/// held at its finish, so it is the finish that is short, not the start.
+/// F6: a fact earlier than its own rule from `created_at` or a date answer allows is a fact,
+/// not a shortfall, for a start and a finish alike; and a code freeze finished after the
+/// launch's chain allowed is not short, nor the launch, and the journey takes the next patch.
 #[test]
-fn a_fact_too_early_for_created_at_or_an_answer_is_short() {
+fn a_fact_against_its_own_rule_is_never_short() {
     let records = support::journey(&add(&[
         "{key: n_date, id: date, kind: decision, title: Date, prompt: When?, answer_type: date}",
         "{key: n_settled, id: settled, kind: action, title: Settled, not_before: {after: journey.created_at}}",
@@ -540,35 +537,16 @@ fn a_fact_too_early_for_created_at_or_an_answer_is_short() {
 - op: set_recorded_date\n  node: n_answered\n  end: start\n  date: \"2026-10-01\"\n\
 - op: set_recorded_date\n  node: n_answered\n  end: finish\n  date: \"2026-10-02\"\n",
     );
-    for (node, days, source) in [
-        ("n_settled", 2, Instant::CreatedAt),
-        (
-            "n_answered",
-            3,
-            Instant::Answer {
-                decision: key("n_date"),
-            },
-        ),
-    ] {
-        let shortfall = dates_of(&finished, node).shortfall.unwrap();
-        assert_eq!(shortfall.shortfall_days, days, "{node}");
-        assert_eq!(shortfall.chain.fixed[0].instant, source, "{node}");
+    for node in ["n_settled", "n_answered"] {
+        assert_eq!(dates_of(&finished, node).shortfall, None, "{node}");
     }
-}
-
-/// F6: the launch's code freeze is done two days after the launch pin's chain allows; the
-/// shortfall names that chain, and an unrelated patch after it is accepted.
-#[test]
-fn a_late_actual_is_a_shortfall_never_a_rejection() {
-    let records = support::finished("product-launch");
-    let derived = support::derived(&records, "j_launch");
-    assert_eq!(
-        derived.dates().shortfall_days(&key("n_code_freeze")),
-        Some(2)
-    );
-    assert_eq!(derived.dates().shortfall_days(&key("n_launch")), Some(2));
+    let launch = support::finished("product-launch");
+    let derived = support::derived(&launch, "j_launch");
+    for node in ["n_code_freeze", "n_launch"] {
+        assert_eq!(derived.dates().shortfall_days(&key(node)), None, "{node}");
+    }
     support::accepted_on(
-        &records,
+        &launch,
         "j_launch",
         "- op: add_annotation\n  annotation: {key: a_late, node: n_code_freeze, note: Slipped two days.}\n",
     );

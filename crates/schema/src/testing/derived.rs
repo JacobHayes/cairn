@@ -6,7 +6,7 @@ use super::model::bounded_vec;
 use super::{
     arb_date, arb_deployment, arb_domain, arb_guard_failure, arb_identity_key, arb_journey,
     arb_kind_key, arb_node_field, arb_node_key, arb_patch_id, arb_path, arb_proposal_id,
-    arb_revision, arb_role_key, arb_snooze_target, arb_subject, arb_write,
+    arb_revision, arb_role_key, arb_snooze_target, arb_stale_reason, arb_subject, arb_write,
 };
 use crate::chain::{
     Chain, ChainList, Constraint, ConstraintSource, DependencyVia, FixedBy, FixedDate, Instant,
@@ -14,8 +14,8 @@ use crate::chain::{
 };
 use crate::derived::{
     Blocker, Bound, ChecklistCount, Consequences, Contribution, DateOrigin, DeriveInputs, Derived,
-    DisplayState, DomainDocument, DoneEarly, EffectiveDate, EffectiveParticipation, Explained,
-    NodeDates, NodeDerived, ParticipationOrigin, Progress, RankConstants, Real, Relevance,
+    DisplayState, DomainDocument, EffectiveDate, EffectiveParticipation, Explained, NodeDates,
+    NodeDerived, ParticipationOrigin, Progress, RankConstants, Real, Relevance,
     RelevanceExplanation, Score, StaleConsequence, StallCause, Stalled,
 };
 use crate::limits::Limit;
@@ -166,12 +166,10 @@ pub fn arb_violation() -> BoxedStrategy<Violation> {
         prop::collection::vec(arb_subject(), 0..2),
         prop::option::of(prop::sample::select(Limit::ALL.to_vec())),
         prop::option::of(prop::sample::select(vec![
-            Guard::DepsDone,
             Guard::HasArtifact,
             Guard::HasNote,
             Guard::AllTicked,
             Guard::BrokenDown,
-            Guard::DateArrived,
         ])),
         prop::collection::btree_set(arb_guard_failure(), 0..2),
         (
@@ -302,7 +300,6 @@ fn arb_node_dates() -> BoxedStrategy<NodeDates> {
             )),
             prop::option::of(arb_date()),
         ),
-        prop::option::of((1u32..60, arb_date(), arb_constraint_source())),
         prop::collection::vec(arb_date_link(), 0..3),
     )
         .prop_map(
@@ -313,7 +310,6 @@ fn arb_node_dates() -> BoxedStrategy<NodeDates> {
                 days,
                 shortfall,
                 (effective, not_before),
-                early,
                 links,
             )| {
                 NodeDates {
@@ -325,7 +321,6 @@ fn arb_node_dates() -> BoxedStrategy<NodeDates> {
                     shortfall,
                     effective_date: effective.map(|(date, origin)| EffectiveDate { date, origin }),
                     not_before,
-                    done_early: early.map(|(days, date, source)| DoneEarly { days, date, source }),
                     links,
                 }
             },
@@ -420,8 +415,6 @@ pub fn arb_display_state() -> BoxedStrategy<DisplayState> {
 fn arb_derived_extras() -> BoxedStrategy<(
     Option<Progress>,
     std::collections::BTreeSet<Guard>,
-    std::collections::BTreeSet<Guard>,
-    bool,
     Explained<Blocker>,
 )> {
     let progress = prop::option::of((0u32..20, 0u32..20, 0u32..20, 0u32..20).prop_map(
@@ -434,12 +427,10 @@ fn arb_derived_extras() -> BoxedStrategy<(
     ));
     let guards = prop::collection::btree_set(
         prop::sample::select(vec![
-            Guard::DepsDone,
             Guard::HasArtifact,
             Guard::HasNote,
             Guard::AllTicked,
             Guard::BrokenDown,
-            Guard::DateArrived,
         ]),
         0..3,
     );
@@ -451,7 +442,7 @@ fn arb_derived_extras() -> BoxedStrategy<(
                 total,
             }
         });
-    (progress, guards.clone(), guards, any::<bool>(), waits).boxed()
+    (progress, guards, waits).boxed()
 }
 
 /// A blocker, with a date or none.
@@ -492,7 +483,7 @@ pub fn arb_node_derived() -> BoxedStrategy<NodeDerived> {
         prop::collection::vec(any::<bool>(), 7),
         arb_blocked(),
         prop::collection::btree_map(arb_kind_key(), arb_participation(), 0..2),
-        prop::collection::btree_set(arb_guard_failure(), 0..2),
+        prop::collection::btree_set(arb_stale_reason(), 0..2),
         arb_node_dates(),
         (
             prop::option::of(arb_snooze_target()),
@@ -518,7 +509,7 @@ pub fn arb_node_derived() -> BoxedStrategy<NodeDerived> {
                 (gravity, gravity_from, unlocks, unlocks_from, rank),
                 shown,
                 subtree,
-                (progress, failing_guards, start_guards, started_early, waits_on),
+                (progress, failing_guards, waits_on),
                 checklist_count,
             )| {
                 let flag = |index: usize| flags.get(index).copied().unwrap_or(false);
@@ -539,8 +530,6 @@ pub fn arb_node_derived() -> BoxedStrategy<NodeDerived> {
                     progress,
                     checklist_count,
                     failing_guards,
-                    start_guards,
-                    started_early,
                     waits_on,
                     done_by_date: flag(5),
                     snoozed,
@@ -604,7 +593,7 @@ pub fn arb_derived() -> BoxedStrategy<Derived> {
 pub fn arb_consequences() -> BoxedStrategy<Consequences> {
     let stale = (
         arb_node_key(),
-        prop::collection::btree_set(arb_guard_failure(), 1..3),
+        prop::collection::btree_set(arb_stale_reason(), 1..3),
     )
         .prop_map(|(node, reasons)| StaleConsequence { node, reasons });
     let shortfall = (arb_node_key(), arb_short_chain())

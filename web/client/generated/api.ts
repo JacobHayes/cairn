@@ -2074,26 +2074,6 @@ export interface components {
         };
         /** @description A domain: `deployment`, `journey:<id>`, or `route:<id>`. */
         DomainName: string;
-        /** @description How early a node finished, and ahead of what. */
-        DoneEarly: {
-            /**
-             * Format: date
-             * @description The date it was finished ahead of: the requirement's or opening's earliest date today
-             *     (its recorded date once it has one; a milestone's date as shown, its actual, pin or
-             *     due, when that is later), or its own not-before date.
-             */
-            date: string;
-            /**
-             * Format: uint32
-             * @description Days between its finish and the date it was finished ahead of.
-             */
-            days: number;
-            /**
-             * @description What it was finished ahead of: a dependency, with how it arose (a stage opening
-             *     among them), or its own not-before rule.
-             */
-            source: components["schemas"]["ConstraintSource"];
-        };
         /** @description Where a route draft comes from. */
         DraftSource: "edit" | "import" | {
             save_as_route: {
@@ -2517,20 +2497,18 @@ export interface components {
         } | {
             annotation: components["schemas"]["Annotation"];
         };
-        /** @description A transition guard. */
-        Guard: "deps_done" | "has_artifact" | "has_note" | "all_ticked" | "broken_down" | "date_arrived";
+        /**
+         * @description A transition guard: evidence a deliverable's or action's completion needs. Order is never
+         *     a guard.
+         */
+        Guard: "has_artifact" | "has_note" | "all_ticked" | "broken_down";
         /**
          * @description One specific guard failure: what a bypass records, so a later distinct failure
-         *     still produces `stale`, and what `stale` lists.
+         *     still produces `stale`.
          */
-        GuardFailure: {
-            open_dependency: components["schemas"]["NodeKey"];
-        } | "missing_artifact" | "missing_note" | {
+        GuardFailure: "missing_artifact" | "missing_note" | {
             unticked: components["schemas"]["Slug"];
-        } | "not_broken_down" | {
-            /** Format: date */
-            too_early: string;
-        };
+        } | "not_broken_down";
         /**
          * @description `GET /healthz`: whether the server is serving. Answered 200 when it is, and 503 when its
          *     store has failed closed and answers nothing until the process is restarted.
@@ -3582,13 +3560,6 @@ export interface components {
         } & (unknown & unknown & unknown & unknown & unknown & unknown & unknown & unknown & unknown & unknown & unknown & unknown & unknown);
         /** @description A node's derived dates. Every bound is null when nothing reaches it. */
         NodeDates: {
-            /**
-             * @description Finished before something it was finished ahead of on purpose, on today's dates: a
-             *     dependency or its own date its guard bypass accepted, a stage opening that does not
-             *     gate, or a milestone's own not-before rule. None when none of those would have put
-             *     its finish later. Other shortfalls still apply.
-             */
-            done_early?: components["schemas"]["DoneEarly"] | null;
             /** @description The latest it can finish. */
             due?: components["schemas"]["Bound"] | null;
             /** @description The earliest it can start. */
@@ -3606,8 +3577,8 @@ export interface components {
              * Format: date
              * @description The earliest its own not-before rules let it start: the latest of each source's
              *     earliest date plus the rule's offset. Work or a decision whose date this is, while it
-             *     is after today, is scheduled and must wait for it to finish without a bypass. None
-             *     when it has no such rule, or no source has a date.
+             *     is after today, is scheduled: off the acting frontier, though it can still be started
+             *     or finished. None when it has no such rule, or no source has a date.
              */
             not_before?: string | null;
             /**
@@ -3656,10 +3627,9 @@ export interface components {
             /** @description A pending auto-done milestone that reads as done. */
             done_by_date?: boolean;
             /**
-             * @description The bypassable guards its completing transition (complete a deliverable or
-             *     action, answer an open decision, complete a pending milestone) would fail if attempted
-             *     now with no bypass in the patch. Empty for every node with no such transition left:
-             *     finished, not relevant, or a group.
+             * @description The bypassable guards completing it (a deliverable or action) would fail if attempted
+             *     now with no bypass in the patch: the evidence it still lacks. Empty for every other
+             *     node, and for one finished or not relevant.
              */
             failing_guards?: components["schemas"]["Guard"][];
             /** @description Gravity and its contributors (Priority). */
@@ -3706,21 +3676,11 @@ export interface components {
              *     container and shows its own target in `snoozed`.
              */
             snoozed_via?: components["schemas"]["NodeKey"] | null;
-            /** @description Why a terminal node's completing guards would now fail. */
-            stale?: components["schemas"]["GuardFailure"][];
             /**
-             * @description The bypassable guards starting the node (a deliverable or action not yet started) would
-             *     fail if attempted now with no bypass in the patch: `deps_done` while a gate it waits
-             *     on is open (its own children and an undecided node's condition gates aside), and
-             *     `date_arrived` while its own not-before date is ahead. Empty when a plain start is
-             *     accepted and for every node with no start left.
+             * @description Why a finished node is stale: a dependency it relied on was reopened, or evidence its
+             *     completion needed is now missing.
              */
-            start_guards?: components["schemas"]["Guard"][];
-            /**
-             * @description Stored `active` with a guard bypass that recorded what the start went ahead of: an
-             *     open dependency or its own not-before date.
-             */
-            started_early?: boolean;
+            stale?: components["schemas"]["StaleReason"][];
             /**
              * @description A container's subtree gravity (Priority): what rides on its whole area, the counted
              *     weight of the container and its open descendants and everything downstream of any of
@@ -3948,6 +3908,12 @@ export interface components {
              *     a reason).
              */
             reason?: components["schemas"]["Reason"] | null;
+            /**
+             * @description Its latest reopen of a finish, while it has not finished again: what finished work
+             *     that relied on it reads to go stale. None after reopening a skip or a mark done, which
+             *     left nothing to rely on.
+             */
+            reopened?: components["schemas"]["Reopened"] | null;
             /**
              * Format: date
              * @description When a deliverable or action was started; editable like an actual date.
@@ -4992,6 +4958,19 @@ export interface components {
         } | {
             kind: components["schemas"]["KindKey"];
         };
+        /** @description A reopen of a finish: the day it happened and the finish it undid. */
+        Reopened: {
+            /**
+             * Format: date
+             * @description The day it had finished.
+             */
+            finished_on: string;
+            /**
+             * Format: date
+             * @description The day it was reopened.
+             */
+            on: string;
+        };
         /** @description The kinds of resolution a conflict can offer: [`ConflictResolution`] without its payload. */
         ResolutionKind: "keep_journey" | "take_route" | "map_choices" | "clear_state" | "reopen" | "remap_role" | "remap_kind" | "remove";
         /** @description Route-authored guidance on a node, keyed so upgrades diff it. */
@@ -5553,8 +5532,14 @@ export interface components {
             /** @description The node. */
             node: components["schemas"]["NodeKey"];
             /** @description The reasons it gained. */
-            reasons: components["schemas"]["GuardFailure"][];
+            reasons: components["schemas"]["StaleReason"][];
         };
+        /** @description Why a finished node is stale. */
+        StaleReason: {
+            reopened: components["schemas"]["NodeKey"];
+        } | "missing_artifact" | "missing_note" | {
+            unticked: components["schemas"]["Slug"];
+        } | "not_broken_down";
         /** @description What a stalled journey waits on. */
         StallCause: {
             gate: components["schemas"]["NodeKey"];
@@ -5893,7 +5878,7 @@ export interface components {
             at: components["schemas"]["Location"];
             /**
              * @description The guard a bypass would accept this past, when it is a bypassable guard failure
-             *     (`deps_done`, `has_artifact`, `broken_down`).
+             *     (`has_artifact`, `has_note`, `all_ticked`, `broken_down`).
              */
             bypassable?: components["schemas"]["Guard"] | null;
             /**

@@ -130,17 +130,11 @@ fn board() -> Records {
     ]))
 }
 
-/// A step written in words: `done n_x`, `start n_x` (`start! n_x` ahead of what it waits on),
-/// `reopen n_x`, `skip n_x`, `yes n_decision`, `no n_decision`, `pin n_x 2026-10-05`, `snooze n_x 2026-10-09`.
+/// A step written in words: `done n_x`, `start n_x`, `reopen n_x`, `skip n_x`, `yes n_decision`, `no n_decision`, `pin n_x 2026-10-05`, `snooze n_x 2026-10-09`.
 fn step(text: &str) -> String {
     match text.split(' ').collect::<Vec<_>>().as_slice() {
         ["done", node] => transition(node, "complete"),
         [verb @ ("start" | "stop" | "reopen"), node] => transition(node, verb),
-        // Ahead of what it waits on: the bypass and the start in one patch.
-        ["start!", node] => format!(
-            "- op: apply_override\n  node: {node}\n  override: {{guard_bypass: {{guards: [deps_done]}}}}\n{}",
-            transition(node, "start")
-        ),
         ["skip", node] => skip(node),
         ["yes", decision] => answer(decision, "{boolean: true}"),
         ["no", decision] => answer(decision, "{boolean: false}"),
@@ -184,7 +178,7 @@ fn precedence_rows() {
         (&[], DAY, "n_second", Blocked),
         (&[], DAY, "n_wall_kid", Blocked),
         (&["done n_first"], DAY, "n_walled", Ready),
-        (&["start! n_wall_kid"], DAY, "n_walled", Blocked),
+        (&["start n_wall_kid"], DAY, "n_walled", Blocked),
         (&["done n_finish"], DAY, "n_finish", Done),
         (&["yes n_ask"], DAY, "n_ask", Done),
         (&["done n_box_kid"], DAY, "n_box", Done),

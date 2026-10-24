@@ -21,7 +21,7 @@ use crate::graph::{
 use crate::refs::{FileRefs, KeyRefs};
 use crate::state::{
     AnswerText, AnswerValue, Bypass, Guard, GuardFailure, JourneyState, LocalEdit, NodeState,
-    Overrides, Provenance, SnoozeTarget, State,
+    Overrides, Provenance, Reopened, SnoozeTarget, StaleReason, State,
 };
 
 /// A role.
@@ -143,15 +143,17 @@ pub fn arb_node_state() -> impl Strategy<Value = NodeState> {
         prop::option::of(arb_date()),
         prop::option::of(arb_date()),
         prop::option::of(arb_reason()),
+        prop::option::of((arb_date(), arb_date())),
     )
         .prop_map(
-            |(state, provenance, atomic, started_on, finished_on, reason)| NodeState {
+            |(state, provenance, atomic, started_on, finished_on, reason, reopened)| NodeState {
                 state,
                 provenance,
                 atomic,
                 started_on,
                 finished_on,
                 reason,
+                reopened: reopened.map(|(on, finished_on)| Reopened { on, finished_on }),
             },
         )
 }
@@ -176,24 +178,28 @@ pub fn arb_answer_value() -> impl Strategy<Value = AnswerValue> {
 /// A guard failure.
 pub fn arb_guard_failure() -> impl Strategy<Value = GuardFailure> {
     prop_oneof![
-        arb_node_key().prop_map(GuardFailure::OpenDependency),
         Just(GuardFailure::MissingArtifact),
         Just(GuardFailure::MissingNote),
         arb_slug().prop_map(GuardFailure::Unticked),
         Just(GuardFailure::NotBrokenDown),
-        arb_date().prop_map(GuardFailure::TooEarly),
+    ]
+}
+
+/// Why a finished node is stale.
+pub fn arb_stale_reason() -> impl Strategy<Value = StaleReason> {
+    prop_oneof![
+        arb_node_key().prop_map(StaleReason::Reopened),
+        arb_guard_failure().prop_map(StaleReason::from),
     ]
 }
 
 /// A guard.
 pub fn arb_guard() -> impl Strategy<Value = Guard> {
     prop::sample::select(vec![
-        Guard::DepsDone,
         Guard::HasArtifact,
         Guard::HasNote,
         Guard::AllTicked,
         Guard::BrokenDown,
-        Guard::DateArrived,
     ])
 }
 

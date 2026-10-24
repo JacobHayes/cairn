@@ -138,7 +138,7 @@ pub struct Violation {
     pub limit: Option<Limit>,
     // PRD: D4.
     /// The guard a bypass would accept this past, when it is a bypassable guard failure
-    /// (`deps_done`, `has_artifact`, `broken_down`).
+    /// (`has_artifact`, `has_note`, `all_ticked`, `broken_down`).
     #[serde(skip_serializing_if = "Option::is_none")]
     pub bypassable: Option<Guard>,
     // PRD: D4.

@@ -4,7 +4,7 @@
 //! condition onto each descendant, both in what each node directly depends on and in what it
 //! transitively reaches, for gate edges and for all edges, in the full and pruned sets; and
 //! blocking (pass 5) read off the entry chain agrees with blocking read off the plain
-//! expansion: what satisfies dependencies and each node's `deps_done`.
+//! expansion: what satisfies dependencies and whether each node is blocked.
 
 #[cfg(test)]
 mod property {

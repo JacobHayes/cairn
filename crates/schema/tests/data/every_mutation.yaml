@@ -179,7 +179,7 @@ mutations:
   override:
     guard_bypass:
       guards:
-      - deps_done
+      - has_note
       reason: Signed off by phone.
 - op: remove_override
   node: n_plan

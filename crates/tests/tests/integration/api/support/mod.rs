@@ -472,8 +472,7 @@ pub async fn proposals_of_every_domain(
         "title": "Charter first",
         "destination_revision": journey.revision,
         "mutations": [
-            {"op": "add_node", "node": {"key": "n_charter", "id": "charter", "kind": "action", "title": "Charter"}},
-            {"op": "add_edge", "edge": {"node": "n_kickoff", "requires": "n_charter"}},
+            {"op": "add_node", "node": {"key": "n_charter", "id": "charter", "kind": "action", "title": "Charter", "due_by": {"before": "n_kickoff", "offset": 30}}},
         ],
     });
     let route = serde_json::json!({

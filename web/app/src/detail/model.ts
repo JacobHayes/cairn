@@ -284,11 +284,6 @@ export function waitsOn(view: Ready, key: string): Holding[] {
   });
 }
 
-/** D4, F6: the guards starting `key` now would go ahead of, as the engine derived them; empty when a plain start is accepted. */
-export function startGuards(view: Ready, key: string): Schema<"Guard">[] {
-  return view.derived.nodes[key]?.start_guards ?? [];
-}
-
 /**
  * D8: the date a scheduled node waits for: a milestone's effective date (its pin, or the date it
  * marks itself done), else its own not-before date. None for a node no date holds.
@@ -333,7 +328,7 @@ export type FlagTone = "good" | "warn" | "bad" | "plain";
 /**
  * D3: the derived flags a node carries (C8) that are real attention, those that are set. The one list every surface (inspector, rows, cards) renders. What
  * its display state already says (blocked, snoozed, skipped, actionable, done by its date) is not
- * a flag (D8); nor is started early, which the node's sentence says (F6).
+ * a flag (D8), and neither is work moved ahead of what it waits on, which is no warning (F6).
  */
 export function flagsOf(derived: NodeDerived): { flag: string; tone: FlagTone }[] {
   const flags: { flag: string; tone: FlagTone }[] = [];

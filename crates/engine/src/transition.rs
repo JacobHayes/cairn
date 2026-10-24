@@ -1,9 +1,9 @@
 //! The per-kind state machines (D1): which transitions each kind's table has, from which
 //! states, to which. Answering a decision is its own mutation and its own row
-//! ([`answered`]); everything else is a [`Transition`]. Guards are not here: `has_artifact`
-//! and `broken_down` are checked on the graph a patch produces (the guards stage), and the
-//! guards that need derived state (relevance, `deps_done`) join with derive (2.4). Marking a
-//! group done is a skip-like terminal move: like a skip it is never guarded.
+//! ([`answered`]); everything else is a [`Transition`]. Guards are not here: the evidence
+//! guards are checked on the graph a patch produces (the guards stage), and relevance joins
+//! with derive. Marking a group done is a skip-like terminal move: like a skip it is never
+//! guarded.
 
 use cairn_schema::{NodeKind, State, Transition};
 
@@ -109,8 +109,8 @@ pub fn answered(from: State) -> Option<State> {
     next(NodeKind::Decision, from, Move::Answer)
 }
 
-/// D4: whether a move is a transition whose guards a bypass can cover: a start, a complete
-/// and a first answer. A start is held to `deps_done` and `date_arrived` only.
+/// D4: whether a move needs its node in scope: a start, a complete and a first answer. Only
+/// a deliverable's or action's completion has guards a bypass can cover, the evidence ones.
 #[must_use]
 pub fn is_guarded(kind: NodeKind, from: State, step: Move) -> bool {
     let guarded = match step {

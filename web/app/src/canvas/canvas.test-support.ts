@@ -1,6 +1,6 @@
 // A small derived journey and its canvas levels for the canvas's unit tests, written as the
 // derive worker answers them: a kickoff milestone (done) opening a build stage, whose build
-// deliverable is active while blocked by an optional extra (started early) and holds a check
+// deliverable is active while blocked by an optional extra (started ahead of it) and holds a check
 // action; a decision the extra's condition reads, so the extra is undecided; and an old step
 // that is not relevant.
 import type { Ready } from "../detail/model.ts";
@@ -70,12 +70,10 @@ export function canvasView(): Ready {
           overdue: true,
           blocked_by: [{ node: "n_option", via: "explicit" }, { node: "n_check", via: "containment" }],
           waits_on: { entries: [{ node: "n_option", via: "explicit" }], total: 1 },
-          started_early: true,
-          failing_guards: ["deps_done"],
           progress: buildProgress,
           dates: { due: bound("2026-10-01"), overdue_days: 5 },
         },
-        n_check: { ...base, display_state: "blocked", ...relevant, ...owned, gravity: 5, failing_guards: ["deps_done"], dates: { due: bound("2026-11-30") } },
+        n_check: { ...base, display_state: "blocked", ...relevant, ...owned, gravity: 5, dates: { due: bound("2026-11-30") } },
         n_option: {
           ...base,
           display_state: "conditional",

@@ -11,7 +11,7 @@ import { Link } from "react-router";
 
 import { ActButton } from "../detail/ActButton.tsx";
 import { newAttachmentKey } from "../detail/Attachments.tsx";
-import { guardFailureText, namer } from "../detail/explain.ts";
+import { namer, staleText } from "../detail/explain.ts";
 import { itemTitle, titleOf, type Ready, type Mutation } from "../detail/model.ts";
 import { Rejected } from "../detail/Rejected.tsx";
 import { useFormDraft, useNodeWrite, type NodeWrite } from "../detail/write.ts";
@@ -88,9 +88,9 @@ function AddNote({ write, node }: { write: NodeWrite; node: string }) {
   );
 }
 
-/** D4: a guard failure that makes finished work stale, as a sentence. */
+/** D4: a reason finished work is stale, as a sentence. */
 function staleWords(view: Ready, key: string, failure: NonNullable<ReturnType<typeof firstStale>>): string {
-  return upperFirst(guardFailureText(failure, namer(view), view.derived.today, (id) => itemTitle(view, key, id)));
+  return upperFirst(staleText(failure, namer(view), (id) => itemTitle(view, key, id)));
 }
 
 function firstStale(view: Ready, key: string) {
@@ -133,7 +133,7 @@ function LookRow({ view, write, look, to }: { view: Ready; write: NodeWrite; loo
     <NodeItem view={view} node={look.row.key} to={to} fact={look.reason} testId="fold-item">
       <span className="row-side">
         {look.fix === "note" ? <AddNote write={write} node={look.row.key} /> : null}
-        {look.fix === "unsnooze" ? <ActButton act="unsnooze" view={view} node={look.row.key} write={write} waiting={false} open={noForm} /> : null}
+        {look.fix === "unsnooze" ? <ActButton act="unsnooze" view={view} node={look.row.key} write={write} open={noForm} /> : null}
         {look.fix === "open" ? <Link className="button" to={to}>{look.reason.endsWith("plan") ? "Open dates" : "Open"}</Link> : null}
       </span>
     </NodeItem>
@@ -169,7 +169,7 @@ function SnoozedGroup({ view, write, held, toOf }: { view: Ready; write: NodeWri
       <span className="row fold-group-head">
         <strong>{held.container === undefined ? `Snoozed ${until}` : `${titleOf(view, held.container)} is snoozed ${until}`}</strong>
         {held.container === undefined ? null : (
-          <ActButton act="unsnooze" view={view} node={held.container} write={write} waiting={false} open={noForm} />
+          <ActButton act="unsnooze" view={view} node={held.container} write={write} open={noForm} />
         )}
       </span>
       <ul className="plain-list node-rows">
@@ -177,7 +177,7 @@ function SnoozedGroup({ view, write, held, toOf }: { view: Ready; write: NodeWri
           <NodeItem key={row.key} view={view} node={row.key} to={toOf(row.key)} testId="fold-item">
             {held.container === undefined ? (
               <span className="row-side">
-                <ActButton act="unsnooze" view={view} node={row.key} write={write} waiting={false} open={noForm} />
+                <ActButton act="unsnooze" view={view} node={row.key} write={write} open={noForm} />
               </span>
             ) : null}
           </NodeItem>

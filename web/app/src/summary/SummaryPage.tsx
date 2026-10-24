@@ -77,7 +77,7 @@ function MilestoneWhen({ ready, line }: { ready: Ready; line: MilestoneLine }) {
         <span className={ink}>{whenWords(line.date, done ? "actual" : line.origin, today)}</span>
       </Tip>
       .
-      {line.shortfallDays === undefined ? null : <span className="ink-bad">{` ${shortfallWords(ready, line.key, line.shortfallDays)}.`}</span>}
+      {line.shortfallDays === undefined ? null : <span className="ink-bad">{` ${shortfallWords(line.shortfallDays)}.`}</span>}
     </>
   );
 }
@@ -158,7 +158,7 @@ function Dates({ ready, model, skip }: { ready: Ready; model: SummaryModel; skip
             <Tip tip={`This date is ${originWord(each.origin)}`} tap>
               <span className={`summary-date-when ${inkClass(dateInk(each.date, today)) ?? "muted"}`}>{whenWords(each.date, each.origin, today)}</span>
             </Tip>
-            {short === undefined ? null : <span className="ink-bad summary-date-short">{shortfallWords(ready, each.key, short)}</span>}
+            {short === undefined ? null : <span className="ink-bad summary-date-short">{shortfallWords(short)}</span>}
           </li>
         );
       })}

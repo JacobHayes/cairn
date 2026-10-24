@@ -305,11 +305,9 @@ pub fn date_limits() -> Graph {
 }
 
 /// [`date_limits`] with early work at the limits: every other stage opening does not gate,
-/// every piece of work, decision and milestone that was not skipped is finished, and each
-/// carries a guard bypass recording every requirement of its ancestors, so the entry hops
-/// that carry them to it are replaced by one constraint per requirement they carry, and each
-/// node of a stage that does not gate is held by the opening directly. That is the worst case
-/// of both: every node finished under a bypass of everything inherited.
+/// and every piece of work, decision and milestone that was not skipped is finished, ahead
+/// of what it waits on, so each node of a stage that does not gate is held by the opening
+/// directly and every constraint into finished work is exempt.
 ///
 /// # Panics
 ///
@@ -329,7 +327,6 @@ pub fn date_limits_early() -> Graph {
             NodeKind::Decision => State::Decided,
             NodeKind::Milestone | NodeKind::Deliverable | NodeKind::Action => State::Done,
         };
-        let failures = inherited(&document, node.parent.as_ref());
         let Some(stored) = document.state.nodes.get_mut(key) else {
             continue;
         };
@@ -345,16 +342,6 @@ pub fn date_limits_early() -> Graph {
                 .answers
                 .insert(key.clone(), AnswerValue::Boolean(true));
         }
-        document
-            .state
-            .overrides
-            .entry(key.clone())
-            .or_default()
-            .bypass = Some(Bypass {
-            guards: BTreeSet::from([Guard::DepsDone]),
-            reason: Some(parse("Generated.")),
-            failures,
-        });
     }
     Graph::new(document, &cairn_schema::Deployment::default())
         .unwrap_or_else(|violations| panic!("{violations:#?}"))
@@ -381,83 +368,12 @@ fn stop_gating_every_other_stage(document: &mut Document, keys: &[NodeKey]) {
     }
 }
 
-/// A bypass failure for every requirement of the node's ancestors.
-fn inherited<'a>(
-    document: &'a Document,
-    mut current: Option<&'a NodeKey>,
-) -> BTreeSet<GuardFailure> {
-    let mut failures = BTreeSet::new();
-    while let Some(ancestor) = current.and_then(|parent| document.nodes.get(parent)) {
-        failures.extend(
-            ancestor
-                .requires
-                .iter()
-                .cloned()
-                .map(GuardFailure::OpenDependency),
-        );
-        current = ancestor.parent.as_ref();
-    }
-    failures
-}
-
 /// The day this many days after the generators' first day.
 fn day(days: u32) -> cairn_schema::Date {
     let start: cairn_schema::Date = parse("2026-09-20");
     start
         .checked_add(jiff::Span::new().days(i64::from(days)))
         .unwrap_or_else(|e| panic!("{e}"))
-}
-
-/// The worst case of early work at the node limit: 64 open milestones, a chain of 15 nested
-/// stages each requiring all 64 (the edge limit per node), and 1,921 finished actions at the
-/// bottom, each with a bypass recording every requirement it inherits, so each one's entry
-/// hop is replaced by 15 x 64 = 960 constraints.
-///
-/// # Panics
-///
-/// When the graph breaks an invariant: a bug in this generator.
-#[must_use]
-pub fn early_work_worst_case() -> Graph {
-    let count = NODE_COUNT_MAX as usize;
-    let targets = EDGE_COUNT_PER_NODE_MAX as usize;
-    let depth = CONTAINMENT_DEPTH_MAX as usize - 1;
-    let seeds: Vec<NodeSeed> = (0..count)
-        .map(|at| {
-            let stage = at >= targets && at < targets + depth;
-            let work = at >= targets + depth;
-            NodeSeed {
-                // A milestone, a group, or an action that closes before the next begins.
-                climb: u8::from(work),
-                kind: if stage {
-                    2
-                } else if work {
-                    6
-                } else {
-                    1
-                },
-                requires: if stage {
-                    (0..targets).filter_map(|j| u16::try_from(j).ok()).collect()
-                } else {
-                    Vec::new()
-                },
-                state: if work { 2 } else { 0 },
-                ..NodeSeed::default()
-            }
-        })
-        .collect();
-    let mut document = build(&seeds).into_document();
-    let inherited: BTreeSet<GuardFailure> = (0..targets)
-        .map(|at| GuardFailure::OpenDependency(key(at)))
-        .collect();
-    for at in targets + depth..count {
-        document.state.overrides.entry(key(at)).or_default().bypass = Some(Bypass {
-            guards: BTreeSet::from([Guard::DepsDone]),
-            reason: Some(parse("Generated.")),
-            failures: inherited.clone(),
-        });
-    }
-    Graph::new(document, &cairn_schema::Deployment::default())
-        .unwrap_or_else(|violations| panic!("{violations:#?}"))
 }
 
 /// True when `key` is `ancestor` or lies beneath it.
@@ -750,55 +666,34 @@ impl Shape {
         document.nodes.put(node).unwrap_or_else(|e| panic!("{e}"));
     }
 
-    /// A guard bypass on some finished nodes (D4), recording one requirement of the node
-    /// itself, of an ancestor (so the entry hop that carries it is replaced), or both, and
-    /// sometimes a failure to wait for its own date.
-    fn bypass(
-        &self,
-        document: &Document,
-        index: usize,
-        seed: &NodeSeed,
-        state: State,
-    ) -> Option<Bypass> {
-        let finished =
-            matches!(state, State::Done | State::Decided) && self.kinds[index] != NodeKind::Group;
+    /// A guard bypass on some finished work (D4), recording a missing note or breakdown.
+    fn bypass(&self, index: usize, seed: &NodeSeed, state: State) -> Option<Bypass> {
+        let work = matches!(self.kinds[index], NodeKind::Deliverable | NodeKind::Action);
         let pick = seed.dates.recorded.0 / 32;
-        let (own, inherited) = match pick % 4 {
-            1 => (true, false),
-            2 => (false, true),
-            3 => (true, true),
-            _ => return None,
-        };
-        if !finished {
+        if state != State::Done || !work || pick.is_multiple_of(4) {
             return None;
         }
-        let mut failures = BTreeSet::new();
-        let mut current = Some(index);
-        while let Some(at) = current {
-            if (at == index && own) || (at != index && inherited) {
-                let required = document
-                    .nodes
-                    .get(&key(at))
-                    .map(|node| node.requires.as_set().clone())
-                    .unwrap_or_default();
-                let skip = usize::from(seed.state) % required.len().max(1);
-                failures.extend(
-                    required
-                        .into_iter()
-                        .skip(skip)
-                        .take(1)
-                        .map(GuardFailure::OpenDependency),
-                );
-            }
-            current = self.parents[at];
-        }
-        if pick >= 6 {
-            failures.insert(GuardFailure::TooEarly(parse("2026-10-10")));
-        }
+        let failure = if pick >= 6 {
+            GuardFailure::NotBrokenDown
+        } else {
+            GuardFailure::MissingNote
+        };
         Some(Bypass {
-            guards: BTreeSet::from([Guard::DepsDone, Guard::DateArrived]),
-            reason: Some(parse("Generated.")),
-            failures,
+            guards: BTreeSet::from([Guard::HasNote, Guard::BrokenDown]),
+            reason: pick.is_multiple_of(2).then(|| parse("Generated.")),
+            failures: BTreeSet::from([failure]),
+        })
+    }
+
+    /// A reopen record on some open nodes (D4): a finish reopened around the fixed clock.
+    fn reopened(seed: &NodeSeed, state: State) -> Option<cairn_schema::Reopened> {
+        let recorded = u32::from(seed.dates.recorded.0);
+        if state.is_terminal() || recorded % 3 != 1 {
+            return None;
+        }
+        Some(cairn_schema::Reopened {
+            on: day(5 + recorded % 10),
+            finished_on: day(recorded % 5),
         })
     }
 
@@ -828,7 +723,8 @@ impl Shape {
         if stored.state.skips_beneath(kind) {
             stored.reason = Some(parse("Generated."));
         }
-        let bypass = self.bypass(document, index, seed, stored.state);
+        let bypass = self.bypass(index, seed, stored.state);
+        stored.reopened = Self::reopened(seed, stored.state);
         let state = &mut document.state;
         if stored.state == State::Decided {
             state.answers.insert(

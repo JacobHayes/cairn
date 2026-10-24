@@ -109,12 +109,15 @@ Write directly when the person asked for a state change: answers (`answer_decisi
 transitions (`transition_node`), participations (`assign`), pins and actual dates
 (`set_date`), snoozes (`snooze`, `unsnooze`), and overrides (`override`).
 
-To go ahead of a guard on purpose (start or finish ahead of what a node waits on or of its own
-date, finish without a note, link, ticks or breakdown, answer ahead), send a guard bypass in
-the same `apply_patch` as the move: an `apply_override` mutation with `guard_bypass` naming
-the guards, then the transition or answer. The reason is optional. A bypass alone covers
-nothing, and `transition_node` alone is refused. Do it only when the person says to; the
-engine records what the move went ahead of.
+Order is never a guard: a node is started, finished or answered whatever it waits on and
+whatever its own date, as a plain move. Out-of-order work is a fact, and a recorded date never
+warns. Reopening something finished work relied on marks that work `stale` while it is open.
+The guards are the evidence a completion needs: a note, a link, ticks or a breakdown. To
+complete without it on purpose, send a guard bypass in the same `apply_patch` as the
+completion: an `apply_override` mutation with `guard_bypass` naming the guards, then the
+`complete` transition. The reason is optional. A bypass alone, or with any other move, is
+refused, and `transition_node` alone is refused with the guard. Do it only when the person
+says to.
 
 A snooze sets a node aside until a date or until another node is done. Snooze a container
 (a group, or work with children) to set its whole subtree aside in one move: every
@@ -129,8 +132,8 @@ or skipping a group, clears its snooze.
 To finish a group or stage while work inside it is still open, `mark_done` it with a reason
 (`transition_node`): it reads done, and its unfinished work reads skipped as under a skip.
 Kept work stays open and still holds the group's dependents; `reopen` removes the mark. Work
-with children has no `mark_done`: complete it, with a guard bypass when its
-children are not done.
+with children has no `mark_done`: complete it, and its children stay open as work of their
+own.
 
 Draft a **proposal** (`create_proposal`) when the change is structural (adding, removing, or
 moving nodes; edges; roles; conditions; date rules), when it touches many nodes, or when the
@@ -210,10 +213,9 @@ Say each kind of date with the field made for it:
 
 - **A deadline** is `due_by`: the node finishes by a milestone, a date answer, or the
   journey's start, give or take an offset. It never holds work back.
-- **A structural not-until** is `not_before`: the work, or the decision, cannot happen before
-  that date. While its date is ahead the node is `scheduled` and off the next list; it can
-  still be started or finished early, but each is refused with the `date_arrived` guard
-  unless it carries a guard bypass; finished that way, it reads done early.
+- **A structural not-until** is `not_before`: the work, or the decision, is planned for no
+  sooner than that date. While its date is ahead the node is `scheduled` and off the next
+  list; it can still be started or finished before it, as a plain move.
 - **A personal not-now** is a snooze: someone sets the node aside until a date or another
   node is done. It changes no plan date.
 - **An event** is a milestone. Pinned, it is `scheduled` until its day, then ready to mark
@@ -231,11 +233,11 @@ group's finish, and so its contents' due dates, unless `closes: false`. Consecut
 stages share a milestone: one stage's `closes_at` is the next stage's `opens_at`.
 
 Put inside a stage the work done during it. Work that can as well be done ahead of time
-can sit in a stage with `gates: false`: its contents can start and finish before the stage
-opens, and the opening dates only contents not yet started. Starting or finishing work
-early is never a shortfall. Ahead of a dependency or a gating opening it takes a guard bypass,
-and a finished node's `dates.done_early` says, on today's dates, how many days early and ahead
-of what. Its other dates, such as its deadline, still apply. Prep that must be done before the stage belongs outside it, with a `due_by` before the opening milestone.
+can sit in a stage with `gates: false`: the opening dates only contents not yet started, so
+the plan does not wait for it. Any work can be started or finished ahead of what it waits on,
+a gating opening included; a recorded date never makes a shortfall, and work still ahead keeps
+its deadlines. Prep that must be done before the stage belongs outside it, with a `due_by`
+before the opening milestone.
 
 ## Reuse a segment
 

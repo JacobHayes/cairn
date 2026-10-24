@@ -16,8 +16,8 @@ mod property {
     use cairn_engine::testing::generated::arb_journey;
     use cairn_engine::{Derived, Graph, derive};
     use cairn_schema::{
-        Date, DateSource, Deployment, Direction, GuardFailure, Instant, InstantPoint, NodeKey,
-        NodeKind, Payload, State,
+        Date, DateSource, Deployment, Direction, Instant, InstantPoint, NodeKey, NodeKind, Payload,
+        State,
     };
     use patina_dst_proptest::prelude::*;
 
@@ -104,39 +104,14 @@ mod property {
 
     type Constraint = (Slot, Slot, i64);
 
-    /// How far along a node is in the execution layer, and what it was finished ahead of on
-    /// purpose, as the engine's scope reads them.
+    /// How far along a node is in the execution layer, as the engine's scope reads it.
     struct Progress {
         /// A recorded start: the node is held at its finish.
         started: bool,
         /// Active, done or decided.
         underway: bool,
-        /// Requirements its guard bypass recorded as open dependencies.
-        accepted: BTreeSet<NodeKey>,
-        /// Not held by its own `not_before` rules.
-        own_date_exempt: bool,
-    }
-
-    /// The pending `auto_done` milestones in scope whose earliest date is ahead of today:
-    /// finished work accepts these as open dependencies, so what exempts a constraint
-    /// depends on the dates themselves.
-    fn ahead(graph: &Graph, derived: &Derived) -> BTreeSet<NodeKey> {
-        let document = graph.document();
-        document
-            .nodes
-            .as_map()
-            .iter()
-            .filter(|(other, node)| {
-                matches!(&node.payload, Payload::Milestone(m) if m.auto_done)
-                    && document.state.nodes.get(*other).map(|s| s.state) == Some(State::Pending)
-                    && !skipped(graph, derived, other)
-                    && derived
-                        .dates()
-                        .earliest_finish(other)
-                        .is_some_and(|earliest| day(earliest) > today())
-            })
-            .map(|(other, _)| other.clone())
-            .collect()
+        /// Done or decided: nothing holds it back any more.
+        finished: bool,
     }
 
     fn progress(graph: &Graph, derived: &Derived, key: &NodeKey, execution: bool) -> Progress {
@@ -148,33 +123,10 @@ mod property {
         let started = counted
             && matches!(state, Some(State::Active | State::Done))
             && stored.is_some_and(|s| s.started_on.is_some());
-        let bypass = document
-            .state
-            .overrides
-            .get(key)
-            .and_then(|o| o.bypass.as_ref())
-            .filter(|_| finished);
-        let failures = bypass.map(|b| &b.failures);
-        // A pending `auto_done` milestone whose date is ahead is accepted by finished work.
-        let pending_auto = ahead(graph, derived).into_iter().filter(|_| finished);
         Progress {
             started,
             underway: finished || (counted && state == Some(State::Active)),
-            accepted: failures
-                .into_iter()
-                .flatten()
-                .filter_map(|failure| match failure {
-                    GuardFailure::OpenDependency(required) => Some(required.clone()),
-                    _ => None,
-                })
-                .chain(pending_auto)
-                .collect(),
-            own_date_exempt: finished
-                && (graph.node(key).unwrap().kind() == NodeKind::Milestone
-                    || failures.is_some_and(|f| {
-                        f.iter()
-                            .any(|failure| matches!(failure, GuardFailure::TooEarly(_)))
-                    })),
+            finished,
         }
     }
 
@@ -182,8 +134,8 @@ mod property {
     /// `execution` gives done work zero duration, as its actual dates replace its estimate,
     /// holds started work at its finish (starting is never guarded), leaves out the stage
     /// openings that do not gate for work begun or finished and for a node with children
-    /// (it waits for its contents), and leaves out what a finished node's guard bypass
-    /// accepted and a done milestone's or bypassed node's own `not_before`.
+    /// (it waits for its contents), and leaves out everything that holds a finished node
+    /// back: its requirements, openings and its own rules.
     fn plain_constraints(graph: &Graph, derived: &Derived, execution: bool) -> Vec<Constraint> {
         let in_scope = |key: &NodeKey| derived.relevance().in_scope(key);
         let mut found = Vec::new();
@@ -211,7 +163,7 @@ mod property {
             let has_children = !graph.tree().children(key).is_empty();
             for (required, date_only) in plain(graph, derived, key) {
                 let waits_for_contents = date_only && (progress.underway || has_children);
-                if execution && (waits_for_contents || progress.accepted.contains(&required)) {
+                if execution && (waits_for_contents || progress.finished) {
                     continue;
                 }
                 found.push((finish(&required), held.clone(), 0));
@@ -234,9 +186,12 @@ mod property {
                         DateSource::Node(other) if in_scope(other) => finish(other),
                         DateSource::Node(_) => continue,
                     };
+                    if execution && progress.finished {
+                        continue;
+                    }
                     if due_by {
                         found.push((finish(key), slot, -signed));
-                    } else if !(execution && progress.own_date_exempt) {
+                    } else {
                         found.push((slot, held.clone(), signed));
                     }
                 }
@@ -361,11 +316,10 @@ mod property {
         ]
     }
 
-    /// The plain shortfall at a node: at each of its instants, an earliest bound past the
-    /// latest, or a fact later than the constraints after it allow; the larger.
+    /// The plain shortfall at a node: at each of its instants not fixed by a fact, an earliest
+    /// bound past the latest; the larger.
     fn plain_shortfall(
         graph: &Graph,
-        constraints: &[Constraint],
         seeds: &BTreeMap<Slot, (Option<i64>, Option<i64>, bool)>,
         (earliest, latest): (&BTreeMap<Slot, i64>, &BTreeMap<Slot, i64>),
         key: &NodeKey,
@@ -373,12 +327,7 @@ mod property {
         let mut worst: Option<i64> = None;
         for slot in [start(graph, key), finish(key)] {
             let gap = match seeds.get(&slot) {
-                Some((Some(actual), _, true)) => constraints
-                    .iter()
-                    .filter(|(before, _, _)| *before == slot)
-                    .filter_map(|(_, after, offset)| latest.get(after).map(|l| -l - offset))
-                    .min()
-                    .map(|allowed| actual - allowed),
+                Some((_, _, true)) => None,
                 _ => earliest
                     .get(&slot)
                     .zip(latest.get(&slot))
@@ -462,118 +411,6 @@ mod property {
         end.is_some_and(|fixed| fixed.instant == *instant)
     }
 
-    fn key(index: usize) -> NodeKey {
-        format!("n_g{index}").parse().unwrap()
-    }
-
-    /// A bare node: the keys and titles `arb_journey` gives, no rules, no requirements.
-    fn bare(
-        index: usize,
-        parent: Option<usize>,
-        payload: Payload<cairn_schema::KeyRefs>,
-    ) -> cairn_schema::Node<cairn_schema::KeyRefs> {
-        cairn_schema::Node {
-            key: key(index),
-            id: format!("g{index}").parse().unwrap(),
-            parent: parent.map(key),
-            title: format!("Generated {index}").parse().unwrap(),
-            description: None,
-            weight: None,
-            requires: cairn_schema::BoundedSet::default(),
-            relevant_when: None,
-            due_by: None,
-            not_before: None,
-            participations: cairn_schema::Participations::default(),
-            resources: Vec::new(),
-            payload,
-        }
-    }
-
-    /// A finished deliverable (`n_g1`) holds a pending auto-done milestone (`n_g2`) and a piece
-    /// of work (`n_g3`) due four days after the milestone, behind a pinned stage (`n_g0`) that
-    /// the work's own stage (`n_g4`) waits for: the milestone's date is ahead only through
-    /// that rule.
-    fn accepted_milestone_graph() -> Graph {
-        use cairn_schema::{
-            BoundedSet, DateRule, Days, Deliverable, Group, Milestone, NodeState, OneOrMany,
-            Provenance,
-        };
-        let work = |days: u32| {
-            Payload::Deliverable(Deliverable {
-                estimate: Some(Days::try_from(days).unwrap()),
-                ..Deliverable::default()
-            })
-        };
-        let milestone = Milestone {
-            auto_done: true,
-            ..Milestone::default()
-        };
-        let mut due = bare(3, Some(1), work(4));
-        due.due_by = Some(DateRule {
-            direction: Direction::After,
-            sources: OneOrMany::new(vec![DateSource::Node(key(2))]).unwrap(),
-            offset: Days::try_from(4).unwrap(),
-        });
-        let mut waiting = bare(4, Some(3), Payload::Group(Group::default()));
-        waiting.requires = BoundedSet::new([key(0)]).unwrap();
-        let nodes = [
-            (
-                bare(0, None, Payload::Group(Group::default())),
-                State::Derived,
-            ),
-            (bare(1, None, work(0)), State::Done),
-            (
-                bare(2, Some(1), Payload::Milestone(milestone)),
-                State::Pending,
-            ),
-            (due, State::Todo),
-            (waiting, State::Derived),
-        ];
-        let mut document = cairn_engine::Document::default();
-        for (node, state) in nodes {
-            let mut stored = NodeState::initial(node.kind(), Provenance::Local);
-            stored.state = state;
-            if state == State::Done {
-                stored.started_on = Some("2026-09-20".parse().unwrap());
-                stored.finished_on = Some("2026-09-20".parse().unwrap());
-            }
-            document.state.nodes.insert(node.key.clone(), stored);
-            document.nodes.put(node).unwrap();
-        }
-        document
-            .state
-            .pins
-            .insert(key(0), "2026-10-10".parse().unwrap());
-        Graph::new(document, &Deployment::default()).unwrap()
-    }
-
-    /// F3, F6: a milestone whose date is ahead and that finished work accepted open is
-    /// exempt from that work's caps, so dropping the rule that dates it puts the cap back:
-    /// the bound it lacked appears. This is why the monotonicity property below holds the
-    /// accepted milestones fixed.
-    #[test]
-    fn dropping_the_rule_that_dates_an_accepted_milestone_caps_it() {
-        let graph = accepted_milestone_graph();
-
-        let capped = day("2026-09-20".parse().unwrap());
-        let before = derived(&graph);
-        assert_eq!(ahead(&graph, &before), BTreeSet::from([key(2)]));
-        assert_eq!(
-            engine_bounds(&before, &key(2))[1],
-            None,
-            "accepted, so uncapped"
-        );
-
-        let looser = without(&graph, &(key(3), Removal::DueBy));
-        let after = derived(&looser);
-        assert_eq!(ahead(&looser, &after), BTreeSet::new());
-        assert_eq!(
-            engine_bounds(&after, &key(2))[1],
-            Some(capped),
-            "no longer accepted, so capped"
-        );
-    }
-
     proptest! {
         #[test]
         fn bounds_over_the_entry_chain_match_the_plain_expansion(graph in arb_journey(1..=60)) {
@@ -590,7 +427,7 @@ mod property {
                 );
                 prop_assert_eq!(
                     derived.dates().shortfall_days(key),
-                    plain_shortfall(&graph, &constraints, &seeds, (&earliest, &latest), key),
+                    plain_shortfall(&graph, &seeds, (&earliest, &latest), key),
                     "{} shortfall", key
                 );
             }
@@ -615,11 +452,6 @@ mod property {
             prop_assume!(!candidates.is_empty());
             let looser = without(&graph, &candidates[pick % candidates.len()]);
             let (before, after) = (derived(&graph), derived(&looser));
-            // Finished work accepts a pending auto-done milestone only while its date is
-            // ahead, and the accepted milestone is exempt from that work's caps. A removal
-            // that moves a date to today or before ends the acceptance and puts the caps
-            // back, which can only tighten; the claim is about the rest.
-            prop_assume!(ahead(&graph, &before) == ahead(&looser, &after));
             for key in graph.document().nodes.as_map().keys() {
                 let [early_was, late_was, due_was] = engine_bounds(&before, key);
                 let [early, late, due] = engine_bounds(&after, key);

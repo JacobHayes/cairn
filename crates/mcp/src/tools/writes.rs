@@ -36,8 +36,8 @@ pub(crate) const SPECS: &[Spec] = &[
     Spec {
         name: "transition_node",
         description: "Start, stop, complete, skip (with a reason), mark a group done (with a \
-            reason), or reopen a node. Starting or completing ahead of what the node waits on \
-            needs a guard bypass in the same `apply_patch`.",
+            reason), or reopen a node, whatever it waits on. Completing without the evidence it \
+            needs takes a guard bypass in the same `apply_patch`.",
         writes: Writes::Patch,
         destructive: true,
         schema: schema::<TransitionNode>,
@@ -81,8 +81,8 @@ pub(crate) const SPECS: &[Spec] = &[
     Spec {
         name: "override",
         description: "Apply or remove an override, with a reason: force include, or keep \
-            under a skipped ancestor. A guard bypass is sent with the start or completion it \
-            covers, in `apply_patch`.",
+            under a skipped ancestor. A guard bypass is sent with the completion it covers, in \
+            `apply_patch`.",
         writes: Writes::Patch,
         destructive: true,
         schema: schema::<OverrideNode>,
@@ -525,8 +525,8 @@ pub(crate) enum OverrideChange {
     Remove(OverrideKind),
 }
 
-/// An override this tool applies. A guard bypass is sent with the start or completion it
-/// covers, in `apply_patch`: alone it covers nothing.
+/// An override this tool applies. A guard bypass is sent with the completion it covers, in
+/// `apply_patch`: alone it covers nothing.
 #[derive(Debug, Deserialize, JsonSchema)]
 #[serde(rename_all = "snake_case", deny_unknown_fields)]
 pub(crate) enum OverrideApplied {

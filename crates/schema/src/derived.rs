@@ -9,13 +9,13 @@ use std::fmt;
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
-use crate::chain::{Chain, ConstraintSource, DependencyVia, ShortChain};
+use crate::chain::{Chain, DependencyVia, ShortChain};
 use crate::collections::{BoundedVec, ByDocumentSize, CollectionError};
 use crate::domain::{Deployment, Journey};
 use crate::id::{IdentityKey, KindKey, NodeKey, RoleKey};
 use crate::limits::{EXPLANATION_ENTRY_COUNT_MAX, Limit, WEIGHT_MAX};
 use crate::node::NodeKind;
-use crate::state::{Guard, GuardFailure, SnoozeTarget};
+use crate::state::{Guard, SnoozeTarget, StaleReason};
 use jiff::civil::Date;
 
 /// A node's relevance (Gating): three-valued.
@@ -562,38 +562,15 @@ pub struct NodeDates {
     // PRD: A8, D8.
     /// The earliest its own not-before rules let it start: the latest of each source's
     /// earliest date plus the rule's offset. Work or a decision whose date this is, while it
-    /// is after today, is scheduled and must wait for it to finish without a bypass. None
-    /// when it has no such rule, or no source has a date.
+    /// is after today, is scheduled: off the acting frontier, though it can still be started
+    /// or finished. None when it has no such rule, or no source has a date.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub not_before: Option<Date>,
-    // PRD: F6, D8.
-    /// Finished before something it was finished ahead of on purpose, on today's dates: a
-    /// dependency or its own date its guard bypass accepted, a stage opening that does not
-    /// gate, or a milestone's own not-before rule. None when none of those would have put
-    /// its finish later. Other shortfalls still apply.
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub done_early: Option<DoneEarly>,
     // PRD: C1.
     /// The date relationships it has directly, in both directions: its own rules, bounds and
     /// answer, and the ones that read it. Sorted.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub links: Vec<crate::projection::DateLink>,
-}
-
-// PRD: F6, D8.
-/// How early a node finished, and ahead of what.
-#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
-#[serde(deny_unknown_fields)]
-pub struct DoneEarly {
-    /// Days between its finish and the date it was finished ahead of.
-    pub days: u32,
-    /// The date it was finished ahead of: the requirement's or opening's earliest date today
-    /// (its recorded date once it has one; a milestone's date as shown, its actual, pin or
-    /// due, when that is later), or its own not-before date.
-    pub date: Date,
-    /// What it was finished ahead of: a dependency, with how it arose (a stage opening
-    /// among them), or its own not-before rule.
-    pub source: ConstraintSource,
 }
 
 // PRD: E2.
@@ -704,9 +681,10 @@ pub struct NodeDerived {
     #[serde(default, skip_serializing_if = "crate::serde_util::is_false")]
     pub membership_lost: bool,
     // PRD: D4.
-    /// Why a terminal node's completing guards would now fail.
+    /// Why a finished node is stale: a dependency it relied on was reopened, or evidence its
+    /// completion needed is now missing.
     #[serde(default, skip_serializing_if = "BTreeSet::is_empty")]
-    pub stale: BTreeSet<GuardFailure>,
+    pub stale: BTreeSet<StaleReason>,
     /// Non-terminal with its due before today.
     #[serde(default, skip_serializing_if = "crate::serde_util::is_false")]
     pub overdue: bool,
@@ -722,25 +700,11 @@ pub struct NodeDerived {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub checklist_count: Option<ChecklistCount>,
     // PRD: D4.
-    /// The bypassable guards its completing transition (complete a deliverable or
-    /// action, answer an open decision, complete a pending milestone) would fail if attempted
-    /// now with no bypass in the patch. Empty for every node with no such transition left:
-    /// finished, not relevant, or a group.
+    /// The bypassable guards completing it (a deliverable or action) would fail if attempted
+    /// now with no bypass in the patch: the evidence it still lacks. Empty for every other
+    /// node, and for one finished or not relevant.
     #[serde(default, skip_serializing_if = "BTreeSet::is_empty")]
     pub failing_guards: BTreeSet<Guard>,
-    // PRD: D4.
-    /// The bypassable guards starting the node (a deliverable or action not yet started) would
-    /// fail if attempted now with no bypass in the patch: `deps_done` while a gate it waits
-    /// on is open (its own children and an undecided node's condition gates aside), and
-    /// `date_arrived` while its own not-before date is ahead. Empty when a plain start is
-    /// accepted and for every node with no start left.
-    #[serde(default, skip_serializing_if = "BTreeSet::is_empty")]
-    pub start_guards: BTreeSet<Guard>,
-    // PRD: D8.
-    /// Stored `active` with a guard bypass that recorded what the start went ahead of: an
-    /// open dependency or its own not-before date.
-    #[serde(default, skip_serializing_if = "crate::serde_util::is_false")]
-    pub started_early: bool,
     // PRD: D8.
     /// The unsatisfied gate dependencies that hold the node now, its own and
     /// those it inherits through its ancestors (requirements, conditions, openings), its
@@ -899,7 +863,7 @@ pub struct StaleConsequence {
     /// The node.
     pub node: NodeKey,
     /// The reasons it gained.
-    pub reasons: BTreeSet<GuardFailure>,
+    pub reasons: BTreeSet<StaleReason>,
 }
 
 // PRD: D4, D7.

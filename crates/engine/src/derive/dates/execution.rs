@@ -7,7 +7,7 @@
 
 use super::Seeds;
 use super::explain::Found;
-use super::network::{Network, Place, Slot};
+use super::network::{Network, Slot};
 use super::plan::walk_back;
 use super::solve::{self, Cost, Direction, Outcome, Pass};
 
@@ -111,33 +111,24 @@ impl Solved {
     }
 
     /// F6: the slot's shortfall with its chain, from the seed that holds it back to the seed
-    /// that caps it: an earliest bound past the latest, or a fact later than the chain after
-    /// it allows. A fact earlier than the chain before it requires shows at that chain's
-    /// upstream end, as an earliest bound past its latest or a fact too late, wherever it
-    /// lies; where that end is `created_at` or a date answer, no node's instant, the fact
-    /// shows it. Exceptions are in the network, not here: work that started is held at its
-    /// finish, and a finished node's exempt constraints are disabled.
+    /// that caps it: an earliest bound past the latest. Only the plan ahead falls short: a
+    /// slot fixed by a fact (a recorded start or finish) never does, and what falls short
+    /// because of a fact shows on the remaining work it holds. A finished node's exempt
+    /// constraints are disabled, so it never holds what it went ahead of short either.
     #[must_use]
     pub(crate) fn shortfall(&self, network: &Network, seeds: &Seeds, slot: Slot) -> Option<Found> {
-        let Some(actual) = seeds.actual(slot) else {
-            let (earliest, latest) = (self.earliest(slot)?, self.latest(slot)?);
-            if earliest <= latest {
-                return None;
-            }
-            let mut found = self.earliest_chain(network, slot);
-            let after = self.latest_chain(network, slot);
-            found.constraints.extend(after.constraints);
-            found.to = after.to;
-            found.shortfall_days = earliest - latest;
-            return Some(self.with_others(network, found));
-        };
-        let too_late = self.too_late(network, slot, actual.day);
-        let too_early = too_early(network, seeds, slot, actual.day);
-        let found = match (too_late, too_early) {
-            (Some(late), Some(early)) if early.shortfall_days > late.shortfall_days => early,
-            (Some(late), _) => late,
-            (None, early) => early?,
-        };
+        if seeds.actual(slot).is_some() {
+            return None;
+        }
+        let (earliest, latest) = (self.earliest(slot)?, self.latest(slot)?);
+        if earliest <= latest {
+            return None;
+        }
+        let mut found = self.earliest_chain(network, slot);
+        let after = self.latest_chain(network, slot);
+        found.constraints.extend(after.constraints);
+        found.to = after.to;
+        found.shortfall_days = earliest - latest;
         Some(self.with_others(network, found))
     }
 
@@ -156,59 +147,4 @@ impl Solved {
         );
         found
     }
-
-    /// A fact later than the constraints after it allow.
-    fn too_late(&self, network: &Network, slot: Slot, actual: i32) -> Option<Found> {
-        let (negated, at) = self.latest.pulled(network, Direction::Backward, slot)?;
-        let allowed = -negated;
-        if allowed >= actual {
-            return None;
-        }
-        let after = network.constraint(at).map_or(slot, |c| c.after);
-        let later = self.latest_chain(network, after);
-        let mut constraints = vec![at];
-        constraints.extend(later.constraints);
-        Some(Found {
-            constraints,
-            from: Some(slot),
-            to: later.to,
-            shortfall_days: actual - allowed,
-            others: (None, None),
-        })
-    }
-}
-
-/// A fact earlier than a rule from `created_at` or a date answer requires, by the date that
-/// fixes the source. Such a source is no node's instant, so its own lateness would show on
-/// no node: the fact it holds back shows it instead.
-fn too_early(network: &Network, seeds: &Seeds, slot: Slot, actual: i32) -> Option<Found> {
-    let mut worst: Option<Found> = None;
-    for &at in network.incoming(slot) {
-        let Some(constraint) = network.constraint(at).filter(|found| !found.exempt) else {
-            continue;
-        };
-        let fixed = match network.place(constraint.before) {
-            Place::CreatedAt => seeds.actual(constraint.before),
-            Place::Answer(_) => seeds.pin(constraint.before),
-            Place::Node(_) => None,
-        };
-        let Some(earliest) = fixed.map(|fix| fix.day) else {
-            continue;
-        };
-        let gap = earliest.saturating_add(constraint.offset_days) - actual;
-        if gap > 0
-            && worst
-                .as_ref()
-                .is_none_or(|found| gap > found.shortfall_days)
-        {
-            worst = Some(Found {
-                constraints: vec![at],
-                from: Some(constraint.before),
-                to: Some(slot),
-                shortfall_days: gap,
-                others: (None, None),
-            });
-        }
-    }
-    worst
 }

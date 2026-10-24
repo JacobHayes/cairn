@@ -6,7 +6,7 @@ use std::str::FromStr;
 
 use cairn_schema::{
     Annotation, AnnotationBody, AnnotationContent, BoundedSet, IdentityKey, JourneyState, Keyed,
-    LocalEdit, NodeState, Overrides, RoleKey, SnoozeTarget,
+    LocalEdit, NodeState, Overrides, Reopened, RoleKey, SnoozeTarget,
 };
 use cairn_store::StoreError;
 use rusqlite::Connection;
@@ -15,8 +15,8 @@ use crate::sql::{Row, corrupt, enum_from, enum_name, parse, rows, text};
 
 /// Every state record of one graph.
 pub(crate) fn load(connection: &Connection, id: &str) -> Result<JourneyState, StoreError> {
-    let select = "SELECT node, state, provenance, atomic, started_on, finished_on, reason \
-                  FROM node_states WHERE graph_id = ?1";
+    let select = "SELECT node, state, provenance, atomic, started_on, finished_on, reason, \
+                  reopened_on, reopened_finished_on FROM node_states WHERE graph_id = ?1";
     let nodes = keyed(connection, select, id, |row| {
         Ok(NodeState {
             state: row.name(1)?,
@@ -25,6 +25,11 @@ pub(crate) fn load(connection: &Connection, id: &str) -> Result<JourneyState, St
             started_on: row.opt_parse(4)?,
             finished_on: row.opt_parse(5)?,
             reason: row.opt_parse(6)?,
+            reopened: match (row.opt_parse(7)?, row.opt_parse(8)?) {
+                (Some(on), Some(finished_on)) => Some(Reopened { on, finished_on }),
+                (None, None) => None,
+                _ => return Err(corrupt("a reopen record lacks its day or its finish")),
+            },
         })
     })?;
     let select = "SELECT decision, value FROM answers WHERE graph_id = ?1";

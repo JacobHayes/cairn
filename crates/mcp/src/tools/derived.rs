@@ -7,13 +7,12 @@ use std::collections::{BTreeMap, BTreeSet};
 
 use cairn_schema::{
     AgentRow, Annotation, AnswerEffects, AnswerValue, Blocker, Bound, Chain, ChecklistCount,
-    Constraint, ConstraintSource, Contribution, Cursor, Date, DisplayState, DoneEarly,
-    EffectiveDate, EffectiveParticipation, Explained, ExplainedField, ExplanationPage, Guard,
-    GuardFailure, Instant, InstantPoint, JourneyId, KeyRefs, KindKey, Level, LevelDateLink,
-    LevelDisplay, LevelNode, LevelQuery, ListFlag, ListQuery, LocalEdit, Markdown, Node,
-    NodeDerived, NodeKey, NodeKind, NodeState, Overrides, Progress, Real, Relevance,
-    RelevanceExplanation, RemovalRead, Score, ShortChain, Snapshot, SnapshotScope, SnoozeTarget,
-    SortBy, StillWaiting,
+    Constraint, ConstraintSource, Contribution, Cursor, Date, DisplayState, EffectiveDate,
+    EffectiveParticipation, Explained, ExplainedField, ExplanationPage, Guard, Instant,
+    InstantPoint, JourneyId, KeyRefs, KindKey, Level, LevelDateLink, LevelDisplay, LevelNode,
+    LevelQuery, ListFlag, ListQuery, LocalEdit, Markdown, Node, NodeDerived, NodeKey, NodeKind,
+    NodeState, Overrides, Progress, Real, Relevance, RelevanceExplanation, RemovalRead, Score,
+    ShortChain, Snapshot, SnapshotScope, SnoozeTarget, SortBy, StaleReason, StillWaiting,
 };
 use cairn_service::{Call, ChildEntry, NodeDetail};
 use schemars::JsonSchema;
@@ -289,7 +288,7 @@ pub(crate) struct LeanDerived {
     #[serde(default, skip_serializing_if = "std::ops::Not::not")]
     membership_lost: bool,
     #[serde(default, skip_serializing_if = "BTreeSet::is_empty")]
-    stale: BTreeSet<GuardFailure>,
+    stale: BTreeSet<StaleReason>,
     #[serde(default, skip_serializing_if = "std::ops::Not::not")]
     overdue: bool,
     dates: LeanDates,
@@ -299,10 +298,6 @@ pub(crate) struct LeanDerived {
     checklist_count: Option<ChecklistCount>,
     #[serde(default, skip_serializing_if = "BTreeSet::is_empty")]
     failing_guards: BTreeSet<Guard>,
-    #[serde(default, skip_serializing_if = "BTreeSet::is_empty")]
-    start_guards: BTreeSet<Guard>,
-    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
-    started_early: bool,
     /// What holds it now, the largest first; `total` counts them all.
     #[serde(default, skip_serializing_if = "Explained::is_empty")]
     waits_on: Explained<Blocker>,
@@ -346,8 +341,6 @@ impl LeanDerived {
             progress,
             checklist_count,
             failing_guards,
-            start_guards,
-            started_early,
             waits_on,
             done_by_date,
             snoozed,
@@ -383,8 +376,6 @@ impl LeanDerived {
             progress,
             checklist_count,
             failing_guards,
-            start_guards,
-            started_early,
             waits_on,
             done_by_date,
             snoozed,
@@ -424,8 +415,6 @@ pub(crate) struct LeanDates {
     effective_date: Option<EffectiveDate>,
     #[serde(skip_serializing_if = "Option::is_none")]
     not_before: Option<Date>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    done_early: Option<DoneEarly>,
 }
 
 /// The latest start: its date, and its chain unless that is the due chain.
@@ -449,7 +438,6 @@ impl LeanDates {
             shortfall,
             effective_date,
             not_before,
-            done_early,
             links: _,
         } = dates;
         let latest_start = latest_start.map(|latest| LatestStart {
@@ -468,7 +456,6 @@ impl LeanDates {
             shortfall,
             effective_date,
             not_before,
-            done_early,
         }
     }
 }

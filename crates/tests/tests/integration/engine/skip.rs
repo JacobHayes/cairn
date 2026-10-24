@@ -332,12 +332,11 @@ fn marking_done_is_not_guarded() {
     assert!(derived.blocking().blocked(&key("n_plan_review")));
 }
 
-/// D1: completing work that has children bypasses the guard and leaves the children open:
-/// they are work of their own, so nothing cascades from a done deliverable.
+/// D1: completing work that has children leaves the children open: they are work of their
+/// own, so nothing cascades from a done deliverable.
 #[test]
 fn completing_work_with_children_skips_nothing() {
-    let bypass = "- op: apply_override\n  node: n_plan\n  override: {guard_bypass: {guards: [deps_done], reason: Done elsewhere.}}\n- op: transition\n  node: n_plan\n  transition: complete\n";
-    let derived = vendor(&[complete("n_access"), bypass.to_owned()]);
+    let derived = vendor(&[complete("n_access"), complete("n_plan")]);
     assert_eq!(skipped_by(&derived, "n_plan_draft"), None);
     assert!(derived.blocking().frontier().contains(&key("n_plan_draft")));
 }

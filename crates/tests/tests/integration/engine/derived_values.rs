@@ -30,12 +30,6 @@ fn transition(node: &str, step: &str) -> String {
     format!("- op: transition\n  node: {node}\n  transition: {step}\n")
 }
 
-fn bypass_deps(node: &str) -> String {
-    format!(
-        "- op: apply_override\n  node: {node}\n  override: {{guard_bypass: {{guards: [deps_done]}}}}\n"
-    )
-}
-
 const FIRST: &str = "{key: n_first, id: first, kind: action, title: First}";
 const SECOND: &str =
     "{key: n_second, id: second, kind: action, title: Second, requires: [n_first]}";
@@ -173,7 +167,8 @@ fn a_roll_up_carries_the_nodes_progress() {
     );
 }
 
-/// D4: the guards a completing transition would fail now, one guard at a time.
+/// D4: the evidence guards a completing transition would fail now, one guard at a time; what
+/// a node waits on is never one.
 #[test]
 fn failing_guards_name_each_guard_a_completion_would_fail() {
     let records = support::journey(&add(&[
@@ -187,12 +182,8 @@ fn failing_guards_name_each_guard_a_completion_would_fail() {
     ]));
     let set = |guards: &[Guard]| guards.iter().copied().collect::<BTreeSet<_>>();
     assert_eq!(guards(&records, "n_first"), set(&[]));
-    assert_eq!(guards(&records, "n_second"), set(&[Guard::DepsDone]));
-    assert_eq!(
-        guards(&records, "n_inside"),
-        set(&[Guard::DepsDone]),
-        "inherited"
-    );
+    assert_eq!(guards(&records, "n_second"), set(&[]), "waiting");
+    assert_eq!(guards(&records, "n_inside"), set(&[]), "waiting inherited");
     assert_eq!(
         guards(&records, "n_stage"),
         set(&[]),
@@ -201,9 +192,14 @@ fn failing_guards_name_each_guard_a_completion_would_fail() {
     assert_eq!(guards(&records, "n_art"), set(&[Guard::HasArtifact]));
     assert_eq!(guards(&records, "n_note"), set(&[Guard::HasNote]));
     assert_eq!(guards(&records, "n_holder"), set(&[Guard::BrokenDown]));
-    let first_done = support::accepted(&records, &transition("n_first", "complete"));
-    assert_eq!(guards(&first_done, "n_second"), set(&[]));
-    assert_eq!(guards(&first_done, "n_first"), set(&[]), "finished");
+    let bypassed = support::accepted(
+        &records,
+        &format!(
+            "{}- op: apply_override\n  node: n_note\n  override: {{guard_bypass: {{guards: [has_note]}}}}\n",
+            transition("n_note", "complete")
+        ),
+    );
+    assert_eq!(guards(&bypassed, "n_note"), set(&[]), "finished");
     let skipped = support::accepted(
         &records,
         &transition("n_second", "{skip: {reason: Not needed.}}"),
@@ -216,9 +212,8 @@ fn failing_guards_name_each_guard_a_completion_would_fail() {
     assert_eq!(guards(&atomic, "n_holder"), set(&[]), "atomic");
 }
 
-/// D4: an undecided node held only by its own condition gate fails no `deps_done` guard
-/// (finishing it is accepted with a warning), a decision fails the dependencies it waits on,
-/// and a milestone completes under the same rule.
+/// D4: an undecided node fails no guard (finishing it is accepted with a warning), and a
+/// decision and a milestone, which carry no evidence, fail none while they wait.
 #[test]
 fn failing_guards_follow_the_transition_each_kind_completes_with() {
     let records = support::journey(&add(&[
@@ -233,8 +228,8 @@ fn failing_guards_follow_the_transition_each_kind_completes_with() {
         derived_of(&records, "n_maybe").display_state,
         DisplayState::Conditional
     );
-    assert_eq!(guards(&records, "n_ask"), BTreeSet::from([Guard::DepsDone]));
-    assert_eq!(guards(&records, "n_end"), BTreeSet::from([Guard::DepsDone]));
+    assert_eq!(guards(&records, "n_ask"), BTreeSet::new());
+    assert_eq!(guards(&records, "n_end"), BTreeSet::new());
     let answered = support::accepted(
         &records,
         "- op: answer\n  decision: n_flag\n  value: {boolean: false}\n",
@@ -302,13 +297,8 @@ fn failing_guards_are_what_applying_the_transition_refuses() {
                     );
                     match support::apply(&records, &patch, &support::fixed_inputs()) {
                         Ok(_) => {
-                            // A completion records a finish date, which can move the dates
-                            // an milestone done by its date reads, so the patch's graph can
-                            // satisfy a gate this graph does not: a guard reported now may be
-                            // gone by the time it is attempted, never the other way round.
-                            if found.failing_guards.is_empty() {
-                                accepted += 1;
-                            }
+                            assert!(found.failing_guards.is_empty(), "{name} {key}");
+                            accepted += 1;
                         }
                         Err(Rejection::Invalid { violations }) => {
                             if violations
@@ -333,44 +323,6 @@ fn failing_guards_are_what_applying_the_transition_refuses() {
         }
     }
     assert!(accepted > 0 && refused > 0, "the oracle saw both outcomes");
-}
-
-/// D8: started early is stored `active` with a bypass that recorded the unsatisfied gate it
-/// went ahead of, its own or an inherited one; a container's children are not a gate, and an
-/// undecided node's condition gate guards nothing.
-#[test]
-fn started_early_is_active_work_behind_a_gate() {
-    let records = support::journey(&add(&[
-        FLAG,
-        FIRST,
-        SECOND,
-        "{key: n_maybe, id: maybe, kind: action, title: Maybe, relevant_when: {equals: {decision: n_flag, value: true}}}",
-        "{key: n_deliv, id: deliv, kind: deliverable, title: Deliv}",
-        "{key: n_child, id: child, parent: n_deliv, kind: action, title: Child}",
-    ]));
-    let started = support::accepted(
-        &records,
-        &format!(
-            "{}{}{}{}{}",
-            bypass_deps("n_second"),
-            transition("n_second", "start"),
-            transition("n_maybe", "start"),
-            transition("n_deliv", "start"),
-            transition("n_first", "start")
-        ),
-    );
-    let early = |name: &str| derived_of(&started, name).started_early;
-    assert!(early("n_second"), "behind an unfinished requirement");
-    assert!(
-        !early("n_maybe"),
-        "an undecided condition gate guards nothing, so the start went ahead of nothing"
-    );
-    assert!(!early("n_first"), "nothing holds it");
-    assert!(!early("n_deliv"), "a container's children are not a gate");
-    assert!(
-        !derived_of(&records, "n_second").started_early,
-        "not started"
-    );
 }
 
 /// Gating, D8: what a node waits on lists its own and inherited unsatisfied gates once each,

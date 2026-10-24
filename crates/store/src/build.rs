@@ -605,7 +605,8 @@ pub fn every_state() -> cairn_schema::JourneyState {
             "n_kickoff": {"state": "done", "provenance": "from_route",
                           "finished_on": "2026-10-05"},
             "n_scope": {"state": "decided", "provenance": "local", "finished_on": "2026-10-05"},
-            "n_steps": {"state": "todo", "provenance": "orphaned"},
+            "n_steps": {"state": "todo", "provenance": "orphaned",
+                        "reopened": {"on": "2026-10-06", "finished_on": "2026-10-05"}},
         },
         "local_edits": {"n_plan": [
             {"field": "title"}, {"requires": "n_scope"}, {"participation": "k_reviewer"},
@@ -626,8 +627,8 @@ pub fn every_state() -> cairn_schema::JourneyState {
         "overrides": {"n_steps": {
             "force_include": "Needed either way.",
             "keep": "Keep it when the plan is skipped.",
-            "bypass": {"guards": ["deps_done", "broken_down"], "reason": "Waived for now.",
-                       "failures": [{"open_dependency": "n_kickoff"}, "not_broken_down"]},
+            "bypass": {"guards": ["has_note", "broken_down"], "reason": "Waived for now.",
+                       "failures": ["missing_note", "not_broken_down"]},
         }},
         "tombstones": ["n_gone"],
         "annotations": [

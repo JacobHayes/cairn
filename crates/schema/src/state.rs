@@ -168,6 +168,23 @@ pub struct NodeState {
     /// a reason).
     #[serde(skip_serializing_if = "Option::is_none")]
     pub reason: Option<Reason>,
+    // PRD: D4.
+    /// Its latest reopen of a finish, while it has not finished again: what finished work
+    /// that relied on it reads to go stale. None after reopening a skip or a mark done, which
+    /// left nothing to rely on.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub reopened: Option<Reopened>,
+}
+
+// PRD: D4.
+/// A reopen of a finish: the day it happened and the finish it undid.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+#[serde(deny_unknown_fields)]
+pub struct Reopened {
+    /// The day it was reopened.
+    pub on: Date,
+    /// The day it had finished.
+    pub finished_on: Date,
 }
 
 impl NodeState {
@@ -181,6 +198,7 @@ impl NodeState {
             started_on: None,
             finished_on: None,
             reason: None,
+            reopened: None,
         }
     }
 }
@@ -273,14 +291,13 @@ pub enum SnoozeTarget {
 }
 
 // PRD: D4.
-/// A transition guard.
+/// A transition guard: evidence a deliverable's or action's completion needs. Order is never
+/// a guard.
 #[derive(
     Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize, JsonSchema,
 )]
 #[serde(rename_all = "snake_case")]
 pub enum Guard {
-    /// Every relevant or undecided hard dependency satisfies dependencies.
-    DepsDone,
     /// A `requires_artifact` deliverable has an artifact link.
     HasArtifact,
     // PRD: G4.
@@ -291,21 +308,16 @@ pub enum Guard {
     AllTicked,
     /// A placeholder has children or is atomic.
     BrokenDown,
-    // PRD: A8, D4.
-    /// Work or a decision whose own not-before rules hold it: that date has arrived.
-    DateArrived,
 }
 
 // PRD: D4.
 /// One specific guard failure: what a bypass records, so a later distinct failure
-/// still produces `stale`, and what `stale` lists.
+/// still produces `stale`.
 #[derive(
     Clone, Debug, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize, JsonSchema,
 )]
 #[serde(rename_all = "snake_case", deny_unknown_fields)]
 pub enum GuardFailure {
-    /// A dependency that does not satisfy dependencies.
-    OpenDependency(NodeKey),
     /// No artifact link on a `requires_artifact` deliverable.
     MissingArtifact,
     // PRD: G4.
@@ -316,10 +328,6 @@ pub enum GuardFailure {
     Unticked(Slug),
     /// A placeholder with no children that is not atomic.
     NotBrokenDown,
-    // PRD: A8, D4.
-    /// Before the date its own not-before rules hold it to: the date, so a bypass for one
-    /// date leaves a later date a distinct failure.
-    TooEarly(Date),
 }
 
 impl GuardFailure {
@@ -327,12 +335,42 @@ impl GuardFailure {
     #[must_use]
     pub fn guard(&self) -> Guard {
         match self {
-            GuardFailure::OpenDependency(_) => Guard::DepsDone,
             GuardFailure::MissingArtifact => Guard::HasArtifact,
             GuardFailure::MissingNote => Guard::HasNote,
             GuardFailure::Unticked(_) => Guard::AllTicked,
             GuardFailure::NotBrokenDown => Guard::BrokenDown,
-            GuardFailure::TooEarly(_) => Guard::DateArrived,
+        }
+    }
+}
+
+// PRD: D4.
+/// Why a finished node is stale.
+#[derive(
+    Clone, Debug, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize, JsonSchema,
+)]
+#[serde(rename_all = "snake_case", deny_unknown_fields)]
+pub enum StaleReason {
+    /// A dependency it relied on, done when it finished, was reopened and is not done again.
+    Reopened(NodeKey),
+    /// No artifact link on a `requires_artifact` deliverable.
+    MissingArtifact,
+    // PRD: G4.
+    /// No note on a `requires_note` deliverable or action.
+    MissingNote,
+    // PRD: G5.
+    /// A checklist item not ticked, on a `requires_checklist` deliverable or action.
+    Unticked(Slug),
+    /// A placeholder with no children that is not atomic.
+    NotBrokenDown,
+}
+
+impl From<GuardFailure> for StaleReason {
+    fn from(failure: GuardFailure) -> Self {
+        match failure {
+            GuardFailure::MissingArtifact => StaleReason::MissingArtifact,
+            GuardFailure::MissingNote => StaleReason::MissingNote,
+            GuardFailure::Unticked(item) => StaleReason::Unticked(item),
+            GuardFailure::NotBrokenDown => StaleReason::NotBrokenDown,
         }
     }
 }

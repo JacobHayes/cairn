@@ -75,16 +75,16 @@ describe("movesFrom (D1)", () => {
 
 describe("a guard bypass (D4)", () => {
   it("leaves the reason out when none, or only spaces, was given, and trims one that was", () => {
-    const bypass = (reason?: string) => guardBypass("n_a", ["deps_done"], reason);
+    const bypass = (reason?: string) => guardBypass("n_a", ["has_note"], reason);
     const guard = (reason?: string) => (bypass(reason) as { override: { guard_bypass: object } }).override.guard_bypass;
-    expect(guard()).toEqual({ guards: ["deps_done"] });
-    expect(guard("   ")).toEqual({ guards: ["deps_done"] });
-    expect(guard(" Ready sooner ")).toEqual({ guards: ["deps_done"], reason: "Ready sooner" });
+    expect(guard()).toEqual({ guards: ["has_note"] });
+    expect(guard("   ")).toEqual({ guards: ["has_note"] });
+    expect(guard(" Said by phone ")).toEqual({ guards: ["has_note"], reason: "Said by phone" });
   });
 });
 
 describe("flags (D3)", () => {
-  it("flags only real attention: started early is said by the sentence, never flagged", () => {
+  it("flags only real attention: active work ahead of what it waits on is never flagged", () => {
     const view = testView();
     const flags = (key: string) => {
       const derived = view.derived.nodes[key];
@@ -93,7 +93,7 @@ describe("flags (D3)", () => {
       }
       return flagsOf(derived).map((each) => each.flag);
     };
-    expect(view.derived.nodes["n_report"]?.started_early).toBe(true);
+    expect(view.derived.nodes["n_report"]?.display_state).toBe("active");
     expect(flags("n_report")).toEqual([]);
     const overdue = view.derived.nodes["n_report"];
     if (overdue !== undefined) {

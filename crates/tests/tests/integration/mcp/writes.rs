@@ -586,44 +586,20 @@ async fn a_journey_is_created_with_owners_and_a_merge_moves_them_on() {
     assert_eq!(owners(&snapshot["snapshot"]["journey"]), json!(["who_b"]));
 }
 
-/// Starting work that waits is refused through `transition_node` with a bypassable guard; the
-/// bypass and the start in one `apply_patch` go through with no reason.
+/// Starting work that waits is a plain `transition_node`: no guard and no bypass, and the
+/// node reads active.
 #[tokio::test]
-async fn starting_ahead_takes_a_reasonless_bypass_in_one_patch() {
+async fn starting_work_that_waits_is_a_plain_transition() {
     let world = World::new();
     let ann = user("u_ann");
     world.vendor_journey(&ann).await;
-    let waiting = "n_plan";
     let start = json!({
-        "journey": "j_vendor_eval", "node": waiting, "transition": "start",
+        "journey": "j_vendor_eval", "node": "n_plan", "transition": "start",
         "patch_id": "p_plan_start", "base_revision": 1,
     });
-    let refused = world.call(&ann, "transition_node", start).await;
-    let Err(ToolError::Rejected {
-        rejection: Rejection::Invalid { violations },
-    }) = refused
-    else {
-        panic!("{refused:?}");
-    };
-    assert!(
-        violations
-            .as_slice()
-            .iter()
-            .all(|found| found.code == ViolationCode::GuardFailed
-                && found.bypassable == Some(Guard::DepsDone)),
-        "{violations:#?}"
-    );
-    let patch = json!({
-        "id": "p_plan_ahead",
-        "target": { "journey": "j_vendor_eval" },
-        "base_revision": 1,
-        "mutations": [
-            { "op": "apply_override", "node": waiting, "override": { "guard_bypass": {
-                "guards": ["deps_done"] } } },
-            { "op": "transition", "node": waiting, "transition": "start" },
-        ],
-    });
-    let arguments = json!({ "patch": patch });
-    let applied = world.ok(&ann, "apply_patch", arguments).await;
-    assert_eq!(applied["revision"], 2);
+    let applied = world.ok(&ann, "transition_node", start).await;
+    assert_eq!(applied["status"], "applied");
+    let node = json!({ "journey": "j_vendor_eval", "node": "n_plan" });
+    let node = world.ok(&ann, "get_node", node).await;
+    assert_eq!(node["detail"]["derived"]["display_state"], "active");
 }

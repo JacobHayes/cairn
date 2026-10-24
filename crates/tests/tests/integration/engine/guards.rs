@@ -1,7 +1,7 @@
-//! The guards that need derived state, on the graph a patch produces (D4, A17): relevance
-//! and `deps_done` on completing transitions (complete or a first answer), the bypass
-//! that records the failures it accepted, and where a snooze may sit (B6), with its wait
-//! cycles rejected.
+//! The checks that need derived state, on the graph a patch produces (D4, A17): relevance on
+//! the transitions that need scope (start, complete or a first answer), never order; the
+//! evidence bypass that records the failures it accepted; and where a snooze may sit (B6),
+//! with its wait cycles rejected.
 #![cfg(test)]
 
 use crate::engine::support;
@@ -9,7 +9,7 @@ use crate::engine::support;
 use std::collections::BTreeSet;
 
 use cairn_engine::Records;
-use cairn_schema::{Guard, GuardFailure, Rejection, Relevance, State, Violation, ViolationCode};
+use cairn_schema::{GuardFailure, Rejection, Relevance, State, Violation, ViolationCode};
 use support::{add_nodes as add, key};
 
 fn complete(node: &str) -> String {
@@ -44,10 +44,10 @@ fn chain() -> Records {
     support::journey(&add(&[FIRST, SECOND, THIRD]))
 }
 
-/// A17, D4: guards see the graph the whole patch produces, so a chain completes in one patch
-/// in any order.
+/// A17, D4: order is never a guard: a chain completes in one patch in any order, and its
+/// later nodes complete or start, and a decision is answered, with what they wait on open.
 #[test]
-fn a_chain_completes_in_one_patch_in_any_order() {
+fn order_is_never_a_guard() {
     let complete_third = "- op: transition\n  node: n_third\n  transition: complete\n";
     let orders = [
         format!(
@@ -60,51 +60,21 @@ fn a_chain_completes_in_one_patch_in_any_order() {
             complete("n_second"),
             complete("n_first")
         ),
+        format!("{}{complete_third}", complete("n_second")),
+        "- op: transition\n  node: n_second\n  transition: start\n".to_owned(),
     ];
     for order in orders {
         assert!(support::journey_patch(&chain(), &order).is_ok(), "{order}");
     }
-    let [found] = &violations(
-        &chain(),
-        &format!("{}{complete_third}", complete("n_second")),
-    )[..] else {
-        panic!("one violation per guarded transition")
-    };
-    assert_eq!(found.code, ViolationCode::GuardFailed);
-    assert_eq!(found.bypassable, Some(Guard::DepsDone));
-    assert_eq!(found.at.mutation, Some(0), "the completion of the second");
-    assert_eq!(
-        found.failures,
-        BTreeSet::from([GuardFailure::OpenDependency(key("n_first"))])
+    let gated = "{key: n_gated, id: gated, kind: decision, title: Gated, prompt: Go?, answer_type: boolean, requires: [n_first]}";
+    let records = support::journey(&add(&[FIRST, gated]));
+    let answered = support::accepted(
+        &records,
+        "- op: answer\n  decision: n_gated\n  value: {boolean: true}\n",
     );
-}
-
-/// D4: completing a node and giving it an unfinished dependency in the same patch is
-/// rejected, naming both mutations; as two patches it is accepted and the node is stale.
-#[test]
-fn a_completion_and_a_new_dependency_in_one_patch_are_rejected_together() {
-    let records = support::journey(&add(&[FIRST]));
-    let insert = format!(
-        "{}- op: add_edge\n  edge: {{node: n_first, requires: n_new}}\n",
-        add(&["{key: n_new, id: new, kind: action, title: New}"])
-    );
-    let together = format!("{}{insert}", complete("n_first"));
-    let [found] = &violations(&records, &together)[..] else {
-        panic!("one violation")
-    };
-    assert_eq!(found.at.mutation, Some(0));
     assert_eq!(
-        found.caused_by,
-        BTreeSet::from([1, 2]),
-        "the new node and its edge"
-    );
-    let completed = support::accepted(&records, &complete("n_first"));
-    let inserted = support::accepted(&completed, &insert);
-    let derived = support::derived(&inserted, support::JOURNEY);
-    let graph = support::journey_graph(&inserted, support::JOURNEY);
-    assert_eq!(
-        derived.stale(&graph, &key("n_first")),
-        BTreeSet::from([GuardFailure::OpenDependency(key("n_new"))])
+        support::graph(&answered).state.nodes[&key("n_gated")].state,
+        State::Decided
     );
 }
 
@@ -180,106 +150,43 @@ fn undecided_work_finishes_and_stays_undecided() {
     }
 }
 
-/// D4: an undecided node's other open dependencies still hold its completion: the violation
-/// names them, not the decision its relevance waits on, and a bypass accepts only them.
+/// D4: a bypass covers the evidence a deliverable's or action's completion lacks, so a
+/// bypass with no completion in its patch, or on a decision's answer, is refused; the
+/// completion it covers is not stale for what it recorded, and reopening clears it.
 #[test]
-fn undecided_work_still_waits_on_its_other_dependencies() {
-    let gated = "{key: n_branch, id: branch, kind: action, title: Branch, requires: [n_first], relevant_when: {equals: {decision: n_flag, value: true}}}";
-    let records = support::journey(&add(&[FLAG, FIRST, gated]));
-    let [found] = &violations(&records, &complete("n_branch"))[..] else {
-        panic!("one violation")
-    };
-    assert_eq!(found.code, ViolationCode::GuardFailed);
-    assert_eq!(
-        found.failures,
-        BTreeSet::from([GuardFailure::OpenDependency(key("n_first"))])
-    );
-    let bypassed = support::accepted(
-        &records,
-        &format!(
-            "{}{}",
-            complete("n_branch"),
-            bypass("n_branch", "deps_done")
-        ),
-    );
-    assert!(!support::derived(&bypassed, support::JOURNEY).is_stale(&key("n_branch")));
-}
-
-/// Gating 2, D4: a gated decision answered before what it requires is done is rejected; in
-/// order, or with a `deps_done` bypass, it is accepted, and the bypass records the open
-/// dependency it accepted.
-#[test]
-fn a_gated_decision_answered_out_of_order() {
-    let gated = "{key: n_gated, id: gated, kind: decision, title: Gated, prompt: Go?, answer_type: boolean, requires: [n_first]}";
-    let records = support::journey(&add(&[FIRST, gated]));
+fn a_bypass_covers_a_completion_and_reopening_clears_it() {
+    let noted = "{key: n_noted, id: noted, kind: action, title: Noted, requires_note: true}";
+    let gated = "{key: n_gated, id: gated, kind: decision, title: Gated, prompt: Go?, answer_type: boolean}";
+    let records = support::journey(&add(&[noted, gated]));
+    let start = "- op: transition\n  node: n_noted\n  transition: start\n";
     let answer = "- op: answer\n  decision: n_gated\n  value: {boolean: true}\n";
-    let [found] = &violations(&records, answer)[..] else {
-        panic!("one violation")
-    };
-    assert_eq!(found.code, ViolationCode::GuardFailed);
-    assert_eq!(found.bypassable, Some(Guard::DepsDone));
-    assert!(
-        found
-            .failures
-            .contains(&GuardFailure::OpenDependency(key("n_first")))
-    );
-    assert!(support::journey_patch(&records, &format!("{answer}{}", complete("n_first"))).is_ok());
+    for alone in [
+        format!("{start}{}", bypass("n_noted", "has_note")),
+        format!("{answer}{}", bypass("n_gated", "has_note")),
+    ] {
+        let [found] = &violations(&records, &alone)[..] else {
+            panic!("one violation: {alone}")
+        };
+        assert_eq!(found.code, ViolationCode::IllegalTransition, "{alone}");
+    }
     let bypassed = support::accepted(
         &records,
-        &format!("{answer}{}", bypass("n_gated", "deps_done")),
+        &format!("{}{}", complete("n_noted"), bypass("n_noted", "has_note")),
     );
-    let recorded = &support::graph(&bypassed).state.overrides[&key("n_gated")]
-        .bypass
-        .as_ref()
-        .unwrap()
-        .failures;
-    assert_eq!(
-        recorded,
-        &BTreeSet::from([GuardFailure::OpenDependency(key("n_first"))])
-    );
-    let revised = "- op: answer\n  decision: n_gated\n  value: {boolean: false}\n";
-    assert!(
-        support::journey_patch(&bypassed, revised).is_ok(),
-        "a revision is not guarded"
-    );
-}
-
-/// D4: a bypass accepts the failures present when it was applied, so the node is not stale
-/// for them, while a later, distinct failure makes it stale; reopening clears the bypass.
-#[test]
-fn a_bypass_accepts_only_the_failures_it_recorded() {
-    let records = support::journey(&add(&[FIRST, SECOND]));
-    let bypassed = support::accepted(
-        &records,
-        &format!(
-            "{}{}",
-            complete("n_second"),
-            bypass("n_second", "deps_done")
-        ),
-    );
-    assert!(!support::derived(&bypassed, support::JOURNEY).is_stale(&key("n_second")));
-    let later = support::accepted(
-        &bypassed,
-        &format!(
-            "{}- op: add_edge\n  edge: {{node: n_second, requires: n_later}}\n",
-            add(&["{key: n_later, id: later, kind: action, title: Later}"])
-        ),
-    );
-    let derived = support::derived(&later, support::JOURNEY);
-    let graph = support::journey_graph(&later, support::JOURNEY);
-    assert_eq!(
-        derived.stale(&graph, &key("n_second")),
-        BTreeSet::from([GuardFailure::OpenDependency(key("n_later"))])
-    );
+    assert!(!support::derived(&bypassed, support::JOURNEY).is_stale(&key("n_noted")));
     let reopened = support::accepted(
-        &later,
-        "- op: transition\n  node: n_second\n  transition: reopen\n",
+        &bypassed,
+        "- op: transition\n  node: n_noted\n  transition: reopen\n",
     );
     let overrides = support::graph(&reopened)
         .state
         .overrides
-        .get(&key("n_second"));
+        .get(&key("n_noted"));
     assert!(overrides.is_none_or(|overrides| overrides.bypass.is_none()));
+    let [found] = &violations(&reopened, &complete("n_noted"))[..] else {
+        panic!("one violation")
+    };
+    assert_eq!(found.failures, BTreeSet::from([GuardFailure::MissingNote]));
 }
 
 /// B6, Gating: a blocked node may be snoozed; a node out of scope or effectively skipped may
@@ -381,58 +288,4 @@ fn a_milestone_that_reads_as_done_is_not_snoozed() {
         )),
         [ViolationCode::SnoozeNotActionable]
     );
-}
-
-/// Review round 1: an answer that brings a completed node's dependency back into scope is
-/// named with the completion it fails.
-#[test]
-fn an_answer_that_reopens_a_dependency_is_named() {
-    let user = "{key: n_user, id: user, kind: action, title: User, requires: [n_branch]}";
-    let records = support::accepted(
-        &support::journey(&add(&[FLAG, BRANCH, user])),
-        "- op: answer\n  decision: n_flag\n  value: {boolean: false}\n",
-    );
-    let patch = format!(
-        "{}- op: answer\n  decision: n_flag\n  value: {{boolean: true}}\n",
-        complete("n_user")
-    );
-    let [found] = &violations(&records, &patch)[..] else {
-        panic!("one violation")
-    };
-    assert_eq!(found.code, ViolationCode::GuardFailed);
-    assert_eq!(found.caused_by, BTreeSet::from([1]), "the answer");
-}
-
-/// Review round 2: a failed completion names the mutation that gave its ancestor an unfinished
-/// opening, and the pin edit that put an `auto_done` dependency's date back ahead.
-#[test]
-fn inherited_openings_and_moved_pins_are_named() {
-    let staged = support::journey(&add(&[
-        "{key: n_opens, id: opens, kind: milestone, title: Opens}",
-        "{key: n_stage, id: stage, kind: group, title: Stage}",
-        "{key: n_inside, id: inside, parent: n_stage, kind: action, title: Inside}",
-    ]));
-    let opening = format!(
-        "{}- op: set_node_field\n  node: n_stage\n  value: {{opens_at: n_opens}}\n",
-        complete("n_inside")
-    );
-    let [found] = &violations(&staged, &opening)[..] else {
-        panic!("one violation")
-    };
-    assert_eq!(found.caused_by, BTreeSet::from([1]), "the opening");
-    let gated = support::accepted(
-        &support::journey(&add(&[
-            "{key: n_gate, id: gate, kind: milestone, title: Gate, auto_done: true}",
-            "{key: n_after, id: after, kind: action, title: After, requires: [n_gate]}",
-        ])),
-        "- op: set_pin\n  node: n_gate\n  date: \"2026-10-05\"\n",
-    );
-    let moved = format!(
-        "{}- op: set_pin\n  node: n_gate\n  date: \"2026-10-10\"\n",
-        complete("n_after")
-    );
-    let [found] = &violations(&gated, &moved)[..] else {
-        panic!("one violation")
-    };
-    assert_eq!(found.caused_by, BTreeSet::from([1]), "the pin");
 }

@@ -10,7 +10,7 @@ use std::collections::BTreeSet;
 
 use cairn_engine::{Derived, Graph, Records};
 use cairn_schema::{
-    Date, DependencyVia, GuardFailure, NodeKey, Relevance, SnoozeTarget, StallCause, ViolationCode,
+    Date, DependencyVia, NodeKey, Relevance, SnoozeTarget, StaleReason, StallCause, ViolationCode,
 };
 use support::{add_nodes as add, key};
 
@@ -464,32 +464,29 @@ fn stalled_names_a_gate_a_snooze_and_an_auto_done_date() {
 
 const DONE_WORK: &str = "{key: n_done, id: done, kind: action, title: Done}";
 
-/// D4: a completion goes stale when a dependency is inserted after it, and is listed with the
-/// open dependency; it is not blocked, and never for what its own skip did not require.
+/// D4: a completion goes stale when a dependency it relied on is reopened, and is listed with
+/// it; it is not blocked, and a skip, which relied on nothing, is never stale.
 #[test]
-fn an_inserted_dependency_makes_a_completion_stale() {
+fn a_reopened_dependency_makes_a_completion_stale() {
     let records = support::journey(&add(&[
-        DONE_WORK,
-        "{key: n_skipped, id: skipped, kind: action, title: Skipped}",
+        "{key: n_first, id: first, kind: action, title: First}",
+        "{key: n_done, id: done, kind: action, title: Done, requires: [n_first]}",
+        "{key: n_skipped, id: skipped, kind: action, title: Skipped, requires: [n_first]}",
     ]));
     let finished = then(
         &records,
         &[
+            transition("n_first", "complete"),
             transition("n_done", "complete"),
             transition("n_skipped", "{skip: {reason: Not needed.}}"),
         ],
     );
-    let inserted = then(
-        &finished,
-        &[format!(
-            "{}- op: add_edge\n  edge: {{node: n_done, requires: n_new}}\n- op: add_edge\n  edge: {{node: n_skipped, requires: n_new}}\n",
-            add(&["{key: n_new, id: new, kind: action, title: New}"])
-        )],
-    );
-    let (graph, derived) = derived_on(&inserted, "2026-10-06");
+    assert!(!derived(&finished).is_stale(&key("n_done")));
+    let reopened = then(&finished, &[transition("n_first", "reopen")]);
+    let (graph, derived) = derived_on(&reopened, "2026-10-06");
     assert_eq!(
         derived.stale(&graph, &key("n_done")),
-        BTreeSet::from([GuardFailure::OpenDependency(key("n_new"))])
+        BTreeSet::from([StaleReason::Reopened(key("n_first"))])
     );
     assert!(
         !derived.blocking().blocked(&key("n_done")),
@@ -497,32 +494,44 @@ fn an_inserted_dependency_makes_a_completion_stale() {
     );
     assert!(
         !derived.is_stale(&key("n_skipped")),
-        "a skip required nothing"
+        "a skip relied on nothing"
     );
 }
 
-/// D4: an answer changed after a completion makes a node relevant that it now waits on, so
-/// the completion goes stale.
+/// D4: what changes after a completion without taking back anything it relied on never makes
+/// it stale: a dependency inserted later, or an answer that brings one into scope.
 #[test]
-fn an_answer_change_makes_a_completion_stale() {
+fn a_later_dependency_never_makes_a_completion_stale() {
     let flag =
         "{key: n_flag, id: flag, kind: decision, title: Flag, prompt: Flag?, answer_type: boolean}";
     let branch = "{key: n_branch, id: branch, kind: action, title: Branch, relevant_when: {equals: {decision: n_flag, value: true}}}";
     let user = "{key: n_user, id: user, kind: action, title: User, requires: [n_branch]}";
     let records = then(
-        &support::journey(&add(&[flag, branch, user])),
+        &support::journey(&add(&[DONE_WORK, flag, branch, user])),
         &[
             answer("n_flag", "{boolean: false}"),
             transition("n_user", "complete"),
+            transition("n_done", "complete"),
         ],
     );
-    assert!(!derived(&records).is_stale(&key("n_user")));
-    let revised = then(&records, &[answer("n_flag", "{boolean: true}")]);
-    let (graph, revised) = derived_on(&revised, "2026-10-06");
-    assert_eq!(
-        revised.stale(&graph, &key("n_user")),
-        BTreeSet::from([GuardFailure::OpenDependency(key("n_branch"))])
+    let later = then(
+        &records,
+        &[
+            format!(
+                "{}- op: add_edge\n  edge: {{node: n_done, requires: n_new}}\n",
+                add(&["{key: n_new, id: new, kind: action, title: New}"])
+            ),
+            answer("n_flag", "{boolean: true}"),
+        ],
     );
+    let derived = derived(&later);
+    assert!(
+        !derived.blocking().deps_done(&key("n_done")),
+        "the inserted dependency is open"
+    );
+    for node in ["n_done", "n_user"] {
+        assert!(!derived.is_stale(&key(node)), "{node}");
+    }
 }
 
 /// B10, D4: a placeholder needs breakdown until it has children or is marked atomic.

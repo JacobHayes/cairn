@@ -43,13 +43,13 @@ describe("resolving a rejection", () => {
 
   it("sends a bypass without a reason when none was typed (D4)", () => {
     const completes: Mutation[] = [{ op: "transition", node: "n_a", transition: "complete" }];
-    const sent = withBypass({ mutations: completes, base: 4, deployment: 2 }, [{ node: "n_a", guards: ["deps_done"] }], "  ");
-    expect(sent[0]).toEqual({ op: "apply_override", node: "n_a", override: { guard_bypass: { guards: ["deps_done"] } } });
+    const sent = withBypass({ mutations: completes, base: 4, deployment: 2 }, [{ node: "n_a", guards: ["has_note"] }], "  ");
+    expect(sent[0]).toEqual({ op: "apply_override", node: "n_a", override: { guard_bypass: { guards: ["has_note"] } } });
   });
 
   it("offers a bypass for each node's bypassable guards, each once", () => {
-    const offered = bypassable([violation("n_a", "deps_done"), violation("n_a", "deps_done"), violation("n_a", "has_artifact"), violation("n_b")]);
-    expect(offered).toEqual([{ node: "n_a", guards: ["deps_done", "has_artifact"] }]);
+    const offered = bypassable([violation("n_a", "has_note"), violation("n_a", "has_note"), violation("n_a", "has_artifact"), violation("n_b")]);
+    expect(offered).toEqual([{ node: "n_a", guards: ["has_note", "has_artifact"] }]);
   });
 });
 
@@ -59,8 +59,8 @@ describe("a refusal for unticked checklist items (G5, D4)", () => {
   it("groups the unticked items per node, and says ticking is all it needs only when nothing else broke", () => {
     const refused = [unticked("n_a", "x"), unticked("n_a", "y"), unticked("n_b", "z")];
     expect(untickedIn(refused)).toEqual({ byNode: [{ node: "n_a", items: ["x", "y"] }, { node: "n_b", items: ["z"] }], only: true });
-    expect(untickedIn([...refused, violation("n_a", "deps_done")]).only).toBe(false);
-    expect(untickedIn([violation("n_a", "deps_done")])).toEqual({ byNode: [], only: false });
+    expect(untickedIn([...refused, violation("n_a", "has_note")]).only).toBe(false);
+    expect(untickedIn([violation("n_a", "has_note")])).toEqual({ byNode: [], only: false });
   });
 
   it("sends the ticks before the refused patch, so the guard reads them ticked", () => {

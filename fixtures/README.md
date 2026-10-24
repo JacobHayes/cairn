@@ -218,9 +218,10 @@ stages bounded by milestones on both ends. The launch materials name the multi-v
 role through a multi-valued `contributor` kind (owner, being single-valued, cannot take a
 multi-valued role, A7). The scenario pins the launch date, completes kickoff,
 shifts the launch pin a week when feature work slips, and records a code-freeze actual
-date later than the plan's chain allows: a shortfall, which is reported, never rejected.
+date later than the plan's chain allows: a fact, accepted and never a warning.
 Derived (brief 2.3): with the launch pinned to 2026-11-23, the freeze is due 21 days before it,
-on 2026-11-02; done on 2026-11-04, it is short by 2 days, and so is the launch. At the end
+on 2026-11-02; done on 2026-11-04, two days late, it is not short, and nor is the launch: the
+work still ahead can meet it. At the end
 three nodes wait for a date, scheduled and off the next list: the launch for its pinned day,
 the beta's start, which marks itself done on its date, and the announcement for its own
 not-before date, the beta's end. The retrospective, a milestone with no pin, is not held by
@@ -275,5 +276,5 @@ overdue on that day; the product launch's late code freeze leaves it and the lau
 
 - `vendor-evaluation`, status summary: active 1, ready 1, blocked 2, scheduled 1, done 19; remaining 5; overdue none; short none; stale none; upcoming `n_review_opens` 2026-10-30, `n_decision_meeting` 2026-11-20; open decisions none.
 - `hiring-loop`, status summary: ready 1, done 11, skipped 1; remaining 1; overdue none; short none; stale none; upcoming none; open decisions none.
-- `product-launch`, status summary: ready 4, blocked 3, scheduled 3, done 5; remaining 10; overdue none; short `n_code_freeze`, `n_launch`; stale none; upcoming `n_beta_start` 2026-11-13, `n_beta_end` 2026-11-18, `n_launch` 2026-11-23; open decisions none.
+- `product-launch`, status summary: ready 4, blocked 3, scheduled 3, done 5; remaining 10; overdue none; short none; stale none; upcoming `n_beta_start` 2026-11-13, `n_beta_end` 2026-11-18, `n_launch` 2026-11-23; open decisions none.
 - `bake-off`, status summary: active 2, ready 1, blocked 3, done 2; remaining 6; overdue none; short none; stale none; upcoming `n_wrap_up` 2026-10-19; open decisions `n_winner`.

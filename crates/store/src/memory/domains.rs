@@ -694,6 +694,7 @@ mod tests {
                         started_on: None,
                         finished_on: None,
                         reason: None,
+                        reopened: None,
                     },
                 },
             ),

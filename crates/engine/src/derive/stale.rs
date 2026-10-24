@@ -1,52 +1,71 @@
-//! `stale` (D4; ARCHITECTURE, Read path: derive, pass 7): a terminal node whose completing
-//! guards would now fail, checked against the transition it used: `done` was completed
-//! (`deps_done`, `has_artifact`, `has_note`, `broken_down`, and for work `date_arrived`), and
-//! `decided` answered (`deps_done`, `date_arrived`), and a `skipped` node is never stale,
-//! since its skip required nothing. A milestone is never held by its date: marking it done
-//! records when it happened. The
-//! failures a guard bypass recorded are accepted (D4: a bypass records the specific failures
-//! present), so only a later, distinct failure makes the node stale. Visible, never blocking.
-//! Only nodes in scope are judged: a node that is not relevant is out of the journey.
+//! `stale` (D4; ARCHITECTURE, Read path: derive, pass 7): a finished node that something it
+//! relied on has gone back on. Two things make one stale, checked against the transition it
+//! used (`done` was completed; `decided` answered; a `skipped` node, or a group marked done,
+//! is never stale, since its move required nothing):
+//!
+//! - **a reopened dependency it relied on**: a gate dependency (its own, inherited, its
+//!   children, an opening that gates; an undecided node's condition gates aside) that is open
+//!   now because something was reopened that was done when the node finished. Reopening is the
+//!   one signal: a dependency added later, an answer that brings one into scope, or a date
+//!   that moves never makes a finished node stale, and neither does finishing ahead of
+//!   something open.
+//! - **missing evidence**, for a completed node: the evidence guards its completion needed
+//!   that fail now, less the failures its bypass recorded (D4: a bypass records the specific
+//!   failures present), so only a later, distinct failure counts.
+//!
+//! Visible, never blocking. Only nodes in scope are judged: a node that is not relevant is out
+//! of the journey.
+//!
+//! "Relied on" reads the record reopening a finish leaves on the node it reopens
+//! (`NodeState::reopened`: the day, and the finish it undid): the dependency satisfied
+//! dependencies on the day the node finished, and was reopened on or after it (a day is the
+//! finest a date says, so a finish on the day of the reopen counts as relied on). Reopening a
+//! skip or a mark done leaves no record: nothing was done to rely on. A node whose state is
+//! derived (a group, a milestone that marks itself done) satisfied dependencies on the days
+//! everything it waits on did ([`Reopens`]), so a group with other work still open then was
+//! never relied on. A dependency added after the node finished is read as if it had been
+//! there: today's graph is the only one there is.
 //!
 //! Which nodes are stale is decided per node here; their reasons are listed on demand
 //! ([`reasons`]), since an open dependency inherited from an ancestor would otherwise be
 //! listed once per descendant (up to nodes x depth x 64 entries).
 //!
-//! Cost at `node_count_max`: the artifact links and notes are indexed once, O(annotations log nodes); a
-//! terminal node whose `deps_done` holds is then decided in O(log nodes); any other walks its entry chains once
-//! ([`super::dependencies::Dependencies::of`], at most about 1,300 edges), so at most
-//! 2,000 x 1,300 steps when every node is a stale terminal node.
+//! Cost at `node_count_max`: the artifact links and notes are indexed once, O(annotations log
+//! nodes); the reopen spans in one sweep of the instants in blocking's order, each gate edge
+//! read once, as blocking reads them; a terminal node whose dependencies are all done is then
+//! decided in O(log nodes); any other walks its entry chains once
+//! ([`super::dependencies::Dependencies::of`]), so at most 2,000 x 1,300 steps when every node
+//! is a stale terminal node.
 
-use std::collections::BTreeSet;
+use std::collections::{BTreeMap, BTreeSet};
 
 use cairn_schema::{
-    Date, DependencyVia, GuardFailure, KeyRefs, Node, NodeKey, Payload, Relevance, State,
+    Date, DependencyVia, GuardFailure, KeyRefs, Node, NodeKey, NodeKind, Payload, Relevance,
+    StaleReason, State,
 };
 
 use super::blocking::Blocking;
 use super::dates::Dates;
-use super::dependencies::{Dependencies, EdgeClass, EdgeSet};
+use super::dependencies::{Dependencies, EdgeClass, EdgeSet, Instant, NodeIndex, Point};
 use super::relevance::Relevances;
-use super::{stored_state, unexpanded};
+use super::{Early, stored_state, unexpanded};
 use crate::graph::{Document, Graph, Tree};
 
-/// The stale nodes, in key order.
+/// The stale nodes, in key order, and the reopen records their reasons read.
 #[derive(Clone, Debug, Default, PartialEq, Eq)]
 pub(crate) struct Staleness {
     nodes: BTreeSet<NodeKey>,
+    reopens: Reopens,
 }
 
 impl Staleness {
     /// D4: the stale nodes of a derived journey.
     #[must_use]
-    pub(crate) fn pass(
-        graph: &Graph,
-        relevance: &Relevances,
-        dependencies: &Dependencies,
-        blocking: &Blocking,
-        dates: &Dates,
-    ) -> Self {
+    pub(crate) fn pass(graph: &Graph, early: &Early, dates: &Dates, blocking: &Blocking) -> Self {
+        let relevance = &early.relevance;
+        let dependencies = &early.dependencies;
         let annotated = annotated_nodes(graph.document());
+        let reopens = Reopens::read(graph, early, dates, blocking);
         let nodes: BTreeSet<NodeKey> = graph
             .document()
             .nodes
@@ -57,7 +76,7 @@ impl Staleness {
                     relevance,
                     dependencies,
                     blocking,
-                    dates,
+                    &reopens,
                     &annotated,
                     &node.key,
                 );
@@ -66,7 +85,7 @@ impl Staleness {
             .map(|node| node.key.clone())
             .collect();
         assert!(nodes.iter().all(|key| relevance.in_scope(key)));
-        Self { nodes }
+        Self { nodes, reopens }
     }
 
     /// The node is stale.
@@ -74,21 +93,168 @@ impl Staleness {
     pub(crate) fn contains(&self, key: &NodeKey) -> bool {
         self.nodes.contains(key)
     }
+
+    /// The reopen records the reasons read.
+    #[must_use]
+    pub(crate) fn reopens(&self) -> &Reopens {
+        &self.reopens
+    }
 }
 
-/// D4: why the node is stale, empty when it is not: the failures of the guards its
-/// transition required, less those its bypass recorded. `annotated` are the nodes with an
-/// artifact link or a note ([`annotated_nodes`]).
+/// The days an instant was last satisfied without a break, as the records tell: from its
+/// finish (`None`: as far back as the records go) to its reopen (`None`: it still is).
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub(crate) struct Span {
+    from: Option<Date>,
+    to: Option<Date>,
+}
+
+impl Span {
+    /// Every day.
+    const ALWAYS: Self = Self {
+        from: None,
+        to: None,
+    };
+
+    /// The days both spans hold, none when they share none.
+    fn and(self, other: Self) -> Option<Self> {
+        let from = self.from.max(other.from);
+        let to = match (self.to, other.to) {
+            (Some(left), Some(right)) => Some(left.min(right)),
+            (left, right) => left.or(right),
+        };
+        let empty = matches!((from, to), (Some(from), Some(to)) if from > to);
+        (!empty).then_some(Self { from, to })
+    }
+
+    fn holds(self, day: Date) -> bool {
+        self.from.is_none_or(|from| from <= day) && self.to.is_none_or(|to| day <= to)
+    }
+}
+
+/// Per node that does not satisfy dependencies now, the days it last did, read from the reopen
+/// records ([`Span`]): a node reopened has its own record; a node whose state is derived (a
+/// group, a skip waiting on kept work, a milestone that marks itself done) did on the days
+/// everything it waits on did, and a milestone that marks itself done only from its date. A
+/// node that never did has none.
+#[derive(Clone, Debug, Default, PartialEq, Eq)]
+pub(crate) struct Reopens {
+    spans: BTreeMap<NodeKey, Span>,
+}
+
+impl Reopens {
+    /// One sweep in the order blocking decided satisfaction, each instant read from those it
+    /// waits on, the way blocking reads them.
+    fn read(graph: &Graph, early: &Early, dates: &Dates, blocking: &Blocking) -> Self {
+        let dependencies = &early.dependencies;
+        let mut spans: Vec<Option<Span>> = vec![None; dependencies.node_count() * Point::ALL.len()];
+        for &instant in blocking.order() {
+            let span = Self::instant(graph, early, dates, &spans, instant);
+            if let Some(slot) = spans.get_mut(instant.slot()) {
+                *slot = span;
+            }
+        }
+        let mut reopens = Reopens::default();
+        for (at, key) in dependencies.keys().iter().enumerate() {
+            let finish = Instant::new(NodeIndex::from_position(at), Point::Finish);
+            if let Some(Some(span)) = spans.get(finish.slot())
+                && span.to.is_some()
+                && early.relevance.in_scope(key)
+                && !blocking.satisfies(key)
+            {
+                reopens.spans.insert(key.clone(), *span);
+            }
+        }
+        reopens
+    }
+
+    /// One instant's span, every instant it waits on read.
+    fn instant(
+        graph: &Graph,
+        early: &Early,
+        dates: &Dates,
+        spans: &[Option<Span>],
+        instant: Instant,
+    ) -> Option<Span> {
+        let dependencies = &early.dependencies;
+        let span_of = |requirement: Instant| spans.get(requirement.slot()).copied().flatten();
+        let waits = || {
+            dependencies
+                .waits(instant, EdgeSet::Pruned)
+                .filter(|edge| edge.class == EdgeClass::Gate)
+                .try_fold(Span::ALWAYS, |span, edge| {
+                    span_of(edge.requirement).and_then(|other| span.and(other))
+                })
+        };
+        if instant.point != Point::Finish {
+            return waits();
+        }
+        let node = dependencies
+            .key(instant.node)
+            .and_then(|key| graph.node(key))?;
+        let document = graph.document();
+        let stored = stored_state(document, node);
+        let skips = &early.skips;
+        if stored.skips_beneath(node.kind()) || skips.skipped_by(&node.key).is_some() {
+            return skips
+                .kept_work(&node.key)
+                .iter()
+                .try_fold(Span::ALWAYS, |span, kept| {
+                    let at = dependencies.node_index(kept)?;
+                    span_of(Instant::new(at, Point::Finish)).and_then(|other| span.and(other))
+                });
+        }
+        let record = document.state.nodes.get(&node.key);
+        if stored.is_terminal() {
+            let from = record.and_then(|stored| stored.finished_on);
+            return Some(Span { from, to: None });
+        }
+        if node.kind() == NodeKind::Group {
+            return waits();
+        }
+        if let Some(reopened) = record.and_then(|stored| stored.reopened) {
+            // A finish reopened, a milestone's marked by hand among them.
+            return Some(Span {
+                from: Some(reopened.finished_on),
+                to: Some(reopened.on),
+            });
+        }
+        if let Payload::Milestone(milestone) = &node.payload
+            && milestone.auto_done
+            && early.relevance.value(&node.key) == Relevance::Relevant
+        {
+            let date = dates.effective_date(&node.key)?.date;
+            return waits()?.and(Span {
+                from: Some(date),
+                to: None,
+            });
+        }
+        None
+    }
+
+    /// Whether work that finished on `finished_on` relied on open `dependency`: it satisfied
+    /// dependencies that day, and has been reopened since.
+    fn relied_on(&self, dependency: &NodeKey, finished_on: Date) -> bool {
+        self.spans
+            .get(dependency)
+            .is_some_and(|span| span.holds(finished_on))
+    }
+}
+
+/// D4: why the node is stale, empty when it is not: each open dependency it relied on that a
+/// reopen took back, and for a completed node the evidence its completion needed that is now
+/// missing, less what its bypass recorded. `annotated` are the nodes with an artifact link or
+/// a note ([`annotated_nodes`]).
 #[must_use]
 pub(crate) fn reasons(
     graph: &Graph,
     relevance: &Relevances,
     dependencies: &Dependencies,
     blocking: &Blocking,
-    dates: &Dates,
+    reopens: &Reopens,
     annotated: &Annotated<'_>,
     key: &NodeKey,
-) -> BTreeSet<GuardFailure> {
+) -> BTreeSet<StaleReason> {
     let document = graph.document();
     let Some(node) = document.nodes.get(key) else {
         return BTreeSet::new();
@@ -116,14 +282,6 @@ pub(crate) fn reasons(
     } else {
         BTreeSet::new()
     };
-    if !blocking.deps_done(key) {
-        failures.extend(
-            guard_open_dependencies(dependencies, blocking, relevance, key, false)
-                .into_iter()
-                .map(GuardFailure::OpenDependency),
-        );
-    }
-    failures.extend(too_early(node, dates).map(GuardFailure::TooEarly));
     let accepted = document
         .state
         .overrides
@@ -133,26 +291,27 @@ pub(crate) fn reasons(
     if let Some(accepted) = accepted {
         failures.retain(|failure| !accepted.contains(failure));
     }
-    failures
-}
-
-/// A8, D4: the `date_arrived` guard's failure: the date a deliverable's, action's, or
-/// decision's own not-before rules hold it to ([`Dates::not_before`]), while that date is
-/// after today. None for a milestone (marking it done records when it happened, whatever its
-/// pin) and for a group (it has no completing transition).
-#[must_use]
-pub(crate) fn too_early(node: &Node<KeyRefs>, dates: &Dates) -> Option<Date> {
-    match node.payload {
-        Payload::Deliverable(_) | Payload::Action(_) | Payload::Decision(_) => {}
-        Payload::Milestone(_) | Payload::Group(_) => return None,
+    let mut found: BTreeSet<StaleReason> = failures.into_iter().map(StaleReason::from).collect();
+    let finished_on = document
+        .state
+        .nodes
+        .get(key)
+        .and_then(|stored| stored.finished_on);
+    if let Some(finished_on) = finished_on
+        && !blocking.deps_done(key)
+    {
+        found.extend(
+            guard_open_dependencies(dependencies, blocking, relevance, key)
+                .into_iter()
+                .filter(|open| reopens.relied_on(open, finished_on))
+                .map(StaleReason::Reopened),
+        );
     }
-    dates
-        .not_before(&node.key)
-        .filter(|date| *date > dates.today())
+    found
 }
 
-/// D4's `deps_done` failures: each relevant or undecided hard dependency of the node, its own
-/// and those it inherits through its entry chains, that does not satisfy dependencies.
+/// Each relevant or undecided hard dependency of the node, its own and those it inherits
+/// through its entry chains, that does not satisfy dependencies.
 #[must_use]
 pub(crate) fn open_dependencies(
     dependencies: &Dependencies,
@@ -174,33 +333,26 @@ pub(crate) fn open_dependencies(
     open
 }
 
-/// D4's `deps_done` as a guard reads it: [`open_dependencies`], less an undecided node's
-/// condition gates. Those hold work until the answer its relevance reads arrives, and
-/// finishing undecided work is accepted with a warning rather than refused (Gating, D4), so
-/// they hold neither its transition nor make it stale; every other dependency still does.
-/// A start (`starting`) is not held by the node's own children either: they are what the
-/// finish waits on, not the start.
+/// [`open_dependencies`], less an undecided node's condition gates: those hold work until the
+/// answer its relevance reads arrives, and finishing undecided work is accepted with a warning
+/// (Gating, D4), so they never make it stale; every other dependency still counts.
 #[must_use]
 pub(crate) fn guard_open_dependencies(
     dependencies: &Dependencies,
     blocking: &Blocking,
     relevance: &Relevances,
     key: &NodeKey,
-    starting: bool,
 ) -> BTreeSet<NodeKey> {
     let open = open_dependencies(dependencies, blocking, key);
     let undecided = relevance.get(key).map(|found| found.value) == Some(Relevance::Undecided);
-    if open.is_empty() || !(undecided || starting) {
+    if open.is_empty() || !undecided {
         return open;
     }
     let held: BTreeSet<NodeKey> = dependencies
         .of(key, EdgeSet::Pruned)
         .into_iter()
         .filter(|dependency| dependency.class == EdgeClass::Gate)
-        .filter(|dependency| {
-            !(undecided && matches!(dependency.via, DependencyVia::Condition { .. }))
-        })
-        .filter(|dependency| !(starting && dependency.via == DependencyVia::Containment))
+        .filter(|dependency| !matches!(dependency.via, DependencyVia::Condition { .. }))
         .filter(|dependency| open.contains(&dependency.node))
         .map(|dependency| dependency.node)
         .collect();

@@ -48,8 +48,8 @@ pub(crate) mod stale;
 use std::collections::BTreeSet;
 
 use cairn_schema::{
-    Blocker, Date, DependencyVia, Deployment, DeriveInputs, GuardFailure, IdentityKey, KeyRefs,
-    Node, NodeKey, RankConstants, Relevance, State,
+    Blocker, Date, DependencyVia, Deployment, DeriveInputs, IdentityKey, KeyRefs, Node, NodeKey,
+    RankConstants, Relevance, StaleReason, State,
 };
 
 use crate::graph::{Document, Graph, Tree};
@@ -163,7 +163,8 @@ impl Derived {
         self.today
     }
 
-    /// D4: the node is terminal and its completing guards would now fail.
+    /// D4: the node is finished and stale: something it relied on was reopened, or evidence
+    /// its completion needed is missing.
     #[must_use]
     pub fn is_stale(&self, key: &NodeKey) -> bool {
         self.stale.contains(key)
@@ -176,14 +177,14 @@ impl Derived {
     ///
     /// When `graph` is not the one derived.
     #[must_use]
-    pub fn stale(&self, graph: &Graph, key: &NodeKey) -> BTreeSet<GuardFailure> {
+    pub fn stale(&self, graph: &Graph, key: &NodeKey) -> BTreeSet<StaleReason> {
         let annotated = stale::annotated_nodes(graph.document());
         let reasons = stale::reasons(
             graph,
             &self.relevance,
             &self.dependencies,
             &self.blocking,
-            &self.dates,
+            self.stale.reopens(),
             &annotated,
             key,
         );
@@ -191,48 +192,11 @@ impl Derived {
         reasons
     }
 
-    /// A8, D4: the date the node's own not-before rules hold it to while that date is after
-    /// today, for work or a decision: what its `date_arrived` guard fails on. `graph` is the
-    /// one derived.
-    #[must_use]
-    pub fn too_early(&self, graph: &Graph, key: &NodeKey) -> Option<Date> {
-        graph
-            .node(key)
-            .and_then(|node| stale::too_early(node, &self.dates))
-    }
-
-    /// D4's `deps_done` failures: each hard dependency of the node, its own and inherited,
-    /// that does not satisfy dependencies.
+    /// Gating: each hard dependency of the node, its own and inherited, that does not satisfy
+    /// dependencies.
     #[must_use]
     pub fn open_dependencies(&self, key: &NodeKey) -> BTreeSet<NodeKey> {
         stale::open_dependencies(&self.dependencies, &self.blocking, key)
-    }
-
-    /// D4's `deps_done` failures as a guarded transition and `stale` read them: those of
-    /// [`Derived::open_dependencies`], less an undecided node's condition gates, which its
-    /// relevance answers for (finishing undecided work is accepted with a warning).
-    #[must_use]
-    pub fn guard_open_dependencies(&self, key: &NodeKey) -> BTreeSet<NodeKey> {
-        stale::guard_open_dependencies(
-            &self.dependencies,
-            &self.blocking,
-            &self.relevance,
-            key,
-            false,
-        )
-    }
-
-    /// D4's `deps_done` failures for a start: [`Derived::guard_open_dependencies`], less the
-    /// node's own children, which its finish waits on and its start does not.
-    #[must_use]
-    pub fn start_open_dependencies(&self, key: &NodeKey) -> BTreeSet<NodeKey> {
-        stale::guard_open_dependencies(
-            &self.dependencies,
-            &self.blocking,
-            &self.relevance,
-            key,
-            true,
-        )
     }
 
     /// Gating, D4: the decisions an undecided node's relevance waits on: those still to be
@@ -461,13 +425,7 @@ pub(crate) fn derive_at(
     let ranking = Ranking::pass(&priority, &dates, &blocking, rank, |key| {
         priority.unlocks(key)
     });
-    let stale = stale::Staleness::pass(
-        journey,
-        &early.relevance,
-        &early.dependencies,
-        &blocking,
-        &dates,
-    );
+    let stale = stale::Staleness::pass(journey, &early, &dates, &blocking);
     let Early {
         relevance,
         dependencies,

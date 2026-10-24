@@ -29,8 +29,6 @@ export interface FormValues {
   keep: string;
   include: string;
   bypass: string;
-  "start-anyway": string;
-  anyway: string;
   snooze: SnoozeDraft;
   evidence: EvidenceDraft;
   "edit-date": string;
@@ -65,7 +63,7 @@ export type Drafted = {
 /** What is open: a form on a draft, or a panel. */
 export type Opened = Drafted | { case: PanelCase };
 
-const FORM_CASES: readonly FormCase[] = ["skip", "mark-done", "keep", "include", "bypass", "start-anyway", "anyway", "snooze", "evidence", "edit-date"];
+const FORM_CASES: readonly FormCase[] = ["skip", "mark-done", "keep", "include", "bypass", "snooze", "evidence", "edit-date"];
 const PANEL_CASES: readonly PanelCase[] = ["assign", "weight", "break-down"];
 
 /** A form opened on `value`, as drafted against `seen`. */
@@ -100,8 +98,6 @@ const valueReaders: { [K in FormCase]: (value: unknown) => value is FormValues[K
   keep: isText,
   include: isText,
   bypass: isText,
-  "start-anyway": isText,
-  anyway: isText,
   snooze: isSnoozeDraft,
   evidence: isEvidenceDraft,
   "edit-date": isText,

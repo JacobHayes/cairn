@@ -4,17 +4,15 @@
 // without a page.
 import { missingEvidence } from "../acting/acts.ts";
 import { isOpen } from "../status/state.ts";
-import { failingGuards, isTerminal, isWork, movesFrom, nodeOf, recordOf, startGuards, storedSnooze, titleOf, type NodeDetail, type Ready } from "./model.ts";
+import { failingGuards, isTerminal, isWork, movesFrom, nodeOf, recordOf, storedSnooze, titleOf, type NodeDetail, type Ready } from "./model.ts";
 
 /** The action beside a node, on any surface: what a person does to it in one move. */
-export type Act = "decide" | "done" | "done-with-evidence" | "start" | "start-anyway" | "break-down" | "mark-atomic" | "unsnooze";
+export type Act = "decide" | "done" | "done-with-evidence" | "start" | "break-down" | "mark-atomic" | "unsnooze";
 
 export interface Offered {
   /** The one primary, none when the node is finished, does not apply, or is a stage. */
   primary: Act | undefined;
   secondary: Act[];
-  /** The primary would be refused: something it waits on is not done, or its own date has not come (the `⋯` menu answers anyway). */
-  waiting: boolean;
 }
 
 /**
@@ -26,40 +24,38 @@ export function unsnoozeOf(view: Ready, key: string): string | undefined {
   return storedSnooze(view, key) ? key : (view.derived.nodes[key]?.snoozed_via ?? undefined);
 }
 
-/** The one place that decides which actions a node offers, for every surface that shows them: rows, the inspector, the graph's menu, the folds. A decision awaiting its answer offers Decide. */
+/** The one place that decides which actions a node offers, for every surface that shows them: rows, the inspector, the graph's menu, the folds. A decision awaiting its answer offers Decide. What a node waits on never takes an action away: order is never a guard. */
 export function offered(view: Ready, key: string): Offered {
   const node = nodeOf(view, key);
   const derived = view.derived.nodes[key];
   if (node === undefined || derived === undefined) {
-    return { primary: undefined, secondary: [], waiting: false };
+    return { primary: undefined, secondary: [] };
   }
   const record = recordOf(view, node);
   const snooze: Act[] = unsnoozeOf(view, key) === undefined ? [] : ["unsnooze"];
   if (!isOpen(derived)) {
-    return { primary: undefined, secondary: [], waiting: false };
+    return { primary: undefined, secondary: [] };
   }
   if (node.kind === "group") {
-    return { primary: undefined, secondary: snooze, waiting: false };
+    return { primary: undefined, secondary: snooze };
   }
   const moves = movesFrom(node.kind, record.state);
-  const waiting = failingGuards(derived).some((guard) => guard === "deps_done" || guard === "date_arrived");
   if (derived.needs_breakdown === true) {
-    return { primary: "break-down", secondary: ["mark-atomic", ...snooze], waiting: false };
+    return { primary: "break-down", secondary: ["mark-atomic", ...snooze] };
   }
   switch (node.kind) {
     case "milestone":
-      return { primary: "done", secondary: snooze, waiting };
+      return { primary: "done", secondary: snooze };
     case "decision":
-      return { primary: record.state === "open" ? "decide" : undefined, secondary: snooze, waiting: false };
+      return { primary: record.state === "open" ? "decide" : undefined, secondary: snooze };
     default: {
       if (!moves.includes("complete")) {
-        return { primary: undefined, secondary: snooze, waiting: false };
+        return { primary: undefined, secondary: snooze };
       }
       const needs = missingEvidence(view, node);
       return {
         primary: needs.artifact || needs.note || needs.unticked.length > 0 ? "done-with-evidence" : "done",
-        secondary: [...(moves.includes("start") ? [startGuards(view, key).length > 0 ? ("start-anyway" as const) : ("start" as const)] : []), ...snooze],
-        waiting,
+        secondary: [...(moves.includes("start") ? ["start" as const] : []), ...snooze],
       };
     }
   }
@@ -72,7 +68,6 @@ export type MenuId =
   | "mark-done"
   | "stop"
   | "done-anyway"
-  | "answer-anyway"
   | "reopen"
   | "edit-date"
   | "keep"
@@ -99,7 +94,6 @@ const LABELS: Record<MenuId, string> = {
   "mark-done": "Mark done…",
   stop: "Stop",
   "done-anyway": "Done anyway…",
-  "answer-anyway": "Answer anyway…",
   reopen: "Reopen",
   "edit-date": "Edit actual date…",
   keep: "Keep…",
@@ -132,8 +126,6 @@ export function menuOf(view: Ready, detail: NodeDetail, writable: boolean): Menu
   const kind = node.kind;
   // A container holds other nodes; an empty group holds none yet, though a segment may go into it.
   const container = detail.children.length > 0;
-  // A completion refused until what it waits on is done or its own date comes.
-  const held = failingGuards(derived).some((guard) => guard === "deps_done" || guard === "date_arrived");
   const guardFails = failingGuards(derived).length > 0 || derived.needs_breakdown === true;
   const keptUnder = derived.skipped_by != null && state !== "skipped";
   // D1a: a skipped node, or a group marked done, skips what is unfinished beneath it.
@@ -165,8 +157,7 @@ export function menuOf(view: Ready, detail: NodeDetail, writable: boolean): Menu
         markable && "mark-done",
         "skip",
         state === "active" && "stop",
-        kind === "decision" && held && "answer-anyway",
-        (kind === "milestone" ? held : isWork(node) && guardFails) && "done-anyway",
+        isWork(node) && guardFails && "done-anyway",
         keptUnder && "keep",
       ],
       branch ? { snooze: "Snooze branch…", skip: "Skip branch…" } : {},
@@ -187,7 +178,6 @@ export const ACT_LABELS: Record<Act, string> = {
   done: "Mark done",
   "done-with-evidence": "Mark done…",
   start: "Start",
-  "start-anyway": "Start anyway…",
   "break-down": "Break down",
   "mark-atomic": "Mark atomic",
   unsnooze: "Unsnooze",
@@ -209,7 +199,7 @@ export function actLabel(view: Ready, key: string, act: Act): string {
 export function contextMenuOf(view: Ready, detail: NodeDetail, writable: boolean, member?: boolean): MenuItem<ContextId>[][] {
   const key = detail.node.key;
   const offers = offered(view, key);
-  const acts: Act[] = !writable ? [] : [...(offers.primary === undefined || offers.waiting ? [] : [offers.primary]), ...offers.secondary];
+  const acts: Act[] = !writable ? [] : [...(offers.primary === undefined ? [] : [offers.primary]), ...offers.secondary];
   const row: MenuItem<ContextId>[] = acts.map((id) => ({ id, label: actLabel(view, key, id) }));
   const rest = menuOf(view, detail, writable).map((group) => group.flatMap((item): MenuItem<ContextId>[] => (item.id === "show-in-graph" ? [{ id: "show-in-list", label: "Show in list" }] : [item])));
   const select: MenuItem<ContextId>[] = member === undefined ? [] : [{ id: "toggle-selection", label: member ? "Remove from selection" : "Add to selection" }];

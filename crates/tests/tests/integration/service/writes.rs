@@ -1575,7 +1575,8 @@ async fn consequences_report_what_the_patch_caused_and_not_what_midnight_did(
         service,
         "j_d7",
         &[
-            "{key: n_work, id: work, kind: action, title: Work}",
+            "{key: n_first, id: first, kind: action, title: First}",
+            "{key: n_work, id: work, kind: action, title: Work, requires: [n_first]}",
             "{key: n_review, id: review, kind: milestone, title: Review}",
             "{key: n_draft, id: draft, kind: action, title: Draft, due_by: {before: n_review}}",
         ],
@@ -1586,14 +1587,14 @@ async fn consequences_report_what_the_patch_caused_and_not_what_midnight_did(
         "p_prepare",
         target,
         1,
-        "- op: transition\n  node: n_work\n  transition: complete\n- op: set_pin\n  node: n_review\n  date: \"2026-10-07\"\n",
+        "- op: transition\n  node: n_first\n  transition: complete\n- op: transition\n  node: n_work\n  transition: complete\n- op: set_pin\n  node: n_review\n  date: \"2026-10-07\"\n",
     );
     applied(service.patch(&call("u_lead", AT), &domain(prepare)).await);
     let insert = patch(
         "p_insert",
         target,
         2,
-        "- op: add_node\n  node: {key: n_new, id: new, kind: action, title: New}\n- op: add_edge\n  edge: {node: n_work, requires: n_new}\n",
+        "- op: transition\n  node: n_first\n  transition: reopen\n",
     );
     let Written::Applied { consequences, .. } = applied(
         service

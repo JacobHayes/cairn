@@ -87,23 +87,23 @@ async fn journey(service: &Service) {
         "p_create",
         "{journey: j_p}",
         0,
-        "- op: create_journey\n  name: P\n- op: add_node\n  node: {key: n_work, id: work, kind: action, title: Work}\n",
+        "- op: create_journey\n  name: P\n- op: add_node\n  node: {key: n_first, id: first, kind: action, title: First}\n- op: add_node\n  node: {key: n_work, id: work, kind: action, title: Work, requires: [n_first]}\n",
     );
     applied(service.patch(&call("u_lead", AT), &domain(created)).await);
     let done = patch(
         "p_done",
         "{journey: j_p}",
         1,
-        "- op: transition\n  node: n_work\n  transition: complete\n",
+        "- op: transition\n  node: n_first\n  transition: complete\n- op: transition\n  node: n_work\n  transition: complete\n",
     );
     applied(service.patch(&call("u_lead", AT), &domain(done)).await);
 }
 
-/// A draft against `j_p` at `base` that gives the finished work a new requirement, which
-/// makes it stale (D4).
+/// A draft against `j_p` at `base` that reopens what the finished work relied on, which makes
+/// it stale (D4).
 fn draft(title: &str, base: u32) -> ProposalDraft {
     from_yaml(&format!(
-        "title: {title}\ndestination_revision: {base}\nmutations:\n- op: add_node\n  node: {{key: n_new, id: new, kind: action, title: New}}\n- op: add_edge\n  edge: {{node: n_work, requires: n_new}}\n"
+        "title: {title}\ndestination_revision: {base}\nmutations:\n- op: transition\n  node: n_first\n  transition: reopen\n"
     ))
     .unwrap()
 }
@@ -133,7 +133,7 @@ async fn a_proposal_is_created_once_and_edited_against_its_own_revision(store: A
     let agent = agent_call("u_lead", "ag_helper", AT);
     let create = async |caller: &cairn_service::Call, id: &str| {
         service
-            .create_proposal(caller, patch_id(id), &target, &proposal, draft("Add", 2))
+            .create_proposal(caller, patch_id(id), &target, &proposal, draft("Reopen", 2))
             .await
     };
 
@@ -169,7 +169,7 @@ async fn a_proposal_is_created_once_and_edited_against_its_own_revision(store: A
             &target,
             &proposal,
             revision(base),
-            draft("Add the new work", 2),
+            draft("Reopen the first", 2),
         )
     };
     let edited = saved(edit("p_edit", 1).await.unwrap());
@@ -250,7 +250,7 @@ async fn drafted_and_edited(service: &Service, author: &cairn_service::Call) {
                 patch_id("p_pr"),
                 &target,
                 &proposal,
-                draft("Add", 2),
+                draft("Reopen", 2),
             )
             .await
             .unwrap(),
@@ -263,7 +263,7 @@ async fn drafted_and_edited(service: &Service, author: &cairn_service::Call) {
                 &target,
                 &proposal,
                 revision(1),
-                draft("Add the new work", 2),
+                draft("Reopen the first", 2),
             )
             .await
             .unwrap(),
@@ -319,7 +319,7 @@ async fn applying_after_the_destination_moved_is_stale_with_what_intervened(stor
                 patch_id("p_pr"),
                 &destination(),
                 &pr_one(),
-                draft("Add", 2),
+                draft("Reopen", 2),
             )
             .await
             .unwrap(),
@@ -475,7 +475,7 @@ async fn a_discarded_proposal_is_never_applied(store: Arc<dyn Store>) {
                 patch_id("p_pr"),
                 &destination(),
                 &pr_one(),
-                draft("Add", 2),
+                draft("Reopen", 2),
             )
             .await
             .unwrap(),
@@ -525,7 +525,7 @@ async fn a_resubmitted_apply_is_answered_from_its_receipt(store: Arc<dyn Store>)
                 patch_id("p_pr"),
                 &destination(),
                 &pr_one(),
-                draft("Add", 2),
+                draft("Reopen", 2),
             )
             .await
             .unwrap(),
@@ -574,7 +574,7 @@ async fn a_proposal_write_ticks_the_proposal_and_its_apply_ticks_both(store: Arc
                 patch_id("p_pr"),
                 &destination(),
                 &pr_one(),
-                draft("Add", 2),
+                draft("Reopen", 2),
             )
             .await
             .unwrap(),
@@ -652,7 +652,7 @@ async fn another_destinations_proposal_is_missing_never_rejected(store: Arc<dyn 
             patch_id("p_pr"),
             &destination(),
             &pr_one(),
-            draft("Add", 2),
+            draft("Reopen", 2),
         )
         .await;
     let created = saved(created.unwrap());
@@ -689,7 +689,7 @@ async fn writes_under(
         elsewhere,
         &id,
         base,
-        draft("Add", 2),
+        draft("Reopen", 2),
     );
     let discard = service.discard_proposal(caller, patch_id("p_pr"), elsewhere, &id, base);
     let refresh = service.refresh_proposal(caller, patch_id("p_refresh"), elsewhere, &id, base);
