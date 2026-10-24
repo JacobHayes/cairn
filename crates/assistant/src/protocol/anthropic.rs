@@ -42,14 +42,36 @@ pub fn request(model: &str, exchange: &Exchange) -> Value {
             })
         })
         .collect();
-    let messages: Vec<Value> = exchange.messages.iter().map(message).collect();
+    let mut messages: Vec<Value> = exchange.messages.iter().map(message).collect();
+    // The second breakpoint: the whole conversation so far, which the next request of the
+    // tool loop (and the next turn, up to the turn's own message) reads from the cache.
+    if let Some(block) = messages
+        .last_mut()
+        .and_then(|last| last.get_mut("content"))
+        .and_then(Value::as_array_mut)
+        .and_then(|content| content.last_mut())
+        .and_then(Value::as_object_mut)
+    {
+        block.insert("cache_control".to_owned(), cache_control());
+    }
     json!({
         "model": model,
         "max_tokens": REPLY_TOKEN_COUNT_MAX,
-        "system": exchange.system,
+        // The first breakpoint closes the stable prefix: the tools, then this system text.
+        "system": [{
+            "type": "text",
+            "text": exchange.system,
+            "cache_control": cache_control(),
+        }],
         "messages": messages,
         "tools": tools,
     })
+}
+
+/// A cache breakpoint: the prefix up to and including its block is cached (the provider
+/// skips it silently when the prefix is under its minimum length).
+fn cache_control() -> Value {
+    json!({ "type": "ephemeral" })
 }
 
 /// One message.

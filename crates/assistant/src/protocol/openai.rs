@@ -12,6 +12,9 @@ use crate::provider::{Exchange, Message, ProviderError, Reply, ToolCall};
 /// The path under the endpoint.
 pub const PATH: &str = "responses";
 
+/// The key that groups this assistant's requests, which share their leading text.
+const PROMPT_CACHE_KEY: &str = "cairn-assistant";
+
 /// The request body for `exchange`.
 #[must_use]
 pub fn request(model: &str, exchange: &Exchange) -> Value {
@@ -38,6 +41,9 @@ pub fn request(model: &str, exchange: &Exchange) -> Value {
         "input": input,
         "tools": tools,
         "store": false,
+        // Prefixes cache automatically; the key routes requests that share one to the same
+        // cache.
+        "prompt_cache_key": PROMPT_CACHE_KEY,
         "include": ["reasoning.encrypted_content"],
     })
 }

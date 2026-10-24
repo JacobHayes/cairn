@@ -273,9 +273,9 @@ async fn a_route_drafted_in_conversation_arrives_as_a_proposal_on_its_draft() {
         0,
         "nothing exists until applied"
     );
-    let context = &world.provider.exchanges()[0].system;
+    let context = &world.provider.exchanges()[0].messages[0];
     assert!(
-        context.contains("not_found"),
+        matches!(context, Message::User { text } if text.contains("not_found")),
         "the turn read the missing draft"
     );
 
@@ -487,15 +487,21 @@ async fn a_conversation_carries_on_for_its_user_alone() {
             ..Reply::default()
         })
     };
+    // History replays as said; the turn's own message follows its context.
+    let history = sent(1);
     assert_eq!(
-        sent(1),
-        [
-            said("First question."),
-            replied("First answer."),
-            said("Second question.")
-        ]
+        history[..2],
+        [said("First question."), replied("First answer.")]
     );
-    assert_eq!(sent(2), [said("Mine.")]);
+    let Message::User { text } = &history[2] else {
+        panic!("{history:?}");
+    };
+    assert!(text.ends_with("Second question."), "{text}");
+    let alone = sent(2);
+    let [Message::User { text }] = alone.as_slice() else {
+        panic!("{alone:?}");
+    };
+    assert!(text.ends_with("Mine."), "{text}");
 }
 
 /// The ten weight overrides as one call each: what a model asked for "every work item" may

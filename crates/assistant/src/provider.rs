@@ -12,7 +12,8 @@ use serde_json::{Map, Value};
 /// What one model call is sent.
 #[derive(Clone, Debug, PartialEq)]
 pub struct Exchange {
-    /// The instructions: the shipped guide, the write policy, and the turn's context.
+    /// The instructions, the same on every request so a provider can cache them: the write
+    /// policy, the shipped guide, and the workflows. The turn's context leads its user message.
     pub system: String,
     /// The conversation so far, oldest first; it ends with the user's message or tool results.
     pub messages: Vec<Message>,

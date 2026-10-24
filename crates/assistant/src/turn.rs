@@ -233,8 +233,13 @@ impl Assistant {
             }
             _ => messages.push(Message::User { text: said }),
         }
+        // The per-turn context leads the turn's user message, after the history, so the
+        // request's prefix (tools, system text, history) is the same on every request.
+        if let Some(Message::User { text }) = messages.last_mut() {
+            *text = format!("{}{text}", turn_context(user, target, &context));
+        }
         let exchange = Exchange {
-            system: system(user, target, &context),
+            system: system(),
             messages,
             tools: tool_specs(),
         };
@@ -448,10 +453,11 @@ fn tool_specs() -> Vec<ToolSpec> {
         .collect()
 }
 
-/// The system prompt: who the assistant is working for and on what, the write policy, the
-/// shipped guide and workflows (I4, I5: the same instructions as external agents), and the
-/// target as read at the start of the turn.
-fn system(user: &Actor, target: &Target, context: &Value) -> String {
+/// The system prompt, the same on every request (so a provider can cache it): the write
+/// policy, the shipped guide and workflows (I4, I5: the same instructions as external
+/// agents). Who the assistant works for and on what, and the target as read, are
+/// [`turn_context`], which goes after it.
+fn system() -> String {
     let mut refused: Vec<&str> = Vec::new();
     for definition in ToolSet::definitions() {
         if let Some(why) = wrapper::refusal(definition.writes)
@@ -461,16 +467,15 @@ fn system(user: &Actor, target: &Target, context: &Value) -> String {
         }
     }
     let mut prompt = format!(
-        "You are Cairn's in-app assistant, working for user {user} on {target}. You have the \
-         same tools as any agent acting for them, and every write you make is recorded \
-         as yours, on their behalf.\n\n\
+        "You are Cairn's in-app assistant. You have the same tools as any agent acting for \
+         the user you are working for, and every write you make is recorded as yours, on \
+         their behalf.\n\n\
          How your writes land: a state change ({state}) applies directly when it touches at \
          most {DIRECT_WRITE_NODE_COUNT_MAX} nodes, and its result lists what it caused: tell \
          the user. A structural change ({structural}), or a state change touching more nodes, \
          is drafted as one proposal instead, which the result says: tell the user it is ready \
          for review. When the user asks for a proposal, draft one with create_proposal. Some \
          writes are the user's alone, and you have no tool for them:\n",
-        user = user.user,
         state = ChangeClass::State.meaning(),
         structural = ChangeClass::Structural.meaning(),
     );
@@ -489,11 +494,17 @@ fn system(user: &Actor, target: &Target, context: &Value) -> String {
             workflow.name, workflow.description, workflow.text
         );
     }
-    let _ = write!(
-        prompt,
-        "\n# Context\n\n{target}, as read at the start of this turn:\n\n```json\n{context}\n```\n"
-    );
     prompt
+}
+
+/// What is true of this turn alone: who the assistant works for and on what, and the
+/// target as read at the start of the turn. It leads the turn's user message.
+fn turn_context(user: &Actor, target: &Target, context: &Value) -> String {
+    format!(
+        "# Context\n\nYou are working for user {user} on {target}, as read at the start of \
+         this turn:\n\n```json\n{context}\n```\n\n# Message\n\n",
+        user = user.user,
+    )
 }
 
 /// A tool call's result as the model is sent it.
