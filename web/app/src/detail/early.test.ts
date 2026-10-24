@@ -65,6 +65,21 @@ describe("work done early on purpose", () => {
     expect(plain).toContain("3 days");
   });
 
+  it("says it without a reason when the bypass recorded none", () => {
+    const early: DoneEarly = { days: 3, date: "2026-10-07", source: { dependency: { node: "n_report", requires: "n_findings", via: "explicit" } } };
+    const view = finishedEarly("n_report", early, (made) => {
+      made.journey.graph.state = { ...made.journey.graph.state, overrides: { n_report: { bypass: { guards: ["deps_done"] } } } };
+      const findings = made.derived.nodes["n_findings"];
+      if (findings !== undefined) {
+        made.derived.nodes["n_findings"] = { ...findings, display_state: "done" };
+      }
+    });
+    const { pieces, plain } = say(view, "n_report");
+    expect(links(pieces)).toEqual(["n_findings"]);
+    expect(plain).toContain("3 days");
+    expect(plain).not.toContain("reason");
+  });
+
   it("gives no day count ahead of a prerequisite that has not finished", () => {
     const early: DoneEarly = { days: 5, date: "2026-10-11", source: { dependency: { node: "n_report", requires: "n_findings", via: "explicit" } } };
     const { pieces, plain } = say(finishedEarly("n_report", early), "n_report");

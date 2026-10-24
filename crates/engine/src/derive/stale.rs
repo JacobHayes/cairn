@@ -118,7 +118,7 @@ pub(crate) fn reasons(
     };
     if !blocking.deps_done(key) {
         failures.extend(
-            guard_open_dependencies(dependencies, blocking, relevance, key)
+            guard_open_dependencies(dependencies, blocking, relevance, key, false)
                 .into_iter()
                 .map(GuardFailure::OpenDependency),
         );
@@ -178,23 +178,29 @@ pub(crate) fn open_dependencies(
 /// condition gates. Those hold work until the answer its relevance reads arrives, and
 /// finishing undecided work is accepted with a warning rather than refused (Gating, D4), so
 /// they hold neither its transition nor make it stale; every other dependency still does.
+/// A start (`starting`) is not held by the node's own children either: they are what the
+/// finish waits on, not the start.
 #[must_use]
 pub(crate) fn guard_open_dependencies(
     dependencies: &Dependencies,
     blocking: &Blocking,
     relevance: &Relevances,
     key: &NodeKey,
+    starting: bool,
 ) -> BTreeSet<NodeKey> {
     let open = open_dependencies(dependencies, blocking, key);
-    if open.is_empty() || relevance.get(key).map(|found| found.value) != Some(Relevance::Undecided)
-    {
+    let undecided = relevance.get(key).map(|found| found.value) == Some(Relevance::Undecided);
+    if open.is_empty() || !(undecided || starting) {
         return open;
     }
     let held: BTreeSet<NodeKey> = dependencies
         .of(key, EdgeSet::Pruned)
         .into_iter()
         .filter(|dependency| dependency.class == EdgeClass::Gate)
-        .filter(|dependency| !matches!(dependency.via, DependencyVia::Condition { .. }))
+        .filter(|dependency| {
+            !(undecided && matches!(dependency.via, DependencyVia::Condition { .. }))
+        })
+        .filter(|dependency| !(starting && dependency.via == DependencyVia::Containment))
         .filter(|dependency| open.contains(&dependency.node))
         .map(|dependency| dependency.node)
         .collect();

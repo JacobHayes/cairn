@@ -109,14 +109,14 @@ pub fn answered(from: State) -> Option<State> {
     next(NodeKind::Decision, from, Move::Answer)
 }
 
-/// D4: whether a move is a completing transition whose guards a bypass can cover: complete
-/// and a first answer.
+/// D4: whether a move is a transition whose guards a bypass can cover: a start, a complete
+/// and a first answer. A start is held to `deps_done` and `date_arrived` only.
 #[must_use]
 pub fn is_guarded(kind: NodeKind, from: State, step: Move) -> bool {
     let guarded = match step {
-        Move::Complete => true,
+        Move::Start | Move::Complete => true,
         Move::Answer => from == State::Open,
-        Move::Start | Move::Stop | Move::Skip | Move::MarkDone | Move::Reopen => false,
+        Move::Stop | Move::Skip | Move::MarkDone | Move::Reopen => false,
     };
     guarded && next(kind, from, step).is_some()
 }

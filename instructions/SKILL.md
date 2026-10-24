@@ -107,6 +107,13 @@ Write directly when the person asked for a state change: answers (`answer_decisi
 transitions (`transition_node`), participations (`assign`), pins and actual dates
 (`set_date`), snoozes (`snooze`, `unsnooze`), and overrides (`override`).
 
+To go ahead of a guard on purpose (start or finish ahead of what a node waits on or of its own
+date, finish without a note, link, ticks or breakdown, answer ahead), send a guard bypass in
+the same `apply_patch` as the move: an `apply_override` mutation with `guard_bypass` naming
+the guards, then the transition or answer. The reason is optional. A bypass alone covers
+nothing, and `transition_node` alone is refused. Do it only when the person says to; the
+engine records what the move went ahead of.
+
 A snooze sets a node aside until a date or until another node is done. Snooze a container
 (a group, or work with children) to set its whole subtree aside in one move: every
 descendant is then held off the next list, names the container in `snoozed_via`, and stays
@@ -120,7 +127,7 @@ or skipping a group, clears its snooze.
 To finish a group or stage while work inside it is still open, `mark_done` it with a reason
 (`transition_node`): it reads done, and its unfinished work reads skipped as under a skip.
 Kept work stays open and still holds the group's dependents; `reopen` removes the mark. Work
-with children has no `mark_done`: complete it, bypassing the guard with a reason when its
+with children has no `mark_done`: complete it, with a guard bypass when its
 children are not done.
 
 Draft a **proposal** (`create_proposal`) when the change is structural (adding, removing, or
@@ -136,8 +143,8 @@ or route); a proposal stays listed until it is applied or discarded.
 Work marked `requires_note` cannot be completed until it has a note of its own (a link,
 or a note on a child or the journey, does not count). Send the note and the completion as
 one `apply_patch` (`add_annotation` with the node and the text, then the `complete`
-transition); `transition_node` alone is refused with the `has_note` guard. Bypass it with
-`override` only when the person says no note is needed. Removing the last note later marks
+transition); `transition_node` alone is refused with the `has_note` guard. Bypass it only
+when the person says no note is needed. Removing the last note later marks
 a finished node `stale` with "missing note".
 
 A deliverable or action can carry a `checklist` (items with an `id` and a `title`, at
@@ -146,7 +153,7 @@ Tick with the `set_ticked` mutation (`node`, `item`, `ticked`) and send the tick
 completion as one `apply_patch`; `transition_node` alone is refused with the `all_ticked`
 guard, one failure per unticked item. Ticking or unticking sets the item's state; sending
 the state it already has changes nothing. An item not on the checklist is refused. Bypass
-the guard with `override` only when the person says the items need not be ticked. Unticking
+the guard only when the person says the items need not be ticked. Unticking
 an item later, or adding one, marks a finished node `stale` with "unticked item". Ticks are
 kept when a node is reopened, and removing an item removes its tick.
 
@@ -202,9 +209,8 @@ Say each kind of date with the field made for it:
   journey's start, give or take an offset. It never holds work back.
 - **A structural not-until** is `not_before`: the work, or the decision, cannot happen before
   that date. While its date is ahead the node is `scheduled` and off the next list; it can
-  still be started early, and finishing it before the date is refused with the
-  `date_arrived` guard unless the person gives a reason to bypass it; finished that way,
-  it reads done early.
+  still be started or finished early, but each is refused with the `date_arrived` guard
+  unless it carries a guard bypass; finished that way, it reads done early.
 - **A personal not-now** is a snooze: someone sets the node aside until a date or another
   node is done. It changes no plan date.
 - **An event** is a milestone. Pinned, it is `scheduled` until its day, then ready to mark
@@ -223,11 +229,10 @@ stages share a milestone: one stage's `closes_at` is the next stage's `opens_at`
 
 Put inside a stage the work done during it. Work that can as well be done ahead of time
 can sit in a stage with `gates: false`: its contents can start and finish before the stage
-opens, and the opening dates only contents not yet started. Starting work early is never a
-shortfall, and neither is finishing it ahead of the opening, or ahead of any dependency with
-a reason (a guard bypass): its `dates.done_early` says, on today's dates, how many days
-early and ahead of what. Its other dates, such as its deadline, still apply. Prep that must
-be done before the stage belongs outside it, with a `due_by` before the opening milestone.
+opens, and the opening dates only contents not yet started. Starting or finishing work
+early is never a shortfall. Ahead of a dependency or a gating opening it takes a guard bypass,
+and a finished node's `dates.done_early` says, on today's dates, how many days early and ahead
+of what. Its other dates, such as its deadline, still apply. Prep that must be done before the stage belongs outside it, with a `due_by` before the opening milestone.
 
 ## Reuse a segment
 

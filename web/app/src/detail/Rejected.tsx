@@ -1,7 +1,7 @@
 // A section's rejected write, shown inline against the patch it rejected (A15: every
 // violation): a stale one with what intervened and a retry on the current version (H5); a
 // contradictory chain with its resolution moves (F5, the DateConflictResolver); a failed
-// guard that can be bypassed with a reason (D4); anything else as its violations.
+// guard that can be bypassed, with an optional reason (D4); anything else as its violations.
 import type { Schema } from "@cairn/client";
 import { useState } from "react";
 
@@ -50,11 +50,6 @@ function retry(write: NodeWrite, failed: Failed, mutations: Mutation[], seen: Se
 /** F5: the rejected patch with one resolution move after it: the edit kept, the chain given its days. */
 export function withMove(attempt: Attempt, move: Mutation): Mutation[] {
   return [...attempt.mutations, move];
-}
-
-/** D4: finishing past a guard takes a reason, so the bypass waits until one is typed. */
-export function bypassReady(reason: string): boolean {
-  return reason.trim() !== "";
 }
 
 /** D4: the guards a bypass would accept the rejected patch past, each once, on the node it is for. */
@@ -128,17 +123,22 @@ export function DateConflictResolver({ view, write, violations, onResolved, onRe
 type Bypassed = { node: string; guards: Guard[] }[];
 
 /** D4: the rejected patch with one bypass per node the refusal names, each for its own guards and all on one reason, so one confirmation finishes every node. */
-export function withBypass(attempt: Attempt, entries: { node: string; guards: Guard[] }[], reason: string): Mutation[] {
+export function withBypass(attempt: Attempt, entries: { node: string; guards: Guard[] }[], reason?: string): Mutation[] {
   return [...entries.map(({ node, guards }) => guardBypass(node, guards, reason)), ...attempt.mutations];
 }
 
-/** The completions a retried patch carries, in words: "mark done", "mark both done", "mark all 3 done". */
+/** The completions (else the starts) a retried patch carries, in words: "mark done", "mark both done", "mark all 3 done", "start", "start both", "start all 3". */
 function completionWords(attempt: Attempt): string {
-  const completing = attempt.mutations.filter((mutation) => mutation.op === "transition" && mutation.transition === "complete").length;
+  const count = (step: string) => attempt.mutations.filter((mutation) => mutation.op === "transition" && mutation.transition === step).length;
+  const completing = count("complete");
+  const starting = count("start");
+  if (completing === 0 && starting > 0) {
+    return starting === 1 ? "start" : starting === 2 ? "start both" : `start all ${String(starting)}`;
+  }
   return completing === 0 ? "go ahead" : completing === 1 ? "mark done" : completing === 2 ? "mark both done" : `mark all ${String(completing)} done`;
 }
 
-/** D4: the bypass of every node's failed guards at once, one reason for the lot, named by what it does; its reason field opens only when the person chooses it, after the remedy above has been offered. */
+/** D4: the bypass of every node's failed guards at once, one optional reason for the lot, named by what it does; its reason field opens only when the person chooses it, after the remedy above has been offered. */
 function Bypass({ write, entries, onResolved, onResent }: Resolving & { entries: Bypassed }) {
   const nodes = entries.map(({ node }) => node);
   const [draft, setReason] = useDraft<string>(`rejected-bypass:${write.journey}:${nodes.join(",")}`);
@@ -162,14 +162,14 @@ function Bypass({ write, entries, onResolved, onResent }: Resolving & { entries:
   return (
     <div className="stack" data-testid="bypass">
       <label className="stack">
-        <span className="label">{`Why ${verb.toLowerCase()} without ${without}`}</span>
+        <span className="label">Why (optional)</span>
         <Field value={reason} onChange={(event) => { setReason(event.target.value); }} />
       </label>
       <span className="row">
         <Button
-          disabled={write.disabled || !bypassReady(reason)}
+          disabled={write.disabled}
           onClick={() => {
-            retry(write, failed, withBypass(failed.attempt, entries, reason), failed.attempt, {
+            retry(write, failed, withBypass(failed.attempt, entries, reason === "" ? undefined : reason), failed.attempt, {
               onResolved: () => {
                 setReason(undefined);
                 onResolved?.();
@@ -178,7 +178,7 @@ function Bypass({ write, entries, onResolved, onResent }: Resolving & { entries:
             });
           }}
         >
-          {`${verb} with this reason`}
+          {`${verb} anyway`}
         </Button>
         <Button onClick={() => { setReason(undefined); choose(false); }}>Cancel</Button>
       </span>

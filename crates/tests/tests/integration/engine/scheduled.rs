@@ -132,8 +132,9 @@ fn started_work_children_and_dependents_of_a_dated_node() {
             "{key: n_after, id: after, kind: action, title: After, requires: [n_launch]}",
         ])),
         &format!(
-            "{}{}",
+            "{}{}{}",
             pin("n_launch", "2026-11-01"),
+            "- op: apply_override\n  node: n_early\n  override: {guard_bypass: {guards: [date_arrived]}}\n",
             transition("n_early", "start")
         ),
     );

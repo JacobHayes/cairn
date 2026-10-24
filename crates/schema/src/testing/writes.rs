@@ -100,7 +100,10 @@ fn arb_override() -> BoxedStrategy<Override> {
     prop_oneof![
         arb_reason().prop_map(|reason| Override::ForceInclude { reason }),
         arb_reason().prop_map(|reason| Override::Keep { reason }),
-        (prop::collection::btree_set(arb_guard(), 1..3), arb_reason())
+        (
+            prop::collection::btree_set(arb_guard(), 1..3),
+            prop::option::of(arb_reason()),
+        )
             .prop_map(|(guards, reason)| Override::GuardBypass { guards, reason }),
     ]
     .boxed()

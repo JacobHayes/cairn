@@ -1,9 +1,14 @@
 // C10, D5: when the acting frontier is empty, what the journey waits on, with the actions the
 // diagnostic offers where they are allowed: unsnooze a snoozed node (B6); for a node waiting for
-// its date (D8 scheduled), mark a milestone done before its day, or start work early (finishing
-// it early needs a reason, so it is not offered here). Each is one patch.
+// its date (D8 scheduled), mark a milestone done before its day, or start work anyway (a guard
+// bypass whose reason is optional; finishing it early is left to the node's own page). Each is
+// one patch.
+import { useRef, type ReactNode } from "react";
 
-import { nodeOf, transition, type Ready } from "../detail/model.ts";
+import { useDraft } from "../data/drafts.ts";
+
+import { ReasonForm } from "../detail/Actions.tsx";
+import { guardBypass, nodeOf, startGuards, transition, type Ready } from "../detail/model.ts";
 import { ACT_LABELS } from "../detail/offers.ts";
 import { Rejected } from "../detail/Rejected.tsx";
 import { useNodeWrite, type NodeWrite } from "../detail/write.ts";
@@ -49,18 +54,63 @@ function CauseLine({ view, write, cause, reach }: { view: Ready; write: NodeWrit
       </li>
     );
   }
-  const { node, date, marks_itself_done: marks } = cause.scheduled;
+  return <ScheduledLine view={view} write={write} cause={cause.scheduled} title={title} inkOf={inkOf} />;
+}
+
+/** A node waiting for its date: a milestone is marked done, work is started anyway through a form with an optional reason. */
+function ScheduledLine({ view, write, cause, title, inkOf }: { view: Ready; write: NodeWrite; cause: Extract<Cause, { scheduled: unknown }>["scheduled"]; title: (node: string) => ReactNode; inkOf: (date: string) => string | undefined }) {
+  const { today } = view.derived;
+  // The form is open while a draft is kept: it, and what was typed, survive a reload or the row being redrawn.
+  const [draft, setDraft] = useDraft<string>(`stalled-start:${write.journey}:${cause.node}`);
+  // What the field holds now, trimmed as it is sent, for telling whether it changed while its write was out.
+  const typed = useRef("");
+  typed.current = (draft ?? "").trim();
+  const { node, date, marks_itself_done: marks } = cause;
   const kind = nodeOf(view, node)?.kind;
   // A milestone is marked done whenever it happens; work may start before its date; a decision waits.
-  const act = kind === "milestone" ? "done" : kind === "deliverable" || kind === "action" ? "start" : undefined;
+  const guards = startGuards(view, node);
+  const act = kind === "milestone" ? "done" : kind === "deliverable" || kind === "action" ? (guards.length > 0 ? "start-anyway" : "start") : undefined;
   const when = kind === "milestone" ? `${marks === true ? "marks itself done " : ""}${whenWords(date, undefined, today)}` : `not before ${dateWords(date, today)}`;
   return (
     <li className="stall-cause" data-testid="stall-cause" data-status="scheduled" data-node={node}>
       <span>{title(node)} <span className={inkOf(date) ?? "muted"}>· {when}</span></span>
       {!write.writable || act === undefined ? null : (
-        <Button disabled={write.disabled} onClick={() => void write.run([transition(node, act === "done" ? "complete" : "start")])}>
+        <Button
+          disabled={write.disabled}
+          onClick={() => {
+            if (act === "start-anyway") {
+              if (draft === undefined) {
+                setDraft("");
+              }
+            } else {
+              void write.run([transition(node, act === "done" ? "complete" : "start")]);
+            }
+          }}
+        >
           {ACT_LABELS[act]}
         </Button>
+      )}
+      {draft === undefined ? null : (
+        <ReasonForm
+          value={draft}
+          label="Why (optional)"
+          hint="This starts it without waiting for its date."
+          optional
+          confirm="Start anyway"
+          testId="start-anyway-form"
+          sending={false}
+          disabled={write.disabled}
+          onChange={setDraft}
+          onConfirm={(why) => {
+            void write.run([guardBypass(node, guards, why), transition(node, "start")]).then((landed) => {
+              // Only the text that was sent goes with it: what was typed since stays.
+              if (landed && typed.current === why) {
+                setDraft(undefined);
+              }
+            });
+          }}
+          onClose={() => { setDraft(undefined); }}
+        />
       )}
     </li>
   );

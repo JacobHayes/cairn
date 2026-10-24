@@ -5,7 +5,7 @@
 // that fills a role or pins a milestone is the only way to change that value (E3), and says so.
 // An identity answer picks an identity or names a new one, made in the same patch as the answer
 // (B3, E6). A blocked decision shows its form with Save disabled; answering anyway is a guard
-// bypass with a reason (D4).
+// bypass whose reason is optional (D4).
 import type { Schema } from "@cairn/client";
 import { useEffect, useId, useMemo, useRef, useState, type ReactNode } from "react";
 
@@ -22,7 +22,7 @@ import { effectOf, effectOfOption, outgoing, sameAnswer } from "./answer.ts";
 import { answerable, failingGuards, guardBypass, titleOf, type AnswerValue, type GraphNode, type NodeDerived, type NodeDetail, type Ready } from "./model.ts";
 import { IdentityOptions, NodeLink, Rationale } from "./parts.tsx";
 import { useSavePreview } from "./preview.ts";
-import { bypassReady, Rejected } from "./Rejected.tsx";
+import { Rejected } from "./Rejected.tsx";
 import { answerText, identityName, resolveIdentity, roleTitle } from "./sections.tsx";
 import { effectWords, savingWords } from "./words.ts";
 import { useFormDraft, useNodeWrite, type NodeWrite } from "./write.ts";
@@ -371,7 +371,7 @@ function answerHolds(derived: NodeDerived): Schema<"Guard">[] {
   return failingGuards(derived).filter((guard) => ANSWER_GUARDS.includes(guard));
 }
 
-/** D4: answering past every guard that holds the decision records why: none without a reason, or with nothing holding it. */
+/** D4: answering past every guard that holds the decision records it: none unless the anyway form was opened (`reason` is then its text, empty for none), or with nothing holding it. */
 export function answerBypass(node: string, derived: NodeDerived, reason: string | undefined): Mutation[] {
   const guards = answerHolds(derived);
   return reason === undefined || guards.length === 0 ? [] : [guardBypass(node, guards, reason)];
@@ -402,7 +402,7 @@ function useAnswerForm(view: Ready, detail: NodeDetail, anyway: Anyway | undefin
   const bypass = anyway?.reason;
   const newAnswer = form.draft !== undefined && !sameAnswer(form.draft.value, stored);
   const blocked = answerHolds(detail.derived).length > 0;
-  const canSave = sending !== undefined && !write.disabled && (!blocked || (bypass !== undefined && bypassReady(bypass)));
+  const canSave = sending !== undefined && !write.disabled && (!blocked || bypass !== undefined);
   const close = () => {
     setNamed(undefined);
     form.close();
@@ -517,7 +517,7 @@ export function AnswerEditor({ view, detail, menu, anyway, focus }: { view: Read
       {bypassing && anyway !== undefined ? (
         <span className="row" data-testid="answer-anyway">
           <label className="stack">
-            <span className="label">Why answer anyway (required)</span>
+            <span className="label">Why (optional)</span>
             <Field value={bypass} onChange={(event) => { anyway.change(event.target.value); }} />
           </label>
           <Button onClick={anyway.cancel}>Cancel</Button>

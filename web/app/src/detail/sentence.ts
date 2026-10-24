@@ -77,20 +77,29 @@ function scheduledSentence(view: Ready, detail: NodeDetail): Piece[] {
     return [node.auto_done === true ? `Scheduled for ${on}; it marks itself done that day.` : `Scheduled for ${on}; mark it done when it happens.`];
   }
   if (node.kind === "decision") {
-    return [`Scheduled: to be decided from ${on}. To answer sooner, choose Answer anyway and give a reason.`];
+    return [`Scheduled: to be decided from ${on}. To answer sooner, choose Answer anyway.`];
   }
-  return [`Scheduled: not before ${on}. It can be started now; to finish sooner, choose Done anyway and give a reason.`];
+  return [`Scheduled: not before ${on}. To start it sooner, choose Start anyway; to finish sooner, choose Done anyway.`];
 }
 
-/** Why work started early is early: what it still waits on, and its own date when that is ahead. */
+/** The reason a guard bypass recorded, without its closing full stop, or none. */
+function bypassReason(detail: NodeDetail): string | undefined {
+  const reason = detail.overrides?.bypass?.reason?.replace(/\.+$/, "");
+  return reason === undefined || reason === "" ? undefined : reason;
+}
+
+/** Why work started early is early: what its start went ahead of, as the start recorded it (the open dependencies and its own date), with the reason it was given if any. */
 function earlyPhrase(view: Ready, detail: NodeDetail, viewer: readonly string[]): Piece[] {
-  const { derived, node } = detail;
-  const own = derived.dates.not_before ?? undefined;
-  const ahead = own !== undefined && own > view.derived.today ? [`its own date is ${dateWords(own, view.derived.today)}`] : [];
-  const waits = waitsOn(view, node.key).length > 0 || ahead.length === 0 ? ["still waits on ", ...waitingPhrase(view, node.key, viewer)] : [];
-  return waits.length > 0 && ahead.length > 0 ? [...waits, ", and ", ...ahead] : [...waits, ...ahead];
+  const failures = detail.overrides?.bypass?.failures ?? [];
+  const waits = failures.flatMap((failure) => (typeof failure === "object" && "open_dependency" in failure ? [failure.open_dependency] : []));
+  const date = failures.flatMap((failure) => (typeof failure === "object" && "too_early" in failure ? [failure.too_early] : []))[0];
+  const ahead: Piece[] = [
+    ...(waits.length === 0 ? [] : ["ahead of ", ...listed(waits.map((node) => namedWithOwner(view, node, viewer)))]),
+    ...(date === undefined ? [] : [`${waits.length === 0 ? "" : ", and "}before its own date, ${dateWords(date, view.derived.today)}`]),
+  ];
+  const reason = bypassReason(detail);
+  return [...ahead, ...(reason === undefined ? [] : [`, with the reason "${reason}"`])];
 }
-
 
 /** The decisions to name when a node waits on answers: those its relevance reads that are still open. */
 function undecidedNames(view: Ready, key: string): Piece[] {
@@ -116,8 +125,8 @@ export function appliesIf(view: Ready, detail: NodeDetail): string | undefined {
  */
 function aheadOf(view: Ready, detail: NodeDetail, early: Schema<"DoneEarly">): Piece[] {
   const days = daysWords(early.days);
-  const reason = detail.overrides?.bypass?.reason.replace(/\.+$/, "");
-  const because = reason === undefined || reason === "" ? [] : [`, with the reason "${reason}"`];
+  const reason = bypassReason(detail);
+  const because = reason === undefined ? [] : [`, with the reason "${reason}"`];
   const { source } = early;
   if ("dependency" in source) {
     const { requires, via } = source.dependency;
@@ -232,7 +241,7 @@ function stateSentence(view: Ready, detail: NodeDetail, rank: RankFacts, viewer:
       return [`${node.kind === "decision" ? "Ready to decide." : "Ready."}${rankClause(view, derived, rank)}`];
     case "active": {
       const since = `${record.started_on == null ? "In progress." : `In progress since ${on(record.started_on)}.`}${rankClause(view, derived, rank)}`;
-      return derived.started_early === true ? [`${since} Started early: `, ...earlyPhrase(view, detail, viewer), "."] : [since];
+      return derived.started_early === true ? [`${since} Started early, `, ...earlyPhrase(view, detail, viewer), "."] : [since];
     }
     case "blocked":
       return ["Waiting on ", ...waitingPhrase(view, node.key, viewer), "."];

@@ -516,3 +516,57 @@ async fn a_journey_is_created_with_owners_and_a_merge_moves_them_on() {
         .await;
     assert_eq!(owners(&snapshot["snapshot"]["journey"]), json!(["who_b"]));
 }
+
+/// Starting work that waits is refused through `transition_node` with a bypassable guard; the
+/// bypass and the start in one `apply_patch` go through with no reason, and the argument
+/// validates against the schema the tool advertises.
+#[tokio::test]
+async fn starting_ahead_takes_a_reasonless_bypass_in_one_patch() {
+    let world = World::new();
+    let ann = user("u_ann");
+    world.vendor_journey(&ann).await;
+    let waiting = "n_plan";
+    let start = json!({
+        "journey": "j_vendor_eval", "node": waiting, "transition": "start",
+        "patch_id": "p_plan_start", "base_revision": 1,
+    });
+    let refused = world.call(&ann, "transition_node", start).await;
+    let Err(ToolError::Rejected {
+        rejection: Rejection::Invalid { violations },
+    }) = refused
+    else {
+        panic!("{refused:?}");
+    };
+    assert!(
+        violations
+            .as_slice()
+            .iter()
+            .all(|found| found.code == ViolationCode::GuardFailed
+                && found.bypassable == Some(Guard::DepsDone)),
+        "{violations:#?}"
+    );
+    let patch = json!({
+        "id": "p_plan_ahead",
+        "target": { "journey": "j_vendor_eval" },
+        "base_revision": 1,
+        "mutations": [
+            { "op": "apply_override", "node": waiting, "override": { "guard_bypass": {
+                "guards": ["deps_done"] } } },
+            { "op": "transition", "node": waiting, "transition": "start" },
+        ],
+    });
+    let arguments = json!({ "patch": patch });
+    let advertised = cairn_mcp::ToolSet::definitions()
+        .into_iter()
+        .find(|tool| tool.name == "apply_patch")
+        .unwrap();
+    let validator =
+        jsonschema::draft202012::new(&serde_json::Value::Object(advertised.input_schema)).unwrap();
+    let errors: Vec<String> = validator
+        .iter_errors(&arguments)
+        .map(|error| error.to_string())
+        .collect();
+    assert!(errors.is_empty(), "{errors:#?}");
+    let applied = world.ok(&ann, "apply_patch", arguments).await;
+    assert_eq!(applied["receipt"]["revision"], 2);
+}

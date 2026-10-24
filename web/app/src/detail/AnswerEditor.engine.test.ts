@@ -42,5 +42,10 @@ describe("D4, D8: answering anyway", () => {
     expect(() => journeyAfter(host, "j_launch", [answer], text)).toThrow();
     const bypassed = journeyAfter(host, "j_launch", [...answerBypass("n_debrief", derived, "The team asked early"), answer], text);
     expect(bypassed).toContain("Written");
+    // The reason is optional: an anyway form opened and left empty bypasses all the same.
+    const reasonless = answerBypass("n_debrief", derived, "");
+    expect(reasonless).toHaveLength(1);
+    expect(journeyAfter(host, "j_launch", [...reasonless, answer], text)).toContain("Written");
+    expect(answerBypass("n_debrief", derived, undefined)).toEqual([]);
   });
 });

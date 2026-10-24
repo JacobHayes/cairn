@@ -141,6 +141,7 @@ impl Derived {
                 .node(key)
                 .and_then(|node| checklist_count(graph.document(), node)),
             failing_guards: self.failing_guards(graph, key, annotated),
+            start_guards: self.start_guards(graph, key),
             started_early: self.started_early(graph, key),
             waits_on,
             done_by_date: blocking.done_by_date(key),
@@ -186,9 +187,32 @@ impl Derived {
         }
     }
 
-    /// D8: stored `active` while its own or an inherited gate is unsatisfied (a container's
-    /// children are not a gate), or before its own not-before date; an undecided node held
-    /// only by its own condition gate counts, since an undecided gate blocks like an open one.
+    /// D4: the bypassable guards starting the node would fail if attempted now with no bypass
+    /// in the patch: a deliverable or action not yet started, in scope. Empty for any other
+    /// node. A start is held to `deps_done` less the node's own children, and `date_arrived`.
+    fn start_guards(&self, graph: &Graph, key: &NodeKey) -> BTreeSet<Guard> {
+        let document = graph.document();
+        let Some(node) = graph.node(key) else {
+            panic!("the graph holds {key}");
+        };
+        let mut guards = BTreeSet::new();
+        let (kind, state) = (node.kind(), stored_state(document, node));
+        if transition::next(kind, state, Move::Start).is_none() || !self.relevance.in_scope(key) {
+            return guards;
+        }
+        if !self.start_open_dependencies(key).is_empty() {
+            guards.insert(Guard::DepsDone);
+        }
+        if self.too_early(graph, key).is_some() {
+            guards.insert(Guard::DateArrived);
+        }
+        guards
+    }
+
+    /// D8: stored `active` with a guard bypass that recorded what the start went ahead of: an
+    /// open dependency or its own not-before date. Read from the record, not from today's
+    /// blocking, so work started normally and then held by a reopened prerequisite does not
+    /// read started early, and a start ahead keeps reading so once the prerequisite is done.
     fn started_early(&self, graph: &Graph, key: &NodeKey) -> bool {
         let Some(node) = graph.node(key) else {
             panic!("the graph holds {key}");
@@ -196,7 +220,13 @@ impl Derived {
         stored_state(graph.document(), node) == State::Active
             && self.relevance.in_scope(key)
             && !self.blocking.closed(key)
-            && (self.waiting(graph, key) || self.too_early(graph, key).is_some())
+            && graph
+                .document()
+                .state
+                .overrides
+                .get(key)
+                .and_then(|overrides| overrides.bypass.as_ref())
+                .is_some_and(|bypass| !bypass.failures.is_empty())
     }
 
     /// D4: the bypassable guards the node's completing transition would fail if attempted

@@ -213,7 +213,26 @@ impl Derived {
     /// relevance answers for (finishing undecided work is accepted with a warning).
     #[must_use]
     pub fn guard_open_dependencies(&self, key: &NodeKey) -> BTreeSet<NodeKey> {
-        stale::guard_open_dependencies(&self.dependencies, &self.blocking, &self.relevance, key)
+        stale::guard_open_dependencies(
+            &self.dependencies,
+            &self.blocking,
+            &self.relevance,
+            key,
+            false,
+        )
+    }
+
+    /// D4's `deps_done` failures for a start: [`Derived::guard_open_dependencies`], less the
+    /// node's own children, which its finish waits on and its start does not.
+    #[must_use]
+    pub fn start_open_dependencies(&self, key: &NodeKey) -> BTreeSet<NodeKey> {
+        stale::guard_open_dependencies(
+            &self.dependencies,
+            &self.blocking,
+            &self.relevance,
+            key,
+            true,
+        )
     }
 
     /// Gating, D4: the decisions an undecided node's relevance waits on: those still to be

@@ -1,6 +1,6 @@
 //! The stage that needs derived state (D4, B6; ARCHITECTURE, Write path: apply): the final
 //! candidate is derived once, with the patch's today, and every guarded transition the patch
-//! attempted (complete or a first answer) is held to relevance and `deps_done` on it, so
+//! attempted (start, complete or a first answer) is held to relevance and `deps_done` on it, so
 //! a guard is never satisfied only for a moment and a bulk completion is accepted in any
 //! order (A17). Relevance refuses a node that is not relevant and has no bypass (force include
 //! is the escape hatch); an undecided node passes, and neither do its condition gates hold it
@@ -8,7 +8,8 @@
 //! a consequence (D7) that it may not apply. A `deps_done` bypass applied in the same patch
 //! accepts the open dependencies present, and they are recorded on it. Work or a decision
 //! whose own not-before date is after the patch's today fails `date_arrived` (A8); a bypass
-//! accepts that date and records it, so a later date is a distinct failure. A milestone is
+//! accepts that date and records it, so a later date is a distinct failure. A start is held
+//! to the same two guards, minus the node's own children, which only its finish waits on. A milestone is
 //! never held by its date: marking it done records when it happened. A snooze the patch made must sit on a node in scope that is not closed: not
 //! effectively skipped and not a milestone that reads as done (B6; a blocked node may be
 //! snoozed, Gating); a group has work left beneath it. An unsnooze of a node with no snooze of
@@ -125,7 +126,14 @@ fn relevance(check: &mut Check<'_, '_>, graph: &Graph, derived: &Derived, key: &
 /// the patch produces (an undecided node's condition gates aside), or a bypass in the patch
 /// that accepts the open ones.
 fn deps_done(check: &mut Check<'_, '_>, graph: &Graph, derived: &Derived, key: &NodeKey, at: u32) {
-    let open = derived.guard_open_dependencies(key);
+    // A start is not held by the node's own children; its finish is.
+    let starting =
+        check.session.started.contains_key(key) && !check.session.completed.contains_key(key);
+    let open = if starting {
+        derived.start_open_dependencies(key)
+    } else {
+        derived.guard_open_dependencies(key)
+    };
     if open.is_empty() {
         return;
     }
@@ -173,7 +181,7 @@ fn deps_done(check: &mut Check<'_, '_>, graph: &Graph, derived: &Derived, key: &
         ViolationCode::GuardFailed,
         format!(
             "this transition needs every hard dependency satisfied, and {} are open on the graph \
-             this patch produces; bypass deps_done with a reason to go ahead anyway",
+             this patch produces; to go ahead anyway, bypass deps_done in the same patch",
             open.len()
         ),
     );
@@ -231,7 +239,7 @@ fn date_arrived(
         ViolationCode::GuardFailed,
         format!(
             "this node waits for its own not-before date, {date}, which has not arrived; \
-             bypass date_arrived with a reason to go ahead anyway"
+             to go ahead anyway, bypass date_arrived in the same patch"
         ),
     );
     violation.at.mutation = Some(at);

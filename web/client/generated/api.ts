@@ -1310,16 +1310,16 @@ export interface components {
             date: string;
         };
         /**
-         * @description A guard bypass as stored: the guards bypassed, why, and the specific failures
-         *     present when it was applied.
+         * @description A guard bypass as stored: the guards bypassed, why when a reason was given, and the
+         *     specific failures present when it was applied.
          */
         Bypass: {
             /** @description The failures present when the bypass was applied. */
             failures?: components["schemas"]["GuardFailure"][];
             /** @description The guards bypassed. */
             guards: components["schemas"]["Guard"][];
-            /** @description Why. */
-            reason: components["schemas"]["Reason"];
+            /** @description Why, when a reason was given. */
+            reason?: components["schemas"]["Reason"] | null;
         };
         /** @description The caller and the identities their verified emails name. */
         Caller: {
@@ -3723,8 +3723,16 @@ export interface components {
             /** @description Why a terminal node's completing guards would now fail. */
             stale?: components["schemas"]["GuardFailure"][];
             /**
-             * @description Stored `active` while its own or an inherited gate is unsatisfied; a container's
-             *     children are not a gate.
+             * @description The bypassable guards starting the node (a deliverable or action not yet started) would
+             *     fail if attempted now with no bypass in the patch: `deps_done` while a gate it waits
+             *     on is open (its own children and an undecided node's condition gates aside), and
+             *     `date_arrived` while its own not-before date is ahead. Empty when a plain start is
+             *     accepted and for every node with no start left.
+             */
+            start_guards?: components["schemas"]["Guard"][];
+            /**
+             * @description Stored `active` with a guard bypass that recorded what the start went ahead of: an
+             *     open dependency or its own not-before date.
              */
             started_early?: boolean;
             /**
@@ -4047,13 +4055,13 @@ export interface components {
             guard_bypass: {
                 /** @description The guards bypassed. */
                 guards: components["schemas"]["Guard"][];
-                /** @description Why. */
-                reason: components["schemas"]["Reason"];
+                /** @description Why, when the person gave a reason. Leave the field out for none. */
+                reason?: components["schemas"]["Reason"] | null;
             };
         };
         /** @description The kind of an override. */
         OverrideKind: "force_include" | "keep" | "guard_bypass";
-        /** @description A node's overrides: reasoned, logged departures. */
+        /** @description A node's overrides: logged departures. */
         Overrides: {
             /** @description A guard bypass on the node's transition. */
             bypass?: components["schemas"]["Bypass"] | null;

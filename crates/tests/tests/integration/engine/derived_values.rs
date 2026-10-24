@@ -30,6 +30,12 @@ fn transition(node: &str, step: &str) -> String {
     format!("- op: transition\n  node: {node}\n  transition: {step}\n")
 }
 
+fn bypass_deps(node: &str) -> String {
+    format!(
+        "- op: apply_override\n  node: {node}\n  override: {{guard_bypass: {{guards: [deps_done]}}}}\n"
+    )
+}
+
 const FIRST: &str = "{key: n_first, id: first, kind: action, title: First}";
 const SECOND: &str =
     "{key: n_second, id: second, kind: action, title: Second, requires: [n_first]}";
@@ -329,9 +335,9 @@ fn failing_guards_are_what_applying_the_transition_refuses() {
     assert!(accepted > 0 && refused > 0, "the oracle saw both outcomes");
 }
 
-/// D8: started early is stored `active` while the node's own or an inherited gate is
-/// unsatisfied, not while a container waits only on its children; an undecided node held by
-/// its condition gate counts.
+/// D8: started early is stored `active` with a bypass that recorded the unsatisfied gate it
+/// went ahead of, its own or an inherited one; a container's children are not a gate, and an
+/// undecided node's condition gate guards nothing.
 #[test]
 fn started_early_is_active_work_behind_a_gate() {
     let records = support::journey(&add(&[
@@ -345,7 +351,8 @@ fn started_early_is_active_work_behind_a_gate() {
     let started = support::accepted(
         &records,
         &format!(
-            "{}{}{}{}",
+            "{}{}{}{}{}",
+            bypass_deps("n_second"),
             transition("n_second", "start"),
             transition("n_maybe", "start"),
             transition("n_deliv", "start"),
@@ -354,7 +361,10 @@ fn started_early_is_active_work_behind_a_gate() {
     );
     let early = |name: &str| derived_of(&started, name).started_early;
     assert!(early("n_second"), "behind an unfinished requirement");
-    assert!(early("n_maybe"), "behind an undecided condition gate");
+    assert!(
+        !early("n_maybe"),
+        "an undecided condition gate guards nothing, so the start went ahead of nothing"
+    );
     assert!(!early("n_first"), "nothing holds it");
     assert!(!early("n_deliv"), "a container's children are not a gate");
     assert!(

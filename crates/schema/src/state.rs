@@ -338,22 +338,23 @@ impl GuardFailure {
 }
 
 // PRD: D4.
-/// A guard bypass as stored: the guards bypassed, why, and the specific failures
-/// present when it was applied.
+/// A guard bypass as stored: the guards bypassed, why when a reason was given, and the
+/// specific failures present when it was applied.
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
 #[serde(deny_unknown_fields)]
 pub struct Bypass {
     /// The guards bypassed.
     pub guards: BTreeSet<Guard>,
-    /// Why.
-    pub reason: Reason,
+    /// Why, when a reason was given.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub reason: Option<Reason>,
     /// The failures present when the bypass was applied.
     #[serde(default, skip_serializing_if = "BTreeSet::is_empty")]
     pub failures: BTreeSet<GuardFailure>,
 }
 
 // PRD: glossary, Override.
-/// A node's overrides: reasoned, logged departures.
+/// A node's overrides: logged departures.
 #[derive(Clone, Debug, Default, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
 #[serde(deny_unknown_fields)]
 pub struct Overrides {

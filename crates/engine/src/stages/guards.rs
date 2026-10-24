@@ -5,7 +5,7 @@
 //! atomic, each on the graph the patch produces, so a guard is never satisfied only for
 //! a moment. A guard bypass applied in the same patch accepts the failures of the guards it
 //! names, and those specific failures are recorded on it; a bypass covers a guarded
-//! transition (complete, a first answer) on its node in the same patch. Relevance and
+//! transition (start, complete, a first answer) on its node in the same patch. Relevance and
 //! `deps_done` join this stage with derive (2.4).
 
 use std::collections::BTreeSet;
@@ -57,11 +57,11 @@ pub(super) fn check(check: &mut Check<'_, '_>) {
                         .and_then(|checklist| checklist.title(item))
                         .map_or_else(|| item.to_string(), ToString::to_string);
                     format!(
-                        "completing this node needs its checklist item \"{title}\" ticked; tick it in the same patch, or bypass it with a reason to complete anyway"
+                        "completing this node needs its checklist item \"{title}\" ticked; tick it in the same patch, or bypass it in the same patch to complete anyway"
                     )
                 }
                 _ => format!(
-                    "completing this node fails {:?}; bypass it with a reason to complete anyway",
+                    "completing this node fails {:?}; bypass it in the same patch to complete anyway",
                     failure.guard()
                 ),
             };

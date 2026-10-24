@@ -50,6 +50,8 @@ pub(crate) struct Session<'a> {
     pub inner: Option<u32>,
     /// Nodes a guarded transition moved (D4), with the mutation that moved them.
     pub guarded: BTreeMap<NodeKey, u32>,
+    /// Nodes started in this patch, with the mutation that started them.
+    pub started: BTreeMap<NodeKey, u32>,
     /// Nodes completed in this patch, with the mutation that completed them.
     pub completed: BTreeMap<NodeKey, u32>,
     /// Nodes given a guard bypass in this patch, with the event holding it.
@@ -222,6 +224,7 @@ impl<'a> Session<'a> {
             ordinal: 0,
             inner: None,
             guarded: BTreeMap::new(),
+            started: BTreeMap::new(),
             completed: BTreeMap::new(),
             bypassed: BTreeMap::new(),
             snoozed: BTreeMap::new(),

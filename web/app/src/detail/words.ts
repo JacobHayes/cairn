@@ -41,6 +41,8 @@ export function keptWords(kind: FormCase): string {
     case "bypass":
     case "evidence":
       return "Marked done.";
+    case "start-anyway":
+      return "Started.";
     case "anyway":
       return "Answered.";
     case "snooze":

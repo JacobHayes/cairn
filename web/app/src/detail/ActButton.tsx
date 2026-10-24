@@ -9,8 +9,8 @@ import { nodeOf, transition, type Mutation, type Ready } from "./model.ts";
 import { actLabel, unsnoozeOf, type Act } from "./offers.ts";
 import type { NodeWrite } from "./write.ts";
 
-/** What an action opens rather than sends: the done form, the break-down form, or the answer form. */
-export type Opens = "evidence" | "break-down" | "decide";
+/** What an action opens rather than sends: the done form, the start-anyway form, the break-down form, or the answer form. */
+export type Opens = "evidence" | "break-down" | "decide" | "start-anyway";
 
 /** What `act` sends for `key` as its one move, if it is one (the others open a form). */
 export function actMutation(view: Ready, act: Act, key: string): Mutation | undefined {
@@ -27,6 +27,7 @@ export function actMutation(view: Ready, act: Act, key: string): Mutation | unde
     }
     case "decide":
     case "done-with-evidence":
+    case "start-anyway":
     case "break-down":
       return undefined;
   }
@@ -65,7 +66,7 @@ export function ActButton({ act, view, node, write, waiting, open, dated = false
   if (act === "done" && dated && nodeOf(view, node)?.kind === "milestone") {
     return <MilestoneDone view={view} write={write} node={node} disabled={waiting} />;
   }
-  const opens = act === "decide" || act === "break-down" || act === "done-with-evidence";
+  const opens = act === "decide" || act === "break-down" || act === "done-with-evidence" || act === "start-anyway";
   const refused = waiting && act === "done";
   return (
     <Button
@@ -74,7 +75,7 @@ export function ActButton({ act, view, node, write, waiting, open, dated = false
       data-testid={act === "break-down" ? "break-down" : undefined}
       onClick={() => {
         if (opens) {
-          open(act === "done-with-evidence" ? "evidence" : act === "decide" ? "decide" : "break-down");
+          open(act === "done-with-evidence" ? "evidence" : act === "decide" ? "decide" : act === "start-anyway" ? "start-anyway" : "break-down");
         } else if (mutation !== undefined) {
           void write.run([mutation]);
         }

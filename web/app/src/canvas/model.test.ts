@@ -225,7 +225,6 @@ describe("C2, C4: roll-ups", () => {
   test("a card shows the engine's display state (D8): a skipped node is finished", () => {
     const skipped = changed((each) => {
       derivedOf(each, "n_build").display_state = "skipped";
-      derivedOf(each, "n_build").started_early = false;
       derivedOf(each, "n_check").display_state = "skipped";
     });
     const build = card(model(wholeLevel(), [], [], skipped), "n_build");
@@ -242,10 +241,10 @@ describe("C2, C4: roll-ups", () => {
 });
 
 describe("C5: I am here, and the rank tags", () => {
-  test("the frontier, active work (started early when blocked), and the viewer's items are marked", () => {
+  test("the frontier, active work, and the viewer's items are marked", () => {
     const mine = model(wholeLevel(), [], ["n_option"]);
     expect(hereWords(card(mine, "n_choose"))).toEqual(["actionable now"]);
-    expect(hereWords(card(mine, "n_build"))).toEqual(["active, started early"]);
+    expect(hereWords(card(mine, "n_build"))).toEqual(["active"]);
     expect(hereWords(card(mine, "n_option"))).toEqual(["yours"]);
     expect(hereWords(card(mine, "n_kick"))).toEqual([]);
   });

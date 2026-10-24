@@ -5,7 +5,7 @@
 // At most one form is open at a time, owned by one machine (actions-form.ts) and kept as one
 // draft; a form that sent its write stays until that write ends, and text typed since is never
 // lost to the landing. A guard that fails disables the primary and says what it waits on;
-// answering or finishing anyway is a bypass with a reason (D4). A container holding its own
+// starting, finishing or answering anyway is a guard bypass whose reason is optional (D4). A container holding its own
 // snooze says that moving it on lifts the snooze (B6).
 import { STATUS_ACCEPTS_CHANGES } from "@cairn/client";
 import { useActorRef, useSelector } from "@xstate/react";
@@ -32,7 +32,7 @@ import { ActButton, actMutation, type Opens } from "./ActButton.tsx";
 import { EvidenceForm } from "./DoneEvidence.tsx";
 import { SnoozePanel, snoozeWords, WeightEditor } from "./editors.tsx";
 import { foldKey, setFold } from "./folds.ts";
-import { answerable, failingGuards, guardBypass, itemTitle, movesFrom, storedSnooze, titleOf, transition, unfinishedInside, type Guard, type GraphNode, type Mutation, type NodeDetail, type Ready } from "./model.ts";
+import { answerable, failingGuards, guardBypass, itemTitle, movesFrom, startGuards, storedSnooze, titleOf, transition, unfinishedInside, type Guard, type GraphNode, type Mutation, type NodeDetail, type Ready } from "./model.ts";
 import { menuOf, offered, type Act, type ContextId, type MenuId, type MenuItem } from "./offers.ts";
 import { OwnerSelect } from "./parts.tsx";
 import { Rejected } from "./Rejected.tsx";
@@ -63,11 +63,13 @@ function Dismiss({ sending, onClose }: { sending: Sending; onClose: () => void }
   return <Button onClick={onClose}>{sending ? "Close" : "Cancel"}</Button>;
 }
 
-/** A reason typed and confirmed in place of the action row: the form every "anyway" and skip shares. */
-function ReasonForm({ value, label, hint, confirm, testId, sending, disabled, onChange, onConfirm, onClose }: {
+/** A reason typed and confirmed in place of the action row: the form every "anyway" and skip shares. Going ahead anyway takes an optional one. */
+export function ReasonForm({ value, label, hint, optional = false, confirm, testId, sending, disabled, onChange, onConfirm, onClose }: {
   value: string;
   label: string;
   hint?: string;
+  /** The reason may be left empty: the confirming button is enabled with the field blank. */
+  optional?: boolean;
   confirm: string;
   testId: string;
   sending: Sending;
@@ -89,7 +91,7 @@ function ReasonForm({ value, label, hint, confirm, testId, sending, disabled, on
       </label>
       {hint === undefined ? null : <p className="muted">{hint}</p>}
       <span className="row">
-        <Button primary disabled={disabled || value.trim() === ""} onClick={() => { onConfirm(value.trim()); }}>
+        <Button primary disabled={disabled || (!optional && value.trim() === "")} onClick={() => { onConfirm(value.trim()); }}>
           {confirm}
         </Button>
         <Dismiss sending={sending} onClose={onClose} />
@@ -115,6 +117,12 @@ function LiftsSnooze({ view, node, moving }: { view: Ready; node: string; moving
 /** The guards a bypass would pass, with what the node is missing in words. */
 function guardsOf(detail: NodeDetail): { guards: Guard[]; words: string } {
   const guards = failingGuards(detail.derived);
+  return { guards, words: guards.map(guardWords).join(" and ") };
+}
+
+/** The guards a start anyway would pass, with what the node waits on in words. */
+function startsOf(view: Ready, detail: NodeDetail): { guards: Guard[]; words: string } {
+  const guards = startGuards(view, detail.node.key);
   return { guards, words: guards.map(guardWords).join(" and ") };
 }
 
@@ -206,7 +214,7 @@ function runnersOf({ view, detail, write, form, onRename, onCopied, insertHere }
   const origin = memberOrigin(view.journey.graph, key);
   const journey = view.journey.header.id;
   const move = (...mutations: Mutation[]) => () => void write.run(mutations);
-  const reason = (kind: "skip" | "mark-done" | "keep" | "include" | "bypass" | "anyway") => () => { form.openForm(kind, ""); };
+  const reason = (kind: "skip" | "mark-done" | "keep" | "include" | "bypass" | "start-anyway" | "anyway") => () => { form.openForm(kind, ""); };
   // The view the person is on goes with them (the graph draws the node whatever it hides); the copied link is the node's own address.
   const graph = graphViewFrom(new URLSearchParams(search));
   const link = `${globalThis.location.origin}${journeyPath({ journey, node: key }, "graph")}`;
@@ -315,7 +323,7 @@ interface OpenProps {
   submit: (opened: Drafted, mutations: Mutation[]) => void;
 }
 
-type ReasonKind = "skip" | "mark-done" | "keep" | "include" | "bypass";
+type ReasonKind = "skip" | "mark-done" | "keep" | "include" | "bypass" | "start-anyway";
 
 /** What sending a reason form's `reason` does to `node`: D1's skip, B5's keep and force include, D4's guard bypass with the move it was needed for. */
 function reasonMutations(kind: ReasonKind, node: GraphNode, guards: Guard[], reason: string): Mutation[] {
@@ -330,11 +338,13 @@ function reasonMutations(kind: ReasonKind, node: GraphNode, guards: Guard[], rea
       return [{ op: "apply_override", node: node.key, override: { force_include: { reason } } }];
     case "bypass":
       return [guardBypass(node.key, guards, reason), transition(node.key, "complete")];
+    case "start-anyway":
+      return [guardBypass(node.key, guards, reason), transition(node.key, "start")];
   }
 }
 
 /** The field's label and the confirming button's words of a reason form. */
-function reasonWords(kind: ReasonKind, node: GraphNode, without: string, inside: number): { label: string; confirm: string; testId: string; hint?: string } {
+function reasonWords(kind: ReasonKind, node: GraphNode, without: string, inside: number): { label: string; confirm: string; testId: string; hint?: string; optional?: boolean } {
   switch (kind) {
     case "skip":
       return { label: "Why skip it", confirm: "Skip", testId: "skip-form" };
@@ -345,14 +355,16 @@ function reasonWords(kind: ReasonKind, node: GraphNode, without: string, inside:
     case "include":
       return { label: "Why include it", confirm: "Include anyway", testId: "include-form" };
     case "bypass":
-      return { label: `Why mark it done without ${without}`, confirm: `Mark done without ${without}`, testId: "bypass" };
+      return { label: "Why (optional)", confirm: "Mark done anyway", testId: "bypass", hint: `This goes ahead without ${without}.`, optional: true };
+    case "start-anyway":
+      return { label: "Why (optional)", confirm: "Start anyway", testId: "start-anyway-form", hint: `This starts it without ${without}.`, optional: true };
   }
 }
 
 /** The forms that take a reason. */
 function ReasonCase({ view, detail, form, write, sending, submit, opened }: OpenProps & { opened: Extract<Drafted, { case: ReasonKind }> }) {
   const { node } = detail;
-  const guards = guardsOf(detail);
+  const guards = opened.case === "start-anyway" ? startsOf(view, detail) : guardsOf(detail);
   return (
     <ReasonForm
       {...reasonWords(opened.case, node, guards.words, unfinishedInside(view, node.key))}
@@ -377,6 +389,7 @@ function OpenedForm({ opened, footer, ...props }: OpenProps & { opened: Opened; 
     case "keep":
     case "include":
     case "bypass":
+    case "start-anyway":
       return <ReasonCase {...props} opened={opened} />;
     case "anyway":
       // The reason is typed inside the answer form, which sends it with the answer.
@@ -469,6 +482,8 @@ function useMenu(menus: Omit<Menus, "insertHere">): { groups: MenuItem[][]; runn
     if (id === "decide") {
       form.close();
       setFocusAsked(true);
+    } else if (id === "start-anyway") {
+      form.openForm("start-anyway", "");
     } else if (id === "done-with-evidence") {
       // Opening the open case again keeps what was typed; another case takes the form's place.
       form.openForm("evidence", { artifact: "", note: "" });
@@ -504,6 +519,8 @@ function opensIn(form: ActionsForm): (what: Opens) => void {
   return (what) => {
     if (what === "evidence") {
       form.openForm("evidence", { artifact: "", note: "" });
+    } else if (what === "start-anyway") {
+      form.openForm("start-anyway", "");
     } else if (what === "break-down") {
       form.openPanel("break-down");
     }

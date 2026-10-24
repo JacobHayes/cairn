@@ -733,7 +733,7 @@
       },
       "Bypass": {
         "additionalProperties": false,
-        "description": "A guard bypass as stored: the guards bypassed, why, and the specific failures\npresent when it was applied.",
+        "description": "A guard bypass as stored: the guards bypassed, why when a reason was given, and the\nspecific failures present when it was applied.",
         "properties": {
           "failures": {
             "description": "The failures present when the bypass was applied.",
@@ -752,13 +752,19 @@
             "uniqueItems": true
           },
           "reason": {
-            "$ref": "#/components/schemas/Reason",
-            "description": "Why."
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Reason"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Why, when a reason was given."
           }
         },
         "required": [
-          "guards",
-          "reason"
+          "guards"
         ],
         "type": "object"
       },
@@ -9232,8 +9238,16 @@
             "type": "array",
             "uniqueItems": true
           },
+          "start_guards": {
+            "description": "The bypassable guards starting the node (a deliverable or action not yet started) would\nfail if attempted now with no bypass in the patch: `deps_done` while a gate it waits\non is open (its own children and an undecided node's condition gates aside), and\n`date_arrived` while its own not-before date is ahead. Empty when a plain start is\naccepted and for every node with no start left.",
+            "items": {
+              "$ref": "#/components/schemas/Guard"
+            },
+            "type": "array",
+            "uniqueItems": true
+          },
           "started_early": {
-            "description": "Stored `active` while its own or an inherited gate is unsatisfied; a container's\nchildren are not a gate.",
+            "description": "Stored `active` with a guard bypass that recorded what the start went ahead of: an\nopen dependency or its own not-before date.",
             "type": "boolean"
           },
           "subtree_gravity": {
@@ -10520,7 +10534,7 @@
           },
           {
             "additionalProperties": false,
-            "description": "Bypass guards on the node's transition in the same patch; the engine records the\nspecific failures present.",
+            "description": "Go ahead anyway: bypass guards on the node's start or completion in the same patch.\nThe engine records the specific failures present.",
             "properties": {
               "guard_bypass": {
                 "additionalProperties": false,
@@ -10534,13 +10548,19 @@
                     "uniqueItems": true
                   },
                   "reason": {
-                    "$ref": "#/components/schemas/Reason",
-                    "description": "Why."
+                    "anyOf": [
+                      {
+                        "$ref": "#/components/schemas/Reason"
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ],
+                    "description": "Why, when the person gave a reason. Leave the field out for none."
                   }
                 },
                 "required": [
-                  "guards",
-                  "reason"
+                  "guards"
                 ],
                 "type": "object"
               }
@@ -10574,7 +10594,7 @@
       },
       "Overrides": {
         "additionalProperties": false,
-        "description": "A node's overrides: reasoned, logged departures.",
+        "description": "A node's overrides: logged departures.",
         "properties": {
           "bypass": {
             "anyOf": [

@@ -124,7 +124,7 @@ export function hereWords(card: Card): string[] {
   }
   return [
     ...(here.frontier ? ["actionable now"] : []),
-    ...(here.startedEarly ? ["active, started early"] : here.active ? ["active"] : []),
+    ...(here.active ? ["active"] : []),
     ...(here.mine ? ["yours"] : []),
   ];
 }

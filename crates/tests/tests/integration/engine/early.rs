@@ -12,7 +12,8 @@ use crate::engine::support;
 
 use cairn_engine::Records;
 use cairn_schema::{
-    ConstraintSource, Date, DependencyVia, DoneEarly, NodeDates, Rejection, ViolationCode,
+    Bypass, ConstraintSource, Date, DependencyVia, DoneEarly, Guard, GuardFailure, NodeDates,
+    Rejection, ViolationCode,
 };
 use support::{add_nodes as add, key};
 
@@ -51,6 +52,13 @@ fn recorded(node: &str, end: &str, on: &str) -> String {
 fn bypass(node: &str, guard: &str) -> String {
     format!(
         "- op: apply_override\n  node: {node}\n  override: {{guard_bypass: {{guards: [{guard}], reason: Done ahead on purpose.}}}}\n"
+    )
+}
+
+/// A bypass with no reason, as a person leaves it out.
+fn bypass_without_reason(node: &str, guard: &str) -> String {
+    format!(
+        "- op: apply_override\n  node: {node}\n  override: {{guard_bypass: {{guards: [{guard}]}}}}\n"
     )
 }
 
@@ -281,9 +289,9 @@ fn early_work_in_a_stage_that_does_not_wait_is_done_early() {
     );
 }
 
-/// F6: starting is never guarded, so starting early is not a shortfall: not the work's, not
-/// its prerequisite's, and not the milestone work waiting for its own date; but finishing it
-/// before that date is still refused.
+/// F6: a start frees nothing, so starting early (with a bypass) is not a shortfall: not the
+/// work's, not its prerequisite's, and not the milestone work waiting for its own date; but
+/// finishing it before that date is still refused.
 #[test]
 fn starting_early_is_not_a_shortfall() {
     let records = support::accepted(
@@ -294,9 +302,11 @@ fn starting_early_is_not_a_shortfall() {
             "{key: n_z, id: z, kind: action, title: Z, not_before: {after: n_k}}",
         ])),
         &format!(
-            "{}{}{}",
+            "{}{}{}{}{}",
             pin("n_k", "2026-10-10"),
+            bypass_without_reason("n_x", "deps_done"),
             transition("n_x", "start"),
+            bypass_without_reason("n_z", "date_arrived"),
             transition("n_z", "start"),
         ),
     );
@@ -477,4 +487,439 @@ fn work_after_a_reached_auto_done_milestone_is_completed_without_a_bypass() {
         assert_eq!(short(&records, node), None, "{node}");
     }
     assert_eq!(early(&records, "n_x"), None);
+}
+
+// Early work is one act: a start or a finish ahead of what the node waits on takes a guard
+// bypass, whose reason is optional; the engine records what it went ahead of.
+
+fn stored_bypass(records: &Records, node: &str) -> Option<Bypass> {
+    support::journey_graph(records, support::JOURNEY)
+        .document()
+        .state
+        .overrides
+        .get(&key(node))
+        .and_then(|overrides| overrides.bypass.clone())
+}
+
+fn derived_of(records: &Records, node: &str) -> cairn_schema::NodeDerived {
+    let graph = support::journey_graph(records, support::JOURNEY);
+    support::derived(records, support::JOURNEY).node_derived(&graph, &key(node))
+}
+
+fn bypass_with_reason(node: &str, guard: &str, reason: Option<&str>) -> String {
+    reason.map_or_else(
+        || bypass_without_reason(node, guard),
+        |reason| {
+            format!(
+                "- op: apply_override\n  node: {node}\n  override: {{guard_bypass: {{guards: [{guard}], reason: {reason}}}}}\n"
+            )
+        },
+    )
+}
+
+/// A prerequisite and the work that waits on it.
+fn chain() -> Records {
+    support::journey(&add(&[
+        "{key: n_a, id: a, kind: action, title: A, estimate: 3}",
+        "{key: n_b, id: b, kind: action, title: B, requires: [n_a]}",
+    ]))
+}
+
+/// Each early move's graph: its name, nodes, the node that goes early, the guard its bypass
+/// names, and the setup written first.
+fn scenarios() -> Vec<Scenario> {
+    [dependency_scenarios(), other_scenarios()].concat()
+}
+
+/// A name, nodes, the node that goes early, the guard its bypass names, and the setup.
+type Scenario = (
+    &'static str,
+    Vec<&'static str>,
+    &'static str,
+    &'static str,
+    String,
+);
+
+/// The scenarios of moves ahead of a dependency, inherited requirement or gating opening.
+fn dependency_scenarios() -> Vec<Scenario> {
+    vec![
+        (
+            "explicit dependency",
+            vec![
+                "{key: n_r, id: r, kind: action, title: R, estimate: 3}",
+                "{key: n_x, id: x, kind: action, title: X, requires: [n_r]}",
+            ],
+            "n_x",
+            "deps_done",
+            String::new(),
+        ),
+        (
+            "inherited requirement",
+            vec![
+                "{key: n_r, id: r, kind: action, title: R, estimate: 3}",
+                "{key: n_p, id: p, kind: group, title: P, requires: [n_r]}",
+                "{key: n_x, id: x, parent: n_p, kind: action, title: X}",
+            ],
+            "n_x",
+            "deps_done",
+            String::new(),
+        ),
+        (
+            "gating stage opening",
+            vec![
+                "{key: n_o, id: o, kind: milestone, title: O}",
+                "{key: n_s, id: s, kind: group, title: S, opens_at: n_o}",
+                "{key: n_x, id: x, parent: n_s, kind: action, title: X}",
+            ],
+            "n_x",
+            "deps_done",
+            String::new(),
+        ),
+    ]
+}
+
+/// The scenarios of a container, a decision, a milestone and an own date.
+fn other_scenarios() -> Vec<Scenario> {
+    vec![
+        (
+            "container ahead of its children",
+            vec![
+                "{key: n_c, id: c, kind: deliverable, title: C}",
+                "{key: n_x, id: x, parent: n_c, kind: action, title: X}",
+            ],
+            "n_c",
+            "deps_done",
+            String::new(),
+        ),
+        (
+            "decision answered ahead",
+            vec![
+                "{key: n_r, id: r, kind: action, title: R, estimate: 3}",
+                "{key: n_d, id: d, kind: decision, title: D, prompt: Which?, answer_type: text, requires: [n_r]}",
+            ],
+            "n_d",
+            "deps_done",
+            String::new(),
+        ),
+        (
+            "milestone done ahead",
+            vec![
+                "{key: n_r, id: r, kind: action, title: R, estimate: 3}",
+                "{key: n_m, id: m, kind: milestone, title: M, requires: [n_r]}",
+            ],
+            "n_m",
+            "deps_done",
+            String::new(),
+        ),
+        (
+            "before its own date",
+            vec![
+                "{key: n_k, id: k, kind: milestone, title: K}",
+                "{key: n_x, id: x, kind: action, title: X, not_before: {after: n_k}}",
+            ],
+            "n_x",
+            "date_arrived",
+            pin("n_k", "2026-10-10"),
+        ),
+    ]
+}
+
+/// The reason changes nothing derived: the same early moves with and without one give equal
+/// dates, shortfalls and done-early readings, and each records the same failures.
+#[test]
+fn a_reason_changes_nothing_derived() {
+    for (name, nodes, node, guard, setup) in scenarios() {
+        let records = {
+            let journey = support::journey(&add(&nodes));
+            if setup.is_empty() {
+                journey
+            } else {
+                support::accepted(&journey, &setup)
+            }
+        };
+        let finish = if node == "n_d" {
+            "- op: answer\n  decision: n_d\n  value: {text: Ahead.}\n".to_owned()
+        } else {
+            transition(node, "complete")
+        };
+        let mut seen = Vec::new();
+        for reason in [None, Some("Done ahead on purpose.")] {
+            let done = support::accepted(
+                &records,
+                &format!("{}{finish}", bypass_with_reason(node, guard, reason)),
+            );
+            let stored = stored_bypass(&done, node).unwrap_or_else(|| panic!("{name}: recorded"));
+            assert_eq!(stored.reason.is_some(), reason.is_some(), "{name}");
+            assert!(!stored.failures.is_empty(), "{name}: what it went ahead of");
+            let nodes: Vec<String> = support::graph(&done)
+                .nodes
+                .as_map()
+                .keys()
+                .map(ToString::to_string)
+                .collect();
+            let readings: Vec<_> = nodes
+                .iter()
+                .map(|each| (dates_of(&done, each).done_early, short(&done, each)))
+                .collect();
+            seen.push((readings, stored.failures));
+        }
+        assert_eq!(seen[0], seen[1], "{name}: the reason changes nothing");
+    }
+}
+
+/// Starting work that waits is refused with a bypassable guard for each thing it waits on;
+/// a bypass without a reason starts it, records both, and reads started early. A container
+/// does not wait on its own children.
+#[test]
+fn starting_ahead_is_guarded_and_recorded() {
+    let records = support::accepted(
+        &support::journey(&add(&[
+            "{key: n_a, id: a, kind: action, title: A, estimate: 3}",
+            "{key: n_k, id: k, kind: milestone, title: K}",
+            "{key: n_b, id: b, kind: action, title: B, requires: [n_a], not_before: {after: n_k}}",
+            "{key: n_c, id: c, kind: deliverable, title: C}",
+            "{key: n_c1, id: c1, parent: n_c, kind: action, title: C1}",
+        ])),
+        &pin("n_k", "2026-10-10"),
+    );
+    assert_eq!(
+        derived_of(&records, "n_b").start_guards,
+        [Guard::DepsDone, Guard::DateArrived].into_iter().collect(),
+        "the engine says what a start would go ahead of"
+    );
+    assert!(
+        derived_of(&records, "n_c").start_guards.is_empty(),
+        "a container's children are not what its start waits on"
+    );
+    let Err(Rejection::Invalid { violations }) =
+        support::journey_patch(&records, &transition("n_b", "start"))
+    else {
+        panic!("a plain start of waiting work is refused");
+    };
+    let guards: std::collections::BTreeSet<_> = violations
+        .as_slice()
+        .iter()
+        .map(|found| {
+            assert_eq!(found.code, ViolationCode::GuardFailed);
+            found.bypassable.unwrap()
+        })
+        .collect();
+    assert_eq!(
+        guards,
+        [Guard::DepsDone, Guard::DateArrived].into_iter().collect()
+    );
+    let started = support::accepted(
+        &records,
+        &format!(
+            "{}{}{}",
+            bypass_without_reason("n_b", "deps_done")
+                .replace("[deps_done]", "[deps_done, date_arrived]"),
+            transition("n_b", "start"),
+            transition("n_c", "start"),
+        ),
+    );
+    let stored = stored_bypass(&started, "n_b").unwrap();
+    assert!(stored.reason.is_none());
+    assert_eq!(
+        stored.failures,
+        [
+            GuardFailure::OpenDependency(key("n_a")),
+            GuardFailure::TooEarly(date("2026-10-10")),
+        ]
+        .into_iter()
+        .collect()
+    );
+    assert!(derived_of(&started, "n_b").started_early);
+    assert!(
+        !derived_of(&started, "n_c").started_early,
+        "a container started with its children open went ahead of nothing"
+    );
+    assert!(stored_bypass(&started, "n_c").is_none());
+    assert_eq!(short(&started, "n_b"), None);
+}
+
+/// Started normally, then its prerequisite is reopened: the work did not go ahead of anything,
+/// so it does not read started early.
+#[test]
+fn a_start_before_a_reopening_is_not_early() {
+    let records = support::accepted(&chain(), &transition("n_a", "complete"));
+    let started = support::accepted(&records, &transition("n_b", "start"));
+    let reopened = support::accepted(&started, &transition("n_a", "reopen"));
+    assert_eq!(
+        derived_of(&reopened, "n_b")
+            .waits_on
+            .entries
+            .as_slice()
+            .len(),
+        1
+    );
+    assert!(!derived_of(&reopened, "n_b").started_early);
+}
+
+/// Started ahead, then finished normally once the prerequisite is done: no record, nothing
+/// short, not done early. Reopen the prerequisite: the work is stale while it is open, and
+/// when it finishes after the work it is short, and the work is no longer stale.
+#[test]
+fn started_ahead_then_finished_normally_relies_on_its_prerequisite() {
+    let started = support::accepted(
+        &chain(),
+        &format!(
+            "{}{}{}",
+            bypass_without_reason("n_b", "deps_done"),
+            transition("n_b", "start"),
+            recorded("n_b", "start", "2026-10-02"),
+        ),
+    );
+    assert!(derived_of(&started, "n_b").started_early);
+    let both = support::accepted(
+        &started,
+        &format!(
+            "{}{}{}{}",
+            transition("n_a", "complete"),
+            recorded("n_a", "finish", "2026-10-03"),
+            transition("n_b", "complete"),
+            recorded("n_b", "finish", "2026-10-04"),
+        ),
+    );
+    assert!(
+        stored_bypass(&both, "n_b").is_none(),
+        "the finish went ahead of nothing"
+    );
+    assert_eq!((short(&both, "n_a"), short(&both, "n_b")), (None, None));
+    assert_eq!(early(&both, "n_b"), None);
+    let reopened = support::accepted(&both, &transition("n_a", "reopen"));
+    assert!(
+        !derived_of(&reopened, "n_b").stale.is_empty(),
+        "stale while A is open"
+    );
+    let finished = support::accepted(&reopened, &transition("n_a", "complete"));
+    assert!(
+        short(&finished, "n_a").is_some(),
+        "A finished after B relied on it"
+    );
+    assert!(derived_of(&finished, "n_b").stale.is_empty());
+}
+
+/// Stopping clears the record of the start, so starting again once the prerequisite is done
+/// is not early.
+#[test]
+fn stopping_clears_the_record_of_a_start() {
+    let started = support::accepted(
+        &chain(),
+        &format!(
+            "{}{}",
+            bypass_without_reason("n_b", "deps_done"),
+            transition("n_b", "start")
+        ),
+    );
+    let stopped = support::accepted(&started, &transition("n_b", "stop"));
+    assert!(stored_bypass(&stopped, "n_b").is_none());
+    let again = support::accepted(
+        &stopped,
+        &format!(
+            "{}{}",
+            transition("n_a", "complete"),
+            transition("n_b", "start")
+        ),
+    );
+    assert!(stored_bypass(&again, "n_b").is_none());
+    assert!(!derived_of(&again, "n_b").started_early);
+}
+
+/// Finished ahead of the prerequisite with no reason: the prerequisite later finishes,
+/// reopens and finishes after the work, and neither is short or stale.
+#[test]
+fn an_accepted_dependency_stays_accepted() {
+    let done = support::accepted(
+        &chain(),
+        &format!(
+            "{}{}{}",
+            bypass_without_reason("n_b", "deps_done"),
+            transition("n_b", "complete"),
+            recorded("n_b", "finish", "2026-10-04"),
+        ),
+    );
+    let again = support::accepted(
+        &done,
+        &format!(
+            "{}{}{}{}",
+            transition("n_a", "complete"),
+            recorded("n_a", "finish", "2026-10-05"),
+            transition("n_a", "reopen"),
+            transition("n_a", "complete"),
+        ),
+    );
+    assert_eq!(short(&again, "n_a"), None);
+    assert!(derived_of(&again, "n_b").stale.is_empty());
+}
+
+/// Finished with only its date excused, the dependency it waited for still counts: when it
+/// is reopened and finished after the work, it is short.
+#[test]
+fn excusing_only_the_date_leaves_the_dependency_holding() {
+    let records = support::accepted(
+        &support::journey(&add(&[
+            "{key: n_k, id: k, kind: milestone, title: K}",
+            "{key: n_a, id: a, kind: action, title: A, estimate: 2}",
+            "{key: n_b, id: b, kind: action, title: B, requires: [n_a], not_before: {after: n_k}}",
+        ])),
+        &format!(
+            "{}{}{}",
+            pin("n_k", "2026-10-20"),
+            transition("n_a", "complete"),
+            recorded("n_a", "finish", "2026-10-03"),
+        ),
+    );
+    let done = support::accepted(
+        &records,
+        &format!(
+            "{}{}{}",
+            bypass_without_reason("n_b", "date_arrived"),
+            transition("n_b", "complete"),
+            recorded("n_b", "finish", "2026-10-04"),
+        ),
+    );
+    let reopened = support::accepted(
+        &done,
+        &format!(
+            "{}{}",
+            transition("n_a", "reopen"),
+            transition("n_a", "complete")
+        ),
+    );
+    assert!(short(&reopened, "n_a").is_some());
+}
+
+/// A completion bypassing a missing artifact, a note, an unticked item or a missing
+/// breakdown needs no reason, and records the failure.
+#[test]
+fn evidence_bypasses_need_no_reason() {
+    let records = support::journey(&add(&[
+        "{key: n_art, id: art, kind: deliverable, title: Art, requires_artifact: true}",
+        "{key: n_note, id: note, kind: action, title: Note, requires_note: true}",
+        "{key: n_list, id: list, kind: action, title: List, checklist: [{id: one, title: One}], requires_checklist: true}",
+        "{key: n_hold, id: hold, kind: action, title: Hold, placeholder: true}",
+    ]));
+    for (node, guard, failure) in [
+        ("n_art", "has_artifact", GuardFailure::MissingArtifact),
+        ("n_note", "has_note", GuardFailure::MissingNote),
+        (
+            "n_list",
+            "all_ticked",
+            GuardFailure::Unticked("one".parse().unwrap()),
+        ),
+        ("n_hold", "broken_down", GuardFailure::NotBrokenDown),
+    ] {
+        let done = support::accepted(
+            &records,
+            &format!(
+                "{}{}",
+                bypass_without_reason(node, guard),
+                transition(node, "complete")
+            ),
+        );
+        let stored = stored_bypass(&done, node).unwrap_or_else(|| panic!("{node}"));
+        assert!(stored.reason.is_none(), "{node}");
+        assert!(stored.failures.contains(&failure), "{node}");
+    }
 }

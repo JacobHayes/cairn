@@ -416,6 +416,7 @@ pub fn arb_display_state() -> BoxedStrategy<DisplayState> {
 fn arb_derived_extras() -> BoxedStrategy<(
     Option<Progress>,
     std::collections::BTreeSet<Guard>,
+    std::collections::BTreeSet<Guard>,
     bool,
     Explained<Blocker>,
 )> {
@@ -446,7 +447,7 @@ fn arb_derived_extras() -> BoxedStrategy<(
                 total,
             }
         });
-    (progress, guards, any::<bool>(), waits).boxed()
+    (progress, guards.clone(), guards, any::<bool>(), waits).boxed()
 }
 
 /// A blocker, with a date or none.
@@ -513,7 +514,7 @@ pub fn arb_node_derived() -> BoxedStrategy<NodeDerived> {
                 (gravity, gravity_from, unlocks, unlocks_from, rank),
                 shown,
                 subtree,
-                (progress, failing_guards, started_early, waits_on),
+                (progress, failing_guards, start_guards, started_early, waits_on),
                 checklist_count,
             )| {
                 let flag = |index: usize| flags.get(index).copied().unwrap_or(false);
@@ -534,6 +535,7 @@ pub fn arb_node_derived() -> BoxedStrategy<NodeDerived> {
                     progress,
                     checklist_count,
                     failing_guards,
+                    start_guards,
                     started_early,
                     waits_on,
                     done_by_date: flag(5),

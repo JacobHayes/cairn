@@ -153,7 +153,6 @@ function cardState(context: Context, node: GraphNode, at: LevelNode): CardState 
     here: {
       frontier: context.frontier.has(node.key),
       active: state === "active",
-      startedEarly: derived.started_early === true,
       mine,
     },
     rank,

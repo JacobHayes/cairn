@@ -669,9 +669,17 @@ pub struct NodeDerived {
     /// finished, not relevant, or a group.
     #[serde(default, skip_serializing_if = "BTreeSet::is_empty")]
     pub failing_guards: BTreeSet<Guard>,
+    // PRD: D4.
+    /// The bypassable guards starting the node (a deliverable or action not yet started) would
+    /// fail if attempted now with no bypass in the patch: `deps_done` while a gate it waits
+    /// on is open (its own children and an undecided node's condition gates aside), and
+    /// `date_arrived` while its own not-before date is ahead. Empty when a plain start is
+    /// accepted and for every node with no start left.
+    #[serde(default, skip_serializing_if = "BTreeSet::is_empty")]
+    pub start_guards: BTreeSet<Guard>,
     // PRD: D8.
-    /// Stored `active` while its own or an inherited gate is unsatisfied; a container's
-    /// children are not a gate.
+    /// Stored `active` with a guard bypass that recorded what the start went ahead of: an
+    /// open dependency or its own not-before date.
     #[serde(default, skip_serializing_if = "crate::serde_util::is_false")]
     pub started_early: bool,
     // PRD: D8.

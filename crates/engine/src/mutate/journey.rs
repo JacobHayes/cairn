@@ -193,14 +193,17 @@ fn move_node(session: &mut Session<'_>, node: &NodeKey, transition: &Transition)
         // Reopening clears the answer and its rationale together (B2).
         writes.push(session.remove(GraphKey::Answer(node.clone())));
     }
-    if step == Move::Reopen {
+    // A node keeps the bypass of its latest move: a completion with none applied in this
+    // patch clears the start's, so a finished node's bypass is always its finish's.
+    let completes_unbypassed = step == Move::Complete && !session.bypassed.contains_key(node);
+    if matches!(step, Move::Reopen | Move::Stop) || completes_unbypassed {
         writes.extend(clear_bypass(session, node));
     }
     writes
 }
 
-/// D4: reopening a node clears its guard bypass, which accepted the failures of the
-/// completion it covered and of no later one.
+/// D4: reopening or stopping a node, or completing it without a bypass, clears its guard
+/// bypass, which accepted the failures of the move it covered and of no later one.
 fn clear_bypass(session: &Session<'_>, node: &NodeKey) -> Option<Write> {
     let mut next = overrides(session, node);
     next.bypass.take()?;
@@ -224,6 +227,9 @@ fn note_guarded(
 ) {
     if transition::is_guarded(kind, from, step) {
         session.guarded.insert(node.clone(), session.ordinal);
+    }
+    if step == Move::Start {
+        session.started.insert(node.clone(), session.ordinal);
     }
     if step == Move::Complete {
         session.completed.insert(node.clone(), session.ordinal);
@@ -461,8 +467,8 @@ fn overrides(session: &Session<'_>, node: &NodeKey) -> Overrides {
         .unwrap_or_default()
 }
 
-/// B5, D1a, D4: an override with its reason. A guard bypass covers a guarded transition in
-/// the same patch; the guards stage records the failures it bypassed.
+/// B5, D1a, D4: an override with its reason (a guard bypass's is optional). A guard bypass
+/// covers a guarded transition in the same patch; the guards stage records the failures it bypassed.
 fn apply_override(
     session: &mut Session<'_>,
     node: &NodeKey,

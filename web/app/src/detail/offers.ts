@@ -4,10 +4,10 @@
 // without a page.
 import { missingEvidence } from "../acting/acts.ts";
 import { isOpen } from "../status/state.ts";
-import { failingGuards, isTerminal, isWork, movesFrom, nodeOf, recordOf, storedSnooze, titleOf, type NodeDetail, type Ready } from "./model.ts";
+import { failingGuards, isTerminal, isWork, movesFrom, nodeOf, recordOf, startGuards, storedSnooze, titleOf, type NodeDetail, type Ready } from "./model.ts";
 
 /** The action beside a node, on any surface: what a person does to it in one move. */
-export type Act = "decide" | "done" | "done-with-evidence" | "start" | "break-down" | "mark-atomic" | "unsnooze";
+export type Act = "decide" | "done" | "done-with-evidence" | "start" | "start-anyway" | "break-down" | "mark-atomic" | "unsnooze";
 
 export interface Offered {
   /** The one primary, none when the node is finished, does not apply, or is a stage. */
@@ -58,7 +58,7 @@ export function offered(view: Ready, key: string): Offered {
       const needs = missingEvidence(view, node);
       return {
         primary: needs.artifact || needs.note || needs.unticked.length > 0 ? "done-with-evidence" : "done",
-        secondary: [...(moves.includes("start") ? (["start"] as const) : []), ...snooze],
+        secondary: [...(moves.includes("start") ? [startGuards(view, key).length > 0 ? ("start-anyway" as const) : ("start" as const)] : []), ...snooze],
         waiting,
       };
     }
@@ -187,6 +187,7 @@ export const ACT_LABELS: Record<Act, string> = {
   done: "Mark done",
   "done-with-evidence": "Mark done…",
   start: "Start",
+  "start-anyway": "Start anyway…",
   "break-down": "Break down",
   "mark-atomic": "Mark atomic",
   unsnooze: "Unsnooze",

@@ -119,12 +119,25 @@ describe("G5: finishing work whose checklist is not all ticked", () => {
 });
 
 describe("D8: a node waiting for its date", () => {
-  it("leaves finishing work before its own date to Done anyway, and still offers Start (D8)", () => {
-    const view = made("n_findings", { display_state: "scheduled", failing_guards: ["date_arrived"], dates: { not_before: "2026-11-02" } });
+  it("leaves finishing work before its own date to Done anyway, and offers Start anyway (D8)", () => {
+    const view = made("n_findings", { display_state: "scheduled", failing_guards: ["date_arrived"], start_guards: ["date_arrived"], dates: { not_before: "2026-11-02" } });
     const acts = contextMenuOf(view, detailOf(view, "n_findings"), true).flat().map((item) => item.id);
     expect(acts).not.toContain("done");
-    expect(acts).toContain("start");
+    expect(acts).toContain("start-anyway");
+    expect(acts).not.toContain("start");
     expect(acts).toContain("done-anyway");
+  });
+
+  it("offers Start anyway on work that waits, Start where nothing is gone ahead of, and Start for a container only held by its children", () => {
+    const waits = made("n_findings", { start_guards: ["deps_done"] });
+    expect(offered(waits, "n_findings").secondary).toContain("start-anyway");
+    expect(offered(waits, "n_findings").secondary).not.toContain("start");
+    const free = testView();
+    expect(offered(free, "n_findings").secondary).toContain("start");
+    expect(offered(free, "n_findings").secondary).not.toContain("start-anyway");
+    // deps_done fails only on the node's own children: a start goes ahead of nothing.
+    const children = made("n_findings", { failing_guards: ["deps_done"] });
+    expect(offered(children, "n_findings").secondary).toContain("start");
   });
 
   it("offers Answer anyway for a decision before its own date (D8)", () => {
@@ -146,8 +159,12 @@ describe("D8: a node waiting for its date", () => {
     const blocked = made("n_report", { display_state: "blocked", waits_on: { entries: [{ node: "n_findings", via: "explicit", date: "2026-11-02" }], total: 1 } });
     expect(say(blocked, "n_report")).toContain("Nov 2");
     const early = made("n_findings", { display_state: "active", started_early: true, dates: { not_before: "2026-11-02" } });
+    early.journey.graph.state = { ...early.journey.graph.state, overrides: { n_findings: { bypass: { guards: ["date_arrived"], failures: [{ too_early: "2026-11-02" }, { open_dependency: "n_meeting" }] } } } };
     expect(say(early, "n_findings")).toContain("Nov 2");
-    expect(say(early, "n_findings")).not.toContain("earlier work");
+    expect(say(early, "n_findings")).toContain("ahead of Meeting");
+    expect(say(early, "n_findings")).not.toContain("with the reason");
+    early.journey.graph.state = { ...early.journey.graph.state, overrides: { n_findings: { bypass: { guards: ["date_arrived"], reason: "Ready sooner.", failures: [{ open_dependency: "n_meeting" }] } } } };
+    expect(say(early, "n_findings")).toContain("Ready sooner");
   });
 });
 

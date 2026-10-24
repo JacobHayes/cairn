@@ -60,8 +60,6 @@ export interface CardBadge {
 export interface Here {
   frontier: boolean;
   active: boolean;
-  /** `active` while still blocked (Gating: started early). */
-  startedEarly: boolean;
   mine: boolean;
 }
 

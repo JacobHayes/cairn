@@ -288,13 +288,14 @@ pub enum Override {
         /// Why.
         reason: Reason,
     },
-    /// Bypass guards on the node's transition in the same patch; the engine records the
-    /// specific failures present.
+    /// Go ahead anyway: bypass guards on the node's start or completion in the same patch.
+    /// The engine records the specific failures present.
     GuardBypass {
         /// The guards bypassed.
         guards: BTreeSet<Guard>,
-        /// Why.
-        reason: Reason,
+        /// Why, when the person gave a reason. Leave the field out for none.
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        reason: Option<Reason>,
     },
 }
 

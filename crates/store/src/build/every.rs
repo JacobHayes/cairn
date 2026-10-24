@@ -213,7 +213,7 @@ pub fn bypass() -> Bypass {
     );
     Bypass {
         guards: guards.into_iter().collect(),
-        reason: id("Waived for now."),
+        reason: Some(id("Waived for now.")),
         failures: failures.into_iter().collect(),
     }
 }

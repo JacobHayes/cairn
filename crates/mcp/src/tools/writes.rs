@@ -40,7 +40,9 @@ pub(crate) const SPECS: &[Spec] = &[
         name: "transition_node",
         description: "Moves a node through its lifecycle: start, stop, complete, skip (with a \
             reason), mark_done (a group, with a reason: it reads done and the unfinished work \
-            inside reads skipped), or reopen. Guards are checked against the result.",
+            inside reads skipped), or reopen. Guards are checked against the result. Starting or \
+            completing ahead of what the node waits on needs a guard bypass in the same \
+            `apply_patch`.",
         writes: Writes::Patch,
         destructive: true,
         schema: schema::<TransitionNode>,
@@ -88,8 +90,9 @@ pub(crate) const SPECS: &[Spec] = &[
     Spec {
         name: "override",
         description: "Applies an override to a node with a reason: force include it \
-            despite its conditions, keep it under a skipped ancestor or a group marked done, or bypass named guards. \
-            Or removes one.",
+            despite its conditions, or keep it under a skipped ancestor or a group marked done. \
+            Or removes one. A guard bypass is sent with the start or completion it covers, \
+            in `apply_patch`.",
         writes: Writes::Patch,
         destructive: true,
         schema: schema::<OverrideNode>,
@@ -605,16 +608,45 @@ pub(crate) struct OverrideNode {
 #[serde(rename_all = "snake_case", deny_unknown_fields)]
 pub(crate) enum OverrideChange {
     /// Apply it, with its reason.
-    Apply(cairn_schema::Override),
+    Apply(OverrideApplied),
     /// Remove the override of this kind.
     Remove(OverrideKind),
+}
+
+/// An override this tool applies. A guard bypass is sent with the start or completion it
+/// covers, in `apply_patch`: alone it covers nothing.
+#[derive(Debug, Deserialize, JsonSchema)]
+#[serde(rename_all = "snake_case", deny_unknown_fields)]
+pub(crate) enum OverrideApplied {
+    /// Treat the node as relevant despite its conditions.
+    ForceInclude {
+        /// Why.
+        reason: cairn_schema::Reason,
+    },
+    /// Exempt the node's subtree from an ancestor's skip.
+    Keep {
+        /// Why.
+        reason: cairn_schema::Reason,
+    },
+}
+
+impl From<OverrideApplied> for cairn_schema::Override {
+    fn from(applied: OverrideApplied) -> Self {
+        match applied {
+            OverrideApplied::ForceInclude { reason } => Self::ForceInclude { reason },
+            OverrideApplied::Keep { reason } => Self::Keep { reason },
+        }
+    }
 }
 
 impl OverrideNode {
     fn patch(self) -> Result<DomainPatch, ToolError> {
         let node = self.node;
         let mutation = match self.change {
-            OverrideChange::Apply(applied) => Mutation::ApplyOverride { node, applied },
+            OverrideChange::Apply(applied) => Mutation::ApplyOverride {
+                node,
+                applied: applied.into(),
+            },
             OverrideChange::Remove(kind) => Mutation::RemoveOverride { node, kind },
         };
         journey_patch(self.journey, write_of!(self), None, mutation)

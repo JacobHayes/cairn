@@ -61,6 +61,8 @@ describe("readOpened keeps what a form can hold", () => {
     opening("include", "Needed", SEEN),
     opening("bypass", "Reviewed", SEEN),
     opening("anyway", "Reviewed", SEEN),
+    opening("anyway", "", SEEN),
+    opening("start-anyway", "", SEEN),
     opening("snooze", { aside: "n_a", until: "date", date: "2026-10-20", target: "" }, SEEN),
     opening("evidence", { artifact: "https://example.test", note: "Done" }, SEEN),
     opening("edit-date", "2026-10-07", SEEN),

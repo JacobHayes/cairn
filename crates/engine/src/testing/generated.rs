@@ -352,7 +352,7 @@ pub fn date_limits_early() -> Graph {
             .or_default()
             .bypass = Some(Bypass {
             guards: BTreeSet::from([Guard::DepsDone]),
-            reason: parse("Generated."),
+            reason: Some(parse("Generated.")),
             failures,
         });
     }
@@ -452,7 +452,7 @@ pub fn early_work_worst_case() -> Graph {
     for at in targets + depth..count {
         document.state.overrides.entry(key(at)).or_default().bypass = Some(Bypass {
             guards: BTreeSet::from([Guard::DepsDone]),
-            reason: parse("Generated."),
+            reason: Some(parse("Generated.")),
             failures: inherited.clone(),
         });
     }
@@ -797,7 +797,7 @@ impl Shape {
         }
         Some(Bypass {
             guards: BTreeSet::from([Guard::DepsDone, Guard::DateArrived]),
-            reason: parse("Generated."),
+            reason: Some(parse("Generated.")),
             failures,
         })
     }

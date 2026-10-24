@@ -8,7 +8,7 @@ import { resolvedAnswer } from "./AnswerEditor.tsx";
 import { isComplete } from "./contributions.ts";
 import { answerInEffect } from "./editors.tsx";
 import type { Mutation } from "./model.ts";
-import { bypassable, bypassReady, untickedIn, withBypass, withMove, withTicks } from "./Rejected.tsx";
+import { bypassable, untickedIn, withBypass, withMove, withTicks } from "./Rejected.tsx";
 import { identityName } from "./sections.tsx";
 import { testView } from "./view.test-support.ts";
 
@@ -41,8 +41,10 @@ describe("resolving a rejection", () => {
     ]);
   });
 
-  it("takes a reason before finishing past a guard (D4)", () => {
-    expect([bypassReady(""), bypassReady("  "), bypassReady("Reviewed out of band")]).toEqual([false, false, true]);
+  it("sends a bypass without a reason when none was typed (D4)", () => {
+    const completes: Mutation[] = [{ op: "transition", node: "n_a", transition: "complete" }];
+    const sent = withBypass({ mutations: completes, base: 4, deployment: 2 }, [{ node: "n_a", guards: ["deps_done"] }], "  ");
+    expect(sent[0]).toEqual({ op: "apply_override", node: "n_a", override: { guard_bypass: { guards: ["deps_done"] } } });
   });
 
   it("offers a bypass for each node's bypassable guards, each once", () => {
