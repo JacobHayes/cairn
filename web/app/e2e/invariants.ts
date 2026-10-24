@@ -3,13 +3,13 @@
 // (e2e/internal-ids.ts), the only tooltip is the app's (e2e/tips.ts), and on a touch screen every
 // control has the touch-sized hit area (e2e/touch.ts). `test.ts` runs them
 // after every test; a screenshot (a proof's, or the `mise run screenshots` walk's) goes through
-// `capture`, which writes the picture only when they pass.
+// `capture`, which writes the picture only when they pass and no tip is open.
 import type { Page } from "@playwright/test";
 
 import { expectContained } from "./containment.ts";
 import { expectNoKeysShown } from "./internal-ids.ts";
 import { expectTouchTargets } from "./touch.ts";
-import { expectNoClosedTipDrawn, expectNoNativeTooltips } from "./tips.ts";
+import { expectNoClosedTipDrawn, expectNoNativeTooltips, expectNoTipOpen } from "./tips.ts";
 
 /**
  * The invariants (containment, no internal key shown, no native tooltip, no closed tip drawn, touch-sized controls on a touch screen) on `page` as it is now. They run once at the
@@ -28,5 +28,6 @@ export async function checkpoint(page: Page, where = "the page"): Promise<void> 
 /** A screenshot of `page` for a proof or a picture, taken only when it passes the invariants. */
 export async function capture(page: Page, path: string, options: { fullPage?: boolean } = {}): Promise<void> {
   await checkpoint(page, path);
+  await expectNoTipOpen(page);
   await page.screenshot({ path, ...options });
 }

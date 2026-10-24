@@ -27,6 +27,15 @@ export async function expectNoClosedTipDrawn(page: Page): Promise<void> {
   expect(drawn, "a closed tooltip that is drawn").toEqual([]);
 }
 
+/** Fails when a tip is open: a picture of a state shows only what the state is, so a tip nobody asked for (left by a focus a script moved) would mislead whoever reads it. */
+export async function expectNoTipOpen(page: Page): Promise<void> {
+  if (page.isClosed()) {
+    return;
+  }
+  const open = await page.evaluate(() => [...document.querySelectorAll('[role="tooltip"]:popover-open')].map((each) => each.textContent.slice(0, 80)));
+  expect(open, "a tooltip open in a picture").toEqual([]);
+}
+
 /** The tip that is open now. */
 export const openTip = (page: Page): Locator => page.locator('[role="tooltip"]:popover-open');
 

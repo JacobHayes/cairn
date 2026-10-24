@@ -52,7 +52,8 @@ for (const [viewport, size] of Object.entries(VIEWPORTS)) {
             // A state that fails is listed with the rest, so one run shows every picture the table cannot take.
             try {
               // The page is kept between states (the in-browser store lives in it), so what the last one left open or focused is closed first.
-              await page.keyboard.press("Escape");
+              // Escape is sent as an event, not typed: a real key press makes the focus the next screen sets keyboard focus, which shows a tip a touch screen's would not.
+            await page.evaluate(() => { document.activeElement?.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", bubbles: true })); });
               await page.evaluate(() => { (document.activeElement as HTMLElement | null)?.blur(); });
               await state.reach(page, on);
               await expect(state.ready(page, on), `${address} ${state.name} is drawn`).toBeVisible();

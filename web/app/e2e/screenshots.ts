@@ -63,7 +63,8 @@ export async function journeyAt(page: Page, journey: string, view: string, node?
 export async function fitGraph(page: Page): Promise<void> {
   await expect(page.getByTestId("node-card").first()).toBeVisible();
   await page.waitForFunction(() => document.querySelector<HTMLElement>(".react-flow__viewport")?.style.transform !== "translate(0px, 0px) scale(1)");
-  await page.keyboard.press("f");
+  // The canvas's own button, not the F key: a typed key makes the next programmatic focus a keyboard one, which shows a tip a touch screen's would not.
+  await page.getByRole("button", { name: "Fit the whole graph" }).click();
   await settled(page);
 }
 
