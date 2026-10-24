@@ -188,6 +188,17 @@ impl Score {
         self.0
     }
 
+    /// The score to three significant figures, for a reader that wants the size and not the
+    /// last millionth.
+    #[must_use]
+    pub fn three_figures(self) -> Self {
+        let mut step = 1;
+        while self.0 / step >= 1_000 {
+            step *= 10;
+        }
+        Self((self.0 + step / 2) / step * step)
+    }
+
     /// The value in weight units, for display and the rank's float terms.
     #[must_use]
     pub fn value(self) -> f64 {
@@ -337,6 +348,12 @@ impl<T> Default for Explained<T> {
 }
 
 impl<T> Explained<T> {
+    /// There are none.
+    #[must_use]
+    pub fn is_empty(&self) -> bool {
+        self.total == 0
+    }
+
     /// A complete list.
     ///
     /// # Errors
@@ -797,6 +814,12 @@ pub struct StillWaiting {
 }
 
 impl StillWaiting {
+    /// There are none.
+    #[must_use]
+    pub fn is_empty(&self) -> bool {
+        self.total == 0
+    }
+
     /// The list a response carries for the complete `held`: the first
     /// `explanation_entry_count_max` entries and the total.
     #[must_use]

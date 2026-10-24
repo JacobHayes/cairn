@@ -193,6 +193,98 @@ async fn a_nodes_children_are_paged() {
     assert_eq!(rest.get("next"), None);
 }
 
+/// C8: `get_node` answers the full read's dates and relevance without what is derivable from
+/// the rest: the latest start's chain is left out only when it is the due chain (led by the
+/// node's own estimate), relevance is left out only when relevant, the rank is the full read's
+/// to three significant figures, and neither path, parent nor date links repeat anything.
+#[tokio::test]
+async fn get_node_leaves_out_only_what_the_rest_of_the_answer_says() {
+    let world = World::new();
+    let ann = user("u_ann");
+    world.vendor_after(&ann, 6).await;
+    world.set_clock("2026-10-01T14:00:00Z");
+    let call = Call {
+        actor: ann.clone(),
+        now: "2026-10-01T14:00:00Z".parse().unwrap(),
+    };
+    let journey: cairn_schema::JourneyId = "j_vendor_eval".parse().unwrap();
+    let snapshot = world
+        .ok(&ann, "get_snapshot", json!({ "journey": "j_vendor_eval" }))
+        .await;
+    let nodes: Vec<String> = snapshot["snapshot"]["nodes"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .map(|node| node["key"].as_str().unwrap().to_owned())
+        .collect();
+    assert_ne!(nodes, [] as [std::string::String; 0]);
+    let (mut shared, mut kept) = (0, 0);
+    for key in nodes {
+        let lean = world
+            .ok(
+                &ann,
+                "get_node",
+                json!({ "journey": "j_vendor_eval", "node": key }),
+            )
+            .await["detail"]
+            .clone();
+        let full = world
+            .service
+            .node_detail(&call, &journey, &key.parse().unwrap())
+            .await
+            .unwrap()
+            .value;
+        assert!(
+            lean.get("path").is_none() && lean.get("parent").is_none(),
+            "{key}"
+        );
+        assert!(lean["derived"]["dates"].get("links").is_none(), "{key}");
+        assert_eq!(
+            lean["derived"].get("relevance").is_some(),
+            full.derived.relevance.value != cairn_schema::Relevance::Relevant,
+            "{key}"
+        );
+        assert_eq!(
+            lean["derived"].get("rank").and_then(Value::as_f64),
+            full.derived
+                .rank
+                .map(|rank| cairn_schema::Real::three_figures(rank.get()).unwrap().get()),
+            "{key}"
+        );
+        if let Some(left_out) = latest_start_left_out(&key, &lean, &full.derived.dates) {
+            if left_out {
+                shared += 1;
+            } else {
+                kept += 1;
+            }
+        }
+    }
+    assert!(
+        shared > 0,
+        "the fixture has latest starts that repeat the due chain ({kept} kept)"
+    );
+}
+
+/// Whether the lean answer left `key`'s latest-start chain out (`Some(true)`) or kept it
+/// (`Some(false)`); none when it has no latest start. Left out, the chain is the due chain
+/// with the node's own estimate first; kept, it is the full read's.
+fn latest_start_left_out(key: &str, lean: &Value, dates: &cairn_schema::NodeDates) -> Option<bool> {
+    let latest = dates.latest_start.as_ref()?;
+    let full_chain = serde_json::to_value(&latest.chain).unwrap();
+    let Some(chain) = lean["derived"]["dates"]["latest_start"].get("chain") else {
+        let due = serde_json::to_value(&dates.due.as_ref().unwrap().chain).unwrap();
+        let mut without = full_chain.clone();
+        if full_chain != due {
+            let first = without["constraints"].as_array_mut().unwrap().remove(0);
+            assert_eq!(first["source"], format!("estimate:{key}"), "{key}");
+        }
+        assert_eq!(without, due, "{key}");
+        return Some(true);
+    };
+    assert_eq!(chain, &full_chain, "{key}");
+    Some(false)
+}
+
 /// I3, C8: the snapshot answers the revision a write names as its base, and with `filters` the
 /// frontier tool lists what they hold for, each an open decision the snapshot names; `get_node`
 /// carries the still-waiting list and pages the same list under `still_waiting`.

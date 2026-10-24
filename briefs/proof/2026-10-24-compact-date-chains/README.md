@@ -1,4 +1,4 @@
-# Compact date chains
+# Compact date chains and a lean node read
 
 A node's date chains (why a start or due date is what it is, and why a plan is short) are
 written in about two thirds of the space, keep each constraint's source and whether it is
@@ -21,17 +21,20 @@ A source is its kind and the nodes it names (`due_by:n_a`, `estimate:n_a`,
 
 Real answers from `cairn demo` over MCP, as compact JSON; tokens by tiktoken `o200k_base`
 (a stated proxy). Every node of each fixture journey, plus three nodes of the generated
-214-node journey (a chain of 200 nodes). Dates are the part of an answer this change touches;
-the rest of the answer is unchanged.
+214-node journey (a chain of 200 nodes). "Chains" is the compact chain alone; "all" adds the
+rest of the lean `get_node`: the latest start's chain left out when it is the due chain
+(led by the node's own estimate), no `path`, no `parent` beside the node's own, no date
+links, `relevance` only when the node is not relevant, empty lists left out, and scores and
+the rank to three significant figures.
 
-| Journey (nodes read) | Tokens before | Tokens after | Change |
-|---|---:|---:|---:|
-| Two-week bake-off (8) | 3,448 | 3,173 | -8% |
-| Hiring (13) | 7,320 | 6,347 | -13% |
-| Product launch (15) | 12,761 | 9,894 | -22% |
-| Vendor evaluation (24) | 13,942 | 12,352 | -11% |
-| Large journey (3) | 15,132 | 9,438 | -38% |
-| Longest answer, large journey (`n_s0_a0`) | 8,091 | 4,561 | -44% |
+| Journey (nodes read) | Before | Chains | All | Change |
+|---|---:|---:|---:|---:|
+| Two-week bake-off (8) | 3,448 | 3,173 | 2,571 | -25% |
+| Hiring (13) | 7,320 | 6,347 | 4,574 | -38% |
+| Product launch (15) | 12,761 | 9,894 | 6,959 | -45% |
+| Vendor evaluation (24) | 13,942 | 12,352 | 9,321 | -33% |
+| Large journey (3) | 15,132 | 9,438 | 8,137 | -46% |
+| Longest answer, large journey (`n_s0_a0`) | 8,091 | 4,561 | 4,503 | -44% |
 
 ## Cut and continued
 
@@ -43,6 +46,9 @@ not cut: no later read can continue them, and the existing limits on contradicto
 and nodes bound them.
 
 Known limits:
-- `latest_start` still repeats the due chain it is built from, and `dates.links` still
-  repeats the dates for the canvas; both are left as they are.
+- A latest start whose chain was cut to the limit keeps its chain even when it is the due
+  chain: what the cut hides is not known to agree, so long chains (the large journey's)
+  save little beyond the compaction.
+- The HTTP node detail keeps `path`, `parent`, the date links and the latest start's chain:
+  the app and other clients render from them.
 - A chain's fixed dates are cut to 50 as well, but a chain holds a handful.

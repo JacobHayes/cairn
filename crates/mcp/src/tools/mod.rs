@@ -113,6 +113,23 @@ pub(crate) struct Paged<T> {
     pub total: u32,
 }
 
+impl<T> Default for Paged<T> {
+    fn default() -> Self {
+        Self {
+            items: Vec::new(),
+            next: None,
+            total: 0,
+        }
+    }
+}
+
+impl<T> Paged<T> {
+    /// The list holds nothing.
+    pub(crate) fn is_empty(&self) -> bool {
+        self.total == 0
+    }
+}
+
 /// The page of `items` (all of a list, in its order) that starts at `cursor`.
 pub(crate) fn page<T>(items: Vec<T>, cursor: Cursor) -> Paged<T> {
     let total = u32::try_from(items.len()).unwrap_or(u32::MAX);

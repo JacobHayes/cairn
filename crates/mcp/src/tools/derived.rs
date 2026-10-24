@@ -6,11 +6,14 @@
 use std::collections::{BTreeMap, BTreeSet};
 
 use cairn_schema::{
-    AgentRow, Annotation, AnswerEffects, AnswerValue, Cursor, Date, DisplayState, ExplainedField,
-    ExplanationPage, JourneyId, KeyRefs, Level, LevelDateLink, LevelDisplay, LevelNode, LevelQuery,
-    ListFlag, ListQuery, LocalEdit, Markdown, Next, NextQuery, Node, NodeDerived, NodeKey,
-    NodeKind, NodeState, Overrides, Path, RemovalRead, Snapshot, SnapshotScope, SortBy, Stalled,
-    StillWaiting,
+    AgentRow, Annotation, AnswerEffects, AnswerValue, Blocker, Bound, Chain, ChecklistCount,
+    Constraint, ConstraintSource, Contribution, Cursor, Date, DisplayState, DoneEarly,
+    EffectiveDate, EffectiveParticipation, Explained, ExplainedField, ExplanationPage, Guard,
+    GuardFailure, Instant, InstantPoint, JourneyId, KeyRefs, KindKey, Level, LevelDateLink,
+    LevelDisplay, LevelNode, LevelQuery, ListFlag, ListQuery, LocalEdit, Markdown, Next, NextQuery,
+    Node, NodeDerived, NodeKey, NodeKind, NodeState, Overrides, Progress, Real, Relevance,
+    RelevanceExplanation, RemovalRead, Score, ShortChain, Snapshot, SnapshotScope, SnoozeTarget,
+    SortBy, Stalled, StillWaiting,
 };
 use cairn_service::{Call, ChildEntry, NodeDetail};
 use schemars::JsonSchema;
@@ -214,13 +217,9 @@ pub(crate) struct Detail {
     /// The node as written: description, resources, participations, and its kind's payload
     /// (a decision's prompt and choices).
     node: Node<KeyRefs>,
-    /// Where it sits.
-    path: Path,
-    /// Its parent.
-    #[serde(skip_serializing_if = "Option::is_none")]
-    parent: Option<NodeKey>,
     /// A page of its children in key order, each with its state; pass `next` as
-    /// `children_cursor` for the next page.
+    /// `children_cursor` for the next page. Absent when it has none.
+    #[serde(default, skip_serializing_if = "Paged::is_empty")]
     children: Paged<Child>,
     /// Its stored state, provenance, and actual dates.
     record: NodeState,
@@ -248,16 +247,18 @@ pub(crate) struct Detail {
     #[serde(skip_serializing_if = "Option::is_none")]
     overrides: Option<Overrides>,
     /// A page of its notes and links, in key order; pass `next` as `annotations_cursor` for
-    /// the next page.
+    /// the next page. Absent when it has none.
+    #[serde(default, skip_serializing_if = "Paged::is_empty")]
     annotations: Paged<Annotation>,
     // PRD: D3.
     /// Every derived value with its explanation: relevance, blocking, dates, gravity,
     /// unlocks, and rank.
-    derived: NodeDerived,
+    derived: LeanDerived,
     // PRD: C8.
     /// The direct dependents completing it would not yet free, each with what else it waits
     /// on (Priority: Unlocks): the largest entries with the total; pass `explanations`
-    /// with field `still_waiting` for the rest.
+    /// with field `still_waiting` for the rest. Absent when there are none.
+    #[serde(default, skip_serializing_if = "StillWaiting::is_empty")]
     still_waiting: StillWaiting,
     // PRD: C12.
     /// A decision's effects per choice: what each answer brings in, drops, and leaves
@@ -265,6 +266,238 @@ pub(crate) struct Detail {
     /// Partner brings in 6 and opens 2 more decisions" uses these numbers.
     #[serde(skip_serializing_if = "Option::is_none")]
     answer_effects: Option<AnswerEffects>,
+}
+
+// PRD: C8, D3.
+/// A node's derived values as `get_node` answers them: those of the full read, less what the
+/// agent reads elsewhere or can derive. `relevance` is present only when the node is not
+/// relevant; empty explanation lists are left out; scores and the rank are written to three
+/// significant figures; the dates are [`LeanDates`].
+#[allow(clippy::struct_excessive_bools)]
+#[derive(Debug, Serialize, JsonSchema)]
+pub(crate) struct LeanDerived {
+    /// Why it is not relevant, when it is not.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    relevance: Option<RelevanceExplanation>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    skipped_by: Option<NodeKey>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    kept_work_pending: Vec<NodeKey>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    blocked_by: Vec<Blocker>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    blocked_through: Vec<NodeKey>,
+    display_state: DisplayState,
+    actionable: bool,
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    unassigned: bool,
+    #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
+    participations: BTreeMap<KindKey, EffectiveParticipation>,
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    membership_lost: bool,
+    #[serde(default, skip_serializing_if = "BTreeSet::is_empty")]
+    stale: BTreeSet<GuardFailure>,
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    overdue: bool,
+    dates: LeanDates,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    progress: Option<Progress>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    checklist_count: Option<ChecklistCount>,
+    #[serde(default, skip_serializing_if = "BTreeSet::is_empty")]
+    failing_guards: BTreeSet<Guard>,
+    #[serde(default, skip_serializing_if = "BTreeSet::is_empty")]
+    start_guards: BTreeSet<Guard>,
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    started_early: bool,
+    /// What holds it now, the largest first; `total` counts them all.
+    #[serde(default, skip_serializing_if = "Explained::is_empty")]
+    waits_on: Explained<Blocker>,
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    done_by_date: bool,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    snoozed: Option<SnoozeTarget>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    snoozed_via: Option<NodeKey>,
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    needs_breakdown: bool,
+    gravity: Score,
+    #[serde(default, skip_serializing_if = "Explained::is_empty")]
+    gravity_from: Explained<Contribution>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    subtree_gravity: Option<Score>,
+    unlocks: Score,
+    #[serde(default, skip_serializing_if = "Explained::is_empty")]
+    unlocks_from: Explained<Contribution>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    rank: Option<Real>,
+}
+
+impl LeanDerived {
+    /// `derived` of the node `key`, in the lean shape.
+    fn of(key: &NodeKey, derived: NodeDerived) -> Self {
+        let NodeDerived {
+            relevance,
+            skipped_by,
+            kept_work_pending,
+            blocked_by,
+            blocked_through,
+            display_state,
+            actionable,
+            unassigned,
+            participations,
+            membership_lost,
+            stale,
+            overdue,
+            dates,
+            progress,
+            checklist_count,
+            failing_guards,
+            start_guards,
+            started_early,
+            waits_on,
+            done_by_date,
+            snoozed,
+            snoozed_via,
+            needs_breakdown,
+            gravity,
+            gravity_from,
+            subtree_gravity,
+            unlocks,
+            unlocks_from,
+            rank,
+        } = derived;
+        let rounded = |mut list: Explained<Contribution>| {
+            for entry in list.entries.as_mut_slice() {
+                entry.score = entry.score.three_figures();
+            }
+            list
+        };
+        Self {
+            relevance: (relevance.value != Relevance::Relevant).then_some(relevance),
+            skipped_by,
+            kept_work_pending,
+            blocked_by,
+            blocked_through,
+            display_state,
+            actionable,
+            unassigned,
+            participations,
+            membership_lost,
+            stale,
+            overdue,
+            dates: LeanDates::of(key, dates),
+            progress,
+            checklist_count,
+            failing_guards,
+            start_guards,
+            started_early,
+            waits_on,
+            done_by_date,
+            snoozed,
+            snoozed_via,
+            needs_breakdown,
+            gravity: gravity.three_figures(),
+            gravity_from: rounded(gravity_from),
+            subtree_gravity: subtree_gravity.map(Score::three_figures),
+            unlocks: unlocks.three_figures(),
+            unlocks_from: rounded(unlocks_from),
+            rank: rank.and_then(|rank| Real::three_figures(rank.get())),
+        }
+    }
+}
+
+// PRD: F3, F6, F7.
+/// A node's derived dates as `get_node` answers them: the full read's, less the links the
+/// canvas draws (the dates a rule reads and the ones that read this node's) and the latest
+/// start's chain when it is the due chain.
+#[derive(Debug, Serialize, JsonSchema)]
+pub(crate) struct LeanDates {
+    #[serde(skip_serializing_if = "Option::is_none")]
+    earliest_start: Option<Bound>,
+    /// The latest it can start. Its `chain` is absent when it is the due chain, with the
+    /// node's own estimate first when the node has one.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    latest_start: Option<LatestStart>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    due: Option<Bound>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    slack_days: Option<i32>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    overdue_days: Option<u32>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    shortfall: Option<ShortChain>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    effective_date: Option<EffectiveDate>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    not_before: Option<Date>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    done_early: Option<DoneEarly>,
+}
+
+/// The latest start: its date, and its chain unless that is the due chain.
+#[derive(Debug, Serialize, JsonSchema)]
+pub(crate) struct LatestStart {
+    /// The date.
+    date: Date,
+    /// The chain that produced it, when it differs from the due chain.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    chain: Option<Chain>,
+}
+
+impl LeanDates {
+    fn of(key: &NodeKey, dates: cairn_schema::NodeDates) -> Self {
+        let cairn_schema::NodeDates {
+            earliest_start,
+            latest_start,
+            due,
+            slack_days,
+            overdue_days,
+            shortfall,
+            effective_date,
+            not_before,
+            done_early,
+            links: _,
+        } = dates;
+        let latest_start = latest_start.map(|latest| LatestStart {
+            date: latest.date,
+            chain: (!due
+                .as_ref()
+                .is_some_and(|due| repeats_due(key, &latest.chain, &due.chain)))
+            .then_some(latest.chain),
+        });
+        Self {
+            earliest_start,
+            latest_start,
+            due,
+            slack_days,
+            overdue_days,
+            shortfall,
+            effective_date,
+            not_before,
+            done_early,
+        }
+    }
+}
+
+/// Whether `latest` is the `due` chain, led by the node's own estimate when it has one, with
+/// the same fixed dates. A chain a response cut is kept: what it hides is not known to agree.
+fn repeats_due(key: &NodeKey, latest: &Chain, due: &Chain) -> bool {
+    if latest.total != 0 || due.total != 0 || latest.fixed != due.fixed {
+        return false;
+    }
+    let own_estimate = |constraint: &Constraint| {
+        constraint.source == ConstraintSource::Estimate { node: key.clone() }
+            && constraint.after
+                == Instant::Node {
+                    node: key.clone(),
+                    point: InstantPoint::Finish,
+                }
+    };
+    match latest.constraints.split_first() {
+        Some((first, rest)) if own_estimate(first) && rest == due.constraints => true,
+        _ => latest.constraints == due.constraints,
+    }
 }
 
 /// One child of a node.
@@ -284,8 +517,8 @@ impl Detail {
     fn of(detail: NodeDetail, children_cursor: Cursor, annotations_cursor: Cursor) -> Self {
         let NodeDetail {
             node,
-            path,
-            parent,
+            path: _,
+            parent: _,
             children,
             record,
             local_edits,
@@ -316,9 +549,8 @@ impl Detail {
             }
         });
         Self {
+            derived: LeanDerived::of(&node.key, derived),
             node,
-            path,
-            parent,
             children: page(children.collect(), children_cursor),
             record,
             local_edits,
@@ -328,7 +560,6 @@ impl Detail {
             pin,
             overrides,
             annotations: page(annotations, annotations_cursor),
-            derived,
             still_waiting,
             answer_effects,
         }
