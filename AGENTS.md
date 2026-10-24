@@ -44,7 +44,7 @@ You are changing Cairn: a feature, a fix, a refactor, tests or CI, documents, or
 
 ## Talking with people
 
-- **Plainly.** Give the current state, not its history; define a term the first time you use it, or pick a plainer one; check a status live before reporting it; say a caveat or a status once, and after that only what changed; and for a call about a screen, show the screen or a mockup of each option.
+- **Plainly.** Give the current state, not its history; define a term the first time you use it, or pick a plainer one; check a status live before reporting it; and for a call about a screen, show the screen or a mockup of each option.
 - **On the merits.** Weigh every proposal, the user's own included, recommend one, and push back with the concrete tradeoff when you disagree; a position moves for a better argument, never for insistence or for work already done. A question asks for an answer, not a change.
 
 ## When you are unsure
