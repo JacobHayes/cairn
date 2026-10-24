@@ -81,7 +81,8 @@ jobs:
       # when a later step fails, and once per lock file, profile and toolchain: it restores
       # Cargo's own target directory, so Cargo still decides what is fresh, and saves it without
       # the workspace's crates or stale dependencies.
-      - uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2.9.2
+      - id: cache
+        uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2.9.2
         with:
           shared-key: check-${{ matrix.part }}-${{ steps.profiles.outputs.hash }}
           # The testbeds build into their own target directories; lint lints them and rust runs
@@ -102,6 +103,9 @@ jobs:
       - run: mise run check --part "$PART"
         env:
           PART: ${{ matrix.part }}
+          # rust-cache's cache-hit is "true" for an exact key match only; the ladder words it on
+          # its build line (scripts/ladder).
+          LADDER_CACHE_HIT: ${{ steps.cache.outputs.cache-hit }}
       # The check prints only what failed; the complete log is a file.
       - if: failure()
         run: tail -n +1 dist/ladder/*.log

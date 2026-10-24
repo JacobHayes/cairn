@@ -16,7 +16,7 @@ case $profile in
     ;;
 esac
 out=web/wasm/dist/bindgen
-cargo build --quiet --locked --profile "$profile" --target wasm32-unknown-unknown -p cairn-wasm --lib
+scripts/timed build cargo build --quiet --locked --profile "$profile" --target wasm32-unknown-unknown -p cairn-wasm --lib
 target_dir=$(scripts/target-dir)
 module=$target_dir/wasm32-unknown-unknown/$profile/cairn_wasm.wasm
 # Cargo has just decided whether the module changed; bind it only if it did, so a run that
@@ -27,13 +27,13 @@ if [ "$out/cairn_wasm_bg.wasm" -nt "$module" ] && [ "$(cat "$out/profile" 2>/dev
 fi
 rm -rf "$out"
 mkdir -p "$out"
-wasm-bindgen --target web --out-dir "$out" --out-name cairn_wasm "$module"
+scripts/timed build wasm-bindgen --target web --out-dir "$out" --out-name cairn_wasm "$module"
 # The shipped module is also shrunk by wasm-opt (-Oz): about 20% off its size and, with level
 # "s", about 12 MB off a tab's memory. The features are the ones rustc's wasm32 target emits
 # by default. The development build skips it: the pass takes seconds and nothing there
 # measures size.
 if [ "$profile" = wasm ]; then
-  wasm-opt -Oz --enable-bulk-memory --enable-sign-ext --enable-nontrapping-float-to-int --enable-mutable-globals \
+  scripts/timed build wasm-opt -Oz --enable-bulk-memory --enable-sign-ext --enable-nontrapping-float-to-int --enable-mutable-globals \
     "$out/cairn_wasm_bg.wasm" -o "$out/cairn_wasm_bg.wasm"
 fi
 echo "$profile" >"$out/profile"

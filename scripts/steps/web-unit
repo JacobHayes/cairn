@@ -36,7 +36,7 @@ for config in web/*/vitest.config.ts; do
   rm -f "$report"
   status=0
   # The dot reporter prints a dot per test and the failures; the JSON report is for the counts.
-  output=$(cd "$package" && "$OLDPWD/node_modules/.bin/vitest" run --reporter=dot --reporter=json \
+  output=$(cd "$package" && "$ladder_timed" tests "$OLDPWD/node_modules/.bin/vitest" run --reporter=dot --reporter=json \
     --outputFile.json="$report" 2>&1) || status=$?
   printf '%s\n' "$output"
   [ -f "$report" ] || { ladder_show "$output"; ladder_fail "Vitest wrote no report for $package"; }

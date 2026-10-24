@@ -9,6 +9,7 @@
 generator=node_modules/.bin/openapi-typescript
 rm -rf openapi web/client/generated
 mkdir -p openapi web/client/generated
+scripts/timed build cargo build --locked --quiet -p cairn-api --bin cairn-openapi --bin cairn-rules
 cargo run --locked --quiet -p cairn-api --bin cairn-openapi -- openapi/cairn.json
 "$generator" openapi/cairn.json -o web/client/generated/api.ts --silent
 cargo run --locked --quiet -p cairn-api --bin cairn-rules -- web/client/generated/rules.ts

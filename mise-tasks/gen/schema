@@ -3,4 +3,5 @@
 # ARCHITECTURE, Generated artifacts. Writes only into schema/; every file there is generated.
 rm -rf schema
 mkdir -p schema
+scripts/timed build cargo build --locked --quiet -p cairn-schema --bin cairn-schema-gen
 cargo run --locked --quiet -p cairn-schema --bin cairn-schema-gen -- schema

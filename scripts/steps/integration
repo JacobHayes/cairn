@@ -44,8 +44,9 @@ ran=$(grep -c . <<<"$ladder_tests" || true)
 
 # The doc tests, here rather than in the unit step because the pass costs seconds in the inner loop
 # and no crate has a doc test. They are a suite once one exists (a suite that ran none fails).
+# Timed as tests, the compiling of each doc test with it: rustdoc builds every one as it runs it.
 doc_status=0
-doc_output=$(cargo test --locked --workspace --all-features --doc 2>&1) || doc_status=$?
+doc_output=$("$ladder_timed" tests cargo test --locked --workspace --all-features --doc 2>&1) || doc_status=$?
 printf '%s\n' "$doc_output"
 [ "$doc_status" -eq 0 ] || {
   ladder_show "$doc_output"

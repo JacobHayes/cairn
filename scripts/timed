@@ -1,0 +1,80 @@
+#!/usr/bin/env node
+// The ladder's step timers (PRACTICES, The validation ladder). Each span of work that compiles
+// ("build") or runs tests ("tests") is timed where it executes, by its own wall clock, and
+// appended to the file LADDER_TIMES names (scripts/ladder-lib.sh sets one per step); nothing is
+// found by subtracting one time from another. Spans of one kind that overlap (builds running
+// side by side) count once, as the wall time something of that kind was running; spans of
+// different kinds that overlap (a build beside a test run) each keep their own. With no step
+// collecting (LADDER_TIMES unset) a command only runs.
+//
+// usage: scripts/timed build|tests COMMAND...
+//        scripts/timed --report FILE
+//   --report FILE: prints the times FILE holds as the tail of a step line
+//     (", 38s tests, 90s build"), nothing when it holds none.
+// Other scripts import `record` to time a span of their own (scripts/ladder-tests).
+import { spawn } from "node:child_process";
+import { appendFileSync, readFileSync, realpathSync } from "node:fs";
+import { fileURLToPath } from "node:url";
+
+/** Appends one span, in epoch milliseconds, unless no step is collecting. */
+export function record(kind, startMilliseconds, endMilliseconds) {
+  const file = process.env["LADDER_TIMES"];
+  if (file === undefined || file === "") return;
+  // One short append: concurrent writers do not interleave.
+  appendFileSync(file, `${kind} ${startMilliseconds} ${endMilliseconds}\n`);
+}
+
+/** The wall seconds of each kind in a times file, the union of its spans: `{ build, tests }`. */
+export function totals(file) {
+  const spans = new Map();
+  let text = "";
+  try {
+    text = readFileSync(file, "utf8");
+  } catch {
+    // No file: nothing was timed.
+  }
+  for (const line of text.split("\n")) {
+    const [kind, start, end] = line.split(" ");
+    if (kind === undefined || end === undefined) continue;
+    spans.set(kind, [...(spans.get(kind) ?? []), [Number(start), Number(end)]]);
+  }
+  const seconds = {};
+  for (const [kind, list] of spans) {
+    list.sort((left, right) => left[0] - right[0]);
+    let milliseconds = 0;
+    let reach = -Infinity;
+    for (const [start, end] of list) {
+      milliseconds += Math.max(0, end - Math.max(start, reach));
+      reach = Math.max(reach, end);
+    }
+    seconds[kind] = Math.round(milliseconds / 1000);
+  }
+  return seconds;
+}
+
+function main(argv) {
+  if (argv[0] === "--report" && argv.length === 2) {
+    const seconds = totals(argv[1]);
+    for (const kind of ["tests", "build"]) if (kind in seconds) process.stdout.write(`, ${seconds[kind]}s ${kind}`);
+    return;
+  }
+  const [kind, command, ...rest] = argv;
+  if ((kind !== "build" && kind !== "tests") || command === undefined) {
+    console.error("usage: scripts/timed build|tests COMMAND... | scripts/timed --report FILE");
+    process.exit(2);
+  }
+  const start = Date.now();
+  const child = spawn(command, rest, { stdio: "inherit" });
+  for (const signal of ["SIGINT", "SIGTERM"]) process.on(signal, () => child.kill(signal));
+  child.on("error", (error) => {
+    console.error(`timed: ${command}: ${error.message}`);
+    record(kind, start, Date.now());
+    process.exit(127);
+  });
+  child.on("close", (status, signal) => {
+    record(kind, start, Date.now());
+    process.exit(status ?? (signal === null ? 1 : 128));
+  });
+}
+
+if (realpathSync(process.argv[1] ?? "") === realpathSync(fileURLToPath(import.meta.url))) main(process.argv.slice(2));

@@ -24,11 +24,24 @@ ladder_reported=
 LADDER_LOG=dist/ladder/$LADDER_STEP.log
 mkdir -p dist/ladder
 : >"$LADDER_LOG"
+# The step's timers: the commands that compile or run tests are wrapped in `$ladder_timed build`
+# or `$ladder_timed tests`, which append their wall time here, and the step's line reports the
+# two apart (`ladder_times`). The file is absolute, for commands that change directory, and
+# exported, for the scripts and mise tasks a step starts (scripts/timed).
+ladder_timed=$PWD/scripts/timed
+export LADDER_TIMES=$PWD/dist/ladder/$LADDER_STEP.times
+: >"$LADDER_TIMES"
 exec 3>&1 >>"$LADDER_LOG" 2>&1
 printf '== %s ==\n' "$ladder_name"
 # Where the binary and its tests read the web build from: the ladder builds them with the
 # `cairn` crate's `web-dir` feature rather than embed it (crates/cairn/src/assets.rs).
 export CAIRN_WEB_DIR=$PWD/web/app/dist/build
+
+# ladder_times: the tail of a step's line, the wall time its tests ran and its builds compiled
+# (", 38s tests, 90s build"), each only if the step had any.
+ladder_times() {
+  "$ladder_timed" --report "$LADDER_TIMES"
+}
 
 # ladder_show [LINE...]: print to the terminal, and to the log, the LINEs, or stdin when there
 # are none. Only for what a person acts on.
@@ -119,8 +132,9 @@ ladder_suite() {
 # ladder_step_end: call last; a step that reported no suite checked nothing.
 ladder_step_end() {
   [ "$ladder_suite_count" -gt 0 ] || ladder_fail "reported no suites"
-  # What a passing step says: one line, with how much it ran (tests, or suites for a step of tools).
-  ladder_show "$ladder_name: passed, $([ "$ladder_test_count" -gt 0 ] && echo "$ladder_test_count tests" || echo "$ladder_suite_count checks"), $(ladder_elapsed)"
+  # What a passing step says: one line, with how much it ran (tests, or suites for a step of tools),
+  # the time its tests ran and its builds compiled, and the step's whole time.
+  ladder_show "$ladder_name: passed, $([ "$ladder_test_count" -gt 0 ] && echo "$ladder_test_count tests" || echo "$ladder_suite_count checks")$(ladder_times), $(ladder_elapsed) in all"
 }
 
 # The tests each later step owns, by name (the module paths PRACTICES lists). These are the one

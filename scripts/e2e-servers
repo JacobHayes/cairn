@@ -5,7 +5,8 @@
 # build and the API on one port) and the static demo site on the in-browser host (the app built
 # with no server, `mise run build:web demo`, served by `vite preview`: the shipped bundle, not
 # the dev server's unbundled modules and development React). Each one's wait (the cargo no-op,
-# the demo build) overlaps the other's. Prints READY once both
+# the demo build) overlaps the other's. Their builds are timed as builds (scripts/timed), so a
+# step that runs Playwright reports them apart from its tests, though they sit inside its run. Prints READY once both
 # answer, which is what Playwright waits for, and exits non-zero when either stops. The ports
 # are the config's, passed in the environment: CAIRN_SERVER_PORT and CAIRN_DEMO_PORT. With
 # CAIRN_E2E_BINARY=0 the binary is left out (`mise run check:fast` does so for a spec with no
@@ -29,7 +30,7 @@ if [ "${CAIRN_E2E_BINARY:-1}" != 0 ]; then
   # The binary the ladder's one build of the test binaries links (scripts/ladder-tests), by the
   # same command, so in the ladder it is a no-op: a build of `-p cairn` resolves features
   # differently, compiling the crates again and replacing the binary the tests run.
-  (cargo test --locked --quiet --workspace --all-features --tests --no-run &&
+  (scripts/timed build cargo test --locked --quiet --workspace --all-features --tests --no-run &&
     exec "${CARGO_TARGET_DIR:-target}/debug/cairn" demo --listen "127.0.0.1:$CAIRN_SERVER_PORT") >/dev/null &
   pids+=($!)
   urls+=("http://127.0.0.1:$CAIRN_SERVER_PORT/api/capabilities")

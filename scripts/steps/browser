@@ -46,7 +46,7 @@ for config in web/*/playwright.config.ts; do
   # The dot reporter prints a dot per test and the failures; the JSON report is for the
   # counts. The servers Playwright starts must not hold the terminal (descriptor 3) open.
   output=$(cd "$package" && PLAYWRIGHT_JSON_OUTPUT_NAME="$report" \
-    "$OLDPWD/node_modules/.bin/playwright" test --reporter=dot,json "${projects[@]}" 3>&- 2>&1) || status=$?
+    "$ladder_timed" tests "$OLDPWD/node_modules/.bin/playwright" test --reporter=dot,json "${projects[@]}" 3>&- 2>&1) || status=$?
   printf '%s\n' "$output"
   [ -f "$report" ] || { ladder_show "$output"; ladder_fail "Playwright wrote no report for $package"; }
   # shellcheck disable=SC2016 # the backticks are a JavaScript template literal

@@ -31,5 +31,6 @@ if [ "$(cat web/wasm/dist/cases.hash 2>/dev/null || true)" = "$hash" ] && [ -n "
   exit 0
 fi
 rm -f web/wasm/dist/cases.hash
-cargo run --locked --quiet --profile test -p cairn-wasm --features server --bin cairn-wasm-cases -- web/wasm/dist/cases
+scripts/timed build cargo build --locked --quiet --profile test -p cairn-wasm --features server --bin cairn-wasm-cases
+scripts/timed tests cargo run --locked --quiet --profile test -p cairn-wasm --features server --bin cairn-wasm-cases -- web/wasm/dist/cases
 printf '%s\n' "$hash" >web/wasm/dist/cases.hash

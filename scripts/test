@@ -76,7 +76,7 @@ for config in web/*/vitest.config.ts; do
   # Paths relative to the package, as Vitest filters its files.
   run=("${selection[@]#"$package"/}")
   status=0
-  output=$(cd "$package" && "$OLDPWD/node_modules/.bin/vitest" run --reporter=dot --reporter=json \
+  output=$(cd "$package" && "$ladder_timed" tests "$OLDPWD/node_modules/.bin/vitest" run --reporter=dot --reporter=json \
     --outputFile.json="$report" "${run[@]}" 2>&1) || status=$?
   printf '%s\n' "$output"
   [ -f "$report" ] || { ladder_show "$output"; ladder_fail "Vitest wrote no report for $package"; }
@@ -150,7 +150,7 @@ if [ ${#specs[@]} -gt 0 ]; then
       "${generated[@]}" package-lock.json -newer "$build" -print -quit)" ]; then
       ladder_run "the app's web build" mise-tasks/build/web
     fi
-    ladder_run "the build of the binary" cargo test --locked --quiet --workspace --all-features --tests --no-run
+    ladder_run "the build of the binary" "$ladder_timed" build cargo test --locked --quiet --workspace --all-features --tests --no-run
     export CAIRN_E2E_BINARY=1
   else
     export CAIRN_E2E_BINARY=0
@@ -170,7 +170,7 @@ if [ ${#specs[@]} -gt 0 ]; then
     # The servers Playwright starts must not hold the terminal (descriptor 3) open.
     # shellcheck disable=SC2086 # the projects are words
     output=$(cd web/app && PLAYWRIGHT_JSON_OUTPUT_NAME="$report" \
-      "$playwright" test --reporter=dot,json $projects --no-deps --pass-with-no-tests "${targets[@]}" 3>&- 2>&1) || status=$?
+      "$ladder_timed" tests "$playwright" test --reporter=dot,json $projects --no-deps --pass-with-no-tests "${targets[@]}" 3>&- 2>&1) || status=$?
     printf '%s\n' "$output"
     [ -f "$report" ] || { ladder_show "$output"; ladder_fail "Playwright wrote no report for ${specs[*]}"; }
     [ "$status" -eq 0 ] || {
@@ -200,4 +200,4 @@ if [ "${changed_rust:-1}" = 1 ] || [ -z "$web_matched" ]; then
 fi
 
 [ "$ran" -gt 0 ] || ladder_fail "nothing matched ${filters[*]}"
-ladder_show "$ladder_name: passed, $ran tests, $(ladder_elapsed)" "log: $LADDER_LOG"
+ladder_show "$ladder_name: passed, $ran tests$(ladder_times), $(ladder_elapsed) in all" "log: $LADDER_LOG"

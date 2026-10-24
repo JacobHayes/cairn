@@ -147,6 +147,17 @@ mkdir -p dist/ladder
 started=$SECONDS
 failed=
 
+# What CI's Rust dependency cache reported (LADDER_CACHE_HIT: rust-cache's cache-hit output,
+# "true" only for an exact key match), worded as that and no more: an exact hit says the
+# dependencies were restored, not that the restored build was warm, and no exact hit may still
+# have restored a near one. Empty on a developer's machine.
+cache_note() {
+  case ${LADDER_CACHE_HIT:-} in
+    true) echo "exact dependency-cache hit" ;;
+    false) echo "no exact dependency-cache hit" ;;
+  esac
+}
+
 # Before the first step after lint, which may fix files, and before the tests: the web build
 # that the binary serves and the embed step reads (the browser step runs it, and so does
 # embed, which in a part of its own gets no build from a step beside it), then the test
@@ -177,10 +188,14 @@ prepare() {
     export LADDER_TEST_LIST=dist/ladder/test-binaries.json
     built="${built:+$built and }the test binaries"
   fi
-  [ -z "$built" ] || echo "build: passed, $built, $((SECONDS - build_started))s"
+  [ -z "$built" ] || {
+    echo "build: passed, $built, $((SECONDS - build_started))s${cache_noted:+ ($cache_noted)}"
+    cache_noted=
+  }
 }
 
 prepared=
+cache_noted=$(cache_note)
 for step in ${first[@]+"${first[@]}"}; do
   if [ "$step" != lint ] && [ -z "$prepared" ]; then
     prepare
@@ -211,4 +226,6 @@ if [ -n "$failed" ]; then
   exit 1
 fi
 ran=(${first[@]+"${first[@]}"} ${side[@]+"${side[@]}"})
-echo "ladder: passed${part:+ (part $part)}, ${ran[*]}, $((SECONDS - started))s; logs: dist/ladder/"
+# The build line carries the cache note when there was one; a part that built nothing (lint)
+# says it here, since its clippy builds ran against the same cache.
+echo "ladder: passed${part:+ (part $part)}, ${ran[*]}, $((SECONDS - started))s${cache_noted:+ ($cache_noted)}; logs: dist/ladder/"

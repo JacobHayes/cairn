@@ -47,7 +47,9 @@ done <<<"$crates"
 for manifest in testbeds/*/Cargo.toml; do
   testbed=$(dirname "$manifest")
   out=dist/ladder/unit-$(basename "$testbed").out
-  cargo test --quiet --locked --manifest-path "$manifest" >"$out" 2>&1 || {
+  # The testbed's build and its test run, timed apart: the run finds the build done.
+  "$ladder_timed" build cargo test --quiet --locked --manifest-path "$manifest" --no-run >"$out" 2>&1 &&
+    "$ladder_timed" tests cargo test --quiet --locked --manifest-path "$manifest" >"$out" 2>&1 || {
     ladder_show <"$out"
     ladder_fail "cargo test reported failures in $testbed"
   }

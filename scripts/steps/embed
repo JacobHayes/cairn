@@ -14,6 +14,6 @@ LADDER_STEP=embed
 source scripts/ladder-lib.sh
 
 ladder_require_tool cargo cargo --version
-ladder_run "the binary's build with the web build embedded" cargo check -q --locked -p cairn
+ladder_run "the binary's build with the web build embedded" "$ladder_timed" build cargo check -q --locked -p cairn
 ladder_suite "binary embeds the web build" 1 builds
 ladder_step_end

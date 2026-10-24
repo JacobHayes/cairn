@@ -10,5 +10,5 @@ case ${1:-} in
   demo) mode=demo out=demo ;;
   *) echo "build:web: the argument is 'demo' or nothing, not '$1'" >&2; exit 1 ;;
 esac
-(cd web/app && ../../node_modules/.bin/vite build --config vite.config.ts --mode "$mode")
+(cd web/app && ../../scripts/timed build ../../node_modules/.bin/vite build --config vite.config.ts --mode "$mode")
 [ -f "web/app/dist/$out/index.html" ] || { echo "build:web: the build wrote no index.html" >&2; exit 1; }
