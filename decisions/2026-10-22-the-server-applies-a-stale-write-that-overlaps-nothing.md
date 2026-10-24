@@ -14,18 +14,17 @@
   commits that application, with a receipt for the patch as submitted, and answers `applied`
   with `over`: the revisions it moved past and what intervened. Otherwise it answers `stale`
   as before. A commit beaten by another is loaded and decided again, against the same
-  original revisions and a fresh read of what intervened, up to 32 times. A proposal's apply
+  original revisions and a fresh read of what intervened, up to the attempt limit. A proposal's apply
   and edits and a route import are never applied this way; a revision named inside a
   patch's mutations (the journeys a merge or delete was checked against) is never moved, so
   a merge lands beside an unrelated deployment change but not after one of its journeys
   moved. Both client loops, the worker's rebase, its wasm export and the schema's rebase
   rule are deleted.
-- The limit: the 32 attempts keep the value of the old resubmission limit, which goes with
-  the loops it bounded; only the subject changes (attempts to commit one stale patch, per
-  request, now on the server), so it is a new row in the limits table and a named constant
-  in the service. Each attempt needs another commit to land on a domain the patch checks
-  between the service's load and its commit, so reaching it is a runaway, not a workload;
-  32 is the value every other runaway stop in the table uses.
+- The limit: 8 attempts per request, the owner's choice, a named constant in the service
+  and a row in the limits table. Each attempt needs another commit to land on a domain the
+  patch checks between the service's load and its commit, so reaching it is a runaway, not a
+  workload; a patch whose last permitted commit also loses is answered `stale` and the client reads
+  again.
 - What an agent must do: read again after an `over` answer and after `already_applied` (a
   lost answer may have hidden an `over`), since the receipt's revision may include changes
   it has not seen. A base revision is the writer's claim to have read that state; the server

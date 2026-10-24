@@ -242,7 +242,8 @@ impl Service {
     ) -> Result<Written, WriteError> {
         let today = self.settings.today(call.now);
         let domain = patch.target.domain();
-        let mut attempts = 0_u32;
+        // Commits tried so far for this patch, counting the one under way.
+        let mut attempts = 1_u32;
         loop {
             let loaded = load::records(&*self.store, patch).await?;
             let inputs = ApplyInputs {

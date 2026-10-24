@@ -13,7 +13,7 @@ use std::sync::atomic::{AtomicBool, Ordering};
 use std::time::Duration;
 
 use cairn_schema::{Domain, Patch, Rejection, TouchedSet};
-use cairn_service::{Service, WriteError, Written};
+use cairn_service::{STALE_ATTEMPT_COUNT_MAX, Service, WriteError, Written};
 use cairn_store::{CommitPoint, Faults, MemoryStore, PauseHook};
 use cairn_store_sqlite::SqliteStore;
 use tokio::sync::Notify;
@@ -403,6 +403,51 @@ fn a_stale_write_racing_a_commit_is_decided_against_everything_since_its_base_on
             .await;
         }
     });
+}
+
+/// H5: a stale write that loses the race at commit is decided again only up to the attempt
+/// limit. A rename drafted at revision 1 applies over a node added at revision 2; each time
+/// its commit is held, another node lands, so it loses every race and is answered stale
+/// after exactly the limit's commits, though nothing it writes overlaps what landed.
+async fn a_stale_write_that_keeps_losing_the_race_is_answered_stale_at_the_limit(on_sqlite: bool) {
+    let (service, faults) = unarmed(on_sqlite).await;
+    applied(
+        service
+            .patch(&call("u_lead", AT), &domain(node("p_c", 1, "n_c")))
+            .await,
+    );
+    let gate = Gate::on(&faults, CommitPoint::BeforeBegin);
+    let held = submit(&service, rename("p_a", 1, "A"));
+    for round in 0..STALE_ATTEMPT_COUNT_MAX {
+        gate.reached.notified().await;
+        let key = format!("n_r{round}");
+        let landed = node(&format!("p_r{round}"), 2 + round, &key);
+        applied(service.patch(&call("u_lead", AT), &domain(landed)).await);
+        gate.armed.store(true, Ordering::SeqCst);
+        gate.release.notify_one();
+    }
+    let held = tokio::time::timeout(Duration::from_secs(10), held)
+        .await
+        .expect("the write is answered after the limit, not held again")
+        .unwrap();
+    assert!(
+        matches!(held, Err(WriteError::Rejected(Rejection::Stale { .. }))),
+        "stale after the limit, not {held:#?}"
+    );
+    assert!(
+        gate.armed.load(Ordering::SeqCst),
+        "no commit was held after the limit"
+    );
+}
+
+#[test]
+fn a_stale_write_that_keeps_losing_the_race_is_answered_stale_at_the_limit_on_memory() {
+    support::run(a_stale_write_that_keeps_losing_the_race_is_answered_stale_at_the_limit(false));
+}
+
+#[test]
+fn a_stale_write_that_keeps_losing_the_race_is_answered_stale_at_the_limit_on_sqlite() {
+    support::run(a_stale_write_that_keeps_losing_the_race_is_answered_stale_at_the_limit(true));
 }
 
 /// Journey `j_race` at revision 2, owned by `who_a`, which names no one else, beside `who_b`.

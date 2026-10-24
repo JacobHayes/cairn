@@ -5,4 +5,4 @@
 /// budget. Each attempt needs another commit to land between the service's load and its
 /// commit, on the patch's own domain or one it checks
 /// (decisions/2026-10-22-the-server-applies-a-stale-write-that-overlaps-nothing.md).
-pub const STALE_ATTEMPT_COUNT_MAX: u32 = 32;
+pub const STALE_ATTEMPT_COUNT_MAX: u32 = 8;
