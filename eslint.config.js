@@ -87,7 +87,7 @@ export default defineConfig(
   },
   {
     // The invariants every page holds after each test are checked on whatever state it is in, settled or not.
-    files: ["web/app/e2e/containment.ts", "web/app/e2e/internal-ids.ts", "web/app/e2e/tips.ts"],
+    files: ["web/app/e2e/containment.ts", "web/app/e2e/structure.ts", "web/app/e2e/internal-ids.ts", "web/app/e2e/tips.ts"],
     rules: { "e2e/settled-reads": "off" },
   },
   {

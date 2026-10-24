@@ -395,10 +395,6 @@ table.data.list-table tbody td {
   white-space: nowrap;
 }
 
-table.data.list-table .badge {
-  font-size: 11px;
-}
-
 /* Status and Title stay at the left while the other columns scroll under them. */
 .list-table .list-pinned {
   position: sticky;

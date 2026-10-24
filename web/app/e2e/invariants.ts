@@ -1,13 +1,15 @@
 // The invariants every page a browser test opened, and every picture taken of one, must hold:
 // nothing spills out of its box (e2e/containment.ts), no key is shown where a name belongs
 // (e2e/internal-ids.ts), the only tooltip is the app's (e2e/tips.ts), and on a touch screen every
-// control has the touch-sized hit area (e2e/touch.ts). `test.ts` runs them
+// control has the touch-sized hit area (e2e/touch.ts), and the structural rules over Chrome's layout
+// snapshot hold (e2e/structure.ts). `test.ts` runs them
 // after every test; a screenshot (a proof's, or the `mise run screenshots` walk's) goes through
 // `capture`, which writes the picture only when they pass and no tip is open.
 import type { Page } from "@playwright/test";
 
 import { expectContained } from "./containment.ts";
 import { expectNoKeysShown } from "./internal-ids.ts";
+import { expectStructure } from "./structure.ts";
 import { expectTouchTargets } from "./touch.ts";
 import { expectNoClosedTipDrawn, expectNoNativeTooltips, expectNoTipOpen } from "./tips.ts";
 
@@ -23,6 +25,7 @@ export async function checkpoint(page: Page, where = "the page"): Promise<void> 
   await expectNoNativeTooltips(page);
   await expectNoClosedTipDrawn(page);
   await expectTouchTargets(page, where);
+  await expectStructure(page, where);
 }
 
 /** A screenshot of `page` for a proof or a picture, taken only when it passes the invariants. */

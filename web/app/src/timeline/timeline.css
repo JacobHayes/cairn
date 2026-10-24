@@ -186,7 +186,7 @@
 .timeline-today-label,
 .timeline-end-label {
   fill: var(--color-muted);
-  font: var(--label-font-px) var(--font-mono);
+  font: var(--type-label-size) var(--font-mono);
   font-variant-numeric: tabular-nums;
 }
 

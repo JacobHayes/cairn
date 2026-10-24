@@ -57,6 +57,7 @@
   --font-body: "IBM Plex Sans", ui-sans-serif, system-ui, sans-serif;
   --font-mono: "IBM Plex Mono", ui-monospace, monospace;
   --type-base-size: 17px;
+  --type-label-size: 12px; /* the one size of a mono label, a status chip and a chart's axis text, and the floor under all drawn text */
   --type-line-height: 1.5;
   --type-letter-spacing: 0.01em;
   --type-heading-weight: 700;

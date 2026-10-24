@@ -245,7 +245,7 @@ body {
 }
 .sync-section h3 {
   margin: 0 0 var(--space-2);
-  font: 500 12px / 1.4 var(--font-mono);
+  font: 500 var(--type-label-size) / 1.4 var(--font-mono);
   letter-spacing: 0.08em;
   text-transform: uppercase;
   color: var(--color-secondary);
@@ -355,7 +355,7 @@ body {
     color: var(--chrome-muted);
     cursor: pointer;
     writing-mode: vertical-rl;
-    font: 500 12px / 1 var(--font-mono);
+    font: 500 var(--type-label-size) / 1 var(--font-mono);
     letter-spacing: 0.08em;
     text-transform: uppercase;
   }
@@ -712,7 +712,7 @@ body {
   content: "Error";
   display: inline-block;
   margin-right: var(--space-2);
-  font: 500 11.5px / 1.6 var(--font-mono);
+  font: 500 var(--type-label-size) / 1.6 var(--font-mono);
   letter-spacing: 0.06em;
   text-transform: uppercase;
   color: var(--color-error);
@@ -822,7 +822,7 @@ table.data {
 }
 .index-state-failed p::before {
   content: "Error ";
-  font: 500 11.5px / 1.6 var(--font-mono);
+  font: 500 var(--type-label-size) / 1.6 var(--font-mono);
   letter-spacing: 0.06em;
   text-transform: uppercase;
   color: var(--color-error);
@@ -1345,7 +1345,7 @@ table.data {
 }
 /* The label is the plain field's, so a name and an email field sit on one line. */
 .chips-field > .label {
-  font: 500 12px / 1.4 var(--font-mono);
+  font: 500 var(--type-label-size) / 1.4 var(--font-mono);
   letter-spacing: 0.08em;
   text-transform: uppercase;
   color: var(--color-secondary);
@@ -1472,7 +1472,7 @@ button.failed-details {
 }
 .chips-reason::before {
   content: "Not added ";
-  font: 500 11.5px / 1.6 var(--font-mono);
+  font: 500 var(--type-label-size) / 1.6 var(--font-mono);
   letter-spacing: 0.06em;
   text-transform: uppercase;
 }
