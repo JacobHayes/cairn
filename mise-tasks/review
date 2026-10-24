@@ -19,9 +19,8 @@
 # Writes DIR/rN.md (the code review), DIR/cull-rN.md, DIR/ui-rN.md and DIR/accept-rN.md, each with
 # a .log beside it holding the whole session. The models come from the environment, and codex's
 # own default is used when they are unset: CAIRN_REVIEW_MODEL for the code review,
-# CAIRN_SKILL_MODEL for the skill jobs; CAIRN_REVIEW_EFFORT sets the code review's effort (default
-# high) and CAIRN_SKILL_EFFORT the skill jobs' (default medium: they are given the diff and the plan
-# inline and follow only what it touches, so more thinking buys little). Exits
+# CAIRN_SKILL_MODEL for the skill jobs; CAIRN_REVIEW_EFFORT sets every job's effort (default high).
+# Each job is told only where its work is and finds the diff itself. Exits
 # non-zero when a job failed to run; findings are for a person (or the agent) to read, not an
 # exit status. Needs the codex CLI and a colocated jj workspace, which codex reads as git.
 cd "$(dirname "$0")/.."
@@ -61,7 +60,6 @@ base_id=$(git merge-base "$base_id" "$target_id")
 plan_base_id=$(git merge-base "$plan_base_id" "$target_id")
 
 effort=${CAIRN_REVIEW_EFFORT:-high}
-skill_effort=${CAIRN_SKILL_EFFORT:-medium}
 review_model=(); [ -z "${CAIRN_REVIEW_MODEL:-}" ] || review_model=(-m "$CAIRN_REVIEW_MODEL")
 skill_model=(); [ -z "${CAIRN_SKILL_MODEL:-}" ] || skill_model=(-m "$CAIRN_SKILL_MODEL")
 mkdir -p "$out"
@@ -74,29 +72,12 @@ git worktree add --detach -q "$checkout" "$target_id"
 
 # A skill is a prompt: its body without the frontmatter, then the job's inputs.
 skill_prompt() { awk '/^---$/ && n < 2 { n++; next } n >= 2' ".agents/skills/$1/SKILL.md"; }
-# The change itself goes in each skill's prompt, so a job starts with it in hand instead of spending
-# its first turns fetching it. A diff over the limit goes in as its stat.
-inline_limit=300000
-diff_section() {
-  local diff
-  diff=$(mktemp "$out/diff.XXXXXX")
-  git -C "$checkout" diff "$1" "$target_id" >"$diff"
-  if [ "$(wc -c <"$diff")" -le "$inline_limit" ]; then
-    printf '\nThe whole difference follows, so there is no need to run git diff.\n\n```diff\n'
-    cat "$diff"
-  else
-    printf '\nThe difference is too large to include; its stat follows, and git diff shows the rest.\n\n```\n'
-    git -C "$checkout" diff --stat "$1" "$target_id"
-  fi
-  rm -f "$diff"
-  printf '```\n'
-}
-# run_skill NAME LOG_PREFIX DIFF_BASE INPUTS [image args...]
+# run_skill NAME LOG_PREFIX INPUTS [image args...]
 run_skill() {
-  local name=$1 prefix=$2 from=$3 inputs=$4
-  shift 4
-  { skill_prompt "$name"; printf '\n%s\n' "$inputs"; diff_section "$from"; } >"$prefix.prompt"
-  timeout 2400 codex exec "${skill_model[@]}" -c "model_reasoning_effort=$skill_effort" -s read-only -C "$checkout" \
+  local name=$1 prefix=$2 inputs=$3
+  shift 3
+  { skill_prompt "$name"; printf '\n%s\n' "$inputs"; } >"$prefix.prompt"
+  timeout 2400 codex exec "${skill_model[@]}" -c "model_reasoning_effort=$effort" -s read-only -C "$checkout" \
     "$@" -o "$prefix.md" - <"$prefix.prompt" >"$prefix.log" 2>&1
 }
 
@@ -108,19 +89,17 @@ run_code_review() {
     -c "model_reasoning_effort=$effort" -o "$out/r$round.md" </dev/null >"$out/r$round.log" 2>&1)
 }
 start "the code review" "r$round" run_code_review
-start "the cull" "cull-r$round" run_skill cull "$out/cull-r$round" "$base_id" \
+start "the cull" "cull-r$round" run_skill cull "$out/cull-r$round" \
   "Scope: one change. It is the difference between $base_id and $target_id; this checkout is at the target, so \`git diff $base_id $target_id\` shows it."
 if [ ${#shots[@]} -gt 0 ]; then
   image_args=()
   for shot in "${shots[@]}"; do image_args+=(-i "$shot"); done
-  start "the screen critique" "ui-r$round" run_skill screen-critique "$out/ui-r$round" "$base_id" \
+  start "the screen critique" "ui-r$round" run_skill screen-critique "$out/ui-r$round" \
     "The change is meant to: $intent. It is the difference between $base_id and $target_id; this checkout is at the target. The screenshots are attached." "${image_args[@]}"
 fi
 if [ -n "$plan" ]; then
-  start "the acceptance audit" "accept-r$round" run_skill acceptance-audit "$out/accept-r$round" "$plan_base_id" \
-    "The plan ($plan) follows. The change is the difference between $plan_base_id and $target_id; this checkout is at the target.
-
-$(cat "$plan")"
+  start "the acceptance audit" "accept-r$round" run_skill acceptance-audit "$out/accept-r$round" \
+    "The plan: $plan. The change is the difference between $plan_base_id and $target_id; this checkout is at the target, so \`git diff $plan_base_id $target_id\` shows it."
 fi
 
 status=0
