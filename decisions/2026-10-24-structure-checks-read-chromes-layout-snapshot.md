@@ -1,0 +1,18 @@
+# The structural checks read Chrome's layout snapshot, with point probing only where boxes cannot answer
+
+**Question.** Work on checking screen structure by program: the geometry checks (containment, cut text, internal keys, native tooltips, touch size) each walked the live page with `getBoundingClientRect`, `elementFromPoint` and scrolling, one implementation per check. New rules (type floor, and those that follow) needed the same facts again. Where should the facts come from, and what do boxes miss?
+
+**Call.** One reader, `e2e/snapshot.ts`, takes Chrome's layout snapshot (`DOMSnapshot.captureSnapshot`) once per state and every rule is a plain, deterministic function over it (`e2e/structure.ts` runs them; `checkpoint` and `capture` share it). No model is in the loop; the screen critique reads the saved results afterwards. The old in-page geometry implementations are deleted. Only what needs live state stays in the page: whether a tip is open (popover state is not in the snapshot) and the point probing below.
+
+Limits, and how each is handled (checked against the old checks on every screenshot state, with and without injected faults: the same problems were found):
+
+- **Transforms.** `bounds` are the transformed bounding box: every non-SVG element matched `getBoundingClientRect` within 0.6px in the graph states (the canvas pans and zooms with transforms). SVG shapes include stroke width in the snapshot and are not held to boxes anyway. A control under a rotation or skew is not decided from its box: it is probed.
+- **Pseudo-elements, scroll and client sizes.** Present with `includeDOMRects` and `includePaintOrder`: `::before`, `::after` and `::marker` come as nodes with boxes and, for generated text, words; scroll and client sizes equalled the page's on every element.
+- **Layout settling.** The snapshot is one protocol call after the same wait for the page to settle that the old checks used; a frame in the middle of an animation was equally measurable before. The screenshot walk emulates reduced motion.
+- **Closed disclosures.** Chrome can still give a closed `<details>`'s content a box; the reader drops it, so it is never measured.
+- **Top layer and `position: sticky`.** A popover in the top layer has an ordinary box and a paint order above the page; sticky and fixed boxes are where they are drawn now. Containment keeps its rule that a pinned ancestor excuses the axis it pins.
+- **What a hit area from boxes and paint order misses.** Rounded corners (4px at most; ignored), `clip-path` and rotation or skew (the control or an ancestor having either is probed), `pointer-events: none` (the control is not a target; one over another is not an occluder), a control scrolled out of the window (a large one is trusted; it was measured at its scrolled-to position before, so a pinned bar that covers it only after the scroll is no longer seen). A control passes from its box only when it is at least the minimum each way, drawn whole in the window, with nothing else painted over it; every other control (small, covered, partly out of the window, shaped) is measured by the points around it in the page, as before.
+
+**Alternatives.** Keep two implementations (in-page geometry for old checks, snapshot for new): rejected, the same facts twice and a drift between them. Probe every control by points: exact, but it dominated the phone screenshot walk (33 s of 36 s).
+
+**What would change it.** A Chrome snapshot that stops carrying a field a rule reads (a Chrome upgrade changing text-box layout), or a rule that needs hover or focus state (those stay live, such as the Tab walk).

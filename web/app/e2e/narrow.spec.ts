@@ -7,6 +7,7 @@ import { expect, test } from "./test.ts";
 
 import { frontierKeys, openActing } from "./acting.ts";
 import { goTo, whenSettled } from "./shell.ts";
+import { expectStructure } from "./structure.ts";
 
 test.use({ viewport: { width: 390, height: 844 } });
 
@@ -14,7 +15,7 @@ test.use({ viewport: { width: 390, height: 844 } });
 async function menusFit(page: Page): Promise<void> {
   await openActing(page, "browser", "j_launch", "list?frontier=1");
   await frontierKeys(page);
-  expect(await whenSettled(page, () => page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth))).toBe(true);
+  await expectStructure(page, "the frontier list");
   for (const trigger of ["journey-menu", "view-picker", "controls-button"]) {
     await page.getByTestId(trigger).click();
     const box = await whenSettled(page, () => page.getByTestId(`${trigger}-menu`).boundingBox());

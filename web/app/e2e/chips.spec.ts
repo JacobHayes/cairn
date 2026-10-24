@@ -4,13 +4,12 @@
 // is ui/chips.test.ts's.
 import type { Page } from "@playwright/test";
 
-import { open, openSheet, whenSettled } from "./shell.ts";
+import { open, openSheet } from "./shell.ts";
 import { checkpoint } from "./invariants.ts";
 import { expect, test } from "./test.ts";
 
 const field = (page: Page) => page.getByTestId("create-identity").getByLabel("Emails");
 const chips = (page: Page) => page.getByTestId("create-identity").getByTestId("chip-value");
-const fitsTheWindow = (page: Page) => whenSettled(page, () => page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth));
 
 test("H3: emails are chips taken from the keyboard, refused with a reason, replaced by a paste, and saved as a list, on a desktop and a phone", async ({ page }) => {
   await page.setViewportSize({ width: 1280, height: 800 });
@@ -26,7 +25,6 @@ test("H3: emails are chips taken from the keyboard, refused with a reason, repla
   // The chips wrap at a phone's width and nothing runs past the window.
   await page.setViewportSize({ width: 390, height: 844 });
   await openSheet(page);
-  expect(await fitsTheWindow(page)).toBe(true);
   await checkpoint(page);
   await page.setViewportSize({ width: 1280, height: 800 });
 

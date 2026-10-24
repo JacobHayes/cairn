@@ -1,5 +1,5 @@
 #!/usr/bin/env -S bash -euo pipefail
-#MISE description="Take a picture of every screen state at desktop and phone width, light and dark, to dist/screenshots/ (or CAIRN_SCREENSHOTS_DIR), with a screenshots.json manifest"
+#MISE description="Take a picture of every screen state at desktop and phone width, light and dark, to dist/screenshots/ (or CAIRN_SCREENSHOTS_DIR), each with a .checks.json (what the structural rules passed and what came near them) and a trimmed .aria.yml beside it, and a screenshots.json manifest"
 #MISE depends=["packages", "build:wasm"]
 # usage: mise run screenshots [playwright test args...]   (for example --grep "phone width, dark")
 # Walks the table in web/app/e2e/screenshots.ts on the in-browser host (the built demo site, no
@@ -9,7 +9,7 @@ repo=$PWD
 mkdir -p "${CAIRN_SCREENSHOTS_DIR:-$repo/dist/screenshots}"
 dir=$(realpath "${CAIRN_SCREENSHOTS_DIR:-$repo/dist/screenshots}")
 if [ "$#" -eq 0 ]; then
-  rm -f "$dir"/*-desktop-*.png "$dir"/*-phone-*.png "$dir"/screenshots.json "$dir"/screenshots.*.part.json
+  rm -f "$dir"/*-desktop-*.png "$dir"/*-phone-*.png "$dir"/*-desktop-*.checks.json "$dir"/*-phone-*.checks.json "$dir"/*-desktop-*.aria.yml "$dir"/*-phone-*.aria.yml "$dir"/screenshots.json "$dir"/screenshots.*.part.json
 fi
 cd web/app
 CAIRN_SCREENSHOTS_DIR=$dir exec "$repo/node_modules/.bin/playwright" test -c playwright.screenshots.config.ts "$@"

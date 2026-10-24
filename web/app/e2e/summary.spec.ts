@@ -11,6 +11,7 @@ import { setStatus } from "./around.ts";
 import { countOf, keysOf, panelOf, rowsOf, stall, startOnSummary } from "./summary.ts";
 import { goTo, nodePanel, openAt, whenSettled } from "./shell.ts";
 import { FIXED_TODAY } from "./views.ts";
+import { expectStructure } from "./structure.ts";
 
 const fixed = { fixedToday: FIXED_TODAY };
 
@@ -62,7 +63,7 @@ async function phoneFitsFirstScreen(page: Page): Promise<void> {
   expect((box?.y ?? 9999) + (box?.height ?? 0)).toBeLessThanOrEqual(844);
   const beyond = await whenSettled(page, () => page.evaluate(() => [...document.querySelectorAll(".summary *")].filter((each) => each.getBoundingClientRect().right > innerWidth + 1).map((each) => each.getAttribute("class") ?? "")));
   expect(beyond).toEqual([]);
-  expect(await whenSettled(page, () => page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth))).toBeLessThanOrEqual(0);
+  await expectStructure(page, "the summary");
   // Who has it and what to do stay visible and reachable, the owner under the title in its column.
   await expect(first.locator(".row-owner")).toBeVisible();
   const [owner, title] = await whenSettled(page, () => Promise.all([first.locator(".row-owner").boundingBox(), first.locator(".node-title").boundingBox()]));

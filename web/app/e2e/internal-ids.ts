@@ -7,8 +7,7 @@
 // document-name patterns are generated from the repository's documents, the same ones the
 // served-text check in the integration tests reads. The text read is what a person sees, so a
 // key or digest is matched in any case: a screen that capitalises with CSS still shows it.
-import type { Page } from "@playwright/test";
-
+import { textOf, type Snapshot } from "./snapshot.ts";
 import { DOCUMENT_NAME_PATTERN, KEY_PREFIXES, REQUIREMENT_ID_PATTERN, SLUG_PATTERN } from "../../client/generated/rules.ts";
 
 /** The slug pattern without its anchors, to find a slug inside text. */
@@ -33,28 +32,25 @@ export interface ShownKey {
   where: string;
 }
 
-/** The text a person can read on `page`, and the attributes they can hover or hear, with every key found in them. */
-export async function shownKeys(page: Page): Promise<ShownKey[]> {
-  const shown = await page.evaluate(() => {
-    const found: { where: string; text: string }[] = [{ where: "text", text: document.body.innerText }];
+/** The text a person can read on `snapshot` (what Chrome drew, generated words included), and the attributes they can hover or hear, with every key found in them. */
+export function shownKeys(snapshot: Snapshot): ShownKey[] {
+  const shown: { where: string; text: string }[] = [];
+  const drawnText = snapshot.nodes.filter((part) => part.text !== undefined && part.box?.style.visibility === "visible").map((part) => part.text ?? "");
+  shown.push({ where: "text", text: drawnText.join("\n") });
+  for (const part of snapshot.nodes) {
     // A tip's words, open or closed: a closed one is not drawn, but it is read as the description of what it belongs to.
-    for (const tip of document.body.querySelectorAll('[role="tooltip"]')) {
-      found.push({ where: "tooltip", text: tip.textContent });
+    if (part.attr["role"] === "tooltip") {
+      shown.push({ where: "tooltip", text: textOf(part) });
     }
-    for (const element of document.body.querySelectorAll("[aria-label], [placeholder], [alt]")) {
-      const style = getComputedStyle(element);
-      if (style.display === "none" || style.visibility === "hidden") {
-        continue;
-      }
+    if (part.box !== undefined && part.box.style.visibility !== "hidden") {
       for (const attribute of ["aria-label", "placeholder", "alt"]) {
-        const text = element.getAttribute(attribute);
-        if (text !== null) {
-          found.push({ where: attribute, text });
+        const text = part.attr[attribute];
+        if (text !== undefined) {
+          shown.push({ where: attribute, text });
         }
       }
     }
-    return found;
-  });
+  }
   return shown.flatMap(({ where, text }) =>
     KEYS.flatMap(({ what, pattern }) =>
       [...text.matchAll(pattern)].map((match) => ({
@@ -67,14 +63,7 @@ export async function shownKeys(page: Page): Promise<ShownKey[]> {
   );
 }
 
-/** Fails when `page` shows a key where a name belongs, saying which, where, and in what text. */
-export async function expectNoKeysShown(page: Page): Promise<void> {
-  if (page.isClosed()) {
-    return;
-  }
-  const keys = await shownKeys(page);
-  if (keys.length > 0) {
-    const lines = keys.map((each) => `${each.what} ${each.key} in ${each.where}: ...${each.around}...`);
-    throw new Error(`${page.url()} shows a key where a name belongs:\n${lines.join("\n")}`);
-  }
+/** One line per key `snapshot` shows where a name belongs, saying which, where, and in what text. */
+export function keyProblems(snapshot: Snapshot): string[] {
+  return shownKeys(snapshot).map((each) => `${each.what} ${each.key} in ${each.where}: ...${each.around}...`);
 }

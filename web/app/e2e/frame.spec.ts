@@ -245,7 +245,6 @@ async function phoneSheetFoldsAndReturns(page: Page): Promise<void> {
   const canvas = await whenSettled(page, () => page.getByTestId("canvas").boundingBox());
   expect((canvas?.y ?? 0) + (canvas?.height ?? 0)).toBeGreaterThan(844 - 24);
   expect(await whenSettled(page, () => page.evaluate(() => document.documentElement.scrollHeight <= window.innerHeight + 1))).toBe(true);
-  expect(await whenSettled(page, () => page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth))).toBe(true);
   await checkpoint(page);
   // The pill brings it back at the peek.
   await pill.click();

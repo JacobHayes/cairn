@@ -59,8 +59,8 @@ for (const [viewport, size] of Object.entries(VIEWPORTS)) {
               await expect(state.ready(page, on), `${address} ${state.name} is drawn`).toBeVisible();
               await settled(page);
               const file = `${address}-${state.name}-${viewport}-${theme}.png`;
-              await capture(page, join(dir, file));
-              taken.push({ file, address, state: state.name, viewport, theme, url: new URL(page.url()).pathname + new URL(page.url()).search });
+              await capture(page, join(dir, file), { structure: true });
+              taken.push({ file, checks: file.replace(/\.png$/, ".checks.json"), aria: file.replace(/\.png$/, ".aria.yml"), address, state: state.name, viewport, theme, url: new URL(page.url()).pathname + new URL(page.url()).search });
             } catch (error) {
               failed.push(`${address} ${state.name}: ${error instanceof Error ? error.message.replaceAll("\n", " | ").slice(0, 1500) : String(error)}`);
             }

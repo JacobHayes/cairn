@@ -11,7 +11,7 @@ import { expect, test } from "./test.ts";
 
 import { answerCard, card, frontierItem, openActing, passOrder, publishFollowUpRoute, revisionAfter, select } from "./acting.ts";
 import { journeyName, startJourney } from "./around.ts";
-import { expectContained } from "./containment.ts";
+import { expectStructure } from "./structure.ts";
 import { derivedRevision, expectAddress, goTo, nodeCard, nodePanel, open, openAt, setDepth, whenSettled } from "./shell.ts";
 import { FIXED_TODAY } from "./views.ts";
 
@@ -52,7 +52,7 @@ test("C9, B6: a bulk snooze is one patch; the snoozed leave the frontier and an 
   expect(await opacityOf(snoozed.getByTestId("card-foot"))).toBe(1);
   await expect(snoozed.getByTestId("card-foot")).toHaveText(/^Until /);
   expect(await opacityOf(nodeCard(page, "n_beta_end").locator(".node-title"))).toBe(1);
-  await expectContained(page);
+  await expectStructure(page);
   const footWords = await whenSettled(page, () => snoozed.getByTestId("card-foot").innerText());
   await goTo(page, "list");
   const row = page.locator('[data-testid="list-row"][data-node="n_docs"]');

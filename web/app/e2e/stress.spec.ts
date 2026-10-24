@@ -1,6 +1,6 @@
 // The containment invariant over worst-case content (e2e/stress.ts): the stress journey walked
 // through every screen and width. Each step ends in a check (e2e/test.ts runs the
-// invariant after the test; `expectContained` runs it between the steps, so a failure names the
+// invariant after the test; `look` runs it between the steps, so a failure names the
 // screen).
 import type { Page } from "@playwright/test";
 
@@ -8,8 +8,7 @@ import { expect, test } from "./test.ts";
 
 import { expectTitleLinesAsLaidOut, viewportOf } from "./canvas.ts";
 import { NEAR_ZOOM } from "../src/canvas/gestures.ts";
-import { containmentProblems } from "./containment.ts";
-import { touchProblems } from "./touch.ts";
+import { observe } from "./structure.ts";
 import { indexAt, journeyAt, openCardMenu, openControlsMenu, openPopover, routeAt } from "./screenshots.ts";
 import { nodeCard, settled, whenSettled } from "./shell.ts";
 import { STRESS, publishStressJourney } from "./stress.ts";
@@ -25,7 +24,7 @@ interface Walk {
 function walkOf(page: Page, journey: string): Walk {
   const found: string[] = [];
   const look = async (where: string) => {
-    found.push(...[...(await containmentProblems(page)), ...(await touchProblems(page))].map((problem) => `${where}: ${problem}`));
+    found.push(...Object.values((await observe(page)).problems).flat().map((problem) => `${where}: ${problem}`));
   };
   const check = async (address: string, node?: string) => {
     await journeyAt(page, journey, address, node);

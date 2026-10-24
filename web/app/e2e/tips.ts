@@ -5,13 +5,13 @@
 // rule that hides a closed popover, and a closed tip taking room in a row is the symptom).
 import { expect, type Locator, type Page } from "@playwright/test";
 
-/** Fails when `page` carries a `title` attribute or an SVG `<title>`: the browser would show its own tooltip. */
-export async function expectNoNativeTooltips(page: Page): Promise<void> {
-  if (page.isClosed()) {
-    return;
-  }
-  const found = await page.evaluate(() => [...document.querySelectorAll("[title], title")].filter((each) => each.closest("head") === null).map((each) => each.outerHTML.slice(0, 140)));
-  expect(found, "a native title, where the app's tooltip belongs").toEqual([]);
+import { upFrom, type Snapshot } from "./snapshot.ts";
+
+/** One line per `title` attribute or SVG `<title>` on `snapshot`: the browser would show its own tooltip, where the app's belongs. */
+export function titleProblems(snapshot: Snapshot): string[] {
+  return snapshot.nodes
+    .filter((part) => ("title" in part.attr || part.tag === "title") && ![...upFrom(part)].some((up) => up.tag === "head"))
+    .map((part) => `a native title, where the app's tooltip belongs: <${part.tag}${"title" in part.attr ? ` title="${(part.attr["title"] ?? "").slice(0, 60)}"` : ""}>`);
 }
 
 /** Fails when a tip that is not open has a box: it is drawn, or takes room. */

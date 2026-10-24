@@ -1,67 +1,144 @@
 // The structural rules (DESIGN, Typography and the rest): plain functions over the page as Chrome
 // laid it out (e2e/snapshot.ts), each returning one line per problem. Every browser test is
 // checked after it ends (e2e/test.ts) and a picture before it is taken (e2e/invariants.ts), so a
-// screen never opts in.
+// screen never opts in. `observe` reads the page once and runs every rule over it; the result also
+// says what came near a rule, which `capture` saves beside the picture.
 import { expect, type Page } from "@playwright/test";
 
-import { drawnTree, type Drawn } from "./snapshot.ts";
+import { containmentProblems, ellipsised } from "./containment.ts";
+import { keyProblems } from "./internal-ids.ts";
+import { classesOf, snapshotOf, upFrom, type Part, type Snapshot } from "./snapshot.ts";
+import { titleProblems } from "./tips.ts";
+import { touchReport } from "./touch.ts";
 
-/** The smallest text the app draws, in px: DESIGN's mono label size (`--type-label-size`), which chips and every mono label are set in. */
-export const TYPE_FLOOR_PX = 12;
-
-/** `el` or an ancestor has one of `classes`. */
-function inClass(el: Drawn | undefined, classes: readonly string[]): boolean {
-  for (let up = el; up !== undefined; up = up.parent) {
-    const names = (up.attr["class"] ?? "").split(/\s+/);
-    if (classes.some((each) => names.includes(each))) {
-      return true;
-    }
-  }
-  return false;
-}
 
 /** A container's title below the near zoom is sized to the room its head has (DESIGN, Graph cards), which may be under the floor: it carries `--title-fit`. */
-function shrunkToFit(run: Drawn): boolean {
-  for (let up: Drawn | undefined = run; up !== undefined; up = up.parent) {
-    if ((up.attr["style"] ?? "").includes("--title-fit")) {
-      return true;
-    }
-  }
-  return false;
+function shrunkToFit(run: Part): boolean {
+  return [...upFrom(run)].some((up) => (up.attr["style"] ?? "").includes("--title-fit"));
 }
 
 /** What a run of text is, for the report. */
-function roleOf(run: Drawn): "chip" | "mono label" | "text" {
-  if (inClass(run.parent, ["chip", "chip-value", "badge", "status-chip"])) {
+function roleOf(run: Part): "chip" | "mono label" | "text" {
+  if ([...upFrom(run.parent)].some((up) => classesOf(up).some((each) => ["chip", "chip-value", "badge", "status-chip"].includes(each)))) {
     return "chip";
   }
-  return run.style["font-family"].includes("Mono") ? "mono label" : "text";
+  return (run.box?.style["font-family"] ?? "").includes("Mono") ? "mono label" : "text";
 }
 
-/** The drawn text under the floor, one line per element and size: its role, size and words. */
-export function textUnderFloor(tree: readonly Drawn[]): string[] {
-  const found = new Map<string, string>();
-  for (const run of tree) {
-    const size = Number.parseFloat(run.style["font-size"]);
+/** The drawn text runs and generated words with their size, in px. */
+function textRuns(snapshot: Snapshot): { run: Part; size: number; words: string }[] {
+  return snapshot.nodes.flatMap((run) => {
     const words = (run.text ?? "").trim().replace(/\s+/g, " ");
-    if (run.text === undefined || words === "" || size >= TYPE_FLOOR_PX || run.style.visibility !== "visible" || run.width === 0 || shrunkToFit(run)) {
+    const box = run.box;
+    return box === undefined || words === "" || box.style.visibility !== "visible" || box.width === 0 ? [] : [{ run, size: Number.parseFloat(box.style["font-size"]), words }];
+  });
+}
+
+/** The drawn text under `floor` px (DESIGN's mono label size, `--type-label-size`: what chips and every mono label are set in),  one line per element and size: its role, size and words. */
+export function textUnderFloor(snapshot: Snapshot, floor: number): string[] {
+  const found = new Map<string, string>();
+  for (const { run, size, words } of textRuns(snapshot)) {
+    if (size >= floor || shrunkToFit(run)) {
       continue;
     }
     const owner = run.parent;
-    const where = `${owner?.tag ?? ""}${(owner?.attr["class"] ?? "") === "" ? "" : `.${(owner?.attr["class"] ?? "").split(/\s+/).join(".")}`}`;
+    const classes = owner === undefined ? "" : classesOf(owner).join(".");
+    const where = `${owner?.tag ?? ""}${classes === "" ? "" : `.${classes}`}`;
     const key = `${roleOf(run)} ${where} ${String(size)}`;
     if (!found.has(key)) {
-      found.set(key, `${roleOf(run)} "${words.slice(0, 30)}" in <${where}> is ${String(size)}px, under the ${String(TYPE_FLOOR_PX)}px floor`);
+      found.set(key, `${roleOf(run)} "${words.slice(0, 30)}" in <${where}> is ${String(size)}px, under the ${String(floor)}px floor`);
     }
   }
   return [...found.values()];
 }
 
-/** Fails, listing every problem, when `page` as it stands breaks a structural rule. */
-export async function expectStructure(page: Page, where = "the page"): Promise<void> {
-  if (page.isClosed() || page.url() === "about:blank") {
-    return;
+/** The page scrolling sideways: its document is wider than its window. */
+export function pageScrollProblems(snapshot: Snapshot): string[] {
+  const root = snapshot.nodes.find((part) => part.tag === "html" && part.box !== undefined);
+  const box = root?.box;
+  return box !== undefined && box.scroll.width > box.client.width ? [`the page scrolls sideways: ${String(box.scroll.width)}px of content in a ${String(box.client.width)}px window`] : [];
+}
+
+/** What a rule found, by rule. */
+export type Problems = Record<string, string[]>;
+
+/** What came near a rule on a page that passed them: the facts a critique reads beside the picture. */
+export interface Near {
+  /** Text that is cut by an ellipsis or a clamp now. */
+  ellipsised: string[];
+  /** The five smallest hit boxes among the controls. */
+  smallestHitAreas: { name: string; width: number; height: number }[];
+  /** The font sizes in use, in px, with how many runs of text each sets. */
+  fontSizes: Record<string, number>;
+}
+
+/** The page as it stands, against every rule, and what came near them. */
+export interface Observed {
+  problems: Problems;
+  near: Near;
+}
+
+/** Reads `page` once and runs every structural rule over it. */
+export async function observe(page: Page): Promise<Observed> {
+  const snapshot = await snapshotOf(page);
+  const touch = await touchReport(page, snapshot);
+   
+  const floor = Number.parseFloat(await page.evaluate(() => getComputedStyle(document.documentElement).getPropertyValue("--type-label-size")));
+  if (!(floor > 0)) {
+    throw new Error("the --type-label-size token is not defined");
   }
-  const tree = await drawnTree(page);
-  expect([...textUnderFloor(tree)], `structure of ${where}`).toEqual([]);
+  const sizes: Record<string, number> = {};
+  for (const { size } of textRuns(snapshot)) {
+    sizes[String(size)] = (sizes[String(size)] ?? 0) + 1;
+  }
+  return {
+    problems: {
+      "elements outside their boxes or text cut without a sign": containmentProblems(snapshot),
+      "a key shown where a name belongs": keyProblems(snapshot),
+      "a native tooltip": titleProblems(snapshot),
+      "controls under the touch target": touch.problems,
+      "the page scrolling sideways": pageScrollProblems(snapshot),
+      "text under the type floor": textUnderFloor(snapshot, floor),
+    },
+    near: {
+      ellipsised: ellipsised(snapshot).slice(0, 10),
+      smallestHitAreas: touch.sizes.sort((a, b) => a.width * a.height - b.width * b.height).slice(0, 5),
+      fontSizes: Object.fromEntries(Object.entries(sizes).sort((a, b) => Number(a[0]) - Number(b[0]))),
+    },
+  };
+}
+
+/** The problems as one report naming `where`, or nothing when there are none. */
+export function report(problems: Problems, where: string): string | undefined {
+  const lines = Object.entries(problems).flatMap(([rule, found]) => (found.length === 0 ? [] : [`${rule}:`, ...found.map((each) => `  ${each}`)]));
+  return lines.length === 0 ? undefined : `${where} breaks a structural rule:\n${lines.join("\n")}`;
+}
+
+/** Whether `page` can be read: open, and not blank. */
+export function readable(page: Page): boolean {
+  return !page.isClosed() && page.url() !== "about:blank";
+}
+
+/** Reads `page` and fails, listing every problem, when it breaks a structural rule. A page still settling is read again until it passes or the assertion times out. */
+export async function expectStructure(page: Page, where = "the page"): Promise<Observed | undefined> {
+  if (!readable(page)) {
+    return undefined;
+  }
+  let seen: Observed | undefined;
+  await expect
+    .poll(async () => {
+      try {
+        seen = await observe(page);
+        return report(seen.problems, where) ?? "";
+      } catch (error) {
+        // A page that navigated away while the rules ran has nothing to check.
+        if (error instanceof Error && /context was destroyed|closed|Target page/.test(error.message)) {
+          seen = undefined;
+          return "";
+        }
+        throw error;
+      }
+    })
+    .toBe("");
+  return seen;
 }

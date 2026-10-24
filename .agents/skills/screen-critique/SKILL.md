@@ -5,7 +5,7 @@ description: Critique Cairn screens from their screenshots and the code behind t
 
 # Screen critique
 
-Judge the screens as a demanding product designer would, for someone opening Cairn for the first time, against DESIGN.md and what the change means to do. Read the screens' code as well as the pictures. Change nothing.
+Judge the screens as a demanding product designer would, for someone opening Cairn for the first time, against DESIGN.md and what the change means to do. Read the screens' code as well as the pictures. When the screenshots come from `mise run screenshots`, read each one's `.checks.json` (the rules it passed, and what came near them: text cut by an ellipsis, the smallest hit areas, the font sizes in use) and `.aria.yml` (its roles and names, as a screen reader meets it; the manifest lists both) beside the picture: they are measured facts, so a finding about size, cut text or structure cites them. Change nothing.
 
 Answer in three parts, in this order, most severe first within each:
 
