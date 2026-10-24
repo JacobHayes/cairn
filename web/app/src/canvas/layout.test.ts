@@ -8,6 +8,7 @@ import { describe, expect, test } from "vitest";
 
 import { MARKER_LENGTH_PX } from "./EdgeLine.tsx";
 import { fitZoom, minZoomOf } from "./gestures.ts";
+import { expectGeometry } from "./layout.test-support.ts";
 import { LAYOUT_MOVED_FRACTION_MAX, edgeId, hintsOf, layOut, movedNodes, type LayoutNode, type LayoutRequest, type Placement } from "./layout.ts";
 
 const CARD = { width: 240, height: 96 };
@@ -109,18 +110,8 @@ describe("the layout (C15)", () => {
     }
   });
 
-  test("a container holds its children below its header", async () => {
-    const { nodes: placed } = await layOut(elk(), fixture);
-    for (const [key, parent] of TREE.filter(([, each]) => each !== undefined)) {
-      const [child, box] = [placed[key], placed[parent ?? ""]];
-      expect(child && box, key).toBeTruthy();
-      if (child === undefined || box === undefined) {
-        continue;
-      }
-      expect(child.y, key).toBeGreaterThanOrEqual(HEADER);
-      expect(child.x + child.width, key).toBeLessThanOrEqual(box.width);
-      expect(child.y + child.height, key).toBeLessThanOrEqual(box.height);
-    }
+  test("the fixture's siblings do not overlap and its containers hold their children below their headers", async () => {
+    await expectGeometry("the vendor evaluation", fixture);
   });
 
   test("a revision laid out with its own positions as hints stays put", async () => {
