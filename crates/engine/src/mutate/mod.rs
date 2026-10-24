@@ -29,7 +29,7 @@ use crate::records::Records;
 use crate::validate::{missing_node_code, violation};
 
 /// B11: why a journey whose status accepts no changes refuses one.
-const ARCHIVED_REFUSAL: &str = "an archived journey accepts only un-archiving";
+const ARCHIVED_REFUSAL: &str = "an archived journey accepts only a move to active or completed";
 
 /// One apply in progress: the candidate the mutations so far produced, and what later stages
 /// need to know about them.

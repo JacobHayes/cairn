@@ -585,6 +585,7 @@ test("B11, A19, C16: the status moves from the menu's Status, and the header say
   await menu.click();
   await expect(page.getByTestId("menu-edit")).toHaveCount(0);
   await status.click();
+  await expect(page.getByTestId("status-active")).toBeVisible();
   await expect(page.getByTestId("status-completed")).toBeVisible();
   await expect(page.getByTestId("status-delete")).toBeVisible();
   await page.getByTestId("status-completed").click();

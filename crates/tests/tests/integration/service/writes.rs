@@ -68,7 +68,7 @@ on_both_stores!(
     deletes_naming_different_graphs_of_one_route_each_name_the_route,
     a_group_merge_resubmitted_with_other_identities_is_another_merge,
     publishing_a_route_never_touches_its_journeys,
-    an_archived_journey_takes_only_unarchiving_or_deletion_and_its_id_never_returns,
+    an_archived_journey_takes_only_a_status_move_or_deletion_and_its_id_never_returns,
     a_route_a_journey_follows_on_an_old_version_is_deleted_only_with_it,
     a_segment_inserted_only_in_a_published_version_is_not_deleted,
     a_users_patch_and_their_agents_land_alike_but_for_the_stamp,
@@ -1266,9 +1266,9 @@ async fn publishing_a_route_never_touches_its_journeys(service: &Service, _: &In
     );
 }
 
-/// B11, A19: an archived journey takes only un-archiving or a hard delete; the delete removes
+/// B11, A19: an archived journey takes only a move to active or completed, or a hard delete; the delete removes
 /// it, the deployment log keeps who deleted it, and its id is never reused.
-async fn an_archived_journey_takes_only_unarchiving_or_deletion_and_its_id_never_returns(
+async fn an_archived_journey_takes_only_a_status_move_or_deletion_and_its_id_never_returns(
     service: &Service,
     _: &InProcessNotifier,
 ) {
@@ -1305,16 +1305,13 @@ async fn an_archived_journey_takes_only_unarchiving_or_deletion_and_its_id_never
     ));
     let refused = rejected(service.patch(&call("u_lead", AT), &edit).await);
     assert_eq!(codes(&refused), vec![ViolationCode::ArchivedJourney]);
-    applied(
-        service
-            .patch(&call("u_lead", AT), &status("p_unarchive", 3, "completed"))
-            .await,
-    );
-    applied(
-        service
-            .patch(&call("u_lead", AT), &status("p_rearchive", 4, "archived"))
-            .await,
-    );
+    for (base, id, to) in [(3, "p_reopen", "active"), (4, "p_rearchive", "archived")] {
+        applied(
+            service
+                .patch(&call("u_lead", AT), &status(id, base, to))
+                .await,
+        );
+    }
     let delete = deletion(service, "p_delete", &[("j_done", 5)], &[]).await;
     applied(service.patch(&call("u_lead", AT), &delete).await);
     assert_eq!(service.journey(&journey_id("j_done")).await.unwrap(), None);

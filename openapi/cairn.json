@@ -5645,7 +5645,7 @@
           },
           {
             "const": "archived",
-            "description": "Archived: accepts only un-archiving or hard deletion.",
+            "description": "Archived: accepts only a move to active or completed, or hard deletion.",
             "type": "string"
           }
         ]

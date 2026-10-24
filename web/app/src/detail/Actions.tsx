@@ -519,7 +519,7 @@ export function Actions({ view, detail, onRename }: { view: Ready; detail: NodeD
 function ClosedNote({ view }: { view: Ready }) {
   return STATUS_ACCEPTS_CHANGES[view.journey.header.status] ? null : (
     <span className="muted" data-testid="closed-note">
-      Archived. To make changes, choose <span className="nowrap">Un-archive</span> from the journey's ⋯ menu, under Status.
+      Archived. To make changes, move it out of the archive from the journey's ⋯ menu, under Status.
     </span>
   );
 }

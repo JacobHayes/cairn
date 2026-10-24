@@ -472,7 +472,7 @@ fn an_identity_created_in_a_journey_patch_advances_the_deployment_once() {
 }
 
 #[test]
-fn an_archived_journey_accepts_only_unarchiving_and_can_be_deleted() {
+fn an_archived_journey_accepts_only_a_move_to_active_or_completed_and_can_be_deleted() {
     let records = vendor_after(2);
     let archived =
         vendor_patch(&records, "- op: set_journey_status\n  status: archived\n").unwrap();
@@ -482,11 +482,12 @@ fn an_archived_journey_accepts_only_unarchiving_and_can_be_deleted() {
         codes(vendor_patch(archived, answer)),
         [ViolationCode::ArchivedJourney]
     );
-    let active = "- op: set_journey_status\n  status: active\n";
+    let edit = "- op: edit_journey\n  name: Again\n";
     assert_eq!(
-        codes(vendor_patch(archived, active)),
+        codes(vendor_patch(archived, edit)),
         [ViolationCode::ArchivedJourney]
     );
+    assert!(vendor_patch(archived, "- op: set_journey_status\n  status: active\n").is_ok());
     assert!(vendor_patch(archived, "- op: set_journey_status\n  status: completed\n").is_ok());
     let revision = archived.journeys.values().next().unwrap().revision.get();
     let delete =

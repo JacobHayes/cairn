@@ -130,7 +130,7 @@ pub enum JourneyStatus {
     Active,
     /// Marked complete; still patchable, out of "mine" and cross-journey lists.
     Completed,
-    /// Archived: accepts only un-archiving or hard deletion.
+    /// Archived: accepts only a move to active or completed, or hard deletion.
     Archived,
 }
 
@@ -154,13 +154,13 @@ impl JourneyStatus {
 
     // PRD: B11.
     /// The statuses a journey in this one may move to: active and completed both ways,
-    /// either archived, and an archived journey back to completed only.
+    /// either archived, and an archived journey to active or completed.
     #[must_use]
     pub const fn moves(self) -> &'static [JourneyStatus] {
         match self {
             JourneyStatus::Active => &[JourneyStatus::Completed, JourneyStatus::Archived],
             JourneyStatus::Completed => &[JourneyStatus::Active, JourneyStatus::Archived],
-            JourneyStatus::Archived => &[JourneyStatus::Completed],
+            JourneyStatus::Archived => &[JourneyStatus::Active, JourneyStatus::Completed],
         }
     }
 

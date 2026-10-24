@@ -6,7 +6,7 @@ import { describe, expect, it } from "vitest";
 
 import { isKey } from "../authoring/keys.ts";
 
-import { createMutation, deleteBlocked, deleteMutations, newJourneyId, type Doomed } from "./lifecycle.ts";
+import { createMutation, deleteBlocked, deleteMutations, newJourneyId, statusActions, type Doomed } from "./lifecycle.ts";
 
 describe("starting a journey (B1)", () => {
   it.each(["Vendor evaluation, round 2", "  ", "Évaluation à l'étranger", "x".repeat(300)])("mints an id the host accepts from %j", (name) => {
@@ -40,5 +40,13 @@ describe("deleting journeys (B11, A19)", () => {
     expect(blocked).toContain("J_B");
     expect(blocked).toContain("J_C");
     expect(blocked).not.toContain("J_A");
+  });
+});
+
+describe("status moves (B11)", () => {
+  it("offers an archived journey both ways out, each under its own name", () => {
+    const actions = statusActions("archived");
+    expect(actions.map((action) => action.to).sort()).toEqual(["active", "completed"]);
+    expect(new Set(actions.map((action) => action.label)).size).toBe(2);
   });
 });

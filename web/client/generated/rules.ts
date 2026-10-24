@@ -129,7 +129,7 @@ export const JOURNEY_STATUSES: readonly JourneyStatus[] = ["active", "completed"
 export const STATUS_MOVES: Record<JourneyStatus, readonly JourneyStatus[]> = {
   active: ["completed", "archived"],
   completed: ["active", "archived"],
-  archived: ["completed"],
+  archived: ["active", "completed"],
 };
 
 /** B11, A19: whether a journey in each status accepts changes beyond its status moves and hard deletion. */

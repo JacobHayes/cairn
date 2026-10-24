@@ -193,7 +193,7 @@ a state change, when there is one, is simpler). Several edits are one patch, one
 - **The journey:** `edit_journey` (the name and description, both as given, so send the
   snapshot's description to keep it; and `owners`, kept when left out, replaced when given,
   cleared by an empty list) and `set_journey_status` (completing
-  or archiving is the person's call). Owners are never assumed, the creator included: leave them empty unless
+  or archiving is the person's call; an archived journey is read-only until its status moves to `active` or `completed`). Owners are never assumed, the creator included: leave them empty unless
   the person names them. `delete_journey` is permanent; only when the
   person asks. Also `discard_proposal` for a proposal nobody will apply.
 - **Routes:** `create_route`, `edit_route`, `set_route_retired` (hides it from new

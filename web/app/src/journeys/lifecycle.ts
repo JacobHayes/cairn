@@ -46,12 +46,12 @@ export interface StatusAction {
   label: string;
 }
 
-/** What a move to each status is called; out of an archive it is un-archiving. */
+/** What a move to each status is called. */
 const MOVE_WORDS: Record<JourneyStatus, string> = { active: "Reopen", completed: "Complete", archived: "Archive" };
 
 /** B11: the status changes a journey in `status` accepts (the engine's table), each with its words. */
 export function statusActions(status: JourneyStatus): StatusAction[] {
-  return STATUS_MOVES[status].map((to) => ({ to, label: status === "archived" ? "Un-archive" : MOVE_WORDS[to] }));
+  return STATUS_MOVES[status].map((to) => ({ to, label: status === "archived" ? `Un-archive as ${to}` : MOVE_WORDS[to] }));
 }
 
 /** A19, C16: hard deletion is offered once a journey is archived. The engine deletes a journey in any status; the screens put deletion behind archiving. */
