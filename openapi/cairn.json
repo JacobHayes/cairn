@@ -3981,7 +3981,7 @@
       },
       "FrontierEntry": {
         "additionalProperties": false,
-        "description": "One entry of the snapshot's acting frontier: enough to say what is next; the node's row is\nin the node list, or in `list_frontier` for a node outside the page or depth.",
+        "description": "One entry of the snapshot's acting frontier: enough to say what is next; the node's row is\nin `list_nodes`.",
         "properties": {
           "ancestors": {
             "description": "Its ancestors, root first: the breadcrumb.",
@@ -9887,6 +9887,25 @@
           }
         ]
       },
+      "NodeRef": {
+        "additionalProperties": false,
+        "description": "An open decision named in the snapshot: its key and what it is asking, so the list says what\neach is without a second read.",
+        "properties": {
+          "key": {
+            "$ref": "#/components/schemas/NodeKey",
+            "description": "The node."
+          },
+          "title": {
+            "$ref": "#/components/schemas/Title",
+            "description": "Its title."
+          }
+        },
+        "required": [
+          "key",
+          "title"
+        ],
+        "type": "object"
+      },
       "NodeRow": {
         "additionalProperties": false,
         "description": "One node as a row of the list, the next list, or the snapshot: what it is,\nwhere it sits, and its derived signals.",
@@ -14576,7 +14595,7 @@
       },
       "Snapshot": {
         "additionalProperties": false,
-        "description": "The bounded agent view of a journey: answers, a page of in-scope nodes, the ranked\nacting frontier's top N with the rest as keys, open decisions by rank, placeholders needing\nbreakdown, unassigned items, shortfalls, and counts, scoped to a subtree and depth.",
+        "description": "The bounded agent overview of a journey, with no node list (`list_nodes` lists the nodes):\nanswers, the ranked acting frontier's top N with the rest as keys, open decisions by rank, placeholders needing\nbreakdown, unassigned items, shortfalls, and counts, scoped to a subtree.",
         "properties": {
           "acting_frontier": {
             "description": "The acting frontier's first `page_item_count_max` items, in rank order.",
@@ -14621,28 +14640,10 @@
             },
             "type": "array"
           },
-          "next": {
-            "anyOf": [
-              {
-                "$ref": "#/components/schemas/Cursor"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "description": "Where the next page of nodes starts, when there is one."
-          },
-          "nodes": {
-            "description": "A page of in-scope nodes within the depth, in tree order.",
-            "items": {
-              "$ref": "#/components/schemas/SnapshotNode"
-            },
-            "type": "array"
-          },
           "open_decisions": {
             "description": "Open, in-scope decisions, in rank order.",
             "items": {
-              "$ref": "#/components/schemas/NodeKey"
+              "$ref": "#/components/schemas/NodeRef"
             },
             "type": "array"
           },
@@ -14658,7 +14659,7 @@
           },
           "scope": {
             "$ref": "#/components/schemas/SnapshotScope",
-            "description": "What it covers, when that is not the whole journey from its first page."
+            "description": "What it covers, when that is not the whole journey."
           },
           "shortfalls": {
             "description": "Nodes whose plan can no longer be met.",
@@ -14688,7 +14689,6 @@
         },
         "required": [
           "journey",
-          "nodes",
           "acting_frontier",
           "counts"
         ],
@@ -14696,7 +14696,7 @@
       },
       "SnapshotCounts": {
         "additionalProperties": false,
-        "description": "What a snapshot counts in its subtree, whatever its depth and page.",
+        "description": "What a snapshot counts in its subtree.",
         "properties": {
           "acting_frontier": {
             "description": "The acting frontier: its top N and the rest.",
@@ -14734,12 +14734,6 @@
             "minimum": 0,
             "type": "integer"
           },
-          "listed": {
-            "description": "In-scope nodes within the depth: the node list across its pages.",
-            "format": "uint32",
-            "minimum": 0,
-            "type": "integer"
-          },
           "not_relevant": {
             "description": "Not-relevant nodes.",
             "format": "uint32",
@@ -14752,7 +14746,6 @@
           "not_relevant",
           "by_state",
           "by_display_state",
-          "listed",
           "frontier",
           "acting_frontier"
         ],
@@ -14795,216 +14788,10 @@
         ],
         "type": "object"
       },
-      "SnapshotNode": {
-        "description": "One in-scope node in the snapshot, with its other participations and blocking.",
-        "properties": {
-          "actionable": {
-            "description": "Whether work can be started on it now: relevant, not blocked, and not finished.",
-            "type": "boolean"
-          },
-          "ancestors": {
-            "description": "Its ancestors, root first: the breadcrumb, on the frontier's rows (a snapshot's node\nlist carries `parent` instead).",
-            "items": {
-              "$ref": "#/components/schemas/NodeKey"
-            },
-            "type": "array"
-          },
-          "blocked_by": {
-            "description": "What blocks it itself (Gating, Blocked). A container's own children are not listed:\nit waits on them by definition.",
-            "items": {
-              "$ref": "#/components/schemas/Blocker"
-            },
-            "type": "array"
-          },
-          "blocked_through": {
-            "description": "The ancestors that block it, nearest first.",
-            "items": {
-              "$ref": "#/components/schemas/NodeKey"
-            },
-            "type": "array"
-          },
-          "checklist_count": {
-            "anyOf": [
-              {
-                "$ref": "#/components/schemas/ChecklistCount"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "description": "How many checklist items are ticked; none for a node with no items."
-          },
-          "display_state": {
-            "$ref": "#/components/schemas/DisplayState",
-            "description": "The state every surface shows for the node."
-          },
-          "due": {
-            "description": "The latest it can finish.",
-            "format": "date",
-            "type": [
-              "string",
-              "null"
-            ]
-          },
-          "earliest_start": {
-            "description": "The earliest it can start, when that is after today.",
-            "format": "date",
-            "type": [
-              "string",
-              "null"
-            ]
-          },
-          "effectively_skipped": {
-            "description": "Skipped through an ancestor.",
-            "type": "boolean"
-          },
-          "key": {
-            "$ref": "#/components/schemas/NodeKey",
-            "description": "The node."
-          },
-          "kind": {
-            "$ref": "#/components/schemas/NodeKind",
-            "description": "Its kind."
-          },
-          "needs_breakdown": {
-            "description": "Whether it is a placeholder that still needs to be broken down into children.",
-            "type": "boolean"
-          },
-          "overdue": {
-            "description": "Non-terminal with its due before today.",
-            "type": "boolean"
-          },
-          "owners": {
-            "description": "Its owners.",
-            "items": {
-              "$ref": "#/components/schemas/IdentityKey"
-            },
-            "type": "array",
-            "uniqueItems": true
-          },
-          "parent": {
-            "anyOf": [
-              {
-                "$ref": "#/components/schemas/NodeKey"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "description": "Its container, when it has one."
-          },
-          "participations": {
-            "additionalProperties": false,
-            "description": "Its effective participations by kind, other than the owner's (that is `owners`).",
-            "patternProperties": {
-              "^k_[a-z0-9][a-z0-9_-]*$": {
-                "items": {
-                  "$ref": "#/components/schemas/IdentityKey"
-                },
-                "type": "array",
-                "uniqueItems": true
-              }
-            },
-            "type": "object"
-          },
-          "rank": {
-            "anyOf": [
-              {
-                "$ref": "#/components/schemas/Real"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "description": "Its rank to three significant figures, for work still to do."
-          },
-          "relevance": {
-            "$ref": "#/components/schemas/Relevance",
-            "description": "Its relevance, when it is not relevant."
-          },
-          "shortfall_days": {
-            "description": "Days the plan can no longer be met by.",
-            "format": "uint32",
-            "minimum": 0,
-            "type": [
-              "integer",
-              "null"
-            ]
-          },
-          "slack_days": {
-            "description": "Latest start minus today; none is no deadline, and none for settled work.",
-            "format": "int32",
-            "type": [
-              "integer",
-              "null"
-            ]
-          },
-          "snoozed": {
-            "anyOf": [
-              {
-                "$ref": "#/components/schemas/SnoozeTarget"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "description": "A snooze that holds over the node: its own, else its container's."
-          },
-          "snoozed_via": {
-            "anyOf": [
-              {
-                "$ref": "#/components/schemas/NodeKey"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "description": "The container whose snooze holds over the node."
-          },
-          "stale": {
-            "description": "A terminal node whose completing guards would now fail.",
-            "type": "boolean"
-          },
-          "state": {
-            "$ref": "#/components/schemas/State",
-            "description": "Its stored state: what transitions act on. Prefer `display_state` for \"what is its\nstatus\"."
-          },
-          "title": {
-            "$ref": "#/components/schemas/Title",
-            "description": "Its title."
-          },
-          "unassigned": {
-            "description": "No owner (on the frontier's rows; a snapshot lists these once, as `unassigned`).",
-            "type": "boolean"
-          }
-        },
-        "required": [
-          "key",
-          "title",
-          "kind",
-          "state",
-          "display_state"
-        ],
-        "type": "object"
-      },
       "SnapshotScope": {
         "additionalProperties": false,
-        "description": "Which part of the journey a snapshot covers and which page of its nodes.",
+        "description": "Which part of the journey a snapshot covers.",
         "properties": {
-          "cursor": {
-            "$ref": "#/components/schemas/Cursor",
-            "default": 0,
-            "description": "Where the node list's page starts."
-          },
-          "depth": {
-            "description": "How many levels below the subtree's node (or of roots, at depth 1) the node list goes;\nevery level when none.",
-            "format": "uint32",
-            "minimum": 0,
-            "type": [
-              "integer",
-              "null"
-            ]
-          },
           "subtree": {
             "anyOf": [
               {
@@ -19425,6 +19212,19 @@
             "style": "form"
           },
           {
+            "description": "How many levels below `within` (or of roots, at 1) the list goes; every level when none.",
+            "explode": true,
+            "in": "query",
+            "name": "depth",
+            "required": false,
+            "schema": {
+              "format": "uint32",
+              "minimum": 0,
+              "type": "integer"
+            },
+            "style": "form"
+          },
+          {
             "description": "Only nodes this identity owns.",
             "explode": true,
             "in": "query",
@@ -21559,41 +21359,6 @@
               "$ref": "#/components/schemas/NodeKey"
             },
             "style": "form"
-          },
-          {
-            "description": "How many levels below the subtree's node (or of roots, at 1) the node list goes; every level when none.",
-            "explode": true,
-            "in": "query",
-            "name": "depth",
-            "required": false,
-            "schema": {
-              "format": "uint32",
-              "minimum": 0,
-              "type": "integer"
-            },
-            "style": "form"
-          },
-          {
-            "description": "Where the page starts: the previous page's `next`. A cursor is a position in the order at one journey revision, so a cursor past the start needs `revision`.",
-            "explode": true,
-            "in": "query",
-            "name": "cursor",
-            "required": false,
-            "schema": {
-              "$ref": "#/components/schemas/Cursor"
-            },
-            "style": "form"
-          },
-          {
-            "description": "The journey revision the previous page was read at (its `revision`); needed with a cursor past the start. When the journey has moved since, the page is refused 409 `page_moved`: start again from the first page.",
-            "explode": true,
-            "in": "query",
-            "name": "revision",
-            "required": false,
-            "schema": {
-              "$ref": "#/components/schemas/Revision"
-            },
-            "style": "form"
           }
         ],
         "responses": {
@@ -21647,16 +21412,6 @@
             },
             "description": "No such resource."
           },
-          "409": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Problem"
-                }
-              }
-            },
-            "description": "The journey moved since the page the cursor came from: start again from the first page."
-          },
           "500": {
             "content": {
               "application/json": {
@@ -21683,7 +21438,7 @@
             "description": "A limit was reached or the request timed out; retry after `Retry-After`. Or: The auth layer could not ask a sign-in provider (in text, without `Retry-After`)."
           }
         },
-        "summary": "The bounded agent snapshot, scoped to a subtree and depth, its nodes paged."
+        "summary": "The bounded agent overview, scoped to a subtree; the nodes are `listNodes`."
       }
     },
     "/api/journeys/{id}/summary": {

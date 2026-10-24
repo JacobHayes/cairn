@@ -7,7 +7,7 @@ description: Break down a placeholder (work the route expects each journey to sp
 A placeholder is a deliverable or action the route expects each journey to break down. It
 cannot be completed until it has children or is marked `atomic`.
 
-1. **Find them.** `get_snapshot` lists `needs_breakdown`; `list_frontier` with `filters`
+1. **Find them.** `get_snapshot` lists `needs_breakdown`; `list_nodes` with `filters`
    `["needs_breakdown"]` ranks them.
 2. **Understand it.** `get_node` shows its description, resources (the route's guidance on
    how to break it down), owner, and dates.

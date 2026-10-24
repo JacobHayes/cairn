@@ -14,7 +14,7 @@ mod in_process {
     use cairn_schema::limits::{EXPLANATION_ENTRY_COUNT_MAX, PAGE_ITEM_COUNT_MAX};
     use cairn_schema::{
         Actor, ExplainedField, ExplanationPage, LevelDisplay, LevelQuery, ListFlag, ListPage,
-        ListQuery, NextQuery, NodeKey, NodeKind, RemovalRead, Snapshot, SnapshotScope, SortBy,
+        ListQuery, NextQuery, NodeKey, NodeKind, RemovalRead, SnapshotScope, SortBy,
     };
     use cairn_service::Call;
     use cairn_service::wire::{Caller, History, Mine, NodeDetail, Problem, ProblemCode, Projected};
@@ -80,9 +80,8 @@ mod in_process {
         let kickoff: &NodeKey = &"n_kickoff".parse().unwrap();
         let scope = SnapshotScope {
             subtree: Some("n_setup".parse().unwrap()),
-            depth: Some(1),
-            ..SnapshotScope::default()
         };
+
         let blocked = ListQuery {
             flags: [ListFlag::Blocked].into(),
             sort: SortBy::Gravity,
@@ -96,7 +95,7 @@ mod in_process {
         let expected = [
             ("next", same(next.unwrap())),
             (
-                "snapshot?subtree=n_setup&depth=1",
+                "snapshot?subtree=n_setup",
                 same(service.snapshot(call, id, &scope).await.unwrap()),
             ),
             (
@@ -142,6 +141,35 @@ mod in_process {
         let expected = service.history(id, Some(kickoff), None).await.unwrap();
         assert_ne!(expected.patches.len(), 0);
         assert_eq!(history, History::from(expected));
+    }
+
+    /// C9: the node list scoped to a subtree and a depth over HTTP is the service's.
+    #[tokio::test]
+    async fn the_node_list_scoped_by_depth_answers_what_the_service_derives() {
+        let world = World::start().await;
+        let ann = world.vendor_after(3).await;
+        world.clock.set(NOW);
+        let call = &call_of(&ann).await;
+        let shallow = ListQuery {
+            within: Some("n_setup".parse().unwrap()),
+            depth: Some(1),
+            ..ListQuery::default()
+        };
+        let expected = same(
+            world
+                .service
+                .list(call, &"j_vendor_eval".parse().unwrap(), &shallow)
+                .await
+                .unwrap(),
+        );
+        let path = format!("{JOURNEY}/nodes?within=n_setup&depth=1");
+        let answered: serde_json::Value = get(&ann, &path).await;
+        assert_eq!(answered, expected);
+        let rows = answered["value"]["rows"].as_array().unwrap();
+        assert_ne!(rows.len(), 0);
+        let everything: serde_json::Value =
+            get(&ann, &format!("{JOURNEY}/nodes?within=n_setup")).await;
+        assert!(everything["value"]["total"].as_u64() > answered["value"]["total"].as_u64());
     }
 
     /// I1, C2, C8, C12: a level collapsed and filtered by relevance class over HTTP is the
@@ -216,31 +244,14 @@ mod in_process {
         assert_eq!(page.value.held, waiting.as_slice());
     }
 
-    /// I3, C9: the snapshot's node list and the list each page at `page_item_count_max`, their
-    /// pages together naming every node once.
+    /// C9: the list pages at `page_item_count_max`, its pages together naming every node once.
     #[tokio::test]
-    async fn the_snapshot_and_the_list_page_through_every_node_once() {
+    async fn the_list_pages_through_every_node_once() {
         let world = World::start().await;
         let ann = world.signed_in("ann");
         let count = usize::try_from(PAGE_ITEM_COUNT_MAX).unwrap() + 50;
         wide(&world, count).await;
         let page_max = usize::try_from(PAGE_ITEM_COUNT_MAX).unwrap();
-
-        let mut seen = Vec::new();
-        let mut target = "/api/journeys/j_wide/snapshot".to_owned();
-        loop {
-            let page: Projected<Snapshot> = get(&ann, &target).await;
-            assert!(page.value.nodes.len() <= page_max);
-            seen.extend(page.value.nodes.into_iter().map(|node| node.row.key));
-            let Some(next) = page.value.next else { break };
-            target = format!(
-                "/api/journeys/j_wide/snapshot?cursor={}&revision={}",
-                next.position(),
-                page.revision
-            );
-        }
-        let distinct: BTreeSet<&NodeKey> = seen.iter().collect();
-        assert_eq!((seen.len(), distinct.len()), (count + 1, count + 1));
 
         let mut listed = Vec::new();
         let mut target = "/api/journeys/j_wide/nodes".to_owned();
@@ -389,10 +400,6 @@ mod in_process {
         let targets = [
             format!(
                 "/api/journeys/j_wide/nodes?cursor={next}&revision={}",
-                first.revision
-            ),
-            format!(
-                "/api/journeys/j_wide/snapshot?cursor={next}&revision={}",
                 first.revision
             ),
             format!(

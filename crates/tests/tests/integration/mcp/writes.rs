@@ -458,15 +458,16 @@ async fn the_removal_read_is_what_a_patch_needs_to_remove_a_node() {
         "value": { "relevant_when": null } });
     let both = patch("p_both", revision, vec![remove, clear]);
     world.ok(&ann, "apply_patch", both).await;
-    let snapshot = world
-        .ok(&ann, "get_snapshot", json!({ "journey": "j_removal" }))
+    let listed = world
+        .ok(&ann, "list_nodes", json!({ "journey": "j_removal" }))
         .await;
-    let left: Vec<&str> = snapshot["snapshot"]["nodes"]
+    let mut left: Vec<&str> = listed["items"]
         .as_array()
         .unwrap()
         .iter()
         .map(|node| node["key"].as_str().unwrap())
         .collect();
+    left.sort_unstable();
     assert_eq!(left, ["n_after", "n_extra"]);
 }
 

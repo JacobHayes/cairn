@@ -11,8 +11,8 @@ use std::sync::Arc;
 use cairn_engine::{DerivedJourney, Graph, derive};
 use cairn_schema::limits::{EXPLANATION_ENTRY_COUNT_MAX, PAGE_ITEM_COUNT_MAX};
 use cairn_schema::{
-    Cursor, Email, ExplainedField, FrontierEntry, JourneyHeader, JourneyId, NextQuery, NodeKey,
-    SnapshotScope,
+    Cursor, Email, ExplainedField, FrontierEntry, JourneyHeader, JourneyId, ListQuery, NextQuery,
+    NodeKey, SnapshotScope,
 };
 use cairn_service::{Call, ReadError, Service};
 use cairn_store::{LoginRecord, Store, UserRecord};
@@ -49,7 +49,7 @@ macro_rules! on_both_stores {
 on_both_stores!(
     merge_revisions_follow_an_alias,
     a_journey_reads_as_the_engine_alone_projects_it,
-    a_snapshot_scopes_to_a_subtree_and_pages_its_nodes,
+    a_snapshot_scopes_to_a_subtree_and_the_node_list_pages,
     node_detail_caps_its_explanations_and_the_rest_page,
     cached_and_uncached_reads_agree_across_an_identity_merge,
     cached_and_uncached_reads_agree_across_midnight,
@@ -151,17 +151,22 @@ async fn a_journey_reads_as_the_engine_alone_projects_it(store: Arc<dyn Store>) 
     );
 }
 
-/// I3: a subtree scopes the node list to that node and what is beneath it, and the node
-/// list pages at `page_item_count_max`, its pages together listing each node once.
-async fn a_snapshot_scopes_to_a_subtree_and_pages_its_nodes(store: Arc<dyn Store>) {
+/// I3, C9: a subtree scopes the snapshot's counts, and the node list scoped to it lists that
+/// node and what is beneath it, paged at `page_item_count_max`, its pages together listing
+/// each node once.
+async fn a_snapshot_scopes_to_a_subtree_and_the_node_list_pages(store: Arc<dyn Store>) {
     let (service, _) = service_over(store);
     vendor_after(&service, 3).await;
     let reader = call("u_lead", AT);
     let setup = SnapshotScope {
         subtree: Some(key("n_setup")),
-        ..SnapshotScope::default()
     };
     let scoped = service.snapshot(&reader, &vendor(), &setup).await.unwrap();
+    let whole = service
+        .snapshot(&reader, &vendor(), &SnapshotScope::default())
+        .await
+        .unwrap();
+    assert!(scoped.value.counts.in_scope < whole.value.counts.in_scope);
     let journey = service.journey(&vendor()).await.unwrap().unwrap();
     let deployment = service.deployment().await.unwrap();
     let graph = Graph::new(journey.graph, &deployment).unwrap();
@@ -171,22 +176,27 @@ async fn a_snapshot_scopes_to_a_subtree_and_pages_its_nodes(store: Arc<dyn Store
         .into_iter()
         .chain([key("n_setup")])
         .collect();
-    assert_ne!(scoped.value.nodes.len(), 0);
-    for node in &scoped.value.nodes {
-        assert!(beneath.contains(&node.row.key), "{}", node.row.key);
+    let within = ListQuery {
+        within: Some(key("n_setup")),
+        ..ListQuery::default()
+    };
+    let listed = service.list(&reader, &vendor(), &within).await.unwrap();
+    assert_ne!(listed.value.rows.len(), 0);
+    for row in &listed.value.rows {
+        assert!(beneath.contains(&row.key), "{}", row.key);
     }
 
     let count = usize::try_from(PAGE_ITEM_COUNT_MAX).unwrap() + 50;
     wide(&service, count).await;
     let id: JourneyId = "j_wide".parse().unwrap();
-    let mut scope = SnapshotScope::default();
+    let mut query = ListQuery::default();
     let mut seen = Vec::new();
     loop {
-        let page = service.snapshot(&reader, &id, &scope).await.unwrap().value;
-        assert!(page.nodes.len() <= usize::try_from(PAGE_ITEM_COUNT_MAX).unwrap());
-        seen.extend(page.nodes.into_iter().map(|node| node.row.key));
+        let page = service.list(&reader, &id, &query).await.unwrap().value;
+        assert!(page.rows.len() <= usize::try_from(PAGE_ITEM_COUNT_MAX).unwrap());
+        seen.extend(page.rows.into_iter().map(|row| row.key));
         match page.next {
-            Some(next) => scope.cursor = next,
+            Some(next) => query.cursor = next,
             None => break,
         }
     }

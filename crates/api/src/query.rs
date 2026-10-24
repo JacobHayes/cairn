@@ -253,19 +253,10 @@ const KINDS: ParamSpec =
 const SORT: ParamSpec = ParamSpec::one::<SortBy>("sort", "The signal to sort by; rank when none.");
 
 /// `GET /api/journeys/{id}/snapshot` (I3).
-pub const SNAPSHOT_PARAMS: &[ParamSpec] = &[
-    ParamSpec::one::<NodeKey>(
-        "subtree",
-        "This node and everything beneath it; the whole journey when none.",
-    ),
-    ParamSpec::one::<u32>(
-        "depth",
-        "How many levels below the subtree's node (or of roots, at 1) the node list goes; every \
-         level when none.",
-    ),
-    CURSOR,
-    REVISION,
-];
+pub const SNAPSHOT_PARAMS: &[ParamSpec] = &[ParamSpec::one::<NodeKey>(
+    "subtree",
+    "This node and everything beneath it; the whole journey when none.",
+)];
 
 /// `GET /api/journeys/{id}/level` (C2).
 pub const LEVEL_PARAMS: &[ParamSpec] = &[
@@ -327,6 +318,10 @@ pub const LIST_PARAMS: &[ParamSpec] = &[
         "Filters with no argument; every one given must hold.",
     ),
     ParamSpec::one::<NodeKey>("within", "Only nodes beneath this container."),
+    ParamSpec::one::<u32>(
+        "depth",
+        "How many levels below `within` (or of roots, at 1) the list goes; every level when none.",
+    ),
     ParamSpec::one::<IdentityKey>("owner", "Only nodes this identity owns."),
     ParamSpec::many::<State>("state", "Only nodes in these stored states; any when none."),
     ParamSpec::many::<DisplayState>(
@@ -545,8 +540,6 @@ pub fn events(params: &Params) -> Result<EventQuery, ApiError> {
 pub fn snapshot(params: &Params) -> Result<SnapshotScope, ApiError> {
     Ok(SnapshotScope {
         subtree: params.one("subtree")?,
-        depth: params.one("depth")?,
-        cursor: params.cursor()?,
     })
 }
 
@@ -597,6 +590,7 @@ pub fn list(params: &Params) -> Result<ListQuery, ApiError> {
     Ok(ListQuery {
         flags: params.all("flag")?.into_iter().collect(),
         within: params.one("within")?,
+        depth: params.one("depth")?,
         owner: params.one("owner")?,
         states: params.all("state")?.into_iter().collect(),
         display_states: params.all("display_state")?.into_iter().collect(),

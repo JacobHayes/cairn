@@ -10,10 +10,10 @@ use cairn_schema::{
     Constraint, ConstraintSource, Contribution, Cursor, Date, DisplayState, DoneEarly,
     EffectiveDate, EffectiveParticipation, Explained, ExplainedField, ExplanationPage, Guard,
     GuardFailure, Instant, InstantPoint, JourneyId, KeyRefs, KindKey, Level, LevelDateLink,
-    LevelDisplay, LevelNode, LevelQuery, ListFlag, ListQuery, LocalEdit, Markdown, Next, NextQuery,
-    Node, NodeDerived, NodeKey, NodeKind, NodeState, Overrides, Progress, Real, Relevance,
+    LevelDisplay, LevelNode, LevelQuery, ListFlag, ListQuery, LocalEdit, Markdown, Node,
+    NodeDerived, NodeKey, NodeKind, NodeState, Overrides, Progress, Real, Relevance,
     RelevanceExplanation, RemovalRead, Score, ShortChain, Snapshot, SnapshotScope, SnoozeTarget,
-    SortBy, Stalled, StillWaiting,
+    SortBy, StillWaiting,
 };
 use cairn_service::{Call, ChildEntry, NodeDetail};
 use schemars::JsonSchema;
@@ -28,23 +28,23 @@ use crate::{ToolError, ToolSet};
 pub(crate) const SPECS: &[Spec] = &[
     Spec {
         name: "get_snapshot",
-        description: "Read this first on a journey: answers, a page of in-scope nodes in \
-            tree order, the ranked acting frontier, open decisions, placeholders \
-            to break down, unassigned items, shortfalls, counts. Scope with `subtree` and `depth`.",
+        description: "Read this first on a journey: answers, counts, the top of the ranked \
+            acting frontier, open decisions, placeholders to break down, unassigned items, \
+            shortfalls. No node list: `list_nodes` lists nodes. Scope with `subtree`.",
         writes: Writes::Nothing,
         destructive: false,
         schema: schema::<GetSnapshot>,
         output: schema::<At<SnapshotOutput>>,
     },
     Spec {
-        name: "list_frontier",
-        description: "The ranked acting frontier, paged: what to do next, each node with its \
-            rank (`get_node` says why). With `filters`, the in-scope nodes matching every \
-            filter, in rank order.",
+        name: "list_nodes",
+        description: "Nodes in rank order, paged, each with its rank (`get_node` says why): \
+            every node, or those matching every `filters` entry (`next_up` is the acting \
+            frontier). Scope with `within` and `depth`.",
         writes: Writes::Nothing,
         destructive: false,
-        schema: schema::<ListFrontier>,
-        output: schema::<At<FrontierOutput>>,
+        schema: schema::<ListNodes>,
+        output: schema::<At<Paged<AgentRow>>>,
     },
     Spec {
         name: "get_node",
@@ -76,18 +76,12 @@ pub(crate) struct GetSnapshot {
     journey: JourneyId,
     #[serde(default)]
     subtree: Option<NodeKey>,
-    /// Levels listed below `subtree` (or of roots); every level when absent. The frontier
-    /// and lists ignore it.
-    #[serde(default)]
-    depth: Option<u32>,
-    #[serde(default)]
-    cursor: Cursor,
 }
 
 /// The snapshot, at its revision.
 #[derive(Debug, Serialize, JsonSchema)]
 pub(crate) struct SnapshotOutput {
-    /// The bounded view: answers, a page of in-scope nodes, the acting frontier's top
+    /// The bounded overview: answers, the acting frontier's top
     /// `page_item_count_max` with the rest as keys, open decisions by rank, placeholders
     /// needing breakdown, unassigned items, shortfalls, and counts.
     snapshot: Snapshot,
@@ -566,39 +560,24 @@ impl Detail {
 }
 
 // PRD: C9, C10, I2.
-/// `list_frontier`.
+/// `list_nodes`.
 #[derive(Debug, Deserialize, JsonSchema)]
 #[serde(deny_unknown_fields)]
-pub(crate) struct ListFrontier {
+pub(crate) struct ListNodes {
     journey: JourneyId,
-    /// None: the acting frontier. Any: the in-scope nodes matching every one, in rank
-    /// order.
+    /// None: every node. Any: the nodes matching every one.
     #[serde(default)]
     filters: BTreeSet<ListFlag>,
-    // PRD: E4.
-    #[serde(default)]
-    mine: bool,
     #[serde(default)]
     kinds: BTreeSet<NodeKind>,
+    /// This node and the nodes beneath it.
     #[serde(default)]
     within: Option<NodeKey>,
-    /// Rank for the caller; with no filters only.
+    /// Levels listed below `within` (or of roots); every level when absent.
     #[serde(default)]
-    for_viewer: bool,
+    depth: Option<u32>,
     #[serde(default)]
     cursor: Cursor,
-}
-
-/// A page of the frontier or of a filtered list, in rank order.
-#[derive(Debug, Serialize, JsonSchema)]
-pub(crate) struct FrontierOutput {
-    /// The page: each node with its breadcrumb, signals, and rank.
-    #[serde(flatten)]
-    rows: Paged<AgentRow>,
-    // PRD: C5, D5.
-    /// When the frontier is empty and work remains, what the journey waits on.
-    #[serde(skip_serializing_if = "Option::is_none")]
-    stalled: Option<Stalled>,
 }
 
 impl ToolSet {
@@ -611,7 +590,7 @@ impl ToolSet {
     ) -> Result<Value, ToolError> {
         match name {
             "get_snapshot" => output(self.get_snapshot(call, parse(arguments)?).await),
-            "list_frontier" => output(self.list_frontier(call, parse(arguments)?).await),
+            "list_nodes" => output(self.list_nodes(call, parse(arguments)?).await),
             "get_node" => output(self.get_node(call, parse(arguments)?).await),
             "get_level" => output(self.get_level(call, parse(arguments)?).await),
             _ => Err(ToolError::UnknownTool {
@@ -629,8 +608,6 @@ impl ToolSet {
     ) -> Result<At<SnapshotOutput>, ToolError> {
         let scope = SnapshotScope {
             subtree: arguments.subtree,
-            depth: arguments.depth,
-            cursor: arguments.cursor,
         };
         let projected = self
             .service
@@ -740,57 +717,26 @@ impl ToolSet {
     }
 
     // PRD: C10, C9.
-    /// `list_frontier`: the acting frontier ranked, or the nodes the filters hold
-    /// for, a page at a time.
-    async fn list_frontier(
+    /// `list_nodes`: the nodes the filters hold for in rank order, a page at a time.
+    async fn list_nodes(
         &self,
         call: &Call,
-        arguments: ListFrontier,
-    ) -> Result<At<FrontierOutput>, ToolError> {
-        let journey = &arguments.journey;
-        if arguments.filters.is_empty() {
-            let query = NextQuery {
-                sort: SortBy::Rank,
-                mine: arguments.mine,
-                kinds: arguments.kinds,
-                within: arguments.within,
-                for_viewer: arguments.for_viewer,
-            };
-            let projected = self.service.next(call, journey, &query).await?;
-            let cursor = arguments.cursor;
-            return Ok(At::of(projected, |next| {
-                let Next { items, stalled } = next;
-                let Paged { items, next, total } = page(items, cursor);
-                FrontierOutput {
-                    rows: Paged {
-                        items: items.iter().map(AgentRow::on_frontier).collect(),
-                        next,
-                        total,
-                    },
-                    stalled,
-                }
-            }));
-        }
-        let mut flags = arguments.filters;
-        if arguments.mine {
-            flags.insert(ListFlag::Mine);
-        }
+        arguments: ListNodes,
+    ) -> Result<At<Paged<AgentRow>>, ToolError> {
         let query = ListQuery {
-            flags,
+            flags: arguments.filters,
             within: arguments.within,
+            depth: arguments.depth,
             kinds: arguments.kinds,
             sort: SortBy::Rank,
             cursor: arguments.cursor,
             ..ListQuery::default()
         };
-        let projected = self.service.list(call, journey, &query).await?;
-        Ok(At::of(projected, |list| FrontierOutput {
-            rows: Paged {
-                items: list.rows.iter().map(AgentRow::on_frontier).collect(),
-                next: list.next,
-                total: list.total,
-            },
-            stalled: None,
+        let projected = self.service.list(call, &arguments.journey, &query).await?;
+        Ok(At::of(projected, |list| Paged {
+            items: list.rows.iter().map(AgentRow::of).collect(),
+            next: list.next,
+            total: list.total,
         }))
     }
 }

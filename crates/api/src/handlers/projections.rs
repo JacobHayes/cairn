@@ -60,7 +60,6 @@ pub async fn snapshot(
     let params = Params::parse(raw.as_deref(), query::SNAPSHOT_PARAMS)?;
     let scope = query::snapshot(&params)?;
     let projected = api.service.snapshot(&api.call(actor), &id, &scope).await?;
-    params.page_at(projected.revision)?;
     Ok(Json(Projected::from_service(projected)))
 }
 

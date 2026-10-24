@@ -12,8 +12,8 @@ use serde::{Deserialize, Serialize};
 
 use crate::chain::{Constraint, FixedDate};
 use crate::derived::{
-    Blocker, ChecklistCount, Contribution, DateOrigin, DisplayState, EffectiveDate, HeldDependent,
-    Progress, Real, Relevance, Score, Stalled,
+    ChecklistCount, Contribution, DateOrigin, DisplayState, EffectiveDate, HeldDependent, Progress,
+    Real, Relevance, Score, Stalled,
 };
 use crate::domain::JourneyStatus;
 use crate::event::Event;
@@ -797,6 +797,10 @@ pub struct ListQuery {
     /// Only nodes beneath this container (by group).
     #[serde(skip_serializing_if = "Option::is_none")]
     pub within: Option<NodeKey>,
+    /// With `within` (or from the roots, at 1), only the nodes no deeper than this many levels
+    /// below that node; every level when none.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub depth: Option<u32>,
     /// Only nodes this identity owns.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub owner: Option<IdentityKey>,
@@ -847,7 +851,7 @@ pub struct MineEntry {
 }
 
 impl SnapshotScope {
-    /// Whether it is the whole journey from the first page.
+    /// Whether it is the whole journey.
     #[must_use]
     pub fn is_whole(&self) -> bool {
         *self == Self::default()
@@ -855,24 +859,17 @@ impl SnapshotScope {
 }
 
 // PRD: I3.
-/// Which part of the journey a snapshot covers and which page of its nodes.
+/// Which part of the journey a snapshot covers.
 #[derive(Clone, Debug, Default, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
 #[serde(deny_unknown_fields)]
 pub struct SnapshotScope {
     /// The subtree: this node and everything beneath it; the whole journey when none.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub subtree: Option<NodeKey>,
-    /// How many levels below the subtree's node (or of roots, at depth 1) the node list goes;
-    /// every level when none.
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub depth: Option<u32>,
-    /// Where the node list's page starts.
-    #[serde(default)]
-    pub cursor: Cursor,
 }
 
 // PRD: I3, C10.
-/// One node as an agent reads it, in the snapshot and the frontier's lists: what it is, where
+/// One node as an agent reads it, in the node list: what it is, where
 /// it sits, who owns it, its dates, the flags that hold, and its rank as one rounded number.
 /// A finished, skipped or ruled-out node keeps its row, dates, flags and containment but no
 /// slack (room left to start) or rank. The rank's terms and the gravity and unlocks behind
@@ -892,11 +889,7 @@ pub struct AgentRow {
     pub state: State,
     /// The state every surface shows for the node.
     pub display_state: DisplayState,
-    /// Its container, when it has one.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub parent: Option<NodeKey>,
-    /// Its ancestors, root first: the breadcrumb, on the frontier's rows (a snapshot's node
-    /// list carries `parent` instead).
+    /// Its ancestors, root first: the breadcrumb.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub ancestors: Vec<NodeKey>,
     /// Its relevance, when it is not relevant.
@@ -914,7 +907,7 @@ pub struct AgentRow {
     /// Its owners.
     #[serde(default, skip_serializing_if = "BTreeSet::is_empty")]
     pub owners: BTreeSet<IdentityKey>,
-    /// No owner (on the frontier's rows; a snapshot lists these once, as `unassigned`).
+    /// No owner.
     #[serde(default, skip_serializing_if = "crate::serde_util::is_false")]
     pub unassigned: bool,
     /// A snooze that holds over the node: its own, else its container's.
@@ -959,25 +952,9 @@ impl AgentRow {
         *relevance == Relevance::Relevant
     }
 
-    /// C10: the row of `row` with its breadcrumb, as the frontier's lists carry it.
+    /// C10: the row of `row` with its breadcrumb, as the node list carries it.
     #[must_use]
-    pub fn on_frontier(row: &NodeRow) -> Self {
-        let mut lean = Self::of(row);
-        lean.ancestors.clone_from(&row.ancestors);
-        lean
-    }
-
-    /// C10: the row of `row` with its container, as the snapshot's node list carries it, and
-    /// without the unassigned flag, which the snapshot lists once.
-    #[must_use]
-    pub fn in_snapshot(row: &NodeRow) -> Self {
-        let mut lean = Self::of(row);
-        lean.unassigned = false;
-        lean.parent = row.ancestors.last().cloned();
-        lean
-    }
-
-    fn of(row: &NodeRow) -> Self {
+    pub fn of(row: &NodeRow) -> Self {
         let settled = matches!(
             row.display_state,
             DisplayState::Done | DisplayState::Skipped | DisplayState::NotRelevant
@@ -988,8 +965,7 @@ impl AgentRow {
             kind: row.kind,
             state: row.state,
             display_state: row.display_state,
-            parent: None,
-            ancestors: Vec::new(),
+            ancestors: row.ancestors.clone(),
             relevance: row.relevance,
             actionable: row.actionable,
             effectively_skipped: row.effectively_skipped,
@@ -1014,7 +990,7 @@ impl AgentRow {
 
 // PRD: I3, C10.
 /// One entry of the snapshot's acting frontier: enough to say what is next; the node's row is
-/// in the node list, or in `list_frontier` for a node outside the page or depth.
+/// in `list_nodes`.
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize, JsonSchema)]
 #[serde(deny_unknown_fields)]
 pub struct FrontierEntry {
@@ -1052,29 +1028,19 @@ impl FrontierEntry {
 }
 
 // PRD: I3.
-/// One in-scope node in the snapshot, with its other participations and blocking.
-#[derive(Clone, Debug, PartialEq, Serialize, Deserialize, JsonSchema)]
-pub struct SnapshotNode {
-    /// What it is and its signals.
-    #[serde(flatten)]
-    pub row: AgentRow,
-    /// Its effective participations by kind, other than the owner's (that is `owners`).
-    #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
-    pub participations: BTreeMap<KindKey, BTreeSet<IdentityKey>>,
-    /// What blocks it itself (Gating, Blocked). A container's own children are not listed:
-    /// it waits on them by definition.
-    #[serde(default, skip_serializing_if = "Vec::is_empty")]
-    pub blocked_by: Vec<Blocker>,
-    /// The ancestors that block it, nearest first.
-    #[serde(default, skip_serializing_if = "Vec::is_empty")]
-    pub blocked_through: Vec<NodeKey>,
-    /// The earliest it can start, when that is after today.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub earliest_start: Option<Date>,
+/// An open decision named in the snapshot: its key and what it is asking, so the list says what
+/// each is without a second read.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+#[serde(deny_unknown_fields)]
+pub struct NodeRef {
+    /// The node.
+    pub key: NodeKey,
+    /// Its title.
+    pub title: Title,
 }
 
 // PRD: I3.
-/// What a snapshot counts in its subtree, whatever its depth and page.
+/// What a snapshot counts in its subtree.
 #[derive(Clone, Debug, Default, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
 #[serde(deny_unknown_fields)]
 pub struct SnapshotCounts {
@@ -1089,8 +1055,6 @@ pub struct SnapshotCounts {
     /// `not_relevant`. A not-relevant node pending on an undecided decision is out of scope
     /// and so not counted here until its decision is answered.
     pub by_display_state: BTreeMap<DisplayState, u32>,
-    /// In-scope nodes within the depth: the node list across its pages.
-    pub listed: u32,
     /// The frontier.
     pub frontier: u32,
     /// The acting frontier: its top N and the rest.
@@ -1116,15 +1080,15 @@ pub struct SnapshotJourney {
 }
 
 // PRD: I3.
-/// The bounded agent view of a journey: answers, a page of in-scope nodes, the ranked
-/// acting frontier's top N with the rest as keys, open decisions by rank, placeholders needing
-/// breakdown, unassigned items, shortfalls, and counts, scoped to a subtree and depth.
+/// The bounded agent overview of a journey, with no node list (`list_nodes` lists the nodes):
+/// answers, the ranked acting frontier's top N with the rest as keys, open decisions by rank, placeholders needing
+/// breakdown, unassigned items, shortfalls, and counts, scoped to a subtree.
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize, JsonSchema)]
 #[serde(deny_unknown_fields)]
 pub struct Snapshot {
     /// The journey's name, description, status and owners.
     pub journey: SnapshotJourney,
-    /// What it covers, when that is not the whole journey from its first page.
+    /// What it covers, when that is not the whole journey.
     #[serde(default, skip_serializing_if = "SnapshotScope::is_whole")]
     pub scope: SnapshotScope,
     /// The answers in effect in the subtree.
@@ -1134,11 +1098,6 @@ pub struct Snapshot {
     /// The rationales those answers were given with, for the answers that have one.
     #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
     pub rationales: BTreeMap<NodeKey, Markdown>,
-    /// A page of in-scope nodes within the depth, in tree order.
-    pub nodes: Vec<SnapshotNode>,
-    /// Where the next page of nodes starts, when there is one.
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub next: Option<Cursor>,
     /// The acting frontier's first `page_item_count_max` items, in rank order.
     pub acting_frontier: Vec<FrontierEntry>,
     /// The rest of the acting frontier, in rank order.
@@ -1146,7 +1105,7 @@ pub struct Snapshot {
     pub acting_frontier_rest: Vec<NodeKey>,
     /// Open, in-scope decisions, in rank order.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
-    pub open_decisions: Vec<NodeKey>,
+    pub open_decisions: Vec<NodeRef>,
     // PRD: B10.
     /// Placeholders needing breakdown.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]

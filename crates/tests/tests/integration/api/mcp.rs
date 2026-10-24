@@ -105,11 +105,11 @@ mod mcp_in_process {
     /// The reads, on the journey after its decisions are answered.
     async fn reads(agent: &Agent) {
         let snapshot = agent
-            .ok("get_snapshot", json!({ "journey": JOURNEY, "depth": 1 }))
+            .ok("get_snapshot", json!({ "journey": JOURNEY }))
             .await;
         assert_eq!(snapshot["revision"], 2);
         let blocked = json!({ "journey": JOURNEY, "filters": ["blocked"] });
-        let blocked = agent.ok("list_frontier", blocked).await;
+        let blocked = agent.ok("list_nodes", blocked).await;
         assert!(blocked["total"].as_u64().unwrap() > 0);
         let node = agent
             .ok(
@@ -339,7 +339,10 @@ mod mcp_in_process {
         break_down_the_placeholder(&agent, revision).await;
 
         let frontier = agent
-            .ok("list_frontier", json!({ "journey": JOURNEY }))
+            .ok(
+                "list_nodes",
+                json!({ "journey": JOURNEY, "filters": ["next_up"] }),
+            )
             .await;
         let actor = cairn_schema::Actor {
             user: "u_anyone".parse().unwrap(),
@@ -360,18 +363,18 @@ mod mcp_in_process {
             "the frontier is the next list"
         );
         let needed = json!({ "journey": JOURNEY, "filters": ["decisions_needed"] });
-        let needed = agent.ok("list_frontier", needed).await;
+        let needed = agent.ok("list_nodes", needed).await;
         assert_eq!(needed["total"], 0, "every decision that can be answered is");
     }
 
     /// Reads the snapshot first, lists the decisions needed, and answers each in rank order
     /// with the scenario's answer; the journey's revision after.
     async fn answer_what_is_needed(agent: &Agent) -> u64 {
-        let snapshot = json!({ "journey": JOURNEY, "depth": 1 });
+        let snapshot = json!({ "journey": JOURNEY });
         let snapshot = agent.ok("get_snapshot", snapshot).await;
-        let open: Vec<String> = strings(&snapshot["snapshot"]["open_decisions"]);
+        let open: Vec<String> = keys(&snapshot["snapshot"]["open_decisions"]);
         let needed = json!({ "journey": JOURNEY, "filters": ["decisions_needed"] });
-        let needed = keys(&agent.ok("list_frontier", needed).await["items"]);
+        let needed = keys(&agent.ok("list_nodes", needed).await["items"]);
         let ranked: Vec<&String> = open.iter().filter(|key| needed.contains(key)).collect();
         assert_eq!(ranked, needed.iter().collect::<Vec<_>>(), "in rank order");
 
@@ -424,11 +427,11 @@ mod mcp_in_process {
 
     /// B10, I6: the placeholder broken down by a proposal, reviewed, and applied.
     async fn break_down_the_placeholder(agent: &Agent, revision: u64) {
-        let snapshot = json!({ "journey": JOURNEY, "depth": 1 });
+        let snapshot = json!({ "journey": JOURNEY });
         let snapshot = agent.ok("get_snapshot", snapshot).await;
         assert_eq!(
-            strings(&snapshot["snapshot"]["needs_breakdown"]),
-            ["n_workload"]
+            snapshot["snapshot"]["needs_breakdown"],
+            json!(["n_workload"])
         );
         let create = json!({ "proposal": "pr_workload", "destination": { "journey": JOURNEY },
             "draft": breakdown(revision, "Break the workload down"),
@@ -440,7 +443,7 @@ mod mcp_in_process {
         let apply = json!({ "proposal": "pr_workload", "reviewed_revision": 1,
             "patch_id": "p_apply_workload" });
         agent.ok("apply_proposal", apply).await;
-        let after = json!({ "journey": JOURNEY, "depth": 1 });
+        let after = json!({ "journey": JOURNEY });
         let after = agent.ok("get_snapshot", after).await;
         assert_eq!(
             after["snapshot"].get("needs_breakdown"),
@@ -635,15 +638,6 @@ mod mcp_in_process {
                     _ => None,
                 });
         answers.collect()
-    }
-
-    fn strings(list: &Value) -> Vec<String> {
-        list.as_array().map_or_else(Vec::new, |items| {
-            items
-                .iter()
-                .map(|v| v.as_str().unwrap().to_owned())
-                .collect()
-        })
     }
 
     fn keys(rows: &Value) -> Vec<String> {

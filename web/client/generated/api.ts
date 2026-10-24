@@ -611,7 +611,7 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** The bounded agent snapshot, scoped to a subtree and depth, its nodes paged. */
+        /** The bounded agent overview, scoped to a subtree; the nodes are `listNodes`. */
         get: operations["getJourneySnapshot"];
         put?: never;
         post?: never;
@@ -2293,7 +2293,7 @@ export interface components {
         FormatVersion: 1;
         /**
          * @description One entry of the snapshot's acting frontier: enough to say what is next; the node's row is
-         *     in the node list, or in `list_frontier` for a node outside the page or depth.
+         *     in `list_nodes`.
          */
         FrontierEntry: {
             /** @description Its ancestors, root first: the breadcrumb. */
@@ -3856,6 +3856,16 @@ export interface components {
         /** @description A node kind. */
         NodeKind: "decision" | "deliverable" | "action" | "milestone" | "group";
         /**
+         * @description An open decision named in the snapshot: its key and what it is asking, so the list says what
+         *     each is without a second read.
+         */
+        NodeRef: {
+            /** @description The node. */
+            key: components["schemas"]["NodeKey"];
+            /** @description Its title. */
+            title: components["schemas"]["Title"];
+        };
+        /**
          * @description One node as a row of the list, the next list, or the snapshot: what it is,
          *     where it sits, and its derived signals.
          */
@@ -5403,9 +5413,9 @@ export interface components {
         /** @description An id: lowercase letters, digits, '_' and '-', at most id_bytes_max (64) bytes. */
         Slug: string;
         /**
-         * @description The bounded agent view of a journey: answers, a page of in-scope nodes, the ranked
-         *     acting frontier's top N with the rest as keys, open decisions by rank, placeholders needing
-         *     breakdown, unassigned items, shortfalls, and counts, scoped to a subtree and depth.
+         * @description The bounded agent overview of a journey, with no node list (`list_nodes` lists the nodes):
+         *     answers, the ranked acting frontier's top N with the rest as keys, open decisions by rank, placeholders needing
+         *     breakdown, unassigned items, shortfalls, and counts, scoped to a subtree.
          */
         Snapshot: {
             /** @description The acting frontier's first `page_item_count_max` items, in rank order. */
@@ -5427,17 +5437,13 @@ export interface components {
             journey: components["schemas"]["SnapshotJourney"];
             /** @description Placeholders needing breakdown. */
             needs_breakdown?: components["schemas"]["NodeKey"][];
-            /** @description Where the next page of nodes starts, when there is one. */
-            next?: components["schemas"]["Cursor"] | null;
-            /** @description A page of in-scope nodes within the depth, in tree order. */
-            nodes: components["schemas"]["SnapshotNode"][];
             /** @description Open, in-scope decisions, in rank order. */
-            open_decisions?: components["schemas"]["NodeKey"][];
+            open_decisions?: components["schemas"]["NodeRef"][];
             /** @description The rationales those answers were given with, for the answers that have one. */
             rationales?: {
                 [key: string]: components["schemas"]["Markdown"];
             };
-            /** @description What it covers, when that is not the whole journey from its first page. */
+            /** @description What it covers, when that is not the whole journey. */
             scope?: components["schemas"]["SnapshotScope"];
             /** @description Nodes whose plan can no longer be met. */
             shortfalls?: components["schemas"]["NodeKey"][];
@@ -5446,7 +5452,7 @@ export interface components {
             /** @description Open, in-scope nodes no one owns. */
             unassigned?: components["schemas"]["NodeKey"][];
         };
-        /** @description What a snapshot counts in its subtree, whatever its depth and page. */
+        /** @description What a snapshot counts in its subtree. */
         SnapshotCounts: {
             /**
              * Format: uint32
@@ -5477,11 +5483,6 @@ export interface components {
             in_scope: number;
             /**
              * Format: uint32
-             * @description In-scope nodes within the depth: the node list across its pages.
-             */
-            listed: number;
-            /**
-             * Format: uint32
              * @description Not-relevant nodes.
              */
             not_relevant: number;
@@ -5500,97 +5501,8 @@ export interface components {
             /** @description Its status. */
             status: components["schemas"]["JourneyStatus"];
         };
-        /** @description One in-scope node in the snapshot, with its other participations and blocking. */
-        SnapshotNode: {
-            /** @description Whether work can be started on it now: relevant, not blocked, and not finished. */
-            actionable?: boolean;
-            /**
-             * @description Its ancestors, root first: the breadcrumb, on the frontier's rows (a snapshot's node
-             *     list carries `parent` instead).
-             */
-            ancestors?: components["schemas"]["NodeKey"][];
-            /**
-             * @description What blocks it itself (Gating, Blocked). A container's own children are not listed:
-             *     it waits on them by definition.
-             */
-            blocked_by?: components["schemas"]["Blocker"][];
-            /** @description The ancestors that block it, nearest first. */
-            blocked_through?: components["schemas"]["NodeKey"][];
-            /** @description How many checklist items are ticked; none for a node with no items. */
-            checklist_count?: components["schemas"]["ChecklistCount"] | null;
-            /** @description The state every surface shows for the node. */
-            display_state: components["schemas"]["DisplayState"];
-            /**
-             * Format: date
-             * @description The latest it can finish.
-             */
-            due?: string | null;
-            /**
-             * Format: date
-             * @description The earliest it can start, when that is after today.
-             */
-            earliest_start?: string | null;
-            /** @description Skipped through an ancestor. */
-            effectively_skipped?: boolean;
-            /** @description The node. */
-            key: components["schemas"]["NodeKey"];
-            /** @description Its kind. */
-            kind: components["schemas"]["NodeKind"];
-            /** @description Whether it is a placeholder that still needs to be broken down into children. */
-            needs_breakdown?: boolean;
-            /** @description Non-terminal with its due before today. */
-            overdue?: boolean;
-            /** @description Its owners. */
-            owners?: components["schemas"]["IdentityKey"][];
-            /** @description Its container, when it has one. */
-            parent?: components["schemas"]["NodeKey"] | null;
-            /** @description Its effective participations by kind, other than the owner's (that is `owners`). */
-            participations?: {
-                [key: string]: components["schemas"]["IdentityKey"][];
-            };
-            /** @description Its rank to three significant figures, for work still to do. */
-            rank?: components["schemas"]["Real"] | null;
-            /** @description Its relevance, when it is not relevant. */
-            relevance?: components["schemas"]["Relevance"];
-            /**
-             * Format: uint32
-             * @description Days the plan can no longer be met by.
-             */
-            shortfall_days?: number | null;
-            /**
-             * Format: int32
-             * @description Latest start minus today; none is no deadline, and none for settled work.
-             */
-            slack_days?: number | null;
-            /** @description A snooze that holds over the node: its own, else its container's. */
-            snoozed?: components["schemas"]["SnoozeTarget"] | null;
-            /** @description The container whose snooze holds over the node. */
-            snoozed_via?: components["schemas"]["NodeKey"] | null;
-            /** @description A terminal node whose completing guards would now fail. */
-            stale?: boolean;
-            /**
-             * @description Its stored state: what transitions act on. Prefer `display_state` for "what is its
-             *     status".
-             */
-            state: components["schemas"]["State"];
-            /** @description Its title. */
-            title: components["schemas"]["Title"];
-            /** @description No owner (on the frontier's rows; a snapshot lists these once, as `unassigned`). */
-            unassigned?: boolean;
-        };
-        /** @description Which part of the journey a snapshot covers and which page of its nodes. */
+        /** @description Which part of the journey a snapshot covers. */
         SnapshotScope: {
-            /**
-             * @description Where the node list's page starts.
-             * @default 0
-             */
-            cursor: components["schemas"]["Cursor"];
-            /**
-             * Format: uint32
-             * @description How many levels below the subtree's node (or of roots, at depth 1) the node list goes;
-             *     every level when none.
-             */
-            depth?: number | null;
             /** @description The subtree: this node and everything beneath it; the whole journey when none. */
             subtree?: components["schemas"]["NodeKey"] | null;
         };
@@ -8223,6 +8135,8 @@ export interface operations {
                 flag?: components["schemas"]["ListFlag"][];
                 /** @description Only nodes beneath this container. */
                 within?: components["schemas"]["NodeKey"];
+                /** @description How many levels below `within` (or of roots, at 1) the list goes; every level when none. */
+                depth?: number;
                 /** @description Only nodes this identity owns. */
                 owner?: components["schemas"]["IdentityKey"];
                 /** @description Only nodes in these stored states; any when none. */
@@ -9796,12 +9710,6 @@ export interface operations {
             query?: {
                 /** @description This node and everything beneath it; the whole journey when none. */
                 subtree?: components["schemas"]["NodeKey"];
-                /** @description How many levels below the subtree's node (or of roots, at 1) the node list goes; every level when none. */
-                depth?: number;
-                /** @description Where the page starts: the previous page's `next`. A cursor is a position in the order at one journey revision, so a cursor past the start needs `revision`. */
-                cursor?: components["schemas"]["Cursor"];
-                /** @description The journey revision the previous page was read at (its `revision`); needed with a cursor past the start. When the journey has moved since, the page is refused 409 `page_moved`: start again from the first page. */
-                revision?: components["schemas"]["Revision"];
             };
             header?: never;
             path: {
@@ -9850,15 +9758,6 @@ export interface operations {
             };
             /** @description No such resource. */
             404: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["Problem"];
-                };
-            };
-            /** @description The journey moved since the page the cursor came from: start again from the first page. */
-            409: {
                 headers: {
                     [name: string]: unknown;
                 };

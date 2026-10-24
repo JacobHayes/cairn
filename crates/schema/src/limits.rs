@@ -80,8 +80,8 @@ pub const REQUEST_DURATION_MAX: Duration = Duration::from_secs(5);
 pub const CHAIN_COUNT_PER_REJECTION_MAX: u32 = 16;
 /// Explanation entries per derived value in a server response; the rest is a total.
 pub const EXPLANATION_ENTRY_COUNT_MAX: u32 = 50;
-/// Items in one page of a projection an agent pages (the snapshot's acting frontier and node
-/// list, the list, history): the snapshot top-N and history page limit, the same value the
+/// Items in one page of a projection an agent pages (the snapshot's acting frontier, the node
+/// list, history): the snapshot top-N and history page limit, the same value the
 /// store pages its lists by. Callers page; the remainder is counts and keys.
 pub const PAGE_ITEM_COUNT_MAX: u32 = 200;
 

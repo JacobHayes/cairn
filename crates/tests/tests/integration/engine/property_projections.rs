@@ -422,35 +422,36 @@ mod property {
         }
     }
 
-    /// Every page of the snapshot from the start: each within the limit; together, the in-scope
-    /// nodes within the depth in tree order; the counts add up; the frontier is the next list's.
-    fn snapshot_holds(graph: &Graph, derived: &Derived, scope: &SnapshotScope) {
+    /// The snapshot: its frontier within the limit and the next list's, and the counts add up.
+    /// The node list within `scope`'s subtree and `depth`: every page within the limit; together
+    /// the nodes within the depth, each once.
+    fn snapshot_holds(graph: &Graph, derived: &Derived, scope: &SnapshotScope, depth: Option<u32>) {
         let journey = DerivedJourney::new(graph, derived);
         let limit = usize::try_from(PAGE_ITEM_COUNT_MAX).unwrap();
-        let mut scope = scope.clone();
-        let mut listed: Vec<NodeKey> = Vec::new();
         let first = journey
             .snapshot(
-                &scope,
+                scope,
                 &cairn_store::build::journey_header("j_plain", "Plain", None),
             )
             .unwrap();
+        assert!(first.acting_frontier.len() <= limit);
+        let top = first.scope.subtree.as_ref();
+        let mut query = ListQuery {
+            within: top.cloned(),
+            depth,
+            ..ListQuery::default()
+        };
+        let mut listed: Vec<NodeKey> = Vec::new();
         loop {
-            let page = journey
-                .snapshot(
-                    &scope,
-                    &cairn_store::build::journey_header("j_plain", "Plain", None),
-                )
-                .unwrap();
-            assert!(page.nodes.len() <= limit && page.acting_frontier.len() <= limit);
-            listed.extend(page.nodes.iter().map(|node| node.row.key.clone()));
+            let page = journey.list(&query, &BTreeSet::new()).unwrap();
+            assert!(page.rows.len() <= limit);
+            listed.extend(page.rows.iter().map(|row| row.key.clone()));
             match page.next {
-                Some(cursor) => scope.cursor = cursor,
+                Some(cursor) => query.cursor = cursor,
                 None => break,
             }
         }
         let tree = graph.tree();
-        let top = first.scope.subtree.as_ref();
         let depth_of = |key: &NodeKey| {
             let mut depth = 0_u32;
             let mut current = Some(key);
@@ -466,15 +467,13 @@ mod property {
             .as_map()
             .keys()
             .filter(|key| top.is_none_or(|top| *key == top || tree.is_ancestor(top, key)))
-            .filter(|key| derived.relevance().in_scope(key))
-            .filter(|key| first.scope.depth.is_none_or(|most| depth_of(key) <= most))
+            .filter(|key| depth.is_none_or(|most| depth_of(key) <= most))
             .cloned()
             .collect();
         let as_set = |keys: &[NodeKey]| keys.iter().cloned().collect::<BTreeSet<NodeKey>>();
         assert_eq!(as_set(&listed), as_set(&expected));
         assert_eq!(listed.len(), expected.len(), "each node once");
         let counts = &first.counts;
-        assert_eq!(counts.listed as usize, listed.len());
         assert_eq!(counts.by_state.values().sum::<u32>(), counts.in_scope);
         let shown = first.acting_frontier.len() + first.acting_frontier_rest.len();
         assert_eq!(counts.acting_frontier as usize, shown);
@@ -591,9 +590,9 @@ mod property {
             trace_holds(&graph, &derived, &traces);
         }
 
-        /// I3: the snapshot's pages, scoping, counts, and frontier.
+        /// I3, C9: the snapshot's scoping, counts, and frontier, and the node list's pages and depth.
         #[test]
-        fn snapshot_pages_are_bounded_complete_and_agree_with_next(
+        fn snapshot_agrees_with_next_and_the_node_list_pages_are_bounded_and_complete(
             graph in arb_journey(1..=300),
             subtree in prop::option::of(0_usize..300),
             depth in prop::option::of(0_u32..6),
@@ -602,10 +601,8 @@ mod property {
             let keys: Vec<&NodeKey> = graph.document().nodes.as_map().keys().collect();
             let scope = SnapshotScope {
                 subtree: subtree.map(|at| keys[at % keys.len()].clone()),
-                depth,
-                cursor: Cursor::START,
             };
-            snapshot_holds(&graph, &derived, &scope);
+            snapshot_holds(&graph, &derived, &scope, depth);
         }
 
         /// J4: history pages, followed from the start, are contiguous and complete: each

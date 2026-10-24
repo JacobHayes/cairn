@@ -156,7 +156,7 @@ pub struct History {
 }
 
 impl Service {
-    /// I3: the bounded agent snapshot, scoped to a subtree and depth, its node list paged.
+    /// I3: the bounded agent snapshot, scoped to a subtree.
     ///
     /// # Errors
     ///

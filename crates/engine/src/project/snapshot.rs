@@ -1,32 +1,26 @@
-//! I3, the snapshot: the bounded agent view of a journey, cut from the same derived journey as
-//! the domain document. Scoped to a subtree (the node and everything beneath it) and a depth
-//! (levels below the subtree's node, roots at depth 1 when there is none), which bounds the
-//! node list only; every other part covers the whole subtree. The node list is paged
-//! `page_item_count_max` at a time; the acting frontier's first `page_item_count_max` items are
-//! the next list's for the subtree (C10), and the rest are keys; the counts add up.
+//! I3, the snapshot: the bounded agent overview of a journey, cut from the same derived journey
+//! as the domain document. Scoped to a subtree (the node and everything beneath it). It lists no
+//! nodes (the node list does); the acting frontier's first `page_item_count_max` items are the
+//! next list's for the subtree (C10), and the rest are keys; the counts add up.
 //!
-//! Cost at `node_count_max`: one pass over the subtree in tree order, each node's depth by its
-//! ancestors (at most 16); a row per listed node on the page and per frontier item shown (at
-//! most 2 x 200), each node's blockers off its entry chains (about 1,300 edges each); the next
-//! list, O(nodes log nodes).
+//! Cost at `node_count_max`: one pass over the subtree in tree order, and an entry per frontier
+//! item shown (at most 200); the next list, O(nodes log nodes).
 
 use std::collections::{BTreeMap, BTreeSet};
 
 use cairn_schema::limits::PAGE_ITEM_COUNT_MAX;
 use cairn_schema::{
-    AgentRow, DependencyVia, DisplayState, FrontierEntry, IdentityKey, JourneyHeader, KindKey,
-    NextQuery, NodeKey, Relevance, Snapshot, SnapshotCounts, SnapshotJourney, SnapshotNode,
-    SnapshotScope, State,
+    DisplayState, FrontierEntry, IdentityKey, JourneyHeader, NextQuery, NodeKey, NodeRef,
+    Relevance, Snapshot, SnapshotCounts, SnapshotJourney, SnapshotScope, State,
 };
 
-use super::rows::{count, page};
+use super::rows::count;
 use super::{DerivedJourney, ProjectionError};
 
 impl DerivedJourney<'_> {
-    /// I3: the snapshot of the scope: answers in effect, a page of in-scope nodes with their
-    /// state, participations, dates, blocking, and priority, the ranked acting frontier's top N
-    /// with the rest as keys, open decisions by rank, placeholders needing breakdown,
-    /// unassigned items, shortfalls, the stalled diagnostic, and counts.
+    /// I3: the snapshot of the scope: answers in effect, the ranked acting frontier's top N with
+    /// the rest as keys, open decisions by rank, placeholders needing breakdown, unassigned
+    /// items, shortfalls, the stalled diagnostic, and counts.
     ///
     /// # Errors
     ///
@@ -51,8 +45,6 @@ impl DerivedJourney<'_> {
             .copied()
             .filter(|key| relevance.in_scope(key))
             .collect();
-        let listed = self.within_depth(&in_scope, subtree, scope.depth);
-        let (shown, next) = page(&listed, scope.cursor, PAGE_ITEM_COUNT_MAX);
         let query = NextQuery {
             within: subtree.cloned(),
             ..NextQuery::default()
@@ -87,17 +79,23 @@ impl DerivedJourney<'_> {
                 .iter()
                 .filter_map(|key| Some(((*key).clone(), self.rationale(key)?)))
                 .collect(),
-            nodes: shown.iter().map(|key| self.snapshot_node(key)).collect(),
-            next,
             acting_frontier: frontier.iter().take(limit).map(FrontierEntry::of).collect(),
             acting_frontier_rest: rest,
-            open_decisions: derived.ranking().sorted(&open_decisions),
+            open_decisions: derived
+                .ranking()
+                .sorted(&open_decisions)
+                .iter()
+                .map(|key| NodeRef {
+                    key: key.clone(),
+                    title: self.node(key).title.clone(),
+                })
+                .collect(),
             needs_breakdown: pick(&|key| blocking.needs_breakdown(key)),
             unassigned: pick(&|key| derived.is_unassigned(self.graph, key)),
             shortfalls: pick(&|key| derived.dates().shortfall_days(key).is_some()),
             stalled: blocking.stalled().cloned(),
             completion_suggested: self.completion_suggested(),
-            counts: self.counts(&scoped, &in_scope, listed.len(), frontier.len(), subtree),
+            counts: self.counts(&scoped, &in_scope, frontier.len(), subtree),
         })
     }
 
@@ -117,65 +115,11 @@ impl DerivedJourney<'_> {
         }
     }
 
-    /// The in-scope nodes no deeper than `depth` levels below the subtree's node (roots at
-    /// depth 1 when there is none).
-    fn within_depth(
-        &self,
-        in_scope: &[&NodeKey],
-        subtree: Option<&NodeKey>,
-        depth: Option<u32>,
-    ) -> Vec<NodeKey> {
-        let top = subtree.map_or(0, |top| self.ancestors(top).len() + 1);
-        in_scope
-            .iter()
-            .filter(|key| {
-                let below = self.ancestors(key).len() + 1 - top;
-                depth.is_none_or(|most| below <= most as usize)
-            })
-            .map(|key| (*key).clone())
-            .collect()
-    }
-
-    /// One node in the snapshot.
-    fn snapshot_node(&self, key: &NodeKey) -> SnapshotNode {
-        let derived = self.derived;
-        let kinds: Vec<KindKey> = self
-            .graph
-            .document()
-            .participation_kinds
-            .as_map()
-            .keys()
-            .cloned()
-            .collect();
-        let today = derived.today();
-        SnapshotNode {
-            row: AgentRow::in_snapshot(&self.row(key, derived.ranking())),
-            participations: kinds
-                .into_iter()
-                .filter_map(|kind| {
-                    let identities = derived.participation().identities(key, &kind);
-                    (!identities.is_empty()).then(|| (kind, identities.clone()))
-                })
-                .collect(),
-            blocked_by: derived
-                .blocked_by(key)
-                .into_iter()
-                .filter(|blocker| blocker.via != DependencyVia::Containment)
-                .collect(),
-            blocked_through: derived.blocked_through(self.graph, key),
-            earliest_start: derived
-                .dates()
-                .earliest_start(key)
-                .filter(|date| *date > today),
-        }
-    }
-
     /// I3: the scope's counts.
     fn counts(
         &self,
         scoped: &[&NodeKey],
         in_scope: &[&NodeKey],
-        listed: usize,
         acting: usize,
         subtree: Option<&NodeKey>,
     ) -> SnapshotCounts {
@@ -205,7 +149,6 @@ impl DerivedJourney<'_> {
             ),
             by_state,
             by_display_state,
-            listed: count(listed),
             frontier: count(frontier),
             acting_frontier: count(acting),
         }

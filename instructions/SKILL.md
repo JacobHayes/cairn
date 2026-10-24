@@ -16,14 +16,15 @@ capabilities; every write records you and that user.
 
 ## The loop
 
-1. **Read state first.** Call `get_snapshot` before anything else on a journey. It answers
-   the answers in effect, a page of in-scope nodes, the ranked acting frontier, open
-   decisions by rank, placeholders needing breakdown, unassigned items, shortfalls, and
-   counts. Scope it with `subtree` and `depth` on a large journey. It says when completing
-   the journey is suggested; completing it is the person's call.
-2. **Look closer only where needed.** `list_frontier` pages the ranked frontier or, with
-   `filters`, the nodes that need something (`decisions_needed`, `blocked`, `stale`, and
-   the others its schema lists). `get_node` explains one node: why it is relevant or
+1. **Read state first.** Call `get_snapshot` before anything else on a journey. It is an
+   overview with no node list: the answers in effect, counts, the top of the ranked acting
+   frontier, open decisions by rank, placeholders needing breakdown, unassigned items, and
+   shortfalls. Scope it with `subtree` on a large journey. It says when completing the
+   journey is suggested; completing it is the person's call.
+2. **Look closer only where needed.** `list_nodes` pages nodes in rank order: every node,
+   or with `filters` those that need something (`next_up` is the acting frontier,
+   `decisions_needed`, `blocked`, `stale`, and the others its schema lists). Scope it with
+   `within` and `depth`. `get_node` explains one node: why it is relevant or
    blocked, its dates, and why it ranks where it does. `get_level` shows the graph at one
    level of containment.
 3. **Write in small, named steps**, by the rules below.
@@ -266,7 +267,7 @@ Each workflow is also served as an MCP prompt by its name.
 
 | Need | Tools |
 |---|---|
-| Where things stand | `get_snapshot`, `list_frontier`, `get_node`, `get_level`, `get_history` |
+| Where things stand | `get_snapshot`, `list_nodes`, `get_node`, `get_level`, `get_history` |
 | Find things | `list_identities`, `list_journeys`, `list_routes`, `list_proposals`, `get_route`, `search` |
 | Change state | `answer_decision`, `transition_node`, `assign`, `set_date`, `snooze`, `unsnooze`, `override`, `resolve_date_conflict` |
 | Change structure | `create_proposal`, `list_proposals`, `get_proposal`, `edit_proposal`, `apply_proposal`, `apply_patch` |

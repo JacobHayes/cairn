@@ -256,7 +256,7 @@ pub static DOCUMENT: Endpoint = endpoint(
     "/api/journeys/{id}/document",
     "getJourneyDocument",
 );
-/// `GET /api/journeys/{id}/snapshot`: the bounded agent snapshot, scoped and paged (I3).
+/// `GET /api/journeys/{id}/snapshot`: the bounded agent overview, scoped to a subtree (I3).
 pub static SNAPSHOT: Endpoint = endpoint(
     Method::GET,
     "/api/journeys/{id}/snapshot",

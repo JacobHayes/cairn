@@ -111,7 +111,7 @@ async fn arguments_are_refused_by_path() {
     let cases = [
         (json!({ "journey": 5 }), "journey"),
         (json!({ "journey": "j_x", "colour": "blue" }), "colour"),
-        (json!({ "journey": "j_x", "depth": "deep" }), "depth"),
+        (json!({ "journey": "j_x", "subtree": 5 }), "subtree"),
         (json!({}), ""),
     ];
     for (arguments, path) in cases {
@@ -141,15 +141,15 @@ async fn the_frontier_is_paged_at_the_limit() {
     let count = PAGE_ITEM_COUNT_MAX + 25;
     many_actions(&world, count).await;
 
-    let first = json!({ "journey": "j_many" });
-    let first = world.ok(&ann, "list_frontier", first).await;
+    let first = json!({ "journey": "j_many", "filters": ["next_up"] });
+    let first = world.ok(&ann, "list_nodes", first).await;
     let first_keys = keys(&first["items"]);
     assert_eq!(first_keys.len(), PAGE_ITEM_COUNT_MAX as usize);
     assert_eq!(first["total"], count);
     let next = first["next"].clone();
     assert_eq!(next, PAGE_ITEM_COUNT_MAX);
-    let rest = json!({ "journey": "j_many", "cursor": next });
-    let rest = world.ok(&ann, "list_frontier", rest).await;
+    let rest = json!({ "journey": "j_many", "filters": ["next_up"], "cursor": next });
+    let rest = world.ok(&ann, "list_nodes", rest).await;
     assert_eq!(rest.get("next"), None, "the last page has no next");
 
     let mut paged = first_keys;
@@ -208,15 +208,10 @@ async fn get_node_leaves_out_only_what_the_rest_of_the_answer_says() {
         now: "2026-10-01T14:00:00Z".parse().unwrap(),
     };
     let journey: cairn_schema::JourneyId = "j_vendor_eval".parse().unwrap();
-    let snapshot = world
-        .ok(&ann, "get_snapshot", json!({ "journey": "j_vendor_eval" }))
+    let listed = world
+        .ok(&ann, "list_nodes", json!({ "journey": "j_vendor_eval" }))
         .await;
-    let nodes: Vec<String> = snapshot["snapshot"]["nodes"]
-        .as_array()
-        .unwrap()
-        .iter()
-        .map(|node| node["key"].as_str().unwrap().to_owned())
-        .collect();
+    let nodes = keys(&listed["items"]);
     assert_ne!(nodes, [] as [std::string::String; 0]);
     let (mut shared, mut kept) = (0, 0);
     for key in nodes {
@@ -286,7 +281,7 @@ fn latest_start_left_out(key: &str, lean: &Value, dates: &cairn_schema::NodeDate
 }
 
 /// I3, C8: the snapshot answers the revision a write names as its base, and with `filters` the
-/// frontier tool lists what they hold for, each an open decision the snapshot names; `get_node`
+/// node list lists what they hold for, each an open decision the snapshot names; `get_node`
 /// carries the still-waiting list and pages the same list under `still_waiting`.
 #[tokio::test]
 async fn the_snapshot_and_its_lists_agree() {
@@ -296,13 +291,26 @@ async fn the_snapshot_and_its_lists_agree() {
     let snapshot = json!({ "journey": "j_vendor_eval" });
     let snapshot = world.ok(&ann, "get_snapshot", snapshot).await;
     assert_eq!(snapshot["revision"], 1);
-    let open = snapshot["snapshot"]["open_decisions"].as_array().unwrap();
+    let open = keys(&snapshot["snapshot"]["open_decisions"]);
     let needed = json!({ "journey": "j_vendor_eval", "filters": ["decisions_needed"] });
-    let needed = world.ok(&ann, "list_frontier", needed).await;
+    let needed = world.ok(&ann, "list_nodes", needed).await;
     assert_ne!(needed["total"], 0);
     for key in keys(&needed["items"]) {
-        assert!(open.contains(&json!(key)), "{key} is open");
+        assert!(open.contains(&key), "{key} is open");
     }
+    let everything = json!({ "journey": "j_vendor_eval" });
+    let everything = world.ok(&ann, "list_nodes", everything).await;
+    let roots = json!({ "journey": "j_vendor_eval", "depth": 1 });
+    let roots = world.ok(&ann, "list_nodes", roots).await;
+    assert!(roots["total"].as_u64() < everything["total"].as_u64());
+    assert!(
+        roots["items"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .all(|row| row.get("ancestors").is_none()),
+        "depth 1 lists only the roots"
+    );
     let node = json!({ "journey": "j_vendor_eval", "node": "n_purpose" });
     let node = world.ok(&ann, "get_node", node).await;
     assert_eq!(node["detail"]["node"]["answer_type"], "single_choice");
@@ -392,7 +400,7 @@ fn keys(rows: &Value) -> Vec<String> {
 }
 
 /// A row an agent reads is held to its size on each fixture journey that starts from a route:
-/// the bytes of the node rows a snapshot lists, over their count, as compact JSON.
+/// the bytes of the rows `list_nodes` lists, over their count, as compact JSON.
 #[tokio::test]
 async fn node_rows_stay_within_their_budget_on_every_fixture_journey() {
     let mut measured = 0;
@@ -409,10 +417,10 @@ async fn node_rows_stay_within_their_budget_on_every_fixture_journey() {
         let world = World::new();
         let ann = user("u_ann");
         let journey = world.fixture_after(&ann, fixture, None).await;
-        let snapshot = world
-            .ok(&ann, "get_snapshot", json!({ "journey": journey }))
+        let listed = world
+            .ok(&ann, "list_nodes", json!({ "journey": journey }))
             .await;
-        let rows = snapshot["snapshot"]["nodes"].as_array().unwrap();
+        let rows = listed["items"].as_array().unwrap();
         assert_ne!(rows.len(), 0, "{fixture} lists nodes");
         measured += 1;
         let bytes: usize = rows

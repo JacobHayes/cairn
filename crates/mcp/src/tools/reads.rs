@@ -408,7 +408,7 @@ struct Review {
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     violations: Vec<Violation>,
     /// For a journey, the start of its frontier after, in rank order; once it is applied,
-    /// `list_frontier` pages the whole of it.
+    /// `list_nodes` pages the whole of it.
     frontier: Cut<NodeKey>,
     // PRD: D7.
     /// What it would cause, by journey.

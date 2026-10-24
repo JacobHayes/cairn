@@ -1,5 +1,5 @@
 ---
-description: Summarize where a journey stands and what to do next, from its snapshot and ranked frontier.
+description: Summarize where a journey stands and what to do next, from its snapshot and node lists.
 ---
 
 # Summarize the frontier
@@ -11,11 +11,11 @@ description: Summarize where a journey stands and what to do next, from its snap
    rank, blocking, and dates when the person asks why.
 3. **Then what needs attention.** Open decisions that block work; placeholders that need
    breakdown; unassigned items; shortfalls (plans that can no longer be met); overdue and
-   stale items (`list_frontier` with the matching `filters`).
+   stale items (`list_nodes` with the matching `filters`).
 4. **When nothing can move.** If the snapshot is `stalled`, say what it waits on: a date, a
    snooze, or a blocker outside the journey. A container's snooze is named once, however
    many nodes it holds (their `snoozed_via` says which); offer to unsnooze that container.
-5. **For one person.** `list_frontier` with `mine` (and `for_viewer` to rank for them)
+5. **For one person.** `list_nodes` with `filters` `["mine", "next_up"]`
    gives their own next steps.
 
 Keep it short: what is next, what is stuck, and what needs a person's call.

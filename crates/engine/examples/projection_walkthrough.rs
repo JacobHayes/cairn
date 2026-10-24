@@ -475,7 +475,7 @@ fn agent_snapshot(vendor: &Fixture, out: &mut String) -> Result<()> {
     writeln!(
         out,
         "- open decisions by rank: {}",
-        codes(&snapshot.open_decisions)
+        codes(snapshot.open_decisions.iter().map(|each| &each.key))
     )?;
     writeln!(
         out,
@@ -484,11 +484,7 @@ fn agent_snapshot(vendor: &Fixture, out: &mut String) -> Result<()> {
         codes(&snapshot.unassigned),
         codes(&snapshot.shortfalls)
     )?;
-    writeln!(
-        out,
-        "- nodes listed on this page: {}\n",
-        snapshot.nodes.len()
-    )?;
+    writeln!(out)?;
     writeln!(
         out,
         "```json\n{}```\n",
@@ -497,17 +493,12 @@ fn agent_snapshot(vendor: &Fixture, out: &mut String) -> Result<()> {
     let setup = journey.snapshot(
         &SnapshotScope {
             subtree: Some("n_setup".parse()?),
-            depth: Some(1),
-            cursor: Cursor::START,
         },
         header,
     )?;
-    let listed: Vec<&NodeKey> = setup.nodes.iter().map(|node| &node.row.key).collect();
     writeln!(
         out,
-        "Scoped to Setup at depth 1: nodes {} ({} listed of {} in scope).\n",
-        codes(listed),
-        setup.counts.listed,
+        "Scoped to Setup: {} in scope.\n",
         setup.counts.in_scope
     )?;
     Ok(())

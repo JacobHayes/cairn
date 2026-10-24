@@ -95,7 +95,8 @@ impl<'a> DerivedJourney<'a> {
         })
     }
 
-    /// C9: the nodes every filter holds for, sorted by one signal, a page at a time.
+    /// C9: the nodes every filter holds for, within a subtree and depth, sorted by one signal, a
+    /// page at a time.
     ///
     /// # Errors
     ///
@@ -122,6 +123,7 @@ impl<'a> DerivedJourney<'a> {
             .as_map()
             .keys()
             .filter(|key| self.within(key, query.within.as_ref()))
+            .filter(|key| self.within_depth(key, query.within.as_ref(), query.depth))
             .filter(|key| matcher.holds(key))
             .filter(|key| query.states.is_empty() || query.states.contains(&self.state(key)))
             .filter(|key| {
@@ -207,6 +209,13 @@ impl<'a> DerivedJourney<'a> {
     /// The node is `within` or beneath it; any node when none.
     fn within(&self, key: &NodeKey, within: Option<&NodeKey>) -> bool {
         within.is_none_or(|top| top == key || self.graph.tree().is_ancestor(top, key))
+    }
+
+    /// The node is no deeper than `depth` levels below `within` (below the roots, at 1, when
+    /// none); at any depth when none is given.
+    fn within_depth(&self, key: &NodeKey, within: Option<&NodeKey>, depth: Option<u32>) -> bool {
+        let top = within.map_or(0, |top| self.ancestors(top).len() + 1);
+        depth.is_none_or(|most| self.ancestors(key).len() + 1 - top <= most as usize)
     }
 
     /// C9: one filter.

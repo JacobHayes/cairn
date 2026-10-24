@@ -124,7 +124,7 @@ const COVERAGE: &[(&str, &[&str])] = &[
     ("get the graph at an aggregation level", &["get_level"]),
     (
         "get the ranked frontier, decisions needed, needs breakdown, unassigned, active, blocked, stale, overdue, shortfall, and \"mine\"",
-        &["list_frontier", "get_snapshot"],
+        &["list_nodes", "get_snapshot"],
     ),
     (
         "get node detail with priority and date explanations",

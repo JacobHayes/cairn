@@ -133,7 +133,7 @@ mod cost {
                 &cairn_store::build::journey_header("j_plain", "Plain", None),
             )
             .unwrap();
-        assert!(snapshot.nodes.len() <= page && snapshot.acting_frontier.len() <= page);
+        assert!(snapshot.acting_frontier.len() <= page);
         let list = journey
             .list(&ListQuery::default(), &BTreeSet::new())
             .unwrap();

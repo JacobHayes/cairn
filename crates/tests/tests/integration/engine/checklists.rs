@@ -10,9 +10,8 @@ use std::collections::BTreeSet;
 
 use cairn_engine::{Applied, DerivedJourney, Records};
 use cairn_schema::{
-    ChecklistCount, Domain, GraphKey, Guard, GuardFailure, Lineage, RecordKey, Rejection,
-    ReviewItem, RouteFile, SequentialKeys, SnapshotScope, Violation, ViolationCode, Write,
-    from_yaml,
+    ChecklistCount, Domain, GraphKey, Guard, GuardFailure, Lineage, ListQuery, RecordKey,
+    Rejection, ReviewItem, RouteFile, SequentialKeys, Violation, ViolationCode, Write, from_yaml,
 };
 use support::key;
 
@@ -102,25 +101,20 @@ fn stale(records: &Records) -> BTreeSet<GuardFailure> {
     support::derived(records, LAUNCH).stale(&graph, &key(HARDENING))
 }
 
-/// The count on the node's derived values and on its row in the snapshot, which must agree.
+/// The count on the node's derived values and on its row in the node list, which must agree.
 fn count(records: &Records) -> Option<ChecklistCount> {
     let graph = support::journey_graph(records, LAUNCH);
     let derived = support::derived(records, LAUNCH);
     let on_node = derived
         .node_derived(&graph, &key(HARDENING))
         .checklist_count;
-    let snapshot = DerivedJourney::new(&graph, &derived)
-        .snapshot(
-            &SnapshotScope::default(),
-            &support::journey_header(records, LAUNCH),
-        )
-        .unwrap();
-    let on_row = snapshot
-        .nodes
-        .iter()
-        .find(|row| row.row.key == key(HARDENING))
+    let on_row = DerivedJourney::new(&graph, &derived)
+        .list(&ListQuery::default(), &BTreeSet::new())
         .unwrap()
-        .row
+        .rows
+        .into_iter()
+        .find(|row| row.key == key(HARDENING))
+        .unwrap()
         .checklist_count;
     assert_eq!(on_node, on_row);
     on_node
