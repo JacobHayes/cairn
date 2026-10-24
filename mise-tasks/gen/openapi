@@ -6,10 +6,11 @@
 # one generator writes both, in that order; the engine then writes rules.ts, the limits and
 # transition tables the app reads. openapi-typescript is a devDependency of
 # web/client, installed by the packages task.
-generator=node_modules/.bin/openapi-typescript
+# Run through npm exec in web/client, which finds the binary wherever npm placed it.
+generator=(npm exec --no-install --workspace web/client -- openapi-typescript)
 rm -rf openapi web/client/generated
 mkdir -p openapi web/client/generated
 scripts/timed build cargo build --locked --quiet -p cairn-api --bin cairn-openapi --bin cairn-rules
 cargo run --locked --quiet -p cairn-api --bin cairn-openapi -- openapi/cairn.json
-"$generator" openapi/cairn.json -o web/client/generated/api.ts --silent
+"${generator[@]}" "$PWD/openapi/cairn.json" -o "$PWD/web/client/generated/api.ts" --silent
 cargo run --locked --quiet -p cairn-api --bin cairn-rules -- web/client/generated/rules.ts

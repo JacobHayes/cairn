@@ -483,7 +483,6 @@ dependencies = [
  "cairn-store",
  "chrono",
  "cookie",
- "ed25519-dalek 3.0.0",
  "getrandom 0.4.3",
  "http-body-util",
  "hyper",
@@ -491,13 +490,11 @@ dependencies = [
  "ipnet",
  "jiff",
  "openidconnect",
- "p256 0.14.0",
  "serde",
  "serde_json",
  "sha2 0.11.1",
  "subtle",
  "tokio",
- "tower",
  "url",
 ]
 
