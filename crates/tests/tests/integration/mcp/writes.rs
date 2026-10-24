@@ -301,7 +301,7 @@ async fn an_agent_write_records_the_agent_and_its_user() {
     let history = json!({ "journey": "j_vendor_eval", "node": "n_kickoff" });
     let history = world.ok(&ann, "get_history", history).await;
     let patches = history["patches"].as_array().unwrap();
-    let last = &patches.last().unwrap()["events"][0];
+    let last = patches.last().unwrap();
     assert_eq!(
         last["actor"],
         json!({ "user": "u_ann", "agent": "ag_helper" })

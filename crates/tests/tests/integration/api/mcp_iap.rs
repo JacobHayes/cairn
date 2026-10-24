@@ -398,7 +398,7 @@ mod mcp_in_process {
         let history = agent
             .ok("get_history", json!({ "journey": "j_blank" }))
             .await;
-        let first_actor = history["patches"][0]["events"][0]["actor"].clone();
+        let first_actor = history["patches"][0]["actor"].clone();
         let actor = &first_actor;
         assert!(actor.get("agent").is_none_or(Value::is_null), "{actor}");
         let user = actor["user"].as_str().unwrap().parse().unwrap();
@@ -438,7 +438,7 @@ mod mcp_in_process {
             .await;
         let patches = history["patches"].as_array().unwrap();
         assert_eq!(patches.len(), 2, "the fresh patch is in the history");
-        let actor = &patches[1]["events"][0]["actor"];
+        let actor = &patches[1]["actor"];
         assert_eq!(
             actor["user"], first_actor["user"],
             "the same person, after a refresh"

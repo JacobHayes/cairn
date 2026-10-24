@@ -27,8 +27,8 @@ fn bakeoff() -> Target {
     Target::Journey(BAKEOFF.parse().unwrap())
 }
 
-/// The events of the journey's last patch, from its history.
-async fn last_events(world: &World, journey: &str) -> Vec<Value> {
+/// The journey's last patch, from its history.
+async fn last_patch(world: &World, journey: &str) -> Value {
     let history = world
         .ok(
             &user("u_reader"),
@@ -37,10 +37,7 @@ async fn last_events(world: &World, journey: &str) -> Vec<Value> {
         )
         .await;
     let patches = history["patches"].as_array().unwrap();
-    patches.last().unwrap()["events"]
-        .as_array()
-        .unwrap()
-        .clone()
+    patches.last().unwrap().clone()
 }
 
 /// The PRD's success criterion with no route (I5, I7, H2): the owner starts an empty
@@ -95,7 +92,9 @@ async fn an_empty_journey_is_structured_through_a_proposal_the_user_applies() {
         !open.is_empty(),
         "the structure's decisions are open: {snapshot}"
     );
-    let events = last_events(&world, BAKEOFF).await;
+    let patch = last_patch(&world, BAKEOFF).await;
+    let events = patch["events"].as_array().unwrap();
+    assert_ne!(events.as_slice(), [] as [Value; 0]);
     assert!(
         events
             .iter()
@@ -184,13 +183,11 @@ async fn a_direct_state_change_is_reported_with_its_consequences() {
     ];
     let overdue: Vec<&str> = overdue.into_iter().map(NodeKey::as_str).collect();
     assert_eq!(overdue, expected);
-    let events = last_events(&world, "j_vendor_eval").await;
-    for event in events {
-        assert_eq!(
-            event["actor"],
-            json!({ "user": "u_lead", "agent": "ag_assistant" })
-        );
-    }
+    let patch = last_patch(&world, "j_vendor_eval").await;
+    assert_eq!(
+        patch["actor"],
+        json!({ "user": "u_lead", "agent": "ag_assistant" })
+    );
 }
 
 /// I5: a bulk request past ten nodes, asked in conversation, is one proposal.

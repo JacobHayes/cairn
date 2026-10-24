@@ -7,10 +7,10 @@ use std::collections::{BTreeMap, BTreeSet};
 
 use cairn_schema::{
     AgentRow, Annotation, AnswerEffects, AnswerValue, Cursor, Date, DisplayState, ExplainedField,
-    ExplanationPage, JourneyId, KeyRefs, Level, LevelDateLink, LevelDisplay, LevelEdge, LevelNode,
-    LevelQuery, ListFlag, ListQuery, LocalEdit, Markdown, Next, NextQuery, Node, NodeDerived,
-    NodeKey, NodeKind, NodeState, Overrides, Path, RemovalRead, Snapshot, SnapshotScope, SortBy,
-    Stalled, StillWaiting,
+    ExplanationPage, JourneyId, KeyRefs, Level, LevelDateLink, LevelDisplay, LevelNode, LevelQuery,
+    ListFlag, ListQuery, LocalEdit, Markdown, Next, NextQuery, Node, NodeDerived, NodeKey,
+    NodeKind, NodeState, Overrides, Path, RemovalRead, Snapshot, SnapshotScope, SortBy, Stalled,
+    StillWaiting,
 };
 use cairn_service::{Call, ChildEntry, NodeDetail};
 use schemars::JsonSchema;
@@ -133,7 +133,7 @@ pub(crate) struct LevelOutput {
     /// A page of the visible nodes, in tree order, with their roll-ups.
     nodes: Paged<LevelNode>,
     /// The level's edges with an end among this page's nodes.
-    edges: Vec<LevelEdge>,
+    edges: Vec<Edge>,
     // PRD: C1.
     /// The level's date relationships (not edges: nothing waits on them) with an end among
     /// this page's nodes.
@@ -144,6 +144,20 @@ pub(crate) struct LevelOutput {
     /// class is shown.
     #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
     hidden_by_class: BTreeMap<LevelDisplay, u32>,
+}
+
+/// An edge drawn at a level, between the nearest visible stand-ins of its ends; the edges it
+/// stands for are left to the canvas.
+#[derive(Debug, Serialize, JsonSchema)]
+struct Edge {
+    /// The stand-in of the requirement side.
+    from: NodeKey,
+    /// The stand-in of the dependent side.
+    to: NodeKey,
+    // PRD: C1.
+    /// Every underlying edge is implicit (drawn dotted).
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    implicit: bool,
 }
 
 // PRD: C8.
@@ -430,6 +444,11 @@ impl ToolSet {
             let edges = edges
                 .into_iter()
                 .filter(|edge| on_page.contains(&edge.from) || on_page.contains(&edge.to))
+                .map(|edge| Edge {
+                    from: edge.from,
+                    to: edge.to,
+                    implicit: edge.implicit,
+                })
                 .collect();
             let date_links = date_links
                 .into_iter()

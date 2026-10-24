@@ -4,11 +4,11 @@
 use std::collections::{BTreeMap, BTreeSet};
 
 use cairn_schema::{
-    AgentId, AttachmentKey, Consequences, Cursor, Domain, Identity, IdentityKey, JourneyId,
-    JourneyStatus, KeyRefs, Lineage, Node, NodeKey, Notice, ParticipationKind, PatchEvents,
-    Proposal, ProposalId, ProposalPreview, Revision, RevisionConflict, Role, RoleKey, RouteHeader,
-    RouteId, RouteKind, Timestamp, Title, TouchedSet, UnresolvedItem, UserId, VersionNumber,
-    Violation, to_yaml,
+    Actor, AgentId, AttachmentKey, Consequences, Cursor, Domain, EventType, Identity, IdentityKey,
+    JourneyId, JourneyStatus, KeyRefs, Lineage, Markdown, Node, NodeKey, Notice, ParticipationKind,
+    PatchEvents, PatchId, Proposal, ProposalId, ProposalPreview, Revision, RevisionConflict, Role,
+    RoleKey, RouteHeader, RouteId, RouteKind, Subject, Timestamp, Title, TouchedSet,
+    UnresolvedItem, UserId, VersionNumber, Violation, Write, to_yaml,
 };
 use cairn_service::{Call, ProposalListing, ProposalReview, StaleBase};
 use cairn_store::{JourneyQuery, PageSize, ProposalCursor, SearchHit, SearchQuery};
@@ -492,40 +492,58 @@ struct Found {
     journey: JourneyId,
     name: Title,
     /// Where the text was found, the first of them; narrower text finds the rest.
-    hits: Cut<Hit>,
+    hits: Hits,
 }
 
-/// Where the text was found.
-#[derive(Debug, Serialize, JsonSchema)]
-#[serde(rename_all = "snake_case")]
-enum Hit {
-    JourneyName,
-    JourneyDescription,
-    NodeTitle {
-        node: NodeKey,
-    },
-    NodeDescription {
-        node: NodeKey,
-    },
-    Annotation {
-        annotation: AttachmentKey,
-    },
-    Resource {
-        node: NodeKey,
-        resource: AttachmentKey,
-    },
+/// Where the text was found, grouped by where: a flag for the journey's own name and
+/// description, the nodes whose title or description matched, the notes by their key, and the
+/// resources with the node they belong to.
+#[derive(Debug, Default, PartialEq, Eq, Serialize, JsonSchema)]
+struct Hits {
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    journey_name: bool,
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    journey_description: bool,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    node_title: Vec<NodeKey>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    node_description: Vec<NodeKey>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    annotation: Vec<AttachmentKey>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    resource: Vec<ResourceHit>,
+    /// How many places the text was found in all.
+    total: u32,
 }
 
-impl From<SearchHit> for Hit {
-    fn from(hit: SearchHit) -> Self {
-        match hit {
-            SearchHit::JourneyName => Hit::JourneyName,
-            SearchHit::JourneyDescription => Hit::JourneyDescription,
-            SearchHit::NodeTitle(node) => Hit::NodeTitle { node },
-            SearchHit::NodeDescription(node) => Hit::NodeDescription { node },
-            SearchHit::Annotation(annotation) => Hit::Annotation { annotation },
-            SearchHit::Resource { node, resource } => Hit::Resource { node, resource },
+/// A resource that matched, with the node it is on.
+#[derive(Debug, PartialEq, Eq, Serialize, JsonSchema)]
+struct ResourceHit {
+    node: NodeKey,
+    resource: AttachmentKey,
+}
+
+impl Hits {
+    /// The first page of `hits`, grouped by where each was found.
+    fn of(hits: BTreeSet<SearchHit>) -> Self {
+        let Cut { items, total } = Cut::of(hits.into_iter().collect());
+        let mut grouped = Self {
+            total,
+            ..Self::default()
+        };
+        for hit in items {
+            match hit {
+                SearchHit::JourneyName => grouped.journey_name = true,
+                SearchHit::JourneyDescription => grouped.journey_description = true,
+                SearchHit::NodeTitle(node) => grouped.node_title.push(node),
+                SearchHit::NodeDescription(node) => grouped.node_description.push(node),
+                SearchHit::Annotation(annotation) => grouped.annotation.push(annotation),
+                SearchHit::Resource { node, resource } => {
+                    grouped.resource.push(ResourceHit { node, resource });
+                }
+            }
         }
+        grouped
     }
 }
 
@@ -538,15 +556,82 @@ pub(crate) struct GetHistory {
     node: Option<NodeKey>,
     #[serde(default)]
     after: Option<u64>,
+    /// Also each event's stored changes.
+    #[serde(default)]
+    deltas: bool,
 }
 
 /// A page of history.
 #[derive(Debug, Serialize, JsonSchema)]
 struct HistoryOutput {
     /// At most `page_item_count_max` events, grouped by patch, in log order.
-    patches: Vec<PatchEvents>,
+    patches: Vec<PatchSummary>,
     #[serde(skip_serializing_if = "Option::is_none")]
     next: Option<u64>,
+}
+
+/// One patch: who made it, when, and its events on this page.
+#[derive(Debug, Serialize, JsonSchema)]
+struct PatchSummary {
+    patch_id: PatchId,
+    /// Who made it.
+    actor: Actor,
+    /// When it was committed.
+    at: Timestamp,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    note: Option<Markdown>,
+    events: Vec<EventSummary>,
+}
+
+/// One event: its type and what it is about; the stored changes only on request.
+#[derive(Debug, Serialize, JsonSchema)]
+struct EventSummary {
+    #[serde(rename = "type")]
+    event_type: EventType,
+    subject: Subject,
+    /// Who made it, when that is not the patch's actor: applying a proposal in a patch with
+    /// direct changes is the proposal's author's.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    actor: Option<Actor>,
+    /// Who confirmed it, when a proposal was applied.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    confirming_user: Option<UserId>,
+    /// What it wrote, as after-state; only with `deltas`.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    delta: Option<Vec<Write>>,
+}
+
+impl PatchSummary {
+    // PRD: J4, H2.
+    /// The patch's facts once (its first event's actor, time and note), each event reduced to
+    /// its type and subject, and to its own actor where that differs, and the user who
+    /// confirmed it. A patch groups events, so it has at least one.
+    fn of(patch: PatchEvents, deltas: bool) -> Self {
+        let PatchEvents { patch_id, events } = patch;
+        assert!(!events.is_empty(), "a patch in a history has events");
+        let (actor, at, note) = (
+            events[0].actor.clone(),
+            events[0].at,
+            events[0].note.clone(),
+        );
+        let events = events
+            .into_iter()
+            .map(|event| EventSummary {
+                event_type: event.event_type,
+                subject: event.subject,
+                actor: (event.actor != actor).then_some(event.actor),
+                confirming_user: event.confirming_user,
+                delta: deltas.then_some(event.delta),
+            })
+            .collect();
+        Self {
+            patch_id,
+            actor,
+            at,
+            note,
+            events,
+        }
+    }
 }
 
 impl ToolSet {
@@ -779,7 +864,7 @@ impl ToolSet {
         let journeys = page.items.into_iter().map(|matches| Found {
             journey: matches.journey,
             name: matches.name,
-            hits: Cut::of(matches.hits.into_iter().map(Hit::from).collect()),
+            hits: Hits::of(matches.hits),
         });
         Ok(SearchOutput {
             journeys: journeys.collect(),
@@ -794,7 +879,11 @@ impl ToolSet {
             .history(&arguments.journey, node, arguments.after)
             .await?;
         Ok(HistoryOutput {
-            patches: history.patches,
+            patches: history
+                .patches
+                .into_iter()
+                .map(|patch| PatchSummary::of(patch, arguments.deltas))
+                .collect(),
             next: history.next,
         })
     }

@@ -446,7 +446,7 @@ mod mcp_in_process {
         agent.ok("transition_node", complete).await;
         let history = json!({ "journey": JOURNEY, "node": "n_kickoff" });
         let history = agent.ok("get_history", history).await;
-        let actor = &history["patches"].as_array().unwrap().last().unwrap()["events"][0]["actor"];
+        let actor = &history["patches"].as_array().unwrap().last().unwrap()["actor"];
         assert_eq!(actor["agent"], json!(minted.agent));
         let user: Value = support::get(&ann, "/api/users/me").await;
         assert_eq!(actor["user"], user["user"]);

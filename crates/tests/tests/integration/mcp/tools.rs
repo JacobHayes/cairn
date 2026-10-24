@@ -235,6 +235,12 @@ async fn the_snapshot_and_its_lists_agree() {
         .ok(&ann, "get_level", json!({ "journey": "j_vendor_eval" }))
         .await;
     assert!(plain.get("date_links").is_none());
+    let edges = plain["edges"].as_array().unwrap();
+    assert_ne!(edges.as_slice(), [] as [Value; 0]);
+    assert!(
+        edges.iter().all(|edge| edge.get("underlying").is_none()),
+        "an agent reads the edge between cards, not the edges it collapses"
+    );
     let selected = json!({ "journey": "j_vendor_eval", "selected": "n_final_review" });
     let selected = world.ok(&ann, "get_level", selected).await;
     let links = selected["date_links"].as_array().expect("date links");
