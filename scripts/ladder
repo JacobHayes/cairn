@@ -147,14 +147,15 @@ mkdir -p dist/ladder
 started=$SECONDS
 failed=
 
-# What CI's Rust dependency cache reported (LADDER_CACHE_HIT: rust-cache's cache-hit output,
-# "true" only for an exact key match), worded as that and no more: an exact hit says the
-# dependencies were restored, not that the restored build was warm, and no exact hit may still
-# have restored a near one. Empty on a developer's machine.
+# What CI's Rust dependency cache gave (LADDER_CACHE_STATE, set by check.yml: exact for a
+# restore of the key itself, partial for a restore from an older key, none for no restore).
+# The cache holds dependencies only, so our own crates compile in every case; the note does
+# not say the build was warm. Empty on a developer's machine.
 cache_note() {
-  case ${LADDER_CACHE_HIT:-} in
-    true) echo "exact dependency-cache hit" ;;
-    false) echo "no exact dependency-cache hit" ;;
+  case ${LADDER_CACHE_STATE:-} in
+    exact) echo "exact dependency cache" ;;
+    partial) echo "partial dependency cache, restored from an older key" ;;
+    none) echo "no dependency cache" ;;
   esac
 }
 

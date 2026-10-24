@@ -93,6 +93,18 @@ jobs:
             ${{ (matrix.part == 'lint' || matrix.part == 'rust') && 'testbeds/durability' || '' }}
           cache-on-failure: true
           save-if: ${{ github.ref == 'refs/heads/main' }}
+      # What the restore gave: rust-cache's cache-hit is "true" for an exact key match only, and
+      # a restore from an older key (a partial one) leaves the dependencies' artifacts in target/
+      # with cache-hit "false"; nothing restored leaves it empty. The ladder words the state on
+      # its build line (scripts/ladder). The web build has no cache to report.
+      - id: cache-state
+        env:
+          CACHE_HIT: ${{ steps.cache.outputs.cache-hit }}
+        run: |
+          if [ "$CACHE_HIT" = true ]; then state=exact
+          elif [ -n "$(ls -A target 2>/dev/null)" ]; then state=partial
+          else state=none; fi
+          echo "state=$state" >>"$GITHUB_OUTPUT"
       # The npm workspace's tools (TypeScript, eslint, openapi-typescript, Vitest, Vite).
       - run: npm ci
       # The browser step's browser, without --with-deps: the runner image has the libraries it
@@ -103,9 +115,7 @@ jobs:
       - run: mise run check --part "$PART"
         env:
           PART: ${{ matrix.part }}
-          # rust-cache's cache-hit is "true" for an exact key match only; the ladder words it on
-          # its build line (scripts/ladder).
-          LADDER_CACHE_HIT: ${{ steps.cache.outputs.cache-hit }}
+          LADDER_CACHE_STATE: ${{ steps.cache-state.outputs.state }}
       # The check prints only what failed; the complete log is a file.
       - if: failure()
         run: tail -n +1 dist/ladder/*.log
