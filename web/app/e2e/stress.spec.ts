@@ -9,6 +9,7 @@ import { expect, test } from "./test.ts";
 import { expectTitleLinesAsLaidOut, viewportOf } from "./canvas.ts";
 import { NEAR_ZOOM } from "../src/canvas/gestures.ts";
 import { containmentProblems } from "./containment.ts";
+import { touchProblems } from "./touch.ts";
 import { indexAt, journeyAt, openCardMenu, openControlsMenu, openPopover, routeAt } from "./screenshots.ts";
 import { nodeCard, settled, whenSettled } from "./shell.ts";
 import { STRESS, publishStressJourney } from "./stress.ts";
@@ -24,7 +25,7 @@ interface Walk {
 function walkOf(page: Page, journey: string): Walk {
   const found: string[] = [];
   const look = async (where: string) => {
-    found.push(...(await containmentProblems(page)).map((problem) => `${where}: ${problem}`));
+    found.push(...[...(await containmentProblems(page)), ...(await touchProblems(page))].map((problem) => `${where}: ${problem}`));
   };
   const check = async (address: string, node?: string) => {
     await journeyAt(page, journey, address, node);
@@ -118,9 +119,9 @@ async function phoneChrome({ page, look, check }: Walk): Promise<void> {
 }
 
 /** Each screen at desktop and phone width (a phone also opens each view's Controls menu), the clamped journey name opened by a tap, and the screens that list journeys, routes and people. */
-async function widths(walk: Walk): Promise<void> {
+async function widths(walk: Walk, sizes: number[]): Promise<void> {
   const { page, look, check } = walk;
-  for (const width of [1280, 390]) {
+  for (const width of sizes) {
     await page.setViewportSize({ width, height: width === 390 ? 844 : 720 });
     for (const address of ["graph", "list", "timeline", "summary", "walk"]) {
       await check(address);
@@ -151,14 +152,28 @@ async function widths(walk: Walk): Promise<void> {
   }
 }
 
-test("the stress journey stays inside its boxes on every screen, and a whole name wears no clamp mark", async ({ page }) => {
+test("the stress journey stays inside its boxes on every screen at desktop width", async ({ page }) => {
   const walk = walkOf(page, await publishStressJourney(page));
   await graphs(walk);
   await routeGraph(walk);
   await details(walk);
-  await widths(walk);
+  await widths(walk, [1280]);
   expect(walk.found).toEqual([]);
-  // The viewport is a phone's: a name that fits whole wears no mark.
-  await journeyAt(page, "j_launch", "list");
-  await expect(page.getByTestId("journey-name-cue")).toHaveCount(0);
+});
+
+// A phone is a touch screen: the same walk there also holds every control to the touch-sized hit area.
+test.describe("on a phone", () => {
+  // The journey is published from a desktop-sized window, as the other walk does, then the walk resizes it to a phone's.
+  test.use({ viewport: { width: 1280, height: 720 }, hasTouch: true });
+  // Every look also measures every control against the touch target, which is slow on the worst-case journey.
+  test.slow();
+
+  test("the stress journey stays inside its boxes and its controls are touch-sized on every screen, and a whole name wears no clamp mark", async ({ page }) => {
+    const walk = walkOf(page, await publishStressJourney(page));
+    await widths(walk, [390]);
+    expect(walk.found).toEqual([]);
+    // A name that fits whole wears no mark.
+    await journeyAt(page, "j_launch", "list");
+    await expect(page.getByTestId("journey-name-cue")).toHaveCount(0);
+  });
 });

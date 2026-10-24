@@ -137,6 +137,12 @@
     --name-lines: 1;
   }
 
+  /* One line is a plain ellipsis, not a clamp: a clamp would show the next line in the padding a touch screen gives the toggle. */
+  .journey-frame[data-layer] .journey-header h1:not([data-expanded="true"]) .journey-name-toggle {
+    display: block;
+    white-space: nowrap;
+  }
+
   /* Words a phone can do without: "View:" before the view's name, "to edit" after Open a draft. */
   .phone-hidden {
     display: none;
@@ -183,6 +189,10 @@
 }
 
 @media (pointer: coarse) {
+  /* The name's toggle sits flush on a fine pointer; here it is padded up to the target around its lines (a minimum height would show a clamped line's neighbour). */
+  .journey-header h1 .journey-name-toggle {
+    padding-block: max(0px, calc((var(--touch-target) - var(--name-lines, 1) * 1lh) / 2));
+  }
   :is(.view-controls, .canvas-signal) :is(.chip, .dropdown-button, input[type="search"]) {
     height: var(--touch-target);
     min-height: var(--touch-target);

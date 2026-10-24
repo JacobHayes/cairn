@@ -290,50 +290,6 @@ select option {
 .pick-label {
   display: contents;
 }
-/* A touch screen: every control a finger taps has a hit area of at least --touch-target each way. Shared controls take it as their height (and an icon-only one as its width too); a control drawn smaller than that (a pick box) sits in a label that is the hit area. */
-@media (pointer: coarse) {
-  button,
-  .button {
-    min-height: var(--touch-target);
-    min-width: var(--touch-target);
-  }
-  input:not([type="checkbox"], [type="radio"], [type="range"]),
-  textarea {
-    min-height: var(--touch-target);
-  }
-  select {
-    height: var(--touch-target);
-    line-height: calc(var(--touch-target) - 2px);
-  }
-  .menu-item,
-  .opt,
-  .segmented label,
-  summary,
-  label:has(> input:is([type="checkbox"], [type="radio"])) {
-    min-height: var(--touch-target);
-  }
-  label:has(> input:is([type="checkbox"], [type="radio"])) {
-    display: flex;
-    align-items: center;
-    gap: var(--space-2);
-  }
-  summary {
-    align-content: center;
-  }
-  .segmented label {
-    min-width: var(--touch-target);
-  }
-  .pick-label {
-    justify-content: center;
-    min-width: var(--touch-target);
-  }
-  /* A link on a row of its own is padded to the touch target, so the hit area reaches past its words. */
-  a:is(.node-title, .home-all, [data-testid="home-held"], [data-testid="lineage"]),
-  :is(.list-node, .detail-list > li, .detail-clamp, .cell-first) > a,
-  [data-tip-tap] {
-    padding-block: max(0px, calc((var(--touch-target) - 1lh) / 2));
-  }
-}
 /* A labelled control: small uppercase mono label above the input or select. */
 .field {
   display: inline-flex;
@@ -1236,5 +1192,55 @@ svg.chart .datum-line {
     animation: none !important;
     transition: none !important;
     scroll-behavior: auto !important;
+  }
+}
+
+/* A touch screen (last in this file, so no shared component's own rule above it can shrink a control back under the target): every control a finger taps has a hit area of at least --touch-target each way. Shared controls take it as their height (and an icon-only one as its width too); a control drawn smaller than that (a pick box) sits in a label that is the hit area. */
+@media (pointer: coarse) {
+  button,
+  .button {
+    min-height: var(--touch-target);
+    min-width: var(--touch-target);
+  }
+  input:not([type="checkbox"], [type="radio"], [type="range"]),
+  textarea {
+    min-height: var(--touch-target);
+  }
+  select {
+    height: var(--touch-target);
+    line-height: calc(var(--touch-target) - 2px);
+  }
+  .menu-item,
+  .opt,
+  .segmented :is(label, button),
+  summary,
+  label:has(> input:is([type="checkbox"], [type="radio"])) {
+    min-height: var(--touch-target);
+  }
+  label:has(> input:is([type="checkbox"], [type="radio"])) {
+    display: flex;
+    align-items: center;
+    gap: var(--space-2);
+  }
+  summary {
+    align-content: center;
+  }
+  .segmented :is(label, button) {
+    min-width: var(--touch-target);
+  }
+  .pick-label {
+    justify-content: center;
+    min-width: var(--touch-target);
+  }
+  /* A link on a row of its own is padded to the touch target, so the hit area reaches past its words. */
+  a:is(.node-title, .home-all, [data-testid="home-held"], [data-testid="lineage"]),
+  :is(.list-node, .detail-list > li, .detail-clamp, .cell-first, .row, .popover-body, .layer-band) > a,
+  [data-tip-tap] {
+    padding-block: max(0px, calc((var(--touch-target) - 1lh) / 2));
+  }
+  /* And never narrower than the target, so a one-word title is as easy to hit as a long one. */
+  a:is(.node-title, .home-all, [data-testid="home-held"], [data-testid="lineage"]),
+  :is(.list-node, .detail-list > li, .detail-clamp, .cell-first, .row, .popover-body, .layer-band) > a {
+    min-width: var(--touch-target);
   }
 }

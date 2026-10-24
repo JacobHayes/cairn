@@ -61,7 +61,7 @@ for (const [viewport, size] of Object.entries(VIEWPORTS)) {
               await capture(page, join(dir, file));
               taken.push({ file, address, state: state.name, viewport, theme, url: new URL(page.url()).pathname + new URL(page.url()).search });
             } catch (error) {
-              failed.push(`${address} ${state.name}: ${error instanceof Error ? error.message.split("\n").slice(0, 6).join(" | ") : String(error)}`);
+              failed.push(`${address} ${state.name}: ${error instanceof Error ? error.message.replaceAll("\n", " | ").slice(0, 1500) : String(error)}`);
             }
           }
         }

@@ -1389,12 +1389,17 @@ button.failed-details {
 .chips-input > select:focus-visible {
   outline: none;
 }
+/* The input and the select drawn inside the box are shorter than the box on a fine pointer; a touch screen keeps the shared controls' height. */
+@media not (pointer: coarse) {
+  .chips-input > :is(input, select) {
+    min-height: 0;
+    height: calc(var(--control-h) - 6px);
+  }
+}
 /* The owners field: the select that adds a value sits inside the box, borderless, after the chips. */
 .chips-input > select {
   flex: 1 1 8rem;
   min-width: 0;
-  min-height: 0;
-  height: calc(var(--control-h) - 6px);
   border: 0;
   background-color: transparent;
   color: var(--color-secondary);
@@ -1412,8 +1417,6 @@ button.failed-details {
 .chips-input > input {
   flex: 1 1 6rem;
   min-width: 0;
-  min-height: 0;
-  height: calc(var(--control-h) - 6px);
   padding: 0 var(--space-1);
   border: 0;
   background: transparent;
