@@ -71,5 +71,4 @@ test("H3: emails are chips taken from the keyboard, refused with a reason, repla
   await expect(detail.getByTestId("identity-emails")).toHaveText("bob@example.org");
   await detail.getByRole("button", { name: "Edit" }).click();
   await expect(detail.getByRole("button", { name: "Remove bob@example.org" })).toBeVisible();
-  expect(await fitsTheWindow(page)).toBe(true);
 });

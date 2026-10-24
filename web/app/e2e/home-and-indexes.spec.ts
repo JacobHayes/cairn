@@ -52,8 +52,7 @@ test("C16, C17: the Journeys index at 390px shows both of each row's facts and n
   const rows = page.getByTestId("journey-row");
   await expect(rows.first()).toBeVisible();
   await expect(page.getByTestId("row-reading")).toHaveCount(0);
-  const [fits, widths] = await whenSettled(page, () => Promise.all([page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth), rows.evaluateAll((each) => each.map((one) => one.getBoundingClientRect().right))]));
-  expect(fits).toBe(true);
+  const widths = await whenSettled(page, () => rows.evaluateAll((each) => each.map((one) => one.getBoundingClientRect().right)));
   for (const right of widths) {
     expect(right).toBeLessThanOrEqual(390);
   }

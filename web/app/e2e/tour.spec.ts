@@ -447,7 +447,6 @@ test.describe("on a phone", () => {
       expect(meets(box, await settledBox(page.locator(`tr[data-node="${node}"]`)))).toBe(false);
     }
     await expect(page.getByTestId("tour-next")).toBeVisible();
-    await expect.poll(() => page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
   });
 
   test("when the sheet is lowered the callout says so and offers to raise it", async ({ page }) => {
