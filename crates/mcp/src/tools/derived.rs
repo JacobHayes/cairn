@@ -6,11 +6,11 @@
 use std::collections::{BTreeMap, BTreeSet};
 
 use cairn_schema::{
-    Annotation, AnswerEffects, AnswerValue, Cursor, Date, DisplayState, ExplainedField,
+    AgentRow, Annotation, AnswerEffects, AnswerValue, Cursor, Date, DisplayState, ExplainedField,
     ExplanationPage, JourneyId, KeyRefs, Level, LevelDateLink, LevelDisplay, LevelEdge, LevelNode,
     LevelQuery, ListFlag, ListQuery, LocalEdit, Markdown, Next, NextQuery, Node, NodeDerived,
-    NodeKey, NodeKind, NodeRow, NodeState, Overrides, Path, RemovalRead, Snapshot, SnapshotScope,
-    SortBy, Stalled, StillWaiting,
+    NodeKey, NodeKind, NodeState, Overrides, Path, RemovalRead, Snapshot, SnapshotScope, SortBy,
+    Stalled, StillWaiting,
 };
 use cairn_service::{Call, ChildEntry, NodeDetail};
 use schemars::JsonSchema;
@@ -40,7 +40,7 @@ pub(crate) const SPECS: &[Spec] = &[
     Spec {
         name: "list_frontier",
         description: "The ranked acting frontier, a page at a time: what to do next, each \
-            node with its breadcrumb and why it ranks where it does. With `filters`, the \
+            node with its breadcrumb and its rank (`get_node` says why). With `filters`, the \
             in-scope nodes they all hold for instead, in rank order; `mine` keeps the \
             caller's own.",
         writes: Writes::Nothing,
@@ -385,9 +385,9 @@ pub(crate) struct ListFrontier {
 /// A page of the frontier or of a filtered list, in rank order.
 #[derive(Debug, Serialize, JsonSchema)]
 pub(crate) struct FrontierOutput {
-    /// The page: each node with its breadcrumb, signals, and rank terms.
+    /// The page: each node with its breadcrumb, signals, and rank.
     #[serde(flatten)]
-    rows: Paged<NodeRow>,
+    rows: Paged<AgentRow>,
     // PRD: C5, D5.
     /// When the frontier is empty and work remains, what the journey waits on.
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -548,8 +548,13 @@ impl ToolSet {
             let cursor = arguments.cursor;
             return Ok(At::of(projected, |next| {
                 let Next { items, stalled } = next;
+                let Paged { items, next, total } = page(items, cursor);
                 FrontierOutput {
-                    rows: page(items, cursor),
+                    rows: Paged {
+                        items: items.iter().map(AgentRow::on_frontier).collect(),
+                        next,
+                        total,
+                    },
                     stalled,
                 }
             }));
@@ -569,7 +574,7 @@ impl ToolSet {
         let projected = self.service.list(call, journey, &query).await?;
         Ok(At::of(projected, |list| FrontierOutput {
             rows: Paged {
-                items: list.rows,
+                items: list.rows.iter().map(AgentRow::on_frontier).collect(),
                 next: list.next,
                 total: list.total,
             },

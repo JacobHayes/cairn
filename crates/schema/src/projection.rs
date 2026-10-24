@@ -845,6 +845,14 @@ pub struct MineEntry {
     pub kinds: BTreeSet<KindKey>,
 }
 
+impl SnapshotScope {
+    /// Whether it is the whole journey from the first page.
+    #[must_use]
+    pub fn is_whole(&self) -> bool {
+        *self == Self::default()
+    }
+}
+
 // PRD: I3.
 /// Which part of the journey a snapshot covers and which page of its nodes.
 #[derive(Clone, Debug, Default, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
@@ -862,28 +870,206 @@ pub struct SnapshotScope {
     pub cursor: Cursor,
 }
 
-// PRD: I3.
-/// One in-scope node in the snapshot, with its participations, blocking, and dates.
+// PRD: I3, C10.
+/// One node as an agent reads it, in the snapshot and the frontier's lists: what it is, where
+/// it sits, who owns it, its dates, the flags that hold, and its rank as one rounded number.
+/// A finished, skipped or ruled-out node keeps its row, dates, flags and containment but no
+/// slack (room left to start) or rank. The rank's terms and the gravity and unlocks behind
+/// it are in the node's own read.
+#[allow(clippy::struct_excessive_bools)]
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize, JsonSchema)]
 #[serde(deny_unknown_fields)]
+pub struct AgentRow {
+    /// The node.
+    pub key: NodeKey,
+    /// Its title.
+    pub title: Title,
+    /// Its kind.
+    pub kind: NodeKind,
+    /// Its stored state: what transitions act on. Prefer `display_state` for "what is its
+    /// status".
+    pub state: State,
+    /// The state every surface shows for the node.
+    pub display_state: DisplayState,
+    /// Its container, when it has one.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub parent: Option<NodeKey>,
+    /// Its ancestors, root first: the breadcrumb, on the frontier's rows (a snapshot's node
+    /// list carries `parent` instead).
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub ancestors: Vec<NodeKey>,
+    /// Its relevance, when it is not relevant.
+    #[serde(
+        default = "AgentRow::relevant",
+        skip_serializing_if = "AgentRow::is_relevant"
+    )]
+    pub relevance: Relevance,
+    /// Whether work can be started on it now: relevant, not blocked, and not finished.
+    #[serde(default, skip_serializing_if = "crate::serde_util::is_false")]
+    pub actionable: bool,
+    /// Skipped through an ancestor.
+    #[serde(default, skip_serializing_if = "crate::serde_util::is_false")]
+    pub effectively_skipped: bool,
+    /// Its owners.
+    #[serde(default, skip_serializing_if = "BTreeSet::is_empty")]
+    pub owners: BTreeSet<IdentityKey>,
+    /// No owner (on the frontier's rows; a snapshot lists these once, as `unassigned`).
+    #[serde(default, skip_serializing_if = "crate::serde_util::is_false")]
+    pub unassigned: bool,
+    /// A snooze that holds over the node: its own, else its container's.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub snoozed: Option<SnoozeTarget>,
+    /// The container whose snooze holds over the node.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub snoozed_via: Option<NodeKey>,
+    /// Non-terminal with its due before today.
+    #[serde(default, skip_serializing_if = "crate::serde_util::is_false")]
+    pub overdue: bool,
+    /// A terminal node whose completing guards would now fail.
+    #[serde(default, skip_serializing_if = "crate::serde_util::is_false")]
+    pub stale: bool,
+    /// How many checklist items are ticked; none for a node with no items.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub checklist_count: Option<ChecklistCount>,
+    /// Whether it is a placeholder that still needs to be broken down into children.
+    #[serde(default, skip_serializing_if = "crate::serde_util::is_false")]
+    pub needs_breakdown: bool,
+    /// Days the plan can no longer be met by.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub shortfall_days: Option<u32>,
+    /// Latest start minus today; none is no deadline, and none for settled work.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub slack_days: Option<i32>,
+    /// The latest it can finish.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub due: Option<Date>,
+    /// Its rank to three significant figures, for work still to do.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub rank: Option<Real>,
+}
+
+impl AgentRow {
+    fn relevant() -> Relevance {
+        Relevance::Relevant
+    }
+
+    #[allow(clippy::trivially_copy_pass_by_ref)]
+    fn is_relevant(relevance: &Relevance) -> bool {
+        *relevance == Relevance::Relevant
+    }
+
+    /// C10: the row of `row` with its breadcrumb, as the frontier's lists carry it.
+    #[must_use]
+    pub fn on_frontier(row: &NodeRow) -> Self {
+        let mut lean = Self::of(row);
+        lean.ancestors.clone_from(&row.ancestors);
+        lean
+    }
+
+    /// C10: the row of `row` with its container, as the snapshot's node list carries it, and
+    /// without the unassigned flag, which the snapshot lists once.
+    #[must_use]
+    pub fn in_snapshot(row: &NodeRow) -> Self {
+        let mut lean = Self::of(row);
+        lean.unassigned = false;
+        lean.parent = row.ancestors.last().cloned();
+        lean
+    }
+
+    fn of(row: &NodeRow) -> Self {
+        let settled = matches!(
+            row.display_state,
+            DisplayState::Done | DisplayState::Skipped | DisplayState::NotRelevant
+        );
+        Self {
+            key: row.key.clone(),
+            title: row.title.clone(),
+            kind: row.kind,
+            state: row.state,
+            display_state: row.display_state,
+            parent: None,
+            ancestors: Vec::new(),
+            relevance: row.relevance,
+            actionable: row.actionable,
+            effectively_skipped: row.effectively_skipped,
+            owners: row.owners.clone(),
+            unassigned: row.unassigned,
+            snoozed: row.snoozed.clone(),
+            snoozed_via: row.snoozed_via.clone(),
+            overdue: row.overdue,
+            stale: row.stale,
+            checklist_count: row.checklist_count,
+            needs_breakdown: row.needs_breakdown,
+            shortfall_days: row.shortfall_days,
+            slack_days: row.slack_days.filter(|_| !settled),
+            due: row.due,
+            rank: row
+                .rank
+                .filter(|_| !settled)
+                .and_then(|terms| Real::three_figures(terms.rank.get())),
+        }
+    }
+}
+
+// PRD: I3, C10.
+/// One entry of the snapshot's acting frontier: enough to say what is next; the node's row is
+/// in the node list, or in `list_frontier` for a node outside the page or depth.
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize, JsonSchema)]
+#[serde(deny_unknown_fields)]
+pub struct FrontierEntry {
+    /// The node.
+    pub key: NodeKey,
+    /// Its title.
+    pub title: Title,
+    /// Its kind.
+    pub kind: NodeKind,
+    /// The state every surface shows for the node.
+    pub display_state: DisplayState,
+    /// Its ancestors, root first: the breadcrumb.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub ancestors: Vec<NodeKey>,
+    /// Its rank to three significant figures.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub rank: Option<Real>,
+}
+
+impl FrontierEntry {
+    /// C10: the entry of a frontier row.
+    #[must_use]
+    pub fn of(row: &NodeRow) -> Self {
+        Self {
+            key: row.key.clone(),
+            title: row.title.clone(),
+            kind: row.kind,
+            display_state: row.display_state,
+            ancestors: row.ancestors.clone(),
+            rank: row
+                .rank
+                .and_then(|terms| Real::three_figures(terms.rank.get())),
+        }
+    }
+}
+
+// PRD: I3.
+/// One in-scope node in the snapshot, with its other participations and blocking.
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize, JsonSchema)]
 pub struct SnapshotNode {
     /// What it is and its signals.
-    pub row: NodeRow,
-    /// Its effective participations by kind.
+    #[serde(flatten)]
+    pub row: AgentRow,
+    /// Its effective participations by kind, other than the owner's (that is `owners`).
     #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
     pub participations: BTreeMap<KindKey, BTreeSet<IdentityKey>>,
-    /// What blocks it itself (Gating, Blocked).
+    /// What blocks it itself (Gating, Blocked). A container's own children are not listed:
+    /// it waits on them by definition.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub blocked_by: Vec<Blocker>,
     /// The ancestors that block it, nearest first.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub blocked_through: Vec<NodeKey>,
-    /// The earliest it can start.
-    #[serde(skip_serializing_if = "Option::is_none")]
+    /// The earliest it can start, when that is after today.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub earliest_start: Option<Date>,
-    /// The latest it can start.
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub latest_start: Option<Date>,
 }
 
 // PRD: I3.
@@ -937,9 +1123,8 @@ pub struct SnapshotJourney {
 pub struct Snapshot {
     /// The journey's name, description, status and owners.
     pub journey: SnapshotJourney,
-    /// The today it was derived for.
-    pub today: Date,
-    /// What it covers.
+    /// What it covers, when that is not the whole journey from its first page.
+    #[serde(default, skip_serializing_if = "SnapshotScope::is_whole")]
     pub scope: SnapshotScope,
     /// The answers in effect in the subtree.
     #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
@@ -953,8 +1138,8 @@ pub struct Snapshot {
     /// Where the next page of nodes starts, when there is one.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub next: Option<Cursor>,
-    /// The acting frontier's first `page_item_count_max` items, in rank order: the next list.
-    pub acting_frontier: Vec<NodeRow>,
+    /// The acting frontier's first `page_item_count_max` items, in rank order.
+    pub acting_frontier: Vec<FrontierEntry>,
     /// The rest of the acting frontier, in rank order.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub acting_frontier_rest: Vec<NodeKey>,

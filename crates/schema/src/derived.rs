@@ -382,6 +382,24 @@ impl Real {
     }
 }
 
+impl Real {
+    /// `value` to three significant figures; none when it is not a finite, non-negative number.
+    #[must_use]
+    pub fn three_figures(value: f64) -> Option<Self> {
+        if value == 0.0 {
+            return Self::try_from(0.0).ok();
+        }
+        if !value.is_finite() || value < 0.0 {
+            return None;
+        }
+        // Scale so the first three figures sit before the point, round, scale back.
+        #[allow(clippy::cast_possible_truncation)]
+        let places = 2 - value.log10().floor() as i32;
+        let scale = 10f64.powi(places);
+        Self::try_from((value * scale).round() / scale).ok()
+    }
+}
+
 impl TryFrom<f64> for Real {
     type Error = String;
 

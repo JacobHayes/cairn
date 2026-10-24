@@ -4070,6 +4070,53 @@
         "const": 1,
         "description": "The file format version."
       },
+      "FrontierEntry": {
+        "additionalProperties": false,
+        "description": "One entry of the snapshot's acting frontier: enough to say what is next; the node's row is\nin the node list, or in `list_frontier` for a node outside the page or depth.",
+        "properties": {
+          "ancestors": {
+            "description": "Its ancestors, root first: the breadcrumb.",
+            "items": {
+              "$ref": "#/components/schemas/NodeKey"
+            },
+            "type": "array"
+          },
+          "display_state": {
+            "$ref": "#/components/schemas/DisplayState",
+            "description": "The state every surface shows for the node."
+          },
+          "key": {
+            "$ref": "#/components/schemas/NodeKey",
+            "description": "The node."
+          },
+          "kind": {
+            "$ref": "#/components/schemas/NodeKind",
+            "description": "Its kind."
+          },
+          "rank": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Real"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Its rank to three significant figures."
+          },
+          "title": {
+            "$ref": "#/components/schemas/Title",
+            "description": "Its title."
+          }
+        },
+        "required": [
+          "key",
+          "title",
+          "kind",
+          "display_state"
+        ],
+        "type": "object"
+      },
       "Graph": {
         "additionalProperties": false,
         "description": "The graph document (resolved): nodes, roles, and kinds by key, every reference a key,\nand, for a journey, its state. Collections serialize\nsorted by key, so a graph has one serialization.",
@@ -14694,9 +14741,9 @@
         "description": "The bounded agent view of a journey: answers, a page of in-scope nodes, the ranked\nacting frontier's top N with the rest as keys, open decisions by rank, placeholders needing\nbreakdown, unassigned items, shortfalls, and counts, scoped to a subtree and depth.",
         "properties": {
           "acting_frontier": {
-            "description": "The acting frontier's first `page_item_count_max` items, in rank order: the next list.",
+            "description": "The acting frontier's first `page_item_count_max` items, in rank order.",
             "items": {
-              "$ref": "#/components/schemas/NodeRow"
+              "$ref": "#/components/schemas/FrontierEntry"
             },
             "type": "array"
           },
@@ -14773,7 +14820,7 @@
           },
           "scope": {
             "$ref": "#/components/schemas/SnapshotScope",
-            "description": "What it covers."
+            "description": "What it covers, when that is not the whole journey from its first page."
           },
           "shortfalls": {
             "description": "Nodes whose plan can no longer be met.",
@@ -14793,11 +14840,6 @@
             ],
             "description": "The stalled diagnostic, when the journey is stalled."
           },
-          "today": {
-            "description": "The today it was derived for.",
-            "format": "date",
-            "type": "string"
-          },
           "unassigned": {
             "description": "Open, in-scope nodes no one owns.",
             "items": {
@@ -14808,8 +14850,6 @@
         },
         "required": [
           "journey",
-          "today",
-          "scope",
           "nodes",
           "acting_frontier",
           "counts"
@@ -14918,11 +14958,21 @@
         "type": "object"
       },
       "SnapshotNode": {
-        "additionalProperties": false,
-        "description": "One in-scope node in the snapshot, with its participations, blocking, and dates.",
+        "description": "One in-scope node in the snapshot, with its other participations and blocking.",
         "properties": {
+          "actionable": {
+            "description": "Whether work can be started on it now: relevant, not blocked, and not finished.",
+            "type": "boolean"
+          },
+          "ancestors": {
+            "description": "Its ancestors, root first: the breadcrumb, on the frontier's rows (a snapshot's node\nlist carries `parent` instead).",
+            "items": {
+              "$ref": "#/components/schemas/NodeKey"
+            },
+            "type": "array"
+          },
           "blocked_by": {
-            "description": "What blocks it itself (Gating, Blocked).",
+            "description": "What blocks it itself (Gating, Blocked). A container's own children are not listed:\nit waits on them by definition.",
             "items": {
               "$ref": "#/components/schemas/Blocker"
             },
@@ -14935,25 +14985,79 @@
             },
             "type": "array"
           },
-          "earliest_start": {
-            "description": "The earliest it can start.",
+          "checklist_count": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ChecklistCount"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "How many checklist items are ticked; none for a node with no items."
+          },
+          "display_state": {
+            "$ref": "#/components/schemas/DisplayState",
+            "description": "The state every surface shows for the node."
+          },
+          "due": {
+            "description": "The latest it can finish.",
             "format": "date",
             "type": [
               "string",
               "null"
             ]
           },
-          "latest_start": {
-            "description": "The latest it can start.",
+          "earliest_start": {
+            "description": "The earliest it can start, when that is after today.",
             "format": "date",
             "type": [
               "string",
               "null"
             ]
+          },
+          "effectively_skipped": {
+            "description": "Skipped through an ancestor.",
+            "type": "boolean"
+          },
+          "key": {
+            "$ref": "#/components/schemas/NodeKey",
+            "description": "The node."
+          },
+          "kind": {
+            "$ref": "#/components/schemas/NodeKind",
+            "description": "Its kind."
+          },
+          "needs_breakdown": {
+            "description": "Whether it is a placeholder that still needs to be broken down into children.",
+            "type": "boolean"
+          },
+          "overdue": {
+            "description": "Non-terminal with its due before today.",
+            "type": "boolean"
+          },
+          "owners": {
+            "description": "Its owners.",
+            "items": {
+              "$ref": "#/components/schemas/IdentityKey"
+            },
+            "type": "array",
+            "uniqueItems": true
+          },
+          "parent": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/NodeKey"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Its container, when it has one."
           },
           "participations": {
             "additionalProperties": false,
-            "description": "Its effective participations by kind.",
+            "description": "Its effective participations by kind, other than the owner's (that is `owners`).",
             "patternProperties": {
               "^k_[a-z0-9][a-z0-9_-]*$": {
                 "items": {
@@ -14965,13 +15069,83 @@
             },
             "type": "object"
           },
-          "row": {
-            "$ref": "#/components/schemas/NodeRow",
-            "description": "What it is and its signals."
+          "rank": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Real"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Its rank to three significant figures, for work still to do."
+          },
+          "relevance": {
+            "$ref": "#/components/schemas/Relevance",
+            "description": "Its relevance, when it is not relevant."
+          },
+          "shortfall_days": {
+            "description": "Days the plan can no longer be met by.",
+            "format": "uint32",
+            "minimum": 0,
+            "type": [
+              "integer",
+              "null"
+            ]
+          },
+          "slack_days": {
+            "description": "Latest start minus today; none is no deadline, and none for settled work.",
+            "format": "int32",
+            "type": [
+              "integer",
+              "null"
+            ]
+          },
+          "snoozed": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/SnoozeTarget"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "A snooze that holds over the node: its own, else its container's."
+          },
+          "snoozed_via": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/NodeKey"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The container whose snooze holds over the node."
+          },
+          "stale": {
+            "description": "A terminal node whose completing guards would now fail.",
+            "type": "boolean"
+          },
+          "state": {
+            "$ref": "#/components/schemas/State",
+            "description": "Its stored state: what transitions act on. Prefer `display_state` for \"what is its\nstatus\"."
+          },
+          "title": {
+            "$ref": "#/components/schemas/Title",
+            "description": "Its title."
+          },
+          "unassigned": {
+            "description": "No owner (on the frontier's rows; a snapshot lists these once, as `unassigned`).",
+            "type": "boolean"
           }
         },
         "required": [
-          "row"
+          "key",
+          "title",
+          "kind",
+          "state",
+          "display_state"
         ],
         "type": "object"
       },

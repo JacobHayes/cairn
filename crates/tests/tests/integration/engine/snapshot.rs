@@ -8,7 +8,10 @@ use crate::engine::support;
 use std::collections::BTreeSet;
 
 use cairn_engine::{DerivedJourney, ProjectionError, Records};
-use cairn_schema::{Cursor, NextQuery, NodeKey, Snapshot, SnapshotScope};
+use cairn_schema::{
+    Cursor, DependencyVia, DisplayState, FrontierEntry, ListQuery, NextQuery, NodeKey, Real,
+    Snapshot, SnapshotScope,
+};
 use support::{add_nodes as add, key};
 
 const VENDOR: &str = "j_vendor_eval";
@@ -68,11 +71,13 @@ fn the_snapshot_holds_answers_nodes_frontier_and_counts() {
         .nodes
         .iter()
         .find(|node| node.row.key == key("n_access"));
+    let access = access.unwrap();
+    assert!(!access.row.owners.is_empty());
     assert!(
-        access
-            .unwrap()
+        !access
             .participations
-            .contains_key(&cairn_schema::KindKey::owner())
+            .contains_key(&cairn_schema::KindKey::owner()),
+        "the owners are on the row, not told twice"
     );
 }
 
@@ -145,7 +150,8 @@ fn the_snapshot_pages_and_cuts_the_frontier_at_its_limit() {
     let next = DerivedJourney::new(&graph, &derived)
         .next(&NextQuery::default(), &BTreeSet::new())
         .unwrap();
-    assert_eq!(first.acting_frontier, next.items[..200]);
+    let entries: Vec<_> = next.items[..200].iter().map(FrontierEntry::of).collect();
+    assert_eq!(first.acting_frontier, entries);
     let second = snapshot(
         &records,
         support::JOURNEY,
@@ -155,4 +161,67 @@ fn the_snapshot_pages_and_cuts_the_frontier_at_its_limit() {
         },
     );
     assert_eq!((second.nodes.len(), second.next), (5, None));
+}
+
+/// I3, C10: a snapshot row says what the full row says, less what an agent cannot use: a
+/// settled node keeps its dates, flags and containment but no slack or rank, the rank of a node
+/// still to do is the full rank to three figures, and a container's blockers leave out its own
+/// children while every other blocker stays.
+#[test]
+fn a_snapshot_row_keeps_the_facts_and_drops_the_working() {
+    let (mut settled, mut containers) = (0, 0);
+    for name in support::fixture_names() {
+        for records in [support::after(&name, 3), support::finished(&name)] {
+            for id in records.journeys.keys() {
+                let journey = id.as_str();
+                let graph = support::journey_graph(&records, journey);
+                let derived = support::derived(&records, journey);
+                let projected = DerivedJourney::new(&graph, &derived);
+                let snapshot = projected
+                    .snapshot(
+                        &SnapshotScope::default(),
+                        &support::journey_header(&records, journey),
+                    )
+                    .unwrap();
+                let rows = projected
+                    .list(&ListQuery::default(), &BTreeSet::new())
+                    .unwrap()
+                    .rows;
+                for node in &snapshot.nodes {
+                    let row = rows.iter().find(|row| row.key == node.row.key).unwrap();
+                    let lean = &node.row;
+                    assert_eq!(
+                        (lean.due, lean.shortfall_days, lean.stale, lean.overdue),
+                        (row.due, row.shortfall_days, row.stale, row.overdue)
+                    );
+                    assert_eq!(lean.owners, row.owners);
+                    assert_eq!(lean.parent, row.ancestors.last().cloned());
+                    if matches!(
+                        row.display_state,
+                        DisplayState::Done | DisplayState::Skipped | DisplayState::NotRelevant
+                    ) {
+                        settled += 1;
+                        assert_eq!((lean.slack_days, lean.rank), (None, None));
+                    } else {
+                        assert_eq!(lean.slack_days, row.slack_days);
+                        let rank = row
+                            .rank
+                            .and_then(|terms| Real::three_figures(terms.rank.get()));
+                        assert_eq!(lean.rank, rank);
+                    }
+                    let full = derived.blocked_by(&row.key);
+                    containers += full
+                        .iter()
+                        .filter(|blocker| blocker.via == DependencyVia::Containment)
+                        .count();
+                    let others: Vec<_> = full
+                        .into_iter()
+                        .filter(|blocker| blocker.via != DependencyVia::Containment)
+                        .collect();
+                    assert_eq!(node.blocked_by, others);
+                }
+            }
+        }
+    }
+    assert!(settled > 0 && containers > 0, "the fixtures exercise both");
 }

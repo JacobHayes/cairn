@@ -14,8 +14,9 @@ use std::collections::{BTreeMap, BTreeSet};
 
 use cairn_schema::limits::PAGE_ITEM_COUNT_MAX;
 use cairn_schema::{
-    DisplayState, IdentityKey, JourneyHeader, KindKey, NextQuery, NodeKey, Relevance, Snapshot,
-    SnapshotCounts, SnapshotJourney, SnapshotNode, SnapshotScope, State,
+    AgentRow, DependencyVia, DisplayState, FrontierEntry, IdentityKey, JourneyHeader, KindKey,
+    NextQuery, NodeKey, Relevance, Snapshot, SnapshotCounts, SnapshotJourney, SnapshotNode,
+    SnapshotScope, State,
 };
 
 use super::rows::{count, page};
@@ -77,7 +78,6 @@ impl DerivedJourney<'_> {
         };
         Ok(Snapshot {
             journey: self.snapshot_journey(header),
-            today: derived.today(),
             scope: scope.clone(),
             answers: in_scope
                 .iter()
@@ -89,7 +89,7 @@ impl DerivedJourney<'_> {
                 .collect(),
             nodes: shown.iter().map(|key| self.snapshot_node(key)).collect(),
             next,
-            acting_frontier: frontier.iter().take(limit).cloned().collect(),
+            acting_frontier: frontier.iter().take(limit).map(FrontierEntry::of).collect(),
             acting_frontier_rest: rest,
             open_decisions: derived.ranking().sorted(&open_decisions),
             needs_breakdown: pick(&|key| blocking.needs_breakdown(key)),
@@ -139,7 +139,7 @@ impl DerivedJourney<'_> {
     /// One node in the snapshot.
     fn snapshot_node(&self, key: &NodeKey) -> SnapshotNode {
         let derived = self.derived;
-        let mut kinds: Vec<KindKey> = self
+        let kinds: Vec<KindKey> = self
             .graph
             .document()
             .participation_kinds
@@ -147,9 +147,9 @@ impl DerivedJourney<'_> {
             .keys()
             .cloned()
             .collect();
-        kinds.push(KindKey::owner());
+        let today = derived.today();
         SnapshotNode {
-            row: self.row(key, derived.ranking()),
+            row: AgentRow::in_snapshot(&self.row(key, derived.ranking())),
             participations: kinds
                 .into_iter()
                 .filter_map(|kind| {
@@ -157,10 +157,16 @@ impl DerivedJourney<'_> {
                     (!identities.is_empty()).then(|| (kind, identities.clone()))
                 })
                 .collect(),
-            blocked_by: derived.blocked_by(key),
+            blocked_by: derived
+                .blocked_by(key)
+                .into_iter()
+                .filter(|blocker| blocker.via != DependencyVia::Containment)
+                .collect(),
             blocked_through: derived.blocked_through(self.graph, key),
-            earliest_start: derived.dates().earliest_start(key),
-            latest_start: derived.dates().latest_start(key),
+            earliest_start: derived
+                .dates()
+                .earliest_start(key)
+                .filter(|date| *date > today),
         }
     }
 

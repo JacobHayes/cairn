@@ -11,7 +11,8 @@ use std::sync::Arc;
 use cairn_engine::{DerivedJourney, Graph, derive};
 use cairn_schema::limits::{EXPLANATION_ENTRY_COUNT_MAX, PAGE_ITEM_COUNT_MAX};
 use cairn_schema::{
-    Cursor, Email, ExplainedField, JourneyHeader, JourneyId, NextQuery, NodeKey, SnapshotScope,
+    Cursor, Email, ExplainedField, FrontierEntry, JourneyHeader, JourneyId, NextQuery, NodeKey,
+    SnapshotScope,
 };
 use cairn_service::{Call, ReadError, Service};
 use cairn_store::{LoginRecord, Store, UserRecord};
@@ -129,7 +130,8 @@ async fn a_journey_reads_as_the_engine_alone_projects_it(store: Arc<dyn Store>) 
         .snapshot(&reader, &vendor(), &SnapshotScope::default())
         .await
         .unwrap();
-    assert_eq!(snapshot.value.acting_frontier, next.value.items);
+    let entries: Vec<_> = next.value.items.iter().map(FrontierEntry::of).collect();
+    assert_eq!(snapshot.value.acting_frontier, entries);
     assert_eq!(
         snapshot.value,
         engine.snapshot(&SnapshotScope::default(), &header).unwrap()
@@ -367,7 +369,6 @@ async fn cached_and_uncached_reads_agree_across_midnight(store: Arc<dyn Store>) 
     let before = cached.snapshot(&evening, &vendor(), &scope).await.unwrap();
     let after = cached.snapshot(&morning, &vendor(), &scope).await.unwrap();
     assert_eq!(before.today.tomorrow().unwrap(), after.today);
-    assert_eq!(after.value.today, after.today);
     let (fresh, _) = service_over(store);
     assert_eq!(
         after,

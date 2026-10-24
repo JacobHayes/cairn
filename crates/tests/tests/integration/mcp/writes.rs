@@ -441,7 +441,7 @@ async fn the_removal_read_is_what_a_patch_needs_to_remove_a_node() {
         .as_array()
         .unwrap()
         .iter()
-        .map(|node| node["row"]["key"].as_str().unwrap())
+        .map(|node| node["key"].as_str().unwrap())
         .collect();
     assert_eq!(left, ["n_after", "n_extra"]);
 }

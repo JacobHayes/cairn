@@ -27,9 +27,9 @@ mod property {
     use cairn_engine::{Derived, DerivedJourney, Graph, derive, history};
     use cairn_schema::limits::PAGE_ITEM_COUNT_MAX;
     use cairn_schema::{
-        AnswerSpec, Cursor, DateLinkKind, DateRuleKind, DateSource, Deployment, Event, Level,
-        LevelDisplay, LevelQuery, ListFlag, ListQuery, NextQuery, NodeKey, NodeKind, PatchId,
-        Payload, SnapshotScope, State, Title, Trace,
+        AnswerSpec, Cursor, DateLinkKind, DateRuleKind, DateSource, Deployment, Event,
+        FrontierEntry, Level, LevelDisplay, LevelQuery, ListFlag, ListQuery, NextQuery, NodeKey,
+        NodeKind, PatchId, Payload, SnapshotScope, State, Title, Trace,
     };
     use patina_dst_proptest::prelude::*;
 
@@ -483,10 +483,11 @@ mod property {
             ..NextQuery::default()
         };
         let next = journey.next(&query, &BTreeSet::new()).unwrap().items;
-        assert_eq!(
-            first.acting_frontier.as_slice(),
-            &next[..first.acting_frontier.len()]
-        );
+        let entries: Vec<_> = next[..first.acting_frontier.len()]
+            .iter()
+            .map(FrontierEntry::of)
+            .collect();
+        assert_eq!(first.acting_frontier, entries);
     }
 
     /// The vendor evaluation's events, the pool generated histories draw from.

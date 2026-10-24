@@ -2304,6 +2304,24 @@ export interface components {
          */
         FormatVersion: 1;
         /**
+         * @description One entry of the snapshot's acting frontier: enough to say what is next; the node's row is
+         *     in the node list, or in `list_frontier` for a node outside the page or depth.
+         */
+        FrontierEntry: {
+            /** @description Its ancestors, root first: the breadcrumb. */
+            ancestors?: components["schemas"]["NodeKey"][];
+            /** @description The state every surface shows for the node. */
+            display_state: components["schemas"]["DisplayState"];
+            /** @description The node. */
+            key: components["schemas"]["NodeKey"];
+            /** @description Its kind. */
+            kind: components["schemas"]["NodeKind"];
+            /** @description Its rank to three significant figures. */
+            rank?: components["schemas"]["Real"] | null;
+            /** @description Its title. */
+            title: components["schemas"]["Title"];
+        };
+        /**
          * @description The graph document (resolved): nodes, roles, and kinds by key, every reference a key,
          *     and, for a journey, its state. Collections serialize
          *     sorted by key, so a graph has one serialization.
@@ -5422,8 +5440,8 @@ export interface components {
          *     breakdown, unassigned items, shortfalls, and counts, scoped to a subtree and depth.
          */
         Snapshot: {
-            /** @description The acting frontier's first `page_item_count_max` items, in rank order: the next list. */
-            acting_frontier: components["schemas"]["NodeRow"][];
+            /** @description The acting frontier's first `page_item_count_max` items, in rank order. */
+            acting_frontier: components["schemas"]["FrontierEntry"][];
             /** @description The rest of the acting frontier, in rank order. */
             acting_frontier_rest?: components["schemas"]["NodeKey"][];
             /** @description The answers in effect in the subtree. */
@@ -5451,17 +5469,12 @@ export interface components {
             rationales?: {
                 [key: string]: components["schemas"]["Markdown"];
             };
-            /** @description What it covers. */
-            scope: components["schemas"]["SnapshotScope"];
+            /** @description What it covers, when that is not the whole journey from its first page. */
+            scope?: components["schemas"]["SnapshotScope"];
             /** @description Nodes whose plan can no longer be met. */
             shortfalls?: components["schemas"]["NodeKey"][];
             /** @description The stalled diagnostic, when the journey is stalled. */
             stalled?: components["schemas"]["Stalled"] | null;
-            /**
-             * Format: date
-             * @description The today it was derived for.
-             */
-            today: string;
             /** @description Open, in-scope nodes no one owns. */
             unassigned?: components["schemas"]["NodeKey"][];
         };
@@ -5519,28 +5532,83 @@ export interface components {
             /** @description Its status. */
             status: components["schemas"]["JourneyStatus"];
         };
-        /** @description One in-scope node in the snapshot, with its participations, blocking, and dates. */
+        /** @description One in-scope node in the snapshot, with its other participations and blocking. */
         SnapshotNode: {
-            /** @description What blocks it itself (Gating, Blocked). */
+            /** @description Whether work can be started on it now: relevant, not blocked, and not finished. */
+            actionable?: boolean;
+            /**
+             * @description Its ancestors, root first: the breadcrumb, on the frontier's rows (a snapshot's node
+             *     list carries `parent` instead).
+             */
+            ancestors?: components["schemas"]["NodeKey"][];
+            /**
+             * @description What blocks it itself (Gating, Blocked). A container's own children are not listed:
+             *     it waits on them by definition.
+             */
             blocked_by?: components["schemas"]["Blocker"][];
             /** @description The ancestors that block it, nearest first. */
             blocked_through?: components["schemas"]["NodeKey"][];
+            /** @description How many checklist items are ticked; none for a node with no items. */
+            checklist_count?: components["schemas"]["ChecklistCount"] | null;
+            /** @description The state every surface shows for the node. */
+            display_state: components["schemas"]["DisplayState"];
             /**
              * Format: date
-             * @description The earliest it can start.
+             * @description The latest it can finish.
+             */
+            due?: string | null;
+            /**
+             * Format: date
+             * @description The earliest it can start, when that is after today.
              */
             earliest_start?: string | null;
-            /**
-             * Format: date
-             * @description The latest it can start.
-             */
-            latest_start?: string | null;
-            /** @description Its effective participations by kind. */
+            /** @description Skipped through an ancestor. */
+            effectively_skipped?: boolean;
+            /** @description The node. */
+            key: components["schemas"]["NodeKey"];
+            /** @description Its kind. */
+            kind: components["schemas"]["NodeKind"];
+            /** @description Whether it is a placeholder that still needs to be broken down into children. */
+            needs_breakdown?: boolean;
+            /** @description Non-terminal with its due before today. */
+            overdue?: boolean;
+            /** @description Its owners. */
+            owners?: components["schemas"]["IdentityKey"][];
+            /** @description Its container, when it has one. */
+            parent?: components["schemas"]["NodeKey"] | null;
+            /** @description Its effective participations by kind, other than the owner's (that is `owners`). */
             participations?: {
                 [key: string]: components["schemas"]["IdentityKey"][];
             };
-            /** @description What it is and its signals. */
-            row: components["schemas"]["NodeRow"];
+            /** @description Its rank to three significant figures, for work still to do. */
+            rank?: components["schemas"]["Real"] | null;
+            /** @description Its relevance, when it is not relevant. */
+            relevance?: components["schemas"]["Relevance"];
+            /**
+             * Format: uint32
+             * @description Days the plan can no longer be met by.
+             */
+            shortfall_days?: number | null;
+            /**
+             * Format: int32
+             * @description Latest start minus today; none is no deadline, and none for settled work.
+             */
+            slack_days?: number | null;
+            /** @description A snooze that holds over the node: its own, else its container's. */
+            snoozed?: components["schemas"]["SnoozeTarget"] | null;
+            /** @description The container whose snooze holds over the node. */
+            snoozed_via?: components["schemas"]["NodeKey"] | null;
+            /** @description A terminal node whose completing guards would now fail. */
+            stale?: boolean;
+            /**
+             * @description Its stored state: what transitions act on. Prefer `display_state` for "what is its
+             *     status".
+             */
+            state: components["schemas"]["State"];
+            /** @description Its title. */
+            title: components["schemas"]["Title"];
+            /** @description No owner (on the frontier's rows; a snapshot lists these once, as `unassigned`). */
+            unassigned?: boolean;
         };
         /** @description Which part of the journey a snapshot covers and which page of its nodes. */
         SnapshotScope: {
