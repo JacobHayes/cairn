@@ -10,7 +10,7 @@ import type { OperationId } from "../data/edit-record.ts";
 import { newPatchId, violationNode, type Rejection, type Violation } from "../data/writes.ts";
 import { RejectionView } from "../screens/RejectionView.tsx";
 import { WriteStatus } from "../screens/WriteStatus.tsx";
-import { Button, Field } from "../ui/kit.tsx";
+import { Button, Input } from "../ui/kit.tsx";
 import { plural } from "../ui/words.ts";
 import { Receipt } from "../ui/Receipt.tsx";
 import { checklistOf, guardBypass, itemTitle, titleOf, type Mutation, type Ready } from "./model.ts";
@@ -163,7 +163,7 @@ function Bypass({ write, entries, onResolved, onResent }: Resolving & { entries:
     <div className="stack" data-testid="bypass">
       <label className="stack">
         <span className="label">Why (optional)</span>
-        <Field value={reason} onChange={(event) => { setReason(event.target.value); }} />
+        <Input value={reason} onChange={(event) => { setReason(event.target.value); }} />
       </label>
       <span className="row">
         <Button

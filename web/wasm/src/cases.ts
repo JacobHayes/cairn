@@ -38,22 +38,5 @@ export interface IndexEntry {
   cases: number;
 }
 
-/** What the page found for one case. */
-export interface CaseResult {
-  name: string;
-  kind: CaseCall["kind"];
-  bytes: number;
-  equal: boolean;
-  firstDifference?: number;
-  error?: string;
-}
-
-/** What the page found for one group. */
-export interface GroupResult {
-  label: string;
-  documentBytes: number;
-  results: CaseResult[];
-}
-
 /** The clock the server walk read and wrote at (crates/wasm `cases::NOW`). */
 export const NOW = "2026-10-12T12:00:00Z";

@@ -8,7 +8,7 @@ import { identityOf, nameProblem } from "../people/model.ts";
 import { useScreenWrite } from "../screens/write.ts";
 import { RejectionView } from "../screens/RejectionView.tsx";
 import { WriteStatus } from "../screens/WriteStatus.tsx";
-import { Button, Field } from "../ui/kit.tsx";
+import { Button, Input } from "../ui/kit.tsx";
 import { asksName } from "./name-prompt.ts";
 
 /** What the prompt knows, which the shell reads too: the tour waits until the caller and deployment are read and nothing is being asked. */
@@ -65,7 +65,7 @@ export function NamePrompt({ ask }: { ask: NameAsk }) {
           This names <span className="mono">{identity.emails?.[0] ?? ""}</span>
           {(identity.emails ?? []).length > 1 ? ` and ${String((identity.emails ?? []).length - 1)} more` : ""}, the identity others see beside your work.
         </span>
-        <Field label="Name" value={name} autoFocus onChange={(event) => { setName(event.target.value); }} />
+        <Input label="Name" value={name} autoFocus onChange={(event) => { setName(event.target.value); }} />
         {problem === undefined ? null : <span className="ink-bad" role="alert">{problem}</span>}
         {write.rejection === undefined ? <WriteStatus view={write.status} /> : <RejectionView rejection={write.rejection} onDismiss={write.dismiss} />}
         <span className="row">

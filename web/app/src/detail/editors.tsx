@@ -7,7 +7,7 @@ import { useId, type ReactNode } from "react";
 
 import { snoozeEndWords } from "../status/snooze.ts";
 import { dateWords } from "../status/when.ts";
-import { Button, Field } from "../ui/kit.tsx";
+import { Button, Input } from "../ui/kit.tsx";
 import { Saving, type Sending } from "../ui/Receipt.tsx";
 import { type Mutation, type NodeDetail, nodeOf, type Ready, titleOf, transition } from "./model.ts";
 import { NodeLink } from "./parts.tsx";
@@ -65,7 +65,7 @@ function DraftForm({
 }
 
 const dateInput = (label: string) => (value: string, change: (value: string) => void) => (
-  <Field type="date" aria-label={label} value={value} onChange={(event) => { change(event.target.value); }} />
+  <Input type="date" aria-label={label} value={value} onChange={(event) => { change(event.target.value); }} />
 );
 
 /**
@@ -176,7 +176,7 @@ export function UntilFields({ view, group, exclude, value, onChange }: { view: R
           ))}
         </div>
       </fieldset>
-      {until === "date" ? <Field type="date" aria-label="Snooze until" value={date} onChange={(event) => { onChange({ date: event.target.value }); }} /> : null}
+      {until === "date" ? <Input type="date" aria-label="Snooze until" value={date} onChange={(event) => { onChange({ date: event.target.value }); }} /> : null}
       {until === "node" ? <UntilNode view={view} label="Snooze until node" exclude={exclude} value={target} onChange={(next) => { onChange({ target: next }); }} /> : null}
     </>
   );
@@ -289,7 +289,7 @@ export function WeightEditor({ view, detail }: { view: Ready; detail: NodeDetail
           start={weight == null ? "1" : String(weight)}
           label="Change the weight"
           input={(value, change) => (
-            <Field type="number" min="0" step="any" aria-label="Weight" value={value} onChange={(event) => { change(event.target.value); }} />
+            <Input type="number" min="0" step="any" aria-label="Weight" value={value} onChange={(event) => { change(event.target.value); }} />
           )}
           mutations={(value) => [{ op: "set_node_field", node: key, value: { weight: Number(value) } }]}
         />

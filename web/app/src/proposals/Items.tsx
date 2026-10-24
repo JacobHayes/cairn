@@ -10,7 +10,7 @@ import type { Kind, Role } from "../authoring/graph.ts";
 import { mintKey, slugOf } from "../authoring/keys.ts";
 import { Picker } from "../authoring/parts.tsx";
 import { choiceId, choiceLabel } from "../status/answer.ts";
-import { Badge, Button, Field } from "../ui/kit.tsx";
+import { Badge, Button, Input } from "../ui/kit.tsx";
 import {
   kindOf,
   needsChoice,
@@ -172,7 +172,7 @@ function MappingControls({ index, mapping, context }: { index: number; mapping: 
         onChange={(event) => { pick(event.target.value); }}
       />
       <span className="row">
-        <Field aria-label="New role title" placeholder="Or a new role" value={title} disabled={!context.editable} onChange={(event) => { setTitle(event.target.value); }} />
+        <Input aria-label="New role title" placeholder="Or a new role" value={title} disabled={!context.editable} onChange={(event) => { setTitle(event.target.value); }} />
         <Button disabled={!context.editable || title.trim() === ""} onClick={() => { set({ new_role: { key: mintKey("r_"), id: slugOf(title, "role"), title: title.trim() } }); setTitle(""); }}>
           Map to a new role
         </Button>

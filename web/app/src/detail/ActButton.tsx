@@ -4,7 +4,7 @@
 // surface supplies as `open`.
 import { useState } from "react";
 
-import { Button, Field } from "../ui/kit.tsx";
+import { Button, Input } from "../ui/kit.tsx";
 import { nodeOf, transition, type Mutation, type Ready } from "./model.ts";
 import { actLabel, unsnoozeOf, type Act } from "./offers.ts";
 import type { NodeWrite } from "./write.ts";
@@ -41,7 +41,7 @@ function MilestoneDone({ view, write, node, disabled }: { view: Ready; write: No
     <span className="row row-end">
       <label className="stack">
         <span className="muted">{date === "" ? "Choose the date it was done." : "Done on"}</span>
-        <Field type="date" aria-label="Done on" value={date} onChange={(event) => { setDate(event.target.value); }} />
+        <Input type="date" aria-label="Done on" value={date} onChange={(event) => { setDate(event.target.value); }} />
       </label>
       <Button
         primary

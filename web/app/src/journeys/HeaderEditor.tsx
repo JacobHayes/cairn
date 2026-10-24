@@ -5,7 +5,7 @@ import { useFormDraft } from "../detail/write.ts";
 import { RejectionView } from "../screens/RejectionView.tsx";
 import { WriteStatus } from "../screens/WriteStatus.tsx";
 import { useScreenWrite } from "../screens/write.ts";
-import { Button, Field } from "../ui/kit.tsx";
+import { Button, Input } from "../ui/kit.tsx";
 import { OwnersField } from "./OwnersField.tsx";
 
 interface HeaderDraft {
@@ -44,7 +44,7 @@ export function HeaderEditor({ ready }: { ready: Ready }) {
   return (
     <div className="stack" data-testid="header-editor">
       <label className="label" htmlFor="header-name">Name</label>
-      <Field id="header-name" value={value.name} onChange={(event) => { form.change({ ...value, name: event.target.value }); }} />
+      <Input id="header-name" value={value.name} onChange={(event) => { form.change({ ...value, name: event.target.value }); }} />
       <label className="label" htmlFor="header-description">Description</label>
       <textarea id="header-description" value={value.description} onChange={(event) => { form.change({ ...value, description: event.target.value }); }} />
       <OwnersField label="label" owners={value.owners} onChange={(owners) => { form.change({ ...value, owners }); }} />

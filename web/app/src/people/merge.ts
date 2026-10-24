@@ -8,7 +8,7 @@
 // The two working states are `busy` and take no new start. The write is the manager's, found
 // by the flow's edit key: stopping the flow (the control going away) stops waiting for the
 // answer and never the write.
-import { assign, enqueueActions, fromPromise, setup, type ActorRefFrom } from "xstate";
+import { assign, enqueueActions, fromPromise, setup } from "xstate";
 
 import { aboutOf, deliverWrite, type EditsRef } from "../data/edit-manager.ts";
 import type { Answer, Command } from "../data/edit-record.ts";
@@ -118,4 +118,3 @@ export const mergeFlow = setup({
   },
 });
 
-export type MergeRef = ActorRefFrom<typeof mergeFlow>;

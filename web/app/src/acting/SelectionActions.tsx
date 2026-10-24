@@ -15,7 +15,7 @@ import { Menu } from "../screens/Menu.tsx";
 import { Rejected } from "../detail/Rejected.tsx";
 import { IdentityOptions } from "../detail/parts.tsx";
 import { useFormDraft, useNodeWrite, type Seen } from "../detail/write.ts";
-import { Button, Field } from "../ui/kit.tsx";
+import { Button, Input } from "../ui/kit.tsx";
 import { reasonFor, runBulk, type BulkAction, type Facts } from "./acts.ts";
 
 type Form = "skip" | "assign" | "snooze";
@@ -69,7 +69,7 @@ function FormInput({ view, open, within, onChange }: { view: Ready; open: Filled
     return (
       <label className="stack">
         <span className="label">Why skip them</span>
-        <Field value={value} onChange={(event) => { onChange({ ...open, value: event.target.value }); }} />
+        <Input value={value} onChange={(event) => { onChange({ ...open, value: event.target.value }); }} />
       </label>
     );
   }

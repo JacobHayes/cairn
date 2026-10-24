@@ -4,7 +4,7 @@
 // started), so the wrong kind of source cannot be entered; several sources are several
 // constraints. F4: `StageBoundsEditor` sets a stage's opening and closing milestones, from the
 // milestones outside it, and whether each gates and closes.
-import { Button, Field } from "../ui/kit.tsx";
+import { Button, Input } from "../ui/kit.tsx";
 import { boundOptions, partsOf, ruleOf, ruleWords, sourceOptions, type Direction, type RuleParts } from "./dates.ts";
 import type { DateRule } from "./fields.ts";
 import type { Tree } from "./graph.ts";
@@ -77,7 +77,7 @@ export function DateRuleEditor({ which, value, onChange, tree, node }: DateRuleE
         {WORDS[which]} {ruleWords(value, label)}
       </span>
       <span className="row">
-        <Field
+        <Input
           type="number"
           min={0}
           aria-label="Offset in days"

@@ -24,8 +24,6 @@ tokio = { workspace = true, features = ["rt"] }
 tracing.workspace = true
 
 [dev-dependencies]
-cairn-engine.workspace = true
-jiff.workspace = true
 tokio = { workspace = true, features = ["macros", "rt"] }
 
 [lints]

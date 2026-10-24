@@ -6,7 +6,7 @@
 import { NODE_COUNT_MAX, TITLE_BYTES_MAX } from "@cairn/client";
 import { useDraft } from "../data/drafts.ts";
 import { wrapRoots } from "../segments/model.ts";
-import { Button, Field } from "../ui/kit.tsx";
+import { Button, Input } from "../ui/kit.tsx";
 import { canHoldChildren, childrenOf, kindOption, newNode, nodesByPath, pathOf, type GraphNode, type NodeKind } from "./graph.ts";
 import { overBytes } from "./limits.ts";
 import { Picker } from "./parts.tsx";
@@ -84,7 +84,7 @@ export function AddNode({ authored, container, onAdded }: AddNodeProps) {
   return (
     <form className="stack" data-testid="add-node" onSubmit={(event) => { event.preventDefault(); add(); }}>
       <Picker aria-label="Kind" value={kind} options={KINDS.map(kindOption)} onChange={(event) => { setKind(event.target.value as NodeKind); }} />
-      <Field aria-label="New node title" placeholder="Title" value={title} onChange={(event) => { setTitle(event.target.value); }} />
+      <Input aria-label="New node title" placeholder="Title" value={title} onChange={(event) => { setTitle(event.target.value); }} />
       <Picker aria-label="Inside" value={parent} none="At the top level" options={containers.map((node) => ({ value: node.key, label: `${node.title} (${pathOf(authored.tree, node.key)})` }))} onChange={(event) => { setParent(event.target.value); }} />
       {second ? (
         <OneRoot root={root} disabled={write.disabled || title.trim() === "" || problem !== undefined} onUnder={() => { addUnder(root); }} onWrap={() => { wrap(root); }} />

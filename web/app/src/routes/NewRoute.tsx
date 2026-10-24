@@ -13,7 +13,7 @@ import { overBytes } from "../authoring/limits.ts";
 import { RejectionView } from "../screens/RejectionView.tsx";
 import { WriteStatus } from "../screens/WriteStatus.tsx";
 import { useScreenWrite } from "../screens/write.ts";
-import { Button, Field, Segmented } from "../ui/kit.tsx";
+import { Button, Input, Segmented } from "../ui/kit.tsx";
 import { ROUTES_INDEX_PATH, routePath } from "./address.ts";
 import { ImportFile } from "./ImportFile.tsx";
 import { openDraft } from "./model.ts";
@@ -31,13 +31,13 @@ function NewForm({ kind, disabled, refused, onStart }: { kind: Kind; disabled: b
     <form className="stack" onSubmit={(event) => { event.preventDefault(); onStart(name.trim(), routeId); }}>
       <label className="stack">
         <span className="label">Name</span>
-        <Field className="new-field" aria-label="New route name" placeholder={`Name of the ${word}`} autoFocus value={name} onChange={(event) => { setKept({ ...kept, name: event.target.value }); }} />
+        <Input className="new-field" aria-label="New route name" placeholder={`Name of the ${word}`} autoFocus value={name} onChange={(event) => { setKept({ ...kept, name: event.target.value }); }} />
       </label>
       <details key={String(refused)} open={refused}>
         <summary className="muted">Change id</summary>
         <label className="stack">
           <span className="label">Id</span>
-          <Field className="new-field" aria-label="New route id" aria-invalid={refused} value={routeId} onChange={(event) => { setKept({ name, id: event.target.value }); }} />
+          <Input className="new-field" aria-label="New route id" aria-invalid={refused} value={routeId} onChange={(event) => { setKept({ name, id: event.target.value }); }} />
         </label>
       </details>
       {problem === undefined ? null : <span className="author-problem" role="alert">{problem}</span>}

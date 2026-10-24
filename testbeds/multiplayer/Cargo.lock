@@ -206,7 +206,6 @@ dependencies = [
  "hyper",
  "hyper-util",
  "metrics",
- "patina-dst",
  "schemars 1.2.3",
  "serde",
  "serde_json",

@@ -1,0 +1,22 @@
+#!/usr/bin/env -S bash -euo pipefail
+#MISE description="Mutation-test web/app source files with StrykerJS: which mutants their unit tests leave alive, and the score (minutes for a few files)"
+#MISE depends=["packages", "build:wasm"]
+# usage: mise run mutants <file>...   (paths from the checkout's root, under web/app/src)
+# For a change that deletes or merges tests: run it on the source files those tests cover
+# before the deletion and again after, and compare the killed counts. A survivor is a mutant
+# no test notices: a missing assertion, or an equivalent mutant (decisions/2026-10-24-where-
+# mutation-testing-runs.md). Stryker edits the files in place (the wasm build output the
+# tests read is not tracked, so a copy would lack it) and restores them when it ends: run it in
+# your own workspace, never in a checkout other work shares.
+cd "$(dirname "$0")/.."
+[ "$#" -gt 0 ] || { echo "usage: mise run mutants <file>..." >&2; exit 2; }
+repo=$PWD
+mutate=""
+for file in "$@"; do
+  mutate+="${mutate:+,}${file#web/app/}"
+done
+# Stryker's backups of the originals stay when it dies before restoring them (an OOM kill);
+# only a clean finish removes them.
+trap 'status=$?; rm -f "$repo"/web/app/stryker-setup-*.js; [ "$status" -ne 0 ] || rm -rf "$repo"/web/app/.stryker-tmp' EXIT
+cd web/app
+nice "$repo/node_modules/.bin/stryker" run stryker.config.json --mutate "$mutate"

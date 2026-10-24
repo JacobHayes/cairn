@@ -6,7 +6,7 @@ import { useEffect, useRef } from "react";
 
 import { newAttachmentKey } from "./Attachments.tsx";
 import { evidenceComplete, type Evidence, type EvidenceDraft, type Needs } from "../acting/acts.ts";
-import { Button, Field } from "../ui/kit.tsx";
+import { Button, Input } from "../ui/kit.tsx";
 import { Saving, type Sending } from "../ui/Receipt.tsx";
 import { plural } from "../ui/words.ts";
 
@@ -87,7 +87,7 @@ export function EvidenceForm({
       {needs.artifact ? (
         <label className="stack">
           <span className="label">Artifact link</span>
-          <Field autoFocus value={artifact} onChange={(event) => { onChange({ artifact: event.target.value, note }); }} />
+          <Input autoFocus value={artifact} onChange={(event) => { onChange({ artifact: event.target.value, note }); }} />
         </label>
       ) : null}
       {needs.note ? (

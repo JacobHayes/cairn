@@ -13,7 +13,7 @@ import { startableVersion } from "../routes/model.ts";
 import { RejectionView } from "../screens/RejectionView.tsx";
 import { WriteStatus } from "../screens/WriteStatus.tsx";
 import { useScreenWrite } from "../screens/write.ts";
-import { Button, Field, Panel } from "../ui/kit.tsx";
+import { Button, Input, Panel } from "../ui/kit.tsx";
 import { Failed } from "../ui/Failed.tsx";
 import { OwnersField } from "./OwnersField.tsx";
 import { walkthroughPath } from "./view.ts";
@@ -89,7 +89,7 @@ function NewJourneyForm({ routes, initial, asked }: { routes: RouteSummary[]; in
     <form className="stack" data-testid="new-journey-form" onSubmit={(event) => { event.preventDefault(); void start(); }}>
       <div className="form-grid">
         <label htmlFor="new-name">Name</label>
-        <Field id="new-name" required value={form.name} onChange={(event) => { setDraft({ ...form, name: event.target.value }); }} />
+        <Input id="new-name" required value={form.name} onChange={(event) => { setDraft({ ...form, name: event.target.value }); }} />
         <label htmlFor="new-description">Description</label>
         <textarea id="new-description" value={form.description} onChange={(event) => { setDraft({ ...form, description: event.target.value }); }} />
         <OwnersField owners={form.owners} onChange={(owners) => { setDraft({ ...form, owners }); }} />

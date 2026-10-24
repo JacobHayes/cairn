@@ -8,7 +8,7 @@ import { RejectionView } from "../screens/RejectionView.tsx";
 import { WriteStatus } from "../screens/WriteStatus.tsx";
 import { useCaller } from "../data/react.ts";
 import { statusTone, statusWord } from "../status/words.ts";
-import { Badge, Button, Field } from "../ui/kit.tsx";
+import { Badge, Button, Input } from "../ui/kit.tsx";
 import { Receipt } from "../ui/Receipt.tsx";
 import { flagsOf, isStage, kindWord, type NodeDetail, type Ready } from "./model.ts";
 import { NodeLink, OwnerSelect } from "./parts.tsx";
@@ -22,7 +22,7 @@ function RenameForm({ view, title, rename }: { view: Ready; title: string; renam
   return (
     <div className="stack" data-testid="rename">
       <span className="row">
-        <Field
+        <Input
           aria-label={`New title for ${title}`}
           value={text}
           disabled={busy || write?.state === "gone"}

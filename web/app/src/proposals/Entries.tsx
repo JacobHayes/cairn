@@ -22,7 +22,7 @@ import { useLive } from "../data/react.ts";
 import type { Ready } from "../detail/model.ts";
 import { RejectionView } from "../screens/RejectionView.tsx";
 import { WriteStatus } from "../screens/WriteStatus.tsx";
-import { Button, Field, Panel } from "../ui/kit.tsx";
+import { Button, Input, Panel } from "../ui/kit.tsx";
 import { useProposalWrite, type ProposalAsk, type ProposalWrite } from "./write.ts";
 
 type ProposalAnswer = Schema<"ProposalAnswer">;
@@ -89,8 +89,8 @@ function SaveAsRoute({ ready }: { ready: Ready }) {
   const [name, setName] = useState(header.name);
   return (
     <span className="row" data-testid="save-as-route-flow">
-      <Field aria-label="Route id" value={route} onChange={(event) => { setRoute(event.target.value); }} />
-      <Field aria-label="Route name" value={name} onChange={(event) => { setName(event.target.value); }} />
+      <Input aria-label="Route id" value={route} onChange={(event) => { setRoute(event.target.value); }} />
+      <Input aria-label="Route name" value={name} onChange={(event) => { setName(event.target.value); }} />
       <Button disabled={write.disabled || route.trim() === "" || name.trim() === ""} onClick={() => { start((id) => ({ op: "save_as_route", journey: header.id, request: { proposal: id, route: route.trim(), name: name.trim() } })); }}>
         Propose saving it as a route
       </Button>

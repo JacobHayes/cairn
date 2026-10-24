@@ -24,9 +24,6 @@ export const ROUTES_INDEX_PATH = pathTo("routes");
 /** The routes index kept to routes. */
 export const ROUTES_PATH = `${ROUTES_INDEX_PATH}?type=routes`;
 
-/** The routes index kept to segments. */
-export const SEGMENTS_PATH = `${ROUTES_INDEX_PATH}?type=segments`;
-
 /** A11, A12: the new-route form (`?kind=segment` for a segment). A route's id `new` is shadowed by it, so the form refuses it. */
 export function newRoutePath(kind?: "segment"): string {
   return kind === "segment" ? `${pathTo("routeNew")}?kind=segment` : pathTo("routeNew");
@@ -101,12 +98,6 @@ export function routeSwitched(route: string, search: string, to: Screen, node: s
   const params = new URLSearchParams(search);
   const { version } = spotOf(params);
   return routePath(route, { version, node, screen: to, proposal }, params.toString());
-}
-
-/** C14: the layer of `proposal` over the route's page at `search`, the view on screen kept. */
-export function routeLayerEntry(route: string, search: string, proposal: string): string {
-  const params = new URLSearchParams(search);
-  return routePath(route, { screen: routeScreenOf(params), proposal }, search);
 }
 
 /** C14: the route's page without the layer at `search`: the view stays; the version is the route as it stands. */

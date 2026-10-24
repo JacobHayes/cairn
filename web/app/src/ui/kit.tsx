@@ -4,8 +4,6 @@
 // a variant (`primary`, `ghost`), and `.field` is its labelled wrapper.
 import { useId, type ButtonHTMLAttributes, type HTMLAttributes, type InputHTMLAttributes, type ReactNode } from "react";
 
-import type { Capabilities } from "../data/host.ts";
-import { useCapabilities } from "../data/react.ts";
 import { Tip, type TipKind } from "./Tip.tsx";
 
 /**
@@ -69,9 +67,6 @@ export function PickBox(props: Omit<InputHTMLAttributes<HTMLInputElement>, "type
     </label>
   );
 }
-
-/** The input itself, kept under its old name so code written against it still builds. Use `Input`. */
-export const Field = Input;
 
 /**
  * A status dot's tone, by its meaning: `done` done or decided (a check, not a dot), `good` approved or new, `bad` failed, `warn` attention or deferred,
@@ -175,7 +170,3 @@ export function IndexState({ kind, children, action, ...rest }: { kind: "loading
   );
 }
 
-/** Capabilities gating: renders `children` only when the host offers what `when` asks. */
-export function Gate({ when, children, otherwise = null }: { when: (capabilities: Capabilities) => boolean; children: ReactNode; otherwise?: ReactNode }) {
-  return when(useCapabilities()) ? children : otherwise;
-}

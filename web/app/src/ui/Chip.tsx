@@ -17,12 +17,3 @@ export function Chip({ children, remove }: { children: ReactNode; remove?: React
 export function Cross() {
   return <span aria-hidden="true">×</span>;
 }
-
-/** A row of chips at rest. */
-export function Chips({ children, ...rest }: { children: ReactNode; "data-testid"?: string }) {
-  return (
-    <span className="chips-static" {...rest}>
-      {children}
-    </span>
-  );
-}

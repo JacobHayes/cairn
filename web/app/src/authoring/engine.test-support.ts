@@ -75,11 +75,6 @@ export function journeyAfter(host: InBrowserHost, journey: string, mutations: Mu
   return JSON.stringify(host.engine.apply(text, { patch, at, actor }).document);
 }
 
-/** Fixture journey `journey`'s document as the root holds it. */
-export function journeyDocument(host: InBrowserHost, journey: string): Schema<"DomainDocument"> {
-  return JSON.parse(host.documentText(journey)) as Schema<"DomainDocument">;
-}
-
 /** A journey as the tab holds it once derived: its view, projections and a way to release the derivation. */
 export interface DerivedJourney {
   ready: Extract<import("../data/journeys.ts").JourneyView, { status: "ready" }>;

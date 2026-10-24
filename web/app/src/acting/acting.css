@@ -51,10 +51,6 @@
   cursor: default;
 }
 
-.crumb {
-  overflow-wrap: anywhere;
-}
-
 .for-you {
   margin: 0;
   padding: var(--space-3) var(--space-4);

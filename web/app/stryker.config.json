@@ -1,0 +1,11 @@
+{
+  "$schema": "../../node_modules/@stryker-mutator/core/schema/stryker-schema.json",
+  "testRunner": "vitest",
+  "vitest": { "configFile": "vitest.config.ts" },
+  "inPlace": true,
+  "concurrency": 4,
+  "coverageAnalysis": "perTest",
+  "ignorePatterns": [".stryker-tmp", "node_modules"],
+  "reporters": ["clear-text"],
+  "clearTextReporter": { "allowColor": false, "reportTests": false, "reportMutants": true, "reportScoreTable": true }
+}

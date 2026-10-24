@@ -11,7 +11,7 @@ import { useState } from "react";
 import { useSession } from "../data/react.ts";
 
 import type { Deriver } from "../data/host.ts";
-import { Button, Field } from "../ui/kit.tsx";
+import { Button, Input } from "../ui/kit.tsx";
 import type { Resource } from "./graph.ts";
 import { mintKey } from "./keys.ts";
 import { overBytes, urlProblem } from "./limits.ts";
@@ -88,12 +88,12 @@ function ResourceFields({ form, setForm, authored }: { form: ResourceForm; setFo
     <>
       <span className="row">
         <Picker aria-label="Resource type" value={form.type} options={TYPES} disabled={form.key !== undefined} onChange={(event) => { setForm({ ...form, type: event.target.value as ResourceType }); }} />
-        <Field aria-label="Resource title" placeholder="Title" value={form.title} onChange={(event) => { setForm({ ...form, title: event.target.value }); }} />
+        <Input aria-label="Resource title" placeholder="Title" value={form.title} onChange={(event) => { setForm({ ...form, title: event.target.value }); }} />
       </span>
       {multiline ? (
         <textarea aria-label={form.type === "tip" ? "Tip" : "Message draft"} value={form.body} onChange={(event) => { setForm({ ...form, body: event.target.value }); }} />
       ) : (
-        <Field aria-label="Address" placeholder="https://..." value={form.body} onChange={(event) => { setForm({ ...form, body: event.target.value }); }} />
+        <Input aria-label="Address" placeholder="https://..." value={form.body} onChange={(event) => { setForm({ ...form, body: event.target.value }); }} />
       )}
       {form.type === "message_draft" ? (
         <Picker

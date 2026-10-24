@@ -22,7 +22,7 @@ import type { Ready } from "../detail/model.ts";
 import { Section } from "../detail/parts.tsx";
 import { fieldWords } from "../status/words.ts";
 import { NODE_FIELDS } from "@cairn/client";
-import { Button, Field, PickBox } from "../ui/kit.tsx";
+import { Button, Input, PickBox } from "../ui/kit.tsx";
 import { carryIds, withFieldValue, withMutation, withMutationsAdded, withoutMutation, type ProposalDraft } from "./model.ts";
 import { mutationWords, type Names } from "./words.ts";
 import { KINDS } from "../detail/model.ts";
@@ -168,9 +168,9 @@ function FieldValue({ editor, mutation, onChange, context }: { editor: string; m
   const targets = includes(MILESTONE_FIELDS, field) ? nodesFor(context.tree, field).map((each) => ({ value: each.key, label: each.title })) : [];
   return (
     <FieldBox label={fieldWords(field)} place={field} notes={{ problem }}>
-      {includes(LINE_FIELDS, field) ? <Field aria-label={fieldWords(field)} value={draft[field]} onChange={(event) => { change({ [field]: event.target.value }); }} /> : null}
+      {includes(LINE_FIELDS, field) ? <Input aria-label={fieldWords(field)} value={draft[field]} onChange={(event) => { change({ [field]: event.target.value }); }} /> : null}
       {includes(MARKDOWN_FIELDS, field) ? <textarea aria-label={fieldWords(field)} value={draft[field]} onChange={(event) => { change({ [field]: event.target.value }); }} /> : null}
-      {includes(NUMBER_FIELDS, field) ? <Field type="number" min={0} aria-label={fieldWords(field)} value={draft[field]} onChange={(event) => { change({ [field]: event.target.value }); }} /> : null}
+      {includes(NUMBER_FIELDS, field) ? <Input type="number" min={0} aria-label={fieldWords(field)} value={draft[field]} onChange={(event) => { change({ [field]: event.target.value }); }} /> : null}
       {includes(FLAG_FIELDS, field) ? <PickBox aria-label={fieldWords(field)} checked={draft[field]} onChange={(event) => { change({ [field]: event.target.checked }); }} /> : null}
       {includes(MILESTONE_FIELDS, field) ? <Picker aria-label={fieldWords(field)} value={draft[field]} none="None" options={targets} onChange={(event) => { change({ [field]: event.target.value }); }} /> : null}
       {field === "fills_role" ? <Picker aria-label={fieldWords(field)} value={draft.fills_role} none="No role" options={rolesForFill(context.roles, draft.answer_type).map((role) => ({ value: role.key, label: role.title ?? role.id }))} onChange={(event) => { change({ fills_role: event.target.value }); }} /> : null}
@@ -199,7 +199,7 @@ function MutationEditor({ editor, mutation, onChange, context }: { editor: strin
     case "set_node_field":
       return <FieldValue editor={editor} mutation={mutation} onChange={onChange} context={context} />;
     case "set_pin":
-      return <Field type="date" aria-label="Pinned date" value={mutation.date} onChange={(event) => { onChange({ ...mutation, date: event.target.value }); }} />;
+      return <Input type="date" aria-label="Pinned date" value={mutation.date} onChange={(event) => { onChange({ ...mutation, date: event.target.value }); }} />;
     case "answer": {
       const decision = context.tree.byKey.get(mutation.decision);
       return context.ready === undefined || decision === undefined ? null : (
@@ -264,7 +264,7 @@ function AddNode({ context }: { context: ChangesContext }) {
   return (
     <form className="row" data-testid="proposal-add-node" onSubmit={(event) => { event.preventDefault(); add(); }}>
       <Picker aria-label="Kind" value={kind} options={KINDS.map(kindOption)} onChange={(event) => { setKind(event.target.value as NodeKind); }} />
-      <Field aria-label="New node title" placeholder="Title" value={title} onChange={(event) => { setTitle(event.target.value); }} />
+      <Input aria-label="New node title" placeholder="Title" value={title} onChange={(event) => { setTitle(event.target.value); }} />
       <Picker aria-label="Inside" value={parent} none="At the top level" options={containers.map((node) => ({ value: node.key, label: `${node.title} (${pathOf(context.tree, node.key)})` }))} onChange={(event) => { setParent(event.target.value); }} />
       <Button type="submit" disabled={title.trim() === ""}>
         Add a node

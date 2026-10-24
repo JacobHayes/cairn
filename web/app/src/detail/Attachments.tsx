@@ -8,7 +8,7 @@ import type { Schema } from "@cairn/client";
 
 import { useUserWords } from "../data/react.ts";
 import { dateWords } from "../status/when.ts";
-import { Badge, Button, Field } from "../ui/kit.tsx";
+import { Badge, Button, Input } from "../ui/kit.tsx";
 import { Markdown, safeHref } from "../ui/markdown.tsx";
 import { foldKey } from "./folds.ts";
 import type { Annotation, NodeDetail, Ready } from "./model.ts";
@@ -83,12 +83,12 @@ function Editor({ write, node, form, types }: { write: NodeWrite; node: string |
             </option>
           ))}
         </select>
-        <Field aria-label="Title" placeholder="Title (optional)" value={value.title} onChange={(event) => { form.change({ ...value, title: event.target.value }); }} />
+        <Input aria-label="Title" placeholder="Title (optional)" value={value.title} onChange={(event) => { form.change({ ...value, title: event.target.value }); }} />
       </span>
       {value.type === "note" ? (
         <textarea aria-label="Note" value={value.text} onChange={(event) => { form.change({ ...value, text: event.target.value }); }} />
       ) : (
-        <Field type="url" aria-label="Address" placeholder="https://" value={value.text} onChange={(event) => { form.change({ ...value, text: event.target.value }); }} />
+        <Input type="url" aria-label="Address" placeholder="https://" value={value.text} onChange={(event) => { form.change({ ...value, text: event.target.value }); }} />
       )}
       <span className="row">
         <Button primary disabled={write.disabled || value.text.trim() === ""} onClick={() => void save()}>

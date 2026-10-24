@@ -8,7 +8,7 @@ import { KIND_COUNT_MAX, OWNER_KIND, ROLE_COUNT_MAX, TITLE_BYTES_MAX } from "@ca
 import { useState } from "react";
 
 import { useDraft } from "../data/drafts.ts";
-import { Button, Field } from "../ui/kit.tsx";
+import { Button, Input } from "../ui/kit.tsx";
 import { CascadeDialog } from "./CascadeDialog.tsx";
 import { useRemovalPlan } from "./removal.ts";
 import { rolesForSlot, type Kind, type Mutation, type Role } from "./graph.ts";
@@ -97,8 +97,8 @@ function SlotForm({ editing, setEditing, kind, slots, write, revision }: { editi
   return (
     <span className="stack" data-testid={`${kind.name}-form`}>
       <span className="row">
-        <Field aria-label={`${kind.words} label`} placeholder="Label" value={slot.title ?? ""} onChange={(event) => { setSlot({ ...slot, title: event.target.value, ...(isNew ? { id: uniqueId(slugOf(event.target.value, kind.name), taken) } : {}) }); }} />
-        <Field aria-label={`${kind.words} id`} value={slot.id} onChange={(event) => { setSlot({ ...slot, id: event.target.value }); }} />
+        <Input aria-label={`${kind.words} label`} placeholder="Label" value={slot.title ?? ""} onChange={(event) => { setSlot({ ...slot, title: event.target.value, ...(isNew ? { id: uniqueId(slugOf(event.target.value, kind.name), taken) } : {}) }); }} />
+        <Input aria-label={`${kind.words} id`} value={slot.id} onChange={(event) => { setSlot({ ...slot, id: event.target.value }); }} />
         <label className="row">
           <input type="checkbox" checked={slot.multi ?? false} onChange={(event) => { setSlot({ ...slot, multi: event.target.checked }); }} />
           Several at once

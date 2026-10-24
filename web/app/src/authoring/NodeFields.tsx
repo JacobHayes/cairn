@@ -7,7 +7,7 @@ import { useState } from "react";
 import { ANSWER_TYPES, DEFAULT_WEIGHT, type Schema } from "@cairn/client";
 
 import { choiceId, choiceLabel, type Choice } from "../status/answer.ts";
-import { Button, Field } from "../ui/kit.tsx";
+import { Button, Input } from "../ui/kit.tsx";
 import { fieldsOf, type FormField, type NodeDraft } from "./fields.ts";
 import { nodesFor, rolesForFill, type AnswerType, type NodeKind, type Role, type Tree } from "./graph.ts";
 import { slugOf, uniqueId } from "./keys.ts";
@@ -62,7 +62,7 @@ function Text({ props, field, label, area = false }: { props: FieldsProps; field
       {area ? (
         <textarea aria-label={label} value={value} onChange={(event) => { onChange(event.target.value); }} />
       ) : (
-        <Field aria-label={label} value={value} onChange={(event) => { onChange(event.target.value); }} />
+        <Input aria-label={label} value={value} onChange={(event) => { onChange(event.target.value); }} />
       )}
     </FieldBox>
   );
@@ -71,7 +71,7 @@ function Text({ props, field, label, area = false }: { props: FieldsProps; field
 function Days({ props, field, label, hint }: { props: FieldsProps; field: "weight" | "estimate"; label: string; hint: string }) {
   return (
     <FieldBox label={label} place={field} notes={props.notes(field)}>
-      <Field type="number" min={0} aria-label={label} placeholder={hint} value={props.draft[field]} onChange={(event) => { props.change({ [field]: event.target.value }); }} />
+      <Input type="number" min={0} aria-label={label} placeholder={hint} value={props.draft[field]} onChange={(event) => { props.change({ [field]: event.target.value }); }} />
     </FieldBox>
   );
 }
@@ -152,7 +152,7 @@ export function ChecklistEditor({ props, flag = true }: { props: FieldsProps; fl
       {items.length === 0 ? <span className="muted small">With no items, this requires nothing.</span> : null}
       {items.map((item, at) => (
         <span key={item.id} className="items-row" data-testid="checklist-item-edit" data-item={item.id}>
-          <Field aria-label="Item title" value={item.title} onChange={(event) => { set(items.map((each, index) => (index === at ? { ...each, title: event.target.value } : each))); }} />
+          <Input aria-label="Item title" value={item.title} onChange={(event) => { set(items.map((each, index) => (index === at ? { ...each, title: event.target.value } : each))); }} />
           {at === 0 ? null : (
             <Button className="items-move items-up" aria-label={`Move ${item.title} up`} onClick={() => { move(at, -1); }}>
               {"\u2191"}
@@ -193,7 +193,7 @@ function AddItem({ items, reserved, pending, onAdd }: { items: readonly Schema<"
     <label className="stack">
       <span className="label">New item</span>
       <span className="stack items-add">
-        <Field
+        <Input
           aria-label="New item"
           placeholder="A new item"
           value={title}
@@ -223,7 +223,7 @@ export function ChoicesEditor({ props }: { props: FieldsProps }) {
     <FieldBox label="Choices" place="choices" notes={props.notes("choices")}>
       {choices.map((choice, at) => (
         <span key={at} className="row" data-testid="choice">
-          <Field aria-label="Choice label" value={choiceLabel(choice)} onChange={(event) => { set(choices.map((each, index) => (index === at ? label(each, event.target.value) : each))); }} />
+          <Input aria-label="Choice label" value={choiceLabel(choice)} onChange={(event) => { set(choices.map((each, index) => (index === at ? label(each, event.target.value) : each))); }} />
           <span className="muted mono">{choiceId(choice)}</span>
           <Button aria-label={`Remove the choice ${choiceLabel(choice)}`} onClick={() => { set(choices.filter((_, index) => index !== at)); }}>
             Remove
@@ -248,7 +248,7 @@ function AddChoice({ choices, onAdd }: { choices: readonly Choice[]; onAdd: (cho
   };
   return (
     <span className="row">
-      <Field
+      <Input
         aria-label="New choice"
         placeholder="A new choice"
         value={title}

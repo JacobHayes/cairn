@@ -9,7 +9,7 @@ import { useState } from "react";
 import { useDraft } from "../data/drafts.ts";
 import { RejectionView } from "../screens/RejectionView.tsx";
 import { WriteStatus } from "../screens/WriteStatus.tsx";
-import { Button, Field } from "../ui/kit.tsx";
+import { Button, Input } from "../ui/kit.tsx";
 import { CascadeDialog } from "./CascadeDialog.tsx";
 import { removalMutations, useRemovalPlan } from "./removal.ts";
 import { useConnecting } from "./connect.tsx";
@@ -169,7 +169,7 @@ export function PieceRows({ pieces, onChange }: { pieces: Piece[]; onChange: (ne
       </label>
       <label className="field">
         <span className="label">Title</span>
-        <Field aria-label="Piece title" placeholder="What it is" value={piece.title} onChange={(event) => { set(at, { title: event.target.value }); }} />
+        <Input aria-label="Piece title" placeholder="What it is" value={piece.title} onChange={(event) => { set(at, { title: event.target.value }); }} />
       </label>
     </span>
   ));

@@ -13,7 +13,7 @@ import { RejectionView } from "../screens/RejectionView.tsx";
 import { WriteStatus } from "../screens/WriteStatus.tsx";
 import { useScreenWrite, type ScreenWrite } from "../screens/write.ts";
 import { ChipsInput } from "../ui/ChipsInput.tsx";
-import { Button, Field } from "../ui/kit.tsx";
+import { Button, Input } from "../ui/kit.tsx";
 import { EMAIL_RULES, identityOf, nameProblem, newIdentityKey, type Identity } from "./model.ts";
 
 /** What is typed in the form, and the email typed and not yet taken as a chip. */
@@ -51,7 +51,7 @@ function Fields({ typed, change }: { typed: Typed; change: (next: Typed) => void
   const problem = nameProblem(typed.name);
   return (
     <>
-      <Field label="Name" value={typed.name} onChange={(event) => { change({ ...typed, name: event.target.value }); }} />
+      <Input label="Name" value={typed.name} onChange={(event) => { change({ ...typed, name: event.target.value }); }} />
       <ChipsInput label="Emails" placeholder="Add an email" inputMode="email" rules={EMAIL_RULES} values={typed.emails} text={typed.emailText} onChange={(emails, emailText) => { change({ ...typed, emails, emailText }); }} />
       {problem === undefined ? null : <span className="ink-bad" role="alert">{problem}</span>}
     </>

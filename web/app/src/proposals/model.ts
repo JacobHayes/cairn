@@ -14,7 +14,6 @@ export type ReviewItem = Schema<"ReviewItem">;
 export type Conflict = Schema<"Conflict">;
 export type Resolution = Schema<"ConflictResolution">;
 export type Mapping = Schema<"ParticipationMapping">;
-export type AnswerValue = Schema<"AnswerValue">;
 export type UnresolvedReason = Schema<"UnresolvedReason">;
 
 /** The kinds of resolution a conflict can offer (B7). */
@@ -183,11 +182,6 @@ export function graphDiff(before: Graph | null | undefined, after: Graph | null 
     edgesAdded: edgesAfter.filter((edge) => !namesBefore.has(edgeName(edge))).sort(order),
     edgesRemoved: edgesBefore.filter((edge) => !namesAfter.has(edgeName(edge))).sort(order),
   };
-}
-
-/** Whether a diff changes nothing. */
-export function unchanged(diff: GraphDiff): boolean {
-  return diff.added.length + diff.removed.length + Object.keys(diff.changed).length + diff.edgesAdded.length + diff.edgesRemoved.length === 0;
 }
 
 /** I6: why a proposal cannot be applied now, each a reason the screen names. */

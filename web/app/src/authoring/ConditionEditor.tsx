@@ -6,7 +6,7 @@
 // checked before it is sent.
 import type { Schema } from "@cairn/client";
 
-import { Button, Field } from "../ui/kit.tsx";
+import { Button, Input } from "../ui/kit.tsx";
 import {
   COMBINATORS,
   OPERATOR_WORDS,
@@ -79,11 +79,11 @@ function ValueControl({ input, value, identities, onChange }: { input: ValueInpu
         <Picker aria-label="Value" value={value === true ? "yes" : "no"} options={[{ value: "yes", label: "yes" }, { value: "no", label: "no" }]} onChange={(event) => { onChange(event.target.value === "yes"); }} />
       );
     case "date":
-      return <Field type="date" aria-label="Value" value={String(value)} onChange={(event) => { onChange(event.target.value); }} />;
+      return <Input type="date" aria-label="Value" value={String(value)} onChange={(event) => { onChange(event.target.value); }} />;
     case "identity":
       return <Picker aria-label="Value" value={String(value)} options={identities.map((identity) => ({ value: identity.key, label: identityLabel(identity) }))} onChange={(event) => { onChange(event.target.value); }} />;
     case "text":
-      return <Field aria-label="Value" value={String(value)} onChange={(event) => { onChange(event.target.value); }} />;
+      return <Input aria-label="Value" value={String(value)} onChange={(event) => { onChange(event.target.value); }} />;
   }
 }
 

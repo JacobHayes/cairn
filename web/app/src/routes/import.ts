@@ -13,7 +13,7 @@
 // waiting for an answer and never the write. `route` is how a flow recovers when a discard
 // landed after the flow stopped waiting (a Retry by hand, a reload, another tab): it reads the
 // route as it is now, and skips the discard when no draft is open.
-import { assign, enqueueActions, fromPromise, setup, type ActorRefFrom } from "xstate";
+import { assign, enqueueActions, fromPromise, setup } from "xstate";
 
 import { aboutOf, deliverWrite, submitWrite, type EditsRef, type Sent } from "../data/edit-manager.ts";
 import type { Answer, Command } from "../data/edit-record.ts";
@@ -165,4 +165,3 @@ export const importFlow = setup({
   },
 });
 
-export type ImportRef = ActorRefFrom<typeof importFlow>;

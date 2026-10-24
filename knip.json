@@ -1,0 +1,10 @@
+{
+  "$schema": "https://unpkg.com/knip@6/schema.json",
+  "ignoreExportsUsedInFile": true,
+  "ignore": ["web/*/generated/**"],
+  "ignoreDependencies": ["openapi-typescript", "@design/.*"],
+  "workspaces": {
+    ".": {},
+    "web/app": { "entry": ["src/lint/run-css.ts", "playwright*.config.ts", "e2e/**/*.ts"] }
+  }
+}

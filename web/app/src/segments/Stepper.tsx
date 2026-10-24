@@ -15,7 +15,7 @@ import { Picker } from "../authoring/parts.tsx";
 import { domainOf, type Authored } from "../authoring/target.ts";
 import { readDraft, writeDraft } from "../data/drafts.ts";
 import { Problem, useDraftAndOpen } from "../proposals/Entries.tsx";
-import { Button, Field } from "../ui/kit.tsx";
+import { Button, Input } from "../ui/kit.tsx";
 import { stepperDraftKey } from "./entry.ts";
 import { heldOf, insertion, stepOf } from "./insertion.ts";
 import { insertionMembers, planInsertion, sizeWords, type Choices, type Mapping, type PeopleRow, type Plan } from "./model.ts";
@@ -61,7 +61,7 @@ function ChooseStep({ authored, onChoose }: { authored: Authored; onChoose: (seg
   const shown = offers.filter((offer) => `${offer.name} ${offer.description ?? ""}`.toLowerCase().includes(text.trim().toLowerCase()));
   return (
     <div className="stack" data-testid="step-choose">
-      <Field aria-label="Search segments" placeholder="Search segments" value={text} onChange={(event) => { setText(event.target.value); }} />
+      <Input aria-label="Search segments" placeholder="Search segments" value={text} onChange={(event) => { setText(event.target.value); }} />
       {loading ? <p className="muted small">Reading the segments...</p> : null}
       {!loading && offers.length === 0 ? <p className="muted small">{leftOut ? "No other segments are published yet." : "There are no published segments yet. Publish one from Routes first."}</p> : null}
       {!loading && offers.length > 0 && shown.length === 0 ? <p className="muted small">No segment is named like that.</p> : null}
@@ -105,7 +105,7 @@ function PlaceStep({ authored, plan, choices, onChange }: { authored: Authored; 
       </label>
       <label className="stack">
         <span className="author-label">Name</span>
-        <Field aria-label="Name" value={choices.title} placeholder={plan.root.title} onChange={(event) => { onChange({ title: event.target.value }); }} />
+        <Input aria-label="Name" value={choices.title} placeholder={plan.root.title} onChange={(event) => { onChange({ title: event.target.value }); }} />
         {plan.root.idTaken ? (
           <span className="muted small" data-testid="id-suffix">
             Its id here is {plan.root.id}: the first is taken.

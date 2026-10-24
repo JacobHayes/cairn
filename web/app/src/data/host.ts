@@ -36,7 +36,6 @@ export type Patch = Schema<"Patch">;
 export type Markdown = Schema<"Markdown">;
 export type Route = Schema<"Route">;
 export type RouteVersion = Schema<"RouteVersion">;
-export type Level = Schema<"Level">;
 export type RoutePage = Schema<"RoutePage">;
 export type RouteDetail = Schema<"RouteDetail">;
 export type RouteFile = Schema<"RouteFile">;

@@ -11,13 +11,11 @@ import { hostFailure } from "./host-failure.ts";
 import { Missing, ReadFailed } from "./host.ts";
 
 export type Proposal = Schema<"Proposal">;
-export type ProposalDraft = Schema<"ProposalDraft">;
 export type ProposalReview = Schema<"ProposalReview">;
 export type ProposalAnswer = Schema<"ProposalAnswer">;
 export type PatchAnswer = Schema<"PatchAnswer">;
 export type Rejection = Schema<"Rejection">;
 export type Domain = Schema<"Domain">;
-export type Lineage = Schema<"Lineage">;
 export type ProposalList = Schema<"ProposalList">;
 export type ProposalSummary = Schema<"ProposalSummary">;
 export type Cursor = Schema<"ProposalCursor">;

@@ -29,6 +29,8 @@ ladder_require_tool cargo cargo --version
 ladder_require_tool rustfmt cargo fmt --version
 ladder_require_tool clippy cargo clippy --version
 ladder_require_tool node node --version
+ladder_require_tool cargo-machete cargo machete --version
+[ -x node_modules/.bin/knip ] || ladder_fail "tool missing: knip (run npm ci)"
 
 # PRACTICES, Code conventions (TypeScript): the strict typecheck over every web package's
 # sources and generated types, and eslint with the type-aware rules over the hand-written
@@ -127,6 +129,15 @@ if [ "$rust" = 1 ]; then
     ladder_fail "a target declaring test = false holds tests"
   }
   ladder_suite "test = false targets without tests" "$untested" targets
+
+  # A dependency a crate declares and never names is a dependency to audit and build for
+  # nothing. cargo-machete reads every manifest under the repository, the testbeds' too. It
+  # reads names, so a crate used only through its macros or features is listed under
+  # [package.metadata.cargo-machete] ignored = [...] with the reason.
+  manifests=$(find . \( -name target -o -name node_modules -o -name dist -o -name .git -o -name .jj \) -prune \
+    -o -name Cargo.toml -type f -exec grep -l '^\[package\]' {} + | wc -l)
+  ladder_run "unused dependencies" cargo machete .
+  ladder_suite "unused dependencies" "$manifests" crates
 
   # The scoped lints of the clippy run below, raised to warn (explained there).
   raised=()
@@ -365,5 +376,12 @@ css_files=$(mise-tasks/lint/css 2>"$typescript/css.err") || {
   ladder_fail "the CSS lint reported violations"
 }
 ladder_suite "css lint" "$css_files" files
+
+# Files and exports nothing imports, and packages nothing uses (knip.json). The count is the
+# web sources it inspects: every TypeScript file under web/ except generated and built ones.
+ladder_run "dead TypeScript" node_modules/.bin/knip --no-progress
+knip_files=$(find web \( -name node_modules -o -name generated -o -name dist \) -prune \
+  -o \( -name '*.ts' -o -name '*.tsx' \) -type f -print | wc -l)
+ladder_suite "dead TypeScript" "$knip_files" files
 
 ladder_step_end

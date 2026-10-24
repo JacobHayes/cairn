@@ -15,7 +15,6 @@ import { useLocation, useNavigate } from "react-router";
 import { useFrameActions } from "../shell/frame.tsx";
 import { doneMutations, evidenceDraft, missingEvidence } from "../acting/acts.ts";
 import { graphPath, graphViewFrom } from "../canvas/settings.ts";
-import { mayNotApply } from "../data/activity.ts";
 import { writeDraft } from "../data/drafts.ts";
 import type { OperationId } from "../data/edit-record.ts";
 import { useSession } from "../data/react.ts";
@@ -25,7 +24,7 @@ import { BreakDown } from "../proposals/Entries.tsx";
 import { Menu } from "../screens/Menu.tsx";
 import { useInsertEntry } from "../segments/entry.ts";
 import { insertionRoot, memberOrigin } from "../segments/model.ts";
-import { Button, Field } from "../ui/kit.tsx";
+import { Button, Input } from "../ui/kit.tsx";
 import { actionsDraftKey, actionsForm, changing, formView, opening, takeOpened, type Drafted, type FormCase, type FormValues, type FormView, type Opened, type PanelCase } from "./actions-form.ts";
 import { AnswerEditor, type Anyway } from "./AnswerEditor.tsx";
 import { ActButton, actMutation, type Opens } from "./ActButton.tsx";
@@ -41,22 +40,6 @@ import { Saving, type Sending } from "../ui/Receipt.tsx";
 import { guardWords, keptWords } from "./words.ts";
 import { useNodeWrite, type NodeWrite } from "./write.ts";
 import { plural } from "../ui/words.ts";
-
-/**
- * D4: beside a finishing action on undecided work, that finishing it is accepted but may not
- * apply, naming the decisions it waits on; nothing when the node is not undecided.
- */
-export function MayNotApply({ view, node }: { view: Ready; node: string }) {
-  const unanswered = view.derived.nodes[node]?.relevance.unanswered ?? [];
-  if (unanswered.length === 0) {
-    return null;
-  }
-  return (
-    <span className="muted small" data-testid="may-not-apply" data-unanswered={unanswered.join(" ")}>
-      {mayNotApply(unanswered, (key) => titleOf(view, key))}.
-    </span>
-  );
-}
 
 /** The end of a form's row of buttons: Cancel, or while its write is out Close (closing leaves the save going). */
 function Dismiss({ sending, onClose }: { sending: Sending; onClose: () => void }) {
@@ -87,7 +70,7 @@ export function ReasonForm({ value, label, hint, optional = false, confirm, test
     <span className="stack reason-form" data-testid={testId} ref={shown}>
       <label className="stack">
         <span className="label">{label}</span>
-        <Field value={value} onChange={(event) => { onChange(event.target.value); }} />
+        <Input value={value} onChange={(event) => { onChange(event.target.value); }} />
       </label>
       {hint === undefined ? null : <p className="muted">{hint}</p>}
       <span className="row">
@@ -133,7 +116,7 @@ function EditDate({ value, unchanged, sending, disabled, onChange, onSave, onClo
       <span className="row row-end">
         <label className="stack">
           <span className="muted">{value === "" ? "Choose the date it was done." : "Done on"}</span>
-          <Field type="date" aria-label="Done on" value={value} onChange={(event) => { onChange(event.target.value); }} />
+          <Input type="date" aria-label="Done on" value={value} onChange={(event) => { onChange(event.target.value); }} />
         </label>
         <Button primary disabled={disabled || value === "" || unchanged} onClick={() => { onSave(value); }}>
           Save

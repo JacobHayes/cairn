@@ -11,7 +11,7 @@
 //
 // `listVersion` counts the changes the list must be read again for (a mint, a revoke, a mint
 // whose answer was lost); the page reads the list afresh for each.
-import { assign, emit, fromPromise, raise, setup, type SnapshotFrom } from "xstate";
+import { assign, emit, fromPromise, raise, setup } from "xstate";
 
 import type { AgentTokenHost, MintedToken } from "../data/host.ts";
 
@@ -110,4 +110,3 @@ export const agentTokens = setup({
   },
 });
 
-export type AgentTokensSnapshot = SnapshotFrom<typeof agentTokens>;

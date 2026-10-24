@@ -16,7 +16,7 @@ import type { OperationId } from "../data/edit-record.ts";
 import { newPatchId, type Mutation } from "../data/writes.ts";
 import { newIdentityKey } from "../people/model.ts";
 import { choiceId, choiceLabel } from "../status/answer.ts";
-import { Button, Field } from "../ui/kit.tsx";
+import { Button, Input as TextInput } from "../ui/kit.tsx";
 import { Markdown } from "../ui/markdown.tsx";
 import { effectOf, effectOfOption, outgoing, sameAnswer } from "./answer.ts";
 import { answerable, failingGuards, guardBypass, titleOf, type AnswerValue, type GraphNode, type NodeDerived, type NodeDetail, type Ready } from "./model.ts";
@@ -93,9 +93,9 @@ export function Input({ view, node, value, onChange }: { view: Ready; node: Grap
     return <Checks options={identities} chosen={value.identity_list} onChange={(next) => { onChange({ identity_list: next }); }} />;
   }
   if ("date" in value) {
-    return <Field type="date" aria-label="Answer" value={value.date} onChange={(event) => { onChange({ date: event.target.value }); }} />;
+    return <TextInput type="date" aria-label="Answer" value={value.date} onChange={(event) => { onChange({ date: event.target.value }); }} />;
   }
-  return <Field aria-label="Answer" value={value.text} onChange={(event) => { onChange({ text: event.target.value }); }} />;
+  return <TextInput aria-label="Answer" value={value.text} onChange={(event) => { onChange({ text: event.target.value }); }} />;
 }
 
 /**
@@ -224,7 +224,7 @@ function IdentityInput({ view, value, pick, named, onNamed }: InputProps) {
         <IdentityOptions view={view} />
         <option value={NEW_PERSON}>Someone new</option>
       </select>
-      {naming ? <Field aria-label="Name of someone new" placeholder="Their name" value={named} onChange={(event) => { onNamed(event.target.value); }} /> : null}
+      {naming ? <TextInput aria-label="Name of someone new" placeholder="Their name" value={named} onChange={(event) => { onNamed(event.target.value); }} /> : null}
     </div>
   );
 }
@@ -238,7 +238,7 @@ function IdentityListInput({ view, value, pick, named, onNamed }: InputProps) {
           <Choose key={identity.key} type="checkbox" title={identityName(view, identity.key)} checked={picked.includes(identity.key)} effect={undefined} onPick={() => { pick({ identity_list: toggled(picked, identity.key) }); }} />
         ))}
       </div>
-      <Field
+      <TextInput
         aria-label="Name of someone new"
         placeholder="Add a new person"
         value={named}
@@ -264,7 +264,7 @@ function AnswerInput(props: InputProps) {
     case "multi_choice":
       return <MultiInput {...props} />;
     case "date":
-      return <Field type="date" aria-label="Answer" data-testid="answer" value={value !== undefined && "date" in value ? value.date : ""} onChange={(event) => { pick({ date: event.target.value }); }} />;
+      return <TextInput type="date" aria-label="Answer" data-testid="answer" value={value !== undefined && "date" in value ? value.date : ""} onChange={(event) => { pick({ date: event.target.value }); }} />;
     case "identity":
       return <IdentityInput {...props} />;
     case "identity_list":
@@ -518,7 +518,7 @@ export function AnswerEditor({ view, detail, menu, anyway, focus }: { view: Read
         <span className="row" data-testid="answer-anyway">
           <label className="stack">
             <span className="label">Why (optional)</span>
-            <Field value={bypass} onChange={(event) => { anyway.change(event.target.value); }} />
+            <TextInput value={bypass} onChange={(event) => { anyway.change(event.target.value); }} />
           </label>
           <Button onClick={anyway.cancel}>Cancel</Button>
         </span>

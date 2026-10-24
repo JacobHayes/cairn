@@ -1442,11 +1442,6 @@ button.failed-details {
   font: 500 13px / 1.6 var(--font-mono);
   padding-left: var(--space-2);
 }
-.chips-static {
-  display: inline-flex;
-  flex-wrap: wrap;
-  gap: var(--space-1);
-}
 .chip-value > span {
   overflow-wrap: anywhere;
 }

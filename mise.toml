@@ -17,3 +17,6 @@ rust = { version = "1.99.0", profile = "minimal", components = "clippy,rustfmt",
 "cargo:https://github.com/JacobHayes/patina" = { version = "rev:1dee57b448d57c390af26a9d5af5f2d3a8820cc8", crate = "cargo-patina", locked = true }
 # RustSec advisories over every lock file: the full check's advisories step (deny.toml).
 cargo-deny = "0.20.2"
+# Dependencies a crate declares and never uses: the lint step's unused-dependency check
+# (decisions/2026-10-24-where-mutation-testing-runs.md).
+"github:bnjbvr/cargo-machete" = "0.9.2"

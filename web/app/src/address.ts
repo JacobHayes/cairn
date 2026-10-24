@@ -113,14 +113,6 @@ export function proposalAddress(destination: Domain, proposal: string, key?: str
   return key === undefined ? pathTo("routeProposal", { route, proposal }) : pathTo("routeProposalNode", { route, proposal, key });
 }
 
-/** The destination the router's params name: the journey, the route, else the deployment (`/identities/proposals`). */
-export function destinationIn(params: Readonly<Record<string, string | undefined>>): Domain {
-  if (params.journey !== undefined) {
-    return { journey: params.journey };
-  }
-  return params.route === undefined ? "deployment" : { route: params.route };
-}
-
 /** The rail entry the page at `pathname` belongs to, or none for a path that is no page. */
 export function sectionOf(pathname: string): Section | undefined {
   return ADDRESSES.find(({ path }) => matchPath({ path, end: true }, pathname) !== null)?.section;
