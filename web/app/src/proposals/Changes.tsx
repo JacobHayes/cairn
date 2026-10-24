@@ -20,7 +20,6 @@ import { subjectOf } from "../data/writes.ts";
 import { Input as AnswerInput } from "../detail/AnswerEditor.tsx";
 import { checklistOf, type Ready } from "../detail/model.ts";
 import { Section } from "../detail/parts.tsx";
-import { useDraft } from "../data/drafts.ts";
 import { fieldWords } from "../status/words.ts";
 import { NODE_FIELDS } from "@cairn/client";
 import { Button, Input, PickBox } from "../ui/kit.tsx";
@@ -38,8 +37,6 @@ export interface ChangesContext {
   roles: readonly Role[];
   deployment: Deployment;
   today: string;
-  /** The proposal's id, which keeps what a reviewer typed and has not yet added across a reload. */
-  proposal: string;
   /** The journey the proposal is for, derived, when it is one: answers read it. */
   ready: Ready | undefined;
   editable: boolean;
@@ -82,13 +79,12 @@ function useSyncedDraft<T>(source: unknown, make: () => T): { draft: T; set: (dr
   };
 }
 
-/** The checklist's new-item text for one node of this proposal, kept across a reload. */
-function useKeptItem(context: ChangesContext, node: string): [string, (value: string) => void] {
-  const [kept, setKept] = useDraft<string>(`proposal-item:${context.proposal}:${node}`);
-  return [kept ?? "", (value) => { setKept(value === "" ? undefined : value); }];
+/** The checklist's new-item text, held by the editor while it is open. */
+function useKeptItem(): [string, (value: string) => void] {
+  return useState("");
 }
 
-/** The editor's new-item field over the kept text: adding makes the change and clears the text. */
+/** The editor's new-item field over the held text: adding makes the change and clears the text. */
 function newItemOf([value, set]: [string, (value: string) => void], change: (next: Partial<NodeDraft>) => void): NewItem {
   return { value, set, add: (next) => { change(next); set(""); } };
 }
@@ -96,7 +92,7 @@ function newItemOf([value, set]: [string, (value: string) => void], change: (nex
 /** A node the proposal adds, edited with authoring's fields; the mutation follows once nothing stops it. */
 function AddedNode({ editor, node, onChange, context }: { editor: string; node: GraphNode; onChange: (node: GraphNode) => void; context: ChangesContext }) {
   const synced = useSyncedDraft<NodeDraft>(node, () => draftOf(node));
-  const kept = useKeptItem(context, node.key);
+  const kept = useKeptItem();
   const draft = synced.draft;
   const condition = useConditionProblem(draft.relevant_when);
   const problems = { ...problemsOf(node, draft), ...(condition.problem === undefined ? {} : { relevant_when: condition.problem }) };
@@ -165,7 +161,7 @@ function FieldValue({ editor, mutation, onChange, context }: { editor: string; m
   const node = nodeOf(context, mutation.node);
   const synced = useSyncedDraft<NodeDraft | undefined>(mutation.value, () => (node === undefined ? undefined : draftOf(withFieldValue(node, mutation.value))));
   const draft = synced.draft;
-  const kept = useKeptItem(context, mutation.node);
+  const kept = useKeptItem();
   const condition = useConditionProblem(field === "relevant_when" ? (draft?.relevant_when ?? null) : null);
   const problem = node === undefined || draft === undefined ? undefined : (draftProblems(node.kind, draft)[field] ?? condition.problem);
   useInvalid(context, editor, problem !== undefined || !condition.checked);
@@ -181,7 +177,7 @@ function FieldValue({ editor, mutation, onChange, context }: { editor: string; m
       onChange({ ...mutation, value });
     }
   };
-  // The items that carry a tick now, from the journey as it is, since the proposal's own graph may already have dropped them.
+  // The items that carry a tick now, from the journey as it is, since the proposal's own graph may already have dropped them: a new item never takes their ids.
   const ticked = context.ready === undefined ? [] : checklistOf(context.ready, node.key).filter((item) => item.ticked).map(({ id, title }) => ({ id, title }));
   const props = { kind: node.kind, nodeKey: node.key, draft, change, notes: () => ({ problem }), tree: context.tree, roles: context.roles, ticked, newItem: newItemOf(kept, change) };
   const targets = includes(MILESTONE_FIELDS, field) ? nodesFor(context.tree, field).map((each) => ({ value: each.key, label: each.title })) : [];

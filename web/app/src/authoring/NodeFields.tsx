@@ -30,7 +30,7 @@ export interface FieldsProps {
   notes: (field: FormField) => FieldNotes;
   tree: Tree;
   roles: readonly Role[];
-  /** A journey's form: the saved items of this node that carry a tick, so saving without one can say it drops the tick. */
+  /** A journey's form: the saved items of this node that carry a tick, whose ids a new item never takes, so it never inherits the tick. */
   ticked?: readonly Schema<"ChecklistItem">[];
   /** The checklist's new-item text, kept with the form's draft so a reload does not lose it. */
   newItem: NewItem;
@@ -137,7 +137,6 @@ export function ChecklistEditor({ props, flag = true }: { props: FieldsProps; fl
     }
   };
   const pending = props.newItem;
-  const dropped = (props.ticked ?? []).filter((item) => !items.some((each) => each.id === item.id));
   return (
     <FieldBox label="Checklist" place="checklist" notes={props.notes("checklist")}>
       {flag ? <Flag props={props} field="requires_checklist" label="Requires all items ticked before done" /> : null}
@@ -158,11 +157,6 @@ export function ChecklistEditor({ props, flag = true }: { props: FieldsProps; fl
           <Button className="items-move items-remove" aria-label={`Remove the item ${item.title}`} onClick={() => { set(items.filter((_, index) => index !== at)); }}>
             {"\u00d7"}
           </Button>
-        </span>
-      ))}
-      {dropped.map((item) => (
-        <span key={item.id} className="muted small" data-testid="tick-dropped">
-          Saving removes the tick on "{item.title}".
         </span>
       ))}
       <AddItem items={items} reserved={(props.ticked ?? []).map((item) => item.id)} pending={pending} onAdd={(item) => { pending.add({ checklist: [...items, item] }); }} />

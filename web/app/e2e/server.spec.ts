@@ -279,10 +279,9 @@ test("C14: the deployment's open proposals are the Identities inspector's Propos
   await expect(page.locator('[data-testid="identity"][data-diff="added"]')).toContainText("Nina Alvarez");
 });
 
-test("C14, G5: a proposal's checklist editor keeps an item typed and not added across a reload, and says saving drops a ticked item's tick", { tag: "@server" }, async ({ page, context }) => {
+test("C14, G5: a proposal that removes a ticked item and adds one of the same title gives the new item an id of its own, so it starts unticked", { tag: "@server" }, async ({ page, context }) => {
   const { id } = await ownJourney(context.request, "hiring-loop");
   await openJourney(page, "server", id);
-  // The screen has two items and the first is ticked.
   const written = await context.request.post(`/api/journeys/${id}/patches`, {
     data: {
       patch: {
@@ -307,17 +306,17 @@ test("C14, G5: a proposal's checklist editor keeps an item typed and not added a
     },
   });
   expect(drafted.ok(), await drafted.text()).toBe(true);
-  const review = `/journeys/${id}/proposals/${proposal}/nodes/n_screen?view=graph`;
-  await open(page, "server", review);
+  await open(page, "server", `/journeys/${id}/proposals/${proposal}/nodes/n_screen?view=graph`);
   const changes = page.getByTestId("item-changes");
   await changes.getByRole("button", { name: "Edit" }).click();
-  // The saved tick on the item the proposal drops is said, as in the node form.
-  await expect(changes.getByTestId("tick-dropped")).toContainText("Alpha");
-  await checkpoint(page);
-  await changes.getByLabel("New item", { exact: true }).fill("Typed and not added");
-  await page.reload();
-  await changes.getByRole("button", { name: "Edit" }).click();
-  await expect(changes.getByLabel("New item", { exact: true })).toHaveValue("Typed and not added");
+  await changes.getByLabel("New item", { exact: true }).fill("Alpha");
+  await changes.getByLabel("New item", { exact: true }).press("Enter");
+  await expect(changes.getByTestId("checklist-item-edit")).toHaveCount(2);
+  await page.getByTestId("save-proposal").click();
+  await expect(page.getByTestId("unsaved")).toHaveCount(0);
+  const saved = await (await context.request.get(`/api/journeys/${id}/proposals/${proposal}`)).text();
+  expect(saved).toContain('"title":"Alpha"');
+  expect(saved).not.toContain('"id":"alpha"');
 });
 
 test("Connect an agent shows this server's address, makes a token that acts as its agent until it is revoked, and is one tap away on a phone", { tag: "@server" }, async ({ page, context, playwright, baseURL }) => {

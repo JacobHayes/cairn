@@ -66,7 +66,7 @@ function shownViolations(preview: ReturnType<typeof useLivePreview>, write: Auth
   return { violations: [], places: [] };
 }
 
-/** G5: the node's saved checklist items that carry a tick, for the editor to say saving without one drops it. */
+/** G5: the node's saved checklist items that carry a tick, whose ids a new item must not take, so it never inherits the tick. */
 function ticked(authored: Authored, node: GraphNode): Schema<"ChecklistItem">[] {
   const marked = new Set(authored.graph.state?.ticks?.[node.key] ?? []);
   return (node.checklist ?? []).filter((item) => marked.has(item.id));
