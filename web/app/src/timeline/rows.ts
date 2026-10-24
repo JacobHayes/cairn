@@ -12,6 +12,7 @@
 import type { RouteSchedule, ScheduleEntry } from "@cairn/wasm";
 
 import { childrenOf, nodesByPath, titleIn, type Tree } from "../authoring/graph.ts";
+import { parseInstant } from "../detail/explain.ts";
 import { nodeOf, recordOf, waitsOn, type GraphNode, type NodeKind, type Ready } from "../detail/model.ts";
 import { snoozeWords } from "../status/snooze.ts";
 import { ancestorsOf, planOrder, treeOf } from "../plan/tree.ts";
@@ -262,9 +263,9 @@ function chainNodes(view: Ready, key: string): string[] {
   const chain = view.derived.nodes[key]?.dates.shortfall?.chain;
   const keys: string[] = [];
   for (const { before, after } of chain?.constraints ?? []) {
-    for (const instant of [before, after]) {
-      if (typeof instant === "object" && "node" in instant && !keys.includes(instant.node.node)) {
-        keys.push(instant.node.node);
+    for (const instant of [parseInstant(before), parseInstant(after)]) {
+      if ("node" in instant && !keys.includes(instant.node)) {
+        keys.push(instant.node);
       }
     }
   }

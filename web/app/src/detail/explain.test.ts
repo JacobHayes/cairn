@@ -33,7 +33,7 @@ describe("editTargets (F7)", () => {
   });
 
   it("offers nothing to edit for a fact", () => {
-    const actual: Chain = { constraints: [], fixed: [{ instant: "created_at", date: "2026-10-01", fixed_by: "actual" }] };
+    const actual: Chain = { constraints: [], fixed: [{ instant: "created", date: "2026-10-01", fixed_by: "actual" }] };
     expect(editTargets(actual, view)).toEqual([]);
   });
 });

@@ -9,7 +9,7 @@ import { dateLinkRowWords } from "../canvas/dates.ts";
 import { dateWords, originWord } from "../status/when.ts";
 import { ChainView } from "./ChainView.tsx";
 import { foldKey } from "./folds.ts";
-import type { Bound } from "./explain.ts";
+import { parseInstant, type Bound } from "./explain.ts";
 import { nodeOf, titleOf, type Mutation, type NodeDetail, type Ready } from "./model.ts";
 import { LinkedDateRow, NodeLink, Section } from "./parts.tsx";
 import { ShortfallView } from "./ShortfallView.tsx";
@@ -24,8 +24,11 @@ export type BoundOrigin = "pin" | "actual" | "derived";
  */
 export function boundOrigin(bound: Bound, node: string): BoundOrigin {
   const [fixed] = bound.chain.fixed ?? [];
-  const onNode = fixed !== undefined && typeof fixed.instant === "object" && "node" in fixed.instant && fixed.instant.node.node === node;
-  if (bound.chain.constraints.length > 0 || !onNode) {
+  if (fixed === undefined || bound.chain.constraints.length > 0) {
+    return "derived";
+  }
+  const instant = parseInstant(fixed.instant);
+  if (!("node" in instant) || instant.node !== node) {
     return "derived";
   }
   return fixed.fixed_by === "actual" ? "actual" : fixed.fixed_by === "today" ? "derived" : "pin";

@@ -220,6 +220,7 @@ impl Explain<'_> {
         Chain {
             constraints: self.shown(&found.constraints),
             fixed,
+            total: 0,
         }
     }
 

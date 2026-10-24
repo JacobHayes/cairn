@@ -58,7 +58,45 @@ macro_rules! string_serde {
     };
 }
 
+/// Implements `Serialize`, `Deserialize`, and `JsonSchema` for a type that has `Display` and
+/// `FromStr` (error: `String`): one string on the wire, with `$pattern` when given.
+macro_rules! text_serde {
+    ($type:ty, $schema_name:expr, $description:expr, $pattern:expr) => {
+        impl ::serde::Serialize for $type {
+            fn serialize<S: ::serde::Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
+                serializer.collect_str(self)
+            }
+        }
+
+        impl<'de> ::serde::Deserialize<'de> for $type {
+            fn deserialize<D: ::serde::Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
+                <String as ::serde::Deserialize>::deserialize(deserializer)?
+                    .parse()
+                    .map_err(::serde::de::Error::custom)
+            }
+        }
+
+        impl ::schemars::JsonSchema for $type {
+            fn schema_name() -> ::std::borrow::Cow<'static, str> {
+                $schema_name.into()
+            }
+
+            fn json_schema(_: &mut ::schemars::SchemaGenerator) -> ::schemars::Schema {
+                let mut schema = ::schemars::json_schema!({
+                    "type": "string",
+                    "description": $description,
+                });
+                if let Some(pattern) = $pattern {
+                    schema.insert("pattern".into(), pattern.into());
+                }
+                schema
+            }
+        }
+    };
+}
+
 pub(crate) use string_serde;
+pub(crate) use text_serde;
 
 /// `skip_serializing_if` for flags that default to false. Serde passes fields by reference.
 #[allow(clippy::trivially_copy_pass_by_ref)]

@@ -526,6 +526,7 @@ fn detail(
         .filter(|annotation| annotation.body.node.as_ref() == Some(key))
         .cloned()
         .collect();
+    let derived = journey.derived().node_derived(graph, key);
     Ok(NodeDetail {
         node: node.clone(),
         path: tree
@@ -542,7 +543,10 @@ fn detail(
         pin: state.pins.get(key).copied(),
         overrides: state.overrides.get(key).cloned(),
         annotations,
-        derived: journey.derived().node_derived(graph, key),
+        derived: NodeDerived {
+            dates: derived.dates.for_response(),
+            ..derived
+        },
         still_waiting: StillWaiting::for_response(journey.still_waiting(key)?),
         answer_effects: journey.answer_effects(key, deployment)?,
     })

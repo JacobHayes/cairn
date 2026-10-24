@@ -11,7 +11,7 @@ const pinnedDue: Bound = {
   date: "2026-11-02",
   chain: {
     constraints: [],
-    fixed: [{ instant: { node: { node: "n_report", point: "finish" } }, date: "2026-11-02", fixed_by: "pin" }],
+    fixed: [{ instant: "n_report.finish", date: "2026-11-02", fixed_by: "pin" }],
   },
 };
 
@@ -21,19 +21,19 @@ const derivedDue: Bound = {
   chain: {
     constraints: [
       {
-        before: { node: { node: "n_findings", point: "finish" } },
-        after: { node: { node: "n_report", point: "start" } },
-        offset_days: 0,
-        source: { dependency: { node: "n_report", requires: "n_findings", via: "explicit" } },
+        before: "n_findings.finish",
+        after: "n_report.start",
+        days: 0,
+        source: "dependency:n_report:n_findings:explicit",
       },
       {
-        before: { node: { node: "n_report", point: "start" } },
-        after: { node: { node: "n_report", point: "finish" } },
-        offset_days: 3,
-        source: { estimate: { node: "n_report" } },
+        before: "n_report.start",
+        after: "n_report.finish",
+        days: 3,
+        source: "estimate:n_report",
       },
     ],
-    fixed: [{ instant: { node: { node: "n_report", point: "finish" } }, date: "2026-11-02", fixed_by: "pin" }],
+    fixed: [{ instant: "n_report.finish", date: "2026-11-02", fixed_by: "pin" }],
   },
 };
 
@@ -42,7 +42,7 @@ const meetingDue: Bound = {
   date: "2026-11-20",
   chain: {
     constraints: [],
-    fixed: [{ instant: { node: { node: "n_meeting", point: "finish" } }, date: "2026-11-20", fixed_by: "pin" }],
+    fixed: [{ instant: "n_meeting.finish", date: "2026-11-20", fixed_by: "pin" }],
   },
 };
 

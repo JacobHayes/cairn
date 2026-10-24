@@ -46,7 +46,7 @@ describe("DatesSection (F7)", () => {
     const due = view.derived.nodes["n_report"]?.dates.due;
     expect(due && boundOrigin(due, "n_report")).toBe("pin");
     expect(due && boundOrigin(due, "n_findings")).toBe("derived");
-    const actual = { date: "2026-10-05", chain: { constraints: [], fixed: [{ instant: { node: { node: "n_report", point: "start" as const } }, date: "2026-10-05", fixed_by: "actual" as const }] } };
+    const actual = { date: "2026-10-05", chain: { constraints: [], fixed: [{ instant: "n_report.start", date: "2026-10-05", fixed_by: "actual" as const }] } };
     expect(boundOrigin(actual, "n_report")).toBe("actual");
   });
 });

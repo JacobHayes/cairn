@@ -1349,6 +1349,13 @@ export interface components {
             constraints: components["schemas"]["Constraint"][];
             /** @description The pins and actuals on it. */
             fixed?: components["schemas"]["FixedDate"][];
+            /**
+             * Format: uint32
+             * @description How many constraints and fixed dates the whole chain holds, when a server response
+             *     cut it to `explanation_entry_count_max` of each; absent for a chain given whole. The
+             *     rest pages through the explanations of the value the chain explains.
+             */
+            total?: number;
         };
         /**
          * @description The contradictory chains a rejection lists: at most
@@ -1746,48 +1753,12 @@ export interface components {
              * Format: int32
              * @description The least number of days between them.
              */
-            offset_days: number;
+            days: number;
             /** @description Where it comes from. */
             source: components["schemas"]["ConstraintSource"];
         };
-        /** @description Where a constraint comes from: what to edit to change it. */
-        ConstraintSource: {
-            due_by: {
-                /** @description The node. */
-                node: components["schemas"]["NodeKey"];
-            };
-        } | {
-            not_before: {
-                /** @description The node. */
-                node: components["schemas"]["NodeKey"];
-            };
-        } | {
-            dependency: {
-                /** @description The dependent. */
-                node: components["schemas"]["NodeKey"];
-                /** @description The requirement. */
-                requires: components["schemas"]["NodeKey"];
-                /** @description How the dependency arose. */
-                via: components["schemas"]["DependencyVia"];
-            };
-        } | {
-            estimate: {
-                /** @description The node. */
-                node: components["schemas"]["NodeKey"];
-            };
-        } | {
-            containment: {
-                /** @description The child. */
-                child: components["schemas"]["NodeKey"];
-                /** @description The parent. */
-                parent: components["schemas"]["NodeKey"];
-            };
-        } | {
-            stage_close: {
-                /** @description The stage. */
-                group: components["schemas"]["NodeKey"];
-            };
-        };
+        /** @description Where a constraint comes from, the kind then the nodes it names, colon-separated: `due_by:n_a`, `not_before:n_a`, `estimate:n_a`, `stage_close:n_stage`, `containment:n_parent:n_child`, or `dependency:n_a:n_b:` then `explicit`, `containment`, `inherited:n_ancestor`, `condition:n_decision` or `opening:n_stage`. */
+        ConstraintSource: string;
         /** @description A lower-case hex SHA-256 digest. */
         ContentHash: string;
         /** @description A gravity or unlocks contribution: the node and how much it adds. */
@@ -2259,16 +2230,20 @@ export interface components {
             total: number;
         };
         /** @description A derived value whose explanation list a server response pages. */
-        ExplainedField: "gravity" | "unlocks" | "still_waiting";
+        ExplainedField: "gravity" | "unlocks" | "still_waiting" | "earliest_start" | "latest_start" | "due" | "shortfall";
         /**
-         * @description A page of one value's explanation list, largest first, `explanation_entry_count_max` at a
-         *     time; the first page is what node detail carries.
+         * @description A page of one value's explanation list, `explanation_entry_count_max` at a time (largest
+         *     first; a date chain in chain order); the first page is what node detail carries.
          */
         ExplanationPage: {
+            /** @description The constraints of a date chain, in chain order; empty for the other fields. */
+            constraints?: components["schemas"]["Constraint"][];
             /** @description The entries of a gravity or unlocks list. */
             entries: components["schemas"]["Contribution"][];
             /** @description The value. */
             field: components["schemas"]["ExplainedField"];
+            /** @description The dates fixed on a date chain; empty for the other fields. */
+            fixed?: components["schemas"]["FixedDate"][];
             /**
              * @description The entries of a still-waiting list, which holds dependents rather than
              *     contributions; empty for the other fields.
@@ -2280,7 +2255,8 @@ export interface components {
             node: components["schemas"]["NodeKey"];
             /**
              * Format: uint32
-             * @description How many entries there are in all.
+             * @description How many entries there are in all (for a date chain, constraints and fixed dates
+             *     together).
              */
             total: number;
         };
@@ -2684,28 +2660,8 @@ export interface components {
             /** @description Whether the segment has a later published version. */
             upgrade_available: boolean;
         };
-        /**
-         * @description A point in time the date network solves for. A container's
-         *     entry is internal and never shown, so it has no form here.
-         */
-        Instant: {
-            node: {
-                /** @description The node. */
-                node: components["schemas"]["NodeKey"];
-                /** @description Which instant. */
-                point: components["schemas"]["InstantPoint"];
-            };
-        } | "created_at" | {
-            answer: {
-                /** @description The decision. */
-                decision: components["schemas"]["NodeKey"];
-            };
-        };
-        /**
-         * @description Which instant of a node: work has a start and a finish; a decision or milestone has
-         *     one instant, which is both.
-         */
-        InstantPoint: "start" | "finish";
+        /** @description A point in time: `n_x.start` or `n_x.finish` for a node's start or finish, `n_x.answer` for a date decision's answered date, `created` for the journey's creation. */
+        Instant: string;
         /** @description A journey domain: its fields, revision, and graph with state. */
         Journey: {
             /** @description The graph and its state. */

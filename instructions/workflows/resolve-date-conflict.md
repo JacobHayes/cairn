@@ -13,7 +13,9 @@ Dates are constraints: rules, dependencies, estimates, and pins. Two problems co
   it.
 
 1. **Read the chain.** Each step says which constraint it comes from (a rule, a dependency,
-   an estimate, a pin) and how many days it is short.
+   an estimate, a pin) and how many days it is short. A chain on a node's dates is cut to
+   its first entries with a `total`; `get_node` with `explanations` (`earliest_start`,
+   `latest_start`, `due` or `shortfall`) pages the rest.
 2. **Offer the moves.** Each resolution is one mutation that alone gives the chain its
    missing days: shift, repin, or unpin a pin; revise the date answer behind a pin; loosen
    a rule's offset; shrink an estimate; drop a requirement. Explain each in plain words and

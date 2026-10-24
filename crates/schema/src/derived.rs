@@ -458,6 +458,30 @@ pub struct Bound {
     pub chain: Chain,
 }
 
+impl NodeDates {
+    // ARCHITECTURE: Read path.
+    /// The dates a server response carries: each date chain (earliest start, latest start,
+    /// due, and the shortfall's) cut to `explanation_entry_count_max` with its total; the
+    /// rest pages through the explanations of the value the chain explains.
+    #[must_use]
+    pub fn for_response(mut self) -> Self {
+        let cut = |bound: Option<Bound>| {
+            bound.map(|bound| Bound {
+                date: bound.date,
+                chain: bound.chain.for_response(),
+            })
+        };
+        self.earliest_start = cut(self.earliest_start);
+        self.latest_start = cut(self.latest_start);
+        self.due = cut(self.due);
+        self.shortfall = self.shortfall.map(|short| ShortChain {
+            chain: short.chain.for_response(),
+            ..short
+        });
+        self
+    }
+}
+
 // PRD: F1, F7.
 /// Where a milestone's effective date comes from (pin, actual, and derived dates are
 /// told apart).

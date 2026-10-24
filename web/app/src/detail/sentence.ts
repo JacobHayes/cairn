@@ -10,7 +10,7 @@ import { SNOOZE_NODE_TAIL } from "../status/snooze.ts";
 import { isOpen } from "../status/state.ts";
 import { upperFirst } from "../status/words.ts";
 import { dateWords, daysUntil, daysWords, relativeDays } from "../status/when.ts";
-import { guardFailureText, namer } from "./explain.ts";
+import { guardFailureText, namer, parseSource } from "./explain.ts";
 import { itemTitle, nodeOf, rankPlaces, scheduledDate, skippedThrough, titleOf, waitsOn, type Holding, type NodeDetail, type NodeDerived, type Ready } from "./model.ts";
 import { answerText, identityName, ownersOf, ownerWords } from "./sections.tsx";
 import { listParts, plural } from "../ui/words.ts";
@@ -127,7 +127,7 @@ function aheadOf(view: Ready, detail: NodeDetail, early: Schema<"DoneEarly">): P
   const days = daysWords(early.days);
   const reason = bypassReason(detail);
   const because = reason === undefined ? [] : [`, with the reason "${reason}"`];
-  const { source } = early;
+  const source = parseSource(early.source);
   if ("dependency" in source) {
     const { requires, via } = source.dependency;
     if (typeof via === "object" && "stage_opening" in via && nodeOf(view, via.stage_opening.group)?.gates === false) {

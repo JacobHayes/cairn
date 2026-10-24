@@ -105,7 +105,11 @@ pub fn arb_chain() -> BoxedStrategy<Chain> {
         prop::collection::vec(constraint, 1..4),
         prop::collection::vec(fixed, 0..2),
     )
-        .prop_map(|(constraints, fixed)| Chain { constraints, fixed })
+        .prop_map(|(constraints, fixed)| Chain {
+            constraints,
+            fixed,
+            total: 0,
+        })
         .boxed()
 }
 

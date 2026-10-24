@@ -298,7 +298,7 @@ mod tests {
     use serde_json::json;
 
     fn chain() -> serde_json::Value {
-        json!({"chain": {"constraints": [{"before": "created_at", "after": {"node": {"node": "n_a", "point": "start"}}, "offset_days": 3, "source": {"estimate": {"node": "n_a"}}}]}, "shortfall_days": 2})
+        json!({"chain": {"constraints": [{"before": "created", "after": "n_a.start", "days": 3, "source": "estimate:n_a"}]}, "shortfall_days": 2})
     }
 
     #[test]

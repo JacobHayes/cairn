@@ -35,6 +35,62 @@ fn explanations_page_past_the_response_limit() {
     assert_eq!((second.entries.len(), second.next), (10, None));
 }
 
+/// ARCHITECTURE, Read path: a date chain a response carries is cut to
+/// `explanation_entry_count_max` constraints with the total, and the pages of its explanation
+/// put together equal the whole chain, in chain order.
+#[test]
+fn a_date_chain_is_cut_to_the_limit_and_pages_to_the_whole() {
+    let mut nodes =
+        vec!["{key: n_c000, id: c000, kind: action, title: First, estimate: 1}".to_owned()];
+    nodes.extend((1..70).map(|at| {
+        format!(
+            "{{key: n_c{at:03}, id: c{at:03}, kind: action, title: Step, estimate: 1, requires: [n_c{prev:03}]}}",
+            prev = at - 1
+        )
+    }));
+    let nodes: Vec<&str> = nodes.iter().map(String::as_str).collect();
+    let records = support::journey(&add(&nodes));
+    let graph: Graph = support::journey_graph(&records, support::JOURNEY);
+    let derived: Derived = support::derived(&records, support::JOURNEY);
+    let journey = DerivedJourney::new(&graph, &derived);
+    let last = key("n_c069");
+    let whole = derived
+        .dates()
+        .node(&graph, &last)
+        .earliest_start
+        .unwrap()
+        .chain;
+    assert!(whole.constraints.len() > 100, "a chain past the limit");
+    let carried = derived.dates().node(&graph, &last).for_response();
+    let cut = carried.earliest_start.unwrap().chain;
+    assert_eq!(cut.constraints.len(), 50);
+    assert_eq!(cut.constraints, whole.constraints[..50]);
+    assert_eq!(
+        usize::try_from(cut.total).unwrap(),
+        whole.constraints.len() + whole.fixed.len()
+    );
+    let mut constraints = Vec::new();
+    let mut fixed = Vec::new();
+    let mut cursor = Cursor::START;
+    loop {
+        let page = journey
+            .explanations(&last, ExplainedField::EarliestStart, cursor)
+            .unwrap();
+        assert_eq!(page.total, cut.total);
+        constraints.extend(page.constraints);
+        fixed.extend(page.fixed);
+        match page.next {
+            Some(next) => cursor = next,
+            None => break,
+        }
+    }
+    assert_eq!(constraints, whole.constraints);
+    assert_eq!(fixed, whole.fixed);
+    // A chain within the limit is given whole, with no total.
+    let short = derived.dates().node(&graph, &key("n_c003")).for_response();
+    assert_eq!(short.earliest_start.unwrap().chain.total, 0);
+}
+
 /// J4: history per journey and per node, grouped by patch.
 #[test]
 fn history_is_grouped_by_patch_per_journey_and_per_node() {

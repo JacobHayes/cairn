@@ -12,7 +12,7 @@ use cairn_schema::limits::{EXPLANATION_ENTRY_COUNT_MAX, PAGE_ITEM_COUNT_MAX};
 use std::collections::BTreeSet;
 
 use cairn_schema::{
-    Cursor, Event, ExplainedField, ExplanationPage, HeldDependent, HistoryPage, NodeKey,
+    Chain, Cursor, Event, ExplainedField, ExplanationPage, HeldDependent, HistoryPage, NodeKey,
     PatchEvents,
 };
 
@@ -35,20 +35,43 @@ impl DerivedJourney<'_> {
     ) -> Result<ExplanationPage, ProjectionError> {
         self.known(key)?;
         let priority = self.derived.priority();
-        let (entries, held) = match field {
-            ExplainedField::Gravity => (priority.gravity_from(key), Vec::new()),
-            ExplainedField::Unlocks => (priority.unlocks_from(key), Vec::new()),
-            ExplainedField::StillWaiting => (Vec::new(), self.still_waiting(key)?),
-        };
+        let (mut entries, mut held) = (Vec::new(), Vec::new());
+        let mut chain = Chain::default();
+        match field {
+            ExplainedField::Gravity => entries = priority.gravity_from(key),
+            ExplainedField::Unlocks => entries = priority.unlocks_from(key),
+            ExplainedField::StillWaiting => held = self.still_waiting(key)?,
+            ExplainedField::EarliestStart
+            | ExplainedField::LatestStart
+            | ExplainedField::Due
+            | ExplainedField::Shortfall => {
+                let dates = self.derived.dates().node(self.graph, key);
+                let found = match field {
+                    ExplainedField::EarliestStart => dates.earliest_start.map(|bound| bound.chain),
+                    ExplainedField::LatestStart => dates.latest_start.map(|bound| bound.chain),
+                    ExplainedField::Due => dates.due.map(|bound| bound.chain),
+                    _ => dates.shortfall.map(|short| short.chain),
+                };
+                chain = found.unwrap_or_default();
+            }
+        }
         let (kept, next_entries) = page(&entries, cursor, EXPLANATION_ENTRY_COUNT_MAX);
         let (kept_held, next_held) = page(&held, cursor, EXPLANATION_ENTRY_COUNT_MAX);
+        let (kept_constraints, next_constraints) =
+            page(&chain.constraints, cursor, EXPLANATION_ENTRY_COUNT_MAX);
+        let (kept_fixed, next_fixed) = page(&chain.fixed, cursor, EXPLANATION_ENTRY_COUNT_MAX);
         Ok(ExplanationPage {
             node: key.clone(),
             field,
             entries: kept,
             held: kept_held,
-            next: next_entries.or(next_held),
-            total: count(entries.len() + held.len()),
+            constraints: kept_constraints,
+            fixed: kept_fixed,
+            next: next_entries
+                .or(next_held)
+                .or(next_constraints)
+                .or(next_fixed),
+            total: count(entries.len() + held.len() + chain.constraints.len() + chain.fixed.len()),
         })
     }
 

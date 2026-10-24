@@ -34,7 +34,7 @@ const links = (pieces: Piece[]) => pieces.flatMap((piece) => (typeof piece === "
 
 describe("work done early on purpose", () => {
   it("links the opening and the stage that does not wait for it", () => {
-    const early: DoneEarly = { days: 9, date: "2026-11-13", source: { dependency: { node: "n_findings", requires: "n_meeting", via: { stage_opening: { group: "n_stage" } } } } };
+    const early: DoneEarly = { days: 9, date: "2026-11-13", source: "dependency:n_findings:n_meeting:opening:n_stage" };
     const view = finishedEarly("n_findings", early, (made) => {
       const stage = made.journey.graph.nodes?.find((node) => node.key === "n_stage");
       if (stage !== undefined) {
@@ -47,7 +47,7 @@ describe("work done early on purpose", () => {
   });
 
   it("carries the reason its bypass recorded, without the sentence's full stop", () => {
-    const early: DoneEarly = { days: 3, date: "2026-10-07", source: { dependency: { node: "n_report", requires: "n_findings", via: "explicit" } } };
+    const early: DoneEarly = { days: 3, date: "2026-10-07", source: "dependency:n_report:n_findings:explicit" };
     const view = finishedEarly("n_report", early, (made) => {
       made.journey.graph.state = {
         ...made.journey.graph.state,
@@ -66,7 +66,7 @@ describe("work done early on purpose", () => {
   });
 
   it("says it without a reason when the bypass recorded none", () => {
-    const early: DoneEarly = { days: 3, date: "2026-10-07", source: { dependency: { node: "n_report", requires: "n_findings", via: "explicit" } } };
+    const early: DoneEarly = { days: 3, date: "2026-10-07", source: "dependency:n_report:n_findings:explicit" };
     const view = finishedEarly("n_report", early, (made) => {
       made.journey.graph.state = { ...made.journey.graph.state, overrides: { n_report: { bypass: { guards: ["deps_done"] } } } };
       const findings = made.derived.nodes["n_findings"];
@@ -81,14 +81,14 @@ describe("work done early on purpose", () => {
   });
 
   it("gives no day count ahead of a prerequisite that has not finished", () => {
-    const early: DoneEarly = { days: 5, date: "2026-10-11", source: { dependency: { node: "n_report", requires: "n_findings", via: "explicit" } } };
+    const early: DoneEarly = { days: 5, date: "2026-10-11", source: "dependency:n_report:n_findings:explicit" };
     const { pieces, plain } = say(finishedEarly("n_report", early), "n_report");
     expect(links(pieces)).toEqual(["n_findings"]);
     expect(plain).not.toMatch(/\d+ days?/);
   });
 
   it("says a node's own date when that is what it finished ahead of", () => {
-    const early: DoneEarly = { days: 4, date: "2026-10-10", source: { not_before: { node: "n_findings" } } };
+    const early: DoneEarly = { days: 4, date: "2026-10-10", source: "not_before:n_findings" };
     const { pieces, plain } = say(finishedEarly("n_findings", early), "n_findings");
     expect(links(pieces)).toEqual([]);
     expect(plain).toContain("4 days");
@@ -96,7 +96,7 @@ describe("work done early on purpose", () => {
   });
 
   it("links the unfinished child a container was finished ahead of, not a not-before date", () => {
-    const early: DoneEarly = { days: 5, date: "2026-10-11", source: { containment: { parent: "n_report", child: "n_findings" } } };
+    const early: DoneEarly = { days: 5, date: "2026-10-11", source: "containment:n_report:n_findings" };
     const { pieces, plain } = say(finishedEarly("n_report", early), "n_report");
     expect(links(pieces)).toEqual(["n_findings"]);
     expect(plain).not.toMatch(/not-before|\d+ days?/);

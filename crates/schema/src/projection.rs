@@ -10,6 +10,7 @@ use jiff::civil::Date;
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
+use crate::chain::{Constraint, FixedDate};
 use crate::derived::{
     Blocker, ChecklistCount, Contribution, DateOrigin, DisplayState, EffectiveDate, HeldDependent,
     Progress, Real, Relevance, Score, Stalled,
@@ -1181,10 +1182,18 @@ pub enum ExplainedField {
     Unlocks,
     /// The direct dependents completing it would not yet free, with what else each waits on.
     StillWaiting,
+    /// The constraints and fixed dates of the chain behind its earliest start, in chain order.
+    EarliestStart,
+    /// The same for its latest start.
+    LatestStart,
+    /// The same for its due date.
+    Due,
+    /// The same for the chain behind its shortfall.
+    Shortfall,
 }
 
-/// A page of one value's explanation list, largest first, `explanation_entry_count_max` at a
-/// time; the first page is what node detail carries.
+/// A page of one value's explanation list, `explanation_entry_count_max` at a time (largest
+/// first; a date chain in chain order); the first page is what node detail carries.
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
 #[serde(deny_unknown_fields)]
 pub struct ExplanationPage {
@@ -1198,10 +1207,17 @@ pub struct ExplanationPage {
     /// contributions; empty for the other fields.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub held: Vec<HeldDependent>,
+    /// The constraints of a date chain, in chain order; empty for the other fields.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub constraints: Vec<Constraint>,
+    /// The dates fixed on a date chain; empty for the other fields.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub fixed: Vec<FixedDate>,
     /// Where the next page starts, when there is one.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub next: Option<Cursor>,
-    /// How many entries there are in all.
+    /// How many entries there are in all (for a date chain, constraints and fixed dates
+    /// together).
     pub total: u32,
 }
 

@@ -865,6 +865,12 @@
               "$ref": "#/components/schemas/FixedDate"
             },
             "type": "array"
+          },
+          "total": {
+            "description": "How many constraints and fixed dates the whole chain holds, when a server response\ncut it to `explanation_entry_count_max` of each; absent for a chain given whole. The\nrest pages through the explanations of the value the chain explains.",
+            "format": "uint32",
+            "minimum": 0,
+            "type": "integer"
           }
         },
         "required": [
@@ -2199,7 +2205,7 @@
             "description": "It passes through an undecided node, so it may not apply.",
             "type": "boolean"
           },
-          "offset_days": {
+          "days": {
             "description": "The least number of days between them.",
             "format": "int32",
             "type": "integer"
@@ -2212,168 +2218,14 @@
         "required": [
           "before",
           "after",
-          "offset_days",
+          "days",
           "source"
         ],
         "type": "object"
       },
       "ConstraintSource": {
-        "description": "Where a constraint comes from: what to edit to change it.",
-        "oneOf": [
-          {
-            "additionalProperties": false,
-            "description": "A node's `due_by` rule.",
-            "properties": {
-              "due_by": {
-                "additionalProperties": false,
-                "properties": {
-                  "node": {
-                    "$ref": "#/components/schemas/NodeKey",
-                    "description": "The node."
-                  }
-                },
-                "required": [
-                  "node"
-                ],
-                "type": "object"
-              }
-            },
-            "required": [
-              "due_by"
-            ],
-            "type": "object"
-          },
-          {
-            "additionalProperties": false,
-            "description": "A node's `not_before` rule.",
-            "properties": {
-              "not_before": {
-                "additionalProperties": false,
-                "properties": {
-                  "node": {
-                    "$ref": "#/components/schemas/NodeKey",
-                    "description": "The node."
-                  }
-                },
-                "required": [
-                  "node"
-                ],
-                "type": "object"
-              }
-            },
-            "required": [
-              "not_before"
-            ],
-            "type": "object"
-          },
-          {
-            "additionalProperties": false,
-            "description": "A dependency: the dependent starts after the requirement finishes.",
-            "properties": {
-              "dependency": {
-                "additionalProperties": false,
-                "properties": {
-                  "node": {
-                    "$ref": "#/components/schemas/NodeKey",
-                    "description": "The dependent."
-                  },
-                  "requires": {
-                    "$ref": "#/components/schemas/NodeKey",
-                    "description": "The requirement."
-                  },
-                  "via": {
-                    "$ref": "#/components/schemas/DependencyVia",
-                    "description": "How the dependency arose."
-                  }
-                },
-                "required": [
-                  "node",
-                  "requires",
-                  "via"
-                ],
-                "type": "object"
-              }
-            },
-            "required": [
-              "dependency"
-            ],
-            "type": "object"
-          },
-          {
-            "additionalProperties": false,
-            "description": "An estimate: a node finishes at least its estimate after it starts.",
-            "properties": {
-              "estimate": {
-                "additionalProperties": false,
-                "properties": {
-                  "node": {
-                    "$ref": "#/components/schemas/NodeKey",
-                    "description": "The node."
-                  }
-                },
-                "required": [
-                  "node"
-                ],
-                "type": "object"
-              }
-            },
-            "required": [
-              "estimate"
-            ],
-            "type": "object"
-          },
-          {
-            "additionalProperties": false,
-            "description": "Containment: a child finishes before its parent's own work starts.",
-            "properties": {
-              "containment": {
-                "additionalProperties": false,
-                "properties": {
-                  "child": {
-                    "$ref": "#/components/schemas/NodeKey",
-                    "description": "The child."
-                  },
-                  "parent": {
-                    "$ref": "#/components/schemas/NodeKey",
-                    "description": "The parent."
-                  }
-                },
-                "required": [
-                  "parent",
-                  "child"
-                ],
-                "type": "object"
-              }
-            },
-            "required": [
-              "containment"
-            ],
-            "type": "object"
-          },
-          {
-            "additionalProperties": false,
-            "description": "A stage's closing milestone bounding the group's finish.",
-            "properties": {
-              "stage_close": {
-                "additionalProperties": false,
-                "properties": {
-                  "group": {
-                    "$ref": "#/components/schemas/NodeKey",
-                    "description": "The stage."
-                  }
-                },
-                "required": [
-                  "group"
-                ],
-                "type": "object"
-              }
-            },
-            "required": [
-              "stage_close"
-            ],
-            "type": "object"
-          }
-        ]
+        "description": "Where a constraint comes from, the kind then the nodes it names, colon-separated: `due_by:n_a`, `not_before:n_a`, `estimate:n_a`, `stage_close:n_stage`, `containment:n_parent:n_child`, or `dependency:n_a:n_b:` then `explicit`, `containment`, `inherited:n_ancestor`, `condition:n_decision` or `opening:n_stage`.",
+        "type": "string"
       },
       "ContentHash": {
         "description": "A lower-case hex SHA-256 digest.",
@@ -3961,13 +3813,40 @@
             "const": "still_waiting",
             "description": "The direct dependents completing it would not yet free, with what else each waits on.",
             "type": "string"
+          },
+          {
+            "const": "earliest_start",
+            "description": "The constraints and fixed dates of the chain behind its earliest start, in chain order.",
+            "type": "string"
+          },
+          {
+            "const": "latest_start",
+            "description": "The same for its latest start.",
+            "type": "string"
+          },
+          {
+            "const": "due",
+            "description": "The same for its due date.",
+            "type": "string"
+          },
+          {
+            "const": "shortfall",
+            "description": "The same for the chain behind its shortfall.",
+            "type": "string"
           }
         ]
       },
       "ExplanationPage": {
         "additionalProperties": false,
-        "description": "A page of one value's explanation list, largest first, `explanation_entry_count_max` at a\ntime; the first page is what node detail carries.",
+        "description": "A page of one value's explanation list, `explanation_entry_count_max` at a time (largest\nfirst; a date chain in chain order); the first page is what node detail carries.",
         "properties": {
+          "constraints": {
+            "description": "The constraints of a date chain, in chain order; empty for the other fields.",
+            "items": {
+              "$ref": "#/components/schemas/Constraint"
+            },
+            "type": "array"
+          },
           "entries": {
             "description": "The entries of a gravity or unlocks list.",
             "items": {
@@ -3978,6 +3857,13 @@
           "field": {
             "$ref": "#/components/schemas/ExplainedField",
             "description": "The value."
+          },
+          "fixed": {
+            "description": "The dates fixed on a date chain; empty for the other fields.",
+            "items": {
+              "$ref": "#/components/schemas/FixedDate"
+            },
+            "type": "array"
           },
           "held": {
             "description": "The entries of a still-waiting list, which holds dependents rather than\ncontributions; empty for the other fields.",
@@ -4002,7 +3888,7 @@
             "description": "The node."
           },
           "total": {
-            "description": "How many entries there are in all.",
+            "description": "How many entries there are in all (for a date chain, constraints and fixed dates\ntogether).",
             "format": "uint32",
             "minimum": 0,
             "type": "integer"
@@ -5428,80 +5314,9 @@
         "type": "object"
       },
       "Instant": {
-        "description": "A point in time the date network solves for. A container's\nentry is internal and never shown, so it has no form here.",
-        "oneOf": [
-          {
-            "additionalProperties": false,
-            "description": "A node's start or finish.",
-            "properties": {
-              "node": {
-                "additionalProperties": false,
-                "properties": {
-                  "node": {
-                    "$ref": "#/components/schemas/NodeKey",
-                    "description": "The node."
-                  },
-                  "point": {
-                    "$ref": "#/components/schemas/InstantPoint",
-                    "description": "Which instant."
-                  }
-                },
-                "required": [
-                  "node",
-                  "point"
-                ],
-                "type": "object"
-              }
-            },
-            "required": [
-              "node"
-            ],
-            "type": "object"
-          },
-          {
-            "const": "created_at",
-            "description": "The journey's `created_at`.",
-            "type": "string"
-          },
-          {
-            "additionalProperties": false,
-            "description": "A date decision's answer, a date rule's source. It is the answered date, apart\nfrom the decision's own instant, which is when it was decided.",
-            "properties": {
-              "answer": {
-                "additionalProperties": false,
-                "properties": {
-                  "decision": {
-                    "$ref": "#/components/schemas/NodeKey",
-                    "description": "The decision."
-                  }
-                },
-                "required": [
-                  "decision"
-                ],
-                "type": "object"
-              }
-            },
-            "required": [
-              "answer"
-            ],
-            "type": "object"
-          }
-        ]
-      },
-      "InstantPoint": {
-        "description": "Which instant of a node: work has a start and a finish; a decision or milestone has\none instant, which is both.",
-        "oneOf": [
-          {
-            "const": "start",
-            "description": "When it starts.",
-            "type": "string"
-          },
-          {
-            "const": "finish",
-            "description": "When it finishes.",
-            "type": "string"
-          }
-        ]
+        "description": "A point in time: `n_x.start` or `n_x.finish` for a node's start or finish, `n_x.answer` for a date decision's answered date, `created` for the journey's creation.",
+        "pattern": "^(created|n_[a-z0-9][a-z0-9_-]*\\.(start|finish|answer))$",
+        "type": "string"
       },
       "Journey": {
         "additionalProperties": false,
