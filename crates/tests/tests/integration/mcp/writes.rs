@@ -50,6 +50,50 @@ async fn a_refused_write_carries_every_violation() {
     assert_eq!(snapshot["revision"], 1, "nothing was written");
 }
 
+/// A direct write takes no mutation that changes a proposal: applying one inside a patch is
+/// refused at its path, pointing at the tool that applies it, and nothing is written; nor is
+/// a proposal a target.
+#[tokio::test]
+async fn a_direct_write_applies_no_proposal() {
+    let world = World::new();
+    let ann = user("u_ann");
+    world.vendor_journey(&ann).await;
+    let patch = json!({
+        "id": "p_apply_inside",
+        "target": { "journey": "j_vendor_eval" },
+        "base_revision": 1,
+        "mutations": [
+            { "op": "transition", "node": "n_kickoff", "transition": "start" },
+            { "op": "apply_proposal", "proposal": "pr_any", "reviewed_revision": 1 },
+        ],
+    });
+    let refused = world
+        .call(&ann, "apply_patch", json!({ "patch": patch }))
+        .await;
+    let Err(ToolError::Arguments { path, message }) = refused else {
+        panic!("{refused:?}");
+    };
+    assert_eq!(path, "patch.mutations[1].op");
+    assert!(message.contains("apply_proposal"), "{message}");
+    let target = json!({
+        "id": "p_at_proposal",
+        "target": { "proposal": { "id": "pr_any", "destination": { "journey": "j_vendor_eval" } } },
+        "base_revision": 1,
+        "mutations": [{ "op": "transition", "node": "n_kickoff", "transition": "start" }],
+    });
+    let refused = world
+        .call(&ann, "apply_patch", json!({ "patch": target }))
+        .await;
+    assert!(
+        matches!(&refused, Err(ToolError::Arguments { path, .. }) if path.starts_with("patch.target")),
+        "{refused:?}"
+    );
+    let snapshot = world
+        .ok(&ann, "get_snapshot", json!({ "journey": "j_vendor_eval" }))
+        .await;
+    assert_eq!(snapshot["revision"], 1, "nothing was written");
+}
+
 /// B10, A16, D4: completing a placeholder that is not broken down is refused through the
 /// tool with the one guard that failed, named on the node and bypassable, and nothing is
 /// written; the same completion bypassing that guard with a reason applies.
@@ -543,8 +587,7 @@ async fn a_journey_is_created_with_owners_and_a_merge_moves_them_on() {
 }
 
 /// Starting work that waits is refused through `transition_node` with a bypassable guard; the
-/// bypass and the start in one `apply_patch` go through with no reason, and the argument
-/// validates against the schema the tool advertises.
+/// bypass and the start in one `apply_patch` go through with no reason.
 #[tokio::test]
 async fn starting_ahead_takes_a_reasonless_bypass_in_one_patch() {
     let world = World::new();
@@ -581,17 +624,6 @@ async fn starting_ahead_takes_a_reasonless_bypass_in_one_patch() {
         ],
     });
     let arguments = json!({ "patch": patch });
-    let advertised = cairn_mcp::ToolSet::definitions()
-        .into_iter()
-        .find(|tool| tool.name == "apply_patch")
-        .unwrap();
-    let validator =
-        jsonschema::draft202012::new(&serde_json::Value::Object(advertised.input_schema)).unwrap();
-    let errors: Vec<String> = validator
-        .iter_errors(&arguments)
-        .map(|error| error.to_string())
-        .collect();
-    assert!(errors.is_empty(), "{errors:#?}");
     let applied = world.ok(&ann, "apply_patch", arguments).await;
     assert_eq!(applied["revision"], 2);
 }

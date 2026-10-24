@@ -62,6 +62,17 @@ pub enum PatchTarget {
     },
 }
 
+impl From<Domain> for PatchTarget {
+    /// The domain itself as a target.
+    fn from(domain: Domain) -> Self {
+        match domain {
+            Domain::Journey(id) => PatchTarget::Journey(id),
+            Domain::Route(id) => PatchTarget::Route(id),
+            Domain::Deployment => PatchTarget::Deployment,
+        }
+    }
+}
+
 impl PatchTarget {
     /// The domain the patch belongs to: the target domain, or a proposal's destination.
     #[must_use]

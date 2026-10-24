@@ -291,7 +291,7 @@ impl Service {
         // What its apply would load: the destination, the proposal, and what its mutations read.
         let reads = Patch {
             id: proposal_read_id(),
-            target: domain_target(destination),
+            target: PatchTarget::from(destination.clone()),
             base_revision: proposal.draft.destination_revision,
             deployment_revision: None,
             mutations: one(Mutation::ApplyProposal {
@@ -387,7 +387,7 @@ impl Service {
         };
         let patch = Patch {
             id: patch_id,
-            target: domain_target(destination),
+            target: PatchTarget::from(destination.clone()),
             base_revision,
             deployment_revision: None,
             mutations: one(Mutation::ApplyProposal {
@@ -592,15 +592,6 @@ fn proposal_patch(
         base_revision,
         deployment_revision: None,
         mutations: one(mutation),
-    }
-}
-
-/// The patch target of a domain.
-pub(crate) fn domain_target(domain: &Domain) -> PatchTarget {
-    match domain {
-        Domain::Journey(id) => PatchTarget::Journey(id.clone()),
-        Domain::Route(id) => PatchTarget::Route(id.clone()),
-        Domain::Deployment => PatchTarget::Deployment,
     }
 }
 

@@ -225,12 +225,21 @@ impl Agent {
         let Value::Object(arguments) = arguments else {
             panic!("arguments are an object");
         };
+        let given = Value::Object(arguments.clone());
         let request = CallToolRequestParams::new(name.to_owned()).with_arguments(arguments);
         self.called.lock().unwrap().insert(name.to_owned());
-        self.client
+        let result = self
+            .client
             .call_tool(request)
             .await
-            .map_err(|error| error.to_string())
+            .map_err(|error| error.to_string());
+        if result
+            .as_ref()
+            .is_ok_and(|result| result.is_error != Some(true))
+        {
+            crate::mcp::support::assert_listed(name, &given);
+        }
+        result
     }
 
     /// Calls `name`, which must succeed: its structured output.

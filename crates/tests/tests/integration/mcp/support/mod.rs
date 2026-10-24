@@ -64,14 +64,19 @@ impl World {
         self.now.store(at.as_second(), Ordering::SeqCst);
     }
 
-    /// Calls `name` as `actor`.
+    /// Calls `name` as `actor`. Arguments a call succeeds with must match the tool's listed
+    /// input schema: a listing that refuses what the tool takes misleads every agent.
     pub async fn call(
         &self,
         actor: &Actor,
         name: &str,
         arguments: Value,
     ) -> Result<Value, ToolError> {
-        self.tools.call(actor, name, arguments).await
+        let answer = self.tools.call(actor, name, arguments.clone()).await;
+        if answer.is_ok() {
+            assert_listed(name, &arguments);
+        }
+        answer
     }
 
     /// Calls `name` as `actor`, which must succeed.
@@ -125,6 +130,26 @@ impl World {
         }
         scenario.journey.to_string()
     }
+}
+
+/// Fails unless `arguments` match the input schema the tool `name` is listed with.
+pub fn assert_listed(name: &str, arguments: &Value) {
+    let Some(tool) = ToolSet::definitions()
+        .into_iter()
+        .find(|tool| tool.name == name)
+    else {
+        return;
+    };
+    let schema = Value::Object(tool.input_schema);
+    let validator = jsonschema::draft202012::new(&schema).unwrap();
+    let errors: Vec<String> = validator
+        .iter_errors(arguments)
+        .map(|error| format!("{}: {error}", error.instance_path()))
+        .collect();
+    assert!(
+        errors.is_empty(),
+        "{name} took arguments its listed schema refuses: {errors:#?}"
+    );
 }
 
 /// A user acting directly.

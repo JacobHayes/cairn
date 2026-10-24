@@ -196,12 +196,13 @@ a state change, when there is one, is simpler). Several edits are one patch, one
   cleared by an empty list) and `set_journey_status` (completing
   or archiving is the person's call; an archived journey is read-only until its status moves to `active` or `completed`). Owners are never assumed, the creator included: leave them empty unless
   the person names them. `delete_journey` is permanent; only when the
-  person asks. Also `discard_proposal` for a proposal nobody will apply.
+  person asks.
 - **Routes:** `create_route`, `edit_route`, `set_route_retired` (hides it from new
   journeys), and a draft's `discard_draft`; `open_draft` and `publish_draft` are also
   tools.
-- **Leave to Cairn:** `set_provenance` and `mark_local_edit` record lineage for upgrades
-  and are written by upgrades and re-linking, not by hand.
+- **Lineage:** `upgrade` and `relink` go only in a proposal, as Cairn drafts them.
+  `set_provenance` to `local` keeps a node an upgrade orphaned as the journey's own;
+  `mark_local_edit` with `marked` false clears a local-edit marker.
 
 ## Dates
 

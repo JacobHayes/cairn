@@ -24,6 +24,9 @@ impl fmt::Display for Unsupported {
     }
 }
 
+/// The groups of a vocabulary, by first op and header, and which of its ops are listed.
+pub(crate) type Listing<'a> = (&'a [(&'a str, &'a str)], &'a dyn Fn(&str) -> bool);
+
 /// The sketch, and the op names it covers in the schema's order.
 #[derive(Debug)]
 pub(crate) struct MutationSketch {
@@ -79,16 +82,45 @@ const READ: &[&str] = &[
     "patternProperties",
 ];
 
+/// The mutation vocabulary's purposes, each named by the op that starts it in the schema's
+/// order and the header the sketch writes above its ops, so an agent reading for one job
+/// finds its ops together.
+pub(crate) const GROUPS: &[(&str, &str)] = &[
+    ("create_journey", "The journey"),
+    ("create_route", "Routes and their drafts"),
+    ("add_node", "Nodes and edges"),
+    ("add_role", "Roles and participation kinds"),
+    ("set_participation", "Who does a node"),
+    ("add_resource", "A node's resources"),
+    ("insert_segment", "Segments"),
+    (
+        "transition",
+        "What happened: progress, answers, dates, snoozes, overrides, ticks",
+    ),
+    ("add_annotation", "Notes and links"),
+    ("upgrade", "Lineage (upgrade and relink only in a proposal)"),
+    (
+        "create_identity",
+        "Identities (create_identity also rides with a journey write)",
+    ),
+    ("delete_journey", "Deleting for good (the deployment)"),
+    ("create_proposal", "Proposals"),
+];
+
 /// The sketch of the mutation schema `mutation` (a union of objects each tagged by an `op`
-/// constant), named `root` among the shared types `definitions` it reaches.
+/// constant), named `root` among the shared types `definitions` it reaches: the ops `listed`
+/// keeps, under the header of the group (of `groups`, by first op) each falls in, and only
+/// the shared types those ops reach.
 ///
 /// # Errors
 ///
-/// [`Unsupported`] on a schema construct Cairn's schemas do not use.
+/// [`Unsupported`] on a schema construct Cairn's schemas do not use, or a vocabulary that
+/// does not open with a group's first op.
 pub(crate) fn mutation_sketch(
     definitions: &Map<String, Value>,
     root: &str,
     mutation: &Value,
+    (groups, listed): Listing<'_>,
 ) -> Rendered<MutationSketch> {
     let mut sketch = Sketch {
         definitions,
@@ -99,7 +131,28 @@ pub(crate) fn mutation_sketch(
     };
     let mut lines = Vec::new();
     let mut ops = Vec::new();
+    let mut group: Option<(&str, bool)> = None;
     for variant in array(mutation, "oneOf")? {
+        let op = variant
+            .pointer("/properties/op/const")
+            .and_then(Value::as_str)
+            .map_or_else(
+                || unsupported(format_args!("a variant without an op: {variant}")),
+                Ok,
+            )?;
+        if let Some((_, header)) = groups.iter().find(|(first, _)| *first == op) {
+            group = Some((header, false));
+        }
+        let Some((header, written)) = group.as_mut() else {
+            return unsupported(format_args!("`{op}` comes before any group's first op"));
+        };
+        if !listed(op) {
+            continue;
+        }
+        if !*written {
+            lines.push(format!("// {header}"));
+            *written = true;
+        }
         let (op, line) = sketch.variant(variant)?;
         ops.push(op);
         lines.push(line);
@@ -659,6 +712,16 @@ mod tests {
     use crate::ToolSet;
     use crate::toolset::schema;
 
+    /// Every op of the vocabulary, under its groups.
+    fn every() -> Listing<'static> {
+        (GROUPS, &|_| true)
+    }
+
+    /// A probe vocabulary's one group.
+    fn probes() -> Listing<'static> {
+        (&[("probe", "Probes")], &|_| true)
+    }
+
     /// The full mutation schema and the definitions it reaches.
     fn full() -> (Map<String, Value>, Value) {
         let patch = schema::<cairn_schema::Patch>();
@@ -744,7 +807,7 @@ mod tests {
     #[test]
     fn every_op_and_field_is_written_as_the_schema_says() {
         let (definitions, mutation) = full();
-        let text = mutation_sketch(&definitions, "Mutation", &mutation)
+        let text = mutation_sketch(&definitions, "Mutation", &mutation, every())
             .expect("a sketch")
             .text;
         for variant in array(&mutation, "oneOf").expect("variants") {
@@ -798,12 +861,13 @@ mod tests {
                 }
             }]
         });
-        let text = mutation_sketch(&Map::new(), "Mutation", &variant)
+        let text = mutation_sketch(&Map::new(), "Mutation", &variant, probes())
             .expect("a sketch")
             .text;
         assert_eq!(
             text,
-            "probe {clearable: int | null, left_out?: bool, left_out_or_null?: bool, must: string}"
+            "// Probes\nprobe {clearable: int | null, left_out?: bool, left_out_or_null?: bool, \
+             must: string}"
         );
     }
 
@@ -847,7 +911,7 @@ mod tests {
         };
         for field in unsupported {
             let schema = probe(field.clone());
-            let outcome = mutation_sketch(&definitions, "Mutation", &schema);
+            let outcome = mutation_sketch(&definitions, "Mutation", &schema, probes());
             assert!(outcome.is_err(), "{field} was rendered");
         }
         // The variant itself is held to the same rule.
@@ -855,11 +919,14 @@ mod tests {
             "type": "object", "additionalProperties": false, "not": { "required": ["x"] },
             "required": ["op"], "properties": { "op": { "const": "probe" } }
         }] });
-        assert!(mutation_sketch(&definitions, "Mutation", &variant).is_err());
+        assert!(mutation_sketch(&definitions, "Mutation", &variant, probes()).is_err());
     }
 
+    /// `apply_patch` lists the ops it takes, each with its line in the sketch under its
+    /// group's header, in the schema's order; the types only the ops it leaves out reach are
+    /// not written.
     #[test]
-    fn apply_patch_lists_every_op_with_the_sketch() {
+    fn apply_patch_lists_the_ops_it_takes_with_the_sketch() {
         let (_, mutation) = full();
         let ops: Vec<String> = array(&mutation, "oneOf")
             .expect("variants")
@@ -883,15 +950,28 @@ mod tests {
             .iter()
             .map(|op| op.as_str().expect("an op name").to_owned())
             .collect();
-        assert_eq!(named, ops);
         let sketch = listed["description"].as_str().expect("the sketch");
-        for op in &ops {
-            assert!(
-                sketch
-                    .lines()
-                    .any(|line| line.starts_with(&format!("{op} {{"))),
-                "{op}"
-            );
+        let lines: Vec<String> = sketch
+            .lines()
+            .filter_map(|line| line.split_once(" {").map(|(op, _)| op.to_owned()))
+            .filter(|op| ops.contains(op))
+            .collect();
+        assert_eq!(named, lines, "each listed op has its line, in order");
+        let in_order: Vec<&String> = ops.iter().filter(|op| named.contains(op)).collect();
+        assert_eq!(named.iter().collect::<Vec<_>>(), in_order);
+        assert!(!named.iter().any(|op| op == "apply_proposal"), "{named:?}");
+        assert!(
+            !sketch.contains("type ProposalDraft ="),
+            "only the proposal ops reach a proposal's content"
+        );
+        // Each group's header comes once, before its first listed op.
+        for (first, header) in GROUPS {
+            let header = format!("// {header}");
+            let written = sketch.lines().filter(|line| **line == header).count();
+            assert!(written <= 1, "{header}");
+            if named.iter().any(|op| op == first) {
+                assert_eq!(written, 1, "{header}");
+            }
         }
         assert!(
             listed.get("oneOf").is_none(),
@@ -942,7 +1022,7 @@ mod tests {
     #[test]
     fn the_nodes_rules_are_written_as_the_schema_has_them() {
         let (definitions, mutation) = full();
-        let text = mutation_sketch(&definitions, "Mutation", &mutation)
+        let text = mutation_sketch(&definitions, "Mutation", &mutation, every())
             .expect("a sketch")
             .text;
         let node = &definitions["Node"];
@@ -1015,7 +1095,7 @@ mod tests {
     #[test]
     fn groups_and_opaque_types_keep_what_the_schema_says() {
         let (definitions, mutation) = full();
-        let text = mutation_sketch(&definitions, "Mutation", &mutation)
+        let text = mutation_sketch(&definitions, "Mutation", &mutation, every())
             .expect("a sketch")
             .text;
         let mut groups = 0;

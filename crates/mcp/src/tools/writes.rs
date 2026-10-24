@@ -5,10 +5,10 @@
 //! a draft and import a route file; `manage_identity` writes the deployment.
 
 use cairn_schema::{
-    AnswerValue, Date, Identity, IdentityKey, IdentitySet, JourneyId, KeyRefs, KindKey, Lineage,
-    Markdown, Mutation, Mutations, NodeKey, OverrideKind, ParticipationSource, Patch, PatchId,
-    PatchTarget, RecordedEnd, Revision, RouteFile, RouteId, SignedDays, SnoozeTarget, Title,
-    Transition, from_yaml,
+    AnswerValue, Date, Domain, Identity, IdentityKey, IdentitySet, JourneyId, KeyRefs, KindKey,
+    Lineage, Markdown, Mutation, Mutations, NodeKey, OverrideKind, ParticipationSource, Patch,
+    PatchId, PatchTarget, RecordedEnd, Revision, RouteFile, RouteId, SignedDays, SnoozeTarget,
+    Title, Transition, from_yaml,
 };
 use cairn_service::{Call, DomainPatch};
 
@@ -112,7 +112,7 @@ pub(crate) const SPECS: &[Spec] = &[
             Draft a proposal instead when someone should review first.",
         writes: Writes::Patch,
         destructive: true,
-        schema: schema_with_mutation_sketch::<ApplyPatch>,
+        schema: || schema_with_mutation_sketch::<ApplyPatch>(&written_directly),
         output: schema::<WriteOutput>,
     },
     Spec {
@@ -663,23 +663,88 @@ impl CreateJourney {
     }
 }
 
+// PRD: I6.
+/// The ops that change a proposal rather than a domain, which no direct write takes:
+/// `apply_proposal` has its own tool, which records the caller as confirming the proposal,
+/// and the others are the proposal tools' to write.
+const PROPOSAL_OPS: [&str; 4] = [
+    "create_proposal",
+    "edit_proposal",
+    "apply_proposal",
+    "discard_proposal",
+];
+
+/// Whether a direct write takes the op `op`: what `apply_patch` lists.
+fn written_directly(op: &str) -> bool {
+    !PROPOSAL_OPS.contains(&op)
+}
+
 /// `apply_patch`.
 #[derive(Debug, Deserialize, JsonSchema)]
 #[serde(deny_unknown_fields)]
 pub(crate) struct ApplyPatch {
-    /// The patch: its id, its target (a journey, a route, or the deployment), the base
-    /// revision, and its mutations in order.
-    patch: Patch,
+    patch: DirectPatch,
     #[serde(default)]
     note: Option<Markdown>,
 }
 
+// PRD: A17.
+/// The patch: its id, its target, the base revision, and its mutations in order.
+#[derive(Debug, Deserialize, JsonSchema)]
+#[serde(deny_unknown_fields)]
+struct DirectPatch {
+    id: PatchId,
+    /// A domain; a proposal is written with the proposal tools.
+    target: Domain,
+    /// 0 creates the target.
+    base_revision: Revision,
+    /// Needed when a journey write names identities.
+    #[serde(default)]
+    deployment_revision: Option<Revision>,
+    mutations: Mutations,
+}
+
 impl ApplyPatch {
     fn patch(self) -> Result<DomainPatch, ToolError> {
-        DomainPatch::new(self.patch, self.note).map_err(|refusal| {
-            ToolError::refused(format_args!("{refusal}: use the proposal tools"))
-        })
+        let DirectPatch {
+            id,
+            target,
+            base_revision,
+            deployment_revision,
+            mutations,
+        } = self.patch;
+        refuse_proposal_ops("patch.mutations", &mutations)?;
+        let patch = Patch {
+            id,
+            target: target.into(),
+            base_revision,
+            deployment_revision,
+            mutations,
+        };
+        DomainPatch::new(patch, self.note)
+            .map_err(|_| unreachable!("a direct target is a domain, never a proposal"))
     }
+}
+
+/// Refuses a mutation that changes a proposal, at its path under `at`.
+fn refuse_proposal_ops(at: &str, mutations: &Mutations) -> Result<(), ToolError> {
+    let found = mutations
+        .as_slice()
+        .iter()
+        .enumerate()
+        .find(|(_, mutation)| mutation.edits_a_proposal());
+    let Some((index, mutation)) = found else {
+        return Ok(());
+    };
+    let message = if matches!(mutation, Mutation::ApplyProposal { .. }) {
+        "a proposal is applied with apply_proposal, which records you as confirming it"
+    } else {
+        "a proposal is drafted and changed with create_proposal and edit_proposal"
+    };
+    Err(ToolError::Arguments {
+        path: format!("{at}[{index}].op"),
+        message: message.to_owned(),
+    })
 }
 
 /// `open_draft`.
@@ -819,4 +884,24 @@ pub(crate) enum IdentityChange {
         /// The identity.
         identity: IdentityKey,
     },
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// Every mutation, one of each op at least.
+    const EVERY_MUTATION: &str = include_str!("../../../schema/tests/data/every_mutation.yaml");
+
+    /// What `apply_patch` lists is what it takes: an op is left out exactly when its
+    /// mutations change a proposal.
+    #[test]
+    fn apply_patch_lists_the_ops_it_takes() {
+        let patch: Patch = cairn_schema::from_yaml(EVERY_MUTATION).expect("every mutation");
+        for mutation in patch.mutations.as_slice() {
+            let op = serde_json::to_value(mutation).expect("a mutation")["op"].clone();
+            let op = op.as_str().expect("an op");
+            assert_eq!(written_directly(op), !mutation.edits_a_proposal(), "{op}");
+        }
+    }
 }

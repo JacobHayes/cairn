@@ -1,7 +1,7 @@
 //! The tests of `cairn-mcp`: one module per file beside this one.
 
 #[cfg(test)]
-mod support;
+pub(crate) mod support;
 
 mod instructions;
 mod proposals;

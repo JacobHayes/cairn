@@ -163,10 +163,11 @@ async fn history_attributes_each_event_in_a_mixed_patch_to_its_own_maker() {
         "key": "n_extra", "id": "extra", "kind": "action", "title": "Extra work" }});
     let apply =
         json!({ "op": "apply_proposal", "proposal": "pr_workload", "reviewed_revision": 1 });
+    // A direct MCP write leaves applying to `apply_proposal`; the API takes the mixed patch.
     let patch = json!({ "id": "p_mixed", "target": { "journey": "j_vendor_eval" },
         "base_revision": 1, "mutations": [apply, direct] });
     world
-        .ok(&ann, "apply_patch", json!({ "patch": patch }))
+        .patch(&ann, serde_json::from_value(patch).unwrap())
         .await;
 
     let history = world

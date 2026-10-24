@@ -97,9 +97,12 @@ pub(crate) fn schema_citing_mutations<T: JsonSchema>() -> Map<String, Value> {
 
 /// The schema of `T`, `apply_patch`'s arguments: the one place the mutation vocabulary is
 /// spelled out, as a type sketch generated from the mutation schema
-/// ([`crate::sketch`]). The `mutations` items are objects whose `op` is one of the op
-/// names, described by the sketch; parsing is by the typed schema, as strict as ever.
-pub(crate) fn schema_with_mutation_sketch<T: JsonSchema>() -> Map<String, Value> {
+/// ([`crate::sketch`]), of the ops `listed` keeps: exactly those the tool takes. The
+/// `mutations` items are objects whose `op` is one of those op names, described by the
+/// sketch; parsing is by the typed schema, as strict as ever.
+pub(crate) fn schema_with_mutation_sketch<T: JsonSchema>(
+    listed: &dyn Fn(&str) -> bool,
+) -> Map<String, Value> {
     let mut schema = cited::<T>(&[REVIEW_ITEM]);
     let Some(Value::Object(definitions)) = schema.get_mut("$defs") else {
         unreachable!("a tool that takes mutations has shared definitions");
@@ -109,9 +112,13 @@ pub(crate) fn schema_with_mutation_sketch<T: JsonSchema>() -> Map<String, Value>
     };
     // The schemas are fixed by the types at build time: a construct the sketch cannot
     // render is a bug the listing's tests reach, not a condition to answer.
-    let crate::sketch::MutationSketch { text: sketch, ops } =
-        crate::sketch::mutation_sketch(definitions, MUTATION.0, &mutation)
-            .unwrap_or_else(|error| unreachable!("{error}"));
+    let crate::sketch::MutationSketch { text: sketch, ops } = crate::sketch::mutation_sketch(
+        definitions,
+        MUTATION.0,
+        &mutation,
+        (crate::sketch::GROUPS, listed),
+    )
+    .unwrap_or_else(|error| unreachable!("{error}"));
     definitions.insert(
         MUTATION.0.to_owned(),
         serde_json::json!({
