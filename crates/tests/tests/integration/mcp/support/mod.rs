@@ -106,17 +106,24 @@ impl World {
     /// Publishes the vendor evaluation and applies its scenario's first `steps` steps as
     /// `actor`, each at its own time: the journey at revision `steps`.
     pub async fn vendor_after(&self, actor: &Actor, steps: usize) {
+        self.fixture_after(actor, "vendor-evaluation", Some(steps))
+            .await;
+    }
+
+    /// Plays the fixture `name`'s scenario as `actor`, its first `steps` steps or all of
+    /// them, its route published first, each step at its own time: the journey it builds.
+    pub async fn fixture_after(&self, actor: &Actor, name: &str, steps: Option<usize>) -> String {
         let (call, people) = crate::people::people_write();
         self.service.patch(&call, &people).await.unwrap();
-        self.publish(actor, "vendor-evaluation").await;
-        let path = fixtures_root()
-            .join("vendor-evaluation")
-            .join("journey.yaml");
+        self.publish(actor, name).await;
+        let path = fixtures_root().join(name).join("journey.yaml");
         let scenario: Scenario = from_yaml(&std::fs::read_to_string(&path).unwrap()).unwrap();
-        for step in scenario.steps.as_slice().iter().take(steps) {
+        let all = scenario.steps.as_slice();
+        for step in all.iter().take(steps.unwrap_or(all.len())) {
             self.now.store(step.at.as_second(), Ordering::SeqCst);
             self.patch(actor, step.patch.clone()).await;
         }
+        scenario.journey.to_string()
     }
 }
 

@@ -25,7 +25,8 @@ pub struct ToolDefinition {
     pub description: &'static str,
     /// What it writes; a tool that writes nothing only reads.
     pub writes: Writes,
-    /// The JSON Schema of its arguments: an object.
+    /// The JSON Schema of its arguments, as listed to an agent: an object, compacted of
+    /// what an agent cannot act on ([`crate::compact`]).
     pub input_schema: Map<String, Value>,
     /// The JSON Schema of what it answers when it succeeds: an object. Not listed over MCP
     /// (decisions/2026-10-06-the-tool-list-carries-the-mutation-vocabulary-once-and-no.md);
@@ -166,7 +167,7 @@ fn cited<T: JsonSchema>(citations: &[Citation]) -> Map<String, Value> {
 }
 
 /// Drops the `$defs` entries nothing outside them reaches any more.
-fn prune_definitions(schema: &mut Map<String, Value>) {
+pub(crate) fn prune_definitions(schema: &mut Map<String, Value>) {
     let Some(Value::Object(definitions)) = schema.remove("$defs") else {
         return;
     };
@@ -227,7 +228,10 @@ impl ToolSet {
                 name: spec.name,
                 description: spec.description,
                 writes: spec.writes,
-                input_schema: (spec.schema)(),
+                input_schema: crate::compact::compact(
+                    (spec.schema)(),
+                    &[MUTATION.0, REVIEW_ITEM.0],
+                ),
                 output_schema: (spec.output)(),
             })
             .collect()

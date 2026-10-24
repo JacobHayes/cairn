@@ -390,3 +390,42 @@ fn keys(rows: &Value) -> Vec<String> {
         .map(|row| row["key"].as_str().unwrap().to_owned())
         .collect()
 }
+
+/// A row an agent reads is held to its size on each fixture journey that starts from a route:
+/// the bytes of the node rows a snapshot lists, over their count, as compact JSON.
+#[tokio::test]
+async fn node_rows_stay_within_their_budget_on_every_fixture_journey() {
+    let mut measured = 0;
+    let routed = |name: &String| {
+        support::fixtures_root()
+            .join(name)
+            .join("route.yaml")
+            .exists()
+    };
+    for fixture in crate::engine::support::fixture_names()
+        .iter()
+        .filter(|name| routed(name))
+    {
+        let world = World::new();
+        let ann = user("u_ann");
+        let journey = world.fixture_after(&ann, fixture, None).await;
+        let snapshot = world
+            .ok(&ann, "get_snapshot", json!({ "journey": journey }))
+            .await;
+        let rows = snapshot["snapshot"]["nodes"].as_array().unwrap();
+        assert_ne!(rows.len(), 0, "{fixture} lists nodes");
+        measured += 1;
+        let bytes: usize = rows
+            .iter()
+            .map(|row| serde_json::to_vec(row).unwrap().len())
+            .sum();
+        let per_row = bytes / rows.len();
+        let limit = cairn_mcp::limits::NODE_ROW_BYTES_MAX as usize;
+        assert!(
+            per_row <= limit,
+            "{fixture}: {per_row} bytes a row over {} rows, past {limit}",
+            rows.len()
+        );
+    }
+    assert!(measured >= 3, "the fixtures with nodes are measured");
+}

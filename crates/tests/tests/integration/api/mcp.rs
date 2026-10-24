@@ -11,7 +11,7 @@ mod mcp_in_process {
     use axum::http::header::WWW_AUTHENTICATE;
     use axum::http::{Method, StatusCode};
     use cairn_api::wire::MintedToken;
-    use cairn_mcp::instructions;
+    use cairn_mcp::{instructions, limits};
     use cairn_schema::{Mutation, NextQuery};
     use cairn_service::wire::{Problem, ProblemCode};
     use serde_json::{Value, json};
@@ -50,6 +50,56 @@ mod mcp_in_process {
             .collect();
         assert_eq!(listed, expected, "the endpoint lists the tool set");
         assert_eq!(agent.called(), listed, "every listed tool was called");
+    }
+
+    /// The tool list an agent loads on connecting stays within its budgets, measured as the
+    /// compact JSON bytes the endpoint sends: the whole list, each tool but for the mutation
+    /// sketch (which `apply_patch` carries once), and the sketch.
+    #[tokio::test]
+    async fn the_tool_list_stays_within_its_budgets() {
+        let world = World::start().await;
+        let agent = Agent::connect(&world, "team-ann").await;
+        let tools: Vec<Value> = agent
+            .tools()
+            .await
+            .iter()
+            .map(|tool| serde_json::to_value(tool).unwrap())
+            .collect();
+        let bytes =
+            |value: &Value| u32::try_from(serde_json::to_vec(value).unwrap().len()).unwrap();
+        let mut sketch = 0;
+        let mut sizes = Vec::new();
+        for tool in &tools {
+            let name = tool["name"].as_str().unwrap();
+            let mut size = bytes(tool);
+            if let Some(text) = tool.pointer("/inputSchema/$defs/Mutation/description")
+                && tool["inputSchema"]["$defs"]["Mutation"]["properties"].is_object()
+            {
+                sketch = bytes(text);
+                size -= sketch;
+            }
+            sizes.push((name.to_owned(), size));
+        }
+        let largest = sizes.iter().max_by_key(|(_, size)| *size).unwrap();
+        assert!(
+            largest.1 <= limits::TOOL_DEFINITION_BYTES_MAX,
+            "{} is {} bytes, past a tool's {}",
+            largest.0,
+            largest.1,
+            limits::TOOL_DEFINITION_BYTES_MAX
+        );
+        assert_ne!(sketch, 0, "the sketch is in the list");
+        assert!(
+            sketch <= limits::MUTATION_SKETCH_BYTES_MAX,
+            "the mutation sketch is {sketch} bytes, past {}",
+            limits::MUTATION_SKETCH_BYTES_MAX
+        );
+        let list = u32::try_from(serde_json::to_vec(&tools).unwrap().len()).unwrap();
+        assert!(
+            list <= limits::TOOL_LIST_BYTES_MAX,
+            "the tool list is {list} bytes, past {}",
+            limits::TOOL_LIST_BYTES_MAX
+        );
     }
 
     /// The reads, on the journey after its decisions are answered.

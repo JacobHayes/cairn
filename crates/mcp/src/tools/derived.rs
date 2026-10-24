@@ -30,8 +30,7 @@ pub(crate) const SPECS: &[Spec] = &[
         name: "get_snapshot",
         description: "Read this first on a journey: answers, a page of in-scope nodes in \
             tree order, the ranked acting frontier, open decisions, placeholders \
-            to break down, unassigned items, shortfalls, counts. Its `revision` is \
-            your next write's `base_revision`. Scope with `subtree` and `depth`.",
+            to break down, unassigned items, shortfalls, counts. Scope with `subtree` and `depth`.",
         writes: Writes::Nothing,
         destructive: false,
         schema: schema::<GetSnapshot>,

@@ -9,6 +9,7 @@
 
 #![forbid(unsafe_code)]
 
+mod compact;
 mod error;
 pub mod instructions;
 pub mod limits;
