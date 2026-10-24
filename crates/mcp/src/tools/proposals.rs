@@ -21,16 +21,9 @@ use crate::{ToolError, ToolSet};
 pub(crate) const SPECS: &[Spec] = &[
     Spec {
         name: "create_proposal",
-        description: "Drafts a proposal against a journey, a route (its draft), or the \
-            deployment, under an id you choose: ordered mutations for someone to review \
-            and apply, as one patch. A destination that does not exist yet is created at \
-            destination revision 0. Use it for structure, breakdowns, and any change a person \
-            should see whole before it lands. Resubmitting the same id answers the proposal \
-            as it stands. To reuse a segment, propose one insert_segment mutation: \
-            {\"op\": \"insert_segment\", \"insertion\": \"i_<new key>\", \"segment\": \
-            {\"route\": \"security-review\", \"version\": 1}, \"parent\": \"<node key or \
-            omit>\", \"edges\": [{\"node\": {\"segment\": \"<segment node key>\"}, \
-            \"requires\": {\"host\": \"<node key>\"}}]}.",
+        description: "Draft a proposal for someone to review: ordered mutations, under an id \
+            you choose. A destination that does not exist yet is created at \
+            revision 0.",
         writes: Writes::Proposal,
         destructive: false,
         schema: schema_citing_mutations::<CreateProposal>,
@@ -38,9 +31,8 @@ pub(crate) const SPECS: &[Spec] = &[
     },
     Spec {
         name: "edit_proposal",
-        description: "Changes an open proposal against its editing revision: replace its \
-            content, discard it, or refresh it against its destination as it stands now (when \
-            the destination moved since it was drafted). Each change needs a new review.",
+        description: "Replace, discard, or refresh an open proposal, against its editing \
+            revision.",
         writes: Writes::Proposal,
         destructive: true,
         schema: schema_citing_mutations::<EditProposal>,
@@ -48,10 +40,7 @@ pub(crate) const SPECS: &[Spec] = &[
     },
     Spec {
         name: "apply_proposal",
-        description: "Applies a reviewed proposal: both its editing revision and its \
-            destination's are checked, its mutations validated and committed with its \
-            applied status, and the caller recorded as confirming it. Rejected with \
-            every violation, or as stale with what moved (then refresh it).",
+        description: "Apply a reviewed proposal; you are recorded as confirming it.",
         writes: Writes::Confirmation,
         destructive: true,
         schema: schema::<ApplyProposal>,
@@ -59,9 +48,8 @@ pub(crate) const SPECS: &[Spec] = &[
     },
     Spec {
         name: "upgrade",
-        description: "Drafts upgrading a journey to a newer version of its route as a \
-            proposal: route changes it did not edit are taken, its local edits kept, and \
-            conflicts become review items. Nothing changes until it is applied.",
+        description: "Draft upgrading a journey to a newer version of its route, as a \
+            proposal.",
         writes: Writes::Proposal,
         destructive: false,
         schema: schema::<Upgrade>,
@@ -69,9 +57,7 @@ pub(crate) const SPECS: &[Spec] = &[
     },
     Spec {
         name: "save_as_route",
-        description: "Drafts saving a journey's structure as a new route's draft, as a \
-            proposal on that route, with review items for participations and nodes to \
-            leave out.",
+        description: "Draft saving a journey's structure as a new route, as a proposal.",
         writes: Writes::Proposal,
         destructive: false,
         schema: schema::<SaveAsRoute>,
@@ -79,9 +65,7 @@ pub(crate) const SPECS: &[Spec] = &[
     },
     Spec {
         name: "relink",
-        description: "Drafts linking a journey to a published route version as a proposal \
-: where it differs from the version is kept as its own edit unless the \
-            reviewer takes the route's.",
+        description: "Draft linking a journey to a published route version, as a proposal.",
         writes: Writes::Proposal,
         destructive: false,
         schema: schema::<Relink>,
@@ -362,14 +346,13 @@ impl From<ProposalWritten> for ProposalOutput {
 #[derive(Debug, Deserialize, JsonSchema)]
 #[serde(deny_unknown_fields)]
 pub struct CreateProposal {
-    /// The proposal's id, chosen by the caller (`pr_` and a slug).
+    /// A new id for the proposal.
     pub proposal: ProposalId,
-    /// The domain it would change: `{"journey": id}`, `{"route": id}`, or `"deployment"`.
+    /// `{"journey": id}`, `{"route": id}`, or `"deployment"`.
     pub destination: Domain,
-    /// Its content: a title, an optional description, the destination revision it was
-    /// drafted against (0 to create the destination), and its mutations in order.
+    /// Title, optional description, the destination revision (0 to create it), and the
+    /// mutations in order.
     pub draft: ProposalDraft,
-    /// A new id for this write.
     pub patch_id: PatchId,
 }
 
@@ -377,13 +360,10 @@ pub struct CreateProposal {
 #[derive(Debug, Deserialize, JsonSchema)]
 #[serde(deny_unknown_fields)]
 pub struct EditProposal {
-    /// The proposal.
     pub proposal: ProposalId,
-    /// The change.
     pub change: ProposalChange,
-    /// The proposal's editing revision the change was drafted against.
+    /// The proposal's editing revision.
     pub base_revision: Revision,
-    /// A new id for this write.
     pub patch_id: PatchId,
 }
 
@@ -408,13 +388,10 @@ pub enum ProposalChange {
 #[derive(Debug, Deserialize, JsonSchema)]
 #[serde(deny_unknown_fields)]
 pub(crate) struct ApplyProposal {
-    /// The proposal.
     proposal: ProposalId,
-    /// The editing revision that was reviewed: a later edit makes the apply stale.
+    /// The editing revision you reviewed.
     reviewed_revision: Revision,
-    /// A new id for this write.
     patch_id: PatchId,
-    /// A note recorded on the apply's events.
     #[serde(default)]
     note: Option<Markdown>,
 }
@@ -423,13 +400,11 @@ pub(crate) struct ApplyProposal {
 #[derive(Debug, Deserialize, JsonSchema)]
 #[serde(deny_unknown_fields)]
 pub(crate) struct Upgrade {
-    /// The journey.
     journey: JourneyId,
-    /// The version of its route to upgrade to.
+    /// The route version to upgrade to.
     to: VersionNumber,
-    /// The proposal's id, chosen by the caller.
+    /// A new id for the proposal.
     proposal: ProposalId,
-    /// A new id for this write.
     patch_id: PatchId,
 }
 
@@ -443,9 +418,8 @@ pub(crate) struct SaveAsRoute {
     route: RouteId,
     /// The new route's name.
     name: Title,
-    /// The proposal's id, chosen by the caller.
+    /// A new id for the proposal.
     proposal: ProposalId,
-    /// A new id for this write.
     patch_id: PatchId,
 }
 
@@ -453,12 +427,10 @@ pub(crate) struct SaveAsRoute {
 #[derive(Debug, Deserialize, JsonSchema)]
 #[serde(deny_unknown_fields)]
 pub(crate) struct Relink {
-    /// The journey.
     journey: JourneyId,
-    /// The route version to link it to.
+    /// The route version to link to.
     to: Lineage,
-    /// The proposal's id, chosen by the caller.
+    /// A new id for the proposal.
     proposal: ProposalId,
-    /// A new id for this write.
     patch_id: PatchId,
 }

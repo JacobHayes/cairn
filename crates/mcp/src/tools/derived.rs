@@ -25,13 +25,10 @@ use crate::{ToolError, ToolSet};
 pub(crate) const SPECS: &[Spec] = &[
     Spec {
         name: "get_snapshot",
-        description: "Call this first. The bounded state of a journey: its name, \
-            description, status and owners, the answers in effect, a page of in-scope nodes with their display state (what to say about \
-            them) beside the stored state (which transition applies), owners, blocking, and \
-            dates, the ranked acting frontier's top items with the rest as keys, open decisions \
-            by rank, placeholders needing breakdown, unassigned items, shortfalls, and counts by \
-            stored state and by display state. Scope it to a subtree and depth; page the node list with `cursor`. Its `revision` is the \
-            `base_revision` of a write that follows.",
+        description: "Read this first on a journey: answers, a page of in-scope nodes in \
+            tree order, the ranked acting frontier, open decisions, placeholders \
+            to break down, unassigned items, shortfalls, counts. Its `revision` is \
+            your next write's `base_revision`. Scope with `subtree` and `depth`.",
         writes: Writes::Nothing,
         destructive: false,
         schema: schema::<GetSnapshot>,
@@ -39,10 +36,9 @@ pub(crate) const SPECS: &[Spec] = &[
     },
     Spec {
         name: "list_frontier",
-        description: "The ranked acting frontier, a page at a time: what to do next, each \
-            node with its breadcrumb and its rank (`get_node` says why). With `filters`, the \
-            in-scope nodes they all hold for instead, in rank order; `mine` keeps the \
-            caller's own.",
+        description: "The ranked acting frontier, paged: what to do next, each node with its \
+            rank (`get_node` says why). With `filters`, the in-scope nodes matching every \
+            filter, in rank order.",
         writes: Writes::Nothing,
         destructive: false,
         schema: schema::<ListFrontier>,
@@ -50,19 +46,10 @@ pub(crate) const SPECS: &[Spec] = &[
     },
     Spec {
         name: "get_node",
-        description: "One node in full: as written (a decision's prompt and choices), its \
-            stored state, answer, pin, overrides, notes, a page of its children, and every \
-            derived value with its explanation (display state, relevance, blocking, dates, \
-            gravity, unlocks, rank; a container's `subtree_gravity` is the gravity of its whole \
-            area), and the dependents finishing it would not yet free with \
-            what else each waits on (`still_waiting`). Say its status from `display_state`, not \
-            the stored state. For a decision, `answer_effects`: per choice, the nodes it \
-            brings in, drops, and leaves to be decided later, and what it pins or fills. \
-            Explanation lists hold their largest entries; pass `explanations` to page the \
-            rest. Pass `removal` instead to get the exact `removal` for a `remove_node` \
-            mutation removing the node now, and the `outside_references` (conditions, date \
-            rules, stage bounds, fed milestones, message drafts, snoozes elsewhere, paged by \
-            `references_cursor`) the same patch must rewrite or remove.",
+        description: "One node in full: as written, its state, answer, notes, children, and \
+            each derived value with why (status, relevance, blocking, dates, \
+            priority). `removal` answers the exact `remove_node` removal instead; \
+            `explanations` pages a cut list.",
         writes: Writes::Nothing,
         destructive: false,
         schema: schema::<GetNode>,
@@ -70,11 +57,8 @@ pub(crate) const SPECS: &[Spec] = &[
     },
     Spec {
         name: "get_level",
-        description: "One aggregation level of the journey's graph: the nodes of the \
-            shown kinds at the top or inside a container, hidden work rolled up into them, \
-            and the edges between them. `collapsed` rolls containers into their own cards; \
-            `display` limits the relevance classes shown. Nodes are paged; edges are those \
-            touching the page.",
+        description: "One level of the graph, at the top or inside `container`: nodes with \
+            roll-ups, and the edges between them.",
         writes: Writes::Nothing,
         destructive: false,
         schema: schema::<GetLevel>,
@@ -87,16 +71,13 @@ pub(crate) const SPECS: &[Spec] = &[
 #[derive(Debug, Deserialize, JsonSchema)]
 #[serde(deny_unknown_fields)]
 pub(crate) struct GetSnapshot {
-    /// The journey.
     journey: JourneyId,
-    /// Only this node and everything beneath it; the whole journey when absent.
     #[serde(default)]
     subtree: Option<NodeKey>,
-    /// How many levels below the subtree's node (or of roots, at depth 1) the node list
-    /// goes; every level when absent. The frontier and the lists ignore it.
+    /// Levels listed below `subtree` (or of roots); every level when absent. The frontier
+    /// and lists ignore it.
     #[serde(default)]
     depth: Option<u32>,
-    /// Where the node list's page starts: the `next` of the page before.
     #[serde(default)]
     cursor: Cursor,
 }
@@ -115,28 +96,22 @@ pub(crate) struct SnapshotOutput {
 #[derive(Debug, Deserialize, JsonSchema)]
 #[serde(deny_unknown_fields)]
 pub(crate) struct GetLevel {
-    /// The journey.
     journey: JourneyId,
-    /// The node kinds shown; every kind when empty.
     #[serde(default)]
     kinds: BTreeSet<NodeKind>,
-    /// The container drilled into; the top level when absent.
+    /// Drill into this container; the top level when absent.
     #[serde(default)]
     container: Option<NodeKey>,
-    /// Containers rolled into their own cards: everything beneath each is hidden and rolls
-    /// up into it, and its edges re-target to it.
+    /// Containers rolled into their own cards: contents hidden, edges re-targeted.
     #[serde(default)]
     collapsed: BTreeSet<NodeKey>,
-    /// The relevance classes shown: `relevant`, `conditional` (undecided, or waiting on a
-    /// decision that cannot be answered yet), `not_relevant` (settled); every class when
-    /// empty. A node of a class left out rolls up like a hidden kind's.
+    /// Relevance classes shown (`relevant`, `conditional`, `not_relevant`); all when
+    /// empty.
     #[serde(default)]
     display: BTreeSet<LevelDisplay>,
-    /// The node selected: drawn whatever would hide it, and the level then carries the date
-    /// relationships between its card and the others (none otherwise).
+    /// Drawn whatever would hide it, with its date relationships to the other cards.
     #[serde(default)]
     selected: Option<NodeKey>,
-    /// Where the page of visible nodes starts.
     #[serde(default)]
     cursor: Cursor,
 }
@@ -176,26 +151,19 @@ pub(crate) struct LevelOutput {
 #[derive(Debug, Deserialize, JsonSchema)]
 #[serde(deny_unknown_fields)]
 pub(crate) struct GetNode {
-    /// The journey.
     journey: JourneyId,
-    /// The node.
     node: NodeKey,
-    /// Instead of the node, a further page of one of its explanation lists, which the
-    /// node's detail cuts to its largest entries.
+    /// A further page of one explanation list the node cuts, instead of the node.
     #[serde(default)]
     explanations: Option<MoreExplanations>,
-    /// Instead of the node, the exact removal for removing it now, and the references
-    /// elsewhere that the same patch must rewrite or remove.
+    /// Instead of the node, the exact removal for `remove_node` and the outside
+    /// references the same patch must change.
     #[serde(default)]
     removal: bool,
-    /// With `removal`, where the page of outside references starts: the `next` of the page
-    /// before.
     #[serde(default)]
     references_cursor: Cursor,
-    /// Where the page of its children starts: the `next` of their page before.
     #[serde(default)]
     children_cursor: Cursor,
-    /// Where the page of its notes and links starts: the `next` of their page before.
     #[serde(default)]
     annotations_cursor: Cursor,
 }
@@ -358,26 +326,21 @@ impl Detail {
 #[derive(Debug, Deserialize, JsonSchema)]
 #[serde(deny_unknown_fields)]
 pub(crate) struct ListFrontier {
-    /// The journey.
     journey: JourneyId,
-    /// With none, the acting frontier in rank order: what to do next. With any, the in-scope
-    /// nodes every filter holds for, in rank order.
+    /// None: the acting frontier. Any: the in-scope nodes matching every one, in rank
+    /// order.
     #[serde(default)]
     filters: BTreeSet<ListFlag>,
     // PRD: E4.
-    /// Only nodes the caller participates in.
     #[serde(default)]
     mine: bool,
-    /// Only these node kinds; every kind when empty.
     #[serde(default)]
     kinds: BTreeSet<NodeKind>,
-    /// Only this node and the nodes beneath it.
     #[serde(default)]
     within: Option<NodeKey>,
-    /// Rank the frontier for the caller ("prioritize for me"); with no filters only.
+    /// Rank for the caller; with no filters only.
     #[serde(default)]
     for_viewer: bool,
-    /// Where the page starts: the `next` of the page before, at the same revision.
     #[serde(default)]
     cursor: Cursor,
 }

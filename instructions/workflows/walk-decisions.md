@@ -25,9 +25,8 @@ undecided. Walking them in rank order unblocks the most first.
    made work relevant or not, filled a role, pinned a date, or opened a decision that was
    undecided before): the write's consequences say so, and `get_snapshot` has the
    decisions now open.
-4. **Move on.** Use the revision from the receipt for the next write, and take the next
-   decision in rank order. Stop when the person wants to, and summarize what was decided
-   and what is now next.
+4. **Move on.** Take the next decision in rank order. Stop when the person wants to, and
+   summarize what was decided and what is now next.
 
 Do not answer for the person. When they are unsure, leave the decision open and say what
 waits on it.

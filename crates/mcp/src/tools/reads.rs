@@ -24,11 +24,9 @@ use crate::{ToolError, ToolSet};
 pub(crate) const SPECS: &[Spec] = &[
     Spec {
         name: "list_journeys",
-        description: "The journey index, in id order, a page at a time: each journey's name, \
-            status, owners, route version, revision, and whether an upgrade is available. \
-            Filter by status, route, owner, upgrade available, the journeys that refer to the \
-            caller, or the journeys that refer to given identities (directly or through a \
-            merged key); every filter given holds.",
+        description: "Journeys, paged: status, owners, route version, revision. Filter by \
+            status, route, owner, upgrade available, or the identities they refer \
+            to.",
         writes: Writes::Nothing,
         destructive: false,
         schema: schema::<ListJourneys>,
@@ -36,9 +34,7 @@ pub(crate) const SPECS: &[Spec] = &[
     },
     Spec {
         name: "list_identities",
-        description: "The deployment's identities (people and teams journeys refer to), in key \
-            order, a page at a time: each one's key, name, emails, and the keys merged into \
-            it. Pass text to list the ones whose name or an email contains it.",
+        description: "People and teams, paged; `text` matches a name or email.",
         writes: Writes::Nothing,
         destructive: false,
         schema: schema::<ListIdentities>,
@@ -46,10 +42,8 @@ pub(crate) const SPECS: &[Spec] = &[
     },
     Spec {
         name: "list_routes",
-        description: "The route index, in id order, a page at a time: each route's name, \
-            kind (absent means a process; a segment is a reusable piece that is inserted, \
-            never started), revision, latest published version, and whether a draft is open. \
-            Pass kind to list one kind.",
+        description: "Routes, paged: name, kind (process or segment), latest version, \
+            whether a draft is open.",
         writes: Writes::Nothing,
         destructive: false,
         schema: schema::<ListRoutes>,
@@ -57,8 +51,8 @@ pub(crate) const SPECS: &[Spec] = &[
     },
     Spec {
         name: "get_route",
-        description: "A route's draft, or a published version by number, with its kind: its roles, \
-            participation kinds, default owner, and a page of its nodes in key order.",
+        description: "A route's draft, or a published `version`: roles, kinds, default \
+            owner, and a page of nodes.",
         writes: Writes::Nothing,
         destructive: false,
         schema: schema::<GetRoute>,
@@ -66,8 +60,7 @@ pub(crate) const SPECS: &[Spec] = &[
     },
     Spec {
         name: "export_route",
-        description: "A published version, or the draft, as a route file in YAML, every key \
-            kept.",
+        description: "A route version, or the draft, as a YAML route file.",
         writes: Writes::Nothing,
         destructive: false,
         schema: schema::<ExportRoute>,
@@ -75,12 +68,8 @@ pub(crate) const SPECS: &[Spec] = &[
     },
     Spec {
         name: "list_proposals",
-        description: "The open proposals of a scope, newest first, a page at a time, with how \
-            many there are in all: the ones under one destination (a journey, a route, or the \
-            deployment), the ones waiting on the caller (created by them, or drafted for an \
-            active journey that refers to them), or the ones that would create a journey or a \
-            route. Use it to find a proposal again whose id you lost; then fetch it with \
-            `get_proposal`.",
+        description: "Open proposals, newest first, paged: under one destination, waiting on \
+            you, or creating a journey or route.",
         writes: Writes::Nothing,
         destructive: false,
         schema: schema::<ListProposals>,
@@ -88,11 +77,8 @@ pub(crate) const SPECS: &[Spec] = &[
     },
     Spec {
         name: "get_proposal",
-        description: "A proposal by id: its destination, editing revision, status, and \
-            content. With `review`, also what applying it now would do: unresolved items, \
-            every violation, the frontier after, consequences, a route draft's notices, and \
-            whether its destination moved since it was drafted (then refresh it with \
-            `edit_proposal`).",
+        description: "A proposal's content and status; with `review`, what applying it now \
+            would do.",
         writes: Writes::Nothing,
         destructive: false,
         schema: schema::<GetProposal>,
@@ -100,9 +86,8 @@ pub(crate) const SPECS: &[Spec] = &[
     },
     Spec {
         name: "search",
-        description: "Text search across journeys (names, descriptions, node titles and \
-            descriptions, notes, resources), a page of journeys at a time, each with where \
-            the text was found.",
+        description: "Text search over journeys: names, descriptions, node titles and \
+            descriptions, notes, resources.",
         writes: Writes::Nothing,
         destructive: false,
         schema: schema::<Search>,
@@ -110,8 +95,8 @@ pub(crate) const SPECS: &[Spec] = &[
     },
     Spec {
         name: "get_history",
-        description: "A journey's history, or one node's, grouped by patch, a page at a time: \
-            who did what and when, with each patch's note.",
+        description: "A journey's or one node's history by patch, paged: who, when, what, \
+            and the note.",
         writes: Writes::Nothing,
         destructive: false,
         schema: schema::<GetHistory>,
@@ -148,10 +133,9 @@ impl ToolSet {
 #[derive(Debug, Deserialize, JsonSchema)]
 #[serde(deny_unknown_fields)]
 pub(crate) struct ListIdentities {
-    /// Only identities whose name or an email contains this text, ignoring case.
+    /// Matches a name or email, ignoring case.
     #[serde(default)]
     text: Option<String>,
-    /// Where the page starts: the `next` of the page before.
     #[serde(default)]
     cursor: Cursor,
 }
@@ -178,10 +162,8 @@ struct IdentityRow {
 #[derive(Debug, Deserialize, JsonSchema)]
 #[serde(deny_unknown_fields)]
 pub(crate) struct ListRoutes {
-    /// Only routes of this kind: `process` or `segment`.
     #[serde(default)]
     kind: Option<RouteKind>,
-    /// The page starts after this route: the `next` of the page before.
     #[serde(default)]
     after: Option<RouteId>,
 }
@@ -210,15 +192,12 @@ struct RouteRow {
 #[derive(Debug, Deserialize, JsonSchema)]
 #[serde(deny_unknown_fields)]
 pub(crate) struct GetRoute {
-    /// The route.
     route: RouteId,
-    /// A published version; the draft when absent.
+    /// The draft when absent.
     #[serde(default)]
     version: Option<VersionNumber>,
-    /// Where the page of nodes starts.
     #[serde(default)]
     cursor: Cursor,
-    /// Where the page of its versions starts.
     #[serde(default)]
     versions_cursor: Cursor,
 }
@@ -276,28 +255,23 @@ impl GraphPage {
 #[derive(Debug, Deserialize, JsonSchema)]
 #[serde(deny_unknown_fields)]
 pub(crate) struct ListJourneys {
-    /// Journeys in any of these statuses; any status when empty.
     #[serde(default)]
     statuses: BTreeSet<JourneyStatus>,
-    /// Journeys following this route.
     #[serde(default)]
     route: Option<RouteId>,
-    /// Journeys whose route has (or has not) published a version newer than theirs.
+    /// Whether the route has a newer published version.
     #[serde(default)]
     upgrade_available: Option<bool>,
     // PRD: H3.
-    /// Only journeys that refer to the caller: ones they own or are named in, in any status.
+    /// Journeys that refer to the caller.
     #[serde(default)]
     mine: bool,
-    /// Only journeys that refer to any of these identities: as an owner, by an answer, a role
-    /// fill, an explicit participation or an identity condition, directly or through a merged
-    /// key; with `mine`, to any of these or the caller's.
+    /// Journeys that refer to any of these identities (owner, answer, role fill,
+    /// participation, condition).
     #[serde(default)]
     referencing: BTreeSet<IdentityKey>,
-    /// Only journeys owned by any of these identities, directly or through a merged key.
     #[serde(default)]
     owners: BTreeSet<IdentityKey>,
-    /// The page starts after this journey: the `next` of the page before.
     #[serde(default)]
     after: Option<JourneyId>,
 }
@@ -328,9 +302,8 @@ struct JourneyRow {
 #[derive(Debug, Deserialize, JsonSchema)]
 #[serde(deny_unknown_fields)]
 pub(crate) struct ExportRoute {
-    /// The route.
     route: RouteId,
-    /// A published version; the draft when absent.
+    /// The draft when absent.
     #[serde(default)]
     version: Option<VersionNumber>,
 }
@@ -361,13 +334,10 @@ pub(crate) enum ProposalsScope {
 #[derive(Debug, Deserialize, JsonSchema)]
 #[serde(deny_unknown_fields)]
 pub(crate) struct ListProposals {
-    /// Which proposals.
     scope: ProposalsScope,
-    /// The destination, for the `destination` scope: `{"journey": id}`, `{"route": id}`, or
-    /// `"deployment"`.
+    /// For the `destination` scope.
     #[serde(default)]
     destination: Option<Domain>,
-    /// The page starts after this proposal: the `next` of the page before.
     #[serde(default)]
     after: Option<ProposalAfter>,
 }
@@ -413,7 +383,6 @@ struct ProposalListed {
 #[derive(Debug, Deserialize, JsonSchema)]
 #[serde(deny_unknown_fields)]
 pub(crate) struct GetProposal {
-    /// The proposal.
     proposal: ProposalId,
     /// Also preview what applying it now would do.
     #[serde(default)]
@@ -504,9 +473,7 @@ impl From<ProposalReview> for Review {
 #[derive(Debug, Deserialize, JsonSchema)]
 #[serde(deny_unknown_fields)]
 pub(crate) struct Search {
-    /// The text to find; ASCII letters match in either case.
     text: Title,
-    /// The page starts after this journey: the `next` of the page before.
     #[serde(default)]
     after: Option<JourneyId>,
 }
@@ -566,12 +533,9 @@ impl From<SearchHit> for Hit {
 #[derive(Debug, Deserialize, JsonSchema)]
 #[serde(deny_unknown_fields)]
 pub(crate) struct GetHistory {
-    /// The journey.
     journey: JourneyId,
-    /// Only the events naming this node.
     #[serde(default)]
     node: Option<NodeKey>,
-    /// The page starts after this log position: the `next` of the page before.
     #[serde(default)]
     after: Option<u64>,
 }

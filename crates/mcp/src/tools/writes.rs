@@ -26,11 +26,8 @@ use crate::{ToolError, ToolSet};
 pub(crate) const SPECS: &[Spec] = &[
     Spec {
         name: "answer_decision",
-        description: "Records a decision's answer: a choice, choices, a boolean, text, a \
-            date, an identity, or identities, matching the decision's answer type. Answering \
-            changes what is relevant, fills roles, and pins dates; the result lists the \
-            consequences: warnings, and what the answer unlocked, took out of scope, or \
-            brought into scope. Name the deployment revision when the answer names identities.",
+        description: "Answer a decision. The result lists what it brought in, ruled out, \
+            unlocked, filled, or pinned.",
         writes: Writes::Patch,
         destructive: true,
         schema: schema::<AnswerDecision>,
@@ -38,11 +35,9 @@ pub(crate) const SPECS: &[Spec] = &[
     },
     Spec {
         name: "transition_node",
-        description: "Moves a node through its lifecycle: start, stop, complete, skip (with a \
-            reason), mark_done (a group, with a reason: it reads done and the unfinished work \
-            inside reads skipped), or reopen. Guards are checked against the result. Starting or \
-            completing ahead of what the node waits on needs a guard bypass in the same \
-            `apply_patch`.",
+        description: "Start, stop, complete, skip (with a reason), mark a group done (with a \
+            reason), or reopen a node. Starting or completing ahead of what the node waits on \
+            needs a guard bypass in the same `apply_patch`.",
         writes: Writes::Patch,
         destructive: true,
         schema: schema::<TransitionNode>,
@@ -50,9 +45,8 @@ pub(crate) const SPECS: &[Spec] = &[
     },
     Spec {
         name: "assign",
-        description: "Sets who holds a participation kind (owner, or one of the graph's own) on \
-            a node: a role, or explicit identities (an empty list is an explicit none). Omit \
-            `source` to clear it, so the node inherits again.",
+        description: "Set who holds a participation kind on a node: a role or identities. \
+            Omit `source` to inherit again.",
         writes: Writes::Patch,
         destructive: true,
         schema: schema::<Assign>,
@@ -60,10 +54,8 @@ pub(crate) const SPECS: &[Spec] = &[
     },
     Spec {
         name: "snooze",
-        description: "Hides a node from the frontier until a date, or until another node is \
-            done. A container (a group, or work with children) with open work beneath it \
-            sets its whole subtree aside, each descendant naming it as `snoozed_via`; a \
-            target inside the subtree, or depending on anything in it, is rejected.",
+        description: "Set a node, or a container's whole subtree, aside until a date or \
+            until another node is done.",
         writes: Writes::Patch,
         destructive: true,
         schema: schema::<Snooze>,
@@ -71,8 +63,7 @@ pub(crate) const SPECS: &[Spec] = &[
     },
     Spec {
         name: "unsnooze",
-        description: "Lifts a node's own snooze. A node held only through a container's \
-            snooze (`snoozed_via`) is refused, naming the container to unsnooze instead.",
+        description: "Lift a node's own snooze.",
         writes: Writes::Patch,
         destructive: true,
         schema: schema::<Unsnooze>,
@@ -80,8 +71,8 @@ pub(crate) const SPECS: &[Spec] = &[
     },
     Spec {
         name: "set_date",
-        description: "Pins a node to a date, shifts or clears its pin, or records an \
-            actual start or finish date.",
+        description: "Pin, shift, or clear a node's date, or record an actual start or \
+            finish.",
         writes: Writes::Patch,
         destructive: true,
         schema: schema::<SetDate>,
@@ -89,10 +80,9 @@ pub(crate) const SPECS: &[Spec] = &[
     },
     Spec {
         name: "override",
-        description: "Applies an override to a node with a reason: force include it \
-            despite its conditions, or keep it under a skipped ancestor or a group marked done. \
-            Or removes one. A guard bypass is sent with the start or completion it covers, \
-            in `apply_patch`.",
+        description: "Apply or remove an override, with a reason: force include, or keep \
+            under a skipped ancestor. A guard bypass is sent with the start or completion it \
+            covers, in `apply_patch`.",
         writes: Writes::Patch,
         destructive: true,
         schema: schema::<OverrideNode>,
@@ -100,10 +90,8 @@ pub(crate) const SPECS: &[Spec] = &[
     },
     Spec {
         name: "resolve_date_conflict",
-        description: "Resolves a contradictory date chain or a shortfall by applying \
-            one of the resolution moves a rejection or a node's dates listed (shift, repin, or \
-            unpin a pin; revise a date answer; loosen a rule's offset; shrink an estimate; drop \
-            a requirement), then, in the same patch, the mutations that were refused.",
+        description: "Apply one resolution move a rejection or a node's dates listed, then \
+            the refused mutations, as one patch.",
         writes: Writes::Patch,
         destructive: true,
         schema: schema_citing_mutations::<ResolveDateConflict>,
@@ -111,8 +99,7 @@ pub(crate) const SPECS: &[Spec] = &[
     },
     Spec {
         name: "create_journey",
-        description: "Creates a journey, empty or from a published route version, with its \
-            owners if given, as the first patch against its new id (base revision 0).",
+        description: "Create a journey, empty or from a published route version.",
         writes: Writes::Patch,
         destructive: false,
         schema: schema::<CreateJourney>,
@@ -120,11 +107,9 @@ pub(crate) const SPECS: &[Spec] = &[
     },
     Spec {
         name: "apply_patch",
-        description: "Applies any patch to a journey, a route (its draft included), or the \
-            deployment: ordered mutations against a base revision, all or nothing. \
-            Structure (nodes, edges, roles, kinds, resources), notes, bulk changes, and \
-            deleting journeys and routes (a deployment patch) go here; a proposal is better \
-            when someone should review first.",
+        description: "Apply ordered mutations to a journey, a route draft, or the \
+            deployment, all or nothing: structure, notes, bulk edits, deletes. \
+            Draft a proposal instead when someone should review first.",
         writes: Writes::Patch,
         destructive: true,
         schema: schema_with_mutation_sketch::<ApplyPatch>,
@@ -132,9 +117,8 @@ pub(crate) const SPECS: &[Spec] = &[
     },
     Spec {
         name: "open_draft",
-        description: "Opens a route's draft for editing, creating the route first when \
-            `create` is given (base revision 0). Edit the draft with `apply_patch` or a \
-            proposal on the route, then publish it.",
+        description: "Open a route's draft for editing; with `create`, create the route \
+            first.",
         writes: Writes::Patch,
         destructive: false,
         schema: schema::<OpenDraft>,
@@ -142,9 +126,7 @@ pub(crate) const SPECS: &[Spec] = &[
     },
     Spec {
         name: "publish_draft",
-        description: "Publishes a route's draft as its next version; journeys on older \
-            versions can then upgrade. The result lists notices: work with no chain to or \
-            from the final milestone, advisory only.",
+        description: "Publish a route's draft as its next version.",
         writes: Writes::Patch,
         destructive: false,
         schema: schema::<PublishDraft>,
@@ -152,9 +134,8 @@ pub(crate) const SPECS: &[Spec] = &[
     },
     Spec {
         name: "import_route",
-        description: "Imports a route file (YAML) as a new route, or as a new draft of an \
-            existing one matched by key or path. Every violation in the file is listed; the \
-            result lists notices, advisory only.",
+        description: "Import a YAML route file as a new route, or as a new draft of an \
+            existing one.",
         writes: Writes::File,
         destructive: false,
         schema: schema::<ImportRoute>,
@@ -162,10 +143,7 @@ pub(crate) const SPECS: &[Spec] = &[
     },
     Spec {
         name: "manage_identity",
-        description: "Creates an identity (a person or team journeys refer to), edits its name \
-            or emails (an email links it to the user who signs in with it), merges \
-            duplicates into one that remains, or deletes one nothing refers to. A \
-            deployment patch.",
+        description: "Create, edit, merge, or delete an identity (a person or team).",
         writes: Writes::Patch,
         destructive: true,
         schema: schema::<ManageIdentity>,
@@ -337,28 +315,18 @@ macro_rules! write_of {
 #[derive(Debug, Deserialize, JsonSchema)]
 #[serde(deny_unknown_fields)]
 pub(crate) struct AnswerDecision {
-    /// The journey.
     journey: JourneyId,
-    /// The decision.
     decision: NodeKey,
-    /// The answer.
     value: AnswerValue,
-    /// Why it was given, markdown. It belongs to this answer alone: a revision that gives
-    /// none leaves the decision without one, so repeat the reason when it still holds.
+    /// Markdown. It belongs to this answer alone: repeat the reason when a new answer
+    /// keeps it.
     #[serde(default)]
     rationale: Option<Markdown>,
-    /// The deployment revision the named identities were read at; needed when the answer
-    /// names an identity.
+    /// Needed when the answer names identities.
     #[serde(default)]
     deployment_revision: Option<Revision>,
-    /// A new id for this write, unique to it (`p_` and a slug). Resubmitting the same id with
-    /// the same content is answered from its receipt, so a lost response is safe to retry.
     patch_id: PatchId,
-    /// The revision the write was drafted against: the `revision` of the read it follows,
-    /// or the receipt's of the write before it. A write against an older revision is
-    /// rejected as stale, naming what moved.
     base_revision: Revision,
-    /// A note recorded on the write's events: why.
     #[serde(default)]
     note: Option<Markdown>,
 }
@@ -383,20 +351,11 @@ impl AnswerDecision {
 #[derive(Debug, Deserialize, JsonSchema)]
 #[serde(deny_unknown_fields)]
 pub(crate) struct TransitionNode {
-    /// The journey.
     journey: JourneyId,
-    /// The node.
     node: NodeKey,
-    /// The transition.
     transition: Transition,
-    /// A new id for this write, unique to it (`p_` and a slug). Resubmitting the same id with
-    /// the same content is answered from its receipt, so a lost response is safe to retry.
     patch_id: PatchId,
-    /// The revision the write was drafted against: the `revision` of the read it follows,
-    /// or the receipt's of the write before it. A write against an older revision is
-    /// rejected as stale, naming what moved.
     base_revision: Revision,
-    /// A note recorded on the write's events: why.
     #[serde(default)]
     note: Option<Markdown>,
 }
@@ -415,27 +374,18 @@ impl TransitionNode {
 #[derive(Debug, Deserialize, JsonSchema)]
 #[serde(deny_unknown_fields)]
 pub(crate) struct Assign {
-    /// The journey.
     journey: JourneyId,
-    /// The node.
     node: NodeKey,
-    /// The participation kind: `owner`, or one the graph defines.
+    /// `owner`, or a kind the graph defines.
     kind: KindKey,
-    /// A role's key, or a list of identity keys; absent clears it.
+    /// A role key, or identity keys; absent clears it.
     #[serde(default)]
     source: Option<ParticipationSource<KeyRefs>>,
-    /// The deployment revision the named identities were read at; needed when the source
-    /// names identities.
+    /// Needed when the source names identities.
     #[serde(default)]
     deployment_revision: Option<Revision>,
-    /// A new id for this write, unique to it (`p_` and a slug). Resubmitting the same id with
-    /// the same content is answered from its receipt, so a lost response is safe to retry.
     patch_id: PatchId,
-    /// The revision the write was drafted against: the `revision` of the read it follows,
-    /// or the receipt's of the write before it. A write against an older revision is
-    /// rejected as stale, naming what moved.
     base_revision: Revision,
-    /// A note recorded on the write's events: why.
     #[serde(default)]
     note: Option<Markdown>,
 }
@@ -460,23 +410,11 @@ impl Assign {
 #[derive(Debug, Deserialize, JsonSchema)]
 #[serde(deny_unknown_fields)]
 pub(crate) struct Snooze {
-    /// The journey.
     journey: JourneyId,
-    /// The node: an actionable node, or a container (a group, or a deliverable or action
-    /// with children) with open work beneath it, which sets its whole subtree aside while
-    /// the snooze holds. A target inside the subtree, or one that depends on anything in it,
-    /// is rejected.
     node: NodeKey,
-    /// Until a date, or until a node is done.
     until: SnoozeTarget,
-    /// A new id for this write, unique to it (`p_` and a slug). Resubmitting the same id with
-    /// the same content is answered from its receipt, so a lost response is safe to retry.
     patch_id: PatchId,
-    /// The revision the write was drafted against: the `revision` of the read it follows,
-    /// or the receipt's of the write before it. A write against an older revision is
-    /// rejected as stale, naming what moved.
     base_revision: Revision,
-    /// A note recorded on the write's events: why.
     #[serde(default)]
     note: Option<Markdown>,
 }
@@ -495,19 +433,10 @@ impl Snooze {
 #[derive(Debug, Deserialize, JsonSchema)]
 #[serde(deny_unknown_fields)]
 pub(crate) struct Unsnooze {
-    /// The journey.
     journey: JourneyId,
-    /// The node. One snoozed only through a container (its `snoozed_via`) is refused,
-    /// naming the container: unsnooze the container instead.
     node: NodeKey,
-    /// A new id for this write, unique to it (`p_` and a slug). Resubmitting the same id with
-    /// the same content is answered from its receipt, so a lost response is safe to retry.
     patch_id: PatchId,
-    /// The revision the write was drafted against: the `revision` of the read it follows,
-    /// or the receipt's of the write before it. A write against an older revision is
-    /// rejected as stale, naming what moved.
     base_revision: Revision,
-    /// A note recorded on the write's events: why.
     #[serde(default)]
     note: Option<Markdown>,
 }
@@ -523,20 +452,11 @@ impl Unsnooze {
 #[derive(Debug, Deserialize, JsonSchema)]
 #[serde(deny_unknown_fields)]
 pub(crate) struct SetDate {
-    /// The journey.
     journey: JourneyId,
-    /// The node.
     node: NodeKey,
-    /// The change.
     change: DateChange,
-    /// A new id for this write, unique to it (`p_` and a slug). Resubmitting the same id with
-    /// the same content is answered from its receipt, so a lost response is safe to retry.
     patch_id: PatchId,
-    /// The revision the write was drafted against: the `revision` of the read it follows,
-    /// or the receipt's of the write before it. A write against an older revision is
-    /// rejected as stale, naming what moved.
     base_revision: Revision,
-    /// A note recorded on the write's events: why.
     #[serde(default)]
     note: Option<Markdown>,
 }
@@ -585,20 +505,12 @@ impl SetDate {
 #[derive(Debug, Deserialize, JsonSchema)]
 #[serde(deny_unknown_fields)]
 pub(crate) struct OverrideNode {
-    /// The journey.
     journey: JourneyId,
-    /// The node.
     node: NodeKey,
     /// The override to apply, or the kind to remove.
     change: OverrideChange,
-    /// A new id for this write, unique to it (`p_` and a slug). Resubmitting the same id with
-    /// the same content is answered from its receipt, so a lost response is safe to retry.
     patch_id: PatchId,
-    /// The revision the write was drafted against: the `revision` of the read it follows,
-    /// or the receipt's of the write before it. A write against an older revision is
-    /// rejected as stale, naming what moved.
     base_revision: Revision,
-    /// A note recorded on the write's events: why.
     #[serde(default)]
     note: Option<Markdown>,
 }
@@ -657,24 +569,17 @@ impl OverrideNode {
 #[derive(Debug, Deserialize, JsonSchema)]
 #[serde(deny_unknown_fields)]
 pub(crate) struct ResolveDateConflict {
-    /// The journey.
     journey: JourneyId,
-    /// One resolution move, as the chain listed it.
+    /// One move, as the chain listed it.
     resolution: Mutation,
-    /// The mutations the conflict refused, applied after the resolution in the same patch.
+    /// The refused mutations, applied after the move.
     #[serde(default)]
     then: Vec<Mutation>,
-    /// The deployment revision, when the resolution or the mutations name identities.
+    /// Needed when the move or the mutations name identities.
     #[serde(default)]
     deployment_revision: Option<Revision>,
-    /// A new id for this write, unique to it (`p_` and a slug). Resubmitting the same id with
-    /// the same content is answered from its receipt, so a lost response is safe to retry.
     patch_id: PatchId,
-    /// The revision the write was drafted against: the `revision` of the read it follows,
-    /// or the receipt's of the write before it. A write against an older revision is
-    /// rejected as stale, naming what moved.
     base_revision: Revision,
-    /// A note recorded on the write's events: why.
     #[serde(default)]
     note: Option<Markdown>,
 }
@@ -719,27 +624,21 @@ impl ResolveDateConflict {
 #[derive(Debug, Deserialize, JsonSchema)]
 #[serde(deny_unknown_fields)]
 pub(crate) struct CreateJourney {
-    /// The new journey's id (`j_` and a slug).
+    /// The new journey's id.
     journey: JourneyId,
-    /// A new id for this write.
     patch_id: PatchId,
-    /// Its name.
     name: Title,
-    /// What it is for.
     #[serde(default)]
     description: Option<Markdown>,
-    /// Who is responsible for the journey as a whole (identity keys); none when absent.
-    /// Nobody is an owner by default, the creator included.
+    /// Identity keys; nobody by default, the creator included.
     #[serde(default)]
     owners: IdentitySet,
-    /// The deployment revision the owners were read at (a snapshot's or `list_identities`'s);
-    /// the write is stale if an identity was merged or deleted since.
+    /// Needed when owners are named.
     #[serde(default)]
     deployment_revision: Option<Revision>,
-    /// The published route version to start from; empty when absent.
+    /// A published route version; empty when absent.
     #[serde(default)]
     from: Option<Lineage>,
-    /// A note recorded on the write's events.
     #[serde(default)]
     note: Option<Markdown>,
 }
@@ -771,7 +670,6 @@ pub(crate) struct ApplyPatch {
     /// The patch: its id, its target (a journey, a route, or the deployment), the base
     /// revision, and its mutations in order.
     patch: Patch,
-    /// A note recorded on the patch's events.
     #[serde(default)]
     note: Option<Markdown>,
 }
@@ -788,19 +686,12 @@ impl ApplyPatch {
 #[derive(Debug, Deserialize, JsonSchema)]
 #[serde(deny_unknown_fields)]
 pub(crate) struct OpenDraft {
-    /// The route (a slug).
     route: RouteId,
     /// Create the route first, with this name and description (base revision 0).
     #[serde(default)]
     create: Option<NewRoute>,
-    /// A new id for this write, unique to it (`p_` and a slug). Resubmitting the same id with
-    /// the same content is answered from its receipt, so a lost response is safe to retry.
     patch_id: PatchId,
-    /// The revision the write was drafted against: the `revision` of the read it follows,
-    /// or the receipt's of the write before it. A write against an older revision is
-    /// rejected as stale, naming what moved.
     base_revision: Revision,
-    /// A note recorded on the write's events: why.
     #[serde(default)]
     note: Option<Markdown>,
 }
@@ -850,16 +741,9 @@ impl OpenDraft {
 #[derive(Debug, Deserialize, JsonSchema)]
 #[serde(deny_unknown_fields)]
 pub(crate) struct PublishDraft {
-    /// The route.
     route: RouteId,
-    /// A new id for this write, unique to it (`p_` and a slug). Resubmitting the same id with
-    /// the same content is answered from its receipt, so a lost response is safe to retry.
     patch_id: PatchId,
-    /// The revision the write was drafted against: the `revision` of the read it follows,
-    /// or the receipt's of the write before it. A write against an older revision is
-    /// rejected as stale, naming what moved.
     base_revision: Revision,
-    /// A note recorded on the write's events: why.
     #[serde(default)]
     note: Option<Markdown>,
 }
@@ -883,12 +767,10 @@ impl PublishDraft {
 #[derive(Debug, Deserialize, JsonSchema)]
 #[serde(deny_unknown_fields)]
 pub(crate) struct ImportRoute {
-    /// A new id for this write; the import's new keys are minted from it.
     patch_id: PatchId,
-    /// The route file, in YAML (or JSON): `route`, `name`, and its roles, kinds, and nodes,
-    /// naming the published version it `extends` to import a new draft of an existing route.
+    /// The route file in YAML (or JSON); `extends` imports a new draft of an existing
+    /// route.
     file: String,
-    /// A note recorded on the import's events.
     #[serde(default)]
     note: Option<Markdown>,
 }
@@ -897,13 +779,10 @@ pub(crate) struct ImportRoute {
 #[derive(Debug, Deserialize, JsonSchema)]
 #[serde(deny_unknown_fields)]
 pub(crate) struct ManageIdentity {
-    /// The change.
     change: IdentityChange,
-    /// A new id for this write.
     patch_id: PatchId,
-    /// The deployment revision it was drafted against.
+    /// The deployment revision.
     base_revision: Revision,
-    /// A note recorded on the write's events.
     #[serde(default)]
     note: Option<Markdown>,
 }

@@ -10,30 +10,23 @@ published versions and at most one draft. A **journey** is a live copy for one r
 situation: its nodes, the answers given, each node's state, who participates, pins, and
 notes. Nodes are decisions (typed questions), deliverables and actions (work), milestones
 (dates), and groups (containers). Edges are hard dependencies. Conditions on answers decide
-what is relevant. Everything else (blocking, dates, gravity, rank, the frontier) is derived
-by Cairn on every read; you never compute it yourself.
-
-You act as the user who connected you, with the same capabilities. Every write records you
-and that user.
+what is relevant. Blocking, dates, rank, and the frontier are derived by Cairn on every
+read; never compute them yourself. You act as the user who connected you, with the same
+capabilities; every write records you and that user.
 
 ## The loop
 
 1. **Read state first.** Call `get_snapshot` before anything else on a journey. It answers
    the answers in effect, a page of in-scope nodes, the ranked acting frontier, open
    decisions by rank, placeholders needing breakdown, unassigned items, shortfalls, and
-   counts. Scope it with `subtree` and `depth` on a large journey. It also says when
-   completing the journey is suggested (nothing left in scope, or the final milestone
-   done); completing it is the person's call.
+   counts. Scope it with `subtree` and `depth` on a large journey. It says when completing
+   the journey is suggested; completing it is the person's call.
 2. **Look closer only where needed.** `list_frontier` pages the ranked frontier or, with
    `filters`, the nodes that need something (`decisions_needed`, `blocked`, `stale`, and
-   the others its schema lists; `blocked` is the display state). `get_node` explains
-   one node: why it is relevant or blocked, its dates, and why it ranks where it does.
-   `get_level` shows the graph at one level of containment.
-3. **Write in small, named steps.** Each write is one patch. Give it a new `patch_id` you
-   make up (`p_` and a short slug, unique per write) and the `base_revision` you read.
-   The answer's `receipt.revision` is the base of your next write on that journey, unless the
-   answer says `over` or `already_applied`: then read again first (see Revisions, retries, and
-   errors).
+   the others its schema lists). `get_node` explains one node: why it is relevant or
+   blocked, its dates, and why it ranks where it does. `get_level` shows the graph at one
+   level of containment.
+3. **Write in small, named steps**, by the rules below.
 4. **Offer to walk open decisions.** Whenever a journey has open decisions (you just
    created it, or you are back at it later), offer to walk them with the person
    (walk-decisions): they gate what depends on them.
@@ -41,14 +34,37 @@ and that user.
    shortfalls, relevance changes, and finished work that may not apply because the decision
    its relevance reads is unanswered). Tell the person what changed, not just that it worked.
 
+## Rules every write shares
+
+- **A new `patch_id` per write**: `p_` and a short slug you make up. Never reuse one for a
+  different write.
+- **`base_revision` is the revision you last read** of what you write: the snapshot's (or
+  `get_node`'s) `revision`, or the `receipt.revision` of your last write there.
+- **`over` or `already_applied` in an answer: read again** (`get_snapshot` or `get_node`)
+  before the next write. `over` means the write landed although the revision had moved,
+  and names what others changed; your view is behind, and the receipt's revision includes
+  changes you have not seen.
+- **No answer (a lost response): resubmit the same call with the same `patch_id`.** A write
+  that landed answers `already_applied` from its receipt and is never applied twice.
+- **Refused as `stale`**: what moved touches what you change. Read again, check the change still
+  makes sense, and write against the new revision with a new `patch_id`.
+- **Rejected**: every violation is listed with its path; fix them all at once, nothing was
+  written. Arguments off the tool's schema are refused with the path that did not match.
+
+## Ids and keys
+
+Every node, role, and participation kind has a `key` (`n_`, `r_`, and so on, with a slug)
+that never changes and is never reused; its `id` is a readable slug unique among its
+siblings. New journeys, routes, and proposals take ids you choose: `j_`, a route slug, and
+`pr_`, with a slug. A new identity's key is `who_` and 16 random lowercase letters and digits;
+never derive it from a name. Read keys from the snapshot or the route; never guess them.
+
 ## Status: read `display_state`
 
-Every node carries a stored `state` (what its transitions act on: `todo`, `open`, `done`,
-and so on) and a derived `display_state`. To say what a node's status is, use
-`display_state`; keep `state` for which transition applies. A decision that an answer ruled
-out still has the stored state `open`, and its `display_state` is `not_relevant`. The counts
-come both ways: `by_state` counts by stored state and `by_display_state` by display state,
-both over the in-scope nodes.
+A node carries a stored `state` (`todo`, `open`, `done`, and so on), which says which
+transition applies, and a derived `display_state`, which says its status: use it when you
+tell the person. A decision an answer ruled out is still `open` but `not_relevant`. The
+counts come both ways: `by_state` and `by_display_state`, over the in-scope nodes.
 
 | `display_state` | Say | Meaning |
 |---|---|---|
@@ -66,24 +82,8 @@ A node that rests on a decision which is itself still undecided is `conditional`
 out, though its relevance reads `not_relevant` and counts for nothing until then
 (`pending_on` names the decision). A container is never `blocked` by its own children.
 
-## Revisions, retries, and errors
+## Identities and deleting
 
-- **Stale.** A write against a revision that moved is applied anyway when nothing changed
-  since touches what it changes. Its answer then carries `over`, naming the revisions that
-  moved and what others changed. Your view is behind by those changes: read again
-  (`get_snapshot` or `get_node`) before your next write, because the receipt's revision
-  includes changes you have not seen. Otherwise the write is refused as `stale`, naming what
-  moved. Read again, check the change still makes sense, and write again against the new
-  revision with a new `patch_id`.
-- **Lost response.** If a call fails without an answer, resubmit it unchanged with the same
-  `patch_id`. A write that already landed answers `already_applied` from its receipt; it is
-  never applied twice. That answer cannot say whether the write was applied over others'
-  changes, so read again before your next write, as after `over`. Never reuse a `patch_id`
-  for a different write.
-- **Rejected.** An invalid write is refused with every violation, each with its path, a
-  code, and a message. Fix all of them at once; nothing was written.
-- **Arguments.** A call whose arguments do not match the tool's schema is refused with the
-  path that did not match.
 - **Identities.** A write that names identities (an identity answer, explicit participants,
   a journey's owners) carries the `deployment_revision` the snapshot reported. An identity has a name, emails,
   or both; a person who only signed in has emails and no name. An identity that anything
@@ -246,14 +246,6 @@ already has a decision that fills that role, `omit` the segment's own. Propose i
 writing it directly, and let a person apply it. After insertion the nodes are ordinary: edit,
 skip, or remove them as you would any other. A segment cannot be started as a journey, and
 it declares no final milestone or default owner. The insert-segment workflow has an example.
-
-## Ids and keys
-
-Every node, role, and participation kind has a `key` (`n_`, `r_`, and so on, with a slug)
-that never changes and is never reused; its `id` is a readable slug unique among its
-siblings. New journeys, routes, and proposals take ids you choose: `j_`, a route slug, and
-`pr_`, with a slug. A new identity's key is `who_` and 16 random lowercase letters and digits;
-never derive it from a name. Read keys from the snapshot or the route; never guess them.
 
 ## Workflows
 
