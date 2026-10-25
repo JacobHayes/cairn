@@ -86,6 +86,7 @@ impl Server {
                 methods,
                 false,
                 McpAccess::closed("http://127.0.0.1/api/mcp"),
+                "dev",
             ),
         });
         let app = cairn_api::router(service.clone(), &auth)

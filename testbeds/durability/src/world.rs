@@ -221,6 +221,7 @@ impl Open {
                 Vec::new(),
                 false,
                 McpAccess::closed("http://127.0.0.1/api/mcp"),
+                "dev",
             ),
         });
         Ok(Open { store, service })

@@ -32,6 +32,7 @@ pub async fn seed_fixtures(path: &Path) -> Result<(), String> {
             }],
             false,
             McpAccess::closed("http://127.0.0.1/api/mcp"),
+            "dev",
         ),
     });
     cairn_wasm::fixtures::seed(&service)

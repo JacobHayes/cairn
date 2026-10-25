@@ -269,6 +269,7 @@ mod binary {
         let capabilities = get(address, "localhost", "/api/capabilities").await.json();
         assert_eq!(capabilities["assistant"], false);
         assert_eq!(capabilities["mcp"]["tokens"], false);
+        assert_eq!(capabilities["version"], cairn::VERSION);
         let document = get(address, "localhost", "/api/journeys/j_hiring/document").await;
         assert_eq!(document.status, 200, "{}", document.text());
         let build = cairn::assets::digest(&cairn::assets::load().unwrap());

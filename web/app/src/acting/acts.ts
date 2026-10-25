@@ -93,6 +93,7 @@ export function assignOwner(key: string, identity: string): Mutation {
 export type BulkAction =
   | { act: "start" }
   | { act: "done" }
+  | { act: "reopen" }
   | { act: "skip"; reason: string }
   | { act: "assign"; identity: string }
   | { act: "snooze"; until: Schema<"SnoozeTarget"> }
@@ -111,6 +112,8 @@ function bulkMutation(action: BulkAction, facts: Facts): Mutation | undefined {
       return moves.includes("start") ? transition(node.key, "start") : undefined;
     case "done":
       return moves.includes("complete") ? transition(node.key, "complete") : undefined;
+    case "reopen":
+      return finished ? transition(node.key, "reopen") : undefined;
     case "skip":
       return moves.includes("skip") ? transition(node.key, "skip", action.reason) : undefined;
     case "assign":
@@ -125,6 +128,7 @@ function bulkMutation(action: BulkAction, facts: Facts): Mutation | undefined {
 const VERB: Record<BulkAction["act"], string> = {
   start: "start",
   done: "be marked done",
+  reopen: "be reopened",
   skip: "be skipped",
   assign: "be assigned",
   snooze: "be snoozed",

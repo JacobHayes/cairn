@@ -43,6 +43,7 @@ impl World {
                 Vec::new(),
                 false,
                 McpAccess::closed("http://127.0.0.1/api/mcp"),
+                "dev",
             ),
         });
         let now = Arc::new(AtomicI64::new(0));

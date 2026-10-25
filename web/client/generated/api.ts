@@ -1354,6 +1354,11 @@ export interface components {
             mcp?: components["schemas"]["McpAccess"] | null;
             /** @description Whether the host streams revision ticks over SSE. */
             sse: boolean;
+            /**
+             * @description The release this host runs (a version, or `dev` for a build without one); null where no
+             *     server binary serves the page.
+             */
+            version?: string | null;
         };
         /** @description A chain of constraints, with the dates fixed on it. */
         Chain: {

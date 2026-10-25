@@ -43,12 +43,18 @@ mod composition {
             sign_in: vec![AgentSignIn::DevUser],
             tokens: false,
         };
-        let server = Capabilities::server(vec![dev.clone()], true, access.clone());
+        let server = Capabilities::server(vec![dev.clone()], true, access.clone(), "1.2.3");
         assert!(server.sse && server.assistant);
+        assert_eq!(server.version.as_deref(), Some("1.2.3"));
         assert_eq!(server.mcp, Some(access));
         assert_eq!(server.auth, vec![dev]);
         let browser = Capabilities::browser();
-        assert!(browser.mcp.is_none() && !browser.sse && !browser.assistant);
+        assert!(
+            browser.mcp.is_none()
+                && !browser.sse
+                && !browser.assistant
+                && browser.version.is_none()
+        );
         assert_eq!(
             browser
                 .auth

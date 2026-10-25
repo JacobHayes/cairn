@@ -38,6 +38,7 @@ pub fn service_over(store: Arc<dyn Store>) -> (Service, Arc<InProcessNotifier>) 
             Vec::new(),
             false,
             McpAccess::closed("http://127.0.0.1/api/mcp"),
+            "dev",
         ),
     });
     (service, notifier)

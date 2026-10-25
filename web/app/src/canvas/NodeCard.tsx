@@ -37,7 +37,7 @@ export interface CardActions {
   /** A node's title by key, for the marker's list. */
   title(key: string): string;
   /** The node's context menu (right-click, or the menu key on a focused card); none on a canvas that has no actions to offer. */
-  menu: { groups: (key: string) => ContextGroup[]; choose: (key: string, id: string) => void } | undefined;
+  menu: { label: (key: string) => string; groups: (key: string) => ContextGroup[]; choose: (key: string, id: string) => void } | undefined;
 }
 
 export const CardActionsContext = createContext<CardActions | undefined>(undefined);
@@ -383,8 +383,9 @@ export function NodeCard({ data, width, height }: NodeProps<CardNode>) {
         </span>
       )}
       <Handle type="target" position={Position.Left} isConnectable={false} className="node-handle" data-overhang="" />
+      {/* `nokey`: a press on the card's own face is a click even with Shift held, so a hand that drifts a pixel still adds the card; only a press on the empty canvas, or inside an open container below its head, draws a box. */}
       {header === undefined ? (
-        <div className="node-inner" style={{ height: "100%" }}>
+        <div className="node-inner nokey" style={{ height: "100%" }}>
           <Head card={card} collapsible={data.collapsible} mark={mark} />
           <TitleRow card={card} rows={rows} />
           {journey?.body === undefined ? null : <Body body={journey.body} />}
@@ -394,7 +395,7 @@ export function NodeCard({ data, width, height }: NodeProps<CardNode>) {
       ) : (
         // An open container: its head (kind, title, progress), a rule under it, then the hidden-prerequisites marker and the children.
         <>
-          <div className="node-inner" style={{ height: header - BORDER_PX - (rows.marker ? MARKER_ROW_PX : 0) }}>
+          <div className="node-inner nokey" style={{ height: header - BORDER_PX - (rows.marker ? MARKER_ROW_PX : 0) }}>
             <Head card={card} collapsible={data.collapsible} mark={mark} />
             <TitleRow card={card} rows={rows} head={{ box: headTitleBox(width ?? 0, header, rows.marker), chip: card.stage && journey !== undefined }} />
             {journey?.body === undefined ? null : <Body body={journey.body} />}

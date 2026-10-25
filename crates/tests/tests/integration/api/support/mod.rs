@@ -190,7 +190,7 @@ impl World {
             settings: settings(),
             capabilities: Capabilities {
                 mcp: mcp.then(|| access.clone()),
-                ..Capabilities::server(methods, assistant.is_some(), access)
+                ..Capabilities::server(methods, assistant.is_some(), access, "dev")
             },
         });
         let assistant = assistant.map(|provider| {

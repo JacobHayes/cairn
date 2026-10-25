@@ -809,7 +809,7 @@ function Flow(props: GraphCanvasProps) {
           <FitControls focus={props.selected === undefined ? undefined : [...new Set([props.selected, ...(props.dates ?? []).flatMap((line) => [line.from, line.to])])]} />
           {props.children}
         </ReactFlow>
-        {menu === undefined || menus === undefined ? null : <ContextMenu at={menu.at} groups={menus.groups(menu.key)} label={`Actions for ${props.actions.title(menu.key)}`} onChoose={(id) => { menus.choose(menu.key, id); }} onClose={closeMenu} />}
+        {menu === undefined || menus === undefined ? null : <ContextMenu at={menu.at} groups={menus.groups(menu.key)} label={menus.label(menu.key)} onChoose={(id) => { menus.choose(menu.key, id); }} onClose={closeMenu} />}
       </div>
     </CardActionsContext>
   );

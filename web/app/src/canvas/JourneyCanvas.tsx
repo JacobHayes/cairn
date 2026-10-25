@@ -12,6 +12,8 @@ import { useCallback, useEffect, useMemo } from "react";
 import { useLocation, useNavigate } from "react-router";
 
 import { nodeDetail, nodeOf, type GraphNode, type Ready, titleOf } from "../detail/model.ts";
+import { selectionOf } from "../acting/acts.ts";
+import { selectionMenuOf, selectionScope, type SelectionChoice, type SelectionOfferId } from "../acting/selectionOffers.ts";
 import { contextMenuOf } from "../detail/offers.ts";
 import { screenSwitched } from "../journeys/address.ts";
 import { useJourneyTarget } from "../journeys/useJourneyTarget.ts";
@@ -93,6 +95,12 @@ function useActions(ready: Ready, view: GraphView, selected: string | undefined,
   const layer = useReviewing();
   const writable = useWritable(ready);
   const proposal = target.proposal;
+  // The members the journey still holds, as the inspector lists them: one removed elsewhere is not counted or acted on.
+  const held = () => selectionOf(ready, selection.members);
+  const ofSeveral = (key: string) => {
+    const members = held();
+    return members.length >= 2 && members.some((facts) => facts.node.key === key);
+  };
   return useMemo<CardActions>(
     () => ({
       open: (key) => {
@@ -112,14 +120,32 @@ function useActions(ready: Ready, view: GraphView, selected: string | undefined,
       title: (key) => titleOf(ready, key),
       // Acting on a picture of the future would be wrong: the layer's canvas offers no menu.
       menu: layer !== undefined ? undefined : {
+        // A card in a selection of several opens the selection's menu: what it offers acts on every member.
+        label: (key) => (ofSeveral(key) ? `Actions for ${String(held().length)} selected` : `Actions for ${titleOf(ready, key)}`),
         groups: (key) => {
+          if (ofSeveral(key)) {
+            const members = held();
+            const acts = writable && !view.edit ? selectionMenuOf(members, (each) => titleOf(ready, each)) : [];
+            const groups = [...acts, [{ id: "toggle-selection", label: `Remove ${titleOf(ready, key)} from selection` }, { id: "clear-selection", label: "Clear selection" }]];
+            return groups.map((items, at) => (at === 0 ? { label: `${String(members.length)} selected`, items } : { items }));
+          }
           const detail = nodeDetail(ready, key);
           return detail === undefined ? [] : contextMenuOf(ready, detail, writable, selection.members.includes(key)).map((items) => ({ items }));
         },
-        // The node's own Actions carry out the choice once it is open beside the canvas.
+        // The node's own Actions carry out the choice once it is open beside the canvas, and the selection panel a choice for the selection.
         choose: (key, id) => {
           if (id === "toggle-selection") {
             selection.toggle(key);
+            return;
+          }
+          if (id === "clear-selection") {
+            selection.clear();
+            return;
+          }
+          if (ofSeveral(key)) {
+            frame?.show("inspector");
+            const choice: SelectionChoice = { scope: selectionScope(held().map((facts) => facts.node.key)), id: id as SelectionOfferId };
+            void navigate(graphPath(journey, view, { node: selected, proposal }, search), { replace: true, state: { selectionChoice: choice } });
             return;
           }
           selection.release();

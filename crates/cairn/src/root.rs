@@ -98,7 +98,8 @@ impl fmt::Display for StartupError {
 impl std::error::Error for StartupError {}
 
 /// The capabilities the configuration offers: its sign-in methods in order, the assistant
-/// when configured, and MCP and SSE always (they are not optional on the server).
+/// when configured, MCP and SSE always (they are not optional on the server), and the
+/// version this build reports.
 #[must_use]
 pub fn capabilities(config: &Config) -> Capabilities {
     let auth = config
@@ -118,7 +119,12 @@ pub fn capabilities(config: &Config) -> Capabilities {
             }
         })
         .collect();
-    Capabilities::server(auth, config.assistant.is_some(), mcp_access(config))
+    Capabilities::server(
+        auth,
+        config.assistant.is_some(),
+        mcp_access(config),
+        crate::VERSION,
+    )
 }
 
 /// How an agent reaches the MCP server this configuration serves (I2): the public URL joined

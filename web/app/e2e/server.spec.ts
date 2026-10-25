@@ -378,6 +378,8 @@ test("Connect an agent shows this server's address, makes a token that acts as i
   await open(page, "server", "/journeys");
   await expect(page.getByRole("navigation", { name: "Screens", exact: true }).getByRole("link", { name: "Connect an agent" })).toBeHidden();
   await syncChip(page).click();
+  // Its head names the release the server runs: a build without a release tag says so.
+  await expect(page.getByTestId("sync-popover").getByTestId("sync-version")).toHaveText("dev build");
   await page.getByTestId("sync-popover").getByRole("link", { name: /Connect an agent/ }).click();
   await expect(page.getByRole("heading", { name: "Connect an agent" })).toBeVisible();
   await checkpoint(page);

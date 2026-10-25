@@ -237,6 +237,16 @@ body {
   text-transform: none;
   white-space: normal;
 }
+/* The head names the popover at the left and the release the server runs at the right, as it is written (a version is not shouted). */
+.sync-head {
+  display: flex;
+  justify-content: space-between;
+  gap: var(--space-3);
+}
+.sync-version {
+  text-transform: none;
+  letter-spacing: 0;
+}
 .sync-popover:focus {
   outline: none;
 }

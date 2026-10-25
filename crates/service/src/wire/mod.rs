@@ -147,6 +147,9 @@ pub struct Capabilities {
     // PRD: H6.
     /// Whether the host streams revision ticks over SSE.
     pub sse: bool,
+    /// The release this host runs (a version, or `dev` for a build without one); null where no
+    /// server binary serves the page.
+    pub version: Option<String>,
 }
 
 /// How an agent reaches this host's MCP server.
@@ -216,6 +219,7 @@ impl From<&crate::Capabilities> for Capabilities {
             assistant,
             mcp,
             sse,
+            version,
         } = capabilities;
         let auth = auth.iter().map(|method| AuthMethod {
             name: method.name.clone(),
@@ -246,6 +250,7 @@ impl From<&crate::Capabilities> for Capabilities {
                 tokens: access.tokens,
             }),
             sse: *sse,
+            version: version.clone(),
         }
     }
 }

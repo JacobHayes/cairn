@@ -862,6 +862,13 @@
           "sse": {
             "description": "Whether the host streams revision ticks over SSE.",
             "type": "boolean"
+          },
+          "version": {
+            "description": "The release this host runs (a version, or `dev` for a build without one); null where no\nserver binary serves the page.",
+            "type": [
+              "string",
+              "null"
+            ]
           }
         },
         "required": [

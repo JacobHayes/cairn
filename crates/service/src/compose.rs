@@ -108,18 +108,23 @@ pub struct Capabilities {
     pub mcp: Option<McpAccess>,
     /// Whether the host streams revision ticks over SSE (H6).
     pub sse: bool,
+    /// The release this host runs, as the binary reports it (a version, or `dev`); `None`
+    /// where no binary serves the page (the browser host).
+    pub version: Option<String>,
 }
 
 impl Capabilities {
     /// The server's: MCP and SSE always (they are not optional on the server), the
-    /// configured sign-in methods, and the assistant when one is configured.
+    /// configured sign-in methods, the assistant when one is configured, and the version the
+    /// binary reports.
     #[must_use]
-    pub fn server(auth: Vec<AuthMethod>, assistant: bool, mcp: McpAccess) -> Self {
+    pub fn server(auth: Vec<AuthMethod>, assistant: bool, mcp: McpAccess, version: &str) -> Self {
         Self {
             auth,
             assistant,
             mcp: Some(mcp),
             sse: true,
+            version: Some(version.to_owned()),
         }
     }
 
@@ -139,6 +144,7 @@ impl Capabilities {
             assistant: false,
             mcp: None,
             sse: false,
+            version: None,
         }
     }
 }

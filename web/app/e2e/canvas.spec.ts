@@ -3,7 +3,7 @@
 // the viewport). It opens fitted at every detail, expands in place, traces a selection, follows an
 // edge, and pans and zooms. What the canvas draws (its levels, lines, lens, layout) is the
 // model's tests'.
-import type { Page } from "@playwright/test";
+import type { Locator, Page } from "@playwright/test";
 
 import { checkpoint } from "./invariants.ts";
 import { expect, test } from "./test.ts";
@@ -132,14 +132,30 @@ test("C2 to C7: the graph opens fitted at every depth, expands in place, traces 
   await depthCountsHiddenFrontier(page);
 });
 
+/** A shift-click as a hand makes one: Shift held, and the pointer drifting a pixel or two between the press and the release. */
+async function shiftClickDrifting(page: Page, target: Locator): Promise<void> {
+  const box = await whenSettled(page, () => target.boundingBox());
+  if (box === null) {
+    throw new Error("the target has no box");
+  }
+  const [x, y] = [box.x + Math.min(10, box.width / 2), box.y + box.height / 2];
+  await page.keyboard.down("Shift");
+  await page.mouse.move(x, y);
+  await page.mouse.down();
+  await page.mouse.move(x + 2, y + 1);
+  await page.mouse.up();
+  await page.keyboard.up("Shift");
+}
+
 /** Click selects and shift-click adds, the inspector lists the members, and the actions that fit them all are offered. */
 async function selectsASet(page: Page): Promise<void> {
   const members = page.getByTestId("selection-member");
   await nodeCard(page, "n_access").getByTestId("card-open").click();
   await expect(nodePanel(page, "n_access")).toBeVisible();
-  // Shift on a title adds as it does on the body; two members are listed, with no trace left drawn.
-  await nodeCard(page, "n_plan").getByTestId("card-open").click({ modifiers: ["Shift"] });
-  await nodeCard(page, "n_decision_meeting").click({ modifiers: ["Shift"] });
+  // Shift on a title adds as it does on the body, though the pointer drifts while pressed; two members are listed, with no trace left drawn.
+  await shiftClickDrifting(page, nodeCard(page, "n_plan").getByTestId("title"));
+  await expect(page.getByTestId("selection-panel")).toHaveAttribute("data-count", "2");
+  await shiftClickDrifting(page, nodeCard(page, "n_decision_meeting"));
   await expect(page.getByTestId("selection-panel")).toHaveAttribute("data-count", "3");
   await expect(members).toHaveCount(3);
   await expect(page.getByTestId("node-detail")).toHaveCount(0);
@@ -230,6 +246,39 @@ async function menuArrowsSkipDisabled(page: Page): Promise<void> {
   await expect(button).toBeFocused();
 }
 
+/** A right-click on a member of a selection of several opens the selection's menu, which acts on every member; on a card outside it, that card's own. */
+async function contextMenuActsOnTheSelection(page: Page): Promise<void> {
+  await openJourney(page, "browser", "j_vendor_eval");
+  await nodeCard(page, "n_kickoff").getByTestId("card-open").click();
+  await nodeCard(page, "n_who_informed").click({ modifiers: ["Shift"] });
+  await expect(page.getByTestId("selection-panel")).toHaveAttribute("data-count", "2");
+  await nodeCard(page, "n_access").click({ button: "right" });
+  await expect(page.getByRole("menu", { name: "Actions for Environment access" })).toBeVisible();
+  await page.keyboard.press("Escape");
+  // Both are finished: the selection's menu offers Reopen and not Start, which neither can take.
+  await nodeCard(page, "n_kickoff").click({ button: "right" });
+  const menu = page.getByRole("menu", { name: "Actions for 2 selected" });
+  await expect(menu.getByRole("menuitem", { name: "Start" })).toHaveCount(0);
+  await menu.getByRole("menuitem", { name: "Reopen" }).click();
+  await expect(nodeCard(page, "n_kickoff")).toHaveAttribute("data-state", "ready");
+  await expect(nodeCard(page, "n_who_informed")).toHaveAttribute("data-state", "ready");
+  await expect(page.getByTestId("selection-panel")).toHaveCount(0);
+  // The inspector's Status menu reopens a selection too, once every member is finished: the open milestone holds it back, and says so.
+  await nodeCard(page, "n_kickoff").getByTestId("card-open").click();
+  await nodeCard(page, "n_purpose").click({ modifiers: ["Shift"] });
+  await page.getByTestId("selection-status").click();
+  const reopen = page.getByTestId("selection-status-menu").getByRole("menuitem", { name: "Reopen" });
+  await expect(reopen).toBeDisabled();
+  await expect(reopen).toHaveAccessibleDescription(/cannot be reopened/);
+  await page.keyboard.press("Escape");
+  await page.getByTestId("selection-member").filter({ hasText: "Kickoff" }).getByRole("button", { name: /Remove .* from the selection/ }).click();
+  await nodeCard(page, "n_who_owns").click({ modifiers: ["Shift"] });
+  await page.getByTestId("selection-status").click();
+  await page.getByTestId("selection-status-menu").getByRole("menuitem", { name: "Reopen" }).click();
+  await expect(nodeCard(page, "n_purpose")).toHaveAttribute("data-state", "ready");
+  await expect(nodeCard(page, "n_who_owns")).toHaveAttribute("data-state", "ready");
+}
+
 test("selection is one set with no mode: click selects, shift-click adds, the inspector lists the members and the actions that fit them all", async ({ page }) => {
   await openJourney(page, "browser", "j_vendor_eval");
   await selectsASet(page);
@@ -238,6 +287,8 @@ test("selection is one set with no mode: click selects, shift-click adds, the in
   await emptyCanvasDeselects(page);
   await checkpoint(page);
   await menuArrowsSkipDisabled(page);
+  await checkpoint(page);
+  await contextMenuActsOnTheSelection(page);
 });
 
 /** Under Fade the cards below the depth are 0.3 whatever their state, a container holding a decision stays clear, and Frontier's dimming joins it without multiplying. */

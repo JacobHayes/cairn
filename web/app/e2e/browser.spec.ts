@@ -108,6 +108,8 @@ test("the in-browser host boots, derives in the worker, applies a patch, and sur
   await syncChip(page).click();
   await expect(page.getByTestId("sync-popover")).toBeVisible();
   await expect(page.getByTestId("sync-popover").getByRole("link", { name: /Connect an agent/ })).toHaveCount(0);
+  // Nor does a server release serve it: the head names none.
+  await expect(page.getByTestId("sync-popover").getByTestId("sync-version")).toHaveCount(0);
   await page.keyboard.press("Escape");
   await visit(page, "browser", "/agents");
   await expect(page.getByTestId("agents-screen")).toContainText("runs in your browser");

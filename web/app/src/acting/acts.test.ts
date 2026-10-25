@@ -95,6 +95,7 @@ describe("C9: bulk actions", () => {
     ["complete a decision", { act: "done" }, [facts("n_pick")], ["n_pick"]],
     ["snooze a finished node", { act: "snooze", until: { date: "2026-10-09" } }, [facts("n_pick"), facts("n_done")], ["n_done"]],
     ["unsnooze a node with no snooze", { act: "unsnooze" }, [facts("n_wait"), facts("n_pick")], ["n_pick"]],
+    ["reopen an unfinished node", { act: "reopen" }, [facts("n_done"), facts("n_work")], ["n_work"]],
   ];
   it.each(cases)("sends nothing when one cannot take it: %s", (_, action, selected, unable) => {
     expect(bulkPlan(action, selected)).toEqual({ unable });
@@ -138,6 +139,15 @@ describe("C9: bulk actions", () => {
     const { sent, run } = recorder();
     expect(await runBulk({ act: "start" }, [facts("n_work"), facts("n_pick")], run)).toEqual({ outcome: "unable", unable: ["n_pick"] });
     expect(sent).toEqual([]);
+  });
+});
+
+it("C9: bulk reopen reopens each finished node, done or skipped, as its own menu does", () => {
+  expect(bulkPlan({ act: "reopen" }, [facts("n_done"), facts("n_done", { state: "skipped" })])).toEqual({
+    mutations: [
+      { op: "transition", node: "n_done", transition: "reopen" },
+      { op: "transition", node: "n_done", transition: "reopen" },
+    ],
   });
 });
 

@@ -1,15 +1,15 @@
 // C9's actions over a selection, the same on every surface that holds one (the inspector's
-// selection panel, the list's header): Status (Start, Mark done, Skip), Assign owner, Snooze (a
+// selection panel, the list's header): Status (Start, Mark done, Reopen, Skip), Assign owner, Snooze (a
 // date, a node, Unsnooze, B6), always in that order. Each is one patch with one mutation, so
 // one event, per node; a guard failure on any node rejects the whole patch, and the rejection
 // names which node failed (A15), with D4's bypass. An action every member's state does not
 // allow stays visible and disabled, its reason in the tooltip, so nothing is sent that is
 // certain to be refused.
 import { useEffect, useId, useRef, useState, type ReactNode } from "react";
+import { useLocation, useNavigate } from "react-router";
 
 import { UntilFields } from "../detail/editors.tsx";
 import { titleOf, type Ready } from "../detail/model.ts";
-import { ACT_LABELS } from "../detail/offers.ts";
 import { snoozeStart, untilOf, withinScope, type SnoozeDraft } from "../detail/snooze.ts";
 import { Menu } from "../screens/Menu.tsx";
 import { Rejected } from "../detail/Rejected.tsx";
@@ -17,14 +17,7 @@ import { IdentityOptions } from "../detail/parts.tsx";
 import { useFormDraft, useNodeWrite, type Seen } from "../detail/write.ts";
 import { Button, Input } from "../ui/kit.tsx";
 import { reasonFor, runBulk, type BulkAction, type Facts } from "./acts.ts";
-
-type Form = "skip" | "assign" | "snooze";
-
-const FORM_WORDS: Record<Form, string> = {
-  skip: "Skip…",
-  assign: "Assign owner…",
-  snooze: "Snooze…",
-};
+import { ASSIGN, offerOf, selectionScope, SNOOZE, STATUS, type Form, type Offer, type SelectionChoice, type SelectionOfferId } from "./selectionOffers.ts";
 
 /** What a form holds: its text, and for a snooze the same draft the inspector's snooze form keeps. */
 interface Filled {
@@ -48,19 +41,26 @@ function actionOf({ form, value, snooze }: Filled, today: string): BulkAction | 
   }
 }
 
-/** One entry of a menu: what it says, the action it asks for (a form's, before it is filled), and the form it opens. */
-interface Offer {
-  words: string;
-  asks: BulkAction;
-  form?: Form;
+/**
+ * The choice the graph's context menu left in the navigation's state for these members: run
+ * here, with the handlers the panel's own menus use, so a form opens in the panel and a plain
+ * move is sent at once. It is taken off the history entry as it is run, so a reload does not
+ * repeat it.
+ */
+function useSelectionChoice(scope: string, run: (id: SelectionOfferId) => void): void {
+  const navigate = useNavigate();
+  const location = useLocation();
+  const chosen = (location.state as { selectionChoice?: SelectionChoice } | null)?.selectionChoice;
+  const done = useRef<string | undefined>(undefined);
+  useEffect(() => {
+    if (chosen === undefined || chosen.scope !== scope || done.current === location.key) {
+      return;
+    }
+    done.current = location.key;
+    void navigate(location, { replace: true, state: { ...(location.state as object), selectionChoice: undefined } });
+    run(chosen.id);
+  });
 }
-
-/** A form's entry: before it is filled it asks for what its action needs to be offered (a snooze, set aside anything unfinished). */
-const form = (kind: Form): Offer => ({ words: FORM_WORDS[kind], asks: kind === "snooze" ? { act: "snooze", until: { date: "" } } : kind === "skip" ? { act: "skip", reason: "" } : { act: "assign", identity: "" }, form: kind });
-
-const STATUS: Offer[] = [{ words: ACT_LABELS.start, asks: { act: "start" } }, { words: ACT_LABELS.done, asks: { act: "done" } }, form("skip")];
-const ASSIGN = form("assign");
-const SNOOZE: Offer[] = [form("snooze"), { words: ACT_LABELS.unsnooze, asks: { act: "unsnooze" } }];
 
 function FormInput({ view, open, within, onChange }: { view: Ready; open: Filled; within: ReadonlySet<string>; onChange: (next: Filled) => void }) {
   const group = useId();
@@ -104,7 +104,7 @@ function FormRow({ view, within, open, count, disabled, onChange, onApply, onCan
 export function SelectionActions({ view, selected, onLanded, structure }: { view: Ready; selected: Facts[]; onLanded?: () => void; structure?: ReactNode }) {
   const write = useNodeWrite(view, "bulk");
   // A form, and what a refusal said, belong to the members they were for, and go with them or with the panel.
-  const scope = selected.map((facts) => facts.node.key).sort().join(",");
+  const scope = selectionScope(selected.map((facts) => facts.node.key));
   const draft = useFormDraft<Filled>(write.journey, "selection", "bulk-form");
   const [refused, setRefused] = useState<{ scope: string; keys: string[] }>({ scope, keys: [] });
   const unable = refused.scope === scope ? refused.keys : [];
@@ -128,6 +128,7 @@ export function SelectionActions({ view, selected, onLanded, structure }: { view
       draft.open({ form: offer.form, value: "", snooze: snoozeStart(view, "") }, write.seen);
     }
   };
+  useSelectionChoice(scope, (id) => { pick(offerOf(id)); });
   const group = (label: string, offers: Offer[]) => {
     const reasons = offers.map(why);
     const none = reasons.every((reason) => reason !== undefined);

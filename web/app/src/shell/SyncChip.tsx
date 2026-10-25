@@ -1,7 +1,7 @@
 // The sync dot at the right edge of the brand row at the top of the rail (design 9): one button that is
 // only a mark (its colour and shape and its accessible name carry the words) that says whether what you see is what exists and whether your edits
 // are landing. Hovering or focusing it peeks the popover; clicking pins it open. It holds the revision,
-// engine and today, what needs you, and this tab's recent saves. Nothing on it closes itself
+// engine and today, the release the server runs, what needs you, and this tab's recent saves. Nothing on it closes itself
 // or needs closing but the popover, which Esc dismisses. A polite and an assertive live
 // region announce the changes that matter.
 import { WriteProblem } from "../ui/Failed.tsx";
@@ -101,13 +101,37 @@ function Recent({ saves, onGo }: { saves: readonly SaveEvent[]; onGo: () => void
   );
 }
 
+/** The release the server runs, as the head shows it: `v1.2.3`, or `dev build` for a build without one; none where no server serves the page. */
+function versionWords(version: string | null | undefined): string | undefined {
+  if (version == null) {
+    return undefined;
+  }
+  return version === "dev" ? "dev build" : `v${version}`;
+}
+
+/** The head: the popover's name, which labels it, and at the right the release the server runs, when one does. */
+function Head({ heading, version }: { heading: string; version: string | undefined }) {
+  return (
+    <div className="popover-head sync-head">
+      <span id={heading}>Sync</span>
+      {version === undefined ? null : (
+        <span className="sync-version" data-testid="sync-version">
+          {version}
+        </span>
+      )}
+    </div>
+  );
+}
+
 function Popover({ summary, anchor, onClose }: { summary: SyncSummary; anchor: Anchor; onClose: () => void }) {
   const stream = useStreamStatus();
   const problems = useProblems();
   const saves = useSaves();
   const derivation = useDerivation();
   const skew = useSkew();
-  const offersMcp = useCapabilities().mcp != null;
+  const capabilities = useCapabilities();
+  const offersMcp = capabilities.mcp != null;
+  const version = versionWords(capabilities.version);
   const heading = useId();
   // Just below the dot, kept inside the window (it is fixed, so the rail's scroller does not clip it).
   const popover = useRef<HTMLDivElement>(null);
@@ -125,9 +149,7 @@ function Popover({ summary, anchor, onClose }: { summary: SyncSummary; anchor: A
   }, [anchor]);
   return (
     <div ref={popover} className="popover sync-popover" role="dialog" aria-labelledby={heading} tabIndex={-1} data-popover="" data-overhang="" data-testid="sync-popover">
-      <div className="popover-head" id={heading}>
-        Sync
-      </div>
+      <Head heading={heading} version={version} />
       <div className="popover-body stack">
         <p>
           <strong>{summary.label}</strong>

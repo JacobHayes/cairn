@@ -74,6 +74,7 @@ fn server() -> Service {
             Vec::new(),
             false,
             McpAccess::closed("http://127.0.0.1/api/mcp"),
+            "dev",
         ),
     });
     served(now_or_never(seed(&service)), "seeding");
