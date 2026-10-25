@@ -11,24 +11,30 @@ use cairn_schema::{
 use cairn_store::StoreError;
 use rusqlite::Connection;
 
-use crate::sql::{Row, corrupt, enum_from, enum_name, parse, rows, text};
+use crate::sql::{Row, corrupt, enum_from, enum_name, number, parse, rows, text};
 
 /// Every state record of one graph.
 pub(crate) fn load(connection: &Connection, id: &str) -> Result<JourneyState, StoreError> {
     let select = "SELECT node, state, provenance, atomic, started_on, finished_on, reason, \
-                  reopened_on, reopened_finished_on FROM node_states WHERE graph_id = ?1";
+                  finished_revision, reopened_revision, reopened_finished_revision \
+                  FROM node_states WHERE graph_id = ?1";
     let nodes = keyed(connection, select, id, |row| {
+        let revision = |index| row.opt_int(index)?.map(number).transpose();
         Ok(NodeState {
             state: row.name(1)?,
             provenance: row.name(2)?,
             atomic: row.flag(3)?,
             started_on: row.opt_parse(4)?,
             finished_on: row.opt_parse(5)?,
+            finished_revision: revision(7)?,
             reason: row.opt_parse(6)?,
-            reopened: match (row.opt_parse(7)?, row.opt_parse(8)?) {
-                (Some(on), Some(finished_on)) => Some(Reopened { on, finished_on }),
+            reopened: match (revision(8)?, revision(9)?) {
+                (Some(revision), Some(finished_revision)) => Some(Reopened {
+                    revision,
+                    finished_revision,
+                }),
                 (None, None) => None,
-                _ => return Err(corrupt("a reopen record lacks its day or its finish")),
+                _ => return Err(corrupt("a reopen record lacks one of its revisions")),
             },
         })
     })?;

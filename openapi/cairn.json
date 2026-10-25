@@ -10004,6 +10004,17 @@
               "null"
             ]
           },
+          "finished_revision": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Revision"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The journey revision the finish was recorded at, which orders it against reopens of\nwhat it relied on; held exactly when the finish's day is."
+          },
           "provenance": {
             "$ref": "#/components/schemas/Provenance",
             "description": "Where the node came from."
@@ -13098,22 +13109,20 @@
       },
       "Reopened": {
         "additionalProperties": false,
-        "description": "A reopen of a finish: the day it happened and the finish it undid.",
+        "description": "A reopen of a finish: the journey revision it was recorded at, and the one the finish it\nundid was recorded at, which is what orders them against other work.",
         "properties": {
-          "finished_on": {
-            "description": "The day it had finished.",
-            "format": "date",
-            "type": "string"
+          "finished_revision": {
+            "$ref": "#/components/schemas/Revision",
+            "description": "The journey revision the finish it undid was recorded at."
           },
-          "on": {
-            "description": "The day it was reopened.",
-            "format": "date",
-            "type": "string"
+          "revision": {
+            "$ref": "#/components/schemas/Revision",
+            "description": "The journey revision the reopen was recorded at."
           }
         },
         "required": [
-          "on",
-          "finished_on"
+          "revision",
+          "finished_revision"
         ],
         "type": "object"
       },

@@ -15,7 +15,7 @@ use cairn_schema::{
     Group, Guard, GuardFailure, Identity, Insertion, JourneyHeader, JourneyState, JourneyStatus,
     Keyed, Lineage, LocalEdit, Milestone, Node, NodeField, NodeKey, NodeKind, NodeState, Overrides,
     ParticipationKind, ParticipationSource, Participations, Payload, Proposal, ProposalDraft,
-    ProposalStatus, Provenance, Reopened, Resource, ResourceContent, RetiredKeys, Role,
+    ProposalStatus, Provenance, Reopened, Resource, ResourceContent, RetiredKeys, Revision, Role,
     RouteHeader, RouteKind, SnoozeTarget, State, Weight, refs::KeyRefs,
 };
 use serde_json::json;
@@ -451,10 +451,11 @@ fn node_states(fill: Fill) -> BTreeMap<NodeKey, NodeState> {
                     atomic: fill.on(),
                     started_on: fill.some(day(1)),
                     finished_on: fill.some(day(2)),
+                    finished_revision: fill.some(Revision::try_from(4).unwrap()),
                     reason: fill.some(id("Not needed here.")),
                     reopened: fill.some(Reopened {
-                        on: day(3),
-                        finished_on: day(2),
+                        revision: Revision::try_from(6).unwrap(),
+                        finished_revision: Revision::try_from(4).unwrap(),
                     }),
                 },
             )

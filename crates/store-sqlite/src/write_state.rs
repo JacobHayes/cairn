@@ -2,11 +2,12 @@
 
 use cairn_schema::{
     Annotation, AnnotationBody, GraphKey, GraphRecord, Markdown, NodeKey, NodeState, Overrides,
+    Revision,
 };
 use cairn_store::{CommitError, StoreError};
 use rusqlite::types::Value;
 
-use crate::sql::{date, flag, json, json_enum, opt_json, opt_text, opt_time, text, time};
+use crate::sql::{date, flag, json, json_enum, opt_int, opt_json, opt_text, opt_time, text, time};
 use crate::state::{annotation_columns, local_edit_columns};
 use crate::write::{Writer, answer_identities, retired_columns, snooze_columns};
 
@@ -127,13 +128,15 @@ fn node_state_put(id: &str, node: &NodeKey, state: &NodeState) -> Result<Stateme
         atomic,
         started_on,
         finished_on,
+        finished_revision,
         reason,
         reopened,
     } = state;
     Ok(statement(
         "INSERT OR REPLACE INTO node_states (graph_id, node, state, provenance, atomic, \
-         started_on, finished_on, reason, reopened_on, reopened_finished_on) \
-         VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10)",
+         started_on, finished_on, reason, finished_revision, reopened_revision, \
+         reopened_finished_revision) \
+         VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11)",
         vec![
             text(id),
             text(node),
@@ -143,8 +146,9 @@ fn node_state_put(id: &str, node: &NodeKey, state: &NodeState) -> Result<Stateme
             started_on.map_or(Value::Null, date),
             finished_on.map_or(Value::Null, date),
             opt_text(reason.as_ref()),
-            reopened.map_or(Value::Null, |reopened| date(reopened.on)),
-            reopened.map_or(Value::Null, |reopened| date(reopened.finished_on)),
+            opt_int(finished_revision.map(Revision::get)),
+            opt_int(reopened.map(|reopened| reopened.revision.get())),
+            opt_int(reopened.map(|reopened| reopened.finished_revision.get())),
         ],
     ))
 }

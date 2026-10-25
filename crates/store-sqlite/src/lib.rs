@@ -25,6 +25,7 @@ mod stored_json;
 mod to_deleted_ids;
 mod to_done;
 mod to_evidence_guards;
+mod to_finish_revisions;
 mod to_reason;
 mod write;
 mod write_state;

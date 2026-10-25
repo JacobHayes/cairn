@@ -141,19 +141,23 @@ pub fn arb_node_state() -> impl Strategy<Value = NodeState> {
         ]),
         any::<bool>(),
         prop::option::of(arb_date()),
-        prop::option::of(arb_date()),
+        prop::option::of((arb_date(), arb_revision())),
         prop::option::of(arb_reason()),
-        prop::option::of((arb_date(), arb_date())),
+        prop::option::of((arb_revision(), arb_revision())),
     )
         .prop_map(
-            |(state, provenance, atomic, started_on, finished_on, reason, reopened)| NodeState {
+            |(state, provenance, atomic, started_on, finished, reason, reopened)| NodeState {
                 state,
                 provenance,
                 atomic,
                 started_on,
-                finished_on,
+                finished_on: finished.map(|(day, _)| day),
+                finished_revision: finished.map(|(_, revision)| revision),
                 reason,
-                reopened: reopened.map(|(on, finished_on)| Reopened { on, finished_on }),
+                reopened: reopened.map(|(revision, finished_revision)| Reopened {
+                    revision,
+                    finished_revision,
+                }),
             },
         )
 }

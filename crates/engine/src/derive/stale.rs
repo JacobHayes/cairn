@@ -17,13 +17,17 @@
 //! of the journey.
 //!
 //! "Relied on" reads the record reopening a finish leaves on the node it reopens
-//! (`NodeState::reopened`: the day, and the finish it undid): the dependency satisfied
-//! dependencies on the day the node finished, and was reopened on or after it (a day is the
-//! finest a date says, so a finish on the day of the reopen counts as relied on). Reopening a
-//! skip or a mark done leaves no record: nothing was done to rely on. A node whose state is
-//! derived (a group, a milestone that marks itself done) satisfied dependencies on the days
-//! everything it waits on did ([`Reopens`]), so a group with other work still open then was
-//! never relied on. A dependency added after the node finished is read as if it had been
+//! (`NodeState::reopened`): the dependency satisfied dependencies when the node finished,
+//! and was reopened after it. "When" is the journey revision each was recorded at, the
+//! journey's own order of writes, so work finished after a reopen, however soon after, did not
+//! rely on what was reopened. Two in one patch share a revision and are not ordered, so work
+//! finished in the patch that reopens what it waits on is not stale on the graph that patch
+//! produced. Reopening a skip or a mark done leaves no record:
+//! nothing was done to rely on. A node whose state is derived (a group, a milestone that marks
+//! itself done) satisfied dependencies while everything it waits on did ([`Reopens`]), so a
+//! group with other work still open then was never relied on; a milestone that marks itself
+//! done did only from its date, the one bound read by day, against the node's actual finish
+//! date. A dependency added after the node finished is read as if it had been
 //! there: today's graph is the only one there is.
 //!
 //! Which nodes are stale is decided per node here; their reasons are listed on demand
@@ -41,7 +45,7 @@ use std::collections::{BTreeMap, BTreeSet};
 
 use cairn_schema::{
     Date, DependencyVia, GuardFailure, KeyRefs, Node, NodeKey, NodeKind, Payload, Relevance,
-    StaleReason, State,
+    Revision, StaleReason, State,
 };
 
 use super::blocking::Blocking;
@@ -101,40 +105,48 @@ impl Staleness {
     }
 }
 
-/// The days an instant was last satisfied without a break, as the records tell: from its
-/// finish (`None`: as far back as the records go) to its reopen (`None`: it still is).
+/// When an instant was last satisfied without a break, as the records tell, in journey
+/// revisions: from its finish ([`Revision::NONE`]: as far back as the records go) to its
+/// reopen (`None`: it still is), and for a milestone that marks itself done only from its date.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub(crate) struct Span {
-    from: Option<Date>,
-    to: Option<Date>,
+    from: Revision,
+    to: Option<Revision>,
+    from_day: Option<Date>,
 }
 
 impl Span {
-    /// Every day.
+    /// Always.
     const ALWAYS: Self = Self {
-        from: None,
+        from: Revision::NONE,
         to: None,
+        from_day: None,
     };
 
-    /// The days both spans hold, none when they share none.
+    /// When both spans hold, none when they share no revision.
     fn and(self, other: Self) -> Option<Self> {
         let from = self.from.max(other.from);
         let to = match (self.to, other.to) {
             (Some(left), Some(right)) => Some(left.min(right)),
             (left, right) => left.or(right),
         };
-        let empty = matches!((from, to), (Some(from), Some(to)) if from > to);
-        (!empty).then_some(Self { from, to })
+        let from_day = self.from_day.max(other.from_day);
+        let empty = to.is_some_and(|to| from >= to);
+        (!empty).then_some(Self { from, to, from_day })
     }
 
-    fn holds(self, day: Date) -> bool {
-        self.from.is_none_or(|from| from <= day) && self.to.is_none_or(|to| day <= to)
+    /// Whether it held when work finished at `revision`, on `day`: satisfied by then, and
+    /// reopened after.
+    fn holds(self, revision: Revision, day: Date) -> bool {
+        self.from <= revision
+            && self.to.is_none_or(|to| revision < to)
+            && self.from_day.is_none_or(|from| from <= day)
     }
 }
 
-/// Per node that does not satisfy dependencies now, the days it last did, read from the reopen
+/// Per node that does not satisfy dependencies now, when it last did, read from the reopen
 /// records ([`Span`]): a node reopened has its own record; a node whose state is derived (a
-/// group, a skip waiting on kept work, a milestone that marks itself done) did on the days
+/// group, a skip waiting on kept work, a milestone that marks itself done) did while
 /// everything it waits on did, and a milestone that marks itself done only from its date. A
 /// node that never did has none.
 #[derive(Clone, Debug, Default, PartialEq, Eq)]
@@ -206,8 +218,13 @@ impl Reopens {
         }
         let record = document.state.nodes.get(&node.key);
         if stored.is_terminal() {
-            let from = record.and_then(|stored| stored.finished_on);
-            return Some(Span { from, to: None });
+            let from = record
+                .and_then(|stored| stored.finished_revision)
+                .unwrap_or(Revision::NONE);
+            return Some(Span {
+                from,
+                ..Span::ALWAYS
+            });
         }
         if node.kind() == NodeKind::Group {
             return waits();
@@ -215,8 +232,9 @@ impl Reopens {
         if let Some(reopened) = record.and_then(|stored| stored.reopened) {
             // A finish reopened, a milestone's marked by hand among them.
             return Some(Span {
-                from: Some(reopened.finished_on),
-                to: Some(reopened.on),
+                from: reopened.finished_revision,
+                to: Some(reopened.revision),
+                from_day: None,
             });
         }
         if let Payload::Milestone(milestone) = &node.payload
@@ -225,19 +243,19 @@ impl Reopens {
         {
             let date = dates.effective_date(&node.key)?.date;
             return waits()?.and(Span {
-                from: Some(date),
-                to: None,
+                from_day: Some(date),
+                ..Span::ALWAYS
             });
         }
         None
     }
 
-    /// Whether work that finished on `finished_on` relied on open `dependency`: it satisfied
-    /// dependencies that day, and has been reopened since.
-    fn relied_on(&self, dependency: &NodeKey, finished_on: Date) -> bool {
+    /// Whether work that finished at `revision`, on `day`, relied on open `dependency`: it
+    /// satisfied dependencies then, and has been reopened since.
+    fn relied_on(&self, dependency: &NodeKey, revision: Revision, day: Date) -> bool {
         self.spans
             .get(dependency)
-            .is_some_and(|span| span.holds(finished_on))
+            .is_some_and(|span| span.holds(revision, day))
     }
 }
 
@@ -292,18 +310,18 @@ pub(crate) fn reasons(
         failures.retain(|failure| !accepted.contains(failure));
     }
     let mut found: BTreeSet<StaleReason> = failures.into_iter().map(StaleReason::from).collect();
-    let finished_on = document
+    let finished = document
         .state
         .nodes
         .get(key)
-        .and_then(|stored| stored.finished_on);
-    if let Some(finished_on) = finished_on
+        .and_then(|stored| stored.finished_revision.zip(stored.finished_on));
+    if let Some((revision, day)) = finished
         && !blocking.deps_done(key)
     {
         found.extend(
             guard_open_dependencies(dependencies, blocking, relevance, key)
                 .into_iter()
-                .filter(|open| reopens.relied_on(open, finished_on))
+                .filter(|open| reopens.relied_on(open, revision, day))
                 .map(StaleReason::Reopened),
         );
     }

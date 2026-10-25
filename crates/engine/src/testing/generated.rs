@@ -336,6 +336,7 @@ pub fn date_limits_early() -> Graph {
         stored.state = finished;
         stored.started_on = (finished == State::Done).then_some(recorded);
         stored.finished_on = Some(recorded);
+        stored.finished_revision = Some(revision(1));
         if finished == State::Decided {
             document
                 .state
@@ -369,6 +370,11 @@ fn stop_gating_every_other_stage(document: &mut Document, keys: &[NodeKey]) {
 }
 
 /// The day this many days after the generators' first day.
+/// A journey revision, for a recorded finish or reopen.
+fn revision(at: u32) -> cairn_schema::Revision {
+    cairn_schema::Revision::try_from(at).unwrap_or_else(|e| panic!("{e:?}"))
+}
+
 fn day(days: u32) -> cairn_schema::Date {
     let start: cairn_schema::Date = parse("2026-09-20");
     start
@@ -634,6 +640,8 @@ impl Shape {
             };
             stored.started_on = start;
             stored.finished_on = finish;
+            stored.finished_revision =
+                finish.map(|_| revision(1 + u32::from(seed.recorded.0) % 10));
         }
         if let Some(pin) = seed.pin {
             document
@@ -692,8 +700,8 @@ impl Shape {
             return None;
         }
         Some(cairn_schema::Reopened {
-            on: day(5 + recorded % 10),
-            finished_on: day(recorded % 5),
+            revision: revision(20 + recorded % 10),
+            finished_revision: revision(1 + recorded % 5),
         })
     }
 

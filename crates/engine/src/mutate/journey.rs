@@ -4,8 +4,8 @@
 
 use cairn_schema::{
     AnswerValue, GraphKey, GraphRecord, Limit, LocalEdit, Markdown, Mutation, NodeKey, NodeKind,
-    NodeState, OverrideKind, Overrides, RecordedEnd, RoleKey, SignedDays, Slug, State, Subject,
-    Transition, ViolationCode, Write,
+    NodeState, OverrideKind, Overrides, RecordedEnd, Revision, RoleKey, SignedDays, Slug, State,
+    Subject, Transition, ViolationCode, Write,
 };
 
 use super::Session;
@@ -122,6 +122,15 @@ fn under_snoozed_container(session: &Session<'_>, node: &NodeKey) -> bool {
     false
 }
 
+/// The journey revision this patch produces: its journey's, one on (the revision moves once
+/// per patch, after its mutations).
+fn produced_revision(session: &Session<'_>) -> Revision {
+    session
+        .journey()
+        .map_or(Revision::NONE, |journey| journey.revision)
+        .next()
+}
+
 fn kind_of(session: &Session<'_>, node: &NodeKey) -> Option<NodeKind> {
     session
         .graph()
@@ -129,10 +138,17 @@ fn kind_of(session: &Session<'_>, node: &NodeKey) -> Option<NodeKind> {
         .map(cairn_schema::Node::kind)
 }
 
-/// D1, D4: the stored state `step` leaves, `to` on `today`: a start or a finish records its
-/// day; a reopen undoes them and records the finish it undid (the fact stale work reads),
-/// which any move that closes the node again clears.
-fn moved(stored: &NodeState, to: State, step: Move, today: cairn_schema::Date) -> NodeState {
+/// D1, D4: the stored state `step` leaves, `to` on `today` at journey revision `revision`
+/// (the one the patch produces): a start or a finish records its day, a finish its revision
+/// too; a reopen undoes them and records when, and the finish it undid (the fact stale work
+/// reads, ordered by revision within a day), which any move that closes the node again clears.
+fn moved(
+    stored: &NodeState,
+    to: State,
+    step: Move,
+    today: cairn_schema::Date,
+    revision: Revision,
+) -> NodeState {
     let mut next = NodeState {
         state: to,
         ..stored.clone()
@@ -140,16 +156,21 @@ fn moved(stored: &NodeState, to: State, step: Move, today: cairn_schema::Date) -
     match step {
         Move::Start => next.started_on = Some(today),
         Move::Stop => next.started_on = None,
-        Move::Complete => next.finished_on = Some(today),
+        Move::Complete => {
+            next.finished_on = Some(today);
+            next.finished_revision = Some(revision);
+        }
         Move::Reopen => {
-            next.reopened = stored
-                .finished_on
-                .map(|finished_on| cairn_schema::Reopened {
-                    on: today,
-                    finished_on,
-                });
+            next.reopened =
+                stored
+                    .finished_revision
+                    .map(|finished_revision| cairn_schema::Reopened {
+                        revision,
+                        finished_revision,
+                    });
             next.started_on = None;
             next.finished_on = None;
+            next.finished_revision = None;
             next.reason = None;
         }
         // A group has no performed dates: a mark done records no finish, which would turn
@@ -194,7 +215,13 @@ fn move_node(session: &mut Session<'_>, node: &NodeKey, transition: &Transition)
         to.legal_for(kind) && stored.state.legal_for(kind),
         "D1: within the kind's machine"
     );
-    let mut next = moved(&stored, to, step, session.inputs.today);
+    let mut next = moved(
+        &stored,
+        to,
+        step,
+        session.inputs.today,
+        produced_revision(session),
+    );
     if let Transition::Skip { reason } | Transition::MarkDone { reason } = transition {
         // D1: the reason a skip or a mark done requires is kept with it, and goes when it is
         // reopened.
@@ -301,6 +328,7 @@ fn answer(
         let next = NodeState {
             state: to,
             finished_on: Some(session.inputs.today),
+            finished_revision: Some(produced_revision(session)),
             reopened: None,
             ..stored
         };

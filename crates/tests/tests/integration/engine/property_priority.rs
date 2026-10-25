@@ -85,7 +85,10 @@ mod property {
         let stored = document.state.nodes.get_mut(key)?;
         stored.state = state;
         stored.finished_on = Some("2026-10-06".parse().unwrap());
-        Graph::new(document, &Deployment::default()).ok()
+        stored.finished_revision = Some(cairn_schema::Revision::NONE.next());
+        // A completion this builds is always a valid graph: a rejection fails the test rather
+        // than skipping the node.
+        Some(Graph::new(document, &Deployment::default()).expect("the completed graph is valid"))
     }
 
     proptest! {

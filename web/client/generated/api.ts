@@ -3906,6 +3906,11 @@ export interface components {
              *     decision was decided or work was done.
              */
             finished_on?: string | null;
+            /**
+             * @description The journey revision the finish was recorded at, which orders it against reopens of
+             *     what it relied on; held exactly when the finish's day is.
+             */
+            finished_revision?: components["schemas"]["Revision"] | null;
             /** @description Where the node came from. */
             provenance: components["schemas"]["Provenance"];
             /**
@@ -4963,18 +4968,15 @@ export interface components {
         } | {
             kind: components["schemas"]["KindKey"];
         };
-        /** @description A reopen of a finish: the day it happened and the finish it undid. */
+        /**
+         * @description A reopen of a finish: the journey revision it was recorded at, and the one the finish it
+         *     undid was recorded at, which is what orders them against other work.
+         */
         Reopened: {
-            /**
-             * Format: date
-             * @description The day it had finished.
-             */
-            finished_on: string;
-            /**
-             * Format: date
-             * @description The day it was reopened.
-             */
-            on: string;
+            /** @description The journey revision the finish it undid was recorded at. */
+            finished_revision: components["schemas"]["Revision"];
+            /** @description The journey revision the reopen was recorded at. */
+            revision: components["schemas"]["Revision"];
         };
         /** @description The kinds of resolution a conflict can offer: [`ConflictResolution`] without its payload. */
         ResolutionKind: "keep_journey" | "take_route" | "map_choices" | "clear_state" | "reopen" | "remap_role" | "remap_kind" | "remove";

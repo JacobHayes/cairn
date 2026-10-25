@@ -315,13 +315,14 @@ fn a_reopen_makes_what_relied_on_it_stale() {
     );
     assert!(stale_on(&finished, "2026-10-08", "n_b").is_empty());
     let reopened = accepted_at(&finished, "2026-10-09", &transition("n_a", "reopen"));
-    assert_eq!(
-        support::graph(&reopened).state.nodes[&key("n_a")].reopened,
-        Some(cairn_schema::Reopened {
-            on: date("2026-10-09"),
-            finished_on: date("2026-10-07"),
-        })
-    );
+    // The record names the revision the reopen produced and the earlier one of the finish it
+    // undid.
+    let record = support::graph(&reopened).state.nodes[&key("n_a")]
+        .reopened
+        .unwrap();
+    let revision = reopened.journeys.values().next().unwrap().revision;
+    assert_eq!(record.revision, revision);
+    assert!(record.finished_revision < revision);
     assert_eq!(
         stale_on(&reopened, "2026-10-09", "n_b"),
         BTreeSet::from([StaleReason::Reopened(key("n_a"))])
@@ -347,6 +348,52 @@ fn a_reopen_makes_what_relied_on_it_stale() {
     for node in ["n_b", "n_c", "n_d"] {
         assert!(stale_on(&again, "2026-10-10", node).is_empty(), "{node}");
     }
+}
+
+/// D4: on one day the order of the writes decides: work finished after its dependency was
+/// reopened did not rely on it, and work finished before the reopen did, whether the
+/// dependency is required or is a child of the work.
+#[test]
+fn on_one_day_a_reopen_counts_only_against_what_finished_before_it() {
+    let records = support::journey(&add(&[
+        "{key: n_a, id: a, kind: action, title: A}",
+        "{key: n_b, id: b, kind: action, title: B, requires: [n_a]}",
+        "{key: n_parent, id: parent, kind: action, title: Parent}",
+        "{key: n_child, id: child, parent: n_parent, kind: deliverable, title: Child}",
+    ]));
+    let day = "2026-10-07";
+    let after = days(
+        &records,
+        &[
+            (day, transition("n_a", "complete")),
+            (day, transition("n_a", "reopen")),
+            (day, transition("n_b", "complete")),
+            (day, transition("n_child", "complete")),
+            (day, transition("n_child", "reopen")),
+            (day, transition("n_parent", "complete")),
+        ],
+    );
+    assert!(stale_on(&after, day, "n_b").is_empty());
+    assert!(stale_on(&after, day, "n_parent").is_empty());
+    let before = days(
+        &records,
+        &[
+            (day, transition("n_a", "complete")),
+            (day, transition("n_b", "complete")),
+            (day, transition("n_a", "reopen")),
+            (day, transition("n_child", "complete")),
+            (day, transition("n_parent", "complete")),
+            (day, transition("n_child", "reopen")),
+        ],
+    );
+    assert_eq!(
+        stale_on(&before, day, "n_b"),
+        BTreeSet::from([StaleReason::Reopened(key("n_a"))])
+    );
+    assert_eq!(
+        stale_on(&before, day, "n_parent"),
+        BTreeSet::from([StaleReason::Reopened(key("n_child"))])
+    );
 }
 
 /// D4: a milestone that marks itself done on a later date, marked done by hand and reopened,

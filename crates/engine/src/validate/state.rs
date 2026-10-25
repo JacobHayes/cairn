@@ -36,7 +36,8 @@ pub(super) fn check(check: &GraphCheck<'_>, out: &mut Vec<Violation>) {
     annotation_counts(check, out);
 }
 
-/// D1: every node has a state its kind's machine has; B10: `atomic` only on placeholders.
+/// D1: every node has a state its kind's machine has; B10: `atomic` only on placeholders;
+/// D4: a finish holds its revision.
 fn node_states(check: &GraphCheck<'_>, out: &mut Vec<Violation>) {
     let document = check.document;
     for node in document.nodes.values() {
@@ -50,6 +51,9 @@ fn node_states(check: &GraphCheck<'_>, out: &mut Vec<Violation>) {
             }
             Some(stored) if stored.reason.is_some() != stored.state.skips_beneath(node.kind()) => {
                 "a skipped node or a group marked done keeps its reason, and no other node has one"
+            }
+            Some(stored) if stored.finished_on.is_some() != stored.finished_revision.is_some() => {
+                "a finish records its day and its revision together"
             }
             Some(_) => continue,
         };

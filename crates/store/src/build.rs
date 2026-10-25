@@ -603,10 +603,10 @@ pub fn every_state() -> cairn_schema::JourneyState {
             "n_plan": {"state": "active", "provenance": "from_route", "atomic": true,
                        "started_on": "2026-10-06"},
             "n_kickoff": {"state": "done", "provenance": "from_route",
-                          "finished_on": "2026-10-05"},
+                          "finished_on": "2026-10-05", "finished_revision": 3},
             "n_scope": {"state": "decided", "provenance": "local", "finished_on": "2026-10-05"},
             "n_steps": {"state": "todo", "provenance": "orphaned",
-                        "reopened": {"on": "2026-10-06", "finished_on": "2026-10-05"}},
+                        "reopened": {"revision": 5, "finished_revision": 2}},
         },
         "local_edits": {"n_plan": [
             {"field": "title"}, {"requires": "n_scope"}, {"participation": "k_reviewer"},

@@ -185,10 +185,12 @@ mod milestone_done {
                 documents(&path, "SELECT delta FROM events ORDER BY seq"),
                 [
                     json!([put(json!({ "node_state": { "node": "n_kick", "state": {
-                        "state": "done", "provenance": "from_route", "finished_on": "2026-10-05"
+                        "state": "done", "provenance": "from_route", "finished_on": "2026-10-05",
+                        "finished_revision": 2
                     } } }))]),
                     json!([put(json!({ "node_state": { "node": "n_work", "state": {
-                        "state": "done", "provenance": "from_route", "finished_on": "2026-10-04"
+                        "state": "done", "provenance": "from_route", "finished_on": "2026-10-04",
+                        "finished_revision": 2
                     } } }))]),
                     json!([
                         put(

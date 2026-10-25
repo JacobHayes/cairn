@@ -4,6 +4,7 @@ mod checklists_migration;
 mod conformance;
 mod deleted_ids_migration;
 mod evidence_guards_migration;
+mod finish_revisions_migration;
 mod journey_owners_migration;
 mod milestone_done_migration;
 mod open;

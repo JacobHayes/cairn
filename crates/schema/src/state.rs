@@ -13,6 +13,7 @@ use crate::field::NodeField;
 use crate::id::{AttachmentKey, IdentityKey, KindKey, NodeKey, RoleKey, Slug};
 use crate::limits::{Limit, LimitExceeded};
 use crate::node::{AnswerType, IdentitySet, NodeKind};
+use crate::number::Revision;
 use crate::text::{Markdown, Reason};
 use jiff::civil::Date;
 
@@ -163,6 +164,11 @@ pub struct NodeState {
     /// decision was decided or work was done.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub finished_on: Option<Date>,
+    // PRD: D4.
+    /// The journey revision the finish was recorded at, which orders it against reopens of
+    /// what it relied on; held exactly when the finish's day is.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub finished_revision: Option<Revision>,
     // PRD: D1.
     /// Why the node was skipped, or why a group was marked done, while it is (both require
     /// a reason).
@@ -177,14 +183,15 @@ pub struct NodeState {
 }
 
 // PRD: D4.
-/// A reopen of a finish: the day it happened and the finish it undid.
+/// A reopen of a finish: the journey revision it was recorded at, and the one the finish it
+/// undid was recorded at, which is what orders them against other work.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
 #[serde(deny_unknown_fields)]
 pub struct Reopened {
-    /// The day it was reopened.
-    pub on: Date,
-    /// The day it had finished.
-    pub finished_on: Date,
+    /// The journey revision the reopen was recorded at.
+    pub revision: Revision,
+    /// The journey revision the finish it undid was recorded at.
+    pub finished_revision: Revision,
 }
 
 impl NodeState {
@@ -197,6 +204,7 @@ impl NodeState {
             atomic: false,
             started_on: None,
             finished_on: None,
+            finished_revision: None,
             reason: None,
             reopened: None,
         }
