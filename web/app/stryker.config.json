@@ -9,7 +9,6 @@
   "mutate": ["src/**/*.ts", "src/**/*.tsx", "!src/**/*.test.ts", "!src/**/*.test.tsx", "!src/**/*.test-support.ts", "!src/**/*.d.ts"],
   "mutator": { "excludedMutations": ["StringLiteral", "OptionalChaining"] },
   "ignorePatterns": ["dist/mutation", "node_modules"],
-  "reporters": ["clear-text", "json"],
   "jsonReporter": { "fileName": "dist/mutation/stryker.json" },
   "clearTextReporter": { "allowColor": false, "reportTests": false, "reportMutants": false, "reportScoreTable": true }
 }

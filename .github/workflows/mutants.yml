@@ -1,7 +1,7 @@
 # The weekly mutation run: the sensing half of the weekly cleanup. A mutant is a small change to the
 # code; one the tests do not notice (a survivor) marks an assertion missing or a test that earns
-# nothing. Stryker mutates the whole web app and cargo-mutants a slice of the engine, and each
-# job uploads its survivors as a short tab-separated list, which the cleanup reads
+# nothing. Stryker mutates the whole web app, split into parallel shards, and cargo-mutants a
+# slice of the engine, and each job uploads its survivors as a short tab-separated list, which the cleanup reads
 # (decisions/2026-10-24-where-mutation-testing-runs.md). Nothing here gates a change. Linux
 # runners only.
 name: mutants
@@ -30,8 +30,14 @@ env:
 
 jobs:
   web:
+    name: web (shard ${{ matrix.shard }} of 12)
     runs-on: ubuntu-latest
     timeout-minutes: 45
+    # Mutating the whole app in one job outran 45 minutes; each shard takes every twelfth file.
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12]
     # Only Stryker needs the Rust toolchain here (for the wasm module the tests read), not the
     # patina runner.
     env:
@@ -39,10 +45,10 @@ jobs:
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - uses: jdx/mise-action@82a612c5ab8bcda7cc5db6b7e81a8e7584c3dc6e # v5.2.3
-      - run: mise run mutants:web
+      - run: mise run mutants:web --shard ${{ matrix.shard }}/12
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
-          name: web-survivors
+          name: web-survivors-${{ matrix.shard }}
           path: web/app/dist/mutation/web-survivors.tsv
           retention-days: 30
           if-no-files-found: error
