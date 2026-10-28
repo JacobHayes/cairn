@@ -65,7 +65,7 @@ use cairn_schema::{
 use super::dates::Dates;
 use super::dependencies::{Dependencies, EdgeClass, EdgeSet, Instant, NodeIndex, Point};
 use super::{Early, stored_state, unexpanded};
-use crate::graph::Graph;
+use crate::graph::{Graph, Tree};
 
 /// What pass 5 decides about one node.
 #[allow(clippy::struct_excessive_bools)]
@@ -90,6 +90,9 @@ struct Flags {
     needs_breakdown: bool,
     /// B6: the node's own stored snooze, while it holds.
     snoozed_own: Option<SnoozeTarget>,
+    /// B6: the node's own snooze, while it holds over its subtree: it holds and the node is
+    /// open and in scope.
+    holds_over: Option<SnoozeTarget>,
     /// B6: what holds the node: its own snooze, else the nearest container's snooze over
     /// the subtree it sits in.
     snoozed: Option<SnoozeTarget>,
@@ -315,6 +318,17 @@ impl Blocking {
             .and_then(|flags| flags.snoozed_own.as_ref())
     }
 
+    /// B6: the containers above the node whose snooze holds over its subtree (open and in
+    /// scope), nearest first, each with its snooze. The node's own snooze is [`Self::snoozed_own`].
+    #[must_use]
+    pub fn snoozes_above<'a>(
+        &'a self,
+        tree: &'a Tree,
+        key: &NodeKey,
+    ) -> Vec<(&'a NodeKey, &'a SnoozeTarget)> {
+        holders_above(tree, &self.keys, &self.flags, key)
+    }
+
     /// B6: the nearest container whose snooze holds over the node (open and in scope), the
     /// reason a descendant names.
     #[must_use]
@@ -494,6 +508,7 @@ impl Sweep<'_> {
             needs_breakdown: open && unexpanded(self.graph.document(), self.graph.tree(), node),
             snoozed: own.clone(),
             snoozed_own: own,
+            holds_over: None,
             snoozed_via: None,
             scheduled,
         }
@@ -503,43 +518,35 @@ impl Sweep<'_> {
     /// container whose snooze holds names the nearest such container, and is held by that
     /// snooze unless its own holds. O(nodes x depth), the walk bounded by the depth limit.
     fn hold_subtrees(&self, keys: &[NodeKey], flags: &mut [Flags]) {
-        let tree = self.graph.tree();
-        let holders: Vec<Option<SnoozeTarget>> = flags
-            .iter()
-            .zip(keys)
-            .map(|(held, key)| {
-                let open = self.early.relevance.in_scope(key) && !held.closed;
-                held.snoozed_own.clone().filter(|_| open)
-            })
-            .collect();
-        if holders.iter().all(Option::is_none) {
+        for (held, key) in flags.iter_mut().zip(keys) {
+            let open = self.early.relevance.in_scope(key) && !held.closed;
+            held.holds_over = held.snoozed_own.clone().filter(|_| open);
+        }
+        if flags.iter().all(|held| held.holds_over.is_none()) {
             return;
         }
-        let holder = |key: &NodeKey| -> Option<&SnoozeTarget> {
-            let at = keys.binary_search(key).ok()?;
-            holders.get(at)?.as_ref()
-        };
-        for (at, key) in keys.iter().enumerate() {
-            let open = self.early.relevance.in_scope(key)
-                && flags.get(at).is_some_and(|held| !held.closed);
-            if !open {
-                continue;
-            }
-            let mut ancestor = tree.parent(key);
-            let mut steps = 0_u32;
-            while let Some(above) = ancestor {
-                if let Some(target) = holder(above) {
-                    if let Some(held) = flags.get_mut(at) {
-                        held.snoozed_via = Some(above.clone());
-                        if held.snoozed.is_none() {
-                            held.snoozed = Some(target.clone());
-                        }
-                    }
-                    break;
+        let tree = self.graph.tree();
+        let held_through: Vec<Option<(NodeKey, SnoozeTarget)>> = keys
+            .iter()
+            .enumerate()
+            .map(|(at, key)| {
+                let open = self.early.relevance.in_scope(key)
+                    && flags.get(at).is_some_and(|held| !held.closed);
+                if !open {
+                    return None;
                 }
-                steps += 1;
-                assert!(steps <= CONTAINMENT_DEPTH_MAX + 1, "containment is bounded");
-                ancestor = tree.parent(above);
+                holders_above(tree, keys, flags, key)
+                    .into_iter()
+                    .next()
+                    .map(|(above, target)| (above.clone(), target.clone()))
+            })
+            .collect();
+        for (held, through) in flags.iter_mut().zip(held_through) {
+            if let Some((above, target)) = through {
+                held.snoozed_via = Some(above);
+                if held.snoozed.is_none() {
+                    held.snoozed = Some(target);
+                }
             }
         }
     }
@@ -559,6 +566,33 @@ impl Sweep<'_> {
         };
         holds.then(|| until.clone())
     }
+}
+
+/// B6: the containers above `key` whose snooze holds over their subtree (they are open and in
+/// scope), nearest first, each with its snooze. `keys` is the sorted node keys `flags` follows.
+fn holders_above<'a>(
+    tree: &'a Tree,
+    keys: &'a [NodeKey],
+    flags: &'a [Flags],
+    key: &NodeKey,
+) -> Vec<(&'a NodeKey, &'a SnoozeTarget)> {
+    let mut found = Vec::new();
+    let mut ancestor = tree.parent(key);
+    let mut steps = 0_u32;
+    while let Some(above) = ancestor {
+        let target = keys
+            .binary_search(above)
+            .ok()
+            .and_then(|at| flags.get(at))
+            .and_then(|held| held.holds_over.as_ref());
+        if let Some(target) = target {
+            found.push((above, target));
+        }
+        steps += 1;
+        assert!(steps <= CONTAINMENT_DEPTH_MAX + 1, "containment is bounded");
+        ancestor = tree.parent(above);
+    }
+    found
 }
 
 /// The instants in a topological order of the full set's gate edges (Kahn's algorithm), each

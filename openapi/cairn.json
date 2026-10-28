@@ -3002,6 +3002,24 @@
             },
             "type": "array"
           },
+          "current_stages": {
+            "description": "The stages that are current: the top-level groups holding a node on the acting\nfrontier or an active one, anywhere beneath them or themselves, in key order.",
+            "items": {
+              "$ref": "#/components/schemas/NodeKey"
+            },
+            "type": "array"
+          },
+          "final_milestone": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/NodeKey"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The final milestone while it is in play: in scope and neither skipped nor missing, still\nto do or done (stored or by its date). Absent when the journey has none, or it is skipped\nor out of scope."
+          },
           "frontier": {
             "description": "The frontier, ranked (Priority: ties by slack, gravity, key).",
             "items": {
@@ -9103,6 +9121,14 @@
           "snoozable": {
             "description": "Whether a snooze can sit on the node: it is in scope with something left to do, and a\ngroup has work in scope left beneath it.",
             "type": "boolean"
+          },
+          "snooze_lifts": {
+            "description": "The day the snooze holding the node lifts, while one holds: the latest of its own and\neach holding container's, a date snooze lifting on its date and a node snooze at the\nfinish of the node it waits on (a milestone's effective date, else its due date). Absent\nwhen nothing holds it, and when a hold has no date yet.",
+            "format": "date",
+            "type": [
+              "string",
+              "null"
+            ]
           },
           "snoozed": {
             "anyOf": [

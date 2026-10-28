@@ -1991,6 +1991,17 @@ export interface components {
         Derived: {
             /** @description The acting frontier, ranked. */
             acting_frontier: components["schemas"]["NodeKey"][];
+            /**
+             * @description The stages that are current: the top-level groups holding a node on the acting
+             *     frontier or an active one, anywhere beneath them or themselves, in key order.
+             */
+            current_stages?: components["schemas"]["NodeKey"][];
+            /**
+             * @description The final milestone while it is in play: in scope and neither skipped nor missing, still
+             *     to do or done (stored or by its date). Absent when the journey has none, or it is skipped
+             *     or out of scope.
+             */
+            final_milestone?: components["schemas"]["NodeKey"] | null;
             /** @description The frontier, ranked (Priority: ties by slack, gravity, key). */
             frontier: components["schemas"]["NodeKey"][];
             /** @description Per node. */
@@ -3718,6 +3729,14 @@ export interface components {
              *     group has work in scope left beneath it.
              */
             snoozable?: boolean;
+            /**
+             * Format: date
+             * @description The day the snooze holding the node lifts, while one holds: the latest of its own and
+             *     each holding container's, a date snooze lifting on its date and a node snooze at the
+             *     finish of the node it waits on (a milestone's effective date, else its due date). Absent
+             *     when nothing holds it, and when a hold has no date yet.
+             */
+            snooze_lifts?: string | null;
             /**
              * @description A snooze that holds over the node: its own, else the one of the container it is
              *     held through (`snoozed_via`).

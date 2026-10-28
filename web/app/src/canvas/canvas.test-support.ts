@@ -57,6 +57,7 @@ export function canvasView(): Ready {
       today,
       frontier: ["n_choose"],
       acting_frontier: ["n_choose"],
+      current_stages: ["n_stage"],
       nodes: {
         n_kick: { ...base, display_state: "done", ...relevant, snoozable: false, open: false, moves: ["reopen"], gravity: 9 },
         n_choose: { ...base, display_state: "ready", ...relevant, ...owned, actionable: true, moves: ["answer", "skip"], gravity: 8, unlocks: 1, dates: { due: bound("2026-10-09"), latest_start: bound("2026-10-08"), slack_days: 2 } },

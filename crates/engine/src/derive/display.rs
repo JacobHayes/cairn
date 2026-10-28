@@ -25,7 +25,9 @@
 //! Cost at `node_count_max`: a node reads its passes' flags; a container also reads its
 //! descendants, 2,000 x 2,000 at worst over every node, O(nodes) per container.
 
-use cairn_schema::{DisplayState, NodeKey, NodeKind, Relevance, State};
+use cairn_schema::{
+    Date, DisplayState, NodeKey, NodeKind, Payload, Relevance, SnoozeTarget, State,
+};
 
 use super::dependencies::{Instant, Point};
 use super::{Derived, stored_state};
@@ -102,6 +104,47 @@ impl Derived {
     #[must_use]
     pub fn open(&self, key: &NodeKey) -> bool {
         self.relevance.in_scope(key) && !self.blocking.closed(key)
+    }
+
+    /// C13, B11: the final milestone while it is in play: in scope and not skipped, still to do
+    /// or done (stored, or by its date). None when the journey has no final milestone, or it
+    /// is skipped or out of scope.
+    #[must_use]
+    pub fn final_milestone(&self, graph: &Graph) -> Option<NodeKey> {
+        graph
+            .document()
+            .nodes
+            .values()
+            .filter(
+                |node| matches!(&node.payload, Payload::Milestone(milestone) if milestone.is_final),
+            )
+            .map(|node| &node.key)
+            .find(|key| self.open(key) || self.display_state(graph, key) == DisplayState::Done)
+            .cloned()
+    }
+
+    /// B6: the day the snooze holding the node lifts: the latest of its own snooze and each
+    /// holding container's. A date snooze lifts on its date; a node snooze at the finish of the
+    /// node it waits on (a milestone's effective date, else its due date). None when no snooze
+    /// holds the node or a hold has no date yet.
+    #[must_use]
+    pub fn snooze_lifts(&self, graph: &Graph, key: &NodeKey) -> Option<Date> {
+        self.blocking.snoozed(key)?;
+        let own = self.blocking.snoozed_own(key).map(|target| (key, target));
+        let above = self.blocking.snoozes_above(graph.tree(), key);
+        let mut latest: Option<Date> = None;
+        for (_, target) in own.into_iter().chain(above) {
+            let lifts = match target {
+                SnoozeTarget::Date(date) => Some(*date),
+                SnoozeTarget::Node(awaited) => self
+                    .dates
+                    .effective_date(awaited)
+                    .map(|effective| effective.date)
+                    .or_else(|| self.dates.due(awaited)),
+            }?;
+            latest = latest.max(Some(lifts));
+        }
+        latest
     }
 
     /// B6: a snooze can sit on the node: it is in scope with something left to do, and a group

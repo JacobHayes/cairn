@@ -103,38 +103,24 @@ describe("the lines", () => {
 });
 
 describe("snoozed nodes", () => {
-  it("order a snoozed node by when its snooze lifts: later of its own date and the lift, undated when the node it waits on has no finish date", () => {
-    const snoozedWith = (snoozed: { date: string } | { node: string }, finish?: string) => {
+  it("order a snoozed node by when its snooze lifts, as the engine says: later of its own date and the lift, undated when the lift is not known yet", () => {
+    const liftingOn = (lifts: string | undefined) => {
       const copy = structuredClone(view);
       const wait = copy.derived.nodes["n_wait"];
       const work = copy.derived.nodes["n_work"];
       if (wait === undefined || work === undefined) {
         throw new Error("the fixture has both");
       }
-      wait.snoozed = snoozed;
-      work.dates = finish === undefined ? {} : { due: { date: finish, chain: { constraints: [], fixed: [] } } };
+      wait.snooze_lifts = lifts ?? null;
+      work.dates = {};
       return planOrder(copy).filter((key) => ["n_wait", "n_inner", "n_later", "n_work"].includes(key));
     };
     // Its own date is Oct 6, as soon as any (it follows n_inner by plan order); a snooze to Oct 30 puts it after the node dated Oct 20.
-    expect(snoozedWith({ date: "2026-10-30" })).toEqual(["n_inner", "n_later", "n_wait", "n_work"]);
+    expect(liftingOn("2026-10-30")).toEqual(["n_inner", "n_later", "n_wait", "n_work"]);
     // A snooze lifting before its own date moves nothing.
-    expect(snoozedWith({ date: "2026-10-01" })).toEqual(["n_inner", "n_wait", "n_later", "n_work"]);
-    // Until a node is done: at that node's finish date, or undated, after the dated, when it has none.
-    expect(snoozedWith({ node: "n_work" }, "2026-10-16")).toEqual(["n_inner", "n_wait", "n_work", "n_later"]);
-    expect(snoozedWith({ node: "n_work" })).toEqual(["n_inner", "n_later", "n_wait", "n_work"]);
-  });
-
-  it("wait for the latest hold: a node snoozed itself and under a snoozed container comes back with the container", () => {
-    const copy = structuredClone(view);
-    const [inner, stage, later] = [copy.derived.nodes["n_inner"], copy.derived.nodes["n_stage"], copy.derived.nodes["n_later"]];
-    if (inner === undefined || stage === undefined || later === undefined) {
-      throw new Error("the fixture has all three");
-    }
-    Object.assign(inner, { display_state: "snoozed", snoozed: { date: "2026-10-25" } });
-    Object.assign(stage, { display_state: "snoozed", snoozed: { date: "2026-10-30" } });
-    later.dates = { earliest_start: { date: "2026-10-27", chain: { constraints: [], fixed: [] } } };
-    const order = planOrder(copy).filter((key) => ["n_stage", "n_later"].includes(key));
-    expect(order).toEqual(["n_later", "n_stage"]);
+    expect(liftingOn("2026-10-01")).toEqual(["n_inner", "n_wait", "n_later", "n_work"]);
+    // No day yet: undated, after the dated.
+    expect(liftingOn(undefined)).toEqual(["n_inner", "n_later", "n_wait", "n_work"]);
   });
 
   it("put snoozed rows after the others when sorted by a signal, keeping the order among them", () => {

@@ -67,13 +67,46 @@ impl Derived {
             self.dependencies.node_count(),
             "the graph derived"
         );
+        let current_stages = self.current_stages(graph, &nodes);
         cairn_schema::Derived {
             today: self.today,
             nodes,
             frontier: self.ranking.frontier().to_vec(),
             acting_frontier: self.ranking.acting_frontier().to_vec(),
             stalled: self.blocking.stalled().cloned(),
+            current_stages,
+            final_milestone: self.final_milestone(graph),
         }
+    }
+
+    /// C2: the stages that are current: each top-level group holding a node on the acting
+    /// frontier or an active one (display state), itself or anywhere beneath it, in key order.
+    /// `nodes` is every node's derived values.
+    fn current_stages(
+        &self,
+        graph: &Graph,
+        nodes: &BTreeMap<NodeKey, NodeDerived>,
+    ) -> Vec<NodeKey> {
+        let tree = graph.tree();
+        let acting: BTreeSet<&NodeKey> = self.ranking.acting_frontier().iter().collect();
+        let lit = nodes.iter().filter(|(key, derived)| {
+            acting.contains(key) || derived.display_state == cairn_schema::DisplayState::Active
+        });
+        let mut stages = BTreeSet::new();
+        for (key, _) in lit {
+            // The depth limit bounds the walk up to the root.
+            let mut top = key;
+            while let Some(parent) = tree.parent(top) {
+                top = parent;
+            }
+            if graph
+                .node(top)
+                .is_some_and(|node| node.kind() == cairn_schema::NodeKind::Group)
+            {
+                stages.insert(top.clone());
+            }
+        }
+        stages.into_iter().collect()
     }
 
     /// One node's derived values (D3) with their explanation inputs, explanation lists cut
@@ -148,6 +181,7 @@ impl Derived {
             done_by_date: blocking.done_by_date(key),
             snoozed: blocking.snoozed(key).cloned(),
             snoozed_via: blocking.snoozed_via(key).cloned(),
+            snooze_lifts: self.snooze_lifts(graph, key),
             snoozable: self.snoozable(graph, key),
             moves: self.moves(graph, node, &failures),
             skips_beneath: skips_beneath(graph.document(), node),

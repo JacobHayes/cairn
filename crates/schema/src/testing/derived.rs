@@ -475,17 +475,21 @@ pub fn arb_node_derived() -> BoxedStrategy<NodeDerived> {
         any::<u32>(),
         prop::option::of(arb_answer_value()),
         prop::collection::btree_set(prop::sample::select(NodeMove::ALL.to_vec()), 0..3),
+        prop::option::of(arb_date()),
     )
-        .prop_map(|(node, skip_count, answer, moves)| NodeDerived {
-            moves,
-            skip_count,
-            answer,
-            ..node
-        })
+        .prop_map(
+            |(node, skip_count, answer, moves, snooze_lifts)| NodeDerived {
+                snooze_lifts,
+                moves,
+                skip_count,
+                answer,
+                ..node
+            },
+        )
         .boxed()
 }
 
-/// One node's derived values, but for its skip count and answer: one field list, so long.
+/// One node's derived values, but for its skip count, answer, moves and snooze lift: one field list, so long.
 #[allow(clippy::too_many_lines)]
 fn arb_node_derived_flags() -> BoxedStrategy<NodeDerived> {
     (
@@ -546,6 +550,7 @@ fn arb_node_derived_flags() -> BoxedStrategy<NodeDerived> {
                     snoozed_via,
                     snoozable: flag(7),
                     skip_count: 0,
+                    snooze_lifts: None,
                     moves: std::collections::BTreeSet::new(),
                     skips_beneath: flag(9),
                     open: flag(8),
@@ -592,14 +597,28 @@ pub fn arb_derived() -> BoxedStrategy<Derived> {
         prop::collection::vec(arb_node_key(), 0..3),
         prop::collection::vec(arb_node_key(), 0..3),
         prop::option::of(arb_stalled()),
+        prop::collection::vec(arb_node_key(), 0..3),
+        prop::option::of(arb_node_key()),
     )
         .prop_map(
-            |(today, nodes, frontier, acting_frontier, stalled)| Derived {
+            |(
                 today,
                 nodes,
                 frontier,
                 acting_frontier,
                 stalled,
+                current_stages,
+                final_milestone,
+            )| {
+                Derived {
+                    today,
+                    nodes,
+                    frontier,
+                    acting_frontier,
+                    stalled,
+                    current_stages,
+                    final_milestone,
+                }
             },
         )
         .boxed()

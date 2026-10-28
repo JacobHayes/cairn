@@ -30,6 +30,10 @@ fn transition(node: &str, step: &str) -> String {
     format!("- op: transition\n  node: {node}\n  transition: {step}\n")
 }
 
+fn snooze(node: &str, until: &str) -> String {
+    format!("- op: snooze\n  node: {node}\n  until: {{node: {until}}}\n")
+}
+
 const FIRST: &str = "{key: n_first, id: first, kind: action, title: First}";
 const SECOND: &str =
     "{key: n_second, id: second, kind: action, title: Second, requires: [n_first]}";
@@ -507,4 +511,169 @@ fn completion_is_suggested_when_nothing_is_left_or_the_end_is_done() {
     let nothing_left = support::journey(&add(&[FIRST]));
     let nothing_left = support::accepted(&nothing_left, &transition("n_first", "complete"));
     assert!(suggested(&nothing_left), "nothing in scope is open");
+}
+
+/// B11, C13: the final milestone is named while it is in play: pending or done, never once it
+/// is skipped or an answer has ruled it out, and never when the journey has none.
+#[test]
+fn the_final_milestone_is_named_while_it_is_in_play() {
+    let named = |records: &Records| {
+        let graph = support::journey_graph(records, support::JOURNEY);
+        support::derived(records, support::JOURNEY)
+            .to_schema(&graph)
+            .final_milestone
+    };
+    let gate =
+        "{key: n_gate, id: gate, kind: decision, title: Gate, prompt: Go?, answer_type: boolean}";
+    let end = "{key: n_end, id: end, kind: milestone, title: End, final: true, relevant_when: {equals: {decision: n_gate, value: true}}}";
+    let records = support::journey(&add(&[FIRST, gate, end]));
+    assert_eq!(named(&records), Some(key("n_end")), "pending");
+    let done = support::accepted(&records, &transition("n_end", "complete"));
+    assert_eq!(named(&done), Some(key("n_end")), "done");
+    let skipped = support::accepted(
+        &records,
+        "- op: transition\n  node: n_end\n  transition: {skip: {reason: Not needed.}}\n",
+    );
+    assert_eq!(named(&skipped), None, "skipped");
+    let ruled_out = support::accepted(
+        &records,
+        "- op: answer\n  decision: n_gate\n  value: {boolean: false}\n",
+    );
+    assert_eq!(named(&ruled_out), None, "out of scope");
+    assert_eq!(
+        named(&support::journey(&add(&[FIRST]))),
+        None,
+        "none marked"
+    );
+}
+
+/// C13: the timeline ends at the same final milestone the derived values name: a final
+/// milestone that is skipped is neither its end anchor nor marked final.
+#[test]
+fn the_timeline_ends_at_the_final_milestone_in_play() {
+    let timeline = |records: &Records| {
+        let graph = support::journey_graph(records, support::JOURNEY);
+        let derived = support::derived(records, support::JOURNEY);
+        DerivedJourney::new(&graph, &derived).timeline()
+    };
+    let records = support::journey(&add(&[
+        "{key: n_end, id: end, kind: milestone, title: End, final: true}",
+    ]));
+    let records = support::accepted(
+        &records,
+        "- op: set_pin\n  node: n_end\n  date: \"2026-11-02\"\n",
+    );
+    let pending = timeline(&records);
+    assert_eq!(pending.end, Some(key("n_end")));
+    assert!(pending.entries.iter().any(|entry| entry.is_final));
+    let skipped = support::accepted(
+        &records,
+        "- op: transition\n  node: n_end\n  transition: {skip: {reason: Not needed.}}\n",
+    );
+    let after = timeline(&skipped);
+    assert_eq!(after.end, None, "a skipped final milestone anchors nothing");
+    assert!(after.entries.iter().all(|entry| !entry.is_final));
+}
+
+/// C2: a stage is current while it holds a node on the acting frontier or an active one; a
+/// stage that waits, or has only finished work, is not.
+#[test]
+fn a_stage_is_current_while_it_holds_live_work() {
+    let current = |records: &Records| {
+        let graph = support::journey_graph(records, support::JOURNEY);
+        support::derived(records, support::JOURNEY)
+            .to_schema(&graph)
+            .current_stages
+    };
+    let records = support::journey(&add(&[
+        "{key: n_a, id: a, kind: group, title: A}",
+        "{key: n_a_work, id: a_work, parent: n_a, kind: action, title: A work}",
+        "{key: n_b, id: b, kind: group, title: B}",
+        "{key: n_b_work, id: b_work, parent: n_b, kind: action, title: B work, requires: [n_a_work]}",
+        "{key: n_c, id: c, kind: group, title: C}",
+        "{key: n_c_work, id: c_work, parent: n_c, kind: action, title: C work}",
+        "{key: n_loose, id: loose, kind: action, title: Loose}",
+    ]));
+    let records = support::accepted(&records, &transition("n_c_work", "complete"));
+    assert_eq!(
+        current(&records),
+        [key("n_a")],
+        "B waits on A's work; C is finished"
+    );
+    let moved_on = support::accepted(&records, &transition("n_a_work", "complete"));
+    assert_eq!(current(&moved_on), [key("n_b")]);
+}
+
+/// B6: the day a snooze lifts is its date, or the finish of the node it waits on; a container's
+/// snooze that lifts later wins over the node's own; none while the target has no date yet.
+#[test]
+fn a_snoozed_node_says_the_day_it_comes_back() {
+    let lifts = |records: &Records, name: &str| derived_of(records, name).snooze_lifts;
+    let day = |text: &str| Some(text.parse().unwrap());
+    let records = support::journey(&add(&[
+        "{key: n_box, id: box, kind: group, title: Box}",
+        "{key: n_item, id: item, parent: n_box, kind: action, title: Item}",
+        "{key: n_other, id: other, kind: action, title: Other}",
+        "{key: n_meet, id: meet, kind: milestone, title: Meet}",
+        "{key: n_undated, id: undated, kind: milestone, title: Undated}",
+    ]));
+    let records = support::accepted(
+        &records,
+        "- op: set_pin\n  node: n_meet\n  date: \"2026-11-02\"\n",
+    );
+    assert_eq!(lifts(&records, "n_item"), None, "nothing holds it");
+    let own = support::accepted(
+        &records,
+        "- op: snooze\n  node: n_item\n  until: {date: \"2026-11-10\"}\n",
+    );
+    assert_eq!(lifts(&own, "n_item"), day("2026-11-10"));
+    let held = support::accepted(
+        &own,
+        "- op: snooze\n  node: n_box\n  until: {date: \"2026-12-01\"}\n",
+    );
+    assert_eq!(
+        lifts(&held, "n_item"),
+        day("2026-12-01"),
+        "the container lifts later"
+    );
+    assert_eq!(lifts(&held, "n_box"), day("2026-12-01"));
+    let waits = support::accepted(&records, &snooze("n_other", "n_meet"));
+    assert_eq!(
+        lifts(&waits, "n_other"),
+        day("2026-11-02"),
+        "the finish of the node awaited"
+    );
+    let open_ended = support::accepted(&records, &snooze("n_other", "n_undated"));
+    assert_eq!(
+        lifts(&open_ended, "n_other"),
+        None,
+        "the node awaited has no date"
+    );
+}
+
+/// B6: the day a snooze lifts counts only the containers whose snooze still holds over the
+/// node: one that an answer rules out does not, though the node is kept in scope by an include.
+#[test]
+fn a_ruled_out_container_does_not_delay_the_lift() {
+    let records = support::journey(&add(&[
+        "{key: n_gate, id: gate, kind: decision, title: Gate, prompt: Go?, answer_type: boolean}",
+        "{key: n_box, id: box, kind: group, title: Box, relevant_when: {equals: {decision: n_gate, value: true}}}",
+        "{key: n_item, id: item, parent: n_box, kind: action, title: Item}",
+    ]));
+    let records = support::accepted(
+        &records,
+        "- op: snooze\n  node: n_item\n  until: {date: \"2026-11-10\"}\n\
+         - op: snooze\n  node: n_box\n  until: {date: \"2026-12-01\"}\n\
+         - op: apply_override\n  node: n_item\n  override: {force_include: {reason: Needed anyway.}}\n",
+    );
+    let both = derived_of(&records, "n_item").snooze_lifts;
+    let ruled_out = support::accepted(
+        &records,
+        "- op: answer\n  decision: n_gate\n  value: {boolean: false}\n",
+    );
+    assert_eq!(
+        derived_of(&ruled_out, "n_item").snooze_lifts,
+        "2026-11-10".parse().ok()
+    );
+    assert_ne!(both, derived_of(&ruled_out, "n_item").snooze_lifts);
 }

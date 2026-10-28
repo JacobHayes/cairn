@@ -148,6 +148,7 @@ export function testView(): Ready {
       today,
       frontier: ["n_findings"],
       acting_frontier: ["n_findings"],
+      current_stages: ["n_stage"],
       nodes: derivedNodes(),
     },
   };

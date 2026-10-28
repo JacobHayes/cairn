@@ -115,11 +115,8 @@ export interface MilestoneLine {
  * the next, and with none the line is left out.
  */
 export function milestoneLine(ready: Ready, model: SummaryModel): MilestoneLine | undefined {
-  // In scope and not skipped (D1a): still to do, or finished.
-  const final = (ready.journey.graph.nodes ?? []).find((node) => {
-    const derived = ready.derived.nodes[node.key];
-    return node.final === true && (derived?.open === true || derived?.display_state === "done");
-  });
+  // The engine names it while it is in play: in scope and not skipped, still to do or finished.
+  const final = (ready.journey.graph.nodes ?? []).find((node) => node.key === ready.derived.final_milestone);
   if (final !== undefined) {
     const dates = ready.derived.nodes[final.key]?.dates;
     const feeder = dates?.effective_date === undefined ? feedingDecision(ready, final.key) : undefined;

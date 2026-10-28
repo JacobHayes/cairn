@@ -3,7 +3,7 @@
 // done beneath a container. Pure over the local derivation, so the unit tests check it without a page.
 //
 // Cost: O(nodes log nodes) per journey document and per derivation, then O(1) per lookup.
-import { nodeOf, recordOf, type GraphNode, type Ready } from "../detail/model.ts";
+import { recordOf, type GraphNode, type Ready } from "../detail/model.ts";
 
 /** The nodes' containment: roots, then each container's children, siblings in plan order. */
 export interface Tree {
@@ -18,9 +18,7 @@ const NO_NODES: GraphNode[] = [];
 /**
  * The soonest date a node has: when it can start, when it is due, or when it was finished. A
  * snoozed node is not now: its date is the later of that and the day its snooze lifts, and
- * undated when a hold on it has no date, so it sorts by when it comes back. Every hold counts: its
- * own snooze and each holding ancestor's. A date snooze lifts on its date; a node snooze at the
- * finish of the node it waits on (a milestone's effective date, else its due date).
+ * undated when the hold on it has no date yet, so it sorts by when it comes back.
  */
 function ownDate(view: Ready, node: GraphNode): string | undefined {
   const derived = view.derived.nodes[node.key];
@@ -29,21 +27,9 @@ function ownDate(view: Ready, node: GraphNode): string | undefined {
   if (derived?.display_state !== "snoozed") {
     return current;
   }
-  const lifts: (string | undefined)[] = [];
-  const seen = new Set<string>();
-  for (let at: GraphNode | undefined = node; at !== undefined && !seen.has(at.key); at = at.parent == null ? undefined : nodeOf(view, at.parent)) {
-    seen.add(at.key);
-    const target = view.derived.nodes[at.key]?.snoozed;
-    if (target != null) {
-      const finish = "date" in target ? undefined : view.derived.nodes[target.node]?.dates;
-      lifts.push("date" in target ? target.date : (finish?.effective_date?.date ?? finish?.due?.date));
-    }
-  }
-  if (lifts.length === 0 || lifts.some((lift) => lift === undefined)) {
-    return lifts.length === 0 ? current : undefined;
-  }
-  const latest = lifts.reduce<string>((later, lift) => (lift !== undefined && lift > later ? lift : later), "");
-  return current === undefined || current < latest ? latest : current;
+  // The engine says the day the holding snooze lifts; none yet means the hold has no date, so the row is undated.
+  const lifts = derived.snooze_lifts ?? undefined;
+  return lifts === undefined ? undefined : current === undefined || current < lifts ? lifts : current;
 }
 
 function soonestOf(dates: readonly (string | undefined)[]): string | undefined {

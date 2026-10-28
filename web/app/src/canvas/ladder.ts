@@ -79,27 +79,6 @@ export function stepOf(view: Pick<CanvasSettings, "step">, nodes: readonly Graph
 }
 
 /**
- * The stages that are current: those holding an acting-frontier or active node (5.1). `active`
- * and `frontier` are node keys; a stage holding one anywhere beneath it is current.
- */
-export function currentStages(nodes: readonly GraphNode[], frontier: Iterable<string>, active: Iterable<string>): Set<string> {
-  const byKey = new Map(nodes.map((node) => [node.key, node]));
-  const current = new Set<string>();
-  for (const key of [...frontier, ...active]) {
-    let at = byKey.get(key);
-    const seen = new Set<string>();
-    while (at !== undefined && !seen.has(at.key)) {
-      seen.add(at.key);
-      if (isStage(at)) {
-        current.add(at.key);
-      }
-      at = at.parent == null ? undefined : byKey.get(at.parent);
-    }
-  }
-  return current;
-}
-
-/**
  * The containers the level collapses: at Stages every stage that is not current, unless the
  * viewer expanded it; at any step every container the viewer collapsed. A remembered collapse
  * of a node the graph no longer has (removed in another tab) is dropped: the projection rejects
@@ -120,7 +99,7 @@ export function collapsedAt(step: Step, nodes: readonly GraphNode[], current: Re
 
 /**
  * C4, 5.1: whether the step opens container `key` before the viewer flips it: at Stages only the
- * current stages (`current`, as `currentStages` reads them) of the top-level ones, every other
+ * current stages (`current`, the engine's `current_stages`) of the top-level ones, every other
  * container at every step. The list and the timeline fold by it as the graph collapses by
  * `collapsedAt`.
  */

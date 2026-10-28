@@ -307,6 +307,9 @@ pub(crate) struct LeanDerived {
     snoozed: Option<SnoozeTarget>,
     #[serde(skip_serializing_if = "Option::is_none")]
     snoozed_via: Option<NodeKey>,
+    /// The day the snooze that holds it lifts, when that is known.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    snooze_lifts: Option<Date>,
     #[serde(default, skip_serializing_if = "std::ops::Not::not")]
     snoozable: bool,
     /// What can be done to it now, beyond snoozing: the moves a write of that one move would be
@@ -352,6 +355,7 @@ impl LeanDerived {
             done_by_date,
             snoozed,
             snoozed_via,
+            snooze_lifts,
             snoozable,
             moves,
             // The web app's: an agent reads `display_state`, and the node read the answer.
@@ -394,6 +398,7 @@ impl LeanDerived {
             done_by_date,
             snoozed,
             snoozed_via,
+            snooze_lifts,
             snoozable,
             moves,
             needs_breakdown,

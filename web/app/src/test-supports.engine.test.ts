@@ -28,6 +28,7 @@ function facts(derived: Ready["derived"]["nodes"][string]) {
     snoozable: derived.snoozable === true,
     open: derived.open === true,
     moves: [...(derived.moves ?? [])].sort(),
+    snooze_lifts: derived.snooze_lifts ?? null,
     skips_beneath: derived.skips_beneath === true,
     skip_count: derived.skip_count ?? 0,
     answer: derived.answer ?? null,
@@ -62,5 +63,6 @@ describe.each([
     const mine = Object.fromEntries(Object.entries(view.derived.nodes).map(([key, each]) => [key, facts(each)]));
     const theirs = Object.fromEntries(Object.keys(view.derived.nodes).map((key) => [key, facts(derived.ready.derived.nodes[key] as Ready["derived"]["nodes"][string])]));
     expect(mine).toEqual(theirs);
+    expect({ stages: view.derived.current_stages ?? [], final: view.derived.final_milestone ?? null }).toEqual({ stages: derived.ready.derived.current_stages ?? [], final: derived.ready.derived.final_milestone ?? null });
   });
 });

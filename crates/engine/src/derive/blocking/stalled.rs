@@ -90,21 +90,16 @@ fn holds(blocking: &Blocking, sweep: &Sweep<'_>) -> BTreeMap<NodeKey, StallCause
     let mut causes = BTreeMap::new();
     for key in &blocking.frontier {
         let own = blocking.snoozed_own(key);
-        let via = blocking.snoozed_via(key);
         if let Some(until) = own {
             causes.insert(key.clone(), snooze(key, until));
         }
         // Every container above it whose snooze holds, not only the nearest: lifting the
         // inner one alone leaves the outer one holding.
-        let tree = sweep.graph.tree();
-        let mut above = via;
-        while let Some(container) = above {
-            if let Some(until) = blocking.snoozed_own(container) {
-                causes.insert(container.clone(), snooze(container, until));
-            }
-            above = tree.parent(container);
+        let above = blocking.snoozes_above(sweep.graph.tree(), key);
+        for (container, until) in &above {
+            causes.insert((*container).clone(), snooze(container, until));
         }
-        if let (None, None, Some(held)) = (own, via, blocking.scheduled(key)) {
+        if let (None, true, Some(held)) = (own, above.is_empty(), blocking.scheduled(key)) {
             causes.insert(
                 key.clone(),
                 StallCause::Scheduled {

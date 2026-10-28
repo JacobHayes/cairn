@@ -126,16 +126,12 @@ impl DerivedJourney<'_> {
         let pins = &self.graph.document().state.pins;
         let mut entries = Vec::new();
         let mut undated = Vec::new();
-        let mut end = None;
+        let end = derived.final_milestone(self.graph);
         for (key, node) in self.graph.document().nodes.as_map() {
             if !derived.relevance().in_scope(key) {
                 continue;
             }
-            let is_final =
-                matches!(&node.payload, Payload::Milestone(milestone) if milestone.is_final);
-            if is_final {
-                end = Some(key.clone());
-            }
+            let is_final = end.as_ref() == Some(key);
             let placed = if node.kind() == NodeKind::Milestone {
                 let effective = dates.effective_date(key);
                 if effective.is_none() {
@@ -185,13 +181,10 @@ impl DerivedJourney<'_> {
         let offset = |date: Date| date.since(start).map_or(0, |span| span.get_days());
         let mut entries = Vec::new();
         let mut undated = Vec::new();
-        let mut end = None;
+        let end = derived.final_milestone(self.graph);
         for (key, node) in document.nodes.as_map() {
             if !derived.relevance().in_scope(key) {
                 continue;
-            }
-            if matches!(&node.payload, Payload::Milestone(milestone) if milestone.is_final) {
-                end = Some(key.clone());
             }
             let waiting = self.waiting_on(node);
             let Some(earliest) = dates.earliest_start(key) else {
@@ -287,15 +280,12 @@ impl DerivedJourney<'_> {
     /// is done (stored or done by its date, F1). Completing is the person's call.
     #[must_use]
     pub fn completion_suggested(&self) -> bool {
-        let document = self.graph.document();
-        if document.nodes.is_empty() {
+        if self.graph.document().nodes.is_empty() {
             return false;
         }
         self.remaining() == 0
-            || document.nodes.values().any(|node| {
-                matches!(&node.payload, Payload::Milestone(milestone) if milestone.is_final)
-                    && (self.state(&node.key) == State::Done
-                        || self.derived.blocking().done_by_date(&node.key))
+            || self.derived.final_milestone(self.graph).is_some_and(|key| {
+                self.derived.display_state(self.graph, &key) == DisplayState::Done
             })
     }
 

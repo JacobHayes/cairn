@@ -773,6 +773,13 @@ pub struct NodeDerived {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub snoozed_via: Option<NodeKey>,
     // PRD: B6.
+    /// The day the snooze holding the node lifts, while one holds: the latest of its own and
+    /// each holding container's, a date snooze lifting on its date and a node snooze at the
+    /// finish of the node it waits on (a milestone's effective date, else its due date). Absent
+    /// when nothing holds it, and when a hold has no date yet.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub snooze_lifts: Option<Date>,
+    // PRD: B6.
     /// Whether a snooze can sit on the node: it is in scope with something left to do, and a
     /// group has work in scope left beneath it.
     #[serde(default, skip_serializing_if = "crate::serde_util::is_false")]
@@ -931,6 +938,17 @@ pub struct Derived {
     /// The stalled diagnostic, when stalled.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub stalled: Option<Stalled>,
+    // PRD: C2.
+    /// The stages that are current: the top-level groups holding a node on the acting
+    /// frontier or an active one, anywhere beneath them or themselves, in key order.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub current_stages: Vec<NodeKey>,
+    // PRD: C13, B11.
+    /// The final milestone while it is in play: in scope and neither skipped nor missing, still
+    /// to do or done (stored or by its date). Absent when the journey has none, or it is skipped
+    /// or out of scope.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub final_milestone: Option<NodeKey>,
 }
 
 /// A node's newly stale reasons.
