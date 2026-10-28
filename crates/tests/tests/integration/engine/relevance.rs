@@ -208,6 +208,15 @@ fn answers_are_in_effect_while_decided_and_relevant() {
     };
     assert!(in_effect(&key("n_who_owns")));
     assert!(!in_effect(&key("n_comparison_set")), "open");
+    // The derived node carries the answer the same way, for the web app to read.
+    let carried = |decision: &str| derived.node_derived(&graph, &key(decision)).answer;
+    assert_eq!(
+        carried("n_who_owns").as_ref(),
+        derived
+            .relevance()
+            .answer_in_effect(graph.document(), &key("n_who_owns"))
+    );
+    assert_eq!(carried("n_comparison_set"), None);
     let mut document = graph.document().clone();
     document
         .nodes
@@ -231,5 +240,10 @@ fn answers_are_in_effect_while_decided_and_relevant() {
             .answer_in_effect(moved.document(), &key("n_who_owns"))
             .is_none(),
         "a decision that leaves scope no longer fills its role"
+    );
+    assert_eq!(
+        out_of_scope.node_derived(&moved, &key("n_who_owns")).answer,
+        None,
+        "nor does its derived node carry the answer"
     );
 }

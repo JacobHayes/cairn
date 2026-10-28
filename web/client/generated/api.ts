@@ -3067,10 +3067,14 @@ export interface components {
         };
         /** @description A node the viewer participates in, with the kinds they hold. */
         MineEntry: {
+            /** @description On the acting frontier: nothing holds it back now. */
+            acting?: boolean;
             /** @description The participation kinds the viewer holds on it. */
             kinds: components["schemas"]["KindKey"][];
             /** @description The node. */
             node: components["schemas"]["NodeKey"];
+            /** @description Still the viewer's to do: an item (not a group) in scope and not finished or skipped. */
+            open?: boolean;
         };
         /** @description A token just minted: the one time its secret is seen. */
         MintedToken: {
@@ -3619,6 +3623,11 @@ export interface components {
             /** @description Relevant, not blocked, and non-terminal. */
             actionable: boolean;
             /**
+             * @description A decision's answer while it is in effect (decided and relevant), identities read
+             *     through aliases; none for any other node, and for a decision out of scope or undecided.
+             */
+            answer?: components["schemas"]["AnswerValue"] | null;
+            /**
              * @description What blocks it itself: its own explicit requirements, condition gates, and stage
              *     opening, and its children, each unsatisfied. What it inherits is listed once, on the
              *     ancestor that holds it (`blocked_through`), never copied onto each descendant. A node
@@ -3661,6 +3670,11 @@ export interface components {
             membership_lost?: boolean;
             /** @description A placeholder with no children that is not atomic. */
             needs_breakdown?: boolean;
+            /**
+             * @description Still to do and in scope: relevant or undecided, and not finished or skipped. A group
+             *     is open until its own finish is satisfied.
+             */
+            open?: boolean;
             /** @description Non-terminal with its due before today. */
             overdue?: boolean;
             /** @description Effective participations by kind. */
@@ -3676,6 +3690,15 @@ export interface components {
             rank?: components["schemas"]["Real"] | null;
             /** @description Relevance and what produced it. */
             relevance: components["schemas"]["RelevanceExplanation"];
+            /**
+             * Format: uint32
+             * @description How many items (nodes that are not groups) a skip of the node covers: the in-scope,
+             *     unfinished ones beneath it, leaving out work marked Keep with what is inside it, and
+             *     what a nearer container already skips. Once the node is skipped, or is a group marked
+             *     done, these are the items that read skipped through it; before, the items marking it
+             *     done would skip.
+             */
+            skip_count?: number;
             /**
              * @description The ancestor whose skip, or whose marking done, skips it; absent when it is not
              *     skipped through an ancestor.

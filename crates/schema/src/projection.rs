@@ -848,6 +848,12 @@ pub struct MineEntry {
     pub node: NodeKey,
     /// The participation kinds the viewer holds on it.
     pub kinds: BTreeSet<KindKey>,
+    /// Still the viewer's to do: an item (not a group) in scope and not finished or skipped.
+    #[serde(default, skip_serializing_if = "crate::serde_util::is_false")]
+    pub open: bool,
+    /// On the acting frontier: nothing holds it back now.
+    #[serde(default, skip_serializing_if = "crate::serde_util::is_false")]
+    pub acting: bool,
 }
 
 impl SnapshotScope {

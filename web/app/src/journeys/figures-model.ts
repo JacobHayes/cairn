@@ -5,8 +5,6 @@
 import { STATUS_HOLDS_CURRENT_WORK, type Schema } from "@cairn/client";
 
 import type { FactTone } from "../acting/reasons.ts";
-import { openForViewer } from "../acting/yours.ts";
-import type { Ready } from "../detail/model.ts";
 import { dateInk, whenWords } from "../status/when.ts";
 import { TROUBLES } from "../status/words.ts";
 import type { SummaryModel } from "../summary/model.ts";
@@ -18,14 +16,10 @@ export function progressOf(model: SummaryModel): { done: number; inScope: number
   return { done: model.inScope - model.remaining, inScope: model.inScope };
 }
 
-/**
- * What is still the viewer's to do (2.4): of their nodes, those still open for them (`openForViewer`),
- * and how many of those are on the acting frontier.
- */
-export function yoursOf(ready: Ready, entries: readonly MineEntry[]): { open: number; actionable: number } {
-  const open = entries.filter((entry) => openForViewer(ready, entry.node));
-  const frontier = new Set(ready.derived.acting_frontier);
-  return { open: open.length, actionable: open.filter((entry) => frontier.has(entry.node)).length };
+/** What is still the viewer's to do (2.4): of their nodes, those the engine reads as open for them, and how many of those are on the acting frontier. */
+export function yoursOf(entries: readonly MineEntry[]): { open: number; actionable: number } {
+  const open = entries.filter((entry) => entry.open === true);
+  return { open: open.length, actionable: open.filter((entry) => entry.acting === true).length };
 }
 
 /** A kind of trouble a journey can be in; all but `stalled` are list flags of the same name. */
@@ -65,7 +59,7 @@ export type ForYou =
   | { kind: "inactive" };
 
 /** The viewer's part in a journey of `status` that they hold `mine` of, `ready` of which can move now. */
-export function forYouOf(view: Ready, status: JourneyStatus, mine: readonly MineEntry[], ready: number): ForYou {
+export function forYouOf(status: JourneyStatus, mine: readonly MineEntry[], ready: number): ForYou {
   if (!STATUS_HOLDS_CURRENT_WORK[status]) {
     return { kind: "inactive" };
   }
@@ -75,7 +69,7 @@ export function forYouOf(view: Ready, status: JourneyStatus, mine: readonly Mine
   if (mine.length === 0) {
     return { kind: "nothing" };
   }
-  return mine.some((entry) => openForViewer(view, entry.node)) ? { kind: "waiting" } : { kind: "nothing-open" };
+  return mine.some((entry) => entry.open === true) ? { kind: "waiting" } : { kind: "nothing-open" };
 }
 
 /** What a viewer's part is, in words. */

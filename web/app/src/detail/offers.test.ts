@@ -2,7 +2,7 @@
 // aside, and the roll-up a container's sentence opens with.
 import { describe, expect, it } from "vitest";
 
-import { nodeDetail, skippedThrough, unfinishedInside, type NodeDerived, type Ready } from "./model.ts";
+import { nodeDetail, type NodeDerived, type Ready } from "./model.ts";
 import { actMutation } from "./ActButton.tsx";
 import { actLabel, contextMenuOf, menuOf, offered, unsnoozeOf } from "./offers.ts";
 import { plainSentence, sentenceOf } from "./sentence.ts";
@@ -165,38 +165,29 @@ describe("a group marked done (D1a)", () => {
 
   it("offers an open stage Mark done before Skip, and a stage that reads done or skipped neither", () => {
     expect(ids(stage("derived"), "n_stage").slice(0, 3)).toEqual(["snooze", "mark-done", "skip"]);
-    expect(ids(made("n_stage", { display_state: "done" }), "n_stage")).not.toContain("mark-done");
-    expect(ids(made("n_stage", { display_state: "skipped", skipped_by: "n_meeting" }), "n_stage")).not.toContain("mark-done");
+    expect(ids(made("n_stage", { display_state: "done", open: false }), "n_stage")).not.toContain("mark-done");
+    expect(ids(made("n_stage", { display_state: "skipped", open: false, skipped_by: "n_meeting" }), "n_stage")).not.toContain("mark-done");
     expect(ids(made("n_findings", {}), "n_findings")).not.toContain("mark-done");
   });
 
   it("offers a stage marked done a plain Reopen first, also when an answer has since ruled it out", () => {
-    const done = stage("done", { display_state: "done" });
+    const done = stage("done", { display_state: "done", open: false });
     expect(ids(done, "n_stage")[0]).toBe("reopen");
     expect(ids(done, "n_stage")).not.toContain("mark-done");
-    const ruledOut = stage("done", { display_state: "not_relevant" });
+    const ruledOut = stage("done", { display_state: "not_relevant", open: false });
     expect(ids(ruledOut, "n_stage").slice(0, 2)).toEqual(["reopen", "include"]);
   });
 
   it("says how many items it skipped and which kept work is pending, as the pieces and the count", () => {
-    const view = stage("done", { display_state: "done", kept_work_pending: ["n_findings"] });
+    const view = stage("done", { display_state: "done", open: false, kept_work_pending: ["n_findings"], skip_count: 1 });
     const report = view.derived.nodes.n_report;
     if (report !== undefined) {
-      view.derived.nodes.n_report = { ...report, display_state: "skipped", skipped_by: "n_stage" };
+      view.derived.nodes.n_report = { ...report, display_state: "skipped", open: false, skipped_by: "n_stage" };
     }
     const pieces = sentenceOf(view, detailOf(view, "n_stage"), { position: undefined, row: undefined });
     expect(pieces).toContainEqual({ node: "n_findings" });
     expect(plainSentence(view, pieces)).toContain("1 unfinished item");
-    expect(skippedThrough(view, "n_stage")).toBe(1);
     const through = sentenceOf(view, detailOf(view, "n_report"), { position: undefined, row: undefined });
     expect(through).toContainEqual({ node: "n_stage" });
-  });
-
-  it("counts the open items inside that Mark done would skip, leaving out work marked Keep", () => {
-    const view = testView();
-    expect(unfinishedInside(view, "n_stage")).toBe(2);
-    view.journey.graph.state = { ...view.journey.graph.state, overrides: { n_report: { keep: "Still needed." } } };
-    expect(unfinishedInside(view, "n_stage")).toBe(1);
-    expect(unfinishedInside(view, "n_meeting")).toBe(0);
   });
 });

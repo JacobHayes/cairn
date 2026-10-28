@@ -10,8 +10,8 @@ mod property {
     use cairn_engine::testing::generated::{arb_journey, plan_held};
     use cairn_engine::{Derived, Graph, derive};
     use cairn_schema::{
-        Deployment, IdentityKey, KindKey, NodeKey, ParticipationOrigin, ParticipationSource,
-        Relevance, RoleKey, State, ViolationCode,
+        Deployment, IdentityKey, KindKey, NodeKey, NodeKind, ParticipationOrigin,
+        ParticipationSource, Relevance, RoleKey, State, ViolationCode,
     };
     use patina_dst_proptest::prelude::*;
 
@@ -70,6 +70,40 @@ mod property {
             below = parent;
         }
         None
+    }
+
+    /// D1a by its definition: the items (not groups) a skip of `container` would cover: the
+    /// non-terminal, in-scope ones beneath it with no keep on the way up and no nearer container
+    /// that skips what is beneath it.
+    fn naive_covered(graph: &Graph, derived: &Derived, container: &NodeKey) -> u32 {
+        let covers = |item: &NodeKey| {
+            let mut below = item.clone();
+            while let Some(parent) = graph.tree().parent(&below).cloned() {
+                if has_override(graph, &below, true) {
+                    return false;
+                }
+                if parent == *container {
+                    return true;
+                }
+                if state(graph, &parent).skips_beneath(graph.node(&parent).unwrap().kind()) {
+                    return false;
+                }
+                below = parent;
+            }
+            false
+        };
+        let count = graph
+            .tree()
+            .descendants(container)
+            .into_iter()
+            .filter(|item| {
+                graph.node(item).unwrap().kind() != NodeKind::Group
+                    && !state(graph, item).is_terminal()
+                    && derived.relevance().in_scope(item)
+                    && covers(item)
+            })
+            .count();
+        u32::try_from(count).unwrap()
     }
 
     /// D1a kept work by its definition: every kept, in-scope node beneath a skipped
@@ -258,6 +292,11 @@ mod property {
                 prop_assert_eq!(
                     derived.skips().kept_work(key).clone(),
                     naive_kept_work(&graph, &derived, key),
+                    "{}", key
+                );
+                prop_assert_eq!(
+                    derived.skips().covered(key),
+                    naive_covered(&graph, &derived, key),
                     "{}", key
                 );
             }

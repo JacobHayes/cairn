@@ -278,7 +278,7 @@ impl DerivedJourney<'_> {
             .nodes
             .as_map()
             .keys()
-            .filter(|key| derived.relevance().in_scope(key) && !derived.blocking().closed(key))
+            .filter(|key| derived.open(key))
             .count();
         u32::try_from(count).unwrap_or(u32::MAX)
     }

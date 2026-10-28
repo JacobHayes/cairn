@@ -6,7 +6,6 @@
 // unit tests check it without a page.
 import type { Ready } from "../detail/model.ts";
 import { planOrder } from "../plan/tree.ts";
-import { isOpen } from "../status/state.ts";
 import { LIST_COLUMNS, SORTS, type ListColumn, type ListSettings, type SortBy } from "./address.ts";
 import type { NodeRow } from "./why.ts";
 
@@ -130,7 +129,7 @@ export function flatLines(view: Ready, rows: readonly NodeRow[], sort: SortBy | 
   const snoozed = (row: NodeRow) => sort !== undefined && row.display_state === "snoozed";
   const planned = sort === undefined ? [...rows].sort((left, right) => (order.get(left.key) ?? 0) - (order.get(right.key) ?? 0)) : rows;
   const ordered = [...planned.filter((row) => !snoozed(row)), ...planned.filter(snoozed)];
-  const over = (row: NodeRow) => (sort === "due" || sort === "slack") && !isOpen(view.derived.nodes[row.key]);
+  const over = (row: NodeRow) => (sort === "due" || sort === "slack") && view.derived.nodes[row.key]?.open !== true;
   return [...ordered.filter((row) => !over(row)), ...ordered.filter(over)].map((row) => ({ key: row.key, depth: 0, row, container: false, foldable: false, open: false, guides: [] }));
 }
 

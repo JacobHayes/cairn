@@ -3,7 +3,6 @@
 // applies, grouped by how often it is wanted. Pure, so the unit tests check each kind and state
 // without a page.
 import { missingEvidence } from "../acting/acts.ts";
-import { isOpen } from "../status/state.ts";
 import { failingGuards, isTerminal, isWork, movesFrom, nodeOf, recordOf, storedSnooze, titleOf, type NodeDetail, type Ready } from "./model.ts";
 
 /** The action beside a node, on any surface: what a person does to it in one move. */
@@ -33,7 +32,7 @@ export function offered(view: Ready, key: string): Offered {
   }
   const record = recordOf(view, node);
   const snooze: Act[] = unsnoozeOf(view, key) === undefined ? [] : ["unsnooze"];
-  if (!isOpen(derived)) {
+  if (derived.open !== true) {
     return { primary: undefined, secondary: [] };
   }
   if (node.kind === "group") {
@@ -131,7 +130,7 @@ export function menuOf(view: Ready, detail: NodeDetail, writable: boolean): Menu
   // D1a: a skipped node, or a group marked done, skips what is unfinished beneath it.
   const skipsBeneath = state === "skipped" || (kind === "group" && state === "done");
   // A group with unfinished work inside can be marked done; one that reads done, skipped or not relevant cannot.
-  const markable = kind === "group" && state === "derived" && isOpen(derived);
+  const markable = kind === "group" && state === "derived" && derived.open === true;
   const member = (view.journey.graph.insertions ?? []).some((insertion) => node.key in insertion.nodes);
   const where = (...extra: (MenuId | false)[]): MenuItem[] => items(["show-in-graph", member && "show-insertion", ...extra, "copy-link"]);
   const groups = (...all: MenuItem[][]) => all.filter((group) => group.length > 0);

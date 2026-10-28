@@ -118,9 +118,7 @@ impl DerivedJourney<'_> {
         let mut held: Vec<HeldDependent> = dependents
             .into_iter()
             .filter(|dependent| *dependent != key && !freed.contains(*dependent))
-            .filter(|dependent| {
-                derived.relevance().in_scope(dependent) && !derived.blocking().closed(dependent)
-            })
+            .filter(|dependent| derived.open(dependent))
             .filter_map(|dependent| {
                 let also_waits_on = derived.held_besides(dependent, &finished);
                 (!also_waits_on.is_empty()).then(|| HeldDependent {

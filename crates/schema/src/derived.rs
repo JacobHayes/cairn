@@ -15,7 +15,7 @@ use crate::domain::{Deployment, Journey};
 use crate::id::{IdentityKey, KindKey, NodeKey, RoleKey};
 use crate::limits::{EXPLANATION_ENTRY_COUNT_MAX, Limit, WEIGHT_MAX};
 use crate::node::NodeKind;
-use crate::state::{Guard, SnoozeTarget, StaleReason};
+use crate::state::{AnswerValue, Guard, SnoozeTarget, StaleReason};
 use jiff::civil::Date;
 
 /// A node's relevance (Gating): three-valued.
@@ -733,6 +733,24 @@ pub struct NodeDerived {
     /// group has work in scope left beneath it.
     #[serde(default, skip_serializing_if = "crate::serde_util::is_false")]
     pub snoozable: bool,
+    // PRD: D1a.
+    /// How many items (nodes that are not groups) a skip of the node covers: the in-scope,
+    /// unfinished ones beneath it, leaving out work marked Keep with what is inside it, and
+    /// what a nearer container already skips. Once the node is skipped, or is a group marked
+    /// done, these are the items that read skipped through it; before, the items marking it
+    /// done would skip.
+    #[serde(default, skip_serializing_if = "crate::serde_util::is_zero")]
+    pub skip_count: u32,
+    // PRD: D8.
+    /// Still to do and in scope: relevant or undecided, and not finished or skipped. A group
+    /// is open until its own finish is satisfied.
+    #[serde(default, skip_serializing_if = "crate::serde_util::is_false")]
+    pub open: bool,
+    // PRD: E3, E6.
+    /// A decision's answer while it is in effect (decided and relevant), identities read
+    /// through aliases; none for any other node, and for a decision out of scope or undecided.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub answer: Option<AnswerValue>,
     // PRD: B10.
     /// A placeholder with no children that is not atomic.
     #[serde(default, skip_serializing_if = "crate::serde_util::is_false")]

@@ -15,9 +15,9 @@
 use std::collections::{BTreeMap, BTreeSet};
 
 use cairn_schema::{
-    Blocker, Contribution, DateLink, DependencyVia, EffectiveParticipation, Explained, Guard,
-    GuardFailure, KindKey, NodeDates, NodeDerived, NodeKey, Progress, Real, Relevance,
-    RelevanceExplanation,
+    AnswerValue, Blocker, Contribution, DateLink, DependencyVia, EffectiveParticipation, Explained,
+    Guard, GuardFailure, IdentitySet, KindKey, NodeDates, NodeDerived, NodeKey, Progress, Real,
+    Relevance, RelevanceExplanation,
 };
 
 use super::checklist::checklist_count;
@@ -145,6 +145,9 @@ impl Derived {
             snoozed: blocking.snoozed(key).cloned(),
             snoozed_via: blocking.snoozed_via(key).cloned(),
             snoozable: self.snoozable(graph, key),
+            skip_count: self.skips.covered(key),
+            open: self.open(key),
+            answer: self.answer(graph, key),
             needs_breakdown: blocking.needs_breakdown(key),
             gravity: priority.gravity(key),
             gravity_from: for_response(priority.gravity_from(key)),
@@ -156,6 +159,32 @@ impl Derived {
                 .rank(key)
                 .map(|rank| Real::try_from(rank).unwrap_or_else(|error| panic!("{error}"))),
         }
+    }
+
+    /// E3, E6: the decision's answer while in effect, its identities read through aliases so
+    /// an answer given before a merge names the survivor.
+    ///
+    /// # Panics
+    ///
+    /// When merging identities breaks the list's limit, which resolving cannot.
+    #[must_use]
+    pub fn answer(&self, graph: &Graph, key: &NodeKey) -> Option<AnswerValue> {
+        let answer = self.relevance.answer_in_effect(graph.document(), key)?;
+        Some(match answer {
+            AnswerValue::Identity(identity) => {
+                AnswerValue::Identity(self.participation.canonical_identity(identity).clone())
+            }
+            AnswerValue::IdentityList(identities) => {
+                let resolved = identities
+                    .iter()
+                    .map(|identity| self.participation.canonical_identity(identity).clone());
+                // Resolving only merges keys, so the list stays within its limit.
+                AnswerValue::IdentityList(
+                    IdentitySet::new(resolved).unwrap_or_else(|error| panic!("{error}")),
+                )
+            }
+            other => other.clone(),
+        })
     }
 
     /// C8: the relevance value and what produced it: the node whose condition or force
@@ -202,7 +231,7 @@ impl Derived {
         };
         let completes =
             transition::next(node.kind(), stored_state(document, node), Move::Complete).is_some();
-        if !completes || !self.relevance.in_scope(key) || self.blocking.closed(key) {
+        if !completes || !self.open(key) {
             return BTreeSet::new();
         }
         static_failures(document, graph.tree(), node, annotated)

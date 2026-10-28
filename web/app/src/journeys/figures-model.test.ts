@@ -8,24 +8,12 @@ import { summaryModel } from "../summary/model.ts";
 import type { StatusSummary } from "../summary/model.ts";
 import { forYouOf, forYouWords, milestoneOf, troubleOf, troubleWords, yoursOf, type Trouble } from "./figures-model.ts";
 
-const entries = (...nodes: string[]) => nodes.map((node) => ({ node, kinds: ["k_owner"] }));
+const entry = (node: string, flags: { open?: boolean; acting?: boolean }) => ({ node, kinds: ["k_owner"], ...flags });
 
 describe("what is still the viewer's to do (2.4)", () => {
-  it("counts their open work, and how much of it is ready to act on", () => {
-    expect(yoursOf(testView(), entries("n_report", "n_findings", "n_meeting"))).toEqual({ open: 3, actionable: 1 });
-  });
-
-  it("leaves out a container, work not in scope, finished work, and a milestone done on its own", () => {
-    const view = testView();
-    const found = view.derived.nodes;
-    for (const [key, change] of [["n_findings", { relevance: { value: "not_relevant" as const } }], ["n_meeting", { done_by_date: true, display_state: "done" as const }], ["n_report", { display_state: "done" as const }]] as const) {
-      const was = found[key];
-      if (was !== undefined) {
-        found[key] = { ...was, ...change };
-      }
-    }
-    view.journey.graph.state = { ...view.journey.graph.state, nodes: { ...view.journey.graph.state?.nodes, n_report: { state: "done", provenance: "local" } } };
-    expect(yoursOf(view, entries("n_stage", "n_findings", "n_meeting", "n_report", "n_pick"))).toEqual({ open: 1, actionable: 0 });
+  it("counts the work the engine reads as open for them, and how much of it is on the acting frontier", () => {
+    expect(yoursOf([entry("n_report", { open: true }), entry("n_findings", { open: true, acting: true }), entry("n_stage", {}), entry("n_done", {})])).toEqual({ open: 2, actionable: 1 });
+    expect(yoursOf([])).toEqual({ open: 0, actionable: 0 });
   });
 });
 
@@ -55,19 +43,18 @@ describe("what needs a look, worst first", () => {
 });
 
 describe("the viewer's part in a journey", () => {
-  const view = testView();
-  const mineOpen = entries("n_report");
-  const mineDone = entries("n_stage");
+  const mineOpen = [entry("n_report", { open: true })];
+  const mineDone = [entry("n_stage", {})];
 
   it("is ready when some of their work can move, else waiting when some is open, else nothing open", () => {
-    expect(forYouOf(view, "active", mineOpen, 2)).toEqual({ kind: "ready", count: 2 });
-    expect(forYouOf(view, "active", mineOpen, 0)).toEqual({ kind: "waiting" });
-    expect(forYouOf(view, "active", mineDone, 0)).toEqual({ kind: "nothing-open" });
-    expect(forYouOf(view, "active", [], 0)).toEqual({ kind: "nothing" });
+    expect(forYouOf("active", mineOpen, 2)).toEqual({ kind: "ready", count: 2 });
+    expect(forYouOf("active", mineOpen, 0)).toEqual({ kind: "waiting" });
+    expect(forYouOf("active", mineDone, 0)).toEqual({ kind: "nothing-open" });
+    expect(forYouOf("active", [], 0)).toEqual({ kind: "nothing" });
   });
 
   it("holds no current work in a journey that is not active", () => {
-    expect(forYouOf(view, "completed", mineOpen, 2)).toEqual({ kind: "inactive" });
+    expect(forYouOf("completed", mineOpen, 2)).toEqual({ kind: "inactive" });
     expect(forYouWords({ kind: "inactive" })).not.toBe(forYouWords({ kind: "nothing" }));
   });
 });

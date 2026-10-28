@@ -53,7 +53,7 @@ function Yours({ ready }: { ready: Ready }) {
   if (mine.status !== "ready" || !STATUS_HOLDS_CURRENT_WORK[ready.journey.header.status]) {
     return null;
   }
-  const { open, actionable } = yoursOf(ready, mine.entries);
+  const { open, actionable } = yoursOf(mine.entries);
   if (open === 0) {
     return null;
   }

@@ -15,7 +15,6 @@ import type { NodeRow } from "../acting/why.ts";
 import { namer, staleText } from "../detail/explain.ts";
 import { feedingDecision, itemTitle, milestonesFirst, nodeOf, recordOf, scheduledDate, titleOf, type GraphNode, type Ready } from "../detail/model.ts";
 import { snoozeEndWords } from "../status/snooze.ts";
-import { isOpen } from "../status/state.ts";
 import { dateWords, daysWords } from "../status/when.ts";
 import { DISPLAY_STATES, stateWord, type DisplayState } from "../status/words.ts";
 import { treeOf } from "../plan/tree.ts";
@@ -119,7 +118,7 @@ export function milestoneLine(ready: Ready, model: SummaryModel): MilestoneLine 
   // In scope and not skipped (D1a): still to do, or finished.
   const final = (ready.journey.graph.nodes ?? []).find((node) => {
     const derived = ready.derived.nodes[node.key];
-    return node.final === true && (isOpen(derived) || derived?.display_state === "done");
+    return node.final === true && (derived?.open === true || derived?.display_state === "done");
   });
   if (final !== undefined) {
     const dates = ready.derived.nodes[final.key]?.dates;

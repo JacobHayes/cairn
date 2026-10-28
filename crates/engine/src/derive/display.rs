@@ -94,17 +94,21 @@ impl Derived {
             && graph
                 .node(key)
                 .is_some_and(|node| node.kind() != NodeKind::Group)
-            && self.relevance.in_scope(key)
-            && !self.blocking.closed(key)
+            && self.open(key)
+    }
+
+    /// D8: the node is still to do and in scope: nothing has closed it (skipped, finished, done
+    /// by its date, or a group whose finish is satisfied) and an answer has not ruled it out.
+    #[must_use]
+    pub fn open(&self, key: &NodeKey) -> bool {
+        self.relevance.in_scope(key) && !self.blocking.closed(key)
     }
 
     /// B6: a snooze can sit on the node: it is in scope with something left to do, and a group
     /// also has work in scope left beneath it. The snooze check and the web app's offers read this.
     #[must_use]
     pub fn snoozable(&self, graph: &Graph, key: &NodeKey) -> bool {
-        self.relevance.in_scope(key)
-            && !self.blocking.closed(key)
-            && !self.group_without_work(graph, key)
+        self.open(key) && !self.group_without_work(graph, key)
     }
 
     /// B6: a group with no node in scope and unfinished beneath it, so nothing is left for a
@@ -117,9 +121,11 @@ impl Derived {
                 .is_some_and(|node| node.kind() == NodeKind::Group)
         };
         is_group(key)
-            && !graph.tree().descendants(key).iter().any(|below| {
-                !is_group(below) && self.relevance.in_scope(below) && !self.blocking.closed(below)
-            })
+            && !graph
+                .tree()
+                .descendants(key)
+                .iter()
+                .any(|below| !is_group(below) && self.open(below))
     }
 
     /// D8: the node waits on a gate of its own or one it inherits: a container, on its

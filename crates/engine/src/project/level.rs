@@ -549,7 +549,7 @@ impl<'a> DerivedJourney<'a> {
         let blocking = derived.blocking();
         let relevance = derived.relevance();
         let children = self.graph.tree().children(key);
-        let open = |child: &&NodeKey| relevance.in_scope(child) && !blocking.closed(child);
+        let open = |child: &&NodeKey| derived.open(child);
         let relevant_open: Vec<&NodeKey> = children
             .iter()
             .filter(|child| relevance.value(child) == Relevance::Relevant)
@@ -557,9 +557,8 @@ impl<'a> DerivedJourney<'a> {
             .collect();
         RollUp {
             ready_to_finish: self.node(key).kind() != NodeKind::Group
-                && relevance.in_scope(key)
-                && blocking.deps_done(key)
-                && !blocking.closed(key),
+                && derived.open(key)
+                && blocking.deps_done(key),
             children_active: children
                 .iter()
                 .any(|child| self.state(child) == State::Active),

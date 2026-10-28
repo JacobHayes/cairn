@@ -19,7 +19,7 @@
 
 use std::collections::{BTreeMap, BTreeSet};
 
-use cairn_schema::{NodeKey, State};
+use cairn_schema::{NodeKey, NodeKind, State};
 
 use super::relevance::Relevances;
 use super::{kept, skips_beneath, stored_state};
@@ -32,6 +32,8 @@ pub struct Skips {
     effective: BTreeMap<NodeKey, NodeKey>,
     /// Each skipped container, stored or effective, or group marked done, and the kept work beneath it.
     kept_work: BTreeMap<NodeKey, BTreeSet<NodeKey>>,
+    /// For each container, how many items a skip of it covers (see [`Skips::covered`]).
+    covered: BTreeMap<NodeKey, u32>,
 }
 
 impl Skips {
@@ -51,6 +53,15 @@ impl Skips {
     /// Every effectively skipped node, with the ancestor its skip comes from, in key order.
     pub fn effective(&self) -> impl Iterator<Item = (&NodeKey, &NodeKey)> {
         self.effective.iter()
+    }
+
+    /// D1a: how many items (nodes that are not groups) a skip of the container covers: the
+    /// in-scope, non-terminal ones beneath it that a keep does not exempt and a nearer skipped
+    /// container does not already hold. For a container already skipped, or a group marked done,
+    /// that is the items skipped through it; for any other, the items skipping it would skip.
+    #[must_use]
+    pub fn covered(&self, key: &NodeKey) -> u32 {
+        self.covered.get(key).copied().unwrap_or(0)
     }
 
     /// D1a: every skipped container or group marked done that holds kept work, with that work.
@@ -142,6 +153,7 @@ pub(crate) fn pass(
                 .and_then(|found| found.parent.as_ref());
         }
     }
+    skips.covered = covered(graph, relevances);
     let stored_skip = |key: &NodeKey| {
         document
             .nodes
@@ -160,4 +172,43 @@ pub(crate) fn pass(
         "only a skipped container holds kept work"
     );
     skips
+}
+
+/// The items a skip of each container covers: one walk down from every container, stopping at
+/// a kept node (its subtree is exempt) and at a node that skips what is beneath it (those
+/// items are its own). The depth limit bounds how many walks reach any one node.
+fn covered(graph: &Graph, relevances: &Relevances) -> BTreeMap<NodeKey, u32> {
+    let document = graph.document();
+    let tree = graph.tree();
+    let mut counts = BTreeMap::new();
+    for container in document
+        .nodes
+        .values()
+        .map(|node| &node.key)
+        .filter(|key| tree.is_container(key))
+    {
+        let mut count = 0_u32;
+        let mut stack: Vec<&NodeKey> = tree.children(container).iter().collect();
+        while let Some(key) = stack.pop() {
+            let Some(node) = document.nodes.get(key) else {
+                continue;
+            };
+            if kept(document, key) {
+                continue;
+            }
+            if node.kind() != NodeKind::Group
+                && !stored_state(document, node).is_terminal()
+                && relevances.in_scope(key)
+            {
+                count += 1;
+            }
+            if !skips_beneath(document, node) {
+                stack.extend(tree.children(key));
+            }
+        }
+        if count > 0 {
+            counts.insert(container.clone(), count);
+        }
+    }
+    counts
 }

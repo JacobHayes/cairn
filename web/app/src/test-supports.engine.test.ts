@@ -26,6 +26,9 @@ function facts(derived: Ready["derived"]["nodes"][string]) {
     relevance: derived.relevance.value,
     actionable: derived.actionable,
     snoozable: derived.snoozable === true,
+    open: derived.open === true,
+    skip_count: derived.skip_count ?? 0,
+    answer: derived.answer ?? null,
     blocked_by: [...(derived.blocked_by ?? [])].map((each) => each.node).sort(),
     failing_guards: [...(derived.failing_guards ?? [])].sort(),
   };

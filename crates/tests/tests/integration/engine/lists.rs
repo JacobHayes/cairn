@@ -502,6 +502,43 @@ fn mine_is_where_the_viewer_participates() {
     );
 }
 
+/// E4: each of "mine" says whether the node is still the viewer's to do (an item in scope, not
+/// finished or skipped) and whether it is on the acting frontier, at every stage of the fixture
+/// journey.
+#[test]
+fn mine_says_what_is_open_and_acting() {
+    let owned = BTreeSet::from([KindKey::owner()]);
+    let viewer = identities(&["who_k3d7qm2xw5tn6pfa"]);
+    let mut seen_open = false;
+    let mut seen_closed = false;
+    let mut seen_acting = false;
+    for steps in 1..=8 {
+        let derive = Derive::vendor(steps);
+        let acting = derive.derived.ranking().acting_frontier();
+        for entry in derive.journey().mine(&viewer, &owned) {
+            let shown = derive.derived.display_state(&derive.graph, &entry.node);
+            let in_scope = derive.derived.relevance().value(&entry.node)
+                != cairn_schema::Relevance::NotRelevant;
+            let item = derive.graph.node(&entry.node).unwrap().kind() != NodeKind::Group;
+            let finished = matches!(shown, DisplayState::Done | DisplayState::Skipped);
+            assert_eq!(
+                entry.open,
+                item && in_scope && !finished,
+                "{} at step {steps}",
+                entry.node
+            );
+            assert_eq!(entry.acting, acting.contains(&entry.node), "{}", entry.node);
+            seen_open |= entry.open;
+            seen_closed |= !entry.open;
+            seen_acting |= entry.acting;
+        }
+    }
+    assert!(
+        seen_open && seen_closed && seen_acting,
+        "the fixture covers each"
+    );
+}
+
 /// E4, E6: one route's role is filled by a different person in each journey made from it,
 /// so "mine" for a person differs by journey: Ana owns the first evaluation, Dara the
 /// second, and neither is the other's.

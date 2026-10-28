@@ -348,6 +348,10 @@ impl LeanDerived {
             snoozed,
             snoozed_via,
             snoozable,
+            // The web app's: an agent reads `display_state`, and the node read the answer.
+            skip_count: _,
+            open: _,
+            answer: _,
             needs_breakdown,
             gravity,
             gravity_from,

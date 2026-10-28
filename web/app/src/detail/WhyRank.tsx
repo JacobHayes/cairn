@@ -6,7 +6,6 @@
 import { useCaller } from "../data/react.ts";
 import { rankParts, type NodeRow, type RankPart } from "../acting/why.ts";
 import { useContributions } from "./contributions.ts";
-import { isOpen } from "../status/state.ts";
 import { foldKey, useFold } from "./folds.ts";
 import type { NodeDetail, Ready } from "./model.ts";
 import { NodeLink, Contributions, Section } from "./parts.tsx";
@@ -137,7 +136,7 @@ function Unlocks({ view, detail, open }: { view: Ready; detail: NodeDetail; open
 
 export function WhyRank({ view, detail, position, row }: { view: Ready; detail: NodeDetail; position: number | undefined; row: NodeRow | undefined }) {
   const { node, derived } = detail;
-  const gone = !isOpen(derived);
+  const gone = derived.open !== true;
   const fold = foldKey(node.kind, "rank");
   const open = useFold(fold, false);
   if (gone) {

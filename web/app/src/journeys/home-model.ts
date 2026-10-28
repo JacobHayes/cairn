@@ -2,7 +2,6 @@
 // which of the four states it is in, what the line under the title counts, and what of the
 // viewer's work in a journey is held back. Pure, so the unit tests check the rules without a page.
 import type { NodeRow } from "../acting/why.ts";
-import { openForViewer } from "../acting/yours.ts";
 import type { Ready } from "../detail/model.ts";
 import type { MineEntry } from "./mine.ts";
 
@@ -63,7 +62,7 @@ export function homeState(input: {
 /** The viewer's work in a journey that is not ready: how much is still open, and how much of it is late. */
 export function heldBack(view: Ready, mine: readonly MineEntry[], ready: readonly NodeRow[]): { count: number; late: number } {
   const movable = new Set(ready.map((row) => row.key));
-  const held = mine.filter((entry) => !movable.has(entry.node) && openForViewer(view, entry.node));
+  const held = mine.filter((entry) => !movable.has(entry.node) && entry.open === true);
   return { count: held.length, late: held.filter((entry) => view.derived.nodes[entry.node]?.overdue === true).length };
 }
 

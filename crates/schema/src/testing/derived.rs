@@ -4,9 +4,10 @@ use proptest::prelude::*;
 
 use super::model::bounded_vec;
 use super::{
-    arb_date, arb_deployment, arb_domain, arb_guard_failure, arb_identity_key, arb_journey,
-    arb_kind_key, arb_node_field, arb_node_key, arb_patch_id, arb_path, arb_proposal_id,
-    arb_revision, arb_role_key, arb_snooze_target, arb_stale_reason, arb_subject, arb_write,
+    arb_answer_value, arb_date, arb_deployment, arb_domain, arb_guard_failure, arb_identity_key,
+    arb_journey, arb_kind_key, arb_node_field, arb_node_key, arb_patch_id, arb_path,
+    arb_proposal_id, arb_revision, arb_role_key, arb_snooze_target, arb_stale_reason, arb_subject,
+    arb_write,
 };
 use crate::chain::{
     Chain, ChainList, Constraint, ConstraintSource, DependencyVia, FixedBy, FixedDate, Instant,
@@ -479,8 +480,24 @@ fn arb_blocked() -> BoxedStrategy<(Vec<Blocker>, Vec<crate::NodeKey>)> {
 /// One node's derived values.
 pub fn arb_node_derived() -> BoxedStrategy<NodeDerived> {
     (
+        arb_node_derived_flags(),
+        any::<u32>(),
+        prop::option::of(arb_answer_value()),
+    )
+        .prop_map(|(node, skip_count, answer)| NodeDerived {
+            skip_count,
+            answer,
+            ..node
+        })
+        .boxed()
+}
+
+/// One node's derived values, but for its skip count and answer: one field list, so long.
+#[allow(clippy::too_many_lines)]
+fn arb_node_derived_flags() -> BoxedStrategy<NodeDerived> {
+    (
         arb_relevance(),
-        prop::collection::vec(any::<bool>(), 8),
+        prop::collection::vec(any::<bool>(), 9),
         arb_blocked(),
         prop::collection::btree_map(arb_kind_key(), arb_participation(), 0..2),
         prop::collection::btree_set(arb_stale_reason(), 0..2),
@@ -535,6 +552,9 @@ pub fn arb_node_derived() -> BoxedStrategy<NodeDerived> {
                     snoozed,
                     snoozed_via,
                     snoozable: flag(7),
+                    skip_count: 0,
+                    open: flag(8),
+                    answer: None,
                     needs_breakdown: flag(6),
                     gravity,
                     gravity_from,

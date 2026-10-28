@@ -4,25 +4,8 @@
 import type { MineEntry } from "../journeys/mine.ts";
 import { milestonesFirst, nodeOf, titleOf, type Ready } from "../detail/model.ts";
 import { snoozeEndWords } from "../status/snooze.ts";
-import { isOpen } from "../status/state.ts";
 import { unblockersOf } from "./waiting.ts";
 import { namedList } from "../ui/words.ts";
-
-/**
- * Whether node `key` is still the viewer's to do if it is in their "mine": in scope, not a
- * container, not skipped, not a milestone that marks itself done, and not finished (2.4). The one
- * rule Home's counts and the journey card's use, and the line for work that is all waiting.
- */
-export function openForViewer(view: Ready, key: string): boolean {
-  const node = nodeOf(view, key);
-  const derived = view.derived.nodes[key];
-  return (
-    node !== undefined &&
-    derived !== undefined &&
-    node.kind !== "group" &&
-    isOpen(derived)
-  );
-}
 
 /** The viewer's earliest-starting open node, none of which is actionable now. */
 export interface NextForYou {
@@ -35,14 +18,13 @@ export interface NextForYou {
 
 /** The viewer's next item when nothing of theirs is on the acting frontier; none when something is, or nothing open is theirs. */
 export function nextForYou(view: Ready, entries: readonly MineEntry[]): NextForYou | undefined {
-  const frontier = new Set(view.derived.acting_frontier);
-  if (entries.some((entry) => frontier.has(entry.node))) {
+  if (entries.some((entry) => entry.acting === true)) {
     return undefined;
   }
   const open = entries.flatMap((entry) => {
     const node = nodeOf(view, entry.node);
     const derived = view.derived.nodes[entry.node];
-    return node !== undefined && derived !== undefined && openForViewer(view, entry.node) ? [{ node, start: derived.dates.earliest_start?.date ?? "9999-12-31" }] : [];
+    return node !== undefined && derived !== undefined && entry.open === true ? [{ node, start: derived.dates.earliest_start?.date ?? "9999-12-31" }] : [];
   });
   const first = open.sort((left, right) => left.start.localeCompare(right.start) || left.node.key.localeCompare(right.node.key))[0];
   if (first === undefined) {

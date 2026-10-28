@@ -44,7 +44,8 @@ describe("the line under the title", () => {
 
 describe("what of the viewer's is held back", () => {
   const rows = (...keys: string[]) => keys.map((key) => ({ key }) as NodeRow);
-  const mine = (...nodes: string[]) => nodes.map((node) => ({ node, kinds: ["k_owner"] }));
+  const open = new Set(["n_pick", "n_later", "n_inner"]);
+  const mine = (...nodes: string[]) => nodes.map((node) => ({ node, kinds: ["k_owner"], open: open.has(node) }));
 
   it("counts their open work that cannot move yet, and how much of it is late", () => {
     const view = actingView();

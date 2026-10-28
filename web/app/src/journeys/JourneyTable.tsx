@@ -244,7 +244,7 @@ function ReadRow({ summary, routes, mine, picks, report, rowRef }: RowProps) {
   }
   const { model } = reading;
   const troubles = model === undefined ? [] : troubleOf(model, reading.view.derived.stalled != null);
-  const forYou = forYouOf(reading.view, summary.status, reading.mine, reading.ready.length);
+  const forYou = forYouOf(summary.status, reading.mine, reading.ready.length);
   return (
     <tr ref={rowRef} {...attrsOf(summary, picks)}>
       <PickCell summary={summary} picks={picks} />

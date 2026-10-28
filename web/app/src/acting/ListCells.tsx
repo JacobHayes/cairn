@@ -11,7 +11,6 @@ import { screenSwitched, useNodeAddresses } from "../journeys/address.ts";
 import { useJourneyTarget } from "../journeys/useJourneyTarget.ts";
 import { NO_OWNER, ownerWords } from "../detail/sections.tsx";
 import { snoozeWords } from "../status/snooze.ts";
-import { isOpen } from "../status/state.ts";
 import { statusTone, statusWord } from "../status/words.ts";
 import { dateInk, dateWords, daysWords, dueWords, inkClass } from "../status/when.ts";
 import { Badge } from "../ui/kit.tsx";
@@ -188,7 +187,7 @@ export function Cell({ column, line, context }: { column: Column; line: Line; co
   const node = nodeOf(view, line.key);
   const state = row?.display_state ?? derived?.display_state;
   const today = view.derived.today;
-  const open = isOpen(derived);
+  const open = derived?.open === true;
   if (column === "status") {
     return state === undefined || node === undefined ? null : <Badge tone={statusTone(state)} data-testid="list-state" data-status={state}>{statusWord(state, node.kind)}</Badge>;
   }

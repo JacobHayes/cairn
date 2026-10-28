@@ -17,7 +17,7 @@ export interface FootFacts {
   latestStart: string | undefined;
   /** D3, F6: how many days past its due date, as the engine derived it; none when it is not overdue. */
   overdueDays: number | undefined;
-  /** Still to do and in scope (`isOpen`): a finished or ruled-out node has no date to give. */
+  /** Still to do and in scope (`open`): a finished or ruled-out node has no date to give. */
   open: boolean;
   /** A milestone's effective date. */
   doneOn: string | undefined;

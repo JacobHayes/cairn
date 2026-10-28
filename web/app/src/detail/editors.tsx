@@ -2,7 +2,7 @@
 // through the decision that feeds it when one does; the snooze form (what to set aside, until
 // when) the actions open; a force include lifted; its weight; and its participations. Each is
 // one patch whose rejection shows here, a pin's with the moves that resolve a contradictory chain.
-import { OWNER_KIND, type Schema } from "@cairn/client";
+import { OWNER_KIND } from "@cairn/client";
 import { useId, type ReactNode } from "react";
 
 import { snoozeEndWords } from "../status/snooze.ts";
@@ -69,17 +69,6 @@ const dateInput = (label: string) => (value: string, change: (value: string) => 
 );
 
 /**
- * E3: a decision's answer while it is in effect: decided and relevant (crates/engine
- * `answer_in_effect`). A decision out of scope or undecided keeps its answer, but what it
- * drove (a role, a milestone's pin) is empty.
- */
-export function answerInEffect(view: Ready, decision: string): Schema<"AnswerValue"> | undefined {
-  const decided = view.journey.graph.state?.nodes?.[decision]?.state === "decided";
-  const relevant = view.derived.nodes[decision]?.relevance.value === "relevant";
-  return decided && relevant ? view.journey.graph.state?.answers?.[decision] : undefined;
-}
-
-/**
  * F2, E3: the node's pin. A milestone a date decision feeds is pinned only through that
  * decision: setting its date answers the decision, and clearing it reopens the decision.
  */
@@ -88,8 +77,8 @@ export function PinEditor({ view, detail }: { view: Ready; detail: NodeDetail })
   const key = detail.node.key;
   const pinForm = useFormDraft<string>(write.journey, key, "pin");
   const fedBy = detail.fedBy;
-  const fedAnswer = fedBy === undefined ? undefined : answerInEffect(view, fedBy.key);
-  const current = fedBy === undefined ? detail.pin : fedAnswer !== undefined && "date" in fedAnswer ? fedAnswer.date : undefined;
+  const fedAnswer = fedBy === undefined ? undefined : view.derived.nodes[fedBy.key]?.answer;
+  const current = fedBy === undefined ? detail.pin : fedAnswer != null && "date" in fedAnswer ? fedAnswer.date : undefined;
   const set = (date: string): Mutation[] =>
     fedBy === undefined ? [{ op: "set_pin", node: key, date }] : [{ op: "answer", decision: fedBy.key, value: { date } }];
   const clear: Mutation = fedBy === undefined ? { op: "clear_pin", node: key } : transition(fedBy.key, "reopen");

@@ -15,7 +15,7 @@ use std::collections::{BTreeMap, BTreeSet};
 use cairn_schema::limits::PAGE_ITEM_COUNT_MAX;
 use cairn_schema::{
     Annotation, AnnotationContent, DisplayState, IdentityKey, KindKey, ListFlag, ListPage,
-    ListQuery, MineEntry, Next, NextQuery, NodeKey, ResourceContent, State, Title,
+    ListQuery, MineEntry, Next, NextQuery, NodeKey, NodeKind, ResourceContent, State, Title,
 };
 
 use super::rows::{count, page};
@@ -177,6 +177,7 @@ impl<'a> DerivedJourney<'a> {
         kinds: &BTreeSet<KindKey>,
     ) -> Vec<MineEntry> {
         let viewer = &self.canonical_viewer(viewer);
+        let acting: BTreeSet<&NodeKey> = self.derived.ranking().acting_frontier().iter().collect();
         self.tree_order(None)
             .into_iter()
             .filter_map(|key| {
@@ -186,6 +187,8 @@ impl<'a> DerivedJourney<'a> {
                     .filter(|kind| kinds.is_empty() || kinds.contains(kind))
                     .collect();
                 (!held.is_empty()).then(|| MineEntry {
+                    open: self.derived.open(key) && self.node(key).kind() != NodeKind::Group,
+                    acting: acting.contains(key),
                     node: key.clone(),
                     kinds: held,
                 })

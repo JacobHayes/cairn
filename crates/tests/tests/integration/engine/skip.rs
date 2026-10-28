@@ -340,3 +340,76 @@ fn completing_work_with_children_skips_nothing() {
     assert_eq!(skipped_by(&derived, "n_plan_draft"), None);
     assert!(derived.blocking().frontier().contains(&key("n_plan_draft")));
 }
+
+/// D1a: how many items skipping a container covers, derived before the skip and after it. The
+/// count leaves out finished work, work kept, and what a nearer container already skips, and it
+/// counts a milestone that reads done by its date (the skip wins over the date).
+#[test]
+fn the_items_a_skip_covers_are_counted_before_and_after_it() {
+    let box_with = |extra: &str| {
+        let added = support::journey(
+            "- op: add_node\n  node: {key: n_box, id: box, kind: group, title: Box}\n\
+             - op: add_node\n  node: {key: n_gate, id: gate, parent: n_box, kind: milestone, title: Gate, auto_done: true}\n\
+             - op: add_node\n  node: {key: n_open, id: open, parent: n_box, kind: action, title: Open}\n\
+             - op: add_node\n  node: {key: n_kept, id: kept, parent: n_box, kind: action, title: Kept}\n\
+             - op: add_node\n  node: {key: n_finished, id: finished, parent: n_box, kind: action, title: Finished}\n\
+             - op: add_node\n  node: {key: n_inner, id: inner, parent: n_box, kind: group, title: Inner}\n\
+             - op: add_node\n  node: {key: n_deep, id: deep, parent: n_inner, kind: action, title: Deep}\n\
+             - op: set_pin\n  node: n_gate\n  date: \"2026-10-01\"\n",
+        );
+        [keep("n_kept"), complete("n_finished"), extra.to_owned()]
+            .iter()
+            .filter(|mutation| !mutation.is_empty())
+            .fold(added, |records, mutation| {
+                support::accepted(&records, mutation)
+            })
+    };
+    let covered = |records: &cairn_engine::Records, node: &str| {
+        let graph = support::journey_graph(records, support::JOURNEY);
+        support::derived(records, support::JOURNEY)
+            .node_derived(&graph, &key(node))
+            .skip_count
+    };
+    let skipped_through = |records: &cairn_engine::Records, node: &str| {
+        let graph = support::journey_graph(records, support::JOURNEY);
+        let derived = support::derived(records, support::JOURNEY);
+        derived
+            .skips()
+            .effective()
+            .filter(|(below, source)| {
+                source.as_str() == node
+                    && graph
+                        .node(below)
+                        .is_some_and(|found| found.kind() != cairn_schema::NodeKind::Group)
+            })
+            .count()
+    };
+    let before = box_with("");
+    assert!(
+        support::derived(&before, support::JOURNEY)
+            .blocking()
+            .done_by_date(&key("n_gate")),
+        "the gate reads done by its date, so only the stored state says it is unfinished"
+    );
+    // The gate, the open action and the deep action; not the kept one or the finished one.
+    assert_eq!(covered(&before, "n_box"), 3);
+    let after = support::accepted(&before, &mark_done("n_box"));
+    assert_eq!(covered(&after, "n_box"), 3, "unchanged once marked done");
+    assert_eq!(
+        usize::try_from(covered(&after, "n_box")).unwrap(),
+        skipped_through(&after, "n_box"),
+        "the count is the items that read skipped through the box"
+    );
+    let nested = box_with(&mark_done("n_inner"));
+    assert_eq!(
+        covered(&nested, "n_box"),
+        2,
+        "the inner group's item is its own"
+    );
+    assert_eq!(
+        covered(&nested, "n_inner"),
+        1,
+        "the inner group skips its own item"
+    );
+    assert_eq!(covered(&before, "n_open"), 0, "an item covers nothing");
+}

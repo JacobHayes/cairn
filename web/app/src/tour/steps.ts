@@ -6,7 +6,6 @@
 // gates and the copy over derived journeys without a page.
 import type { Screen } from "../journeys/address.ts";
 import type { Ready } from "../detail/model.ts";
-import { answerInEffect } from "../detail/editors.tsx";
 import { stateWord, type DisplayState } from "../status/words.ts";
 import type { Side } from "../ui/place.ts";
 import { namedList } from "../ui/words.ts";
@@ -283,11 +282,11 @@ export function clampCursor(cursor: number | undefined, steps: readonly Step[]):
 /** What the engine derived for the practice journey, for the copy. */
 export function factsOf(view: Ready): Facts {
   const titles = new Map((view.journey.graph.nodes ?? []).map((node) => [node.key, node.title]));
-  const answer = answerInEffect(view, decision);
+  const answer = view.derived.nodes[decision]?.answer;
   return {
     title: (key) => titles.get(key) ?? key,
     state: (key) => view.derived.nodes[key]?.display_state,
-    answer: answer !== undefined && "boolean" in answer ? answer.boolean : undefined,
+    answer: answer != null && "boolean" in answer ? answer.boolean : undefined,
     frontier: view.derived.acting_frontier,
   };
 }

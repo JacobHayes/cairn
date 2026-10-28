@@ -6,7 +6,7 @@
 import { INITIAL_STATE, MOVES_FROM, TERMINAL_STATES, type Move as EngineMove, type Schema } from "@cairn/client";
 
 import type { JourneyView } from "../data/journeys.ts";
-import { isFinished, isOpen } from "../status/state.ts";
+import { isFinished } from "../status/state.ts";
 import { dueWords } from "../status/when.ts";
 import type { DisplayState } from "../status/words.ts";
 
@@ -217,37 +217,6 @@ export function moveOf(change: Schema<"Transition">): Move {
     return change;
   }
   return "skip" in change ? "skip" : "mark_done";
-}
-
-/**
- * D1a: how many items (nodes that are not groups) inside `key` that are unfinished and in scope
- * would read skipped if `key` were marked done: the form says it before it is sent. Work marked
- * Keep, and what is inside it, is left out, because it stays open.
- */
-export function unfinishedInside(view: Ready, key: string): number {
-  const kept = view.journey.graph.state?.overrides ?? {};
-  const inside = (node: GraphNode): boolean => {
-    // Walks up from the node: it is inside the group when the walk reaches it, unless a keep is met first.
-    for (let at: GraphNode | undefined = node; at?.parent != null; at = nodeOf(view, at.parent)) {
-      if (kept[at.key]?.keep != null) {
-        return false;
-      }
-      if (at.parent === key) {
-        return true;
-      }
-    }
-    return false;
-  };
-  return (view.journey.graph.nodes ?? []).filter((node) => node.kind !== "group" && isOpen(view.derived.nodes[node.key]) && inside(node)).length;
-}
-
-/**
- * D1a: how many items (nodes that are not groups) read skipped through `key`, a skipped
- * container or a group marked done. The card and the sentence both say it, so it is counted
- * here once.
- */
-export function skippedThrough(view: Ready, key: string): number {
-  return Object.entries(view.derived.nodes).filter(([node, derived]) => derived.skipped_by === key && nodeOf(view, node)?.kind !== "group").length;
 }
 
 /** When a node is due, in words, while it is open: none once it is finished, as a Contents row and a Stages row say it. */

@@ -7,11 +7,10 @@ import { INITIAL_STATE, type Schema } from "@cairn/client";
 import { conditionNames, conditionWords } from "../authoring/condition.ts";
 import { rankParts, type NodeRow } from "../acting/why.ts";
 import { SNOOZE_NODE_TAIL } from "../status/snooze.ts";
-import { isOpen } from "../status/state.ts";
 import { upperFirst } from "../status/words.ts";
 import { dateWords, daysUntil, daysWords, relativeDays } from "../status/when.ts";
 import { namer, staleText } from "./explain.ts";
-import { itemTitle, nodeOf, rankPlaces, scheduledDate, skippedThrough, titleOf, waitsOn, type Holding, type NodeDetail, type NodeDerived, type Ready } from "./model.ts";
+import { itemTitle, nodeOf, rankPlaces, scheduledDate, titleOf, waitsOn, type Holding, type NodeDetail, type NodeDerived, type Ready } from "./model.ts";
 import { answerText, identityName, ownersOf, ownerWords } from "./sections.tsx";
 import { listParts, plural } from "../ui/words.ts";
 
@@ -155,7 +154,7 @@ function rollUp(view: Ready, detail: NodeDetail): Piece[] {
   }
   const { done, total, decisions_needed: toDecide } = progress;
   const tightest = detail.children
-    .filter((child) => isOpen(view.derived.nodes[child.key]))
+    .filter((child) => view.derived.nodes[child.key]?.open === true)
     .flatMap((child) => {
       const slack = view.derived.nodes[child.key]?.dates.slack_days;
       return slack == null ? [] : [{ key: child.key, slack }];
@@ -225,7 +224,7 @@ function stateSentence(view: Ready, detail: NodeDetail, rank: RankFacts, viewer:
     case "done": {
       if (markedDone(detail)) {
         const why = record.reason == null || record.reason === "" ? "" : `: ${record.reason.replace(/\.+$/, "")}`;
-        const skipped = skippedThrough(view, node.key);
+        const skipped = derived.skip_count ?? 0;
         return [`Marked done${why}.`, ...(skipped === 0 ? [] : [` It skipped ${plural(skipped, "unfinished item")}.`]), ...keptPending(derived)];
       }
       const verb = node.kind === "decision" ? `Decided${detail.answer === undefined ? "" : ` ${answerText(view, detail.answer, node)}`}` : "Done";

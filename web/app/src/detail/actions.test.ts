@@ -6,7 +6,6 @@ import { describe, expect, it } from "vitest";
 import { violationNode } from "../data/writes.ts";
 import { resolvedAnswer } from "./AnswerEditor.tsx";
 import { isComplete } from "./contributions.ts";
-import { answerInEffect } from "./editors.tsx";
 import type { Mutation } from "./model.ts";
 import { bypassable, untickedIn, withBypass, withMove, withTicks } from "./Rejected.tsx";
 import { identityName } from "./sections.tsx";
@@ -82,30 +81,6 @@ describe("merged identities (E6)", () => {
   it("starts an answer editor on the surviving identities, each once", () => {
     expect(resolvedAnswer(view, { identity: "who_old" })).toEqual({ identity: "who_one" });
     expect(resolvedAnswer(view, { identity_list: ["who_older", "who_one", "who_two"] })).toEqual({ identity_list: ["who_one", "who_two"] });
-  });
-});
-
-describe("answerInEffect (E3)", () => {
-  const decided = () => {
-    const view = testView();
-    const state = view.journey.graph.state ?? {};
-    state.nodes = { ...state.nodes, n_when: { state: "decided", provenance: "local" } };
-    view.journey.graph.state = state;
-    return view;
-  };
-
-  it("is the answer of a decided, relevant decision", () => {
-    expect(answerInEffect(decided(), "n_when")).toEqual({ date: "2026-11-20" });
-  });
-
-  it("is nothing once the decision is out of scope or open, though the answer is kept", () => {
-    const view = decided();
-    const when = view.derived.nodes["n_when"];
-    if (when !== undefined) {
-      when.relevance = { value: "not_relevant" };
-    }
-    expect(answerInEffect(view, "n_when")).toBeUndefined();
-    expect(answerInEffect(testView(), "n_when")).toBeUndefined();
   });
 });
 

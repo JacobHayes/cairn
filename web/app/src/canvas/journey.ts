@@ -6,10 +6,10 @@
 import type { Schema } from "@cairn/client";
 
 import { conditionNames } from "../authoring/condition.ts";
-import { type GraphNode, isStage, type NodeDerived, nodeOf, rankPlaces, type Ready, recordOf, skippedThrough, titleOf } from "../detail/model.ts";
+import { type GraphNode, isStage, type NodeDerived, nodeOf, rankPlaces, type Ready, recordOf, titleOf } from "../detail/model.ts";
 import { answerText, identityName, NO_OWNER, ownersOf, ownerWords, YOU } from "../detail/sections.tsx";
 import { currentStagesOf } from "../journeys/requests.ts";
-import { isFinished, isOpen } from "../status/state.ts";
+import { isFinished } from "../status/state.ts";
 import type { DisplayState } from "../status/words.ts";
 import type { CardBadge, CardBody, CardState, JourneyExtras, LevelNode, Looks, Signals } from "./model.ts";
 import { dependsWords, firstParagraph, footWords } from "./words.ts";
@@ -85,7 +85,7 @@ function bodyOf(context: Context, node: GraphNode, derived: NodeDerived, at: Lev
     return { kind: "answer", text: answerText(view, answer, node), rationale: rationale === undefined || rationale === "" ? undefined : firstParagraph(rationale) };
   }
   if (node.kind === "group" && recordOf(view, node).state === "done") {
-    return { kind: "marked_done", skipped: skippedThrough(view, node.key), keptPending: (derived.kept_work_pending ?? []).length > 0 };
+    return { kind: "marked_done", skipped: derived.skip_count ?? 0, keptPending: (derived.kept_work_pending ?? []).length > 0 };
   }
   if (context.children.has(node.key)) {
     const { done, total } = derived.progress ?? { done: 0, total: 0 };
@@ -114,7 +114,7 @@ function footOf(context: Context, node: GraphNode, derived: NodeDerived, state: 
     due: due?.date,
     latestStart: latestStart?.date,
     overdueDays: derived.dates.overdue_days ?? undefined,
-    open: isOpen(derived),
+    open: derived.open === true,
     doneOn: effective?.date,
   });
 }

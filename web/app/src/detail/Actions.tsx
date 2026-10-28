@@ -32,7 +32,7 @@ import { EvidenceForm } from "./DoneEvidence.tsx";
 import { SnoozePanel, snoozeWords, WeightEditor } from "./editors.tsx";
 import { setFold } from "./folds.ts";
 import { datesFold } from "./datesShown.ts";
-import { answerable, failingGuards, guardBypass, itemTitle, movesFrom, storedSnooze, titleOf, transition, unfinishedInside, type Guard, type GraphNode, type Mutation, type NodeDetail, type Ready } from "./model.ts";
+import { answerable, failingGuards, guardBypass, itemTitle, movesFrom, storedSnooze, titleOf, transition, type Guard, type GraphNode, type Mutation, type NodeDetail, type Ready } from "./model.ts";
 import { menuOf, offered, type Act, type ContextId, type MenuId, type MenuItem } from "./offers.ts";
 import { OwnerSelect } from "./parts.tsx";
 import { Rejected } from "./Rejected.tsx";
@@ -335,12 +335,12 @@ function reasonWords(kind: ReasonKind, node: GraphNode, without: string, inside:
 }
 
 /** The forms that take a reason. */
-function ReasonCase({ view, detail, form, write, sending, submit, opened }: OpenProps & { opened: Extract<Drafted, { case: ReasonKind }> }) {
+function ReasonCase({ detail, form, write, sending, submit, opened }: OpenProps & { opened: Extract<Drafted, { case: ReasonKind }> }) {
   const { node } = detail;
   const guards = guardsOf(detail);
   return (
     <ReasonForm
-      {...reasonWords(opened.case, node, guards.words, unfinishedInside(view, node.key))}
+      {...reasonWords(opened.case, node, guards.words, detail.derived.skip_count ?? 0)}
       value={opened.value}
       sending={sending}
       disabled={write.disabled}
