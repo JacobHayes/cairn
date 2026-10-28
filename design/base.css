@@ -236,17 +236,24 @@ select,
 textarea {
   font: 400 14px / 1.4 var(--font-body);
   padding: 4px 8px;
+  /* A select is as wide as its longest option: never wider than the box it sits in. */
+  max-width: 100%;
+}
+/* The box of a field: an input's, and the multi-value input's that holds chips and an input. */
+input,
+select,
+textarea,
+.chips-input {
   border-radius: var(--radius-md);
   border: 1px solid var(--color-border);
   background: var(--color-surface);
   color: var(--color-text);
   min-height: var(--control-h);
-  /* A select is as wide as its longest option: never wider than the box it sits in. */
-  max-width: 100%;
 }
 input:hover,
 select:hover,
-textarea:hover {
+textarea:hover,
+.chips-input:hover {
   border-color: var(--color-secondary);
 }
 input:focus-visible,
@@ -1238,6 +1245,12 @@ svg.chart .datum-line {
   :is(.list-node, .detail-list > li, .detail-clamp, .cell-first, .row, .popover-body, .layer-band) > a,
   [data-tip-tap] {
     padding-block: max(0px, calc((var(--touch-target) - 1lh) / 2));
+  }
+  /* A link in an index row (its name, what it offers) is as tall as a finger needs, its words centred in it. */
+  .index-table table.data td a {
+    display: inline-flex;
+    align-items: center;
+    min-height: var(--touch-target);
   }
   /* And never narrower than the target, so a one-word title is as easy to hit as a long one. */
   a:is(.node-title, .home-all, [data-testid="home-held"], [data-testid="lineage"]),

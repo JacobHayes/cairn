@@ -62,19 +62,6 @@
   width: 100%;
 }
 
-/* A field with its label above it, in the Label style (DESIGN, Label). */
-.field {
-  display: grid;
-  gap: var(--space-1);
-}
-
-.field > .label {
-  font: 500 var(--type-label-size) / 1.4 var(--font-mono);
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
-  color: var(--color-secondary);
-}
-
 /* A checklist item's row: its title takes the width the move and remove buttons leave, on one line; a control that cannot act (up on the first, down on the last) is absent and leaves its column empty, so the rest stay aligned down the list. */
 .items-row {
   --items-button: 36px;

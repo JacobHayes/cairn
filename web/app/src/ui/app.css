@@ -1343,20 +1343,6 @@ table.data {
     display: none;
   }
 }
-/* Multi-value input (DESIGN): an input's box holding a chip per value and the input that takes the next. */
-.chips-field {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-1);
-  min-width: 0;
-}
-/* The label is the plain field's, so a name and an email field sit on one line. */
-.chips-field > .label {
-  font: 500 var(--type-label-size) / 1.4 var(--font-mono);
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
-  color: var(--color-secondary);
-}
 /* Details sits under the action that leads: plain secondary text, underlined, still a button for focus. */
 button.failed-details {
   border: 0;
@@ -1367,23 +1353,17 @@ button.failed-details {
   color: var(--color-secondary);
   text-decoration: underline;
 }
+/* Multi-value input (DESIGN): an input's box holding a chip per value and the input that takes the next. */
 .chips-input {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
   gap: var(--space-1);
-  min-height: var(--control-h);
   padding: 2px var(--space-1);
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-md);
-  background: var(--color-surface);
   cursor: text;
 }
-.chips-input:hover {
-  border-color: var(--color-secondary);
-}
 /* The box wears the focus ring, not the input inside it. */
-.chips-input:has(> input:focus-visible) {
+.chips-input:has(> :is(input, select):focus-visible) {
   border-color: var(--color-accent);
   outline: 2px solid var(--color-accent);
   outline-offset: 1px;
@@ -1413,11 +1393,6 @@ button.failed-details {
   font-size: 14px;
   cursor: pointer;
 }
-.chips-input:has(> select:focus-visible) {
-  border-color: var(--color-accent);
-  outline: 2px solid var(--color-accent);
-  outline-offset: 1px;
-}
 .chips-input[data-invalid] {
   border-color: var(--color-error);
 }
@@ -1428,16 +1403,6 @@ button.failed-details {
   border: 0;
   background: transparent;
   font: 500 13px / 1.6 var(--font-mono);
-}
-/* Beside a growing field, the form's controls hold the top edge, and the name takes a share of the row. */
-.row:has(> .chips-field) {
-  align-items: flex-start;
-}
-.row:has(> .chips-field) > .field {
-  flex: 1 1 12rem;
-}
-.row:has(> .chips-field) > .field > input {
-  width: 100%;
 }
 .chip-value {
   display: inline-flex;
@@ -1492,9 +1457,6 @@ button.failed-details {
 @media (max-width: 719px) {
   .chips-input > input {
     font-size: 16px;
-  }
-  .row:has(> .chips-field) > .field {
-    flex: 1 1 100%;
   }
 }
 /* A reason form's field is 16px on a phone, so the browser does not zoom into it. */
@@ -1741,3 +1703,4 @@ button.tree-fold[aria-expanded="true"] .tree-chevron {
     flex-basis: calc(100% - var(--touch-target) - var(--space-2));
   }
 }
+

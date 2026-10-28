@@ -96,7 +96,7 @@ export function ChipsInput({
   const inputId = useId();
   const { problem, setProblem, handlers } = useTaking(chips, input);
   return (
-    <div className="chips-field">
+    <div className="field">
       <label className="label" htmlFor={inputId}>
         {label}
       </label>

@@ -12,32 +12,17 @@ import type { Page } from "@playwright/test";
 import { under, upFrom, type Part, type Snapshot } from "./snapshot.ts";
 import { whenSettled } from "./shell.ts";
 
-/** What a finger can tap. */
-const SELECTOR = [
-  "a[href]",
-  "button",
-  "input:not([type=hidden])",
-  "select",
-  "textarea",
-  "summary",
-  '[role="button"]',
-  '[role="menuitem"]',
-  '[role="menuitemradio"]',
-  '[role="menuitemcheckbox"]',
-  '[role="tab"]',
-  '[role="radio"]',
-  '[role="checkbox"]',
-  '[role="switch"]',
-  '[role="option"]',
-  '[role="slider"]',
-  "[tabindex]:not([tabindex='-1'])",
-].join(", ");
-
-/** What the page reports for one control under the minimum. */
+/** One control's name and hit size in a report. */
 interface Offender {
   name: string;
   width: number;
   height: number;
+}
+
+/** Where a control and its owner are in the page (`pathOf`), for the live probe. */
+interface Place {
+  control: number[];
+  owner: number[];
 }
 
 /** `measure`, with every scroll position put back afterwards: it scrolls controls into view, and the page must stay as the test left it. */
@@ -60,12 +45,18 @@ async function keepingScroll<T>(page: Page, measure: () => Promise<T>): Promise<
   }
 }
 
-/** The controls among the page's `only` (their places in the document's controls) whose hit area is under the touch-target minimum, measured by the points around them, named by their tag, label and hit box. */
-async function undersized(page: Page, only: number[], minimum: number): Promise<Offender[]> {
+/**
+ * The controls `only` (each with its owner, the label a tap on it lands on, as places in the page)
+ * whose hit area is under the touch-target minimum, measured by the points around them: their
+ * index in `only` and hit size, named by the caller. Which elements are controls, and which are exempt, is `controlsOf`'s
+ * to say over the snapshot; here only what the live page alone knows is read (where a tap lands).
+ */
+async function undersized(page: Page, only: Place[], minimum: number): Promise<{ at: number; width: number; height: number }[]> {
   // eslint-disable-next-line e2e/settled-reads -- the caller reads it in whenSettled
-  return page.evaluate(([selector, ordinals, minimum]) => {
+  return page.evaluate(([places, minimum]) => {
     const STEP = 2;
-    const found: Offender[] = [];
+    const found: { at: number; width: number; height: number }[] = [];
+    const find = (path: number[]): Element | undefined => path.reduce<Element | undefined>((at, index) => at?.children[index], document.documentElement);
     /** The width and height of the points around `el` where a tap lands on it or on `owner` (its label). */
     const hitSize = (el: HTMLElement, owner: HTMLElement, rect: DOMRect): [number, number] => {
       const meets = (x: number, y: number): boolean => {
@@ -95,45 +86,30 @@ async function undersized(page: Page, only: number[], minimum: number): Promise<
       }
       return [right - left + STEP, bottom - top + STEP];
     };
-    // An open popover covers part of the page beneath it: a control it overlaps is under it, not tapped, so it is measured inside the popover only.
-    const popovers = [...document.querySelectorAll("[data-popover]")];
-    const inert = (el: Element): boolean => el.closest("[inert], [aria-hidden='true']") !== null;
-    const wanted = new Set(ordinals);
-    for (const [ordinal, el] of [...document.querySelectorAll<HTMLElement>(selector)].entries()) {
-      if (!wanted.has(ordinal)) {
-        continue;
+    for (const [at, place] of places.entries()) {
+      const [el, owner] = [find(place.control), find(place.owner)];
+      if (!(el instanceof HTMLElement) || !(owner instanceof HTMLElement)) {
+        throw new Error(`the control at ${place.control.join("/")} is not in the page`);
       }
-      const style = getComputedStyle(el);
-      // A link inside a run of text is exempt, as in any touch guideline.
-      if (el instanceof HTMLAnchorElement && style.display === "inline") {
-        continue;
-      }
-      // What is drawn on a canvas is placed and scaled by the camera, so its size is the zoom's to give (the zoom buttons make it larger); the controls around the canvas are held to the minimum.
-      if (style.visibility === "hidden" || style.display === "none" || inert(el) || el.closest(".react-flow__viewport") !== null) {
-        continue;
-      }
-      const owner = (el instanceof HTMLInputElement ? el.closest("label") : null) ?? el;
       if (!el.closest(".react-flow")) {
         el.scrollIntoView({ block: "center", inline: "center" });
       }
       const rect = owner.getBoundingClientRect();
-      const under = popovers.some((each) => !each.contains(el) && each.getBoundingClientRect().left < rect.right && each.getBoundingClientRect().right > rect.left && each.getBoundingClientRect().top < rect.bottom && each.getBoundingClientRect().bottom > rect.top);
-      if (under || rect.width === 0 || rect.height === 0 || rect.bottom < 0 || rect.top > innerHeight || rect.right < 0 || rect.left > innerWidth) {
+      if (rect.width === 0 || rect.height === 0 || rect.bottom < 0 || rect.top > innerHeight || rect.right < 0 || rect.left > innerWidth) {
         continue;
       }
       const [width, height] = hitSize(el, owner, rect);
       if (width < minimum - 1 || height < minimum - 1) {
-        const [text, testId] = [(el.getAttribute("aria-label") ?? el.textContent).trim().replace(/\s+/g, " ").slice(0, 30), el.getAttribute("data-testid")];
-        found.push({ name: `${el.tagName.toLowerCase()}${testId === null ? "" : `[${testId}]`} in ${el.parentElement?.className ?? ""} "${text}"`, width, height });
+        found.push({ at, width, height });
       }
     }
     return found;
-  }, [SELECTOR, only, minimum] as const);
+  }, [only, minimum] as const);
 }
 
 const CONTROL_ROLES = new Set(["button", "menuitem", "menuitemradio", "menuitemcheckbox", "tab", "radio", "checkbox", "switch", "option", "slider"]);
 
-/** Whether `part` is what a finger can tap: SELECTOR, over the snapshot. */
+/** Whether `part` is what a finger can tap. The one definition of a control: the live probe is given the controls this picks. */
 function isControl(part: Part): boolean {
   const { tag, attr } = part;
   return (
@@ -147,7 +123,6 @@ function isControl(part: Part): boolean {
 
 /** A control the check looks at: its place among the document's controls, its name, and the box a tap on it or its label lands in. */
 interface Control {
-  ordinal: number;
   part: Part;
   owner: Part;
 }
@@ -155,13 +130,10 @@ interface Control {
 /** What the page's controls are held to: the controls to measure, and the ones that are exempt. */
 function controlsOf(snapshot: Snapshot): Control[] {
   const found: Control[] = [];
-  let ordinal = 0;
   for (const part of snapshot.nodes) {
     if (!isControl(part)) {
       continue;
     }
-    const place = ordinal;
-    ordinal += 1;
     const box = part.box;
     // A link inside a run of text is exempt, as in any touch guideline; so is what is not drawn, inert, or placed by a canvas's camera (the zoom buttons make it larger).
     // A control that takes no taps (pointer-events: none) is not a target.
@@ -172,9 +144,18 @@ function controlsOf(snapshot: Snapshot): Control[] {
       continue;
     }
     const label = part.tag === "input" ? [...upFrom(part)].find((up) => up.tag === "label") : undefined;
-    found.push({ ordinal: place, part, owner: label ?? part });
+    found.push({ part, owner: label ?? part });
   }
   return found;
+}
+
+/** Where `part` is in the page: the index of each element from the document element down, among its parent's elements. */
+function pathOf(part: Part): number[] {
+  const path: number[] = [];
+  for (let at = part; at.parent !== undefined && at.parent.tag !== "#document"; at = at.parent) {
+    path.unshift(at.parent.children.filter((child) => !child.tag.startsWith("#") && !child.tag.startsWith("::")).indexOf(at));
+  }
+  return path;
 }
 
 /** How a control is named in a report. */
@@ -258,7 +239,7 @@ export async function touchReport(page: Page, snapshot: Snapshot): Promise<Touch
   }
   const popovers = snapshot.nodes.filter((part) => "data-popover" in part.attr && part.box !== undefined);
   const { width: windowWidth, height: windowHeight } = snapshot.viewport;
-  const [sizes, doubtful] = [new Array<Offender>(), new Array<number>()];
+  const [sizes, doubtful] = [new Array<Offender>(), new Array<Control>()];
   for (const control of controlsOf(snapshot)) {
     const rect = control.owner.box;
     if (rect === undefined || rect.width === 0 || rect.height === 0) {
@@ -277,8 +258,13 @@ export async function touchReport(page: Page, snapshot: Snapshot): Promise<Touch
     if (width >= minimum && height >= minimum && !distorted(control.part) && (!whole || !coveredIn(snapshot, control, hit))) {
       continue;
     }
-    doubtful.push(control.ordinal);
+    doubtful.push(control);
   }
-  const rest = doubtful.length === 0 ? [] : await whenSettled(page, () => keepingScroll(page, () => undersized(page, doubtful, minimum)));
-  return { problems: rest.map((each) => `${each.name} ${String(each.width)}x${String(each.height)}`), sizes };
+  const places = doubtful.map((control) => ({ control: pathOf(control.part), owner: pathOf(control.owner) }));
+  const rest = doubtful.length === 0 ? [] : await whenSettled(page, () => keepingScroll(page, () => undersized(page, places, minimum)));
+  const problems = rest.map(({ at, width, height }) => {
+    const found = describe(doubtful[at] as Control, width, height);
+    return `${found.name} ${String(found.width)}x${String(found.height)}`;
+  });
+  return { problems, sizes };
 }
