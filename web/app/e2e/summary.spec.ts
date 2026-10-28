@@ -61,8 +61,6 @@ async function phoneFitsFirstScreen(page: Page): Promise<void> {
   await expect(first).toBeVisible();
   const box = await whenSettled(page, () => first.boundingBox());
   expect((box?.y ?? 9999) + (box?.height ?? 0)).toBeLessThanOrEqual(844);
-  const beyond = await whenSettled(page, () => page.evaluate(() => [...document.querySelectorAll(".summary *")].filter((each) => each.getBoundingClientRect().right > innerWidth + 1).map((each) => each.getAttribute("class") ?? "")));
-  expect(beyond).toEqual([]);
   await expectStructure(page, "the summary");
   // Who has it and what to do stay visible and reachable, the owner under the title in its column.
   await expect(first.locator(".row-owner")).toBeVisible();

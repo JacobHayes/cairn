@@ -6,6 +6,8 @@
 import { expect, type Page } from "@playwright/test";
 
 import { containmentProblems, ellipsised } from "./containment.ts";
+import { contrastReport } from "./contrast.ts";
+import { edgeProblems, pageHeightProblems } from "./edges.ts";
 import { keyProblems } from "./internal-ids.ts";
 import { classesOf, snapshotOf, upFrom, type Part, type Snapshot } from "./snapshot.ts";
 import { titleProblems } from "./tips.ts";
@@ -70,6 +72,8 @@ export interface Near {
   smallestHitAreas: { name: string; width: number; height: number }[];
   /** The font sizes in use, in px, with how many runs of text each sets. */
   fontSizes: Record<string, number>;
+  /** The five lowest contrast ratios among the text the rule could decide. */
+  lowestContrast: { words: string; ratio: number }[];
 }
 
 /** The page as it stands, against every rule, and what came near them. */
@@ -87,6 +91,11 @@ export async function observe(page: Page): Promise<Observed> {
   if (!(floor > 0)) {
     throw new Error("the --type-label-size token is not defined");
   }
+  const snoozed = Number.parseFloat(await page.evaluate(() => getComputedStyle(document.documentElement).getPropertyValue("--opacity-snoozed")));
+  if (!(snoozed > 0)) {
+    throw new Error("the --opacity-snoozed token is not defined");
+  }
+  const contrast = contrastReport(snapshot, snoozed);
   const sizes: Record<string, number> = {};
   for (const { size } of textRuns(snapshot)) {
     sizes[String(size)] = (sizes[String(size)] ?? 0) + 1;
@@ -98,12 +107,16 @@ export async function observe(page: Page): Promise<Observed> {
       "a native tooltip": titleProblems(snapshot),
       "controls under the touch target": touch.problems,
       "the page scrolling sideways": pageScrollProblems(snapshot),
+      "the page scrolling down at a desktop width": pageHeightProblems(snapshot),
+      "content past the window's edge": edgeProblems(snapshot),
+      "text under the contrast floor": contrast.problems,
       "text under the type floor": textUnderFloor(snapshot, floor),
     },
     near: {
       ellipsised: ellipsised(snapshot).slice(0, 10),
       smallestHitAreas: touch.sizes.sort((a, b) => a.width * a.height - b.width * b.height).slice(0, 5),
       fontSizes: Object.fromEntries(Object.entries(sizes).sort((a, b) => Number(a[0]) - Number(b[0]))),
+      lowestContrast: contrast.lowest,
     },
   };
 }

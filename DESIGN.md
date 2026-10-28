@@ -85,7 +85,7 @@ The hierarchy is the order of the steps. In light, paper is the lightest, then t
 | `--color-muted` | `--n-8` (dark: `--n-5`) | secondary text (AA on the header band, and under a diff fill) |
 | `--color-border` | `--n-4` | hairlines, row rules, separators, chart gridlines |
 | `--color-error` | `#b8342c` | text: 4.5:1 on paper and the band (dark: `#f07a70`) |
-| `--color-success` | `#1e7853` | text: 4.5:1 on paper (dark: `#45c08c`) |
+| `--color-success` | `#1b7050` | text: 4.5:1 on paper and on the band (dark: `#45c08c`) |
 | `--color-warning` | `#8a5608` | text: 4.5:1 on paper and the band (dark: `#e0a23c`) |
 
 ### Derived
@@ -121,7 +121,7 @@ Both themes meet these, and `web/app/src/ui/tokens.test.ts` parses `design/token
 | --- | --- |
 | text and muted on surface and on band, muted on ground, and chrome ink, muted and brand on chrome | 4.5:1 |
 | `--color-frame` on ground and on sunken | 3:1 |
-| error, warning on surface and on band; success on surface (they are set as text) | 4.5:1 |
+| error, warning, success on surface and on band (they are set as text) | 4.5:1 |
 | text and muted over `--color-add`, `--color-change` and `--color-del`, each on paper, band, ground and sunken, and error, warning and success over them on paper (a marked card or row keeps its text legible) | 4.5:1 |
 | `--color-edge` on ground and on surface | 2:1 |
 | surface on ground (a visible step before any border) | 1.08:1 |

@@ -3,6 +3,8 @@
 import { readFileSync } from "node:fs";
 import { expect, it } from "vitest";
 
+import { contrastRatio } from "./wcag.ts";
+
 const css = readFileSync(new URL("../../../../design/tokens.css", import.meta.url), "utf8").replace(/\/\*[\s\S]*?\*\//g, "");
 
 type Theme = "light" | "dark";
@@ -72,15 +74,9 @@ function over(layers: string[], theme: Theme): [number, number, number] {
   return under;
 }
 
-function luminance(rgb: [number, number, number]): number {
-  const [r = 0, g = 0, b = 0] = rgb.map((c) => (c <= 0.03928 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4));
-  return 0.2126 * r + 0.7152 * g + 0.0722 * b;
-}
-
 /** The contrast of the opaque ink `fg` on the ground stacked from `bg`, bottom layer first. */
 function ratio(theme: Theme, fg: string, bg: string[]): number {
-  const [hi = 0, lo = 0] = [luminance(over([fg], theme)), luminance(over(bg, theme))].sort((x, y) => y - x);
-  return (hi + 0.05) / (lo + 0.05);
+  return contrastRatio(over([fg], theme), over(bg, theme));
 }
 
 // [foreground, background layers (bottom first), floor]
@@ -95,6 +91,7 @@ const floors: [string, string[], number][] = [
   ["color-warning", ["color-surface"], 4.5],
   ["color-warning", ["color-band"], 4.5],
   ["color-success", ["color-surface"], 4.5],
+  ["color-success", ["color-band"], 4.5],
   ["chrome-ink", ["chrome-bg"], 4.5],
   ["chrome-muted", ["chrome-bg"], 4.5],
   ["chrome-brand", ["chrome-bg"], 4.5],

@@ -11,6 +11,7 @@ import { join, resolve } from "node:path";
 import { expect, test } from "./test.ts";
 
 import { closeFolds, openFolds } from "./folds.ts";
+import { focusRingProblems } from "./focus.ts";
 import { capture } from "./invariants.ts";
 import { FIXTURE_SUBJECT, SCREENS, seedProposals, type State, type Subject } from "./screenshots.ts";
 import { open, settled } from "./shell.ts";
@@ -66,6 +67,13 @@ for (const [viewport, size] of Object.entries(VIEWPORTS)) {
               const file = `${address}-${state.name}-${viewport}-${theme}.png`;
               await capture(page, join(dir, file), { structure: true });
               const url = new URL(page.url());
+              // One Tab walk per screen, on its first state: it moves focus and opens tips, so the state is reached again after.
+              if (viewport === "desktop" && theme === "light" && state === SCREENS[address][0]) {
+                const ringless = await focusRingProblems(page);
+                await open(page, "browser", "/");
+                await reachState();
+                expect(ringless, `${address} ${state.name} focus rings`).toEqual([]);
+              }
               if ((await openFolds(page)) > 0) {
                 try {
                   await expectStructure(page, `${file} with its folds open`);

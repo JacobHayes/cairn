@@ -7,7 +7,7 @@
 import type { Page } from "@playwright/test";
 
 /** The computed styles the rules read. Each is a key of `Box.style`. */
-const STYLES = ["font-size", "font-family", "visibility", "display", "position", "overflow-x", "overflow-y", "text-overflow", "-webkit-line-clamp", "clip-path", "pointer-events", "transform"] as const;
+const STYLES = ["font-size", "font-family", "visibility", "display", "position", "overflow-x", "overflow-y", "text-overflow", "-webkit-line-clamp", "clip-path", "pointer-events", "transform", "color", "background-color", "background-image", "opacity"] as const;
 
 export type StyleName = (typeof STYLES)[number];
 

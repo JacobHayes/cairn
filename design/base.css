@@ -810,7 +810,8 @@ svg.chart .datum-line {
   color: var(--color-text);
   border-bottom-color: var(--color-text);
 }
-.segmented label:has(input:focus-visible) {
+.segmented label:has(input:focus-visible),
+.segmented button:focus-visible {
   outline: 2px solid var(--color-accent);
   outline-offset: -2px;
 }

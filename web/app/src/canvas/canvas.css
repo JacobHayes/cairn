@@ -952,6 +952,20 @@
   fill: var(--color-text);
 }
 
+/* A line the keyboard reaches takes the accent at 2.5px: its stroke is its ring (an outline would box the whole diagonal). */
+.react-flow__edge:focus-visible .line .react-flow__edge-path {
+  stroke: var(--color-accent);
+  stroke-width: 2.5px;
+}
+
+.react-flow__edge:focus-visible .line .line-marker {
+  stroke: var(--color-accent);
+}
+
+.react-flow__edge:focus-visible .line-requires .line-marker {
+  fill: var(--color-accent);
+}
+
 .line-selected .react-flow__edge-path,
 .line-selected .line-marker {
   stroke: var(--color-accent);

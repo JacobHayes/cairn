@@ -21,7 +21,7 @@ export function isBounded(part: Part): boolean {
 }
 
 /** What the rules look at: elements Chrome drew, outside every `data-overhang` subtree's own checks. */
-function seen(snapshot: Snapshot): Part[] {
+export function seen(snapshot: Snapshot): Part[] {
   return snapshot.nodes.filter((part) => {
     const box = part.box;
     if (box === undefined || part.tag.startsWith("#") || part.tag.startsWith("::") || box.width <= 0 || box.height <= 0 || box.style.visibility !== "visible" || "data-overhang" in part.attr) {
@@ -144,10 +144,30 @@ function cutProblems(drawn: Part[]): string[] {
   return found;
 }
 
+/** A card inside a container card on the canvas: the canvas places it freely (its viewport ends the walk above), though DESIGN's containers hold their children. Each is held to its parent's box, drawn whole. */
+function cardProblems(drawn: Part[]): string[] {
+  const cards = new Map(drawn.filter((part) => part.attr["data-testid"] === "node-card").map((part) => [part.attr["data-node"], part]));
+  return drawn.flatMap((card) => {
+    const parent = cards.get(card.attr["data-parent"]);
+    const [inner, outer] = [card.box, parent?.box];
+    if (card.attr["data-testid"] !== "node-card" || parent === undefined || inner === undefined || outer === undefined) {
+      return [];
+    }
+    const out = [
+      ["left", outer.x - inner.x],
+      ["right", inner.x + inner.width - (outer.x + outer.width)],
+      ["top", outer.y - inner.y],
+      ["bottom", inner.y + inner.height - (outer.y + outer.height)],
+    ] as const;
+    const over = out.filter(([, by]) => by > 0.5).map(([side, by]) => `${side} by ${String(Math.round(by * 10) / 10)}px`);
+    return over.length === 0 ? [] : [`${nameOf(card)} sticks out of its container ${nameOf(parent)}: ${over.join(", ")}`];
+  });
+}
+
 /** What sticks out of its box or is cut without a sign on `snapshot`: one line each, naming the element, its text and its box, and the box it escaped. */
 export function containmentProblems(snapshot: Snapshot): string[] {
   const drawn = seen(snapshot);
-  return [...boxProblems(drawn, 0.5), ...cutProblems(drawn)];
+  return [...boxProblems(drawn, 0.5), ...cardProblems(drawn), ...cutProblems(drawn)];
 }
 
 /** What is cut by a sign (an ellipsis or a clamp) and is cut now: the near misses of the rule above. */

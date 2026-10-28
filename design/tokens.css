@@ -31,7 +31,7 @@
   --color-muted: light-dark(var(--n-8), var(--n-5)); /* AA (4.5:1) on the band */
   --color-border: light-dark(var(--n-4), var(--n-9)); /* hairlines */
   --color-error: light-dark(#b8342c, #f07a70);
-  --color-success: light-dark(#1e7853, #45c08c);
+  --color-success: light-dark(#1b7050, #45c08c);
   --color-warning: light-dark(#8a5608, #e0a23c);
   --radius-none: 0;
   --radius-sm: 0;

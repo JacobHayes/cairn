@@ -432,13 +432,13 @@ test("the window does not scroll: the head stays, a popover scrolls inside itsel
   for (const address of ["list?frontier=1", "list"]) {
     await openAt(page, "browser", "j_vendor_eval", address, { fixedToday: FIXED_TODAY });
     await expect(page.getByTestId("journey-header")).toBeVisible();
-    expect(await whenSettled(page, () => page.evaluate(() => document.documentElement.scrollHeight)), address).toBe(800);
+    await checkpoint(page, address);
   }
   // A popover taller than the room below it scrolls inside itself, not the window.
   await page.setViewportSize({ width: 1280, height: 500 });
   await openAt(page, "browser", "j_vendor_eval", "list", { fixedToday: FIXED_TODAY });
   await openFilter(page);
-  expect(await whenSettled(page, () => page.evaluate(() => document.documentElement.scrollHeight))).toBe(500);
+  await checkpoint(page, "the Filter in a short window");
   // The View picker sits on the title's row, at the same right edge on every view, between 720 and 1100px.
   await page.setViewportSize({ width: 1024, height: 700 });
   const edges: Record<string, number> = {};
