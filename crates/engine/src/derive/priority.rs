@@ -84,7 +84,6 @@ pub struct Priority {
     /// Per node: undecided (Gating), so discounted.
     undecided: Vec<bool>,
     /// Per node: relevant or undecided.
-    in_scope: Vec<bool>,
     /// Per node: in the rank normalization set (Priority).
     normalized: Vec<bool>,
     /// Per node: what it counts toward gravity, in millionths.
@@ -124,7 +123,6 @@ impl Priority {
             words: keys.len().div_ceil(64),
             weights: Vec::new(),
             undecided: Vec::new(),
-            in_scope: Vec::new(),
             normalized: Vec::new(),
             counted: Vec::new(),
             downstream: Vec::new(),
@@ -167,12 +165,10 @@ impl Priority {
         let weight = node.map_or(0, |node| node.effective_weight().get());
         let relevance = early.relevance.value(key);
         let group = node.is_some_and(|node| node.kind() == NodeKind::Group);
-        let in_scope = relevance != Relevance::NotRelevant;
-        let open = in_scope && !blocking.closed(key);
+        let open = blocking.open(key);
         let undecided = relevance == Relevance::Undecided;
         self.weights.push(weight);
         self.open.push(open);
-        self.in_scope.push(in_scope);
         self.undecided.push(undecided);
         self.normalized.push(open && !group);
         let counted = if open {

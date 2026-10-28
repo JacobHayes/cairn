@@ -110,7 +110,7 @@ impl<'a> DerivedJourney<'a> {
     fn open_decision(&self, key: &NodeKey) -> bool {
         self.node(key).kind() == NodeKind::Decision
             && self.state(key) == State::Open
-            && !self.derived.blocking().closed(key)
+            && self.derived.open(key)
     }
 
     /// The nodes beneath `container` (every node when none), in tree order: each node before

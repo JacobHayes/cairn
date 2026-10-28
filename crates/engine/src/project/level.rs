@@ -579,7 +579,7 @@ impl<'a> DerivedJourney<'a> {
         let relevant_open: Vec<&NodeKey> = children
             .iter()
             .filter(|child| relevance.value(child) == Relevance::Relevant)
-            .filter(|child| !blocking.closed(child))
+            .filter(open)
             .collect();
         RollUp {
             ready_to_finish: self.node(key).kind() != NodeKind::Group

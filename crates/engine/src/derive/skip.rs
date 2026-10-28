@@ -14,8 +14,8 @@
 //! work satisfies dependencies is blocking's to decide (2.4: `deps_done` reads it).
 //!
 //! Cost at `node_count_max`: the inherited skips are one walk down the tree, O(nodes); kept
-//! work is a walk up from each kept node, at most `containment_depth_max` steps, so at most
-//! 2,000 x 16 steps and as many entries.
+//! work and the covered counts are each a walk up from a node, at most `containment_depth_max`
+//! steps, so at most 2,000 x 16 steps and as many entries.
 
 use std::collections::{BTreeMap, BTreeSet};
 
@@ -174,40 +174,34 @@ pub(crate) fn pass(
     skips
 }
 
-/// The items a skip of each container covers: one walk down from every container, stopping at
-/// a kept node (its subtree is exempt) and at a node that skips what is beneath it (those
-/// items are its own). The depth limit bounds how many walks reach any one node.
+/// The items a skip of each container covers, counted from the items up: each in-scope,
+/// non-terminal item that is not kept adds one to every container above it, until the walk
+/// reaches a kept node (its subtree is exempt from the skips above it) or a node that skips
+/// what is beneath it (those items are its own). The depth limit bounds each walk.
 fn covered(graph: &Graph, relevances: &Relevances) -> BTreeMap<NodeKey, u32> {
     let document = graph.document();
     let tree = graph.tree();
-    let mut counts = BTreeMap::new();
-    for container in document
-        .nodes
-        .values()
-        .map(|node| &node.key)
-        .filter(|key| tree.is_container(key))
-    {
-        let mut count = 0_u32;
-        let mut stack: Vec<&NodeKey> = tree.children(container).iter().collect();
-        while let Some(key) = stack.pop() {
-            let Some(node) = document.nodes.get(key) else {
-                continue;
-            };
-            if kept(document, key) {
-                continue;
-            }
-            if node.kind() != NodeKind::Group
-                && !stored_state(document, node).is_terminal()
-                && relevances.in_scope(key)
-            {
-                count += 1;
-            }
-            if !skips_beneath(document, node) {
-                stack.extend(tree.children(key));
-            }
+    let mut counts: BTreeMap<NodeKey, u32> = BTreeMap::new();
+    for node in document.nodes.values() {
+        let key = &node.key;
+        if node.kind() == NodeKind::Group
+            || stored_state(document, node).is_terminal()
+            || !relevances.in_scope(key)
+            || kept(document, key)
+        {
+            continue;
         }
-        if count > 0 {
-            counts.insert(container.clone(), count);
+        let mut below = key;
+        while let Some(container) = tree.parent(below) {
+            *counts.entry(container.clone()).or_default() += 1;
+            let holds = document
+                .nodes
+                .get(container)
+                .is_some_and(|found| skips_beneath(document, found));
+            if kept(document, container) || holds {
+                break;
+            }
+            below = container;
         }
     }
     counts

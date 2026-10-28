@@ -397,7 +397,7 @@ fn an_effectively_skipped_decision_is_not_open() {
     );
     let derive = Derive::of(records, support::JOURNEY);
     let journey = derive.journey();
-    assert!(derive.derived.blocking().closed(&key("n_d")));
+    assert!(!derive.derived.open(&key("n_d")));
     assert_eq!(journey.status_summary().open_decisions.len(), 0);
     let snapshot = journey
         .snapshot(

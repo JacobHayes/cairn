@@ -41,7 +41,7 @@ pub(super) fn diagnose(blocking: &Blocking, sweep: &Sweep<'_>) -> Option<Stalled
                 .graph
                 .node(key)
                 .is_none_or(|node| node.kind() == NodeKind::Group);
-            !group && !flags.closed && sweep.early.relevance.in_scope(key)
+            !group && flags.open
         })
         .map(|(key, _)| key)
         .collect();

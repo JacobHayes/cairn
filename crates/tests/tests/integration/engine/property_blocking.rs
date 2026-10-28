@@ -26,7 +26,7 @@ mod property {
             let blocking = derived.blocking();
             let mut actionable = Vec::new();
             for (key, node) in graph.document().nodes.as_map() {
-                let open = derived.relevance().in_scope(key) && !blocking.closed(key);
+                let open = blocking.open(key);
                 prop_assert_eq!(blocking.blocked(key), open && !blocking.deps_done(key), "{}", key);
                 let expected = open && blocking.deps_done(key) && node.kind() != NodeKind::Group
                     && derived.relevance().value(key) == Relevance::Relevant;
@@ -57,7 +57,7 @@ mod property {
             let derived = derived(&graph);
             let blocking = derived.blocking();
             let open_work = graph.document().nodes.as_map().iter().any(|(key, node)| {
-                node.kind() != NodeKind::Group && derived.relevance().in_scope(key) && !blocking.closed(key)
+                node.kind() != NodeKind::Group && blocking.open(key)
             });
             prop_assert_eq!(open_work, !blocking.frontier().is_empty());
             if let Some(stalled) = blocking.stalled() {

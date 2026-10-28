@@ -43,7 +43,7 @@ mod property {
     /// undecided, when it is in scope and nothing is left to do on it.
     fn counted(graph: &Graph, derived: &Derived, key: &NodeKey) -> u64 {
         let relevance = derived.relevance().value(key);
-        if relevance == Relevance::NotRelevant || derived.blocking().closed(key) {
+        if !derived.open(key) {
             return 0;
         }
         let weight = u64::from(graph.node(key).unwrap().effective_weight().get());

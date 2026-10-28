@@ -140,7 +140,7 @@ impl DerivedJourney<'_> {
                 effective.map(|effective| (effective.date, effective.origin))
             } else if let Some(pin) = pins.get(key) {
                 Some((*pin, DateOrigin::Pin))
-            } else if derived.blocking().closed(key) {
+            } else if !derived.open(key) {
                 None
             } else {
                 dates.due(key).map(|due| (due, DateOrigin::Due))
@@ -316,7 +316,7 @@ impl DerivedJourney<'_> {
                 .map(|key| (*key).clone())
                 .collect()
         };
-        let open = |key: &NodeKey| !derived.blocking().closed(key);
+        let open = |key: &NodeKey| derived.open(key);
         let mut upcoming: Vec<UpcomingMilestone> = in_scope
             .iter()
             .filter(|key| self.node(key).kind() == NodeKind::Milestone && open(key))

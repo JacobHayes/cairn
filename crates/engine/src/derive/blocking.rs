@@ -71,13 +71,13 @@ use crate::graph::{Graph, Tree};
 #[allow(clippy::struct_excessive_bools)]
 #[derive(Clone, Debug, Default, PartialEq, Eq)]
 struct Flags {
-    /// Terminal, effectively skipped, done by its date, or for a group done or skipped: nothing
-    /// is left to do on it.
-    closed: bool,
+    /// D8: in scope and not closed, where closed is terminal, effectively skipped, done by its
+    /// date, or for a group done or skipped: still to do, and no answer has ruled it out.
+    open: bool,
     /// Its start is satisfied: every dependency it waits on satisfies dependencies (D4's
     /// `deps_done`).
     deps_done: bool,
-    /// In scope, not closed, and `deps_done` false.
+    /// Open and `deps_done` false.
     blocked: bool,
     /// D2.
     actionable: bool,
@@ -211,8 +211,7 @@ impl Blocking {
         let tree = sweep.graph.tree();
         for key in &self.frontier {
             let mut ancestor = tree.parent(key);
-            let open =
-                |above: &&NodeKey| sweep.early.relevance.in_scope(above) && !self.closed(above);
+            let open = |above: &&NodeKey| self.open(above);
             while let Some(above) = ancestor.filter(open) {
                 assert!(
                     !self.actionable(above),
@@ -275,11 +274,11 @@ impl Blocking {
         kind == NodeKind::Decision && self.actionable(key)
     }
 
-    /// Nothing is left to do on the node: terminal, effectively skipped, done by its date, or a
-    /// group that is done or skipped (D5: not "effectively unfinished").
+    /// D8: the node is still to do and in scope: nothing has closed it (finished, skipped, done
+    /// by its date, or a group whose finish is satisfied) and an answer has not ruled it out.
     #[must_use]
-    pub fn closed(&self, key: &NodeKey) -> bool {
-        self.flags_of(key).is_some_and(|flags| flags.closed)
+    pub fn open(&self, key: &NodeKey) -> bool {
+        self.flags_of(key).is_some_and(|flags| flags.open)
     }
 
     /// F1: a pending `auto_done` milestone that reads as done.
@@ -489,7 +488,7 @@ impl Sweep<'_> {
             state.skips_beneath(node.kind()) || self.early.skips.skipped_by(key).is_some();
         let closed = skipped || state.is_terminal() || by_date || (group && value(Point::Finish));
         let relevance = self.early.relevance.value(key);
-        let in_scope = relevance != Relevance::NotRelevant;
+        let in_scope = self.early.relevance.in_scope(key);
         let deps_done = value(Point::Start);
         let open = in_scope && !closed;
         let own = self.holding(key, satisfied);
@@ -499,7 +498,7 @@ impl Sweep<'_> {
             .then(|| self.date_ahead(node))
             .flatten();
         Flags {
-            closed,
+            open,
             deps_done,
             blocked: open && !deps_done,
             actionable,
@@ -518,9 +517,8 @@ impl Sweep<'_> {
     /// container whose snooze holds names the nearest such container, and is held by that
     /// snooze unless its own holds. O(nodes x depth), the walk bounded by the depth limit.
     fn hold_subtrees(&self, keys: &[NodeKey], flags: &mut [Flags]) {
-        for (held, key) in flags.iter_mut().zip(keys) {
-            let open = self.early.relevance.in_scope(key) && !held.closed;
-            held.holds_over = held.snoozed_own.clone().filter(|_| open);
+        for held in flags.iter_mut() {
+            held.holds_over = held.snoozed_own.clone().filter(|_| held.open);
         }
         if flags.iter().all(|held| held.holds_over.is_none()) {
             return;
@@ -530,9 +528,7 @@ impl Sweep<'_> {
             .iter()
             .enumerate()
             .map(|(at, key)| {
-                let open = self.early.relevance.in_scope(key)
-                    && flags.get(at).is_some_and(|held| !held.closed);
-                if !open {
+                if !flags.get(at).is_some_and(|held| held.open) {
                     return None;
                 }
                 holders_above(tree, keys, flags, key)

@@ -103,7 +103,7 @@ impl Derived {
     /// by its date, or a group whose finish is satisfied) and an answer has not ruled it out.
     #[must_use]
     pub fn open(&self, key: &NodeKey) -> bool {
-        self.relevance.in_scope(key) && !self.blocking.closed(key)
+        self.blocking.open(key)
     }
 
     /// C13, B11: the final milestone while it is in play: in scope and not skipped, still to do
