@@ -31,7 +31,7 @@ env:
 jobs:
   web:
     runs-on: ubuntu-latest
-    timeout-minutes: 90
+    timeout-minutes: 45
     # Only Stryker needs the Rust toolchain here (for the wasm module the tests read), not the
     # patina runner.
     env:

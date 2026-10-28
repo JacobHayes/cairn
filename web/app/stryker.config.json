@@ -4,6 +4,7 @@
   "vitest": { "configFile": "vitest.config.ts" },
   "concurrency": 4,
   "coverageAnalysis": "perTest",
+  "ignoreStatic": true,
   "tempDirName": "dist/mutation/box/web/app",
   "mutate": ["src/**/*.ts", "src/**/*.tsx", "!src/**/*.test.ts", "!src/**/*.test.tsx", "!src/**/*.test-support.ts", "!src/**/*.d.ts"],
   "mutator": { "excludedMutations": ["StringLiteral", "OptionalChaining"] },

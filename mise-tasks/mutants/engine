@@ -1,6 +1,7 @@
 #!/usr/bin/env -S bash -euo pipefail
-#MISE tools={"github:sourcefrog/cargo-mutants"="27.1.0", "github:nextest-rs/nextest"="0.9.148"}
+#MISE tools={"github:sourcefrog/cargo-mutants"="27.1.0", "github:nextest-rs/nextest"={version="0.9.148", version_prefix="cargo-nextest-"}}
 #MISE description="Mutation-test a slice of the engine with cargo-mutants: lists the mutants its tests leave alive in dist/mutation/engine-survivors.tsv"
+# (nextest tags its releases cargo-nextest-X.Y.Z, so mise needs the prefix to find 0.9.148.)
 # usage: mise run mutants:engine [SLICE [cargo-mutants option...]]   (a slice number, default this ISO week's;
 # options such as --file narrow the run further)
 # The engine has about 3,500 mutants and each costs a rebuild plus a test run, so a run takes a

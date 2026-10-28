@@ -8,12 +8,12 @@ Question: from the work of measuring four tools (cargo-mutants, StrykerJS, cargo
 |---|---|
 | cargo-machete | lint, every run |
 | knip | lint, every run |
-| StrykerJS | weekly in CI, over the whole web app, with the noisy mutators off |
+| StrykerJS | weekly in CI, over the whole web app, with the noisy mutators off and static mutants skipped |
 | cargo-mutants | weekly in CI, over one sixteenth of the engine (a stretch of consecutive mutants, the week's chosen by ISO week), under a time cap |
 
 Mutation testing runs weekly and feeds the weekly cleanup: the job (`.github/workflows/mutants.yml`) uploads each tool's survivors as a short list, and the cleanup reads them next to the test evidence when it decides what to cull or strengthen. Builders do not run it: a change that deletes tests is judged by the cull's own questions, not by a before-and-after score. A mutation result is evidence that a cut lost nothing, not proof of it.
 
-Both tools are tuned to be read, not gated. Stryker leaves out string-literal and optional-chaining mutants, the two kinds that were mostly noise in the measurements below. cargo-mutants runs the engine's tests under nextest, which stops at the first failing test, so a mutant the tests catch costs one test instead of the whole suite (15.7 s a mutant against 29.1 s in the same sample), and its build runs without the shared build cache's wrapper, which switched incremental compilation off. Survivors are listed with a file and line, what was mutated, and the tool's own id (`scripts/mutation-survivors`).
+Both tools are tuned to be read, not gated. Stryker leaves out string-literal and optional-chaining mutants, the two kinds that were mostly noise in the measurements below, and static mutants (top-level code that runs once; 9% of the app's mutants, but 92% of the run time because each runs every test). Without that the first weekly run did not finish in 90 minutes; with it the whole app takes about 20 minutes. cargo-mutants runs the engine's tests under nextest, which stops at the first failing test, so a mutant the tests catch costs one test instead of the whole suite (15.7 s a mutant against 29.1 s in the same sample), and its build runs without the shared build cache's wrapper, which switched incremental compilation off. Survivors are listed with a file and line, what was mutated, and the tool's own id (`scripts/mutation-survivors`).
 
 ## Numbers
 

@@ -6,7 +6,8 @@
 # is a mutant no test notices: a missing assertion, or an equivalent mutant
 # (decisions/2026-10-24-where-mutation-testing-runs.md). Stryker mutates a copy of the tree in
 # web/app/dist/mutation/box (ignored), never the checkout's own files, so it is safe to run
-# anywhere.
+# anywhere. Static mutants (top-level code that runs once) are left out in stryker.config.json:
+# they were 9% of the mutants and 92% of the run time, each one running every test.
 cd "$(dirname "$0")/../.."
 repo=$PWD
 args=()
@@ -25,6 +26,8 @@ rm -rf web/app/dist/mutation
 mkdir -p web/app/dist/mutation/box/web/app
 ln -s "$repo/web/wasm" web/app/dist/mutation/box/web/app/wasm
 ln -s "$repo/design" web/app/dist/mutation/box/web/design
-(cd web/app && nice "$repo/node_modules/.bin/stryker" run stryker.config.json ${args[@]+"${args[@]}"})
+# Vitest adds a GitHub annotation reporter when GITHUB_ACTIONS is set; every killed mutant
+# fails tests, and the annotations and step summary they would fill overflow the job's limits.
+(cd web/app && env -u GITHUB_ACTIONS nice "$repo/node_modules/.bin/stryker" run stryker.config.json ${args[@]+"${args[@]}"})
 scripts/mutation-survivors stryker web/app/dist/mutation/stryker.json >web/app/dist/mutation/web-survivors.tsv
 head -n 1 web/app/dist/mutation/web-survivors.tsv
