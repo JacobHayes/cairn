@@ -2,7 +2,7 @@
 // assistant about a journey or a route's draft, in the inspector column's ASSISTANT tab. A
 // message is one turn on the host; the reply shows with each write the assistant made: a
 // direct change with the nodes it wrote and what it newly caused (D7), linked to those nodes,
-// and a structural change, or one touching more than ten nodes, as a proposal to review in
+// and a structural change as a proposal to review in
 // proposal review (C14), where applying it is the user's click. Offered only when the host's
 // capabilities say there is an assistant (the in-browser host never has one). The panel opens
 // from a toggle in the screen's header or the tab, and stays open across screens in this tab; the message
@@ -108,6 +108,12 @@ function Written({ action, titleOf }: { action: AssistantAction; titleOf: TitleO
   switch (action.outcome) {
     case "applied":
       return <Applied action={action} titleOf={titleOf} />;
+    case "already_applied":
+      return (
+        <div className="assistant-write muted small" data-testid="assistant-already-applied" data-tool={action.tool}>
+          {toolWords(action.tool)} was already applied.
+        </div>
+      );
     case "proposed":
       return <Proposed action={action} />;
     case "discarded":
@@ -230,7 +236,7 @@ function Composer({ target, ready, sending, send }: { target: AssistantTarget; r
 function Empty() {
   return (
     <p className="muted" data-testid="assistant-empty">
-      Small changes are made directly and reported here. Changes to structure, or to more than ten nodes, come back as a proposal for you to review.
+      Changes are made directly and reported here. Changes to structure, or any change you ask to see first, come back as a proposal for you to review.
     </p>
   );
 }
@@ -272,7 +278,13 @@ function Conversing({ conversation, target, titleOf }: { conversation: Conversat
       </div>
       {failure === undefined ? null : (
         <p className="callout callout-bad" role="alert" data-testid="assistant-failed" data-status={failure.status}>
-          {failure.status === 503 ? "The assistant is busy; try again in a moment." : <Failed what="The message" verb="answered" error={kindOf(failure)} />}
+          {failure.status === 503 ? (
+            "The assistant is busy; try again in a moment."
+          ) : failure.status === 409 ? (
+            "A reply is still in progress in this conversation; wait for it before sending another message."
+          ) : (
+            <Failed what="The message" verb="answered" error={kindOf(failure)} />
+          )}
         </p>
       )}
       <Composer target={target} ready={read.status === "ready"} sending={sending !== undefined} send={send} />

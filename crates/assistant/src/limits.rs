@@ -3,10 +3,25 @@
 
 use std::time::Duration;
 
-/// Nodes one direct assistant write may touch (I5): "mark these three done" applies at once;
-/// past this a misheard request is expensive to undo, so the whole change becomes one
-/// proposal.
-pub const DIRECT_WRITE_NODE_COUNT_MAX: u32 = 10;
+/// Bytes of tool results a turn keeps and resends to the provider: every loop iteration
+/// sends the conversation again, so results kept whole make a turn's cost grow with the
+/// square of its reads. Past this the oldest results are replaced by a note that they were
+/// dropped, and the model reads again what it still needs. About 64 thousand tokens, well
+/// inside every current model's context beside the guide and the tool list.
+pub const TOOL_RESULT_BYTES_PER_TURN_MAX: u32 = 256 * 1024;
+
+/// Identical tool calls (same tool, same arguments) that may fail in one turn: the third
+/// ends the turn, since a model repeating a refused call is stuck and every repeat is
+/// billed.
+pub const TOOL_CALL_FAILURE_REPEAT_COUNT_MAX: u32 = 3;
+
+/// Retries of one provider call that was answered with a rate limit or a server error. A
+/// timeout is never retried: the provider may have billed the tokens.
+pub const PROVIDER_RETRY_COUNT_MAX: u32 = 2;
+
+/// The longest a provider may ask a retry to wait (its `Retry-After`); asked for longer, the
+/// call fails instead.
+pub const PROVIDER_RETRY_WAIT_MAX: Duration = Duration::from_secs(30);
 
 /// Tool calls run from one model reply: a reply asking for more is answered with a refusal
 /// for each call past this, so a reply cannot run past the turn's limits on tool calls
@@ -53,6 +68,11 @@ pub const DIALOGUE_REPLAY_BYTES_MAX: u32 = 4 * cairn_schema::limits::BODY_BYTES_
 /// (decisions/2026-10-06-the-write-wrapper-decides-on-the-patch-a-tool-would-submit.md).
 pub const PROVIDER_RESPONSE_BYTES_MAX: u32 = cairn_schema::limits::REQUEST_BYTES_MAX;
 
+// A call's retries, at their longest, fit in the call.
+const _: () = assert!(
+    PROVIDER_RETRY_WAIT_MAX.as_secs() * (PROVIDER_RETRY_COUNT_MAX as u64)
+        < PROVIDER_CALL_DURATION_MAX.as_secs()
+);
 // A provider call fits in a turn, several times over.
 const _: () = assert!(PROVIDER_CALL_DURATION_MAX.as_secs() * 4 <= TURN_DURATION_MAX.as_secs());
 // A conversation at its cap, every message at the body cap, is stored whole.

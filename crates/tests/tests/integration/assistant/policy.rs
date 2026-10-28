@@ -1,6 +1,6 @@
 //! The write wrapper's policy (I5, I7; PRD glossary, Structural change): every write tool
-//! the tool set lists is decided by mutation kind and destination, structural changes and
-//! bulk state changes never land directly, and applying a proposal is left to the user.
+//! the tool set lists is decided by mutation kind and destination, structural changes never
+//! land directly, and applying a proposal is left to the user.
 //! The tables iterate every write tool, so a write tool added without a case fails here.
 #![cfg(test)]
 
@@ -8,7 +8,7 @@ use crate::assistant::support;
 
 use std::collections::BTreeSet;
 
-use cairn_assistant::wrapper::{self, Action, Because, Decision, Ledger, Outcome, Policy};
+use cairn_assistant::wrapper::{self, Action, Because, Decision, Outcome, Policy};
 use cairn_mcp::{ToolError, ToolSet};
 use serde_json::{Value, json};
 
@@ -16,16 +16,6 @@ use support::{World, assisting, user};
 
 const JOURNEY: &str = "j_vendor_eval";
 const ROUTE: &str = "vendor-evaluation";
-
-/// The weight-override patch: one `set_node_field` weight per node, to the journey.
-fn weights(nodes: &[&str], patch_id: &str, base: u64) -> Value {
-    let mutations: Vec<Value> = nodes
-        .iter()
-        .map(|node| json!({ "op": "set_node_field", "node": node, "value": { "weight": 3 } }))
-        .collect();
-    json!({ "patch": { "id": patch_id, "target": { "journey": JOURNEY }, "base_revision": base,
-        "mutations": mutations } })
-}
 
 const ELEVEN: [&str; 11] = [
     "n_access",
@@ -224,8 +214,7 @@ fn proposal_cases() -> Vec<Case> {
 /// Runs one call through the wrapper as a turn of its own.
 async fn run(world: &World, actor: &cairn_schema::Actor, name: &str, arguments: Value) -> Outcome {
     let store = world.store.as_ref();
-    let mut ledger = Ledger::default();
-    wrapper::run(&world.tools, store, actor, (name, arguments), &mut ledger).await
+    wrapper::run(&world.tools, store, actor, (name, arguments)).await
 }
 
 /// Whether two policies are the same, a refusal's reason aside.
@@ -408,53 +397,6 @@ async fn a_drafted_proposal_cannot_hold_a_proposal_edit() {
     assert_eq!(listed["count"], 0, "{listed}");
 }
 
-/// I5: a state change touching more than ten nodes is one proposal, so a misheard bulk
-/// request is seen whole; ten apply at once.
-#[tokio::test]
-async fn a_state_change_past_ten_nodes_becomes_one_proposal() {
-    let world = World::new();
-    let ann = user("u_ann");
-    world.vendor_journey(&ann).await;
-    let assistant = assisting("u_ann");
-    let eleven = run(
-        &world,
-        &assistant,
-        "apply_patch",
-        weights(&ELEVEN, "p_eleven", 1),
-    )
-    .await;
-    let Some(Action::Proposed {
-        proposal, because, ..
-    }) = eleven.action
-    else {
-        panic!("{eleven:?}");
-    };
-    assert_eq!(because, Because::TooManyNodes { count: Some(11) });
-    assert_eq!(world.journey_revision(JOURNEY).await, 1, "nothing landed");
-    let held = world
-        .ok(&ann, "get_proposal", json!({ "proposal": proposal }))
-        .await;
-    let mutations = held["proposal"]["draft"]["mutations"].as_array().unwrap();
-    assert_eq!(
-        mutations.len(),
-        ELEVEN.len(),
-        "the whole change, in one proposal"
-    );
-
-    let ten = run(
-        &world,
-        &assistant,
-        "apply_patch",
-        weights(&ELEVEN[..10], "p_ten", 1),
-    )
-    .await;
-    assert!(
-        matches!(ten.action, Some(Action::Applied { .. })),
-        "{ten:?}"
-    );
-    assert_eq!(world.journey_revision(JOURNEY).await, 2);
-}
-
 /// H5, I6: the same write asked twice is filed under the same proposal, not a second one.
 #[tokio::test]
 async fn a_write_asked_again_answers_the_same_proposal() {
@@ -468,7 +410,8 @@ async fn a_write_asked_again_answers_the_same_proposal() {
             &world,
             &assistant,
             "apply_patch",
-            weights(&ELEVEN, "p_again", 1),
+            json!({ "patch": { "id": "p_again", "target": { "journey": JOURNEY },
+                "base_revision": 1, "mutations": [add_node()] } }),
         )
         .await;
         let Some(Action::Proposed { proposal, .. }) = outcome.action else {
@@ -479,10 +422,11 @@ async fn a_write_asked_again_answers_the_same_proposal() {
     assert_eq!(proposals.len(), 1);
 }
 
-/// I5 (review 4.4 r1): removing notes counts the nodes they are on, read from the stored
-/// journey, as adding them does; skipping a container counts the subtree it skips (D1a).
+/// I5: a direct write reports the nodes it reaches: removing notes names the nodes they are
+/// on, read from the stored journey, as adding them does; skipping a container names the
+/// subtree it skips (D1a).
 #[tokio::test]
-async fn removals_and_skips_count_the_nodes_they_reach() {
+async fn removals_and_skips_report_the_nodes_they_reach() {
     let world = World::new();
     let lead = user("u_lead");
     let assistant = assisting("u_lead");
@@ -512,10 +456,10 @@ async fn removals_and_skips_count_the_nodes_they_reach() {
         ("apply_patch", &removal),
     )
     .await;
-    assert_eq!(
-        decided.map(|decision| decision.policy()),
-        Ok(Policy::Propose(Because::TooManyNodes { count: Some(12) }))
-    );
+    let Ok(Decision::Direct { nodes, .. }) = decided else {
+        panic!("{decided:?}");
+    };
+    assert_eq!(nodes.len(), twelve.len());
 
     let skip = json!({ "journey": JOURNEY, "node": "n_setup",
         "transition": { "skip": { "reason": "Not needed." } }, "patch_id": "p_skip_setup",
@@ -534,10 +478,10 @@ async fn removals_and_skips_count_the_nodes_they_reach() {
     assert!(nodes.contains(&"n_access".parse().unwrap()));
 }
 
-/// I5: moving notes onto one node counts the nodes they leave, read from the stored journey,
+/// I5: moving notes onto one node reports the nodes they leave, read from the stored journey,
 /// as well as the one they land on.
 #[tokio::test]
-async fn moving_notes_counts_the_nodes_they_leave() {
+async fn moving_notes_reports_the_nodes_they_leave() {
     let world = World::new();
     let lead = user("u_lead");
     let assistant = assisting("u_lead");
@@ -563,13 +507,10 @@ async fn moving_notes_counts_the_nodes_they_leave() {
         ("apply_patch", &patch),
     )
     .await;
-    let count = u32::try_from(ELEVEN.len() + 1).unwrap();
-    assert_eq!(
-        decided.map(|decision| decision.policy()),
-        Ok(Policy::Propose(Because::TooManyNodes {
-            count: Some(count)
-        }))
-    );
+    let Ok(Decision::Direct { nodes, .. }) = decided else {
+        panic!("{decided:?}");
+    };
+    assert_eq!(nodes.len(), ELEVEN.len() + 1);
 }
 
 /// H5: a direct write asked again under its patch id, its first answer lost, is answered
@@ -590,6 +531,10 @@ async fn a_direct_write_asked_again_is_answered_from_its_receipt() {
         "{first:?}"
     );
     let again = run(&world, &assistant, "apply_patch", note).await;
+    assert!(
+        matches!(again.action, Some(Action::AlreadyApplied { .. })),
+        "reported as already applied, not applied: {again:?}"
+    );
     let answer = again.answer.expect("answered from its receipt");
     assert_eq!(answer["status"], "already_applied", "{answer}");
     assert_eq!(world.journey_revision(JOURNEY).await, 2);

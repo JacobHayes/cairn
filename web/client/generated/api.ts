@@ -1093,6 +1093,13 @@ export interface components {
             /** @description The tool. */
             tool: string;
         } | {
+            /** @constant */
+            outcome: "already_applied";
+            /** @description The earlier write's receipt. */
+            receipt: components["schemas"]["AppliedReceipt"];
+            /** @description The tool. */
+            tool: string;
+        } | {
             /** @description Why it is a proposal. */
             because: components["schemas"]["Because"];
             /** @description Its destination, under which it is addressed. */
@@ -1278,22 +1285,6 @@ export interface components {
         Because: {
             /** @constant */
             reason: "structural";
-        } | {
-            /**
-             * Format: uint32
-             * @description The nodes it writes; absent when it may write every node of its domain.
-             */
-            count?: number | null;
-            /** @constant */
-            reason: "too_many_nodes";
-        } | {
-            /**
-             * Format: uint32
-             * @description The nodes the turn's direct writes and this one would touch together.
-             */
-            count: number;
-            /** @constant */
-            reason: "too_many_nodes_this_turn";
         } | {
             /** @constant */
             reason: "asked";
@@ -2139,6 +2130,21 @@ export interface components {
             message: string;
             /** @constant */
             status: "provider_failed";
+        } | {
+            /** @constant */
+            status: "provider_not_set_up";
+        } | {
+            /** @constant */
+            status: "reply_cut_off";
+        } | {
+            /** @constant */
+            status: "model_refused";
+        } | {
+            /** @constant */
+            status: "model_paused";
+        } | {
+            /** @constant */
+            status: "repeated_failure";
         } | {
             /** @constant */
             status: "iteration_limit";
@@ -4206,7 +4212,7 @@ export interface components {
          * @description The kinds of error that are not patch rejections. A rejected patch answers its `Rejection`
          *     instead.
          */
-        ProblemCode: "bad_request" | "unsupported_media_type" | "payload_too_large" | "target_mismatch" | "cannot_draft" | "not_found" | "page_moved" | "no_such_endpoint" | "method_not_allowed" | "user_only" | "tokens_not_accepted" | "overloaded" | "subscriber_limit" | "store_busy" | "timed_out" | "engine_panic" | "internal";
+        ProblemCode: "bad_request" | "unsupported_media_type" | "payload_too_large" | "target_mismatch" | "cannot_draft" | "not_found" | "page_moved" | "no_such_endpoint" | "method_not_allowed" | "user_only" | "tokens_not_accepted" | "overloaded" | "turn_in_progress" | "subscriber_limit" | "store_busy" | "timed_out" | "engine_panic" | "internal";
         /**
          * @description A container's progress over the work beneath it, counted over every proper
          *     descendant that is an item: not a group, in scope (relevant or undecided), and neither

@@ -141,11 +141,14 @@ Hard-coded named constants; validation rejects a patch that would exceed one, an
 | contradictory chains per rejection | 16 | Enough to see every distinct conflict a person would fix in one sitting; the rejection says when there were more. |
 | explanation entries per value in a server response | 50 | The calculation uses everything and the browser, which derives locally, sees everything; a server response carries the largest entries and a total and pages the rest. |
 | SSE subscribers per process | 256 | Tens of users with a few tabs each. |
-| nodes touched by one direct assistant write | 10 | "Mark these three done" applies at once; past ten a misheard request is expensive to undo, so the whole change becomes one proposal. |
 | assistant tool-loop iterations per turn | 32 | A runaway stop, not a budget. Structuring a journey is a few reads, one proposal, and a report; 32 is several times that. If a turn hits it, the tool set is wrong, not the number. |
 | request duration, API and MCP (not SSE or the assistant) | 5 s | Typical requests take tens of milliseconds; the heaviest, an import at the mutation limit, about a second. Past five seconds something is stuck. |
 | assistant provider call | 120 s | One non-streamed model response, including a long proposal; past this the provider is down and the turn reports it. |
 | assistant turn | 10 min | The iteration limit at typical provider latency, with room. |
+| assistant tool-result bytes kept per turn | 256 KiB | Every loop iteration resends the whole exchange, so results kept whole make a turn's cost grow with the square of its reads. Past this the oldest results are replaced by a note that they were dropped; about 64 thousand tokens. |
+| identical failing tool calls per turn | 3 | The same tool with the same arguments failing again is a stuck model, and every repeat is billed; the third failure ends the turn. |
+| assistant provider call retries | 2 | A rate limit (429) or a server error (5xx, 529 included) is retried with jittered backoff, inside the turn's limits. A timeout is never retried: the tokens may already be billed. |
+| longest `Retry-After` honoured | 30 s | A provider asking for a longer wait fails the call at once rather than holding the turn. |
 | store connection acquire | 5 s | Commits take milliseconds; five seconds of waiting is contention, which at this scale is a bug. |
 | outbound sign-in provider call (OIDC, Tailscale whois, IAP key set, Google token exchange), and a whole request to the IAP relay's endpoints | 10 s | A sign-in provider that slow is down; the login fails. |
 | requests in flight at the IAP relay's endpoints, per process | 16 | Each sign-in or refresh is one short request; the token endpoint, registration and the metadata are reachable without IAP, so a flood of them holds at most this many of the 128 and signed-in requests keep the rest. |

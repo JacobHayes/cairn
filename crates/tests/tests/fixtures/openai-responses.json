@@ -45,7 +45,8 @@
         "include": [
           "reasoning.encrypted_content"
         ],
-        "prompt_cache_key": "cairn-assistant"
+        "prompt_cache_key": "cairn-assistant",
+        "max_output_tokens": 8192
       },
       "response": {
         "id": "resp_68af402f9fbc8193a8b5e5b0a0a6e2c3",
@@ -135,7 +136,8 @@
         "include": [
           "reasoning.encrypted_content"
         ],
-        "prompt_cache_key": "cairn-assistant"
+        "prompt_cache_key": "cairn-assistant",
+        "max_output_tokens": 8192
       },
       "response": {
         "id": "resp_68af4031c3d48193b2b1f51c2a9f7c3e",

@@ -45,7 +45,7 @@ out_of_reach=(
   service-proposal-refreshed-against-destination
   # 4.4's assistant: its tool loop, turn limits, and write wrapper. The testbed never drives
   # the assistant, so no turn runs.
-  assistant-bulk-write-proposed
+  assistant-structural-write-proposed
   assistant-direct-write-applied
   assistant-iteration-limit-reached
   assistant-provider-call-timed-out

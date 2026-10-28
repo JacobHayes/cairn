@@ -302,10 +302,10 @@ mod in_process {
 
     /// I5, I7, H2, D7, PRD Success criteria: a conversation over HTTP. An empty
     /// journey with no route is structured through one proposal the user applies; a state
-    /// change applies directly with its consequences; a request touching more than ten
-    /// nodes becomes one proposal; and a provider that stops answering is reported.
+    /// change applies directly with its consequences; and a provider that stops answering is
+    /// reported.
     #[tokio::test(start_paused = true)]
-    async fn a_conversation_structures_reports_proposes_and_times_out() {
+    async fn a_conversation_structures_reports_and_times_out() {
         let provider = scripted(Vec::new());
         let world = with_assistant(&provider).await;
         let ann = world.vendor_after(1).await;
@@ -315,7 +315,6 @@ mod in_process {
 
         structure_an_ad_hoc_journey(&world, &provider, &ann).await;
         answer_directly(&world, &provider, &ann).await;
-        reweigh_in_bulk(&world, &provider, &ann).await;
         time_out(&world, &provider, &ann).await;
     }
 
@@ -396,36 +395,19 @@ mod in_process {
         assert_eq!(world.revision(JOURNEY).await, 2, "the answers landed");
     }
 
-    /// Eleven weight overrides drafted as one proposal, nothing landing (I5).
-    async fn reweigh_in_bulk(world: &World, provider: &ScriptedProvider, ann: &Transport) {
-        let nodes = [
-            "n_access",
-            "n_plan",
-            "n_plan_draft",
-            "n_plan_review",
-            "n_workload",
-            "n_baseline",
-            "n_criteria",
-            "n_partner_results",
-            "n_findings",
-            "n_final_report",
-            "n_decision_meeting",
-        ];
-        let weights: Vec<Value> = nodes
-            .iter()
-            .map(|node| json!({ "op": "set_node_field", "node": node, "value": { "weight": 2 } }))
-            .collect();
-        let reweigh = json!({ "patch": { "id": "p_reweigh", "target": { "journey": JOURNEY },
-            "base_revision": 2, "mutations": weights } });
-        provider.push([
-            Step::call("apply_patch", reweigh),
-            Step::say("That touches eleven nodes, so it is a proposal for you to review."),
-        ]);
-        let said = json!({ "message": "Lower the weight of every work item to 2." });
-        let reply = post(ann, "/api/journeys/j_vendor_eval/assistant", &said).await;
-        let turn: TurnReply = ok(&reply);
-        assert!(matches!(turn.actions.as_slice(), [Action::Proposed { .. }]));
-        assert_eq!(world.revision(JOURNEY).await, 2, "nothing landed");
+    /// A message sent while a reply in the same conversation is still being written is told
+    /// to wait, with its own problem code, not the one for an overloaded process.
+    #[tokio::test(start_paused = true)]
+    async fn a_message_sent_during_a_reply_is_told_to_wait() {
+        let provider = scripted(vec![Step::Hang]);
+        let world = with_assistant(&provider).await;
+        let ann = world.vendor_after(1).await;
+        let said = json!({ "message": "Hello." });
+        let target = at::ASSISTANT_JOURNEY.path_with(&[JOURNEY]);
+        let (_, again) = tokio::join!(post(&ann, &target, &said), post(&ann, &target, &said));
+        assert_eq!(again.status, StatusCode::CONFLICT);
+        let problem = again.json::<Problem>().unwrap();
+        assert_eq!(problem.error, ProblemCode::TurnInProgress);
     }
 
     /// A provider that stops answering, after a write that stands.

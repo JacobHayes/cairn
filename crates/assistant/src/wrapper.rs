@@ -5,12 +5,8 @@
 //!
 //! - structural (PRD glossary, Structural change; every write to a route or its draft) is
 //!   drafted as one proposal instead, against the same destination and revision;
-//! - state touching more than [`DIRECT_WRITE_NODE_COUNT_MAX`] nodes ([`touched_nodes`]) is
-//!   drafted as one proposal too, so a misheard bulk request is seen whole before it lands;
-//! - any other state change applies directly, as one patch, and is reported with its
-//!   consequences (D7), as long as the turn's direct writes together stay within the same
-//!   limit: a bulk request split into many calls is still one change, and what would carry
-//!   the turn past the limit is drafted as one proposal ([`Ledger`]).
+//! - any other state change applies directly, as one patch, like any external agent's, and
+//!   is reported with the nodes it touched ([`touched_nodes`]) and its consequences (D7).
 //!
 //! Each tool says what it writes ([`Writes`]), and the wrapper decides by that: the proposal
 //! tools draft proposals already and pass through. Applying a proposal is the user's click
@@ -34,10 +30,7 @@ use serde::{Deserialize, Serialize};
 use serde_json::{Value, json};
 use sha2::{Digest, Sha256};
 
-pub use crate::ledger::Ledger;
 pub use crate::touched::touched_nodes;
-
-use crate::limits::DIRECT_WRITE_NODE_COUNT_MAX;
 
 // PRD: I7.
 /// Why the assistant never runs a tool that writes `writes`, when it is the user's to do;
@@ -60,7 +53,7 @@ pub const fn refusal(writes: Writes) -> Option<&'static str> {
 pub enum Policy {
     /// A read, or a name no tool has: passed through.
     Read,
-    /// A state change within the node limit: applied as one patch.
+    /// A state change: applied as one patch.
     Direct,
     /// A write drafted as one proposal instead, and why.
     Propose(Because),
@@ -79,20 +72,6 @@ pub enum Because {
     // PRD: glossary, Structural change.
     /// It changes structure, or writes a route or its draft.
     Structural,
-    // PRD: I5.
-    /// It touches more nodes than one direct write may.
-    TooManyNodes {
-        /// The nodes it writes; absent when it may write every node of its domain.
-        #[serde(default, skip_serializing_if = "Option::is_none")]
-        count: Option<u32>,
-    },
-    // PRD: I5.
-    /// It would carry the nodes the turn's direct writes touch past the limit one change
-    /// may: with every later such write in the turn, one proposal.
-    TooManyNodesThisTurn {
-        /// The nodes the turn's direct writes and this one would touch together.
-        count: u32,
-    },
     /// The assistant drafted it as a proposal itself.
     Asked,
 }
@@ -131,6 +110,14 @@ pub enum Action {
         #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
         consequences: BTreeMap<JourneyId, Consequences>,
     },
+    /// A write whose patch id was applied before, with the same content: answered from that
+    /// write's receipt, and not applied again.
+    AlreadyApplied {
+        /// The tool.
+        tool: String,
+        /// The earlier write's receipt.
+        receipt: AppliedReceipt,
+    },
     /// Drafted as a proposal for the user to review and apply.
     Proposed {
         /// The tool.
@@ -157,7 +144,7 @@ impl Action {
     #[must_use]
     pub fn proposal(&self) -> Option<&ProposalId> {
         match self {
-            Action::Applied { .. } => None,
+            Action::Applied { .. } | Action::AlreadyApplied { .. } => None,
             Action::Proposed { proposal, .. } | Action::Discarded { proposal, .. } => {
                 Some(proposal)
             }
@@ -176,9 +163,8 @@ pub struct Outcome {
 
 /// The policy for the tool `name` with `arguments` as `actor`, with the domain patch a write
 /// would submit, and for a direct write the nodes it touches: what applying it at the
-/// current revision writes (as an overflow proposal would draft it), read against its
-/// journey in `store`. A state write that would be refused there is answered with that
-/// rejection.
+/// current revision writes, read against its journey in `store`. A state write that would be
+/// refused there is answered with that rejection.
 ///
 /// # Errors
 ///
@@ -214,32 +200,14 @@ pub async fn decide(
         Err(rejection) => return Ok(Decision::Rejected(rejection)),
     };
     let stored = stored_journey(store, drafted.patch()).await?;
-    let graph = stored.as_ref().map(|(graph, _)| graph);
-    let current = stored.as_ref().map(|(_, revision)| *revision);
-    Ok(match touched_nodes(drafted.patch(), &touched, graph) {
-        Some(nodes) if within_limit(nodes.len()) => Decision::Direct {
-            drafted,
-            nodes,
-            current,
-        },
-        nodes => {
-            let count = nodes.map(|nodes| u32::try_from(nodes.len()).unwrap_or(u32::MAX));
-            Decision::Propose(Because::TooManyNodes { count }, drafted)
-        }
-    })
+    // A write to a whole domain or graph names no nodes to link to.
+    let nodes = touched_nodes(drafted.patch(), &touched, stored.as_ref()).unwrap_or_default();
+    Ok(Decision::Direct { drafted, nodes })
 }
 
-/// Whether `count` nodes are within what one direct change may touch.
-pub(crate) fn within_limit(count: usize) -> bool {
-    u32::try_from(count).is_ok_and(|count| count <= DIRECT_WRITE_NODE_COUNT_MAX)
-}
-
-/// The journey `patch` targets, as stored, with its revision; `None` for another domain or
-/// a journey that does not exist yet.
-async fn stored_journey(
-    store: &dyn Store,
-    patch: &Patch,
-) -> Result<Option<(Graph, Revision)>, ToolError> {
+/// The journey `patch` targets, as stored; `None` for another domain or a journey that does
+/// not exist yet.
+async fn stored_journey(store: &dyn Store, patch: &Patch) -> Result<Option<Graph>, ToolError> {
     let PatchTarget::Journey(journey) = &patch.target else {
         return Ok(None);
     };
@@ -248,7 +216,7 @@ async fn stored_journey(
         message: error.to_string(),
     })?;
     Ok(match loaded {
-        Some(Document::Journey(journey)) => Some((journey.graph, journey.revision)),
+        Some(Document::Journey(journey)) => Some(journey.graph),
         _ => None,
     })
 }
@@ -258,14 +226,12 @@ async fn stored_journey(
 pub enum Decision {
     /// Passed through.
     Read,
-    /// Applied as one patch, if the turn's direct writes stay within the limit with it.
+    /// Applied as one patch.
     Direct {
         /// The patch.
         drafted: DomainPatch,
         /// The nodes it touches.
         nodes: BTreeSet<NodeKey>,
-        /// Its journey's current revision, when it targets one that exists.
-        current: Option<Revision>,
     },
     /// Drafted as one proposal of this patch's mutations instead.
     Propose(Because, DomainPatch),
@@ -293,13 +259,12 @@ impl Decision {
 }
 
 /// Runs the tool call `name` with `arguments` for `actor` (the assistant acting for its
-/// user, H2) through the policy, keeping the turn's direct writes in `ledger`.
+/// user, H2) through the policy.
 pub async fn run(
     tools: &ToolSet,
     store: &dyn Store,
     actor: &Actor,
     (name, arguments): (&str, Value),
-    ledger: &mut Ledger,
 ) -> Outcome {
     let decision = match decide(tools, store, actor, (name, &arguments)).await {
         Ok(decision) => decision,
@@ -309,26 +274,13 @@ pub async fn run(
         Decision::Refused(message) => not_run(ToolError::Refused { message }),
         Decision::Rejected(rejection) => not_run(ToolError::Rejected { rejection }),
         Decision::Propose(because, drafted) => propose(tools, actor, name, &drafted, because).await,
-        Decision::Direct {
-            drafted,
-            nodes,
-            current,
-        } => {
+        Decision::Direct { drafted, nodes } => {
             let domain = drafted.patch().target.domain();
-            let count = ledger.with(&domain, &nodes);
-            if !within_limit(count) {
-                return ledger
-                    .overflow(tools, actor, name, &drafted, current, &nodes)
-                    .await;
-            }
             let answer = tools.call(actor, name, arguments).await;
             let action = answer
                 .as_ref()
                 .ok()
                 .and_then(|output| applied(name, output, &nodes, (&drafted.patch().id, &domain)));
-            if action.is_some() {
-                ledger.wrote(&domain, nodes);
-            }
             patina_dst::sometimes!(action.is_some(), "assistant-direct-write-applied");
             Outcome { answer, action }
         }
@@ -395,8 +347,8 @@ async fn propose(
     match answer {
         Ok(output) => {
             patina_dst::sometimes!(
-                matches!(because, Because::TooManyNodes { .. }),
-                "assistant-bulk-write-proposed"
+                matches!(because, Because::Structural),
+                "assistant-structural-write-proposed"
             );
             let answer = json!({ "drafted_as_proposal": because, "proposal": output });
             Outcome {
@@ -487,15 +439,24 @@ fn applied(
     (patch_id, domain): (&PatchId, &Domain),
 ) -> Option<Action> {
     let written: WriteOutput = serde_json::from_value(output.clone()).ok()?;
+    let already = written.is_already_applied();
     let (revision, consequences) = written.into_parts();
-    Some(Action::Applied {
-        tool: tool.to_owned(),
-        receipt: AppliedReceipt {
+    let (tool, receipt) = (
+        tool.to_owned(),
+        AppliedReceipt {
             patch_id: patch_id.clone(),
             domain: domain.clone(),
             revision,
         },
-        nodes: nodes.iter().cloned().collect(),
-        consequences,
+    );
+    Some(if already {
+        Action::AlreadyApplied { tool, receipt }
+    } else {
+        Action::Applied {
+            tool,
+            receipt,
+            nodes: nodes.iter().cloned().collect(),
+            consequences,
+        }
     })
 }

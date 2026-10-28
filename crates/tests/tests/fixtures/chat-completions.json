@@ -38,7 +38,8 @@
               }
             }
           }
-        ]
+        ],
+        "max_tokens": 8192
       },
       "response": {
         "id": "chatcmpl-abc123",
@@ -126,7 +127,8 @@
               }
             }
           }
-        ]
+        ],
+        "max_tokens": 8192
       },
       "response": {
         "id": "chatcmpl-abc124",

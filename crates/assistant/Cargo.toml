@@ -1,6 +1,6 @@
 [package]
 name = "cairn-assistant"
-description = "The optional in-app assistant: a vendor-neutral provider trait with the Anthropic Messages, OpenAI Responses, and OpenAI-compatible chat-completions protocols, a server-side tool loop over the MCP tool set in process, and the write wrapper that turns structural and bulk writes into proposals."
+description = "The optional in-app assistant: a vendor-neutral provider trait with the Anthropic Messages, OpenAI Responses, and OpenAI-compatible chat-completions protocols, a server-side tool loop over the MCP tool set in process, and the write wrapper that turns structural writes into proposals."
 version.workspace = true
 edition.workspace = true
 rust-version.workspace = true
@@ -15,6 +15,7 @@ cairn-mcp.workspace = true
 cairn-schema.workspace = true
 cairn-service.workspace = true
 cairn-store.workspace = true
+jiff.workspace = true
 metrics.workspace = true
 patina-dst.workspace = true
 reqwest.workspace = true
@@ -29,7 +30,6 @@ url.workspace = true
 [dev-dependencies]
 axum.workspace = true
 cairn-engine.workspace = true
-jiff.workspace = true
 tokio = { workspace = true, features = ["macros", "net", "rt", "sync", "test-util", "time"] }
 
 [lints]

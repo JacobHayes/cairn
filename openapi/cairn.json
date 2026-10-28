@@ -45,6 +45,29 @@
             "type": "object"
           },
           {
+            "description": "A write whose patch id was applied before, with the same content: answered from that\nwrite's receipt, and not applied again.",
+            "properties": {
+              "outcome": {
+                "const": "already_applied",
+                "type": "string"
+              },
+              "receipt": {
+                "$ref": "#/components/schemas/AppliedReceipt",
+                "description": "The earlier write's receipt."
+              },
+              "tool": {
+                "description": "The tool.",
+                "type": "string"
+              }
+            },
+            "required": [
+              "outcome",
+              "tool",
+              "receipt"
+            ],
+            "type": "object"
+          },
+          {
             "description": "Drafted as a proposal for the user to review and apply.",
             "properties": {
               "because": {
@@ -647,48 +670,6 @@
             },
             "required": [
               "reason"
-            ],
-            "type": "object"
-          },
-          {
-            "description": "It touches more nodes than one direct write may.",
-            "properties": {
-              "count": {
-                "description": "The nodes it writes; absent when it may write every node of its domain.",
-                "format": "uint32",
-                "minimum": 0,
-                "type": [
-                  "integer",
-                  "null"
-                ]
-              },
-              "reason": {
-                "const": "too_many_nodes",
-                "type": "string"
-              }
-            },
-            "required": [
-              "reason"
-            ],
-            "type": "object"
-          },
-          {
-            "description": "It would carry the nodes the turn's direct writes touch past the limit one change\nmay: with every later such write in the turn, one proposal.",
-            "properties": {
-              "count": {
-                "description": "The nodes the turn's direct writes and this one would touch together.",
-                "format": "uint32",
-                "minimum": 0,
-                "type": "integer"
-              },
-              "reason": {
-                "const": "too_many_nodes_this_turn",
-                "type": "string"
-              }
-            },
-            "required": [
-              "reason",
-              "count"
             ],
             "type": "object"
           },
@@ -3554,6 +3535,71 @@
             "required": [
               "status",
               "message"
+            ],
+            "type": "object"
+          },
+          {
+            "description": "The provider refused the deployment's credential: the assistant is not set up.",
+            "properties": {
+              "status": {
+                "const": "provider_not_set_up",
+                "type": "string"
+              }
+            },
+            "required": [
+              "status"
+            ],
+            "type": "object"
+          },
+          {
+            "description": "The reply hit the output limit and is cut off; none of its tool calls ran.",
+            "properties": {
+              "status": {
+                "const": "reply_cut_off",
+                "type": "string"
+              }
+            },
+            "required": [
+              "status"
+            ],
+            "type": "object"
+          },
+          {
+            "description": "The model declined to answer.",
+            "properties": {
+              "status": {
+                "const": "model_refused",
+                "type": "string"
+              }
+            },
+            "required": [
+              "status"
+            ],
+            "type": "object"
+          },
+          {
+            "description": "The provider paused the reply, which the assistant does not continue; none of its\ntool calls ran.",
+            "properties": {
+              "status": {
+                "const": "model_paused",
+                "type": "string"
+              }
+            },
+            "required": [
+              "status"
+            ],
+            "type": "object"
+          },
+          {
+            "description": "The model kept repeating a tool call that failed.",
+            "properties": {
+              "status": {
+                "const": "repeated_failure",
+                "type": "string"
+              }
+            },
+            "required": [
+              "status"
             ],
             "type": "object"
           },
@@ -11062,6 +11108,11 @@
           {
             "const": "overloaded",
             "description": "The process is at its in-flight request limit; retry after the `Retry-After` delay.",
+            "type": "string"
+          },
+          {
+            "const": "turn_in_progress",
+            "description": "A reply in this assistant conversation is still in progress: wait for it, then send\nagain.",
             "type": "string"
           },
           {

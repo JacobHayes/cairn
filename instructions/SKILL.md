@@ -135,9 +135,10 @@ Kept work stays open and still holds the group's dependents; `reopen` removes th
 with children has no `mark_done`: complete it, and its children stay open as work of their
 own.
 
-Draft a **proposal** (`create_proposal`) when the change is structural (adding, removing, or
-moving nodes; edges; roles; conditions; date rules), when it touches many nodes, or when the
-person should see it whole first. A proposal has an id you choose (`pr_` and a slug), its
+Draft a **proposal** (`create_proposal`) when the person asks for one, when the change is
+structural (adding, removing, or moving nodes; edges; roles; conditions; date rules), or when
+it is large or ambiguous enough that the person should see it whole before it lands: Cairn has
+no undo, and a direct write has no cap on the nodes it touches. A proposal has an id you choose (`pr_` and a slug), its
 own editing revision, and the destination revision it was drafted against. Review it with
 `get_proposal` and `review`; a person applies it with `apply_proposal`. Upgrades, saving a
 journey as a route, and re-linking are always proposals (`upgrade`, `save_as_route`,

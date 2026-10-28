@@ -118,7 +118,8 @@ async fn converse(
     let reply = assistant.turn(actor, target, request.message).await;
     reply.map(Json).map_err(|error| {
         let code = match &error {
-            TurnError::Overloaded | TurnError::ConversationBusy => ProblemCode::Overloaded,
+            TurnError::Overloaded => ProblemCode::Overloaded,
+            TurnError::ConversationBusy => ProblemCode::TurnInProgress,
             TurnError::TargetMissing(_) => ProblemCode::NotFound,
             TurnError::TimedOut => ProblemCode::TimedOut,
             TurnError::Failed(_) => ProblemCode::Internal,

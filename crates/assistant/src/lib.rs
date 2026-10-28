@@ -2,8 +2,8 @@
 //! thing as an external agent with a different transport. A turn runs a server-side tool
 //! loop over the MCP tool set in process ([`Assistant::turn`]), as the assistant acting for
 //! its user, and every tool call passes through one write wrapper ([`wrapper`]): structural
-//! changes, and state changes touching more than ten nodes, become one proposal for the user
-//! to review; other state changes apply directly and are reported with their consequences.
+//! changes become one proposal for the user to review; state changes apply directly, like any
+//! external agent's, and are reported with their consequences.
 //!
 //! The model provider is a trait in Cairn's own types ([`Provider`]) with three wire
 //! protocols ([`protocol`]) and a scripted provider for tests ([`scripted`]). The
@@ -12,20 +12,24 @@
 #![forbid(unsafe_code)]
 
 pub mod conversation;
-mod ledger;
 pub mod limits;
 pub mod protocol;
 pub mod provider;
 pub mod scripted;
+pub mod tool_results;
 mod touched;
 mod turn;
 pub mod wrapper;
 
 pub use conversation::Target;
 pub use provider::{
-    Exchange, Message, Protocol, Provider, ProviderError, Reply, ToolCall, ToolResult, ToolSpec,
+    Exchange, Message, Protocol, Provider, ProviderError, Reply, Stop, ToolCall, ToolResult,
+    ToolSpec, Usage,
 };
-pub use turn::{ASSISTANT_AGENT, Assistant, Ended, TurnError, TurnReply, assistant_agent};
+pub use turn::{
+    ASSISTANT_AGENT, Assistant, Ended, PROVIDER_TOKENS_TOTAL, TURNS_TOTAL, TurnError, TurnReply,
+    assistant_agent,
+};
 pub use wrapper::{Action, AppliedReceipt, Because};
 
 /// `bytes` as lowercase hex digits.

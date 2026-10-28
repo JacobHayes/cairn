@@ -7,8 +7,8 @@
 
 use serde_json::{Value, json};
 
-use super::{arguments_as_text, arguments_from_text, malformed};
-use crate::provider::{Exchange, Message, ProviderError, Reply, ToolCall};
+use super::{REPLY_TOKEN_COUNT_MAX, arguments_as_text, arguments_from_text, malformed};
+use crate::provider::{Exchange, Message, ProviderError, Reply, Stop, ToolCall, Usage};
 
 /// The path under the endpoint.
 pub const PATH: &str = "chat/completions";
@@ -38,6 +38,9 @@ pub fn request(model: &str, exchange: &Exchange) -> Value {
         "model": model,
         "messages": messages,
         "tools": tools,
+        // The field every OpenAI-compatible server reads; OpenAI's own reasoning models want
+        // `max_completion_tokens` instead, and a deployment on OpenAI uses the Responses protocol.
+        "max_tokens": REPLY_TOKEN_COUNT_MAX,
     })
 }
 
@@ -82,10 +85,11 @@ fn entries(message: &Message, into: &mut Vec<Value>) {
 ///
 /// [`ProviderError::Failed`] when there is no choice with a message, or a call is malformed.
 pub fn reply(answer: &Value) -> Result<Reply, ProviderError> {
-    let message = answer
+    let choice = answer
         .get("choices")
         .and_then(Value::as_array)
-        .and_then(|choices| choices.first())
+        .and_then(|choices| choices.first());
+    let message = choice
         .and_then(|choice| choice.get("message"))
         .ok_or_else(|| malformed("no choice with a message"))?;
     let text = message
@@ -119,5 +123,40 @@ pub fn reply(answer: &Value) -> Result<Reply, ProviderError> {
         text,
         calls,
         raw: None,
+        usage: usage(answer),
+        stop: stop(choice),
     })
+}
+
+/// The tokens an answer reports. Its `prompt_tokens` counts the cached ones and the ones
+/// written to the cache, which are taken out; a server that reports cache writes
+/// (`OpenRouter`) says so beside the reads.
+fn usage(answer: &Value) -> Usage {
+    let usage = answer.get("usage");
+    let count = |of: Option<&Value>, name: &str| {
+        of.and_then(|of| of.get(name))
+            .and_then(Value::as_u64)
+            .unwrap_or(0)
+    };
+    let details = usage.and_then(|usage| usage.get("prompt_tokens_details"));
+    let cached = count(details, "cached_tokens");
+    let written = count(details, "cache_write_tokens");
+    Usage {
+        input: count(usage, "prompt_tokens").saturating_sub(cached + written),
+        output: count(usage, "completion_tokens"),
+        cache_read: cached,
+        cache_write: written,
+    }
+}
+
+/// Why the choice stopped, by its `finish_reason`.
+fn stop(choice: Option<&Value>) -> Stop {
+    match choice
+        .and_then(|choice| choice.get("finish_reason"))
+        .and_then(Value::as_str)
+    {
+        Some("length") => Stop::OutputLimit,
+        Some("content_filter") => Stop::Refused,
+        _ => Stop::Done,
+    }
 }

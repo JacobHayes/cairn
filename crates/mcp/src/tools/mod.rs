@@ -225,6 +225,13 @@ enum WriteStatus {
 }
 
 impl WriteOutput {
+    /// Whether the write was answered from the receipt of an earlier one, which this call did
+    /// not apply.
+    #[must_use]
+    pub fn is_already_applied(&self) -> bool {
+        matches!(self.status, WriteStatus::AlreadyApplied)
+    }
+
     /// The revision the write produced, and what it newly caused in each journey it changed.
     #[must_use]
     pub fn into_parts(self) -> (Revision, BTreeMap<JourneyId, Consequences>) {

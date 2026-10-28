@@ -51,6 +51,7 @@ sign_in_with = "sso"
 protocol = "anthropic_messages"          # or openai_responses, chat_completions
 endpoint = "https://api.anthropic.com/v1"
 model = "a-model-name"
+api_key = "..."                          # required except for chat_completions; or CAIRN_ASSISTANT_API_KEY
 ```
 
 Each provider kind's settings: `dev` (`user`, `verified_emails`, which must hold at least one email,

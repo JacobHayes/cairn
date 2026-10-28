@@ -57,6 +57,40 @@ pub struct Reply {
     /// turn continues (reasoning a provider asks to see again rides here); `None` when the
     /// message was built from Cairn's types alone. Never stored.
     pub raw: Option<Value>,
+    /// The tokens the call used, as the provider counted them.
+    pub usage: Usage,
+    /// Why the model stopped.
+    pub stop: Stop,
+}
+
+/// The tokens one provider call used. `input` counts what was neither read from nor written
+/// to the provider's prompt cache, so the four add up to the call's whole input on every
+/// protocol.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub struct Usage {
+    /// Input tokens neither read from nor written to the cache.
+    pub input: u64,
+    /// Output tokens, reasoning included.
+    pub output: u64,
+    /// Input tokens read from the prompt cache.
+    pub cache_read: u64,
+    /// Input tokens written to the prompt cache.
+    pub cache_write: u64,
+}
+
+/// Why a reply ended. Anything but [`Stop::Done`] means the reply is not what the model meant
+/// to send, and none of its tool calls run.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub enum Stop {
+    /// The model finished: it answered, or called tools and waits for their results.
+    #[default]
+    Done,
+    /// The reply hit the output token cap and is cut off.
+    OutputLimit,
+    /// The model declined to answer.
+    Refused,
+    /// The provider paused the turn, which asks to be continued.
+    Paused,
 }
 
 /// One tool call.
@@ -91,6 +125,13 @@ pub enum ProviderError {
         /// What it said, without the credential.
         message: String,
     },
+    /// The provider answered with an HTTP error status.
+    Rejected {
+        /// The status code.
+        status: u16,
+        /// What it said, without the credential.
+        message: String,
+    },
 }
 
 impl fmt::Display for ProviderError {
@@ -101,6 +142,12 @@ impl fmt::Display for ProviderError {
             }
             ProviderError::Failed { message } => {
                 write!(formatter, "the model provider failed: {message}")
+            }
+            ProviderError::Rejected { status, message } => {
+                write!(
+                    formatter,
+                    "the model provider failed (status {status}): {message}"
+                )
             }
         }
     }

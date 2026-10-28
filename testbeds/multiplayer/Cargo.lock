@@ -225,6 +225,7 @@ dependencies = [
  "cairn-schema",
  "cairn-service",
  "cairn-store",
+ "jiff",
  "metrics",
  "patina-dst",
  "reqwest",

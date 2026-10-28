@@ -6,19 +6,14 @@
 
 use serde_json::{Value, json};
 
-use super::malformed;
-use crate::provider::{Exchange, Message, ProviderError, Reply, ToolCall};
+use super::{REPLY_TOKEN_COUNT_MAX, malformed};
+use crate::provider::{Exchange, Message, ProviderError, Reply, Stop, ToolCall, Usage};
 
 /// The path under the endpoint.
 pub const PATH: &str = "messages";
 
 /// The API version the request is written against.
 pub const VERSION: &str = "2023-06-01";
-
-/// The most tokens one reply may hold, which the protocol requires a request to name: a long
-/// proposal fits, and at typical output rates a reply this long still lands inside the
-/// provider call limit.
-pub const REPLY_TOKEN_COUNT_MAX: u32 = 8_192;
 
 /// The headers besides the content type.
 #[must_use]
@@ -154,5 +149,34 @@ pub fn reply(answer: &Value) -> Result<Reply, ProviderError> {
         text,
         calls,
         raw: Some(Value::Array(content.clone())),
+        usage: usage(answer),
+        stop: stop(answer),
     })
+}
+
+/// The tokens an answer reports. Its `input_tokens` already leaves out the cache's.
+fn usage(answer: &Value) -> Usage {
+    let count = |name: &str| {
+        answer
+            .get("usage")
+            .and_then(|usage| usage.get(name))
+            .and_then(Value::as_u64)
+            .unwrap_or(0)
+    };
+    Usage {
+        input: count("input_tokens"),
+        output: count("output_tokens"),
+        cache_read: count("cache_read_input_tokens"),
+        cache_write: count("cache_creation_input_tokens"),
+    }
+}
+
+/// Why an answer stopped, by its `stop_reason`.
+fn stop(answer: &Value) -> Stop {
+    match answer.get("stop_reason").and_then(Value::as_str) {
+        Some("max_tokens" | "model_context_window_exceeded") => Stop::OutputLimit,
+        Some("refusal") => Stop::Refused,
+        Some("pause_turn") => Stop::Paused,
+        _ => Stop::Done,
+    }
 }

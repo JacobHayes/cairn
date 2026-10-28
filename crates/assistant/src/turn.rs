@@ -22,12 +22,22 @@ use tokio::time::Instant;
 
 use crate::conversation::{self, Target};
 use crate::limits::{
-    DIALOGUE_REPLAY_BYTES_MAX, DIRECT_WRITE_NODE_COUNT_MAX, PROVIDER_CALL_DURATION_MAX,
-    TOOL_CALL_COUNT_PER_REPLY_MAX, TOOL_LOOP_ITERATION_COUNT_MAX, TURN_DURATION_MAX,
+    DIALOGUE_REPLAY_BYTES_MAX, PROVIDER_CALL_DURATION_MAX, TOOL_CALL_COUNT_PER_REPLY_MAX,
+    TOOL_LOOP_ITERATION_COUNT_MAX, TOOL_RESULT_BYTES_PER_TURN_MAX, TURN_DURATION_MAX,
     TURN_IN_FLIGHT_COUNT_MAX, TURN_SAVE_RESERVE,
 };
-use crate::provider::{Exchange, Message, Provider, ProviderError, Reply, ToolResult, ToolSpec};
-use crate::wrapper::{self, Action, Ledger};
+use crate::provider::{
+    Exchange, Message, Provider, ProviderError, Reply, Stop, ToolResult, ToolSpec,
+};
+use crate::tool_results::{self, Failures};
+use crate::wrapper::{self, Action};
+
+/// The counter of turns, by how they ended and the status class of a refused provider call.
+pub const TURNS_TOTAL: &str = "cairn_assistant_turns_total";
+
+/// The counter of tokens the provider reported, by kind (input, output, cache read, cache
+/// write).
+pub const PROVIDER_TOKENS_TOTAL: &str = "cairn_assistant_provider_tokens_total";
 
 /// The agent id every assistant write records beside the user it acts for (H2).
 pub const ASSISTANT_AGENT: &str = "ag_assistant";
@@ -72,6 +82,17 @@ pub enum Ended {
         /// What it said.
         message: String,
     },
+    /// The provider refused the deployment's credential: the assistant is not set up.
+    ProviderNotSetUp,
+    /// The reply hit the output limit and is cut off; none of its tool calls ran.
+    ReplyCutOff,
+    /// The model declined to answer.
+    ModelRefused,
+    /// The provider paused the reply, which the assistant does not continue; none of its
+    /// tool calls ran.
+    ModelPaused,
+    /// The model kept repeating a tool call that failed.
+    RepeatedFailure,
     /// The model was still calling tools past the tool-loop limit.
     IterationLimit,
     /// The turn ran past the turn's time limit.
@@ -102,9 +123,8 @@ impl std::fmt::Display for TurnError {
                 "{TURN_IN_FLIGHT_COUNT_MAX} assistant turns are in flight \
                  (assistant_turns_in_flight)"
             ),
-            TurnError::ConversationBusy => formatter.write_str(
-                "a turn of this conversation is already running; try again once it answers",
-            ),
+            TurnError::ConversationBusy => formatter
+                .write_str("a reply in this conversation is still in progress; wait for it"),
             TurnError::TargetMissing(target) => write!(formatter, "no {target}"),
             TurnError::TimedOut => formatter
                 .write_str("reading the target or the conversation ran past the turn's limit"),
@@ -224,20 +244,7 @@ impl Assistant {
         let held = stored.is_some();
         let mut record =
             stored.unwrap_or_else(|| conversation::started(target, &user.user, started));
-        let mut messages = conversation::dialogue(&record, DIALOGUE_REPLAY_BYTES_MAX);
-        let said = message.as_str().to_owned();
-        match messages.last_mut() {
-            Some(Message::User { text }) => {
-                text.push_str("\n\n");
-                text.push_str(&said);
-            }
-            _ => messages.push(Message::User { text: said }),
-        }
-        // The per-turn context leads the turn's user message, after the history, so the
-        // request's prefix (tools, system text, history) is the same on every request.
-        if let Some(Message::User { text }) = messages.last_mut() {
-            *text = format!("{}{text}", turn_context(user, target, &context));
-        }
+        let messages = replay(&record, message, &turn_context(user, target, &context));
         let exchange = Exchange {
             system: system(),
             messages,
@@ -247,7 +254,10 @@ impl Assistant {
             user: user.user.clone(),
             agent: Some(assistant_agent()),
         };
-        let (reply, actions, ended) = self.converse(&acting, exchange, deadline).await;
+        let mut provider_status = None;
+        let (reply, actions, ended) = self
+            .converse(&acting, exchange, deadline, &mut provider_status)
+            .await;
 
         let now = self.clock.now();
         let mut kept: Vec<ConversationMessage> = Vec::new();
@@ -273,9 +283,14 @@ impl Assistant {
         if exists || held || !actions.is_empty() {
             self.save(record, end, !actions.is_empty()).await?;
         }
-        metrics::counter!("cairn_assistant_turns_total", "ended" => ended_label(&ended))
-            .increment(1);
-        tracing::info!(conversation = %id, ended = ended_label(&ended), writes = actions.len(), "assistant turn");
+        let status_class = status_class(provider_status);
+        metrics::counter!(
+            TURNS_TOTAL,
+            "ended" => ended_label(&ended),
+            "status_class" => status_class
+        )
+        .increment(1);
+        tracing::info!(conversation = %id, ended = ended_label(&ended), status_class, writes = actions.len(), "assistant turn");
         Ok(TurnReply {
             conversation: id,
             reply: reply.map(|message| message.content),
@@ -309,19 +324,28 @@ impl Assistant {
     }
 
     /// The tool loop: provider calls until one answers without a tool call, or a limit.
+    /// `provider_status` is set to the HTTP status of a call the provider refused.
     async fn converse(
         &self,
         acting: &Actor,
         mut exchange: Exchange,
         deadline: Instant,
+        provider_status: &mut Option<u16>,
     ) -> (Option<String>, Vec<Action>, Ended) {
         let mut actions: Vec<Action> = Vec::new();
-        let mut ledger = Ledger::default();
+        let mut failures = Failures::default();
         for _ in 0..TOOL_LOOP_ITERATION_COUNT_MAX {
             let reply = match self.ask(&exchange, deadline).await {
                 Ok(reply) => reply,
-                Err(ended) => return (None, actions, ended),
+                Err((ended, status)) => {
+                    *provider_status = status;
+                    return (None, actions, ended);
+                }
             };
+            // A reply that did not finish runs none of its calls: they may be cut mid-way.
+            if let Some(ended) = unfinished(reply.stop) {
+                return (reply.text, actions, ended);
+            }
             if reply.calls.is_empty() {
                 return (reply.text, actions, Ended::Replied);
             }
@@ -344,15 +368,12 @@ impl Assistant {
                 let (tools, store, actor) =
                     (self.tools.clone(), Arc::clone(&self.store), acting.clone());
                 let (name, arguments) = (call.name.clone(), call.arguments.clone());
-                let mut held = std::mem::take(&mut ledger);
-                let running = tokio::spawn(async move {
+                let repeat = (name.clone(), arguments.clone());
+                let mut running = tokio::spawn(async move {
                     let called = (name.as_str(), arguments);
-                    let store = store.as_ref();
-                    let outcome = wrapper::run(&tools, store, &actor, called, &mut held).await;
-                    (outcome, held)
+                    wrapper::run(&tools, store.as_ref(), &actor, called).await
                 });
-                let mut running = running;
-                let (outcome, held) = match tokio::time::timeout_at(deadline, &mut running).await {
+                let outcome = match tokio::time::timeout_at(deadline, &mut running).await {
                     Ok(Ok(ran)) => ran,
                     Ok(Err(error)) if error.is_panic() => {
                         std::panic::resume_unwind(error.into_panic())
@@ -365,47 +386,73 @@ impl Assistant {
                         // turn's ending note says.
                         patina_dst::sometimes!(true, "assistant-tool-call-past-deadline");
                         let late = deadline + TURN_SAVE_RESERVE / 2;
-                        if let Ok(Ok((outcome, _))) = tokio::time::timeout_at(late, running).await {
+                        if let Ok(Ok(outcome)) = tokio::time::timeout_at(late, running).await {
                             record(&mut actions, outcome.action);
                         }
                         return (None, actions, Ended::TurnTimedOut);
                     }
                 };
-                ledger = held;
                 record(&mut actions, outcome.action);
+                let failed = outcome.answer.is_err();
                 results.push(result(&call.id, outcome.answer));
+                if failed && failures.failed(&repeat.0, &repeat.1) {
+                    return (None, actions, Ended::RepeatedFailure);
+                }
             }
             exchange.messages.push(Message::Assistant(reply));
             exchange.messages.push(Message::ToolResults(results));
+            tool_results::keep_newest(&mut exchange.messages, TOOL_RESULT_BYTES_PER_TURN_MAX);
         }
         patina_dst::sometimes!(true, "assistant-iteration-limit-reached");
         (None, actions, Ended::IterationLimit)
     }
 
-    /// One provider call, held to the provider call limit and what is left of the turn.
-    async fn ask(&self, exchange: &Exchange, deadline: Instant) -> Result<Reply, Ended> {
+    /// One provider call, held to the provider call limit and what is left of the turn; its
+    /// failure also answers the HTTP status the provider refused it with.
+    async fn ask(
+        &self,
+        exchange: &Exchange,
+        deadline: Instant,
+    ) -> Result<Reply, (Ended, Option<u16>)> {
         let left = deadline.saturating_duration_since(Instant::now());
         let limit = left.min(PROVIDER_CALL_DURATION_MAX);
         if limit == Duration::ZERO {
-            return Err(Ended::TurnTimedOut);
+            return Err((Ended::TurnTimedOut, None));
         }
         // PRACTICES, Simulation: a provider that does not answer, which no runtime fault
         // reaches from outside the process.
         if patina_dst::buggify!("assistant-provider-timeout") {
-            return Err(Ended::ProviderTimedOut);
+            return Err((Ended::ProviderTimedOut, None));
         }
         let started = Instant::now();
         let answer = tokio::time::timeout(limit, self.provider.send(exchange)).await;
         metrics::histogram!("cairn_assistant_provider_call_seconds")
             .record(started.elapsed().as_secs_f64());
         match answer {
-            Ok(Ok(reply)) => Ok(reply),
-            Ok(Err(ProviderError::TimedOut)) => Err(Ended::ProviderTimedOut),
-            Ok(Err(ProviderError::Failed { message })) => Err(Ended::ProviderFailed { message }),
-            Err(_) if limit < PROVIDER_CALL_DURATION_MAX => Err(Ended::TurnTimedOut),
+            Ok(Ok(reply)) => {
+                observe(&reply);
+                Ok(reply)
+            }
+            Ok(Err(ProviderError::TimedOut)) => Err((Ended::ProviderTimedOut, None)),
+            Ok(Err(ProviderError::Failed { message })) => {
+                tracing::warn!(%message, "assistant provider call failed");
+                Err((Ended::ProviderFailed { message }, None))
+            }
+            Ok(Err(ProviderError::Rejected { status, message })) => {
+                tracing::warn!(status, %message, "assistant provider call rejected");
+                let ended = if status == 401 {
+                    Ended::ProviderNotSetUp
+                } else {
+                    Ended::ProviderFailed {
+                        message: format!("status {status}: {message}"),
+                    }
+                };
+                Err((ended, Some(status)))
+            }
+            Err(_) if limit < PROVIDER_CALL_DURATION_MAX => Err((Ended::TurnTimedOut, None)),
             Err(_) => {
                 patina_dst::sometimes!(true, "assistant-provider-call-timed-out");
-                Err(Ended::ProviderTimedOut)
+                Err((Ended::ProviderTimedOut, None))
             }
         }
     }
@@ -440,6 +487,25 @@ impl Assistant {
     }
 }
 
+/// The conversation as a provider is sent it: the stored dialogue, then `message` led by the
+/// turn's `context`, so the request's prefix (tools, system text, history) is the same on
+/// every request.
+fn replay(record: &ConversationRecord, message: &Markdown, context: &str) -> Vec<Message> {
+    let mut messages = conversation::dialogue(record, DIALOGUE_REPLAY_BYTES_MAX);
+    let said = message.as_str();
+    match messages.last_mut() {
+        Some(Message::User { text }) => {
+            text.push_str("\n\n");
+            text.push_str(said);
+            text.insert_str(0, context);
+        }
+        _ => messages.push(Message::User {
+            text: format!("{context}{said}"),
+        }),
+    }
+    messages
+}
+
 /// The tools the model is offered: every tool but those the wrapper always refuses.
 fn tool_specs() -> Vec<ToolSpec> {
     ToolSet::definitions()
@@ -470,12 +536,10 @@ fn system() -> String {
         "You are Cairn's in-app assistant. You have the same tools as any agent acting for \
          the user you are working for, and every write you make is recorded as yours, on \
          their behalf.\n\n\
-         How your writes land: a state change ({state}) applies directly when it touches at \
-         most {DIRECT_WRITE_NODE_COUNT_MAX} nodes, and its result lists what it caused: tell \
-         the user. A structural change ({structural}), or a state change touching more nodes, \
-         is drafted as one proposal instead, which the result says: tell the user it is ready \
-         for review. When the user asks for a proposal, draft one with create_proposal. Some \
-         writes are the user's alone, and you have no tool for them:\n",
+         How your writes land: a state change ({state}) applies directly, like any external \
+         agent's, and its result lists what it caused: tell the user. A structural change \
+         ({structural}) is drafted as one proposal instead, which the result says: tell the \
+         user it is ready for review. Some writes are the user's alone, and you have no tool for them:\n",
         state = ChangeClass::State.meaning(),
         structural = ChangeClass::Structural.meaning(),
     );
@@ -557,6 +621,10 @@ fn report(action: &Action) -> String {
                 receipt.patch_id, receipt.domain, receipt.revision
             )
         }
+        Action::AlreadyApplied { tool, receipt } => format!(
+            "`{tool}` as patch `{}` was already applied: {} is at revision {}.",
+            receipt.patch_id, receipt.domain, receipt.revision
+        ),
         Action::Proposed {
             tool,
             proposal,
@@ -565,15 +633,6 @@ fn report(action: &Action) -> String {
         } => {
             let why = match because {
                 wrapper::Because::Structural => "it changes structure".to_owned(),
-                wrapper::Because::TooManyNodes { count: Some(count) } => {
-                    format!("it touches {count} nodes")
-                }
-                wrapper::Because::TooManyNodes { count: None } => {
-                    "it may touch every node".to_owned()
-                }
-                wrapper::Because::TooManyNodesThisTurn { count } => {
-                    format!("the turn's direct writes would touch {count} nodes")
-                }
                 wrapper::Because::Asked => "the assistant drafted a proposal".to_owned(),
             };
             format!("Drafted `{tool}` as proposal `{proposal}` for review: {why}.")
@@ -591,9 +650,24 @@ fn ending_note(ended: &Ended) -> Option<String> {
         Ended::ProviderTimedOut => {
             Some("The turn ended: the model provider did not answer in time.".to_owned())
         }
-        Ended::ProviderFailed { message } => Some(format!(
-            "The turn ended: the model provider failed ({message})."
-        )),
+        // The provider's own words are left out: this note is replayed to the model as the
+        // assistant's, and an error text is not something it said.
+        Ended::ProviderFailed { .. } => {
+            Some("The turn ended: the model provider failed.".to_owned())
+        }
+        Ended::ProviderNotSetUp => {
+            Some("The turn ended: the assistant is not set up on this deployment.".to_owned())
+        }
+        Ended::ReplyCutOff => {
+            Some("The turn ended: the reply was cut off at the output limit.".to_owned())
+        }
+        Ended::ModelRefused => Some("The turn ended: the model declined to answer.".to_owned()),
+        Ended::ModelPaused => {
+            Some("The turn ended: the model paused before finishing its reply.".to_owned())
+        }
+        Ended::RepeatedFailure => {
+            Some("The turn ended: the assistant kept repeating a tool call that failed.".to_owned())
+        }
         Ended::IterationLimit => {
             Some("The turn ended: the assistant reached its tool-call limit.".to_owned())
         }
@@ -611,9 +685,58 @@ fn ended_label(ended: &Ended) -> &'static str {
         Ended::Replied => "replied",
         Ended::ProviderTimedOut => "provider_timed_out",
         Ended::ProviderFailed { .. } => "provider_failed",
+        Ended::ProviderNotSetUp => "provider_not_set_up",
+        Ended::ReplyCutOff => "reply_cut_off",
+        Ended::ModelRefused => "model_refused",
+        Ended::ModelPaused => "model_paused",
+        Ended::RepeatedFailure => "repeated_failure",
         Ended::IterationLimit => "iteration_limit",
         Ended::TurnTimedOut => "turn_timed_out",
     }
+}
+
+/// The status class of a refused provider call, for the ended metric: `none` when the turn
+/// did not end on one.
+fn status_class(status: Option<u16>) -> &'static str {
+    match status {
+        Some(400..=499) => "4xx",
+        Some(500..=599) => "5xx",
+        Some(_) => "other",
+        None => "none",
+    }
+}
+
+/// How a turn ends on a reply that did not finish; `None` for one that did.
+fn unfinished(stop: Stop) -> Option<Ended> {
+    match stop {
+        Stop::Done => None,
+        Stop::OutputLimit => Some(Ended::ReplyCutOff),
+        Stop::Refused => Some(Ended::ModelRefused),
+        Stop::Paused => Some(Ended::ModelPaused),
+    }
+}
+
+/// Records what a provider call used and called: a metric per kind of token, and a log line.
+fn observe(reply: &Reply) {
+    let usage = reply.usage;
+    for (kind, tokens) in [
+        ("input", usage.input),
+        ("output", usage.output),
+        ("cache_read", usage.cache_read),
+        ("cache_write", usage.cache_write),
+    ] {
+        metrics::counter!(PROVIDER_TOKENS_TOTAL, "kind" => kind).increment(tokens);
+    }
+    let tools: Vec<&str> = reply.calls.iter().map(|call| call.name.as_str()).collect();
+    tracing::info!(
+        input = usage.input,
+        output = usage.output,
+        cache_read = usage.cache_read,
+        cache_write = usage.cache_write,
+        stop = ?reply.stop,
+        tools = %tools.join(","),
+        "assistant provider call"
+    );
 }
 
 /// Adds `action` to the turn's: a later write to a proposal the turn already reported

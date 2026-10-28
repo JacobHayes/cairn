@@ -81,10 +81,18 @@ describe("a turn's writes in the panel (I5, D7)", () => {
     expect(markup).toContain('data-kind="stale"');
   });
 
+  it("reports a write answered from an earlier receipt as already applied, not as a change", () => {
+    const markup = shown([
+      { outcome: "already_applied", tool: "snooze", receipt: { patch_id: "p_one", domain: { journey: "j_one" }, revision: 3 } },
+    ]);
+    expect(markup).toContain('data-testid="assistant-already-applied"');
+    expect(markup).not.toContain('data-testid="assistant-applied"');
+  });
+
   it("opens a drafted proposal in proposal review, whatever made it a proposal", () => {
     const reasons: AssistantAction[] = [
       { outcome: "proposed", tool: "apply_patch", proposal: "pr_one", destination: { journey: "j_one" }, because: { reason: "structural" } },
-      { outcome: "proposed", tool: "assign", proposal: "pr_two", destination: { route: "r_two" }, because: { reason: "too_many_nodes", count: 12 } },
+      { outcome: "proposed", tool: "assign", proposal: "pr_two", destination: { route: "r_two" }, because: { reason: "structural" } },
       { outcome: "proposed", tool: "create_proposal", proposal: "pr_three", destination: "deployment", because: { reason: "asked" } },
     ];
     const markup = shown(reasons);

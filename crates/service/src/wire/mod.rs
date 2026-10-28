@@ -326,6 +326,9 @@ pub enum ProblemCode {
     TokensNotAccepted,
     /// The process is at its in-flight request limit; retry after the `Retry-After` delay.
     Overloaded,
+    /// A reply in this assistant conversation is still in progress: wait for it, then send
+    /// again.
+    TurnInProgress,
     /// The process is at its SSE subscriber limit; retry after the `Retry-After` delay.
     SubscriberLimit,
     /// No store connection came free in time; retry after the `Retry-After` delay.

@@ -156,10 +156,6 @@ export function becauseWords(because: Because): string {
   switch (because.reason) {
     case "structural":
       return "it changes structure, which goes through review";
-    case "too_many_nodes":
-      return because.count == null ? "it may touch every node" : `it touches ${String(because.count)} nodes, more than one change may`;
-    case "too_many_nodes_this_turn":
-      return `with this turn's other changes it would touch ${String(because.count)} nodes`;
     case "asked":
       return "the assistant drafted it for review";
   }
@@ -174,6 +170,16 @@ export function endedWords(ended: Ended): string {
       return "The model did not answer in time. Anything listed above was done; try again.";
     case "provider_failed":
       return `The model failed (${ended.message}). Anything listed above was done.`;
+    case "provider_not_set_up":
+      return "The assistant is not set up on this deployment. Ask whoever runs it to check the model provider's key.";
+    case "reply_cut_off":
+      return "The reply was cut off at the model's output limit, so nothing it asked for was done. Anything listed above was done; try a smaller request.";
+    case "model_refused":
+      return "The model declined to answer. Anything listed above was done.";
+    case "model_paused":
+      return "The model paused before finishing its reply, so nothing it asked for was done. Anything listed above was done; try again.";
+    case "repeated_failure":
+      return "The assistant kept repeating a tool call that failed, so the turn stopped. Anything listed above was done.";
     case "iteration_limit":
       return "The assistant reached its limit of tool calls for one turn. Anything listed above was done.";
     case "turn_timed_out":

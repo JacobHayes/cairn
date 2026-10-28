@@ -61,7 +61,7 @@ pub fn status_of(code: ProblemCode) -> StatusCode {
         ProblemCode::PayloadTooLarge => StatusCode::PAYLOAD_TOO_LARGE,
         ProblemCode::NotFound | ProblemCode::NoSuchEndpoint => StatusCode::NOT_FOUND,
         ProblemCode::MethodNotAllowed => StatusCode::METHOD_NOT_ALLOWED,
-        ProblemCode::PageMoved => StatusCode::CONFLICT,
+        ProblemCode::PageMoved | ProblemCode::TurnInProgress => StatusCode::CONFLICT,
         ProblemCode::UserOnly | ProblemCode::TokensNotAccepted => StatusCode::FORBIDDEN,
         ProblemCode::Overloaded
         | ProblemCode::SubscriberLimit

@@ -1,4 +1,4 @@
-//! What one direct write touches (I5: "unless one change would touch more than ten nodes"),
+//! What one direct write touches (I5: a direct change is reported with the nodes it affected),
 //! resolved against its journey as it stands
 //! (decisions/2026-10-06-the-write-wrapper-decides-on-the-patch-a-tool-would-submit.md): every
 //! node a record the patch writes hangs off, by its touched set (H5) as applying it there

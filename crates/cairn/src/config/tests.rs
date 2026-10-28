@@ -220,6 +220,16 @@ api_key = \"key\"
     assert!(assistant.credential.is_some());
 }
 
+/// An OpenAI-compatible server may need no key.
+#[test]
+fn a_chat_completions_assistant_needs_no_key() {
+    let text = format!(
+        "{MINIMAL}\n[assistant]\nprotocol = \"chat_completions\"\nendpoint = \"http://localhost:8000/v1\"\nmodel = \"m\""
+    );
+    let assistant = parsed(&text).unwrap().assistant.unwrap();
+    assert!(assistant.credential.is_none());
+}
+
 /// Tailscale's proxy mode trusts this machine unless it lists where its proxy connects
 /// from, as addresses or networks.
 #[test]
@@ -356,6 +366,14 @@ fn provider_mistakes_are_named_by_provider() {
         (
             "[assistant]\nprotocol = \"chat_completions\"\nendpoint = \"file:///x\"\nmodel = \"m\"",
             "assistant.endpoint",
+        ),
+        (
+            "[assistant]\nprotocol = \"anthropic_messages\"\nendpoint = \"https://api.anthropic.com/v1\"\nmodel = \"m\"",
+            "assistant.api_key",
+        ),
+        (
+            "[assistant]\nprotocol = \"openai_responses\"\nendpoint = \"https://api.openai.com/v1\"\nmodel = \"m\"\napi_key = \" \"",
+            "assistant.api_key",
         ),
         (
             "[[auth]]\nkind = \"builtin_oauth\"\nname = \"first\"\n[[auth]]\nkind = \"builtin_oauth\"\nname = \"second\"",

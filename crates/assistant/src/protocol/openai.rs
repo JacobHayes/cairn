@@ -2,12 +2,14 @@
 //! prompt is `instructions`; the conversation is a list of input items, a tool call a
 //! `function_call` item with its arguments as JSON text, and its result a
 //! `function_call_output` item. Nothing is stored at the provider (`store: false`), so the
-//! reasoning items of a reply are asked for encrypted and sent back unchanged within a turn.
+//! reasoning items of a reply are asked for encrypted and sent back unchanged within a turn;
+//! a model that does not reason refuses being asked, which [`super::HttpProvider`] learns and
+//! stops doing.
 
 use serde_json::{Value, json};
 
-use super::{arguments_as_text, arguments_from_text, malformed};
-use crate::provider::{Exchange, Message, ProviderError, Reply, ToolCall};
+use super::{REPLY_TOKEN_COUNT_MAX, arguments_as_text, arguments_from_text, malformed};
+use crate::provider::{Exchange, Message, ProviderError, Reply, Stop, ToolCall, Usage};
 
 /// The path under the endpoint.
 pub const PATH: &str = "responses";
@@ -15,9 +17,10 @@ pub const PATH: &str = "responses";
 /// The key that groups this assistant's requests, which share their leading text.
 const PROMPT_CACHE_KEY: &str = "cairn-assistant";
 
-/// The request body for `exchange`.
+/// The request body for `exchange`, asking for the reply's reasoning encrypted when
+/// `encrypted_reasoning`.
 #[must_use]
-pub fn request(model: &str, exchange: &Exchange) -> Value {
+pub fn request(model: &str, exchange: &Exchange, encrypted_reasoning: bool) -> Value {
     let tools: Vec<Value> = exchange
         .tools
         .iter()
@@ -35,7 +38,7 @@ pub fn request(model: &str, exchange: &Exchange) -> Value {
     for message in &exchange.messages {
         items(message, &mut input);
     }
-    json!({
+    let mut body = json!({
         "model": model,
         "instructions": exchange.system,
         "input": input,
@@ -44,8 +47,12 @@ pub fn request(model: &str, exchange: &Exchange) -> Value {
         // Prefixes cache automatically; the key routes requests that share one to the same
         // cache.
         "prompt_cache_key": PROMPT_CACHE_KEY,
-        "include": ["reasoning.encrypted_content"],
-    })
+        "max_output_tokens": REPLY_TOKEN_COUNT_MAX,
+    });
+    if encrypted_reasoning {
+        body["include"] = json!(["reasoning.encrypted_content"]);
+    }
+    body
 }
 
 /// The input items of one message.
@@ -105,6 +112,7 @@ pub fn reply(answer: &Value) -> Result<Reply, ProviderError> {
     };
     let mut texts = Vec::new();
     let mut calls = Vec::new();
+    let mut refused = false;
     for item in output {
         let field = |name: &str| item.get(name).and_then(Value::as_str);
         match field("type") {
@@ -114,6 +122,10 @@ pub fn reply(answer: &Value) -> Result<Reply, ProviderError> {
                     .into_iter()
                     .flatten()
                     .filter(|part| part.get("type").and_then(Value::as_str) == Some("output_text"));
+                refused |= content
+                    .into_iter()
+                    .flatten()
+                    .any(|part| part.get("type").and_then(Value::as_str) == Some("refusal"));
                 for part in parts {
                     let text = part.get("text").and_then(Value::as_str);
                     texts.push(text.ok_or_else(|| malformed("output text without text"))?);
@@ -142,5 +154,43 @@ pub fn reply(answer: &Value) -> Result<Reply, ProviderError> {
         text,
         calls,
         raw: Some(Value::Array(output.clone())),
+        usage: usage(answer),
+        stop: stop(answer, refused),
     })
+}
+
+/// The tokens an answer reports. Its `input_tokens` counts the cached ones, which are
+/// taken out; this API has no cache write to report.
+fn usage(answer: &Value) -> Usage {
+    let usage = answer.get("usage");
+    let count = |of: Option<&Value>, name: &str| {
+        of.and_then(|of| of.get(name))
+            .and_then(Value::as_u64)
+            .unwrap_or(0)
+    };
+    let cached = count(
+        usage.and_then(|usage| usage.get("input_tokens_details")),
+        "cached_tokens",
+    );
+    Usage {
+        input: count(usage, "input_tokens").saturating_sub(cached),
+        output: count(usage, "output_tokens"),
+        cache_read: cached,
+        cache_write: 0,
+    }
+}
+
+/// Why an answer stopped: an incomplete response says why, and a refusal part is a refusal.
+fn stop(answer: &Value, refused: bool) -> Stop {
+    if answer.get("status").and_then(Value::as_str) == Some("incomplete") {
+        let reason = answer
+            .get("incomplete_details")
+            .and_then(|details| details.get("reason"))
+            .and_then(Value::as_str);
+        return match reason {
+            Some("content_filter") => Stop::Refused,
+            _ => Stop::OutputLimit,
+        };
+    }
+    if refused { Stop::Refused } else { Stop::Done }
 }
