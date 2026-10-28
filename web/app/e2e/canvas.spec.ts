@@ -364,7 +364,10 @@ async function stageHeadsAndTracedOpacity(page: Page): Promise<void> {
   // Tracing a card puts what is outside the trace at a third, done or not: the levels are never multiplied.
   await nodeCard(page, "n_final_review").getByTestId("card-open").click({ force: true });
   await expect(nodeCard(page, "n_purpose")).toHaveCSS("opacity", "0.3");
-  // The final review closes at the decision meeting: that card is the far end of its date line, so it stays in focus.
+  // The final review closes at the decision meeting: with its Dates section folded that card is outside the trace; open, it is the far end of a date line and stays in focus.
+  await setDatesOpen(page, "n_final_review", false);
+  await expect(nodeCard(page, "n_decision_meeting")).toHaveCSS("opacity", "0.3");
+  await setDatesOpen(page, "n_final_review", true);
   await expect(nodeCard(page, "n_decision_meeting")).toHaveCSS("opacity", "1");
   await expect(nodeCard(page, "n_kickoff")).toHaveCSS("opacity", "0.5");
 }
@@ -413,42 +416,92 @@ test("C1, C2: a line is selectable only where the view's own level draws it, an 
   await expect(page.getByRole("link", { name: "Go to Test plan" })).toBeVisible();
 });
 
-test("C1: date relationships are drawn only for the one selected node, both ways, with an arrowhead where the order is fixed, open no card, and are listed in the inspector's linked dates", async ({ page }) => {
+/** Opens or folds the Dates section of the open node's panel, whichever it is not now. */
+async function setDatesOpen(page: Page, key: string, open: boolean): Promise<Locator> {
+  const section = nodePanel(page, key).getByTestId("dates");
+  if (((await whenSettled(page, () => section.getAttribute("open"))) !== null) !== open) {
+    await section.locator("summary").first().click();
+  }
+  return section;
+}
+
+test("C1: date relationships are drawn only for the one selected node while its Dates section is open, both ways, with an arrowhead where the order is fixed, open no card, and are listed in that section", async ({ page }) => {
   await visit(page, "browser", "/journeys/j_launch?view=graph&depth=actions");
   await expect(nodeCard(page, "n_launch")).toBeVisible();
   const dates = page.locator('[data-kind="dates"]');
   // At rest no date relationship is drawn.
   await expect(dates).toHaveCount(0);
-  // Documentation is due before the launch: one line, with the later end marked.
+  // Documentation is due before the launch. With its Dates section folded nothing is drawn; open, one line with the later end marked; folded again, none.
   await nodeCard(page, "n_docs").getByTestId("card-open").click();
   await expect(nodePanel(page, "n_docs")).toBeVisible();
+  await setDatesOpen(page, "n_docs", false);
+  await expect(dates).toHaveCount(0);
+  await setDatesOpen(page, "n_docs", true);
   await expect(dates).toHaveCount(1);
   await expect(dates.first()).toHaveAttribute("data-marker", "open");
   const address = page.url();
   await dates.first().dispatchEvent("click");
   expect(page.url()).toBe(address);
-  // The launch has five relationships; the trace fades what it does not reach to a third, and none of the far ends is.
+  await setDatesOpen(page, "n_docs", false);
+  await expect(dates).toHaveCount(0);
+  await setDatesOpen(page, "n_docs", true);
+  await expect(dates).toHaveCount(1);
+  // The launch, selected next, draws its five relationships, and none of the far ends is dimmed by the trace.
   await nodeCard(page, "n_launch").getByTestId("card-open").click();
   await expect(nodePanel(page, "n_launch")).toBeVisible();
+  const launch = await setDatesOpen(page, "n_launch", true);
   await expect(dates).toHaveCount(5);
   for (const far of ["n_docs", "n_announcement", "n_go_no_go", "n_code_freeze", "n_retro"]) {
     await expect(nodeCard(page, far), far).not.toHaveCSS("opacity", "0.3");
   }
-  // The inspector lists them, and a link in it selects that node.
-  const linked = page.getByTestId("linked-dates");
-  await expect(linked).toBeVisible();
-  await linked.locator("summary").click();
+  // The one section lists them, and there is no second section for linked dates.
+  await expect(page.getByText("Linked dates", { exact: true })).toHaveCount(1);
+  const linked = launch.getByTestId("linked-dates");
   await expect(linked.locator("li")).toHaveCount(5);
+  // Pointing at a row, or focusing inside it, leaves only its lines in ink; leaving restores the rest.
+  const stepped = page.locator('[data-kind="dates"].line-faded');
+  await linked.locator('li[data-node="n_docs"]').hover();
+  await expect(stepped).toHaveCount(4);
+  await expect(page.locator('[data-kind="dates"]:not(.line-faded)')).toHaveAttribute("data-to", /n_docs|n_launch/);
+  await page.mouse.move(0, 0);
+  await expect(stepped).toHaveCount(0);
+  await linked.locator('li[data-node="n_retro"] a').focus();
+  await expect(stepped).toHaveCount(4);
+  await linked.locator('li[data-node="n_retro"] a').blur();
+  await expect(stepped).toHaveCount(0);
+  // A link in the section selects that node.
   await linked.locator('li[data-node="n_docs"] a').first().click();
   await expect(nodePanel(page, "n_docs")).toBeVisible();
   await expect(dates).toHaveCount(1);
-  // Deselecting clears them, and a multi-selection draws none.
+  // Deselecting clears them, a multi-selection draws none, and neither does a hidden inspector.
   await page.keyboard.press("Escape");
   await expect(dates).toHaveCount(0);
   await nodeCard(page, "n_launch").getByTestId("card-open").click();
   await expect(dates).toHaveCount(5);
+  await page.getByRole("button", { name: "Hide inspector" }).click();
+  await expect(dates).toHaveCount(0);
+  await page.getByRole("button", { name: "Show inspector" }).click();
+  await expect(dates).toHaveCount(5);
   await nodeCard(page, "n_docs").click({ modifiers: ["Shift"] });
   await expect(dates).toHaveCount(0);
+});
+
+test("C1: the Dates fold is remembered per kind of node, and the pin action opens it", async ({ page }) => {
+  await visit(page, "browser", "/journeys/j_launch?view=graph&depth=actions");
+  const dates = page.locator('[data-kind="dates"]');
+  await nodeCard(page, "n_docs").getByTestId("card-open").click();
+  await setDatesOpen(page, "n_docs", true);
+  // Another deliverable, selected next, has its section open and draws its line without anything being toggled.
+  await nodeCard(page, "n_announcement").getByTestId("card-open").click();
+  await expect(nodePanel(page, "n_announcement").getByTestId("dates")).toHaveAttribute("open", "");
+  await expect(dates.first()).toBeVisible();
+  // The pin action opens a folded Dates section.
+  await setDatesOpen(page, "n_announcement", false);
+  await expect(dates).toHaveCount(0);
+  await nodePanel(page, "n_announcement").getByTestId("more-actions").click();
+  await page.getByRole("menuitem", { name: "Pin a date…" }).click();
+  await expect(nodePanel(page, "n_announcement").getByTestId("dates")).toHaveAttribute("open", "");
+  await expect(dates.first()).toBeVisible();
 });
 
 test("C1: a date line's far end stays in focus under Frontier, and a published route's inspector lists the same relationships", async ({ page }) => {
@@ -458,13 +511,17 @@ test("C1: a date line's far end stays in focus under Frontier, and a published r
   // Launch is not on the frontier, so Frontier dims it; Documentation's line to it keeps it in focus.
   await expect(nodeCard(page, "n_launch")).toHaveCSS("opacity", "0.3");
   await nodeCard(page, "n_docs").getByTestId("card-open").click();
+  await setDatesOpen(page, "n_docs", true);
   await expect(page.locator('[data-kind="dates"]')).toHaveCount(1);
   await expect(nodeCard(page, "n_launch")).not.toHaveCSS("opacity", "0.3");
-  // A route's version reads the same relationships in its inspector.
+  // A route's version reads the same relationships in its Dates section, and draws them while it is open.
   await visit(page, "browser", "/routes/product-launch/nodes/n_launch?version=1&view=graph");
-  const linked = page.getByTestId("linked-dates");
-  await expect(linked).toBeVisible();
-  await linked.locator("summary").click();
-  await expect(linked.locator("li")).toHaveCount(5);
+  const section = page.getByTestId("dates");
+  await expect(section).toBeVisible();
+  await expect(page.locator('[data-kind="dates"]')).toHaveCount(0);
+  await section.locator("summary").first().click();
+  await expect(section.locator("li")).toHaveCount(5);
   await expect(page.locator('[data-kind="dates"]')).toHaveCount(5);
+  await section.locator("summary").first().click();
+  await expect(page.locator('[data-kind="dates"]')).toHaveCount(0);
 });

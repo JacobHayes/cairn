@@ -1,10 +1,11 @@
 // The small pieces every node detail section is built from: a collapsible section (C8 shows
 // everything, so most of it starts folded: progressive disclosure), a link to another node's
 // detail, and a list of contributing nodes.
-import { createContext, use, type ComponentProps, type ReactNode } from "react";
+import { createContext, use, useEffect, type ComponentProps, type ReactNode } from "react";
 import { Link } from "react-router";
 
 import "./detail.css";
+import { pointAtDate } from "../canvas/datePointing.ts";
 import { useNodeAddresses } from "../journeys/address.ts";
 import { Markdown } from "../ui/markdown.tsx";
 import { setFold, useFold } from "./folds.ts";
@@ -47,9 +48,17 @@ export function NodeLink({ node, to, ...rest }: { node: string; to?: string } & 
  * One of a node's linked dates (C1): the other node as a link, and under it the relationship in words (the
  * sentence the canvas says on hover), so every row reads the same way whichever end the selected node is.
  */
-export function LinkedDateRow({ node, link, words }: { node: ReactNode; link: string; words: string }) {
+export function LinkedDateRow({ node, link, relationship, words }: { node: ReactNode; link: string; relationship: string; words: string }) {
+  // Pointing at the row (or focusing inside it) keeps its relationship's lines in ink on the canvas and steps the others back.
+  useEffect(() => () => { pointAtDate("hover", undefined); pointAtDate("focus", undefined); }, []);
   return (
-    <li data-node={link}>
+    <li
+      data-node={link}
+      onMouseEnter={() => { pointAtDate("hover", relationship); }}
+      onMouseLeave={() => { pointAtDate("hover", undefined); }}
+      onFocus={() => { pointAtDate("focus", relationship); }}
+      onBlur={() => { pointAtDate("focus", undefined); }}
+    >
       <span className="linked-date-node">{node}</span>
       <span className="linked-date-words">{words}</span>
     </li>

@@ -267,6 +267,11 @@ dl.kv dd {
   gap: var(--space-1);
 }
 
+/* The row whose lines the canvas is emphasising, by pointer or by focus. */
+.linked-dates li:is(:hover, :focus-within) {
+  background: var(--color-hover);
+}
+
 .linked-date-words {
   color: var(--color-muted);
 }

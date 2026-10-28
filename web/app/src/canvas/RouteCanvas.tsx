@@ -13,6 +13,7 @@ import { useLocation, useNavigate } from "react-router";
 
 import { ruleFoot } from "../authoring/dates.ts";
 import { titleIn, type Tree, treeOf } from "../authoring/graph.ts";
+import { useDatesShown } from "../detail/datesShown.ts";
 import { useNodeAddresses } from "../journeys/address.ts";
 import { useReviewing } from "../proposals/layer.ts";
 import { routePath } from "../routes/address.ts";
@@ -72,7 +73,8 @@ function useGraph(shown: Derived<Shown>, view: GraphView, selected: string | und
   const was = useMemo(() => (before === undefined || wasTree === undefined ? undefined : routeSide(before, wasTree, new Set())), [before, wasTree]);
   const title = useCallback((key: string) => titleIn(tree, key), [tree]);
   const domain = layer === undefined ? `route:${id}:${String(shown.of)}` : `route:${id}/proposals/${layer.id}`;
-  const graph = useCanvasGraph({ view, side, was, wait: waiting, layer, ready: undefined, selected, address: selected, domain, title, edge });
+  const datesOpen = useDatesShown(selected === undefined ? undefined : tree.byKey.get(selected)?.kind, false);
+  const graph = useCanvasGraph({ view, side, was, wait: waiting, layer, ready: undefined, selected, address: selected, domain, title, edge, datesOpen });
   return { ...graph, tree };
 }
 

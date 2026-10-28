@@ -3,10 +3,11 @@
 // closed arrowhead for a requirement, a hollow diamond for a condition gate, a bar for a stage
 // opening. No words on the line; hovering or focusing one gives the
 // sentence in a tip (GraphCanvas), which is also the edge's accessible name, and a click selects it. The line is steel, and an overlay's trace colours it. A date relationship
-// (`DateEdgeLine`) is a different thing, drawn only for the selected node: a dashed ink line with an
+// (`DateEdgeLine`) is a different thing, drawn only for the selected node while its Dates section is open: a dashed ink line with an
 // open arrowhead at its later end where the order is fixed.
 import { BaseEdge, useStore, type Edge, type EdgeProps } from "@xyflow/react";
 
+import { stepsBack, usePointedDate } from "./datePointing.ts";
 import type { Point } from "./layout.ts";
 import { DATED, lineLook } from "./look.ts";
 import type { DateLine, Line } from "./model.ts";
@@ -148,6 +149,7 @@ export function EdgeLine({ id, data, selected }: EdgeProps<LineEdge>) {
 /** C1: one date relationship, drawn for the selected node: dashed ink, an open arrowhead at the later end when the order is fixed. */
 export function DateEdgeLine({ id, data }: EdgeProps<DateEdge>) {
   const scale = useStore((state) => Math.round(markerScale(state.transform[2]) * 10) / 10);
+  const pointed = usePointedDate();
   if (data === undefined || data.route.length < 2) {
     return null;
   }
@@ -156,7 +158,7 @@ export function DateEdgeLine({ id, data }: EdgeProps<DateEdge>) {
   const before = route.at(-2);
   const marked = line.orders && end !== undefined && before !== undefined;
   return (
-    <g data-testid="date-line" data-from={line.from} data-to={line.to} data-orders={line.orders ? "" : undefined} data-kind="dates" data-dash={DATED} data-marker={marked ? "open" : "none"} className="line line-dates" role="img" aria-label={line.sentence}>
+    <g data-testid="date-line" data-from={line.from} data-to={line.to} data-orders={line.orders ? "" : undefined} data-kind="dates" data-dash={DATED} data-marker={marked ? "open" : "none"} className={`line line-dates${stepsBack(line, pointed) ? " line-faded" : ""}`} role="img" aria-label={line.sentence}>
       <BaseEdge id={id} path={polyline(route)} />
       {marked ? <path className="line-marker" d={markerPath("open", end, direction(before, end), scale)} /> : null}
     </g>

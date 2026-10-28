@@ -11,6 +11,7 @@ import { Panel } from "@xyflow/react";
 import { useCallback, useEffect, useMemo } from "react";
 import { useLocation, useNavigate } from "react-router";
 
+import { useJourneyDatesShown } from "../detail/datesShown.ts";
 import { nodeDetail, nodeOf, type GraphNode, type Ready, titleOf } from "../detail/model.ts";
 import { selectionOf } from "../acting/acts.ts";
 import { selectionMenuOf, selectionScope, type SelectionChoice, type SelectionOfferId } from "../acting/selectionOffers.ts";
@@ -70,7 +71,8 @@ function useGraph(ready: Ready, view: GraphView, selected: string | undefined, a
   const before = layer?.before;
   const was = useMemo(() => (before === undefined ? undefined : { held: before, nodes: before.journey.graph.nodes ?? NO_NODES, model: (level: Level) => journeyModel(before, level, { mine: [], owned: [] }) }), [before]);
   const title = useCallback((key: string) => titleOf(ready, key), [ready]);
-  return useCanvasGraph({ view, side, was, layer, ready, selected, address, domain: layer === undefined ? journey : `${journey}/proposals/${layer.id}`, title, edge });
+  const datesOpen = useJourneyDatesShown(ready, selected);
+  return useCanvasGraph({ view, side, was, layer, ready, selected, address, domain: layer === undefined ? journey : `${journey}/proposals/${layer.id}`, title, edge, datesOpen });
 }
 
 export interface JourneyCanvasProps {

@@ -127,7 +127,7 @@ function Fields({ props }: { props: FieldsProps & { authored: Authored } }) {
       <Section title="Relevance" open={holds(props, ["relevant_when"])} testId="form-relevance">
         <Relevance props={props} />
       </Section>
-      <Section title="Dates" open={holds(props, ["due_by", "not_before", "opens_at", "closes_at"])} testId="form-dates">
+      <Section title="Date rules" open={holds(props, ["due_by", "not_before", "opens_at", "closes_at"])} testId="form-dates">
         <Rules props={props} />
         {has(props, "opens_at") ? <StageFields props={props} /> : null}
       </Section>

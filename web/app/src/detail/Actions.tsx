@@ -30,7 +30,8 @@ import { AnswerEditor } from "./AnswerEditor.tsx";
 import { ActButton, actMutation, type Opens } from "./ActButton.tsx";
 import { EvidenceForm } from "./DoneEvidence.tsx";
 import { SnoozePanel, snoozeWords, WeightEditor } from "./editors.tsx";
-import { foldKey, setFold } from "./folds.ts";
+import { setFold } from "./folds.ts";
+import { datesFold } from "./datesShown.ts";
 import { answerable, failingGuards, guardBypass, itemTitle, movesFrom, storedSnooze, titleOf, transition, unfinishedInside, type Guard, type GraphNode, type Mutation, type NodeDetail, type Ready } from "./model.ts";
 import { menuOf, offered, type Act, type ContextId, type MenuId, type MenuItem } from "./offers.ts";
 import { OwnerSelect } from "./parts.tsx";
@@ -208,7 +209,7 @@ function runnersOf({ view, detail, write, form, onRename, onCopied, insertHere }
     rename: onRename,
     assign: () => { form.openPanel("assign"); },
     weight: () => { form.openPanel("weight"); },
-    pin: () => { setFold(foldKey(detail.node.kind, "dates"), true); },
+    pin: () => { setFold(datesFold(detail.node.kind), true); },
     "break-down": () => { form.openPanel("break-down"); },
     "show-in-graph": () => { navigate(graphPath(journey, graph, { node: key }, search)); },
     "insert-segment": () => { insertHere?.(key); },

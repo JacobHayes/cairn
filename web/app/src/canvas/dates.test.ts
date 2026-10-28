@@ -5,6 +5,7 @@
 import { describe, expect, test } from "vitest";
 
 import { canvasView, actionsAndDecisionsHidden, wholeLevel } from "./canvas.test-support.ts";
+import { dateLinkId, stepsBack } from "./datePointing.ts";
 import { datesAround, dateLinesOf, dateLinkRowWords, dateLinkWords, mergeDateParts } from "./dates.ts";
 import { cardsOf, type CanvasModel, type DateLine, type DateLink, type Level, type LevelDateLink } from "./model.ts";
 import { TRACE_LABELS, traceOverlay } from "./overlay.ts";
@@ -111,5 +112,27 @@ describe("mergeDateParts", () => {
       { from: "n_a", to: "n_b", orders: true, entries: [entry] },
     ]);
     expect(lines.map((line) => [line.from, line.to, line.orders, line.entries.length])).toEqual([["n_a", "n_b", true, 2]]);
+  });
+});
+
+describe("stepsBack (C1)", () => {
+  const [first, second] = [rule("n_stage", "n_kick"), rule("n_build", "n_kick")];
+  const level = withLinks(wholeLevel(), link("n_kick", "n_stage", true, first), link("n_kick", "n_build", false, second));
+  const lines = model(level).dates;
+
+  test("with nothing pointed at, no line steps back", () => {
+    expect(lines.map((line) => stepsBack(line, undefined))).toEqual([false, false]);
+  });
+
+  test("pointing at a relationship keeps the line that stands for it and steps the others back", () => {
+    expect(lines.map((line) => stepsBack(line, dateLinkId(first)))).toEqual([false, true]);
+    expect(lines.map((line) => stepsBack(line, dateLinkId(second)))).toEqual([true, false]);
+  });
+
+  test("two relationships between the same nodes are told apart", () => {
+    const [due, start] = [rule("n_stage", "n_kick", "before", 0), { ...rule("n_kick", "n_stage", "after", 0), rule: "not_before" } as DateLink];
+    const [one, other] = model(withLinks(wholeLevel(), link("n_kick", "n_stage", true, due), link("n_stage", "n_kick", true, start))).dates as [DateLine, DateLine];
+    expect([stepsBack(one, dateLinkId(due)), stepsBack(other, dateLinkId(due))]).toEqual([false, true]);
+    expect([stepsBack(one, dateLinkId(start)), stepsBack(other, dateLinkId(start))]).toEqual([true, false]);
   });
 });

@@ -17,11 +17,11 @@ import { AttachmentList } from "./Attachments.tsx";
 import { Checklist } from "./Checklist.tsx";
 import { Contents } from "./Contents.tsx";
 import { Connections } from "./Connections.tsx";
-import { DatesSection, LinkedDates } from "./DatesSection.tsx";
+import { DatesSection } from "./DatesSection.tsx";
 import { PinEditor } from "./editors.tsx";
 import { Details } from "./Details.tsx";
 import { People } from "./Facts.tsx";
-import { foldKey } from "./folds.ts";
+import { datesFold, datesStartOpen } from "./datesShown.ts";
 import { Header } from "./Header.tsx";
 import { nodeDetail, type NodeDetail, type Ready } from "./model.ts";
 import { FoldedSections } from "./parts.tsx";
@@ -41,8 +41,8 @@ function Dates({ view, detail }: { view: Ready; detail: NodeDetail }) {
     <DatesSection
       view={view}
       detail={detail}
-      open={detail.derived.dates.shortfall != null || detail.derived.overdue === true}
-      fold={foldKey(detail.node.kind, "dates")}
+      open={datesStartOpen(detail)}
+      fold={datesFold(detail.node.kind)}
       onMove={write.writable ? (move) => void write.run([move]) : undefined}
       pinEditor={
         <>
@@ -106,7 +106,6 @@ export function NodeDetailPanel({ view, nodeKey, extra, folded = false }: { view
           <ResourceList view={view} detail={detail} />
           <AttachmentList view={view} detail={detail} />
           <Dates view={view} detail={detail} />
-          <LinkedDates view={view} detail={detail} />
           <WhyRank view={view} detail={detail} position={position} row={row} />
           <People view={view} detail={detail} />
           <Details view={view} detail={detail} />

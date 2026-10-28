@@ -59,6 +59,8 @@ export interface FrameState {
   /** How many open proposals the Proposals tab holds, once read; undefined while reading or failed. */
   proposalsCount: number | undefined;
   tab: InspectorTab;
+  /** The inspector's own tab is showing: the column or sheet is not hidden, not on another tab, and a sheet is above its peek. */
+  inspectorShowing: boolean;
   /** Opens the assistant panel; undefined where none is offered. */
   openAssistant: (() => void) | undefined;
   /** The keys of the page on screen; undefined where the page binds none (the rail draws no `?`). */

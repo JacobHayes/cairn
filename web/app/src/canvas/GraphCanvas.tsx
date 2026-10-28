@@ -719,6 +719,8 @@ function FitControls({ focus }: { focus: readonly string[] | undefined }) {
   const work = useWork();
   const flow = useReactFlow();
   const [atMin, atMax] = [useStore((state) => state.transform[2] <= state.minZoom), useStore((state) => state.transform[2] >= state.maxZoom)];
+  // The date lines frame with the card only while they are drawn.
+  const framing = focus !== undefined && focus.length > 1 ? "Frame the selected card and its dates" : "Frame the selected card";
   return (
     <Controls showZoom={false} showFitView={false} showInteractive={false} position="bottom-left">
       <Tip tip="Zoom in" kind="name">
@@ -732,8 +734,8 @@ function FitControls({ focus }: { focus: readonly string[] | undefined }) {
         </ControlButton>
       </Tip>
       {focus === undefined ? null : (
-        <Tip tip="Frame the selected card and its dates" kind="name">
-          <ControlButton className="react-flow__controls-focus" aria-label="Frame the selected card and its dates" onClick={() => { work(fitTo(focus)); }}>
+        <Tip tip={framing} kind="name">
+          <ControlButton className="react-flow__controls-focus" aria-label={framing} onClick={() => { work(fitTo(focus)); }}>
             <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32"><path d="M14.5 0h3v7h-3zm0 25h3v7h-3zM0 14.5h7v3H0zm25 0h7v3h-7zM16 10a6 6 0 100 12 6 6 0 000-12zm0 3a3 3 0 110 6 3 3 0 010-6z" /></svg>
           </ControlButton>
         </Tip>

@@ -175,7 +175,8 @@ export function useFrame(): Frame {
   }, []);
   useFrameKeys({ tab: shown, dock, closeTo, open: present && !hidden }, toggleFolded);
   const openAssistant = useOpenAssistant(dock, actions);
-  const state = useMemo<FrameState>(() => ({ inspector, assistant, proposals, proposalsCount, tab: shown, openAssistant, keys }), [inspector, assistant, proposals, proposalsCount, shown, openAssistant, keys]);
+  const inspectorShowing = present && !hidden && shown === "inspector" && (wide || snap !== "peek");
+  const state = useMemo<FrameState>(() => ({ inspector, assistant, proposals, proposalsCount, tab: shown, inspectorShowing, openAssistant, keys }), [inspector, assistant, proposals, proposalsCount, shown, inspectorShowing, openAssistant, keys]);
   // The inspector's tab is there where it has something, or the assistant's does (its tabs are its only way in), or nothing else is.
   const tabs = useMemo<InspectorTab[]>(
     () => [...(counts.inspector > 0 || dock !== undefined || counts.proposals === 0 ? (["inspector"] as const) : []), ...(dock === undefined ? [] : (["assistant"] as const)), ...(counts.proposals > 0 ? (["proposals"] as const) : [])],

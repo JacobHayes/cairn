@@ -117,6 +117,8 @@ export interface CanvasGraphArgs {
   title: (key: string) => string;
   /** The line whose card is open, as `<from>~<to>` in the address; none for no line. */
   edge?: string | undefined;
+  /** The selected node's Dates section is open and in view: its date lines are drawn only then. */
+  datesOpen: boolean;
 }
 
 /** The whole graph's level under the same collapse, which Reveal draws from. */
@@ -151,7 +153,7 @@ function useComposed(args: { side: Side; was: Side | undefined; wait: boolean; l
 }
 
 /** What the canvas draws: the view's level laid out, the selected node's trace over it, what the highlights light, and what Reveal asks for. */
-export function useCanvasGraph({ view, side, was, wait = false, layer, ready, selected, address, domain, title, edge }: CanvasGraphArgs) {
+export function useCanvasGraph({ view, side, was, wait = false, layer, ready, selected, address, domain, title, edge, datesOpen }: CanvasGraphArgs) {
   const { nodes } = side;
   // The trace and the diff never show at once: under a proposal's layer a pick is for the rail.
   const { trace, learn } = useSelectionTrace(side.held, layer === undefined ? selected : undefined);
@@ -191,7 +193,7 @@ export function useCanvasGraph({ view, side, was, wait = false, layer, ready, se
       learn(rolledUp);
     }
   }, [rolledUp, learn]);
-  const { dates, farEnds } = useDateLines(side.held, side.nodes, layer !== undefined ? undefined : traceOnly === undefined ? request : everythingOf(collapsed), selected);
+  const { dates, farEnds } = useDateLines(side.held, side.nodes, layer !== undefined || !datesOpen ? undefined : traceOnly === undefined ? request : everythingOf(collapsed), selected);
   const overlay = useMemo(() => {
     if (laidOut === undefined) {
       return undefined;
@@ -259,8 +261,8 @@ export function useRevealed(selected: string | undefined): Reveal | undefined {
 }
 
 /**
- * C1: the selected node's date lines, drawn while it alone is selected and no proposal's layer is
- * on (no `request` then), and the cards at their far ends, which stay in focus. The level carries
+ * C1: the selected node's date lines, drawn while it alone is selected, its Dates section is open and no
+ * proposal's layer is on (no `request` then), and the cards at their far ends, which stay in focus. The level carries
  * the relationships for the card its query selects only, so they are a read of their own that the
  * layout never waits on.
  */

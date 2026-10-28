@@ -80,7 +80,7 @@ function VersionNode({ tree, node }: { tree: Tree; node: GraphNode }) {
         <Linked title="Requirements" testId="version-requirements" tree={tree} keys={requires} item="requirement" />
         <Linked title="Holds" testId="version-holds" tree={tree} keys={holds} item={undefined} />
         {rules.length === 0 ? null : (
-          <Section title="Dates" open testId="version-dates">
+          <Section title="Date rules" open testId="version-dates">
             {rules.map((words) => (
               <span key={words}>{words}</span>
             ))}

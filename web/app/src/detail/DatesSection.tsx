@@ -5,10 +5,10 @@
 // routes through a feeding decision when there is one (E3).
 import type { ReactNode } from "react";
 
+import { dateLinkId } from "../canvas/datePointing.ts";
 import { dateLinkRowWords } from "../canvas/dates.ts";
 import { dateWords, originWord } from "../status/when.ts";
 import { ChainView } from "./ChainView.tsx";
-import { foldKey } from "./folds.ts";
 import { parseInstant, type Bound } from "./explain.ts";
 import { nodeOf, titleOf, type Mutation, type NodeDetail, type Ready } from "./model.ts";
 import { LinkedDateRow, NodeLink, Section } from "./parts.tsx";
@@ -70,10 +70,11 @@ function Actuals({ view, detail }: { view: Ready; detail: NodeDetail }) {
 /**
  * C1, C8: the node's date relationships in both directions (its due-by and not-before rules, its
  * stage's close, an opening that holds dates only, a decision that sets a milestone's date), each
- * as the sentence the canvas says on hover, with the other node as a link. This is where every date
- * line the canvas draws for the node is read and followed, with the keyboard or by touch.
+ * as the sentence the canvas says on hover, with the other node as a link. These are the date lines
+ * the canvas draws for the node while this section is open, read and followed here with the keyboard
+ * or by touch; pointing at a row draws its lines in ink.
  */
-export function LinkedDates({ view, detail }: { view: Ready; detail: NodeDetail }) {
+function LinkedDates({ view, detail }: { view: Ready; detail: NodeDetail }) {
   const key = detail.node.key;
   const { links = [] } = detail.derived.dates;
   if (links.length === 0) {
@@ -81,14 +82,15 @@ export function LinkedDates({ view, detail }: { view: Ready; detail: NodeDetail 
   }
   const words = (link: (typeof links)[number], other: string) => dateLinkRowWords(link, other, titleOf(view, link.node), titleOf(view, link.source), { decision: nodeOf(view, link.node)?.kind === "decision" });
   return (
-    <Section title="Linked dates" summary={String(links.length)} testId="linked-dates" fold={foldKey(detail.node.kind, "linked-dates")}>
+    <div className="stack" data-testid="linked-dates">
+      <span className="muted small">Linked dates</span>
       <ul className="stack linked-dates">
         {links.map((link) => {
           const other = link.node === key ? link.source : link.node;
-          return <LinkedDateRow key={`${link.node}|${link.source}|${link.kind}|${"rule" in link ? link.rule : ""}`} link={other} node={<NodeLink view={view} node={other} />} words={words(link, other)} />;
+          return <LinkedDateRow key={dateLinkId(link)} relationship={dateLinkId(link)} link={other} node={<NodeLink view={view} node={other} />} words={words(link, other)} />;
         })}
       </ul>
-    </Section>
+    </div>
   );
 }
 
@@ -111,9 +113,10 @@ export function DatesSection({
   const { dates } = detail.derived;
   const key = detail.node.key;
   return (
-    <Section title="Dates" open={open} {...(fold === undefined ? {} : { fold })} testId="dates">
+    <Section title="Dates" summary={dates.links === undefined || dates.links.length === 0 ? undefined : `${String(dates.links.length)} linked`} open={open} {...(fold === undefined ? {} : { fold })} testId="dates">
       <BoundRow view={view} node={key} label="Due" bound={dates.due} />
       <Actuals view={view} detail={detail} />
+      <LinkedDates view={view} detail={detail} />
       <details className="date-more" data-testid="more-dates">
         <summary className="muted small">Earliest start, latest start and slack</summary>
         <div className="stack">
