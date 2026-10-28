@@ -801,6 +801,58 @@ fn a_route_draft_naming_a_removed_node_is_a_resource_conflict() {
     assert_eq!(node(&kept, "n_findings").resources.len(), 0);
 }
 
+/// B4, A10: on a node the route adds, a draft naming a removed node is dropped and reported,
+/// while the same node's clean draft is kept.
+#[test]
+fn a_new_route_nodes_dangling_draft_is_dropped_and_its_clean_draft_kept() {
+    let records = support::accepted_on(
+        &support::vendor_after(1),
+        "j_vendor_eval",
+        "- op: remove_node\n  removal: {node: n_partner_led, descendants: [n_criteria, n_partner_results], edges: [{node: n_partner_results, requires: n_criteria}]}\n",
+    );
+    let mut target = support::vendor_v2();
+    target
+        .nodes
+        .put(support::node("{key: n_partner_ok, id: partner-ok, parent: n_partner_led, kind: decision, title: Partner OK, prompt: OK?, answer_type: boolean}"))
+        .unwrap();
+    let mut added = support::node("{key: n_added, id: added, kind: action, title: Added}");
+    added.resources.push(
+        cairn_schema::from_yaml(
+            "{key: a_dangling, title: Dangling, message_draft: 'Partner OK: {{answers.n_partner_ok}}'}",
+        )
+        .unwrap(),
+    );
+    added.resources.push(
+        cairn_schema::from_yaml("{key: a_clean, title: Clean, message_draft: 'Hello.'}").unwrap(),
+    );
+    target.nodes.put(added).unwrap();
+    let records = support::publish_vendor(&records, target);
+    let draft = upgrade_to_two(&records);
+    let [
+        Conflict::Resource {
+            node: at,
+            resource,
+            dangling: true,
+            ..
+        },
+    ] = conflicts(&draft)[..]
+    else {
+        panic!("{:#?}", draft.items)
+    };
+    assert_eq!(at, &support::key("n_added"));
+    assert_eq!(resource.as_str(), "a_dangling");
+    let kept = applied(
+        &records,
+        &chosen(&draft, |_| Some(ConflictResolution::KeepJourney), true),
+    );
+    let resources: Vec<_> = node(&kept, "n_added")
+        .resources
+        .iter()
+        .map(|found| found.key.to_string())
+        .collect();
+    assert_eq!(resources, ["a_clean"]);
+}
+
 /// B7: a field conflict whose route value names a removed node offers only the journey's
 /// side; taking the route's is reported as not offered.
 #[test]

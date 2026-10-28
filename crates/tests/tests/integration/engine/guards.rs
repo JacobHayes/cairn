@@ -87,18 +87,23 @@ const BRANCH: &str = "{key: n_branch, id: branch, kind: action, title: Branch, r
 /// hatch.
 #[test]
 fn relevance_guards_completion() {
-    let records = support::journey(&add(&[FLAG, BRANCH]));
-    let answered_away = format!(
-        "{}- op: answer\n  decision: n_flag\n  value: {{boolean: false}}\n",
-        complete("n_branch")
-    );
+    let records = support::journey(&add(&[FLAG, BRANCH, FIRST]));
+    let answer = "- op: answer\n  decision: n_flag\n  value: {boolean: false}\n";
+    // The cause sits after an unrelated mutation, so its ordinal is not the first after the
+    // completion.
+    let answered_away = format!("{}{}{answer}", complete("n_branch"), complete("n_first"));
     let [found] = &violations(&records, &answered_away)[..] else {
         panic!("one violation")
     };
     assert_eq!(found.code, ViolationCode::NotRelevant);
     assert_eq!(found.bypassable, None, "relevance has no bypass");
-    assert_eq!(found.caused_by, BTreeSet::from([1]), "the answer");
+    assert_eq!(found.caused_by, BTreeSet::from([2]), "the answer");
     assert_eq!(found.at.mutation, Some(0), "the completion");
+    let away = support::accepted(&records, answer);
+    let [found] = &violations(&away, &complete("n_branch"))[..] else {
+        panic!("one violation")
+    };
+    assert_eq!(found.caused_by, BTreeSet::new(), "nothing in this patch");
     let forced = format!(
         "- op: apply_override\n  node: n_branch\n  override: {{force_include: {{reason: Needed anyway.}}}}\n{answered_away}"
     );
@@ -232,6 +237,16 @@ fn a_snooze_sits_on_a_node_in_scope() {
     );
     assert_eq!(
         support::codes(support::journey_patch(&group, &snooze("n_pack", "n_first"))),
+        [ViolationCode::SnoozeNotActionable]
+    );
+    // An empty group waiting on an open gate has no work beneath it either.
+    let empty = support::journey(&add(&[
+        "{key: n_pack, id: pack, kind: group, title: Pack, requires: [n_first]}",
+        FIRST,
+        "{key: n_other, id: other, kind: action, title: Other}",
+    ]));
+    assert_eq!(
+        support::codes(support::journey_patch(&empty, &snooze("n_pack", "n_other"))),
         [ViolationCode::SnoozeNotActionable]
     );
 }
