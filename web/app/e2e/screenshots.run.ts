@@ -13,6 +13,7 @@ import { expect, test } from "./test.ts";
 import { closeFolds, openFolds } from "./folds.ts";
 import { focusRingProblems } from "./focus.ts";
 import { capture } from "./invariants.ts";
+import { themeProblems } from "./themes.ts";
 import { FIXTURE_SUBJECT, SCREENS, seedProposals, type State, type Subject } from "./screenshots.ts";
 import { open, settled } from "./shell.ts";
 import { expectStructure } from "./structure.ts";
@@ -67,6 +68,10 @@ for (const [viewport, size] of Object.entries(VIEWPORTS)) {
               const file = `${address}-${state.name}-${viewport}-${theme}.png`;
               await capture(page, join(dir, file), { structure: true });
               const url = new URL(page.url());
+              // The light run reads each state in dark too, once: the theme changes colours and no box.
+              if (theme === "light") {
+                expect(await themeProblems(page), `${address} ${state.name} in dark`).toEqual([]);
+              }
               // One Tab walk per screen, on its first state: it moves focus and opens tips, so the state is reached again after.
               if (viewport === "desktop" && theme === "light" && state === SCREENS[address][0]) {
                 const ringless = await focusRingProblems(page);
