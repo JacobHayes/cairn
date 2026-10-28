@@ -127,7 +127,7 @@ mise run build        # the release binary, with the web build embedded
 CAIRN_VERSION=v0.4.0 mise run build:release   # that binary versioned by a tag, copied to dist/release/ with its checksum
 mise run serve        # a local deployment from cairn.dev.toml
 mise run demo         # the sample journeys in memory, nothing to configure
-mise run proof DIR    # a proof's media, from the Playwright specs in DIR (kept outside the repository)
+mise run proof DIR    # screenshots and video from the Playwright specs in DIR (kept outside the repository)
 mise run screenshots  # a picture of every screen state, desktop and phone, light and dark, to dist/screenshots/
 mise run workspace name   # a jj workspace in ../cairn-ws/name with this checkout's build outputs copied in
 ```
@@ -146,7 +146,7 @@ More reading:
 - [`PRACTICES.md`](PRACTICES.md): how code is written and checked.
 - [`DESIGN.md`](DESIGN.md): the look and feel.
 - [`AGENTS.md`](AGENTS.md): where an agent changing Cairn starts.
-- [`briefs/`](briefs/README.md): the milestones that built Cairn, with their proofs.
+- [`briefs/`](briefs/README.md): the milestones that built Cairn.
 - [`decisions/`](decisions/README.md): judgment calls awaiting review, one file each.
 
 ## Built with

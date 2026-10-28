@@ -4,7 +4,7 @@
 // control has the touch-sized hit area (e2e/touch.ts), no text is under the type floor or the
 // contrast floor (e2e/contrast.ts), the document does not scroll down at a desktop width and nothing
 // is drawn past the window's edge (e2e/edges.ts), all read from Chrome's layout snapshot (e2e/snapshot.ts, e2e/structure.ts). `test.ts` runs them
-// after every test; a screenshot (a proof's, or the `mise run screenshots` walk's) goes through
+// after every test; a screenshot (a proof spec's, or the `mise run screenshots` walk's) goes through
 // `capture`, which writes the picture only when they pass and no tip is open.
 import { writeFileSync } from "node:fs";
 

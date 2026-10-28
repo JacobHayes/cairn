@@ -1,13 +1,13 @@
 #!/usr/bin/env -S bash -euo pipefail
-#MISE description="Take a proof's media: build the browser host's module, then run the *.proof.ts specs in a directory outside the repository with web/app/playwright.proof.config.ts"
+#MISE description="Take screenshots and video of a change: build the browser host's module, then run the *.proof.ts specs in a directory outside the repository with web/app/playwright.proof.config.ts"
 #MISE depends=["packages", "build:wasm"]
 # usage: mise run proof <dir> [playwright test args...]
 #   <dir>  the directory holding the *.proof.ts specs: absolute, or from the checkout's root
-# AGENTS, Leave proof people can see: a proof page and its media are committed, the spec that
-# took the media is not. The spec lives in the change's scratch directory, imports
+# AGENTS, Show a change people can see: nothing here is committed. The spec lives in the
+# change's scratch directory, imports
 # `@playwright/test` (web/app/tsconfig.proof.json maps it to the checkout's copy) and the
 # browser tests' helpers (by their absolute path under web/app/e2e/), and saves its screenshots
-# and video beside the proof page. Runs on the in-browser host; CAIRN_E2E_BINARY=1 also starts
+# and video in the scratch directory. Runs on the in-browser host; CAIRN_E2E_BINARY=1 also starts
 # the server host, the binary serving the web build, which is built first.
 cd "$(dirname "$0")/.."
 repo=$PWD

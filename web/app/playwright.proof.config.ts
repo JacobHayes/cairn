@@ -1,7 +1,7 @@
-// A proof's media run: the app's tests' browser and the built demo site (the binary only when
+// A change's screenshots and video run: the app's tests' browser and the built demo site (the binary only when
 // asked), running the *.proof.ts specs in CAIRN_PROOF_DIR. Proof specs are not kept in the
-// repository (AGENTS, Leave proof people can see): one lives in its change's scratch directory
-// and saves a screenshot of each state and a video of the main flow beside the proof page. Not
+// repository (AGENTS, Show a change people can see): one lives in its change's scratch directory
+// and saves a screenshot of each state and a video of the main flow in that directory. Not
 // a browser-step suite: it navigates and captures, and waits for the state it pictures; the
 // e2e specs assert.
 //

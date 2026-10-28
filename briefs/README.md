@@ -1,6 +1,6 @@
 # Cairn: feature briefs
 
-Briefs are Cairn's implementation milestones: what each builds, in what order, and how it is shown to work, with its decision log and its proof under `briefs/proof/<id>/`. Phases 1 to 6 have landed and are the record of the milestones that built Cairn; read the ones that built what your work touches. Phases 7 and 8 are planned, and phase 9 holds briefs added after the plan, for needs met in running Cairn: each of their briefs is a unit of work for whoever picks it up, built and proved the way the landed ones were, and marked landed in the table below in the same commit. Work that no brief covers starts from the documents alone (`AGENTS.md`), and its proof sits beside the briefs' proofs, under `briefs/proof/YYYY-MM-DD-<short-slug>/`. A brief points into `PRD.md`, `ARCHITECTURE.md`, and `PRACTICES.md` by requirement id and section heading and does not restate them; where a brief and a document disagree, the document wins (`AGENTS.md`).
+Briefs are Cairn's implementation milestones: what each builds, in what order, and how it is shown to work, with its decision log. Phases 1 to 6 have landed and are the record of the milestones that built Cairn; read the ones that built what your work touches. Phases 7 and 8 are planned, and phase 9 holds briefs added after the plan, for needs met in running Cairn: each of their briefs is a unit of work for whoever picks it up, built the way the landed ones were, and marked landed in the table below in the same commit. Work that no brief covers starts from the documents alone (`AGENTS.md`). A brief points into `PRD.md`, `ARCHITECTURE.md`, and `PRACTICES.md` by requirement id and section heading and does not restate them; where a brief and a document disagree, the document wins (`AGENTS.md`).
 
 Files are named `<phase>.<step>-<slug>.md`. Phases run in order; within a phase, steps run in order unless the table says otherwise. 4.8 and 4.9 finish what 4.1 and 4.2 start once the engine is complete, so they run before 4.3 and 4.5, which depend on them ([`decisions/2026-10-06-the-service-and-api-split-at-the-engines-2-4-boundary.md`](../decisions/2026-10-06-the-service-and-api-split-at-the-engines-2-4-boundary.md)).
 
@@ -12,7 +12,7 @@ The shape every brief follows.
 2. **Goal**: one paragraph.
 3. **Governing**: PRD ids; ARCHITECTURE and PRACTICES sections by heading.
 4. **Scope**: in, and out where a neighbor could build the same thing.
-5. **Acceptance**: behavior by PRD id and scenario; a real bug its tests must catch; the rungs this brief adds to the ladder, if any (PRACTICES, Growing the ladder); fixtures used. Every brief also leaves `briefs/proof/<id>/` (AGENTS, Leave proof).
+5. **Acceptance**: behavior by PRD id and scenario; a real bug its tests must catch; the rungs this brief adds to the ladder, if any (PRACTICES, Growing the ladder); fixtures used.
 6. **Decisions left to the implementer**.
 7. **Decision log**: appended by the implementer, for small calls; calls that matter go in `decisions/`, one new file per decision (AGENTS).
 

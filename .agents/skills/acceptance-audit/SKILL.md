@@ -5,7 +5,7 @@ description: Check a change against the plan or brief it was built from - every 
 
 # Acceptance audit
 
-A builder's report is a claim, not evidence. Read the plan or brief you were given and the change between the two revisions you were given, and account for everything the plan asks for: its acceptance, tests, documents, proof and deletions. Where the plan conflicts with the governing documents AGENTS.md names, the documents win; say so.
+A builder's report is a claim, not evidence. Read the plan or brief you were given and the change between the two revisions you were given, and account for everything the plan asks for: its acceptance, tests, documents and deletions. Where the plan conflicts with the governing documents AGENTS.md names, the documents win; say so.
 
 For each item say **done** (where, and whether there is sign it ran), **done differently** (what instead, and whether it serves the same goal), or **not done**. Judge from the code, not the commit message.
 
