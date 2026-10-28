@@ -48,11 +48,9 @@ describe("C11 done with its artifact (G2) or note (G4)", () => {
     const checklist = checklistView();
     const node = checklist.journey.graph.nodes?.find((each) => each.key === "n_findings");
     expect(node && missingEvidence(checklist, node).unticked).toEqual(["a", "c"]);
-    const derived = checklist.derived.nodes["n_findings"];
-    if (derived !== undefined) {
-      checklist.derived.nodes["n_findings"] = { ...derived, failing_guards: [] };
-    }
-    expect(node && missingEvidence(checklist, node).unticked).toEqual([]);
+    const ticked = checklistView(["a", "b", "c"]);
+    const tickedNode = ticked.journey.graph.nodes?.find((each) => each.key === "n_findings");
+    expect(tickedNode && missingEvidence(ticked, tickedNode).unticked).toEqual([]);
   });
 });
 
@@ -80,25 +78,13 @@ describe("C9: bulk actions", () => {
   });
 
   it("makes one mutation per node, in the order selected", () => {
-    const plan = bulkPlan({ act: "done" }, [facts("n_meet"), ...work]);
+    const plan = bulkPlan({ act: "done" }, [facts("n_meet"), facts("n_plain")]);
     expect(plan).toEqual({
       mutations: [
         { op: "transition", node: "n_meet", transition: "complete" },
-        { op: "transition", node: "n_work", transition: "complete" },
-        { op: "transition", node: "n_hold", transition: "complete" },
+        { op: "transition", node: "n_plain", transition: "complete" },
       ],
     });
-  });
-
-  const cases: [string, BulkAction, Facts[], string[]][] = [
-    ["start a decision", { act: "start" }, [facts("n_work"), facts("n_pick")], ["n_pick"]],
-    ["complete a decision", { act: "done" }, [facts("n_pick")], ["n_pick"]],
-    ["snooze a finished node", { act: "snooze", until: { date: "2026-10-09" } }, [facts("n_pick"), facts("n_done")], ["n_done"]],
-    ["unsnooze a node with no snooze", { act: "unsnooze" }, [facts("n_wait"), facts("n_pick")], ["n_pick"]],
-    ["reopen an unfinished node", { act: "reopen" }, [facts("n_done"), facts("n_work")], ["n_work"]],
-  ];
-  it.each(cases)("sends nothing when one cannot take it: %s", (_, action, selected, unable) => {
-    expect(bulkPlan(action, selected)).toEqual({ unable });
   });
 
   it("snoozes a container like any node, and one snoozed only through its container is not unsnoozed alone", () => {
@@ -142,11 +128,35 @@ describe("C9: bulk actions", () => {
   });
 });
 
+describe("C9: what a bulk action refuses", () => {
+  it("still sends a completion whose guards fail, for the refusal to name the evidence", () => {
+    expect(bulkPlan({ act: "done" }, [facts("n_work"), facts("n_log")])).toEqual({
+      mutations: [
+        { op: "transition", node: "n_work", transition: "complete" },
+        { op: "transition", node: "n_log", transition: "complete" },
+      ],
+    });
+  });
+
+  const cases: [string, BulkAction, Facts[], string[]][] = [
+    ["start a decision", { act: "start" }, [facts("n_work"), facts("n_pick")], ["n_pick"]],
+    ["complete a decision", { act: "done" }, [facts("n_pick")], ["n_pick"]],
+    ["snooze a finished node", { act: "snooze", until: { date: "2026-10-09" } }, [facts("n_pick"), facts("n_done")], ["n_done"]],
+    ["unsnooze a node with no snooze", { act: "unsnooze" }, [facts("n_wait"), facts("n_pick")], ["n_pick"]],
+    ["reopen an unfinished node", { act: "reopen" }, [facts("n_done"), facts("n_work")], ["n_work"]],
+    ["start work that no longer applies", { act: "start" }, [facts("n_plain"), facts("n_ruled")], ["n_ruled"]],
+    ["complete work that no longer applies", { act: "done" }, [facts("n_plain"), facts("n_ruled")], ["n_ruled"]],
+  ];
+  it.each(cases)("sends nothing when one cannot take it: %s", (_, action, selected, unable) => {
+    expect(bulkPlan(action, selected)).toEqual({ unable });
+  });
+});
+
 it("C9: bulk reopen reopens each finished node, done or skipped, as its own menu does", () => {
-  expect(bulkPlan({ act: "reopen" }, [facts("n_done"), facts("n_done", { state: "skipped" })])).toEqual({
+  expect(bulkPlan({ act: "reopen" }, [facts("n_done"), facts("n_dropped")])).toEqual({
     mutations: [
       { op: "transition", node: "n_done", transition: "reopen" },
-      { op: "transition", node: "n_done", transition: "reopen" },
+      { op: "transition", node: "n_dropped", transition: "reopen" },
     ],
   });
 });

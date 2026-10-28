@@ -33,7 +33,7 @@ import { EvidenceForm } from "./DoneEvidence.tsx";
 import { SnoozePanel, snoozeWords, WeightEditor } from "./editors.tsx";
 import { setFold } from "./folds.ts";
 import { datesFold } from "./datesShown.ts";
-import { answerable, completeAnyway, failingGuards, itemTitle, movesFrom, storedSnooze, titleOf, transition, type GraphNode, type Mutation, type NodeDetail, type Ready } from "./model.ts";
+import { accepts, completeAnyway, failingGuards, itemTitle, storedSnooze, titleOf, transition, type GraphNode, type Mutation, type NodeDetail, type Ready } from "./model.ts";
 import { menuOf, offered, type Act, type ContextId, type MenuId, type MenuItem } from "./offers.ts";
 import { OwnerSelect } from "./parts.tsx";
 import { Rejected } from "./Rejected.tsx";
@@ -451,11 +451,11 @@ function ClosedNote({ view }: { view: Ready }) {
 // A write's receipt or rejection is as wide as it needs: beside the sentence (the menu-only case) it would squeeze the sentence, so it sits under it.
 function NodeActions({ view, detail, onRename }: { view: Ready; detail: NodeDetail; onRename: () => void }) {
   const write = useNodeWrite(view, `actions:${detail.node.key}`, detail.node.key);
-  const { node, record } = detail;
+  const { node } = detail;
   const [copied, setCopied] = useState(false);
   const form = useActionsForm(write.journey, node.key, write.seen, () => { setCopied(false); });
   const offers = offered(view, node.key);
-  const deciding = write.writable && answerable(node.kind, record.state);
+  const deciding = write.writable && accepts(detail.derived, "answer");
   const { open } = form;
   const kept = form.view.state === "kept" ? form.view.opened : undefined;
   // Open in place of the row: every form and panel.
@@ -477,7 +477,7 @@ function NodeActions({ view, detail, onRename }: { view: Ready; detail: NodeDeta
   // A decision awaiting its answer has the answer form in the place of Decide; a page that takes no write has neither, and its menu says only where to find the node.
   const acts = !write.writable ? [] : [...(offers.primary === undefined || offers.primary === "decide" ? [] : [offers.primary]), ...offers.secondary];
   const opens = opensIn(form);
-  const moving = movesFrom(node.kind, record.state).includes("start") ? "Starting" : "Finishing";
+  const moving = accepts(detail.derived, "start") ? "Starting" : "Finishing";
   const inDialog = open?.case === "snooze";
   const rejected = <Rejected view={view} write={write} onResent={form.resent} />;
   const settled = kept === undefined && !inDialog ? rejected : null;

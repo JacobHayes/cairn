@@ -2,7 +2,7 @@
 // in the real engine and derived by it: a meeting milestone and an unassigned decision on the
 // acting frontier; a deliverable that requires an artifact; a placeholder still to break down;
 // a decision snoozed until the deliverable is done; a later decision that requires the meeting;
-// a stage the meeting opens, holding a decision; a finished action; and a decision no longer
+// a stage the meeting opens, holding a decision; a finished action, a skipped one and a plain one waiting on the meeting; two actions no longer in scope, one of them finished first; and a decision no longer
 // in scope. The derived values are the engine's, so no state here is one it cannot produce.
 import type { Mutation } from "../authoring/graph.ts";
 import { builtJourney, loadedEngine } from "../authoring/engine.test-support.ts";
@@ -29,14 +29,22 @@ const mutations: Mutation[] = [
   work("n_stage", "group", "Stage", { opens_at: "n_meet" }),
   decision("n_inner", "Inside the stage", { parent: "n_stage" }),
   work("n_done", "action", "Finished"),
+  work("n_dropped", "action", "Dropped"),
+  work("n_plain", "action", "Plain", { requires: ["n_meet"] }),
+  work("n_ruled", "action", "Ruled out", { relevant_when: { not: { answered: "n_gate" } } }),
+  work("n_closed_ruled", "action", "Finished, then ruled out", { relevant_when: { not: { answered: "n_gate" } } }),
   decision("n_gate", "Is it needed?"),
   decision("n_gone", "Out of scope", { relevant_when: { not: { answered: "n_gate" } } }),
   { op: "snooze", node: "n_wait", until: { node: "n_work" } },
   { op: "transition", node: "n_done", transition: "complete" },
-  { op: "answer", decision: "n_gate", value: { boolean: false } },
+  { op: "transition", node: "n_closed_ruled", transition: "complete" },
+  { op: "transition", node: "n_dropped", transition: { skip: { reason: "Not needed." } } },
 ] as Mutation[];
+
+/** Then the gate is answered, which rules out the work that was finished before it. */
+const afterwards: Mutation[] = [{ op: "answer", decision: "n_gate", value: { boolean: false } }];
 
 /** The journey above, derived by the engine. */
 export function actingView(): Ready {
-  return builtJourney("j_act", "Acting journey", mutations);
+  return builtJourney("j_act", "Acting journey", mutations, afterwards);
 }

@@ -165,9 +165,9 @@ function rollUp(view: Ready, detail: NodeDetail): Piece[] {
   return [`${String(done)} of ${String(total)} done${toDecide === 0 ? "" : `; ${String(toDecide)} to decide`}`, ...slack, ". "];
 }
 
-/** Whether the node is a group marked done: its progress no longer counts what was skipped, so its sentence has no roll-up. */
+/** Whether the node is a group marked done (it reads done and skips what is beneath it): its progress no longer counts what was skipped, so its sentence has no roll-up. */
 function markedDone(detail: NodeDetail): boolean {
-  return detail.node.kind === "group" && detail.record.state === "done";
+  return detail.derived.skips_beneath === true && detail.derived.display_state === "done";
 }
 
 /** D1a: the kept work beneath a skipped container or a group marked done that is not yet done, which its dependents still wait for. */

@@ -11,8 +11,8 @@ use cairn_schema::{
     EffectiveParticipation, Explained, ExplainedField, ExplanationPage, Guard, Instant,
     InstantPoint, JourneyId, KeyRefs, KindKey, Level, LevelDateLink, LevelDisplay, LevelNode,
     LevelQuery, ListFlag, ListQuery, LocalEdit, Markdown, Node, NodeDerived, NodeKey, NodeKind,
-    NodeState, Overrides, Progress, Real, Relevance, RelevanceExplanation, RemovalRead, Score,
-    ShortChain, Snapshot, SnapshotScope, SnoozeTarget, SortBy, StaleReason, StillWaiting,
+    NodeMove, NodeState, Overrides, Progress, Real, Relevance, RelevanceExplanation, RemovalRead,
+    Score, ShortChain, Snapshot, SnapshotScope, SnoozeTarget, SortBy, StaleReason, StillWaiting,
 };
 use cairn_service::{Call, ChildEntry, NodeDetail};
 use schemars::JsonSchema;
@@ -309,6 +309,10 @@ pub(crate) struct LeanDerived {
     snoozed_via: Option<NodeKey>,
     #[serde(default, skip_serializing_if = "std::ops::Not::not")]
     snoozable: bool,
+    /// What can be done to it now, beyond snoozing: the moves a write of that one move would be
+    /// accepted for.
+    #[serde(default, skip_serializing_if = "BTreeSet::is_empty")]
+    moves: BTreeSet<NodeMove>,
     #[serde(default, skip_serializing_if = "std::ops::Not::not")]
     needs_breakdown: bool,
     gravity: Score,
@@ -325,6 +329,7 @@ pub(crate) struct LeanDerived {
 
 impl LeanDerived {
     /// `derived` of the node `key`, in the lean shape.
+    #[allow(clippy::too_many_lines)]
     fn of(key: &NodeKey, derived: NodeDerived) -> Self {
         let NodeDerived {
             relevance,
@@ -348,7 +353,9 @@ impl LeanDerived {
             snoozed,
             snoozed_via,
             snoozable,
+            moves,
             // The web app's: an agent reads `display_state`, and the node read the answer.
+            skips_beneath: _,
             skip_count: _,
             open: _,
             answer: _,
@@ -388,6 +395,7 @@ impl LeanDerived {
             snoozed,
             snoozed_via,
             snoozable,
+            moves,
             needs_breakdown,
             gravity: gravity.three_figures(),
             gravity_from: rounded(gravity_from),

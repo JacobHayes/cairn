@@ -2,8 +2,7 @@
 // 6.5): one primary action, at most one visible secondary, and an overflow menu listing only what
 // applies, grouped by how often it is wanted. Pure, so the unit tests check each kind and state
 // without a page.
-import { missingEvidence } from "../acting/acts.ts";
-import { failingGuards, isTerminal, isWork, movesFrom, nodeOf, recordOf, storedSnooze, titleOf, type NodeDetail, type Ready } from "./model.ts";
+import { accepts, isTerminal, isWork, nodeOf, storedSnooze, titleOf, type NodeDetail, type NodeMove, type Ready } from "./model.ts";
 
 /** The action beside a node, on any surface: what a person does to it in one move. */
 export type Act = "decide" | "done" | "done-with-evidence" | "start" | "break-down" | "mark-atomic" | "unsnooze";
@@ -30,7 +29,7 @@ export function offered(view: Ready, key: string): Offered {
   if (node === undefined || derived === undefined) {
     return { primary: undefined, secondary: [] };
   }
-  const record = recordOf(view, node);
+  const can = (move: NodeMove) => accepts(derived, move);
   const snooze: Act[] = unsnoozeOf(view, key) === undefined ? [] : ["unsnooze"];
   if (derived.open !== true) {
     return { primary: undefined, secondary: [] };
@@ -38,25 +37,17 @@ export function offered(view: Ready, key: string): Offered {
   if (node.kind === "group") {
     return { primary: undefined, secondary: snooze };
   }
-  const moves = movesFrom(node.kind, record.state);
   if (derived.needs_breakdown === true) {
     return { primary: "break-down", secondary: ["mark-atomic", ...snooze] };
   }
   switch (node.kind) {
     case "milestone":
-      return { primary: "done", secondary: snooze };
+      return { primary: can("complete") ? "done" : undefined, secondary: snooze };
     case "decision":
-      return { primary: record.state === "open" ? "decide" : undefined, secondary: snooze };
-    default: {
-      if (!moves.includes("complete")) {
-        return { primary: undefined, secondary: snooze };
-      }
-      const needs = missingEvidence(view, node);
-      return {
-        primary: needs.artifact || needs.note || needs.unticked.length > 0 ? "done-with-evidence" : "done",
-        secondary: [...(moves.includes("start") ? ["start" as const] : []), ...snooze],
-      };
-    }
+      return { primary: can("answer") ? "decide" : undefined, secondary: snooze };
+    default:
+      // A completion the guards refuse still goes ahead with the evidence they lack.
+      return { primary: can("complete") ? "done" : can("complete_anyway") ? "done-with-evidence" : undefined, secondary: [...(can("start") ? ["start" as const] : []), ...snooze] };
   }
 }
 
@@ -125,12 +116,10 @@ export function menuOf(view: Ready, detail: NodeDetail, writable: boolean): Menu
   const kind = node.kind;
   // A container holds other nodes; an empty group holds none yet, though a segment may go into it.
   const container = detail.children.length > 0;
-  const guardFails = failingGuards(derived).length > 0 || derived.needs_breakdown === true;
+  const can = (move: NodeMove) => accepts(derived, move);
   const keptUnder = derived.skipped_by != null && state !== "skipped";
-  // D1a: a skipped node, or a group marked done, skips what is unfinished beneath it.
-  const skipsBeneath = state === "skipped" || (kind === "group" && state === "done");
-  // A group with unfinished work inside can be marked done; one that reads done, skipped or not relevant cannot.
-  const markable = kind === "group" && state === "derived" && derived.open === true;
+  // A group with unfinished work inside can be marked done; one that reads done, skipped or not relevant has nothing to mark.
+  const markable = can("mark_done") && derived.open === true;
   const member = (view.journey.graph.insertions ?? []).some((insertion) => node.key in insertion.nodes);
   const where = (...extra: (MenuId | false)[]): MenuItem[] => items(["show-in-graph", member && "show-insertion", ...extra, "copy-link"]);
   const groups = (...all: MenuItem[][]) => all.filter((group) => group.length > 0);
@@ -139,7 +128,7 @@ export function menuOf(view: Ready, detail: NodeDetail, writable: boolean): Menu
   }
   if (derived.display_state === "not_relevant") {
     // Undoing a skip or a mark done never needs a force include.
-    return groups(items([skipsBeneath && "reopen", "include"]), where());
+    return groups(items([can("reopen") && "reopen", "include"]), where());
   }
   if (state === "skipped") {
     return groups(items(["reopen"]), items(["rename"]), where());
@@ -154,14 +143,14 @@ export function menuOf(view: Ready, detail: NodeDetail, writable: boolean): Menu
       [
         derived.snoozable === true && "snooze",
         markable && "mark-done",
-        "skip",
-        state === "active" && "stop",
-        isWork(node) && guardFails && "done-anyway",
+        can("skip") && "skip",
+        can("stop") && "stop",
+        can("complete_anyway") && "done-anyway",
         keptUnder && "keep",
       ],
       branch ? { snooze: "Snooze branch…", skip: "Skip branch…" } : {},
     ),
-    items(["rename", "assign", kind !== "milestone" && "weight", "pin", isWork(node) && !container && derived.needs_breakdown !== true && "break-down", (container || kind === "group") && "insert-segment"], {
+    items(["rename", "assign", kind !== "milestone" && "weight", "pin", isWork(node) && !container && derived.needs_breakdown !== true && "break-down", can("insert_segment") && "insert-segment"], {
       pin: kind === "decision" ? "Pin decide-by…" : kind === "milestone" ? "Pin date…" : "Pin a date…",
     }),
     where("edit-node"),

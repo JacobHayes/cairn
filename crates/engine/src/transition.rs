@@ -5,7 +5,7 @@
 //! with derive. Marking a group done is a skip-like terminal move: like a skip it is never
 //! guarded.
 
-use cairn_schema::{NodeKind, State, Transition};
+use cairn_schema::{NodeKind, NodeMove, State, Transition};
 
 /// A transition by name, without its reason.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord)]
@@ -37,6 +37,20 @@ impl Move {
         Move::Reopen,
         Move::Answer,
     ];
+
+    /// The move as the derived values name it.
+    #[must_use]
+    pub fn named(self) -> NodeMove {
+        match self {
+            Move::Start => NodeMove::Start,
+            Move::Stop => NodeMove::Stop,
+            Move::Complete => NodeMove::Complete,
+            Move::Skip => NodeMove::Skip,
+            Move::MarkDone => NodeMove::MarkDone,
+            Move::Reopen => NodeMove::Reopen,
+            Move::Answer => NodeMove::Answer,
+        }
+    }
 
     /// The move a transition mutation makes.
     #[must_use]

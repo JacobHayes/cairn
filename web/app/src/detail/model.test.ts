@@ -1,7 +1,7 @@
 // C8's node detail composed in the tab from the document and its derive, and D1's moves.
 import { describe, expect, it } from "vitest";
 
-import { checklistOf, completeAnyway, failingGuards, flagsOf, itemTitle, milestonesFirst, movesFrom, nodeDetail, rankPlaces, transition, waitsMore, waitsOn, type Move, type NodeKind, type State } from "./model.ts";
+import { checklistOf, completeAnyway, failingGuards, flagsOf, itemTitle, milestonesFirst, nodeDetail, rankPlaces, transition, waitsMore, waitsOn } from "./model.ts";
 import { ITEM_GONE } from "../ui/gone.ts";
 import { checklistView, testView } from "./view.test-support.ts";
 
@@ -46,23 +46,7 @@ describe("a node's checklist (G5)", () => {
   });
 });
 
-describe("movesFrom (D1)", () => {
-  const cases: [NodeKind, State, Move[]][] = [
-    ["deliverable", "todo", ["start", "complete", "skip"]],
-    ["action", "active", ["stop", "complete", "skip"]],
-    ["deliverable", "done", ["reopen"]],
-    ["decision", "open", ["skip"]],
-    ["decision", "decided", ["reopen"]],
-    ["milestone", "pending", ["complete", "skip"]],
-    ["milestone", "done", ["reopen"]],
-    ["group", "derived", ["skip", "mark_done"]],
-    ["group", "skipped", ["reopen"]],
-    ["group", "done", ["reopen"]],
-  ];
-  it.each(cases)("a %s in %s can %j", (kind, state, moves) => {
-    expect(movesFrom(kind, state)).toEqual(moves);
-  });
-
+describe("transition (D1)", () => {
   it("carries a skip's reason in its mutation", () => {
     expect(transition("n_a", "skip", "out of scope")).toEqual({
       op: "transition",

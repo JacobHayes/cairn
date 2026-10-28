@@ -3666,6 +3666,12 @@ export interface components {
             kept_work_pending?: components["schemas"]["NodeKey"][];
             /** @description Its seeding identity left the role it was broken down by. */
             membership_lost?: boolean;
+            /**
+             * @description The moves the node accepts now: the transitions its kind's table has from its stored
+             *     state, those that need the node in scope only while it is, a completion only while its
+             *     guards hold (else `complete_anyway`), and `insert_segment` where it may hold children.
+             */
+            moves?: components["schemas"]["NodeMove"][];
             /** @description A placeholder with no children that is not atomic. */
             needs_breakdown?: boolean;
             /**
@@ -3702,6 +3708,11 @@ export interface components {
              *     skipped through an ancestor.
              */
             skipped_by?: components["schemas"]["NodeKey"] | null;
+            /**
+             * @description Whether the node skips the unfinished work beneath it, and so carries the reason it was
+             *     given: it is skipped, or a group marked done.
+             */
+            skips_beneath?: boolean;
             /**
              * @description Whether a snooze can sit on the node: it is in scope with something left to do, and a
              *     group has work in scope left beneath it.
@@ -3857,6 +3868,11 @@ export interface components {
         NodeKey: string;
         /** @description A node kind. */
         NodeKind: "decision" | "deliverable" | "action" | "milestone" | "group";
+        /**
+         * @description A move a node accepts now, as a patch of that one move would find it: the engine's answer to
+         *     what can be done to the node, for every surface to offer and none to work out again.
+         */
+        NodeMove: "start" | "stop" | "complete" | "complete_anyway" | "skip" | "mark_done" | "reopen" | "answer" | "insert_segment";
         /**
          * @description A node named in one of the snapshot's lists: its key and its title, so the list says what
          *     each is without a second read.

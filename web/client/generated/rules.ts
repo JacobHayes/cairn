@@ -73,18 +73,6 @@ export const EXPLANATION_ENTRY_COUNT_MAX = 50;
 /** Items in one page, and users one read names: the server refuses more names. */
 export const PAGE_ITEM_COUNT_MAX = 200;
 
-/** A move by name (D1); answering a decision is its own mutation. */
-export type Move = "start" | "stop" | "complete" | "skip" | "mark_done" | "reopen" | "answer";
-
-/** D1: the states each kind's moves leave from. */
-export const MOVES_FROM: Record<NodeKind, Partial<Record<Move, State[]>>> = {
-  decision: { skip: ["open"], reopen: ["decided", "skipped"], answer: ["open", "decided"] },
-  deliverable: { start: ["todo"], stop: ["active"], complete: ["todo", "active"], skip: ["todo", "active"], reopen: ["done", "skipped"] },
-  action: { start: ["todo"], stop: ["active"], complete: ["todo", "active"], skip: ["todo", "active"], reopen: ["done", "skipped"] },
-  milestone: { complete: ["pending"], skip: ["pending"], reopen: ["done", "skipped"] },
-  group: { skip: ["derived"], mark_done: ["derived"], reopen: ["skipped", "done"] },
-};
-
 /** B1: the state a node of each kind starts in. */
 export const INITIAL_STATE: Record<NodeKind, State> = {
   decision: "open",

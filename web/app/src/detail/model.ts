@@ -3,7 +3,7 @@
 // nothing is fetched for it). It mirrors the server's node detail (crates/service
 // projections, `detail`) field for field, plus the decisions that drive the node's values
 // (E3), which the panel routes edits through.
-import { INITIAL_STATE, MOVES_FROM, TERMINAL_STATES, type Move as EngineMove, type Schema } from "@cairn/client";
+import { INITIAL_STATE, TERMINAL_STATES, type Schema } from "@cairn/client";
 
 import type { JourneyView } from "../data/journeys.ts";
 import { isFinished } from "../status/state.ts";
@@ -43,6 +43,7 @@ export type Annotation = Schema<"Annotation">;
 export type AnswerValue = Schema<"AnswerValue">;
 export type Mutation = Schema<"Mutation">;
 export type Guard = Schema<"Guard">;
+export type NodeMove = Schema<"NodeMove">;
 
 /** One child in a node's Contents. */
 export interface Child {
@@ -186,18 +187,11 @@ export function completeAnyway(node: string, reason?: string): Mutation {
 }
 
 /** A transition by name (D1); answering a decision is its own mutation. */
-export type Move = Exclude<EngineMove, "answer">;
+export type Move = Exclude<NodeMove, "answer" | "complete_anyway" | "insert_segment">;
 
-const MOVE_ORDER: Move[] = ["start", "stop", "complete", "skip", "mark_done", "reopen"];
-
-/** D1: the moves a node of `kind` in `state` can make, in the order the panel offers them. */
-export function movesFrom(kind: NodeKind, state: State): Move[] {
-  return MOVE_ORDER.filter((move) => MOVES_FROM[kind][move]?.includes(state) === true);
-}
-
-/** D1: whether a decision in `state` can be answered (a first answer or a revision). */
-export function answerable(kind: NodeKind, state: State): boolean {
-  return MOVES_FROM[kind].answer?.includes(state) === true;
+/** D1: whether the engine derived `move` among what a node accepts now. */
+export function accepts(derived: NodeDerived | undefined, move: NodeMove): boolean {
+  return derived?.moves?.includes(move) === true;
 }
 
 /** The transition mutation for `move` on `node`; a skip and a mark done carry their reason (D1). */

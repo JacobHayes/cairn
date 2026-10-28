@@ -16,7 +16,7 @@ use crate::chain::{
 use crate::derived::{
     Blocker, Bound, ChecklistCount, Consequences, Contribution, DateOrigin, DeriveInputs, Derived,
     DisplayState, DomainDocument, EffectiveDate, EffectiveParticipation, Explained, NodeDates,
-    NodeDerived, ParticipationOrigin, Progress, RankConstants, Real, Relevance,
+    NodeDerived, NodeMove, ParticipationOrigin, Progress, RankConstants, Real, Relevance,
     RelevanceExplanation, Score, StaleConsequence, StallCause, Stalled,
 };
 use crate::limits::Limit;
@@ -474,8 +474,10 @@ pub fn arb_node_derived() -> BoxedStrategy<NodeDerived> {
         arb_node_derived_flags(),
         any::<u32>(),
         prop::option::of(arb_answer_value()),
+        prop::collection::btree_set(prop::sample::select(NodeMove::ALL.to_vec()), 0..3),
     )
-        .prop_map(|(node, skip_count, answer)| NodeDerived {
+        .prop_map(|(node, skip_count, answer, moves)| NodeDerived {
+            moves,
             skip_count,
             answer,
             ..node
@@ -488,7 +490,7 @@ pub fn arb_node_derived() -> BoxedStrategy<NodeDerived> {
 fn arb_node_derived_flags() -> BoxedStrategy<NodeDerived> {
     (
         arb_relevance(),
-        prop::collection::vec(any::<bool>(), 9),
+        prop::collection::vec(any::<bool>(), 10),
         arb_blocked(),
         prop::collection::btree_map(arb_kind_key(), arb_participation(), 0..2),
         prop::collection::btree_set(arb_stale_reason(), 0..2),
@@ -544,6 +546,8 @@ fn arb_node_derived_flags() -> BoxedStrategy<NodeDerived> {
                     snoozed_via,
                     snoozable: flag(7),
                     skip_count: 0,
+                    moves: std::collections::BTreeSet::new(),
+                    skips_beneath: flag(9),
                     open: flag(8),
                     answer: None,
                     needs_breakdown: flag(6),

@@ -5,13 +5,13 @@ import { useCaller } from "../data/react.ts";
 import { statusTone, statusWord } from "../status/words.ts";
 import { Badge } from "../ui/kit.tsx";
 import { foldKey } from "./folds.ts";
-import { type Child, dueWordsOf, isWork, type NodeDetail, type Ready, transition } from "./model.ts";
+import { accepts, type Child, dueWordsOf, isWork, type NodeDetail, type Ready, transition } from "./model.ts";
 import { NodeLink, Section } from "./parts.tsx";
 import { Rejected } from "./Rejected.tsx";
 import { ownerName } from "./sentence.ts";
 import { useNodeWrite, type NodeWrite } from "./write.ts";
 
-function ContentsRow({ view, child, write, viewer }: { view: Ready; child: Child; write: NodeWrite; viewer: readonly string[] | undefined }) {
+export function ContentsRow({ view, child, write, viewer }: { view: Ready; child: Child; write: NodeWrite; viewer: readonly string[] | undefined }) {
   const done = child.state === "done";
   // The one fact on the right: the date while it is open, else who owns it.
   const due = dueWordsOf(view, child);
@@ -19,7 +19,7 @@ function ContentsRow({ view, child, write, viewer }: { view: Ready; child: Child
   return (
     <li data-testid="child" data-node={child.key} data-state={child.displayState}>
       <span className="contents-mark">
-        {write.writable && isWork(child) && child.state !== "skipped" && child.displayState !== "skipped" ? (
+        {write.writable && isWork(child) && accepts(view.derived.nodes[child.key], done ? "reopen" : "complete") ? (
           <input
             type="checkbox"
             aria-label={`${done ? "Reopen" : "Complete"} ${child.title}`}

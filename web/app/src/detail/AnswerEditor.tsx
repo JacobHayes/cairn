@@ -17,7 +17,7 @@ import { choiceId, choiceLabel } from "../status/answer.ts";
 import { Button, Input as TextInput } from "../ui/kit.tsx";
 import { Markdown } from "../ui/markdown.tsx";
 import { effectOf, effectOfOption, outgoing, sameAnswer } from "./answer.ts";
-import { answerable, titleOf, type AnswerValue, type GraphNode, type NodeDetail, type Ready } from "./model.ts";
+import { accepts, titleOf, type AnswerValue, type GraphNode, type NodeDetail, type Ready } from "./model.ts";
 import { IdentityOptions, NodeLink, Rationale } from "./parts.tsx";
 import { useSavePreview } from "./preview.ts";
 import { Rejected } from "./Rejected.tsx";
@@ -356,10 +356,10 @@ function useAnswerForm(view: Ready, detail: NodeDetail) {
   const write = useNodeWrite(view, `answer:${detail.node.key}`, detail.node.key);
   // The new identity's name is part of the answer's draft: kept across a reload, gone with it.
   const [namedDraft, setNamed] = useDraft<string>(`answer-identity:${write.journey}:${detail.node.key}`);
-  const { node, record, answer, rationale } = detail;
+  const { node, answer, rationale } = detail;
   const form = useFormDraft<AnswerValue>(write.journey, node.key, "answer");
   const why = useFormDraft<string>(write.journey, node.key, "answer-why");
-  const open = answerable(node.kind, record.state);
+  const open = accepts(detail.derived, "answer");
   const effects = useChoiceEffects(view, node.key, open);
   const stored = resolvedAnswer(view, answer);
   const meanwhile = useAnsweredMeanwhile(write, node.key, form, stored);

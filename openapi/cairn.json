@@ -9023,6 +9023,14 @@
             "description": "Its seeding identity left the role it was broken down by.",
             "type": "boolean"
           },
+          "moves": {
+            "description": "The moves the node accepts now: the transitions its kind's table has from its stored\nstate, those that need the node in scope only while it is, a completion only while its\nguards hold (else `complete_anyway`), and `insert_segment` where it may hold children.",
+            "items": {
+              "$ref": "#/components/schemas/NodeMove"
+            },
+            "type": "array",
+            "uniqueItems": true
+          },
           "needs_breakdown": {
             "description": "A placeholder with no children that is not atomic.",
             "type": "boolean"
@@ -9087,6 +9095,10 @@
               }
             ],
             "description": "The ancestor whose skip, or whose marking done, skips it; absent when it is not\nskipped through an ancestor."
+          },
+          "skips_beneath": {
+            "description": "Whether the node skips the unfinished work beneath it, and so carries the reason it was\ngiven: it is skipped, or a group marked done.",
+            "type": "boolean"
           },
           "snoozable": {
             "description": "Whether a snooze can sit on the node: it is in scope with something left to do, and a\ngroup has work in scope left beneath it.",
@@ -9870,6 +9882,56 @@
           {
             "const": "group",
             "description": "A pure container.",
+            "type": "string"
+          }
+        ]
+      },
+      "NodeMove": {
+        "description": "A move a node accepts now, as a patch of that one move would find it: the engine's answer to\nwhat can be done to the node, for every surface to offer and none to work out again.",
+        "oneOf": [
+          {
+            "const": "start",
+            "description": "`start`.",
+            "type": "string"
+          },
+          {
+            "const": "stop",
+            "description": "`stop`.",
+            "type": "string"
+          },
+          {
+            "const": "complete",
+            "description": "`complete`: its guards hold.",
+            "type": "string"
+          },
+          {
+            "const": "complete_anyway",
+            "description": "`complete_anyway`: completing would fail a guard, and this goes ahead past it. Absent\nwhile `complete` is accepted.",
+            "type": "string"
+          },
+          {
+            "const": "skip",
+            "description": "`skip`.",
+            "type": "string"
+          },
+          {
+            "const": "mark_done",
+            "description": "`mark_done`.",
+            "type": "string"
+          },
+          {
+            "const": "reopen",
+            "description": "`reopen`.",
+            "type": "string"
+          },
+          {
+            "const": "answer",
+            "description": "Answering the decision, a first answer or a revision.",
+            "type": "string"
+          },
+          {
+            "const": "insert_segment",
+            "description": "A segment inserted under the node: any node but a decision or milestone holds children.",
             "type": "string"
           }
         ]

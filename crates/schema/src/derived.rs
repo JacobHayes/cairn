@@ -141,6 +141,50 @@ impl DisplayState {
     }
 }
 
+// PRD: D1, D1a, D4.
+/// A move a node accepts now, as a patch of that one move would find it: the engine's answer to
+/// what can be done to the node, for every surface to offer and none to work out again.
+#[derive(
+    Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize, JsonSchema,
+)]
+#[serde(rename_all = "snake_case")]
+pub enum NodeMove {
+    /// `start`.
+    Start,
+    /// `stop`.
+    Stop,
+    /// `complete`: its guards hold.
+    Complete,
+    /// `complete_anyway`: completing would fail a guard, and this goes ahead past it. Absent
+    /// while `complete` is accepted.
+    CompleteAnyway,
+    /// `skip`.
+    Skip,
+    /// `mark_done`.
+    MarkDone,
+    /// `reopen`.
+    Reopen,
+    /// Answering the decision, a first answer or a revision.
+    Answer,
+    /// A segment inserted under the node: any node but a decision or milestone holds children.
+    InsertSegment,
+}
+
+impl NodeMove {
+    /// Every move, in the order a menu lists them.
+    pub const ALL: [NodeMove; 9] = [
+        NodeMove::Start,
+        NodeMove::Stop,
+        NodeMove::Complete,
+        NodeMove::CompleteAnyway,
+        NodeMove::Skip,
+        NodeMove::MarkDone,
+        NodeMove::Reopen,
+        NodeMove::Answer,
+        NodeMove::InsertSegment,
+    ];
+}
+
 // PRD: D1.
 /// A dependency that blocks a node (Gating: Blocked).
 #[derive(
@@ -733,6 +777,16 @@ pub struct NodeDerived {
     /// group has work in scope left beneath it.
     #[serde(default, skip_serializing_if = "crate::serde_util::is_false")]
     pub snoozable: bool,
+    /// The moves the node accepts now: the transitions its kind's table has from its stored
+    /// state, those that need the node in scope only while it is, a completion only while its
+    /// guards hold (else `complete_anyway`), and `insert_segment` where it may hold children.
+    #[serde(default, skip_serializing_if = "BTreeSet::is_empty")]
+    pub moves: BTreeSet<NodeMove>,
+    // PRD: D1a.
+    /// Whether the node skips the unfinished work beneath it, and so carries the reason it was
+    /// given: it is skipped, or a group marked done.
+    #[serde(default, skip_serializing_if = "crate::serde_util::is_false")]
+    pub skips_beneath: bool,
     // PRD: D1a.
     /// How many items (nodes that are not groups) a skip of the node covers: the in-scope,
     /// unfinished ones beneath it, leaving out work marked Keep with what is inside it, and

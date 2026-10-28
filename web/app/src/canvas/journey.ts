@@ -6,7 +6,7 @@
 import type { Schema } from "@cairn/client";
 
 import { conditionNames } from "../authoring/condition.ts";
-import { type GraphNode, isStage, type NodeDerived, nodeOf, rankPlaces, type Ready, recordOf, titleOf } from "../detail/model.ts";
+import { type GraphNode, isStage, type NodeDerived, nodeOf, rankPlaces, type Ready, titleOf } from "../detail/model.ts";
 import { answerText, identityName, NO_OWNER, ownersOf, ownerWords, YOU } from "../detail/sections.tsx";
 import { currentStagesOf } from "../journeys/requests.ts";
 import { isFinished } from "../status/state.ts";
@@ -84,7 +84,7 @@ function bodyOf(context: Context, node: GraphNode, derived: NodeDerived, at: Lev
     const rationale = view.journey.graph.state?.rationales?.[node.key];
     return { kind: "answer", text: answerText(view, answer, node), rationale: rationale === undefined || rationale === "" ? undefined : firstParagraph(rationale) };
   }
-  if (node.kind === "group" && recordOf(view, node).state === "done") {
+  if (derived.skips_beneath === true && state === "done") {
     return { kind: "marked_done", skipped: derived.skip_count ?? 0, keptPending: (derived.kept_work_pending ?? []).length > 0 };
   }
   if (context.children.has(node.key)) {

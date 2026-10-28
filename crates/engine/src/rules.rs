@@ -1,5 +1,5 @@
 //! The rule tables the web app reads (ARCHITECTURE, Generated artifacts): the limits
-//! (PRACTICES, Explicit limits), each kind's transition table (D1), the initial state of
+//! (PRACTICES, Explicit limits), the initial state of
 //! each kind (B1) and which states are terminal, the display states and the words they are
 //! said by (D8), every key prefix, and what each journey status allows (B11, A19), the fields
 //! each kind and answer type has and the defaults of its flags (A1a), the condition operators
@@ -21,8 +21,6 @@ use cairn_schema::{
     ReferenceField, State, role_fits_slot,
 };
 use serde::Serialize;
-
-use crate::transition::{Move, rows};
 
 /// The state's name as the API writes it.
 fn state_name(state: State) -> &'static str {
@@ -53,19 +51,6 @@ fn display_state_name(state: DisplayState) -> &'static str {
     }
 }
 
-/// The move's name as the API writes it.
-fn move_name(step: Move) -> &'static str {
-    match step {
-        Move::Start => "start",
-        Move::Stop => "stop",
-        Move::Complete => "complete",
-        Move::Skip => "skip",
-        Move::MarkDone => "mark_done",
-        Move::Reopen => "reopen",
-        Move::Answer => "answer",
-    }
-}
-
 /// The text of `web/client/generated/rules.ts`.
 #[must_use]
 pub fn typescript() -> String {
@@ -83,7 +68,6 @@ pub fn typescript() -> String {
          \n",
     );
     limits(&mut out);
-    moves(&mut out);
     initial_states(&mut out);
     terminal_states(&mut out);
     display_states(&mut out);
@@ -158,35 +142,6 @@ fn limits(out: &mut String) {
          export const PAGE_ITEM_COUNT_MAX = {PAGE_ITEM_COUNT_MAX};"
     );
     out.push('\n');
-}
-
-/// D1: the move type and the states each kind's moves leave from.
-fn moves(out: &mut String) {
-    let names: Vec<String> = Move::ALL
-        .iter()
-        .map(|step| format!("\"{}\"", move_name(*step)))
-        .collect();
-    let _ = writeln!(
-        out,
-        "/** A move by name (D1); answering a decision is its own mutation. */\nexport type Move = {};\n",
-        names.join(" | ")
-    );
-    out.push_str("/** D1: the states each kind's moves leave from. */\n");
-    out.push_str("export const MOVES_FROM: Record<NodeKind, Partial<Record<Move, State[]>>> = {\n");
-    for kind in NodeKind::ALL {
-        let mut parts: Vec<String> = Vec::new();
-        for step in Move::ALL {
-            let from: Vec<String> = rows(kind, step)
-                .iter()
-                .map(|(from, _)| format!("\"{}\"", state_name(*from)))
-                .collect();
-            if !from.is_empty() {
-                parts.push(format!("{}: [{}]", move_name(step), from.join(", ")));
-            }
-        }
-        let _ = writeln!(out, "  {}: {{ {} }},", kind.name(), parts.join(", "));
-    }
-    out.push_str("};\n\n");
 }
 
 /// B1: the state a node of each kind starts in.
@@ -616,12 +571,5 @@ mod tests {
         for kind in NodeKind::ALL {
             assert!(text.contains(&format!("  {}: ", kind.name())));
         }
-    }
-
-    /// A move's table row survives into the text: a decision can be answered from `open`.
-    #[test]
-    fn moves_are_listed_from_the_transition_table() {
-        let text = typescript();
-        assert!(text.contains("answer: [\"open\", \"decided\"]"));
     }
 }

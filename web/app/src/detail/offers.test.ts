@@ -7,6 +7,7 @@ import { actMutation } from "./ActButton.tsx";
 import { actLabel, contextMenuOf, menuOf, offered, unsnoozeOf } from "./offers.ts";
 import { plainSentence, sentenceOf } from "./sentence.ts";
 import { setAsideOptions } from "./snooze.ts";
+import { actingView } from "../acting/acting.test-support.ts";
 import { checklistView, testView } from "./view.test-support.ts";
 
 /** `view` with node `key`'s derived values changed. */
@@ -119,12 +120,9 @@ describe("G5: finishing work whose checklist is not all ticked", () => {
     const menu = () => menuOf(view, detailOf(view, "n_findings"), true).flat().map((item) => item.id);
     expect(offered(view, "n_findings").primary).toBe("done-with-evidence");
     expect(menu()).toContain("done-anyway");
-    const derived = view.derived.nodes["n_findings"];
-    if (derived !== undefined) {
-      view.derived.nodes["n_findings"] = { ...derived, failing_guards: [] };
-    }
-    expect(offered(view, "n_findings").primary).toBe("done");
-    expect(menu()).not.toContain("done-anyway");
+    const ticked = checklistView(["a", "b", "c"]);
+    expect(offered(ticked, "n_findings").primary).toBe("done");
+    expect(menuOf(ticked, detailOf(ticked, "n_findings"), true).flat().map((item) => item.id)).not.toContain("done-anyway");
   });
 });
 
@@ -158,7 +156,7 @@ describe("a group marked done (D1a)", () => {
 
   /** The stage stored as `state`, with its report effectively skipped through it when it is marked done. */
   function stage(state: "derived" | "done", derived: Partial<NodeDerived> = {}): Ready {
-    const view = made("n_stage", derived);
+    const view = made("n_stage", state === "done" ? { moves: ["insert_segment", "reopen"], skips_beneath: true, ...derived } : derived);
     view.journey.graph.state = { ...view.journey.graph.state, nodes: { ...view.journey.graph.state?.nodes, n_stage: { state, provenance: "local", ...(state === "done" ? { reason: "Covered elsewhere." } : {}) } } };
     return view;
   }
@@ -189,5 +187,33 @@ describe("a group marked done (D1a)", () => {
     expect(plainSentence(view, pieces)).toContain("1 unfinished item");
     const through = sentenceOf(view, detailOf(view, "n_report"), { position: undefined, row: undefined });
     expect(through).toContainEqual({ node: "n_stage" });
+  });
+});
+
+describe("what the engine says a node accepts, read as it derived it", () => {
+  const view = actingView();
+  const ids = (key: string) => menuOf(view, detailOf(view, key), true).flat().map((item) => item.id);
+
+  it("offers Reopen on finished work an answer has since ruled out, with Include anyway", () => {
+    expect(ids("n_closed_ruled").slice(0, 2)).toEqual(["reopen", "include"]);
+  });
+
+  it("offers Insert segment on work that holds nothing yet, and on no decision or milestone", () => {
+    expect(ids("n_plain")).toContain("insert-segment");
+    expect(ids("n_pick")).not.toContain("insert-segment");
+    expect(ids("n_meet")).not.toContain("insert-segment");
+  });
+
+  it("offers work that no longer applies neither Start nor Mark done", () => {
+    const offers = offered(view, "n_ruled");
+    expect(offers.primary).toBeUndefined();
+    expect(offers.secondary).not.toContain("start");
+  });
+
+  it("offers Mark done with its evidence form where a guard fails, and Done anyway beside it", () => {
+    expect(offered(view, "n_log").primary).toBe("done-with-evidence");
+    expect(ids("n_log")).toContain("done-anyway");
+    expect(offered(view, "n_plain").primary).toBe("done");
+    expect(ids("n_plain")).not.toContain("done-anyway");
   });
 });

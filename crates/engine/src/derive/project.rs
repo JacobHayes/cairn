@@ -16,8 +16,8 @@ use std::collections::{BTreeMap, BTreeSet};
 
 use cairn_schema::{
     AnswerValue, Blocker, Contribution, DateLink, DependencyVia, EffectiveParticipation, Explained,
-    Guard, GuardFailure, IdentitySet, KindKey, NodeDates, NodeDerived, NodeKey, Progress, Real,
-    Relevance, RelevanceExplanation,
+    Guard, GuardFailure, IdentitySet, KeyRefs, KindKey, Node, NodeDates, NodeDerived, NodeKey,
+    NodeMove, Progress, Real, Relevance, RelevanceExplanation,
 };
 
 use super::checklist::checklist_count;
@@ -25,7 +25,7 @@ use super::dependencies::EdgeSet;
 use super::links::date_links_by_node;
 use super::relevance::Producer;
 use super::stale::{Annotated, annotated_nodes, static_failures};
-use super::{Derived, held_by, stored_state};
+use super::{Derived, held_by, skips_beneath, stored_state};
 use crate::graph::Graph;
 use crate::transition::{self, Move};
 
@@ -104,8 +104,12 @@ impl Derived {
         annotated: &Annotated<'_>,
         date_links: Vec<DateLink>,
     ) -> NodeDerived {
+        let Some(node) = graph.node(key) else {
+            panic!("the graph holds {key}");
+        };
         let blocking = &self.blocking;
         let priority = &self.priority;
+        let failures = static_failures(graph.document(), graph.tree(), node, annotated);
         let waits_on = self.waits_on(graph, key);
         let waits_total = waits_on.len();
         let waits_on = Explained::complete(waits_on)
@@ -139,12 +143,14 @@ impl Derived {
             checklist_count: graph
                 .node(key)
                 .and_then(|node| checklist_count(graph.document(), node)),
-            failing_guards: self.failing_guards(graph, key, annotated),
+            failing_guards: self.failing_guards(graph, key, node, &failures),
             waits_on,
             done_by_date: blocking.done_by_date(key),
             snoozed: blocking.snoozed(key).cloned(),
             snoozed_via: blocking.snoozed_via(key).cloned(),
             snoozable: self.snoozable(graph, key),
+            moves: self.moves(graph, node, &failures),
+            skips_beneath: skips_beneath(graph.document(), node),
             skip_count: self.skips.covered(key),
             open: self.open(key),
             answer: self.answer(graph, key),
@@ -214,30 +220,61 @@ impl Derived {
         }
     }
 
+    /// D1, D4: the moves a patch of that one move would be accepted for. A row of the node's
+    /// kind table from its stored state is needed, and a move that needs the node in scope (a
+    /// start, a complete, a first answer) is accepted only while it is. A completion whose
+    /// guards fail is not accepted but, for work, can go ahead past them: `complete_anyway`
+    /// stands in for `complete`. A node that is not a leaf takes an inserted segment.
+    /// `failures` is the node's [`static_failures`].
+    fn moves(
+        &self,
+        graph: &Graph,
+        node: &Node<KeyRefs>,
+        failures: &BTreeSet<GuardFailure>,
+    ) -> BTreeSet<NodeMove> {
+        let document = graph.document();
+        let (kind, from) = (node.kind(), stored_state(document, node));
+        let in_scope = self.relevance.in_scope(&node.key);
+        let mut found = BTreeSet::new();
+        for step in Move::ALL {
+            if transition::next(kind, from, step).is_none()
+                || (transition::is_guarded(kind, from, step) && !in_scope)
+            {
+                continue;
+            }
+            let guards_fail = step == Move::Complete && !failures.is_empty();
+            // Only work has guards, so only work has a completion to go ahead past.
+            found.insert(if guards_fail {
+                NodeMove::CompleteAnyway
+            } else {
+                step.named()
+            });
+        }
+        if !kind.is_leaf() {
+            found.insert(NodeMove::InsertSegment);
+        }
+        found
+    }
+
     /// D4: the bypassable guards completing the node would fail if attempted now with no
     /// bypass in the patch: the evidence a deliverable or action still lacks. Empty for any
     /// other node, and for one out of scope or closed. A bypass recorded by an earlier patch
-    /// removes nothing: apply accepts only a bypass in the same patch. `annotated` is
-    /// [`annotated_nodes`] of `graph`.
+    /// removes nothing: apply accepts only a bypass in the same patch. `failures` is the
+    /// node's [`static_failures`].
     fn failing_guards(
         &self,
         graph: &Graph,
         key: &NodeKey,
-        annotated: &Annotated<'_>,
+        node: &Node<KeyRefs>,
+        failures: &BTreeSet<GuardFailure>,
     ) -> BTreeSet<Guard> {
         let document = graph.document();
-        let Some(node) = graph.node(key) else {
-            panic!("the graph holds {key}");
-        };
         let completes =
             transition::next(node.kind(), stored_state(document, node), Move::Complete).is_some();
         if !completes || !self.open(key) {
             return BTreeSet::new();
         }
-        static_failures(document, graph.tree(), node, annotated)
-            .iter()
-            .map(GuardFailure::guard)
-            .collect()
+        failures.iter().map(GuardFailure::guard).collect()
     }
 
     /// Gating, D8: the unsatisfied gate dependencies holding the node now, its own and those

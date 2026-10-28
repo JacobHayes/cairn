@@ -98,12 +98,13 @@ let built: Promise<InBrowserHost> | undefined;
 /**
  * A new journey named `name` with `id`, patched with `mutations` and derived by the real
  * engine, for the unit tests of the screens that read a derived journey. Synchronous so a
- * test support can return it: the engine is loaded once, with top-level await, by the support.
+ * test support can return it: `then` is a second patch on the result (what a patch cannot do in one step, such as ruling out work it finished); the engine is loaded once, with top-level await, by the support.
  */
-export function builtJourney(id: string, name: string, mutations: Mutation[]): import("../data/journeys.ts").JourneyView & { status: "ready" } {
+export function builtJourney(id: string, name: string, mutations: Mutation[], then: Mutation[] = []): import("../data/journeys.ts").JourneyView & { status: "ready" } {
   if (engineHost === undefined) throw new Error("the engine is not loaded: await loadedEngine() before building a journey");
   engineHost.patch({ patch: { id: `p_create_${id}`, target: { journey: id }, base_revision: 0, mutations: [{ op: "create_journey", name }] } });
-  const derived = derivedJourney(engineHost, journeyAfter(engineHost, id, mutations));
+  const first = journeyAfter(engineHost, id, mutations);
+  const derived = derivedJourney(engineHost, then.length === 0 ? first : journeyAfter(engineHost, id, then, first));
   const { ready } = derived;
   derived.free();
   return ready;

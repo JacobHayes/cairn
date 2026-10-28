@@ -69,7 +69,9 @@ never derive it from a name. Read keys from the snapshot or the route; never gue
 A node carries a stored `state` (`todo`, `open`, `done`, and so on), which says which
 transition applies, and a derived `display_state`, which says its status: use it when you
 tell the person. A decision an answer ruled out is still `open` but `not_relevant`. The
-counts come both ways: `by_state` and `by_display_state`, over the in-scope nodes.
+counts come both ways: `by_state` and `by_display_state`, over the in-scope nodes. A node's
+`moves` lists the single moves a write would be accepted for now (`complete_anyway` stands in
+for `complete` while a guard fails), so read it instead of working out what applies.
 
 | `display_state` | Say | Meaning |
 |---|---|---|

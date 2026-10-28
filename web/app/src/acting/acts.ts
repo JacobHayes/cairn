@@ -4,13 +4,12 @@
 // any node rejects it whole and names which (A15, D4).
 import { OWNER_KIND, type Schema } from "@cairn/client";
 
-import { checklistOf, type GraphNode, movesFrom, type Mutation, type NodeDerived, nodeOf, type Ready, recordOf, type State, storedSnooze, transition } from "../detail/model.ts";
+import { accepts, checklistOf, type GraphNode, type Mutation, type NodeDerived, type NodeMove, nodeOf, type Ready, storedSnooze, transition } from "../detail/model.ts";
 import { namedList } from "../ui/words.ts";
 
 /** What the acting surfaces read about one node. */
 export interface Facts {
   node: GraphNode;
-  state: State;
   derived: NodeDerived;
   /** A stored snooze, whether or not it holds (B6). */
   snoozed: boolean;
@@ -23,7 +22,7 @@ export function factsOf(view: Ready, key: string): Facts | undefined {
   if (node === undefined || derived === undefined) {
     return undefined;
   }
-  return { node, state: recordOf(view, node).state, derived, snoozed: storedSnooze(view, key) };
+  return { node, derived, snoozed: storedSnooze(view, key) };
 }
 
 /** C9: the facts of every selected node the journey still holds, in the order selected, whatever page each is on. */
@@ -104,18 +103,18 @@ export type BulkPlan = { mutations: Mutation[] } | { unable: string[] };
 
 /** The mutation `action` makes on one node, or undefined when its kind or state cannot take it. */
 function bulkMutation(action: BulkAction, facts: Facts): Mutation | undefined {
-  const { node, state } = facts;
-  const moves = movesFrom(node.kind, state);
-  const finished = moves.includes("reopen");
+  const { node } = facts;
+  const can = (move: NodeMove) => accepts(facts.derived, move);
   switch (action.act) {
     case "start":
-      return moves.includes("start") ? transition(node.key, "start") : undefined;
+      return can("start") ? transition(node.key, "start") : undefined;
     case "done":
-      return moves.includes("complete") ? transition(node.key, "complete") : undefined;
+      // A completion the guards refuse is still sent: the refusal names the evidence it lacks and offers the remedy.
+      return can("complete") || can("complete_anyway") ? transition(node.key, "complete") : undefined;
     case "reopen":
-      return finished ? transition(node.key, "reopen") : undefined;
+      return can("reopen") ? transition(node.key, "reopen") : undefined;
     case "skip":
-      return moves.includes("skip") ? transition(node.key, "skip", action.reason) : undefined;
+      return can("skip") ? transition(node.key, "skip", action.reason) : undefined;
     case "assign":
       return assignOwner(node.key, action.identity);
     case "snooze":

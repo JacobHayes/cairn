@@ -1,8 +1,12 @@
 // A small derived journey for node detail's unit tests, written as the derive worker answers
 // it: a stage holding a report that requires an artifact and is pinned, a meeting milestone an
 // answered date decision feeds (E3), an open decision, and a findings deliverable the report requires.
+import type { Mutation } from "../authoring/graph.ts";
+import { builtJourney, loadedEngine } from "../authoring/engine.test-support.ts";
 import type { Bound } from "./explain.ts";
 import type { Ready } from "./model.ts";
+
+await loadedEngine();
 
 const today = "2026-10-06";
 
@@ -55,6 +59,7 @@ function derivedNodes(): Ready["derived"]["nodes"] {
     n_stage: {
       ...relevant,
       skip_count: 2,
+      moves: ["insert_segment", "mark_done", "skip"],
       display_state: "active",
       actionable: false,
       dates: {},
@@ -66,6 +71,7 @@ function derivedNodes(): Ready["derived"]["nodes"] {
     },
     n_report: {
       ...relevant,
+      moves: ["complete", "insert_segment", "skip", "stop"],
       display_state: "active",
       actionable: false,
       blocked_by: [{ node: "n_findings", via: "explicit" }],
@@ -77,6 +83,7 @@ function derivedNodes(): Ready["derived"]["nodes"] {
     },
     n_findings: {
       ...relevant,
+      moves: ["complete", "insert_segment", "skip", "start"],
       display_state: "ready",
       actionable: true,
       dates: { due: derivedDue },
@@ -85,28 +92,22 @@ function derivedNodes(): Ready["derived"]["nodes"] {
       unlocks: 2,
       unlocks_from: { entries: [{ node: "n_report", score: 1.5, other_owner: true }], total: 1 },
     },
-    n_meeting: { ...relevant, display_state: "scheduled", actionable: true, waits_on: none, dates: { due: meetingDue, effective_date: { date: "2026-11-20", origin: "pin" } }, gravity_from: none, unlocks_from: none },
-    n_when: { ...relevant, snoozable: false, open: false, answer: { date: "2026-11-20" }, display_state: "done", actionable: false, waits_on: none, dates: {}, gravity_from: none, unlocks_from: none },
-    n_pick: { ...relevant, display_state: "ready", actionable: true, waits_on: none, dates: {}, gravity_from: none, unlocks_from: none },
+    n_meeting: { ...relevant, moves: ["complete", "skip"], display_state: "scheduled", actionable: true, waits_on: none, dates: { due: meetingDue, effective_date: { date: "2026-11-20", origin: "pin" } }, gravity_from: none, unlocks_from: none },
+    n_when: { ...relevant, snoozable: false, open: false, answer: { date: "2026-11-20" }, moves: ["answer", "reopen"], display_state: "done", actionable: false, waits_on: none, dates: {}, gravity_from: none, unlocks_from: none },
+    n_pick: { ...relevant, moves: ["answer", "skip"], display_state: "ready", actionable: true, waits_on: none, dates: {}, gravity_from: none, unlocks_from: none },
   };
 }
 
-/** `testView` with a checklist on Findings (items a, b and c, all required before done), `b` ticked. */
-export function checklistView(): Ready {
-  const view = testView();
-  const nodes = view.journey.graph.nodes ?? [];
-  const at = nodes.findIndex((node) => node.key === "n_findings");
-  const findings = nodes[at];
-  if (findings === undefined || view.journey.graph.state === undefined) {
-    throw new Error("the test journey has no Findings");
-  }
-  nodes[at] = { ...findings, requires_checklist: true, checklist: [{ id: "a", title: "Rollback plan written" }, { id: "b", title: "Support team briefed" }, { id: "c", title: "Security sign-off" }] };
-  view.journey.graph.state.ticks = { n_findings: ["b"] };
-  const derived = view.derived.nodes["n_findings"];
-  if (derived !== undefined) {
-    view.derived.nodes["n_findings"] = { ...derived, failing_guards: ["all_ticked"], checklist_count: { ticked: 1, total: 3 } };
-  }
-  return view;
+/**
+ * A journey the engine derives with a checklist on Findings (items a, b and c, all required
+ * before done) and a plain Report; `ticked` of the items are ticked.
+ */
+export function checklistView(ticked: string[] = ["b"]): Ready {
+  return builtJourney("j_checklist", "Checklist journey", [
+    { op: "add_node", node: { key: "n_findings", id: "findings", kind: "deliverable", title: "Findings", requires_checklist: true, checklist: [{ id: "a", title: "Rollback plan written" }, { id: "b", title: "Support team briefed" }, { id: "c", title: "Security sign-off" }] } },
+    { op: "add_node", node: { key: "n_report", id: "report", kind: "action", title: "Report" } },
+    ...ticked.map((item) => ({ op: "set_ticked", node: "n_findings", item, ticked: true })),
+  ] as Mutation[]);
 }
 
 export function testView(): Ready {

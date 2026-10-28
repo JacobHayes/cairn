@@ -5,7 +5,7 @@
 use crate::engine::support;
 
 use cairn_engine::transition::{self, Move};
-use cairn_schema::{AnswerValue, GraphKey, NodeKind, Record, State, Write};
+use cairn_schema::{AnswerValue, GraphKey, NodeKind, NodeMove, Record, State, Write};
 use support::{accepted, graph, journey, journey_patch, key};
 
 use Move::{Answer, Complete, MarkDone, Reopen, Skip, Start, Stop};
@@ -68,13 +68,15 @@ fn the_tables_have_every_row_and_no_other() {
     }
 }
 
-fn node_yaml(kind: NodeKind) -> String {
+/// The mutations adding the node `n_x` of `kind`, with `fields` (YAML lines, each indented four
+/// spaces) beside the ones every node has.
+fn node_yaml(kind: NodeKind, fields: &str) -> String {
     let extra = match kind {
         Decision => "\n    prompt: Yes?\n    answer_type: boolean",
         Deliverable | Action | Milestone | Group => "",
     };
     format!(
-        "- op: add_node\n  node:\n    key: n_x\n    id: x\n    kind: {}\n    title: X{extra}\n",
+        "- op: add_node\n  node:\n    key: n_x\n    id: x\n    kind: {}\n    title: X{extra}\n{fields}",
         kind.name()
     )
 }
@@ -82,7 +84,15 @@ fn node_yaml(kind: NodeKind) -> String {
 /// A journey holding one node of `kind`, stored in `state` (a decided decision holds an
 /// answer).
 fn one_node(kind: NodeKind, state: State) -> cairn_engine::Records {
-    let mut records = journey(&node_yaml(kind));
+    in_state(journey(&node_yaml(kind, "")), kind, state)
+}
+
+/// `records`, whose node `n_x` of `kind` is stored in `state`.
+fn in_state(
+    mut records: cairn_engine::Records,
+    kind: NodeKind,
+    state: State,
+) -> cairn_engine::Records {
     let journey = records.journeys.values_mut().next().unwrap();
     journey
         .graph
@@ -117,6 +127,90 @@ fn mutation(step: Move) -> &'static str {
         Reopen => "- op: transition\n  node: n_x\n  transition: reopen\n",
         Answer => "- op: answer\n  decision: n_x\n  value: {boolean: false}\n",
     }
+}
+
+/// A journey whose node `n_x` of `kind` sits in `state`, in a situation: ordinary, out of scope
+/// (an answer ruled it out), or (work) lacking the note its completion needs.
+#[derive(Clone, Copy, Debug)]
+enum Situation {
+    Ordinary,
+    NotRelevant,
+    LacksNote,
+}
+
+fn in_situation(kind: NodeKind, state: State, situation: Situation) -> cairn_engine::Records {
+    let flag = "- op: add_node\n  node: {key: n_flag, id: flag, kind: decision, title: Flag, prompt: Go?, answer_type: boolean}\n\
+                - op: answer\n  decision: n_flag\n  value: {boolean: false}\n";
+    let records = match situation {
+        Situation::Ordinary => journey(&node_yaml(kind, "")),
+        Situation::NotRelevant => journey(&format!(
+            "{flag}{}",
+            node_yaml(
+                kind,
+                "    relevant_when: {equals: {decision: n_flag, value: true}}\n"
+            )
+        )),
+        Situation::LacksNote => journey(&node_yaml(kind, "    requires_note: true\n")),
+    };
+    in_state(records, kind, state)
+}
+
+const COMPLETE_ANYWAY: &str =
+    "- op: transition\n  node: n_x\n  transition: {complete_anyway: {}}\n";
+
+#[test]
+fn the_moves_a_node_derives_are_the_ones_apply_accepts() {
+    let mut anyway_seen = false;
+    for kind in NodeKind::ALL {
+        for from in State::ALL.into_iter().filter(|state| state.legal_for(kind)) {
+            for situation in [
+                Situation::Ordinary,
+                Situation::NotRelevant,
+                Situation::LacksNote,
+            ] {
+                // Only work has a completion that can lack its note.
+                if matches!(situation, Situation::LacksNote)
+                    && !matches!(kind, Deliverable | Action)
+                {
+                    continue;
+                }
+                let records = in_situation(kind, from, situation);
+                let moves = support::derived(&records, support::JOURNEY)
+                    .node_derived(
+                        &support::journey_graph(&records, support::JOURNEY),
+                        &key("n_x"),
+                    )
+                    .moves;
+                let label = format!("{kind:?} {from:?} {situation:?}");
+                for step in Move::ALL {
+                    assert_eq!(
+                        moves.contains(&step.named()),
+                        journey_patch(&records, mutation(step)).is_ok(),
+                        "{label} {step:?}"
+                    );
+                }
+                // Going ahead anyway is listed where a plain completion is refused only
+                // for a guard it can go ahead past.
+                let plain = journey_patch(&records, mutation(Complete)).is_ok();
+                let anyway = journey_patch(&records, COMPLETE_ANYWAY).is_ok();
+                assert_eq!(
+                    moves.contains(&NodeMove::CompleteAnyway),
+                    anyway && !plain,
+                    "{label} complete_anyway"
+                );
+                assert_eq!(
+                    moves.contains(&NodeMove::InsertSegment),
+                    !kind.is_leaf(),
+                    "{label} insert_segment"
+                );
+                anyway_seen |= moves.contains(&NodeMove::CompleteAnyway);
+            }
+        }
+    }
+    assert!(
+        anyway_seen,
+        "the grid reaches a completion that lacks its note"
+    );
 }
 
 #[test]
