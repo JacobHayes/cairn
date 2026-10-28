@@ -170,6 +170,7 @@ export const SCREENS: Record<AddressName, [State, ...State[]]> = {
   journey: [
     ...nonEmpty(viewsOf(JOURNEY_OFFERS.screens, async (page, on, view) => { await journeyAt(page, on.journey, view); if (view === "graph") { await fitGraph(page); } }, viewReady)),
     ...POPOVERS,
+    { name: "stages-open", reach: async (page, on) => { await journeyAt(page, on.journey, "list"); await page.getByTestId("card-stages").locator("summary").click(); }, ready: (page) => page.getByTestId("stage-row").first(), only: "desktop" },
     { name: "frontier", reach: (page, on) => journeyAt(page, on.journey, "list?frontier=1"), ready: (page) => page.getByTestId("list") },
     { name: "card-menu", reach: async (page, on) => { await journeyAt(page, on.journey, "graph"); await fitGraph(page); await openCardMenu(page, on.node); }, ready: (page) => page.getByTestId("context-menu"), only: "desktop" },
     { name: "controls-menu", reach: async (page, on) => { await journeyAt(page, on.journey, "list"); await openControlsMenu(page); }, ready: (page) => page.getByTestId("controls-panel-phone"), only: "phone" },

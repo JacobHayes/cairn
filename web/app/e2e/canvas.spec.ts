@@ -11,7 +11,7 @@ import { openTip } from "./tips.ts";
 
 import { expectTitleLinesAsLaidOut, lineBetween, pointOn, viewportOf } from "./canvas.ts";
 import { journeyName, startJourney } from "./around.ts";
-import { goWithin, nodeCard, nodePanel, openJourney, setDepth, setFade, settled, visit, whenSettled } from "./shell.ts";
+import { goWithin, nodeCard, nodePanel, openJourney, openSheet, setDepth, setFade, settled, visit, whenSettled } from "./shell.ts";
 
 /** The open Filter counts what it hides beside its box, and showing the not relevant removes the count. */
 async function filterCountsWhatItHides(page: Page): Promise<void> {
@@ -524,4 +524,55 @@ test("C1: a date line's far end stays in focus under Frontier, and a published r
   await expect(page.locator('[data-kind="dates"]')).toHaveCount(5);
   await section.locator("summary").first().click();
   await expect(page.locator('[data-kind="dates"]')).toHaveCount(0);
+});
+
+test("The journey card's Stages list: a row per stage, choosing one selects and frames it, pointing at one outlines it, and a journey without stages has none", async ({ page }) => {
+  await visit(page, "browser", "/journeys/j_launch?view=graph&depth=actions");
+  await expect(nodeCard(page, "n_build")).toBeVisible();
+  const stages = page.getByTestId("card-stages");
+  await stages.locator("summary").click();
+  await expect(stages.getByTestId("stage-row")).toHaveCount(3);
+  for (const [at, key] of ["n_build", "n_beta", "n_materials"].entries()) {
+    await expect(stages.getByTestId("stage-row").nth(at)).toHaveAttribute("data-node", key);
+  }
+  // Pointing at a row outlines its stage, and leaving it takes the outline away.
+  const row = stages.locator('[data-testid="stage-row"][data-node="n_beta"]');
+  await row.hover();
+  await expect(nodeCard(page, "n_beta")).toHaveClass(/node-edge-end/);
+  await page.mouse.move(0, 0);
+  await expect(nodeCard(page, "n_beta")).not.toHaveClass(/node-edge-end/);
+  // Choosing a row, anywhere on it, selects the stage and frames it whole on the canvas.
+  await row.click({ position: { x: 4, y: 4 } });
+  await expect(nodePanel(page, "n_beta")).toBeVisible();
+  await expect
+    .poll(() =>
+      whenSettled(page, async () => {
+        const [card, canvas] = await Promise.all([nodeCard(page, "n_beta").boundingBox(), page.locator(".react-flow").boundingBox()]);
+        return card !== null && canvas !== null && card.x >= canvas.x && card.y >= canvas.y && card.x + card.width <= canvas.x + canvas.width && card.y + card.height <= canvas.y + canvas.height;
+      }),
+    )
+    .toBe(true);
+  // A journey whose nodes are in no group has no Stages section.
+  await visit(page, "browser", "/journeys/j_bakeoff?view=graph&depth=actions");
+  await expect(page.getByTestId("journey-card")).toBeVisible();
+  await expect(page.getByTestId("card-stages")).toHaveCount(0);
+});
+
+test("The Stages list on a phone: choosing a stage from the sheet lowers the sheet and frames the stage above it", async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  await visit(page, "browser", "/journeys/j_launch?view=graph&depth=actions");
+  await expect(nodeCard(page, "n_beta")).toBeVisible();
+  await openSheet(page);
+  const stages = page.getByTestId("card-stages");
+  await stages.locator("summary").click();
+  await stages.locator('li[data-node="n_beta"]').click({ position: { x: 4, y: 4 } });
+  await expect(page.locator(".frame")).toHaveAttribute("data-sheet", "peek");
+  await expect
+    .poll(() =>
+      whenSettled(page, async () => {
+        const [card, sheet] = await Promise.all([nodeCard(page, "n_beta").boundingBox(), page.locator(".inspector").boundingBox()]);
+        return card !== null && sheet !== null && card.y >= 0 && card.y + card.height <= sheet.y && card.x >= 0 && card.x + card.width <= 390;
+      }),
+    )
+    .toBe(true);
 });

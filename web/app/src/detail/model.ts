@@ -6,7 +6,8 @@
 import { INITIAL_STATE, MOVES_FROM, TERMINAL_STATES, type Move as EngineMove, type Schema } from "@cairn/client";
 
 import type { JourneyView } from "../data/journeys.ts";
-import { isOpen } from "../status/state.ts";
+import { isFinished, isOpen } from "../status/state.ts";
+import { dueWords } from "../status/when.ts";
 import type { DisplayState } from "../status/words.ts";
 
 import { ITEM_GONE, nodeTitle } from "../ui/gone.ts";
@@ -247,6 +248,12 @@ export function unfinishedInside(view: Ready, key: string): number {
  */
 export function skippedThrough(view: Ready, key: string): number {
   return Object.entries(view.derived.nodes).filter(([node, derived]) => derived.skipped_by === key && nodeOf(view, node)?.kind !== "group").length;
+}
+
+/** When a node is due, in words, while it is open: none once it is finished, as a Contents row and a Stages row say it. */
+export function dueWordsOf(view: Ready, node: { key: string; kind: NodeKind; state: State; displayState: DisplayState }): string | undefined {
+  const date = isTerminal(node.state) || isFinished(node.displayState) ? undefined : view.derived.nodes[node.key]?.dates.due?.date;
+  return date === undefined ? undefined : dueWords(date, view.derived.today, node.kind === "decision");
 }
 
 /** D1: whether a node in `state` is finished (done, skipped, decided). */

@@ -2,12 +2,10 @@
 // unchecked in place, each one transition patch (complete, reopen); any other child shows its
 // state and opens its own detail.
 import { useCaller } from "../data/react.ts";
-import { isFinished } from "../status/state.ts";
-import { dueWords } from "../status/when.ts";
 import { statusTone, statusWord } from "../status/words.ts";
 import { Badge } from "../ui/kit.tsx";
 import { foldKey } from "./folds.ts";
-import { type Child, isTerminal, isWork, type NodeDetail, type Ready, transition } from "./model.ts";
+import { type Child, dueWordsOf, isWork, type NodeDetail, type Ready, transition } from "./model.ts";
 import { NodeLink, Section } from "./parts.tsx";
 import { Rejected } from "./Rejected.tsx";
 import { ownerName } from "./sentence.ts";
@@ -16,8 +14,7 @@ import { useNodeWrite, type NodeWrite } from "./write.ts";
 function ContentsRow({ view, child, write, viewer }: { view: Ready; child: Child; write: NodeWrite; viewer: readonly string[] | undefined }) {
   const done = child.state === "done";
   // The one fact on the right: the date while it is open, else who owns it.
-  const dueDate = isTerminal(child.state) || isFinished(child.displayState) ? undefined : view.derived.nodes[child.key]?.dates.due?.date;
-  const due = dueDate === undefined ? undefined : dueWords(dueDate, view.derived.today, child.kind === "decision");
+  const due = dueWordsOf(view, child);
   const fact = due ?? ownerName(view, child.key, viewer);
   return (
     <li data-testid="child" data-node={child.key} data-state={child.displayState}>

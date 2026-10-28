@@ -23,6 +23,7 @@ import { useFraming, type Framing } from "../tour/presentation.ts";
 import { headHeight } from "./cards.ts";
 import { dateRoutes } from "./dateRoutes.ts";
 import { DateEdgeLine, EdgeLine, type Box, type DateEdge, type LineEdge } from "./EdgeLine.tsx";
+import { usePointed } from "./pointed.tsx";
 import { NEAR_ZOOM, firstFrame, fitZoom, listenPinch, minZoomOf, roomOf, shiftInto } from "./gestures.ts";
 import { lensChips, lensTiers } from "./lens.ts";
 import type { Layout } from "./layout.ts";
@@ -52,7 +53,7 @@ export interface Reveal {
   key: string;
   /** The navigation that asked, so each is done once. */
   id: string;
-  how: "centre" | "expanded" | "collapsed";
+  how: "centre" | "expanded" | "collapsed" | "frame";
 }
 
 export interface GraphCanvasProps {
@@ -370,7 +371,7 @@ function useReveal(reveal: Reveal | undefined, model: CanvasModel): void {
       return undefined;
     }
     const container = model.cards.some((card) => card.parent === reveal.key);
-    const ready = model.cards.some((card) => card.key === reveal.key) && (reveal.how === "centre" || (reveal.how === "expanded") === container);
+    const ready = model.cards.some((card) => card.key === reveal.key) && (reveal.how === "centre" || reveal.how === "frame" || (reveal.how === "expanded") === container);
     if (!ready) {
       return undefined;
     }
@@ -673,10 +674,11 @@ const INPUT = {
   edgesFocusable: true,
 } as const;
 
-/** The cards at the ends of the line being hovered and of the one selected: both are drawn in ink, so the card beside says which two it describes. */
+/** The cards at the ends of the line being hovered and of the one selected, and the one a list beside the canvas points at: each is drawn in ink, so the card beside says which it describes. */
 function useEdgeEnds(model: CanvasModel, selectedEdge: string | undefined, hover: Line | DateLine | undefined): ReadonlySet<string> {
   const open = useMemo(() => model.lines.find((line) => line.id === selectedEdge), [model, selectedEdge]);
-  return useMemo(() => new Set([hover, open].flatMap((line) => (line === undefined ? [] : [line.from, line.to]))), [hover, open]);
+  const pointed = usePointed();
+  return useMemo(() => new Set([...[hover, open].flatMap((line) => (line === undefined ? [] : [line.from, line.to])), ...(pointed === undefined ? [] : [pointed])]), [hover, open, pointed]);
 }
 
 /** The node menu: open on a card at a point, offered only where the cards have actions. */

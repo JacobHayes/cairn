@@ -114,3 +114,69 @@
 .home-all {
   align-self: flex-start;
 }
+
+/* The Stages list: one bordered segmented list, a row per stage divided by a rule, the whole row the link's target. */
+.stage-rows {
+  border: 1px solid var(--color-edge);
+}
+
+.stage-row {
+  position: relative;
+  display: grid;
+  gap: var(--space-1);
+  padding: var(--space-2) var(--space-3);
+  min-height: var(--touch-target);
+}
+
+.stage-row + .stage-row {
+  border-top: 1px solid var(--color-border);
+}
+
+.stage-row:hover,
+.stage-row:focus-within {
+  background: var(--color-band);
+}
+
+/* The link covers its row, so a tap anywhere on it chooses the stage. */
+.stage-row-head a::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+}
+
+.stage-row-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2);
+  min-width: 0;
+}
+
+.stage-row-head a {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-weight: 600;
+}
+
+.stage-row-foot {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.stage-row-foot .meter {
+  flex: none;
+  width: 64px;
+}
+
+.stage-row-due {
+  margin-left: auto;
+  text-align: right;
+  white-space: nowrap;
+}
+
+.stage-row[data-state="done"] > * {
+  opacity: 0.5;
+}

@@ -21,6 +21,7 @@ import type { Ready } from "../detail/model.ts";
 import { NodeDetailPanel } from "../detail/NodeDetail.tsx";
 import { SelectionPanel } from "../detail/SelectionPanel.tsx";
 import { indexPath, unavailableScreens, useNodeAddresses, type Screen } from "../journeys/address.ts";
+import { PointedProvider } from "../canvas/pointed.tsx";
 import { JourneyCard } from "../journeys/JourneyCard.tsx";
 import { SummaryPage } from "../summary/SummaryPage.tsx";
 import { useJourneyTarget } from "../journeys/useJourneyTarget.ts";
@@ -146,7 +147,7 @@ function InspectorSlot({
   }
   return !card || screen === "summary" ? null : (
     <Inspector focus={journey} reveal={false}>
-      <JourneyCard ready={ready} selected={selected} />
+      <JourneyCard ready={ready} selected={selected} framing={screen === "graph"} />
     </Inspector>
   );
 }
@@ -216,6 +217,7 @@ function ReadyFrame({ ready, screen, selected, edge }: { ready: Ready } & Omit<F
   const phone = useMedia(PHONE_WIDTH);
   const card = reviewing || selected !== undefined || edge !== undefined || screen === "summary" || screen === "walk" ? "none" : wide || phone ? "column" : fills ? "none" : "inline";
   return (
+    <PointedProvider>
     <ViewStateContext value={viewState}>
     <ConnectContext value={authored === undefined ? undefined : drawing}>
       <InsertEntryContext value={inserting.start}>
@@ -227,7 +229,7 @@ function ReadyFrame({ ready, screen, selected, edge }: { ready: Ready } & Omit<F
         </div>
         <div className={fills ? "ws-canvas journey-body" : "journey-body journey-scroll stack"}>
           <Workspace ready={ready} view={view} screen={screen} selected={selected} edge={line} authored={authored} drawing={drawing} selection={selection} preview={inserting.preview} onCard={setWalkCard} />
-          {card === "inline" ? <JourneyCard ready={ready} selected={selected} /> : null}
+          {card === "inline" ? <JourneyCard ready={ready} selected={selected} framing={screen === "graph"} /> : null}
         </div>
         {sheetOpen ? <KeySheet bindings={bindings} onClose={() => { setSheetOpen(false); }} /> : null}
       </div>
@@ -236,6 +238,7 @@ function ReadyFrame({ ready, screen, selected, edge }: { ready: Ready } & Omit<F
       </InsertEntryContext>
     </ConnectContext>
     </ViewStateContext>
+    </PointedProvider>
   );
 }
 
