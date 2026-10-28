@@ -81,7 +81,6 @@ const CASES: Record<EventType, Case> = {
   snooze_set: { event: event("snooze_set", plan, [put({ snooze: { node: "n_plan", until: { date: "2026-10-31" } } })]), facts: { date: "2026-10-31" } },
   unsnoozed: { event: event("unsnoozed", plan) },
   override_applied: { event: event("override_applied", plan, [put({ overrides: { node: "n_plan", overrides: { keep: "Still needed" } } })]), facts: { reason: "Still needed" } },
-  guard_bypassed: { event: event("guard_bypassed", plan) },
   override_removed: { event: event("override_removed", plan, [put({ overrides: { node: "n_plan", overrides: {} } })]) },
   atomic_changed: { event: event("atomic_changed", plan, [state("n_plan", { state: "todo", atomic: true })]) },
   item_ticked: { event: event("item_ticked", plan, [put({ tick: { node: "n_plan", item: "load" } })]), facts: { item: "Load test", subject: "n_plan" } },
@@ -188,5 +187,32 @@ describe("ticks in words (G5)", () => {
     ]);
     expect(folded[0]?.what).toContain("3");
     expect(folded[1]?.what).toContain("Load test");
+  });
+});
+
+describe("a bypass in the history", () => {
+  it("tells a logged bypass from a keep, giving its reason", () => {
+    const bypassed = event("override_applied", plan, [put({ overrides: { node: "n_plan", overrides: { bypass: { reason: "Said by phone" } } } })]);
+    const said = told({ event: bypassed });
+    expect(said.facts).toEqual(expect.objectContaining({ reason: "Said by phone" }));
+    expect(said.what).not.toBe(told(CASES.override_applied).what);
+  });
+
+  it("tells which override an event applied when the node already held another", () => {
+    const included = event("override_applied", plan, [put({ overrides: { node: "n_plan", overrides: { force_include: "Needed" } } })]);
+    const bypassed = event("override_applied", plan, [put({ overrides: { node: "n_plan", overrides: { force_include: "Needed", bypass: { reason: "Said by phone" } } } })]);
+    const prior = noPrior();
+    remember(prior, included);
+    const said = happened(bypassed, words, prior);
+    expect(said.facts).toEqual(expect.objectContaining({ reason: "Said by phone" }));
+    expect(said.what).not.toBe(happened(included, words, noPrior()).what);
+  });
+
+  it("says a completion that went ahead anyway, with its reason", () => {
+    const done = state("n_plan", { state: "done" });
+    const anyway = told({ event: event("node_transitioned", plan, [done, put({ overrides: { node: "n_plan", overrides: { bypass: { reason: "Said by phone", failures: ["missing_note"] } } } })]) });
+    const plain = told({ event: event("node_transitioned", plan, [done]) });
+    expect(anyway.what).not.toBe(plain.what);
+    expect(anyway.facts).toEqual(expect.objectContaining({ state: "done", reason: "Said by phone" }));
   });
 });

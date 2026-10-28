@@ -5,13 +5,13 @@ use proptest::prelude::*;
 use super::model::bounded_vec;
 use super::{
     arb_agent_id, arb_annotation, arb_annotation_body, arb_answer_value, arb_attachment_key,
-    arb_choices, arb_date, arb_guard, arb_identity, arb_identity_key, arb_identity_set,
-    arb_insertion, arb_insertion_key, arb_journey_header, arb_journey_id, arb_journey_status,
-    arb_kind_key, arb_lineage, arb_local_edit, arb_markdown, arb_node, arb_node_field_value,
-    arb_node_key, arb_node_state, arb_overrides, arb_participation_kind, arb_patch_id,
-    arb_proposal_id, arb_reason, arb_resource, arb_revision, arb_role, arb_role_key,
-    arb_route_header, arb_route_id, arb_route_kind, arb_slug, arb_snooze_target, arb_timestamp,
-    arb_title, arb_user_id, arb_version_number,
+    arb_choices, arb_date, arb_identity, arb_identity_key, arb_identity_set, arb_insertion,
+    arb_insertion_key, arb_journey_header, arb_journey_id, arb_journey_status, arb_kind_key,
+    arb_lineage, arb_local_edit, arb_markdown, arb_node, arb_node_field_value, arb_node_key,
+    arb_node_state, arb_overrides, arb_participation_kind, arb_patch_id, arb_proposal_id,
+    arb_reason, arb_resource, arb_revision, arb_role, arb_role_key, arb_route_header, arb_route_id,
+    arb_route_kind, arb_slug, arb_snooze_target, arb_timestamp, arb_title, arb_user_id,
+    arb_version_number,
 };
 use crate::domain::{DeletedId, Domain, GraphId};
 use crate::event::{Actor, ChangeSet, Event, PatchReceipt, Subject};
@@ -90,6 +90,7 @@ fn arb_transition() -> BoxedStrategy<Transition> {
         Just(Transition::Start),
         Just(Transition::Stop),
         Just(Transition::Complete),
+        prop::option::of(arb_reason()).prop_map(|reason| Transition::CompleteAnyway { reason }),
         arb_reason().prop_map(|reason| Transition::Skip { reason }),
         Just(Transition::Reopen),
     ]
@@ -100,11 +101,6 @@ fn arb_override() -> BoxedStrategy<Override> {
     prop_oneof![
         arb_reason().prop_map(|reason| Override::ForceInclude { reason }),
         arb_reason().prop_map(|reason| Override::Keep { reason }),
-        (
-            prop::collection::btree_set(arb_guard(), 1..3),
-            prop::option::of(arb_reason()),
-        )
-            .prop_map(|(guards, reason)| Override::GuardBypass { guards, reason }),
     ]
     .boxed()
 }
@@ -248,11 +244,7 @@ fn arb_insert_segment() -> BoxedStrategy<Mutation> {
 }
 
 fn arb_state_mutation() -> BoxedStrategy<Mutation> {
-    let override_kind = prop::sample::select(vec![
-        OverrideKind::ForceInclude,
-        OverrideKind::Keep,
-        OverrideKind::GuardBypass,
-    ]);
+    let override_kind = prop::sample::select(vec![OverrideKind::ForceInclude, OverrideKind::Keep]);
     let shift =
         (-365i32..=365).prop_filter_map("within the limit", |days| SignedDays::try_from(days).ok());
     prop_oneof![
@@ -550,7 +542,6 @@ pub fn arb_review_item() -> BoxedStrategy<ReviewItem> {
                 message: message.to_string(),
                 related: Vec::new(),
                 limit: None,
-                bypassable: None,
                 failures: std::collections::BTreeSet::new(),
                 chains: None,
                 caused_by: std::collections::BTreeSet::new(),

@@ -25,6 +25,7 @@ import { Menu } from "../screens/Menu.tsx";
 import { useInsertEntry } from "../segments/entry.ts";
 import { insertionRoot, memberOrigin } from "../segments/model.ts";
 import { Button, Input } from "../ui/kit.tsx";
+import { Dismiss, ReasonForm } from "./ReasonForm.tsx";
 import { actionsDraftKey, actionsForm, changing, formView, opening, takeOpened, type Drafted, type FormCase, type FormValues, type FormView, type Opened, type PanelCase } from "./actions-form.ts";
 import { AnswerEditor } from "./AnswerEditor.tsx";
 import { ActButton, actMutation, type Opens } from "./ActButton.tsx";
@@ -32,7 +33,7 @@ import { EvidenceForm } from "./DoneEvidence.tsx";
 import { SnoozePanel, snoozeWords, WeightEditor } from "./editors.tsx";
 import { setFold } from "./folds.ts";
 import { datesFold } from "./datesShown.ts";
-import { answerable, failingGuards, guardBypass, itemTitle, movesFrom, storedSnooze, titleOf, transition, type Guard, type GraphNode, type Mutation, type NodeDetail, type Ready } from "./model.ts";
+import { answerable, completeAnyway, failingGuards, itemTitle, movesFrom, storedSnooze, titleOf, transition, type GraphNode, type Mutation, type NodeDetail, type Ready } from "./model.ts";
 import { menuOf, offered, type Act, type ContextId, type MenuId, type MenuItem } from "./offers.ts";
 import { OwnerSelect } from "./parts.tsx";
 import { Rejected } from "./Rejected.tsx";
@@ -41,49 +42,6 @@ import { Saving, type Sending } from "../ui/Receipt.tsx";
 import { guardWords, keptWords } from "./words.ts";
 import { useNodeWrite, type NodeWrite } from "./write.ts";
 import { plural } from "../ui/words.ts";
-
-/** The end of a form's row of buttons: Cancel, or while its write is out Close (closing leaves the save going). */
-function Dismiss({ sending, onClose }: { sending: Sending; onClose: () => void }) {
-  return <Button onClick={onClose}>{sending ? "Close" : "Cancel"}</Button>;
-}
-
-/** A reason typed and confirmed in place of the action row: the form every "anyway" and skip shares. Going ahead anyway takes an optional one. */
-export function ReasonForm({ value, label, hint, optional = false, confirm, testId, sending, disabled, onChange, onConfirm, onClose }: {
-  value: string;
-  label: string;
-  hint?: string;
-  /** The reason may be left empty: the confirming button is enabled with the field blank. */
-  optional?: boolean;
-  confirm: string;
-  testId: string;
-  sending: Sending;
-  disabled: boolean;
-  onChange: (reason: string) => void;
-  onConfirm: (reason: string) => void;
-  onClose: () => void;
-}) {
-  // A form opened low in a short sheet (a phone with its keyboard up) is brought wholly into view: the field, its hint and the confirming button.
-  const shown = useRef<HTMLSpanElement>(null);
-  useEffect(() => {
-    shown.current?.scrollIntoView({ block: "nearest" });
-  }, []);
-  return (
-    <span className="stack reason-form" data-testid={testId} ref={shown}>
-      <label className="stack">
-        <span className="label">{label}</span>
-        <Input value={value} onChange={(event) => { onChange(event.target.value); }} />
-      </label>
-      {hint === undefined ? null : <p className="muted">{hint}</p>}
-      <span className="row">
-        <Button primary disabled={disabled || (!optional && value.trim() === "")} onClick={() => { onConfirm(value.trim()); }}>
-          {confirm}
-        </Button>
-        <Dismiss sending={sending} onClose={onClose} />
-      </span>
-      <Saving sending={sending} />
-    </span>
-  );
-}
 
 /** B6: a transition on a container holding its own snooze clears it, and with it the hold on everything beneath. */
 function LiftsSnooze({ view, node, moving }: { view: Ready; node: string; moving: string }) {
@@ -98,10 +56,9 @@ function LiftsSnooze({ view, node, moving }: { view: Ready; node: string; moving
   );
 }
 
-/** The guards a bypass would pass, with what the node is missing in words. */
-function guardsOf(detail: NodeDetail): { guards: Guard[]; words: string } {
-  const guards = failingGuards(detail.derived);
-  return { guards, words: guards.map(guardWords).join(" and ") };
+/** What the node is missing in words: what completing it anyway goes ahead without. */
+function missingWords(detail: NodeDetail): string {
+  return failingGuards(detail.derived).map(guardWords).join(" and ");
 }
 
 /** F2: a done milestone's actual date, edited. */
@@ -302,8 +259,8 @@ interface OpenProps {
 
 type ReasonKind = "skip" | "mark-done" | "keep" | "include" | "bypass";
 
-/** What sending a reason form's `reason` does to `node`: D1's skip, B5's keep and force include, D4's guard bypass with the completion it covers. */
-function reasonMutations(kind: ReasonKind, node: GraphNode, guards: Guard[], reason: string): Mutation[] {
+/** What sending a reason form's `reason` does to `node`: D1's skip, B5's keep and force include, D4's completion that goes ahead anyway. */
+function reasonMutations(kind: ReasonKind, node: GraphNode, reason: string): Mutation[] {
   switch (kind) {
     case "skip":
       return [transition(node.key, "skip", reason)];
@@ -314,7 +271,7 @@ function reasonMutations(kind: ReasonKind, node: GraphNode, guards: Guard[], rea
     case "include":
       return [{ op: "apply_override", node: node.key, override: { force_include: { reason } } }];
     case "bypass":
-      return [guardBypass(node.key, guards, reason), transition(node.key, "complete")];
+      return [completeAnyway(node.key, reason)];
   }
 }
 
@@ -337,15 +294,14 @@ function reasonWords(kind: ReasonKind, node: GraphNode, without: string, inside:
 /** The forms that take a reason. */
 function ReasonCase({ detail, form, write, sending, submit, opened }: OpenProps & { opened: Extract<Drafted, { case: ReasonKind }> }) {
   const { node } = detail;
-  const guards = guardsOf(detail);
   return (
     <ReasonForm
-      {...reasonWords(opened.case, node, guards.words, detail.derived.skip_count ?? 0)}
+      {...reasonWords(opened.case, node, missingWords(detail), detail.derived.skip_count ?? 0)}
       value={opened.value}
       sending={sending}
       disabled={write.disabled}
       onChange={(next) => { form.change(opened.case, next); }}
-      onConfirm={(reason) => { submit(opened, reasonMutations(opened.case, node, guards.guards, reason)); }}
+      onConfirm={(reason) => { submit(opened, reasonMutations(opened.case, node, reason)); }}
       onClose={form.close}
     />
   );

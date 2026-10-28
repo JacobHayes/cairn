@@ -21,7 +21,7 @@ use proptest::prelude::*;
 use cairn_schema::limits::{CONTAINMENT_DEPTH_MAX, EDGE_COUNT_PER_NODE_MAX, NODE_COUNT_MAX};
 use cairn_schema::{
     Action, AnswerSpec, AnswerValue, BoundedSet, Bypass, Clause, Comparison, Condition,
-    ConditionValue, DateRule, DateSource, Days, Decision, Deliverable, Direction, Group, Guard,
+    ConditionValue, DateRule, DateSource, Days, Decision, Deliverable, Direction, Group,
     GuardFailure, KeyRefs, KindKey, Milestone, Node, NodeKey, NodeKind, NodeState, OneOrMany,
     Overrides, ParticipationKind, ParticipationSource, Participations, Payload, Provenance, Role,
     State, Weight,
@@ -687,7 +687,6 @@ impl Shape {
             GuardFailure::MissingNote
         };
         Some(Bypass {
-            guards: BTreeSet::from([Guard::HasNote, Guard::BrokenDown]),
             reason: pick.is_multiple_of(2).then(|| parse("Generated.")),
             failures: BTreeSet::from([failure]),
         })

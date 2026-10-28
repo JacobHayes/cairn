@@ -11,11 +11,11 @@ import { bypassable, untickedIn, withBypass, withMove, withTicks } from "./Rejec
 import { identityName } from "./sections.tsx";
 import { testView } from "./view.test-support.ts";
 
-const violation = (node: string, bypass?: Schema<"Guard">): Schema<"Violation"> => ({
+const violation = (node: string, failure?: Schema<"GuardFailure">): Schema<"Violation"> => ({
   code: "guard_failed",
   at: { subject: { node } },
   message: "a guard failed",
-  ...(bypass === undefined ? {} : { bypassable: bypass }),
+  ...(failure === undefined ? {} : { failures: [failure] }),
 });
 
 describe("resolving a rejection", () => {
@@ -30,36 +30,32 @@ describe("resolving a rejection", () => {
     expect(violationNode({ code: "duplicate_key", at: {}, message: "no subject" })).toBeUndefined();
   });
 
-  it("bypasses every node a refusal names at once, each for its own guards, on one reason (D4)", () => {
-    const completes: Mutation[] = [{ op: "transition", node: "n_a", transition: "complete" }, { op: "transition", node: "n_b", transition: "complete" }];
-    const sent = withBypass({ mutations: completes, base: 4, deployment: 2 }, [{ node: "n_a", guards: ["all_ticked"] }, { node: "n_b", guards: ["has_note", "all_ticked"] }], "Reviewed");
-    expect(sent.slice(2)).toEqual(completes);
-    expect(sent.slice(0, 2)).toEqual([
-      { op: "apply_override", node: "n_a", override: { guard_bypass: { guards: ["all_ticked"], reason: "Reviewed" } } },
-      { op: "apply_override", node: "n_b", override: { guard_bypass: { guards: ["has_note", "all_ticked"], reason: "Reviewed" } } },
-    ]);
+  it("completes every node a refusal names anyway at once, on one reason, leaving other moves alone (D4)", () => {
+    const skip: Mutation = { op: "transition", node: "n_c", transition: { skip: { reason: "No" } } };
+    const attempt: Mutation[] = [{ op: "transition", node: "n_a", transition: "complete" }, { op: "transition", node: "n_b", transition: "complete" }, skip];
+    const sent = withBypass({ mutations: attempt, base: 4, deployment: 2 }, ["n_a"], "Reviewed");
+    expect(sent).toEqual([{ op: "transition", node: "n_a", transition: { complete_anyway: { reason: "Reviewed" } } }, attempt[1], skip]);
   });
 
-  it("sends a bypass without a reason when none was typed (D4)", () => {
+  it("sends the completion without a reason when none was typed (D4)", () => {
     const completes: Mutation[] = [{ op: "transition", node: "n_a", transition: "complete" }];
-    const sent = withBypass({ mutations: completes, base: 4, deployment: 2 }, [{ node: "n_a", guards: ["has_note"] }], "  ");
-    expect(sent[0]).toEqual({ op: "apply_override", node: "n_a", override: { guard_bypass: { guards: ["has_note"] } } });
+    expect(withBypass({ mutations: completes, base: 4, deployment: 2 }, ["n_a"], "  ")).toEqual([{ op: "transition", node: "n_a", transition: { complete_anyway: {} } }]);
   });
 
-  it("offers a bypass for each node's bypassable guards, each once", () => {
-    const offered = bypassable([violation("n_a", "has_note"), violation("n_a", "has_note"), violation("n_a", "has_artifact"), violation("n_b")]);
-    expect(offered).toEqual([{ node: "n_a", guards: ["has_note", "has_artifact"] }]);
+  it("offers a bypass for each node with a failed guard, once", () => {
+    const offered = bypassable([violation("n_a", "missing_note"), violation("n_a", "missing_note"), violation("n_a", "missing_artifact"), violation("n_b")]);
+    expect(offered).toEqual(["n_a"]);
   });
 });
 
 describe("a refusal for unticked checklist items (G5, D4)", () => {
-  const unticked = (node: string, item: string): Schema<"Violation"> => ({ ...violation(node, "all_ticked"), failures: [{ unticked: item }] });
+  const unticked = (node: string, item: string): Schema<"Violation"> => violation(node, { unticked: item });
 
   it("groups the unticked items per node, and says ticking is all it needs only when nothing else broke", () => {
     const refused = [unticked("n_a", "x"), unticked("n_a", "y"), unticked("n_b", "z")];
     expect(untickedIn(refused)).toEqual({ byNode: [{ node: "n_a", items: ["x", "y"] }, { node: "n_b", items: ["z"] }], only: true });
-    expect(untickedIn([...refused, violation("n_a", "has_note")]).only).toBe(false);
-    expect(untickedIn([violation("n_a", "has_note")])).toEqual({ byNode: [], only: false });
+    expect(untickedIn([...refused, violation("n_a", "missing_note")]).only).toBe(false);
+    expect(untickedIn([violation("n_a", "missing_note")])).toEqual({ byNode: [], only: false });
   });
 
   it("sends the ticks before the refused patch, so the guard reads them ticked", () => {

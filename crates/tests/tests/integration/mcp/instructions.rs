@@ -142,7 +142,7 @@ const COVERAGE: &[(&str, &[&str])] = &[
         &["update_journey_state", "apply_patch"],
     ),
     (
-        "force-include, keep under skipped ancestors, and bypass guards",
+        "force-include, keep under skipped ancestors, and complete past guards",
         &["update_journey_state"],
     ),
     (

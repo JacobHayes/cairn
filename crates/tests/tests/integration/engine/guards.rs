@@ -16,9 +16,9 @@ fn complete(node: &str) -> String {
     format!("- op: transition\n  node: {node}\n  transition: complete\n")
 }
 
-fn bypass(node: &str, guards: &str) -> String {
+fn complete_anyway(node: &str) -> String {
     format!(
-        "- op: apply_override\n  node: {node}\n  override: {{guard_bypass: {{guards: [{guards}], reason: Done elsewhere.}}}}\n"
+        "- op: transition\n  node: {node}\n  transition: {{complete_anyway: {{reason: Done elsewhere.}}}}\n"
     )
 }
 
@@ -111,7 +111,6 @@ fn relevance_guards_completion() {
         panic!("one violation")
     };
     assert_eq!(found.code, ViolationCode::NotRelevant);
-    assert_eq!(found.bypassable, None, "relevance has no bypass");
     assert_eq!(found.caused_by, BTreeSet::from([2]), "the answer");
     assert_eq!(found.at.mutation, Some(0), "the completion");
     let away = support::accepted(&records, answer);
@@ -170,30 +169,39 @@ fn undecided_work_finishes_and_stays_undecided() {
     }
 }
 
-/// D4: a bypass covers the evidence a deliverable's or action's completion lacks, so a
-/// bypass with no completion in its patch, or on a decision's answer, is refused; the
-/// completion it covers is not stale for what it recorded, and reopening clears it.
+/// D4: going ahead anyway covers the evidence a deliverable's or action's completion lacks,
+/// and nothing else: a milestone has no guard to go ahead past. The completion is not stale
+/// for what it recorded, and reopening clears the record.
 #[test]
-fn a_bypass_covers_a_completion_and_reopening_clears_it() {
+fn completing_anyway_covers_the_evidence_and_reopening_clears_it() {
     let noted = "{key: n_noted, id: noted, kind: action, title: Noted, requires_note: true}";
-    let gated = "{key: n_gated, id: gated, kind: decision, title: Gated, prompt: Go?, answer_type: boolean}";
-    let records = support::journey(&add(&[noted, gated]));
-    let start = "- op: transition\n  node: n_noted\n  transition: start\n";
-    let answer = "- op: answer\n  decision: n_gated\n  value: {boolean: true}\n";
-    for alone in [
-        format!("{start}{}", bypass("n_noted", "has_note")),
-        format!("{answer}{}", bypass("n_gated", "has_note")),
-    ] {
-        let [found] = &violations(&records, &alone)[..] else {
-            panic!("one violation: {alone}")
-        };
-        assert_eq!(found.code, ViolationCode::IllegalTransition, "{alone}");
-    }
-    let bypassed = support::accepted(
-        &records,
-        &format!("{}{}", complete("n_noted"), bypass("n_noted", "has_note")),
-    );
+    let gate = "{key: n_gate, id: gate, kind: milestone, title: Gate}";
+    let records = support::journey(&add(&[noted, gate]));
+    let found = violations(&records, &complete_anyway("n_gate"));
+    assert_eq!(found[0].code, ViolationCode::IllegalTransition);
+    // A reopen after it in the same patch does not hide the refusal.
+    let reopen = "- op: transition\n  node: n_gate\n  transition: reopen\n";
+    let found = violations(&records, &format!("{}{reopen}", complete_anyway("n_gate")));
+    assert!(found.iter().any(|v| v.at.mutation == Some(0)));
+    let bypassed = support::accepted(&records, &complete_anyway("n_noted"));
     assert!(!support::derived(&bypassed, support::JOURNEY).is_stale(&key("n_noted")));
+    let stored = support::graph(&bypassed).state.overrides[&key("n_noted")]
+        .bypass
+        .clone()
+        .unwrap();
+    assert_eq!(stored.failures, BTreeSet::from([GuardFailure::MissingNote]));
+    // The bypass covers its own completion: a plain completion after a reopen in the same
+    // patch is refused for the evidence it lacks.
+    let again = format!(
+        "{}{}{}",
+        complete_anyway("n_noted"),
+        "- op: transition\n  node: n_noted\n  transition: reopen\n",
+        complete("n_noted")
+    );
+    let [found] = &violations(&records, &again)[..] else {
+        panic!("one violation")
+    };
+    assert_eq!(found.code, ViolationCode::GuardFailed);
     let reopened = support::accepted(
         &bypassed,
         "- op: transition\n  node: n_noted\n  transition: reopen\n",

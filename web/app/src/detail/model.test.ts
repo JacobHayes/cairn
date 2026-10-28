@@ -1,7 +1,7 @@
 // C8's node detail composed in the tab from the document and its derive, and D1's moves.
 import { describe, expect, it } from "vitest";
 
-import { checklistOf, failingGuards, flagsOf, guardBypass, itemTitle, milestonesFirst, movesFrom, nodeDetail, rankPlaces, transition, waitsMore, waitsOn, type Move, type NodeKind, type State } from "./model.ts";
+import { checklistOf, completeAnyway, failingGuards, flagsOf, itemTitle, milestonesFirst, movesFrom, nodeDetail, rankPlaces, transition, waitsMore, waitsOn, type Move, type NodeKind, type State } from "./model.ts";
 import { ITEM_GONE } from "../ui/gone.ts";
 import { checklistView, testView } from "./view.test-support.ts";
 
@@ -73,13 +73,12 @@ describe("movesFrom (D1)", () => {
   });
 });
 
-describe("a guard bypass (D4)", () => {
+describe("completing anyway (D4)", () => {
   it("leaves the reason out when none, or only spaces, was given, and trims one that was", () => {
-    const bypass = (reason?: string) => guardBypass("n_a", ["has_note"], reason);
-    const guard = (reason?: string) => (bypass(reason) as { override: { guard_bypass: object } }).override.guard_bypass;
-    expect(guard()).toEqual({ guards: ["has_note"] });
-    expect(guard("   ")).toEqual({ guards: ["has_note"] });
-    expect(guard(" Said by phone ")).toEqual({ guards: ["has_note"], reason: "Said by phone" });
+    const ahead = (reason?: string) => (completeAnyway("n_a", reason) as { transition: { complete_anyway: object } }).transition.complete_anyway;
+    expect(ahead()).toEqual({});
+    expect(ahead("   ")).toEqual({});
+    expect(ahead(" Said by phone ")).toEqual({ reason: "Said by phone" });
   });
 });
 

@@ -79,7 +79,6 @@ pub(crate) fn violation(code: ViolationCode, message: impl Into<String>) -> Viol
         message: message.into(),
         related: Vec::new(),
         limit: None,
-        bypassable: None,
         failures: std::collections::BTreeSet::new(),
         chains: None,
         caused_by: std::collections::BTreeSet::new(),

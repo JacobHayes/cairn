@@ -627,7 +627,7 @@ pub fn every_state() -> cairn_schema::JourneyState {
         "overrides": {"n_steps": {
             "force_include": "Needed either way.",
             "keep": "Keep it when the plan is skipped.",
-            "bypass": {"guards": ["has_note", "broken_down"], "reason": "Waived for now.",
+            "bypass": {"reason": "Waived for now.",
                        "failures": ["missing_note", "not_broken_down"]},
         }},
         "tombstones": ["n_gone"],

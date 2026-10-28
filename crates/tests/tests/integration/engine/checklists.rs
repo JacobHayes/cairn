@@ -10,14 +10,14 @@ use std::collections::BTreeSet;
 
 use cairn_engine::{Applied, DerivedJourney, Records};
 use cairn_schema::{
-    ChecklistCount, Domain, GraphKey, Guard, GuardFailure, Lineage, ListQuery, RecordKey,
-    Rejection, ReviewItem, RouteFile, SequentialKeys, StaleReason, Violation, ViolationCode, Write,
-    from_yaml,
+    ChecklistCount, Domain, GraphKey, GuardFailure, Lineage, ListQuery, RecordKey, Rejection,
+    ReviewItem, RouteFile, SequentialKeys, StaleReason, Violation, ViolationCode, Write, from_yaml,
 };
 use support::key;
 
 const LAUNCH: &str = "j_launch";
 const HARDENING: &str = "n_hardening";
+const ANYWAY: &str = "- op: transition\n  node: n_hardening\n  transition: {complete_anyway: {reason: The rest are not needed.}}\n";
 const DONE: &str = "- op: transition\n  node: n_hardening\n  transition: complete\n";
 const TITLE: &str = "  title: Hardening pass\n";
 const ITEMS: &str = "  requires_checklist: true\n  checklist:\n  - {id: rollback, title: Rollback plan}\n  - {id: load, title: Load test}\n  - {id: docs, title: Runbook updated}\n";
@@ -173,7 +173,6 @@ fn completion_needs_every_item_ticked_and_an_untick_makes_it_stale() {
         failures,
         BTreeSet::from([failure("rollback"), failure("load"), failure("docs")])
     );
-    assert!(found.iter().all(|v| v.bypassable == Some(Guard::AllTicked)));
 
     let found = refusals(&records, &format!("{}{DONE}", ticks(&["rollback", "load"])));
     assert_eq!(found.len(), 1);
@@ -223,13 +222,7 @@ fn completion_needs_every_item_ticked_and_an_untick_makes_it_stale() {
 #[test]
 fn a_bypass_records_the_items_and_an_added_item_is_stale() {
     let records = ready(ITEMS);
-    let bypassed = accepted(
-        &records,
-        &format!(
-            "{}- op: apply_override\n  node: n_hardening\n  override: {{guard_bypass: {{guards: [all_ticked], reason: \"The rest are not needed.\"}}}}\n{DONE}",
-            tick("rollback", true)
-        ),
-    );
+    let bypassed = accepted(&records, &format!("{}{ANYWAY}", tick("rollback", true)));
     assert!(stale(&bypassed).is_empty());
     let recorded = bypassed.journeys[&LAUNCH.parse().unwrap()]
         .graph
@@ -266,10 +259,7 @@ fn a_bypass_records_the_items_and_an_added_item_is_stale() {
 fn a_removed_item_leaves_the_bypass_and_a_new_item_under_its_id_is_stale() {
     let bypassed = accepted(
         &ready(ITEMS),
-        &format!(
-            "{}- op: apply_override\n  node: n_hardening\n  override: {{guard_bypass: {{guards: [all_ticked], reason: \"The rest are not needed.\"}}}}\n{DONE}",
-            tick("rollback", true)
-        ),
+        &format!("{}{ANYWAY}", tick("rollback", true)),
     );
     let list = |ids: &[&str]| {
         let items: Vec<String> = ids
@@ -307,10 +297,7 @@ fn a_removed_item_leaves_the_bypass_and_a_new_item_under_its_id_is_stale() {
 fn an_upgrade_dropping_an_item_leaves_the_bypass() {
     let bypassed = accepted(
         &ready(ITEMS),
-        &format!(
-            "{}- op: apply_override\n  node: n_hardening\n  override: {{guard_bypass: {{guards: [all_ticked], reason: \"The rest are not needed.\"}}}}\n{DONE}",
-            tick("rollback", true)
-        ),
+        &format!("{}{ANYWAY}", tick("rollback", true)),
     );
     let changed = "  requires_checklist: true\n  checklist:\n  - {id: rollback, title: Rollback plan}\n  - {id: docs, title: Runbook updated}\n";
     let published =

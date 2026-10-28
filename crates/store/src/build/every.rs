@@ -12,8 +12,8 @@ use std::collections::{BTreeMap, BTreeSet};
 use cairn_schema::{
     Action, Annotation, AnnotationBody, AnnotationContent, AnswerSpec, AnswerType, AnswerValue,
     BoundedSet, Bypass, Checklist, Choices, Date, Days, Decision, Deliverable, Domain, Graph,
-    Group, Guard, GuardFailure, Identity, Insertion, JourneyHeader, JourneyState, JourneyStatus,
-    Keyed, Lineage, LocalEdit, Milestone, Node, NodeField, NodeKey, NodeKind, NodeState, Overrides,
+    Group, GuardFailure, Identity, Insertion, JourneyHeader, JourneyState, JourneyStatus, Keyed,
+    Lineage, LocalEdit, Milestone, Node, NodeField, NodeKey, NodeKind, NodeState, Overrides,
     ParticipationKind, ParticipationSource, Participations, Payload, Proposal, ProposalDraft,
     ProposalStatus, Provenance, Reopened, Resource, ResourceContent, RetiredKeys, Revision, Role,
     RouteHeader, RouteKind, SnoozeTarget, State, Weight, refs::KeyRefs,
@@ -189,15 +189,9 @@ pub fn annotation_contents() -> Vec<AnnotationContent> {
     )
 }
 
-/// Every guard and every guard failure, in one bypass.
+/// Every guard failure, in one bypass.
 #[must_use]
 pub fn bypass() -> Bypass {
-    let guards = chain(Guard::HasArtifact, |guard| match guard {
-        Guard::HasArtifact => Some(Guard::HasNote),
-        Guard::HasNote => Some(Guard::AllTicked),
-        Guard::AllTicked => Some(Guard::BrokenDown),
-        Guard::BrokenDown => None,
-    });
     let failures = chain(GuardFailure::MissingArtifact, |failure| match failure {
         GuardFailure::MissingArtifact => Some(GuardFailure::MissingNote),
         GuardFailure::MissingNote => Some(GuardFailure::Unticked(id("load"))),
@@ -205,7 +199,6 @@ pub fn bypass() -> Bypass {
         GuardFailure::NotBrokenDown => None,
     });
     Bypass {
-        guards: guards.into_iter().collect(),
         reason: Some(id("Waived for now.")),
         failures: failures.into_iter().collect(),
     }

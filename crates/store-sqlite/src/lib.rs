@@ -22,6 +22,7 @@ mod records;
 mod sql;
 mod state;
 mod stored_json;
+mod to_complete_anyway;
 mod to_deleted_ids;
 mod to_done;
 mod to_evidence_guards;

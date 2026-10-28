@@ -391,7 +391,6 @@ fn violation(code: ViolationCode, subject: Subject, message: String) -> Violatio
         message,
         related: Vec::new(),
         limit: None,
-        bypassable: None,
         failures: BTreeSet::new(),
         chains: None,
         caused_by: std::collections::BTreeSet::new(),

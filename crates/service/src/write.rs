@@ -585,7 +585,6 @@ pub(crate) fn violation(code: ViolationCode, mutation: Option<u32>, message: Str
         message,
         related: Vec::new(),
         limit: None,
-        bypassable: None,
         failures: std::collections::BTreeSet::new(),
         chains: None,
         caused_by: std::collections::BTreeSet::new(),

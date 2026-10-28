@@ -35,7 +35,7 @@ use crate::node::{IdentitySet, Node, ParticipationSource};
 use crate::number::{Revision, SignedDays, VersionNumber};
 use crate::proposal::ProposalDraft;
 use crate::refs::KeyRefs;
-use crate::state::{AnswerValue, Guard, LocalEdit, OverrideKind, Provenance, SnoozeTarget};
+use crate::state::{AnswerValue, LocalEdit, OverrideKind, Provenance, SnoozeTarget};
 use crate::text::{Markdown, Reason, Title};
 use jiff::civil::Date;
 
@@ -252,6 +252,14 @@ pub enum Transition {
     Stop,
     /// To `done` (deliverable, action, milestone).
     Complete,
+    // PRD: D4.
+    /// To `done` going ahead anyway: the guards it fails are bypassed, and the engine
+    /// records which. Only a deliverable or action has guards to bypass.
+    CompleteAnyway {
+        /// Why, when the person gave a reason. Leave the field out for none.
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        reason: Option<Reason>,
+    },
     // PRD: D1.
     /// To `skipped`, with the reason a skip requires.
     Skip {
@@ -299,15 +307,6 @@ pub enum Override {
         /// Why.
         reason: Reason,
     },
-    /// Go ahead anyway: bypass guards on the node's start or completion in the same patch.
-    /// The engine records the specific failures present.
-    GuardBypass {
-        /// The guards bypassed.
-        guards: BTreeSet<Guard>,
-        /// Why, when the person gave a reason. Leave the field out for none.
-        #[serde(default, skip_serializing_if = "Option::is_none")]
-        reason: Option<Reason>,
-    },
 }
 
 impl Override {
@@ -317,7 +316,6 @@ impl Override {
         match self {
             Override::ForceInclude { .. } => OverrideKind::ForceInclude,
             Override::Keep { .. } => OverrideKind::Keep,
-            Override::GuardBypass { .. } => OverrideKind::GuardBypass,
         }
     }
 }

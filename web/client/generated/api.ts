@@ -1318,14 +1318,12 @@ export interface components {
             date: string;
         };
         /**
-         * @description A guard bypass as stored: the guards bypassed, why when a reason was given, and the
-         *     specific failures present when it was applied.
+         * @description A guard bypass as stored, written by a completion that went ahead anyway: why when a
+         *     reason was given, and the specific failures present, which say the guards bypassed.
          */
         Bypass: {
-            /** @description The failures present when the bypass was applied. */
+            /** @description The failures present when the completion went ahead. */
             failures?: components["schemas"]["GuardFailure"][];
-            /** @description The guards bypassed. */
-            guards: components["schemas"]["Guard"][];
             /** @description Why, when a reason was given. */
             reason?: components["schemas"]["Reason"] | null;
         };
@@ -2208,7 +2206,7 @@ export interface components {
          *     their content ([`Mutation::event_type`]).
          * @enum {string}
          */
-        EventType: "journey_created" | "journey_edited" | "journey_status_changed" | "journey_deleted" | "route_created" | "route_edited" | "route_retired" | "route_unretired" | "draft_opened" | "route_version_imported" | "saved_as_route" | "draft_discarded" | "route_published" | "route_deleted" | "node_added" | "node_changed" | "weight_changed" | "node_removed" | "edge_changed" | "role_changed" | "participation_kind_changed" | "default_owner_changed" | "participation_changed" | "resource_changed" | "segment_inserted" | "node_transitioned" | "answer_set" | "recorded_date_changed" | "role_fill_changed" | "date_pinned" | "date_shifted" | "date_unpinned" | "snooze_set" | "unsnoozed" | "override_applied" | "guard_bypassed" | "override_removed" | "atomic_changed" | "item_ticked" | "item_unticked" | "annotation_added" | "annotation_edited" | "annotation_removed" | "journey_upgraded" | "relinked" | "provenance_changed" | "local_edit_changed" | "identity_created" | "identity_edited" | "identities_merged" | "identity_deleted" | "proposal_created" | "proposal_edited" | "proposal_applied" | "proposal_discarded";
+        EventType: "journey_created" | "journey_edited" | "journey_status_changed" | "journey_deleted" | "route_created" | "route_edited" | "route_retired" | "route_unretired" | "draft_opened" | "route_version_imported" | "saved_as_route" | "draft_discarded" | "route_published" | "route_deleted" | "node_added" | "node_changed" | "weight_changed" | "node_removed" | "edge_changed" | "role_changed" | "participation_kind_changed" | "default_owner_changed" | "participation_changed" | "resource_changed" | "segment_inserted" | "node_transitioned" | "answer_set" | "recorded_date_changed" | "role_fill_changed" | "date_pinned" | "date_shifted" | "date_unpinned" | "snooze_set" | "unsnoozed" | "override_applied" | "override_removed" | "atomic_changed" | "item_ticked" | "item_unticked" | "annotation_added" | "annotation_edited" | "annotation_removed" | "journey_upgraded" | "relinked" | "provenance_changed" | "local_edit_changed" | "identity_created" | "identity_edited" | "identities_merged" | "identity_deleted" | "proposal_created" | "proposal_edited" | "proposal_applied" | "proposal_discarded";
         /**
          * @description A list of explanation entries with its total: complete inside
          *     the engine and the browser; a server response keeps the largest entries up to
@@ -4062,16 +4060,9 @@ export interface components {
                 /** @description Why. */
                 reason: components["schemas"]["Reason"];
             };
-        } | {
-            guard_bypass: {
-                /** @description The guards bypassed. */
-                guards: components["schemas"]["Guard"][];
-                /** @description Why, when the person gave a reason. Leave the field out for none. */
-                reason?: components["schemas"]["Reason"] | null;
-            };
         };
         /** @description The kind of an override. */
-        OverrideKind: "force_include" | "keep" | "guard_bypass";
+        OverrideKind: "force_include" | "keep";
         /** @description A node's overrides: logged departures. */
         Overrides: {
             /** @description A guard bypass on the node's transition. */
@@ -5814,6 +5805,11 @@ export interface components {
          *     [`Mutation::SetRecordedDate`].
          */
         Transition: "start" | "stop" | "complete" | {
+            complete_anyway: {
+                /** @description Why, when the person gave a reason. Leave the field out for none. */
+                reason?: components["schemas"]["Reason"] | null;
+            };
+        } | {
             skip: {
                 /** @description Why. */
                 reason: components["schemas"]["Reason"];
@@ -5922,11 +5918,6 @@ export interface components {
         Violation: {
             /** @description Where. */
             at: components["schemas"]["Location"];
-            /**
-             * @description The guard a bypass would accept this past, when it is a bypassable guard failure
-             *     (`has_artifact`, `has_note`, `all_ticked`, `broken_down`).
-             */
-            bypassable?: components["schemas"]["Guard"] | null;
             /**
              * @description The patch's other mutations that brought it about, beside `at.mutation` (a
              *     completion and the mutation that gave it an unfinished dependency in the same patch).

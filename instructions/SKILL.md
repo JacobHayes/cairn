@@ -120,10 +120,11 @@ Order is never a guard: a node is started, finished or answered whatever it wait
 whatever its own date, as a plain move. Out-of-order work is a fact, and a recorded date never
 warns. Reopening something finished work relied on marks that work `stale` while it is open.
 The guards are the evidence a completion needs: a note, a link, ticks or a breakdown. To
-complete without it on purpose, send a guard bypass in the same patch as the completion: an
-`apply_override` mutation with `guard_bypass` naming the guards, then the `complete`
-transition. The reason is optional. A bypass alone, or with any other move, is refused, and
-the completion alone is refused with the guard. Do it only when the person says to.
+complete without it on purpose, send the `complete_anyway` transition (to complete it
+anyway, or to go ahead without the evidence) in place of `complete`, with an optional
+`reason`. It bypasses whatever guards fail and records which. The plain `complete` is refused
+with the guard. `mark_done` is for a group only, never a way to complete work. Do it only when
+the person says to.
 
 A snooze sets a node aside until a date or until another node is done. Snooze a container
 (a group, or work with children) to set its whole subtree aside in one move: every
@@ -156,8 +157,7 @@ or route); a proposal stays listed until it is applied or discarded.
 Work marked `requires_note` cannot be completed until it has a note of its own (a link,
 or a note on a child or the journey, does not count). Send the note and the completion as
 one patch (`add_annotation` with the node and the text, then the `complete` transition); the
-completion alone is refused with the `has_note` guard. Bypass it only
-when the person says no note is needed. Removing the last note later marks
+completion alone is refused with the `has_note` guard. Removing the last note later marks
 a finished node `stale` with "missing note".
 
 A deliverable or action can carry a `checklist` (items with an `id` and a `title`, at
@@ -165,8 +165,7 @@ most 50), and with `requires_checklist` it cannot be completed until every item 
 Tick with the `set_ticked` mutation (`node`, `item`, `ticked`) and send the ticks and the
 completion as one patch; the completion alone is refused with the `all_ticked` guard, one
 failure per unticked item. Ticking or unticking sets the item's state; sending
-the state it already has changes nothing. An item not on the checklist is refused. Bypass
-the guard only when the person says the items need not be ticked. Unticking
+the state it already has changes nothing. An item not on the checklist is refused. Unticking
 an item later, or adding one, marks a finished node `stale` with "unticked item". Ticks are
 kept when a node is reopened, and removing an item removes its tick.
 

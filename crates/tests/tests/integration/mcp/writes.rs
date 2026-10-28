@@ -10,7 +10,7 @@ use crate::mcp::support;
 use std::collections::BTreeSet;
 
 use cairn_mcp::ToolError;
-use cairn_schema::{Guard, GuardFailure, Rejection, Subject, ViolationCode};
+use cairn_schema::{GuardFailure, Rejection, Subject, ViolationCode};
 use serde_json::{Value, json};
 
 use support::{World, agent, user};
@@ -107,8 +107,8 @@ async fn a_direct_write_applies_no_proposal() {
 }
 
 /// B10, A16, D4: completing a placeholder that is not broken down is refused through the
-/// tool with the one guard that failed, named on the node and bypassable, and nothing is
-/// written; the same completion bypassing that guard with a reason applies.
+/// tool with the one guard that failed, named on the node, and nothing is
+/// written; the same completion going ahead anyway with a reason applies.
 #[tokio::test]
 async fn completing_a_placeholder_not_broken_down_is_refused_until_bypassed() {
     let world = World::new();
@@ -134,16 +134,12 @@ async fn completing_a_placeholder_not_broken_down_is_refused_until_bypassed() {
         violation.failures,
         BTreeSet::from([GuardFailure::NotBrokenDown])
     );
-    assert_eq!(violation.bypassable, Some(Guard::BrokenDown));
     let snapshot = json!({ "journey": "j_vendor_eval" });
     let snapshot = world.ok(&ann, "get_snapshot", snapshot).await;
     assert_eq!(snapshot["revision"], 4, "nothing was written");
 
-    let bypassed = json!([
-        { "op": "transition", "node": "n_workload", "transition": "complete" },
-        { "op": "apply_override", "node": "n_workload", "override": { "guard_bypass": {
-            "guards": ["broken_down"], "reason": "Run as one piece." } } },
-    ]);
+    let bypassed = json!([{ "op": "transition", "node": "n_workload",
+        "transition": { "complete_anyway": { "reason": "Run as one piece." } } }]);
     let bypassed = state("p_workload_bypassed", 4, bypassed);
     let applied = world.ok(&ann, "update_journey_state", bypassed).await;
     assert_eq!(applied["revision"], 5);
@@ -191,12 +187,6 @@ async fn completing_work_with_a_checklist_needs_its_ticks_in_the_same_patch() {
             GuardFailure::Unticked("request".parse().unwrap()),
             GuardFailure::Unticked("granted".parse().unwrap()),
         ])
-    );
-    assert!(
-        violations
-            .as_slice()
-            .iter()
-            .all(|violation| violation.bypassable == Some(Guard::AllTicked))
     );
 
     let ticked = json!([

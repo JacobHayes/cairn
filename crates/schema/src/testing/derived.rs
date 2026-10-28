@@ -166,12 +166,6 @@ pub fn arb_violation() -> BoxedStrategy<Violation> {
         "[A-Z][a-z ]{4,30}",
         prop::collection::vec(arb_subject(), 0..2),
         prop::option::of(prop::sample::select(Limit::ALL.to_vec())),
-        prop::option::of(prop::sample::select(vec![
-            Guard::HasArtifact,
-            Guard::HasNote,
-            Guard::AllTicked,
-            Guard::BrokenDown,
-        ])),
         prop::collection::btree_set(arb_guard_failure(), 0..2),
         (
             prop::option::of(chains),
@@ -179,18 +173,15 @@ pub fn arb_violation() -> BoxedStrategy<Violation> {
         ),
     )
         .prop_map(
-            |(code, at, message, related, limit, bypassable, failures, (chains, caused_by))| {
-                Violation {
-                    code,
-                    at,
-                    message,
-                    related,
-                    limit,
-                    bypassable,
-                    failures,
-                    chains,
-                    caused_by,
-                }
+            |(code, at, message, related, limit, failures, (chains, caused_by))| Violation {
+                code,
+                at,
+                message,
+                related,
+                limit,
+                failures,
+                chains,
+                caused_by,
             },
         )
         .boxed()

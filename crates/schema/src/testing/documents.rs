@@ -210,15 +210,10 @@ pub fn arb_guard() -> impl Strategy<Value = Guard> {
 /// A node's overrides.
 pub fn arb_overrides() -> impl Strategy<Value = Overrides> {
     let bypass = (
-        prop::collection::btree_set(arb_guard(), 1..3),
         prop::option::of(arb_reason()),
         prop::collection::btree_set(arb_guard_failure(), 0..3),
     )
-        .prop_map(|(guards, reason, failures)| Bypass {
-            guards,
-            reason,
-            failures,
-        });
+        .prop_map(|(reason, failures)| Bypass { reason, failures });
     (
         prop::option::of(arb_reason()),
         prop::option::of(arb_reason()),

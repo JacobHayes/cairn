@@ -10,7 +10,7 @@ use std::collections::BTreeSet;
 
 use cairn_engine::{Applied, Records};
 use cairn_schema::{
-    Guard, GuardFailure, Lineage, Rejection, RouteFile, SequentialKeys, StaleReason, ViolationCode,
+    GuardFailure, Lineage, Rejection, RouteFile, SequentialKeys, StaleReason, ViolationCode,
     from_yaml,
 };
 use support::key;
@@ -96,7 +96,6 @@ fn completion_needs_a_note_of_its_own_and_loses_it_as_stale() {
     let records = ready();
     let found = refusal(&records, DONE);
     assert_eq!(found.code, ViolationCode::GuardFailed);
-    assert_eq!(found.bypassable, Some(Guard::HasNote));
     assert_eq!(found.failures, BTreeSet::from([GuardFailure::MissingNote]));
 
     // A link on the node and a note on the journey are not a note on the node.
@@ -120,9 +119,7 @@ fn completion_needs_a_note_of_its_own_and_loses_it_as_stale() {
 fn a_bypassed_note_stays_accepted_when_a_later_one_goes() {
     let bypassed = accepted(
         &ready(),
-        &format!(
-            "- op: apply_override\n  node: n_hardening\n  override: {{guard_bypass: {{guards: [has_note]}}}}\n{DONE}"
-        ),
+        "- op: transition\n  node: n_hardening\n  transition: {complete_anyway: {}}\n",
     );
     assert!(stale(&bypassed).is_empty());
     let noted = accepted(&bypassed, NOTE);

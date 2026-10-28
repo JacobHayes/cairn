@@ -1,6 +1,7 @@
 //! The tests of `cairn-store-sqlite`: one module per file beside this one.
 
 mod checklists_migration;
+mod complete_anyway_migration;
 mod conformance;
 mod deleted_ids_migration;
 mod evidence_guards_migration;

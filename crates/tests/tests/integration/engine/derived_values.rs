@@ -10,8 +10,8 @@ use std::collections::BTreeSet;
 
 use cairn_engine::{DerivedJourney, Records};
 use cairn_schema::{
-    DependencyVia, DisplayState, Guard, Journey, NodeDerived, NodeKey, Progress, Rejection,
-    ViolationCode,
+    DependencyVia, DisplayState, Guard, GuardFailure, Journey, NodeDerived, NodeKey, Progress,
+    Rejection, ViolationCode,
 };
 use support::{add_nodes as add, key};
 
@@ -192,13 +192,7 @@ fn failing_guards_name_each_guard_a_completion_would_fail() {
     assert_eq!(guards(&records, "n_art"), set(&[Guard::HasArtifact]));
     assert_eq!(guards(&records, "n_note"), set(&[Guard::HasNote]));
     assert_eq!(guards(&records, "n_holder"), set(&[Guard::BrokenDown]));
-    let bypassed = support::accepted(
-        &records,
-        &format!(
-            "{}- op: apply_override\n  node: n_note\n  override: {{guard_bypass: {{guards: [has_note]}}}}\n",
-            transition("n_note", "complete")
-        ),
-    );
+    let bypassed = support::accepted(&records, &transition("n_note", "{complete_anyway: {}}"));
     assert_eq!(guards(&bypassed, "n_note"), set(&[]), "finished");
     let skipped = support::accepted(
         &records,
@@ -312,7 +306,9 @@ fn failing_guards_are_what_applying_the_transition_refuses() {
                             let refused_guards: BTreeSet<Guard> = violations
                                 .as_slice()
                                 .iter()
-                                .filter_map(|violation| violation.bypassable)
+                                .flat_map(|violation| {
+                                    violation.failures.iter().map(GuardFailure::guard)
+                                })
                                 .collect();
                             assert_eq!(found.failing_guards, refused_guards, "{name} {key}");
                         }

@@ -530,23 +530,13 @@ fn evidence_bypasses_need_no_reason() {
         "{key: n_list, id: list, kind: action, title: List, checklist: [{id: one, title: One}], requires_checklist: true}",
         "{key: n_hold, id: hold, kind: action, title: Hold, placeholder: true}",
     ]));
-    for (node, guard, failure) in [
-        ("n_art", "has_artifact", GuardFailure::MissingArtifact),
-        ("n_note", "has_note", GuardFailure::MissingNote),
-        (
-            "n_list",
-            "all_ticked",
-            GuardFailure::Unticked("one".parse().unwrap()),
-        ),
-        ("n_hold", "broken_down", GuardFailure::NotBrokenDown),
+    for (node, failure) in [
+        ("n_art", GuardFailure::MissingArtifact),
+        ("n_note", GuardFailure::MissingNote),
+        ("n_list", GuardFailure::Unticked("one".parse().unwrap())),
+        ("n_hold", GuardFailure::NotBrokenDown),
     ] {
-        let done = support::accepted(
-            &records,
-            &format!(
-                "- op: apply_override\n  node: {node}\n  override: {{guard_bypass: {{guards: [{guard}]}}}}\n{}",
-                transition(node, "complete")
-            ),
-        );
+        let done = support::accepted(&records, &transition(node, "{complete_anyway: {}}"));
         let stored = stored_bypass(&done, node).unwrap_or_else(|| panic!("{node}"));
         assert!(stored.reason.is_none(), "{node}");
         assert!(stored.failures.contains(&failure), "{node}");

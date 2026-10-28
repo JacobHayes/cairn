@@ -44,6 +44,8 @@ export interface Prior {
   states: Map<string, State>;
   /** The recorded start and finish dates, so an edit of one is told from the one it left alone. */
   dates: Map<string, { started: string | null; finished: string | null }>;
+  /** A node's overrides as the last event left them, so the override an event applied is the one that differs. */
+  overrides: Map<string, Schema<"Overrides">>;
 }
 
 /** The facts a sentence is made from, for what reads them (and the tests) rather than the words. */
@@ -92,7 +94,7 @@ export interface Happened {
 
 /** A prior with nothing in it. */
 export function noPrior(): Prior {
-  return { titles: new Map(), states: new Map(), dates: new Map() };
+  return { titles: new Map(), states: new Map(), dates: new Map(), overrides: new Map() };
 }
 
 interface Context {
@@ -172,8 +174,10 @@ function transitioned(c: Context): Said {
     case "active":
       return { what: `started ${thing(c, node)}`, facts };
     case "done": {
-      const reason = record?.state.reason ?? undefined;
-      return { what: `marked ${it(c, node)} done`, facts: { ...facts, ...(reason === undefined ? {} : { reason }) } };
+      const bypass = c.records.flatMap((each) => ("overrides" in each && each.overrides.overrides.bypass != null ? [each.overrides.overrides.bypass] : []))[0];
+      const reason = record?.state.reason ?? bypass?.reason ?? undefined;
+      const anyway = bypass !== undefined;
+      return { what: `marked ${it(c, node)} done${anyway ? " anyway" : ""}`, facts: { ...facts, ...(reason === undefined ? {} : { reason }) } };
     }
     case "skipped": {
       const reason = record?.state.reason ?? undefined;
@@ -280,20 +284,33 @@ function attachment(c: Context, verb: string): Said {
   return { what: `${verb} a ${noun} on ${it(c)}` };
 }
 
+/** The override an event applied: the field of the node's overrides it changed, else the one it holds. */
+function appliedOverride(held: Schema<"Overrides">, before: Schema<"Overrides"> | undefined): "force_include" | "keep" | "bypass" | undefined {
+  const kinds = (["force_include", "keep", "bypass"] as const).filter((kind) => held[kind] != null);
+  return kinds.find((kind) => JSON.stringify(held[kind]) !== JSON.stringify(before?.[kind])) ?? kinds[0];
+}
+
 function overrides(c: Context, removed: boolean): Said {
   for (const record of c.records) {
     if ("overrides" in record) {
-      const { force_include, keep } = record.overrides.overrides;
+      const held = record.overrides.overrides;
       const node = it(c, record.overrides.node);
-      const reason = force_include ?? keep ?? undefined;
-      const facts: Facts = reason === undefined ? {} : { reason };
       if (removed) {
         return { what: `removed an override from ${node}` };
       }
-      if (force_include != null) {
-        return { what: `included ${node} despite its condition`, facts };
+      const kind = appliedOverride(held, c.prior.overrides.get(record.overrides.node));
+      const reason = kind === "bypass" ? held.bypass?.reason : kind === undefined ? undefined : held[kind];
+      const facts: Facts = reason == null ? {} : { reason };
+      switch (kind) {
+        case "force_include":
+          return { what: `included ${node} despite its condition`, facts };
+        case "bypass":
+          return { what: `went ahead past a check on ${node}`, facts };
+        case "keep":
+          return { what: `kept ${node} despite a skipped container`, facts };
+        case undefined:
+          return { what: `applied an override to ${node}` };
       }
-      return keep != null ? { what: `kept ${node} despite a skipped container`, facts } : { what: `applied an override to ${node}` };
     }
   }
   return { what: removed ? `removed an override from ${it(c)}` : `applied an override to ${it(c)}` };
@@ -398,7 +415,6 @@ const SAY: Record<EventType, (c: Context) => Said> = {
   snooze_set: snoozed,
   unsnoozed: (c) => ({ what: `woke ${it(c)} from its snooze` }),
   override_applied: (c) => overrides(c, false),
-  guard_bypassed: (c) => ({ what: `bypassed a check on ${it(c)}` }),
   override_removed: (c) => overrides(c, true),
   item_ticked: (c) => ticking(c, "ticked"),
   item_unticked: (c) => ticking(c, "unticked"),
@@ -453,6 +469,8 @@ export function remember(prior: Prior, event: Event): void {
       prior.titles.set(record.node.key, record.node.title);
     } else if ("node_field" in record && "title" in record.node_field.value) {
       prior.titles.set(record.node_field.node, record.node_field.value.title);
+    } else if ("overrides" in record) {
+      prior.overrides.set(record.overrides.node, record.overrides.overrides);
     } else if ("node_state" in record) {
       prior.states.set(record.node_state.node, record.node_state.state.state);
       prior.dates.set(record.node_state.node, { started: record.node_state.state.started_on ?? null, finished: record.node_state.state.finished_on ?? null });

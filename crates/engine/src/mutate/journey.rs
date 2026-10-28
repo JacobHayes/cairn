@@ -224,6 +224,9 @@ fn move_node(session: &mut Session<'_>, node: &NodeKey, transition: &Transition)
         to.legal_for(kind) && stored.state.legal_for(kind),
         "D1: within the kind's machine"
     );
+    if !can_go_ahead(session, node, kind, transition) {
+        return Vec::new();
+    }
     let mut next = moved(
         &stored,
         to,
@@ -254,8 +257,53 @@ fn move_node(session: &mut Session<'_>, node: &NodeKey, transition: &Transition)
     }
     if step == Move::Reopen {
         writes.extend(clear_bypass(session, node));
+        // A later plain completion in the patch is not covered by an earlier one's bypass.
+        session.bypassed.remove(node);
+    }
+    if let Transition::CompleteAnyway { reason } = transition {
+        writes.push(bypass_guards(session, node, reason.clone()));
     }
     writes
+}
+
+/// D4: whether the transition may be sent: going ahead anyway needs a node with guards, so
+/// a milestone's or any other completion is refused rather than carrying a bypass that covers
+/// nothing.
+fn can_go_ahead(
+    session: &mut Session<'_>,
+    node: &NodeKey,
+    kind: NodeKind,
+    transition: &Transition,
+) -> bool {
+    let unguarded = matches!(transition, Transition::CompleteAnyway { .. })
+        && !matches!(kind, NodeKind::Deliverable | NodeKind::Action);
+    if unguarded {
+        session.reject(
+            ViolationCode::IllegalTransition,
+            Some(node),
+            "only a deliverable or action has guards to go ahead past: complete the node instead",
+        );
+    }
+    !unguarded
+}
+
+/// D4: a completion that goes ahead anyway stores a bypass on the node; the guards stage
+/// fills in the failures it accepted.
+fn bypass_guards(
+    session: &mut Session<'_>,
+    node: &NodeKey,
+    reason: Option<cairn_schema::Reason>,
+) -> Write {
+    let mut next = overrides(session, node);
+    next.bypass = Some(cairn_schema::Bypass {
+        reason,
+        failures: std::collections::BTreeSet::new(),
+    });
+    session.bypassed.insert(node.clone(), session.ordinal);
+    session.put(GraphRecord::Overrides {
+        node: node.clone(),
+        overrides: next,
+    })
 }
 
 /// D4: reopening a node clears its guard bypass, which accepted the failures of the
@@ -528,8 +576,7 @@ fn overrides(session: &Session<'_>, node: &NodeKey) -> Overrides {
         .unwrap_or_default()
 }
 
-/// B5, D1a, D4: an override with its reason (a guard bypass's is optional). A guard bypass
-/// covers a guarded transition in the same patch; the guards stage records the failures it bypassed.
+/// B5, D1a: an override with its reason.
 fn apply_override(
     session: &mut Session<'_>,
     node: &NodeKey,
@@ -544,14 +591,6 @@ fn apply_override(
             next.force_include = Some(reason.clone());
         }
         cairn_schema::Override::Keep { reason } => next.keep = Some(reason.clone()),
-        cairn_schema::Override::GuardBypass { guards, reason } => {
-            next.bypass = Some(cairn_schema::Bypass {
-                guards: guards.clone(),
-                reason: reason.clone(),
-                failures: std::collections::BTreeSet::new(),
-            });
-            session.bypassed.insert(node.clone(), session.ordinal);
-        }
     }
     assert!(!next.is_empty(), "an applied override is stored");
     vec![session.put(GraphRecord::Overrides {
@@ -568,7 +607,6 @@ fn remove_override(session: &mut Session<'_>, node: &NodeKey, kind: OverrideKind
     let removed = match kind {
         OverrideKind::ForceInclude => next.force_include.take().is_some(),
         OverrideKind::Keep => next.keep.take().is_some(),
-        OverrideKind::GuardBypass => next.bypass.take().is_some(),
     };
     if !removed {
         session.reject(

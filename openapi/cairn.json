@@ -737,20 +737,12 @@
       },
       "Bypass": {
         "additionalProperties": false,
-        "description": "A guard bypass as stored: the guards bypassed, why when a reason was given, and the\nspecific failures present when it was applied.",
+        "description": "A guard bypass as stored, written by a completion that went ahead anyway: why when a\nreason was given, and the specific failures present, which say the guards bypassed.",
         "properties": {
           "failures": {
-            "description": "The failures present when the bypass was applied.",
+            "description": "The failures present when the completion went ahead.",
             "items": {
               "$ref": "#/components/schemas/GuardFailure"
-            },
-            "type": "array",
-            "uniqueItems": true
-          },
-          "guards": {
-            "description": "The guards bypassed.",
-            "items": {
-              "$ref": "#/components/schemas/Guard"
             },
             "type": "array",
             "uniqueItems": true
@@ -767,9 +759,6 @@
             "description": "Why, when a reason was given."
           }
         },
-        "required": [
-          "guards"
-        ],
         "type": "object"
       },
       "Caller": {
@@ -3772,7 +3761,6 @@
           "snooze_set",
           "unsnoozed",
           "override_applied",
-          "guard_bypassed",
           "override_removed",
           "atomic_changed",
           "item_ticked",
@@ -10456,44 +10444,6 @@
               "keep"
             ],
             "type": "object"
-          },
-          {
-            "additionalProperties": false,
-            "description": "Go ahead anyway: bypass guards on the node's start or completion in the same patch.\nThe engine records the specific failures present.",
-            "properties": {
-              "guard_bypass": {
-                "additionalProperties": false,
-                "properties": {
-                  "guards": {
-                    "description": "The guards bypassed.",
-                    "items": {
-                      "$ref": "#/components/schemas/Guard"
-                    },
-                    "type": "array",
-                    "uniqueItems": true
-                  },
-                  "reason": {
-                    "anyOf": [
-                      {
-                        "$ref": "#/components/schemas/Reason"
-                      },
-                      {
-                        "type": "null"
-                      }
-                    ],
-                    "description": "Why, when the person gave a reason. Leave the field out for none."
-                  }
-                },
-                "required": [
-                  "guards"
-                ],
-                "type": "object"
-              }
-            },
-            "required": [
-              "guard_bypass"
-            ],
-            "type": "object"
           }
         ]
       },
@@ -10508,11 +10458,6 @@
           {
             "const": "keep",
             "description": "Keep under a skipped ancestor.",
-            "type": "string"
-          },
-          {
-            "const": "guard_bypass",
-            "description": "Guard bypass.",
             "type": "string"
           }
         ]
@@ -15752,6 +15697,33 @@
           },
           {
             "additionalProperties": false,
+            "description": "To `done` going ahead anyway: the guards it fails are bypassed, and the engine\nrecords which. Only a deliverable or action has guards to bypass.",
+            "properties": {
+              "complete_anyway": {
+                "additionalProperties": false,
+                "properties": {
+                  "reason": {
+                    "anyOf": [
+                      {
+                        "$ref": "#/components/schemas/Reason"
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ],
+                    "description": "Why, when the person gave a reason. Leave the field out for none."
+                  }
+                },
+                "type": "object"
+              }
+            },
+            "required": [
+              "complete_anyway"
+            ],
+            "type": "object"
+          },
+          {
+            "additionalProperties": false,
             "description": "To `skipped`, with the reason a skip requires.",
             "properties": {
               "skip": {
@@ -16055,17 +16027,6 @@
           "at": {
             "$ref": "#/components/schemas/Location",
             "description": "Where."
-          },
-          "bypassable": {
-            "anyOf": [
-              {
-                "$ref": "#/components/schemas/Guard"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "description": "The guard a bypass would accept this past, when it is a bypassable guard failure\n(`has_artifact`, `has_note`, `all_ticked`, `broken_down`)."
           },
           "caused_by": {
             "description": "The patch's other mutations that brought it about, beside `at.mutation` (a\ncompletion and the mutation that gave it an unfinished dependency in the same patch).",

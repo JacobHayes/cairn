@@ -16,7 +16,7 @@ use crate::field::NodeField;
 use crate::id::{PatchId, Path, ProposalId};
 use crate::limits::Limit;
 use crate::number::Revision;
-use crate::state::{Guard, GuardFailure};
+use crate::state::GuardFailure;
 use crate::touched::TouchedSet;
 
 // PRD: Invariants; D1, D4, A11, A18, A19, B6, E3, E6, H3.
@@ -136,11 +136,6 @@ pub struct Violation {
     /// The limit exceeded, for `limit_exceeded`.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub limit: Option<Limit>,
-    // PRD: D4.
-    /// The guard a bypass would accept this past, when it is a bypassable guard failure
-    /// (`has_artifact`, `has_note`, `all_ticked`, `broken_down`).
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub bypassable: Option<Guard>,
     // PRD: D4.
     /// The specific guard failures present.
     #[serde(default, skip_serializing_if = "BTreeSet::is_empty")]

@@ -5,7 +5,7 @@
 use crate::engine::support;
 
 use cairn_schema::{
-    ChangeClass, EventType, Guard, GuardFailure, LocalEdit, NodeField, Rejection, RevisionOf,
+    ChangeClass, EventType, GuardFailure, LocalEdit, NodeField, Rejection, RevisionOf,
     ViolationCode,
 };
 use support::{codes, key, vendor_after, vendor_graph, vendor_patch};
@@ -340,7 +340,6 @@ fn an_artifact_guard_fails_on_the_graph_the_patch_produces() {
         panic!("{violations:#?}")
     };
     assert_eq!(found.code, ViolationCode::GuardFailed);
-    assert_eq!(found.bypassable, Some(Guard::HasArtifact));
     assert!(found.failures.contains(&GuardFailure::MissingArtifact));
 }
 
@@ -360,20 +359,14 @@ fn an_artifact_on_another_node_does_not_satisfy_the_guard() {
 fn a_bypass_records_the_failures_it_bypassed() {
     let records = report_ready_without_artifact();
     let mutations = "\
-- op: transition\n  node: n_final_report\n  transition: complete\n\
-- op: apply_override\n  node: n_final_report\n  override: {guard_bypass: {guards: [has_artifact], reason: Linked in the meeting notes.}}\n";
+- op: transition\n  node: n_final_report\n  transition: {complete_anyway: {reason: Linked in the meeting notes.}}\n";
     let applied = vendor_patch(&records, mutations).unwrap();
-    assert_eq!(applied.events()[1].event_type, EventType::GuardBypassed);
+    assert_eq!(applied.events()[0].event_type, EventType::NodeTransitioned);
     let overrides = &vendor_graph(applied.records()).state.overrides[&key("n_final_report")];
     let bypass = overrides.bypass.as_ref().unwrap();
     assert_eq!(
         bypass.failures.iter().collect::<Vec<_>>(),
         [&GuardFailure::MissingArtifact]
-    );
-    let alone = "- op: apply_override\n  node: n_final_report\n  override: {guard_bypass: {guards: [has_artifact], reason: No transition.}}\n";
-    assert_eq!(
-        codes(vendor_patch(&records, alone)),
-        [ViolationCode::IllegalTransition]
     );
 }
 
@@ -384,7 +377,11 @@ fn a_placeholder_completes_only_once_broken_down_or_atomic() {
     let Err(Rejection::Invalid { violations }) = vendor_patch(&records, complete) else {
         panic!("an unexpanded placeholder fails broken_down (A16, B10)")
     };
-    assert_eq!(violations.as_slice()[0].bypassable, Some(Guard::BrokenDown));
+    assert!(
+        violations.as_slice()[0]
+            .failures
+            .contains(&GuardFailure::NotBrokenDown)
+    );
     let atomic = format!("- op: set_atomic\n  node: n_workload\n  atomic: true\n{complete}");
     assert!(vendor_patch(&records, &atomic).is_ok());
     assert_eq!(
@@ -673,11 +670,10 @@ fn replacing_a_decision_with_another_answer_type_marks_its_shape() {
 }
 
 #[test]
-fn bypassed_failures_are_recorded_on_the_bypass_event() {
+fn bypassed_failures_are_recorded_on_the_completion_event() {
     let records = report_ready_without_artifact();
     let mutations = "\
-- op: apply_override\n  node: n_final_report\n  override: {guard_bypass: {guards: [has_artifact], reason: Shared in the meeting.}}\n\
-- op: transition\n  node: n_final_report\n  transition: complete\n\
+- op: transition\n  node: n_final_report\n  transition: {complete_anyway: {reason: Shared in the meeting.}}\n\
 - op: apply_override\n  node: n_final_report\n  override: {force_include: {reason: Always in scope.}}\n";
     let applied = vendor_patch(&records, mutations).unwrap();
     let failures_in = |event: &cairn_schema::Event| {
@@ -693,11 +689,11 @@ fn bypassed_failures_are_recorded_on_the_bypass_event() {
         })
     };
     let bypass_event = &applied.events()[0];
-    assert_eq!(bypass_event.event_type, EventType::GuardBypassed);
+    assert_eq!(bypass_event.event_type, EventType::NodeTransitioned);
     let recorded = failures_in(bypass_event).unwrap();
     assert!(
         recorded.contains(&GuardFailure::MissingArtifact),
-        "D4: the guard-bypassed event says what it bypassed"
+        "D4: the completion event says what it bypassed"
     );
     let stored = &vendor_graph(applied.records()).state.overrides[&key("n_final_report")];
     assert_eq!(stored.bypass.as_ref().unwrap().failures, recorded);

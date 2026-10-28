@@ -179,10 +179,10 @@ export function nodeDetail(view: Ready, key: string): NodeDetail | undefined {
   };
 }
 
-/** D4: the override that lets a move past the `guards` it would fail, with the reason it was given if any; the one place it is built. */
-export function guardBypass(node: string, guards: Schema<"Guard">[], reason?: string): Mutation {
+/** D4: the completion that goes ahead past the guards it would fail, with the reason it was given if any; the one place it is built. */
+export function completeAnyway(node: string, reason?: string): Mutation {
   const why = reason?.trim() ?? "";
-  return { op: "apply_override", node, override: { guard_bypass: { guards, ...(why === "" ? {} : { reason: why }) } } };
+  return { op: "transition", node, transition: { complete_anyway: why === "" ? {} : { reason: why } } };
 }
 
 /** A transition by name (D1); answering a decision is its own mutation. */
@@ -215,6 +215,9 @@ export function transition(node: string, move: Move, reason = ""): Mutation {
 export function moveOf(change: Schema<"Transition">): Move {
   if (typeof change === "string") {
     return change;
+  }
+  if ("complete_anyway" in change) {
+    return "complete";
   }
   return "skip" in change ? "skip" : "mark_done";
 }

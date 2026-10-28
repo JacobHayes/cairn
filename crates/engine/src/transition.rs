@@ -44,7 +44,7 @@ impl Move {
         match transition {
             Transition::Start => Move::Start,
             Transition::Stop => Move::Stop,
-            Transition::Complete => Move::Complete,
+            Transition::Complete | Transition::CompleteAnyway { .. } => Move::Complete,
             Transition::Skip { .. } => Move::Skip,
             Transition::MarkDone { .. } => Move::MarkDone,
             Transition::Reopen => Move::Reopen,

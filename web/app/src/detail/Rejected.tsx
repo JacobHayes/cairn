@@ -10,15 +10,14 @@ import type { OperationId } from "../data/edit-record.ts";
 import { newPatchId, violationNode, type Rejection, type Violation } from "../data/writes.ts";
 import { RejectionView } from "../screens/RejectionView.tsx";
 import { WriteStatus } from "../screens/WriteStatus.tsx";
-import { Button, Input } from "../ui/kit.tsx";
+import { Button } from "../ui/kit.tsx";
+import { ReasonForm } from "./ReasonForm.tsx";
 import { plural } from "../ui/words.ts";
 import { Receipt } from "../ui/Receipt.tsx";
-import { checklistOf, guardBypass, itemTitle, titleOf, type Mutation, type Ready } from "./model.ts";
+import { checklistOf, completeAnyway, failingGuards, itemTitle, titleOf, type Mutation, type Ready } from "./model.ts";
 import { ShortfallView } from "./ShortfallView.tsx";
 import { guardWords } from "./words.ts";
 import { rebasedOnto, type Attempt, type Failed, type NodeWrite, type Seen } from "./write.ts";
-
-type Guard = Schema<"Guard">;
 
 interface Resolving {
   view: Ready;
@@ -52,41 +51,44 @@ export function withMove(attempt: Attempt, move: Mutation): Mutation[] {
   return [...attempt.mutations, move];
 }
 
-/** D4: the guards a bypass would accept the rejected patch past, each once, on the node it is for. */
-export function bypassable(violations: Violation[]): { node: string; guards: Guard[] }[] {
-  const byNode = new Map<string, Guard[]>();
+/** D4: the nodes a refusal names for failed guards, each once: the ones a completion can go ahead anyway on. */
+export function bypassable(violations: Violation[]): string[] {
+  const nodes: string[] = [];
   for (const violation of violations) {
     const node = violationNode(violation);
-    if (violation.bypassable == null || node === undefined) {
-      continue;
+    if ((violation.failures?.length ?? 0) > 0 && node !== undefined && !nodes.includes(node)) {
+      nodes.push(node);
     }
-    const guards = byNode.get(node) ?? [];
-    if (!guards.includes(violation.bypassable)) {
-      guards.push(violation.bypassable);
-    }
-    byNode.set(node, guards);
   }
-  return [...byNode].map(([node, guards]) => ({ node, guards }));
+  return nodes;
 }
+
+const isUnticked = (failure: Schema<"GuardFailure">): failure is { unticked: string } => typeof failure === "object" && "unticked" in failure;
 
 /** G5, D4: the unticked items a refusal names, per node, and whether ticking them is all it needs. */
 export function untickedIn(violations: Violation[]): { byNode: { node: string; items: string[] }[]; only: boolean } {
   const byNode = new Map<string, string[]>();
   for (const violation of violations) {
     const node = violationNode(violation);
-    if (violation.bypassable !== "all_ticked" || node === undefined) {
+    if (!ticksOnly(violation) || node === undefined) {
       continue;
     }
     const items = byNode.get(node) ?? [];
     for (const failure of violation.failures ?? []) {
-      if (typeof failure === "object" && "unticked" in failure && !items.includes(failure.unticked)) {
+      if (isUnticked(failure) && !items.includes(failure.unticked)) {
         items.push(failure.unticked);
       }
     }
     byNode.set(node, items);
   }
-  const only = violations.length > 0 && violations.every((violation) => violation.bypassable === "all_ticked");
+  const only = violations.length > 0 && violations.every(ticksOnly);
   return { byNode: [...byNode].map(([node, items]) => ({ node, items })), only };
+}
+
+/** Whether a violation is failed checklist items and nothing else. */
+export function ticksOnly(violation: Violation): boolean {
+  const failures = violation.failures ?? [];
+  return failures.length > 0 && failures.every(isUnticked);
 }
 
 /** The rejected patch with each named item ticked first, so the guard reads them ticked. */
@@ -120,11 +122,9 @@ export function DateConflictResolver({ view, write, violations, onResolved, onRe
   );
 }
 
-type Bypassed = { node: string; guards: Guard[] }[];
-
-/** D4: the rejected patch with one bypass per node the refusal names, each for its own guards and all on one reason, so one confirmation finishes every node. */
-export function withBypass(attempt: Attempt, entries: { node: string; guards: Guard[] }[], reason?: string): Mutation[] {
-  return [...entries.map(({ node, guards }) => guardBypass(node, guards, reason)), ...attempt.mutations];
+/** D4: the rejected patch with the completion of each node the refusal names going ahead anyway, all on one reason, so one confirmation finishes every node. */
+export function withBypass(attempt: Attempt, nodes: string[], reason?: string): Mutation[] {
+  return attempt.mutations.map((mutation) => (mutation.op === "transition" && mutation.transition === "complete" && nodes.includes(mutation.node) ? completeAnyway(mutation.node, reason) : mutation));
 }
 
 /** The completions a retried patch carries, in words: "mark done", "mark both done", "mark all 3 done" (a bypass covers only a completion). */
@@ -134,8 +134,7 @@ function completionWords(attempt: Attempt): string {
 }
 
 /** D4: the bypass of every node's failed guards at once, one optional reason for the lot, named by what it does; its reason field opens only when the person chooses it, after the remedy above has been offered. */
-function Bypass({ write, entries, onResolved, onResent }: Resolving & { entries: Bypassed }) {
-  const nodes = entries.map(({ node }) => node);
+function Bypass({ write, view, nodes, onResolved, onResent }: Resolving & { nodes: string[] }) {
   const [draft, setReason] = useDraft<string>(`rejected-bypass:${write.journey}:${nodes.join(",")}`);
   const [chosen, choose] = useState(false);
   const reason = draft ?? "";
@@ -144,7 +143,7 @@ function Bypass({ write, entries, onResolved, onResent }: Resolving & { entries:
     return null;
   }
   const verb = completionWords(failed.attempt).replace(/^./, (first) => first.toUpperCase());
-  const without = [...new Set(entries.flatMap(({ guards }) => guards))].map(guardWords).join(" and ");
+  const without = [...new Set(nodes.flatMap((node) => { const derived = view.derived.nodes[node]; return derived === undefined ? [] : failingGuards(derived); }))].map(guardWords).join(" and ");
   if (!chosen && reason === "") {
     return (
       <span data-testid="bypass-offer">
@@ -155,29 +154,26 @@ function Bypass({ write, entries, onResolved, onResent }: Resolving & { entries:
     );
   }
   return (
-    <div className="stack" data-testid="bypass">
-      <label className="stack">
-        <span className="label">Why (optional)</span>
-        <Input value={reason} onChange={(event) => { setReason(event.target.value); }} />
-      </label>
-      <span className="row">
-        <Button
-          disabled={write.disabled}
-          onClick={() => {
-            retry(write, failed, withBypass(failed.attempt, entries, reason === "" ? undefined : reason), failed.attempt, {
-              onResolved: () => {
-                setReason(undefined);
-                onResolved?.();
-              },
-              onResent,
-            });
-          }}
-        >
-          {`${verb} anyway`}
-        </Button>
-        <Button onClick={() => { setReason(undefined); choose(false); }}>Cancel</Button>
-      </span>
-    </div>
+    <ReasonForm
+      testId="bypass"
+      label="Why (optional)"
+      confirm={`${verb} anyway`}
+      optional
+      value={reason}
+      sending={false}
+      disabled={write.disabled}
+      onChange={setReason}
+      onConfirm={(why) => {
+        retry(write, failed, withBypass(failed.attempt, nodes, why === "" ? undefined : why), failed.attempt, {
+          onResolved: () => {
+            setReason(undefined);
+            onResolved?.();
+          },
+          onResent,
+        });
+      }}
+      onClose={() => { setReason(undefined); choose(false); }}
+    />
   );
 }
 
@@ -230,14 +226,14 @@ function Invalid({ view, write, failed, rejection, violations, onResolved, onRes
     <RejectionView
       rejection={rejection}
       titleOf={(node) => titleOf(view, node)}
-      omit={(violation) => violation.code === "contradictory_chain" || violation.bypassable === "all_ticked"}
+      omit={(violation) => violation.code === "contradictory_chain" || ticksOnly(violation)}
       {...(ticks.only ? { invalidHeading: "checklist items are not ticked." } : {})}
       onDismiss={write.dismiss}
       extras={
         <>
           <DateConflictResolver view={view} write={write} violations={chains} onResolved={onResolved} onResent={onResent} />
           <TickTheRest view={view} write={write} failed={failed} ticks={ticks.byNode} only={ticks.only} onResolved={onResolved} onResent={onResent} />
-          {bypasses.length === 0 ? null : <Bypass write={write} view={view} entries={bypasses} onResolved={onResolved} onResent={onResent} />}
+          {bypasses.length === 0 ? null : <Bypass write={write} view={view} nodes={bypasses} onResolved={onResolved} onResent={onResent} />}
         </>
       }
     />

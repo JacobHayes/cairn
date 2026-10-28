@@ -17,7 +17,7 @@ use crate::id::{
     ProposalId, RoleKey, RouteId, UserId,
 };
 use crate::number::Revision;
-use crate::patch::{DraftSource, Mutation, Override, Patch, PatchTarget};
+use crate::patch::{DraftSource, Mutation, Patch, PatchTarget};
 use crate::record::{GraphKey, RecordKey, Write};
 use crate::text::Markdown;
 use crate::touched::TouchedSet;
@@ -67,7 +67,6 @@ pub enum EventType {
     SnoozeSet,
     Unsnoozed,
     OverrideApplied,
-    GuardBypassed,
     OverrideRemoved,
     AtomicChanged,
     ItemTicked,
@@ -240,10 +239,6 @@ impl Mutation {
             Mutation::ClearPin { .. } => EventType::DateUnpinned,
             Mutation::Snooze { .. } => EventType::SnoozeSet,
             Mutation::Unsnooze { .. } => EventType::Unsnoozed,
-            Mutation::ApplyOverride {
-                applied: Override::GuardBypass { .. },
-                ..
-            } => EventType::GuardBypassed,
             Mutation::ApplyOverride { .. } => EventType::OverrideApplied,
             Mutation::RemoveOverride { .. } => EventType::OverrideRemoved,
             Mutation::SetAtomic { .. } => EventType::AtomicChanged,

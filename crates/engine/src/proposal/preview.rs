@@ -84,7 +84,6 @@ pub fn candidate(
                         })
                         .collect(),
                     limit: None,
-                    bypassable: None,
                     failures: BTreeSet::new(),
                     chains: None,
                     caused_by: BTreeSet::new(),

@@ -9,7 +9,7 @@ mod evidence_guards {
     use std::collections::BTreeSet;
     use std::path::{Path, PathBuf};
 
-    use cairn_schema::{GraphKey, GraphRecord, Guard, GuardFailure, Record, RecordKey, Write};
+    use cairn_schema::{GraphKey, GraphRecord, GuardFailure, Record, RecordKey, Write};
     use cairn_store::{Document, EventQuery, LoadTarget, Store};
     use cairn_store_sqlite::SqliteStore;
 
@@ -74,7 +74,6 @@ INSERT INTO "proposals" VALUES ('pr_ahead', 'journey', 'j_one', 1, 'open', 'Ahea
                 .bypass
                 .clone()
                 .unwrap();
-            assert_eq!(work.guards, BTreeSet::from([Guard::HasNote]));
             assert_eq!(work.failures, BTreeSet::from([GuardFailure::MissingNote]));
             assert_eq!(
                 work.reason.as_ref().map(cairn_schema::Reason::as_str),

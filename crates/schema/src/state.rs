@@ -384,17 +384,15 @@ impl From<GuardFailure> for StaleReason {
 }
 
 // PRD: D4.
-/// A guard bypass as stored: the guards bypassed, why when a reason was given, and the
-/// specific failures present when it was applied.
+/// A guard bypass as stored, written by a completion that went ahead anyway: why when a
+/// reason was given, and the specific failures present, which say the guards bypassed.
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
 #[serde(deny_unknown_fields)]
 pub struct Bypass {
-    /// The guards bypassed.
-    pub guards: BTreeSet<Guard>,
     /// Why, when a reason was given.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub reason: Option<Reason>,
-    /// The failures present when the bypass was applied.
+    /// The failures present when the completion went ahead.
     #[serde(default, skip_serializing_if = "BTreeSet::is_empty")]
     pub failures: BTreeSet<GuardFailure>,
 }
@@ -435,8 +433,6 @@ pub enum OverrideKind {
     ForceInclude,
     /// Keep under a skipped ancestor.
     Keep,
-    /// Guard bypass.
-    GuardBypass,
 }
 
 /// A journey's state, on its graph document. Maps are keyed and sorted, so a state has one

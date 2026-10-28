@@ -7,7 +7,7 @@ use std::collections::{BTreeMap, BTreeSet};
 use std::fmt::Write;
 
 use cairn_schema::{
-    AnnotationContent, Consequences, JourneyId, Mutation, NodeKey, Override, Patch, Transition,
+    AnnotationContent, Consequences, JourneyId, Mutation, NodeKey, Patch, Transition,
 };
 
 // PRD: I5, D7.
@@ -59,6 +59,7 @@ fn phrase(mutation: &Mutation) -> &'static str {
             Transition::Start => "started",
             Transition::Stop => "stopped",
             Transition::Complete | Transition::MarkDone { .. } => "marked done",
+            Transition::CompleteAnyway { .. } => "marked done anyway",
             Transition::Skip { .. } => "skipped",
             Transition::Reopen => "reopened",
         },
@@ -84,10 +85,6 @@ fn phrase(mutation: &Mutation) -> &'static str {
         Mutation::SetRecordedDate { .. } => "recorded a date",
         Mutation::Snooze { .. } => "snoozed",
         Mutation::Unsnooze { .. } => "lifted a snooze",
-        Mutation::ApplyOverride {
-            applied: Override::GuardBypass { .. },
-            ..
-        } => "went ahead without a guard",
         Mutation::ApplyOverride { .. } => "applied an override",
         Mutation::RemoveOverride { .. } => "removed an override",
         Mutation::SetAtomic { atomic: true, .. } => "marked as one piece",

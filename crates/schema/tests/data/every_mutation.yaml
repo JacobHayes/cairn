@@ -140,6 +140,11 @@ mutations:
 - op: transition
   node: n_kickoff
   transition: complete
+- op: transition
+  node: n_plan
+  transition:
+    complete_anyway:
+      reason: Signed off by phone.
 - op: answer
   decision: n_scope
   value:
@@ -174,13 +179,6 @@ mutations:
   override:
     keep:
       reason: Still needed.
-- op: apply_override
-  node: n_plan
-  override:
-    guard_bypass:
-      guards:
-      - has_note
-      reason: Signed off by phone.
 - op: remove_override
   node: n_plan
   kind: keep
