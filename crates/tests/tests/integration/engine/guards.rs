@@ -26,6 +26,21 @@ fn snooze(node: &str, until: &str) -> String {
     format!("- op: snooze\n  node: {node}\n  until: {{node: {until}}}\n")
 }
 
+/// B6: whether the node reads as snoozable, which must agree with a snooze of it being accepted
+/// (the web app's offers and the snooze check read one rule).
+fn assert_snoozable(records: &Records, node: &str, until: &str, expected: bool) {
+    let graph = support::journey_graph(records, support::JOURNEY);
+    let found = support::derived(records, support::JOURNEY)
+        .node_derived(&graph, &key(node))
+        .snoozable;
+    assert_eq!(found, expected, "{node} snoozable");
+    assert_eq!(
+        found,
+        support::journey_patch(records, &snooze(node, until)).is_ok(),
+        "{node}: snoozable and accepted agree"
+    );
+}
+
 /// The rejection's violations, or a panic.
 fn violations(records: &Records, mutations: &str) -> Vec<Violation> {
     match support::journey_patch(records, mutations) {
@@ -200,6 +215,7 @@ fn a_bypass_covers_a_completion_and_reopening_clears_it() {
 fn a_snooze_sits_on_a_node_in_scope() {
     let records = support::journey(&add(&[FIRST, SECOND, FLAG, BRANCH]));
     assert!(support::journey_patch(&records, &snooze("n_second", "n_flag")).is_ok());
+    assert_snoozable(&records, "n_second", "n_flag", true);
     let away = support::accepted(
         &records,
         "- op: answer\n  decision: n_flag\n  value: {boolean: false}\n",
@@ -211,6 +227,7 @@ fn a_snooze_sits_on_a_node_in_scope() {
         )),
         [ViolationCode::SnoozeNotActionable]
     );
+    assert_snoozable(&away, "n_branch", "n_first", false);
     let parent = support::journey(&add(&[
         "{key: n_box, id: box, kind: deliverable, title: Box}",
         "{key: n_inside, id: inside, parent: n_box, kind: action, title: Inside}",
@@ -239,6 +256,8 @@ fn a_snooze_sits_on_a_node_in_scope() {
         support::codes(support::journey_patch(&group, &snooze("n_pack", "n_first"))),
         [ViolationCode::SnoozeNotActionable]
     );
+    assert_snoozable(&group, "n_pack", "n_first", false);
+    assert_snoozable(&group, "n_item", "n_first", false);
     // An empty group waiting on an open gate has no work beneath it either.
     let empty = support::journey(&add(&[
         "{key: n_pack, id: pack, kind: group, title: Pack, requires: [n_first]}",
@@ -249,6 +268,14 @@ fn a_snooze_sits_on_a_node_in_scope() {
         support::codes(support::journey_patch(&empty, &snooze("n_pack", "n_other"))),
         [ViolationCode::SnoozeNotActionable]
     );
+    assert_snoozable(&empty, "n_pack", "n_other", false);
+    // A group with work left beneath it can be snoozed.
+    let with_work = support::journey(&add(&[
+        "{key: n_pack, id: pack, kind: group, title: Pack}",
+        "{key: n_item, id: item, parent: n_pack, kind: action, title: Item}",
+        FIRST,
+    ]));
+    assert_snoozable(&with_work, "n_pack", "n_first", true);
 }
 
 /// B6: a node snooze whose target transitively depends on the snoozed node is rejected: a

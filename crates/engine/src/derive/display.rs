@@ -98,6 +98,30 @@ impl Derived {
             && !self.blocking.closed(key)
     }
 
+    /// B6: a snooze can sit on the node: it is in scope with something left to do, and a group
+    /// also has work in scope left beneath it. The snooze check and the web app's offers read this.
+    #[must_use]
+    pub fn snoozable(&self, graph: &Graph, key: &NodeKey) -> bool {
+        self.relevance.in_scope(key)
+            && !self.blocking.closed(key)
+            && !self.group_without_work(graph, key)
+    }
+
+    /// B6: a group with no node in scope and unfinished beneath it, so nothing is left for a
+    /// snooze of it to hold back.
+    #[must_use]
+    pub fn group_without_work(&self, graph: &Graph, key: &NodeKey) -> bool {
+        let is_group = |key: &NodeKey| {
+            graph
+                .node(key)
+                .is_some_and(|node| node.kind() == NodeKind::Group)
+        };
+        is_group(key)
+            && !graph.tree().descendants(key).iter().any(|below| {
+                !is_group(below) && self.relevance.in_scope(below) && !self.blocking.closed(below)
+            })
+    }
+
     /// D8: the node waits on a gate of its own or one it inherits: a container, on its
     /// entries (its children are not a gate); anything else, on being blocked.
     pub(super) fn waiting(&self, graph: &Graph, key: &NodeKey) -> bool {

@@ -119,7 +119,7 @@ function bulkMutation(action: BulkAction, facts: Facts): Mutation | undefined {
     case "assign":
       return assignOwner(node.key, action.identity);
     case "snooze":
-      return finished ? undefined : { op: "snooze", node: node.key, until: action.until };
+      return facts.derived.snoozable === true ? { op: "snooze", node: node.key, until: action.until } : undefined;
     case "unsnooze":
       return facts.snoozed ? { op: "unsnooze", node: node.key } : undefined;
   }

@@ -153,7 +153,7 @@ export function menuOf(view: Ready, detail: NodeDetail, writable: boolean): Menu
   return groups(
     items(
       [
-        "snooze",
+        derived.snoozable === true && "snooze",
         markable && "mark-done",
         "skip",
         state === "active" && "stop",

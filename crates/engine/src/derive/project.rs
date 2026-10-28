@@ -144,6 +144,7 @@ impl Derived {
             done_by_date: blocking.done_by_date(key),
             snoozed: blocking.snoozed(key).cloned(),
             snoozed_via: blocking.snoozed_via(key).cloned(),
+            snoozable: self.snoozable(graph, key),
             needs_breakdown: blocking.needs_breakdown(key),
             gravity: priority.gravity(key),
             gravity_from: for_response(priority.gravity_from(key)),

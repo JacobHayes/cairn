@@ -308,6 +308,8 @@ pub(crate) struct LeanDerived {
     #[serde(skip_serializing_if = "Option::is_none")]
     snoozed_via: Option<NodeKey>,
     #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    snoozable: bool,
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
     needs_breakdown: bool,
     gravity: Score,
     #[serde(default, skip_serializing_if = "Explained::is_empty")]
@@ -345,6 +347,7 @@ impl LeanDerived {
             done_by_date,
             snoozed,
             snoozed_via,
+            snoozable,
             needs_breakdown,
             gravity,
             gravity_from,
@@ -380,6 +383,7 @@ impl LeanDerived {
             done_by_date,
             snoozed,
             snoozed_via,
+            snoozable,
             needs_breakdown,
             gravity: gravity.three_figures(),
             gravity_from: rounded(gravity_from),

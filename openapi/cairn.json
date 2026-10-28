@@ -9071,6 +9071,10 @@
             ],
             "description": "The ancestor whose skip, or whose marking done, skips it; absent when it is not\nskipped through an ancestor."
           },
+          "snoozable": {
+            "description": "Whether a snooze can sit on the node: it is in scope with something left to do, and a\ngroup has work in scope left beneath it.",
+            "type": "boolean"
+          },
           "snoozed": {
             "anyOf": [
               {

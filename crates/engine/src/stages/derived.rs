@@ -22,8 +22,8 @@
 use std::collections::BTreeSet;
 
 use cairn_schema::{
-    Event, GraphKey, GraphRecord, NodeKey, NodeKind, Record, RecordKey, Relevance, Subject,
-    ViolationCode, Write,
+    Event, GraphKey, GraphRecord, NodeKey, Record, RecordKey, Relevance, Subject, ViolationCode,
+    Write,
 };
 
 use super::Check;
@@ -125,11 +125,10 @@ fn snoozes(check: &mut Check<'_, '_>, graph: &Graph, derived: &Derived) {
             continue;
         }
         // Closed: effectively skipped, or a milestone that reads as done (F1).
-        let out_of_scope = !derived.relevance().in_scope(key);
-        let nothing_beneath = is_group(graph, key) && !work_beneath(graph, derived, key);
-        if !out_of_scope && !derived.blocking().closed(key) && !nothing_beneath {
+        if derived.snoozable(graph, key) {
             continue;
         }
+        let nothing_beneath = derived.group_without_work(graph, key);
         let message = if nothing_beneath {
             "a group is snoozed only while work in scope is left beneath it"
         } else {
@@ -139,21 +138,6 @@ fn snoozes(check: &mut Check<'_, '_>, graph: &Graph, derived: &Derived) {
         violation.at.mutation = Some(*at);
         check.violations.push(violation);
     }
-}
-
-fn is_group(graph: &Graph, key: &NodeKey) -> bool {
-    graph
-        .node(key)
-        .is_some_and(|node| node.kind() == NodeKind::Group)
-}
-
-/// B6: whether a node beneath the container is in scope with something left to do.
-fn work_beneath(graph: &Graph, derived: &Derived, key: &NodeKey) -> bool {
-    graph.tree().descendants(key).iter().any(|below| {
-        !is_group(graph, below)
-            && derived.relevance().in_scope(below)
-            && !derived.blocking().closed(below)
-    })
 }
 
 /// B6: an unsnooze of a node whose snooze is not its own: refused while a container's snooze

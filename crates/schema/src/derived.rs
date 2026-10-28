@@ -728,6 +728,11 @@ pub struct NodeDerived {
     /// container and shows its own target in `snoozed`.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub snoozed_via: Option<NodeKey>,
+    // PRD: B6.
+    /// Whether a snooze can sit on the node: it is in scope with something left to do, and a
+    /// group has work in scope left beneath it.
+    #[serde(default, skip_serializing_if = "crate::serde_util::is_false")]
+    pub snoozable: bool,
     // PRD: B10.
     /// A placeholder with no children that is not atomic.
     #[serde(default, skip_serializing_if = "crate::serde_util::is_false")]

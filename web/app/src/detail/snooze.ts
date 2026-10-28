@@ -34,14 +34,11 @@ export function openUnder(view: Ready, container: string): number {
   return progress == null ? 0 : progress.total - progress.done;
 }
 
-/** The node, then each ancestor container with unfinished in-scope work, nearest first, with its open count. */
+/** The node, then each ancestor container the engine reads as snoozable, nearest first, with its open count. */
 export function setAsideOptions(view: Ready, detail: NodeDetail): SetAside[] {
-  const own: SetAside = { node: detail.node.key, title: detail.node.title, open: undefined };
-  const ancestors = [...detail.ancestors].reverse().flatMap((ancestor): SetAside[] => {
-    const open = openUnder(view, ancestor.key);
-    return open === 0 ? [] : [{ node: ancestor.key, title: ancestor.title, open }];
-  });
-  return [own, ...ancestors];
+  const own: SetAside[] = detail.derived.snoozable === true ? [{ node: detail.node.key, title: detail.node.title, open: undefined }] : [];
+  const ancestors = [...detail.ancestors].reverse().flatMap((ancestor): SetAside[] => (view.derived.nodes[ancestor.key]?.snoozable === true ? [{ node: ancestor.key, title: ancestor.title, open: openUnder(view, ancestor.key) }] : []));
+  return [...own, ...ancestors];
 }
 
 /** The day after `today`. */

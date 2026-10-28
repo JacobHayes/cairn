@@ -3682,6 +3682,11 @@ export interface components {
              */
             skipped_by?: components["schemas"]["NodeKey"] | null;
             /**
+             * @description Whether a snooze can sit on the node: it is in scope with something left to do, and a
+             *     group has work in scope left beneath it.
+             */
+            snoozable?: boolean;
+            /**
              * @description A snooze that holds over the node: its own, else the one of the container it is
              *     held through (`snoozed_via`).
              */

@@ -12,7 +12,7 @@ const base = { gravity_from: none, unlocks_from: none, waits_on: none, actionabl
 /** The build stage holds the build and its check, the build is overdue; the build holds the check. */
 const stageProgress = { done: 0, total: 2, overdue: 1, decisions_needed: 0 };
 const buildProgress = { done: 0, total: 1, overdue: 0, decisions_needed: 0 };
-const relevant = { relevance: { value: "relevant" as const } };
+const relevant = { relevance: { value: "relevant" as const }, snoozable: true };
 const owned = { participations: { k_owner: { identities: ["who_one"], origin: "explicit" as const } } };
 const bound = (date: string) => ({ date, chain: { constraints: [], fixed: [] } });
 
@@ -58,7 +58,7 @@ export function canvasView(): Ready {
       frontier: ["n_choose"],
       acting_frontier: ["n_choose"],
       nodes: {
-        n_kick: { ...base, display_state: "done", ...relevant, gravity: 9 },
+        n_kick: { ...base, display_state: "done", ...relevant, snoozable: false, gravity: 9 },
         n_choose: { ...base, display_state: "ready", ...relevant, ...owned, actionable: true, gravity: 8, unlocks: 1, dates: { due: bound("2026-10-09"), latest_start: bound("2026-10-08"), slack_days: 2 } },
         n_stage: { ...base, display_state: "active", ...relevant, gravity: 4, blocked_by: [{ node: "n_build", via: "containment" }], progress: stageProgress },
         n_build: {
@@ -78,6 +78,7 @@ export function canvasView(): Ready {
           ...base,
           display_state: "conditional",
           relevance: { value: "undecided", decisions: ["n_choose"], unanswered: ["n_choose"] },
+          snoozable: true,
           gravity: 4.5,
           blocked_by: [{ node: "n_choose", via: { condition: { condition_on: "n_option" } } }],
           waits_on: { entries: [{ node: "n_choose", via: { condition: { condition_on: "n_option" } } }], total: 1 },

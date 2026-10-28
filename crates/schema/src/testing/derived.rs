@@ -480,7 +480,7 @@ fn arb_blocked() -> BoxedStrategy<(Vec<Blocker>, Vec<crate::NodeKey>)> {
 pub fn arb_node_derived() -> BoxedStrategy<NodeDerived> {
     (
         arb_relevance(),
-        prop::collection::vec(any::<bool>(), 7),
+        prop::collection::vec(any::<bool>(), 8),
         arb_blocked(),
         prop::collection::btree_map(arb_kind_key(), arb_participation(), 0..2),
         prop::collection::btree_set(arb_stale_reason(), 0..2),
@@ -534,6 +534,7 @@ pub fn arb_node_derived() -> BoxedStrategy<NodeDerived> {
                     done_by_date: flag(5),
                     snoozed,
                     snoozed_via,
+                    snoozable: flag(7),
                     needs_breakdown: flag(6),
                     gravity,
                     gravity_from,

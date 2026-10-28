@@ -27,6 +27,16 @@ function detailOf(view: Ready, key: string) {
   return detail;
 }
 
+describe("B6: where a snooze is offered", () => {
+  it("is only where the engine says a snooze can sit, in the menu and in the choice of what to set aside", () => {
+    const ids = (view: Ready) => menuOf(view, detailOf(view, "n_findings"), true).flat().map((item) => item.id);
+    expect(ids(testView())).toContain("snooze");
+    const held = made("n_findings", { snoozable: false });
+    expect(ids(held)).not.toContain("snooze");
+    expect(setAsideOptions(held, detailOf(held, "n_findings")).map((option) => option.node)).toEqual(["n_stage"]);
+  });
+});
+
 describe("a page that takes no write (B11)", () => {
   it("offers only where to find a node on a page that takes no write, on the menu and the graph's context menu", () => {
     const view = made("n_findings", {});
