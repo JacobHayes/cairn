@@ -1,0 +1,430 @@
+format: 1
+route: large-program
+name: Large program
+description: Five stages with nested groups, large enough to be read only in part at its fit.
+nodes:
+- key: n_kickoff
+  id: kickoff
+  kind: milestone
+  title: Kickoff
+- key: n_scope
+  id: scope
+  kind: decision
+  title: Scope
+  prompt: How wide is the work?
+  answer_type: single_choice
+  choices:
+  - narrow
+  - broad
+- key: n_outside_help
+  id: outside-help
+  kind: decision
+  title: Outside help
+  prompt: Does an outside team help with the build?
+  answer_type: boolean
+- key: n_end_date
+  id: end-date
+  kind: decision
+  title: End date
+  prompt: When does the work close?
+  answer_type: date
+  feeds_milestone: close
+- key: n_plan_approved
+  id: plan-approved
+  kind: milestone
+  title: Plan approved
+  requires:
+  - plan
+- key: n_build_done
+  id: build-done
+  kind: milestone
+  title: Build complete
+  requires:
+  - build
+- key: n_review_passed
+  id: review-passed
+  kind: milestone
+  title: Review passed
+  requires:
+  - review
+- key: n_close
+  id: close
+  kind: milestone
+  title: Close
+  weight: 10
+  final: true
+  requires:
+  - wrap-up
+- key: n_shape
+  id: shape
+  kind: group
+  title: Shape the work
+  opens_at: kickoff
+- key: n_shape_goals
+  id: goals
+  parent: shape
+  kind: deliverable
+  title: Goals
+- key: n_shape_goals_draft
+  id: draft
+  parent: shape/goals
+  kind: action
+  title: Draft the goals
+  estimate: 2
+- key: n_shape_goals_review
+  id: review
+  parent: shape/goals
+  kind: action
+  title: Review the goals
+  estimate: 1
+  requires:
+  - shape/goals/draft
+- key: n_shape_constraints
+  id: constraints
+  parent: shape
+  kind: deliverable
+  title: Constraints
+  estimate: 2
+- key: n_shape_research
+  id: research
+  parent: shape
+  kind: group
+  title: Research
+- key: n_shape_research_interviews
+  id: interviews
+  parent: shape/research
+  kind: deliverable
+  title: Interviews
+- key: n_shape_research_interviews_schedule
+  id: schedule
+  parent: shape/research/interviews
+  kind: action
+  title: Schedule the interviews
+  estimate: 1
+- key: n_shape_research_interviews_run
+  id: run
+  parent: shape/research/interviews
+  kind: action
+  title: Run the interviews
+  estimate: 4
+  requires:
+  - shape/research/interviews/schedule
+- key: n_shape_research_interviews_write_up
+  id: write-up
+  parent: shape/research/interviews
+  kind: action
+  title: Write up the interviews
+  estimate: 2
+  requires:
+  - shape/research/interviews/run
+- key: n_shape_research_survey
+  id: survey
+  parent: shape/research
+  kind: deliverable
+  title: Survey
+  estimate: 5
+- key: n_shape_research_findings
+  id: findings
+  parent: shape/research
+  kind: deliverable
+  title: Findings summary
+  estimate: 2
+  requires:
+  - shape/research/interviews
+  - shape/research/survey
+- key: n_shape_options
+  id: options
+  parent: shape
+  kind: deliverable
+  title: Options compared
+  estimate: 3
+  requires:
+  - shape/constraints
+  - shape/research/findings
+- key: n_shape_approach
+  id: approach
+  parent: shape
+  kind: decision
+  title: Which approach
+  prompt: Which approach do we take?
+  answer_type: single_choice
+  choices:
+  - first
+  - second
+  requires:
+  - shape/options
+- key: n_plan
+  id: plan
+  kind: group
+  title: Plan
+  closes_at: plan-approved
+  requires:
+  - shape
+- key: n_plan_schedule
+  id: schedule
+  parent: plan
+  kind: deliverable
+  title: Schedule
+  estimate: 2
+- key: n_plan_budget
+  id: budget
+  parent: plan
+  kind: deliverable
+  title: Budget
+  estimate: 2
+- key: n_plan_risks
+  id: risks
+  parent: plan
+  kind: deliverable
+  title: Risk list
+  estimate: 1
+- key: n_plan_approvals
+  id: approvals
+  parent: plan
+  kind: group
+  title: Approvals
+- key: n_plan_approvals_first
+  id: first
+  parent: plan/approvals
+  kind: deliverable
+  title: First sign-off
+  estimate: 1
+  requires:
+  - plan/budget
+  - plan/schedule
+- key: n_plan_approvals_second
+  id: second
+  parent: plan/approvals
+  kind: deliverable
+  title: Second sign-off
+  estimate: 1
+  requires:
+  - plan/risks
+- key: n_build
+  id: build
+  kind: group
+  title: Build
+  opens_at: plan-approved
+  closes_at: build-done
+- key: n_build_part_a
+  id: part-a
+  parent: build
+  kind: group
+  title: Part A
+- key: n_build_part_a_one
+  id: one
+  parent: build/part-a
+  kind: deliverable
+  title: Component one
+- key: n_build_part_a_one_make
+  id: make
+  parent: build/part-a/one
+  kind: action
+  title: Make component one
+  estimate: 3
+- key: n_build_part_a_one_test
+  id: test
+  parent: build/part-a/one
+  kind: action
+  title: Test component one
+  estimate: 2
+  requires:
+  - build/part-a/one/make
+- key: n_build_part_a_two
+  id: two
+  parent: build/part-a
+  kind: deliverable
+  title: Component two
+  estimate: 4
+  requires:
+  - build/part-a/one
+- key: n_build_part_a_three
+  id: three
+  parent: build/part-a
+  kind: deliverable
+  title: Component three
+  estimate: 3
+- key: n_build_part_a_four
+  id: four
+  parent: build/part-a
+  kind: deliverable
+  title: Component four
+  estimate: 2
+  requires:
+  - build/part-a/three
+- key: n_build_part_b
+  id: part-b
+  parent: build
+  kind: group
+  title: Part B
+- key: n_build_part_b_five
+  id: five
+  parent: build/part-b
+  kind: deliverable
+  title: Component five
+  estimate: 3
+- key: n_build_part_b_six
+  id: six
+  parent: build/part-b
+  kind: deliverable
+  title: Component six
+  estimate: 3
+  requires:
+  - build/part-b/five
+- key: n_build_part_b_seven
+  id: seven
+  parent: build/part-b
+  kind: deliverable
+  title: Component seven
+  estimate: 2
+- key: n_build_helpers
+  id: helpers
+  parent: build
+  kind: group
+  title: Outside team
+  relevant_when:
+    equals:
+      decision: outside-help
+      value: true
+- key: n_build_helpers_brief
+  id: brief
+  parent: build/helpers
+  kind: action
+  title: Brief the outside team
+  estimate: 1
+- key: n_build_helpers_handoff
+  id: handoff
+  parent: build/helpers
+  kind: action
+  title: Hand over part B
+  estimate: 1
+  requires:
+  - build/helpers/brief
+  - build/part-a/four
+  - build/part-a/two
+  - build/part-b/six
+- key: n_build_integration
+  id: integration
+  parent: build
+  kind: group
+  title: Integration
+  requires:
+  - build/part-a
+  - build/part-b
+- key: n_build_integration_assemble
+  id: assemble
+  parent: build/integration
+  kind: deliverable
+  title: Assemble the parts
+  estimate: 2
+- key: n_build_integration_check
+  id: check
+  parent: build/integration
+  kind: deliverable
+  title: End-to-end check
+  estimate: 2
+  requires:
+  - build/integration/assemble
+- key: n_review
+  id: review
+  kind: group
+  title: Review
+  opens_at: build-done
+  closes_at: review-passed
+- key: n_review_quality
+  id: quality
+  parent: review
+  kind: group
+  title: Quality checks
+- key: n_review_quality_q1
+  id: q1
+  parent: review/quality
+  kind: deliverable
+  title: Accuracy check
+  estimate: 1
+- key: n_review_quality_q2
+  id: q2
+  parent: review/quality
+  kind: deliverable
+  title: Consistency check
+  estimate: 1
+- key: n_review_quality_q3
+  id: q3
+  parent: review/quality
+  kind: deliverable
+  title: Edge cases
+  estimate: 2
+  requires:
+  - review/quality/q1
+- key: n_review_readiness
+  id: readiness
+  parent: review
+  kind: group
+  title: Readiness checks
+- key: n_review_readiness_r1
+  id: r1
+  parent: review/readiness
+  kind: deliverable
+  title: Support ready
+  estimate: 1
+- key: n_review_readiness_r2
+  id: r2
+  parent: review/readiness
+  kind: deliverable
+  title: Training done
+  estimate: 2
+  requires:
+  - review/readiness/r1
+- key: n_review_readiness_r3
+  id: r3
+  parent: review/readiness
+  kind: deliverable
+  title: Rollback plan
+  estimate: 1
+- key: n_review_notes
+  id: notes
+  parent: review
+  kind: deliverable
+  title: Review notes
+  estimate: 1
+  requires:
+  - review/quality
+  - review/readiness
+- key: n_review_proceed
+  id: proceed
+  parent: review
+  kind: decision
+  title: Ready to proceed
+  prompt: Is the work ready to proceed?
+  answer_type: boolean
+  requires:
+  - review/notes
+- key: n_wrap_up
+  id: wrap-up
+  kind: group
+  title: Wrap up
+  opens_at: review-passed
+  closes_at: close
+- key: n_wrap_up_handover
+  id: handover
+  parent: wrap-up
+  kind: deliverable
+  title: Handover
+  estimate: 2
+- key: n_wrap_up_archive
+  id: archive
+  parent: wrap-up
+  kind: deliverable
+  title: Archive the records
+  estimate: 1
+  requires:
+  - wrap-up/handover
+- key: n_wrap_up_retro
+  id: retro
+  parent: wrap-up
+  kind: deliverable
+  title: Retrospective notes
+  estimate: 1
+  due_by:
+    before: close
+    offset: 3

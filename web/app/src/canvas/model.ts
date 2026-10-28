@@ -87,6 +87,8 @@ export interface Card {
   rolledUp: string[];
   /** C2: hidden, unsatisfied prerequisites no drawn edge stands for. */
   hiddenPrerequisites: string[];
+  /** C9: the search or filters match this node itself, not only something it holds. */
+  matched: boolean;
   journey: CardState | undefined;
   /** A route draft's marks; none on a journey. */
   route?: RouteMarks | undefined;
@@ -281,6 +283,58 @@ export function lineOf(id: string, from: string, to: string, links: readonly Lin
   };
 }
 
+/** A line that stands for lines between other cards, and the lines it stands for. */
+export interface JoinedLine {
+  line: Line;
+  members: Line[];
+}
+
+/**
+ * Lines re-targeted to the cards that stand for their ends (`standIn`, none where nothing does):
+ * a line that then joins a card to itself is not drawn, and lines that land between the same two
+ * cards are one, which keeps every edge its members stand for. A line whose ends do not change
+ * stays the line it was. Reveal and the zoomed-out tiles both draw lines this way (C2).
+ */
+export function joinLines(lines: readonly Line[], standIn: (key: string) => string | undefined): JoinedLine[] {
+  const joined = new Map<string, { from: string; to: string; members: Line[] }>();
+  for (const line of lines) {
+    const [from, to] = [standIn(line.from), standIn(line.to)];
+    if (from === undefined || to === undefined || from === to) {
+      continue;
+    }
+    const id = lineIdOf(from, to);
+    const kept = joined.get(id) ?? { from, to, members: [] };
+    joined.set(id, kept);
+    kept.members.push(line);
+  }
+  return [...joined.entries()].map(([id, one]) => {
+    const [only] = one.members;
+    const unchanged = one.members.length === 1 && only !== undefined && only.id === id;
+    // A joined line opens its card where any line it stands for does: the view's own decision about which lines are selectable is carried, not made again.
+    return { line: unchanged ? only : { ...lineOf(id, one.from, one.to, one.members.flatMap((member) => member.edges)), selectable: one.members.some((member) => member.selectable) }, members: one.members };
+  });
+}
+
+/**
+ * The line between two cards that stand for what is inside them: every line of the model that
+ * runs from inside `from` (or from it) to inside `to` (or to it), as one, with each edge it
+ * stands for. A line between two tiles is this. None where no line runs between the two.
+ */
+export function rolledLine(model: CanvasModel, ends: { from: string; to: string }): Line | undefined {
+  const parents = new Map(model.cards.map((card) => [card.key, card.parent]));
+  const within = (key: string, outer: string): boolean => {
+    for (let at: string | undefined = key, seen = 0; at !== undefined && seen <= parents.size; at = parents.get(at), seen += 1) {
+      if (at === outer) {
+        return true;
+      }
+    }
+    return false;
+  };
+  const standIn = (key: string) => (within(key, ends.from) ? ends.from : within(key, ends.to) ? ends.to : undefined);
+  const wanted = lineIdOf(ends.from, ends.to);
+  return joinLines(model.lines, standIn).find((each) => each.line.id === wanted)?.line;
+}
+
 /**
  * C1: the level's edges as lines, each keeping the graph's edges it stands for. An edge whose end
  * is hidden is drawn to the card that stands for it (where it is rolled up, or the container
@@ -359,6 +413,7 @@ export function cardsOf(level: Level, graph: GraphNode[], looks?: Looks): Card[]
         collapsed: level.collapsed?.includes(node.key) === true,
         rolledUp: at.rolled_up ?? [],
         hiddenPrerequisites: at.hidden_prerequisites ?? [],
+        matched: at.matched ?? false,
         journey: looks?.card(node, at),
       },
     ];

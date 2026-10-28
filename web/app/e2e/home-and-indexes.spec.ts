@@ -4,9 +4,10 @@
 import { checkpoint } from "./invariants.ts";
 import { expect, test } from "./test.ts";
 
-import { nodeCard, nodePanel, open, whenSettled } from "./shell.ts";
+import { nodeCard, nodePanel, open, readable, whenSettled } from "./shell.ts";
 
 test("C16, C17: Done on a Home row acts in place and the address stays `/`, a row opens its node's address, Home ends with a link to every journey, and the rail leads to Routes, whose Type filter writes ?type=", async ({ page }) => {
+  await readable(page);
   await open(page, "browser", "/");
   const group = page.getByTestId("home-journey").first();
   await expect(group).toBeVisible();

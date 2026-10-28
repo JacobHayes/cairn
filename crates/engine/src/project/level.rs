@@ -136,6 +136,20 @@ impl<'a> StandIns<'a> {
     fn visible(&self, key: &NodeKey) -> bool {
         self.get(key) == Some(key)
     }
+
+    /// What rolls up into each visible node: the nodes within the level that stand in it.
+    fn rolled_up(&self) -> BTreeMap<&'a NodeKey, Vec<NodeKey>> {
+        let mut rolled_up: BTreeMap<&'a NodeKey, Vec<NodeKey>> = BTreeMap::new();
+        for key in &self.within {
+            match self.get(key) {
+                Some(stand_in) if stand_in != *key => {
+                    rolled_up.entry(stand_in).or_default().push((*key).clone());
+                }
+                Some(_) | None => {}
+            }
+        }
+        rolled_up
+    }
 }
 
 impl<'a> DerivedJourney<'a> {
@@ -180,20 +194,20 @@ impl<'a> DerivedJourney<'a> {
                 || (query.display.len() == LevelDisplay::ALL.len() && !query.filters_by_node()),
             "a level that leaves a class out, or filters by flag or owner, has the classes"
         );
-        let kept = query.filters().then(|| self.kept(query, viewer));
+        let matched = query.filters().then(|| {
+            self.matched_by(
+                &query.flags,
+                query.owner.as_ref(),
+                query.text.as_ref(),
+                viewer,
+            )
+        });
+        let kept = matched.as_ref().map(|matched| self.holding(matched));
         let by_filter = query
             .filters_by_node()
             .then(|| self.filter_kept(query, viewer, kept.clone().unwrap_or_default()));
         let stand_ins = self.stand_ins(query, classes, kept.as_ref(), by_filter.as_ref());
-        let mut rolled_up: BTreeMap<&NodeKey, Vec<NodeKey>> = BTreeMap::new();
-        for key in &stand_ins.within {
-            match stand_ins.get(key) {
-                Some(stand_in) if stand_in != *key => {
-                    rolled_up.entry(stand_in).or_default().push((*key).clone());
-                }
-                Some(_) | None => {}
-            }
-        }
+        let mut rolled_up = stand_ins.rolled_up();
         let tree = self.graph.tree();
         let progress = self.derived.progress(self.graph);
         let nodes = stand_ins
@@ -211,6 +225,9 @@ impl<'a> DerivedJourney<'a> {
                     hidden_prerequisites: self.hidden_prerequisites(&stand_ins, key, &members),
                     rolled_up: members,
                     kept_work_pending: self.kept_work_pending(key),
+                    matched: matched
+                        .as_ref()
+                        .is_some_and(|matched| matched.contains(key)),
                     display_state: self.derived.display_state(self.graph, key),
                     roll_up: progress
                         .get(key)
@@ -235,19 +252,8 @@ impl<'a> DerivedJourney<'a> {
         })
     }
 
-    /// C2, C9: the nodes the query's filters match, and every node holding one: what a level
-    /// that filters keeps. Each match walks up its ancestors until one is already kept.
-    fn kept(&self, query: &LevelQuery, viewer: &BTreeSet<IdentityKey>) -> BTreeSet<&'a NodeKey> {
-        self.kept_by(
-            &query.flags,
-            query.owner.as_ref(),
-            query.text.as_ref(),
-            viewer,
-        )
-    }
-
-    /// [`Self::kept`] for these filters alone.
-    fn kept_by(
+    /// C9: the nodes these filters match themselves, not those that only hold one.
+    fn matched_by(
         &self,
         flags: &BTreeSet<ListFlag>,
         owner: Option<&IdentityKey>,
@@ -255,13 +261,22 @@ impl<'a> DerivedJourney<'a> {
         viewer: &BTreeSet<IdentityKey>,
     ) -> BTreeSet<&'a NodeKey> {
         let matcher = self.matcher(flags, owner, text, viewer);
+        self.graph
+            .document()
+            .nodes
+            .as_map()
+            .keys()
+            .filter(|key| matcher.holds(key))
+            .collect()
+    }
+
+    /// C2, C9: every node that `matched` holds or is: what a level that filters keeps. Each
+    /// match walks up its ancestors until one is already kept.
+    fn holding(&self, matched: &BTreeSet<&'a NodeKey>) -> BTreeSet<&'a NodeKey> {
         let tree = self.graph.tree();
         let mut kept: BTreeSet<&'a NodeKey> = BTreeSet::new();
-        for key in self.graph.document().nodes.as_map().keys() {
-            if !matcher.holds(key) {
-                continue;
-            }
-            let mut at = Some(key);
+        for key in matched {
+            let mut at = Some(*key);
             while let Some(key) = at {
                 if !kept.insert(key) {
                     break;
@@ -274,6 +289,17 @@ impl<'a> DerivedJourney<'a> {
             "each node is kept once"
         );
         kept
+    }
+
+    /// [`Self::holding`] what these filters alone match.
+    fn kept_by(
+        &self,
+        flags: &BTreeSet<ListFlag>,
+        owner: Option<&IdentityKey>,
+        text: Option<&Title>,
+        viewer: &BTreeSet<IdentityKey>,
+    ) -> BTreeSet<&'a NodeKey> {
+        self.holding(&self.matched_by(flags, owner, text, viewer))
     }
 
     /// C9: the sets the Filter's counts are the differences of, for a query with a flag or an

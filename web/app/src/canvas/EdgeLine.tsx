@@ -7,7 +7,7 @@
 // open arrowhead at its later end where the order is fixed.
 import { BaseEdge, useStore, type Edge, type EdgeProps } from "@xyflow/react";
 
-import { stepsBack, usePointedDate } from "./datePointing.ts";
+import { stepsBack, usePointedDate } from "./pointed.tsx";
 import type { Point } from "./layout.ts";
 import { DATED, lineLook } from "./look.ts";
 import type { DateLine, Line } from "./model.ts";

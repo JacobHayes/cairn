@@ -6,7 +6,7 @@ import type { Page } from "@playwright/test";
 import { checkpoint } from "./invariants.ts";
 import { expect, test } from "./test.ts";
 
-import { expectAddress, nodeCard, nodePanel, openAt, openJourney, openSheet, whenSettled } from "./shell.ts";
+import { expectAddress, nodeCard, nodePanel, openAt, openFromCanvas, openJourney, openSheet, readable, whenSettled } from "./shell.ts";
 
 /** Opens Details (with the History in it) in `node`'s inspector and scrolls it to its end the way a person does: the wheel over it. */
 async function reachHistory(page: Page, node: string, height: number): Promise<void> {
@@ -35,9 +35,12 @@ test("the inspector scrolls to the end of Details at 1440 and 1024px, a node ope
   await page.setViewportSize({ width: 1440, height: 768 });
   await openAt(page, "browser", "j_vendor_eval", "graph?depth=actions", { node: "n_plan" });
   await reachHistory(page, "n_plan", 768);
+  // From here a window that draws every card, so the canvas is clicked rather than framed.
+  await readable(page);
+  await page.keyboard.press("f");
   // The next node opens at its header, not part-way down this one's long body.
   // The card may be off screen: the click is sent to it, as panning to it would.
-  await nodeCard(page, "n_access").getByTestId("card-open").dispatchEvent("click");
+  await openFromCanvas(page, "n_access");
   await expect(nodePanel(page, "n_access")).toBeVisible();
   await expect.poll(() => page.locator('[data-pane="inspector"]').evaluate((element) => element.scrollTop)).toBe(0);
   // The inspector hides to a rail that shows it again, by its button and by the key.
@@ -51,12 +54,12 @@ test("the inspector scrolls to the end of Details at 1440 and 1024px, a node ope
   await page.keyboard.press("]");
   await expect(show).toBeVisible();
   // Picking a node on the canvas opens it in the inspector again, and so does clicking the node that is already selected, which changes no address.
-  await nodeCard(page, "n_plan").getByTestId("card-open").dispatchEvent("click");
+  await openFromCanvas(page, "n_plan");
   await expect(nodePanel(page, "n_plan")).toBeVisible();
   await expect(show).toBeHidden();
   await page.keyboard.press("]");
   await expect(show).toBeVisible();
-  await nodeCard(page, "n_plan").getByTestId("card-open").dispatchEvent("click");
+  await openFromCanvas(page, "n_plan");
   await expect(nodePanel(page, "n_plan")).toBeVisible();
   await checkpoint(page);
 

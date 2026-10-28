@@ -354,6 +354,9 @@ function gridOf(boxes: ReadonlyMap<string, Box>, stubs: readonly Point[]): Grid 
   return { xs: track(left, right, stubs.map((p) => p.x)), ys: track(top, bottom, stubs.map((p) => p.y)) };
 }
 
+/** The canvas area (px squared) the coarsest grid covers within its point budget, less the margin the grid adds round the cards. */
+const AREA_MAX = 0.8 * GRID_POINTS_MAX * GRID_PX_MAX * GRID_PX_MAX;
+
 /**
  * C1: the route of every line, in the order given, as points on the canvas from its first card to
  * its second. A route leaves and enters at its ports by a straight stub, and between the stubs
@@ -362,7 +365,7 @@ function gridOf(boxes: ReadonlyMap<string, Box>, stubs: readonly Point[]): Grid 
  * another line already uses. A canvas too large for the grid, or two stubs that find no path,
  * are joined by a plain elbow instead.
  */
-export function dateRoutes(lines: readonly RouteLine[], cards: readonly RouteCard[], boxes: ReadonlyMap<string, Box>): Point[][] {
+function routesOnGrid(lines: readonly RouteLine[], cards: readonly RouteCard[], boxes: ReadonlyMap<string, Box>): Point[][] {
   const ports = portsOf(lines, boxes);
   const stubOf = (port: Point, side: Side): Point => ({ x: port.x + (side === "right" ? STUB_PX : -STUB_PX), y: port.y });
   const live = ports.flatMap((port, at) => (port === undefined ? [] : [{ port, line: lines[at] as RouteLine, at, from: stubOf(port.from, port.out), to: stubOf(port.to, port.into) }]));
@@ -378,4 +381,23 @@ export function dateRoutes(lines: readonly RouteLine[], cards: readonly RouteCar
     routes[at] = straightened([port.from, ...(path ?? elbowOf(from, to)), port.to]);
   }
   return routes;
+}
+
+/**
+ * The routes of `lines` (see `routesOnGrid`). A canvas wider than the grid's budget covers (a very
+ * large program, seen whole) is routed at a smaller scale: the cards' boxes shrink until the
+ * coarsest grid covers them, and the routes grow back. Its gutters and stubs shrink with it, which
+ * at that distance is a few pixels on screen.
+ */
+export function dateRoutes(lines: readonly RouteLine[], cards: readonly RouteCard[], boxes: ReadonlyMap<string, Box>): Point[][] {
+  const all = [...boxes.values()];
+  const [left, right] = [Math.min(...all.map((box) => box.x)), Math.max(...all.map((box) => box.x + box.width))];
+  const [top, bottom] = [Math.min(...all.map((box) => box.y)), Math.max(...all.map((box) => box.y + box.height))];
+  const area = (right - left) * (bottom - top);
+  const k = area > AREA_MAX ? Math.sqrt(AREA_MAX / area) : 1;
+  if (k === 1) {
+    return routesOnGrid(lines, cards, boxes);
+  }
+  const small = new Map([...boxes].map(([key, box]): [string, Box] => [key, { x: (box.x - left) * k, y: (box.y - top) * k, width: box.width * k, height: box.height * k }]));
+  return routesOnGrid(lines, cards, small).map((route) => route.map((point) => ({ x: point.x / k + left, y: point.y / k + top })));
 }

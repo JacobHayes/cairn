@@ -14,7 +14,7 @@ import { expect, test } from "./test.ts";
 import { openRoute, routeMenuItem, savedText } from "./around.ts";
 import { TOAST_MS } from "../src/data/toasts.ts";
 import { HOVER_LEAVE_MS } from "../src/ui/tip.ts";
-import { derivedRevision, expectAddress, fresh, goTo, goWithin, openJourney, recentSaves, rename, syncChip, visit, whenSettled } from "./shell.ts";
+import { derivedRevision, expectAddress, fresh, goTo, goWithin, openJourney, readable, recentSaves, rename, syncChip, visit, whenSettled } from "./shell.ts";
 
 const rail = (page: Page) => page.getByRole("navigation", { name: "Screens", exact: true });
 const current = (page: Page) => rail(page).locator("[aria-current=page]");
@@ -77,6 +77,7 @@ async function saysOffline(page: Page, context: BrowserContext): Promise<void> {
 }
 
 test("the in-browser host boots, derives in the worker, applies a patch, and survives a screen that cannot load; the rail marks the screen it is on, and the dot says OFFLINE", async ({ page, context }) => {
+  await readable(page);
   await watchWindow(page);
   await opensOnHome(page);
   await visit(page, "browser", "/journeys");

@@ -2951,6 +2951,11 @@ export interface components {
             /** @description The node. */
             key: components["schemas"]["NodeKey"];
             /**
+             * @description Whether the query's filters or text match the node itself, not only something it holds:
+             *     what a search counts as a match. False when the query filters nothing.
+             */
+            matched?: boolean;
+            /**
              * @description Its nearest visible ancestor within the level, which it is drawn under; none at the
              *     top level.
              */

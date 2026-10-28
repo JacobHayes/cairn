@@ -9,7 +9,7 @@ import { expect, test } from "./test.ts";
 
 import { importIntoDraft, openRoute, publishDraft, routeMenuItem, savedText, versionSelect } from "./around.ts";
 import { addNode, addRole, formField, newRoute, nodeForm, openEditing, openForm, pickByTitle, routeName, saveForm, section, structure } from "./authoring.ts";
-import { nodeCard, open, openFromCanvas, openJourney } from "./shell.ts";
+import { nodeCard, open, openFromCanvas, openJourney, readable } from "./shell.ts";
 
 /** Opens a draft node's structure from its card. */
 async function openNode(page: Page, key: string): Promise<void> {
@@ -86,6 +86,7 @@ test("A12, A1a: a route authored by hand from an empty draft, published, exporte
 
 
 test("B4: on a fixture journey, a local node added, a route-copied title edited and reset to the route", async ({ page }) => {
+  await readable(page);
   await openEditing(page, "browser", "j_vendor_eval");
   const local = await addNode(page, "action", "Order the test data", "Setup");
   await expect((await section(page, "author-local-edits")).getByTestId("local-edits")).toHaveAttribute("data-status", "local");

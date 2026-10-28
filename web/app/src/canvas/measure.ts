@@ -23,6 +23,33 @@ export function emWidthOf(text: string): number {
   return measure(text);
 }
 
+/**
+ * The lines `text` takes wrapped between its words in `width` ems, or undefined when a word is
+ * wider than a line. With `breaking`, only the first word must fit: a later word wider than a
+ * line is broken across lines (the tile's title).
+ */
+export function wrappedLines(text: string, width: number, breaking = false): number | undefined {
+  let [lines, used] = [1, 0];
+  const space = emWidthOf(" ");
+  for (const [at, word] of text.split(/\s+/).filter(Boolean).map(emWidthOf).entries()) {
+    if (word > width && (!breaking || at === 0)) {
+      return undefined;
+    }
+    if (word > width) {
+      lines += Math.ceil(word / width);
+      used = word - Math.floor(word / width) * width;
+    } else if (used === 0) {
+      used = word;
+    } else if (used + space + word <= width) {
+      used += space + word;
+    } else {
+      lines += 1;
+      used = word;
+    }
+  }
+  return lines;
+}
+
 /** The title weight (DESIGN, Typography: a card's title is 600). */
 const TITLE_WEIGHT = 600;
 /** The body tracking, in ems (DESIGN, Typography). */

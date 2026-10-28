@@ -4,7 +4,7 @@
 // canvas draws for the selected node are read and followed by keyboard or touch. The level that
 // selects the node carries them, read with every kind shown and nothing folded, so each end is
 // the node itself.
-import { dateLinkId } from "../canvas/datePointing.ts";
+import { dateLinkId } from "../canvas/pointed.tsx";
 import { dateLinkRowWords } from "../canvas/dates.ts";
 import { useProjected, type Held } from "../canvas/hooks.ts";
 import { valueOf } from "../data/keyed-read.ts";

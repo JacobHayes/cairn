@@ -12,10 +12,11 @@ import { expect, test } from "./test.ts";
 import { answerCard, card, frontierItem, openActing, passOrder, publishFollowUpRoute, revisionAfter, select } from "./acting.ts";
 import { journeyName, startJourney } from "./around.ts";
 import { expectStructure } from "./structure.ts";
-import { derivedRevision, expectAddress, goTo, nodeCard, nodePanel, open, openAt, setDepth, whenSettled } from "./shell.ts";
+import { derivedRevision, expectAddress, goTo, nodeCard, nodePanel, open, openAt, readable, setDepth, whenSettled } from "./shell.ts";
 import { FIXED_TODAY } from "./views.ts";
 
 test("C9, B6: a bulk snooze is one patch; the snoozed leave the frontier and an unsnooze returns them", async ({ page }) => {
+  await readable(page);
   await openActing(page, "browser", "j_launch", "list?frontier=1");
   const revision = await derivedRevision(page);
   await select(page, "n_docs");

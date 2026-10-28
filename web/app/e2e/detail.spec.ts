@@ -12,7 +12,7 @@ import { expect, test } from "./test.ts";
 import { frontierItem, openActing } from "./acting.ts";
 import { openEditing, openForm } from "./authoring.ts";
 import { openNode, pin, section, state } from "./detail.ts";
-import { fresh, goTo, goWithin, menuItem, nodeCard, nodePanel, openAt, openFromCanvas, openJourney, openSheet, settled, syncChip, whenSettled } from "./shell.ts";
+import { fresh, goTo, goWithin, menuItem, nodeCard, nodePanel, openAt, openFromCanvas, openJourney, openSheet, readable, settled, syncChip, whenSettled } from "./shell.ts";
 
 async function discardClearsRejection(page: Page) {
   const panel = await openNode(page, "browser", "j_vendor_eval", "n_final_report");
@@ -118,6 +118,7 @@ async function markDoneKeepsTypedText(page: Page) {
 }
 
 test("a later pin is rejected with its chain, kept across a reload and counted away from it, discarded or resolved with a listed move (F5); a node's actions hold one open form; its history says who did what", async ({ page }) => {
+  await readable(page);
   await discardClearsRejection(page);
   await rejectionSurvivesAndResolves(page);
   await oneOpenFormSurvivesReload(page);
@@ -162,6 +163,7 @@ test("a milestone done on a phone: an empty date says what to choose and blocks 
 });
 
 test("a stage is marked done with a reason: what was left inside reads skipped and what waited for it is freed, and Reopen takes it back (D1a)", async ({ page }) => {
+  await readable(page);
   const stage = await openNode(page, "browser", "j_launch", "n_materials");
   await expect(nodeCard(page, "n_announcement").getByTestId("card-state")).not.toHaveAttribute("data-state", "skipped");
   await menuItem(stage, "mark-done");

@@ -246,6 +246,11 @@ pub struct LevelNode {
     /// A skipped container, or a group marked done, whose kept work is not yet done.
     #[serde(default, skip_serializing_if = "crate::serde_util::is_false")]
     pub kept_work_pending: bool,
+    // PRD: C9.
+    /// Whether the query's filters or text match the node itself, not only something it holds:
+    /// what a search counts as a match. False when the query filters nothing.
+    #[serde(default, skip_serializing_if = "crate::serde_util::is_false")]
+    pub matched: bool,
     // PRD: D8.
     /// The state every surface shows for the node.
     pub display_state: DisplayState,

@@ -81,6 +81,37 @@ fn rolled_up<'a>(level: &'a Level, name: &str) -> Vec<&'a str> {
         .collect()
 }
 
+/// C9: a drawn node says whether the search matches it itself, so a count of matches does not
+/// count a container that only holds one, and counts a container that matches on its own.
+#[test]
+fn a_node_says_whether_it_matches_or_only_holds_a_match() {
+    let records = journey();
+    let matched = |text: &str| -> BTreeSet<String> {
+        level_of(&records, &searching(text), &[])
+            .nodes
+            .iter()
+            .filter(|node| node.matched)
+            .map(|node| node.key.as_str().to_owned())
+            .collect()
+    };
+    // The step's resource matches: its deliverable and the group are drawn only for holding it.
+    assert_eq!(matched("anchor"), BTreeSet::from(["n_step".to_owned()]));
+    // The work's own description matches: it is a match though it holds no other.
+    assert_eq!(matched("harbour"), BTreeSet::from(["n_work".to_owned()]));
+    // Both the work and the side deliverable say "moored"; the group holds them and matches nothing.
+    assert_eq!(
+        matched("moored"),
+        BTreeSet::from(["n_work".to_owned(), "n_side".to_owned()])
+    );
+    // No search, no matches.
+    assert!(
+        level_of(&records, &every_kind(), &[])
+            .nodes
+            .iter()
+            .all(|node| !node.matched)
+    );
+}
+
 /// C2, C9: text found only in a description, only in a resource, or only in a note draws that
 /// node and the containers holding it; what does not match rolls up into the nearest drawn
 /// container, and a top-level node holding no match is not drawn.

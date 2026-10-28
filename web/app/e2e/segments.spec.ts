@@ -8,13 +8,14 @@
 
 import { expect, test } from "./test.ts";
 
-import { goTo, menuItem, openJourney } from "./shell.ts";
+import { goTo, menuItem, openJourney, readable } from "./shell.ts";
 import { apply } from "./proposals.ts";
 import { publishSegment, startInsert, stepper } from "./segments.ts";
 
 const JOURNEY = "j_vendor_eval";
 
 test("C19, C14: a segment inserted from a container, reviewed, applied, and shown in Origin", async ({ page }) => {
+  await readable(page);
   await publishSegment(page, "browser");
 
   // After the access deliverable, with the reviewer mapped onto the journey's findings reviewer.

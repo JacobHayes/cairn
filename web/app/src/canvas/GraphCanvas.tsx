@@ -6,8 +6,10 @@
 // graph, as `f` and the Fit button do, unless it is given nodes to open on (`firstFit`).
 //
 // Input (5.10), 720px and wider: two-finger scroll pans freely, the wheel alone never zooms, a
-// pinch or Ctrl/Cmd+wheel zooms at the pointer, a double-click expands a container. Zoom only
+// pinch or Ctrl/Cmd+wheel zooms at the pointer, a double-click zooms into a container. Zoom only
 // simplifies a container's head below a zoom (`data-lod` on the root, CSS only); a card never changes size.
+// Below the reading zoom a container is drawn as a tile (tiles.ts) and what it holds is hidden;
+// the lines, the trace and the focus read the one mapping from a hidden card to the tile.
 import "@xyflow/react/dist/base.css";
 import "./canvas.css";
 
@@ -23,8 +25,8 @@ import { useFraming, type Framing } from "../tour/presentation.ts";
 import { headHeight } from "./cards.ts";
 import { dateRoutes } from "./dateRoutes.ts";
 import { DateEdgeLine, EdgeLine, type Box, type DateEdge, type LineEdge } from "./EdgeLine.tsx";
-import { usePointed } from "./pointed.tsx";
-import { NEAR_ZOOM, firstFrame, fitZoom, listenPinch, minZoomOf, roomOf, shiftInto } from "./gestures.ts";
+import { usePointedNode } from "./pointed.tsx";
+import { NEAR_ZOOM, firstFrame, fitZoom, listenPinch, minZoomOf, roomOf, shiftInto, viewportAround } from "./gestures.ts";
 import { lensChips, lensTiers } from "./lens.ts";
 import type { Layout } from "./layout.ts";
 import { fadedCards } from "./look.ts";
@@ -32,6 +34,7 @@ import type { CanvasModel, DateLine, Line, Lens } from "./model.ts";
 import { CardActionsContext, NodeCard, type CardActions, type CardNode } from "./NodeCard.tsx";
 import type { CanvasOverlay } from "./overlay.ts";
 import { firstFitCards } from "./refit.ts";
+import { bandOf, drawnZoomOf, standsBehind, tileLinesOf, tileOverlay, tilePiecesOf, tileTableOf, tilingIn, tiledDates, type TileTable, type Tiling } from "./tiles.ts";
 import { lineWaitWords } from "./words.ts";
 
 import { useWork } from "../data/react.ts";
@@ -119,9 +122,38 @@ function withEmphasis(props: GraphCanvasProps): GraphCanvasProps {
   return { ...props, faded: new Set([...dimmed].filter((key) => !clear.has(key))) };
 }
 
-function nodesOf(props: GraphCanvasProps, edgeEnds: ReadonlySet<string>): CardNode[] {
+/** The one fact a tile may carry: what is selected inside it, else how many nodes inside it the search or filters match (each node says whether it matches itself, C9). */
+function tileFacts(props: GraphCanvasProps, tiling: Tiling): Map<string, string> {
+  const { model, selected } = props;
+  const facts = new Map<string, string>();
+  if (tiling.tiles.size === 0) {
+    return facts;
+  }
+  const matches = new Map<string, number>();
+  for (const card of model.cards) {
+    const tile = tiling.hidden.get(card.key);
+    if (tile !== undefined && card.matched) {
+      matches.set(tile, (matches.get(tile) ?? 0) + 1);
+    }
+  }
+  for (const [tile, count] of matches) {
+    facts.set(tile, `${String(count)} ${count === 1 ? "match" : "matches"}`);
+  }
+  const inside = selected === undefined ? undefined : tiling.hidden.get(selected);
+  if (inside !== undefined) {
+    facts.set(inside, `${model.cards.find((card) => card.key === selected)?.title ?? ""} selected`);
+  }
+  return facts;
+}
+
+function nodesOf(props: GraphCanvasProps, edgeEnds: ReadonlySet<string>, tiling: Tiling): CardNode[] {
   const { model, layout, overlay, lens, faded, selected, selection } = props;
   const containers = openContainers(model);
+  const facts = tileFacts(props, tiling);
+  // A card a tile stands for is outlined on the tile.
+  const ends = new Set([...edgeEnds].map((key) => tiling.hidden.get(key) ?? key));
+  // A tile that stands for a member of a selection of several is picked as that member would be.
+  const pickedTiles = new Set([...(selection?.picked ?? [])].flatMap((key) => tiling.hidden.get(key) ?? []));
   const chips = lens === undefined ? undefined : lensChips(model.cards, lens);
   const tiers = chips === undefined ? undefined : lensTiers(chips);
   return model.cards.flatMap((card) => {
@@ -142,17 +174,19 @@ function nodesOf(props: GraphCanvasProps, edgeEnds: ReadonlySet<string>): CardNo
       // which Chromium reports as a ResizeObserver loop error on every edit. A card whose
       // size does change stays observed and is measured again.
       measured: { width: placed.width, height: placed.height },
+      hidden: tiling.hidden.has(card.key),
       data: {
         card,
         overlay,
         faded: faded?.has(card.key) === true,
         selected: card.key === selected,
-        picked: selection?.picked.has(card.key) === true,
+        picked: selection?.picked.has(card.key) === true || pickedTiles.has(card.key),
         header: containers.has(card.key) ? headHeight(card) : undefined,
         place: { x: Math.round(placed.x), y: Math.round(placed.y) },
         lens: chip === undefined || lens === undefined ? undefined : { chip, tier: tiers?.get(card.key) ?? 0, name: lens },
-        edgeEnd: edgeEnds.has(card.key),
+        edgeEnd: ends.has(card.key),
         collapsible: containers.has(card.key),
+        tile: tiling.tiles.has(card.key) ? tilePiecesOf(card, facts.get(card.key)) : undefined,
       },
       draggable: false,
       // xyflow selects only for the lasso; which nodes are selected is ours (the address and the frame's set).
@@ -220,14 +254,16 @@ function boxesOf(model: CanvasModel, layout: Layout): Map<string, Box> {
 }
 
 /** C1: the date lines to draw, as flow edges between the cards they join: not selectable, not focusable, and opening no card (the inspector's dates list them). */
-function dateEdgesOf({ model, layout, dates }: Pick<GraphCanvasProps, "model" | "layout" | "dates">): DateEdge[] {
+function dateEdgesOf({ model, layout, dates }: Pick<GraphCanvasProps, "model" | "layout" | "dates">, tiling: Tiling): DateEdge[] {
   if (dates === undefined || dates.length === 0) {
     return [];
   }
   const boxes = boxesOf(model, layout);
-  const containers = new Set(model.cards.flatMap((card) => (card.parent === undefined ? [] : [card.parent])));
-  const drawn = dates.filter((line) => boxes.has(line.from) && boxes.has(line.to));
-  const routes = dateRoutes(drawn, model.cards.map((card) => ({ key: card.key, parent: card.parent, container: containers.has(card.key) })), boxes);
+  // A tile is a card the lines route round, not a frame they cross; what it holds is not drawn.
+  const shown = model.cards.filter((card) => !tiling.hidden.has(card.key));
+  const containers = new Set(shown.flatMap((card) => (card.parent === undefined ? [] : [card.parent])));
+  const drawn = tiledDates(dates, tiling).filter((line) => boxes.has(line.from) && boxes.has(line.to));
+  const routes = dateRoutes(drawn, shown.map((card) => ({ key: card.key, parent: card.parent, container: containers.has(card.key) })), boxes);
   return drawn.map((line, index) => ({
     id: line.id,
     source: line.from,
@@ -308,17 +344,36 @@ function onNextFrame(work: (step: Promise<unknown>) => void, move: () => Promise
  * or `nodes` alone at no more than full size, measured when it runs and padded for the sheet or
  * rail over the canvas's lower part. It answers once React Flow has run it, on a later frame.
  */
-function useFit(): (nodes?: string | readonly string[]) => Promise<unknown> {
+function useFit(table: TileTable): (nodes?: string | readonly string[]) => Promise<unknown> {
   const sheet = useFrameState()?.inspector?.parentElement;
   const store = useStoreApi();
   const flow = useReactFlow();
   return useCallback(
     (nodes?: string | readonly string[]) => {
       measureCanvas(store);
-      const padding = { ...FIT_PADDING, bottom: px(PAD.bottom + coveredBy(sheet, store.getState().domNode)) };
-      return flow.fitView(nodes === undefined ? { ...FIT, padding } : { nodes: (typeof nodes === "string" ? [nodes] : nodes).map((id) => ({ id })), padding, maxZoom: 1 });
+      const covered = coveredBy(sheet, store.getState().domNode);
+      const padding = { ...FIT_PADDING, bottom: px(PAD.bottom + covered) };
+      const wanted = nodes === undefined ? [] : typeof nodes === "string" ? [nodes] : nodes;
+      if (nodes === undefined) {
+        return flow.fitView({ ...FIT, padding });
+      }
+      // The cards asked for, hidden inside a tile or not, are framed by where the layout put them (fitView leaves a hidden node out; a card inside a tile is not measured, so its laid-out size is read).
+      const frames = wanted.flatMap((id) => {
+        const each = flow.getInternalNode(id);
+        return each === undefined ? [] : [{ x: each.internals.positionAbsolute.x, y: each.internals.positionAbsolute.y, width: each.measured.width ?? each.width ?? 0, height: each.measured.height ?? each.height ?? 0 }];
+      });
+      if (frames.length === 0) {
+        return flow.fitView({ ...FIT, padding });
+      }
+      const [left, top] = [Math.min(...frames.map((frame) => frame.x)), Math.min(...frames.map((frame) => frame.y))];
+      const frame = { x: left, y: top, width: Math.max(...frames.map((each) => each.x + each.width)) - left, height: Math.max(...frames.map((each) => each.y + each.height)) - top };
+      const { width, height } = store.getState();
+      const room = roomOf({ width, height }, PAD, covered);
+      const fits = Math.min(1, (room.right - room.left) / Math.max(1, frame.width), (room.bottom - room.top) / Math.max(1, frame.height));
+      // One card framed alone lands at least at the zoom it is drawn as itself at (a container opened, a card readable), so it is not left inside a tile.
+      return flow.setViewport(viewportAround(frame, Math.max(wanted.length === 1 && wanted[0] !== undefined ? drawnZoomOf(table, wanted[0]) : 0, fits), room));
     },
-    [sheet, store, flow],
+    [sheet, store, flow, table],
   );
 }
 
@@ -327,7 +382,7 @@ function useFit(): (nodes?: string | readonly string[]) => Promise<unknown> {
  * part where the canvas reaches it: a node picked is brought into the band the sheet leaves, less the zones the floating controls
  * keep (PAD), by the least move (none if it is already whole in it), so the selection is never under the sheet and the view keeps its neighbours.
  */
-function useCenterAboveSheet(selected: string | undefined, layered: boolean): void {
+function useCenterAboveSheet(selected: string | undefined, layered: boolean, table: TileTable): void {
   const flow = useReactFlow();
   const store = useStoreApi();
   const sheet = useFrameState()?.inspector?.parentElement;
@@ -339,8 +394,8 @@ function useCenterAboveSheet(selected: string | undefined, layered: boolean): vo
     }
     // After the commit that shows the sheet, so its height is there to read.
     return onNextFrame(work, () => {
-      // A card inside a container is placed relative to it: the flow knows where it is on the canvas.
-      const card = flow.getInternalNode(selected);
+      // A card inside a container is placed relative to it: the flow knows where it is on the canvas. One inside a tile is not drawn: the tile that stands for it is the box brought into view.
+      const card = flow.getInternalNode(standsBehind(tilingIn(table, bandOf(table, flow.getZoom())), selected));
       if (card === undefined) {
         return undefined;
       }
@@ -361,9 +416,9 @@ function useCenterAboveSheet(selected: string | undefined, layered: boolean): vo
 }
 
 /** A find centres its result, and an expand or collapse fits the container (5.1): once the card is drawn as asked. */
-function useReveal(reveal: Reveal | undefined, model: CanvasModel): void {
+function useReveal(reveal: Reveal | undefined, model: CanvasModel, table: TileTable): void {
   const flow = useReactFlow();
-  const fitTo = useFit();
+  const fitTo = useFit(table);
   const done = useRef<string | undefined>(undefined);
   const work = useWork();
   useEffect(() => {
@@ -385,14 +440,14 @@ function useReveal(reveal: Reveal | undefined, model: CanvasModel): void {
         return undefined;
       }
       const { x, y } = card.internals.positionAbsolute;
-      return flow.setCenter(x + (card.measured.width ?? 0) / 2, y + (card.measured.height ?? 0) / 2, { zoom: Math.max(flow.getZoom(), 0.6) });
+      return flow.setCenter(x + (card.measured.width ?? 0) / 2, y + (card.measured.height ?? 0) / 2, { zoom: Math.max(flow.getZoom(), NEAR_ZOOM) });
     });
   }, [reveal, model, flow, fitTo, work]);
 }
 
 /** The canvas's own key: `f` fits the selection, or the whole graph with none. Depth's keys are the view's (screens/keys.ts). */
-function useCanvasKeys(props: GraphCanvasProps): void {
-  const fitTo = useFit();
+function useCanvasKeys(props: GraphCanvasProps, table: TileTable): void {
+  const fitTo = useFit(table);
   const { selected } = props;
   const work = useWork();
   useEffect(() => {
@@ -648,16 +703,31 @@ function clicked({ selection, actions }: GraphCanvasProps, event: ReactMouseEven
   }
 }
 
-/** Expand a collapsed container, or collapse an open one: a double-click, or Enter on the focused card (5.1). True when it did. */
-function toggleOf({ model, actions }: GraphCanvasProps): (key: string) => boolean {
+/**
+ * Zoom into a container: a double-click, a double-tap, or Enter on the focused card. It is framed at least at the zoom it opens at, so it is drawn open and its contents readable. A collapsed container has nothing to zoom into, so it expands. Folding an open one is the fold control's. True when it did something.
+ */
+function zoomIntoOf({ model, actions }: GraphCanvasProps, fitTo: (key: string) => Promise<unknown>, work: (step: Promise<unknown>) => void): (key: string) => boolean {
   return (key) => {
     const found = model.cards.find((each) => each.key === key);
-    if (actions.expand !== undefined && found !== undefined && (found.collapsed || model.cards.some((each) => each.parent === found.key))) {
-      actions.expand(found.key, found.collapsed);
+    if (found === undefined) {
+      return false;
+    }
+    if (model.cards.some((each) => each.parent === key)) {
+      work(fitTo(key));
+      return true;
+    }
+    if (found.collapsed && actions.expand !== undefined) {
+      actions.expand(key, true);
       return true;
     }
     return false;
   };
+}
+
+function useZoomInto(props: GraphCanvasProps, table: TileTable): (key: string) => boolean {
+  const fitTo = useFit(table);
+  const work = useWork();
+  return zoomIntoOf(props, fitTo, work);
 }
 
 /** Input (5.10): two-finger scroll pans; pinch (and ctrl+wheel) zooms; the wheel alone never does. */
@@ -677,7 +747,7 @@ const INPUT = {
 /** The cards at the ends of the line being hovered and of the one selected, and the one a list beside the canvas points at: each is drawn in ink, so the card beside says which it describes. */
 function useEdgeEnds(model: CanvasModel, selectedEdge: string | undefined, hover: Line | DateLine | undefined): ReadonlySet<string> {
   const open = useMemo(() => model.lines.find((line) => line.id === selectedEdge), [model, selectedEdge]);
-  const pointed = usePointed();
+  const pointed = usePointedNode();
   return useMemo(() => new Set([...[hover, open].flatMap((line) => (line === undefined ? [] : [line.from, line.to])), ...(pointed === undefined ? [] : [pointed])]), [hover, open, pointed]);
 }
 
@@ -690,7 +760,7 @@ function useNodeMenu(props: GraphCanvasProps) {
 }
 
 /**
- * Keys on a focused card: Enter toggles a container (a button inside it keeps its own Enter),
+ * Keys on a focused card: Enter zooms into a container (a button inside it keeps its own Enter),
  * Shift+Space toggles the card in the selection, and the menu key, or Shift+F10, opens its menu
  * beside it, as a right-click does at the pointer.
  */
@@ -716,8 +786,8 @@ function cardKeys(toggle: (key: string) => boolean, select: ((key: string) => vo
 }
 
 /** The zoom buttons, a stack at the bottom left (our own, so each carries the shared tooltip, not the browser's); Fit pads for the sheet or rail like the other fits. */
-function FitControls({ focus }: { focus: readonly string[] | undefined }) {
-  const fitTo = useFit();
+function FitControls({ focus, table }: { focus: readonly string[] | undefined; table: TileTable }) {
+  const fitTo = useFit(table);
   const work = useWork();
   const flow = useReactFlow();
   const [atMin, atMax] = [useStore((state) => state.transform[2] <= state.minZoom), useStore((state) => state.transform[2] >= state.maxZoom)];
@@ -751,34 +821,94 @@ function FitControls({ focus }: { focus: readonly string[] | undefined }) {
   );
 }
 
+/**
+ * A focus inside a card that a tile now stands for, or on a container that has itself become a tile, moves to the tile: the control has left the page, and the keyboard would otherwise fall to its body. It is set on the next frame, once the flow has dropped the card, and only if the focus was lost, never taken from another control.
+ */
+function useTileFocus(root: RefObject<HTMLDivElement | null>, tiling: Tiling): void {
+  const last = useRef<string | undefined>(undefined);
+  useEffect(() => {
+    const element = root.current;
+    if (element === null) {
+      return undefined;
+    }
+    const into = (event: FocusEvent) => {
+      last.current = event.target instanceof Element ? (event.target.closest<HTMLElement>(".react-flow__node")?.dataset["id"] ?? undefined) : undefined;
+    };
+    // A card that a tile now stands for loses its focus to nowhere (no related element); a focus that went to another element, or a pointer press, is a choice not to be undone.
+    const out = (event: FocusEvent) => {
+      if (event.relatedTarget !== null) {
+        last.current = undefined;
+      }
+    };
+    const pressed = () => {
+      last.current = undefined;
+    };
+    element.addEventListener("focusin", into);
+    element.addEventListener("focusout", out);
+    element.addEventListener("pointerdown", pressed, true);
+    return () => {
+      element.removeEventListener("focusin", into);
+      element.removeEventListener("focusout", out);
+      element.removeEventListener("pointerdown", pressed, true);
+    };
+  }, [root]);
+  useEffect(() => {
+    const frame = requestAnimationFrame(() => {
+      const tile = last.current === undefined ? undefined : (tiling.hidden.get(last.current) ?? (tiling.tiles.has(last.current) ? last.current : undefined));
+      const lost = document.activeElement === null || document.activeElement === document.body;
+      if (tile !== undefined && lost) {
+        root.current?.querySelector<HTMLElement>(`.react-flow__node[data-id="${CSS.escape(tile)}"]`)?.focus({ preventScroll: true });
+      }
+    });
+    return () => {
+      cancelAnimationFrame(frame);
+    };
+  }, [tiling, root]);
+}
+
+/**
+ * What the zoom makes a tile (tiles.ts): decided by the zoom alone, from the laid-out boxes. The table is made once per layout, and the canvas re-renders when the zoom crosses a container's open zoom, not on every tick. `shown` is the props as drawn: the lines and their routes at this tiling, and the overlay lit through the one mapping from a hidden card to its tile.
+ */
+function useTiles(props: GraphCanvasProps) {
+  const table = useMemo(() => tileTableOf(props.model.cards, (key) => props.layout.nodes[key]), [props.model, props.layout]);
+  const band = useStore((state) => bandOf(table, state.transform[2]));
+  const tiling = useMemo(() => tilingIn(table, band), [table, band]);
+  const tiled = useMemo(() => tileLinesOf(props.model.lines, tiling, props.layout.routes, boxesOf(props.model, props.layout)), [props.model, props.layout, tiling]);
+  const overlay = useMemo(() => tileOverlay(props.overlay, tiling, tiled), [props.overlay, tiling, tiled]);
+  const shown = useMemo<GraphCanvasProps>(() => ({ ...props, overlay, model: { ...props.model, lines: tiled.lines }, layout: { ...props.layout, routes: tiled.routes } }), [props, overlay, tiled]);
+  return { table, tiling, shown };
+}
+
 function Flow(props: GraphCanvasProps) {
   const theme = useResolvedTheme();
   const root = useRef<HTMLDivElement>(null);
-  const { hover, focus, handlers } = useEdgeHover(props);
-  const edgeEnds = useEdgeEnds(props.model, props.selectedEdge, hover);
-  const nodes = useMemo(() => nodesOf(withEmphasis(props), edgeEnds), [props, edgeEnds]);
-  // The date lines are routed only when what they run between changes (a selection, a layout), not on every render.
+  const { table, tiling, shown } = useTiles(props);
+  const { hover, focus, handlers } = useEdgeHover(shown);
+  const edgeEnds = useEdgeEnds(shown.model, props.selectedEdge, hover);
+  const nodes = useMemo(() => nodesOf(withEmphasis(shown), edgeEnds, tiling), [shown, edgeEnds, tiling]);
+  // The date lines are routed only when what they run between changes (a selection, a layout, a tile), not on every render.
   const { model, layout, dates } = props;
-  const dateEdges = useMemo(() => dateEdgesOf({ model, layout, dates }), [model, layout, dates]);
-  const edges = useMemo<(LineEdge | DateEdge)[]>(() => [...edgesOf(withEmphasis(props)), ...dateEdges], [props, dateEdges]);
+  const dateEdges = useMemo(() => dateEdgesOf({ model, layout, dates }, tiling), [model, layout, dates, tiling]);
+  const edges = useMemo<(LineEdge | DateEdge)[]>(() => [...edgesOf(withEmphasis(shown)), ...dateEdges], [shown, dateEdges]);
   const { menu, menus, openMenu, closeMenu } = useNodeMenu(props);
   const near = useStore((state) => state.transform[2] >= NEAR_ZOOM);
   const { minZoom, fit } = useZoomRange(props, root);
   useFirstFit(props, fit);
   useTourFraming(useFraming(), props.layout);
   useZoomVariable(root);
-  useCenterAboveSheet(props.selected, props.firstFit !== undefined);
-  useReveal(props.reveal, props.model);
-  useCanvasKeys(props);
-  const changes = useChanges(props);
-  const toggle = toggleOf(props);
+  useCenterAboveSheet(props.selected, props.firstFit !== undefined, table);
+  useReveal(props.reveal, props.model, table);
+  useCanvasKeys(props, table);
+  useTileFocus(root, tiling);
+  const changes = useChanges(shown);
+  const zoomInto = useZoomInto(props, table);
   const selection = props.selection;
   return (
     <CardActionsContext value={props.actions}>
       <div
         ref={root}
         className="canvas-root"
-        onKeyDown={cardKeys(toggle, selection?.toggle, menus === undefined ? undefined : openMenu)}
+        onKeyDown={cardKeys(zoomInto, selection?.toggle, menus === undefined ? undefined : openMenu)}
         onFocus={focus.onFocus}
         onBlur={focus.onBlur}
       >
@@ -794,7 +924,7 @@ function Flow(props: GraphCanvasProps) {
           multiSelectionKeyCode={null}
           {...changes}
           onNodeClick={(event, node) => { clicked(props, event, node.id); }}
-          onNodeDoubleClick={(_, node) => { toggle(node.id); }}
+          onNodeDoubleClick={(_, node) => { zoomInto(node.id); }}
           onNodeContextMenu={(event, node) => {
             if (menus !== undefined) {
               event.preventDefault();
@@ -810,7 +940,7 @@ function Flow(props: GraphCanvasProps) {
           aria-label={props.label}
           data-lod={near ? "near" : "out"}
         >
-          <FitControls focus={props.selected === undefined ? undefined : [...new Set([props.selected, ...(props.dates ?? []).flatMap((line) => [line.from, line.to])])]} />
+          <FitControls table={table} focus={props.selected === undefined ? undefined : [...new Set([props.selected, ...(props.dates ?? []).flatMap((line) => [line.from, line.to])])]} />
           {props.children}
         </ReactFlow>
         {menu === undefined || menus === undefined ? null : <ContextMenu at={menu.at} groups={menus.groups(menu.key)} label={menus.label(menu.key)} onChoose={(id) => { menus.choose(menu.key, id); }} onClose={closeMenu} />}

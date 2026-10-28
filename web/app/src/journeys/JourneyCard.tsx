@@ -5,7 +5,7 @@
 // (H6): both read the journey's local derivation.
 import { STATUS_HOLDS_CURRENT_WORK } from "@cairn/client";
 
-import { usePoint } from "../canvas/pointed.tsx";
+import { usePointRow } from "../canvas/pointed.tsx";
 import { useFrameActions } from "../shell/frame.tsx";
 import { useProjected } from "../canvas/hooks.ts";
 import { errorWords, valueOf } from "../data/keyed-read.ts";
@@ -22,7 +22,7 @@ import { yoursOf } from "./figures-model.ts";
 import { Flags, LineageBlock, OwnersLine, useLineage } from "./JourneyFacts.tsx";
 import { useMineOf } from "./mine.ts";
 import { stagesOf } from "./stages.ts";
-import { useEffect, useMemo } from "react";
+import { useMemo } from "react";
 import "./journeys.css";
 import { Failed } from "../ui/Failed.tsx";
 import { plural } from "../ui/words.ts";
@@ -106,13 +106,29 @@ function NextMilestone({ ready, model }: { ready: Ready; model: SummaryModel }) 
   );
 }
 
+type StageRowData = ReturnType<typeof stagesOf>[number];
+
 /** One stage as a row, the whole row a target: choosing it selects the stage and frames it on the canvas; pointing at it outlines the stage there. */
+function StageRow({ ready, stage, lower }: { ready: Ready; stage: StageRowData; lower: () => void }) {
+  const pointing = usePointRow({ kind: "node", id: stage.key });
+  return (
+    <li className="stage-row" data-testid="stage-row" data-node={stage.key} data-state={stage.displayState} {...pointing}>
+      <span className="stage-row-head">
+        <NodeLink view={ready} node={stage.key} state={{ reveal: { key: stage.key, how: "frame" } }} onClick={lower} />
+        <Badge tone={statusTone(stage.displayState)}>{statusWord(stage.displayState, stage.kind)}</Badge>
+      </span>
+      <span className="stage-row-foot muted">
+        <Meter done={stage.done} of={stage.total} />
+        <span>{progressWords(stage.done, stage.total)}</span>
+        {stage.due === undefined ? null : <span className={["stage-row-due", stage.dueInk].filter(Boolean).join(" ")}>{stage.due}</span>}
+      </span>
+    </li>
+  );
+}
+
 function StagesFold({ ready, framing }: { ready: Ready; framing: boolean }) {
   const stages = stagesOf(ready);
   const actions = useFrameActions();
-  const point = usePoint();
-  // Choosing a row replaces the card: the list's own pointing ends with it.
-  useEffect(() => () => { point(undefined); }, [point]);
   // Where the stage is framed on a canvas under a sheet, it would be framed in no room at all: the sheet drops to its peek, where a card picked on the canvas opens it too.
   const lower = () => { if (framing) { actions?.snap("peek"); } };
   if (stages.length === 0) {
@@ -122,27 +138,7 @@ function StagesFold({ ready, framing }: { ready: Ready; framing: boolean }) {
     <Section title="Stages" summary={String(stages.length)} testId="card-stages">
       <ul className="plain-list stage-rows">
         {stages.map((stage) => (
-          <li
-            key={stage.key}
-            className="stage-row"
-            data-testid="stage-row"
-            data-node={stage.key}
-            data-state={stage.displayState}
-            onPointerEnter={() => { point(stage.key); }}
-            onPointerLeave={() => { point(undefined); }}
-            onFocus={() => { point(stage.key); }}
-            onBlur={() => { point(undefined); }}
-          >
-            <span className="stage-row-head">
-              <NodeLink view={ready} node={stage.key} state={{ reveal: { key: stage.key, how: "frame" } }} onClick={lower} />
-              <Badge tone={statusTone(stage.displayState)}>{statusWord(stage.displayState, stage.kind)}</Badge>
-            </span>
-            <span className="stage-row-foot muted">
-              <Meter done={stage.done} of={stage.total} />
-              <span>{progressWords(stage.done, stage.total)}</span>
-              {stage.due === undefined ? null : <span className={["stage-row-due", stage.dueInk].filter(Boolean).join(" ")}>{stage.due}</span>}
-            </span>
-          </li>
+          <StageRow key={stage.key} ready={ready} stage={stage} lower={lower} />
         ))}
       </ul>
     </Section>

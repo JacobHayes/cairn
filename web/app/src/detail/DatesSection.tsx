@@ -5,7 +5,7 @@
 // routes through a feeding decision when there is one (E3).
 import type { ReactNode } from "react";
 
-import { dateLinkId } from "../canvas/datePointing.ts";
+import { dateLinkId } from "../canvas/pointed.tsx";
 import { dateLinkRowWords } from "../canvas/dates.ts";
 import { dateWords, originWord } from "../status/when.ts";
 import { ChainView } from "./ChainView.tsx";

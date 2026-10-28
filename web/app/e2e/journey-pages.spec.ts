@@ -15,7 +15,7 @@ import { expect, test } from "./test.ts";
 import { journeyName, setStatus, startJourney } from "./around.ts";
 import { viewportOf } from "./canvas.ts";
 import { daysAfter, frontierKeys, listKeys, passOrder, select, setFrontier, withFrontier } from "./acting.ts";
-import { expectAddress, fresh, goTo, nodeCard, nodePanel, openAt, openFilter, openJourney, setDepth, setFade, settled, whenSettled } from "./shell.ts";
+import { expectAddress, fresh, goTo, nodeCard, nodePanel, openAt, openFilter, openJourney, readable, setDepth, setFade, settled, whenSettled } from "./shell.ts";
 import { closePopover, filterOf, ownAndPin, search, setCheck, setViewState, VIEWER } from "./view-state.ts";
 import { FIXED_TODAY } from "./views.ts";
 
@@ -249,6 +249,7 @@ async function stockViewAndChips(page: Page): Promise<void> {
 }
 
 test("C2, C9, C10, C11, C12: the view state set on the graph follows every view, and each draws the node it keeps; the View picker says which view is open; a journey opens as the stock view and coming back to it starts over", async ({ page }) => {
+  await readable(page);
   const id = await viewStateFollows(page);
   await depthAndFadeFollow(page, id);
   await stockViewAndChips(page);
@@ -335,6 +336,7 @@ test("C10: Frontier highlights the list: every row stays, the frontier's rows ca
 });
 
 test("C2, C9: a search narrows the graph to its matches and fits them; nothing matching offers Reset the view, which clears the search and the collapses", async ({ page }) => {
+  await readable(page);
   await openJourney(page, "browser", "j_vendor_eval", "");
   await settled(page);
   const whole = await whenSettled(page, () => page.getByTestId("node-card").count());
@@ -476,6 +478,7 @@ async function fadeTicked(page: Page): Promise<boolean | undefined> {
 }
 
 test("C2: Fade moves nothing: stepping the depth with Fade on keeps every card and the camera where Actions has them, and Hide returns to a layout of its own", async ({ page }) => {
+  await readable(page);
   await openJourney(page, "browser", "j_vendor_eval", "");
   await settled(page);
   const cards = page.getByTestId("node-card");

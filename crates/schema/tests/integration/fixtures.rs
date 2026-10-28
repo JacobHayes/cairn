@@ -16,20 +16,33 @@ fn fixtures_root() -> PathBuf {
     Path::new(env!("CARGO_MANIFEST_DIR")).join("../../fixtures")
 }
 
-/// Each segment fixture: a route file of kind segment, with no scenario of its own (the
-/// engine's insertion tests insert it).
-fn segments() -> Vec<(String, RouteFile)> {
+/// The fixture directories, by name.
+fn directories() -> Vec<(String, PathBuf)> {
+    let mut found: Vec<(String, PathBuf)> = std::fs::read_dir(fixtures_root())
+        .unwrap()
+        .map(|entry| entry.unwrap().path())
+        .filter(|path| path.is_dir())
+        .map(|path| {
+            (
+                path.file_name().unwrap().to_string_lossy().into_owned(),
+                path,
+            )
+        })
+        .collect();
+    found.sort();
+    found
+}
+
+/// Every route document the fixtures hold, whether or not a scenario runs over it: the route
+/// files, and the segments (which the engine's insertion tests insert).
+fn route_documents() -> Vec<(String, RouteFile)> {
     let mut found = Vec::new();
-    for entry in std::fs::read_dir(fixtures_root()).unwrap() {
-        let directory = entry.unwrap().path();
-        let path = directory.join("segment.yaml");
-        if path.exists() {
-            let name = directory
-                .file_name()
-                .unwrap()
-                .to_string_lossy()
-                .into_owned();
-            found.push((name, read_canonical::<RouteFile>(&path)));
+    for (name, directory) in directories() {
+        for file in ["route.yaml", "segment.yaml"] {
+            let path = directory.join(file);
+            if path.exists() {
+                found.push((format!("{name}/{file}"), read_canonical::<RouteFile>(&path)));
+            }
         }
     }
     found
@@ -38,16 +51,7 @@ fn segments() -> Vec<(String, RouteFile)> {
 /// Each fixture directory with a scenario, with its route file if it has one.
 fn fixtures() -> Vec<(String, Option<RouteFile>, Scenario)> {
     let mut found = Vec::new();
-    for entry in std::fs::read_dir(fixtures_root()).unwrap() {
-        let directory = entry.unwrap().path();
-        if !directory.is_dir() {
-            continue;
-        }
-        let name = directory
-            .file_name()
-            .unwrap()
-            .to_string_lossy()
-            .into_owned();
+    for (name, directory) in directories() {
         if !directory.join("journey.yaml").exists() {
             continue;
         }
@@ -58,7 +62,6 @@ fn fixtures() -> Vec<(String, Option<RouteFile>, Scenario)> {
         let scenario = read_canonical::<Scenario>(&directory.join("journey.yaml"));
         found.push((name, route, scenario));
     }
-    found.sort_by(|first, second| first.0.cmp(&second.0));
     found
 }
 
@@ -103,10 +106,7 @@ fn every_fixture_parses_and_round_trips_byte_for_byte() {
 fn every_route_file_validates_against_the_json_schema() {
     let schema: serde_json::Value = serde_json::from_str(&json_schema::route_file()).unwrap();
     let validator = jsonschema::draft202012::new(&schema).unwrap();
-    let routes = fixtures()
-        .into_iter()
-        .filter_map(|(name, route, _)| route.map(|route| (name, route)));
-    for (name, route) in routes.chain(segments()) {
+    for (name, route) in route_documents() {
         let document: serde_json::Value = serde_json::from_str(&to_json(&route).unwrap()).unwrap();
         let errors: Vec<String> = validator
             .iter_errors(&document)
@@ -337,7 +337,7 @@ fn the_vendor_evaluation_covers_the_illustrative_example() {
 #[test]
 fn the_readme_describes_every_fixture() {
     let readme = std::fs::read_to_string(fixtures_root().join("README.md")).unwrap();
-    for (name, ..) in fixtures() {
+    for (name, _) in directories() {
         assert!(
             readme.contains(&format!("`{name}/`")),
             "fixtures/README.md has no section for {name}"

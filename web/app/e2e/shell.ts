@@ -228,6 +228,11 @@ export async function goTo(page: Page, view: string): Promise<void> {
   await expect(frame).toHaveAttribute("data-screen", view);
 }
 
+/** A window wide enough that a fitted graph is at the reading zoom, so every card is a card and not inside a tile. */
+export async function readable(page: Page): Promise<void> {
+  await page.setViewportSize({ width: 3200, height: 2000 });
+}
+
 /** Node `node`'s card on the journey's canvas. */
 export function nodeCard(page: Page, node: string) {
   return page.locator(`[data-testid="node-card"][data-node="${node}"]`);
@@ -238,11 +243,41 @@ export function nodePanel(page: Page, node: string) {
   return page.locator(`[data-testid="node-detail"][data-node="${node}"]`);
 }
 
+/**
+ * Draws `node`'s card on the page. A card inside a container that the fit draws as a tile is not on
+ * the page: the app opens it at its address (no reload, so the host keeps its data) and the canvas
+ * frames it, which draws it as itself.
+ */
+export async function reachCard(page: Page, node: string): Promise<void> {
+  const card = nodeCard(page, node);
+  const open = card.getByTestId("card-open");
+  const canvas = page.getByTestId("canvas");
+  // On the canvas, not beside it (a card panned under the rail is drawn but cannot be clicked).
+  const onCanvas = () =>
+    whenSettled(page, async () => {
+      if ((await open.count()) === 0) {
+        return false;
+      }
+      const [at, within] = await Promise.all([open.boundingBox(), canvas.boundingBox()]);
+      return at !== null && within !== null && at.x >= within.x && at.y >= within.y && at.x + at.width <= within.x + within.width && at.y + at.height <= within.y + within.height;
+    });
+  if (await onCanvas()) {
+    return;
+  }
+  const { pathname, search } = new URL(page.url());
+  await follow(page, `${pathname.replace(/\/(nodes|edges)\/[^/]*$/, "").replace(/\/$/, "")}/nodes/${node}${search}`);
+  await page.getByRole("button", { name: /^Frame the selected card/ }).click();
+  await expect.poll(onCanvas).toBe(true);
+}
+
 /** Opens `node`'s detail from its card on the canvas, unless it is open already. */
 export async function openFromCanvas(page: Page, node: string) {
   const panel = nodePanel(page, node);
   if (!(await whenSettled(page, () => panel.isVisible()))) {
-    await nodeCard(page, node).getByTestId("card-open").click();
+    await reachCard(page, node);
+    if (!(await whenSettled(page, () => panel.isVisible()))) {
+      await nodeCard(page, node).getByTestId("card-open").click();
+    }
   }
   await expect(panel).toBeVisible();
   return panel;

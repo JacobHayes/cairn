@@ -5,7 +5,7 @@
 import { describe, expect, test } from "vitest";
 
 import { canvasView, actionsAndDecisionsHidden, wholeLevel } from "./canvas.test-support.ts";
-import { dateLinkId, stepsBack } from "./datePointing.ts";
+import { dateLinkId, stepsBack } from "./pointed.tsx";
 import { datesAround, dateLinesOf, dateLinkRowWords, dateLinkWords, mergeDateParts } from "./dates.ts";
 import { cardsOf, type CanvasModel, type DateLine, type DateLink, type Level, type LevelDateLink } from "./model.ts";
 import { TRACE_LABELS, traceOverlay } from "./overlay.ts";

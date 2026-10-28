@@ -21,7 +21,6 @@ import type { Ready } from "../detail/model.ts";
 import { NodeDetailPanel } from "../detail/NodeDetail.tsx";
 import { SelectionPanel } from "../detail/SelectionPanel.tsx";
 import { indexPath, unavailableScreens, useNodeAddresses, type Screen } from "../journeys/address.ts";
-import { PointedProvider } from "../canvas/pointed.tsx";
 import { JourneyCard } from "../journeys/JourneyCard.tsx";
 import { SummaryPage } from "../summary/SummaryPage.tsx";
 import { useJourneyTarget } from "../journeys/useJourneyTarget.ts";
@@ -217,7 +216,6 @@ function ReadyFrame({ ready, screen, selected, edge }: { ready: Ready } & Omit<F
   const phone = useMedia(PHONE_WIDTH);
   const card = reviewing || selected !== undefined || edge !== undefined || screen === "summary" || screen === "walk" ? "none" : wide || phone ? "column" : fills ? "none" : "inline";
   return (
-    <PointedProvider>
     <ViewStateContext value={viewState}>
     <ConnectContext value={authored === undefined ? undefined : drawing}>
       <InsertEntryContext value={inserting.start}>
@@ -238,7 +236,6 @@ function ReadyFrame({ ready, screen, selected, edge }: { ready: Ready } & Omit<F
       </InsertEntryContext>
     </ConnectContext>
     </ViewStateContext>
-    </PointedProvider>
   );
 }
 

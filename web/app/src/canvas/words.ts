@@ -56,6 +56,11 @@ export function progressWords(done: number, total: number): string {
   return `${String(done)} of ${String(total)} done`;
 }
 
+/** What a marked-done container says: its kept work still pending, or how many of its nodes were skipped. */
+export function markedDoneWords(keptPending: boolean, skipped: number): string {
+  return keptPending ? "Kept work pending" : skipped === 0 ? "Marked done" : `Marked done \u00b7 ${String(skipped)} skipped`;
+}
+
 /** A checklist's progress as words: `7 of 11 ticked`. */
 export function checklistWords(ticked: number, total: number): string {
   return `${String(ticked)} of ${String(total)} ticked`;

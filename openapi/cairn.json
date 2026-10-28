@@ -6014,6 +6014,10 @@
             "$ref": "#/components/schemas/NodeKey",
             "description": "The node."
           },
+          "matched": {
+            "description": "Whether the query's filters or text match the node itself, not only something it holds:\nwhat a search counts as a match. False when the query filters nothing.",
+            "type": "boolean"
+          },
           "parent": {
             "anyOf": [
               {

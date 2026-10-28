@@ -11,7 +11,7 @@ import { openTip } from "./tips.ts";
 
 import { expectTitleLinesAsLaidOut, lineBetween, pointOn, viewportOf } from "./canvas.ts";
 import { journeyName, startJourney } from "./around.ts";
-import { goWithin, nodeCard, nodePanel, openJourney, openSheet, setDepth, setFade, settled, visit, whenSettled } from "./shell.ts";
+import { goWithin, nodeCard, nodePanel, openFromCanvas, openJourney, openSheet, readable, setDepth, setFade, settled, visit, whenSettled } from "./shell.ts";
 
 /** The open Filter counts what it hides beside its box, and showing the not relevant removes the count. */
 async function filterCountsWhatItHides(page: Page): Promise<void> {
@@ -119,6 +119,7 @@ async function depthCountsHiddenFrontier(page: Page): Promise<void> {
 }
 
 test("C2 to C7: the graph opens fitted at every depth, expands in place, traces a selection, follows an edge, and pans and zooms", async ({ page }) => {
+  await readable(page);
   await openJourney(page, "browser", "j_vendor_eval", "");
   // It opens at the stock view: every depth, fitted to the whole graph, as Fit does.
   await expect(page.getByTestId("depth-button")).toHaveAccessibleName("Depth: Actions");
@@ -150,7 +151,7 @@ async function shiftClickDrifting(page: Page, target: Locator): Promise<void> {
 /** Click selects and shift-click adds, the inspector lists the members, and the actions that fit them all are offered. */
 async function selectsASet(page: Page): Promise<void> {
   const members = page.getByTestId("selection-member");
-  await nodeCard(page, "n_access").getByTestId("card-open").click();
+  await openFromCanvas(page, "n_access");
   await expect(nodePanel(page, "n_access")).toBeVisible();
   // Shift on a title adds as it does on the body, though the pointer drifts while pressed; two members are listed, with no trace left drawn.
   await shiftClickDrifting(page, nodeCard(page, "n_plan").getByTestId("title"));
@@ -280,6 +281,7 @@ async function contextMenuActsOnTheSelection(page: Page): Promise<void> {
 }
 
 test("selection is one set with no mode: click selects, shift-click adds, the inspector lists the members and the actions that fit them all", async ({ page }) => {
+  await readable(page);
   await openJourney(page, "browser", "j_vendor_eval");
   await selectsASet(page);
   await clearsAndBoxSelects(page);
@@ -345,22 +347,13 @@ async function revealedNodesStayDimmed(page: Page): Promise<void> {
   await checkpoint(page);
 }
 
-/** At the stock view, open and in focus is full and done is half; a zoomed-out stage head draws its chip inside the head, a group's has none; a trace puts what is outside it at a third. */
-async function stageHeadsAndTracedOpacity(page: Page): Promise<void> {
+/** At the stock view, open and in focus is full and done is half; a trace puts what is outside it at a third. */
+async function stockAndTracedOpacity(page: Page): Promise<void> {
   await goWithin(page, "/journeys/j_vendor_eval?view=graph&depth=actions");
   await expect(nodeCard(page, "n_plan")).toBeVisible();
   await page.keyboard.press("f");
   await expect(nodeCard(page, "n_reporting")).toHaveCSS("opacity", "1");
   await expect(nodeCard(page, "n_testing")).toHaveCSS("opacity", "0.5");
-  const chip = nodeCard(page, "n_testing").getByTestId("card-head-chip");
-  await expect(chip).toBeVisible();
-  const [chipBox, cardBox] = await whenSettled(page, () => Promise.all([chip.boundingBox(), nodeCard(page, "n_testing").boundingBox()]));
-  if (chipBox === null || cardBox === null) {
-    throw new Error("the stage and its chip are drawn");
-  }
-  expect(chipBox.y).toBeGreaterThanOrEqual(cardBox.y);
-  expect(chipBox.x + chipBox.width).toBeLessThanOrEqual(cardBox.x + cardBox.width);
-  await expect(nodeCard(page, "n_final_review").getByTestId("card-head-chip")).toHaveCount(0);
   // Tracing a card puts what is outside the trace at a third, done or not: the levels are never multiplied.
   await nodeCard(page, "n_final_review").getByTestId("card-open").click({ force: true });
   await expect(nodeCard(page, "n_purpose")).toHaveCSS("opacity", "0.3");
@@ -373,14 +366,14 @@ async function stageHeadsAndTracedOpacity(page: Page): Promise<void> {
 }
 
 test("C2, DESIGN opacity: a card takes the lowest opacity that applies: under Fade the cards below the depth are 0.3 whatever their state, a container holding a decision stays clear, Frontier's dimming joins it without multiplying, and a trace's never lifts it", async ({ page }) => {
-  await page.setViewportSize({ width: 1440, height: 900 });
+  await readable(page);
   await openJourney(page, "browser", "j_vendor_eval", "?depth=decisions&fade=1");
   await expect(nodeCard(page, "n_plan")).toBeVisible();
   await fadeAndFrontierLevels(page);
   await checkpoint(page);
   await revealedNodesStayDimmed(page);
   await checkpoint(page);
-  await stageHeadsAndTracedOpacity(page);
+  await stockAndTracedOpacity(page);
 });
 
 /** A line between folded stages opens the links it stands for, and each end is a link. */
@@ -426,13 +419,14 @@ async function setDatesOpen(page: Page, key: string, open: boolean): Promise<Loc
 }
 
 test("C1: date relationships are drawn only for the one selected node while its Dates section is open, both ways, with an arrowhead where the order is fixed, open no card, and are listed in that section", async ({ page }) => {
+  await readable(page);
   await visit(page, "browser", "/journeys/j_launch?view=graph&depth=actions");
   await expect(nodeCard(page, "n_launch")).toBeVisible();
   const dates = page.locator('[data-kind="dates"]');
   // At rest no date relationship is drawn.
   await expect(dates).toHaveCount(0);
   // Documentation is due before the launch. With its Dates section folded nothing is drawn; open, one line with the later end marked; folded again, none.
-  await nodeCard(page, "n_docs").getByTestId("card-open").click();
+  await openFromCanvas(page, "n_docs");
   await expect(nodePanel(page, "n_docs")).toBeVisible();
   await setDatesOpen(page, "n_docs", false);
   await expect(dates).toHaveCount(0);
@@ -487,12 +481,13 @@ test("C1: date relationships are drawn only for the one selected node while its 
 });
 
 test("C1: the Dates fold is remembered per kind of node, and the pin action opens it", async ({ page }) => {
+  await readable(page);
   await visit(page, "browser", "/journeys/j_launch?view=graph&depth=actions");
   const dates = page.locator('[data-kind="dates"]');
-  await nodeCard(page, "n_docs").getByTestId("card-open").click();
+  await openFromCanvas(page, "n_docs");
   await setDatesOpen(page, "n_docs", true);
   // Another deliverable, selected next, has its section open and draws its line without anything being toggled.
-  await nodeCard(page, "n_announcement").getByTestId("card-open").click();
+  await openFromCanvas(page, "n_announcement");
   await expect(nodePanel(page, "n_announcement").getByTestId("dates")).toHaveAttribute("open", "");
   await expect(dates.first()).toBeVisible();
   // The pin action opens a folded Dates section.
@@ -505,12 +500,13 @@ test("C1: the Dates fold is remembered per kind of node, and the pin action open
 });
 
 test("C1: a date line's far end stays in focus under Frontier, and a published route's inspector lists the same relationships", async ({ page }) => {
+  await readable(page);
   await visit(page, "browser", "/journeys/j_launch?view=graph&depth=actions");
   await expect(nodeCard(page, "n_launch")).toBeVisible();
   await page.getByTestId("chip-frontier").click();
   // Launch is not on the frontier, so Frontier dims it; Documentation's line to it keeps it in focus.
   await expect(nodeCard(page, "n_launch")).toHaveCSS("opacity", "0.3");
-  await nodeCard(page, "n_docs").getByTestId("card-open").click();
+  await openFromCanvas(page, "n_docs");
   await setDatesOpen(page, "n_docs", true);
   await expect(page.locator('[data-kind="dates"]')).toHaveCount(1);
   await expect(nodeCard(page, "n_launch")).not.toHaveCSS("opacity", "0.3");

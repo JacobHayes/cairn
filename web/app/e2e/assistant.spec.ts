@@ -13,7 +13,7 @@ import { startVendorJourney } from "./acting.ts";
 import { ask, openPanel, patchId, script, type ScriptStep } from "./assistant.ts";
 import { state } from "./detail.ts";
 import { apply, reviewOpen } from "./proposals.ts";
-import { derived, goTo, nodePanel, open, openJourney, whenSettled } from "./shell.ts";
+import { derived, goTo, nodePanel, open, openJourney, readable, whenSettled } from "./shell.ts";
 
 /** A model's step that notes `node` and completes it, as one direct change. */
 function noteAndComplete(journey: string, node: string, base: number): ScriptStep {
@@ -76,6 +76,9 @@ test("I5, I7: a direct change reported with its node, and a breakdown proposed, 
   await expect(page.locator('[data-testid="list-row"][data-diff="added"]')).toHaveCount(2);
   await apply(page);
   await goTo(page, "graph");
+  // A window that draws every card, so the new ones are cards and not inside a tile.
+  await readable(page);
+  await page.keyboard.press("f");
   for (const title of ["Ingest workload", "Query workload"]) {
     await expect(page.locator('[data-testid="node-card"][data-parent="n_workload"]').filter({ hasText: title })).toHaveCount(1);
   }

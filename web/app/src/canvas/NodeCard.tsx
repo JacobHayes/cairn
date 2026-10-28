@@ -13,13 +13,16 @@ import { createContext, useContext, type CSSProperties } from "react";
 import type { ContextGroup } from "../ui/ContextMenu.tsx";
 import { Meter } from "../ui/kit.tsx";
 import { statusTone, statusWord } from "../status/words.ts";
-import { BORDER_PX, CARD_GEOMETRY_VARS, CHIP_BORDER_PX, CHIP_FONT_PX, CHIP_LEADING, MARKER_ROW_PX, TITLE_LINE_PX, cardRows, headChipFits, headTitleBox, titleFitPx, titleLines, titleWordOverflows, type CardRows } from "./cards.ts";
+import { BORDER_PX, CARD_GEOMETRY_VARS, CHIP_VARS, MARKER_ROW_PX, TITLE_LINE_PX, cardRows, headChipFits, headTitleBox, titleFitPx, titleLines, titleWordOverflows, type CardRows } from "./cards.ts";
 import { NEAR_ZOOM } from "./gestures.ts";
 import type { LensChip } from "./lens.ts";
 import { hereWords, nodeClasses } from "./look.ts";
 import { RANK_TAG_COUNT, type Card, type CardBody } from "./model.ts";
 import type { CanvasOverlay, OverlayMark } from "./overlay.ts";
-import { checklistWords, progressWords } from "./words.ts";
+import { MarkNote } from "./MarkNote.tsx";
+import { TileCard } from "./TileCard.tsx";
+import type { TilePieces } from "./tiles.ts";
+import { checklistWords, markedDoneWords, progressWords } from "./words.ts";
 
 import { plural } from "../ui/words.ts";
 import { nodeTitle } from "../ui/gone.ts";
@@ -62,6 +65,8 @@ export type CardData = {
   edgeEnd: boolean;
   /** The container is open and has children to collapse. */
   collapsible: boolean;
+  /** Drawn as a tile, zoomed out: what it says (tiles.ts). None for a card, or a container drawn open. */
+  tile: TilePieces | undefined;
 };
 
 export type CardNode = Node<CardData, "card">;
@@ -185,7 +190,7 @@ function Body({ body }: { body: CardBody }) {
     case "marked_done":
       return (
         <div className="node-body-line node-marked" data-testid="card-marked-done">
-          {body.keptPending ? "Kept work pending" : body.skipped === 0 ? "Marked done" : `Marked done \u00b7 ${String(body.skipped)} skipped`}
+          {markedDoneWords(body.keptPending, body.skipped)}
         </div>
       );
     case "depends":
@@ -326,7 +331,7 @@ function HeadChip({ card, box }: { card: Card; box: { width: number; height: num
     return null;
   }
   return (
-    <span className={`badge ${statusTone(journey.state)} node-head-chip`} style={{ "--chip-font": `${String(CHIP_FONT_PX)}px`, "--chip-leading": CHIP_LEADING, "--chip-border": `${String(CHIP_BORDER_PX)}px` } as CSSProperties} data-testid="card-head-chip" data-state={journey.state}>
+    <span className={`badge ${statusTone(journey.state)} node-head-chip`} style={CHIP_VARS as CSSProperties} data-testid="card-head-chip" data-state={journey.state}>
       {word}
     </span>
   );
@@ -353,6 +358,13 @@ function TitleRow({ card, rows, head }: { card: Card; rows: CardRows; head?: { b
 /** `NodeCard`: one node on the canvas, drawn as cards.ts sized it. */
 export function NodeCard({ data, width, height }: NodeProps<CardNode>) {
   const { card, overlay, selected, picked, header, faded, edgeEnd } = data;
+  if (data.tile !== undefined) {
+    return (
+      <TileCard card={card} pieces={data.tile} overlay={overlay} faded={faded} selected={selected} picked={picked} edgeEnd={edgeEnd} place={data.place} width={width} height={height}>
+        <Hanging data={data} />
+      </TileCard>
+    );
+  }
   const journey = card.journey;
   const rows = cardRows(card);
   const classes = [...nodeClasses(card, { overlay, faded }), selected ? "node-selected" : "", picked ? "node-picked" : "", edgeEnd ? "node-edge-end" : "", header === undefined ? "" : "node-container"];
@@ -375,13 +387,7 @@ export function NodeCard({ data, width, height }: NodeProps<CardNode>) {
       data-x={data.place.x}
       data-y={data.place.y}
     >
-      {/* Under a proposal's layer, what the card's own words do not say: that it needs a choice, and the mark's note. */}
-      {mark?.diff === undefined || (mark.choice !== true && mark.note === undefined) ? null : (
-        <span className="visually-hidden">
-          {mark.choice === true ? "Needs a choice. " : ""}
-          {mark.note}
-        </span>
-      )}
+      <MarkNote mark={mark} />
       <Handle type="target" position={Position.Left} isConnectable={false} className="node-handle" data-overhang="" />
       {/* `nokey`: a press on the card's own face is a click even with Shift held, so a hand that drifts a pixel still adds the card; only a press on the empty canvas, or inside an open container below its head, draws a box. */}
       {header === undefined ? (

@@ -17,7 +17,7 @@ import type { Reveal } from "./GraphCanvas.tsx";
 import { useLaidOut, useLevel, useProjected, type Held } from "./hooks.ts";
 import { ancestorsOf } from "./ladder.ts";
 import { datesAround, dateLinesOf } from "./dates.ts";
-import { endsOf, lineIdOf, lineOf, type CanvasModel, type DateLine, type Level, type LineLink } from "./model.ts";
+import { endsOf, joinLines, lineIdOf, rolledLine, type CanvasModel, type DateLine, type Level } from "./model.ts";
 import { marksOverlay, standsFor, traceOverlay } from "./overlay.ts";
 import type { GraphView } from "./settings.ts";
 import { useViewLevel } from "./viewLevel.ts";
@@ -50,20 +50,7 @@ export function onlyTraced(model: CanvasModel, traced: ReadonlySet<string>, draw
     }
     return at?.key;
   };
-  const joined = new Map<string, { from: string; to: string; edges: LineLink[] }>();
-  for (const line of model.lines) {
-    const [from, to] = [standIn(line.from), standIn(line.to)];
-    if (from === undefined || to === undefined || from === to) {
-      continue;
-    }
-    const id = lineIdOf(from, to);
-    const kept = joined.get(id) ?? { from, to, edges: [] };
-    joined.set(id, kept);
-    for (const edge of line.edges) {
-      kept.edges.push(edge);
-    }
-  }
-  const lines = [...joined.entries()].map(([id, line]) => lineOf(id, line.from, line.to, line.edges));
+  const lines = joinLines(model.lines, standIn).map((joined) => joined.line);
   return { cards: model.cards.filter((card) => !out.has(card.key)), lines };
 }
 
@@ -186,7 +173,8 @@ export function useCanvasGraph({ view, side, was, wait = false, layer, ready, se
   // The line is the one the canvas draws: none when the view draws no such line, nothing yet before the first layout or when the level failed.
   const ends = edge === undefined ? undefined : endsOf(edge);
   const wanted = ends === undefined ? undefined : lineIdOf(ends.from, ends.to);
-  const line = edge === undefined || laidOut === undefined || levelError !== undefined ? undefined : (laidOut.model.lines.find((each) => each.id === wanted) ?? null);
+  // A line between two cards that hold others (two tiles) stands for every line between what they hold, so its card lists all of them.
+  const line = edge === undefined || laidOut === undefined || levelError !== undefined ? undefined : ((ends === undefined ? undefined : rolledLine(laidOut.model, ends)) ?? laidOut.model.lines.find((each) => each.id === wanted) ?? null);
   const rolledUp = laidOut?.model.cards.find((card) => card.key === selected)?.rolledUp;
   useEffect(() => {
     if (rolledUp !== undefined) {

@@ -26,6 +26,7 @@ import {
   openFromCanvas,
   openJourney,
   ownJourney,
+  readable,
   rename,
   renameOf,
   save,
@@ -40,6 +41,7 @@ const title = (page: Parameters<typeof nodeCard>[0], node: string) => nodeCard(p
 
 test("edits to different nodes both land, and edits to one field surface a conflict", { tag: "@server" }, async ({ context }) => {
   const [one, two] = [await context.newPage(), await context.newPage()];
+  await Promise.all([readable(one), readable(two)]);
   const { id } = await ownJourney(context.request, "hiring-loop");
   await openJourney(one, "server", id);
   await openJourney(two, "server", id);
@@ -76,6 +78,7 @@ test("edits to different nodes both land, and edits to one field surface a confl
 // Serial: it counts the page's fetches of the document, and a deployment tick caused by another test's journey would add one.
 test("a later page shows the edit, and a page on the index shows a journey started elsewhere", { tag: ["@server", "@serial"] }, async ({ context }) => {
   const [one, two] = [await context.newPage(), await context.newPage()];
+  await Promise.all([readable(one), readable(two)]);
   const { id, name } = await ownJourney(context.request, "product-launch");
   const fetched = countDocumentFetches(two, id);
   await openJourney(one, "server", id);
@@ -93,6 +96,7 @@ test("a later page shows the edit, and a page on the index shows a journey start
   await expect(title(two, "n_docs")).toHaveText(renamed);
   await live(two);
   const later = await context.newPage();
+  await readable(later);
   await openJourney(later, "server", id);
   await expect(title(later, "n_docs")).toHaveText(renamed);
   // The page refetched once per newer revision, never for one it already held.
@@ -137,6 +141,7 @@ async function journeyOwnedBy(request: APIRequestContext, owner: string): Promis
 
 test("a deployment tick refetches the deployment context and re-derives: a merge changes the owner another page shows", { tag: ["@server", "@serial"] }, async ({ context }) => {
   const [one, two] = [await context.newPage(), await context.newPage()];
+  await Promise.all([readable(one), readable(two)]);
   const deploymentFetches: string[] = [];
   two.on("request", (request) => {
     if (new URL(request.url()).pathname === "/api/deployment") {
@@ -207,6 +212,7 @@ test("a nameless identity of the user is asked for its name; an identity signed 
 
 test("a route's canvas keeps its graph while its reads fail, says BEHIND, and catches up once they recover", { tag: "@server" }, async ({ context }) => {
   const [one, two] = [await context.newPage(), await context.newPage()];
+  await Promise.all([readable(one), readable(two)]);
   const id = await newRoute(one, "server", routeName("Behind"));
   await addNode(one, "decision", "First choice");
   await open(two, "server", `/routes/${id}`);

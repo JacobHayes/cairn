@@ -96,4 +96,13 @@ describe("date routes and stage frames", () => {
     const routes = dateRoutes(keys.map((key) => ({ from: key, to: "m" })), [...boxes.keys()].map((key) => cardOf(key)), boxes);
     expect(routes.every((route, at) => route[0]?.x === (boxes.get(keys[at] ?? "")?.x ?? 0) + 240 && route.at(-1)?.x === 4000)).toBe(true);
   });
+
+  test("a canvas too large for the grid is still routed round the cards in the way, ending on the real boxes", () => {
+    const boxes = new Map([["a", box(0, 0, 2000, 1000)], ["b", box(18000, 10000, 2000, 1000)], ["wall", box(8000, 3000, 4000, 6000)]]);
+    const [route] = dateRoutes([{ from: "a", to: "b" }], [...boxes.keys()].map((key) => cardOf(key)), boxes);
+    expect(route?.length).toBeGreaterThan(2);
+    expect(crosses(route ?? [], boxes.get("wall") as Box)).toBe(false);
+    expect(route?.[0]?.x).toBeCloseTo(2000, 6);
+    expect(route?.at(-1)?.x).toBeCloseTo(18000, 6);
+  });
 });

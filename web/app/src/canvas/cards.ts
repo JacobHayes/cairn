@@ -5,7 +5,7 @@
 // its width as the browser measures it (measure.ts), so the count is what the drawing wraps to. What an overlay or the Signals
 // lens adds hangs outside the card, so neither moves a node.
 import type { LayoutRequest } from "./layout.ts";
-import { emWidthOf } from "./measure.ts";
+import { wrappedLines } from "./measure.ts";
 import type { Card, CanvasModel } from "./model.ts";
 
 /** A card's width (px): ten of the ruling's cells. */
@@ -136,29 +136,6 @@ export const TITLE_FIT_MIN_PX = 5;
 export const TITLE_READING_PX = 15;
 export const TITLE_SCREEN_PX = 13;
 
-const wordsOf = (title: string) => title.split(/\s+/).filter(Boolean).map(emWidthOf);
-
-/** The lines a title takes wrapped between its words in `width` ems, or undefined when a word is wider than a line. */
-function wrappedLines(title: string, width: number): number | undefined {
-  let lines = 1;
-  let used = 0;
-  const space = emWidthOf(" ");
-  for (const word of wordsOf(title)) {
-    if (word > width) {
-      return undefined;
-    }
-    if (used === 0) {
-      used = word;
-    } else if (used + space + word <= width) {
-      used += space + word;
-    } else {
-      lines += 1;
-      used = word;
-    }
-  }
-  return lines;
-}
-
 /** Whether a word of the title is wider than `width` even at the least size: it can only be cut, with an ellipsis, on one line. */
 export function titleWordOverflows(title: string, width: number): boolean {
   return wrappedLines(title, width / TITLE_FIT_MIN_PX) === undefined;
@@ -202,8 +179,10 @@ export function titleSizePx(title: string, box: { width: number; height: number 
 export const CHIP_FONT_PX = 10.5;
 export const CHIP_LEADING = 1.6;
 export const CHIP_BORDER_PX = 1;
-const CHIP_LETTER_PX = 6.9;
-const CHIP_EXTRA_PX = 31;
+/** The chip's size as CSS variables: a head's chip and a tile's chip are set by the one rule in canvas.css. */
+export const CHIP_VARS = { "--chip-font": `${String(CHIP_FONT_PX)}px`, "--chip-leading": CHIP_LEADING, "--chip-border": `${String(CHIP_BORDER_PX)}px` } as const;
+export const CHIP_LETTER_PX = 6.9;
+export const CHIP_EXTRA_PX = 31;
 
 /** Whether a chip of `letters` fits beside the title in `box` at `zoom` without the title getting smaller or taking more lines. */
 export function headChipFits(title: string, letters: number, box: { width: number; height: number }, zoom: number): boolean {

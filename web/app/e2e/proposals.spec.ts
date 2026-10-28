@@ -9,7 +9,7 @@ import { expect, test } from "./test.ts";
 import { DESKTOP_MIN } from "../src/shell/breakpoints.ts";
 import { openJourneyCard } from "./around.ts";
 import { apply, blockers, editWhereVersionTwoChanges, graphRoom, marginIn, pickNode, publishVersionTwo, resolve, reviewItem, reviewOpen, saveEdits, scrollsOnce } from "./proposals.ts";
-import { expectAddress, goTo, nodeCard, open, setDepth, syncChip, whenSettled } from "./shell.ts";
+import { expectAddress, goTo, nodeCard, open, readable, setDepth, syncChip, whenSettled } from "./shell.ts";
 
 /** Drafts the upgrade of the scenario journey to version 2 (after the edits version 2 also touches) and returns the review's address. */
 async function draftUpgrade(page: Page): Promise<string> {
@@ -104,6 +104,9 @@ async function resolvedAndApplied(page: Page): Promise<void> {
   await apply(page);
   await goTo(page, "graph");
   await setDepth(page, "Actions");
+  // Wide enough for every card to be drawn at the fit.
+  await readable(page);
+  await page.keyboard.press("f");
   await expect(nodeCard(page, "n_signoff")).toBeVisible();
   await expect(nodeCard(page, "n_access").getByTestId("title")).toHaveText("Access to the environment");
   await expect(nodeCard(page, "n_workload")).toHaveCount(0);

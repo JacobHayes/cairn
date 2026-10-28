@@ -16,13 +16,14 @@ import { expect, test } from "./test.ts";
 
 import { importIntoDraft, openRoute, openRouteMenu, versionSelect } from "./around.ts";
 import { addNode, formField, newRoute, nodeForm, routeName, saveForm, structure } from "./authoring.ts";
-import { fresh, goWithin, menuItem, nodeCard, nodePanel, open, openFromCanvas, openJourney, ownJourney, recentSaves, rename, renameOf, save, startRename, syncChip } from "./shell.ts";
+import { fresh, goWithin, menuItem, nodeCard, nodePanel, open, openFromCanvas, openJourney, ownJourney, readable, recentSaves, rename, renameOf, save, startRename, syncChip } from "./shell.ts";
 
 const PATCHES = "**/api/journeys/*/patches";
 
 /** Two pages on a journey of its own started from the hiring loop: `two` has started renaming `node`, then `one` renames it, so `two`'s save will conflict. */
 async function conflicting(context: BrowserContext, node: string) {
   const [one, two] = [await context.newPage(), await context.newPage()];
+  await Promise.all([readable(one), readable(two)]);
   const { id } = await ownJourney(context.request, "hiring-loop");
   await openJourney(one, "server", id);
   await openJourney(two, "server", id);
@@ -185,6 +186,7 @@ test("a form that sent its write keeps text typed since when the send lands, and
 
 test("a node action rejected after its screen was left waits under its form, across a reload", { tag: "@server" }, async ({ context }) => {
   const [one, two] = [await context.newPage(), await context.newPage()];
+  await Promise.all([readable(one), readable(two)]);
   const { id } = await ownJourney(context.request, "product-launch");
   await openJourney(one, "server", id);
   await openJourney(two, "server", id);

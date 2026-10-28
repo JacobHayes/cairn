@@ -11,7 +11,7 @@ import { openRoute, pickVersion, publishDraft, routeMenuItem, versionSelect } fr
 import { formField, saveForm } from "./authoring.ts";
 import { publishVersionTwo } from "./proposals.ts";
 import { lineBetween, pointOn } from "./canvas.ts";
-import { expectAddress, follow, goWithin, importRoute, nodeCard, open, setDepth, settled, whenSettled } from "./shell.ts";
+import { expectAddress, follow, goWithin, importRoute, nodeCard, open, readable, setDepth, settled, whenSettled } from "./shell.ts";
 import { search } from "./view-state.ts";
 
 /** Opens a draft on the route being shown (a version) and waits for the draft view. */
@@ -172,6 +172,7 @@ async function draftTraces(page: Page): Promise<void> {
 }
 
 test("C7: selecting a node on a route draft traces it, as on a journey, through an edit; Reveal and Hide, a hidden-prerequisites marker, and a click on the empty canvas clears it", async ({ page }) => {
+  await readable(page);
   await openRoute(page, "browser", "vendor-evaluation");
   await openDraftHere(page);
   await draftTraces(page);
@@ -213,6 +214,7 @@ async function putAwayInspectorReturns(page: Page): Promise<void> {
 }
 
 test("C7, C19: a node of a published version is selected like a draft's: its address keeps the version, its panel is read only, it traces, a search that hides it still draws it on every view, Esc clears it, and a version's node says when it applies", async ({ page }) => {
+  await readable(page);
   await openRoute(page, "browser", "vendor-evaluation", "?version=1");
   await selectCard(page, "n_plan_review");
   await expect(page).toHaveURL(/\/routes\/vendor-evaluation\/nodes\/n_plan_review\?version=1/);
@@ -275,6 +277,7 @@ async function versionLineOpensCard(page: Page): Promise<void> {
 }
 
 test("C1, C7, C19: a line on a route opens its card: on a version the address keeps the version and the card says no state, a row's link opens the read-only panel, and the empty canvas clears it; on a draft it takes the draft card's place, a second click brings a hidden inspector back, and Esc brings the draft card back", async ({ page }) => {
+  await readable(page);
   await versionLineOpensCard(page);
   await openDraftHere(page);
   await clickLine(page, "n_access", "n_plan");

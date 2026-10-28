@@ -20,7 +20,7 @@ import type { AddressName } from "../src/address.ts";
 import { JOURNEY_OFFERS, ROUTE_OFFERS } from "../src/journeys/view.ts";
 import { openJourneyCard } from "./around.ts";
 import { editWhereVersionTwoChanges, publishVersionTwo, reviewOpen } from "./proposals.ts";
-import { nodeCard, open, openAt, settled } from "./shell.ts";
+import { nodeCard, nodePanel, open, openAt, reachCard, settled } from "./shell.ts";
 
 /** What the walk reaches states of: the journey and the route it opens, a node and an edge both have, an identity, and the proposals `seedProposals` made. */
 export interface Subject {
@@ -85,6 +85,7 @@ export async function openPopover(page: Page, trigger: "filter-button" | "depth-
 
 /** A card's context menu, opened on the page as it is. */
 export async function openCardMenu(page: Page, node: string): Promise<void> {
+  await reachCard(page, node);
   await nodeCard(page, node).click({ button: "right" });
 }
 
@@ -172,12 +173,12 @@ export const SCREENS: Record<AddressName, [State, ...State[]]> = {
     ...POPOVERS,
     { name: "stages-open", reach: async (page, on) => { await journeyAt(page, on.journey, "list"); await page.getByTestId("card-stages").locator("summary").click(); }, ready: (page) => page.getByTestId("stage-row").first(), only: "desktop" },
     { name: "frontier", reach: (page, on) => journeyAt(page, on.journey, "list?frontier=1"), ready: (page) => page.getByTestId("list") },
-    { name: "card-menu", reach: async (page, on) => { await journeyAt(page, on.journey, "graph"); await fitGraph(page); await openCardMenu(page, on.node); }, ready: (page) => page.getByTestId("context-menu"), only: "desktop" },
+    { name: "card-menu", reach: async (page, on) => { await journeyAt(page, on.journey, "graph"); await fitGraph(page); await openCardMenu(page, "n_kickoff"); }, ready: (page) => page.getByTestId("context-menu"), only: "desktop" },
     { name: "controls-menu", reach: async (page, on) => { await journeyAt(page, on.journey, "list"); await openControlsMenu(page); }, ready: (page) => page.getByTestId("controls-panel-phone"), only: "phone" },
   ],
   journeyNode: [
     { name: "list", reach: (page, on) => journeyAt(page, on.journey, "list", on.node), ready: (page) => inspector(page).getByTestId("detail-header") },
-    { name: "graph", reach: async (page, on) => { await journeyAt(page, on.journey, "graph", on.node); await fitGraph(page); }, ready: (page, on) => nodeCard(page, on.node) },
+    { name: "graph", reach: async (page, on) => { await journeyAt(page, on.journey, "graph", on.node); await fitGraph(page); }, ready: (page, on) => nodePanel(page, on.node) },
   ],
   journeyEdge: [{ name: "edge-card", reach: async (page, on) => { await journeyAt(page, on.journey, `graph/edges/${on.edge}`); await fitGraph(page); }, ready: (page) => page.getByTestId("edge-card") }],
   journeyProposals: [{ name: "tab", reach: (page, on) => indexAt(page, `/journeys/${on.journey}/proposals`), ready: (page) => page.getByTestId("proposals-pane") }],

@@ -19,6 +19,7 @@ import { LoadFailure } from "./LoadFailure.tsx";
 import { SyncChip } from "./SyncChip.tsx";
 import { Toast } from "./Toast.tsx";
 import { useFrame } from "./useFrame.ts";
+import { PointedProvider } from "../canvas/pointed.tsx";
 import { Pending } from "../ui/Pending.tsx";
 import { Tip, TipLayer } from "../ui/Tip.tsx";
 
@@ -78,6 +79,7 @@ export function Shell() {
   const ask = useNameAsk();
   return (
     <TipLayer>
+    <PointedProvider>
     <FrameActionsContext value={frame.actions}>
       <FrameStateContext value={frame.state}>
         <TourProvider nameSettled={ask.settled}>
@@ -113,6 +115,7 @@ export function Shell() {
         </TourProvider>
       </FrameStateContext>
     </FrameActionsContext>
+    </PointedProvider>
     </TipLayer>
   );
 }

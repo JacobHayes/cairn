@@ -809,6 +809,103 @@
   border-color: var(--ink-fill);
 }
 
+/* ---- a container zoomed out: a tile ------------------------------------------------------------- */
+
+/* Below the reading zoom a container is one sheet at its own box (TileCard.tsx): an opaque paper with the card's small shadow, a second sheet's edge 4px behind it (none under 40px on screen) and corner ticks from 100px. It is not a frame: nothing of what it holds is drawn. Sizes are in px on screen (`--z` is the zoom), so a hairline stays one and a word keeps its size; the block of words is centred in the sheet. */
+.node.node-tile {
+  justify-content: center;
+  padding: calc(var(--tile-pad) / var(--z, 1));
+  border-width: calc(var(--card-border) / var(--z, 1));
+}
+
+.node.node-tile[data-ticks="off"]:not(.node-selected, .node-picked) {
+  background: var(--paper);
+}
+
+/* A ghosted container (conditional, ruled out, skipped) keeps its sheet opaque, so the second sheet never shows through; the whole stack is faded instead. */
+.node.node-tile:is(.node-conditional, .node-not-relevant, .node-skipped) {
+  background: var(--color-surface);
+  box-shadow: var(--shadow-sm);
+  opacity: 0.6;
+}
+
+.node.node-tile.node-faded {
+  opacity: 0.3;
+}
+
+.node-tile::before {
+  content: "";
+  position: absolute;
+  z-index: -1;
+  inset: calc(4px / var(--z, 1)) calc(-4px / var(--z, 1)) calc(-4px / var(--z, 1)) calc(4px / var(--z, 1));
+  box-sizing: border-box;
+  border: inherit;
+  background: var(--color-surface);
+  pointer-events: none;
+}
+
+.node-tile[data-stack="off"]::before {
+  display: none;
+}
+
+.node.node-tile:is(.node-selected, .node-picked) {
+  box-shadow:
+    inset 0 0 0 calc(2px / var(--z, 1)) var(--color-accent),
+    var(--shadow-sm);
+}
+
+.node-tile-block {
+  display: flex;
+  flex-direction: column;
+  gap: calc(var(--tile-gap) / var(--z, 1));
+  min-width: 0;
+}
+
+.node-tile-title-row {
+  display: flex;
+  gap: calc(var(--tile-gap) / var(--z, 1));
+  align-items: center;
+  min-width: 0;
+}
+
+.node-tile-title {
+  flex: 0 1 auto;
+  min-width: 0;
+  width: auto;
+  font: 600 calc(var(--tile-title) / var(--z, 1)) / 1.2 var(--font-body);
+}
+
+.node-tile-title .node-title-text {
+  -webkit-line-clamp: var(--tile-title-lines, 2);
+  /* The first word fits whole; a later word wider than the tile breaks across lines. */
+  overflow-wrap: anywhere;
+  word-break: normal;
+}
+
+.node-tile-line {
+  display: flex;
+  gap: calc(var(--tile-gap) / var(--z, 1));
+  align-items: center;
+  overflow: hidden;
+  white-space: nowrap;
+  font: 400 calc(var(--tile-body) / var(--z, 1)) / var(--tile-row) var(--font-body);
+}
+
+.node-tile .node-progress .meter {
+  flex: 0 1 calc(36px / var(--z, 1));
+  min-width: calc(20px / var(--z, 1));
+  height: calc(4px / var(--z, 1));
+}
+
+.node-tile-line.node-date {
+  display: block;
+  font: 500 calc(var(--tile-body) / var(--z, 1)) / var(--tile-row) var(--font-mono);
+}
+
+.node-tile-line.node-flag {
+  margin-left: 0;
+}
+
 /* ---- zoomed out (5.4): an open container's head ---------------------------------------------- */
 
 /* Below the near zoom a container's head is its title, left aligned and centred in the head's box, and a stage's state chip at the far right. The kind, progress, date, owner, the marker and the fold control go (a double-click still folds); the marker's row keeps its height, the rule stays. The title is 13px on screen (the zoom is `--z` on the root), never below the reading size 15px unless the room needs it, or the largest size at which the whole title fits the room (`--title-fit`, cards.ts), whichever is less. */
@@ -865,8 +962,8 @@
   font-size: max(15px, calc(13px / var(--z, 1)));
 }
 
-/* The chip is set at 10.5px on screen, its border and radius keeping their hairline weight, laid out as on every card's head: the title left, the chip far right. */
-.react-flow[data-lod="out"] .node-container .node-head-chip.badge {
+/* The chip is set at 10.5px on screen, its border and radius keeping their hairline weight, laid out as on every card's head: the title left, the chip far right. A tile's chip is the same chip. */
+:is(.react-flow[data-lod="out"] .node-container .node-head-chip, .node-tile .node-state).badge {
   flex: none;
   margin-left: auto;
   padding: 0 0.45em;
@@ -877,7 +974,7 @@
   line-height: var(--chip-leading);
 }
 
-.react-flow[data-lod="out"] .node-container .node-head-chip.badge:not(.done)::before {
+:is(.react-flow[data-lod="out"] .node-container .node-head-chip, .node-tile .node-state).badge:not(.done)::before {
   width: 0.55em;
   height: 0.55em;
 }
