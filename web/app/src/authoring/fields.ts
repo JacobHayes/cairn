@@ -5,13 +5,11 @@
 // `feeds_milestone` on a date). A saved draft is the one-field mutations of what changed;
 // an answer-type change replaces the node whole, the only way the engine takes one (B7:
 // a shape change).
-import { ANSWER_TYPE_FIELDS, BODY_BYTES_MAX, CHECKLIST_ITEM_COUNT_PER_NODE_MAX, CHOICE_COUNT_PER_DECISION_MAX, FLAG_DEFAULTS, KIND_FIELDS, NODE_FIELDS, OFFSET_DAYS_MAX, TITLE_BYTES_MAX, WEIGHT_MAX, type KindFieldName } from "@cairn/client";
+import { ANSWER_TYPE_FIELDS, FLAG_DEFAULTS, KIND_FIELDS, NODE_FIELDS, type KindFieldName } from "@cairn/client";
 import type { Schema } from "@cairn/client";
 
-import { choiceId, type Choice } from "../status/answer.ts";
+import type { Choice } from "../status/answer.ts";
 import type { AnswerType, GraphNode, Mutation, NodeField, NodeKind } from "./graph.ts";
-import { outOfRange, overBytes } from "./limits.ts";
-import { isSlug } from "./keys.ts";
 
 export type Condition = Schema<"ConditionResolved">;
 export type DateRule = Schema<"DateRule">;
@@ -187,59 +185,4 @@ export function changesOf(node: GraphNode, draft: NodeDraft, only?: ReadonlySet<
     }
     return [{ field, mutation: { op: "set_node_field", node: node.key, value } }];
   });
-}
-
-/** PRACTICES, Explicit limits: why each field of `draft` cannot be sent, by field; empty when all can. */
-export function draftProblems(kind: NodeKind, draft: NodeDraft): Partial<Record<FormField, string>> {
-  const problems: Partial<Record<FormField, string>> = {};
-  const fields = new Set(fieldsOf(kind, draft.answer_type));
-  const note = (field: FormField, problem: string | undefined) => {
-    if (problem !== undefined && fields.has(field)) {
-      problems[field] = problem;
-    }
-  };
-  note("id", isSlug(draft.id) ? undefined : "An id is lowercase letters, digits, '_' and '-', led by a letter or digit, at most 64 bytes.");
-  note("title", draft.title.trim() === "" ? "A node needs a title." : overBytes(draft.title, TITLE_BYTES_MAX, "The title"));
-  note("description", overBytes(draft.description, BODY_BYTES_MAX, "The description"));
-  note("weight", draft.weight === "" ? undefined : outOfRange(Number(draft.weight), WEIGHT_MAX, "A weight"));
-  note("estimate", draft.estimate === "" ? undefined : outOfRange(Number(draft.estimate), OFFSET_DAYS_MAX, "An estimate in days"));
-  note("prompt", draft.prompt.trim() === "" ? "A decision asks something: it needs a prompt." : overBytes(draft.prompt, BODY_BYTES_MAX, "The prompt"));
-  note("help", overBytes(draft.help, BODY_BYTES_MAX, "The help"));
-  note("choices", choicesProblem(draft.choices));
-  note("checklist", checklistProblem(draft.checklist));
-  return problems;
-}
-
-/** G5 and the checklist limit: at most 50 items, each with a title within the title limit. */
-export function checklistProblem(items: readonly Schema<"ChecklistItem">[]): string | undefined {
-  if (items.length > CHECKLIST_ITEM_COUNT_PER_NODE_MAX) {
-    return `At most ${String(CHECKLIST_ITEM_COUNT_PER_NODE_MAX)} items.`;
-  }
-  for (const [at, item] of items.entries()) {
-    const what = `Item ${String(at + 1)}`;
-    const problem = item.title.trim() === "" ? `${what} needs a title.` : overBytes(item.title, TITLE_BYTES_MAX, `${what}'s title`);
-    if (problem !== undefined) {
-      return problem;
-    }
-  }
-  return undefined;
-}
-
-/** A4 and the choice limit: at least one choice, each an id slug, no id twice. */
-export function choicesProblem(choices: readonly Choice[]): string | undefined {
-  if (choices.length === 0) {
-    return "A choice decision needs at least one choice.";
-  }
-  if (choices.length > CHOICE_COUNT_PER_DECISION_MAX) {
-    return `At most ${String(CHOICE_COUNT_PER_DECISION_MAX)} choices.`;
-  }
-  const ids = choices.map(choiceId);
-  if (ids.some((id) => !isSlug(id))) {
-    return "A choice's id is lowercase letters, digits, '_' and '-'.";
-  }
-  if (new Set(ids).size !== ids.length) {
-    return "Two choices share an id.";
-  }
-  const labels = choices.flatMap((choice) => (typeof choice === "string" ? [] : [choice.title]));
-  return labels.map((label) => overBytes(label, TITLE_BYTES_MAX, "A choice's label")).find((problem) => problem !== undefined);
 }

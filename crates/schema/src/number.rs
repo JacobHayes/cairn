@@ -79,8 +79,8 @@ pub enum NumberError {
 impl fmt::Display for NumberError {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            NumberError::TooLarge(exceeded) => write!(formatter, "number is too large: {exceeded}"),
-            NumberError::Zero => formatter.write_str("zero, where counting starts at 1"),
+            NumberError::TooLarge(exceeded) => exceeded.fmt(formatter),
+            NumberError::Zero => formatter.write_str("0 is not allowed; counting starts at 1"),
         }
     }
 }

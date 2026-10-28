@@ -189,6 +189,25 @@ export type DraftStored = { stored: string } | { problem: DraftProblem };
 /** `crates/wasm` `ConditionProblem`: what keeps a clause from being a condition. */
 export type ConditionProblem = { too_large: { limit: Schema<"Limit">; count: number } } | "empty_combination" | { unreadable: { reason: string } };
 
+/** `crates/schema` `NodeFormValues`: a node form's values as typed, for the fields the node has (numbers as the text in their boxes). */
+export interface NodeFormValues {
+  id?: string;
+  title?: string;
+  description?: string;
+  weight?: string;
+  estimate?: string;
+  prompt?: string;
+  help?: string;
+  choices?: (string | { id: string; title: string })[];
+  checklist?: { id: string; title: string }[];
+}
+
+/** `crates/schema` `FieldProblem`: why one field of a node form cannot be sent, in words for the author. */
+export interface FieldProblem {
+  field: Schema<"NodeField">;
+  message: string;
+}
+
 /** `crates/wasm` `AppliedLocally`: the document a local apply leaves, and what it causes. */
 export interface AppliedLocally {
   document: Schema<"DomainDocument">;

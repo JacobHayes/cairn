@@ -16,6 +16,7 @@ pub mod document;
 pub mod domain;
 pub mod event;
 pub mod field;
+pub mod form;
 pub mod graph;
 pub mod id;
 pub mod json_schema;
@@ -67,6 +68,7 @@ pub use domain::{
 };
 pub use event::{Actor, ChangeSet, ContentHash, Event, EventType, PatchReceipt, Subject};
 pub use field::{NodeField, NodeFieldValue};
+pub use form::{ChecklistValue, ChoiceValue, FieldProblem, NodeFormValues, node_form_problems};
 pub use graph::{
     Edge, FormatVersion, Graph, Insertion, OWNER_KIND_MULTI, ParticipationKind, RetiredKeys, Role,
     RouteFile, role_fits_slot,

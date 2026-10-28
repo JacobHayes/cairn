@@ -2,7 +2,7 @@
 // patch of one-field mutations (an answer-type change replaces the node whole). The draft is
 // kept per tab across reloads (ARCHITECTURE, Web UI: drafts survive a reload). What it would
 // send is previewed with the wasm engine as the author types, so every violation shows at its
-// field before Save (A15); limits stop a value before it is sent (PRACTICES); and a journey's
+// field before Save (A15); the engine's checks of its values stop one before it is sent (PRACTICES); and a journey's
 // route-copied fields carry their local-edit marker (B4).
 import { useDraft } from "../data/drafts.ts";
 import { Failed } from "../ui/Failed.tsx";
@@ -10,10 +10,9 @@ import { Button } from "../ui/kit.tsx";
 import { WriteStatus } from "../screens/WriteStatus.tsx";
 import { Receipt } from "../ui/Receipt.tsx";
 import { ConditionEditor } from "./ConditionEditor.tsx";
-import { useConditionProblem } from "./condition-problem.ts";
 import { DateRuleEditor } from "./DateRuleEditor.tsx";
-import { partsOf, ruleProblem } from "./dates.ts";
-import { changesOf, draftOf, draftProblems, type FormField, type NodeDraft } from "./fields.ts";
+import { changesOf, draftOf, type FormField, type NodeDraft } from "./fields.ts";
+import { useDraftProblems } from "./form-problems.ts";
 import { Section } from "../detail/parts.tsx";
 import type { GraphNode } from "./graph.ts";
 import { BasicsFields, CompletionFields, DecisionFields, StageFields, WeightFields, has, typedItem, type FieldsProps } from "./NodeFields.tsx";
@@ -33,19 +32,6 @@ interface Kept {
   base: number;
   /** Text typed in the checklist's new-item field and not yet added, so a reload keeps it. */
   newItem?: string;
-}
-
-/** Every problem that stops the draft being sent, by field: limits, and a rule's own. A condition's is the engine's, read by `useConditionProblem`. */
-export function problemsOf(node: GraphNode, draft: NodeDraft): Partial<Record<FormField, string>> {
-  const problems = draftProblems(node.kind, draft);
-  for (const which of ["due_by", "not_before"] as const) {
-    const rule = draft[which];
-    const problem = rule === null ? undefined : ruleProblem(partsOf(rule));
-    if (problem !== undefined) {
-      problems[which] = problem;
-    }
-  }
-  return problems;
 }
 
 /** Whether a local-edit marker names `field` of the node (B4). */
@@ -157,9 +143,8 @@ export function NodeForm({ authored, node }: NodeFormProps) {
   const typed = typedItem(draft.checklist, ticked(authored, node).map((item) => item.id), kept?.newItem ?? "");
   const sending: NodeDraft = typed === undefined || !has({ kind: node.kind, draft }, "checklist") ? draft : { ...draft, checklist: [...draft.checklist, typed] };
   const changes = changesOf(node, sending, new Set([...Object.keys(edits), ...(sending === draft ? [] : ["checklist"])] as FormField[]));
-  const condition = useConditionProblem(draft.relevant_when);
-  const problems = { ...problemsOf(node, sending), ...(condition.problem === undefined ? {} : { relevant_when: condition.problem }) };
-  const sendable = changes.length > 0 && condition.checked && Object.keys(problems).length === 0;
+  const { checked, problems } = useDraftProblems(node.kind, sending);
+  const sendable = changes.length > 0 && checked && Object.keys(problems).length === 0;
   const preview = useLivePreview(authored, sendable ? changes.map((change) => change.mutation) : undefined);
   const { violations, places: sent } = shownViolations(preview, write);
   const places = byPlace(violations, node.key, sent);

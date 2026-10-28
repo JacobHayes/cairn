@@ -325,11 +325,34 @@ impl fmt::Display for LimitExceeded {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(
             formatter,
-            "{} is past the limit {} ({})",
+            "{} is more than the {} allowed ({})",
             self.count,
-            self.limit.name(),
-            self.limit.max()
+            self.limit.max(),
+            self.limit.name()
         )
+    }
+}
+
+impl LimitExceeded {
+    /// The excess as a person reads it, about `what` (a phrase that starts a sentence, such as
+    /// "The title"): "The title is 300 bytes; at most 256."
+    #[must_use]
+    pub fn words(&self, what: &str) -> String {
+        let (count, max) = (self.count, self.limit.max());
+        match self.limit {
+            Limit::IdBytes
+            | Limit::TitleBytes
+            | Limit::BodyBytes
+            | Limit::LinkBytes
+            | Limit::EmailBytes
+            | Limit::ReasonBytes
+            | Limit::GraphBytes
+            | Limit::RequestBytes => {
+                format!("{what} is {count} bytes; at most {max}. Shorten it.")
+            }
+            Limit::OffsetDays | Limit::Weight => format!("{what} is {count}; at most {max}."),
+            _ => format!("{what} has {count}; at most {max}."),
+        }
     }
 }
 

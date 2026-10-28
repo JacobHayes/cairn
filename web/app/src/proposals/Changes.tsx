@@ -7,15 +7,15 @@
 import { useEffect, useRef, useState } from "react";
 
 import { ConditionEditor } from "../authoring/ConditionEditor.tsx";
-import { useConditionProblem } from "../authoring/condition-problem.ts";
 import { removalMutations, useRemovalPlan } from "../authoring/removal.ts";
 import { DateRuleEditor } from "../authoring/DateRuleEditor.tsx";
-import { draftOf, draftProblems, nodeFrom, valueOf, type FormField, type NodeDraft } from "../authoring/fields.ts";
+import { draftOf, nodeFrom, valueOf, type FormField, type NodeDraft } from "../authoring/fields.ts";
+import { checkDraft, useDraftProblems } from "../authoring/form-problems.ts";
 import { canHoldChildren, kindOption, moveTargets, newNode, nodesByPath, nodesFor, pathOf, rolesForFill, type GraphNode, type Mutation, type NodeField, type NodeKind, type ReferenceField, type Role, type Tree } from "../authoring/graph.ts";
 import { BasicsFields, ChecklistEditor, type NewItem, ChoicesEditor, CompletionFields, DecisionFields, StageFields, WeightFields, has } from "../authoring/NodeFields.tsx";
-import { problemsOf } from "../authoring/NodeForm.tsx";
 import { FieldBox, Picker } from "../authoring/parts.tsx";
 import type { Deployment } from "../data/host.ts";
+import { useSession } from "../data/react.ts";
 import { subjectOf } from "../data/writes.ts";
 import { Input as AnswerInput } from "../detail/AnswerEditor.tsx";
 import { checklistOf, type Ready } from "../detail/model.ts";
@@ -79,6 +79,28 @@ function useSyncedDraft<T>(source: unknown, make: () => T): { draft: T; set: (dr
   };
 }
 
+/**
+ * What an editor needs to write a value once the engine has checked it: the newest `onChange`
+ * (the proposal may have changed meanwhile, and a write through an older one would undo that),
+ * and whether the editor is still shown (a value checked for an editor that has gone is dropped).
+ */
+function useLateWrite<T>(onChange: (value: T) => void): (write: T) => void {
+  const latest = useRef(onChange);
+  const shown = useRef(true);
+  useEffect(() => {
+    latest.current = onChange;
+  });
+  useEffect(() => {
+    shown.current = true;
+    return () => { shown.current = false; };
+  }, []);
+  return (write) => {
+    if (shown.current) {
+      latest.current(write);
+    }
+  };
+}
+
 /** The checklist's new-item text, held by the editor while it is open. */
 function useKeptItem(): [string, (value: string) => void] {
   return useState("");
@@ -94,17 +116,22 @@ function AddedNode({ editor, node, onChange, context }: { editor: string; node: 
   const synced = useSyncedDraft<NodeDraft>(node, () => draftOf(node));
   const kept = useKeptItem();
   const draft = synced.draft;
-  const condition = useConditionProblem(draft.relevant_when);
-  const problems = { ...problemsOf(node, draft), ...(condition.problem === undefined ? {} : { relevant_when: condition.problem }) };
-  useInvalid(context, editor, Object.keys(problems).length > 0 || !condition.checked);
+  const { deriver } = useSession();
+  const { checked, problems } = useDraftProblems(node.kind, draft);
+  useInvalid(context, editor, Object.keys(problems).length > 0 || !checked);
+  const latest = useRef(draft);
+  const write = useLateWrite(onChange);
   const change = (next: Partial<NodeDraft>) => {
     const merged = { ...draft, ...next };
+    latest.current = merged;
     synced.set(merged);
-    if (Object.keys(problemsOf(node, merged)).length === 0) {
-      const written = nodeFrom(node, merged);
-      synced.wrote(written);
-      onChange(written);
-    }
+    void checkDraft(deriver, node.kind, merged).then((found) => {
+      if (latest.current === merged && Object.keys(found).length === 0) {
+        const written = nodeFrom(node, merged);
+        synced.wrote(written);
+        write(written);
+      }
+    });
   };
   const props = {
     kind: node.kind,
@@ -156,26 +183,36 @@ const MILESTONE_FIELDS = ["opens_at", "closes_at", "feeds_milestone"] as const s
 const includes = <T extends string>(list: readonly T[], field: string): field is T => (list as readonly string[]).includes(field);
 
 /** A field the proposal sets, edited with authoring's controls for that field; a value with a problem is held here, not written. */
-function FieldValue({ editor, mutation, onChange, context }: { editor: string; mutation: Extract<Mutation, { op: "set_node_field" }>; onChange: (mutation: Mutation) => void; context: ChangesContext }) {
-  const field = Object.keys(mutation.value)[0] as NodeField;
-  const node = nodeOf(context, mutation.node);
-  const synced = useSyncedDraft<NodeDraft | undefined>(mutation.value, () => (node === undefined ? undefined : draftOf(withFieldValue(node, mutation.value))));
-  const draft = synced.draft;
-  const kept = useKeptItem();
-  const condition = useConditionProblem(field === "relevant_when" ? (draft?.relevant_when ?? null) : null);
-  const problem = node === undefined || draft === undefined ? undefined : (draftProblems(node.kind, draft)[field] ?? condition.problem);
-  useInvalid(context, editor, problem !== undefined || !condition.checked);
-  if (node === undefined || draft === undefined) {
+function FieldValue(props: { editor: string; mutation: Extract<Mutation, { op: "set_node_field" }>; onChange: (mutation: Mutation) => void; context: ChangesContext }) {
+  const node = nodeOf(props.context, props.mutation.node);
+  if (node === undefined) {
     return <span className="muted small">Its node is not in the graph, so its value cannot be edited here.</span>;
   }
+  return <FieldValueOf {...props} node={node} />;
+}
+
+function FieldValueOf({ editor, mutation, onChange, context, node }: { editor: string; mutation: Extract<Mutation, { op: "set_node_field" }>; onChange: (mutation: Mutation) => void; context: ChangesContext; node: GraphNode }) {
+  const field = Object.keys(mutation.value)[0] as NodeField;
+  const synced = useSyncedDraft<NodeDraft>(mutation.value, () => draftOf(withFieldValue(node, mutation.value)));
+  const draft = synced.draft;
+  const kept = useKeptItem();
+  const { deriver } = useSession();
+  const latest = useRef(draft);
+  const write = useLateWrite(onChange);
+  const form = useDraftProblems(node.kind, draft);
+  const problem = form.problems[field];
+  useInvalid(context, editor, problem !== undefined || !form.checked);
   const change = (next: Partial<NodeDraft>) => {
     const merged = { ...draft, ...next };
+    latest.current = merged;
     synced.set(merged);
-    if (draftProblems(node.kind, merged)[field] === undefined) {
-      const value = valueOf(field, merged);
-      synced.wrote(value);
-      onChange({ ...mutation, value });
-    }
+    void checkDraft(deriver, node.kind, merged).then((found) => {
+      if (latest.current === merged && found[field] === undefined) {
+        const value = valueOf(field, merged);
+        synced.wrote(value);
+        write({ ...mutation, value });
+      }
+    });
   };
   // The items that carry a tick now, from the journey as it is, since the proposal's own graph may already have dropped them: a new item never takes their ids.
   const ticked = context.ready === undefined ? [] : checklistOf(context.ready, node.key).filter((item) => item.ticked).map(({ id, title }) => ({ id, title }));

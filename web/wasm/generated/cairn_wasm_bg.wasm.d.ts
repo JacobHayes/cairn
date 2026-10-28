@@ -47,6 +47,7 @@ export const draftStored: (a: number, b: number, c: number, d: number, e: number
 export const draftWritten: (a: number, b: number, c: number, d: number, e: number) => void;
 export const exportRoute: (a: number, b: number, c: number) => void;
 export const importRoute: (a: number, b: number, c: number) => void;
+export const nodeFormProblems: (a: number, b: number, c: number) => void;
 export const preview: (a: number, b: number, c: number, d: number, e: number) => void;
 export const readRouteFile: (a: number, b: number, c: number) => void;
 export const removalPlan: (a: number, b: number, c: number, d: number, e: number) => void;

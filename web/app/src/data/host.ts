@@ -6,6 +6,8 @@ import type {
   AppliedLocally,
   ApplyRequest,
   ConditionProblem,
+  FieldProblem,
+  NodeFormValues,
   DraftStored,
   DerivationHandle,
   JourneyIndexQuery,
@@ -183,6 +185,8 @@ export interface Deriver {
   routeFileText(file: RouteFile): Promise<string>;
   /** A5: what keeps a clause from being a condition (too deep, too many comparisons, an empty combination), or none. */
   conditionProblem(clause: Schema<"ConditionResolved">): Promise<ConditionProblem | undefined>;
+  /** A1a, A4, A9, G5: why each field of a node form's values cannot be sent, in words for the author; none when all can. */
+  nodeFormProblems(values: NodeFormValues): Promise<FieldProblem[]>;
   /** A18: what removing a node, role or kind from a graph takes and leaves dangling, with the rewrites to send first; none when the node is not in it. */
   removalPlan(graph: Schema<"Graph">, target: Schema<"RemovalTarget">): Promise<Schema<"RemovalPlan"> | undefined>;
   /** B4: the mutations restoring tombstoned node `key` of a route version into a journey, parents first; none when it is not in the version. */

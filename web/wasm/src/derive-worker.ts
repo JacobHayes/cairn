@@ -10,6 +10,8 @@ import {
   type AppliedLocally,
   type ApplyRequest,
   type ConditionProblem,
+  type FieldProblem,
+  type NodeFormValues,
   type DraftStored,
   type DerivationHandle,
   type DerivationKey,
@@ -192,6 +194,11 @@ export class DeriveWorker {
   /** A5: what keeps `clause` from being a condition (the engine's size and shape rule), or none. */
   async conditionProblem(clause: Schema<"ConditionResolved">): Promise<ConditionProblem | undefined> {
     return parsed<ConditionProblem | null>(await this.#ask({ op: "condition_problem", clause })) ?? undefined;
+  }
+
+  /** A1a, A4, A9, G5: why each field of a node form's values cannot be sent, in words for the author; none when all can. */
+  async nodeFormProblems(values: NodeFormValues): Promise<FieldProblem[]> {
+    return parsed<FieldProblem[]>(await this.#ask({ op: "node_form_problems", values }));
   }
 
   /** A18: what removing `target` from `graph` takes and leaves dangling, with the rewrites to send first; none when a node asked for is not in it. */

@@ -5,7 +5,7 @@ import type { Schema } from "@cairn/client";
 import { beforeAll, describe, expect, it } from "vitest";
 
 import { applyToDraft, seeded } from "./engine.test-support.ts";
-import { changesOf, checklistProblem, draftOf, draftProblems, fieldsOf, type NodeDraft } from "./fields.ts";
+import { changesOf, draftOf, fieldsOf, type NodeDraft } from "./fields.ts";
 import type { AnswerType, Graph, GraphNode, NodeField, NodeKind } from "./graph.ts";
 
 type Deployment = Schema<"Deployment">;
@@ -113,38 +113,5 @@ describe("changesOf", () => {
     const changes = changesOf(decision, draft);
     expect(changes.map((change) => [change.field, change.mutation.op])).toEqual([["answer_type", "replace_node"]]);
     expect(applyToDraft(host.engine, host.deployment(), graphOf(decision), changes.map((change) => change.mutation))).toEqual({ accepted: true });
-  });
-});
-
-describe("checklistProblem (G5)", () => {
-  const item = (at: number, title = `Item ${String(at)}`) => ({ id: `i${String(at)}`, title });
-  it("catches too many items and a blank title; a list within the limit, or none, has no problem", () => {
-    expect(checklistProblem(Array.from({ length: 51 }, (_, at) => item(at)))).toBeDefined();
-    expect(checklistProblem([item(1), item(2, "  ")])).toBeDefined();
-    expect(checklistProblem(Array.from({ length: 50 }, (_, at) => item(at)))).toBeUndefined();
-    expect(checklistProblem([])).toBeUndefined();
-  });
-});
-
-describe("draftProblems (PRACTICES, Explicit limits)", () => {
-  const base = draftOf({ key: "n_work", id: "work", kind: "deliverable", title: "Work" });
-  const problems: [string, Partial<NodeDraft>, string][] = [
-    ["an id that is not a slug", { id: "Not a slug" }, "id"],
-    ["no title", { title: "  " }, "title"],
-    ["an estimate past a year", { estimate: "366" }, "estimate"],
-    ["a fractional estimate", { estimate: "1.5" }, "estimate"],
-    ["a weight past the limit", { weight: "1001" }, "weight"],
-  ];
-  it.each(problems)("%s is caught at its field", (_, change, field) => {
-    expect(Object.keys(draftProblems("deliverable", { ...base, ...change }))).toEqual([field]);
-  });
-
-  it("a draft within every limit has no problems", () => {
-    expect(draftProblems("deliverable", { ...base, estimate: "365", weight: "1000" })).toEqual({});
-  });
-
-  it("only a kind's own fields are checked", () => {
-    expect(draftProblems("deliverable", { ...base, prompt: "" })).toEqual({});
-    expect(Object.keys(draftProblems("decision", { ...base, prompt: "" }))).toEqual(["prompt"]);
   });
 });

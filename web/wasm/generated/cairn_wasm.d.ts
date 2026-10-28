@@ -417,6 +417,18 @@ export function exportRoute(request: string): string;
 export function importRoute(request: string): string;
 
 /**
+ * A1a, A4, A9, G5: the JSON of the problems with a node form's values (the JSON of
+ * [`NodeFormValues`]), one per field that cannot be sent, each `{"field", "message"}` with the
+ * message in words for the person filling in the form; `[]` when all can be sent. The rules
+ * are the types' own, the ones the patch reader builds a node from.
+ *
+ * # Errors
+ *
+ * The JSON of a [`HostError`] when the values do not read.
+ */
+export function nodeFormProblems(values: string): string;
+
+/**
  * Previews a proposal against `document`'s journey: `request` is the JSON of a
  * [`PreviewRequest`]; the answer is the JSON of a `ProposalPreview`.
  *
@@ -534,6 +546,7 @@ export interface InitOutput {
     readonly draftWritten: (a: number, b: number, c: number, d: number, e: number) => void;
     readonly exportRoute: (a: number, b: number, c: number) => void;
     readonly importRoute: (a: number, b: number, c: number) => void;
+    readonly nodeFormProblems: (a: number, b: number, c: number) => void;
     readonly preview: (a: number, b: number, c: number, d: number, e: number) => void;
     readonly readRouteFile: (a: number, b: number, c: number) => void;
     readonly removalPlan: (a: number, b: number, c: number, d: number, e: number) => void;

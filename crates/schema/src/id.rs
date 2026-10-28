@@ -31,14 +31,28 @@ pub enum IdError {
     Reserved(String),
 }
 
+impl IdError {
+    /// What is wrong, about `what` (a phrase that starts a sentence, such as "An id").
+    #[must_use]
+    pub fn words(&self, what: &str) -> String {
+        match self {
+            IdError::TooLong(exceeded) => exceeded.words(what),
+            IdError::NotSlug(_) => format!(
+                "{what} is lowercase letters, digits, '_' and '-', starting with a letter or digit."
+            ),
+            other => format!("{what}: {other}."),
+        }
+    }
+}
+
 impl fmt::Display for IdError {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            IdError::TooLong(exceeded) => write!(formatter, "identifier is too long: {exceeded}"),
+            IdError::TooLong(exceeded) => write!(formatter, "that id is too long: {exceeded}"),
             IdError::NotSlug(text) => write!(
                 formatter,
-                "{text:?} is not an id slug (lowercase letters, digits, '_' and '-', starting \
-                 with a letter or digit)"
+                "{text:?} is not an id: use lowercase letters, digits, '_' and '-', starting \
+                 with a letter or digit"
             ),
             IdError::NotKey { prefix, text } => write!(
                 formatter,

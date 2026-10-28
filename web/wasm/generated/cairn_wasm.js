@@ -1679,6 +1679,45 @@ export function importRoute(request) {
 }
 
 /**
+ * A1a, A4, A9, G5: the JSON of the problems with a node form's values (the JSON of
+ * [`NodeFormValues`]), one per field that cannot be sent, each `{"field", "message"}` with the
+ * message in words for the person filling in the form; `[]` when all can be sent. The rules
+ * are the types' own, the ones the patch reader builds a node from.
+ *
+ * # Errors
+ *
+ * The JSON of a [`HostError`] when the values do not read.
+ * @param {string} values
+ * @returns {string}
+ */
+export function nodeFormProblems(values) {
+    let deferred3_0;
+    let deferred3_1;
+    try {
+        const retptr = wasm.__wbindgen_add_to_stack_pointer(-16);
+        const ptr0 = passStringToWasm0(values, wasm.__wbindgen_export, wasm.__wbindgen_export2);
+        const len0 = WASM_VECTOR_LEN;
+        wasm.nodeFormProblems(retptr, ptr0, len0);
+        var r0 = getDataViewMemory0().getInt32(retptr + 4 * 0, true);
+        var r1 = getDataViewMemory0().getInt32(retptr + 4 * 1, true);
+        var r2 = getDataViewMemory0().getInt32(retptr + 4 * 2, true);
+        var r3 = getDataViewMemory0().getInt32(retptr + 4 * 3, true);
+        var ptr2 = r0;
+        var len2 = r1;
+        if (r3) {
+            ptr2 = 0; len2 = 0;
+            throw takeObject(r2);
+        }
+        deferred3_0 = ptr2;
+        deferred3_1 = len2;
+        return getStringFromWasm0(ptr2, len2);
+    } finally {
+        wasm.__wbindgen_add_to_stack_pointer(16);
+        wasm.__wbindgen_export3(deferred3_0, deferred3_1, 1);
+    }
+}
+
+/**
  * Previews a proposal against `document`'s journey: `request` is the JSON of a
  * [`PreviewRequest`]; the answer is the JSON of a `ProposalPreview`.
  *

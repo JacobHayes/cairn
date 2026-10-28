@@ -15,8 +15,8 @@ use cairn_engine::{ApplyInputs, Graph as EngineGraph, Records, consequences, der
 use cairn_schema::condition::ConditionError;
 use cairn_schema::{
     Actor, Clause, Condition, Consequences, Date, Deployment, Domain, DomainDocument, Graph,
-    KeyRefs, Limit, Lineage, Markdown, NodeKey, Patch, PatchTarget, Proposal, RemovalTarget, Route,
-    RouteId, RouteVersion, Timestamp,
+    KeyRefs, Limit, Lineage, Markdown, NodeFormValues, NodeKey, Patch, PatchTarget, Proposal,
+    RemovalTarget, Route, RouteId, RouteVersion, Timestamp, node_form_problems,
 };
 use serde::{Deserialize, Serialize};
 use wasm_bindgen::prelude::wasm_bindgen;
@@ -389,6 +389,20 @@ pub fn condition_problem(clause: &str) -> String {
             reason: error.to_string(),
         })),
     }
+}
+
+/// A1a, A4, A9, G5: the JSON of the problems with a node form's values (the JSON of
+/// [`NodeFormValues`]), one per field that cannot be sent, each `{"field", "message"}` with the
+/// message in words for the person filling in the form; `[]` when all can be sent. The rules
+/// are the types' own, the ones the patch reader builds a node from.
+///
+/// # Errors
+///
+/// The JSON of a [`HostError`] when the values do not read.
+#[wasm_bindgen(js_name = nodeFormProblems)]
+pub fn node_form_problems_text(values: &str) -> Result<String, String> {
+    let values: NodeFormValues = read("node form values", values)?;
+    Ok(json(&node_form_problems(&values)))
 }
 
 /// A18: the JSON of a `RemovalPlan`: what removing `target` (a `RemovalTarget`) from `graph`

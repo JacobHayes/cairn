@@ -205,6 +205,8 @@ async function answer(request: WorkerRequest): Promise<string> {
       return ready().routeFileText(request.file);
     case "condition_problem":
       return ready().conditionProblemText(request.clause);
+    case "node_form_problems":
+      return ready().nodeFormProblemsText(request.values);
     case "restore_nodes":
       return ready().restoreNodesText(request.journey, request.version, request.key, request.seed);
     case "removal_plan":

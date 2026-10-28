@@ -22,15 +22,24 @@ pub enum TextError {
     Malformed(&'static str),
 }
 
+impl TextError {
+    /// What is wrong, about `what` (a phrase that starts a sentence, such as "The title").
+    #[must_use]
+    pub fn words(&self, what: &str) -> String {
+        match self {
+            TextError::Empty => format!("{what} cannot be blank."),
+            TextError::TooLong(exceeded) => exceeded.words(what),
+            TextError::ControlCharacter => format!("{what} must be on one line."),
+            TextError::Malformed(expected) => format!("{what} must be {expected}."),
+        }
+    }
+}
+
 impl fmt::Display for TextError {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            TextError::Empty => formatter.write_str("text is empty"),
-            TextError::TooLong(exceeded) => write!(formatter, "text is too long: {exceeded}"),
-            TextError::ControlCharacter => {
-                formatter.write_str("single-line text holds a line break or control character")
-            }
-            TextError::Malformed(expected) => write!(formatter, "expected {expected}"),
+            TextError::TooLong(exceeded) => write!(formatter, "This text is too long: {exceeded}"),
+            other => formatter.write_str(&other.words("This text")),
         }
     }
 }

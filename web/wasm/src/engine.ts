@@ -8,6 +8,7 @@ import init, {
   apply,
   applyRoute,
   conditionProblem,
+  nodeFormProblems,
   draftStored,
   draftWritten,
   exportRoute,
@@ -33,6 +34,7 @@ import {
   type DraftRequest,
   type ExportRequest,
   type ImportRequest,
+  type NodeFormValues,
   type PreviewAnswer,
   type PreviewRequest,
   type ProjectionAnswer,
@@ -180,6 +182,11 @@ export class Engine {
   /** A5: what keeps `clause` from being a condition, as the module wrote it (`null` when nothing does). */
   conditionProblemText(clause: Schema<"ConditionResolved">): string {
     return hosted(() => conditionProblem(JSON.stringify(clause)));
+  }
+
+  /** A1a, A4, A9, G5: the problems with a node form's values, as the module wrote them (a list; empty when all can be sent). */
+  nodeFormProblemsText(values: NodeFormValues): string {
+    return hosted(() => nodeFormProblems(JSON.stringify(values)));
   }
 
   /** A18: what removing `target` from `graph` takes and leaves dangling, as the module wrote it (`null` when a node asked for is not there). */

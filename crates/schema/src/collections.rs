@@ -82,12 +82,25 @@ pub enum CollectionError {
     Empty,
 }
 
+impl CollectionError {
+    /// What is wrong, about `what` (a phrase that starts a sentence, such as "The choices").
+    #[must_use]
+    pub fn words(&self, what: &str) -> String {
+        match self {
+            CollectionError::TooMany(exceeded) => exceeded.words(what),
+            CollectionError::Duplicate(_) => format!("{what} include the same one twice."),
+            CollectionError::Empty => format!("{what} need at least one."),
+        }
+    }
+}
+
 impl fmt::Display for CollectionError {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            CollectionError::TooMany(exceeded) => write!(formatter, "too many items: {exceeded}"),
-            CollectionError::Duplicate(item) => write!(formatter, "{item} appears twice"),
-            CollectionError::Empty => formatter.write_str("at least one item is required"),
+            CollectionError::TooMany(exceeded) => {
+                write!(formatter, "There are too many items: {exceeded}")
+            }
+            other => formatter.write_str(&other.words("The items")),
         }
     }
 }
