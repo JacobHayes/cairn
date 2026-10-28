@@ -19,8 +19,7 @@ undecided. Walking them in rank order unblocks the most first.
    to be decided later, so you can say "answering yes brings in 6 and opens 2 more
    decisions". Ask the person the question in plain words, offering the choices. If the
    person explains the choice, keep it as the answer's `rationale`.
-3. **Record what they have said** with `answer_decision` or `apply_patch` (see
-   record-answers). Answers the person has already given go in one write. Before asking
+3. **Record what they have said** with `update_journey_state` (see record-answers). Answers the person has already given go in one write. Before asking
    the next question, read again whenever an answer changes which questions apply (it
    made work relevant or not, filled a role, pinned a date, or opened a decision that was
    undecided before): the write's consequences say so, and `get_snapshot` has the

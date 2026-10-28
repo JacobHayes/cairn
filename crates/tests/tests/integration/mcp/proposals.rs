@@ -94,8 +94,9 @@ async fn a_draft_that_cannot_be_made_is_answered_by_its_kind() {
     let world = World::new();
     let ann = user("u_ann");
     world.vendor_journey(&ann).await;
-    let free = json!({ "journey": "j_free", "patch_id": "p_free", "name": "Free" });
-    world.ok(&ann, "create_journey", free).await;
+    let free = json!({ "target": { "journey": "j_free" }, "patch_id": "p_free", "base_revision": 0,
+        "mutations": [{ "op": "create_journey", "name": "Free" }] });
+    world.ok(&ann, "apply_patch", free).await;
     let upgrade = |journey: &str| json!({ "journey": journey, "to": 2, "proposal": "pr_up", "patch_id": "p_up" });
     let relink = json!({ "journey": "j_vendor_eval", "proposal": "pr_relink", "patch_id": "p_relink",
         "to": { "route": "vendor-evaluation", "version": 9 } });

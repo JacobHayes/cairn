@@ -28,7 +28,10 @@ capabilities; every write records you and that user.
    `within` and `depth`. `get_node` explains one node: why it is relevant or
    blocked, its dates, and why it ranks where it does. `get_level` shows the graph at one
    level of containment.
-3. **Write in small, named steps**, by the rules below.
+3. **Write in small, named steps**, by the rules below. Every direct write is one patch of
+   ordered mutations: `update_journey_state` records what happened in a journey (answers,
+   transitions, notes, ticks, dates, snoozes, overrides, who does a node); `apply_patch`
+   takes anything on any target (structure, routes, the deployment, or a mix).
 4. **Offer to walk open decisions.** Whenever a journey has open decisions (you just
    created it, or you are back at it later), offer to walk them with the person
    (walk-decisions): they gate what depends on them.
@@ -87,8 +90,10 @@ out, though its relevance reads `not_relevant` and counts for nothing until then
 ## Identities and deleting
 
 - **Identities.** A write that names identities (an identity answer, explicit participants,
-  a journey's owners) carries the `deployment_revision` the snapshot reported. An identity has a name, emails,
-  or both; a person who only signed in has emails and no name. An identity that anything
+  a journey's owners) carries the `deployment_revision` the snapshot reported. A person an
+  answer names who is not in Cairn yet is created in the same patch: a `create_identity`,
+  then the answer naming its key. Other identity changes (an edit, a merge, a delete) go
+  through `manage_identity`. An identity has a name, emails, or both; a person who only signed in has emails and no name. An identity that anything
   refers to (an answer, a participant, an owner, a condition) cannot be deleted: merge it into
   the identity that remains, naming the journeys that refer to it. `list_identities` finds an
   identity by name or email; `list_journeys` with `referencing` finds the journeys that
@@ -105,19 +110,20 @@ out, though its relevance reads `not_relevant` and counts for nothing until then
 
 ## Direct writes or proposals
 
-Write directly when the person asked for a state change: answers (`answer_decision`),
-transitions (`transition_node`), participations (`assign`), pins and actual dates
-(`set_date`), snoozes (`snooze`, `unsnooze`), and overrides (`override`).
+Write directly when the person asked for a state change, with `update_journey_state`: answers
+(`answer`), transitions (`transition`), who does a node (`set_participation`,
+`clear_participation`), pins and actual dates (`set_pin`, `shift_pin`, `clear_pin`,
+`set_recorded_date`), snoozes (`snooze`, `unsnooze`), overrides (`apply_override`,
+`remove_override`), notes and ticks. Several of them are one patch, one revision.
 
 Order is never a guard: a node is started, finished or answered whatever it waits on and
 whatever its own date, as a plain move. Out-of-order work is a fact, and a recorded date never
 warns. Reopening something finished work relied on marks that work `stale` while it is open.
 The guards are the evidence a completion needs: a note, a link, ticks or a breakdown. To
-complete without it on purpose, send a guard bypass in the same `apply_patch` as the
-completion: an `apply_override` mutation with `guard_bypass` naming the guards, then the
-`complete` transition. The reason is optional. A bypass alone, or with any other move, is
-refused, and `transition_node` alone is refused with the guard. Do it only when the person
-says to.
+complete without it on purpose, send a guard bypass in the same patch as the completion: an
+`apply_override` mutation with `guard_bypass` naming the guards, then the `complete`
+transition. The reason is optional. A bypass alone, or with any other move, is refused, and
+the completion alone is refused with the guard. Do it only when the person says to.
 
 A snooze sets a node aside until a date or until another node is done. Snooze a container
 (a group, or work with children) to set its whole subtree aside in one move: every
@@ -130,7 +136,7 @@ does not lift the container's. Any transition on the container itself, such as s
 or skipping a group, clears its snooze.
 
 To finish a group or stage while work inside it is still open, `mark_done` it with a reason
-(`transition_node`): it reads done, and its unfinished work reads skipped as under a skip.
+(a `transition`): it reads done, and its unfinished work reads skipped as under a skip.
 Kept work stays open and still holds the group's dependents; `reopen` removes the mark. Work
 with children has no `mark_done`: complete it, and its children stay open as work of their
 own.
@@ -148,16 +154,16 @@ or route); a proposal stays listed until it is applied or discarded.
 
 Work marked `requires_note` cannot be completed until it has a note of its own (a link,
 or a note on a child or the journey, does not count). Send the note and the completion as
-one `apply_patch` (`add_annotation` with the node and the text, then the `complete`
-transition); `transition_node` alone is refused with the `has_note` guard. Bypass it only
+one patch (`add_annotation` with the node and the text, then the `complete` transition); the
+completion alone is refused with the `has_note` guard. Bypass it only
 when the person says no note is needed. Removing the last note later marks
 a finished node `stale` with "missing note".
 
 A deliverable or action can carry a `checklist` (items with an `id` and a `title`, at
 most 50), and with `requires_checklist` it cannot be completed until every item is ticked.
 Tick with the `set_ticked` mutation (`node`, `item`, `ticked`) and send the ticks and the
-completion as one `apply_patch`; `transition_node` alone is refused with the `all_ticked`
-guard, one failure per unticked item. Ticking or unticking sets the item's state; sending
+completion as one patch; the completion alone is refused with the `all_ticked` guard, one
+failure per unticked item. Ticking or unticking sets the item's state; sending
 the state it already has changes nothing. An item not on the checklist is refused. Bypass
 the guard only when the person says the items need not be ticked. Unticking
 an item later, or adding one, marks a finished node `stale` with "unticked item". Ticks are
@@ -166,8 +172,9 @@ kept when a node is reopened, and removing an item removes its tick.
 ## Editing structure
 
 Structural edits are mutations, in a proposal's `mutations` or, when the person asked for
-the change, in `apply_patch` (a journey, a route's draft, or the deployment; the tool for
-a state change, when there is one, is simpler). Several edits are one patch, one revision.
+the change, in `apply_patch` (a journey, a route's draft, or the deployment). `apply_patch`
+takes state mutations too, so a change that mixes them (a removal and the `unsnooze` it
+needs) is one patch, one revision.
 
 - **One field of a node:** `set_node_field` with the field and its new value. Prefer it
   for any small edit. It does not take `requires`.
@@ -184,26 +191,31 @@ a state change, when there is one, is simpler). Several edits are one patch, one
   `removal` for now, and the `outside_references` the same patch must also change (a
   page at a time; `next` goes back as `references_cursor`). Each names a `holder` node
   outside, the `field` that mentions a node being removed, and the `target`. Clear or
-  rewrite it with `set_node_field` (`relevant_when`, `due_by`, `not_before`, `opens_at`,
+  rewrite it in the same patch with `set_node_field` (`relevant_when`, `due_by`, `not_before`, `opens_at`,
   `closes_at`, or `feeds_milestone`), `edit_resource` for a message draft, or `unsnooze`.
   Read again if the revision moved. A route's draft has no such read: assemble the removal
   from `get_route`, and expect the refusal to list anything missed.
 - **Roles and kinds:** `add_role`, `edit_role`, `remove_role` (refused while a
   participation or `fills_role` names it), the matching `..._participation_kind` ops, and
-  `set_default_owner`. `assign` is the tool for who does a node; a role no decision
-  fills is filled with `fill_role` and emptied with `clear_role_fill`.
+  `set_default_owner`. Who does a node is `set_participation` (a role or identities) and
+  `clear_participation` (inherit again); a role no decision fills is filled with
+  `fill_role` and emptied with `clear_role_fill`.
 - **Resources and notes:** `add_resource`, `edit_resource`, `remove_resource`; and
   `add_annotation`, `edit_annotation`, `remove_annotation`.
 - **A placeholder's breakdown flag:** `set_atomic`.
+- **A new journey:** `apply_patch` to the new journey's id (`j_` and a slug) at base revision
+  0, opening with `create_journey` (empty, or `from` a published route version); its first
+  answers can follow in the same patch.
 - **The journey:** `edit_journey` (the name and description, both as given, so send the
   snapshot's description to keep it; and `owners`, kept when left out, replaced when given,
   cleared by an empty list) and `set_journey_status` (completing
   or archiving is the person's call; an archived journey is read-only until its status moves to `active` or `completed`). Owners are never assumed, the creator included: leave them empty unless
   the person names them. `delete_journey` is permanent; only when the
   person asks.
-- **Routes:** `create_route`, `edit_route`, `set_route_retired` (hides it from new
-  journeys), and a draft's `discard_draft`; `open_draft` and `publish_draft` are also
-  tools.
+- **Routes:** `apply_patch` to the route. A new route is `create_route` then `open_draft`
+  (`source` `edit`) at base revision 0; an existing one opens its draft with `open_draft`
+  against its revision, and `publish_draft` makes the draft its next version. Also
+  `edit_route`, `set_route_retired` (hides it from new journeys), and `discard_draft`.
 - **Lineage:** `upgrade` and `relink` go only in a proposal, as Cairn drafts them.
   `set_provenance` to `local` keeps a node an upgrade orphaned as the journey's own;
   `mark_local_edit` with `marked` false clears a local-edit marker.
@@ -274,9 +286,10 @@ Each workflow is also served as an MCP prompt by its name.
 |---|---|
 | Where things stand | `get_snapshot`, `list_nodes`, `get_node`, `get_level`, `get_history` |
 | Find things | `list_identities`, `list_journeys`, `list_routes`, `list_proposals`, `get_route`, `search` |
-| Change state | `answer_decision`, `transition_node`, `assign`, `set_date`, `snooze`, `unsnooze`, `override`, `resolve_date_conflict` |
-| Change structure | `create_proposal`, `list_proposals`, `get_proposal`, `edit_proposal`, `apply_proposal`, `apply_patch` |
-| Journeys and routes | `create_journey`, `open_draft`, `publish_draft`, `import_route`, `export_route` |
+| Record what happened | `update_journey_state` |
+| Change anything else | `apply_patch` (structure, a new journey, routes and their drafts, the deployment) |
+| Propose a change | `create_proposal`, `list_proposals`, `get_proposal`, `edit_proposal`, `apply_proposal` |
+| Route files | `import_route`, `export_route` |
 | Lineage | `upgrade`, `save_as_route`, `relink` |
 | People and teams | `manage_identity` (create, edit, merge, delete) |
 

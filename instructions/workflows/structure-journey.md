@@ -7,9 +7,9 @@ description: Give a journey that started empty its structure, drafted as one pro
 A journey can start with no route. Its structure is drafted the same way as a route's,
 but on the journey itself.
 
-1. **Create it if needed.** `create_journey` with an id you choose (`j_` and a slug), a
-   name, no `from`, and `owners` if the person named who owns
-   it.
+1. **Create it if needed.** `apply_patch` to `{"journey": "<id>"}` (an id you choose, `j_`
+   and a slug) at `base_revision` 0 with one `create_journey`: a name, no `from`, and
+   `owners` if the person named who owns it.
 2. **Understand the situation.** Ask what has to happen, what has to be decided first, who
    is involved, and what dates are fixed. Keep it small: a few groups with the decisions,
    deliverables, actions, and milestones under them. For phases bounded by milestones, see Stages in the Cairn guide.

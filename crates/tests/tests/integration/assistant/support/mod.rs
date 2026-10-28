@@ -186,9 +186,10 @@ impl World {
     /// after it.
     pub async fn open_vendor_draft(&self, actor: &Actor) -> u64 {
         let base = self.route_revision("vendor-evaluation").await;
-        let open = json!({ "route": "vendor-evaluation", "patch_id": "p_open_vendor_draft",
-            "base_revision": base });
-        let opened = self.ok(actor, "open_draft", open).await;
+        let open = json!({ "target": { "route": "vendor-evaluation" },
+            "patch_id": "p_open_vendor_draft", "base_revision": base,
+            "mutations": [{ "op": "open_draft", "source": "edit" }] });
+        let opened = self.ok(actor, "apply_patch", open).await;
         opened["revision"].as_u64().unwrap()
     }
 }

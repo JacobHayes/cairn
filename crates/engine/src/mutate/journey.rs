@@ -198,8 +198,17 @@ fn move_node(session: &mut Session<'_>, node: &NodeKey, transition: &Transition)
     };
     let step = Move::of(transition);
     let Some(to) = transition::next(kind, stored.state, step) else {
-        let message = if kind == NodeKind::Group && step == Move::Complete {
+        // The advice names the move the node's own table takes instead, if it takes one.
+        let takes = |instead| transition::next(kind, stored.state, instead).is_some();
+        let message = if step == Move::Complete && takes(Move::MarkDone) {
             "a group is not completed: mark it done with a reason".to_owned()
+        } else if step == Move::MarkDone && takes(Move::Complete) {
+            format!(
+                "only a group is marked done: complete the {}, whatever it waits on",
+                kind.name()
+            )
+        } else if step == Move::MarkDone && takes(Move::Answer) {
+            "only a group is marked done: answer the decision".to_owned()
         } else {
             format!(
                 "a {} in {} cannot {}",

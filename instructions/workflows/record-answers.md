@@ -4,25 +4,26 @@ description: Record answers a person gives in conversation as decision answers, 
 
 # Record answers
 
-1. **Match the value to the answer type.** `get_node` shows a decision's answer type.
-   `answer_decision` takes one `value`:
+1. **Match the value to the answer type.** `get_node` shows a decision's answer type. An
+   answer is an `answer` mutation in `update_journey_state`, with the `decision` and one
+   `value`:
    - `boolean`: true or false;
    - `single_choice`: one choice's id; `multi_choice`: a list of choice ids;
    - `text`: free text, possibly empty;
    - `date`: a calendar date;
    - `identity`: one identity key; `identity_list`: a list of identity keys.
 2. **People are identities.** An identity answer names an identity's key. If the person named
-   someone Cairn does not know, create them first with `manage_identity` (`create`), or ask.
-   A write naming identities carries the `deployment_revision` the snapshot reported.
-3. **Record why, when the person said.** `answer_decision` also takes a `rationale`
+   someone Cairn does not know, create them in the same patch: a `create_identity` with a new
+   key, then the answer naming it. A write naming identities carries the
+   `deployment_revision` the snapshot reported.
+3. **Record why, when the person said.** An `answer` also takes a `rationale`
    (markdown): the reason this answer was given, in the person's terms. It belongs to
    that answer alone, so repeat it when you revise an answer for the same reason, and
    leave it off when the person gave none; never write one the person did not give.
-4. **Batch what is already given.** Answers the person has given together go in one
-   `apply_patch` with an `answer` mutation each (one `patch_id`, the journey's current
-   revision); a single answer can use `answer_decision`. Answers the person has not given
-   yet wait for their question.
-5. **Changing an answer** is another `answer_decision`. Cairn re-evaluates what is relevant;
+4. **Batch what is already given.** Answers the person has given together go in one patch,
+   an `answer` mutation each (one `patch_id`, the journey's current revision). Answers the
+   person has not given yet wait for their question.
+5. **Changing an answer** is another `answer`. Cairn re-evaluates what is relevant;
    work already done under the old answer is kept and reported if it no longer applies.
    The new answer has only the `rationale` you send with it: the previous reason is not
    carried over, and `get_node` shows the current one beside the answer.

@@ -392,9 +392,9 @@ mod mcp_in_process {
         let agent = Agent::through(&world.router, Some(&signed_in.access_token)).await;
         let agent = agent.unwrap();
         assert_ne!(agent.tools().await.len(), 0);
-        let empty =
-            json!({ "journey": "j_blank", "name": "A blank journey", "patch_id": "p_blank" });
-        let created = agent.ok("create_journey", empty).await;
+        let empty = json!({ "target": { "journey": "j_blank" }, "patch_id": "p_blank",
+            "base_revision": 0, "mutations": [{ "op": "create_journey", "name": "A blank journey" }] });
+        let created = agent.ok("apply_patch", empty).await;
         let history = agent
             .ok("get_history", json!({ "journey": "j_blank" }))
             .await;
@@ -429,9 +429,9 @@ mod mcp_in_process {
         let node = json!({ "op": "add_node", "node": {
             "key": "n_after", "id": "after", "kind": "action", "title": "After the refresh",
         }});
-        let patch = json!({ "id": "p_after", "target": { "journey": "j_blank" },
+        let patch = json!({ "patch_id": "p_after", "target": { "journey": "j_blank" },
             "base_revision": created["revision"], "mutations": [node] });
-        let written = agent.ok("apply_patch", json!({ "patch": patch })).await;
+        let written = agent.ok("apply_patch", patch).await;
         assert_eq!(written["status"], "applied");
         let history = agent
             .ok("get_history", json!({ "journey": "j_blank" }))

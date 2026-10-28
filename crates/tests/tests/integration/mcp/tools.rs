@@ -34,8 +34,9 @@ fn every_tool_has_a_name_a_description_and_object_schemas() {
     }
 }
 
-/// The mutation vocabulary is written out in one tool's schema, `apply_patch`'s, as a type
-/// sketch; every other tool that takes mutations cites it, so the tool list carries it once.
+/// The mutation vocabulary is written out, as a type sketch, only by the tools that take a
+/// patch: `apply_patch` and `update_journey_state`, each of the ops it takes, so a client that
+/// loaded one of them alone can write with it; every other tool that takes mutations cites it.
 #[test]
 fn the_mutation_vocabulary_is_spelled_out_once() {
     let definitions = ToolSet::definitions();
@@ -54,8 +55,8 @@ fn the_mutation_vocabulary_is_spelled_out_once() {
             _ => {}
         }
     }
-    assert_eq!(spelled, ["apply_patch"]);
-    assert!(cited.contains(&"resolve_date_conflict"), "{cited:?}");
+    assert_eq!(spelled, ["update_journey_state", "apply_patch"]);
+    assert!(cited.contains(&"create_proposal"), "{cited:?}");
 }
 
 /// A mutation the sketch describes is parsed as strictly as before: a value of the wrong
@@ -66,10 +67,10 @@ async fn a_mutation_that_does_not_match_the_sketch_is_refused_by_path() {
     let world = World::new();
     let ann = user("u_ann");
     let patch = |mutation: Value, base_revision: Value| {
-        json!({ "patch": {
-            "id": "p_bad", "target": { "journey": "j_x" }, "base_revision": base_revision,
+        json!({
+            "target": { "journey": "j_x" }, "patch_id": "p_bad", "base_revision": base_revision,
             "mutations": [mutation],
-        } })
+        })
     };
     let pin = json!({ "op": "set_pin", "node": "n_a", "date": "2027-01-01" });
     let cases = [
@@ -77,19 +78,15 @@ async fn a_mutation_that_does_not_match_the_sketch_is_refused_by_path() {
             json!({ "op": "add_node", "node": { "key": "n_a", "id": "a", "kind": "action",
                 "title": 5 } }),
             json!(1),
-            "patch.mutations[0]",
+            "mutations[0]",
         ),
         (
             json!({ "op": "set_pin", "node": "n_a", "date": "2027-01-01", "colour": "blue" }),
             json!(1),
-            "patch.mutations[0]",
+            "mutations[0]",
         ),
-        (
-            json!({ "op": "no_such_op" }),
-            json!(1),
-            "patch.mutations[0].op",
-        ),
-        (pin, json!("one"), "patch.base_revision"),
+        (json!({ "op": "no_such_op" }), json!(1), "mutations[0].op"),
+        (pin, json!("one"), "base_revision"),
     ];
     for (mutation, base_revision, path) in cases {
         match world

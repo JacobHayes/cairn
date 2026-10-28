@@ -21,7 +21,7 @@ function noteAndComplete(journey: string, node: string, base: number): ScriptSte
     { op: "add_annotation", annotation: { key: "a_done", node, note: "Held this morning." } },
     { op: "transition", node, transition: "complete" },
   ];
-  return { calls: [{ name: "apply_patch", arguments: { patch: { id: patchId(), target: { journey }, base_revision: base, mutations } } }] };
+  return { calls: [{ name: "update_journey_state", arguments: { journey, patch_id: patchId(), base_revision: base, mutations } }] };
 }
 
 /**
@@ -62,7 +62,7 @@ test("I5, I7: a direct change reported with its node, and a breakdown proposed, 
     node: { key: `n_piece_${String(index)}`, id: `piece-${String(index)}`, kind: "deliverable", title, parent: "n_workload" },
   }));
   await script(page, [
-    { calls: [{ name: "apply_patch", arguments: { patch: { id: patchId(), target: { journey }, base_revision: 2, mutations: pieces } } }] },
+    { calls: [{ name: "apply_patch", arguments: { target: { journey }, patch_id: patchId(), base_revision: 2, mutations: pieces } }] },
     { say: "I drafted the breakdown for your review." },
   ]);
   await ask(page, "Break the test workload down into an ingest and a query workload.");

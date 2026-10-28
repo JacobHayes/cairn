@@ -179,4 +179,32 @@ mod tests {
         ]));
         assert_eq!(did(&notes).split(", ").count(), 1, "{}", did(&notes));
     }
+
+    /// A note sent with a completion says both changes, and names the node once.
+    #[test]
+    fn a_combined_write_says_each_change() {
+        let combined = patch(&serde_json::json!([
+            { "op": "add_annotation", "annotation":
+                { "key": "a_note", "node": "n_plan", "note": "Sent." } },
+            { "op": "transition", "node": "n_plan", "transition": "complete" },
+        ]));
+        let journey: JourneyId = "j_one".parse().unwrap();
+        let nodes: BTreeSet<NodeKey> = ["n_plan".parse().unwrap()].into();
+        let said = applied(&combined, Some(&journey), &nodes, &BTreeMap::new());
+        let (changes, named) = said.split_once(": ").expect("names its node");
+        assert_eq!(changes.split(", ").count(), 2, "{said}");
+        assert_eq!(named, "`j_one/n_plan`.", "{said}");
+    }
+
+    /// A write that names no node still says what it did.
+    #[test]
+    fn a_write_naming_no_node_says_its_change() {
+        let renamed = patch(&serde_json::json!([
+            { "op": "edit_journey", "name": "Renamed" },
+        ]));
+        let journey: JourneyId = "j_one".parse().unwrap();
+        let said = applied(&renamed, Some(&journey), &BTreeSet::new(), &BTreeMap::new());
+        assert_eq!(said, format!("{}.", did(&renamed)));
+        assert_ne!(did(&renamed), "");
+    }
 }

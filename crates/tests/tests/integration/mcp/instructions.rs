@@ -108,18 +108,10 @@ const COVERAGE: &[(&str, &[&str])] = &[
         "list/get routes and journeys",
         &["list_routes", "get_route", "list_journeys", "get_snapshot"],
     ),
-    (
-        "create a journey (from route or empty)",
-        &["create_journey"],
-    ),
+    ("create a journey (from route or empty)", &["apply_patch"]),
     (
         "create/edit a route draft and publish it",
-        &[
-            "open_draft",
-            "apply_patch",
-            "create_proposal",
-            "publish_draft",
-        ],
+        &["apply_patch", "create_proposal"],
     ),
     ("get the graph at an aggregation level", &["get_level"]),
     (
@@ -130,11 +122,11 @@ const COVERAGE: &[(&str, &[&str])] = &[
         "get node detail with priority and date explanations",
         &["get_node"],
     ),
-    ("answer decisions", &["answer_decision"]),
-    ("transition nodes", &["transition_node"]),
-    ("snooze/unsnooze", &["snooze", "unsnooze"]),
-    ("assign participations", &["assign"]),
-    ("apply a patch", &["apply_patch"]),
+    ("answer decisions", &["update_journey_state"]),
+    ("transition nodes", &["update_journey_state"]),
+    ("snooze/unsnooze", &["update_journey_state"]),
+    ("assign participations", &["update_journey_state"]),
+    ("apply a patch", &["apply_patch", "update_journey_state"]),
     (
         "draft, list, get and edit proposals",
         &[
@@ -147,11 +139,11 @@ const COVERAGE: &[(&str, &[&str])] = &[
     ),
     (
         "pin/unpin dates and resolve conflicts",
-        &["set_date", "resolve_date_conflict"],
+        &["update_journey_state", "apply_patch"],
     ),
     (
         "force-include, keep under skipped ancestors, and bypass guards",
-        &["override"],
+        &["update_journey_state"],
     ),
     (
         "list identities by name or email, find the journeys that refer to an identity or that it owns, and manage identities (create, link, merge, delete)",

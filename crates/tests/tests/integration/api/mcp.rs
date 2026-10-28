@@ -34,9 +34,9 @@ mod mcp_in_process {
         proposals(&agent, revision).await;
         routes(&agent).await;
         identities(&agent).await;
-        let empty =
-            json!({ "journey": "j_blank", "name": "A blank journey", "patch_id": "p_blank" });
-        let created = agent.ok("create_journey", empty).await;
+        let empty = json!({ "target": { "journey": "j_blank" }, "patch_id": "p_blank",
+            "base_revision": 0, "mutations": [{ "op": "create_journey", "name": "A blank journey" }] });
+        let created = agent.ok("apply_patch", empty).await;
         assert_eq!(created["revision"], 1);
         let listed: BTreeSet<String> = agent
             .tools()
@@ -53,8 +53,8 @@ mod mcp_in_process {
     }
 
     /// The tool list an agent loads on connecting stays within its budgets, measured as the
-    /// compact JSON bytes the endpoint sends: the whole list, each tool but for the mutation
-    /// sketch (which `apply_patch` carries once), and the sketch.
+    /// compact JSON bytes the endpoint sends: the whole list, each tool but for its mutation
+    /// sketch (each patch tool carries one, of the ops it takes), and each sketch.
     #[tokio::test]
     async fn the_tool_list_stays_within_its_budgets() {
         let world = World::start().await;
@@ -67,7 +67,7 @@ mod mcp_in_process {
             .collect();
         let bytes =
             |value: &Value| u32::try_from(serde_json::to_vec(value).unwrap().len()).unwrap();
-        let mut sketch = 0;
+        let mut sketches = Vec::new();
         let mut sizes = Vec::new();
         for tool in &tools {
             let name = tool["name"].as_str().unwrap();
@@ -75,8 +75,8 @@ mod mcp_in_process {
             if let Some(text) = tool.pointer("/inputSchema/$defs/Mutation/description")
                 && tool["inputSchema"]["$defs"]["Mutation"]["properties"].is_object()
             {
-                sketch = bytes(text);
-                size -= sketch;
+                sketches.push((name.to_owned(), bytes(text)));
+                size -= bytes(text);
             }
             sizes.push((name.to_owned(), size));
         }
@@ -88,12 +88,14 @@ mod mcp_in_process {
             largest.1,
             limits::TOOL_DEFINITION_BYTES_MAX
         );
-        assert_ne!(sketch, 0, "the sketch is in the list");
-        assert!(
-            sketch <= limits::MUTATION_SKETCH_BYTES_MAX,
-            "the mutation sketch is {sketch} bytes, past {}",
-            limits::MUTATION_SKETCH_BYTES_MAX
-        );
+        assert!(!sketches.is_empty(), "a sketch is in the list");
+        for (name, sketch) in &sketches {
+            assert!(
+                *sketch <= limits::MUTATION_SKETCH_BYTES_MAX,
+                "{name}'s mutation sketch is {sketch} bytes, past {}",
+                limits::MUTATION_SKETCH_BYTES_MAX
+            );
+        }
         let list = u32::try_from(serde_json::to_vec(&tools).unwrap().len()).unwrap();
         assert!(
             list <= limits::TOOL_LIST_BYTES_MAX,
@@ -142,72 +144,54 @@ mod mcp_in_process {
         assert_eq!(history["patches"].as_array().unwrap().len(), 2);
     }
 
-    /// The journey's state tools, each one patch on the revision the last produced.
+    /// What happened in the journey, each one patch on the revision the last produced, then
+    /// a note and a structural edit as one `apply_patch`.
     async fn journey_writes(agent: &Agent, mut revision: u64) -> u64 {
-        let calls = [
-            (
-                "answer_decision",
-                json!({ "decision": "n_purpose", "value": { "single_choice": "research-only" } }),
-            ),
-            (
-                "transition_node",
-                json!({ "node": "n_kickoff", "transition": "complete" }),
-            ),
-            (
-                "snooze",
-                json!({ "node": "n_access", "until": { "date": "2026-10-03" } }),
-            ),
-            ("unsnooze", json!({ "node": "n_access" })),
-            (
-                "assign",
-                json!({ "node": "n_access", "kind": "k_reviewer", "source": ["who_k3d7qm2xw5tn6pfa"], "deployment_revision": 1 }),
-            ),
-            (
-                "set_date",
-                json!({ "node": "n_findings", "change": { "pin": { "date": "2026-11-03" } } }),
-            ),
-            (
-                "override",
-                json!({ "node": "n_partner_led", "change": { "apply": { "force_include": { "reason": "The partner may run part of it." } } } }),
-            ),
+        let writes = [
+            json!({ "op": "answer", "decision": "n_purpose", "value": { "single_choice": "research-only" } }),
+            json!({ "op": "transition", "node": "n_kickoff", "transition": "complete" }),
+            json!({ "op": "snooze", "node": "n_access", "until": { "date": "2026-10-03" } }),
+            json!({ "op": "unsnooze", "node": "n_access" }),
+            json!({ "op": "set_participation", "node": "n_access", "kind": "k_reviewer",
+                "source": ["who_k3d7qm2xw5tn6pfa"] }),
+            json!({ "op": "set_pin", "node": "n_findings", "date": "2026-11-03" }),
+            json!({ "op": "apply_override", "node": "n_partner_led", "override": {
+                "force_include": { "reason": "The partner may run part of it." } } }),
         ];
-        for (name, mut arguments) in calls {
-            arguments["journey"] = json!(JOURNEY);
-            arguments["patch_id"] = json!(format!("p_{name}"));
-            arguments["base_revision"] = json!(revision);
-            let written = agent.ok(name, arguments).await;
-            assert_eq!(written["status"], "applied", "{name}");
+        for (index, mutation) in writes.into_iter().enumerate() {
+            let arguments = json!({ "journey": JOURNEY, "patch_id": format!("p_state_{index}"),
+                "base_revision": revision, "deployment_revision": 1, "mutations": [mutation] });
+            let written = agent.ok("update_journey_state", arguments).await;
+            assert_eq!(written["status"], "applied", "{index}");
             revision = written["revision"].as_u64().unwrap();
         }
-        let note = json!({ "op": "add_annotation", "annotation": {
-            "key": "a_access_note", "node": "n_access", "note": "Requested.",
-        }});
-        let patch = json!({ "id": "p_note", "target": { "journey": JOURNEY },
-            "base_revision": revision, "mutations": [note] });
-        let written = agent.ok("apply_patch", json!({ "patch": patch })).await;
+        let mixed = json!([
+            { "op": "add_annotation", "annotation": {
+                "key": "a_access_note", "node": "n_access", "note": "Requested." } },
+            { "op": "set_node_field", "node": "n_access", "value": { "estimate": 2 } },
+        ]);
+        let patch = json!({ "target": { "journey": JOURNEY }, "patch_id": "p_note",
+            "base_revision": revision, "mutations": mixed });
+        let written = agent.ok("apply_patch", patch).await;
         written["revision"].as_u64().unwrap()
     }
 
     /// F5: a pin that contradicts a date rule is refused with its chain and moves; one move
-    /// and the pin then apply together.
+    /// and the pin then apply together, as one patch.
     async fn date_conflict(agent: &Agent, revision: u64) -> u64 {
-        let pin = json!({
-            "journey": JOURNEY, "node": "n_review_opens", "change": { "pin": { "date": "2026-11-15" } },
-            "patch_id": "p_late_review", "base_revision": revision,
-        });
-        let refused = agent.refused("set_date", pin).await;
+        let pin = json!({ "op": "set_pin", "node": "n_review_opens", "date": "2026-11-15" });
+        let pinned = json!({ "journey": JOURNEY, "patch_id": "p_late_review",
+            "base_revision": revision, "mutations": [pin.clone()] });
+        let refused = agent.refused("update_journey_state", pinned).await;
         let violation = &refused["rejection"]["violations"][0];
         assert_eq!(violation["code"], "contradictory_chain");
         let moves = violation["chains"]["chains"][0]["resolutions"]
             .as_array()
             .unwrap();
         let later_meeting = moves.iter().find(|m| m["op"] == "answer").unwrap().clone();
-        let resolved = json!({
-            "journey": JOURNEY, "resolution": later_meeting,
-            "then": [{ "op": "set_pin", "node": "n_review_opens", "date": "2026-11-15" }],
-            "patch_id": "p_later_meeting", "base_revision": revision,
-        });
-        let written = agent.ok("resolve_date_conflict", resolved).await;
+        let resolved = json!({ "journey": JOURNEY, "patch_id": "p_later_meeting",
+            "base_revision": revision, "mutations": [later_meeting, pin] });
+        let written = agent.ok("update_journey_state", resolved).await;
         written["revision"].as_u64().unwrap()
     }
 
@@ -262,12 +246,15 @@ mod mcp_in_process {
             route["graph"]["extends"], 1,
             "the import is a draft extending version 1"
         );
-        let publish =
-            json!({ "route": ROUTE, "patch_id": "p_publish", "base_revision": route["revision"] });
-        agent.ok("publish_draft", publish).await;
-        let create = json!({ "name": "Checklist" });
-        let open = json!({ "route": "checklist", "create": create, "patch_id": "p_checklist", "base_revision": 0 });
-        agent.ok("open_draft", open).await;
+        let publish = json!({ "target": { "route": ROUTE }, "patch_id": "p_publish",
+            "base_revision": route["revision"], "mutations": [{ "op": "publish_draft" }] });
+        agent.ok("apply_patch", publish).await;
+        let open = json!({ "target": { "route": "checklist" }, "patch_id": "p_checklist",
+            "base_revision": 0, "mutations": [
+                { "op": "create_route", "name": "Checklist" },
+                { "op": "open_draft", "source": "edit" },
+            ] });
+        agent.ok("apply_patch", open).await;
         let drafted = [
             (
                 "upgrade",
@@ -382,10 +369,11 @@ mod mcp_in_process {
         let mut revision = snapshot["revision"].as_u64().unwrap();
         for decision in &needed {
             let (_, value) = answers.iter().find(|(key, _)| key == decision).unwrap();
-            let answer = json!({ "journey": JOURNEY, "decision": decision, "value": value,
+            let answer = json!({ "journey": JOURNEY,
+                "mutations": [{ "op": "answer", "decision": decision, "value": value }],
                 "deployment_revision": snapshot["deployment_revision"],
                 "patch_id": format!("p_answer_{}", &decision[2..]), "base_revision": revision });
-            let written = agent.ok("answer_decision", answer).await;
+            let written = agent.ok("update_journey_state", answer).await;
             revision = written["revision"].as_u64().unwrap();
         }
         revision
@@ -393,14 +381,12 @@ mod mcp_in_process {
 
     /// A15: a patch with two independent mistakes is refused with both.
     async fn refused_with_both_mistakes(agent: &Agent, revision: u64) {
-        let mistakes = json!({ "id": "p_mistakes", "target": { "journey": JOURNEY },
+        let mistakes = json!({ "target": { "journey": JOURNEY }, "patch_id": "p_mistakes",
             "base_revision": revision, "mutations": [
                 { "op": "transition", "node": "n_workload", "transition": "complete" },
                 { "op": "answer", "decision": "n_partner_runs", "value": { "text": "maybe" } },
             ] });
-        let refused = agent
-            .refused("apply_patch", json!({ "patch": mistakes }))
-            .await;
+        let refused = agent.refused("apply_patch", mistakes).await;
         let violations = refused["rejection"]["violations"].as_array().unwrap();
         let codes: BTreeSet<&str> = violations
             .iter()
@@ -408,13 +394,11 @@ mod mcp_in_process {
             .collect();
         assert_eq!(codes.len(), 2, "{refused}");
 
-        let stale = json!({ "id": "p_stale", "target": { "journey": JOURNEY },
+        let stale = json!({ "target": { "journey": JOURNEY }, "patch_id": "p_stale",
             "base_revision": 1, "mutations": [
                 { "op": "answer", "decision": "n_partner_runs", "value": { "single_choice": "yes" } },
             ] });
-        let stale = agent
-            .refused("apply_patch", json!({ "patch": stale }))
-            .await;
+        let stale = agent.refused("apply_patch", stale).await;
         let moved = &stale["rejection"]["conflicts"][0];
         assert_eq!(stale["rejection"]["rejection"], "stale", "{stale}");
         assert_eq!(moved["current"], revision, "{stale}");
@@ -510,9 +494,9 @@ mod mcp_in_process {
         let reply = post(&ann, "/api/users/me/tokens", &json!({ "name": "helper" })).await;
         let minted: MintedToken = reply.json().unwrap();
         let agent = Agent::connect(&world, &minted.token).await;
-        let complete = json!({ "journey": JOURNEY, "node": "n_kickoff", "transition": "complete",
-            "patch_id": "p_done", "base_revision": 2 });
-        agent.ok("transition_node", complete).await;
+        let complete = json!({ "journey": JOURNEY, "patch_id": "p_done", "base_revision": 2,
+            "mutations": [{ "op": "transition", "node": "n_kickoff", "transition": "complete" }] });
+        agent.ok("update_journey_state", complete).await;
         let history = json!({ "journey": JOURNEY, "node": "n_kickoff" });
         let history = agent.ok("get_history", history).await;
         let actor = &history["patches"].as_array().unwrap().last().unwrap()["actor"];
@@ -577,7 +561,7 @@ mod mcp_in_process {
 
     /// The list marks what a tool does: a read is read-only; a write is idempotent under
     /// its patch id, and destructive when it can undo or overwrite (a discard, a merge, any
-    /// patch) rather than only add (a new journey or proposal).
+    /// patch) rather than only add (a route file or a proposal).
     #[tokio::test]
     async fn the_tool_list_marks_reads_and_destructive_writes() {
         let world = World::start().await;
@@ -594,11 +578,12 @@ mod mcp_in_process {
         };
         let cases = [
             ("get_snapshot", Some(true), Some(false), Some(false)),
-            ("create_journey", Some(false), Some(false), Some(true)),
+            ("import_route", Some(false), Some(false), Some(true)),
             ("create_proposal", Some(false), Some(false), Some(true)),
             ("edit_proposal", Some(false), Some(true), Some(true)),
             ("manage_identity", Some(false), Some(true), Some(true)),
             ("apply_patch", Some(false), Some(true), Some(true)),
+            ("update_journey_state", Some(false), Some(true), Some(true)),
         ];
         for (name, read_only, destructive, idempotent) in cases {
             assert_eq!(hint(name), (read_only, destructive, idempotent), "{name}");

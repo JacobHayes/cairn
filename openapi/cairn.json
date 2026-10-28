@@ -7209,7 +7209,7 @@
           },
           {
             "additionalProperties": false,
-            "description": "A state-machine transition.",
+            "description": "Move a node, whatever it waits on: start, stop, complete (work and milestones),\nskip, reopen, or `mark_done` (a group only).",
             "properties": {
               "node": {
                 "$ref": "#/components/schemas/NodeKey",

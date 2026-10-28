@@ -55,8 +55,8 @@ async fn an_empty_journey_is_structured_through_a_proposal_the_user_applies() {
     world.empty_bakeoff().await;
     let owner = user("u_owner");
     let structure = proposed_mutations(&scenario("bake-off"), 1);
-    let patch = json!({ "patch": { "id": "p_structure", "target": { "journey": BAKEOFF },
-        "base_revision": 1, "mutations": structure }, "note": "Structure the bake-off" });
+    let patch = json!({ "patch_id": "p_structure", "target": { "journey": BAKEOFF },
+        "base_revision": 1, "mutations": structure, "note": "Structure the bake-off" });
     world.script([
         Step::call("get_snapshot", json!({ "journey": BAKEOFF })),
         Step::call("apply_patch", patch),
@@ -152,8 +152,8 @@ async fn a_direct_state_change_is_reported_with_its_consequences() {
     let vendor: JourneyId = "j_vendor_eval".parse().unwrap();
     let before = summary(&world, &lead).await;
     assert_eq!((before.overdue.len(), before.shortfalls.len()), (0, 0));
-    let patch = json!({ "patch": { "id": "p_answers", "target": { "journey": "j_vendor_eval" },
-        "base_revision": 1, "deployment_revision": 1, "mutations": answers } });
+    let patch = json!({ "patch_id": "p_answers", "target": { "journey": "j_vendor_eval" },
+        "base_revision": 1, "deployment_revision": 1, "mutations": answers });
     world.script([
         Step::call("apply_patch", patch),
         Step::say("Answered; the decision meeting is now too soon for the work before it."),
@@ -237,8 +237,8 @@ async fn a_bulk_request_in_conversation_applies_directly() {
         .iter()
         .map(|node| json!({ "op": "set_node_field", "node": node, "value": { "weight": 2 } }))
         .collect();
-    let patch = json!({ "patch": { "id": "p_reweigh", "target": { "journey": "j_vendor_eval" },
-        "base_revision": 1, "mutations": mutations } });
+    let patch = json!({ "patch_id": "p_reweigh", "target": { "journey": "j_vendor_eval" },
+        "base_revision": 1, "mutations": mutations });
     world.script([Step::call("apply_patch", patch), Step::say("Done.")]);
     let turn = world
         .turn(
@@ -270,8 +270,8 @@ async fn a_route_drafted_in_conversation_arrives_as_a_proposal_on_its_draft() {
         node("n_gather", "gather", "Gather what is needed"),
         node("n_check", "check", "Check it"),
     ]);
-    let patch = json!({ "patch": { "id": "p_checklist", "target": { "route": "checklist" },
-        "base_revision": 0, "mutations": mutations } });
+    let patch = json!({ "patch_id": "p_checklist", "target": { "route": "checklist" },
+        "base_revision": 0, "mutations": mutations });
     world.script([
         Step::call("apply_patch", patch),
         Step::say("Drafted the checklist."),
@@ -374,9 +374,9 @@ async fn a_provider_timeout_is_reported_and_the_writes_before_it_stand() {
     let world = World::new();
     let lead = user("u_lead");
     world.vendor_journey(&lead).await;
-    let complete = json!({ "journey": "j_vendor_eval", "node": "n_kickoff", "transition": "complete",
-        "patch_id": "p_kickoff", "base_revision": 1 });
-    world.script([Step::call("transition_node", complete), Step::Hang]);
+    let complete = json!({ "journey": "j_vendor_eval", "patch_id": "p_kickoff", "base_revision": 1,
+        "mutations": [{ "op": "transition", "node": "n_kickoff", "transition": "complete" }] });
+    world.script([Step::call("update_journey_state", complete), Step::Hang]);
     let turn = world
         .turn(&lead, &vendor_target(), "Kickoff happened.")
         .await;
@@ -532,9 +532,9 @@ fn weight_calls(nodes: &[&str], first_base: usize) -> Vec<(&'static str, Value)>
         .iter()
         .enumerate()
         .map(|(index, node)| {
-            let patch = json!({ "patch": { "id": format!("p_weight_{index}"),
+            let patch = json!({ "patch_id": format!("p_weight_{index}"),
                 "target": { "journey": "j_vendor_eval" }, "base_revision": first_base + index,
-                "mutations": [{ "op": "set_node_field", "node": node, "value": { "weight": 2 } }] } });
+                "mutations": [{ "op": "set_node_field", "node": node, "value": { "weight": 2 } }] });
             ("apply_patch", patch)
         })
         .collect()
@@ -636,8 +636,8 @@ async fn no_tool_call_runs_past_the_turn_deadline() {
     let world = World::new();
     let lead = user("u_lead");
     world.vendor_journey(&lead).await;
-    let complete = json!({ "journey": "j_vendor_eval", "node": "n_kickoff", "transition": "complete",
-        "patch_id": "p_late", "base_revision": 1 });
+    let complete = json!({ "journey": "j_vendor_eval", "patch_id": "p_late", "base_revision": 1,
+        "mutations": [{ "op": "transition", "node": "n_kickoff", "transition": "complete" }] });
     let reply = |step: Step| {
         let Step::Reply(reply) = step else {
             unreachable!()
@@ -655,7 +655,7 @@ async fn no_tool_call_runs_past_the_turn_deadline() {
     let work = TURN_DURATION_MAX.checked_sub(TURN_SAVE_RESERVE).unwrap();
     let left = work.checked_sub(slow * 5).unwrap();
     assert!(left > Duration::ZERO);
-    let write = Step::Slow(left, reply(Step::call("transition_node", complete)));
+    let write = Step::Slow(left, reply(Step::call("update_journey_state", complete)));
     world.script(reads.chain([write, Step::say("Done.")]));
     let turn = world
         .turn(&lead, &vendor_target(), "Kickoff happened.")
@@ -742,9 +742,12 @@ async fn a_commit_landing_just_past_the_deadline_is_reported() {
     faults.pause_with(std::sync::Arc::new(move |_| {
         Box::pin(tokio::time::sleep_until(lands))
     }));
-    let complete = json!({ "journey": "j_vendor_eval", "node": "n_kickoff", "transition": "complete",
-        "patch_id": "p_late", "base_revision": 1 });
-    world.script([Step::call("transition_node", complete), Step::say("Hello.")]);
+    let complete = json!({ "journey": "j_vendor_eval", "patch_id": "p_late", "base_revision": 1,
+        "mutations": [{ "op": "transition", "node": "n_kickoff", "transition": "complete" }] });
+    world.script([
+        Step::call("update_journey_state", complete),
+        Step::say("Hello."),
+    ]);
     let turn = world
         .turn(&lead, &vendor_target(), "Kickoff happened.")
         .await;
@@ -765,9 +768,12 @@ async fn a_stalled_commit_cannot_hold_a_turn_past_its_limit() {
     let lead = user("u_lead");
     world.vendor_journey(&lead).await;
     faults.pause_with(std::sync::Arc::new(|_| Box::pin(std::future::pending())));
-    let complete = json!({ "journey": "j_vendor_eval", "node": "n_kickoff", "transition": "complete",
-        "patch_id": "p_stalled", "base_revision": 1 });
-    world.script([Step::call("transition_node", complete), Step::say("Hello.")]);
+    let complete = json!({ "journey": "j_vendor_eval", "patch_id": "p_stalled", "base_revision": 1,
+        "mutations": [{ "op": "transition", "node": "n_kickoff", "transition": "complete" }] });
+    world.script([
+        Step::call("update_journey_state", complete),
+        Step::say("Hello."),
+    ]);
     let started = tokio::time::Instant::now();
     let turn = world
         .turn(&lead, &vendor_target(), "Kickoff happened.")

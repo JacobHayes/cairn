@@ -44,12 +44,19 @@ fn cases(draft: u64) -> Vec<Case> {
     cases
 }
 
-/// The journey's arguments with `extra` added.
-fn on_journey(extra: Value) -> Value {
-    let mut arguments = json!({ "journey": JOURNEY, "base_revision": 1 });
-    if let Value::Object(extra) = extra {
-        arguments.as_object_mut().unwrap().extend(extra);
-    }
+/// A patch of what happened in the journey, at revision 1.
+fn state(patch_id: &str, mutations: Value) -> Value {
+    let mut arguments = json!({ "journey": JOURNEY, "base_revision": 1,
+        "deployment_revision": 1, "patch_id": patch_id });
+    arguments["mutations"] = mutations;
+    arguments
+}
+
+/// Any patch, to `target` at `base`.
+fn patch(target: Value, base: u64, patch_id: &str, mutations: Value) -> Value {
+    let mut arguments = json!({ "base_revision": base, "patch_id": patch_id });
+    arguments["target"] = target;
+    arguments["mutations"] = mutations;
     arguments
 }
 
@@ -59,99 +66,77 @@ fn add_node() -> Value {
         "kind": "action", "title": "An extra step" } })
 }
 
-/// The journey's state tools: one node each, so each applies directly, but for an unsnooze
-/// of a node nothing snoozed, which would be refused, so it is answered with that rejection
-/// and not run.
+/// What happened in the journey: one node each, so each applies directly, but for an
+/// unsnooze of a node nothing snoozed, which would be refused, so it is answered with that
+/// rejection and not run. A note sent as any patch is state too.
 fn state_cases() -> Vec<Case> {
-    let journey = on_journey;
-    vec![
-        (
-            "answer_decision",
-            journey(
-                json!({ "decision": "n_purpose", "value": { "single_choice": "purchase" },
-                "patch_id": "p_answer" }),
-            ),
-            Policy::Direct,
-        ),
-        (
-            "transition_node",
-            journey(json!({ "node": "n_kickoff", "transition": "complete", "patch_id": "p_done" })),
-            Policy::Direct,
-        ),
-        (
-            "assign",
-            journey(
-                json!({ "node": "n_access", "kind": "k_reviewer", "source": ["who_k3d7qm2xw5tn6pfa"],
-                "deployment_revision": 1, "patch_id": "p_assign" }),
-            ),
-            Policy::Direct,
-        ),
-        (
-            "snooze",
-            journey(
-                json!({ "node": "n_access", "until": { "date": "2026-10-03" },
-                "patch_id": "p_snooze" }),
-            ),
-            Policy::Direct,
-        ),
-        (
-            "unsnooze",
-            journey(json!({ "node": "n_access", "patch_id": "p_unsnooze" })),
-            Policy::Rejected,
-        ),
-        (
-            "set_date",
-            journey(
-                json!({ "node": "n_findings", "change": { "pin": { "date": "2026-11-03" } },
-                "patch_id": "p_pin" }),
-            ),
-            Policy::Direct,
-        ),
-        (
-            "override",
-            journey(
-                json!({ "node": "n_partner_led", "change": { "apply": { "force_include":
-                { "reason": "The partner may run part of it." } } }, "patch_id": "p_force" }),
-            ),
-            Policy::Direct,
-        ),
-    ]
+    let writes = [
+        json!({ "op": "answer", "decision": "n_purpose", "value": { "single_choice": "purchase" } }),
+        json!({ "op": "transition", "node": "n_kickoff", "transition": "complete" }),
+        json!({ "op": "set_participation", "node": "n_access", "kind": "k_reviewer",
+            "source": ["who_k3d7qm2xw5tn6pfa"] }),
+        json!({ "op": "snooze", "node": "n_access", "until": { "date": "2026-10-03" } }),
+        json!({ "op": "set_pin", "node": "n_findings", "date": "2026-11-03" }),
+        json!({ "op": "apply_override", "node": "n_partner_led", "override": {
+            "force_include": { "reason": "The partner may run part of it." } } }),
+    ];
+    let mut cases: Vec<Case> = writes
+        .into_iter()
+        .enumerate()
+        .map(|(index, mutation)| {
+            let patch_id = format!("p_state_{index}");
+            (
+                "update_journey_state",
+                state(&patch_id, json!([mutation])),
+                Policy::Direct,
+            )
+        })
+        .collect();
+    let unsnooze = json!([{ "op": "unsnooze", "node": "n_access" }]);
+    cases.push((
+        "update_journey_state",
+        state("p_unsnooze", unsnooze),
+        Policy::Rejected,
+    ));
+    let note = json!([{ "op": "add_annotation", "annotation": { "key": "a_access",
+        "node": "n_access", "note": "Requested." } }]);
+    let journey = json!({ "journey": JOURNEY });
+    cases.push((
+        "apply_patch",
+        patch(journey, 1, "p_note", note),
+        Policy::Direct,
+    ));
+    cases
 }
 
-/// The writes that carry structure, each drafted as a proposal.
+/// The writes that carry structure, each drafted as a proposal: a node added, a journey
+/// begun, a route's draft opened and published, and an identity merged.
 fn structural_cases(draft: u64) -> Vec<Case> {
-    let journey = on_journey;
     let structural = Policy::Propose(Because::Structural);
-    let add_node = add_node();
+    let journey = json!({ "journey": JOURNEY });
+    let begun = json!([{ "op": "create_journey", "name": "A new journey" }]);
+    let opened = json!([{ "op": "create_route", "name": "Fresh" },
+        { "op": "open_draft", "source": "edit" }]);
+    let published = json!([{ "op": "publish_draft" }]);
     vec![
         (
-            "resolve_date_conflict",
-            journey(
-                json!({ "resolution": { "op": "remove_edge", "edge": { "node": "n_findings",
-                "requires": "n_baseline" } }, "patch_id": "p_resolve" }),
-            ),
-            structural.clone(),
-        ),
-        (
-            "create_journey",
-            json!({ "journey": "j_new", "name": "A new journey", "patch_id": "p_new_journey" }),
+            "apply_patch",
+            patch(journey, 1, "p_add", json!([add_node()])),
             structural.clone(),
         ),
         (
             "apply_patch",
-            json!({ "patch": { "id": "p_add", "target": { "journey": JOURNEY },
-                "base_revision": 1, "mutations": [add_node] } }),
+            patch(json!({ "journey": "j_new" }), 0, "p_new_journey", begun),
             structural.clone(),
         ),
         (
-            "open_draft",
-            json!({ "route": "fresh", "create": { "name": "Fresh" }, "patch_id": "p_fresh",
-                "base_revision": 0 }),
+            "apply_patch",
+            patch(json!({ "route": "fresh" }), 0, "p_fresh", opened),
             structural.clone(),
         ),
         (
-            "publish_draft",
-            json!({ "route": ROUTE, "patch_id": "p_publish", "base_revision": draft }),
+            "apply_patch",
+            patch(json!({ "route": ROUTE }), draft, "p_publish", published),
             structural.clone(),
         ),
         (
@@ -342,8 +327,8 @@ async fn a_weight_change_is_proposed_on_a_draft_and_applied_on_a_journey() {
     let draft = world.open_vendor_draft(&ann).await;
     let assistant = assisting("u_ann");
     let weight = json!({ "op": "set_node_field", "node": "n_findings", "value": { "weight": 7 } });
-    let on_draft = json!({ "patch": { "id": "p_draft_weight", "target": { "route": ROUTE },
-        "base_revision": draft, "mutations": [weight] } });
+    let on_draft = json!({ "patch_id": "p_draft_weight", "target": { "route": ROUTE },
+        "base_revision": draft, "mutations": [weight] });
     let proposed = run(&world, &assistant, "apply_patch", on_draft).await;
     assert!(
         matches!(
@@ -357,8 +342,8 @@ async fn a_weight_change_is_proposed_on_a_draft_and_applied_on_a_journey() {
     );
     assert_eq!(world.route_revision(ROUTE).await, draft);
 
-    let on_journey = json!({ "patch": { "id": "p_journey_weight", "target": { "journey": JOURNEY },
-        "base_revision": 1, "mutations": [weight] } });
+    let on_journey = json!({ "patch_id": "p_journey_weight", "target": { "journey": JOURNEY },
+        "base_revision": 1, "mutations": [weight] });
     let applied = run(&world, &assistant, "apply_patch", on_journey).await;
     let Some(Action::Applied { receipt, .. }) = applied.action else {
         panic!("{applied:?}");
@@ -377,8 +362,8 @@ async fn a_drafted_proposal_cannot_hold_a_proposal_edit() {
     world.vendor_journey(&ann).await;
     let draft = world.open_vendor_draft(&ann).await;
     let assistant = assisting("u_ann");
-    let nested = json!({ "patch": { "id": "p_nested", "target": { "route": ROUTE },
-        "base_revision": draft, "mutations": [{ "op": "discard_proposal" }] } });
+    let nested = json!({ "patch_id": "p_nested", "target": { "route": ROUTE },
+        "base_revision": draft, "mutations": [{ "op": "discard_proposal" }] });
     let outcome = run(&world, &assistant, "apply_patch", nested).await;
     assert!(
         matches!(outcome.answer, Err(ToolError::Arguments { .. })),
@@ -410,8 +395,8 @@ async fn a_write_asked_again_answers_the_same_proposal() {
             &world,
             &assistant,
             "apply_patch",
-            json!({ "patch": { "id": "p_again", "target": { "journey": JOURNEY },
-                "base_revision": 1, "mutations": [add_node()] } }),
+            json!({ "patch_id": "p_again", "target": { "journey": JOURNEY },
+                "base_revision": 1, "mutations": [add_node()] }),
         )
         .await;
         let Some(Action::Proposed { proposal, .. }) = outcome.action else {
@@ -441,14 +426,14 @@ async fn removals_and_skips_report_the_nodes_they_reach() {
                 "node": node, "note": "Mine." } })
         })
         .collect();
-    let added = json!({ "patch": { "id": "p_notes", "target": { "journey": JOURNEY },
-        "base_revision": 1, "mutations": adds } });
+    let added = json!({ "patch_id": "p_notes", "target": { "journey": JOURNEY },
+        "base_revision": 1, "mutations": adds });
     world.ok(&lead, "apply_patch", added).await;
     let removes: Vec<Value> = (0..twelve.len())
         .map(|index| json!({ "op": "remove_annotation", "annotation": format!("a_note_{index}") }))
         .collect();
-    let removal = json!({ "patch": { "id": "p_unnote", "target": { "journey": JOURNEY },
-        "base_revision": 2, "mutations": removes } });
+    let removal = json!({ "patch_id": "p_unnote", "target": { "journey": JOURNEY },
+        "base_revision": 2, "mutations": removes });
     let decided = wrapper::decide(
         &world.tools,
         world.store.as_ref(),
@@ -461,14 +446,14 @@ async fn removals_and_skips_report_the_nodes_they_reach() {
     };
     assert_eq!(nodes.len(), twelve.len());
 
-    let skip = json!({ "journey": JOURNEY, "node": "n_setup",
-        "transition": { "skip": { "reason": "Not needed." } }, "patch_id": "p_skip_setup",
-        "base_revision": 2 });
+    let skip = json!({ "journey": JOURNEY, "patch_id": "p_skip_setup", "base_revision": 2,
+        "mutations": [{ "op": "transition", "node": "n_setup",
+            "transition": { "skip": { "reason": "Not needed." } } }] });
     let decided = wrapper::decide(
         &world.tools,
         world.store.as_ref(),
         &assistant,
-        ("transition_node", &skip),
+        ("update_journey_state", &skip),
     )
     .await;
     let Ok(Decision::Direct { nodes, .. }) = decided else {
@@ -492,14 +477,14 @@ async fn moving_notes_reports_the_nodes_they_leave() {
         .enumerate()
         .map(|(index, node)| json!({ "op": "add_annotation", "annotation": note(index, node) }))
         .collect();
-    let added = json!({ "patch": { "id": "p_notes", "target": { "journey": JOURNEY },
-        "base_revision": 1, "mutations": adds } });
+    let added = json!({ "patch_id": "p_notes", "target": { "journey": JOURNEY },
+        "base_revision": 1, "mutations": adds });
     world.ok(&lead, "apply_patch", added).await;
     let moves: Vec<Value> = (0..ELEVEN.len())
         .map(|index| json!({ "op": "edit_annotation", "annotation": note(index, "n_kickoff") }))
         .collect();
-    let patch = json!({ "patch": { "id": "p_move", "target": { "journey": JOURNEY },
-        "base_revision": 2, "mutations": moves } });
+    let patch = json!({ "patch_id": "p_move", "target": { "journey": JOURNEY },
+        "base_revision": 2, "mutations": moves });
     let decided = wrapper::decide(
         &world.tools,
         world.store.as_ref(),
@@ -522,9 +507,9 @@ async fn a_direct_write_asked_again_is_answered_from_its_receipt() {
     let lead = user("u_lead");
     world.vendor_journey(&lead).await;
     let assistant = assisting("u_lead");
-    let note = json!({ "patch": { "id": "p_note_once", "target": { "journey": JOURNEY },
+    let note = json!({ "patch_id": "p_note_once", "target": { "journey": JOURNEY },
         "base_revision": 1, "mutations": [{ "op": "add_annotation", "annotation": {
-        "key": "a_once", "node": "n_kickoff", "note": "Once." } }] } });
+        "key": "a_once", "node": "n_kickoff", "note": "Once." } }] });
     let first = run(&world, &assistant, "apply_patch", note.clone()).await;
     assert!(
         matches!(first.action, Some(Action::Applied { .. })),

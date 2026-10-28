@@ -17,7 +17,7 @@ cannot be completed until it has children or is marked `atomic`.
    `kind` (deliverable or action), a `title`, and an `estimate` in days when known. For
    "one per person in a role", add one child per member, each naming that member as its
    owner in its `participations`.
-4. **Or mark it atomic.** When it really is one piece of work, `apply_patch` with
+4. **Or mark it atomic.** When it really is one piece of work, `update_journey_state` with
    `set_atomic` and `atomic` true, after the person agrees.
 5. **Review and hand over.** `get_proposal` with `review` shows the frontier after; ask the
    person to apply it.

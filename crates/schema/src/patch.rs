@@ -606,7 +606,8 @@ pub enum Mutation {
     },
 
     // Journey state (B2, B5, B6, B10, D1, F1, F5, G1).
-    /// A state-machine transition.
+    /// Move a node, whatever it waits on: start, stop, complete (work and milestones),
+    /// skip, reopen, or `mark_done` (a group only).
     Transition {
         /// The node.
         node: NodeKey,
@@ -1035,6 +1036,22 @@ impl Mutation {
             | Mutation::EditProposal { .. }
             | Mutation::DiscardProposal {} => ChangeClass::State,
         }
+    }
+
+    // PRD: glossary, Structural change.
+    /// True for what happened in one journey, recorded there: a state change a journey patch
+    /// takes (progress, answers, dates, snoozes, overrides, ticks, notes, who does a node,
+    /// the journey's own name, owners and status, and a new identity an answer names). Not
+    /// a node field, even a journey's weight, whose values are the structure's own; not an
+    /// identity edit, which is the deployment's; and not a proposal's lifecycle.
+    #[must_use]
+    pub fn records_journey_state(&self) -> bool {
+        self.change_class() == ChangeClass::State
+            && !self.edits_a_proposal()
+            && !matches!(
+                self,
+                Mutation::SetNodeField { .. } | Mutation::EditIdentity { .. }
+            )
     }
 
     /// True for the mutations that edit a proposal rather than a domain; a proposal's own

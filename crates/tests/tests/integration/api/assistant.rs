@@ -117,10 +117,10 @@ mod in_process {
     /// turn answered; another user's conversation about the same journey is their own.
     #[tokio::test]
     async fn a_conversation_reads_back_as_kept_and_only_by_its_user() {
-        let complete = json!({ "journey": JOURNEY, "node": "n_kickoff", "transition": "complete",
-            "patch_id": "p_kickoff", "base_revision": 2 });
+        let complete = json!({ "journey": JOURNEY, "patch_id": "p_kickoff", "base_revision": 2,
+            "mutations": [{ "op": "transition", "node": "n_kickoff", "transition": "complete" }] });
         let provider = scripted(vec![
-            Step::call("transition_node", complete),
+            Step::call("update_journey_state", complete),
             Step::say("Kickoff is done."),
         ]);
         let world = with_assistant(&provider).await;
@@ -154,14 +154,14 @@ mod in_process {
     /// write with its consequences, the proposal by id.
     #[tokio::test]
     async fn a_turn_answers_its_writes_as_documented() {
-        let complete = json!({ "journey": JOURNEY, "node": "n_kickoff", "transition": "complete",
-            "patch_id": "p_kickoff", "base_revision": 2 });
+        let complete = json!({ "journey": JOURNEY, "patch_id": "p_kickoff", "base_revision": 2,
+            "mutations": [{ "op": "transition", "node": "n_kickoff", "transition": "complete" }] });
         let add = json!({ "op": "add_node", "node": { "key": "n_extra", "id": "extra",
             "kind": "action", "title": "An extra step" } });
-        let structure = json!({ "patch": { "id": "p_extra", "target": { "journey": JOURNEY },
-            "base_revision": 3, "mutations": [add] } });
+        let structure = json!({ "patch_id": "p_extra", "target": { "journey": JOURNEY },
+            "base_revision": 3, "mutations": [add] });
         let provider = scripted(vec![
-            Step::call("transition_node", complete),
+            Step::call("update_journey_state", complete),
             Step::call("apply_patch", structure),
             Step::say("Kickoff is done; the extra step is proposed."),
         ]);
@@ -324,9 +324,9 @@ mod in_process {
         provider: &ScriptedProvider,
         ann: &Transport,
     ) {
-        let structure = json!({ "patch": { "id": "p_bakeoff_structure",
+        let structure = json!({ "patch_id": "p_bakeoff_structure",
             "target": { "journey": "j_bakeoff" }, "base_revision": 1,
-            "mutations": proposed("bake-off", 1) },
+            "mutations": proposed("bake-off", 1),
             "note": "Structure a two-week bake-off between two options" });
         let read = json!({ "journey": "j_bakeoff" });
         provider.push([
@@ -378,8 +378,8 @@ mod in_process {
                 answer["value"] = json!({ "date": "2026-10-06" });
             }
         }
-        let answer = json!({ "patch": { "id": "p_up_front", "target": { "journey": JOURNEY },
-            "base_revision": 1, "deployment_revision": 1, "mutations": answers } });
+        let answer = json!({ "patch_id": "p_up_front", "target": { "journey": JOURNEY },
+            "base_revision": 1, "deployment_revision": 1, "mutations": answers });
         provider.push([
             Step::call("apply_patch", answer),
             Step::say("Answered. The decision meeting on the 6th leaves the work before it short."),
@@ -412,9 +412,11 @@ mod in_process {
 
     /// A provider that stops answering, after a write that stands.
     async fn time_out(world: &World, provider: &ScriptedProvider, ann: &Transport) {
-        let snooze = json!({ "journey": JOURNEY, "node": "n_access", "until": { "date":
-            "2026-10-05" }, "patch_id": "p_snooze_access", "base_revision": 2 });
-        provider.push([Step::call("snooze", snooze), Step::Hang]);
+        let snooze =
+            json!({ "op": "snooze", "node": "n_access", "until": { "date": "2026-10-05" } });
+        let snooze = json!({ "journey": JOURNEY, "patch_id": "p_snooze_access", "base_revision": 2,
+            "mutations": [snooze] });
+        provider.push([Step::call("update_journey_state", snooze), Step::Hang]);
         let said = json!({ "message": "Snooze the access request until Monday, then tell me \
             what is next." });
         let reply = post(ann, "/api/journeys/j_vendor_eval/assistant", &said).await;

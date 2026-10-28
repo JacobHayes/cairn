@@ -8,9 +8,10 @@ A route is authored on its draft. Conversation is the expected way to author one
 draft, the person reviews on the canvas, and publishing makes the next version.
 
 1. **Find or start the route.** `list_routes` shows the routes and whether a draft is open.
-   For a new route, choose a slug for it and call `open_draft` with `create` (its name and
-   description) and `base_revision` 0. For an existing route with no draft open, call
-   `open_draft` against its `revision`. `get_route` reads the draft (or a published
+   For a new route, choose a slug for it and send `apply_patch` to `{"route": "<slug>"}` at
+   `base_revision` 0 with `create_route` (its name and description) then `open_draft`
+   (`source` `edit`). For an existing route with no draft open, send `open_draft` alone
+   against its `revision`. `get_route` reads the draft (or a published
    `version`) with its roles, participation kinds, and a page of nodes.
 2. **Ask before you draft.** Learn the stages of the process, who takes part (roles such as
    an owner or a reviewer), what has to be decided up front, and which dates matter. Model:
@@ -35,9 +36,9 @@ draft, the person reviews on the canvas, and publishing makes the next version.
    that fills a role is exempt). A notice never blocks anything: add the missing edge, or
    tell the person it is intended.
 5. **Hand it over.** Tell the person what the proposal adds and ask them to review and
-   apply it. When they are happy with the draft, `publish_draft` makes it the next
-   version; journeys on older versions can then upgrade. `publish_draft` and `import_route`
-   list the same notices in their result.
+   apply it. When they are happy with the draft, `apply_patch` with `publish_draft`
+   makes it the next version; journeys on older versions can then upgrade. Publishing and
+   `import_route` list the same notices in their result.
 
 A route file can also be imported whole with `import_route` (YAML), and any version
 exported with `export_route`.

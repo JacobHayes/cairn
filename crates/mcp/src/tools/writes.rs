@@ -1,14 +1,14 @@
 //! The direct-write tools: each call is one patch (A17), named by a client-generated patch id
 //! so a lost response can be resubmitted safely (H5), against the base revision the agent
-//! read. A journey's state tools (answer, transition, snooze, assign, dates, overrides) are
-//! one mutation each; `apply_patch` takes any domain patch; the route tools open and publish
-//! a draft and import a route file; `manage_identity` writes the deployment.
+//! read. `update_journey_state` records what happened in one journey; `apply_patch` takes any
+//! domain patch, state and structure alike, so a mixed change stays one patch;
+//! `import_route` imports a route file; `manage_identity` writes the deployment's identities,
+//! reading the journeys a merge names
+//! (decisions/2026-10-28-direct-mcp-writes-are-patches-through-two-tools.md).
 
 use cairn_schema::{
-    AnswerValue, Date, Domain, Identity, IdentityKey, IdentitySet, JourneyId, KeyRefs, KindKey,
-    Lineage, Markdown, Mutation, Mutations, NodeKey, OverrideKind, ParticipationSource, Patch,
-    PatchId, PatchTarget, RecordedEnd, Revision, RouteFile, RouteId, SignedDays, SnoozeTarget,
-    Title, Transition, from_yaml,
+    Domain, Identity, IdentityKey, IdentitySet, JourneyId, Markdown, Mutation, Mutations, Patch,
+    PatchId, PatchTarget, Revision, RouteFile, from_yaml,
 };
 use cairn_service::{Call, DomainPatch};
 
@@ -17,119 +17,31 @@ use serde::Deserialize;
 use serde_json::Value;
 
 use super::WriteOutput;
-use crate::toolset::{
-    Spec, Writes, output, parse, schema, schema_citing_mutations, schema_with_mutation_sketch,
-};
+use crate::toolset::{Spec, Writes, output, parse, schema, schema_with_mutation_sketch};
 use crate::{ToolError, ToolSet};
 
 /// The direct-write tools.
 pub(crate) const SPECS: &[Spec] = &[
     Spec {
-        name: "answer_decision",
-        description: "Answer a decision. The result lists what it brought in, ruled out, \
-            unlocked, filled, or pinned.",
+        name: "update_journey_state",
+        description: "Record what happened in one journey, as one patch of ordered mutations: \
+            answers, transitions, notes, ticks, who does a node, pins and recorded dates, \
+            snoozes, overrides, the journey's name, owners and status, and a new identity an \
+            answer names. It never changes what the graph is: that is apply_patch or a \
+            proposal.",
         writes: Writes::Patch,
         destructive: true,
-        schema: schema::<AnswerDecision>,
-        output: schema::<WriteOutput>,
-    },
-    Spec {
-        name: "transition_node",
-        description: "Start, stop, complete, skip (with a reason), mark a group done (with a \
-            reason), or reopen a node, whatever it waits on. Completing without the evidence it \
-            needs takes a guard bypass in the same `apply_patch`.",
-        writes: Writes::Patch,
-        destructive: true,
-        schema: schema::<TransitionNode>,
-        output: schema::<WriteOutput>,
-    },
-    Spec {
-        name: "assign",
-        description: "Set who holds a participation kind on a node: a role or identities. \
-            Omit `source` to inherit again.",
-        writes: Writes::Patch,
-        destructive: true,
-        schema: schema::<Assign>,
-        output: schema::<WriteOutput>,
-    },
-    Spec {
-        name: "snooze",
-        description: "Set a node, or a container's whole subtree, aside until a date or \
-            until another node is done.",
-        writes: Writes::Patch,
-        destructive: true,
-        schema: schema::<Snooze>,
-        output: schema::<WriteOutput>,
-    },
-    Spec {
-        name: "unsnooze",
-        description: "Lift a node's own snooze.",
-        writes: Writes::Patch,
-        destructive: true,
-        schema: schema::<Unsnooze>,
-        output: schema::<WriteOutput>,
-    },
-    Spec {
-        name: "set_date",
-        description: "Pin, shift, or clear a node's date, or record an actual start or \
-            finish.",
-        writes: Writes::Patch,
-        destructive: true,
-        schema: schema::<SetDate>,
-        output: schema::<WriteOutput>,
-    },
-    Spec {
-        name: "override",
-        description: "Apply or remove an override, with a reason: force include, or keep \
-            under a skipped ancestor. A guard bypass is sent with the completion it covers, in \
-            `apply_patch`.",
-        writes: Writes::Patch,
-        destructive: true,
-        schema: schema::<OverrideNode>,
-        output: schema::<WriteOutput>,
-    },
-    Spec {
-        name: "resolve_date_conflict",
-        description: "Apply one resolution move a rejection or a node's dates listed, then \
-            the refused mutations, as one patch.",
-        writes: Writes::Patch,
-        destructive: true,
-        schema: schema_citing_mutations::<ResolveDateConflict>,
-        output: schema::<WriteOutput>,
-    },
-    Spec {
-        name: "create_journey",
-        description: "Create a journey, empty or from a published route version.",
-        writes: Writes::Patch,
-        destructive: false,
-        schema: schema::<CreateJourney>,
+        schema: || schema_with_mutation_sketch::<UpdateJourneyState>(&records_journey_state),
         output: schema::<WriteOutput>,
     },
     Spec {
         name: "apply_patch",
-        description: "Apply ordered mutations to a journey, a route draft, or the \
-            deployment, all or nothing: structure, notes, bulk edits, deletes. \
-            Draft a proposal instead when someone should review first.",
+        description: "Apply ordered mutations to a journey, a route's draft, or the \
+            deployment, all or nothing: any change, structure and state alike. Base revision \
+            0 creates the target. Draft a proposal instead when someone should review first.",
         writes: Writes::Patch,
         destructive: true,
         schema: || schema_with_mutation_sketch::<ApplyPatch>(&written_directly),
-        output: schema::<WriteOutput>,
-    },
-    Spec {
-        name: "open_draft",
-        description: "Open a route's draft for editing; with `create`, create the route \
-            first.",
-        writes: Writes::Patch,
-        destructive: false,
-        schema: schema::<OpenDraft>,
-        output: schema::<WriteOutput>,
-    },
-    Spec {
-        name: "publish_draft",
-        description: "Publish a route's draft as its next version.",
-        writes: Writes::Patch,
-        destructive: false,
-        schema: schema::<PublishDraft>,
         output: schema::<WriteOutput>,
     },
     Spec {
@@ -180,18 +92,8 @@ impl ToolSet {
         arguments: Value,
     ) -> Result<Option<DomainPatch>, ToolError> {
         let drafted = match name {
-            "answer_decision" => parse::<AnswerDecision>(arguments)?.patch(),
-            "transition_node" => parse::<TransitionNode>(arguments)?.patch(),
-            "assign" => parse::<Assign>(arguments)?.patch(),
-            "snooze" => parse::<Snooze>(arguments)?.patch(),
-            "unsnooze" => parse::<Unsnooze>(arguments)?.patch(),
-            "set_date" => parse::<SetDate>(arguments)?.patch(),
-            "override" => parse::<OverrideNode>(arguments)?.patch(),
-            "resolve_date_conflict" => parse::<ResolveDateConflict>(arguments)?.patch(),
-            "create_journey" => parse::<CreateJourney>(arguments)?.patch(),
+            "update_journey_state" => parse::<UpdateJourneyState>(arguments)?.patch(),
             "apply_patch" => parse::<ApplyPatch>(arguments)?.patch(),
-            "open_draft" => parse::<OpenDraft>(arguments)?.patch(),
-            "publish_draft" => parse::<PublishDraft>(arguments)?.patch(),
             "manage_identity" => self.identity_patch(parse(arguments)?).await,
             _ => return Ok(None),
         }?;
@@ -240,426 +142,15 @@ impl ToolSet {
             }
             IdentityChange::Delete { identity } => Mutation::DeleteIdentity { identity },
         };
-        let target = PatchTarget::Deployment;
-        domain_patch(
-            arguments.patch_id,
-            target,
-            arguments.base_revision,
-            None,
-            vec![mutation],
-            arguments.note,
-        )
-    }
-}
-
-/// A patch of `mutations`, in order, to `target` at `base_revision`.
-fn domain_patch(
-    id: PatchId,
-    target: PatchTarget,
-    base_revision: Revision,
-    deployment_revision: Option<Revision>,
-    mutations: Vec<Mutation>,
-    note: Option<Markdown>,
-) -> Result<DomainPatch, ToolError> {
-    let mutations = Mutations::new(mutations).map_err(|error| ToolError::Arguments {
-        path: String::new(),
-        message: error.to_string(),
-    })?;
-    let patch = Patch {
-        id,
-        target,
-        base_revision,
-        deployment_revision,
-        mutations,
-    };
-    DomainPatch::new(patch, note).map_err(ToolError::refused)
-}
-
-/// One mutation to a journey.
-fn journey_patch(
-    journey: JourneyId,
-    write: Write,
-    deployment_revision: Option<Revision>,
-    mutation: Mutation,
-) -> Result<DomainPatch, ToolError> {
-    let target = PatchTarget::Journey(journey);
-    domain_patch(
-        write.patch_id,
-        target,
-        write.base_revision,
-        deployment_revision,
-        vec![mutation],
-        write.note,
-    )
-}
-
-/// What every direct write carries besides its mutations.
-struct Write {
-    patch_id: PatchId,
-    base_revision: Revision,
-    note: Option<Markdown>,
-}
-
-/// The write `arguments` describe: they carry `patch_id`, `base_revision`, and `note`.
-macro_rules! write_of {
-    ($arguments:expr) => {
-        Write {
-            patch_id: $arguments.patch_id,
-            base_revision: $arguments.base_revision,
-            note: $arguments.note,
-        }
-    };
-}
-
-/// `answer_decision`.
-#[derive(Debug, Deserialize, JsonSchema)]
-#[serde(deny_unknown_fields)]
-pub(crate) struct AnswerDecision {
-    journey: JourneyId,
-    decision: NodeKey,
-    value: AnswerValue,
-    /// Markdown. It belongs to this answer alone: repeat the reason when a new answer
-    /// keeps it.
-    #[serde(default)]
-    rationale: Option<Markdown>,
-    /// Needed when the answer names identities.
-    #[serde(default)]
-    deployment_revision: Option<Revision>,
-    patch_id: PatchId,
-    base_revision: Revision,
-    #[serde(default)]
-    note: Option<Markdown>,
-}
-
-impl AnswerDecision {
-    fn patch(self) -> Result<DomainPatch, ToolError> {
-        let mutation = Mutation::Answer {
-            decision: self.decision,
-            value: self.value,
-            rationale: self.rationale,
+        let patch = Patch {
+            id: arguments.patch_id,
+            target: PatchTarget::Deployment,
+            base_revision: arguments.base_revision,
+            deployment_revision: None,
+            mutations: Mutations::new(vec![mutation])
+                .unwrap_or_else(|error| unreachable!("one mutation is a patch's worth: {error}")),
         };
-        journey_patch(
-            self.journey,
-            write_of!(self),
-            self.deployment_revision,
-            mutation,
-        )
-    }
-}
-
-/// `transition_node`.
-#[derive(Debug, Deserialize, JsonSchema)]
-#[serde(deny_unknown_fields)]
-pub(crate) struct TransitionNode {
-    journey: JourneyId,
-    node: NodeKey,
-    transition: Transition,
-    patch_id: PatchId,
-    base_revision: Revision,
-    #[serde(default)]
-    note: Option<Markdown>,
-}
-
-impl TransitionNode {
-    fn patch(self) -> Result<DomainPatch, ToolError> {
-        let mutation = Mutation::Transition {
-            node: self.node,
-            transition: self.transition,
-        };
-        journey_patch(self.journey, write_of!(self), None, mutation)
-    }
-}
-
-/// `assign`.
-#[derive(Debug, Deserialize, JsonSchema)]
-#[serde(deny_unknown_fields)]
-pub(crate) struct Assign {
-    journey: JourneyId,
-    node: NodeKey,
-    /// `owner`, or a kind the graph defines.
-    kind: KindKey,
-    /// A role key, or identity keys; absent clears it.
-    #[serde(default)]
-    source: Option<ParticipationSource<KeyRefs>>,
-    /// Needed when the source names identities.
-    #[serde(default)]
-    deployment_revision: Option<Revision>,
-    patch_id: PatchId,
-    base_revision: Revision,
-    #[serde(default)]
-    note: Option<Markdown>,
-}
-
-impl Assign {
-    fn patch(self) -> Result<DomainPatch, ToolError> {
-        let (node, kind) = (self.node, self.kind);
-        let mutation = match self.source {
-            Some(source) => Mutation::SetParticipation { node, kind, source },
-            None => Mutation::ClearParticipation { node, kind },
-        };
-        journey_patch(
-            self.journey,
-            write_of!(self),
-            self.deployment_revision,
-            mutation,
-        )
-    }
-}
-
-/// `snooze`.
-#[derive(Debug, Deserialize, JsonSchema)]
-#[serde(deny_unknown_fields)]
-pub(crate) struct Snooze {
-    journey: JourneyId,
-    node: NodeKey,
-    until: SnoozeTarget,
-    patch_id: PatchId,
-    base_revision: Revision,
-    #[serde(default)]
-    note: Option<Markdown>,
-}
-
-impl Snooze {
-    fn patch(self) -> Result<DomainPatch, ToolError> {
-        let mutation = Mutation::Snooze {
-            node: self.node,
-            until: self.until,
-        };
-        journey_patch(self.journey, write_of!(self), None, mutation)
-    }
-}
-
-/// `unsnooze`.
-#[derive(Debug, Deserialize, JsonSchema)]
-#[serde(deny_unknown_fields)]
-pub(crate) struct Unsnooze {
-    journey: JourneyId,
-    node: NodeKey,
-    patch_id: PatchId,
-    base_revision: Revision,
-    #[serde(default)]
-    note: Option<Markdown>,
-}
-
-impl Unsnooze {
-    fn patch(self) -> Result<DomainPatch, ToolError> {
-        let mutation = Mutation::Unsnooze { node: self.node };
-        journey_patch(self.journey, write_of!(self), None, mutation)
-    }
-}
-
-/// `set_date`.
-#[derive(Debug, Deserialize, JsonSchema)]
-#[serde(deny_unknown_fields)]
-pub(crate) struct SetDate {
-    journey: JourneyId,
-    node: NodeKey,
-    change: DateChange,
-    patch_id: PatchId,
-    base_revision: Revision,
-    #[serde(default)]
-    note: Option<Markdown>,
-}
-
-/// A change to a node's dates.
-#[derive(Debug, Deserialize, JsonSchema)]
-#[serde(rename_all = "snake_case", deny_unknown_fields)]
-pub(crate) enum DateChange {
-    // PRD: F2.
-    /// Pin it to a date.
-    Pin {
-        /// The date.
-        date: Date,
-    },
-    /// Move its pin by days, later when positive.
-    ShiftPin {
-        /// The days.
-        offset_days: SignedDays,
-    },
-    /// Clear its pin.
-    Unpin,
-    // PRD: F6.
-    /// Record when it actually started or finished.
-    Actual {
-        /// Its start or its finish.
-        end: RecordedEnd,
-        /// The date.
-        date: Date,
-    },
-}
-
-impl SetDate {
-    fn patch(self) -> Result<DomainPatch, ToolError> {
-        let node = self.node;
-        let mutation = match self.change {
-            DateChange::Pin { date } => Mutation::SetPin { node, date },
-            DateChange::ShiftPin { offset_days } => Mutation::ShiftPin { node, offset_days },
-            DateChange::Unpin => Mutation::ClearPin { node },
-            DateChange::Actual { end, date } => Mutation::SetRecordedDate { node, end, date },
-        };
-        journey_patch(self.journey, write_of!(self), None, mutation)
-    }
-}
-
-/// `override`.
-#[derive(Debug, Deserialize, JsonSchema)]
-#[serde(deny_unknown_fields)]
-pub(crate) struct OverrideNode {
-    journey: JourneyId,
-    node: NodeKey,
-    /// The override to apply, or the kind to remove.
-    change: OverrideChange,
-    patch_id: PatchId,
-    base_revision: Revision,
-    #[serde(default)]
-    note: Option<Markdown>,
-}
-
-/// An override applied or removed.
-#[derive(Debug, Deserialize, JsonSchema)]
-#[serde(rename_all = "snake_case", deny_unknown_fields)]
-pub(crate) enum OverrideChange {
-    /// Apply it, with its reason.
-    Apply(OverrideApplied),
-    /// Remove the override of this kind.
-    Remove(OverrideKind),
-}
-
-/// An override this tool applies. A guard bypass is sent with the completion it covers, in
-/// `apply_patch`: alone it covers nothing.
-#[derive(Debug, Deserialize, JsonSchema)]
-#[serde(rename_all = "snake_case", deny_unknown_fields)]
-pub(crate) enum OverrideApplied {
-    /// Treat the node as relevant despite its conditions.
-    ForceInclude {
-        /// Why.
-        reason: cairn_schema::Reason,
-    },
-    /// Exempt the node's subtree from an ancestor's skip.
-    Keep {
-        /// Why.
-        reason: cairn_schema::Reason,
-    },
-}
-
-impl From<OverrideApplied> for cairn_schema::Override {
-    fn from(applied: OverrideApplied) -> Self {
-        match applied {
-            OverrideApplied::ForceInclude { reason } => Self::ForceInclude { reason },
-            OverrideApplied::Keep { reason } => Self::Keep { reason },
-        }
-    }
-}
-
-impl OverrideNode {
-    fn patch(self) -> Result<DomainPatch, ToolError> {
-        let node = self.node;
-        let mutation = match self.change {
-            OverrideChange::Apply(applied) => Mutation::ApplyOverride {
-                node,
-                applied: applied.into(),
-            },
-            OverrideChange::Remove(kind) => Mutation::RemoveOverride { node, kind },
-        };
-        journey_patch(self.journey, write_of!(self), None, mutation)
-    }
-}
-
-/// `resolve_date_conflict`.
-#[derive(Debug, Deserialize, JsonSchema)]
-#[serde(deny_unknown_fields)]
-pub(crate) struct ResolveDateConflict {
-    journey: JourneyId,
-    /// One move, as the chain listed it.
-    resolution: Mutation,
-    /// The refused mutations, applied after the move.
-    #[serde(default)]
-    then: Vec<Mutation>,
-    /// Needed when the move or the mutations name identities.
-    #[serde(default)]
-    deployment_revision: Option<Revision>,
-    patch_id: PatchId,
-    base_revision: Revision,
-    #[serde(default)]
-    note: Option<Markdown>,
-}
-
-impl ResolveDateConflict {
-    fn patch(self) -> Result<DomainPatch, ToolError> {
-        // F5: the moves a chain lists
-        // (decisions/2026-10-06-chains-gain-answer-and-today-fixers-resolution-moves.md).
-        let move_kind = matches!(
-            self.resolution,
-            Mutation::ShiftPin { .. }
-                | Mutation::SetPin { .. }
-                | Mutation::ClearPin { .. }
-                | Mutation::Answer { .. }
-                | Mutation::SetNodeField { .. }
-                | Mutation::RemoveEdge { .. }
-        );
-        if !move_kind {
-            return Err(ToolError::Arguments {
-                path: "resolution.op".to_owned(),
-                message: "a resolution is one of the moves a chain lists: shift_pin, set_pin, \
-                          clear_pin, answer, set_node_field, or remove_edge"
-                    .to_owned(),
-            });
-        }
-        let mut mutations = vec![self.resolution];
-        mutations.extend(self.then);
-        let target = PatchTarget::Journey(self.journey);
-        let write = write_of!(self);
-        domain_patch(
-            write.patch_id,
-            target,
-            write.base_revision,
-            self.deployment_revision,
-            mutations,
-            write.note,
-        )
-    }
-}
-
-/// `create_journey`.
-#[derive(Debug, Deserialize, JsonSchema)]
-#[serde(deny_unknown_fields)]
-pub(crate) struct CreateJourney {
-    /// The new journey's id.
-    journey: JourneyId,
-    patch_id: PatchId,
-    name: Title,
-    #[serde(default)]
-    description: Option<Markdown>,
-    /// Identity keys; nobody by default, the creator included.
-    #[serde(default)]
-    owners: IdentitySet,
-    /// Needed when owners are named.
-    #[serde(default)]
-    deployment_revision: Option<Revision>,
-    /// A published route version; empty when absent.
-    #[serde(default)]
-    from: Option<Lineage>,
-    #[serde(default)]
-    note: Option<Markdown>,
-}
-
-impl CreateJourney {
-    fn patch(self) -> Result<DomainPatch, ToolError> {
-        let mutation = Mutation::CreateJourney {
-            name: self.name,
-            description: self.description,
-            owners: self.owners,
-            from: self.from,
-        };
-        let target = PatchTarget::Journey(self.journey);
-        domain_patch(
-            self.patch_id,
-            target,
-            Revision::NONE,
-            self.deployment_revision,
-            vec![mutation],
-            self.note,
-        )
+        DomainPatch::new(patch, arguments.note).map_err(ToolError::refused)
     }
 }
 
@@ -679,47 +170,107 @@ fn written_directly(op: &str) -> bool {
     !PROPOSAL_OPS.contains(&op)
 }
 
+/// The ops whose mutations record what happened in a journey
+/// ([`Mutation::records_journey_state`]): what `update_journey_state` lists and takes.
+const JOURNEY_STATE_OPS: [&str; 22] = [
+    "edit_journey",
+    "set_journey_status",
+    "set_participation",
+    "clear_participation",
+    "transition",
+    "answer",
+    "set_recorded_date",
+    "fill_role",
+    "clear_role_fill",
+    "set_pin",
+    "shift_pin",
+    "clear_pin",
+    "snooze",
+    "unsnooze",
+    "apply_override",
+    "remove_override",
+    "set_atomic",
+    "set_ticked",
+    "add_annotation",
+    "edit_annotation",
+    "remove_annotation",
+    "create_identity",
+];
+
+/// Whether `update_journey_state` takes the op `op`.
+fn records_journey_state(op: &str) -> bool {
+    JOURNEY_STATE_OPS.contains(&op)
+}
+
+/// `update_journey_state`.
+#[derive(Debug, Deserialize, JsonSchema)]
+#[serde(deny_unknown_fields)]
+pub(crate) struct UpdateJourneyState {
+    journey: JourneyId,
+    patch_id: PatchId,
+    base_revision: Revision,
+    /// Needed when the mutations name identities.
+    #[serde(default)]
+    deployment_revision: Option<Revision>,
+    #[serde(default)]
+    note: Option<Markdown>,
+    mutations: Mutations,
+}
+
+impl UpdateJourneyState {
+    fn patch(self) -> Result<DomainPatch, ToolError> {
+        refuse_proposal_ops("mutations", &self.mutations)?;
+        let found = self
+            .mutations
+            .as_slice()
+            .iter()
+            .position(|mutation| !mutation.records_journey_state());
+        if let Some(index) = found {
+            return Err(ToolError::Arguments {
+                path: format!("mutations[{index}].op"),
+                message: "update_journey_state records what happened in a journey; this op \
+                          changes what the graph is, a route, or the deployment: send it \
+                          with apply_patch, or draft a proposal"
+                    .to_owned(),
+            });
+        }
+        let patch = Patch {
+            id: self.patch_id,
+            target: PatchTarget::Journey(self.journey),
+            base_revision: self.base_revision,
+            deployment_revision: self.deployment_revision,
+            mutations: self.mutations,
+        };
+        DomainPatch::new(patch, self.note).map_err(ToolError::refused)
+    }
+}
+
 /// `apply_patch`.
 #[derive(Debug, Deserialize, JsonSchema)]
 #[serde(deny_unknown_fields)]
 pub(crate) struct ApplyPatch {
-    patch: DirectPatch,
-    #[serde(default)]
-    note: Option<Markdown>,
-}
-
-// PRD: A17.
-/// The patch: its id, its target, the base revision, and its mutations in order.
-#[derive(Debug, Deserialize, JsonSchema)]
-#[serde(deny_unknown_fields)]
-struct DirectPatch {
-    id: PatchId,
-    /// A domain; a proposal is written with the proposal tools.
+    /// `{"journey": id}`, `{"route": id}`, or `"deployment"`.
     target: Domain,
+    patch_id: PatchId,
     /// 0 creates the target.
     base_revision: Revision,
     /// Needed when a journey write names identities.
     #[serde(default)]
     deployment_revision: Option<Revision>,
+    #[serde(default)]
+    note: Option<Markdown>,
     mutations: Mutations,
 }
 
 impl ApplyPatch {
     fn patch(self) -> Result<DomainPatch, ToolError> {
-        let DirectPatch {
-            id,
-            target,
-            base_revision,
-            deployment_revision,
-            mutations,
-        } = self.patch;
-        refuse_proposal_ops("patch.mutations", &mutations)?;
+        refuse_proposal_ops("mutations", &self.mutations)?;
         let patch = Patch {
-            id,
-            target: target.into(),
-            base_revision,
-            deployment_revision,
-            mutations,
+            id: self.patch_id,
+            target: self.target.into(),
+            base_revision: self.base_revision,
+            deployment_revision: self.deployment_revision,
+            mutations: self.mutations,
         };
         DomainPatch::new(patch, self.note)
             .map_err(|_| unreachable!("a direct target is a domain, never a proposal"))
@@ -745,87 +296,6 @@ fn refuse_proposal_ops(at: &str, mutations: &Mutations) -> Result<(), ToolError>
         path: format!("{at}[{index}].op"),
         message: message.to_owned(),
     })
-}
-
-/// `open_draft`.
-#[derive(Debug, Deserialize, JsonSchema)]
-#[serde(deny_unknown_fields)]
-pub(crate) struct OpenDraft {
-    route: RouteId,
-    /// Create the route first, with this name and description (base revision 0).
-    #[serde(default)]
-    create: Option<NewRoute>,
-    patch_id: PatchId,
-    base_revision: Revision,
-    #[serde(default)]
-    note: Option<Markdown>,
-}
-
-/// A route to create.
-#[derive(Debug, Deserialize, JsonSchema)]
-#[serde(deny_unknown_fields)]
-pub(crate) struct NewRoute {
-    /// Its name.
-    name: Title,
-    /// What it is for.
-    #[serde(default)]
-    description: Option<Markdown>,
-    /// `process` (the default) or `segment`: a reusable piece that is inserted, never started.
-    #[serde(default)]
-    kind: cairn_schema::RouteKind,
-}
-
-impl OpenDraft {
-    fn patch(self) -> Result<DomainPatch, ToolError> {
-        let mut mutations: Vec<Mutation> = self
-            .create
-            .into_iter()
-            .map(|route| Mutation::CreateRoute {
-                name: route.name,
-                description: route.description,
-                kind: route.kind,
-            })
-            .collect();
-        mutations.push(Mutation::OpenDraft {
-            source: cairn_schema::DraftSource::Edit,
-        });
-        let write = write_of!(self);
-        let target = PatchTarget::Route(self.route);
-        domain_patch(
-            write.patch_id,
-            target,
-            write.base_revision,
-            None,
-            mutations,
-            write.note,
-        )
-    }
-}
-
-/// `publish_draft`.
-#[derive(Debug, Deserialize, JsonSchema)]
-#[serde(deny_unknown_fields)]
-pub(crate) struct PublishDraft {
-    route: RouteId,
-    patch_id: PatchId,
-    base_revision: Revision,
-    #[serde(default)]
-    note: Option<Markdown>,
-}
-
-impl PublishDraft {
-    fn patch(self) -> Result<DomainPatch, ToolError> {
-        let target = PatchTarget::Route(self.route);
-        let write = write_of!(self);
-        domain_patch(
-            write.patch_id,
-            target,
-            write.base_revision,
-            None,
-            vec![Mutation::PublishDraft {}],
-            write.note,
-        )
-    }
 }
 
 /// `import_route`.
@@ -893,15 +363,21 @@ mod tests {
     /// Every mutation, one of each op at least.
     const EVERY_MUTATION: &str = include_str!("../../../schema/tests/data/every_mutation.yaml");
 
-    /// What `apply_patch` lists is what it takes: an op is left out exactly when its
-    /// mutations change a proposal.
+    /// What each patch tool lists is what it takes: `apply_patch` leaves an op out exactly
+    /// when its mutations change a proposal, and `update_journey_state` lists exactly the ops
+    /// whose mutations record what happened in a journey.
     #[test]
-    fn apply_patch_lists_the_ops_it_takes() {
+    fn each_patch_tool_lists_the_ops_it_takes() {
         let patch: Patch = cairn_schema::from_yaml(EVERY_MUTATION).expect("every mutation");
         for mutation in patch.mutations.as_slice() {
             let op = serde_json::to_value(mutation).expect("a mutation")["op"].clone();
             let op = op.as_str().expect("an op");
             assert_eq!(written_directly(op), !mutation.edits_a_proposal(), "{op}");
+            assert_eq!(
+                records_journey_state(op),
+                mutation.records_journey_state(),
+                "{op}"
+            );
         }
     }
 }
