@@ -1,42 +1,38 @@
 // `mise run sweep`: the structural rules (e2e/invariants.ts, `checkpoint`) over every state of the
-// screenshot table at the widths where the layout can change: the viewport thresholds the CSS's
-// media queries name (read from the stylesheets, so a new one is swept with no edit here), each
-// one and a pixel either side, and a spread of widths between them where the container queries
-// switch and the content wraps. Light only (light and dark are held to the same layout by the
-// screenshot walk). A phone's states are visited below the desktop threshold and the desktop's
-// from it. The browser step runs it on every push (decisions/).
-import { readdirSync, readFileSync } from "node:fs";
-import { join } from "node:path";
-import { fileURLToPath } from "node:url";
-
+// screenshot table at the widths where the layout can change, chosen by rule: both sides of each
+// viewport switch the CSS's media queries name (read from the stylesheets, so a new one is swept
+// with no edit here: a min-width switches at its value, a max-width one pixel above it), the
+// narrowest phone and a wide screen, and one width for each container-query switch (the list's
+// rows at 420 and 760, the Summary at 960, the journey's scroll area at 560) that no other chosen
+// width reaches. Light only (light and dark are held to the same layout by the screenshot walk). A
+// phone's states are visited below the desktop threshold and the desktop's from it. The browser
+// step runs it on every push (decisions/).
 import { expect, test } from "./test.ts";
 
 import { DESKTOP_MIN } from "../src/shell/breakpoints.ts";
 import { checkpoint } from "./invariants.ts";
 import { walkStates } from "./screenshots.ts";
+import { mediaFeatures } from "./stylesheets.ts";
 
 /** The height every width is swept at. */
 const HEIGHT = 900;
 
-/** Widths between the thresholds: a phone, where the container queries of the list and Summary switch, a desktop, and a wide screen. */
-const BETWEEN = [390, 560, 810, 960, 1440, 2560];
+/** The narrowest phone and a wide screen, then the container-query switches the other widths do not reach: the Summary's (960) and the journey scroll area's (560). */
+const FIXED = [390, 560, 960, 2560];
 
-/** Every `min-width` and `max-width` a media query in the app's stylesheets names. */
+/** Every width at which a media query in the app's stylesheets switches: a `min-width` at its value, a `max-width` one above it. */
 function thresholds(): number[] {
-  const files = ["../../../design", "../src"].flatMap((root) => {
-    const base = fileURLToPath(new URL(root, import.meta.url));
-    return readdirSync(base, { recursive: true, encoding: "utf8" }).filter((each) => each.endsWith(".css")).map((each) => join(base, each));
-  });
-  const found = new Set<number>();
-  for (const file of files) {
-    for (const match of readFileSync(file, "utf8").matchAll(/@media[^{]*\((?:min|max)-width:\s*(\d+)px\)/g)) {
-      found.add(Number(match[1]));
-    }
-  }
-  return [...found];
+  return [
+    ...new Set(
+      mediaFeatures().flatMap(({ feature }) => {
+        const match = /^(min|max)-width: (\d+)px$/.exec(feature);
+        return match === null ? [] : [Number(match[2]) + (match[1] === "max" ? 1 : 0)];
+      }),
+    ),
+  ];
 }
 
-const WIDTHS = [...new Set([...thresholds().flatMap((width) => [width - 1, width, width + 1]), ...BETWEEN])].sort((a, b) => a - b);
+const WIDTHS = [...new Set([...thresholds().flatMap((width) => [width - 1, width]), ...FIXED])].sort((a, b) => a - b);
 
 for (const width of WIDTHS) {
   const phone = width < DESKTOP_MIN;
