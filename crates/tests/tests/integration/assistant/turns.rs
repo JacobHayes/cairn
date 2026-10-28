@@ -1056,3 +1056,25 @@ async fn provider_usage_and_refusals_are_counted() {
     assert!(has("replied", "none"), "{ended:?}");
     assert!(has("provider_failed", "4xx"), "{ended:?}");
 }
+
+/// I4: the system prompt names every workflow with what it is for and leaves its steps to
+/// `get_workflow`, the same text on every request so a provider can cache it.
+#[tokio::test]
+async fn the_system_prompt_names_every_workflow_and_stays_the_same() {
+    let world = World::new();
+    let lead = user("u_lead");
+    world.vendor_journey(&lead).await;
+    world.script([Step::say("Hello."), Step::say("Hello again.")]);
+    world.turn(&lead, &vendor_target(), "Hello?").await;
+    world.turn(&lead, &vendor_target(), "Still there?").await;
+    let exchanges = world.provider.exchanges();
+    let [first, second] = exchanges.as_slice() else {
+        panic!("{} exchanges", exchanges.len());
+    };
+    assert_eq!(first.system, second.system);
+    for workflow in cairn_mcp::instructions::workflows() {
+        let named = format!("{}: {}", workflow.name, workflow.description);
+        assert!(first.system.contains(&named), "{named}");
+        assert!(!first.system.contains(workflow.text), "{}", workflow.name);
+    }
+}

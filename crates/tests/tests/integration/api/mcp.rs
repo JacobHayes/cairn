@@ -34,6 +34,7 @@ mod mcp_in_process {
         proposals(&agent, revision).await;
         routes(&agent).await;
         identities(&agent).await;
+        workflows(&agent).await;
         let empty = json!({ "target": { "journey": "j_blank" }, "patch_id": "p_blank",
             "base_revision": 0, "mutations": [{ "op": "create_journey", "name": "A blank journey" }] });
         let created = agent.ok("apply_patch", empty).await;
@@ -453,6 +454,38 @@ mod mcp_in_process {
             None,
             "it is broken down"
         );
+    }
+
+    /// I4: every workflow is read through `get_workflow` as it ships, the text its prompt
+    /// serves too, and the tool's listing names exactly the workflows, each with what it is
+    /// for; a name it does not list is refused.
+    async fn workflows(agent: &Agent) {
+        let tools = agent.tools().await;
+        let tool = tools
+            .iter()
+            .find(|tool| tool.name == "get_workflow")
+            .unwrap();
+        let listed = serde_json::to_value(&tool.input_schema).unwrap();
+        let name = &listed["properties"]["name"];
+        let workflows = instructions::workflows();
+        let names: Vec<&str> = workflows.iter().map(|workflow| workflow.name).collect();
+        assert_eq!(name["enum"], json!(names));
+        for workflow in &workflows {
+            let purpose = format!("{}: {}", workflow.name, workflow.description);
+            assert!(
+                name["description"].as_str().unwrap().contains(&purpose),
+                "{purpose}"
+            );
+        }
+        for workflow in &workflows {
+            let read = agent
+                .ok("get_workflow", json!({ "name": workflow.name }))
+                .await;
+            assert_eq!(read["text"], workflow.text, "{}", workflow.name);
+        }
+        let unknown = json!({ "name": "no-such-workflow" });
+        let refused = agent.refused("get_workflow", unknown).await;
+        assert_eq!(refused["path"], "name", "{refused}");
     }
 
     /// I4: the guide arrives as the session's instructions, and each workflow is a prompt.

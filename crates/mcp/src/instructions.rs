@@ -4,8 +4,9 @@
 //! as a prompt, so a connected agent has them with no setup; the same files are published
 //! as the skill.
 
-/// One workflow: its prompt name, what it is for, and its text.
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+/// One workflow: its prompt name, what it is for, and its text, as `get_workflow` answers it
+/// and its prompt serves it.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, serde::Serialize, schemars::JsonSchema)]
 pub struct Workflow {
     /// The prompt's name: the file's name without `.md`.
     pub name: &'static str,

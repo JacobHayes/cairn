@@ -1,5 +1,5 @@
 //! The store-backed read tools: the route and journey indexes, a route's graph and its
-//! file, a proposal under review, search, and history.
+//! file, a proposal under review, search, and history; and the shipped workflows.
 
 use std::collections::{BTreeMap, BTreeSet};
 
@@ -14,9 +14,10 @@ use cairn_service::{Call, ProposalListing, ProposalReview, StaleBase};
 use cairn_store::{JourneyQuery, PageSize, ProposalCursor, SearchHit, SearchQuery};
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
-use serde_json::Value;
+use serde_json::{Map, Value, json};
 
 use super::{Cut, Paged, page};
+use crate::instructions::{self, Workflow};
 use crate::toolset::{Spec, Writes, output, parse, schema};
 use crate::{ToolError, ToolSet};
 
@@ -102,6 +103,15 @@ pub(crate) const SPECS: &[Spec] = &[
         schema: schema::<GetHistory>,
         output: schema::<HistoryOutput>,
     },
+    Spec {
+        name: "get_workflow",
+        description: "A workflow: the steps for one kind of job, by name. Read the one that \
+            fits before you do its job.",
+        writes: Writes::Nothing,
+        destructive: false,
+        schema: workflow_schema,
+        output: schema::<Workflow>,
+    },
 ];
 
 impl ToolSet {
@@ -122,6 +132,7 @@ impl ToolSet {
             "get_proposal" => output(self.get_proposal(call, parse(arguments)?).await),
             "search" => output(self.search(parse(arguments)?).await),
             "get_history" => output(self.get_history(parse(arguments)?).await),
+            "get_workflow" => output(workflow(parse(arguments)?)),
             _ => Err(ToolError::UnknownTool {
                 name: name.to_owned(),
             }),
@@ -887,4 +898,44 @@ impl ToolSet {
             next: history.next,
         })
     }
+}
+
+/// `get_workflow`.
+#[derive(Debug, Deserialize, JsonSchema)]
+#[serde(deny_unknown_fields)]
+struct GetWorkflow {
+    /// The workflow.
+    name: String,
+}
+
+// PRD: I4.
+/// `get_workflow`'s arguments: `name` is one of the shipped workflows, each with what it is
+/// for, from the workflows themselves.
+fn workflow_schema() -> Map<String, Value> {
+    let mut listed = schema::<GetWorkflow>();
+    let workflows = instructions::workflows();
+    let names: Vec<&str> = workflows.iter().map(|workflow| workflow.name).collect();
+    let purposes: Vec<String> = workflows
+        .iter()
+        .map(|workflow| format!("{}: {}", workflow.name, workflow.description))
+        .collect();
+    let Some(Value::Object(properties)) = listed.get_mut("properties") else {
+        unreachable!("an arguments type's schema has properties");
+    };
+    let name = json!({ "type": "string", "enum": names, "description": purposes.join("\n") });
+    properties.insert("name".to_owned(), name);
+    listed
+}
+
+// PRD: I4.
+/// The workflow `name`, as its prompt serves it.
+/// The workflow `name`, as its prompt serves it.
+fn workflow(GetWorkflow { name }: GetWorkflow) -> Result<Workflow, ToolError> {
+    let found = instructions::workflows()
+        .into_iter()
+        .find(|workflow| workflow.name == name);
+    found.ok_or_else(|| ToolError::Arguments {
+        path: "name".to_owned(),
+        message: format!("no workflow is named {name}"),
+    })
 }

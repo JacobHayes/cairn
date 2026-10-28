@@ -20,8 +20,8 @@ capabilities; every write records you and that user.
    overview with no node list: the answers in effect, counts, the top of the ranked acting
    frontier, open decisions by rank, placeholders needing breakdown, unassigned items, and
    shortfalls (each list is the top few; `counts` has the totals). Scope it with `subtree`
-   on a large journey. It says when completing the
-   journey is suggested; completing it is the person's call.
+   on a large journey. It says when completing the journey is suggested; completing it is
+   the person's call.
 2. **Look closer only where needed.** `list_nodes` pages nodes in rank order: every node,
    or with `filters` those that need something (`next_up` is the acting frontier,
    `decisions_needed`, `blocked`, `stale`, and the others its schema lists). Scope it with
@@ -33,8 +33,9 @@ capabilities; every write records you and that user.
    transitions, notes, ticks, dates, snoozes, overrides, who does a node); `apply_patch`
    takes anything on any target (structure, routes, the deployment, or a mix).
 4. **Offer to walk open decisions.** Whenever a journey has open decisions (you just
-   created it, or you are back at it later), offer to walk them with the person
-   (walk-decisions): they gate what depends on them.
+   created it, or you are back at it later), offer to walk them with the person: they gate
+   what depends on them. Before a job a workflow covers, like this one, read it with
+   `get_workflow`.
 5. **Report consequences.** A write answers what it newly caused (nodes that went stale,
    shortfalls, relevance changes, and finished work that may not apply because the decision
    its relevance reads is unanswered). Tell the person what changed, not just that it worked.
@@ -47,10 +48,9 @@ capabilities; every write records you and that user.
   `get_node`'s) `revision`, or the `revision` your last write there answered.
 - **`over` or `already_applied` in an answer: read again** (`get_snapshot` or `get_node`)
   before the next write. `over` means the write landed although the revision had moved,
-  and names what others changed; your view is behind, and the answer's revision includes
-  changes you have not seen.
+  and names what others changed; the answer's revision includes changes you have not seen.
 - **No answer (a lost response): resubmit the same call with the same `patch_id`.** A write
-  that landed answers `already_applied` from its receipt and is never applied twice.
+  that landed answers `already_applied` and is never applied twice.
 - **Refused as `stale`**: what moved touches what you change. Read again, check the change still
   makes sense, and write against the new revision with a new `patch_id`.
 - **Rejected**: every violation is listed with its path; fix them all at once, nothing was
@@ -268,7 +268,7 @@ it declares no final milestone or default owner. The insert-segment workflow has
 
 ## Workflows
 
-Each workflow is also served as an MCP prompt by its name.
+Read one with `get_workflow`; each is also served as an MCP prompt by its name.
 
 - [author-route](workflows/author-route.md): author or revise a route in conversation.
 - [insert-segment](workflows/insert-segment.md): reuse a segment by proposing its insertion.

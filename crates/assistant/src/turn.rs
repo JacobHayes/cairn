@@ -520,9 +520,10 @@ fn tool_specs() -> Vec<ToolSpec> {
 }
 
 /// The system prompt, the same on every request (so a provider can cache it): the write
-/// policy, the shipped guide and workflows (I4, I5: the same instructions as external
-/// agents). Who the assistant works for and on what, and the target as read, are
-/// [`turn_context`], which goes after it.
+/// policy, the shipped guide, and the workflows by name and purpose, each read with
+/// `get_workflow` when its job comes up (I4, I5: the same instructions as external agents).
+/// Who the assistant works for and on what, and the target as read, are [`turn_context`],
+/// which goes after it.
 fn system() -> String {
     let mut refused: Vec<&str> = Vec::new();
     for definition in ToolSet::definitions() {
@@ -548,15 +549,12 @@ fn system() -> String {
     }
     let _ = write!(
         prompt,
-        "\n# Guide\n\n{guide}\n\n# Workflows\n",
+        "\n# Guide\n\n{guide}\n\n# Workflows\n\nBefore a job one of these covers, read \
+         it with get_workflow:\n\n",
         guide = instructions::guide()
     );
     for workflow in instructions::workflows() {
-        let _ = write!(
-            prompt,
-            "\n## {} ({})\n\n{}\n",
-            workflow.name, workflow.description, workflow.text
-        );
+        let _ = writeln!(prompt, "- {}: {}", workflow.name, workflow.description);
     }
     prompt
 }
