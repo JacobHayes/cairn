@@ -147,8 +147,9 @@ it is large or ambiguous enough that the person should see it whole before it la
 no undo, and a direct write has no cap on the nodes it touches. A proposal has an id you choose (`pr_` and a slug), its
 own editing revision, and the destination revision it was drafted against. Review it with
 `get_proposal` and `review`; a person applies it with `apply_proposal`. Upgrades, saving a
-journey as a route, and re-linking are always proposals (`upgrade`, `save_as_route`,
-`relink`). A proposal you lost the id of is found again with `list_proposals` (the ones
+journey as a route, and re-linking are always proposals Cairn drafts: `create_proposal` with
+`upgrade` (`journey`, `to`), `save_as_route` (`journey`, `route`, `name`) or `relink`
+(`journey`, `to`) in place of a destination and draft. A proposal you lost the id of is found again with `list_proposals` (the ones
 under a destination, the ones waiting on the caller, or the ones that would create a journey
 or route); a proposal stays listed until it is applied or discarded.
 
@@ -216,7 +217,7 @@ needs) is one patch, one revision.
   (`source` `edit`) at base revision 0; an existing one opens its draft with `open_draft`
   against its revision, and `publish_draft` makes the draft its next version. Also
   `edit_route`, `set_route_retired` (hides it from new journeys), and `discard_draft`.
-- **Lineage:** `upgrade` and `relink` go only in a proposal, as Cairn drafts them.
+- **Lineage:** the `upgrade` and `relink` ops go only in a proposal, as Cairn drafts them.
   `set_provenance` to `local` keeps a node an upgrade orphaned as the journey's own;
   `mark_local_edit` with `marked` false clears a local-edit marker.
 
@@ -288,9 +289,8 @@ Each workflow is also served as an MCP prompt by its name.
 | Find things | `list_identities`, `list_journeys`, `list_routes`, `list_proposals`, `get_route`, `search` |
 | Record what happened | `update_journey_state` |
 | Change anything else | `apply_patch` (structure, a new journey, routes and their drafts, the deployment) |
-| Propose a change | `create_proposal`, `list_proposals`, `get_proposal`, `edit_proposal`, `apply_proposal` |
+| Propose a change, or an upgrade, save as route or re-link | `create_proposal`, `list_proposals`, `get_proposal`, `edit_proposal`, `apply_proposal` |
 | Route files | `import_route`, `export_route` |
-| Lineage | `upgrade`, `save_as_route`, `relink` |
 | People and teams | `manage_identity` (create, edit, merge, delete) |
 
 Lists that can grow come a page at a time: pass the `next` you were given back as the

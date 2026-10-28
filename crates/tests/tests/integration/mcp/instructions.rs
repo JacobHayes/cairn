@@ -150,18 +150,12 @@ const COVERAGE: &[(&str, &[&str])] = &[
         &["list_identities", "list_journeys", "manage_identity"],
     ),
     ("route import/export", &["import_route", "export_route"]),
-    ("save as route", &["save_as_route"]),
-    ("re-link", &["relink"]),
-    ("upgrade", &["upgrade"]),
+    ("save as route", &["create_proposal"]),
+    ("re-link", &["create_proposal"]),
+    ("upgrade", &["create_proposal"]),
     (
         "segments through the route tools (filtered by kind), insert a segment, upgrade an insertion, save as segment, and link an insertion",
-        &[
-            "list_routes",
-            "create_proposal",
-            "upgrade",
-            "save_as_route",
-            "relink",
-        ],
+        &["list_routes", "create_proposal"],
     ),
     ("search", &["search"]),
 ];

@@ -21,9 +21,11 @@ use crate::{ToolError, ToolSet};
 pub(crate) const SPECS: &[Spec] = &[
     Spec {
         name: "create_proposal",
-        description: "Draft a proposal for someone to review: ordered mutations, under an id \
-            you choose. A destination that does not exist yet is created at \
-            revision 0.",
+        description: "Draft a proposal for someone to review, under an id you choose: your own \
+            ordered mutations to a destination (one that does not exist yet is created at \
+            revision 0), or one Cairn drafts: upgrading a journey to a newer version of its \
+            route, saving a journey's structure as a new route, or linking a journey to a \
+            published route version. Name exactly one.",
         writes: Writes::Proposal,
         destructive: false,
         schema: schema_citing_mutations::<CreateProposal>,
@@ -45,31 +47,6 @@ pub(crate) const SPECS: &[Spec] = &[
         destructive: true,
         schema: schema::<ApplyProposal>,
         output: schema::<WriteOutput>,
-    },
-    Spec {
-        name: "upgrade",
-        description: "Draft upgrading a journey to a newer version of its route, as a \
-            proposal.",
-        writes: Writes::Proposal,
-        destructive: false,
-        schema: schema::<Upgrade>,
-        output: schema::<ProposalOutput>,
-    },
-    Spec {
-        name: "save_as_route",
-        description: "Draft saving a journey's structure as a new route, as a proposal.",
-        writes: Writes::Proposal,
-        destructive: false,
-        schema: schema::<SaveAsRoute>,
-        output: schema::<ProposalOutput>,
-    },
-    Spec {
-        name: "relink",
-        description: "Draft linking a journey to a published route version, as a proposal.",
-        writes: Writes::Proposal,
-        destructive: false,
-        schema: schema::<Relink>,
-        output: schema::<ProposalOutput>,
     },
 ];
 
@@ -115,9 +92,6 @@ impl ToolSet {
                 let discards = matches!(edit.change, ProposalChange::Discard);
                 (edit.proposal, discards)
             }
-            "upgrade" => (parse::<Upgrade>(arguments).ok()?.proposal, false),
-            "save_as_route" => (parse::<SaveAsRoute>(arguments).ok()?.proposal, false),
-            "relink" => (parse::<Relink>(arguments).ok()?.proposal, false),
             _ => return None,
         };
         Some(ProposalCall { proposal, discards })
@@ -134,30 +108,49 @@ impl ToolSet {
             "create_proposal" => output(self.create_proposal(call, parse(arguments)?).await),
             "edit_proposal" => output(self.edit_proposal(call, parse(arguments)?).await),
             "apply_proposal" => output(self.apply_proposal(call, parse(arguments)?).await),
-            "upgrade" => output(self.upgrade(call, parse(arguments)?).await),
-            "save_as_route" => output(self.save_as_route(call, parse(arguments)?).await),
-            "relink" => output(self.relink(call, parse(arguments)?).await),
             _ => Err(ToolError::UnknownTool {
                 name: name.to_owned(),
             }),
         }
     }
 
+    // PRD: I6, B7, B8, B9.
     async fn create_proposal(
         &self,
         call: &Call,
         arguments: CreateProposal,
     ) -> Result<ProposalOutput, ToolError> {
-        let written = self
-            .service
-            .create_proposal(
-                call,
-                arguments.patch_id,
-                &arguments.destination,
-                &arguments.proposal,
-                arguments.draft,
-            )
-            .await?;
+        let (proposal, patch_id, content) = arguments.content()?;
+        let written = match content {
+            ProposalContent::Draft { destination, draft } => {
+                let create =
+                    self.service
+                        .create_proposal(call, patch_id, &destination, &proposal, draft);
+                create.await?
+            }
+            ProposalContent::Upgrade(UpgradeTo { journey, to }) => {
+                let upgrade = self
+                    .service
+                    .propose_upgrade(call, patch_id, &proposal, &journey, to);
+                upgrade.await?
+            }
+            ProposalContent::SaveAsRoute(SaveAs {
+                journey,
+                route,
+                name,
+            }) => {
+                let save = self
+                    .service
+                    .propose_save_as_route(call, patch_id, &proposal, &journey, &route, &name);
+                save.await?
+            }
+            ProposalContent::Relink(RelinkTo { journey, to }) => {
+                let relink = self
+                    .service
+                    .propose_relink(call, patch_id, &proposal, &journey, &to);
+                relink.await?
+            }
+        };
         Ok(written.into())
     }
 
@@ -216,53 +209,6 @@ impl ToolSet {
                 id,
                 arguments.reviewed_revision,
                 arguments.note,
-            )
-            .await?;
-        Ok(written.into())
-    }
-
-    async fn upgrade(&self, call: &Call, arguments: Upgrade) -> Result<ProposalOutput, ToolError> {
-        let written = self
-            .service
-            .propose_upgrade(
-                call,
-                arguments.patch_id,
-                &arguments.proposal,
-                &arguments.journey,
-                arguments.to,
-            )
-            .await?;
-        Ok(written.into())
-    }
-
-    async fn save_as_route(
-        &self,
-        call: &Call,
-        arguments: SaveAsRoute,
-    ) -> Result<ProposalOutput, ToolError> {
-        let written = self
-            .service
-            .propose_save_as_route(
-                call,
-                arguments.patch_id,
-                &arguments.proposal,
-                &arguments.journey,
-                &arguments.route,
-                &arguments.name,
-            )
-            .await?;
-        Ok(written.into())
-    }
-
-    async fn relink(&self, call: &Call, arguments: Relink) -> Result<ProposalOutput, ToolError> {
-        let written = self
-            .service
-            .propose_relink(
-                call,
-                arguments.patch_id,
-                &arguments.proposal,
-                &arguments.journey,
-                &arguments.to,
             )
             .await?;
         Ok(written.into())
@@ -356,18 +302,131 @@ impl From<ProposalWritten> for ProposalOutput {
     }
 }
 
-/// `create_proposal`.
+/// `create_proposal`: exactly one content, a draft of your own (`destination` with `draft`)
+/// or one Cairn drafts (`upgrade`, `save_as_route`, or `relink`).
 #[derive(Debug, Deserialize, JsonSchema)]
 #[serde(deny_unknown_fields)]
+#[schemars(extend("oneOf" = [
+    { "required": ["destination", "draft"] },
+    { "required": ["upgrade"] },
+    { "required": ["save_as_route"] },
+    { "required": ["relink"] },
+]), extend("dependentRequired" = { "destination": ["draft"], "draft": ["destination"] }))]
 pub struct CreateProposal {
     /// A new id for the proposal.
     pub proposal: ProposalId,
-    /// `{"journey": id}`, `{"route": id}`, or `"deployment"`.
-    pub destination: Domain,
-    /// Title, optional description, the destination revision (0 to create it), and the
-    /// mutations in order.
-    pub draft: ProposalDraft,
     pub patch_id: PatchId,
+    /// With `draft`: `{"journey": id}`, `{"route": id}`, or `"deployment"`.
+    #[serde(default, deserialize_with = "named")]
+    pub destination: Option<Domain>,
+    /// With `destination`: title, optional description, the destination revision (0 to
+    /// create it), and the mutations in order.
+    #[serde(default, deserialize_with = "named")]
+    pub draft: Option<ProposalDraft>,
+    /// Upgrading a journey to a newer version of its route.
+    #[serde(default, deserialize_with = "named")]
+    pub upgrade: Option<UpgradeTo>,
+    /// Saving a journey's structure as a new route.
+    #[serde(default, deserialize_with = "named")]
+    pub save_as_route: Option<SaveAs>,
+    /// Linking a journey to a published route version.
+    #[serde(default, deserialize_with = "named")]
+    pub relink: Option<RelinkTo>,
+}
+
+/// A content argument that is named: present with a value. A null is refused at its path,
+/// as the listed schema refuses it, rather than read as absent.
+fn named<'de, D, T>(deserializer: D) -> Result<Option<T>, D::Error>
+where
+    D: serde::Deserializer<'de>,
+    T: Deserialize<'de>,
+{
+    T::deserialize(deserializer).map(Some)
+}
+
+/// What a proposal holds: one content.
+enum ProposalContent {
+    Draft {
+        destination: Domain,
+        draft: ProposalDraft,
+    },
+    Upgrade(UpgradeTo),
+    SaveAsRoute(SaveAs),
+    Relink(RelinkTo),
+}
+
+impl CreateProposal {
+    /// A proposal of `draft` to `destination`.
+    #[must_use]
+    pub fn drafted(
+        proposal: ProposalId,
+        patch_id: PatchId,
+        destination: Domain,
+        draft: ProposalDraft,
+    ) -> Self {
+        Self {
+            proposal,
+            patch_id,
+            destination: Some(destination),
+            draft: Some(draft),
+            upgrade: None,
+            save_as_route: None,
+            relink: None,
+        }
+    }
+
+    /// The proposal, the patch id, and its one content; refused at the argument that makes
+    /// it none or more than one.
+    fn content(self) -> Result<(ProposalId, PatchId, ProposalContent), ToolError> {
+        let own = if self.destination.is_some() {
+            Some("destination")
+        } else {
+            self.draft.as_ref().map(|_| "draft")
+        };
+        let kinds: Vec<&str> = [
+            own,
+            self.upgrade.as_ref().map(|_| "upgrade"),
+            self.save_as_route.as_ref().map(|_| "save_as_route"),
+            self.relink.as_ref().map(|_| "relink"),
+        ]
+        .into_iter()
+        .flatten()
+        .collect();
+        if kinds.len() != 1 {
+            return Err(ToolError::Arguments {
+                // The second content named, or the whole call when it names none.
+                path: kinds.get(1).copied().unwrap_or_default().to_owned(),
+                message: "name exactly one content: destination with draft, upgrade, \
+                    save_as_route, or relink"
+                    .to_owned(),
+            });
+        }
+        let content = match (
+            self.destination,
+            self.draft,
+            self.upgrade,
+            self.save_as_route,
+            self.relink,
+        ) {
+            (Some(destination), Some(draft), ..) => ProposalContent::Draft { destination, draft },
+            (Some(_), None, ..) | (None, Some(_), ..) => {
+                let missing = if own == Some("destination") {
+                    "draft"
+                } else {
+                    "destination"
+                };
+                return Err(ToolError::Arguments {
+                    path: missing.to_owned(),
+                    message: "a draft of your own names both destination and draft".to_owned(),
+                });
+            }
+            (None, None, Some(upgrade), ..) => ProposalContent::Upgrade(upgrade),
+            (None, None, None, Some(save), _) => ProposalContent::SaveAsRoute(save),
+            (None, None, None, None, Some(relink)) => ProposalContent::Relink(relink),
+            (None, None, None, None, None) => unreachable!("one content was named"),
+        };
+        Ok((self.proposal, self.patch_id, content))
+    }
 }
 
 /// `edit_proposal`.
@@ -410,41 +469,35 @@ pub(crate) struct ApplyProposal {
     note: Option<Markdown>,
 }
 
-/// `upgrade`.
+// PRD: B7.
+/// A journey's upgrade to a newer version of its route.
 #[derive(Debug, Deserialize, JsonSchema)]
 #[serde(deny_unknown_fields)]
-pub(crate) struct Upgrade {
+pub struct UpgradeTo {
     journey: JourneyId,
     /// The route version to upgrade to.
     to: VersionNumber,
-    /// A new id for the proposal.
-    proposal: ProposalId,
-    patch_id: PatchId,
 }
 
-/// `save_as_route`.
+// PRD: B8.
+/// A journey's structure saved as a new route.
 #[derive(Debug, Deserialize, JsonSchema)]
 #[serde(deny_unknown_fields)]
-pub(crate) struct SaveAsRoute {
+pub struct SaveAs {
     /// The journey whose structure to save.
     journey: JourneyId,
     /// The new route's id.
     route: RouteId,
     /// The new route's name.
     name: Title,
-    /// A new id for the proposal.
-    proposal: ProposalId,
-    patch_id: PatchId,
 }
 
-/// `relink`.
+// PRD: B9.
+/// A journey linked to a published route version.
 #[derive(Debug, Deserialize, JsonSchema)]
 #[serde(deny_unknown_fields)]
-pub(crate) struct Relink {
+pub struct RelinkTo {
     journey: JourneyId,
     /// The route version to link to.
     to: Lineage,
-    /// A new id for the proposal.
-    proposal: ProposalId,
-    patch_id: PatchId,
 }

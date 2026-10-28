@@ -291,20 +291,27 @@ pub async fn run(
         Decision::Proposal => {
             let call = ToolSet::proposal_call(name, &arguments);
             let answer = tools.call(actor, name, arguments).await;
-            let action = answer.as_ref().ok().and_then(|output| {
-                let ProposalCall { proposal, discards } = call?;
+            // A proposal tool that answered took its arguments and answered its own output:
+            // the action it made is always recorded.
+            let action = answer.as_ref().ok().map(|output| {
+                let Some(ProposalCall { proposal, discards }) = call else {
+                    unreachable!("{name} answered, so its arguments parsed");
+                };
                 let tool = name.to_owned();
-                Some(if discards {
+                if discards {
                     Action::Discarded { tool, proposal }
                 } else {
-                    let output: ProposalOutput = serde_json::from_value(output.clone()).ok()?;
+                    let output: ProposalOutput = match serde_json::from_value(output.clone()) {
+                        Ok(output) => output,
+                        Err(error) => unreachable!("{name} answers a proposal: {error}"),
+                    };
                     Action::Proposed {
                         tool,
                         proposal,
                         destination: output.destination().clone(),
                         because: Because::Asked,
                     }
-                })
+                }
             });
             Outcome { answer, action }
         }
@@ -338,12 +345,12 @@ async fn propose(
     let mutations = patch.mutations.as_slice().to_vec();
     let answer = match draft(name, drafted.note(), patch.base_revision, mutations) {
         Ok(draft) => {
-            let create = CreateProposal {
-                proposal: proposal.clone(),
-                destination: patch.target.domain(),
+            let create = CreateProposal::drafted(
+                proposal.clone(),
+                patch.id.clone(),
+                patch.target.domain(),
                 draft,
-                patch_id: patch.id.clone(),
-            };
+            );
             tools.create_proposal_as(actor, create).await
         }
         Err(error) => Err(error),

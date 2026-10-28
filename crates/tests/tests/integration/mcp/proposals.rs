@@ -97,16 +97,16 @@ async fn a_draft_that_cannot_be_made_is_answered_by_its_kind() {
     let free = json!({ "target": { "journey": "j_free" }, "patch_id": "p_free", "base_revision": 0,
         "mutations": [{ "op": "create_journey", "name": "Free" }] });
     world.ok(&ann, "apply_patch", free).await;
-    let upgrade = |journey: &str| json!({ "journey": journey, "to": 2, "proposal": "pr_up", "patch_id": "p_up" });
-    let relink = json!({ "journey": "j_vendor_eval", "proposal": "pr_relink", "patch_id": "p_relink",
-        "to": { "route": "vendor-evaluation", "version": 9 } });
+    let upgrade = |journey: &str| json!({ "upgrade": { "journey": journey, "to": 2 }, "proposal": "pr_up", "patch_id": "p_up" });
+    let relink = json!({ "proposal": "pr_relink", "patch_id": "p_relink", "relink": {
+        "journey": "j_vendor_eval", "to": { "route": "vendor-evaluation", "version": 9 } } });
     let cases = [
         ("upgrade", upgrade("j_missing"), "not found"),
         ("relink", relink, "not found"),
         ("upgrade", upgrade("j_free"), "refused"),
     ];
     for (tool, arguments, kind) in cases {
-        let answered = world.call(&ann, tool, arguments).await;
+        let answered = world.call(&ann, "create_proposal", arguments).await;
         let found = match &answered {
             Err(cairn_mcp::ToolError::NotFound { .. }) => "not found",
             Err(cairn_mcp::ToolError::Refused { .. }) => "refused",
@@ -114,4 +114,63 @@ async fn a_draft_that_cannot_be_made_is_answered_by_its_kind() {
         };
         assert_eq!(found, kind, "{tool}: {answered:?}");
     }
+}
+
+/// I6: `create_proposal` holds exactly one content, as its listing says: naming none is
+/// refused, and naming two kinds, or half of your own draft, is refused at the argument that
+/// makes it wrong; a content named as null is refused there too, not read as absent.
+#[tokio::test]
+async fn a_proposal_names_exactly_one_content() {
+    let world = World::new();
+    let ann = user("u_ann");
+    world.vendor_journey(&ann).await;
+    let base = json!({ "proposal": "pr_one", "patch_id": "p_one" });
+    let with = |extra: Value| {
+        let mut arguments = base.clone();
+        arguments
+            .as_object_mut()
+            .unwrap()
+            .extend(extra.as_object().unwrap().clone());
+        arguments
+    };
+    let relink =
+        json!({ "journey": "j_vendor_eval", "to": { "route": "vendor-evaluation", "version": 1 } });
+    let cases = [
+        (base.clone(), ""),
+        (
+            with(json!({ "upgrade": { "journey": "j_vendor_eval", "to": 2 }, "relink": relink })),
+            "relink",
+        ),
+        (
+            with(json!({ "destination": { "journey": "j_vendor_eval" } })),
+            "draft",
+        ),
+        (
+            with(json!({ "draft": breakdown(), "relink": relink })),
+            "relink",
+        ),
+        (
+            with(json!({ "relink": relink, "upgrade": null })),
+            "upgrade",
+        ),
+    ];
+    let listed = cairn_mcp::ToolSet::definitions()
+        .into_iter()
+        .find(|tool| tool.name == "create_proposal")
+        .unwrap();
+    let listed = jsonschema::draft202012::new(&Value::Object(listed.input_schema)).unwrap();
+    for (arguments, at) in cases {
+        assert!(
+            !listed.is_valid(&arguments),
+            "the listing refuses {arguments}"
+        );
+        let answered = world.call(&ann, "create_proposal", arguments.clone()).await;
+        let Err(cairn_mcp::ToolError::Arguments { path, .. }) = &answered else {
+            panic!("{arguments}: {answered:?}");
+        };
+        assert_eq!(path, at, "{arguments}");
+    }
+    let listed = json!({ "scope": "destination", "destination": { "journey": "j_vendor_eval" } });
+    let listed = world.ok(&ann, "list_proposals", listed).await;
+    assert_eq!(listed["count"], 0, "nothing was drafted");
 }

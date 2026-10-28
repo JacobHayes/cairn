@@ -255,23 +255,42 @@ mod mcp_in_process {
                 { "op": "open_draft", "source": "edit" },
             ] });
         agent.ok("apply_patch", open).await;
+        // B7, B8, B9: each kind Cairn drafts reaches review at its destination holding the
+        // draft of its kind, a saved route at the new route; asked again under its patch id,
+        // it is answered.
         let drafted = [
             (
-                "upgrade",
-                json!({ "journey": JOURNEY, "to": 2, "proposal": "pr_upgrade", "patch_id": "p_upgrade" }),
+                json!({ "upgrade": { "journey": JOURNEY, "to": 2 }, "proposal": "pr_upgrade", "patch_id": "p_upgrade" }),
+                json!({ "journey": JOURNEY }),
+                json!({ "op": "upgrade" }),
             ),
             (
-                "save_as_route",
-                json!({ "journey": JOURNEY, "route": "saved-evaluation", "name": "Saved evaluation", "proposal": "pr_save", "patch_id": "p_save" }),
+                json!({ "save_as_route": { "journey": JOURNEY, "route": "saved-evaluation", "name": "Saved evaluation" }, "proposal": "pr_save", "patch_id": "p_save" }),
+                json!({ "route": "saved-evaluation" }),
+                json!({ "op": "open_draft", "source": { "save_as_route": { "journey": JOURNEY } } }),
             ),
             (
-                "relink",
-                json!({ "journey": JOURNEY, "to": { "route": ROUTE, "version": 2 }, "proposal": "pr_relink", "patch_id": "p_relink" }),
+                json!({ "relink": { "journey": JOURNEY, "to": { "route": ROUTE, "version": 2 } }, "proposal": "pr_relink", "patch_id": "p_relink" }),
+                json!({ "journey": JOURNEY }),
+                json!({ "op": "relink" }),
             ),
         ];
-        for (name, arguments) in drafted {
-            let proposed = agent.ok(name, arguments).await;
-            assert_eq!(proposed["status"], "saved", "{name}");
+        for (arguments, destination, drafts) in drafted {
+            let proposed = agent.ok("create_proposal", arguments.clone()).await;
+            assert_eq!(proposed["status"], "saved", "{arguments}");
+            assert_eq!(proposed["destination"], destination, "{arguments}");
+            let id = &arguments["proposal"];
+            let held = agent.ok("get_proposal", json!({ "proposal": id })).await;
+            let mutations = held["proposal"]["draft"]["mutations"].as_array().unwrap();
+            let fields = drafts.as_object().unwrap();
+            assert!(
+                mutations
+                    .iter()
+                    .any(|mutation| fields.iter().all(|(key, value)| &mutation[key] == value)),
+                "{id} drafts {drafts}: {mutations:?}"
+            );
+            let again = agent.ok("create_proposal", arguments.clone()).await;
+            assert_eq!(again["status"], "already_saved", "{arguments}");
         }
     }
 

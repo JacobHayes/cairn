@@ -10,6 +10,7 @@ use std::collections::BTreeSet;
 
 use cairn_assistant::wrapper::{self, Action, Because, Decision, Outcome, Policy};
 use cairn_mcp::{ToolError, ToolSet};
+use cairn_schema::Domain;
 use serde_json::{Value, json};
 
 use support::{World, assisting, user};
@@ -173,24 +174,6 @@ fn proposal_cases() -> Vec<Case> {
             "edit_proposal",
             json!({ "proposal": "pr_mine", "change": "discard", "base_revision": 1,
                 "patch_id": "p_discard_mine" }),
-            Policy::Proposal,
-        ),
-        (
-            "upgrade",
-            json!({ "journey": JOURNEY, "to": 1, "proposal": "pr_upgrade",
-                "patch_id": "p_upgrade" }),
-            Policy::Proposal,
-        ),
-        (
-            "save_as_route",
-            json!({ "journey": JOURNEY, "route": "saved", "name": "Saved",
-                "proposal": "pr_save", "patch_id": "p_save" }),
-            Policy::Proposal,
-        ),
-        (
-            "relink",
-            json!({ "journey": JOURNEY, "to": { "route": ROUTE, "version": 1 },
-                "proposal": "pr_relink", "patch_id": "p_relink" }),
             Policy::Proposal,
         ),
     ]
@@ -523,4 +506,43 @@ async fn a_direct_write_asked_again_is_answered_from_its_receipt() {
     let answer = again.answer.expect("answered from its receipt");
     assert_eq!(answer["status"], "already_applied", "{answer}");
     assert_eq!(world.journey_revision(JOURNEY).await, 2);
+}
+
+/// I5, B7, B8, B9: a draft Cairn makes, asked for through the assistant, is recorded as the
+/// proposal it is, at its destination: an upgrade or a re-link at the journey, a saved route
+/// at the new route.
+#[tokio::test]
+async fn a_draft_cairn_makes_is_recorded_at_its_destination() {
+    let world = World::new();
+    let ann = user("u_ann");
+    world.vendor_journey(&ann).await;
+    let opened = world.open_vendor_draft(&ann).await;
+    let publish = json!({ "target": { "route": ROUTE }, "patch_id": "p_publish_two",
+        "base_revision": opened, "mutations": [{ "op": "publish_draft" }] });
+    world.ok(&ann, "apply_patch", publish).await;
+    let assistant = assisting("u_ann");
+    let cases = [
+        (
+            json!({ "upgrade": { "journey": JOURNEY, "to": 2 },
+                "proposal": "pr_upgrade", "patch_id": "p_upgrade" }),
+            Domain::Journey(JOURNEY.parse().unwrap()),
+        ),
+        (
+            json!({ "save_as_route": { "journey": JOURNEY, "route": "saved", "name": "Saved" },
+                "proposal": "pr_save", "patch_id": "p_save" }),
+            Domain::Route("saved".parse().unwrap()),
+        ),
+        (
+            json!({ "relink": { "journey": JOURNEY, "to": { "route": ROUTE, "version": 1 } },
+                "proposal": "pr_relink", "patch_id": "p_relink" }),
+            Domain::Journey(JOURNEY.parse().unwrap()),
+        ),
+    ];
+    for (arguments, expected) in cases {
+        let outcome = run(&world, &assistant, "create_proposal", arguments).await;
+        let Some(Action::Proposed { destination, .. }) = outcome.action else {
+            panic!("{outcome:?}");
+        };
+        assert_eq!(destination, expected);
+    }
 }

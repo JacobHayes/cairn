@@ -1,0 +1,9 @@
+# Cairn-drafted proposals go through create_proposal
+
+Question (from simplifying the MCP tool surface): an upgrade, saving a journey as a route, and a re-link are always proposals Cairn drafts, and each had its own tool (`upgrade`, `save_as_route`, `relink`) beside `create_proposal`, which took the caller's own draft. Four tools made proposals, and three of them were used rarely. Should they stay separate?
+
+Call: `create_proposal` makes every proposal. Its arguments name exactly one content: the caller's own draft with its destination, or one of `upgrade` (the journey and the route version to move it to), `save_as_route` (the journey, the new route's id and name) or `relink` (the journey and the route to link it to). The listed schema says this as an exclusive union, so a client that validates arguments refuses a mix before sending it, and the server refuses it too, at the path of the second content named; a content named as null is refused at its path rather than read as absent, as the schema says. The three tools are gone; what each drafted, and how it is reviewed and applied, is unchanged. The in-app assistant's guard reads a proposal's destination from the same arguments, so a lineage proposal it makes is recorded at the journey or route it changes.
+
+Alternatives: keep the three tools (three more schemas listed, one more way to start a proposal for an agent to choose between); fold them into `apply_patch` as ops (they are drafts Cairn computes, not mutations a caller writes, and the result is a proposal to review, not an applied patch).
+
+What would change it: clients that cannot read a `oneOf` schema and send mixed arguments often; a Cairn-drafted proposal whose inputs no longer fit beside the others.
