@@ -6,7 +6,7 @@ import type { Page } from "@playwright/test";
 
 import { nameOf } from "./containment.ts";
 import { settled } from "./shell.ts";
-import { snapshotOf, upFrom, type Snapshot } from "./snapshot.ts";
+import { classesOf, snapshotOf, upFrom, type Part, type Snapshot } from "./snapshot.ts";
 
 /** How far a box may differ between themes (px): rounding of the same layout. */
 const TOLERANCE_PX = 0.5;
@@ -16,8 +16,9 @@ const LISTED_MAX = 10;
 
 /** Where `now` differs from `before`: one line for each element that is drawn in one theme and not the other, or has a different box. */
 export function themeDifferences(light: Snapshot, dark: Snapshot): string[] {
-  // The sync chip's words come and go with the clock (SAVED shows for a moment after a save), which is not the theme's doing; the chip's popover is compared.
-  const kept = (snapshot: Snapshot): Snapshot => ({ ...snapshot, nodes: snapshot.nodes.filter((part) => ![...upFrom(part)].some((up) => up.attr["data-testid"] === "sync")) });
+  // The sync chip's words and the announcements beside it (visually hidden) come and go with the clock (SAVED shows for a moment after a save), which is not the theme's doing; the chip's popover is compared.
+  const clocked = (up: Part): boolean => up.attr["data-testid"] === "sync" || classesOf(up).includes("visually-hidden");
+  const kept = (snapshot: Snapshot): Snapshot => ({ ...snapshot, nodes: snapshot.nodes.filter((part) => ![...upFrom(part)].some(clocked)) });
   const [before, now] = [kept(light), kept(dark)];
   if (before.nodes.length !== now.nodes.length) {
     // Which elements are in one theme and not the other (by name, with how many more).

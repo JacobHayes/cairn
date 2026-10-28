@@ -6,6 +6,7 @@ import type { Page } from "@playwright/test";
 
 import { expect, test } from "./test.ts";
 
+import { DESKTOP_MIN } from "../src/shell/breakpoints.ts";
 import { openJourneyCard } from "./around.ts";
 import { apply, blockers, editWhereVersionTwoChanges, graphRoom, marginIn, pickNode, publishVersionTwo, resolve, reviewItem, reviewOpen, saveEdits, scrollsOnce } from "./proposals.ts";
 import { expectAddress, goTo, nodeCard, open, setDepth, syncChip, whenSettled } from "./shell.ts";
@@ -167,7 +168,7 @@ async function firstChangeFramed(page: Page, layered: string, size: { width: num
   await expect.poll(async () => (await marginIn(page, node, await graphRoom(page))) >= 8).toBe(true);
   expect((await graphRoom(page)).zoom).toBeGreaterThanOrEqual(LEGIBLE - 0.001);
   await changeReads(page, node);
-  if (size.width < 720) {
+  if (size.width < DESKTOP_MIN) {
     // At the sheet's peek the rail already says what holds Apply.
     const [holds, sheet] = await whenSettled(page, () => Promise.all([page.getByTestId("apply-waits").boundingBox(), page.locator(".inspector").locator("xpath=..").boundingBox()]));
     expect((holds?.y ?? 0) + (holds?.height ?? 0)).toBeLessThanOrEqual((sheet?.y ?? 0) + (sheet?.height ?? 0));

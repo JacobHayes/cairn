@@ -11,11 +11,11 @@ import { fileURLToPath } from "node:url";
 
 import { expect, test } from "./test.ts";
 
+import { DESKTOP_MIN } from "../src/shell/breakpoints.ts";
 import { checkpoint } from "./invariants.ts";
 import { walkStates } from "./screenshots.ts";
 
-/** The first width a desktop's layout applies at, and the height every width is swept at. */
-const DESKTOP_MIN = 720;
+/** The height every width is swept at. */
 const HEIGHT = 900;
 
 /** Widths between the thresholds: a phone, where the container queries of the list and Summary switch, a desktop, and a wide screen. */

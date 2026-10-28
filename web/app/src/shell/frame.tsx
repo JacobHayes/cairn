@@ -13,6 +13,7 @@ import { useLocation } from "react-router";
 
 import { useNodeAddresses } from "../journeys/address.ts";
 import type { KeyBinding } from "../screens/keys.ts";
+import { DESKTOP_MIN } from "./breakpoints.ts";
 import type { SheetSnap } from "./InspectorColumn.tsx";
 
 export type InspectorTab = "inspector" | "assistant" | "proposals";
@@ -23,7 +24,7 @@ export const SHEET = "(max-width: 1099px)";
 /** The widths that give the inspector a column of its own (design 3.3); narrower, it is a sheet. */
 export const COLUMN = "(min-width: 1100px)";
 /** A phone's width: the top bar replaces the rail and the sheet opens at its peek. */
-export const PHONE_WIDTH = "(max-width: 719px)";
+export const PHONE_WIDTH = `(max-width: ${String(DESKTOP_MIN - 1)}px)`;
 
 /** Windows where the sheet opens at its peek: a phone's width, or any window too short to give up half its height to it. */
 export const PEEK_FIRST = `${PHONE_WIDTH}, (max-height: 599px)`;

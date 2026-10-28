@@ -2,11 +2,10 @@
 // down, and nothing is drawn past the window's side edges. Plain functions over Chrome's layout
 // snapshot (e2e/snapshot.ts); a pane that scrolls or clips inside the window is excused for what it holds,
 // but is itself held to the window, and the frame that clips at the window's edge excuses nothing.
+import { DESKTOP_MIN } from "../src/shell/breakpoints.ts";
 import { nameOf, seen } from "./containment.ts";
 import { classesOf, upFrom, type Part, type Snapshot } from "./snapshot.ts";
 
-/** The width from which the page is a desktop's, one that never scrolls the document (DESIGN, Layout). */
-export const DESKTOP_MIN = 720;
 
 /** The document scrolling down at a desktop width: its content is taller than its window. */
 export function pageHeightProblems(snapshot: Snapshot): string[] {
