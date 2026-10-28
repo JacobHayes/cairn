@@ -10,9 +10,11 @@ import { join, resolve } from "node:path";
 
 import { expect, test } from "./test.ts";
 
+import { closeFolds, openFolds } from "./folds.ts";
 import { capture } from "./invariants.ts";
 import { FIXTURE_SUBJECT, SCREENS, seedProposals, type State, type Subject } from "./screenshots.ts";
 import { open, settled } from "./shell.ts";
+import { expectStructure } from "./structure.ts";
 import type { AddressName } from "../src/address.ts";
 
 /** The day the fixtures' last scenario patch applies, so the dates the pictures show read as one history. */
@@ -51,16 +53,30 @@ for (const [viewport, size] of Object.entries(VIEWPORTS)) {
           for (const state of SCREENS[address].filter((each: State) => each.only === undefined || each.only === viewport)) {
             // A state that fails is listed with the rest, so one run shows every picture the table cannot take.
             try {
-              // The page is kept between states (the in-browser store lives in it), so what the last one left open or focused is closed first.
-              // Escape is sent as an event, not typed: a real key press makes the focus the next screen sets keyboard focus, which shows a tip a touch screen's would not.
-            await page.evaluate(() => { document.activeElement?.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", bubbles: true })); });
-              await page.evaluate(() => { (document.activeElement as HTMLElement | null)?.blur(); });
-              await state.reach(page, on);
-              await expect(state.ready(page, on), `${address} ${state.name} is drawn`).toBeVisible();
-              await settled(page);
+              const reachState = async (): Promise<void> => {
+                // The page is kept between states (the in-browser store lives in it), so what the last one left open or focused is closed first.
+                // Escape is sent as an event, not typed: a real key press makes the focus the next screen sets keyboard focus, which shows a tip a touch screen's would not.
+                await page.evaluate(() => { document.activeElement?.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", bubbles: true })); });
+                await page.evaluate(() => { (document.activeElement as HTMLElement | null)?.blur(); });
+                await state.reach(page, on);
+                await expect(state.ready(page, on), `${address} ${state.name} is drawn`).toBeVisible();
+                await settled(page);
+              };
+              await reachState();
               const file = `${address}-${state.name}-${viewport}-${theme}.png`;
               await capture(page, join(dir, file), { structure: true });
-              taken.push({ file, checks: file.replace(/\.png$/, ".checks.json"), aria: file.replace(/\.png$/, ".aria.yml"), address, state: state.name, viewport, theme, url: new URL(page.url()).pathname + new URL(page.url()).search });
+              const url = new URL(page.url());
+              if ((await openFolds(page)) > 0) {
+                try {
+                  await expectStructure(page, `${file} with its folds open`);
+                } finally {
+                  await closeFolds(page);
+                  // Home first: reaching the same address again would leave the frame as the folds' clicks left it.
+                  await open(page, "browser", "/");
+                  await reachState();
+                }
+              }
+              taken.push({ file, checks: file.replace(/\.png$/, ".checks.json"), aria: file.replace(/\.png$/, ".aria.yml"), address, state: state.name, viewport, theme, url: url.pathname + url.search });
             } catch (error) {
               failed.push(`${address} ${state.name}: ${error instanceof Error ? error.message.replaceAll("\n", " | ").slice(0, 1500) : String(error)}`);
             }

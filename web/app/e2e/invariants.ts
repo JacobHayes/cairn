@@ -32,7 +32,7 @@ export async function checkpoint(page: Page, where = "the page"): Promise<Observ
  * passed, and what came near a rule) and `.aria.yml` (the trimmed accessibility snapshot). They
  * are build output, never committed.
  */
-export async function capture(page: Page, path: string, options: { fullPage?: boolean; structure?: boolean } = {}): Promise<void> {
+export async function capture(page: Page, path: string, options: { fullPage?: boolean; structure?: boolean} = {}): Promise<void> {
   const seen = await checkpoint(page, path);
   await expectNoTipOpen(page);
   const { structure, ...shot } = options;
