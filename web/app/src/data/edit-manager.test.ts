@@ -175,6 +175,31 @@ describe("the kept records", () => {
   });
 });
 
+describe("storage that refuses a record a write relays", () => {
+  it("say so once when storage refuses a record a write relays after it accepted the first", async () => {
+    let refusing = false;
+    const base = memoryStorage();
+    const keep = base.setItem.bind(base);
+    const flaky = Object.assign(base, {
+      setItem: (key: string, value: string) => {
+        if (refusing) {
+          throw new DOMException("full", "QuotaExceededError");
+        }
+        keep(key, value);
+      },
+    });
+    const { notes, host, submit } = await startRoot({ storage: flaky });
+    host.answers = [refusal(invalid), refusal(invalid)];
+    submit(renaming("p_a", "n_a"), aboutNode("n_a"));
+    refusing = true;
+    await settled();
+    expect(notes.unstored).toBe(1);
+    submit(renaming("p_b", "n_b"), aboutNode("n_b"));
+    await settled();
+    expect(notes.unstored).toBe(1);
+  });
+});
+
 describe("what the chip says of a write", () => {
   const base = { id: "p_a", about: aboutNode(), command: { kind: "patch" as const, patch: renaming("p_a") } };
   const stale: Rejection = { rejection: "stale", conflicts: [], intervening: [], touched: [] };

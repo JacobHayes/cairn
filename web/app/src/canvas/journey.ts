@@ -39,7 +39,7 @@ export function rollUpBadge(derived: NodeDerived, at: LevelNode): CardBadge | un
   if (roll?.ready_to_finish === true) {
     return { flag: "ready to finish", tone: "good" };
   }
-  if (roll?.needs_breakdown === true || derived.needs_breakdown === true) {
+  if (roll?.needs_breakdown === true) {
     return { flag: "needs breakdown", tone: "warn" };
   }
   return undefined;

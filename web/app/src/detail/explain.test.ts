@@ -32,6 +32,17 @@ describe("editTargets (F7)", () => {
     expect(editTargets(due("n_meeting"), view)).toEqual([{ edit: "answer", decision: "n_when" }]);
   });
 
+  it("points a dependency a node inherits from its container at the container's requirement, not the node's", () => {
+    const inherited: Chain = { constraints: [{ before: "n_findings.finish", after: "n_report.start", days: 0, source: "dependency:n_report:n_findings:inherited:n_stage" }], fixed: [] };
+    expect(editTargets(inherited, view)).toEqual([{ edit: "requirement", node: "n_stage", requires: "n_findings" }]);
+  });
+
+  it("offers no requirement to edit for a dependency that comes from containment or a decision's condition", () => {
+    const from = (source: string): Chain => ({ constraints: [{ before: "n_findings.finish", after: "n_report.start", days: 0, source }], fixed: [] });
+    expect(editTargets(from("dependency:n_report:n_findings:containment"), view)).toEqual([]);
+    expect(editTargets(from("dependency:n_report:n_pick:condition:n_pick"), view)).toEqual([]);
+  });
+
   it("offers nothing to edit for a fact", () => {
     const actual: Chain = { constraints: [], fixed: [{ instant: "created", date: "2026-10-01", fixed_by: "actual" }] };
     expect(editTargets(actual, view)).toEqual([]);

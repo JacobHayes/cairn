@@ -30,6 +30,8 @@ describe("Markdown", () => {
     const out = html('<img src=x onerror="alert(1)"> [run](javascript:alert(1))');
     expect(out).not.toContain("<img");
     expect(out).not.toContain("href=");
+    expect(out).not.toContain("<a");
+    expect(out).toContain("[run](javascript:alert(1))");
     expect(safeHref("mailto:someone@example.org")).toBe(true);
     expect(safeHref("javascript:alert(1)")).toBe(false);
   });

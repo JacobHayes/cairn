@@ -7,6 +7,7 @@ import { journeyLooks } from "../canvas/journey.ts";
 import { nodeDetail, nodeOf, type Ready } from "../detail/model.ts";
 import { plainSentence, sentenceOf } from "../detail/sentence.ts";
 import { testView } from "../detail/view.test-support.ts";
+import { treeOf } from "./tree.ts";
 
 /** The test journey with its stage's engine progress set to `done` of `total`. */
 function showing(done: number, total: number): Ready {
@@ -33,5 +34,24 @@ describe("a container's progress", () => {
     }
     expect(journeyLooks(view, { mine: [], owned: [] }).card(stage, { key: "n_stage", display_state: "active" }).body).toMatchObject({ kind: "progress", done, total });
     expect(plainSentence(view, sentenceOf(view, detail, { position: undefined, row: undefined }))).toMatch(new RegExp(`^${String(done)} of ${String(total)} done`));
+  });
+});
+
+describe("the order of siblings", () => {
+  it("puts the final milestone last whatever its date, and an ordinary milestone by its date", () => {
+    const orderOf = (final: boolean) => {
+      const view = testView();
+      const meeting = view.derived.nodes["n_meeting"];
+      const node = view.journey.graph.nodes?.find((each) => each.key === "n_meeting");
+      if (meeting === undefined || node === undefined) {
+        throw new Error("the test journey has the meeting");
+      }
+      // Due before everything else in the journey.
+      view.derived.nodes["n_meeting"] = { ...meeting, dates: { ...meeting.dates, due: { date: "2000-01-01", chain: { constraints: [], fixed: [] } } } };
+      node.final = final;
+      return treeOf(view).roots;
+    };
+    expect(orderOf(false)[0]).toBe("n_meeting");
+    expect(orderOf(true).at(-1)).toBe("n_meeting");
   });
 });

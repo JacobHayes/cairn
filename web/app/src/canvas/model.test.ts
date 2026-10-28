@@ -326,3 +326,22 @@ describe("C6: the Signals lens", () => {
     expect(text("slack")).toEqual({ n_choose: "Slack 2 days", n_build: "Slack 40 days" });
   });
 });
+
+describe("C2: what the rest of a card says", () => {
+  test("a container with a child needing breakdown says so in its badge", () => {
+    const breakdown = wholeLevel();
+    breakdown.nodes = breakdown.nodes.map((node) => (node.key === "n_stage" ? { ...node, roll_up: { needs_breakdown: true, progress: { done: 0, total: 1, overdue: 0, decisions_needed: 0 } } } : node));
+    expect(card(model(breakdown), "n_stage").journey?.body).toMatchObject({ badge: { flag: "needs breakdown" } });
+  });
+
+  test("an overdue open node says how late it is in its foot, and a node that is not open does not", () => {
+    const late = (open: boolean) =>
+      changed((each) => {
+        const derived = derivedOf(each, "n_build");
+        derived.open = open;
+        derived.dates = { ...derived.dates, overdue_days: 3 };
+      });
+    expect(card(model(wholeLevel(), [], [], late(true)), "n_build").journey?.foot).toMatchObject({ words: "3 days late", tone: "bad" });
+    expect(card(model(wholeLevel(), [], [], late(false)), "n_build").journey?.foot).toBeUndefined();
+  });
+});

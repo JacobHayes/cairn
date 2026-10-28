@@ -85,6 +85,27 @@ describe("the rows are the drawn nodes with dates", () => {
   });
 });
 
+describe("what each row's mark says", () => {
+  const row = (chart: ReturnType<typeof chartOf>, key: string) => chart.rows.find((each) => each.key === key);
+
+  it("draws a task with an earlier start as a bar from there, and one without as a tick on its day", () => {
+    const view = testView();
+    const report = view.derived.nodes["n_report"];
+    if (report === undefined) {
+      throw new Error("no report");
+    }
+    const chain = { constraints: [], fixed: [] };
+    expect(row(chartOf(view, timeline, options), "n_report")).toMatchObject({ shape: "tick", from: dayOf("2026-11-02"), to: dayOf("2026-11-02") });
+    view.derived.nodes["n_report"] = { ...report, dates: { ...report.dates, latest_start: { date: "2026-10-30", chain } } };
+    expect(row(chartOf(view, timeline, options), "n_report")).toMatchObject({ shape: "bar", from: dayOf("2026-10-30"), to: dayOf("2026-11-02") });
+  });
+
+  it("marks only the final milestone as the end", () => {
+    const chart = chartOf(testView(), timeline, options);
+    expect(chart.rows.filter((each) => each.end).map((each) => each.key)).toEqual(["n_meeting"]);
+  });
+});
+
 describe("a selection and the highlights fade what they do not reach", () => {
   it("draws what the selected row needs and its float, and fades every row the trace does not reach", () => {
     const view = testView();
@@ -99,6 +120,9 @@ describe("a selection and the highlights fade what they do not reach", () => {
     expect(chart.dependencies).toEqual([{ from: "n_findings", to: "n_report", kind: "needs" }]);
     expect(chart.rows.filter((row) => !row.faded).map((row) => row.key).sort()).toEqual(["n_findings", "n_report"]);
     expect(chart.rows.filter((row) => row.float !== undefined).map((row) => [row.key, row.float])).toEqual([["n_report", { from: dayOf("2026-10-20"), to: dayOf("2026-10-30") }]]);
+    // The axis reaches every row's days and the float's start, which no row stands on.
+    expect(chart.days).toEqual(expect.arrayContaining([...chart.rows.flatMap((row) => [row.from, row.to]), dayOf("2026-10-20")]));
+    expect(chart.days).not.toEqual([]);
   });
 
   it("fades the rows a highlight does not light and removes none", () => {

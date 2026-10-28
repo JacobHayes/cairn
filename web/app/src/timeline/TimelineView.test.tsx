@@ -65,6 +65,26 @@ describe("TimelineChart (C13)", () => {
     ]);
   });
 
+  it("draws each row's mark in the shape of its row, and fills a container by what is done beneath it", () => {
+    const rows = chartOf(view, timeline, options).rows;
+    const marks = (markup: string) => [...markup.matchAll(/class="timeline-mark timeline-shape-(\w+)/g)].map((found) => found[1]);
+    expect(marks(drawn(timeline))).toEqual(rows.map((row) => row.shape));
+    expect(drawn(timeline)).not.toContain("timeline-fill");
+
+    const done = testView();
+    const stage = done.derived.nodes["n_stage"];
+    if (stage === undefined) {
+      throw new Error("no stage");
+    }
+    done.derived.nodes["n_stage"] = { ...stage, progress: { done: 1, total: 2, overdue: 0, decisions_needed: 0 } };
+    const progressed = renderToStaticMarkup(
+      <MemoryRouter>
+        <TimelineChart {...shared} chart={chartOf(done, timeline, options)} spec={calendarSpec(timeline, "2026-10-06")} />
+      </MemoryRouter>,
+    );
+    expect(count(progressed, "timeline-fill")).toBe(1);
+  });
+
   it("anchors the end on the final milestone: down the tracks and named on the axis", () => {
     const markup = drawn(timeline);
     expect(markup).toContain(`data-end="n_meeting" data-end-date="2026-11-20" data-end-day="${String(dayOf("2026-11-20"))}"`);
