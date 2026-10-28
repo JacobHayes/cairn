@@ -1,0 +1,28 @@
+#!/usr/bin/env -S bash -euo pipefail
+#MISE tools={"github:sourcefrog/cargo-mutants"="27.1.0", "github:nextest-rs/nextest"="0.9.148"}
+#MISE description="Mutation-test a slice of the engine with cargo-mutants: lists the mutants its tests leave alive in dist/mutation/engine-survivors.tsv"
+# usage: mise run mutants:engine [SLICE [cargo-mutants option...]]   (a slice number, default this ISO week's;
+# options such as --file narrow the run further)
+# The engine has about 3,500 mutants and each costs a rebuild plus a test run, so a run takes a
+# sixteenth of them (around 220, consecutive, so a slice is a stretch of the engine) by slice
+# number: the slices together cover the whole engine, and the weekly job
+# (.github/workflows/mutants.yml) takes the next one each week. Which code is mutated and which
+# tests judge it is .cargo/mutants.toml. It mutates the checkout in place (so the build cache is
+# the checkout's own) and restores it when it ends: run it in your own workspace, never in a
+# checkout other work shares. The run is capped at 110 minutes: the slice is cut short, and the
+# survivors found so far are reported
+# (decisions/2026-10-24-where-mutation-testing-runs.md).
+cd "$(dirname "$0")/../.."
+slices=16
+week=$(date +%V)
+slice=$(( ${1:-$((10#$week))} % slices ))
+out=dist/mutation
+rm -rf "$out/engine"
+mkdir -p "$out"
+status=0
+timeout --signal=INT 110m cargo mutants --in-place --package cairn-engine \
+  --shard "$slice/$slices" "${@:2}" --output "$out/engine" || status=$?
+# cargo-mutants exits 2 when mutants survive and 3 on timeouts; 124 is the time cap.
+case $status in 0 | 2 | 3 | 124) ;; *) exit "$status" ;; esac
+scripts/mutation-survivors cargo-mutants "$out/engine/mutants.out/outcomes.json" "slice $slice of $slices" >"$out/engine-survivors.tsv"
+head -n 1 "$out/engine-survivors.tsv"

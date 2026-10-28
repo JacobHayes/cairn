@@ -1,0 +1,11 @@
+# cargo-mutants (`mise run mutants:engine`, the weekly mutation job): which code is mutated and
+# which tests judge it.
+# The engine's tests live in cairn-tests (one binary over every library crate) and in the engine
+# itself; nextest stops at the first failing test.
+test_tool = "nextest"
+test_package = ["cairn-tests", "cairn-engine"]
+# The engine's test support is test code, not behaviour to mutate.
+exclude_globs = ["crates/engine/src/testing/**"]
+# A mutant is called a timeout when its tests run past this many seconds: the build and link of
+# the test binary count, and a loaded runner is slow.
+minimum_test_timeout = 120

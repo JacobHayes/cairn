@@ -1,0 +1,42 @@
+#!/usr/bin/env -S node
+// Reduces a mutation tool's report to the mutants no test noticed, one per line, for the weekly
+// cleanup to read: file:line, the tool's status, what was mutated, and the tool's own id.
+//
+// usage: scripts/mutation-survivors stryker REPORT.json [LABEL]
+//        scripts/mutation-survivors cargo-mutants OUTCOMES.json [LABEL]
+// Stryker's survivors are `Survived` and `NoCoverage`; cargo-mutants' are `MissedMutant`.
+// Rows are tab-separated: location, status, what was mutated, id (Stryker's mutant id; for
+// cargo-mutants its file:line:column). A count line leads, so an empty list reads as clean.
+// A cargo-mutants run cut short reports only the mutants it reached.
+import { readFileSync } from "node:fs";
+
+const [tool, path, label] = process.argv.slice(2);
+const report = JSON.parse(readFileSync(path, "utf8"));
+const rows = [];
+let total = 0;
+if (tool === "stryker") {
+  for (const [file, { source, mutants }] of Object.entries(report.files)) {
+    const lines = source.split("\n");
+    for (const mutant of mutants) {
+      total += 1;
+      if (mutant.status !== "Survived" && mutant.status !== "NoCoverage") continue;
+      const { line } = mutant.location.start;
+      const before = lines[line - 1].trim().slice(0, 100);
+      rows.push([`${file}:${line}`, mutant.status, `${mutant.mutatorName}: ${before} => ${mutant.replacement ?? "(removed)"}`.replace(/\s+/g, " "), mutant.id]);
+    }
+  }
+} else if (tool === "cargo-mutants") {
+  for (const outcome of report.outcomes) {
+    const mutant = outcome.scenario?.Mutant;
+    if (!mutant) continue;
+    total += 1;
+    if (outcome.summary !== "MissedMutant") continue;
+    // cargo-mutants has no id; its name (file, position, change) is what `--file` and `--regex` take.
+    rows.push([`${mutant.file}:${mutant.span.start.line}`, outcome.summary, mutant.name.replace(/^[^ ]+ /, ""), mutant.name.split(" ")[0].replace(/:$/, "")]);
+  }
+} else {
+  console.error("usage: scripts/mutation-survivors stryker|cargo-mutants REPORT.json");
+  process.exit(2);
+}
+console.log(`${rows.length} survivors of ${total} mutants (${tool}${label ? `, ${label}` : ""})`);
+for (const row of rows) console.log(row.join("\t"));

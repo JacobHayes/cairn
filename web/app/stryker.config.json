@@ -2,10 +2,13 @@
   "$schema": "../../node_modules/@stryker-mutator/core/schema/stryker-schema.json",
   "testRunner": "vitest",
   "vitest": { "configFile": "vitest.config.ts" },
-  "inPlace": true,
   "concurrency": 4,
   "coverageAnalysis": "perTest",
-  "ignorePatterns": [".stryker-tmp", "node_modules"],
-  "reporters": ["clear-text"],
-  "clearTextReporter": { "allowColor": false, "reportTests": false, "reportMutants": true, "reportScoreTable": true }
+  "tempDirName": "dist/mutation/box/web/app",
+  "mutate": ["src/**/*.ts", "src/**/*.tsx", "!src/**/*.test.ts", "!src/**/*.test.tsx", "!src/**/*.test-support.ts", "!src/**/*.d.ts"],
+  "mutator": { "excludedMutations": ["StringLiteral", "OptionalChaining"] },
+  "ignorePatterns": ["dist/mutation", "node_modules"],
+  "reporters": ["clear-text", "json"],
+  "jsonReporter": { "fileName": "dist/mutation/stryker.json" },
+  "clearTextReporter": { "allowColor": false, "reportTests": false, "reportMutants": false, "reportScoreTable": true }
 }

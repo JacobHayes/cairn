@@ -8,10 +8,12 @@ Question: from the work of measuring four tools (cargo-mutants, StrykerJS, cargo
 |---|---|
 | cargo-machete | lint, every run |
 | knip | lint, every run |
-| StrykerJS | `mise run mutants <files>`, on a change that deletes or merges web unit tests |
-| cargo-mutants | nowhere (not added) |
+| StrykerJS | weekly in CI, over the whole web app, with the noisy mutators off |
+| cargo-mutants | weekly in CI, over one sixteenth of the engine (a stretch of consecutive mutants, the week's chosen by ISO week), under a time cap |
 
-A mutation result is evidence that a cut lost nothing, not proof of it. Nothing runs weekly, so no weekly workflow is needed for these tools.
+Mutation testing runs weekly and feeds the weekly cleanup: the job (`.github/workflows/mutants.yml`) uploads each tool's survivors as a short list, and the cleanup reads them next to the test evidence when it decides what to cull or strengthen. Builders do not run it: a change that deletes tests is judged by the cull's own questions, not by a before-and-after score. A mutation result is evidence that a cut lost nothing, not proof of it.
+
+Both tools are tuned to be read, not gated. Stryker leaves out string-literal and optional-chaining mutants, the two kinds that were mostly noise in the measurements below. cargo-mutants runs the engine's tests under nextest, which stops at the first failing test, so a mutant the tests catch costs one test instead of the whole suite (15.7 s a mutant against 29.1 s in the same sample), and its build runs without the shared build cache's wrapper, which switched incremental compilation off. Survivors are listed with a file and line, what was mutated, and the tool's own id (`scripts/mutation-survivors`).
 
 ## Numbers
 
@@ -29,7 +31,17 @@ All runs were on the shared workspace box with other builders running, so wall t
 | StrykerJS, `timeline/rows.ts` alone (710 mutants) | 31 to 36 s | 4 workers | score 55% (385 killed, 5 timeouts, 243 survived, 77 uncovered) |
 | StrykerJS, `rows.ts` with its test file removed | 30 s | 4 workers | score 20% (130 killed, 318 survived, 242 uncovered) |
 
-cargo-mutants costs about 36 s a mutant even with the engine tests alone taking 6 s: every mutant rebuilds the engine and relinks the single `cairn-tests` binary (40 to 140 s), and its builds bypass the shared build cache. At that rate the engine (27,000 lines) is a day or more of machine time.
+cargo-mutants cost about 36 to 59 s a mutant in those runs, with the engine tests alone taking 6 s: every mutant rebuilt the engine and relinked the single `cairn-tests` binary, with incremental compilation off (the shared build cache's wrapper forces it) and in a copied tree. At that rate the engine (27,000 lines, about 3,500 mutants) is a day or more of machine time.
+
+Speeding it up, measured on 15 mutants of `derive/blocking.rs` (identical outcomes in each: 11 caught, 4 missed) on the shared box, one mutant at a time:
+
+| Setup | Seconds a mutant |
+|---|---|
+| copied tree, plain `cargo test`, incremental on | 29.1 |
+| the same with nextest (stops at the first failing test) | 15.7 |
+| nextest, with opt-level 0 and no debug info | 22.6 (the tests run slower than the build saves) |
+
+Running in place gave the same time as the copy, and lld is already Rust's default linker here, so neither is used beyond placing the run where the build cache can restore dependencies. Nextest is kept; the lighter profile is not.
 
 ## What each found
 
@@ -50,13 +62,13 @@ cargo-mutants was run over the code of both, at the cull's parent and at the cul
 ## Why these calls
 
 - Machete and knip take under two seconds, find real things, and have findings that hold up: lint.
-- cargo-mutants takes tens of minutes for one file, kills at the rate the engine's tests already show, and could not see the cull's loss. Weekly over the engine is days of machine time for a handful of equivalent survivors, and in-band is out of the question. It stays out of the repository.
-- StrykerJS is cheap when scoped to the few modules whose tests a change removes (about a minute for a module of 500 lines), and the kills it reports fall when tests are removed. A weekly whole-app run is about 47,000 lines, an hour or more with a survivor list that is mostly noise, which nobody would act on. So it runs on test-removing web changes only, not on every change and not weekly. Stryker mutates in place because the wasm module the tests read is untracked build output, so it must run in the change's own workspace.
+- cargo-mutants at about 16 s a mutant cannot cover the engine in one run, but a slice a week covers it in 16 weeks, and a survivor list is cheap to read. In-band is out of the question. A cargo-mutants run could not have seen the 10-17 cull's loss, so the list is a lead for the cleanup, not a check on a change.
+- StrykerJS is cheap per module (about a minute for 500 lines), and the kills it reports fall when tests are removed. Whole-app weekly is about 48,000 lines; with string-literal and optional-chaining mutants off the list is shorter, and the cleanup, not a builder, wades through it. Stryker mutates a sandbox copy of the app, with the untracked wasm module and the design tokens linked in where the tests look, so no mutated file reaches the checkout.
 
 ## Alternatives
 
-Stryker weekly across the app, cargo-mutants weekly on a rotating engine area, both rejected for cost against yield. Running Stryker in a copy needs the untracked build output copied and was not worth the cost.
+Stryker on every test-removing web change (the earlier call: it costs a builder minutes and only compares scores) was dropped for the weekly list. A copy of the tree for cargo-mutants, a lighter build profile, and a different linker were measured and left out above.
 
 ## What would change it
 
-A Rust mutation run under the shared build cache that costs a few seconds a mutant; a test-removing Rust change whose lost behaviour a mutant exposes; or the weekly cull wanting a survivor list it can act on.
+A survivor list the cleanup cannot act on (mostly equivalent mutants), or a job that outgrows its time cap.
