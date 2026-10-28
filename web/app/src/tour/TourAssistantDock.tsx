@@ -23,7 +23,7 @@ function Example({ journey }: { journey: string }) {
     <section className="panel assistant-panel" aria-label="Assistant" data-testid="tour-assistant-example">
       <div className="assistant-scroll inspector-body">
         <p className="muted small">Example only. No message is sent.</p>
-        <Transcript entries={entries} titleOf={view.status === "ready" ? journeyTitles(view) : undefined} />
+        <Transcript entries={entries} journey={journey} titleOf={view.status === "ready" ? journeyTitles(view) : undefined} />
       </div>
       {replied ? null : (
         <form className="stack" onSubmit={(event) => { event.preventDefault(); }}>

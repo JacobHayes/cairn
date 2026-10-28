@@ -35,29 +35,30 @@ export interface KeptTurns {
   write(conversation: string, turns: KeptTurn[]): void;
 }
 
+/** What every build's kept-turn keys start with, this one's included. */
+const KEPT_PREFIX = "assistant-turns";
+
 /**
  * Where a conversation's kept turns are stored. The version names the turns' shape: a tab open
  * across a deploy that changed it holds turns under an earlier version's key, which this build
- * never reads (a proposed action kept before proposals named their destination has no address).
+ * never reads (a direct change kept before it said what it did has nothing to show).
  */
-export const keptKey = (conversation: string): string => `assistant-turns-2:${conversation}`;
-
-/** What every earlier build's kept-turn keys start with. */
-const EARLIER_KEPT = `${DRAFT_PREFIX}assistant-turns:`;
+export const keptKey = (conversation: string): string => `${KEPT_PREFIX}-3:${conversation}`;
 
 /**
  * Removes the turns an earlier build kept in `storage` (a tab's session storage; none where it
  * is unavailable), once at boot. Unread, they would only take space: without them the
- * conversation shows those turns' reports as Cairn kept them, as text. Goes once one release has
- * shipped it.
+ * conversation shows those turns' reports as Cairn kept them, as text.
  */
 export function forgetEarlierKeptTurns(storage: Storage | undefined): void {
   if (storage === undefined) {
     return;
   }
+  const current = `${DRAFT_PREFIX}${keptKey("")}`;
+  const earlier = (key: string | null): key is string => key?.startsWith(`${DRAFT_PREFIX}${KEPT_PREFIX}`) === true && !key.startsWith(current);
   try {
-    const earlier = Array.from({ length: storage.length }, (_, at) => storage.key(at)).filter((key): key is string => key?.startsWith(EARLIER_KEPT) === true);
-    for (const key of earlier) {
+    const keys = Array.from({ length: storage.length }, (_, at) => storage.key(at)).filter(earlier);
+    for (const key of keys) {
       storage.removeItem(key);
     }
   } catch {

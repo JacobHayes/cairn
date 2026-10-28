@@ -201,9 +201,12 @@ describe("the turns a conversation keeps", () => {
 describe("turns kept by an earlier build", () => {
   it("are removed at boot, and this build's turns stay", () => {
     const storage = memoryStorage();
-    // A proposed action kept before proposals named their destination: this build cannot address it.
-    const earlier = [{ at: "t2", actions: [{ outcome: "proposed", tool: "create_proposal", proposal: "p_1", because: { reason: "asked" } }], ended: { status: "replied" } }];
-    storage.setItem(`${DRAFT_PREFIX}assistant-turns:c_1`, JSON.stringify(earlier));
+    // A proposed action kept before proposals named their destination, and a direct change
+    // kept before it said what it did: this build cannot show either.
+    const proposed = [{ at: "t2", actions: [{ outcome: "proposed", tool: "create_proposal", proposal: "p_1", because: { reason: "asked" } }], ended: { status: "replied" } }];
+    const applied = [{ at: "t3", actions: [{ outcome: "applied", tool: "transition_node", receipt: { patch_id: "p_2", domain: { journey: "j_one" }, revision: 2 } }], ended: { status: "replied" } }];
+    storage.setItem(`${DRAFT_PREFIX}assistant-turns:c_1`, JSON.stringify(proposed));
+    storage.setItem(`${DRAFT_PREFIX}assistant-turns-2:c_1`, JSON.stringify(applied));
     storage.setItem(`${DRAFT_PREFIX}${keptKey("c_1")}`, JSON.stringify([]));
     storage.setItem(`${DRAFT_PREFIX}title:j_one:n_a`, JSON.stringify("Unrelated"));
     forgetEarlierKeptTurns(storage);

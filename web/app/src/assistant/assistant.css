@@ -75,22 +75,9 @@
   overflow-wrap: anywhere;
 }
 
-.assistant-report {
-  font-size: 14px;
-  overflow-wrap: anywhere;
-}
-
+/* Cairn's report of a write, and a proposal drafted: a card on the edge token. */
 .assistant-write {
-  display: flex;
-  flex-direction: column;
-  align-items: flex-start;
-  gap: var(--space-1);
-  padding: var(--space-2) var(--space-3);
-  border: 1px solid var(--color-border);
-  background: var(--color-band);
-}
-
-.assistant-nodes {
+  border-color: var(--color-edge);
   overflow-wrap: anywhere;
 }
 

@@ -32,14 +32,14 @@
                 "$ref": "#/components/schemas/AppliedReceipt",
                 "description": "Which patch, where, and the revision it produced."
               },
-              "tool": {
-                "description": "The tool.",
+              "report": {
+                "description": "What it did, in words: each kind of change once in the order its patch first\nmakes it, the nodes it wrote, and what it newly caused, each node as\n`journey/node` code (\"Added a note, marked done: `j_one/n_kickoff`.\"). The panel\nshows it and the conversation keeps it, the same text.",
                 "type": "string"
               }
             },
             "required": [
               "outcome",
-              "tool",
+              "report",
               "receipt"
             ],
             "type": "object"

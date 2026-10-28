@@ -590,37 +590,7 @@ fn result(call_id: &str, answer: Result<Value, ToolError>) -> ToolResult {
 /// Cairn's report of a write, kept in the conversation.
 fn report(action: &Action) -> String {
     match action {
-        Action::Applied {
-            tool,
-            receipt,
-            nodes,
-            consequences,
-        } => {
-            let caused: usize = consequences
-                .values()
-                .map(|caused| {
-                    caused.stale.len()
-                        + caused.shortfalls.len()
-                        + caused.overdue.len()
-                        + usize::from(caused.stalled.is_some())
-                })
-                .sum();
-            let wrote = nodes
-                .iter()
-                .map(|node| format!("`{node}`"))
-                .collect::<Vec<_>>()
-                .join(", ");
-            let wrote = if wrote.is_empty() {
-                String::new()
-            } else {
-                format!(" (wrote {wrote})")
-            };
-            format!(
-                "Applied `{tool}` as patch `{}`{wrote}: {} is at revision {}, with {caused} new \
-                 consequence(s).",
-                receipt.patch_id, receipt.domain, receipt.revision
-            )
-        }
+        Action::Applied { report, .. } => report.clone(),
         Action::AlreadyApplied { tool, receipt } => format!(
             "`{tool}` as patch `{}` was already applied: {} is at revision {}.",
             receipt.patch_id, receipt.domain, receipt.revision

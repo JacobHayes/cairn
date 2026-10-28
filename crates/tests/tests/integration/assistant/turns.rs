@@ -112,6 +112,17 @@ async fn an_empty_journey_is_structured_through_a_proposal_the_user_applies() {
     assert_eq!(held["proposal"]["created_by"], "u_owner");
 }
 
+/// Asserts `report` names each of `nodes` with its journey.
+fn names_each<'a>(report: &str, journey: &JourneyId, nodes: impl Iterator<Item = &'a &'a NodeKey>) {
+    for node in nodes {
+        let named = format!("`{journey}/{node}`");
+        assert!(
+            report.contains(&named),
+            "the report names {named}: {report}"
+        );
+    }
+}
+
 /// The vendor evaluation's status summary, as the service derives it now.
 async fn summary(world: &World, actor: &cairn_schema::Actor) -> StatusSummary {
     let call = Call {
@@ -156,6 +167,7 @@ async fn a_direct_state_change_is_reported_with_its_consequences() {
         .await;
     let [
         Action::Applied {
+            report,
             receipt,
             consequences,
             ..
@@ -164,6 +176,11 @@ async fn a_direct_state_change_is_reported_with_its_consequences() {
     else {
         panic!("{:?}", turn.actions);
     };
+    let (did, _) = report.split_once(':').unwrap();
+    assert!(
+        !did.is_empty() && !did.contains(", "),
+        "every mutation is an answer, said once: {report}"
+    );
     assert_eq!(receipt.revision.get(), 2);
     let caused = &consequences[&vendor];
     // What it reports caused is what the journey now derives: nothing was overdue or short
@@ -173,6 +190,7 @@ async fn a_direct_state_change_is_reported_with_its_consequences() {
     assert_eq!(overdue, after.overdue.iter().collect(), "{consequences:?}");
     let short: BTreeSet<&NodeKey> = caused.shortfalls.iter().map(|short| &short.node).collect();
     assert_eq!(short, after.shortfalls.iter().collect(), "{consequences:?}");
+    names_each(report, &vendor, short.iter().chain(&overdue));
     // Read on the 1st, every unfinished node due before it: the work up to the end of
     // testing and the review's opening, which the meeting on the 6th leaves no time for.
     let expected = [

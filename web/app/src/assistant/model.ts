@@ -187,7 +187,7 @@ export function endedWords(ended: Ended): string {
   }
 }
 
-/** A tool's name as words: `transition_node` reads "transition node". */
+/** A tool's name as words: `create_proposal` reads "create proposal". */
 export function toolWords(tool: string): string {
   return tool.replaceAll("_", " ");
 }

@@ -1090,8 +1090,13 @@ export interface components {
             outcome: "applied";
             /** @description Which patch, where, and the revision it produced. */
             receipt: components["schemas"]["AppliedReceipt"];
-            /** @description The tool. */
-            tool: string;
+            /**
+             * @description What it did, in words: each kind of change once in the order its patch first
+             *     makes it, the nodes it wrote, and what it newly caused, each node as
+             *     `journey/node` code ("Added a note, marked done: `j_one/n_kickoff`."). The panel
+             *     shows it and the conversation keeps it, the same text.
+             */
+            report: string;
         } | {
             /** @constant */
             outcome: "already_applied";

@@ -1,6 +1,6 @@
 // The assistant panel's gating and what it shows of a turn (I5, I7): offered only when the
 // host's capabilities say there is an assistant, so the in-browser host never shows it; a
-// direct change links to the nodes it wrote and what it caused, and a proposal opens in
+// direct change shows as Cairn's report, linking the nodes it names, and a proposal opens in
 // proposal review.
 import { renderToStaticMarkup } from "react-dom/server";
 import { MemoryRouter } from "react-router";
@@ -12,8 +12,9 @@ import { browserHost } from "../data/browser-host.ts";
 import { FakeDeriver, FakeHost } from "../data/fake.test-support.ts";
 import type { Host } from "../data/host.ts";
 import { Session } from "../data/session.ts";
+import { NODE_GONE } from "../ui/gone.ts";
 import { Transcript } from "./AssistantPanel.tsx";
-import { assistantOffered } from "./model.ts";
+import { assistantOffered, type Entry } from "./model.ts";
 
 const anAssistant: AssistantHost = {
   conversation: () => Promise.resolve({ conversation: "cv_one", messages: [] }),
@@ -53,32 +54,36 @@ describe("the assistant panel's gating (I5, capabilities)", () => {
 
 const count = (markup: string, needle: string) => markup.split(needle).length - 1;
 
-function shown(actions: AssistantAction[]): string {
-  const entries = actions.map((action) => ({ entry: "action" as const, at: "2026-10-07T10:00:05Z", action }));
+const AT = "2026-10-07T10:00:05Z";
+
+function rendered(entries: Entry[]): string {
   return renderToStaticMarkup(
     <MemoryRouter>
-      <Transcript entries={entries} titleOf={(key) => (key === "n_kickoff" ? "Kickoff" : undefined)} />
+      <Transcript entries={entries} journey="j_one" titleOf={(key) => (key === "n_kickoff" ? "Kickoff" : undefined)} />
     </MemoryRouter>,
   );
 }
 
+/** `actions` as this tab shows a turn it sent. */
+const shown = (actions: AssistantAction[]) => rendered(actions.map((action): Entry => ({ entry: "action", at: AT, action })));
+
 describe("a turn's writes in the panel (I5, D7)", () => {
-  it("links a direct change to each node it wrote and each node it made stale, in that journey", () => {
-    const markup = shown([
-      {
-        outcome: "applied",
-        tool: "transition_node",
-        receipt: { patch_id: "p_one", domain: { journey: "j_one" }, revision: 3 },
-        nodes: ["n_kickoff", "n_plan"],
-        consequences: { j_one: { stale: [{ node: "n_report", reasons: [] }] } },
-      },
-    ]);
-    for (const node of ["n_kickoff", "n_plan", "n_report"]) {
-      expect(markup).toContain(`href="/journeys/j_one/nodes/${node}"`);
-    }
-    expect(count(markup, 'data-testid="assistant-node"')).toBe(3);
+  it("shows a direct change as it lands the same as the conversation keeps it", () => {
+    const report = "Added a note, marked done: `j_one/n_kickoff`. Newly stale: `j_one/n_kickoff`.";
+    const applied: AssistantAction = { outcome: "applied", report, receipt: { patch_id: "p_one", domain: { journey: "j_one" }, revision: 3 }, nodes: ["n_kickoff"] };
+    const live = rendered([{ entry: "action", at: AT, action: applied }]);
+    const kept = rendered([{ entry: "report", at: AT, text: report }]);
+    expect(live.replace("assistant-applied", "assistant-report")).toBe(kept);
+  });
+
+  it("links a node of this journey by its title, says a removed one in words, and links another journey's", () => {
+    const markup = rendered([{ entry: "report", at: AT, text: "Marked done: `j_one/n_kickoff`, `j_one/n_gone`, `j_two/n_kickoff`." }]);
+    expect(markup).toContain('href="/journeys/j_one/nodes/n_kickoff"');
     expect(markup).toContain(">Kickoff</a>");
-    expect(markup).toContain('data-kind="stale"');
+    expect(markup).not.toContain("n_gone");
+    expect(markup).toContain(NODE_GONE);
+    expect(markup).toContain('href="/journeys/j_two/nodes/n_kickoff"');
+    expect(count(markup, ">Kickoff</a>")).toBe(1);
   });
 
   it("reports a write answered from an earlier receipt as already applied, not as a change", () => {

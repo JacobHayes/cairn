@@ -30,6 +30,7 @@ use serde::{Deserialize, Serialize};
 use serde_json::{Value, json};
 use sha2::{Digest, Sha256};
 
+use crate::said;
 pub use crate::touched::touched_nodes;
 
 // PRD: I7.
@@ -96,8 +97,12 @@ pub struct AppliedReceipt {
 pub enum Action {
     /// Applied directly, as one patch.
     Applied {
-        /// The tool.
-        tool: String,
+        // PRD: I5, D7.
+        /// What it did, in words: each kind of change once in the order its patch first
+        /// makes it, the nodes it wrote, and what it newly caused, each node as
+        /// `journey/node` code ("Added a note, marked done: `j_one/n_kickoff`."). The panel
+        /// shows it and the conversation keeps it, the same text.
+        report: String,
         /// Which patch, where, and the revision it produced.
         receipt: AppliedReceipt,
         // PRD: I5.
@@ -275,12 +280,11 @@ pub async fn run(
         Decision::Rejected(rejection) => not_run(ToolError::Rejected { rejection }),
         Decision::Propose(because, drafted) => propose(tools, actor, name, &drafted, because).await,
         Decision::Direct { drafted, nodes } => {
-            let domain = drafted.patch().target.domain();
             let answer = tools.call(actor, name, arguments).await;
             let action = answer
                 .as_ref()
                 .ok()
-                .and_then(|output| applied(name, output, &nodes, (&drafted.patch().id, &domain)));
+                .and_then(|output| applied(name, output, drafted.patch(), &nodes));
             patina_dst::sometimes!(action.is_some(), "assistant-direct-write-applied");
             Outcome { answer, action }
         }
@@ -431,21 +435,20 @@ pub(crate) fn title(tool: &str, note: Option<&str>, count: usize) -> Title {
 }
 
 /// The applied action a direct write's output reports: the answer carries the revision and
-/// what the write caused, and the patch it drafted carries its id and domain.
-fn applied(
-    tool: &str,
-    output: &Value,
-    nodes: &BTreeSet<NodeKey>,
-    (patch_id, domain): (&PatchId, &Domain),
-) -> Option<Action> {
+/// what the write caused, and the patch it drafted carries its id, its domain and its ops.
+fn applied(tool: &str, output: &Value, patch: &Patch, nodes: &BTreeSet<NodeKey>) -> Option<Action> {
     let written: WriteOutput = serde_json::from_value(output.clone()).ok()?;
     let already = written.is_already_applied();
     let (revision, consequences) = written.into_parts();
+    let journey = match &patch.target {
+        PatchTarget::Journey(journey) => Some(journey),
+        _ => None,
+    };
     let (tool, receipt) = (
         tool.to_owned(),
         AppliedReceipt {
-            patch_id: patch_id.clone(),
-            domain: domain.clone(),
+            patch_id: patch.id.clone(),
+            domain: patch.target.domain(),
             revision,
         },
     );
@@ -453,7 +456,7 @@ fn applied(
         Action::AlreadyApplied { tool, receipt }
     } else {
         Action::Applied {
-            tool,
+            report: said::applied(patch, journey, nodes, &consequences),
             receipt,
             nodes: nodes.iter().cloned().collect(),
             consequences,

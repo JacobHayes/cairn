@@ -14,17 +14,16 @@ import { Link } from "react-router";
 import { proposalAddress } from "../address.ts";
 import { targetKey, type AssistantAction, type AssistantTarget } from "../data/assistant.ts";
 import { useDraft } from "../data/drafts.ts";
-import { linesOf, mayNotApply } from "../data/activity.ts";
 import { useSession } from "../data/react.ts";
 import type { Ready } from "../detail/model.ts";
 import { AssistantSlot, useAssistantDock } from "../shell/frame.tsx";
 import { journeyPath } from "../journeys/address.ts";
-import { Markdown } from "../ui/markdown.tsx";
-import { Badge, Button } from "../ui/kit.tsx";
+import { Markdown, type CodeSpan } from "../ui/markdown.tsx";
+import { Button } from "../ui/kit.tsx";
 import { aboutWords, assistantOffered, becauseWords, endedWords, shown, toolWords, type Entry } from "./model.ts";
 import { conversationView, sendTurn, type ConversationRef } from "./conversation.ts";
 import "./assistant.css";
-import { nodeTitle } from "../ui/gone.ts";
+import { NODE_GONE } from "../ui/gone.ts";
 import { Failed, kindOf } from "../ui/Failed.tsx";
 import { NodeLink } from "../detail/parts.tsx";
 
@@ -37,52 +36,43 @@ export function journeyTitles(ready: Ready): TitleOf {
   return (key) => nodes.find((node) => node.key === key)?.title;
 }
 
-function AssistantNode({ journey, node, titleOf }: { journey: string; node: string; titleOf: TitleOf | undefined }) {
-  return <NodeLink node={node} title={nodeTitle(titleOf?.(node))} to={journeyPath({ journey, node }, "graph")} data-testid="assistant-node" />;
+function AssistantNode({ journey, node, title }: { journey: string; node: string; title: string }) {
+  return <NodeLink node={node} title={title} to={journeyPath({ journey, node }, "graph")} data-testid="assistant-node" />;
 }
 
-/** I5, D7: a direct change, with the nodes it wrote and what it newly caused. */
-function Applied({ action, titleOf }: { action: Extract<AssistantAction, { outcome: "applied" }>; titleOf: TitleOf | undefined }) {
-  const domain = action.receipt.domain;
-  const journey = typeof domain === "object" && "journey" in domain ? domain.journey : undefined;
-  const nodes = action.nodes ?? [];
-  const lines = linesOf(action.consequences ?? {});
+/** A node a report names, as `journey/node` code. */
+const NAMED_NODE = /^(j_[^\s/]+)\/(n_[^\s/]+)$/;
+/** A node of a journey other than the one open, whose title this screen does not hold. */
+const NODE_ELSEWHERE = "an item in another journey";
+
+/**
+ * How a report shows the nodes it names: a node of the open journey by its linked title, or in
+ * words once the journey no longer holds it; another journey's node linked, said as one.
+ */
+function namedNodes(journey: string | undefined, titleOf: TitleOf | undefined): CodeSpan {
+  return (text, at) => {
+    const [, named, node] = NAMED_NODE.exec(text) ?? [];
+    if (named === undefined || node === undefined) {
+      return undefined;
+    }
+    if (named !== journey) {
+      return <AssistantNode key={at} journey={named} node={node} title={NODE_ELSEWHERE} />;
+    }
+    const title = titleOf?.(node);
+    return title === undefined ? <span key={at}>{NODE_GONE}</span> : <AssistantNode key={at} journey={named} node={node} title={title} />;
+  };
+}
+
+/** I5, D7: Cairn's report of a write (what it did, the nodes it wrote, what it newly caused), the same as it lands and as the conversation keeps it. */
+function Receipt({ text, journey, titleOf, testId }: { text: string; journey: string | undefined; titleOf: TitleOf | undefined; testId: string }) {
   return (
-    <div className="assistant-write" data-testid="assistant-applied" data-tool={action.tool}>
-      <span className="row">
-        <Badge tone="good">Changed</Badge>
-        <span>
-          {toolWords(action.tool)}
-        </span>
-      </span>
-      {journey === undefined || nodes.length === 0 ? null : (
-        <span className="assistant-nodes">
-          Wrote{" "}
-          {nodes.map((node, index) => (
-            <span key={node}>
-              {index === 0 ? null : ", "}
-              <AssistantNode journey={journey} node={node} titleOf={titleOf} />
-            </span>
-          ))}
-        </span>
-      )}
-      {lines.map((line) => (
-          <span key={`${line.journey}:${line.kind}`} className="muted small" data-testid="assistant-caused" data-kind={line.kind}>
-            {line.kind === "stalled" ? (
-              `The journey is now stalled`
-            ) : (
-              <>
-                {line.kind === "undecided" ? mayNotApply(line.unanswered ?? [], (key) => nodeTitle(titleOf?.(key))) : `Newly ${line.kind}`}:{" "}
-                {line.nodes.map((node, index) => (
-                  <span key={node}>
-                    {index === 0 ? null : ", "}
-                    <AssistantNode journey={line.journey} node={node} titleOf={titleOf} />
-                  </span>
-                ))}
-              </>
-            )}
-          </span>
-      ))}
+    <div className="assistant-write card" data-testid={testId}>
+      <div className="card-head">
+        <span className="label">Cairn</span>
+      </div>
+      <div className="card-body">
+        <Markdown text={text} code={namedNodes(journey, titleOf)} />
+      </div>
     </div>
   );
 }
@@ -90,24 +80,26 @@ function Applied({ action, titleOf }: { action: Extract<AssistantAction, { outco
 /** I5, C14: a write drafted as a proposal, to review where the user applies it. */
 function Proposed({ action }: { action: Extract<AssistantAction, { outcome: "proposed" }> }) {
   return (
-    <div className="assistant-write" data-testid="assistant-proposed" data-proposal={action.proposal} data-because={action.because.reason}>
-      <span className="row">
-        <Badge tone="warn">Proposal</Badge>
-        <span>
-          {toolWords(action.tool)}, drafted for review: {becauseWords(action.because)}.
-        </span>
-      </span>
-      <Link className="button primary" to={proposalAddress(action.destination, action.proposal)} data-testid="review-proposal">
-        Review proposal
-      </Link>
+    <div className="assistant-write card" data-testid="assistant-proposed" data-proposal={action.proposal} data-because={action.because.reason}>
+      <div className="card-head">
+        <span className="label">Proposal</span>
+      </div>
+      <div className="card-body">
+        {toolWords(action.tool)}, drafted for review: {becauseWords(action.because)}.
+      </div>
+      <div className="card-actions">
+        <Link className="button primary" to={proposalAddress(action.destination, action.proposal)} data-testid="review-proposal">
+          Review proposal
+        </Link>
+      </div>
     </div>
   );
 }
 
-function Written({ action, titleOf }: { action: AssistantAction; titleOf: TitleOf | undefined }) {
+function Written({ action, journey, titleOf }: { action: AssistantAction; journey: string | undefined; titleOf: TitleOf | undefined }) {
   switch (action.outcome) {
     case "applied":
-      return <Applied action={action} titleOf={titleOf} />;
+      return <Receipt text={action.report} journey={journey} titleOf={titleOf} testId="assistant-applied" />;
     case "already_applied":
       return (
         <div className="assistant-write muted small" data-testid="assistant-already-applied" data-tool={action.tool}>
@@ -125,7 +117,7 @@ function Written({ action, titleOf }: { action: AssistantAction; titleOf: TitleO
   }
 }
 
-function EntryView({ entry, titleOf }: { entry: Entry; titleOf: TitleOf | undefined }) {
+function EntryView({ entry, journey, titleOf }: { entry: Entry; journey: string | undefined; titleOf: TitleOf | undefined }) {
   switch (entry.entry) {
     case "said":
       return (
@@ -140,13 +132,9 @@ function EntryView({ entry, titleOf }: { entry: Entry; titleOf: TitleOf | undefi
         </div>
       );
     case "report":
-      return (
-        <div className="assistant-report muted small" data-testid="assistant-report">
-          <Markdown text={entry.text} />
-        </div>
-      );
+      return <Receipt text={entry.text} journey={journey} titleOf={titleOf} testId="assistant-report" />;
     case "action":
-      return <Written action={entry.action} titleOf={titleOf} />;
+      return <Written action={entry.action} journey={journey} titleOf={titleOf} />;
     case "ended":
       return (
         <div className="callout" data-testid="assistant-ended" data-status={entry.ended.status}>
@@ -157,12 +145,12 @@ function EntryView({ entry, titleOf }: { entry: Entry; titleOf: TitleOf | undefi
 }
 
 /** The conversation's entries, oldest first. */
-export function Transcript({ entries, titleOf }: { entries: readonly Entry[]; titleOf: TitleOf | undefined }) {
+export function Transcript({ entries, journey, titleOf }: { entries: readonly Entry[]; journey: string | undefined; titleOf: TitleOf | undefined }) {
   return (
-    <ol className="assistant-transcript" data-testid="assistant-transcript">
+    <ol className="assistant-transcript" data-testid="assistant-transcript" aria-live="polite">
       {entries.map((entry, index) => (
         <li key={`${entry.at}:${String(index)}`}>
-          <EntryView entry={entry} titleOf={titleOf} />
+          <EntryView entry={entry} journey={journey} titleOf={titleOf} />
         </li>
       ))}
     </ol>
@@ -264,13 +252,13 @@ function Conversing({ conversation, target, titleOf }: { conversation: Conversat
         {read.status === "loading" ? <p className="muted small">Reading the conversation...</p> : null}
         {read.status === "failed" ? <p className="callout callout-bad"><Failed what="The conversation" error={read.message} /></p> : null}
         {read.status === "ready" && entries.length === 0 && sending === undefined ? <Empty /> : null}
-        <Transcript entries={entries} titleOf={titleOf} />
+        <Transcript entries={entries} journey={"journey" in target ? target.journey : undefined} titleOf={titleOf} />
         {sending === undefined ? null : (
           <>
             <div className="assistant-said" data-testid="assistant-said">
               {sending}
             </div>
-            <p className="muted small" data-testid="assistant-working">
+            <p className="muted small" role="status" data-testid="assistant-working">
               The assistant is working on it...
             </p>
           </>

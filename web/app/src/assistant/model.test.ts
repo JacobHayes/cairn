@@ -11,7 +11,7 @@ const reply = (at: string, content: string): ConversationEntry => ({ author: "as
 
 const applied: AssistantAction = {
   outcome: "applied",
-  tool: "transition_node",
+  report: "Marked done: `j_one/n_kickoff`.",
   receipt: { patch_id: "p_one", domain: { journey: "j_one" }, revision: 3 },
   nodes: ["n_kickoff"],
 };

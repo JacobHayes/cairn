@@ -5,13 +5,37 @@
 // target, read back after a reload, on a route's draft too. The test is tagged @server:
 // the demo's scripted model is one for the whole server, so it runs one at a time with the
 // other tests that write to it. The conversation's own rules are vitest's.
+import type { Page } from "@playwright/test";
+
 import { expect, test } from "./test.ts";
 
 import { startVendorJourney } from "./acting.ts";
-import { ask, openPanel, patchId, script } from "./assistant.ts";
+import { ask, openPanel, patchId, script, type ScriptStep } from "./assistant.ts";
 import { state } from "./detail.ts";
 import { apply, reviewOpen } from "./proposals.ts";
-import { derived, goTo, nodePanel, open, openJourney } from "./shell.ts";
+import { derived, goTo, nodePanel, open, openJourney, whenSettled } from "./shell.ts";
+
+/** A model's step that notes `node` and completes it, as one direct change. */
+function noteAndComplete(journey: string, node: string, base: number): ScriptStep {
+  const mutations = [
+    { op: "add_annotation", annotation: { key: "a_done", node, note: "Held this morning." } },
+    { op: "transition", node, transition: "complete" },
+  ];
+  return { calls: [{ name: "apply_patch", arguments: { patch: { id: patchId(), target: { journey }, base_revision: base, mutations } } }] };
+}
+
+/**
+ * A new tab holds none of this tab's turns: it shows the conversation as Cairn kept it, the
+ * write reading `said`, what the live card said, and linking the node it wrote.
+ */
+async function keptInANewTab(page: Page, journey: string, said: string): Promise<void> {
+  const fresh = await page.context().newPage();
+  await openJourney(fresh, "server", journey);
+  const report = (await openPanel(fresh)).getByTestId("assistant-report").first();
+  await expect(report).toHaveText(said);
+  await expect(report.locator('[data-testid="assistant-node"][data-node="n_kickoff"]')).toHaveCount(1);
+  await fresh.close();
+}
 
 test("I5, I7: a direct change reported with its node, and a breakdown proposed, reviewed, and applied", { tag: ["@server", "@serial"] }, async ({ page }) => {
   const journey = await startVendorJourney(page);
@@ -19,13 +43,12 @@ test("I5, I7: a direct change reported with its node, and a breakdown proposed, 
   const panel = await openPanel(page);
   await expect(panel.getByTestId("assistant-empty")).toBeVisible();
 
-  await script(page, [
-    { calls: [{ name: "transition_node", arguments: { journey, node: "n_kickoff", transition: "complete", patch_id: patchId(), base_revision: 1 } }] },
-    { say: "Kickoff is marked done." },
-  ]);
+  await script(page, [noteAndComplete(journey, "n_kickoff", 1), { say: "Kickoff is marked done." }]);
   await ask(page, "Kickoff happened this morning.");
   const applied = panel.getByTestId("assistant-applied");
   await expect(applied).toHaveCount(1);
+  const said = (await whenSettled(page, () => applied.textContent())) ?? "";
+  await expect(applied.locator('[data-testid="assistant-node"][data-node="n_kickoff"]')).toHaveText("Kickoff");
   await expect(panel.getByTestId("assistant-reply")).toContainText("Kickoff is marked done.");
   await applied.locator('[data-testid="assistant-node"][data-node="n_kickoff"]').click();
   await expect(state(nodePanel(page, "n_kickoff"))).toHaveAttribute("data-status", "done");
@@ -76,6 +99,7 @@ test("I5, I7: a direct change reported with its node, and a breakdown proposed, 
   const kept = page.getByTestId("assistant-panel");
   await expect(kept.getByTestId("assistant-said")).toHaveText(["Kickoff happened this morning.", "Break the test workload down into an ingest and a query workload."]);
   await expect(kept.getByTestId("assistant-reply").last()).toContainText("I drafted the breakdown");
+  await keptInANewTab(page, journey, said);
   await open(page, "server", "/routes/product-launch");
   await expect(page.getByTestId("assistant-panel")).toHaveAttribute("data-target", "route:product-launch");
   await expect(page.getByTestId("assistant-panel").getByTestId("assistant-said")).toHaveCount(0);

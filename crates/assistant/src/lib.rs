@@ -15,6 +15,7 @@ pub mod conversation;
 pub mod limits;
 pub mod protocol;
 pub mod provider;
+mod said;
 pub mod scripted;
 pub mod tool_results;
 mod touched;
