@@ -21,7 +21,7 @@ Copies of one rule rarely look alike. Start from each rule's owner and ask who e
 
 ## Evidence
 
-Confirm each finding at every copy, and drop what you cannot confirm. For tests, use the evidence that exists: CI's per-test browser report, the Rust suite and step times, and the mutation survivors. The weekly mutation job publishes them as run artifacts: `gh run download $(gh run list --workflow mutants.yml --status success --limit 1 --json databaseId --jq '.[0].databaseId') -p '*-survivors*'`, each a tab-separated list under a count line (location, status, what was mutated, the tool's id). The web run is several shards, one list each in its own directory; read them together (the counts add up). They cover the whole app; the engine list one slice of sixteen, so a run says nothing about the other fifteen. A survivor is a missing assertion, a test that earns nothing, or an equivalent mutant: say which. A mutation result shows that a cut lost nothing; it does not prove it.
+Confirm each finding at every copy, and drop what you cannot confirm. For tests, use the evidence that exists: CI's per-test browser report, the Rust suite and step times. A test earns its place by what it catches, so judge it by the break it would catch and whether another test catches the same.
 
 ## Output
 

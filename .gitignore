@@ -10,4 +10,3 @@ dist
 
 # Per-checkout agent notes.
 AGENTS.local.md
-.stryker-tmp
