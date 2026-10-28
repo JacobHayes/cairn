@@ -1,0 +1,10 @@
+#!/usr/bin/env -S bash -euo pipefail
+#MISE description="Run the structural rules over every screen state at the widths where the layout can change (the CSS's media query thresholds, a pixel either side, and a spread between), light, on the in-browser host"
+#MISE depends=["packages", "build:wasm"]
+# usage: mise run sweep [playwright test args...]   (for example --grep "719px")
+# Walks the table in web/app/e2e/screenshots.ts once per width (web/app/e2e/breakpoints.run.ts)
+# and fails with every state and width that breaks a rule. Takes no pictures.
+cd "$(dirname "$0")/.."
+repo=$PWD
+cd web/app
+CAIRN_E2E_BINARY=0 exec "$repo/node_modules/.bin/playwright" test --project=sweep "$@"

@@ -12,4 +12,4 @@ if [ "$#" -eq 0 ]; then
   rm -f "$dir"/*-desktop-*.png "$dir"/*-phone-*.png "$dir"/*-desktop-*.checks.json "$dir"/*-phone-*.checks.json "$dir"/*-desktop-*.aria.yml "$dir"/*-phone-*.aria.yml "$dir"/screenshots.json "$dir"/screenshots.*.part.json
 fi
 cd web/app
-CAIRN_SCREENSHOTS_DIR=$dir exec "$repo/node_modules/.bin/playwright" test -c playwright.screenshots.config.ts "$@"
+CAIRN_E2E_BINARY=0 CAIRN_SCREENSHOTS_DIR=$dir exec "$repo/node_modules/.bin/playwright" test --project=screenshots "$@"

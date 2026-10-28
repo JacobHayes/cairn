@@ -189,8 +189,9 @@
 }
 
 @media (pointer: coarse) {
-  /* The name's toggle sits flush on a fine pointer; here it is padded up to the target around its lines (a minimum height would show a clamped line's neighbour). */
+  /* The name's toggle sits flush on a fine pointer; here it is padded up to the target around the lines it may have, and is at least the target tall when the name takes fewer (a name of one line under a limit of three). */
   .journey-header h1 .journey-name-toggle {
+    min-height: var(--touch-target);
     padding-block: max(0px, calc((var(--touch-target) - var(--name-lines, 1) * 1lh) / 2));
   }
   :is(.view-controls, .canvas-signal) :is(.chip, .dropdown-button, input[type="search"]) {

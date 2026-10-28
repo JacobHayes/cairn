@@ -4,7 +4,11 @@ import { existsSync, readdirSync, readFileSync, rmSync, writeFileSync } from "no
 import { join, resolve } from "node:path";
 
 export default function joinManifests(): void {
-  const dir = resolve(process.env["CAIRN_SCREENSHOTS_DIR"] ?? "dist/screenshots");
+  // Only a run that took pictures (`mise run screenshots` names the folder) has manifests to join.
+  if (process.env["CAIRN_SCREENSHOTS_DIR"] === undefined) {
+    return;
+  }
+  const dir = resolve(process.env["CAIRN_SCREENSHOTS_DIR"]);
   const parts = readdirSync(dir).filter((name) => name.endsWith(".part.json")).sort();
   const manifest = join(dir, "screenshots.json");
   const read = (path: string) => JSON.parse(readFileSync(path, "utf8")) as { file: string }[];

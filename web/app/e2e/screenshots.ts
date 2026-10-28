@@ -153,6 +153,16 @@ function nonEmpty(states: State[]): [State, ...State[]] {
   return [first, ...rest];
 }
 
+/** Reaches `state` of `address` from wherever the page is, once the page has settled and shows its ready sign. The page is kept between states (the in-browser store lives in it), so what the last one left open or focused is closed first. */
+export async function reachState(page: Page, address: AddressName, state: State, on: Subject): Promise<void> {
+  // Escape is sent as an event, not typed: a real key press makes the focus the next screen sets keyboard focus, which shows a tip a touch screen's would not.
+  await page.evaluate(() => { document.activeElement?.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", bubbles: true })); });
+  await page.evaluate(() => { (document.activeElement as HTMLElement | null)?.blur(); });
+  await state.reach(page, on);
+  await expect(state.ready(page, on), `${address} ${state.name} is drawn`).toBeVisible();
+  await settled(page);
+}
+
 export const SCREENS: Record<AddressName, [State, ...State[]]> = {
   home: [{ name: "home", reach: (page) => indexAt(page, "/"), ready: (page) => page.getByTestId("home") }],
   journeys: [{ name: "index", reach: (page) => indexAt(page, "/journeys"), ready: (page) => page.getByTestId("journey-table") }],
@@ -213,4 +223,48 @@ export async function seedProposals(page: Page, on: Subject): Promise<Proposals>
   const saved = /\/routes\/r_saved\/proposals\/(pr_[0-9a-f]+)$/.exec(new URL(page.url()).pathname)?.[1] ?? "";
   expect(saved).not.toBe("");
   return { upgrade, saved, savedRoute: "r_saved" };
+}
+
+/** The day the fixtures' last scenario patch applies, so the dates every walk shows read as one history. */
+const WALK_TODAY = "2026-10-26";
+
+/** The proposal addresses need the proposals drafted, which edits the journey: they come last. */
+const NEEDS_PROPOSALS: readonly AddressName[] = ["journeyProposal", "journeyProposalNode", "routeProposal", "routeProposalNode"];
+
+/** The window the authoring forms (and so the drafting of proposals) need, which is a desktop's. */
+const DRAFTING_WINDOW = { width: 1440, height: 900 };
+
+/**
+ * Visits every state of the table that `phone` (or a desktop) reaches, in the window `size` that
+ * the caller set on `page` (its theme and touch are the caller's too): the page at Home on the
+ * fixed day, the proposals drafted once the addresses that need them come, then `visit` for each
+ * state, given what reaches it again. A state whose visit throws is listed with the rest, so one
+ * run shows every state that fails; the list is returned.
+ */
+export async function walkStates(
+  page: Page,
+  size: { width: number; height: number },
+  phone: boolean,
+  visit: (address: AddressName, state: State, reach: () => Promise<void>) => Promise<void>,
+): Promise<string[]> {
+  await page.clock.setFixedTime(new Date(`${WALK_TODAY}T12:00:00Z`));
+  await open(page, "browser", "/");
+  const failed: string[] = [];
+  let on: Subject = FIXTURE_SUBJECT;
+  const addresses = Object.keys(SCREENS) as AddressName[];
+  for (const address of [...addresses.filter((each) => !NEEDS_PROPOSALS.includes(each)), ...NEEDS_PROPOSALS]) {
+    if (NEEDS_PROPOSALS.includes(address) && on.proposals === undefined) {
+      await page.setViewportSize(DRAFTING_WINDOW);
+      on = { ...on, proposals: await seedProposals(page, on) };
+      await page.setViewportSize(size);
+    }
+    for (const state of SCREENS[address].filter((each: State) => each.only === undefined || each.only === (phone ? "phone" : "desktop"))) {
+      try {
+        await visit(address, state, () => reachState(page, address, state, on));
+      } catch (error) {
+        failed.push(`${address} ${state.name}: ${error instanceof Error ? error.message.replaceAll("\n", " | ").slice(0, 6000) : String(error)}`);
+      }
+    }
+  }
+  return failed;
 }

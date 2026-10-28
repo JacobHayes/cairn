@@ -61,7 +61,12 @@ export default defineConfig({
     { name: "server-serial", grep: /@serial/, workers: 1, use: { ...devices["Desktop Chrome"] } },
     { name: "server", grep: /@server/, grepInvert: /@serial/, fullyParallel: true, dependencies: ["server-serial"], use: { ...devices["Desktop Chrome"] } },
     { name: "chromium", grepInvert: /@server/, fullyParallel: true, use: { ...devices["Desktop Chrome"] } },
+    // The structural walks (`mise run screenshots`, `mise run sweep`): not tests of behaviour but
+    // rules run over every screen state on the in-browser host, so they match their own files.
+    { name: "screenshots", testMatch: "screenshots.run.ts", timeout: 900_000, fullyParallel: true, use: { ...devices["Desktop Chrome"], actionTimeout: 15_000 } },
+    { name: "sweep", testMatch: "breakpoints.run.ts", timeout: 900_000, fullyParallel: true, use: { ...devices["Desktop Chrome"], actionTimeout: 15_000 } },
   ],
+  globalTeardown: "./e2e/screenshots.teardown.ts",
   // One entry, so Playwright does not start the two servers one after another:
   // scripts/e2e-servers starts them side by side (the binary and the demo site) and
   // prints READY when both answer.

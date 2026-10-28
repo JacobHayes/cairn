@@ -93,6 +93,7 @@ const floors: [string, string[], number][] = [
   ["color-success", ["color-surface"], 4.5],
   ["color-success", ["color-band"], 4.5],
   ["chrome-ink", ["chrome-bg"], 4.5],
+  ["color-error", ["chrome-bg"], 4.5],
   ["chrome-muted", ["chrome-bg"], 4.5],
   ["chrome-brand", ["chrome-bg"], 4.5],
   ["color-frame", ["color-ground"], 3],

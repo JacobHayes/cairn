@@ -886,8 +886,8 @@ table.data {
 .index-table table.data tbody tr:last-child td {
   border-bottom: 0;
 }
-/* A row is the same height read or not, so a long table does not jump as rows near the view are read. */
-@media (min-width: 720px) {
+/* A row is the same height read or not, so a long table does not jump as rows near the view are read. A table is a table from 1100px, where its columns fit the workspace beside the rail; under that (the inspector a sheet) its rows are blocks, as on a phone. */
+@media (min-width: 1100px) {
   .index-table table.data tbody tr {
     height: 70px;
   }
@@ -940,13 +940,13 @@ table.data {
   margin-top: var(--space-1);
 }
 /* The short actions keep their words on one line; the description column yields the room. */
-@media (min-width: 720px) {
+@media (min-width: 1100px) {
   .index-table table.data td:is([data-column="use"], [data-column="act"]) {
     white-space: nowrap;
   }
 }
 /* The name column takes the room the other columns leave, and its description is cut with an ellipsis rather than pushing them off the table. */
-@media (min-width: 720px) {
+@media (min-width: 1100px) {
   .index-table td[data-column="name"]:has(.cell-description) {
     width: 100%;
     max-width: 0;
@@ -978,7 +978,7 @@ table.data {
    line (progress and next milestone) whose pieces flow as one; then one
    attention line, each fact in its own ink: what needs a look and what is yours, both, since they
    are independent. A fact that says nothing ("None", "No work assigned to you") is left out. */
-@media (max-width: 719px) {
+@media (max-width: 1099px) {
   .index-table table.data,
   .index-table tbody {
     display: block;
@@ -1732,8 +1732,8 @@ button.tree-fold[aria-expanded="true"] .tree-chevron {
   text-underline-offset: 3px;
 }
 
-/* A picked table's row on a phone: the pick box's cell is as wide as its hit area. */
-@media (pointer: coarse) and (max-width: 719px) {
+/* A picked table's row in the block layout (a phone, a tablet): the pick box's cell is as wide as its hit area. */
+@media (pointer: coarse) and (max-width: 1099px) {
   .index-table.picks table.data td.pick {
     flex-basis: var(--touch-target);
   }
