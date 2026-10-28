@@ -91,6 +91,7 @@ export function ContextMenu({ at, groups, label, onChoose, onClose }: { at: { x:
       onClose();
     }
   };
+  // Inside the page's main landmark, so its content sits in one; it is fixed to the window, so the main box places nothing.
   return createPortal(
     <div ref={root} className="popover context-menu" role="menu" aria-label={label} data-popover="" data-overhang="" data-testid="context-menu" onKeyDown={onKeyDown} onContextMenu={(event) => { event.preventDefault(); }}>
       <div className="popover-body">
@@ -99,6 +100,6 @@ export function ContextMenu({ at, groups, label, onChoose, onClose }: { at: { x:
         ))}
       </div>
     </div>,
-    document.body,
+    document.querySelector("main") ?? document.body,
   );
 }

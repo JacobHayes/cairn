@@ -226,7 +226,7 @@ export function Menu({ trigger, label, tip, tipKind = "describe", keys, testId, 
         </button>
       </Tip>
       {open ? (
-        <div ref={popover} className="popover dropdown-popover" role={role} data-popover="" data-overhang="" data-testid={`${testId}-menu`} onKeyDown={keyboard.onPopoverKeyDown}>
+        <div ref={popover} className="popover dropdown-popover" role={role} aria-label={label} data-popover="" data-overhang="" data-testid={`${testId}-menu`} onKeyDown={keyboard.onPopoverKeyDown}>
           <div ref={body} className="popover-body stack">
             {children(closeToButton)}
           </div>

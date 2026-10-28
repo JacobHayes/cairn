@@ -58,7 +58,7 @@ function YourIdentities({ caller }: { caller: Caller }) {
   const identities = (deployment?.identities ?? []).filter((identity) => caller.identities.includes(identity.key)).sort((one, other) => one.key.localeCompare(other.key));
   const several = identities.length > 1;
   return (
-    <section className="stack" aria-label="Your identity" data-testid="your-identities">
+    <section className="stack" data-testid="your-identities">
       <NodePanel title={several ? "Your identities" : "Your identity"} count={identities.length}>
         {identities.map((identity, at) => (
           <li key={identity.key} className="you-row" data-testid="your-identity" data-identity={identity.key}>
@@ -139,7 +139,7 @@ export function You() {
     <section className="stack" aria-label="You" data-testid="you-screen">
       <h1>You</h1>
       <YourIdentities caller={caller} />
-      <section className="stack" aria-label="Sign-in methods" data-testid="sign-in-methods">
+      <section className="stack" data-testid="sign-in-methods">
         <Logins caller={caller} />
         {providers.length === 0 ? null : (
           <span className="row" data-testid="link-login">

@@ -10,13 +10,10 @@ import { join, resolve } from "node:path";
 
 import { expect, test } from "./test.ts";
 
-import { closeFolds, openFolds } from "./folds.ts";
-import { focusRingProblems } from "./focus.ts";
 import { capture } from "./invariants.ts";
-import { themeProblems } from "./themes.ts";
 import { FIXTURE_SUBJECT, SCREENS, seedProposals, type State, type Subject } from "./screenshots.ts";
 import { open, settled } from "./shell.ts";
-import { expectStructure } from "./structure.ts";
+import { checkState } from "./walk-checks.ts";
 import type { AddressName } from "../src/address.ts";
 
 /** The day the fixtures' last scenario patch applies, so the dates the pictures show read as one history. */
@@ -68,27 +65,7 @@ for (const [viewport, size] of Object.entries(VIEWPORTS)) {
               const file = `${address}-${state.name}-${viewport}-${theme}.png`;
               await capture(page, join(dir, file), { structure: true });
               const url = new URL(page.url());
-              // The light run reads each state in dark too, once: the theme changes colours and no box.
-              if (theme === "light") {
-                expect(await themeProblems(page), `${address} ${state.name} in dark`).toEqual([]);
-              }
-              // One Tab walk per screen, on its first state: it moves focus and opens tips, so the state is reached again after.
-              if (viewport === "desktop" && theme === "light" && state === SCREENS[address][0]) {
-                const ringless = await focusRingProblems(page);
-                await open(page, "browser", "/");
-                await reachState();
-                expect(ringless, `${address} ${state.name} focus rings`).toEqual([]);
-              }
-              if ((await openFolds(page)) > 0) {
-                try {
-                  await expectStructure(page, `${file} with its folds open`);
-                } finally {
-                  await closeFolds(page);
-                  // Home first: reaching the same address again would leave the frame as the folds' clicks left it.
-                  await open(page, "browser", "/");
-                  await reachState();
-                }
-              }
+              await checkState(page, `${address} ${state.name}`, { axe: viewport === (state.only ?? "desktop") && theme === "dark", darkToo: theme === "light", tabs: viewport === "desktop" && theme === "light" && state === SCREENS[address][0], reach: reachState });
               taken.push({ file, checks: file.replace(/\.png$/, ".checks.json"), aria: file.replace(/\.png$/, ".aria.yml"), address, state: state.name, viewport, theme, url: url.pathname + url.search });
             } catch (error) {
               failed.push(`${address} ${state.name}: ${error instanceof Error ? error.message.replaceAll("\n", " | ").slice(0, 1500) : String(error)}`);
