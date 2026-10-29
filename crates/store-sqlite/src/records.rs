@@ -3,7 +3,7 @@
 
 use std::collections::BTreeSet;
 
-use cairn_schema::{ConversationId, Email, Slug, Timestamp, Title, UserId};
+use cairn_schema::{ConversationId, Slug, Timestamp, Title, UserId};
 use cairn_store::backend;
 use cairn_store::{
     AgentTokenRecord, AuthLogEntry, AuthLogQuery, ConversationMessage, ConversationRecord,
@@ -136,16 +136,6 @@ pub(crate) fn logins_of(
     user: &UserId,
 ) -> Result<Vec<LoginRecord>, StoreError> {
     logins(connection, "user_id = ?1", vec![text(user)])
-}
-
-pub(crate) fn logins_with_email(
-    connection: &Connection,
-    email: &Email,
-) -> Result<Vec<LoginRecord>, StoreError> {
-    let filter = "EXISTS (SELECT 1 FROM login_emails AS verified \
-                  WHERE verified.provider = user_logins.provider \
-                  AND verified.subject = user_logins.subject AND verified.email = ?1)";
-    logins(connection, filter, vec![text(email)])
 }
 
 pub(crate) fn put_session(

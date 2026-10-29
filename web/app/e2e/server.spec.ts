@@ -193,7 +193,7 @@ async function nameless(page: Page): Promise<void> {
   await expect(page.getByTestId("your-identity").first()).toContainText(name);
 }
 
-test("a nameless identity of the user is asked for its name; an identity signed in with the stub issuer links to the user, and its verified email names their identity", { tag: ["@server", "@serial"] }, async ({ page }) => {
+test("a nameless identity of the user is asked for its name; signing in with the stub issuer names the identity holding its verified email", { tag: ["@server", "@serial"] }, async ({ page }) => {
   await nameless(page);
   const email = `${fresh("linked").replace(/\W/g, "-")}@example.org`;
   await open(page, "server", "/identities");
@@ -201,12 +201,11 @@ test("a nameless identity of the user is asked for its name; an identity signed 
   await open(page, "server", "/me");
   await expect(page.getByTestId("login")).toHaveCount(1);
   await expect(page.locator(`[data-testid="your-identity"][data-identity="${identity}"]`)).toHaveCount(0);
-  await page.getByTestId("link-login").getByRole("link", { name: "Sign in with stub" }).click();
+  await page.goto("/api/auth/stub/sign-in?return_to=%2Fme");
   await page.getByLabel("Email").fill(email);
   await page.getByRole("button", { name: "Sign in" }).click();
   await expect(page.getByTestId("you-screen")).toBeVisible();
   await expect(page.locator('[data-testid="login"][data-provider="stub"]').getByTestId("login-emails")).toContainText(email);
-  await expect(page.locator('[data-testid="login"][data-provider="dev"]')).toBeVisible();
   await expect(page.locator(`[data-testid="your-identity"][data-identity="${identity}"]`)).toBeVisible();
 });
 

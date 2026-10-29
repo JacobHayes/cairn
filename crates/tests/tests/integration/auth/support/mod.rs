@@ -16,7 +16,7 @@ use axum::http::header::{COOKIE, SET_COOKIE};
 use axum::http::{Request, Response, StatusCode};
 use axum::routing::get;
 use axum::{Extension, Json, Router};
-use cairn_auth::{Accounts, Auth, AuthProvider, Clock, Listener};
+use cairn_auth::{Accounts, Auth, AuthProvider, Clock};
 use cairn_schema::{Actor, Timestamp};
 use cairn_store::{AuthEvent, AuthLogQuery, MemoryStore};
 use http_body_util::BodyExt;
@@ -38,14 +38,14 @@ impl TestClock {
     }
 }
 
-/// A loopback TCP listener.
-pub fn loopback() -> Listener {
-    Listener::Tcp("127.0.0.1:8080".parse().unwrap())
+/// A loopback address.
+pub fn loopback() -> SocketAddr {
+    "127.0.0.1:8080".parse().unwrap()
 }
 
-/// A listener every machine on the network reaches.
-pub fn public() -> Listener {
-    Listener::Tcp("0.0.0.0:8080".parse().unwrap())
+/// An address every machine on the network reaches.
+pub fn public() -> SocketAddr {
+    "0.0.0.0:8080".parse().unwrap()
 }
 
 pub fn base() -> Url {
@@ -71,8 +71,8 @@ impl World {
         }
     }
 
-    pub fn auth(&self, listener: Listener, providers: Vec<Arc<dyn AuthProvider>>) -> Auth {
-        Auth::new(self.accounts.clone(), listener, &base(), providers)
+    pub fn auth(&self, providers: Vec<Arc<dyn AuthProvider>>) -> Auth {
+        Auth::new(self.accounts.clone(), &base(), providers)
     }
 
     /// The auth log's events, in order.

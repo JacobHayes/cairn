@@ -2,7 +2,7 @@
 
 use std::collections::BTreeMap;
 
-use cairn_schema::{AgentId, ConversationId, Email, Slug, Timestamp, Title, UserId};
+use cairn_schema::{AgentId, ConversationId, Slug, Timestamp, Title, UserId};
 
 use crate::backend;
 use crate::commit::StoreError;
@@ -59,14 +59,6 @@ impl Outside {
     pub fn logins_of(&self, user: &UserId) -> Vec<LoginRecord> {
         let mine = self.logins.values().filter(|login| login.user == *user);
         mine.cloned().collect()
-    }
-
-    pub fn logins_with_email(&self, email: &Email) -> Vec<LoginRecord> {
-        let verified = self
-            .logins
-            .values()
-            .filter(|login| login.verified_emails.contains(email));
-        verified.cloned().collect()
     }
 
     pub fn put_session(&mut self, session: SessionRecord) -> Result<(), StoreError> {

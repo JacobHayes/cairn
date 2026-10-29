@@ -2,9 +2,10 @@
 //! the routes auth serves outside it: each provider's own, and sign-out.
 //!
 //! A request is authenticated by its session cookie and by every configured provider. Any
-//! refusal refuses the request, so a credential that fails never falls through to another
-//! provider (3.2, Security); otherwise the session, then the first provider in configured
-//! order with a credential, names the actor. Handlers behind the layer read it as an
+//! provider's refusal refuses the request, so a credential that fails never falls through
+//! to another provider (3.2, Security); otherwise the session, then the first provider in
+//! configured order with a credential, names the actor. A session cookie that is no live
+//! session is no credential: it names no one, and the answer clears it. Handlers behind the layer read it as an
 //! `Extension<Actor>`.
 
 use std::net::SocketAddr;
@@ -24,10 +25,10 @@ use url::Url;
 use crate::accounts::Accounts;
 use crate::cookies::{self, SESSION_COOKIE};
 use crate::error::Refusal;
-use crate::provider::{AuthProvider, Listener, Peer, Presented, Verdict};
+use crate::provider::{AuthProvider, Presented, Verdict};
 
-/// Authenticates a request the way the layer does; what a provider's own routes use to
-/// learn who the browser is (the built-in OAuth server's consent).
+/// Authenticates a request the way the layer does; what the built-in OAuth server's consent
+/// uses to learn who the browser is.
 #[async_trait]
 pub trait Authenticate: Send + Sync {
     /// The actor a request's credentials name; none when it carries none.
@@ -36,40 +37,6 @@ pub trait Authenticate: Send + Sync {
         headers: &HeaderMap,
         extensions: &Extensions,
     ) -> Result<Option<Actor>, Refusal>;
-}
-
-/// Who a browser is at a sign-in step (an OIDC sign-in, an OAuth consent).
-pub(crate) struct Browser {
-    /// The actor its credentials name, if any.
-    pub actor: Option<Actor>,
-    /// It carried a session cookie that has lapsed, which the step's answer clears.
-    pub stale_session: bool,
-}
-
-/// Who a browser is at a sign-in step. A lapsed session cookie is what signing in
-/// replaces, so the browser is asked again without it: a provider that signs each request
-/// in (Tailscale, the dev user) still names its user rather than the browser passing for
-/// no one. Any other refusal stands.
-pub(crate) async fn browser(
-    authenticator: &dyn Authenticate,
-    headers: &HeaderMap,
-    extensions: &Extensions,
-) -> Result<Browser, Refusal> {
-    match authenticator.authenticate(headers, extensions).await {
-        Ok(actor) => Ok(Browser {
-            actor,
-            stale_session: false,
-        }),
-        Err(Refusal::Credential) if cookies::read(headers, SESSION_COOKIE).is_some() => {
-            let without = cookies::without(headers, SESSION_COOKIE);
-            let actor = authenticator.authenticate(&without, extensions).await?;
-            Ok(Browser {
-                actor,
-                stale_session: true,
-            })
-        }
-        Err(refusal) => Err(refusal),
-    }
 }
 
 /// The deployment's auth: accounts and the configured providers.
@@ -81,24 +48,16 @@ pub struct Auth {
 struct Inner {
     accounts: Accounts,
     providers: Vec<Arc<dyn AuthProvider>>,
-    listener: Listener,
     secure: bool,
 }
 
 impl Auth {
-    /// Auth for a server on `listener` at the public `base` URL, asking `providers` in
-    /// this order.
+    /// Auth for a server at the public `base` URL, asking `providers` in this order.
     #[must_use]
-    pub fn new(
-        accounts: Accounts,
-        listener: Listener,
-        base: &Url,
-        providers: Vec<Arc<dyn AuthProvider>>,
-    ) -> Self {
+    pub fn new(accounts: Accounts, base: &Url, providers: Vec<Arc<dyn AuthProvider>>) -> Self {
         let inner = Inner {
             accounts,
             providers,
-            listener,
             secure: base.scheme() == "https",
         };
         Self {
@@ -113,9 +72,9 @@ impl Auth {
     }
 
     /// `router` behind the auth layer: every request reaches it with an `Actor` extension,
-    /// or is answered 401, 403, or 503 without reaching it. A TCP server must record peers
+    /// or is answered 401, 403, or 503 without reaching it. The server must record peers
     /// (axum's `into_make_service_with_connect_info::<SocketAddr>`): a request with no
-    /// recorded peer is never local, so the local-only providers refuse it.
+    /// recorded peer is never local, so the providers that need one refuse it.
     pub fn protect(&self, router: Router) -> Router {
         router.layer(middleware::from_fn_with_state(self.clone(), require_actor))
     }
@@ -132,70 +91,13 @@ impl Auth {
             .fold(sign_out, Router::merge)
     }
 
-    /// The connection's peer, as the server recorded it.
-    #[must_use]
-    pub fn peer(&self, extensions: &Extensions) -> Peer {
-        match (
-            extensions.get::<ConnectInfo<SocketAddr>>(),
-            self.inner.listener,
-        ) {
-            (Some(ConnectInfo(address)), Listener::Tcp(_)) => Peer::Tcp(*address),
-            (_, Listener::Unix) => Peer::Unix,
-            (None, Listener::Tcp(_)) => Peer::Unknown,
-        }
-    }
-
-    /// The actor a request names: its session, or the first provider with a credential.
-    ///
-    /// # Errors
-    ///
-    /// The refusal of the session or of any provider.
-    pub async fn authenticate_request(
-        &self,
-        request: Presented<'_>,
-    ) -> Result<Option<Actor>, Refusal> {
-        let mut found = self.session_actor(request.headers).await?;
-        self.check_authorization(request)?;
-        for provider in &self.inner.providers {
-            let actor = match provider.authenticate(request).await {
-                Verdict::Absent => continue,
-                Verdict::Refused(refusal) => return Err(refusal),
-                Verdict::Actor(actor) => self.matchable(actor).await?,
-                Verdict::Login(_) if found.is_some() => continue,
-                Verdict::Login(login) => {
-                    let accounts = &self.inner.accounts;
-                    let user = accounts.resolve(&login, None, provider.auto_link());
-                    Actor {
-                        user: user.await?,
-                        agent: None,
-                    }
-                }
-            };
-            found.get_or_insert(actor);
-        }
-        Ok(found)
-    }
-
-    /// The session cookie's user; a cookie that is not a live session is refused.
+    /// The session cookie's user; none for no cookie or one that is not a live session.
     async fn session_actor(&self, headers: &HeaderMap) -> Result<Option<Actor>, Refusal> {
         let Some(token) = cookies::read(headers, SESSION_COOKIE) else {
             return Ok(None);
         };
-        match self.inner.accounts.session_user(&token).await? {
-            Some(user) => self.matchable(Actor { user, agent: None }).await.map(Some),
-            None => Err(Refusal::Credential),
-        }
-    }
-
-    /// H3: `actor`, unless their user has no login with a verified email, as a session or
-    /// agent token from before sign-in required one may not. They are refused as an
-    /// invalid credential, so they sign in again.
-    async fn matchable(&self, actor: Actor) -> Result<Actor, Refusal> {
-        if self.inner.accounts.can_be_matched(&actor.user).await? {
-            Ok(actor)
-        } else {
-            Err(Refusal::Credential)
-        }
+        let user = self.inner.accounts.session_user(&token).await?;
+        Ok(user.map(|user| Actor { user, agent: None }))
     }
 
     /// An `Authorization` header must hold a bearer token some provider claims: anything
@@ -251,30 +153,42 @@ impl Authenticate for Auth {
         headers: &HeaderMap,
         extensions: &Extensions,
     ) -> Result<Option<Actor>, Refusal> {
-        let request = Presented {
-            headers,
-            peer: self.peer(extensions),
-        };
-        self.authenticate_request(request).await
+        let peer = extensions
+            .get::<ConnectInfo<SocketAddr>>()
+            .map(|ConnectInfo(address)| *address);
+        let request = Presented { headers, peer };
+        let mut found = self.session_actor(request.headers).await?;
+        self.check_authorization(request)?;
+        for provider in &self.inner.providers {
+            let actor = match provider.authenticate(request).await {
+                Verdict::Absent => continue,
+                Verdict::Refused(refusal) => return Err(refusal),
+                Verdict::Actor(actor) => actor,
+                Verdict::Login(_) if found.is_some() => continue,
+                Verdict::Login(login) => {
+                    let user = self.inner.accounts.resolve(&login).await?;
+                    Actor { user, agent: None }
+                }
+            };
+            found.get_or_insert(actor);
+        }
+        Ok(found)
     }
 }
 
 async fn require_actor(State(auth): State<Auth>, mut request: Request, next: Next) -> Response {
-    let presented = Presented {
-        headers: request.headers(),
-        peer: auth.peer(request.extensions()),
-    };
     let path = request.uri().path().to_owned();
-    match auth.authenticate_request(presented).await {
+    let had_session = cookies::read(request.headers(), SESSION_COOKIE).is_some();
+    match auth
+        .authenticate(request.headers(), request.extensions())
+        .await
+    {
         Ok(Some(actor)) => {
             request.extensions_mut().insert(actor);
             next.run(request).await
         }
-        Ok(None) => auth.challenge(&path, None, false),
-        Err(Refusal::Credential) => {
-            let had_session = cookies::read(request.headers(), SESSION_COOKIE).is_some();
-            auth.challenge(&path, Some("invalid_token"), had_session)
-        }
+        Ok(None) => auth.challenge(&path, None, had_session),
+        Err(Refusal::Credential) => auth.challenge(&path, Some("invalid_token"), had_session),
         Err(refusal @ (Refusal::Peer | Refusal::NoVerifiedEmail)) => {
             (StatusCode::FORBIDDEN, refusal.to_string()).into_response()
         }

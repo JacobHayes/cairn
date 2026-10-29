@@ -56,9 +56,10 @@ use super::{GoogleEndpoints, RelayClient};
 use crate::cookies;
 use crate::lifetimes::BROWSER_STEP_LIFETIME;
 use crate::limits::{PROVIDER_CALL_DURATION_MAX, RELAY_REQUEST_IN_FLIGHT_COUNT_MAX};
+use crate::oauth::authorize::{AuthorizeQuery, Checked};
 use crate::oauth::client::{Client, RELAY, Registration};
 use crate::oauth::metadata::{AUTHORIZE, Metadata, REGISTER, TOKEN};
-use crate::oauth::pkce::{is_challenge, is_verifier};
+use crate::oauth::pkce::is_verifier;
 use crate::oauth::reply::{Back, no_store, oauth_error, page, redirect, registered};
 use crate::outbound::Outbound;
 use crate::secret::{digest, random_hex, secrets_equal};
@@ -80,7 +81,6 @@ pub(super) struct Relay {
     /// The Google client's id: the audience of the ID tokens it hands out.
     client_id: String,
     metadata: Arc<Metadata>,
-    base: Url,
     callback: Url,
     authorization: Url,
     google: GoogleClient,
@@ -124,7 +124,6 @@ impl Relay {
         Ok(Self {
             client_id: client.client_id.clone(),
             metadata: Arc::new(Metadata::new(base, &RELAY)),
-            base: base.clone(),
             callback,
             authorization: endpoints.authorization.clone(),
             google,
@@ -132,14 +131,6 @@ impl Relay {
             cookie: format!("cairn_relay_{name}"),
             secure: base.scheme() == "https",
             in_flight: Arc::new(Semaphore::new(RELAY_REQUEST_IN_FLIGHT_COUNT_MAX as usize)),
-        })
-    }
-
-    /// RFC 8707: a resource is this deployment (any path on its origin, as the protected
-    /// resource metadata serves every path), never a query or a fragment.
-    fn is_own_resource(&self, resource: &str) -> bool {
-        Url::parse(resource).is_ok_and(|url| {
-            url.origin() == self.base.origin() && url.query().is_none() && url.fragment().is_none()
         })
     }
 
@@ -254,64 +245,28 @@ impl Carried {
     }
 }
 
-#[derive(Deserialize)]
-struct AuthorizeQuery {
-    response_type: Option<String>,
-    client_id: Option<String>,
-    redirect_uri: Option<String>,
-    state: Option<String>,
-    code_challenge: Option<String>,
-    code_challenge_method: Option<String>,
-    resource: Option<String>,
-}
-
-/// I2, H1: RFC 6749 section 4.1.1: the client and its redirect URI first (answered with a page,
-/// never sent to a URI the client did not register), then the request (answered at the
-/// redirect URI), then on to Google with a cookie binding the attempt to this browser.
+/// I2, H1: RFC 6749 section 4.1.1: the request checked as the built-in server checks it,
+/// then on to Google with a cookie binding the attempt to this browser.
 async fn authorize(
     State(relay): State<Arc<Relay>>,
     Query(query): Query<AuthorizeQuery>,
 ) -> Response {
-    let client_id = query.client_id.unwrap_or_default();
-    let Ok(client) = Client::from_id(&client_id, &RELAY) else {
-        let unknown = "This client is not registered here.";
-        return page(StatusCode::BAD_REQUEST, unknown);
+    let (checked, _) = match Checked::of(query, &relay.metadata, &RELAY) {
+        Ok(checked) => checked,
+        Err(refused) => return *refused,
     };
-    let redirect_uri = query.redirect_uri.unwrap_or_default();
-    if !client.redirects_to(&redirect_uri, &RELAY) {
-        let foreign = "The redirect URI is not the client's.";
-        return page(StatusCode::BAD_REQUEST, foreign);
-    }
-    let back = Back {
-        issuer: relay.metadata.issuer(),
-        redirect_uri: &redirect_uri,
-        state: query.state.as_deref(),
-    };
-    if query.response_type.as_deref() != Some("code") {
-        return back.error("unsupported_response_type");
-    }
-    let challenge = query.code_challenge.unwrap_or_default();
-    if query.code_challenge_method.as_deref() != Some("S256") || !is_challenge(&challenge) {
-        return back.error("invalid_request");
-    }
-    if query
-        .resource
-        .as_deref()
-        .is_some_and(|resource| !relay.is_own_resource(resource))
-    {
-        return back.error("invalid_target");
-    }
+    let back = checked.back(&relay.metadata);
     let Ok(attempt) = random_hex(ATTEMPT_BYTES) else {
         return back.error("temporarily_unavailable");
     };
     let carried = Carried {
-        client_id,
-        redirect_uri: redirect_uri.clone(),
-        state: query.state.clone(),
+        client_id: checked.client_id.clone(),
+        redirect_uri: checked.redirect_uri.clone(),
+        state: checked.state.clone(),
         attempt,
     };
     let state = carried.encode();
-    let google = relay.google_authorization(&state, &challenge);
+    let google = relay.google_authorization(&state, &checked.challenge);
     if Limit::LinkBytes.check(google.as_str().len()).is_err() {
         return back.error("invalid_request");
     }
@@ -410,7 +365,7 @@ async fn token(State(relay): State<Arc<Relay>>, Form(form): Form<TokenForm>) -> 
     if form
         .resource
         .as_deref()
-        .is_some_and(|resource| !relay.is_own_resource(resource))
+        .is_some_and(|resource| !relay.metadata.is_own_resource(resource))
     {
         return refuse("invalid_target", "the resource is not this deployment");
     }

@@ -2,7 +2,7 @@
 
 use std::collections::BTreeSet;
 
-use cairn_schema::{AgentId, Date, Email, IdentityKey, JourneyId, Slug, Timestamp, Title, UserId};
+use cairn_schema::{AgentId, Date, Email, IdentityKey, JourneyId, Slug, Title, UserId};
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
@@ -52,8 +52,6 @@ pub struct LinkedLogin {
     /// The emails the provider marked verified at the last sign-in; only these match an
     /// identity.
     pub verified_emails: BTreeSet<Email>,
-    /// When it was linked.
-    pub linked_at: Timestamp,
 }
 
 impl From<cairn_store::LoginRecord> for LinkedLogin {
@@ -63,7 +61,6 @@ impl From<cairn_store::LoginRecord> for LinkedLogin {
             subject: record.subject,
             name: record.name,
             verified_emails: record.verified_emails,
-            linked_at: record.linked_at,
         }
     }
 }

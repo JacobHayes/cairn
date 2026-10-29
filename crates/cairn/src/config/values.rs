@@ -8,7 +8,6 @@ use cairn_assistant::Protocol;
 use cairn_assistant::protocol::{Credential, ProviderConfig};
 use cairn_auth::{
     DevConfig, GcpIapConfig, OAuthConfig, OidcConfig, ProxySource, RelayClient, TailscaleConfig,
-    TailscaleMode, TrustedProxies,
 };
 use cairn_schema::{Email, Slug, TimeZoneName, Title};
 use jiff::tz::TimeZone;
@@ -17,7 +16,7 @@ use url::Url;
 use super::env::{Origin, VALUE_OVERRIDES, variable_name};
 use super::file::{
     AssistantFile, DevFile, FileConfig, GcpIapFile, OAuthFile, OidcFile, ProviderFile,
-    TailscaleFile, TailscaleModeFile,
+    TailscaleFile,
 };
 use super::{Config, Problem, Provider, rank};
 
@@ -265,17 +264,12 @@ fn provider(
             }))
         }
         ProviderFile::Tailscale(TailscaleFile {
-            mode,
-            socket,
-            trusted_proxies,
-            auto_link,
-            ..
+            trusted_proxies, ..
         }) => {
-            let mode = tailscale_mode(mode, socket, trusted_proxies, &mut at)?;
+            let trusted_proxies = proxy_sources(&trusted_proxies, &mut at)?;
             Some(Provider::Tailscale(TailscaleConfig {
                 name: name?,
-                mode,
-                auto_link,
+                trusted_proxies,
             }))
         }
         ProviderFile::GcpIap(iap) => self::gcp_iap(name, iap, &mut at),
@@ -311,7 +305,6 @@ fn gcp_iap(name: Option<Slug>, written: GcpIapFile, at: &mut At<'_>) -> Option<P
     Some(Provider::GcpIap(GcpIapConfig {
         name: name?,
         audience: written.audience,
-        auto_link: written.auto_link,
         relay,
     }))
 }
@@ -338,7 +331,6 @@ fn dev(name: Option<Slug>, written: DevFile, at: &mut At<'_>) -> Option<Provider
         user: user?,
         verified_emails: verified_emails?,
         token: written.token,
-        auto_link: written.auto_link,
         allow_off_loopback: written.allow_off_loopback,
     }))
 }
@@ -357,7 +349,6 @@ fn oidc(name: Option<Slug>, written: OidcFile, at: &mut At<'_>) -> Option<Provid
         issuer: issuer?,
         client_id: written.client_id,
         client_secret: written.client_secret,
-        auto_link: written.auto_link,
     }))
 }
 
@@ -405,55 +396,13 @@ fn sign_in(
         .map_err(|error| at.push("sign_in_with", error.to_string()))
 }
 
-/// Tailscale's mode: direct names tailscaled's socket (no default: where it lives is the
-/// machine's) and trusts no proxy; proxy names no socket, and trusts this machine unless it
-/// lists where its proxy connects from.
-fn tailscale_mode(
-    mode: TailscaleModeFile,
-    socket: Option<String>,
-    trusted_proxies: Option<Vec<String>>,
-    at: &mut At<'_>,
-) -> Option<TailscaleMode> {
-    match mode {
-        TailscaleModeFile::Direct => {
-            if trusted_proxies.is_some() {
-                at.push(
-                    "trusted_proxies",
-                    "is for proxy mode; direct mode asks tailscaled and reads no header",
-                );
-            }
-            if socket.is_none() {
-                at.push(
-                    "socket",
-                    "is required in direct mode: tailscaled's local API socket",
-                );
-            }
-            let socket = socket.filter(|_| trusted_proxies.is_none())?;
-            Some(TailscaleMode::Direct {
-                socket: PathBuf::from(socket),
-            })
-        }
-        TailscaleModeFile::Proxy => {
-            let trusted = match trusted_proxies {
-                None => Some(TrustedProxies::ThisMachine),
-                Some(written) => proxy_sources(&written, at).map(TrustedProxies::Sources),
-            };
-            if socket.is_some() {
-                at.push("socket", "is for direct mode; proxy mode reads no socket");
-                return None;
-            }
-            trusted.map(|trusted| TailscaleMode::Proxy { trusted })
-        }
-    }
-}
-
-/// The addresses and networks a proxy on another machine connects from: at least one, each
+/// The addresses and networks the authenticating proxy connects from: at least one, each
 /// valid.
 fn proxy_sources(written: &[String], at: &mut At<'_>) -> Option<Vec<ProxySource>> {
     if written.is_empty() {
         at.push(
             "trusted_proxies",
-            "lists no address; leave it out to trust a proxy on this machine",
+            "lists no address; `tailscale serve` on this machine connects from 127.0.0.1",
         );
         return None;
     }

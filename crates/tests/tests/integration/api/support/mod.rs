@@ -16,7 +16,7 @@ use async_trait::async_trait;
 use axum::http::Method;
 use cairn_api::client::{Reply, Transport};
 use cairn_auth::{
-    Accounts, Auth, AuthProvider, Clock, GcpIapConfig, GcpIapProvider, GoogleEndpoints, Listener,
+    Accounts, Auth, AuthProvider, Clock, GcpIapConfig, GcpIapProvider, GoogleEndpoints,
     OAuthConfig, OAuthServer, Presented, RelayClient, Verdict,
 };
 use cairn_engine::from_file;
@@ -72,10 +72,6 @@ struct TeamProvider {
 
 #[async_trait]
 impl AuthProvider for TeamProvider {
-    fn name(&self) -> &Slug {
-        &self.name
-    }
-
     async fn authenticate(&self, request: Presented<'_>) -> Verdict {
         let member = request
             .bearer()
@@ -178,7 +174,7 @@ impl World {
         let base = format!("http://{address}").parse().unwrap();
         let accounts = Accounts::new(Arc::<MemoryStore>::clone(&store), clock.clock());
         let (providers, methods) = front.providers(&accounts, &base, clock.clock());
-        let auth = Auth::new(accounts, Listener::Tcp(address), &base, providers);
+        let auth = Auth::new(accounts, &base, providers);
         let access = McpAccess {
             url: format!("http://{address}/api/mcp"),
             sign_in: vec![AgentSignIn::Oauth],
@@ -328,7 +324,6 @@ impl Front {
                 let config = GcpIapConfig {
                     name: "iap".parse().unwrap(),
                     audience: AUDIENCE.to_owned(),
-                    auto_link: false,
                     relay: Some(RelayClient {
                         client_id: GOOGLE_CLIENT.to_owned(),
                         client_secret: GOOGLE_SECRET.to_owned(),

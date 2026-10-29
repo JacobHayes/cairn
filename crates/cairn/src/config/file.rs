@@ -69,7 +69,7 @@ pub(crate) enum ProviderFile {
     Oidc(OidcFile),
     /// The built-in OAuth server for MCP clients and agent tokens (I2).
     BuiltinOauth(OAuthFile),
-    /// Tailscale login, direct or behind `tailscale serve`.
+    /// Tailscale login, from the headers of the authenticating proxy in front.
     Tailscale(TailscaleFile),
     /// Google Cloud Identity-Aware Proxy's signed assertion on each request.
     GcpIap(GcpIapFile),
@@ -97,8 +97,6 @@ pub(crate) struct DevFile {
     pub verified_emails: Vec<String>,
     pub token: Option<String>,
     #[serde(default)]
-    pub auto_link: bool,
-    #[serde(default)]
     pub allow_off_loopback: bool,
 }
 
@@ -110,8 +108,6 @@ pub(crate) struct OidcFile {
     pub issuer: String,
     pub client_id: String,
     pub client_secret: Option<String>,
-    #[serde(default)]
-    pub auto_link: bool,
 }
 
 /// The built-in OAuth server as written.
@@ -127,13 +123,8 @@ pub(crate) struct OAuthFile {
 #[serde(deny_unknown_fields)]
 pub(crate) struct TailscaleFile {
     pub name: String,
-    pub mode: TailscaleModeFile,
-    pub socket: Option<String>,
-    /// Proxy mode: the addresses or networks a proxy on another machine connects from;
-    /// absent, the proxy is this machine's.
-    pub trusted_proxies: Option<Vec<String>>,
-    #[serde(default)]
-    pub auto_link: bool,
+    /// The addresses or networks the authenticating proxy connects from.
+    pub trusted_proxies: Vec<String>,
 }
 
 /// The Google Cloud IAP provider as written.
@@ -142,22 +133,10 @@ pub(crate) struct TailscaleFile {
 pub(crate) struct GcpIapFile {
     pub name: String,
     pub audience: String,
-    #[serde(default)]
-    pub auto_link: bool,
     /// The Google OAuth client MCP clients sign in through (the relay); absent, there is no
     /// relay.
     pub client_id: Option<String>,
     pub client_secret: Option<String>,
-}
-
-/// Tailscale's two modes.
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Deserialize)]
-#[serde(rename_all = "snake_case")]
-pub(crate) enum TailscaleModeFile {
-    /// Ask tailscaled who the peer is.
-    Direct,
-    /// Trust an authenticating proxy's login headers.
-    Proxy,
 }
 
 /// The assistant's provider (ARCHITECTURE, Assistant).

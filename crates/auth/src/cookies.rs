@@ -24,27 +24,6 @@ pub fn read(headers: &HeaderMap, name: &str) -> Option<String> {
     found.map(|cookie| cookie.value().to_owned())
 }
 
-/// `headers` without the cookie `name`: what a request would be had it not carried it.
-#[must_use]
-pub fn without(headers: &HeaderMap, name: &str) -> HeaderMap {
-    let mut kept = headers.clone();
-    kept.remove(COOKIE);
-    let values = headers.get_all(COOKIE).into_iter();
-    let others: Vec<String> = values
-        .filter_map(|value| value.to_str().ok())
-        .flat_map(Cookie::split_parse)
-        .filter_map(Result::ok)
-        .filter(|cookie| cookie.name() != name)
-        .map(|cookie| format!("{}={}", cookie.name(), cookie.value()))
-        .collect();
-    if let Ok(value) = HeaderValue::from_str(&others.join("; "))
-        && !others.is_empty()
-    {
-        kept.insert(COOKIE, value);
-    }
-    kept
-}
-
 /// A `Set-Cookie` header setting `name` to `value` under `path` for `lifetime`.
 #[must_use]
 pub fn set(name: &str, value: &str, path: &str, lifetime: Duration, secure: bool) -> HeaderValue {
@@ -94,22 +73,6 @@ mod tests {
         assert_eq!(read(&headers, SESSION_COOKIE).as_deref(), Some("abc"));
         assert_eq!(read(&headers, "b").as_deref(), Some("2"));
         assert_eq!(read(&headers, "missing"), None);
-    }
-
-    #[test]
-    fn a_request_without_one_cookie_keeps_the_others() {
-        let mut headers = HeaderMap::new();
-        headers.append(COOKIE, "a=1; cairn_session=abc".parse().unwrap());
-        headers.append(COOKIE, "b=2".parse().unwrap());
-        let kept = without(&headers, SESSION_COOKIE);
-        assert_eq!(read(&kept, SESSION_COOKIE), None);
-        assert_eq!(
-            (read(&kept, "a"), read(&kept, "b")),
-            (Some("1".to_owned()), Some("2".to_owned()))
-        );
-        let mut only = HeaderMap::new();
-        only.insert(COOKIE, "cairn_session=abc".parse().unwrap());
-        assert!(!without(&only, SESSION_COOKIE).contains_key(COOKIE));
     }
 
     #[test]

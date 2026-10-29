@@ -149,10 +149,6 @@ pub trait AuthStore: Send + Sync {
     /// A user's logins, by provider and subject.
     async fn logins_of(&self, user: &UserId) -> Result<Vec<LoginRecord>, StoreError>;
 
-    /// H3: the logins whose provider marked `email` verified, by provider and subject:
-    /// what auto-linking a new login on a matching verified email looks for (3.2).
-    async fn logins_with_email(&self, email: &Email) -> Result<Vec<LoginRecord>, StoreError>;
-
     /// Stores a session, replacing any with its token digest.
     async fn put_session(&self, session: SessionRecord) -> Result<(), StoreError>;
 

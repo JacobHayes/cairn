@@ -23,13 +23,13 @@ use serde_json::json;
 use url::Url;
 
 use super::Server;
+use super::authorize::{AuthorizeQuery, Checked};
 use super::client::{BUILT_IN, Client, Registration};
 use super::metadata::AUTHORIZE;
-use super::pkce::{answers, is_challenge};
-use super::reply::{Back, escape, framed_never, no_store, oauth_error, page, redirect, registered};
-use crate::cookies::{self, SESSION_COOKIE};
+use super::pkce::answers;
+use super::reply::{escape, framed_never, no_store, oauth_error, page, redirect, registered};
 use crate::error::{AuthError, Refusal};
-use crate::layer::{Authenticate, browser};
+use crate::layer::Authenticate;
 use crate::lifetimes::{AUTHORIZATION_CODE_LIFETIME, BROWSER_STEP_LIFETIME};
 use crate::secret::{Secret, SecretKind, digest};
 
@@ -44,33 +44,14 @@ pub(super) struct Flow {
 #[serde(tag = "step", rename_all = "snake_case", deny_unknown_fields)]
 enum Pending {
     /// The user was shown the consent page.
-    Consent { user: UserId, request: Approved },
+    Consent { user: UserId, request: Checked },
     /// The user allowed the client; the code awaits its exchange.
-    Code { user: UserId, request: Approved },
-}
-
-/// An authorization request that passed every check before the user's answer.
-#[derive(Clone, Serialize, Deserialize)]
-struct Approved {
-    client_id: String,
-    redirect_uri: String,
-    challenge: String,
-    state: Option<String>,
+    Code { user: UserId, request: Checked },
 }
 
 /// RFC 7591: registers a public client.
 pub(super) async fn register(Json(registration): Json<Registration>) -> Response {
     registered(Client::register(registration, &BUILT_IN), &BUILT_IN)
-}
-
-#[derive(Deserialize)]
-pub(super) struct AuthorizeQuery {
-    response_type: Option<String>,
-    client_id: Option<String>,
-    redirect_uri: Option<String>,
-    state: Option<String>,
-    code_challenge: Option<String>,
-    code_challenge_method: Option<String>,
 }
 
 /// RFC 6749 section 4.1.1: checks the request, then shows a signed-in user the consent
@@ -82,45 +63,18 @@ pub(super) async fn authorize(
     uri: Uri,
     Query(query): Query<AuthorizeQuery>,
 ) -> Response {
-    let client_id = query.client_id.clone().unwrap_or_default();
-    let Ok(client) = Client::from_id(&client_id, &BUILT_IN) else {
-        return page(
-            StatusCode::BAD_REQUEST,
-            "This client is not registered here.",
-        );
+    let (request, client) = match Checked::of(query, &flow.server.metadata, &BUILT_IN) {
+        Ok(checked) => checked,
+        Err(refused) => return *refused,
     };
-    let redirect_uri = query.redirect_uri.clone().unwrap_or_default();
-    if !client.redirects_to(&redirect_uri, &BUILT_IN) {
-        return page(
-            StatusCode::BAD_REQUEST,
-            "The redirect URI is not the client's.",
-        );
-    }
-    let back = Back {
-        issuer: flow.server.metadata.issuer(),
-        redirect_uri: &redirect_uri,
-        state: query.state.as_deref(),
-    };
-    if query.response_type.as_deref() != Some("code") {
-        return back.error("unsupported_response_type");
-    }
-    let challenge = query.code_challenge.clone().unwrap_or_default();
-    if query.code_challenge_method.as_deref() != Some("S256") || !is_challenge(&challenge) {
-        return back.error("invalid_request");
-    }
-    let (user, lapsed) = match flow.browser_user(&headers, &extensions).await {
-        Ok((Some(user), lapsed)) => (user, lapsed),
-        Ok((None, lapsed)) => return flow.sign_in_first(lapsed, &uri),
+    let user = match flow.browser_user(&headers, &extensions).await {
+        Ok(Some(user)) => user,
+        Ok(None) => return flow.sign_in_first(&uri),
         Err(response) => return *response,
     };
-    let request = Approved {
-        client_id,
-        redirect_uri,
-        challenge,
-        state: query.state,
-    };
-    let shown = flow.ask(user, request, &client).await;
-    flow.clear(lapsed, shown.unwrap_or_else(|error| failure(&error)))
+    flow.ask(user, request, &client)
+        .await
+        .unwrap_or_else(|error| failure(&error))
 }
 
 #[derive(Deserialize)]
@@ -143,15 +97,11 @@ pub(super) async fn consent(
         Err(error) => return failure(&error),
     };
     match flow.browser_user(&headers, &extensions).await {
-        Ok((Some(browser), _)) if browser == user => {}
+        Ok(Some(browser)) if browser == user => {}
         Ok(_) => return page(StatusCode::FORBIDDEN, "Sign in as the user who was asked."),
         Err(response) => return *response,
     }
-    let back = Back {
-        issuer: flow.server.metadata.issuer(),
-        redirect_uri: &request.redirect_uri,
-        state: request.state.as_deref(),
-    };
+    let back = request.back(&flow.server.metadata);
     if form.decision != "allow" {
         return back.error("access_denied");
     }
@@ -208,31 +158,27 @@ pub(super) async fn token(
 }
 
 impl Flow {
-    /// The browser's user, past a lapsed session cookie (which the answer must clear);
-    /// none when it is not signed in. An agent, or any other refused credential, is
-    /// answered at once.
+    /// The browser's user; none when it is not signed in. An agent, or any refused
+    /// credential, is answered at once.
     async fn browser_user(
         &self,
         headers: &HeaderMap,
         extensions: &Extensions,
-    ) -> Result<(Option<UserId>, Lapsed), Box<Response>> {
-        let found = browser(self.authenticator.as_ref(), headers, extensions).await;
-        let found = found.map_err(|refusal| Box::new(refused(&refusal)))?;
-        let lapsed = Lapsed(found.stale_session);
-        match found.actor {
-            Some(Actor { user, agent: None }) => Ok((Some(user), lapsed)),
+    ) -> Result<Option<UserId>, Box<Response>> {
+        let found = self.authenticator.authenticate(headers, extensions).await;
+        match found.map_err(|refusal| Box::new(refused(&refusal)))? {
+            Some(Actor { user, agent: None }) => Ok(Some(user)),
             Some(_) => {
                 let refused = page(StatusCode::FORBIDDEN, "An agent cannot authorize a client.");
                 Err(Box::new(refused))
             }
-            None => Ok((None, lapsed)),
+            None => Ok(None),
         }
     }
 
-    /// Sends the browser to sign in, returning to this very request, and clears the
-    /// session cookie it carried, which did not sign it in.
-    fn sign_in_first(&self, lapsed: Lapsed, uri: &Uri) -> Response {
-        let response = match &self.server.config.sign_in_with {
+    /// Sends the browser to sign in, returning to this very request.
+    fn sign_in_first(&self, uri: &Uri) -> Response {
+        match &self.server.config.sign_in_with {
             Some(provider) => {
                 let path = uri.path_and_query().map_or("/", |path| path.as_str());
                 let return_to: String =
@@ -242,25 +188,14 @@ impl Flow {
                 ))
             }
             None => page(StatusCode::UNAUTHORIZED, "Sign in to Cairn first."),
-        };
-        self.clear(lapsed, response)
-    }
-
-    /// Clears a lapsed session cookie in `response`.
-    fn clear(&self, lapsed: Lapsed, mut response: Response) -> Response {
-        if lapsed.0 {
-            let secure = self.server.metadata.issuer().starts_with("https://");
-            let cleared = cookies::clear(SESSION_COOKIE, "/", secure);
-            cookies::append(response.headers_mut(), cleared);
         }
-        response
     }
 
     /// Stores the consent step and shows the page asking the user.
     async fn ask(
         &self,
         user: UserId,
-        request: Approved,
+        request: Checked,
         client: &Client,
     ) -> Result<Response, AuthError> {
         let step = Secret::mint(SecretKind::Step)?;
@@ -278,7 +213,7 @@ impl Flow {
         Ok(consent_page(name, &request.redirect_uri, step.expose()))
     }
 
-    async fn issue_code(&self, user: UserId, request: Approved) -> Result<Secret, AuthError> {
+    async fn issue_code(&self, user: UserId, request: Checked) -> Result<Secret, AuthError> {
         let code = Secret::mint(SecretKind::Code)?;
         let pending = Pending::Code { user, request };
         let kind = OAuthStateKind::AuthorizationCode;
@@ -339,10 +274,6 @@ impl Flow {
         Ok(minted.token)
     }
 }
-
-/// Whether the request carried a session cookie that has lapsed.
-#[derive(Clone, Copy)]
-struct Lapsed(bool);
 
 fn refused(refusal: &Refusal) -> Response {
     let status = match refusal {

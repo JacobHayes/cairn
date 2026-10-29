@@ -1,53 +1,30 @@
 // H3, H1: who you are here. Your identity (the one holding a verified email of yours, made at
 // your first sign-in when none did), the logins you sign in with and the emails each provider
-// verified. On the server, signing in with another provider while signed in links that login to
-// you (ARCHITECTURE, Auth: users and logins); it comes back here.
+// verified.
 import { Link } from "react-router";
 
 import { pathTo } from "../address.ts";
-import type { Capabilities, Caller } from "../data/host.ts";
-import { useCapabilities, useCaller, useDeployment, useToday } from "../data/react.ts";
-import { dateWords } from "../status/when.ts";
+import type { Caller } from "../data/host.ts";
+import { useCaller, useDeployment } from "../data/react.ts";
 import { NodePanel } from "../acting/NodeItem.tsx";
 import { Badge, Button, Segmented } from "../ui/kit.tsx";
 import { THEME_CHOICES, useThemeChoice, type ThemeChoice } from "../ui/theme.ts";
 import { Failed } from "../ui/Failed.tsx";
 import { useTour } from "../tour/Tour.tsx";
 import { identityLabel } from "./label.ts";
-import { Tip } from "../ui/Tip.tsx";
-
-/** Where a sign-in with provider `name` starts, coming back to this screen (the tab keeps its host). */
-export function signInHref(name: string): string {
-  return `/api/auth/${name}/sign-in?return_to=${encodeURIComponent(pathTo("me"))}`;
-}
-
-/** The providers a browser signs in with by being sent to them: OIDC on the server. */
-export function linkable(capabilities: Capabilities): string[] {
-  return capabilities.auth.filter((method) => method.kind === "oidc").map((method) => method.name);
-}
 
 function Logins({ caller }: { caller: Caller }) {
-  const today = useToday();
   return (
     <NodePanel title="Sign-in methods" count={caller.logins.length} testId="logins">
-      {caller.logins.map((login) => {
-        const linked = login.linked_at.slice(0, 10);
-        return (
+      {caller.logins.map((login) => (
           <li key={`${login.provider}:${login.subject}`} className="you-row" data-testid="login" data-provider={login.provider}>
-            <span className="row">
-              <strong>{login.provider}</strong>
-              <span className="mono">{login.subject}</span>
-            </span>
+            <strong>{login.provider}</strong>
             <span data-testid="login-emails">
               <span className="muted">Verified emails: </span>
               <span className="mono">{login.verified_emails.join(", ") || "none"}</span>
             </span>
-            <Tip tip={login.linked_at} tap>
-              <span className="muted mono small">Linked {dateWords(linked, today)}</span>
-            </Tip>
           </li>
-        );
-      })}
+      ))}
     </NodePanel>
   );
 }
@@ -130,27 +107,15 @@ function Licenses() {
 
 export function You() {
   const { caller, failed } = useCaller();
-  const capabilities = useCapabilities();
   if (caller === undefined) {
     return <p className={failed === undefined ? "muted small" : "callout callout-bad"}>{failed === undefined ? "Reading who you are..." : <Failed what="Who you are" error={failed} />}</p>;
   }
-  const providers = linkable(capabilities);
   return (
     <section className="stack" aria-label="You" data-testid="you-screen">
       <h1>You</h1>
       <YourIdentities caller={caller} />
       <section className="stack" data-testid="sign-in-methods">
         <Logins caller={caller} />
-        {providers.length === 0 ? null : (
-          <span className="row" data-testid="link-login">
-            <span>Link another login:</span>
-            {providers.map((name) => (
-              <a key={name} className="button" href={signInHref(name)}>
-                Sign in with {name}
-              </a>
-            ))}
-          </span>
-        )}
       </section>
       <ThemeControl />
       <TourControl />

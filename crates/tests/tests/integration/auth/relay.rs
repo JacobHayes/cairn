@@ -25,8 +25,7 @@ mod relay {
     use crate::auth::support::iap::AUDIENCE;
     use crate::auth::support::issuer::{Issuer, Person, Switches};
     use crate::auth::support::{
-        REMOTE, World, app, base, body, cookie_header, cookies_set, public, request, send,
-        with_cookie,
+        REMOTE, World, app, base, body, cookie_header, cookies_set, request, send, with_cookie,
     };
 
     const GOOGLE_CLIENT: &str = "relay-client.apps.example";
@@ -51,7 +50,6 @@ mod relay {
         GcpIapConfig {
             name: "iap".parse().unwrap(),
             audience: AUDIENCE.to_owned(),
-            auto_link: false,
             relay: Some(RelayClient {
                 client_id: GOOGLE_CLIENT.to_owned(),
                 client_secret: GOOGLE_SECRET.to_owned(),
@@ -71,7 +69,7 @@ mod relay {
         let clock = world.clock.clock();
         let iap = GcpIapProvider::with_endpoints(relay_config(), clock, &base(), endpoints);
         let iap: Arc<dyn AuthProvider> = Arc::new(iap.unwrap());
-        let router = app(&world.auth(public(), vec![iap]));
+        let router = app(&world.auth(vec![iap]));
         Setup {
             world,
             google,

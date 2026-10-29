@@ -3,7 +3,6 @@
 
 use std::fmt;
 
-use cairn_schema::UserId;
 use cairn_store::StoreError;
 
 /// Why a request's credentials were refused. A refusal decides the request: no other
@@ -46,11 +45,6 @@ pub enum AuthError {
     Upstream(String),
     /// The login carries no verified email, so no identity could ever be matched to it (H3).
     NoVerifiedEmail,
-    /// The login already belongs to another user; merging users is `Later` (PRD).
-    LoginHeldByAnotherUser {
-        /// The user holding it.
-        holder: UserId,
-    },
     /// The token named is not one of the user's.
     NoSuchToken,
 }
@@ -63,9 +57,6 @@ impl fmt::Display for AuthError {
             AuthError::Upstream(reason) => write!(formatter, "sign-in provider: {reason}"),
             AuthError::NoVerifiedEmail => {
                 formatter.write_str("Cairn signs in only with a verified email")
-            }
-            AuthError::LoginHeldByAnotherUser { holder } => {
-                write!(formatter, "the login already belongs to user {holder}")
             }
             AuthError::NoSuchToken => formatter.write_str("no such agent token"),
         }

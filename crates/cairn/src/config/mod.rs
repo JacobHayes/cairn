@@ -18,7 +18,7 @@ use std::fmt;
 use std::net::SocketAddr;
 use std::path::{Path, PathBuf};
 
-use cairn_auth::{DevConfig, GcpIapConfig, Listener, OAuthConfig, OidcConfig, TailscaleConfig};
+use cairn_auth::{DevConfig, GcpIapConfig, OAuthConfig, OidcConfig, TailscaleConfig};
 use cairn_schema::{RankConstants, TimeZoneName};
 use cairn_service::DeploymentSettings;
 use jiff::tz::TimeZone;
@@ -53,12 +53,6 @@ impl Config {
     #[must_use]
     pub fn settings(&self) -> DeploymentSettings {
         DeploymentSettings::new(self.timezone.clone(), self.zone.clone(), self.rank)
-    }
-
-    /// Where the listener accepts connections, as the auth providers judge it.
-    #[must_use]
-    pub fn listener(&self) -> Listener {
-        Listener::Tcp(self.listen)
     }
 }
 

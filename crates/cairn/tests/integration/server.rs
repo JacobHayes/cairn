@@ -372,7 +372,7 @@ mod in_process {
     async fn behind_a_listed_proxy_only_its_login_headers_sign_in() {
         async fn serve_listing(proxy: &str) -> std::net::SocketAddr {
             let tailscale = format!(
-                "[[auth]]\nkind = \"tailscale\"\nname = \"tailnet\"\nmode = \"proxy\"\ntrusted_proxies = [\"{proxy}\"]\n"
+                "[[auth]]\nkind = \"tailscale\"\nname = \"tailnet\"\ntrusted_proxies = [\"{proxy}\"]\n"
             );
             let mut config = support::config(&tailscale);
             // A listener on every address, as one on a private network is: only the listed

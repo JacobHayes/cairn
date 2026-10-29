@@ -4,24 +4,19 @@
 
 #[cfg(test)]
 mod oidc {
-    use std::sync::atomic::{AtomicBool, Ordering};
-    use std::sync::{Arc, OnceLock};
+    use std::sync::Arc;
 
-    use async_trait::async_trait;
     use axum::Router;
     use axum::body::Body;
     use axum::http::StatusCode;
     use axum::http::header::LOCATION;
-    use cairn_auth::{
-        AuthProvider, DevConfig, DevProvider, OidcConfig, OidcProvider, Presented, Refusal, Verdict,
-    };
-    use cairn_schema::{Actor, Login, Slug, UserId};
+    use cairn_auth::{AuthProvider, OidcConfig, OidcProvider};
+    use cairn_schema::{Actor, Login};
     use cairn_store::{AuthLogQuery, AuthStore};
 
     use crate::auth::support::issuer::{Advertise, Issuer, Person, Spoil};
     use crate::auth::support::{
-        LOCAL, World, app, base, cookie_header, cookies_set, loopback, request, send, whoami,
-        with_cookie,
+        LOCAL, World, app, base, cookie_header, cookies_set, request, send, whoami, with_cookie,
     };
 
     const ANN: Person = Person {
@@ -37,7 +32,7 @@ mod oidc {
         router: Router,
     }
 
-    async fn setup(auto_link: bool) -> Setup {
+    async fn setup() -> Setup {
         let world = World::new();
         let issuer = Issuer::start(world.clock.clock()).await;
         let config = OidcConfig {
@@ -45,11 +40,10 @@ mod oidc {
             issuer: issuer.url(),
             client_id: "cairn".to_owned(),
             client_secret: None,
-            auto_link,
         };
         let provider = OidcProvider::new(config, world.accounts.clone(), &base()).unwrap();
         let providers: Vec<Arc<dyn AuthProvider>> = vec![Arc::new(provider)];
-        let router = app(&world.auth(loopback(), providers));
+        let router = app(&world.auth(providers));
         Setup {
             world,
             issuer,
@@ -137,7 +131,7 @@ mod oidc {
     /// the ID token names, with its verified email (H3).
     #[tokio::test]
     async fn a_sign_in_ends_in_a_session_for_the_login_the_issuer_names() {
-        let setup = setup(false).await;
+        let setup = setup().await;
         let session = sign_in(&setup, &ANN, Spoil::Nothing, "").await.unwrap();
         let signed_in = actor(&setup, &session).await;
         let held = setup.world.store.logins_of(&signed_in.user).await.unwrap();
@@ -162,7 +156,7 @@ mod oidc {
     /// sign-in's nonce is refused, and no session is started.
     #[tokio::test]
     async fn a_spoiled_id_token_is_refused() {
-        let setup = setup(false).await;
+        let setup = setup().await;
         let spoils = [
             Spoil::Issuer,
             Spoil::Audience,
@@ -181,7 +175,7 @@ mod oidc {
     /// callback without its cookie, with another sign-in's, or replayed is refused.
     #[tokio::test]
     async fn the_state_and_verifier_are_bound_to_the_browser_that_started() {
-        let setup = setup(false).await;
+        let setup = setup().await;
         let mine = start(&setup, "").await;
         let theirs = start(&setup, "").await;
         let code = setup.issuer.approve(&mine.location, &ANN, Spoil::Nothing);
@@ -199,54 +193,11 @@ mod oidc {
         assert_eq!(replay.status(), StatusCode::BAD_REQUEST);
     }
 
-    /// Signing in while signed in links the login to the browser's user.
+    /// H3: an email the issuer does not mark verified signs no one in: a sign-in with no
+    /// verified email is refused, starting no session and creating no user.
     #[tokio::test]
-    async fn signing_in_while_signed_in_links_the_login() {
-        let setup = setup(false).await;
-        let tailnet = Login {
-            provider: "tailscale".parse().unwrap(),
-            subject: "ann@tailnet".parse().unwrap(),
-            name: None,
-            verified_emails: ["ann@tailnet.example".parse().unwrap()].into(),
-        };
-        let user = setup
-            .world
-            .accounts
-            .resolve(&tailnet, None, false)
-            .await
-            .unwrap();
-        let session = setup.world.accounts.start_session(&user).await.unwrap();
-        let cookie = format!("cairn_session={}", session.expose());
-        let renewed = sign_in(&setup, &ANN, Spoil::Nothing, &cookie)
-            .await
-            .unwrap();
-        assert_eq!(actor(&setup, &renewed).await.user, user);
-        assert_eq!(setup.world.store.logins_of(&user).await.unwrap().len(), 2);
-        let old = with_cookie(request("/whoami", LOCAL), &cookie).body(Body::empty());
-        assert_eq!(
-            whoami(&setup.router, old.unwrap()).await,
-            Err(StatusCode::UNAUTHORIZED)
-        );
-    }
-
-    /// H3: with auto-link on, a verified email joins the user already holding it; an email
-    /// the issuer does not mark verified never links, and a sign-in with no verified email
-    /// at all is refused, starting no session and creating no user.
-    #[tokio::test]
-    async fn an_unverified_email_never_auto_links() {
-        let setup = setup(true).await;
-        let holder = Login {
-            provider: "tailscale".parse().unwrap(),
-            subject: "ann@tailnet".parse().unwrap(),
-            name: None,
-            verified_emails: [ANN.email.parse().unwrap()].into(),
-        };
-        let user = setup
-            .world
-            .accounts
-            .resolve(&holder, None, false)
-            .await
-            .unwrap();
+    async fn an_unverified_email_signs_no_one_in() {
+        let setup = setup().await;
         let unverified = Person {
             subject: "unverified",
             email_verified: false,
@@ -256,16 +207,9 @@ mod oidc {
         assert_eq!(refused, Err(StatusCode::FORBIDDEN));
         let query = AuthLogQuery::default();
         let logged = setup.world.accounts.auth_log(&query).await.unwrap();
-        assert_eq!(logged.items.len(), 2, "no user or login was added");
-        let verified = Person {
-            subject: "verified",
-            ..ANN
-        };
-        let session = sign_in(&setup, &verified, Spoil::Nothing, "")
-            .await
-            .unwrap();
-        assert_eq!(actor(&setup, &session).await.user, user);
+        assert_eq!(logged.items, Vec::new(), "no user or login was added");
     }
+
     /// An issuer that cannot be reached fails the sign-in as a bad gateway, and starts
     /// nothing.
     #[tokio::test]
@@ -276,10 +220,9 @@ mod oidc {
             issuer: "http://127.0.0.1:1/".parse().unwrap(),
             client_id: "cairn".to_owned(),
             client_secret: None,
-            auto_link: false,
         };
         let provider = OidcProvider::new(config, world.accounts.clone(), &base()).unwrap();
-        let router = app(&world.auth(loopback(), vec![Arc::new(provider)]));
+        let router = app(&world.auth(vec![Arc::new(provider)]));
         let start = request("/api/auth/oidc/sign-in", LOCAL)
             .body(Body::empty())
             .unwrap();
@@ -293,7 +236,7 @@ mod oidc {
     #[tokio::test]
     async fn the_issuer_is_called_only_over_https_or_loopback_and_within_the_limit() {
         for advertise in [Advertise::PlainHttpKeys, Advertise::Oversized] {
-            let setup = setup(false).await;
+            let setup = setup().await;
             setup.issuer.advertise(advertise);
             let start = request("/api/auth/oidc/sign-in", LOCAL)
                 .body(Body::empty())
@@ -301,142 +244,12 @@ mod oidc {
             let response = send(&setup.router, start).await;
             assert_eq!(response.status(), StatusCode::BAD_GATEWAY, "{advertise:?}");
         }
-        let setup = setup(false).await;
+        let setup = setup().await;
         setup.issuer.advertise(Advertise::PlainHttpToken);
         let refused = sign_in(&setup, &ANN, Spoil::Nothing, "").await;
         assert_eq!(refused, Err(StatusCode::BAD_GATEWAY));
     }
 
-    /// A browser another provider already signs in (here the named dev user, as Tailscale
-    /// would) links the OIDC login to that user rather than making a new one.
-    #[tokio::test]
-    async fn signing_in_while_signed_in_by_another_provider_links_the_login() {
-        let world = World::new();
-        let issuer = Issuer::start(world.clock.clock()).await;
-        let dev = DevConfig {
-            name: "dev".parse().unwrap(),
-            user: "Dev".parse().unwrap(),
-            verified_emails: ["dev@example.org".parse().unwrap()].into(),
-            token: None,
-            auto_link: false,
-            allow_off_loopback: false,
-        };
-        let config = OidcConfig {
-            name: "oidc".parse().unwrap(),
-            issuer: issuer.url(),
-            client_id: "cairn".to_owned(),
-            client_secret: None,
-            auto_link: false,
-        };
-        let providers: Vec<Arc<dyn AuthProvider>> = vec![
-            Arc::new(DevProvider::new(dev, loopback()).unwrap()),
-            Arc::new(OidcProvider::new(config, world.accounts.clone(), &base()).unwrap()),
-        ];
-        let router = app(&world.auth(loopback(), providers));
-        let setup = Setup {
-            world,
-            issuer,
-            router,
-        };
-        let before = whoami(
-            &setup.router,
-            request("/whoami", LOCAL).body(Body::empty()).unwrap(),
-        );
-        let dev_user = before.await.unwrap().user;
-        sign_in(&setup, &ANN, Spoil::Nothing, "").await.unwrap();
-        let logins = setup.world.store.logins_of(&dev_user).await.unwrap();
-        let providers: Vec<&str> = logins.iter().map(|held| held.provider.as_str()).collect();
-        assert_eq!(providers, ["dev", "oidc"]);
-    }
-    async fn session_for(world: &World, subject: &str) -> (UserId, String) {
-        let login = Login {
-            provider: "tailscale".parse().unwrap(),
-            subject: subject.parse().unwrap(),
-            name: None,
-            verified_emails: [format!("{}@example.org", subject.replace('@', "."))
-                .parse()
-                .unwrap()]
-            .into(),
-        };
-        let user = world.accounts.resolve(&login, None, false).await.unwrap();
-        let session = world.accounts.start_session(&user).await.unwrap();
-        (user, format!("cairn_session={}", session.expose()))
-    }
-
-    /// The login links only to the user who started the sign-in: a browser that
-    /// changed accounts before the callback is refused, and neither user gains it.
-    #[tokio::test]
-    async fn a_sign_in_links_only_to_the_user_who_started_it() {
-        let setup = setup(false).await;
-        let (ann, ann_session) = session_for(&setup.world, "ann@tailnet").await;
-        let (bob, bob_session) = session_for(&setup.world, "bob@tailnet").await;
-        let started = start(&setup, &ann_session).await;
-        let code = setup
-            .issuer
-            .approve(&started.location, &ANN, Spoil::Nothing);
-        let switched = [bob_session.as_str(), started.cookies.as_str()].join("; ");
-        let response = callback(&setup, &code, &state_of(&started.location), &switched).await;
-        assert_eq!(response.status(), StatusCode::BAD_REQUEST);
-        for user in [&ann, &bob] {
-            assert_eq!(setup.world.store.logins_of(user).await.unwrap().len(), 1);
-        }
-    }
-
-    /// A provider that cannot be asked fails the sign-in step, rather than letting it
-    /// carry on as if the browser were no one.
-    #[tokio::test]
-    async fn a_provider_that_cannot_be_asked_fails_the_callback() {
-        struct Failing(AtomicBool);
-        #[async_trait]
-        impl AuthProvider for Failing {
-            fn name(&self) -> &Slug {
-                static NAME: OnceLock<Slug> = OnceLock::new();
-                NAME.get_or_init(|| "failing".parse().unwrap())
-            }
-            async fn authenticate(&self, _: Presented<'_>) -> Verdict {
-                if self.0.load(Ordering::SeqCst) {
-                    Verdict::Refused(Refusal::Unavailable("down".to_owned()))
-                } else {
-                    Verdict::Absent
-                }
-            }
-        }
-        let world = World::new();
-        let issuer = Issuer::start(world.clock.clock()).await;
-        let failing = Arc::new(Failing(AtomicBool::new(false)));
-        let config = OidcConfig {
-            name: "oidc".parse().unwrap(),
-            issuer: issuer.url(),
-            client_id: "cairn".to_owned(),
-            client_secret: None,
-            auto_link: false,
-        };
-        let providers: Vec<Arc<dyn AuthProvider>> = vec![
-            failing.clone(),
-            Arc::new(OidcProvider::new(config, world.accounts.clone(), &base()).unwrap()),
-        ];
-        let router = app(&world.auth(loopback(), providers));
-        let setup = Setup {
-            world,
-            issuer,
-            router,
-        };
-        let started = start(&setup, "").await;
-        let code = setup
-            .issuer
-            .approve(&started.location, &ANN, Spoil::Nothing);
-        failing.0.store(true, Ordering::SeqCst);
-        let response = callback(
-            &setup,
-            &code,
-            &state_of(&started.location),
-            &started.cookies,
-        )
-        .await;
-        assert_eq!(response.status(), StatusCode::SERVICE_UNAVAILABLE);
-        assert_eq!(cookies_set(&response), Vec::new());
-        assert_eq!(setup.world.log().await, Vec::new());
-    }
     /// An issuer that takes the client secret only in the form post gets it there.
     #[tokio::test]
     async fn the_client_secret_goes_where_the_issuer_takes_it() {
@@ -448,73 +261,14 @@ mod oidc {
             issuer: issuer.url(),
             client_id: "cairn".to_owned(),
             client_secret: Some("shh".to_owned()),
-            auto_link: false,
         };
         let provider = OidcProvider::new(config, world.accounts.clone(), &base()).unwrap();
-        let router = app(&world.auth(loopback(), vec![Arc::new(provider)]));
+        let router = app(&world.auth(vec![Arc::new(provider)]));
         let setup = Setup {
             world,
             issuer,
             router,
         };
         assert!(sign_in(&setup, &ANN, Spoil::Nothing, "").await.is_ok());
-    }
-
-    /// A browser the dev user signs in, carrying a lapsed session cookie, still links the
-    /// login to the dev user.
-    #[tokio::test]
-    async fn a_lapsed_session_does_not_hide_the_provider_that_signs_the_browser_in() {
-        let world = World::new();
-        let issuer = Issuer::start(world.clock.clock()).await;
-        let dev = DevConfig {
-            name: "dev".parse().unwrap(),
-            user: "Dev".parse().unwrap(),
-            verified_emails: ["dev@example.org".parse().unwrap()].into(),
-            token: None,
-            auto_link: false,
-            allow_off_loopback: false,
-        };
-        let config = OidcConfig {
-            name: "oidc".parse().unwrap(),
-            issuer: issuer.url(),
-            client_id: "cairn".to_owned(),
-            client_secret: None,
-            auto_link: false,
-        };
-        let providers: Vec<Arc<dyn AuthProvider>> = vec![
-            Arc::new(DevProvider::new(dev, loopback()).unwrap()),
-            Arc::new(OidcProvider::new(config, world.accounts.clone(), &base()).unwrap()),
-        ];
-        let router = app(&world.auth(loopback(), providers));
-        let setup = Setup {
-            world,
-            issuer,
-            router,
-        };
-        let dev_user = whoami(
-            &setup.router,
-            request("/whoami", LOCAL).body(Body::empty()).unwrap(),
-        )
-        .await
-        .unwrap()
-        .user;
-        let (_, session) = session_for(&setup.world, "someone@tailnet").await;
-        setup
-            .world
-            .clock
-            .advance(i64::try_from(cairn_auth::lifetimes::SESSION_LIFETIME.as_secs()).unwrap());
-        sign_in(&setup, &ANN, Spoil::Nothing, &session)
-            .await
-            .unwrap();
-        let providers: Vec<String> = setup
-            .world
-            .store
-            .logins_of(&dev_user)
-            .await
-            .unwrap()
-            .into_iter()
-            .map(|held| held.provider.to_string())
-            .collect();
-        assert_eq!(providers, ["dev", "oidc"]);
     }
 }

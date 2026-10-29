@@ -45,6 +45,15 @@ impl Metadata {
         &self.issuer
     }
 
+    /// RFC 8707: a resource is this deployment (any path on its origin, as the protected
+    /// resource metadata serves every path), never a query or a fragment.
+    pub(crate) fn is_own_resource(&self, resource: &str) -> bool {
+        let own = Url::parse(&self.issuer).ok().map(|url| url.origin());
+        Url::parse(resource).is_ok_and(|url| {
+            Some(url.origin()) == own && url.query().is_none() && url.fragment().is_none()
+        })
+    }
+
     /// The absolute URL of `path` on this deployment.
     pub(crate) fn endpoint(&self, path: &str) -> String {
         format!("{}{path}", self.issuer)

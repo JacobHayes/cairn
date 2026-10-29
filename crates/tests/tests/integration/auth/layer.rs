@@ -5,13 +5,14 @@
 #[cfg(test)]
 mod layer {
     use std::collections::BTreeSet;
+    use std::net::SocketAddr;
     use std::sync::Arc;
 
     use axum::body::Body;
     use axum::http::StatusCode;
     use axum::http::header::{AUTHORIZATION, WWW_AUTHENTICATE};
     use cairn_auth::lifetimes::SESSION_LIFETIME;
-    use cairn_auth::{AuthProvider, DevConfig, DevProvider, Listener};
+    use cairn_auth::{AuthProvider, DevConfig, DevProvider};
     use cairn_schema::UserId;
     use cairn_store::{AuthEvent, AuthStore};
 
@@ -26,13 +27,12 @@ mod layer {
             user: format!("{name} user").parse().unwrap(),
             verified_emails: BTreeSet::from(["dev@example.org".parse().unwrap()]),
             token: token.map(str::to_owned),
-            auto_link: false,
             allow_off_loopback: false,
         }
     }
 
-    /// A user with one login, verified for `email` when given.
-    async fn signed_up(world: &World, user: &str, email: Option<&str>) -> UserId {
+    /// A user with one login verified for `email`.
+    async fn signed_up(world: &World, user: &str, email: &str) -> UserId {
         let user: UserId = user.parse().unwrap();
         let store = world.accounts.store();
         let created_at = world.accounts.clock().now();
@@ -47,10 +47,7 @@ mod layer {
                 subject: user.as_str().parse().unwrap(),
                 user: user.clone(),
                 name: None,
-                verified_emails: email
-                    .map(|email| email.parse().unwrap())
-                    .into_iter()
-                    .collect(),
+                verified_emails: [email.parse().unwrap()].into(),
                 linked_at: created_at,
             })
             .await
@@ -58,8 +55,8 @@ mod layer {
         user
     }
 
-    fn provider(config: DevConfig, listener: Listener) -> Arc<dyn AuthProvider> {
-        Arc::new(DevProvider::new(config, listener).unwrap())
+    fn provider(config: DevConfig, listen: SocketAddr) -> Arc<dyn AuthProvider> {
+        Arc::new(DevProvider::new(config, listen).unwrap())
     }
 
     fn get(uri: &str, peer: &str) -> axum::http::Request<Body> {
@@ -76,7 +73,7 @@ mod layer {
     #[tokio::test]
     async fn the_named_dev_user_is_one_user_created_once() {
         let world = World::new();
-        let auth = world.auth(loopback(), vec![provider(dev("dev", None), loopback())]);
+        let auth = world.auth(vec![provider(dev("dev", None), loopback())]);
         let router = app(&auth);
         let first = whoami(&router, get("/whoami", LOCAL)).await.unwrap();
         let again = whoami(&router, get("/whoami", LOCAL)).await.unwrap();
@@ -91,12 +88,10 @@ mod layer {
         assert_eq!(world.log().await, logged);
     }
 
-    /// Dev mode is refused off loopback without the override: it does not start on a
-    /// listener other machines reach, and refuses a request from another machine.
+    /// Dev mode is refused off loopback without the override: it does not start on an
+    /// address other machines reach, and refuses a request from another machine.
     #[tokio::test]
     async fn dev_mode_is_refused_off_loopback_without_the_override() {
-        let unix = DevProvider::new(dev("dev", None), Listener::Unix);
-        assert!(unix.is_ok());
         let refused = DevProvider::new(dev("dev", None), public());
         assert!(refused.is_err());
         let overridden = DevConfig {
@@ -104,10 +99,10 @@ mod layer {
             ..dev("dev", None)
         };
         let world = World::new();
-        let open = world.auth(public(), vec![provider(overridden, public())]);
+        let open = world.auth(vec![provider(overridden, public())]);
         assert!(whoami(&app(&open), get("/whoami", REMOTE)).await.is_ok());
 
-        let local = world.auth(loopback(), vec![provider(dev("dev", None), loopback())]);
+        let local = world.auth(vec![provider(dev("dev", None), loopback())]);
         let status = whoami(&app(&local), get("/whoami", REMOTE)).await;
         assert_eq!(status, Err(StatusCode::FORBIDDEN));
     }
@@ -119,7 +114,7 @@ mod layer {
     async fn the_dev_token_signs_in_and_a_wrong_or_unclaimed_token_is_refused() {
         let world = World::new();
         let config = dev("dev", Some("let-me-in"));
-        let router = app(&world.auth(loopback(), vec![provider(config, loopback())]));
+        let router = app(&world.auth(vec![provider(config, loopback())]));
         assert!(whoami(&router, bearer("let-me-in", LOCAL)).await.is_ok());
 
         let cases = [
@@ -153,7 +148,7 @@ mod layer {
             provider(dev("token", Some("let-me-in")), loopback()),
             provider(dev("ambient", None), loopback()),
         ];
-        let router = app(&world.auth(loopback(), providers));
+        let router = app(&world.auth(providers));
         let token = whoami(&router, bearer("let-me-in", LOCAL)).await.unwrap();
         let ambient = whoami(&router, get("/whoami", LOCAL)).await.unwrap();
         assert_ne!(token.user, ambient.user);
@@ -162,21 +157,6 @@ mod layer {
         let basic = request("/whoami", LOCAL).header(AUTHORIZATION, "Basic YTpi");
         let basic = whoami(&router, basic.body(Body::empty()).unwrap()).await;
         assert_eq!(basic, Err(StatusCode::UNAUTHORIZED));
-    }
-
-    /// H3: a session of a user from before sign-in required a verified email, with none on
-    /// any login, is refused and cleared like a lapsed one, so they sign in again.
-    #[tokio::test]
-    async fn a_session_of_a_user_with_no_verified_email_is_refused() {
-        let world = World::new();
-        let router = app(&world.auth(loopback(), Vec::new()));
-        let ann = signed_up(&world, "u_ann", None).await;
-        let token = world.accounts.start_session(&ann).await.unwrap();
-        let cookie = format!("cairn_session={}", token.expose());
-        let signed_in = with_cookie(request("/whoami", LOCAL), &cookie).body(Body::empty());
-        let response = send(&router, signed_in.unwrap()).await;
-        assert_eq!(response.status(), StatusCode::UNAUTHORIZED);
-        assert!(!cookies_set(&response).is_empty(), "the cookie is cleared");
     }
 
     /// A blank `Authorization`, as IAP passes on once it has taken a Google ID token from
@@ -189,7 +169,7 @@ mod layer {
             provider(dev("token", Some("let-me-in")), loopback()),
             provider(dev("ambient", None), loopback()),
         ];
-        let router = app(&world.auth(loopback(), providers));
+        let router = app(&world.auth(providers));
         let ambient = whoami(&router, get("/whoami", LOCAL)).await.unwrap();
         for blank in ["", "  "] {
             let request = request("/whoami", LOCAL).header(AUTHORIZATION, blank);
@@ -204,12 +184,12 @@ mod layer {
     }
 
     /// A session cookie signs the browser in until it lapses or is ended; a lapsed, ended,
-    /// or forged one is refused and cleared rather than ignored.
+    /// or forged one signs no one in, and the refusal clears it.
     #[tokio::test]
     async fn a_session_signs_in_until_it_lapses_or_ends() {
         let world = World::new();
-        let router = app(&world.auth(loopback(), Vec::new()));
-        let ann = signed_up(&world, "u_ann", Some("ann@example.org")).await;
+        let router = app(&world.auth(Vec::new()));
+        let ann = signed_up(&world, "u_ann", "ann@example.org").await;
         let token = world.accounts.start_session(&ann).await.unwrap();
         let cookie = format!("cairn_session={}", token.expose());
         let signed_in = || with_cookie(request("/whoami", LOCAL), &cookie).body(Body::empty());

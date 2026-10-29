@@ -20,7 +20,7 @@ mod oauth {
 
     use crate::auth::support::issuer::{Issuer, Person, Spoil};
     use crate::auth::support::{
-        LOCAL, World, app, base, body, cookie_header, cookies_set, loopback, request, send, whoami,
+        LOCAL, World, app, base, body, cookie_header, cookies_set, request, send, whoami,
         with_cookie,
     };
 
@@ -47,7 +47,6 @@ mod oauth {
                 issuer: issuer.url(),
                 client_id: "cairn".to_owned(),
                 client_secret: None,
-                auto_link: false,
             };
             providers.push(Arc::new(
                 OidcProvider::new(config, world.accounts.clone(), &base()).unwrap(),
@@ -62,7 +61,7 @@ mod oauth {
             world.accounts.clone(),
             &base(),
         )));
-        let router = app(&world.auth(loopback(), providers));
+        let router = app(&world.auth(providers));
         Setup {
             world,
             router,
@@ -470,8 +469,8 @@ mod oauth {
             "no provider to sign in with"
         );
     }
-    /// A lapsed session cookie is no dead end: the authorization clears it and sends the
-    /// browser to sign in again.
+    /// A lapsed session cookie is no dead end: the authorization sends the browser to
+    /// sign in again.
     #[tokio::test]
     async fn a_lapsed_session_signs_in_again_rather_than_failing() {
         let setup = setup(true).await;
@@ -488,10 +487,6 @@ mod oauth {
         .await;
         assert_eq!(response.status(), StatusCode::SEE_OTHER);
         assert!(location(&response).starts_with("/api/auth/oidc/sign-in?"));
-        assert_eq!(
-            cookies_set(&response),
-            [("cairn_session".to_owned(), String::new())]
-        );
     }
     /// Every challenge names metadata the server serves, the deployment's root included.
     #[tokio::test]
@@ -512,53 +507,5 @@ mod oauth {
             assert_eq!(response.status(), StatusCode::OK, "{path}");
             assert_eq!(json_of(response).await["resource"], resource);
         }
-    }
-
-    /// A browser whose session lapsed but which another provider signs in (the dev user)
-    /// goes on to the consent as that user, and the lapsed cookie is cleared.
-    #[tokio::test]
-    async fn a_lapsed_session_falls_back_to_the_provider_that_signs_the_browser_in() {
-        let world = World::new();
-        let dev = cairn_auth::DevConfig {
-            name: "dev".parse().unwrap(),
-            user: "Dev".parse().unwrap(),
-            verified_emails: ["dev@example.org".parse().unwrap()].into(),
-            token: None,
-            auto_link: false,
-            allow_off_loopback: false,
-        };
-        let config = OAuthConfig {
-            name: "cairn".parse().unwrap(),
-            sign_in_with: None,
-        };
-        let providers: Vec<Arc<dyn AuthProvider>> = vec![
-            Arc::new(cairn_auth::DevProvider::new(dev, loopback()).unwrap()),
-            Arc::new(OAuthServer::new(config, world.accounts.clone(), &base())),
-        ];
-        let router = app(&world.auth(loopback(), providers));
-        let setup = Setup {
-            world,
-            router,
-            issuer: None,
-        };
-        let lapsed = format!(
-            "cairn_session={}",
-            cairn_auth::Secret::mint(cairn_auth::secret::SecretKind::Session)
-                .unwrap()
-                .expose()
-        );
-        let client = client_id(&setup).await;
-        let (challenge, _) = PkceCodeChallenge::new_random_sha256();
-        let shown = get(
-            &setup,
-            &authorize_uri(&client, REDIRECT, challenge.as_str()),
-            &lapsed,
-        )
-        .await;
-        assert_eq!(shown.status(), StatusCode::OK);
-        assert_eq!(
-            cookies_set(&shown),
-            [("cairn_session".to_owned(), String::new())]
-        );
     }
 }

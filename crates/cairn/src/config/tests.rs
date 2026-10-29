@@ -4,7 +4,6 @@
 use std::path::Path;
 
 use cairn_assistant::Protocol;
-use cairn_auth::{TailscaleMode, TrustedProxies};
 use cairn_schema::RankConstants;
 
 use super::*;
@@ -168,7 +167,6 @@ kind = \"oidc\"
 name = \"corp\"
 issuer = \"https://issuer.example\"
 client_id = \"cairn\"
-auto_link = true
 [[auth]]
 kind = \"builtin_oauth\"
 name = \"agents\"
@@ -176,12 +174,11 @@ sign_in_with = \"corp\"
 [[auth]]
 kind = \"tailscale\"
 name = \"tailnet\"
-mode = \"proxy\"
+trusted_proxies = [\"10.10.10.2\"]
 [[auth]]
 kind = \"gcp_iap\"
 name = \"iap\"
 audience = \"/projects/1/global/backendServices/2\"
-auto_link = true
 [assistant]
 protocol = \"anthropic_messages\"
 endpoint = \"https://api.anthropic.com/v1\"
@@ -195,10 +192,7 @@ api_key = \"key\"
         .iter()
         .map(|provider| match provider {
             Provider::Dev(dev) => dev.name.to_string(),
-            Provider::Oidc(oidc) => {
-                assert!(oidc.auto_link);
-                oidc.name.to_string()
-            }
+            Provider::Oidc(oidc) => oidc.name.to_string(),
             Provider::BuiltinOauth(oauth) => {
                 assert_eq!(
                     oauth.sign_in_with.as_ref().map(ToString::to_string),
@@ -206,9 +200,11 @@ api_key = \"key\"
                 );
                 oauth.name.to_string()
             }
-            Provider::Tailscale(tailscale) => tailscale.name.to_string(),
+            Provider::Tailscale(tailscale) => {
+                assert_eq!(tailscale.trusted_proxies.len(), 1);
+                tailscale.name.to_string()
+            }
             Provider::GcpIap(iap) => {
-                assert!(iap.auto_link);
                 assert_eq!(iap.audience, "/projects/1/global/backendServices/2");
                 iap.name.to_string()
             }
@@ -228,32 +224,6 @@ fn a_chat_completions_assistant_needs_no_key() {
     );
     let assistant = parsed(&text).unwrap().assistant.unwrap();
     assert!(assistant.credential.is_none());
-}
-
-/// Tailscale's proxy mode trusts this machine unless it lists where its proxy connects
-/// from, as addresses or networks.
-#[test]
-fn proxy_mode_trusts_this_machine_or_the_proxies_it_lists() {
-    let cases = [
-        ("", TrustedProxies::ThisMachine),
-        (
-            "trusted_proxies = [\"10.10.10.2\", \"fd00::/8\"]",
-            TrustedProxies::Sources(vec![
-                "10.10.10.2".parse().unwrap(),
-                "fd00::/8".parse().unwrap(),
-            ]),
-        ),
-    ];
-    for (listed, trusted) in cases {
-        let text = format!(
-            "{MINIMAL}\n[[auth]]\nkind = \"tailscale\"\nname = \"tailnet\"\nmode = \"proxy\"\n{listed}"
-        );
-        let config = parsed(&text).unwrap();
-        let Some(Provider::Tailscale(tailscale)) = config.auth.last() else {
-            panic!("no Tailscale provider: {listed}");
-        };
-        assert_eq!(tailscale.mode, TailscaleMode::Proxy { trusted }, "{listed}");
-    }
 }
 
 /// An IAP provider with the Google client its relay signs MCP clients in through.
@@ -340,23 +310,11 @@ fn provider_mistakes_are_named_by_provider() {
             "auth.agents.sign_in_with",
         ),
         (
-            "[[auth]]\nkind = \"tailscale\"\nname = \"tailnet\"\nmode = \"direct\"",
-            "auth.tailnet.socket",
-        ),
-        (
-            "[[auth]]\nkind = \"tailscale\"\nname = \"tailnet\"\nmode = \"proxy\"\nsocket = \"/run/ts.sock\"",
-            "auth.tailnet.socket",
-        ),
-        (
-            "[[auth]]\nkind = \"tailscale\"\nname = \"tailnet\"\nmode = \"direct\"\nsocket = \"/run/ts.sock\"\ntrusted_proxies = [\"10.0.0.1\"]",
+            "[[auth]]\nkind = \"tailscale\"\nname = \"tailnet\"\ntrusted_proxies = []",
             "auth.tailnet.trusted_proxies",
         ),
         (
-            "[[auth]]\nkind = \"tailscale\"\nname = \"tailnet\"\nmode = \"proxy\"\ntrusted_proxies = []",
-            "auth.tailnet.trusted_proxies",
-        ),
-        (
-            "[[auth]]\nkind = \"tailscale\"\nname = \"tailnet\"\nmode = \"proxy\"\ntrusted_proxies = [\"10.0.0.1\", \"edge.example\"]",
+            "[[auth]]\nkind = \"tailscale\"\nname = \"tailnet\"\ntrusted_proxies = [\"10.0.0.1\", \"edge.example\"]",
             "auth.tailnet.trusted_proxies",
         ),
         (
@@ -408,7 +366,8 @@ fn the_mcp_access_follows_the_providers() {
 
     let head = "database = \"cairn.db\"\nlisten = \"127.0.0.1:8080\"\ntimezone = \"UTC\"\n";
     let dev = "[[auth]]\nkind = \"dev\"\nname = \"dev\"\nuser = \"Dev\"\nverified_emails = [\"dev@example.org\"]\n";
-    let tailscale = "[[auth]]\nkind = \"tailscale\"\nname = \"tailnet\"\nmode = \"proxy\"\n";
+    let tailscale =
+        "[[auth]]\nkind = \"tailscale\"\nname = \"tailnet\"\ntrusted_proxies = [\"10.10.10.2\"]\n";
     let builtin = "[[auth]]\nkind = \"builtin_oauth\"\nname = \"agents\"\n";
     let oidc = "[[auth]]\nkind = \"oidc\"\nname = \"corp\"\nissuer = \"https://issuer.example/\"\nclient_id = \"c\"\n";
     let iap = IAP_RELAY.replace(

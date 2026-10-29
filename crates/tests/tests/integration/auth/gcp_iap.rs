@@ -20,7 +20,7 @@ mod gcp_iap {
     use axum::http::header::{CONTENT_TYPE, WWW_AUTHENTICATE};
     use cairn_auth::gcp_iap::ASSERTION_HEADER;
     use cairn_auth::{
-        AuthProvider, DevConfig, DevProvider, GcpIapConfig, GcpIapProvider, GoogleEndpoints, Peer,
+        AuthProvider, DevConfig, DevProvider, GcpIapConfig, GcpIapProvider, GoogleEndpoints,
         Presented, Refusal, RelayClient, Verdict,
     };
     use cairn_store::AuthStore;
@@ -28,9 +28,7 @@ mod gcp_iap {
     use url::Url;
 
     use crate::auth::support::iap::{AUDIENCE, KeySet, claims_of, key, sign, sign_as};
-    use crate::auth::support::{
-        LOCAL, REMOTE, World, app, base, loopback, public, request, send, whoami,
-    };
+    use crate::auth::support::{LOCAL, REMOTE, World, app, base, loopback, request, send, whoami};
 
     const SUBJECT: &str = "accounts.google.com:1234567890";
     const EMAIL: &str = "ann@example.org";
@@ -39,7 +37,6 @@ mod gcp_iap {
         GcpIapConfig {
             name: "iap".parse().unwrap(),
             audience: AUDIENCE.to_owned(),
-            auto_link: false,
             relay: None,
         }
     }
@@ -83,7 +80,7 @@ mod gcp_iap {
         }
         let presented = Presented {
             headers: &headers,
-            peer: Peer::Unknown,
+            peer: None,
         };
         provider.authenticate(presented).await
     }
@@ -101,7 +98,7 @@ mod gcp_iap {
         let keys = KeySet::start(&[&signer]).await;
         let world = World::new();
         let iap: Arc<dyn AuthProvider> = Arc::new(provider(&world, &keys));
-        let router = app(&world.auth(public(), vec![iap]));
+        let router = app(&world.auth(vec![iap]));
         let assertion = sign(&claims(now(&world)), &signer);
         let get = request("/whoami", REMOTE)
             .header(ASSERTION_HEADER, &assertion)
@@ -212,7 +209,7 @@ mod gcp_iap {
         headers.append(ASSERTION_HEADER, other.parse().unwrap());
         let presented = Presented {
             headers: &headers,
-            peer: Peer::Unknown,
+            peer: None,
         };
         let refused = iap.authenticate(presented).await;
         assert_eq!(refused, Verdict::Refused(Refusal::Credential));
@@ -228,7 +225,7 @@ mod gcp_iap {
         let keys = KeySet::start(&[&signer]).await;
         let world = World::new();
         let iap: Arc<dyn AuthProvider> = Arc::new(provider(&world, &keys));
-        let router = app(&world.auth(public(), vec![iap]));
+        let router = app(&world.auth(vec![iap]));
         let call = |subject: &str| {
             let assertion = sign(&claims_of(subject, EMAIL, now(&world)), &signer);
             let call = request("/whoami", REMOTE).header(ASSERTION_HEADER, assertion);
@@ -537,7 +534,7 @@ mod gcp_iap {
         let keys = KeySet::start(&[&signer]).await;
         let world = World::new();
         let iap: Arc<dyn AuthProvider> = Arc::new(provider_with(&world, &keys, relay_config()));
-        let router = app(&world.auth(public(), vec![iap]));
+        let router = app(&world.auth(vec![iap]));
         let bearer = google_bearer(&world);
         let at = now(&world);
         let expired = sign(&claims_of(SUBJECT, EMAIL, at - 3600), &signer);
@@ -588,14 +585,13 @@ mod gcp_iap {
             user: "Dev".parse().unwrap(),
             verified_emails: ["dev@example.org".parse().unwrap()].into(),
             token: None,
-            auto_link: false,
             allow_off_loopback: false,
         };
         let providers: Vec<Arc<dyn AuthProvider>> = vec![
             Arc::new(DevProvider::new(dev, loopback()).unwrap()),
             Arc::new(provider_with(&world, &keys, relay_config())),
         ];
-        let router = app(&world.auth(loopback(), providers));
+        let router = app(&world.auth(providers));
         let plain = request("/whoami", LOCAL).body(Body::empty()).unwrap();
         assert!(
             whoami(&router, plain).await.is_ok(),
@@ -615,7 +611,7 @@ mod gcp_iap {
         let keys = KeySet::start(&[&signer]).await;
         let world = World::new();
         let iap: Arc<dyn AuthProvider> = Arc::new(provider(&world, &keys));
-        let router = app(&world.auth(public(), vec![iap]));
+        let router = app(&world.auth(vec![iap]));
         let assertion = sign(&claims(now(&world)), &signer);
         let both = request("/whoami", REMOTE)
             .header(ASSERTION_HEADER, &assertion)

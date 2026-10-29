@@ -490,10 +490,6 @@ impl AuthStore for MemoryStore {
         Ok(self.state().outside.logins_of(user))
     }
 
-    async fn logins_with_email(&self, email: &Email) -> Result<Vec<LoginRecord>, StoreError> {
-        Ok(self.state().outside.logins_with_email(email))
-    }
-
     async fn put_session(&self, session: SessionRecord) -> Result<(), StoreError> {
         self.state().outside.put_session(session)
     }

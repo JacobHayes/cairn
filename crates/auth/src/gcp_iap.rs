@@ -77,8 +77,6 @@ pub struct GcpIapConfig {
     /// `/projects/<project number>/global/backendServices/<backend service id>` behind a
     /// load balancer.
     pub audience: String,
-    /// H3: link a new login to the user holding one of its verified emails.
-    pub auto_link: bool,
     /// I2: the Google OAuth client on IAP's programmatic allowlist, through which MCP
     /// clients sign in; without it the provider serves no OAuth endpoints.
     pub relay: Option<RelayClient>,
@@ -393,10 +391,6 @@ impl GcpIapProvider {
 
 #[async_trait]
 impl AuthProvider for GcpIapProvider {
-    fn name(&self) -> &Slug {
-        &self.config.name
-    }
-
     /// H1, I2: the request's assertion names its user. A Google ID token as the bearer
     /// (the relay's) counts only beside a valid assertion: alone, it is refused rather than
     /// left for another provider, and it is never read for who the user is.
@@ -423,13 +417,8 @@ impl AuthProvider for GcpIapProvider {
         self.relay.is_some() && relay::is_id_token(token)
     }
 
-    fn auto_link(&self) -> bool {
-        self.config.auto_link
-    }
-
     /// The relay's OAuth endpoints, when it has a Google client.
-    fn router(&self, authenticator: Arc<dyn Authenticate>) -> Option<Router> {
-        let _ = authenticator;
+    fn router(&self, _authenticator: Arc<dyn Authenticate>) -> Option<Router> {
         self.relay.as_ref().map(relay::router)
     }
 }

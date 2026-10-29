@@ -1,7 +1,7 @@
 //! The `AuthProvider` trait (ARCHITECTURE, Auth): given a request, a provider answers with
-//! the login it vouches for, an actor Cairn already knows, nothing, or a refusal.
-//! Providers are configured independently and run together; each may serve its own routes
-//! (a login and its callback, the OAuth endpoints).
+//! the login it vouches for, an actor Cairn already knows, nothing, or a refusal. Providers
+//! are configured independently and run together; each may serve its own routes (a login
+//! and its callback, the OAuth endpoints).
 
 use std::net::{IpAddr, SocketAddr};
 use std::sync::Arc;
@@ -10,7 +10,7 @@ use async_trait::async_trait;
 use axum::Router;
 use axum::http::HeaderMap;
 use axum::http::header::AUTHORIZATION;
-use cairn_schema::{Actor, Login, Slug};
+use cairn_schema::{Actor, Login};
 
 use crate::error::Refusal;
 use crate::layer::Authenticate;
@@ -29,62 +29,13 @@ pub enum Verdict {
     Refused(Refusal),
 }
 
-/// Where a listener accepts connections: what decides whether the local-only providers
-/// (dev without its override, Tailscale's proxy mode) may run at all.
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub enum Listener {
-    /// A TCP listener at this address.
-    Tcp(SocketAddr),
-    /// A unix socket, reachable only from this machine.
-    Unix,
-}
-
-impl Listener {
-    /// Whether only this machine can connect: a loopback address or a unix socket.
-    #[must_use]
-    pub fn is_local(self) -> bool {
-        match self {
-            Listener::Tcp(address) => is_loopback(address.ip()),
-            Listener::Unix => true,
-        }
-    }
-}
-
-/// Who is on the other end of a request's connection.
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub enum Peer {
-    /// A TCP peer at this address.
-    Tcp(SocketAddr),
-    /// A peer on a unix socket: this machine.
-    Unix,
-    /// Unknown: a TCP listener whose server did not record peers. Never local.
-    Unknown,
-}
-
-impl Peer {
-    /// Whether the peer is this machine.
-    #[must_use]
-    pub fn is_local(self) -> bool {
-        match self {
-            Peer::Tcp(address) => is_loopback(address.ip()),
-            Peer::Unix => true,
-            Peer::Unknown => false,
-        }
-    }
-}
-
-/// A loopback address, including an IPv4 loopback address mapped into IPv6.
-fn is_loopback(address: IpAddr) -> bool {
-    address.to_canonical().is_loopback()
-}
-
 /// What a provider sees of a request: its headers and its peer.
 #[derive(Clone, Copy, Debug)]
 pub struct Presented<'a> {
     /// The request's headers.
     pub headers: &'a HeaderMap,
-    /// The connection's peer.
-    pub peer: Peer,
+    /// The connection's peer; none when the server did not record it, which is never local.
+    pub peer: Option<SocketAddr>,
 }
 
 impl Presented<'_> {
@@ -98,12 +49,16 @@ impl Presented<'_> {
     }
 }
 
+/// Whether `address` is this machine: a loopback address, including an IPv4 loopback
+/// address mapped into IPv6.
+#[must_use]
+pub fn is_loopback(address: IpAddr) -> bool {
+    address.to_canonical().is_loopback()
+}
+
 /// One way of authenticating (ARCHITECTURE, Auth).
 #[async_trait]
 pub trait AuthProvider: Send + Sync {
-    /// The provider's configured name: the `provider` of every login it vouches for.
-    fn name(&self) -> &Slug;
-
     /// What this provider makes of a request. A provider refuses only a credential of its
     /// own; one it does not read is [`Verdict::Absent`].
     async fn authenticate(&self, request: Presented<'_>) -> Verdict;
@@ -112,12 +67,6 @@ pub trait AuthProvider: Send + Sync {
     /// token no provider claims is refused, so a mistyped token never passes unnoticed.
     fn claims_bearer(&self, token: &str) -> bool {
         let _ = token;
-        false
-    }
-
-    /// H3: whether a new login from this provider links to the user already holding one
-    /// of its verified emails, a per-provider security choice (ARCHITECTURE, Auth).
-    fn auto_link(&self) -> bool {
         false
     }
 
@@ -142,25 +91,20 @@ mod tests {
     use super::*;
 
     #[test]
-    fn local_means_loopback_or_a_unix_socket() {
+    fn local_means_loopback() {
         let cases = [
-            ("127.0.0.1:8080", true),
-            ("127.3.4.5:8080", true),
-            ("[::1]:8080", true),
-            ("[::ffff:127.0.0.1]:8080", true),
-            ("0.0.0.0:8080", false),
-            ("192.168.1.4:8080", false),
-            ("[::]:8080", false),
-            ("100.101.102.103:443", false),
+            ("127.0.0.1", true),
+            ("127.3.4.5", true),
+            ("::1", true),
+            ("::ffff:127.0.0.1", true),
+            ("0.0.0.0", false),
+            ("192.168.1.4", false),
+            ("::", false),
+            ("100.101.102.103", false),
         ];
         for (address, local) in cases {
-            let address: SocketAddr = address.parse().unwrap();
-            assert_eq!(Listener::Tcp(address).is_local(), local, "{address}");
-            assert_eq!(Peer::Tcp(address).is_local(), local, "{address}");
+            assert_eq!(is_loopback(address.parse().unwrap()), local, "{address}");
         }
-        assert!(Listener::Unix.is_local());
-        assert!(Peer::Unix.is_local());
-        assert!(!Peer::Unknown.is_local());
     }
 
     #[test]
@@ -180,7 +124,7 @@ mod tests {
             }
             let request = Presented {
                 headers: &headers,
-                peer: Peer::Unix,
+                peer: None,
             };
             assert_eq!(request.bearer(), token, "{header:?}");
         }

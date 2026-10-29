@@ -8,7 +8,7 @@ use std::path::Path;
 use std::sync::Arc;
 use std::time::Duration;
 
-use cairn_auth::{Accounts, Auth, AuthProvider, Clock, DevConfig, DevProvider, Listener};
+use cairn_auth::{Accounts, Auth, AuthProvider, Clock, DevConfig, DevProvider};
 use cairn_schema::{IdentityKey, JourneyId, NodeKey, PatchReceipt, RankConstants, Revision};
 use cairn_service::{
     AuthKind, AuthMethod, Capabilities, DeploymentSettings, McpAccess, Parts, Service,
@@ -159,14 +159,13 @@ fn auth(store: &Arc<SqliteStore>) -> Result<Auth, Stop> {
             .parse()
             .map_err(|error| invalid("dev-email")(&error))?]),
         token: None,
-        auto_link: false,
         allow_off_loopback: false,
     };
-    let provider = DevProvider::new(dev, Listener::Tcp(SERVER))
-        .map_err(|error| invalid("dev-provider")(&error))?;
+    let provider =
+        DevProvider::new(dev, SERVER).map_err(|error| invalid("dev-provider")(&error))?;
     let providers: Vec<Arc<dyn AuthProvider>> = vec![Arc::new(provider)];
     let accounts = Accounts::new(Arc::<SqliteStore>::clone(store), Clock::system());
-    Ok(Auth::new(accounts, Listener::Tcp(SERVER), &base, providers))
+    Ok(Auth::new(accounts, &base, providers))
 }
 
 /// A slug the testbed names, known valid.

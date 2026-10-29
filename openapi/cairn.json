@@ -6034,11 +6034,6 @@
         "additionalProperties": false,
         "description": "One login a user signs in with.",
         "properties": {
-          "linked_at": {
-            "description": "When it was linked.",
-            "format": "date-time",
-            "type": "string"
-          },
           "name": {
             "anyOf": [
               {
@@ -6070,8 +6065,7 @@
         "required": [
           "provider",
           "subject",
-          "verified_emails",
-          "linked_at"
+          "verified_emails"
         ],
         "type": "object"
       },

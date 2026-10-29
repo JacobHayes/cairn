@@ -40,7 +40,6 @@ kind = "oidc"                            # or dev, builtin_oauth, tailscale, gcp
 name = "sso"
 issuer = "https://login.example.com"
 client_id = "cairn"
-auto_link = true
 
 [[auth]]
 kind = "builtin_oauth"                   # MCP clients and agent tokens
@@ -55,13 +54,10 @@ api_key = "..."                          # required except for chat_completions;
 ```
 
 Each provider kind's settings: `dev` (`user`, `verified_emails`, which must hold at least one email,
-`token`, `auto_link`,
-`allow_off_loopback`), `oidc` (`issuer`, `client_id`, `client_secret`, `auto_link`),
-`builtin_oauth` (`sign_in_with`), `tailscale` (`mode` direct with `socket`, or proxy, with
-`trusted_proxies` listing the addresses or networks of a proxy on another machine, or left
-out for `tailscale serve` on this one; `auto_link`), `gcp_iap` (`audience`, the
-IAP-protected backend service as `/projects/<number>/global/backendServices/<id>`;
-`auto_link`; and, for MCP clients, `client_id`, the Google OAuth client they sign in
+`token`, `allow_off_loopback`), `oidc` (`issuer`, `client_id`, `client_secret`),
+`builtin_oauth` (`sign_in_with`), `tailscale` (`trusted_proxies`, the addresses or networks `tailscale serve` or another proxy connects
+from: 127.0.0.1 for `tailscale serve` on this machine), `gcp_iap` (`audience`, the
+IAP-protected backend service as `/projects/<number>/global/backendServices/<id>`; and, for MCP clients, `client_id`, the Google OAuth client they sign in
 through). Behind Google Cloud Identity-Aware Proxy, `gcp_iap` verifies the signed
 assertion IAP adds to every request (`x-goog-iap-jwt-assertion`) against Google's keys, so
 each person is signed in as their Google account with no sign-in step of Cairn's own.

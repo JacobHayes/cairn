@@ -13,6 +13,7 @@
 //! shapes, and the answers) are this module's children; consent, stored codes, and token
 //! minting are the built-in server's alone.
 
+pub(crate) mod authorize;
 pub mod client;
 mod flow;
 pub(crate) mod metadata;
@@ -89,10 +90,6 @@ impl Server {
 
 #[async_trait]
 impl AuthProvider for OAuthServer {
-    fn name(&self) -> &Slug {
-        &self.inner.config.name
-    }
-
     async fn authenticate(&self, request: Presented<'_>) -> Verdict {
         self.inner.verdict(request).await
     }

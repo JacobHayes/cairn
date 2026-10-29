@@ -15,10 +15,10 @@ use async_trait::async_trait;
 use axum::Router;
 use axum::extract::{Query, State};
 use axum::http::header::LOCATION;
-use axum::http::{Extensions, HeaderMap, HeaderValue, StatusCode};
+use axum::http::{HeaderMap, HeaderValue, StatusCode};
 use axum::response::{IntoResponse, Response};
 use axum::routing::get;
-use cairn_schema::{Actor, Email, Login, Slug, Title, UserId};
+use cairn_schema::{Email, Login, Slug, Title};
 use cairn_store::{OAuthStateKind, OAuthStateRecord};
 use openidconnect::core::{
     CoreAuthenticationFlow, CoreClient, CoreClientAuthMethod, CoreIdTokenClaims,
@@ -33,8 +33,8 @@ use url::Url;
 
 use crate::accounts::Accounts;
 use crate::cookies::{self, SESSION_COOKIE};
-use crate::error::{AuthError, ConfigError, Refusal};
-use crate::layer::{Authenticate, browser};
+use crate::error::{AuthError, ConfigError};
+use crate::layer::Authenticate;
 use crate::lifetimes::{BROWSER_STEP_LIFETIME, SESSION_LIFETIME};
 use crate::outbound::{Outbound, is_trusted_origin};
 use crate::provider::{AuthProvider, Presented, Verdict};
@@ -51,8 +51,6 @@ pub struct OidcConfig {
     pub client_id: String,
     /// Cairn's client secret at the issuer, for a confidential client.
     pub client_secret: Option<String>,
-    /// H3: link a new login to the user holding one of its verified emails.
-    pub auto_link: bool,
 }
 
 /// The OIDC provider.
@@ -76,9 +74,6 @@ struct Pending {
     nonce: String,
     verifier_digest: String,
     return_to: String,
-    /// The user the browser was signed in as when the sign-in started: the callback links
-    /// the login to this user only if the browser is still them.
-    initiator: Option<UserId>,
 }
 
 impl OidcProvider {
@@ -136,7 +131,7 @@ impl Inner {
     }
 
     /// Starts a sign-in: stores its `state` and sends the browser to the issuer.
-    async fn start(&self, return_to: &str, initiator: Option<UserId>) -> Result<Response, Failure> {
+    async fn start(&self, return_to: &str) -> Result<Response, Failure> {
         let client = self.client().await?;
         let (challenge, verifier) = PkceCodeChallenge::new_random_sha256();
         let (url, state, nonce) = client
@@ -159,7 +154,6 @@ impl Inner {
             nonce: nonce.secret().clone(),
             verifier_digest: digest(verifier.secret()).to_string(),
             return_to: return_to.to_owned(),
-            initiator,
         };
         let payload = serde_json::to_string(&pending).map_err(|error| Failure::bug(&error))?;
         let record = OAuthStateRecord {
@@ -186,21 +180,11 @@ impl Inner {
 
     /// Finishes a sign-in: checks the state against this browser, exchanges the code, has
     /// the ID token verified, and signs the browser in.
-    async fn finish(
-        &self,
-        headers: &HeaderMap,
-        query: &Callback,
-        signed_in: Option<UserId>,
-    ) -> Result<Response, Failure> {
+    async fn finish(&self, headers: &HeaderMap, query: &Callback) -> Result<Response, Failure> {
         let (Some(code), Some(state)) = (&query.code, &query.state) else {
             return Err(Failure::Refused("the issuer did not sign in"));
         };
         let pending = self.take_pending(headers, state).await?;
-        if pending.initiator != signed_in {
-            return Err(Failure::BadRequest(
-                "the browser changed accounts during the sign-in",
-            ));
-        }
         let verifier = cookies::read(headers, &self.login_cookie).unwrap_or_default();
         let client = self.client().await?;
         let exchange = client
@@ -223,8 +207,7 @@ impl Inner {
             .claims(&verifier, &nonce)
             .map_err(|_| Failure::Refused("the ID token is not valid"))?;
         let login = self.login(claims)?;
-        self.sign_in(headers, &login, signed_in, &pending.return_to)
-            .await
+        self.sign_in(headers, &login, &pending.return_to).await
     }
 
     /// The pending sign-in `state` names, which only the browser holding its verifier
@@ -275,21 +258,16 @@ impl Inner {
         })
     }
 
-    /// Resolves the login, linking it to the browser's user if it is signed in, and
-    /// starts a new session in place of any it had.
+    /// Resolves the login and starts a new session in place of any the browser had.
     async fn sign_in(
         &self,
         headers: &HeaderMap,
         login: &Login,
-        signed_in: Option<UserId>,
         return_to: &str,
     ) -> Result<Response, Failure> {
-        let existing = cookies::read(headers, SESSION_COOKIE);
-        let auto_link = self.config.auto_link;
-        let user = self.accounts.resolve(login, signed_in.as_ref(), auto_link);
-        let user = user.await?;
-        if let Some(token) = &existing {
-            self.accounts.end_session(token).await?;
+        let user = self.accounts.resolve(login).await?;
+        if let Some(token) = cookies::read(headers, SESSION_COOKIE) {
+            self.accounts.end_session(&token).await?;
         }
         let session = self.accounts.start_session(&user).await?;
         let path = format!("/api/auth/{}", self.config.name);
@@ -345,8 +323,6 @@ enum Failure {
     BadRequest(&'static str),
     /// The issuer did not vouch for anyone.
     Refused(&'static str),
-    /// The browser's credentials were refused, or could not be checked.
-    Browser(Refusal),
     /// An operation failed.
     Auth(AuthError),
 }
@@ -365,21 +341,17 @@ impl From<AuthError> for Failure {
 
 impl IntoResponse for Failure {
     fn into_response(self) -> Response {
-        let status = match &self {
-            Failure::BadRequest(_) => StatusCode::BAD_REQUEST,
-            Failure::Refused(_) | Failure::Browser(Refusal::Credential) => StatusCode::UNAUTHORIZED,
-            Failure::Browser(Refusal::Peer | Refusal::NoVerifiedEmail)
-            | Failure::Auth(AuthError::NoVerifiedEmail) => StatusCode::FORBIDDEN,
-            Failure::Auth(AuthError::LoginHeldByAnotherUser { .. }) => StatusCode::CONFLICT,
-            Failure::Auth(AuthError::Upstream(_)) => StatusCode::BAD_GATEWAY,
-            Failure::Browser(Refusal::Unavailable(_)) | Failure::Auth(_) => {
-                StatusCode::SERVICE_UNAVAILABLE
+        let (status, message) = match self {
+            Failure::BadRequest(message) => (StatusCode::BAD_REQUEST, message.to_owned()),
+            Failure::Refused(message) => (StatusCode::UNAUTHORIZED, message.to_owned()),
+            Failure::Auth(error) => {
+                let status = match error {
+                    AuthError::NoVerifiedEmail => StatusCode::FORBIDDEN,
+                    AuthError::Upstream(_) => StatusCode::BAD_GATEWAY,
+                    _ => StatusCode::SERVICE_UNAVAILABLE,
+                };
+                (status, error.to_string())
             }
-        };
-        let message = match self {
-            Failure::BadRequest(message) | Failure::Refused(message) => message.to_owned(),
-            Failure::Browser(refusal) => refusal.to_string(),
-            Failure::Auth(error) => error.to_string(),
         };
         (status, message).into_response()
     }
@@ -422,67 +394,27 @@ struct Callback {
     state: Option<String>,
 }
 
-/// The routes' state: the provider, and how they learn who a browser already is.
-struct Routes {
-    inner: Arc<Inner>,
-    authenticator: Arc<dyn Authenticate>,
-}
-
-impl Routes {
-    /// The user the browser is signed in as, by its session or by a provider that signs
-    /// each request in (Tailscale, the dev user), past a lapsed session cookie: the user a
-    /// new login links to. An agent is no one's browser, and a refused credential is
-    /// what signing in replaces; a credential that could not be checked fails the step,
-    /// rather than signing in as someone new.
-    async fn browser_user(
-        &self,
-        headers: &HeaderMap,
-        extensions: &Extensions,
-    ) -> Result<Option<UserId>, Failure> {
-        let found = browser(self.authenticator.as_ref(), headers, extensions).await;
-        match found.map(|browser| browser.actor) {
-            Ok(Some(Actor { user, agent: None })) => Ok(Some(user)),
-            Ok(_) | Err(Refusal::Credential) => Ok(None),
-            Err(refusal) => Err(Failure::Browser(refusal)),
-        }
-    }
-}
-
-async fn start(
-    State(routes): State<Arc<Routes>>,
-    headers: HeaderMap,
-    extensions: Extensions,
-    Query(query): Query<SignIn>,
-) -> Response {
+async fn start(State(inner): State<Arc<Inner>>, Query(query): Query<SignIn>) -> Response {
     let return_to = local_path(query.return_to.as_deref());
-    let started = match routes.browser_user(&headers, &extensions).await {
-        Ok(initiator) => routes.inner.start(&return_to, initiator).await,
-        Err(failure) => Err(failure),
-    };
-    started.unwrap_or_else(IntoResponse::into_response)
+    inner
+        .start(&return_to)
+        .await
+        .unwrap_or_else(IntoResponse::into_response)
 }
 
-/// The callback: the login links to the browser's user, who must be the one who
-/// started the sign-in.
 async fn finish(
-    State(routes): State<Arc<Routes>>,
+    State(inner): State<Arc<Inner>>,
     headers: HeaderMap,
-    extensions: Extensions,
     Query(query): Query<Callback>,
 ) -> Response {
-    let finished = match routes.browser_user(&headers, &extensions).await {
-        Ok(signed_in) => routes.inner.finish(&headers, &query, signed_in).await,
-        Err(failure) => Err(failure),
-    };
-    finished.unwrap_or_else(IntoResponse::into_response)
+    inner
+        .finish(&headers, &query)
+        .await
+        .unwrap_or_else(IntoResponse::into_response)
 }
 
 #[async_trait]
 impl AuthProvider for OidcProvider {
-    fn name(&self) -> &Slug {
-        &self.inner.config.name
-    }
-
     /// The OIDC provider signs a browser in through its routes; requests after that carry
     /// the session cookie, so a request on its own holds nothing of this provider's.
     async fn authenticate(&self, request: Presented<'_>) -> Verdict {
@@ -490,21 +422,13 @@ impl AuthProvider for OidcProvider {
         Verdict::Absent
     }
 
-    fn auto_link(&self) -> bool {
-        self.inner.config.auto_link
-    }
-
     /// `GET /api/auth/<name>/sign-in?return_to=<path>` and the issuer's callback.
-    fn router(&self, authenticator: Arc<dyn Authenticate>) -> Option<Router> {
-        let state = Routes {
-            inner: Arc::clone(&self.inner),
-            authenticator,
-        };
+    fn router(&self, _authenticator: Arc<dyn Authenticate>) -> Option<Router> {
         let name = &self.inner.config.name;
         let router = Router::new()
             .route(&format!("/api/auth/{name}/sign-in"), get(start))
             .route(&format!("/api/auth/{name}/callback"), get(finish))
-            .with_state(Arc::new(state));
+            .with_state(Arc::clone(&self.inner));
         Some(router)
     }
 }

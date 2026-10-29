@@ -12,7 +12,7 @@ mod tokens {
     use cairn_schema::{Actor, Title};
     use cairn_store::{AuthEvent, AuthStore, MemoryStore, UserRecord};
 
-    use crate::auth::support::{LOCAL, World, app, base, loopback, request, whoami};
+    use crate::auth::support::{LOCAL, World, app, base, request, whoami};
 
     fn oauth(world: &World) -> Arc<dyn AuthProvider> {
         let config = OAuthConfig {
@@ -58,7 +58,7 @@ mod tokens {
     async fn a_token_is_minted_then_used_then_revoked() {
         let world = World::new();
         let ann = ann(&world).await;
-        let router = app(&world.auth(loopback(), vec![oauth(&world)]));
+        let router = app(&world.auth(vec![oauth(&world)]));
         let minted = world
             .accounts
             .mint_token(&ann, named("nightly"))
@@ -95,33 +95,13 @@ mod tokens {
         assert_eq!(world.log().await, logged);
     }
 
-    /// H3: a token of a user none of whose logins has a verified email, which predates sign-in
-    /// requiring one, is refused like a revoked one: the user signs in again.
-    #[tokio::test]
-    async fn a_token_of_a_user_with_no_verified_email_is_refused() {
-        let world = World::new();
-        let ann = ann(&world).await;
-        let router = app(&world.auth(loopback(), vec![oauth(&world)]));
-        let minted = world
-            .accounts
-            .mint_token(&ann, named("nightly"))
-            .await
-            .unwrap();
-        assert!(whoami(&router, bearer(minted.token.expose())).await.is_ok());
-        let mut login = world.store.logins_of(&ann.user).await.unwrap().remove(0);
-        login.verified_emails.clear();
-        world.store.put_login(login).await.unwrap();
-        let refused = whoami(&router, bearer(minted.token.expose())).await;
-        assert_eq!(refused, Err(StatusCode::UNAUTHORIZED));
-    }
-
     /// A stored token is never readable in plain text: the store holds its digest, and the
     /// digest does not sign anything in.
     #[tokio::test]
     async fn a_stored_token_is_only_its_digest() {
         let world = World::new();
         let ann = ann(&world).await;
-        let router = app(&world.auth(loopback(), vec![oauth(&world)]));
+        let router = app(&world.auth(vec![oauth(&world)]));
         let minted = world
             .accounts
             .mint_token(&ann, named("script"))
@@ -160,7 +140,7 @@ mod tokens {
     async fn other_cairn_secrets_are_refused_as_bearer_tokens() {
         let world = World::new();
         let ann = ann(&world).await;
-        let router = app(&world.auth(loopback(), vec![oauth(&world)]));
+        let router = app(&world.auth(vec![oauth(&world)]));
         let session = world.accounts.start_session(&ann.user).await.unwrap();
         let unknown = Secret::mint(cairn_auth::secret::SecretKind::Agent).unwrap();
         for token in [session.expose(), unknown.expose(), "cairn_agent_short"] {

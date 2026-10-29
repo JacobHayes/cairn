@@ -5,7 +5,6 @@ import type { Schema } from "@cairn/client";
 import { describe, expect, it } from "vitest";
 
 import { identityLabel } from "./label.ts";
-import { linkable } from "./You.tsx";
 import { aliasesOf, identityOf, mergeMutation, newIdentityKey } from "./model.ts";
 
 describe("identities as sent (E6, H3)", () => {
@@ -46,13 +45,5 @@ describe("a merge (E6)", () => {
     expect(identityLabel({ name: "Ana", emails: ["ana@example.org"] })).toBe("Ana");
     expect(identityLabel({ emails: ["ana@example.org", "a@example.org"] })).toBe("ana@example.org");
     expect(identityOf("who_a", "  ", ["ana@example.org"])).toEqual({ key: "who_a", emails: ["ana@example.org"] });
-  });
-});
-
-describe("linking an identity (H3)", () => {
-  it("offers a sign-in link for each OIDC provider only, so a host with none offers no link", () => {
-    const capabilities = (...auth: { kind: string; name: string }[]) => ({ auth }) as Schema<"Capabilities">;
-    expect(linkable(capabilities({ kind: "dev", name: "dev" }, { kind: "oidc", name: "stub" }))).toEqual(["stub"]);
-    expect(linkable(capabilities({ kind: "dev", name: "dev" }))).toEqual([]);
   });
 });

@@ -30,10 +30,8 @@ cairn-wasm = { path = "crates/wasm" }
 # the session and sign-in cookies; ed25519-dalek only to sign the ID tokens of `cairn demo`'s
 # stub issuer and of the tests; p256 only to sign test IAP
 # assertions (already in the tree under openidconnect); getrandom for secrets; subtle to
-# compare them in constant time; url for the public base URL; hyper, hyper-util, and
-# http-body-util for the one GET to tailscaled's whois over its unix socket (already in the
-# tree under axum and reqwest); ipnet for the networks Tailscale's proxy mode trusts (already
-# in the tree under reqwest); tower only to drive a router in tests.
+# compare them in constant time; url for the public base URL; ipnet for the networks the
+# Tailscale provider trusts (already in the tree under reqwest); tower only to drive a router in tests.
 # The store traits (ARCHITECTURE, Store trait): plain `async fn` in a trait that stays object-safe
 # and `Send`; already compiled in the tree through rmcp.
 async-trait = "0.1.92"

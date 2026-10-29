@@ -100,8 +100,8 @@ pub(crate) fn is_trusted_origin(url: &Url) -> bool {
     match url.scheme() {
         "https" => url.host().is_some(),
         "http" => match url.host() {
-            Some(url::Host::Ipv4(address)) => address.is_loopback(),
-            Some(url::Host::Ipv6(address)) => address.is_loopback(),
+            Some(url::Host::Ipv4(address)) => crate::provider::is_loopback(address.into()),
+            Some(url::Host::Ipv6(address)) => crate::provider::is_loopback(address.into()),
             Some(url::Host::Domain(domain)) => domain == "localhost",
             None => false,
         },

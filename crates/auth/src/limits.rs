@@ -2,7 +2,7 @@
 
 use std::time::Duration;
 
-/// An outbound login call (an OIDC discovery or code exchange, a Tailscale whois, the
+/// An outbound login call (an OIDC discovery or code exchange, the
 /// IAP key set, a Google token exchange), and a whole request to the IAP relay's
 /// endpoints, its body read included: a sign-in provider this slow is down, and the
 /// sign-in fails.

@@ -2961,11 +2961,6 @@ export interface components {
         };
         /** @description One login a user signs in with. */
         LinkedLogin: {
-            /**
-             * Format: date-time
-             * @description When it was linked.
-             */
-            linked_at: string;
             /** @description The name the provider gave the account at the last sign-in, if it gave one. */
             name?: components["schemas"]["Title"] | null;
             /** @description The provider, by its configured name. */

@@ -42,9 +42,7 @@ impl AllowedHosts {
             unreachable!("a public URL has a host: configuration checks it");
         };
         let mut names = BTreeSet::from([normalized(public)]);
-        // An IPv4-mapped loopback (`::ffff:127.0.0.1`) is loopback too, as the auth
-        // providers judge it.
-        if listen.ip().to_canonical().is_loopback() {
+        if cairn_auth::is_loopback(listen.ip()) {
             names.extend(LOOPBACK_NAMES.map(str::to_owned));
         }
         Self(names)

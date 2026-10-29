@@ -173,14 +173,13 @@ pub fn providers(
     config: &Config,
     accounts: &Accounts,
 ) -> Result<Vec<Arc<dyn AuthProvider>>, Vec<Problem>> {
-    let listener = config.listener();
     let base = &config.public_url;
     let mut built: Vec<Arc<dyn AuthProvider>> = Vec::with_capacity(config.auth.len());
     let mut problems = Vec::new();
     for provider in &config.auth {
         let made: Result<Arc<dyn AuthProvider>, _> = match provider {
             Provider::Dev(dev) => {
-                DevProvider::new(dev.clone(), listener).map(|made| Arc::new(made) as _)
+                DevProvider::new(dev.clone(), config.listen).map(|made| Arc::new(made) as _)
             }
             Provider::Oidc(oidc) => OidcProvider::new(oidc.clone(), accounts.clone(), base)
                 .map(|made| Arc::new(made) as _),
@@ -188,7 +187,7 @@ pub fn providers(
                 Ok(Arc::new(OAuthServer::new(oauth.clone(), accounts.clone(), base)) as _)
             }
             Provider::Tailscale(tailscale) => {
-                TailscaleProvider::new(tailscale.clone(), listener).map(|made| Arc::new(made) as _)
+                TailscaleProvider::new(tailscale.clone()).map(|made| Arc::new(made) as _)
             }
             Provider::GcpIap(iap) => {
                 GcpIapProvider::new(iap.clone(), accounts.clock().clone(), base)
@@ -226,7 +225,7 @@ pub fn app(config: &Config, parts: Assembly) -> Result<Router, StartupError> {
     });
     let accounts = Accounts::new(Arc::clone(&parts.store), parts.clock.clone());
     let providers = providers(config, &accounts).map_err(StartupError::Providers)?;
-    let auth = Auth::new(accounts, config.listener(), &config.public_url, providers);
+    let auth = Auth::new(accounts, &config.public_url, providers);
     let assistant = config.assistant.clone().map(|provider| {
         Assistant::new(
             service.clone(),
