@@ -1,26 +1,16 @@
 //! Pass 7 (PRD Priority; C5, C10): urgency and lateness from slack, null slack, normalization
-//! over the normalization set, the tie order, "prioritize for me" leaving the global rank
-//! unchanged, and effort-adjusted ordering. Hand-built journeys are created on 2026-10-06 and
+//! over the normalization set, the tie order, and the unlocks gate. Hand-built journeys are created on 2026-10-06 and
 //! derived at that day.
 #![cfg(test)]
 
 use crate::engine::support;
 
-use std::collections::BTreeSet;
-
 use cairn_engine::{Derived, Records};
-use cairn_schema::{IdentityKey, NodeKey, RankConstants, Real};
+use cairn_schema::NodeKey;
 use support::{add_nodes as add, key};
 
 fn derived(records: &Records) -> Derived {
     support::derived(records, support::JOURNEY)
-}
-
-fn derived_with(records: &Records, constants: RankConstants) -> Derived {
-    let mut inputs = cairn_engine::testing::derive_inputs(records.deployment.clone());
-    inputs.rank = constants;
-    let graph = support::journey_graph(records, support::JOURNEY);
-    cairn_engine::derive(&graph, None, &inputs)
 }
 
 fn names(keys: &[NodeKey]) -> Vec<&str> {
@@ -126,15 +116,14 @@ fn only_the_normalization_set_is_ranked() {
 }
 
 /// Priority, Rank: equal ranks break by smaller slack with null last, then greater gravity,
-/// then key. With the gravity and unlocks coefficients at zero and every slack past the
-/// horizon, every rank is zero.
+/// then key. Every slack here is past the horizon, so urgency is 0 and equal ranks follow
+/// from equal gravity.
 #[test]
-fn ties_break_by_slack_then_gravity_then_key() {
+fn ties_break_by_slack_then_key() {
     let records = journey(
         &[
             "{key: n_far, id: far, kind: action, title: Far}",
             "{key: n_near, id: near, kind: action, title: Near}",
-            "{key: n_heavy, id: heavy, kind: action, title: Heavy, weight: 5}",
             "{key: n_light_b, id: light-b, kind: action, title: Light}",
             "{key: n_light_a, id: light-a, kind: action, title: Light}",
         ],
@@ -143,59 +132,16 @@ fn ties_break_by_slack_then_gravity_then_key() {
             ("n_near_due", "n_near", "2026-10-26"),
         ],
     );
-    let constants = RankConstants {
-        gravity: Real::try_from(0.0).unwrap(),
-        unlocks: Real::try_from(0.0).unwrap(),
-        ..RankConstants::default()
-    };
-    let derived = derived_with(&records, constants);
-    assert!(
-        derived
-            .ranking()
-            .frontier()
-            .iter()
-            .all(|node| derived.ranking().rank(node) == Some(0.0))
-    );
+    let derived = derived(&records);
+    let ranking = derived.ranking();
+    assert_eq!(ranking.rank(&key("n_far")), ranking.rank(&key("n_near")));
     assert_eq!(
-        names(derived.ranking().frontier()),
-        ["n_near", "n_far", "n_heavy", "n_light_a", "n_light_b"]
+        names(ranking.frontier()),
+        ["n_near", "n_far", "n_light_a", "n_light_b"]
     );
 }
 
 const PEOPLE: &str = "- op: create_identity\n  identity: {key: who_a, name: A}\n- op: create_identity\n  identity: {key: who_b, name: B}\n";
-
-fn viewer(identity: &str) -> BTreeSet<IdentityKey> {
-    BTreeSet::from([identity.parse().unwrap()])
-}
-
-/// Priority, "prioritize for me": each of two gates unblocks the other owner's work, so
-/// globally they tie; for a viewer, the gate that frees someone else's work ranks first. The
-/// global ranking is unchanged.
-#[test]
-fn prioritize_for_me_recomputes_the_owner_factor_for_the_viewer() {
-    let records = support::journey(&format!(
-        "{PEOPLE}{}",
-        add(&[
-            "{key: n_gate_a, id: gate-a, kind: action, title: Gate, participations: {k_owner: [who_a]}}",
-            "{key: n_gate_b, id: gate-b, kind: action, title: Gate, participations: {k_owner: [who_b]}}",
-            "{key: n_work_b, id: work-b, kind: action, title: Work, requires: [n_gate_a], participations: {k_owner: [who_b]}}",
-            "{key: n_work_a, id: work-a, kind: action, title: Work, requires: [n_gate_b], participations: {k_owner: [who_a]}}",
-        ])
-    ));
-    let derived = derived(&records);
-    let global = derived.ranking().clone();
-    assert_eq!(names(global.frontier()), ["n_gate_a", "n_gate_b"]);
-    assert_eq!(global.rank(&key("n_gate_a")), global.rank(&key("n_gate_b")));
-    assert_eq!(global.unlocks(&key("n_gate_a")).unwrap().value(), 2.0);
-    let for_a = derived.rank_for(&viewer("who_a"));
-    assert_eq!(names(for_a.frontier()), ["n_gate_a", "n_gate_b"]);
-    assert_eq!(for_a.unlocks(&key("n_gate_a")).unwrap().value(), 2.0);
-    assert_eq!(for_a.unlocks(&key("n_gate_b")).unwrap().value(), 1.0);
-    let for_b = derived.rank_for(&viewer("who_b"));
-    assert_eq!(names(for_b.frontier()), ["n_gate_b", "n_gate_a"]);
-    assert!(for_b.rank(&key("n_gate_b")) > for_b.rank(&key("n_gate_a")));
-    assert_eq!(derived.ranking(), &global, "the shared rank is unchanged");
-}
 
 /// Priority, Unlocks, Rank: a small gate in front of others' parallel work ranks above a
 /// heavy standalone task.
@@ -214,37 +160,5 @@ fn a_small_gate_ranks_early() {
     assert_eq!(
         names(derived(&records).ranking().frontier()),
         ["n_gate", "n_heavy"]
-    );
-}
-
-/// Priority, Effort-adjusted: gravity per estimated day, greatest first; no or a zero
-/// estimate last, in rank order.
-#[test]
-fn effort_adjusted_ordering_puts_unestimated_work_last() {
-    let records = support::journey(&add(&[
-        "{key: n_long, id: long, kind: action, title: Long, weight: 4, estimate: 2}",
-        "{key: n_short, id: short, kind: action, title: Short, weight: 3, estimate: 1}",
-        "{key: n_zero, id: zero, kind: action, title: Zero, weight: 9, estimate: 0}",
-        "{key: n_none, id: none, kind: action, title: None, weight: 2}",
-    ]));
-    let derived = derived(&records);
-    let graph = support::journey_graph(&records, support::JOURNEY);
-    let frontier = derived.blocking().frontier();
-    assert_eq!(
-        names(&derived.by_effort(&graph, frontier)),
-        ["n_short", "n_long", "n_zero", "n_none"]
-    );
-}
-
-/// Priority, D6: two derives of the same journey rank identically, per viewer too.
-#[test]
-fn two_derives_rank_identically() {
-    let records = support::vendor_after(2);
-    let first = support::derived(&records, "j_vendor_eval");
-    let second = support::derived(&records, "j_vendor_eval");
-    assert_eq!(first.ranking(), second.ranking());
-    assert_eq!(
-        first.rank_for(&viewer("who_k3d7qm2xw5tn6pfa")),
-        second.rank_for(&viewer("who_k3d7qm2xw5tn6pfa"))
     );
 }

@@ -6,9 +6,7 @@
 use std::collections::BTreeSet;
 use std::sync::Arc;
 
-use cairn_schema::{
-    Date, Deployment, DeriveInputs, IdentityKey, RankConstants, Slug, TimeZoneName, Timestamp,
-};
+use cairn_schema::{Date, Deployment, DeriveInputs, IdentityKey, Slug, TimeZoneName, Timestamp};
 use cairn_store::{Notifier, Store};
 use jiff::tz::TimeZone;
 use schemars::JsonSchema;
@@ -20,19 +18,18 @@ pub struct Parts {
     pub store: Arc<dyn Store>,
     /// The notifier every commit is announced through.
     pub notifier: Arc<dyn Notifier>,
-    /// The deployment's time zone and rank constants.
+    /// The deployment's time zone.
     pub settings: DeploymentSettings,
     /// What the host offers.
     pub capabilities: Capabilities,
 }
 
 /// The deployment's settings that derive reads (ARCHITECTURE, Terms: Derive inputs): its
-/// time zone (A9) and the rank constants (Priority).
+/// time zone (A9).
 #[derive(Clone, Debug, PartialEq)]
 pub struct DeploymentSettings {
     timezone: TimeZoneName,
     zone: TimeZone,
-    rank: RankConstants,
 }
 
 impl DeploymentSettings {
@@ -44,29 +41,19 @@ impl DeploymentSettings {
     ///
     /// When `zone` names an IANA zone other than `timezone`.
     #[must_use]
-    pub fn new(timezone: TimeZoneName, zone: TimeZone, rank: RankConstants) -> Self {
+    pub fn new(timezone: TimeZoneName, zone: TimeZone) -> Self {
         assert!(
             zone.iana_name()
                 .is_none_or(|name| name == timezone.as_str()),
             "the zone is the deployment's time zone"
         );
-        Self {
-            timezone,
-            zone,
-            rank,
-        }
+        Self { timezone, zone }
     }
 
     /// The deployment's time zone.
     #[must_use]
     pub fn timezone(&self) -> &TimeZoneName {
         &self.timezone
-    }
-
-    /// The rank constants.
-    #[must_use]
-    pub fn rank(&self) -> RankConstants {
-        self.rank
     }
 
     /// A9: the calendar day `now` falls on in the deployment's time zone, the today every
@@ -88,7 +75,6 @@ impl DeploymentSettings {
         DeriveInputs {
             today,
             timezone: self.timezone.clone(),
-            rank: self.rank,
             viewer,
             deployment,
         }

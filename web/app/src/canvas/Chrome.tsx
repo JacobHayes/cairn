@@ -50,7 +50,7 @@ export function SignalMenu({ lens, onLens }: { lens: Lens | undefined; onLens: (
   return (
     <Menu
       label={`Signal: ${lens === undefined ? "Off" : LENS_WORDS[lens]}`}
-      tip="Which priority signal each card shows: rank, gravity, unlocks or slack"
+      tip="Which priority signal each card shows: rank"
       testId="view-menu"
       role="dialog"
       align="end"

@@ -4,8 +4,8 @@
 //! derive would give.
 //!
 //! The memo key is the journey and its revision, the deployment revision (identities and
-//! aliases, E6), today in the deployment's zone (A9), and the viewer; the time zone and rank
-//! constants are the service's own settings, fixed for its life. A commit moves a revision and
+//! aliases, E6), today in the deployment's zone (A9), and the viewer; the time zone is
+//! the service's own setting, fixed for its life. A commit moves a revision and
 //! midnight moves today, so neither ever meets an entry derived before it (D6: caching is
 //! invisible). The memo holds at most [`MEMO_ENTRY_COUNT_MAX`] derivations and drops the least
 //! recently read one first.
@@ -123,7 +123,7 @@ impl Memo {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use cairn_schema::{DeriveInputs, RankConstants, from_yaml};
+    use cairn_schema::{DeriveInputs, from_yaml};
 
     fn journey(id: &str, revision: u32) -> Journey {
         let mut journey = Journey {
@@ -144,7 +144,6 @@ mod tests {
         let inputs = DeriveInputs {
             today: today.parse().unwrap(),
             timezone: "UTC".parse().unwrap(),
-            rank: RankConstants::default(),
             viewer: BTreeSet::new(),
             deployment: Deployment::default(),
         };

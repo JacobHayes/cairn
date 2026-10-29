@@ -16,8 +16,8 @@ use crate::chain::{
 use crate::derived::{
     Blocker, Bound, ChecklistCount, Consequences, Contribution, DateOrigin, DeriveInputs, Derived,
     DisplayState, DomainDocument, EffectiveDate, EffectiveParticipation, Explained, NodeDates,
-    NodeDerived, NodeMove, ParticipationOrigin, Progress, RankConstants, Real, Relevance,
-    RelevanceExplanation, Score, StaleConsequence, StallCause, Stalled,
+    NodeDerived, NodeMove, ParticipationOrigin, Progress, Real, Relevance, RelevanceExplanation,
+    Score, StaleConsequence, StallCause, Stalled,
 };
 use crate::limits::Limit;
 use crate::node::Direction;
@@ -690,7 +690,6 @@ pub fn arb_derive_inputs() -> BoxedStrategy<DeriveInputs> {
         .prop_map(|(today, timezone, viewer, deployment)| DeriveInputs {
             today,
             timezone: super::parsed(timezone),
-            rank: RankConstants::default(),
             viewer,
             deployment,
         })

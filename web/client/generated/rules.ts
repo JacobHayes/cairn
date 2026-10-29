@@ -73,6 +73,9 @@ export const EXPLANATION_ENTRY_COUNT_MAX = 50;
 /** Items in one page, and users one read names: the server refuses more names. */
 export const PAGE_ITEM_COUNT_MAX = 200;
 
+/** Priority: the rank blend's weights, the days urgency looks ahead, the undecided discount and the other-owner factor. */
+export const RANK = { urgency: 0.4, late: 0.15, gravity: 0.25, unlocks: 0.2, horizonDays: 14, undecidedDiscount: 0.5, otherOwnerFactor: 2 } as const;
+
 /** B1: the state a node of each kind starts in. */
 export const INITIAL_STATE: Record<NodeKind, State> = {
   decision: "open",

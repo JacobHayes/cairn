@@ -3,7 +3,7 @@
 //! shape their own surfaces but never bypass it.
 //!
 //! A [`Service`] is assembled once by the composition root from [`Parts`]: a store,
-//! a notifier, the deployment's settings (time zone and rank constants), and the
+//! a notifier, the deployment's settings (the time zone), and the
 //! [`Capabilities`] the host offers. Every write takes a [`Call`]: who is acting (H2) and the
 //! request's clock, from which today is computed once, in the deployment's time zone.
 //!

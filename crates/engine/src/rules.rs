@@ -11,6 +11,9 @@
 
 use std::fmt::Write;
 
+use crate::derive::priority::{OTHER_OWNER_FACTOR, THOUSAND, UNDECIDED_DISCOUNT};
+use crate::derive::rank::RANK;
+
 use cairn_schema::id::{
     KEY_PREFIXES, KEY_TYPE_PREFIXES, RESERVED_ROUTE_ID, owner_kind_id, slug_pattern,
 };
@@ -68,6 +71,7 @@ pub fn typescript() -> String {
          \n",
     );
     limits(&mut out);
+    rank(&mut out);
     initial_states(&mut out);
     terminal_states(&mut out);
     display_states(&mut out);
@@ -142,6 +146,24 @@ fn limits(out: &mut String) {
          export const PAGE_ITEM_COUNT_MAX = {PAGE_ITEM_COUNT_MAX};"
     );
     out.push('\n');
+}
+
+/// Priority: the fixed rank constants the explanation of a rank quotes.
+#[allow(clippy::cast_precision_loss)] // a few thousandths: exact in a float
+fn rank(out: &mut String) {
+    let blend = &RANK;
+    let _ = writeln!(
+        out,
+        "/** Priority: the rank blend's weights, the days urgency looks ahead, the undecided discount and the other-owner factor. */\n\
+         export const RANK = {{ urgency: {}, late: {}, gravity: {}, unlocks: {}, horizonDays: {}, undecidedDiscount: {}, otherOwnerFactor: {} }} as const;\n",
+        blend.urgency,
+        blend.late,
+        blend.gravity,
+        blend.unlocks,
+        blend.horizon_days,
+        UNDECIDED_DISCOUNT as f64 / THOUSAND as f64,
+        OTHER_OWNER_FACTOR as f64 / THOUSAND as f64,
+    );
 }
 
 /// B1: the state a node of each kind starts in.

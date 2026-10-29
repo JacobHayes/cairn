@@ -299,10 +299,6 @@ pub const NEXT_PARAMS: &[ParamSpec] = &[
     ParamSpec::one::<bool>("mine", "Only nodes the caller participates in."),
     KINDS,
     ParamSpec::one::<NodeKey>("within", "Only this node and the nodes beneath it."),
-    ParamSpec::one::<bool>(
-        "for_viewer",
-        "Rank for the caller: prioritize for me (Priority).",
-    ),
 ];
 
 /// `GET /api/journeys/{id}/nodes` (C9).
@@ -560,7 +556,6 @@ pub fn next(params: &Params) -> Result<NextQuery, ApiError> {
         mine: params.one("mine")?.unwrap_or(false),
         kinds: params.all("kind")?.into_iter().collect(),
         within: params.one("within")?,
-        for_viewer: params.one("for_viewer")?.unwrap_or(false),
     })
 }
 

@@ -1,17 +1,15 @@
 //! The configuration (PRACTICES, Scope and dependencies: exactly the configuration surface):
 //! the database file's path, the listen address, the public base URL, the auth providers
 //! with their own security settings, the assistant's provider and credential, the
-//! deployment's time zone, and the rank constants. One TOML file plus environment overrides
+//! deployment's time zone. One TOML file plus environment overrides
 //! ([`env`]). The values a deployment must choose have no defaults, so a missing one fails
-//! at startup naming it (ARCHITECTURE, Build, run, deploy); the rank constants default to
-//! the PRD's (Priority: "the constants are defaults, configurable per deployment").
+//! at startup naming it (ARCHITECTURE, Build, run, deploy).
 //!
 //! Loading reports every problem it finds at once, each by the key or variable it is about,
 //! rather than stopping at the first.
 
 pub mod env;
 mod file;
-mod rank;
 mod values;
 
 use std::fmt;
@@ -19,7 +17,7 @@ use std::net::SocketAddr;
 use std::path::{Path, PathBuf};
 
 use cairn_auth::{DevConfig, GcpIapConfig, OAuthConfig, OidcConfig, TailscaleConfig};
-use cairn_schema::{RankConstants, TimeZoneName};
+use cairn_schema::TimeZoneName;
 use cairn_service::DeploymentSettings;
 use jiff::tz::TimeZone;
 use url::Url;
@@ -40,8 +38,6 @@ pub struct Config {
     pub timezone: TimeZoneName,
     /// The zone `timezone` names.
     pub zone: TimeZone,
-    /// The rank constants (Priority).
-    pub rank: RankConstants,
     /// The auth providers, in the order a request is put to them.
     pub auth: Vec<Provider>,
     /// The assistant's provider, when the deployment offers the assistant (I5).
@@ -52,7 +48,7 @@ impl Config {
     /// The deployment settings derive reads.
     #[must_use]
     pub fn settings(&self) -> DeploymentSettings {
-        DeploymentSettings::new(self.timezone.clone(), self.zone.clone(), self.rank)
+        DeploymentSettings::new(self.timezone.clone(), self.zone.clone())
     }
 }
 
@@ -74,7 +70,7 @@ pub enum Provider {
 /// One thing wrong with a configuration: the key or variable it is about, and what.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct Problem {
-    /// The key (`timezone`, `auth.corp.issuer`, `rank`) or variable.
+    /// The key (`timezone`, `auth.corp.issuer`) or variable.
     pub key: String,
     /// What is wrong with it.
     pub message: String,

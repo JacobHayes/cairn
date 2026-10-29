@@ -55,7 +55,6 @@ pub fn derive_inputs(deployment: cairn_schema::Deployment) -> cairn_schema::Deri
     cairn_schema::DeriveInputs {
         today: parse("2026-10-06"),
         timezone: parse("UTC"),
-        rank: cairn_schema::RankConstants::default(),
         viewer: BTreeSet::new(),
         deployment,
     }

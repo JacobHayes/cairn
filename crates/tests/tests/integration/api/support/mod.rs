@@ -20,7 +20,7 @@ use cairn_auth::{
     Accounts, Auth, AuthProvider, Clock, GcpIapConfig, GcpIapProvider, GoogleEndpoints,
     OAuthConfig, OAuthServer, Presented, RelayClient, Verdict,
 };
-use cairn_schema::{Login, Patch, RankConstants, Slug, Timestamp, from_yaml};
+use cairn_schema::{Login, Patch, Slug, Timestamp, from_yaml};
 use cairn_service::{
     AgentSignIn, AuthKind, AuthMethod, Capabilities, DeploymentSettings, McpAccess, Parts, Service,
 };
@@ -99,7 +99,7 @@ pub const GOOGLE_SECRET: &str = "relay-secret-value";
 /// The test deployment's time zone: five hours behind UTC all year.
 pub fn settings() -> DeploymentSettings {
     let zone = TimeZone::fixed(Offset::constant(-5));
-    DeploymentSettings::new("Etc/GMT+5".parse().unwrap(), zone, RankConstants::default())
+    DeploymentSettings::new("Etc/GMT+5".parse().unwrap(), zone)
 }
 
 /// A server on loopback and what it stands on.

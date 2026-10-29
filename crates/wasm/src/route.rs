@@ -11,9 +11,7 @@
 use std::collections::BTreeSet;
 
 use cairn_engine::{Derived, DerivedJourney, Graph, derive, notices};
-use cairn_schema::{
-    Date, Deployment, DeriveInputs, Graph as GraphDocument, Notice, RankConstants, RouteSchedule,
-};
+use cairn_schema::{Date, Deployment, DeriveInputs, Graph as GraphDocument, Notice, RouteSchedule};
 use serde::{Deserialize, Serialize};
 use wasm_bindgen::prelude::wasm_bindgen;
 
@@ -60,7 +58,6 @@ impl RouteDerivation {
             timezone: "UTC"
                 .parse()
                 .map_err(|error| HostError::unreadable("timezone", error))?,
-            rank: RankConstants::default(),
             viewer: BTreeSet::new(),
             deployment: request.deployment.clone(),
         };

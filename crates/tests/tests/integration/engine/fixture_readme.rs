@@ -324,7 +324,7 @@ fn the_rank_table_is_what_derive_gives() {
                 vec![
                     format!("`{key}`"),
                     derived.priority().gravity(key).value().to_string(),
-                    ranking.unlocks(key).unwrap().value().to_string(),
+                    derived.priority().unlocks(key).value().to_string(),
                     derived
                         .dates()
                         .slack_days(key)

@@ -277,7 +277,6 @@ async fn cached_and_uncached_reads_agree_across_an_identity_merge(store: Arc<dyn
     let reader = call("u_dup", AT);
     let mine = NextQuery {
         mine: true,
-        for_viewer: true,
         ..NextQuery::default()
     };
     let before = cached.next(&reader, &vendor(), &mine).await.unwrap();

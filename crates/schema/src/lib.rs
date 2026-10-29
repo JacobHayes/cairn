@@ -54,10 +54,9 @@ pub use condition::{Clause, Comparison, Condition, ConditionValue, Membership};
 pub use derived::{
     Blocker, Bound, ChecklistCount, Consequences, Contribution, DateOrigin, DeriveInputs, Derived,
     DisplayState, DomainDocument, EffectiveDate, EffectiveParticipation, Explained, HeldDependent,
-    NodeDates, NodeDerived, NodeMove, OwnerFactor, ParticipationOrigin, Progress, RankConstants,
-    Real, Relevance, RelevanceExplanation, Score, ShortfallConsequence, StaleConsequence,
-    StallCause, Stalled, StillWaiting, Thousandths, TimeZoneName, UndecidedConsequence,
-    UndecidedDiscount,
+    NodeDates, NodeDerived, NodeMove, ParticipationOrigin, Progress, Real, Relevance,
+    RelevanceExplanation, Score, ShortfallConsequence, StaleConsequence, StallCause, Stalled,
+    StillWaiting, TimeZoneName, UndecidedConsequence,
 };
 pub use document::{
     ParseError, WriteError, from_json, from_yaml, to_json, to_json_pretty, to_yaml,

@@ -144,7 +144,7 @@ describe("opening and closing a node keeps the view", () => {
     ["closes it back to the bare journey", page("journeyNode", { ...J, key: "n_x" }), "?view=summary", undefined, "/journeys/j_a"],
     ["opens a node on the Graph with no view named", page("journey", J), "?view=graph&depth=stages", "n_x", "/journeys/j_a/nodes/n_x?depth=stages"],
     ["closes a node on the default Graph and names the Graph", page("journeyNode", { ...J, key: "n_x" }), "?depth=stages", undefined, "/journeys/j_a?view=graph&depth=stages"],
-    ["closes an edge", page("journeyEdge", { ...J, edge: "n_x~n_y" }), "?lens=gravity", undefined, "/journeys/j_a?view=graph&lens=gravity"],
+    ["closes an edge", page("journeyEdge", { ...J, edge: "n_x~n_y" }), "?lens=rank", undefined, "/journeys/j_a?view=graph&lens=rank"],
     ["opens a node from an edge", page("journeyEdge", { ...J, edge: "n_x~n_y" }), "", "n_y", "/journeys/j_a/nodes/n_y"],
     ["moves to the next node", page("journeyNode", { ...J, key: "n_x" }), "?view=timeline&range=3m", "n_z", "/journeys/j_a/nodes/n_z?view=timeline&range=3m"],
   ])("%s", (_, at, search, key, expected) => {
@@ -178,7 +178,7 @@ describe("opening a drawn line", () => {
   it.each([
     ["from a journey's List, on the Graph with the settings kept and no node", page("journeyNode", { ...J, key: "n_x" }), "?view=list&depth=stages", "/journeys/j_a/edges/n_x~n_y?depth=stages"],
     ["from the bare journey", page("journey", J), "?view=summary", "/journeys/j_a/edges/n_x~n_y"],
-    ["from another line", page("journeyEdge", { ...J, edge: "n_a~n_b" }), "?lens=gravity", "/journeys/j_a/edges/n_x~n_y?lens=gravity"],
+    ["from another line", page("journeyEdge", { ...J, edge: "n_a~n_b" }), "?lens=rank", "/journeys/j_a/edges/n_x~n_y?lens=rank"],
     ["from a route's List, keeping the version", page("routeNode", { route: "r", key: "n_a" }), "?version=2&view=list&depth=stages", "/routes/r/edges/n_x~n_y?version=2&depth=stages"],
     ["from a route's draft", page("route", { route: "r" }), "?q=a", "/routes/r/edges/n_x~n_y?q=a"],
   ])("writes the line's address %s", (_, at, search, expected) => {

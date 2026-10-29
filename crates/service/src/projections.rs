@@ -266,7 +266,7 @@ impl Service {
             .await
     }
 
-    /// C10, Priority: the acting frontier ranked, globally or for the caller, filtered.
+    /// C10, Priority: the acting frontier ranked, filtered.
     ///
     /// # Errors
     ///

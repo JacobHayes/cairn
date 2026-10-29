@@ -60,15 +60,6 @@ fn an_undecided_node_counts_at_half_and_what_follows_it_in_full() {
         [("n_after", 3.0, false), ("n_maybe", 2.0, false)],
         "largest first"
     );
-    let mut inputs = cairn_engine::testing::derive_inputs(records.deployment.clone());
-    inputs.rank.undecided_discount = 250.try_into().unwrap();
-    let graph = support::journey_graph(&records, support::JOURNEY);
-    let quartered = cairn_engine::derive(&graph, None, &inputs);
-    assert_eq!(
-        gravity(&quartered, "n_maybe"),
-        1.0 + 3.0,
-        "the configured discount"
-    );
 }
 
 /// Priority, Gravity: a not-relevant branch is pruned, so what waits on it is no longer

@@ -7,8 +7,8 @@ import type { Schema } from "@cairn/client";
 export type ListFlag = Schema<"ListFlag">;
 export type SortBy = Schema<"SortBy">;
 
-/** C9, C10: the single signals a list sorts by (Priority: effort when estimates exist). */
-export const SORTS: SortBy[] = ["rank", "slack", "gravity", "unlocks", "due", "effort"];
+/** C9, C10: the single signals a list sorts by. */
+export const SORTS: SortBy[] = ["rank", "slack", "gravity", "unlocks", "due"];
 
 /** C9: the columns Columns adds beyond the ones every list shows, in the order they sit. */
 export const LIST_COLUMNS = ["rank", "start_by", "slack", "gravity", "unlocks", "kind", "answer", "why", "affects", "effort"] as const;

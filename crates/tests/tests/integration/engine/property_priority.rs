@@ -8,16 +8,14 @@
 
 #[cfg(test)]
 mod property {
-    use std::collections::{BTreeMap, BTreeSet};
+    use std::collections::BTreeSet;
 
     use cairn_engine::derive::EdgeSet;
     use cairn_engine::derive::dependencies::{EdgeClass, Instant, Point};
     use cairn_engine::testing::derive_inputs;
     use cairn_engine::testing::generated::arb_journey;
     use cairn_engine::{Derived, Graph, derive};
-    use cairn_schema::{
-        Deployment, IdentityKey, NodeKey, NodeKind, Payload, Relevance, Score, State,
-    };
+    use cairn_schema::{Deployment, NodeKey, NodeKind, Payload, Relevance, Score, State};
     use patina_dst_proptest::prelude::*;
 
     fn derived(graph: &Graph) -> Derived {
@@ -201,17 +199,6 @@ mod property {
             let keys: BTreeSet<&NodeKey> = ranking.frontier().iter().collect();
             let unranked: BTreeSet<&NodeKey> = derived.blocking().frontier().iter().collect();
             prop_assert_eq!(keys, unranked);
-            let owners: BTreeMap<&NodeKey, &BTreeSet<IdentityKey>> = graph.document().nodes.as_map().keys()
-                .map(|key| (key, derived.participation().identities(key, &cairn_schema::KindKey::owner())))
-                .collect();
-            let global = ranking.clone();
-            for viewer in owners.values() {
-                let mine = derived.rank_for(viewer);
-                prop_assert_eq!(mine.frontier().len(), global.frontier().len());
-            }
-            prop_assert_eq!(derived.ranking(), &global);
-            let again = self::derived(&graph);
-            prop_assert_eq!(derived.ranking(), again.ranking());
         }
 
         /// D3: the schema's `Derived` agrees with the engine's values for every node, lists

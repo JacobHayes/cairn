@@ -118,7 +118,6 @@ export function testView(): Ready {
       today,
       timezone: "UTC",
       deployment: { revision: 2, identities: [{ key: "who_one", name: "Person One" }, { key: "who_two", name: "Person Two" }] },
-      rank: { urgency: 0.4, late: 0.15, gravity: 0.25, unlocks: 0.2, horizon_days: 14, undecided_discount: 0.5, other_owner_factor: 2 },
     },
     journey: {
       header: { id: "j_test", name: "Test journey", status: "active", created_at: "2026-10-01T00:00:00Z", created_on: "2026-10-01" },

@@ -1,6 +1,6 @@
 //! Pass 6, gravity and unlocks (PRD Priority; ARCHITECTURE, Read path: derive, pass 6), over
 //! the pruned gate edges of the effective dependency graph, with the undecided discount and
-//! the owner factor from the rank constants.
+//! the owner factor.
 //!
 //! Subtree gravity: a container's area is itself and its open descendants, and its subtree
 //! gravity sums the counted weight of the area and everything downstream of any of it, each
@@ -51,10 +51,7 @@ pub(super) mod unlocks;
 use std::collections::BTreeSet;
 
 use cairn_schema::limits::{NODE_COUNT_MAX, WEIGHT_MAX};
-use cairn_schema::{
-    Contribution, IdentityKey, KindKey, NodeKey, NodeKind, OwnerFactor, RankConstants, Relevance,
-    Score, UndecidedDiscount,
-};
+use cairn_schema::{Contribution, IdentityKey, KindKey, NodeKey, NodeKind, Relevance, Score};
 
 use super::Early;
 use super::blocking::Blocking;
@@ -63,12 +60,19 @@ use super::participation::Participation;
 use crate::graph::{Graph, Tree};
 
 /// Thousandths in one: the unit the discount and the factor are counted in.
-const THOUSAND: u64 = 1_000;
+pub const THOUSAND: u64 = 1_000;
+
+/// An undecided node's weight factor in gravity and unlocks, in thousandths (0.5).
+pub const UNDECIDED_DISCOUNT: u64 = 500;
+
+/// The factor a target owned by someone other than the node's owner gets in unlocks, in
+/// thousandths (2).
+pub const OTHER_OWNER_FACTOR: u64 = 2 * THOUSAND;
 
 // Every sum of terms fits a score that reads back exactly (Score::MAX): `node_count_max`
-// targets at `weight_max`, undiscounted, at the largest owner factor.
+// targets at `weight_max`, undiscounted, at the owner factor.
 const _: () = assert!(
-    NODE_COUNT_MAX as u64 * WEIGHT_MAX as u64 * THOUSAND * (WEIGHT_MAX as u64 * THOUSAND)
+    NODE_COUNT_MAX as u64 * WEIGHT_MAX as u64 * THOUSAND * OTHER_OWNER_FACTOR
         <= Score::MAX.millionths()
 );
 
@@ -100,21 +104,18 @@ pub struct Priority {
     /// Per node in the normalization set: the nodes completing it would unblock.
     unblocks: Vec<Vec<NodeIndex>>,
     unlocks: Vec<Score>,
-    discount: UndecidedDiscount,
-    factor: OwnerFactor,
     /// Word operations of the gravity sweep and instants and edges the simulations read.
     operations: u64,
 }
 
 impl Priority {
-    /// Pass 6 over passes 1 to 5, with the rank constants' discount and owner factor.
+    /// Pass 6 over passes 1 to 5.
     #[must_use]
     pub(crate) fn pass(
         graph: &Graph,
         early: &Early,
         participation: &Participation,
         blocking: &Blocking,
-        constants: &RankConstants,
     ) -> Self {
         let dependencies = &early.dependencies;
         let keys = dependencies.keys().to_vec();
@@ -132,8 +133,6 @@ impl Priority {
             owners: Vec::new(),
             unblocks: Vec::new(),
             unlocks: Vec::new(),
-            discount: constants.undecided_discount,
-            factor: constants.other_owner_factor,
             operations: 0,
         };
         for key in &keys {
@@ -172,7 +171,7 @@ impl Priority {
         self.undecided.push(undecided);
         self.normalized.push(open && !group);
         let counted = if open {
-            u64::from(weight) * self.discounted(undecided) * THOUSAND
+            u64::from(weight) * Self::discounted(undecided) * THOUSAND
         } else {
             0
         };
@@ -182,9 +181,9 @@ impl Priority {
     }
 
     /// The discount's thousandths when undecided, else a thousand.
-    fn discounted(&self, undecided: bool) -> u64 {
+    fn discounted(undecided: bool) -> u64 {
         if undecided {
-            u64::from(self.discount.get())
+            UNDECIDED_DISCOUNT
         } else {
             THOUSAND
         }
@@ -318,12 +317,8 @@ impl Priority {
         let weight = u64::from(self.weights.get(target).copied().unwrap_or(0));
         let undecided = self.undecided.get(target).copied().unwrap_or(false);
         let other = !same_owner(acting, self.owners.get(target));
-        let factor = if other {
-            u64::from(self.factor.get())
-        } else {
-            THOUSAND
-        };
-        (weight * self.discounted(undecided) * factor, other)
+        let factor = if other { OTHER_OWNER_FACTOR } else { THOUSAND };
+        (weight * Self::discounted(undecided) * factor, other)
     }
 
     /// The unlocks of the node at `at` with the owner factor relative to `acting`, and its
@@ -449,15 +444,6 @@ impl Priority {
     pub fn unlocks_from(&self, key: &NodeKey) -> Vec<Contribution> {
         self.at(key)
             .map(|at| self.unlocks_at(at, self.owners.get(at)).1)
-            .unwrap_or_default()
-    }
-
-    /// Priority, "prioritize for me": the node's unlocks with the owner factor relative to
-    /// the viewer's identities rather than the node's owners.
-    #[must_use]
-    pub fn unlocks_for(&self, key: &NodeKey, viewer: &BTreeSet<IdentityKey>) -> Score {
-        self.at(key)
-            .map(|at| self.unlocks_at(at, Some(viewer)).0)
             .unwrap_or_default()
     }
 

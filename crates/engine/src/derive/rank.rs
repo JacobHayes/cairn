@@ -1,31 +1,49 @@
 //! Pass 7, rank (PRD Priority; ARCHITECTURE, Read path: derive, pass 7; C5, C10): each node in
 //! the normalization set (relevant or undecided, open, not a group) gets `urgency` and `late`
 //! from its slack, `gravity_norm` and `unlocks_norm` against the largest gravity and unlocks
-//! in that set (0 when the largest is 0), and their blend under the rank constants; the
+//! in that set (0 when the largest is 0), and their blend under the fixed rank constants; the
 //! frontier and the acting frontier are ordered by rank, then smaller slack (null last), then
 //! greater gravity, then key. Rank is global: the owner factor of unlocks is relative to each
-//! node's owner. "Prioritize for me" ([`super::Derived::rank_for`]) recomputes unlocks with
-//! the owner factor relative to the viewer, and the ranks and order from it, leaving the
-//! global ranking unchanged. Effort-adjusted ordering sorts by gravity per estimated day,
-//! nodes with no or a zero estimate last.
+//! node's owner.
 //!
-//! Rank terms are floats: rank is never stored, and ties break on exact values and keys. With
-//! the default constants, which sum to 1, a rank is in [0, 1]; in general it is at most the
-//! constants' sum.
+//! Rank terms are floats: rank is never stored, and ties break on exact values and keys. The
+//! constants sum to 1, so a rank is in [0, 1].
 //!
 //! Cost at `node_count_max`: two maxima and one blend per node, O(nodes), and sorting the
-//! frontiers, O(nodes log nodes); a per-viewer ranking re-sums each ranked node's unblocked
-//! targets (at most one entry per node in all, pass 6) and does the same.
+//! frontiers, O(nodes log nodes).
 
 use std::cmp::Ordering;
 use std::collections::BTreeMap;
 
-use cairn_schema::{NodeKey, RankConstants, Score};
+use cairn_schema::{NodeKey, Score};
 
 use super::blocking::Blocking;
 use super::dates::Dates;
 use super::priority::Priority;
-use crate::graph::Graph;
+
+/// The rank constants (Priority), fixed: the blend's weights, which sum to 1, and the days of
+/// slack over which urgency rises from 0 to 1.
+pub struct RankConstants {
+    /// Urgency's weight.
+    pub urgency: f64,
+    /// Lateness's weight.
+    pub late: f64,
+    /// Normalized gravity's weight.
+    pub gravity: f64,
+    /// Normalized unlocks' weight.
+    pub unlocks: f64,
+    /// Days of slack over which urgency rises from 0 to 1.
+    pub horizon_days: u32,
+}
+
+/// The rank constants.
+pub const RANK: RankConstants = RankConstants {
+    urgency: 0.40,
+    late: 0.15,
+    gravity: 0.25,
+    unlocks: 0.20,
+    horizon_days: 14,
+};
 
 /// Why a node ranks where it does (C10): rank and the terms it blends.
 #[derive(Clone, Copy, Debug, PartialEq)]
@@ -63,11 +81,10 @@ struct Ranked {
     terms: RankTerms,
     slack_days: Option<i32>,
     gravity: Score,
-    unlocks: Score,
 }
 
-/// Pass 7's output, globally or for one viewer: each ranked node's terms, and the frontier
-/// and acting frontier in rank order.
+/// Pass 7's output: each ranked node's terms, and the frontier and acting frontier in rank
+/// order.
 #[derive(Clone, Debug, PartialEq)]
 pub struct Ranking {
     ranked: BTreeMap<NodeKey, Ranked>,
@@ -76,20 +93,13 @@ pub struct Ranking {
 }
 
 impl Ranking {
-    /// Ranks the normalization set, each node's unlocks given by `unlocks` (the global value
-    /// or a viewer's).
-    pub(crate) fn pass(
-        priority: &Priority,
-        dates: &Dates,
-        blocking: &Blocking,
-        constants: &RankConstants,
-        unlocks: impl Fn(&NodeKey) -> Score,
-    ) -> Self {
+    /// Ranks the normalization set.
+    pub(crate) fn pass(priority: &Priority, dates: &Dates, blocking: &Blocking) -> Self {
         let set: Vec<(&NodeKey, Score, Score)> = blocking
             .keys()
             .iter()
             .filter(|key| priority.in_normalization_set(key))
-            .map(|key| (key, priority.gravity(key), unlocks(key)))
+            .map(|key| (key, priority.gravity(key), priority.unlocks(key)))
             .collect();
         let gravity_max = set.iter().map(|(_, gravity, _)| *gravity).max();
         let unlocks_max = set.iter().map(|(_, _, unlocks)| *unlocks).max();
@@ -97,14 +107,14 @@ impl Ranking {
             .into_iter()
             .map(|(key, gravity, unlocks)| {
                 let slack_days = dates.slack_days(key);
-                let (urgency, late) = urgency(slack_days, constants.horizon_days);
+                let (urgency, late) = urgency(slack_days);
                 let gravity_norm = normalized(gravity, gravity_max.unwrap_or_default());
                 let unlocks_norm = normalized(unlocks, unlocks_max.unwrap_or_default());
                 let adds = RankAdds {
-                    urgency: constants.urgency.get() * urgency,
-                    late: constants.late.get() * late,
-                    gravity: constants.gravity.get() * gravity_norm,
-                    unlocks: constants.unlocks.get() * unlocks_norm,
+                    urgency: RANK.urgency * urgency,
+                    late: RANK.late * late,
+                    gravity: RANK.gravity * gravity_norm,
+                    unlocks: RANK.unlocks * unlocks_norm,
                 };
                 let terms = RankTerms {
                     urgency,
@@ -114,12 +124,11 @@ impl Ranking {
                     adds,
                     rank: adds.urgency + adds.late + adds.gravity + adds.unlocks,
                 };
-                assert_terms(&terms, constants);
+                assert_terms(&terms);
                 let ranked = Ranked {
                     terms,
                     slack_days,
                     gravity,
-                    unlocks,
                 };
                 (key.clone(), ranked)
             })
@@ -173,12 +182,6 @@ impl Ranking {
         self.terms(key).map(|terms| terms.rank)
     }
 
-    /// The unlocks the rank read: the global value, or the viewer's in a per-viewer ranking.
-    #[must_use]
-    pub fn unlocks(&self, key: &NodeKey) -> Option<Score> {
-        self.ranked.get(key).map(|ranked| ranked.unlocks)
-    }
-
     /// PRD Frontier, in rank order.
     #[must_use]
     pub fn frontier(&self) -> &[NodeKey] {
@@ -189,33 +192,6 @@ impl Ranking {
     #[must_use]
     pub fn acting_frontier(&self) -> &[NodeKey] {
         &self.acting_frontier
-    }
-
-    /// Priority, Effort-adjusted: the keys by gravity per estimated day, greatest first; nodes
-    /// with no or a zero estimate last; ties in rank order. `graph` is the one derived.
-    #[must_use]
-    pub fn by_effort(&self, graph: &Graph, priority: &Priority, keys: &[NodeKey]) -> Vec<NodeKey> {
-        let estimate = |key: &NodeKey| {
-            let days = graph.node(key).and_then(|node| node.payload.estimate());
-            days.map(|days| u128::from(days.get()))
-                .filter(|days| *days > 0)
-        };
-        let mut sorted = keys.to_vec();
-        sorted.sort_by(|a, b| {
-            let per_day = match (estimate(a), estimate(b)) {
-                // a / ea against b / eb, exactly: a x eb against b x ea.
-                (Some(first), Some(second)) => {
-                    let a_gravity = u128::from(priority.gravity(a).millionths());
-                    let b_gravity = u128::from(priority.gravity(b).millionths());
-                    (b_gravity * first).cmp(&(a_gravity * second))
-                }
-                (Some(_), None) => Ordering::Less,
-                (None, Some(_)) => Ordering::Greater,
-                (None, None) => Ordering::Equal,
-            };
-            per_day.then_with(|| self.compare(a, b))
-        });
-        sorted
     }
 }
 
@@ -229,18 +205,12 @@ fn by_slack(first: Option<i32>, second: Option<i32>) -> Ordering {
     }
 }
 
-/// Priority, Rank: `urgency` and `late` from slack over the horizon; both 0 for null slack. A
-/// zero horizon is the limit of a shrinking one: urgency 1 from slack 0, late 1 below it.
-fn urgency(slack_days: Option<i32>, horizon_days: u32) -> (f64, f64) {
+/// Priority, Rank: `urgency` and `late` from slack over the horizon; both 0 for null slack.
+fn urgency(slack_days: Option<i32>) -> (f64, f64) {
     let Some(slack) = slack_days else {
         return (0.0, 0.0);
     };
-    if horizon_days == 0 {
-        let urgency = if slack <= 0 { 1.0 } else { 0.0 };
-        let late = if slack < 0 { 1.0 } else { 0.0 };
-        return (urgency, late);
-    }
-    let horizon = f64::from(horizon_days);
+    let horizon = f64::from(RANK.horizon_days);
     let slack = f64::from(slack);
     (
         ((horizon - slack) / horizon).clamp(0.0, 1.0),
@@ -258,7 +228,7 @@ fn normalized(value: Score, max: Score) -> f64 {
 }
 
 /// Each term is in [0, 1], and the rank within the constants' sum.
-fn assert_terms(terms: &RankTerms, constants: &RankConstants) {
+fn assert_terms(terms: &RankTerms) {
     for term in [
         terms.urgency,
         terms.late,
@@ -267,10 +237,7 @@ fn assert_terms(terms: &RankTerms, constants: &RankConstants) {
     ] {
         assert!((0.0..=1.0).contains(&term), "a rank term is in [0, 1]");
     }
-    let sum = constants.urgency.get()
-        + constants.late.get()
-        + constants.gravity.get()
-        + constants.unlocks.get();
+    let sum = RANK.urgency + RANK.late + RANK.gravity + RANK.unlocks;
     assert!(
         terms.rank.is_finite() && terms.rank >= 0.0 && terms.rank <= sum * (1.0 + 1e-12),
         "a rank is within the constants' sum"

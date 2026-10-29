@@ -15,6 +15,7 @@ import { useStillWaiting } from "./reads.ts";
 import { holdingPhrase, rankClause } from "./sentence.ts";
 import { relativeDays } from "../status/when.ts";
 import { plural } from "../ui/words.ts";
+import { RANK } from "@cairn/client";
 
 const TERM_NAMES: Record<RankPart["signal"], string> = { urgency: "Urgency", late: "Running late", gravity: "Gravity", unlocks: "Unlocks" };
 
@@ -50,7 +51,6 @@ function Bar({ parts }: { parts: RankPart[] }) {
 /** The gravity broken down: the node's own weight, what applies downstream, and what waits on each decision at the discount. */
 function Gravity({ view, detail }: { view: Ready; detail: NodeDetail }) {
   const { node, derived } = detail;
-  const constants = view.inputs.rank;
   const all = useContributions(view, node.key, "gravity", derived.gravity_from);
   const container = detail.children.length > 0;
   const parts = gravityParts(view, derived.gravity, all.entries);
@@ -73,14 +73,14 @@ function Gravity({ view, detail }: { view: Ready; detail: NodeDetail }) {
           {parts.conditional.map((share) => (
             <div key={share.decision} className="kv-row">
               <dt>
-                Downstream if {share.decision === "" ? "a decision" : <NodeLink view={view} node={share.decision} />} is answered ({plural(share.nodes, "node")} × {constants.undecided_discount})
+                Downstream if {share.decision === "" ? "a decision" : <NodeLink view={view} node={share.decision} />} is answered ({plural(share.nodes, "node")} × {RANK.undecidedDiscount})
               </dt>
               <dd>{share.adds.toFixed(1)}</dd>
             </div>
           ))}
         </dl>
       )}
-      {parts.conditional.length === 0 || container ? null : <span className="muted small">× {constants.undecided_discount} is the undecided discount, as configured.</span>}
+      {parts.conditional.length === 0 || container ? null : <span className="muted small">× {RANK.undecidedDiscount} is the undecided discount.</span>}
       {derived.gravity_from.total === 0 ? null : (
         <details>
           <summary className="small">Contributors ({derived.gravity_from.total})</summary>
@@ -150,7 +150,6 @@ export function WhyRank({ view, detail, position, row }: { view: Ready; detail: 
       </Section>
     );
   }
-  const constants = view.inputs.rank;
   const parts = row?.rank == null ? [] : rankParts(row.rank);
   const sentence = position === undefined ? "Not ranked: only what is ready now is ranked." : rankClause(view, derived, { position, row }).trim();
   return (
@@ -173,8 +172,8 @@ export function WhyRank({ view, detail, position, row }: { view: Ready; detail: 
       <details data-testid="rank-how">
         <summary className="small">How</summary>
         <span className="small">
-          Rank is urgency × {constants.urgency}, plus running late × {constants.late}, plus gravity's share × {constants.gravity}, plus unlocks' share × {constants.unlocks}. Urgency looks {constants.horizon_days} days ahead; a
-          dependent owned by someone else counts × {constants.other_owner_factor}.
+          Rank is urgency × {RANK.urgency}, plus running late × {RANK.late}, plus gravity's share × {RANK.gravity}, plus unlocks' share × {RANK.unlocks}. Urgency looks {RANK.horizonDays} days ahead; a
+          dependent owned by someone else counts × {RANK.otherOwnerFactor}.
         </span>
       </details>
     </Section>

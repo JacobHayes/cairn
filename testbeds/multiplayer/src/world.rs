@@ -9,7 +9,7 @@ use std::sync::Arc;
 use std::time::Duration;
 
 use cairn_auth::{Accounts, Auth, AuthProvider, Clock, DevConfig, DevProvider};
-use cairn_schema::{IdentityKey, JourneyId, NodeKey, PatchReceipt, RankConstants, Revision};
+use cairn_schema::{IdentityKey, JourneyId, NodeKey, PatchReceipt, Revision};
 use cairn_service::{
     AuthKind, AuthMethod, Capabilities, DeploymentSettings, McpAccess, Parts, Service,
 };
@@ -72,7 +72,6 @@ impl Server {
                 detail: format!("{error:?}"),
             })?,
             jiff::tz::TimeZone::UTC,
-            RankConstants::default(),
         );
         let methods = vec![AuthMethod {
             name: slug("dev"),

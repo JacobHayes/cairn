@@ -1,6 +1,6 @@
 //! C9's list (each filter on a fixture state, in-journey search, sorting, paging), C10's next
 //! list (rank order, breadcrumbs and terms, re-sorting by one signal, "only mine", by kind, a
-//! subtree, "prioritize for me", the stalled diagnostic), and E4's "mine". Derived at
+//! subtree, the stalled diagnostic), and E4's "mine". Derived at
 //! 2026-10-06 unless a test says otherwise.
 #![cfg(test)]
 
@@ -430,31 +430,6 @@ fn the_launch_ranks_by_gravity_at_the_scenario_day_and_re_sorts_by_slack() {
         launch.next(&by_slack, &[]),
         ["n_docs", "n_beta_end", "n_retro"]
     );
-}
-
-/// Priority, "prioritize for me": the next list in the viewer's ranking, where the gate that
-/// frees someone else's work leads.
-#[test]
-fn next_ranks_for_the_viewer() {
-    let records = support::journey(&format!(
-        "- op: create_identity\n  identity: {{key: who_a, name: A}}\n- op: create_identity\n  identity: {{key: who_b, name: B}}\n{}",
-        add(&[
-            "{key: n_gate_a, id: gate-a, kind: action, title: Gate, participations: {k_owner: [who_a]}}",
-            "{key: n_gate_b, id: gate-b, kind: action, title: Gate, participations: {k_owner: [who_b]}}",
-            "{key: n_work_b, id: work-b, kind: action, title: Work, requires: [n_gate_a], participations: {k_owner: [who_b]}}",
-            "{key: n_work_a, id: work-a, kind: action, title: Work, requires: [n_gate_b], participations: {k_owner: [who_a]}}",
-        ])
-    ));
-    let derive = Derive::test(&records);
-    let for_me = NextQuery {
-        for_viewer: true,
-        ..NextQuery::default()
-    };
-    assert_eq!(
-        derive.next(&NextQuery::default(), &["who_b"]),
-        ["n_gate_a", "n_gate_b"]
-    );
-    assert_eq!(derive.next(&for_me, &["who_b"]), ["n_gate_b", "n_gate_a"]);
 }
 
 /// C5, D5: with the acting frontier empty, the next list carries what the journey waits on.

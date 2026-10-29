@@ -10,16 +10,15 @@ use std::collections::BTreeSet;
 use cairn_schema::{Cursor, IdentityKey, KindKey, NodeKey, NodeRow, Real, SortBy};
 
 use super::DerivedJourney;
-use crate::derive::{Ranking, checklist_count};
+use crate::derive::checklist_count;
 
 impl DerivedJourney<'_> {
-    /// The node's row (C9, C10), its unlocks and rank from `ranking`: the global one, or a
-    /// viewer's.
+    /// The node's row (C9, C10).
     ///
     /// # Panics
     ///
     /// When the node is not in the graph or no root reaches it, which a valid graph rules out.
-    pub(crate) fn row(&self, key: &NodeKey, ranking: &Ranking) -> NodeRow {
+    pub(crate) fn row(&self, key: &NodeKey) -> NodeRow {
         let node = self.node(key);
         let derived = self.derived;
         let blocking = derived.blocking();
@@ -53,41 +52,37 @@ impl DerivedJourney<'_> {
             slack_days: dates.slack_days(key),
             due: dates.due(key),
             gravity: priority.gravity(key),
-            unlocks: ranking
-                .unlocks(key)
-                .unwrap_or_else(|| priority.unlocks(key)),
-            rank: ranking.terms(key).map(|terms| cairn_schema::RankTerms {
-                urgency: real(terms.urgency),
-                late: real(terms.late),
-                gravity_norm: real(terms.gravity_norm),
-                unlocks_norm: real(terms.unlocks_norm),
-                adds: cairn_schema::RankAdds {
-                    urgency: real(terms.adds.urgency),
-                    late: real(terms.adds.late),
-                    gravity: real(terms.adds.gravity),
-                    unlocks: real(terms.adds.unlocks),
-                },
-                rank: real(terms.rank),
-            }),
+            unlocks: priority.unlocks(key),
+            rank: derived
+                .ranking()
+                .terms(key)
+                .map(|terms| cairn_schema::RankTerms {
+                    urgency: real(terms.urgency),
+                    late: real(terms.late),
+                    gravity_norm: real(terms.gravity_norm),
+                    unlocks_norm: real(terms.unlocks_norm),
+                    adds: cairn_schema::RankAdds {
+                        urgency: real(terms.adds.urgency),
+                        late: real(terms.adds.late),
+                        gravity: real(terms.adds.gravity),
+                        unlocks: real(terms.adds.unlocks),
+                    },
+                    rank: real(terms.rank),
+                }),
         }
     }
 
-    /// The keys sorted by one signal (C9, C10), ties in `ranking`'s order.
-    pub(crate) fn sorted(&self, keys: &[NodeKey], by: SortBy, ranking: &Ranking) -> Vec<NodeKey> {
+    /// The keys sorted by one signal (C9, C10), ties in rank order.
+    pub(crate) fn sorted(&self, keys: &[NodeKey], by: SortBy) -> Vec<NodeKey> {
+        let ranking = self.derived.ranking();
         let dates = self.derived.dates();
         let priority = self.derived.priority();
-        let unlocks = |key: &NodeKey| {
-            ranking
-                .unlocks(key)
-                .unwrap_or_else(|| priority.unlocks(key))
-        };
         let signal: Order<'_> = match by {
             SortBy::Rank => return ranking.sorted(keys),
-            SortBy::Effort => return ranking.by_effort(self.graph, priority, keys),
             SortBy::Slack => Box::new(|a, b| least_first(dates.slack_days(a), dates.slack_days(b))),
             SortBy::Due => Box::new(|a, b| least_first(dates.due(a), dates.due(b))),
             SortBy::Gravity => Box::new(|a, b| priority.gravity(b).cmp(&priority.gravity(a))),
-            SortBy::Unlocks => Box::new(|a, b| unlocks(b).cmp(&unlocks(a))),
+            SortBy::Unlocks => Box::new(|a, b| priority.unlocks(b).cmp(&priority.unlocks(a))),
         };
         let mut sorted = keys.to_vec();
         sorted.sort_by(|a, b| signal(a, b).then_with(|| ranking.compare(a, b)));

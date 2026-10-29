@@ -19,43 +19,11 @@ pub(crate) struct FileConfig {
     pub public_url: Option<String>,
     /// The deployment's IANA time zone (A9).
     pub timezone: Option<String>,
-    /// The rank constants (Priority): the PRD's defaults for any not given.
-    #[serde(default)]
-    pub rank: RankFile,
     /// The auth providers, in the order a request is put to them.
     #[serde(default)]
     pub auth: Vec<ProviderFile>,
     /// The assistant's provider, when the deployment offers the assistant (I5).
     pub assistant: Option<AssistantFile>,
-}
-
-/// The rank constants as written: plain numbers, each checked by validation.
-#[derive(Debug, Deserialize)]
-#[serde(deny_unknown_fields, default)]
-pub(crate) struct RankFile {
-    pub urgency: f64,
-    pub late: f64,
-    pub gravity: f64,
-    pub unlocks: f64,
-    pub horizon_days: i64,
-    pub undecided_discount: f64,
-    pub other_owner_factor: f64,
-}
-
-impl Default for RankFile {
-    /// The PRD's defaults (Priority), as the schema's `RankConstants::default` holds them.
-    fn default() -> Self {
-        let rank = cairn_schema::RankConstants::default();
-        Self {
-            urgency: rank.urgency.get(),
-            late: rank.late.get(),
-            gravity: rank.gravity.get(),
-            unlocks: rank.unlocks.get(),
-            horizon_days: i64::from(rank.horizon_days),
-            undecided_discount: f64::from(rank.undecided_discount.get()) / 1_000.0,
-            other_owner_factor: f64::from(rank.other_owner_factor.get()) / 1_000.0,
-        }
-    }
 }
 
 /// One auth provider (ARCHITECTURE, Auth), by kind.

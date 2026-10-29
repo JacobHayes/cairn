@@ -10,7 +10,7 @@ describe("a journey graph's address", () => {
   const query = (path: string) => new URLSearchParams(path.split("?")[1] ?? "");
 
   it("round-trips the view state and the graph's own settings, and names the graph only off its default", () => {
-    const view: GraphView = { state: { ...DEFAULT_VIEW_STATE, depth: "deliverables", fade: true, frontier: true, text: "x" }, open: ["n_s"], shut: ["n_t"], lens: "gravity", edit: true };
+    const view: GraphView = { state: { ...DEFAULT_VIEW_STATE, depth: "deliverables", fade: true, frontier: true, text: "x" }, open: ["n_s"], shut: ["n_t"], lens: "rank", edit: true };
     const bare = graphPath("j_a", view, {}, "");
     expect(graphViewFrom(query(bare))).toEqual(view);
     expect(screenOf({ journey: "j_a" }, query(bare))).toBe("graph");
@@ -31,10 +31,10 @@ describe("a journey graph's address", () => {
 
 describe("a route graph's address", () => {
   it("reads the view state as far as a route offers it, and the graph's own settings in full", () => {
-    const params = new URLSearchParams("depth=deliverables&fade=1&mine=1&owner=u&flag=blocked&frontier=1&show=notrelevant&open=n_s&shut=n_t&lens=gravity");
+    const params = new URLSearchParams("depth=deliverables&fade=1&mine=1&owner=u&flag=blocked&frontier=1&show=notrelevant&open=n_s&shut=n_t&lens=rank");
     const view = graphViewFrom(params, ROUTE_OFFERS);
     expect(view.state).toEqual({ ...DEFAULT_VIEW_STATE, depth: "deliverables", fade: true, filter: { ...DEFAULT_VIEW_STATE.filter, conditional: false } });
-    expect([view.open, view.shut, view.lens]).toEqual([["n_s"], ["n_t"], "gravity"]);
+    expect([view.open, view.shut, view.lens]).toEqual([["n_s"], ["n_t"], "rank"]);
   });
 
   it("rewrites the graph's settings in a route's query and keeps the version and the view it is on", () => {

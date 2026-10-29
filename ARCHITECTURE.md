@@ -36,7 +36,7 @@ flowchart LR
 
 Load-bearing decisions:
 
-1. **Engine is pure.** No storage, HTTP, or clock in it; today, timezone, rank constants, and the viewer are inputs (D6, J3).
+1. **Engine is pure.** No storage, HTTP, or clock in it; today, timezone and the viewer are inputs (D6, J3).
 2. **Whole domain in memory.** Every read loads one journey or route whole and derives once; every write validates a full candidate graph.
 3. **State and events in one transaction.** The patch applier is the only writer; row deltas and one event per mutation commit together or not at all (A17, J1, J2).
 4. **One engine, two places it runs.** Server and browser run the same crate; the browser runs the pure functions locally, against the server's answers.
@@ -49,7 +49,7 @@ Load-bearing decisions:
 - **One deployment, one trust boundary** (H4): no RBAC or per-journey visibility.
 - **One process** over one embedded database file; several instances are `Later`.
 - **Calendar days in the deployment timezone** (A9): "today" is computed once per request and passed in, so every user sees the same slack, overdue, and rank. Event timestamps render in the viewer's zone.
-- **Rank constants are configuration**; limits are hard-coded (`PRACTICES.md`).
+- **Rank constants are fixed in the engine**; limits are hard-coded (`PRACTICES.md`).
 
 ## Terms
 
@@ -58,7 +58,7 @@ PRD terms keep their meaning. Additionally:
 | Term | Definition |
 |---|---|
 | **Domain** | A patch target (A17), loaded and revision-checked as one unit: a journey, a route with its draft (a segment is a route of kind `segment`), or the deployment. Published versions are immutable graphs loaded singly by id, never part of the domain; inserting or upgrading a segment (B13, B14) reads the versions it names as inputs. |
-| **Derive inputs** | Today, deployment timezone, rank constants, the viewer's identities (resolved by the host from verified emails, H3), and the deployment context (identities, emails, aliases at a deployment revision) through which ownership, "mine", and the owner factor resolve (E4, E6). Supplied by the host. |
+| **Derive inputs** | Today, deployment timezone, the viewer's identities (resolved by the host from verified emails, H3), and the deployment context (identities, emails, aliases at a deployment revision) through which ownership, "mine", and the owner factor resolve (E4, E6). Supplied by the host. |
 | **Projection** | A read-only view over a derived journey (snapshot, level, trace, decision view, timeline, status summary, next, mine). |
 | **Domain document** | A journey's graph and state plus its derive inputs. Nothing derived, no proposals; the browser derives it locally. |
 | **Snapshot** | The I3 projection: a journey's facts and counts, for agents. |

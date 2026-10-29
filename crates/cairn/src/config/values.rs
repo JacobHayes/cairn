@@ -17,7 +17,7 @@ use super::file::{
     AssistantFile, DevFile, FileConfig, GcpIapFile, OAuthFile, OidcFile, ProviderFile,
     TailscaleFile,
 };
-use super::{Config, Problem, Provider, rank};
+use super::{Config, Problem, Provider};
 
 /// The configuration `file` holds, or `None` with its problems pushed.
 pub(crate) fn build(
@@ -37,7 +37,6 @@ pub(crate) fn build(
         .and_then(|text| public_url(&text, problems));
     let timezone =
         required(file.timezone, "timezone", problems).and_then(|text| timezone(&text, problems));
-    let rank = rank::build(&file.rank, problems);
     let auth = providers(file.auth, problems);
     let assistant = file
         .assistant
@@ -53,7 +52,6 @@ pub(crate) fn build(
         public_url: public_url?,
         timezone,
         zone,
-        rank: rank?,
         auth: auth?,
         assistant: assistant?,
     })

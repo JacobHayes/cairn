@@ -3,8 +3,6 @@
 
 use std::path::Path;
 
-use cairn_schema::RankConstants;
-
 use super::*;
 
 /// Every required value, one dev provider.
@@ -45,13 +43,12 @@ fn without(key: &str) -> String {
 }
 
 #[test]
-fn a_minimal_file_configures_a_deployment_with_the_prds_rank_constants() {
+fn a_minimal_file_configures_a_deployment() {
     let config = parsed(MINIMAL).unwrap();
     assert_eq!(config.database, Path::new("/etc/cairn/cairn.db"));
     assert_eq!(config.listen.to_string(), "127.0.0.1:8080");
     assert_eq!(config.public_url.as_str(), "http://127.0.0.1:8080/");
     assert_eq!(config.timezone.as_str(), "America/New_York");
-    assert_eq!(config.rank, RankConstants::default());
     assert!(config.assistant.is_none());
     assert!(matches!(config.auth.as_slice(), [Provider::Dev(dev)] if dev.name.as_str() == "dev"));
     // A9: today is computed in the configured zone.
@@ -145,16 +142,9 @@ fn a_key_the_file_does_not_know_fails_rather_than_being_ignored() {
     for text in [
         format!("{MINIMAL}\ntimezon = \"UTC\""),
         format!("{MINIMAL}\nallow_off_loopbak = true"),
-        format!("{MINIMAL}\n[rank]\nurgent = 0.4"),
     ] {
         assert_eq!(problem_keys(&text), vec!["file"], "{text}");
     }
-}
-
-#[test]
-fn rank_constants_are_checked_at_load() {
-    let text = format!("{MINIMAL}\n[rank]\nurgency = 0.5\nundecided_discount = 1.5");
-    assert_eq!(problem_keys(&text), ["rank", "rank.undecided_discount"]);
 }
 
 #[test]

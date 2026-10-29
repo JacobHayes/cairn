@@ -8,7 +8,7 @@ use std::sync::Arc;
 use std::sync::atomic::{AtomicU32, Ordering};
 
 use cairn_engine::{ApplyInputs, Records};
-use cairn_schema::{Actor, Patch, RankConstants, ScenarioStep, Timestamp, from_yaml};
+use cairn_schema::{Actor, Patch, ScenarioStep, Timestamp, from_yaml};
 use cairn_service::{
     Call, Capabilities, DeploymentSettings, DomainPatch, McpAccess, Parts, Service, WriteError,
     Written,
@@ -21,7 +21,7 @@ use jiff::tz::{Offset, TimeZone};
 /// midnight in it is 05:00 UTC.
 pub fn settings() -> DeploymentSettings {
     let zone = TimeZone::fixed(Offset::constant(-5));
-    DeploymentSettings::new("Etc/GMT+5".parse().unwrap(), zone, RankConstants::default())
+    DeploymentSettings::new("Etc/GMT+5".parse().unwrap(), zone)
 }
 
 /// A service over `store`, with its notifier.

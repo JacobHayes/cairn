@@ -154,7 +154,7 @@ function nodesOf(props: GraphCanvasProps, edgeEnds: ReadonlySet<string>, tiling:
   const ends = new Set([...edgeEnds].map((key) => tiling.hidden.get(key) ?? key));
   // A tile that stands for a member of a selection of several is picked as that member would be.
   const pickedTiles = new Set([...(selection?.picked ?? [])].flatMap((key) => tiling.hidden.get(key) ?? []));
-  const chips = lens === undefined ? undefined : lensChips(model.cards, lens);
+  const chips = lens === undefined ? undefined : lensChips(model.cards);
   const tiers = chips === undefined ? undefined : lensTiers(chips);
   return model.cards.flatMap((card) => {
     const placed = layout.nodes[card.key];

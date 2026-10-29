@@ -20,7 +20,6 @@ const inputs: Ready["inputs"] = {
   today,
   timezone: "UTC",
   deployment: { revision: 1, identities: [{ key: "who_one", name: "Person One" }] },
-  rank: { urgency: 0.4, late: 0.15, gravity: 0.25, unlocks: 0.2, horizon_days: 14, undecided_discount: 0.5, other_owner_factor: 2 },
 };
 
 export function canvasView(): Ready {

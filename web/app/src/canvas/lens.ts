@@ -2,17 +2,12 @@
 // neutral ramp by quartile of the range shown. It never re-lays out: the chip hangs outside the
 // card. Pure, so the unit tests read the same chips the canvas draws.
 import type { Card, Lens } from "./model.ts";
-import { plural } from "../ui/words.ts";
-import { daysWords } from "../status/when.ts";
 
-export const LENS_WORDS: Record<Lens, string> = { rank: "Rank", gravity: "Gravity", unlocks: "Unlocks", slack: "Slack" };
+export const LENS_WORDS: Record<Lens, string> = { rank: "Rank" };
 
 /** The one-line meaning of each signal, for the key under the View menu. */
 export const LENS_MEANING: Record<Lens, string> = {
   rank: "Where it stands among what can be done now.",
-  gravity: "How much rides on it.",
-  unlocks: "How many things finishing it frees.",
-  slack: "How many days it can slip before the deadline.",
 };
 
 /** What a card's chip says, its hover (none when the chip already says it), and the number the tint follows. */
@@ -22,27 +17,13 @@ export interface LensChip {
   value: number;
 }
 
-/** The chip `lens` puts on `card`, or none when the card has no value for it. */
-export function lensChip(card: Card, lens: Lens): LensChip | undefined {
-  const signals = card.journey?.signals;
-  if (signals === undefined) {
-    return undefined;
-  }
-  switch (lens) {
-    case "rank":
-      return signals.rank === undefined ? undefined : { text: `Rank #${String(signals.rank)}`, title: undefined, value: -signals.rank };
-    case "gravity":
-      return signals.gravity === undefined ? undefined : { text: `Gravity ${String(signals.gravity)}`, title: "How much rides on it", value: signals.gravity };
-    case "unlocks":
-      return signals.unlocks === undefined
-        ? undefined
-        : { text: `Unlocks ${String(signals.unlocks.count)}`, title: `Frees ${plural(signals.unlocks.count, "node")}, weighted ${String(signals.unlocks.weighted)}`, value: signals.unlocks.weighted };
-    case "slack":
-      return signals.slackDays === undefined ? undefined : { text: `Slack ${daysWords(signals.slackDays)}`, title: "How many days it can slip", value: -signals.slackDays };
-  }
+/** The chip the lens puts on `card`, or none when the card has no rank. */
+export function lensChip(card: Card): LensChip | undefined {
+  const rank = card.journey?.rank;
+  return rank === undefined ? undefined : { text: `Rank #${String(rank)}`, title: undefined, value: -rank };
 }
 
-/** Each chip's tint: 0 (palest) to 3 (darkest), by quartile of the values shown. For rank and slack a smaller number is the stronger signal. */
+/** Each chip's tint: 0 (palest) to 3 (darkest), by quartile of the values shown. A smaller rank is the stronger signal. */
 export function lensTiers(chips: ReadonlyMap<string, LensChip>): Map<string, number> {
   const values = [...chips.values()].map((chip) => chip.value).sort((a, b) => a - b);
   const tiers = new Map<string, number>();
@@ -53,11 +34,11 @@ export function lensTiers(chips: ReadonlyMap<string, LensChip>): Map<string, num
   return tiers;
 }
 
-/** Every card's chip for `lens`, by key. */
-export function lensChips(cards: readonly Card[], lens: Lens): Map<string, LensChip> {
+/** Every card's chip, by key. */
+export function lensChips(cards: readonly Card[]): Map<string, LensChip> {
   const chips = new Map<string, LensChip>();
   for (const card of cards) {
-    const chip = lensChip(card, lens);
+    const chip = lensChip(card);
     if (chip !== undefined) {
       chips.set(card.key, chip);
     }

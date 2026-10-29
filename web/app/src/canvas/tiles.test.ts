@@ -236,7 +236,7 @@ describe("what a tile says", () => {
 });
 
 describe("a tile's pieces from its card", () => {
-  const container: Card = { ...card("stage"), title: "Build", journey: { state: "blocked", finished: false, relevance: "relevant" as const, foot: { words: "Due Feb 5, 2027", tone: "plain" }, owner: undefined, owners: "", body: { kind: "progress", done: 9, total: 12, badge: { flag: "overdue", tone: "bad" } }, here: { frontier: false, active: false, mine: false }, rank: undefined, signals: { rank: undefined, gravity: undefined, unlocks: undefined, slackDays: undefined }, current: false } };
+  const container: Card = { ...card("stage"), title: "Build", journey: { state: "blocked", finished: false, relevance: "relevant" as const, foot: { words: "Due Feb 5, 2027", tone: "plain" }, owner: undefined, owners: "", body: { kind: "progress", done: 9, total: 12, badge: { flag: "overdue", tone: "bad" } }, here: { frontier: false, active: false, mine: false }, rank: undefined, current: false } };
 
   it("is the card's own title, state, progress, message and date, and the fact it is given", () => {
     const pieces = tilePiecesOf(container, "6 matches");

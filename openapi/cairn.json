@@ -2743,10 +2743,6 @@
             "$ref": "#/components/schemas/Deployment",
             "description": "The deployment context: identities, emails, and aliases at a revision."
           },
-          "rank": {
-            "$ref": "#/components/schemas/RankConstants",
-            "description": "The rank constants."
-          },
           "timezone": {
             "$ref": "#/components/schemas/TimeZoneName",
             "description": "The deployment's time zone."
@@ -2768,7 +2764,6 @@
         "required": [
           "today",
           "timezone",
-          "rank",
           "deployment"
         ],
         "type": "object"
@@ -9760,7 +9755,7 @@
           },
           "unlocks": {
             "$ref": "#/components/schemas/Score",
-            "description": "Unlocks: the viewer's, in a ranking for them."
+            "description": "Unlocks."
           }
         },
         "required": [
@@ -11973,45 +11968,6 @@
           "late",
           "gravity",
           "unlocks"
-        ],
-        "type": "object"
-      },
-      "RankConstants": {
-        "additionalProperties": false,
-        "description": "The rank constants (Priority: normative formulas, configurable constants, defaults\nshown). The four coefficients sum to a finite number, so every rank is finite.",
-        "properties": {
-          "gravity": {
-            "$ref": "#/components/schemas/Real"
-          },
-          "horizon_days": {
-            "format": "uint32",
-            "minimum": 0,
-            "type": "integer"
-          },
-          "late": {
-            "$ref": "#/components/schemas/Real"
-          },
-          "other_owner_factor": {
-            "$ref": "#/components/schemas/Thousandths1000To1000000"
-          },
-          "undecided_discount": {
-            "$ref": "#/components/schemas/Thousandths0To1000"
-          },
-          "unlocks": {
-            "$ref": "#/components/schemas/Real"
-          },
-          "urgency": {
-            "$ref": "#/components/schemas/Real"
-          }
-        },
-        "required": [
-          "urgency",
-          "late",
-          "gravity",
-          "unlocks",
-          "horizon_days",
-          "undecided_discount",
-          "other_owner_factor"
         ],
         "type": "object"
       },
@@ -14522,11 +14478,6 @@
             "const": "due",
             "description": "Due date, earliest first, none last.",
             "type": "string"
-          },
-          {
-            "const": "effort",
-            "description": "Gravity per estimated day, greatest first, no estimate last (Priority: Effort-adjusted).",
-            "type": "string"
           }
         ]
       },
@@ -15001,18 +14952,6 @@
             "type": "string"
           }
         ]
-      },
-      "Thousandths0To1000": {
-        "maximum": 1.0,
-        "minimum": 0.0,
-        "multipleOf": 0.001,
-        "type": "number"
-      },
-      "Thousandths1000To1000000": {
-        "maximum": 1000.0,
-        "minimum": 1.0,
-        "multipleOf": 0.001,
-        "type": "number"
       },
       "Tick": {
         "additionalProperties": false,
@@ -18855,17 +18794,6 @@
             "required": false,
             "schema": {
               "$ref": "#/components/schemas/NodeKey"
-            },
-            "style": "form"
-          },
-          {
-            "description": "Rank for the caller: prioritize for me (Priority).",
-            "explode": true,
-            "in": "query",
-            "name": "for_viewer",
-            "required": false,
-            "schema": {
-              "type": "boolean"
             },
             "style": "form"
           }

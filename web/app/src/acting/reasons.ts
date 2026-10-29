@@ -180,7 +180,6 @@ function reasonWords(view: Ready, row: NodeRow, sort: SortBy): string | undefine
     case "unlocks":
       return unlocksReason(view, row) ?? rankReason(view, row);
     case "rank":
-    case "effort":
       return rankReason(view, row);
   }
 }

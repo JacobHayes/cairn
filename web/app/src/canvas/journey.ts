@@ -1,7 +1,7 @@
 // What a journey adds to its canvas's cards (C1, C2, C5, C6): each card's display state (D8),
 // its one date and the owner when it is the viewer's or missing, a decided decision's answer, a
 // container's progress and roll-up badge, what a conditional node depends on, the "I am here"
-// marks, the rank order, and the numbers the Signals lens shows. All read from the document and
+// marks, the rank order, and the rank the Signals lens shows. All read from the document and
 // its local derive; the words are words.ts's.
 import type { Schema } from "@cairn/client";
 
@@ -11,7 +11,7 @@ import { answerText, identityName, NO_OWNER, ownersOf, ownerWords, YOU } from ".
 import { currentStagesOf } from "../journeys/requests.ts";
 import { isFinished } from "../status/state.ts";
 import type { DisplayState } from "../status/words.ts";
-import type { CardBadge, CardBody, CardState, JourneyExtras, LevelNode, Looks, Signals } from "./model.ts";
+import type { CardBadge, CardBody, CardState, JourneyExtras, LevelNode, Looks } from "./model.ts";
 import { dependsWords, firstParagraph, footWords } from "./words.ts";
 import { snoozeWords } from "../status/snooze.ts";
 
@@ -119,17 +119,6 @@ function footOf(context: Context, node: GraphNode, derived: NodeDerived, state: 
   });
 }
 
-function signalsOf(context: Context, node: GraphNode, derived: NodeDerived, at: LevelNode, rank: number | undefined, finished: boolean): Signals {
-  const container = context.children.has(node.key);
-  const slack = container ? at.roll_up?.min_child_slack_days : derived.dates.slack_days;
-  return {
-    rank,
-    gravity: finished || derived.relevance.value === "not_relevant" ? undefined : at.roll_up?.subtree_gravity ?? derived.gravity,
-    unlocks: context.frontier.has(node.key) ? { count: derived.unlocks_from.total, weighted: derived.unlocks } : undefined,
-    slackDays: finished || slack == null ? undefined : slack,
-  };
-}
-
 function cardState(context: Context, node: GraphNode, at: LevelNode): CardState {
   const { view } = context;
   const derived = view.derived.nodes[node.key];
@@ -156,7 +145,6 @@ function cardState(context: Context, node: GraphNode, at: LevelNode): CardState 
       mine,
     },
     rank,
-    signals: signalsOf(context, node, derived, at, rank, finished),
     current: context.current.has(node.key) && isStage(node),
   };
 }

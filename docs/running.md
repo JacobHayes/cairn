@@ -31,10 +31,6 @@ listen = "127.0.0.1:8080"
 public_url = "https://cairn.example.com/" # links, OAuth redirects, and the Host served
 timezone = "America/New_York"            # what "today" is, for everyone
 
-# [rank]                               # optional: any of urgency, late, gravity, unlocks,
-#                                        # horizon_days, undecided_discount, other_owner_factor;
-#                                        # each left out takes its default
-
 [[auth]]                                 # one or more, asked in this order
 kind = "oidc"                            # or dev, builtin_oauth, tailscale, gcp_iap
 name = "sso"

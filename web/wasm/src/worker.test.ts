@@ -30,7 +30,6 @@ function sample(): string {
     inputs: {
       today: "2026-10-06",
       timezone: "UTC",
-      rank: { urgency: 0.4, late: 0.15, gravity: 0.25, unlocks: 0.2, horizon_days: 14, undecided_discount: 0.5, other_owner_factor: 2.0 },
       deployment: { revision: 1, identities: [] },
     },
   });

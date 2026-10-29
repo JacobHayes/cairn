@@ -247,7 +247,7 @@ mod in_process {
             read(&at::DECISIONS, &[journey], ""),
             read(&at::TIMELINE, &[journey], ""),
             read(&at::SUMMARY, &[journey], ""),
-            read(&at::NEXT, &[journey], "?for_viewer=true"),
+            read(&at::NEXT, &[journey], ""),
             read(&at::NODES, &[journey], "?flag=blocked"),
             read(&at::MINE, &[journey], ""),
             read(&at::NODE, &[journey, node], ""),

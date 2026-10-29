@@ -32,7 +32,7 @@ export const STEPS = ["stages", "decisions", "deliverables", "actions"] as const
 export type Step = (typeof STEPS)[number];
 
 /** C6: what the Signals lens puts on each card. */
-export const LENSES = ["rank", "gravity", "unlocks", "slack"] as const;
+export const LENSES = ["rank"] as const;
 export type Lens = (typeof LENSES)[number];
 
 /**
@@ -104,15 +104,6 @@ export type CardBody =
   | { kind: "marked_done"; skipped: number; keptPending: boolean }
   | { kind: "depends"; text: string };
 
-/** What the Signals lens can put on a card: each is a number, or none when the card has no value. */
-export interface Signals {
-  rank: number | undefined;
-  gravity: number | undefined;
-  /** How many nodes finishing it frees (the acting frontier only), and the weighted value the tint follows. */
-  unlocks: { count: number; weighted: number } | undefined;
-  slackDays: number | undefined;
-}
-
 /** A journey card's state and derived values (C1, C5, C6, C2's roll-ups). */
 export interface CardState {
   /** The engine's display state (D8). */
@@ -130,7 +121,6 @@ export interface CardState {
   here: Here;
   /** C5: its place in the acting frontier's rank order. */
   rank: number | undefined;
-  signals: Signals;
   /** C5: a stage holding the acting frontier or active work, which the Stages step opens. */
   current: boolean;
 }

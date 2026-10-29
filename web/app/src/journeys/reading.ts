@@ -14,7 +14,7 @@ import { summaryModel, type SummaryModel } from "../summary/model.ts";
 import { useMineOf, type MineEntry } from "./mine.ts";
 
 /** The viewer's own work that can be done now, in the journey's rank (E4, C10). */
-export const READY_FOR_VIEWER: NextQuery = { sort: "rank", mine: true, kinds: [], for_viewer: false };
+export const READY_FOR_VIEWER: NextQuery = { sort: "rank", mine: true, kinds: [] };
 
 const READY_REQUEST = { projection: "next" as const, query: READY_FOR_VIEWER };
 const SUMMARY_REQUEST = { projection: "status_summary" as const };

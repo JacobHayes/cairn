@@ -594,8 +594,6 @@ pub enum SortBy {
     Unlocks,
     /// Due date, earliest first, none last.
     Due,
-    /// Gravity per estimated day, greatest first, no estimate last (Priority: Effort-adjusted).
-    Effort,
 }
 
 // PRD: C8, C10.
@@ -711,14 +709,14 @@ pub struct NodeRow {
     pub due: Option<Date>,
     /// Gravity.
     pub gravity: Score,
-    /// Unlocks: the viewer's, in a ranking for them.
+    /// Unlocks.
     pub unlocks: Score,
     /// Its rank and terms, for nodes in the normalization set.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub rank: Option<RankTerms>,
 }
 
-/// C10: what the next list shows: filters, the sort, and whose ranking.
+/// C10: what the next list shows: filters and the sort.
 #[derive(Clone, Debug, Default, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
 #[serde(deny_unknown_fields)]
 pub struct NextQuery {
@@ -734,9 +732,6 @@ pub struct NextQuery {
     /// Only this node and the nodes beneath it.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub within: Option<NodeKey>,
-    /// Rank for the viewer: "prioritize for me" (Priority).
-    #[serde(default, skip_serializing_if = "crate::serde_util::is_false")]
-    pub for_viewer: bool,
 }
 
 // PRD: C5, D5.

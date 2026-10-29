@@ -8,7 +8,7 @@ use std::sync::atomic::{AtomicI64, Ordering};
 
 use cairn_auth::Clock;
 use cairn_mcp::{ToolError, ToolSet};
-use cairn_schema::{Actor, Patch, RankConstants, Scenario, Timestamp, from_yaml};
+use cairn_schema::{Actor, Patch, Scenario, Timestamp, from_yaml};
 use cairn_service::{
     Call, Capabilities, DeploymentSettings, DomainPatch, McpAccess, Parts, Service,
 };
@@ -28,8 +28,7 @@ impl World {
     /// The tools over an empty deployment, at the vendor evaluation's first step.
     pub fn new() -> Self {
         let zone = TimeZone::fixed(Offset::constant(-5));
-        let settings =
-            DeploymentSettings::new("Etc/GMT+5".parse().unwrap(), zone, RankConstants::default());
+        let settings = DeploymentSettings::new("Etc/GMT+5".parse().unwrap(), zone);
         let service = Service::new(Parts {
             store: Arc::new(MemoryStore::new()),
             notifier: Arc::new(InProcessNotifier::new()),

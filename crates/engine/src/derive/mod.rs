@@ -18,8 +18,7 @@
 //! 6. Gravity and unlocks ([`priority`]): each node's downstream set and gravity, its
 //!    largest child gravity, and for the rank normalization set what completing it would
 //!    unblock and its unlocks.
-//! 7. Rank ([`rank`]): each ranked node's terms and rank, the frontiers in rank order, the
-//!    per-viewer recomputation, and effort-adjusted ordering; then `stale` ([`stale`];
+//! 7. Rank ([`rank`]): each ranked node's terms and rank, the frontiers in rank order; then `stale` ([`stale`];
 //!    `overdue` is pass 4's): terminal nodes whose completing guards would now fail.
 //!
 //! [`Derived`] holds the output of every pass. It is the engine's own type, with explanation
@@ -48,8 +47,8 @@ pub(crate) mod stale;
 use std::collections::BTreeSet;
 
 use cairn_schema::{
-    Blocker, Date, DependencyVia, Deployment, DeriveInputs, IdentityKey, KeyRefs, Node, NodeKey,
-    RankConstants, Relevance, StaleReason, State,
+    Blocker, Date, DependencyVia, Deployment, DeriveInputs, KeyRefs, Node, NodeKey, Relevance,
+    StaleReason, State,
 };
 
 use crate::graph::{Document, Graph, Tree};
@@ -76,7 +75,6 @@ pub struct Derived {
     blocking: Blocking,
     priority: Priority,
     ranking: Ranking,
-    rank_constants: RankConstants,
     stale: stale::Staleness,
     today: Date,
 }
@@ -124,37 +122,11 @@ impl Derived {
         &self.priority
     }
 
-    /// Pass 7: the global ranking (Priority: rank is global), its terms, and the frontiers in
+    /// Pass 7: the ranking (Priority: rank is global), its terms, and the frontiers in
     /// rank order.
     #[must_use]
     pub fn ranking(&self) -> &Ranking {
         &self.ranking
-    }
-
-    /// Priority, "prioritize for me": the ranking with the owner factor of unlocks relative to the
-    /// viewer's identities (H3) instead of each node's owner. The global ranking is unchanged.
-    #[must_use]
-    pub fn rank_for(&self, viewer: &BTreeSet<IdentityKey>) -> Ranking {
-        Ranking::pass(
-            &self.priority,
-            &self.dates,
-            &self.blocking,
-            &self.rank_constants,
-            |key| self.priority.unlocks_for(key, viewer),
-        )
-    }
-
-    /// Priority, Effort-adjusted: the keys by gravity per estimated day, greatest first, nodes
-    /// with no or a zero estimate last, ties in global rank order. `graph` is the one derived.
-    #[must_use]
-    pub fn by_effort(&self, graph: &Graph, keys: &[NodeKey]) -> Vec<NodeKey> {
-        self.ranking.by_effort(graph, &self.priority, keys)
-    }
-
-    /// The rank constants it was derived with.
-    #[must_use]
-    pub fn rank_constants(&self) -> &RankConstants {
-        &self.rank_constants
     }
 
     /// The today it was derived for (D7: both sides of a consequence share it).
@@ -396,16 +368,10 @@ pub fn derive(journey: &Graph, created_on: Option<Date>, inputs: &DeriveInputs) 
         state.is_empty() || state.len() == document.nodes.len(),
         "every node of a journey has a stored state"
     );
-    derive_at(
-        journey,
-        created_on,
-        inputs.today,
-        &inputs.deployment,
-        &inputs.rank,
-    )
+    derive_at(journey, created_on, inputs.today, &inputs.deployment)
 }
 
-/// Derives a journey at `today` over `deployment` with the rank constants: every pass that
+/// Derives a journey at `today` over `deployment` every pass that
 /// reads no viewer, which the validation pipeline's derived guards also run (ARCHITECTURE,
 /// Write path: one derive of the final candidate).
 #[must_use]
@@ -414,17 +380,14 @@ pub(crate) fn derive_at(
     created_on: Option<Date>,
     today: Date,
     deployment: &Deployment,
-    rank: &RankConstants,
 ) -> Derived {
     let early = early(journey, deployment);
     let participation = participation::pass(journey, &early.relevance, deployment);
     let mut dates = Dates::pass(journey, &early, today, created_on);
     let blocking = Blocking::pass(journey, &early, &dates, today);
     dates.settle_done(journey, |key| blocking.done_by_date(key));
-    let priority = Priority::pass(journey, &early, &participation, &blocking, rank);
-    let ranking = Ranking::pass(&priority, &dates, &blocking, rank, |key| {
-        priority.unlocks(key)
-    });
+    let priority = Priority::pass(journey, &early, &participation, &blocking);
+    let ranking = Ranking::pass(&priority, &dates, &blocking);
     let stale = stale::Staleness::pass(journey, &early, &dates, &blocking);
     let Early {
         relevance,
@@ -440,7 +403,6 @@ pub(crate) fn derive_at(
         blocking,
         priority,
         ranking,
-        rank_constants: *rank,
         stale,
         today,
     }

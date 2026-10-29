@@ -61,7 +61,6 @@ export interface NextQuery {
   mine?: boolean;
   kinds?: Schema<"NodeKind">[];
   within?: NodeKey;
-  for_viewer?: boolean;
 }
 
 /** C9: the schema's `ListQuery`, the list's filters, sort, and page. */

@@ -10,7 +10,7 @@ use cairn_assistant::chat::{Credential, ProviderConfig};
 use cairn_assistant::{Assistant, Target, TurnReply, assistant_agent};
 use cairn_auth::Clock;
 use cairn_mcp::{ToolError, ToolSet};
-use cairn_schema::{Actor, Mutation, Patch, RankConstants, Scenario, Timestamp, from_yaml};
+use cairn_schema::{Actor, Mutation, Patch, Scenario, Timestamp, from_yaml};
 use cairn_service::{
     Call, Capabilities, DeploymentSettings, DomainPatch, McpAccess, Parts, Service,
 };
@@ -39,8 +39,7 @@ impl World {
     /// As [`World::new`], over a memory store whose commits `faults` can fail or hold.
     pub async fn with_faults(faults: cairn_store::Faults) -> Self {
         let zone = TimeZone::fixed(Offset::constant(-5));
-        let settings =
-            DeploymentSettings::new("Etc/GMT+5".parse().unwrap(), zone, RankConstants::default());
+        let settings = DeploymentSettings::new("Etc/GMT+5".parse().unwrap(), zone);
         let store = Arc::new(MemoryStore::with_faults(faults));
         let service = Service::new(Parts {
             store: Arc::<MemoryStore>::clone(&store),

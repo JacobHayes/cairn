@@ -42,7 +42,7 @@ How code is written and verified. Companion to `ARCHITECTURE.md`.
 
 ### Scope and dependencies
 
-- **No configuration by default.** A knob exists only when two real deployments need different values. The surface: database path, listen address, public base URL, auth providers and their security settings (the Tailscale trusted proxies, the dev provider's off-loopback override and verified emails), assistant provider and credential, deployment timezone, rank constants. Limits and behavior switches are not configuration.
+- **No configuration by default.** A knob exists only when two real deployments need different values. The surface: database path, listen address, public base URL, auth providers and their security settings (the Tailscale trusted proxies, the dev provider's off-loopback override and verified emails), assistant provider and credential, deployment timezone. Limits and behavior switches are not configuration.
 - **Do it right while it is hot.** No `TODO` without an owner and reason on the same line; deferred work lives only in the PRD's Later.
 - **Back-of-the-envelope first.** A new pass over the graph states its cost at `node_count_max` (compute, memory, storage or network) before code, and comes with a property test.
 - **Dependencies are deliberate, not zero.** The engine takes only `serde` and a date type, nothing touching the OS or a runtime, so it compiles to wasm and simulates. Shell crates take what they need when maintaining our own would cost more than auditing upgrades; the adding commit says why. Tools in `mise.toml` are pinned and earn their place the same way.

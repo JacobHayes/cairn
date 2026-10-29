@@ -1891,8 +1891,6 @@ export interface components {
         DeriveInputs: {
             /** @description The deployment context: identities, emails, and aliases at a revision. */
             deployment: components["schemas"]["Deployment"];
-            /** @description The rank constants. */
-            rank: components["schemas"]["RankConstants"];
             /** @description The deployment's time zone. */
             timezone: components["schemas"]["TimeZoneName"];
             /**
@@ -3896,7 +3894,7 @@ export interface components {
             title: components["schemas"]["Title"];
             /** @description No owner. */
             unassigned?: boolean;
-            /** @description Unlocks: the viewer's, in a ranking for them. */
+            /** @description Unlocks. */
             unlocks: components["schemas"]["Score"];
         };
         /** @description One node's stored state in a journey. */
@@ -4715,20 +4713,6 @@ export interface components {
             /** @description Urgency times its constant. */
             urgency: components["schemas"]["Real"];
         };
-        /**
-         * @description The rank constants (Priority: normative formulas, configurable constants, defaults
-         *     shown). The four coefficients sum to a finite number, so every rank is finite.
-         */
-        RankConstants: {
-            gravity: components["schemas"]["Real"];
-            /** Format: uint32 */
-            horizon_days: number;
-            late: components["schemas"]["Real"];
-            other_owner_factor: components["schemas"]["Thousandths1000To1000000"];
-            undecided_discount: components["schemas"]["Thousandths0To1000"];
-            unlocks: components["schemas"]["Real"];
-            urgency: components["schemas"]["Real"];
-        };
         /** @description Why a node ranks where it does: its rank and the terms it blends. */
         RankTerms: {
             /** @description What each term adds to the rank: the term times its constant. */
@@ -5491,7 +5475,7 @@ export interface components {
             node: components["schemas"]["NodeKey"];
         };
         /** @description The single signal a list is sorted by; ties fall back to rank order. */
-        SortBy: "rank" | "slack" | "gravity" | "unlocks" | "due" | "effort";
+        SortBy: "rank" | "slack" | "gravity" | "unlocks" | "due";
         /** @description A proposal's destination moved past the revision it was drafted against. */
         StaleBase: {
             /** @description The destination's revision the proposal names, and its current one. */
@@ -5621,8 +5605,6 @@ export interface components {
         } | {
             proposal: components["schemas"]["ProposalId"];
         } | "deployment";
-        Thousandths0To1000: number;
-        Thousandths1000To1000000: number;
         /**
          * @description One SSE `tick` event: `of` is now at `revision`. A view refetches only when it is
          *     newer than the revision it holds.
@@ -8061,8 +8043,6 @@ export interface operations {
                 kind?: components["schemas"]["NodeKind"][];
                 /** @description Only this node and the nodes beneath it. */
                 within?: components["schemas"]["NodeKey"];
-                /** @description Rank for the caller: prioritize for me (Priority). */
-                for_viewer?: boolean;
             };
             header?: never;
             path: {

@@ -8,7 +8,7 @@
 use std::path::{Path, PathBuf};
 use std::sync::{Arc, Mutex, MutexGuard, PoisonError};
 
-use cairn_schema::{Actor, RankConstants};
+use cairn_schema::Actor;
 use cairn_service::{
     Call, Capabilities, DeploymentSettings, DomainPatch, McpAccess, Parts, Service, WriteError,
     Written,
@@ -212,7 +212,7 @@ impl Open {
     fn new(directory: &Path, faults: &Faults) -> Result<Open, Stop> {
         let store = Arc::new(open_store(directory, faults)?);
         let zone = TimeZone::fixed(Offset::constant(-5));
-        let settings = DeploymentSettings::new(parse("Etc/GMT+5"), zone, RankConstants::default());
+        let settings = DeploymentSettings::new(parse("Etc/GMT+5"), zone);
         let service = Service::new(Parts {
             store: Arc::<SqliteStore>::clone(&store),
             notifier: Arc::new(InProcessNotifier::new()),

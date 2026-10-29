@@ -5,7 +5,7 @@
 //! as the store's cross-journey search does.
 //!
 //! Cost at `node_count_max`: the next list filters and sorts the acting frontier, O(nodes log
-//! nodes), and a per-viewer ranking (pass 7 again, O(nodes) plus the unblocked targets); the
+//! nodes); the
 //! list tests each node once against each filter, text search reading each node's text and its
 //! annotations once (indexed by node first, so the journey's annotations are read once), then
 //! sorts and cuts a page; `mine` tests each node's kinds, O(nodes x kinds).
@@ -21,7 +21,6 @@ use cairn_schema::{
 
 use super::rows::{count, page};
 use super::{DerivedJourney, ProjectionError};
-use crate::derive::Ranking;
 
 /// C9: the list's flag, owner, and text filters over one journey: whether a node matches every
 /// one given. The viewer and the owner are read through aliases (E6).
@@ -56,7 +55,7 @@ impl Matcher<'_, '_> {
 }
 
 impl<'a> DerivedJourney<'a> {
-    /// C10: the acting frontier ordered by rank (the viewer's, for "prioritize for me") or by
+    /// C10: the acting frontier ordered by rank or by
     /// one signal, filtered to the viewer's items, to kinds, or to a subtree, each item with
     /// its breadcrumb and rank terms; with what the journey waits on when it is stalled (C5).
     ///
@@ -72,14 +71,9 @@ impl<'a> DerivedJourney<'a> {
             self.known(within)?;
         }
         let viewer = &self.canonical_viewer(viewer);
-        let owned: Ranking;
-        let ranking = if query.for_viewer {
-            owned = self.derived.rank_for(viewer);
-            &owned
-        } else {
-            self.derived.ranking()
-        };
-        let keys: Vec<NodeKey> = ranking
+        let keys: Vec<NodeKey> = self
+            .derived
+            .ranking()
             .acting_frontier()
             .iter()
             .filter(|key| query.kinds.is_empty() || query.kinds.contains(&self.node(key).kind()))
@@ -88,9 +82,9 @@ impl<'a> DerivedJourney<'a> {
             .cloned()
             .collect();
         let items = self
-            .sorted(&keys, query.sort, ranking)
+            .sorted(&keys, query.sort)
             .iter()
-            .map(|key| self.row(key, ranking))
+            .map(|key| self.row(key))
             .collect();
         Ok(Next {
             items,
@@ -112,7 +106,6 @@ impl<'a> DerivedJourney<'a> {
         if let Some(within) = &query.within {
             self.known(within)?;
         }
-        let ranking = self.derived.ranking();
         let matcher = self.matcher(
             &query.flags,
             query.owner.as_ref(),
@@ -138,10 +131,10 @@ impl<'a> DerivedJourney<'a> {
             .filter(|key| query.kinds.is_empty() || query.kinds.contains(&self.node(key).kind()))
             .cloned()
             .collect();
-        let sorted = self.sorted(&matching, query.sort, ranking);
+        let sorted = self.sorted(&matching, query.sort);
         let (keys, next) = page(&sorted, query.cursor, PAGE_ITEM_COUNT_MAX);
         Ok(ListPage {
-            rows: keys.iter().map(|key| self.row(key, ranking)).collect(),
+            rows: keys.iter().map(|key| self.row(key)).collect(),
             next,
             total: count(sorted.len()),
         })

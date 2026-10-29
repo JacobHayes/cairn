@@ -172,7 +172,7 @@ export class FakeHost implements Host {
       throw new Skewed();
     }
     const document = {
-      inputs: { deployment: { revision: held.deployment }, rank: {}, timezone: "UTC", today: held.today },
+      inputs: { deployment: { revision: held.deployment }, timezone: "UTC", today: held.today },
       journey: { header: { id: journey, name: journey, status: "active" }, revision: held.revision, graph: {} },
     };
     return JSON.stringify(document);
