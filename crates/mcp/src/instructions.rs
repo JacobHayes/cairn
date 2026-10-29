@@ -65,7 +65,7 @@ pub fn guide() -> &'static str {
     split(SKILL).1
 }
 
-/// Every workflow, in the order the guide lists them.
+/// Every workflow, in the order their files are listed.
 #[must_use]
 pub fn workflows() -> Vec<Workflow> {
     WORKFLOW_FILES
@@ -115,19 +115,11 @@ mod tests {
     }
 
     #[test]
-    fn every_workflow_has_a_description_and_is_linked_from_the_guide() {
+    fn every_workflow_has_a_description_and_a_title() {
         for workflow in workflows() {
             assert!(!workflow.description.is_empty(), "{}", workflow.name);
             assert!(workflow.text.starts_with("# "), "{}", workflow.name);
-            let link = format!("](workflows/{}.md)", workflow.name);
-            assert!(guide().contains(&link), "{} is not linked", workflow.name);
         }
-        let linked = guide().matches("](workflows/").count();
-        assert_eq!(
-            linked,
-            workflows().len(),
-            "every link is to a workflow served"
-        );
     }
 
     #[test]

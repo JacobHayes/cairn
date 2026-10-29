@@ -10,6 +10,10 @@ pub use cairn_schema::limits::PAGE_ITEM_COUNT_MAX;
 // The context budgets (PRACTICES, Explicit limits): what an agent loads or reads is held to
 // a size, measured as compact JSON bytes (about four bytes a token), and tests fail past it.
 
+/// Bytes in the served guide (`instructions::guide()`): the part a client shows an agent
+/// before it reads anything else, held to what Claude Code shows of server instructions.
+/// Rules that govern one tool live in that tool's description.
+pub const GUIDE_BYTES_MAX: u32 = 4096;
 /// Bytes in the whole tool list, every tool's name, description, input schema and
 /// annotations.
 pub const TOOL_LIST_BYTES_MAX: u32 = 48 * 1024;

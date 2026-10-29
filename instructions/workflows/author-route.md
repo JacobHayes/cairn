@@ -17,7 +17,7 @@ draft, the person reviews on the canvas, and publishing makes the next version.
    an owner or a reviewer), what has to be decided up front, and which dates matter. Model:
    - questions as decisions (with an answer type and, for choices, the choices);
    - work as deliverables (an output) and actions (a step), grouped into groups (a stage
-     is a group between milestones; see Stages in the Cairn guide);
+     is a group between milestones; see the stage rules in `apply_patch`);
    - points in time as milestones;
    - "only if" as a condition on a decision's answer;
    - "after" as an edge (`requires`), and dates as date rules (`due_by`, `not_before`)

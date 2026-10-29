@@ -21,11 +21,14 @@ use crate::{ToolError, ToolSet};
 pub(crate) const SPECS: &[Spec] = &[
     Spec {
         name: "create_proposal",
-        description: "Draft a proposal for someone to review, under an id you choose: your own \
-            ordered mutations to a destination (one that does not exist yet is created at \
-            revision 0), or one Cairn drafts: upgrading a journey to a newer version of its \
-            route, saving a journey's structure as a new route, or linking a journey to a \
-            published route version. Name exactly one.",
+        description: "Draft a proposal for someone to review, under an id you choose: your own ordered \
+            mutations to a destination (one that does not exist yet is created at revision 0), \
+            or one Cairn drafts: upgrading a journey to a newer version of its route, saving a \
+            journey's structure as a new route, or linking a journey to a published route \
+            version. Name exactly one.\n\n\
+            To reuse a recurring piece of a process, find a segment first (`list_routes` with \
+            `kind` `segment`) and propose an `insert_segment`; the insert-segment workflow has \
+            the wiring and an example.",
         writes: Writes::Proposal,
         destructive: false,
         schema: schema_citing_mutations::<CreateProposal>,

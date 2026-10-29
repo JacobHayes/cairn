@@ -69,8 +69,9 @@ pub(crate) const SPECS: &[Spec] = &[
     },
     Spec {
         name: "list_proposals",
-        description: "Open proposals, newest first, paged: under one destination, waiting on \
-            you, or creating a journey or route.",
+        description: "Open proposals, newest first, paged: under one destination, waiting on you, or \
+            creating a journey or route. A proposal stays listed until applied or discarded, so \
+            this finds one whose id you lost.",
         writes: Writes::Nothing,
         destructive: false,
         schema: schema::<ListProposals>,

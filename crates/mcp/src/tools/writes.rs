@@ -24,11 +24,24 @@ use crate::{ToolError, ToolSet};
 pub(crate) const SPECS: &[Spec] = &[
     Spec {
         name: "update_journey_state",
-        description: "Record what happened in one journey, as one patch of ordered mutations: \
-            answers, transitions, notes, ticks, who does a node, pins and recorded dates, \
-            snoozes, overrides, the journey's name, owners and status, and a new identity an \
-            answer names. It never changes what the graph is: that is apply_patch or a \
-            proposal.",
+        description: "Record what happened in one journey, as one patch of ordered mutations: answers, \
+            transitions, notes, ticks, who does a node, pins and recorded dates, snoozes, \
+            overrides, the journey's name, owners and status, and a new identity an answer \
+            names. It never changes what the graph is: that is apply_patch or a proposal.\n\n\
+            Order is never a guard: start, finish or answer a node whatever it waits on or its \
+            own date; out-of-order work is a fact. Reopening what finished work relied on marks \
+            that work `stale`. Completion guards are evidence: `requires_note` needs a note on \
+            the node itself (a child's or the journey's does not count), `requires_checklist` \
+            needs every item ticked; send `add_annotation` or `set_ticked` and the `complete` \
+            transition as one patch. `complete_anyway` replaces `complete` to go ahead without \
+            the evidence, with an optional `reason`; only when the person says to. `mark_done` \
+            is for a group only: it reads done, its unfinished work reads skipped, and `reopen` \
+            removes it.\n\n\
+            A snooze sets a node aside until a date or another node is done and changes no plan \
+            date. Snoozing a container sets its whole subtree aside, still blocking and counting \
+            for priority; any transition on the container clears it.\n\n\
+            A person an answer names who is not in Cairn yet is a `create_identity` in the same \
+            patch, before the answer naming its key.",
         writes: Writes::Patch,
         destructive: true,
         schema: || schema_with_mutation_sketch::<UpdateJourneyState>(&records_journey_state),
@@ -36,9 +49,30 @@ pub(crate) const SPECS: &[Spec] = &[
     },
     Spec {
         name: "apply_patch",
-        description: "Apply ordered mutations to a journey, a route's draft, or the \
-            deployment, all or nothing: any change, structure and state alike. Base revision \
-            0 creates the target. Draft a proposal instead when someone should review first.",
+        description: "Apply ordered mutations to a journey, a route's draft, or the deployment, all or \
+            nothing: any change, structure and state alike, so a mix is one patch. Base revision \
+            0 creates the target.\n\n\
+            Prefer `set_node_field` for one field; `replace_node` sends everything, `requires` \
+            included, and a `checklist` value replaces the whole list. `remove_node` needs the \
+            exact removal: in a journey get it from `get_node` with `removal` true and clear its \
+            `outside_references` in the same patch (`set_node_field` on the holder's field, \
+            `edit_resource`, or `unsnooze`); a route draft has none: assemble it from \
+            `get_route`. Completing or archiving a journey is the person's call. Deleting is \
+            permanent, unlike retiring or archiving, so only when the person asks: one patch to \
+            the `deployment` deletes any number, all or none; delete the journeys using a route \
+            in the same patch, or retire the route instead.\n\n\
+            Dates, each in its own field: a deadline is `due_by` and never holds work back; a \
+            structural not-until is `not_before`: the node reads `scheduled` and stays off the \
+            next list until then, yet can be started or finished early; an event is a milestone, \
+            `scheduled` until its pinned day, then ready to mark done, or done by itself with \
+            `auto_done`; unpinned it is ready, and marking it done early records when. Whatever \
+            waits on a `scheduled` node is `blocked`, its `waits_on` carrying the date.\n\n\
+            A stage is a group bounded by milestones outside it: `opens_at` gates its contents \
+            unless `gates` is false, `closes_at` bounds its finish and its contents' due dates \
+            unless `closes` is false, and consecutive stages share one. Put in a stage the work \
+            done during it; work that can as well be done ahead goes in a stage with `gates` \
+            false; prep that must come first sits outside, with a `due_by` before the opening \
+            milestone.",
         writes: Writes::Patch,
         destructive: true,
         schema: || schema_with_mutation_sketch::<ApplyPatch>(&written_directly),
@@ -55,7 +89,8 @@ pub(crate) const SPECS: &[Spec] = &[
     },
     Spec {
         name: "manage_identity",
-        description: "Create, edit, merge, or delete an identity (a person or team).",
+        description: "Create, edit, merge, or delete an identity (a person or team). An identity has a \
+            name, emails, or both; someone who only signed in has emails and no name.",
         writes: Writes::Patch,
         destructive: true,
         schema: schema::<ManageIdentity>,

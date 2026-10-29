@@ -1102,10 +1102,10 @@ async fn provider_usage_and_refusals_are_counted() {
     assert!(has("provider_failed", "4xx"), "{ended:?}");
 }
 
-/// I4: the system prompt names every workflow once, through the guide, and leaves its steps to
-/// `get_workflow`, the same text on every request so a provider can cache it.
+/// I4: the system prompt leaves every workflow's steps to `get_workflow`, which names each one
+/// among its tools, the same text on every request so a provider can cache it.
 #[tokio::test]
-async fn the_system_prompt_names_every_workflow_and_stays_the_same() {
+async fn the_system_prompt_leaves_workflows_to_their_tool_and_stays_the_same() {
     let world = World::new();
     let lead = user("u_lead");
     world.vendor_journey(&lead).await;
@@ -1117,8 +1117,10 @@ async fn the_system_prompt_names_every_workflow_and_stays_the_same() {
         panic!("{} exchanges", exchanges.len());
     };
     assert_eq!(first.system, second.system);
+    let tool = first.tools.iter().find(|tool| tool.name == "get_workflow");
+    let listed = serde_json::to_string(&tool.expect("get_workflow is offered").parameters).unwrap();
     for workflow in cairn_mcp::instructions::workflows() {
-        assert!(first.system.contains(workflow.name), "{}", workflow.name);
+        assert!(listed.contains(workflow.name), "{}", workflow.name);
         assert!(!first.system.contains(workflow.text), "{}", workflow.name);
     }
 }

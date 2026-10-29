@@ -534,8 +534,8 @@ fn tool_specs() -> Vec<ToolSpec> {
 }
 
 /// The system prompt, the same on every request (so a provider can cache it): the write
-/// policy, and the shipped guide, which lists the workflows, each read with
-/// `get_workflow` when its job comes up (I4, I5: the same instructions as external agents).
+/// policy, and the shipped guide, which points to `get_workflow` for the
+/// workflows, each read when its job comes up (I4, I5: the same instructions as external agents).
 /// Who the assistant works for and on what, and the target as read, are [`turn_context`],
 /// which goes after it.
 fn system() -> String {

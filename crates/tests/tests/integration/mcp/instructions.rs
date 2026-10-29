@@ -5,8 +5,8 @@
 
 use std::collections::BTreeSet;
 
-use cairn_mcp::ToolSet;
 use cairn_mcp::instructions::{self, SKILL};
+use cairn_mcp::{ToolSet, limits};
 use cairn_schema::{DisplayState, NodeKind};
 use serde_json::Value;
 
@@ -23,24 +23,35 @@ fn the_instructions_name_only_tools_and_fields_that_exist() {
     }
     let mut texts = vec![("SKILL.md".to_owned(), SKILL)];
     texts.extend(
+        definitions
+            .iter()
+            .map(|t| (t.name.to_owned(), t.description)),
+    );
+    texts.extend(
         instructions::workflows()
             .into_iter()
             .map(|w| (w.name.to_owned(), w.text)),
     );
-    let mut named_tools = BTreeSet::new();
     for (file, text) in texts {
         for identifier in identifiers(text) {
             assert!(
                 known.contains(&identifier),
                 "{file} names `{identifier}`, which no tool has"
             );
-            if definitions.iter().any(|tool| tool.name == identifier) {
-                named_tools.insert(identifier);
-            }
         }
     }
-    let every: BTreeSet<String> = definitions.iter().map(|t| t.name.to_owned()).collect();
-    assert_eq!(named_tools, every, "the guide names every tool");
+}
+
+/// The served guide stays within the size a client shows of server instructions: whatever
+/// governs one tool is on that tool.
+#[test]
+fn the_guide_stays_within_its_size() {
+    let bytes = u32::try_from(instructions::guide().len()).unwrap();
+    assert!(
+        bytes <= limits::GUIDE_BYTES_MAX,
+        "the guide is {bytes} bytes, past {}",
+        limits::GUIDE_BYTES_MAX
+    );
 }
 
 /// D8: the guide's table of display states says each one by the words every screen does:
@@ -53,7 +64,7 @@ fn the_guide_says_each_display_state_as_the_screens_do() {
             let mut cells = line.strip_prefix("| `")?.split(" | ");
             let state = cells.next()?.strip_suffix('`')?.to_owned();
             serde_json::from_value::<DisplayState>(Value::String(state.clone())).ok()?;
-            Some((state, cells.next()?.to_owned()))
+            Some((state, cells.next()?.trim_end_matches(" |").to_owned()))
         })
         .collect();
     let expected: Vec<(String, String)> = DisplayState::ALL
