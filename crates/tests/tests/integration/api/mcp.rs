@@ -611,8 +611,9 @@ mod mcp_in_process {
         assert_eq!(tools, expected.map(str::to_owned).into());
     }
 
-    /// The list marks what a tool does: a read is read-only; a write is idempotent under
-    /// its patch id, and destructive when it can undo or overwrite (a discard, a merge, any
+    /// The list marks what a tool does, leaving out hints equal to MCP's defaults: a read is
+    /// read-only; a write is idempotent
+    /// under its patch id, and destructive when it can undo or overwrite (a discard, a merge, any
     /// patch) rather than only add (a route file or a proposal).
     #[tokio::test]
     async fn the_tool_list_marks_reads_and_destructive_writes() {
@@ -629,13 +630,13 @@ mod mcp_in_process {
             )
         };
         let cases = [
-            ("get_snapshot", Some(true), Some(false), Some(false)),
-            ("import_route", Some(false), Some(false), Some(true)),
-            ("create_proposal", Some(false), Some(false), Some(true)),
-            ("edit_proposal", Some(false), Some(true), Some(true)),
-            ("manage_identity", Some(false), Some(true), Some(true)),
-            ("apply_patch", Some(false), Some(true), Some(true)),
-            ("update_journey_state", Some(false), Some(true), Some(true)),
+            ("get_snapshot", Some(true), None, None),
+            ("import_route", None, Some(false), Some(true)),
+            ("create_proposal", None, Some(false), Some(true)),
+            ("edit_proposal", None, None, Some(true)),
+            ("manage_identity", None, None, Some(true)),
+            ("apply_patch", None, None, Some(true)),
+            ("update_journey_state", None, None, Some(true)),
         ];
         for (name, read_only, destructive, idempotent) in cases {
             assert_eq!(hint(name), (read_only, destructive, idempotent), "{name}");

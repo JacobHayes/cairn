@@ -6,27 +6,23 @@ description: Work with Cairn, a process tracker where routes are templates and j
 # Working with Cairn
 
 Cairn tracks processes as graphs. A **route** is a template with numbered, immutable
-published versions and at most one draft. A **journey** is a live copy for one real
-situation: its nodes, the answers given, each node's state, who participates, pins, and
-notes. Nodes are decisions (typed questions), deliverables and actions (work), milestones
-(dates), and groups (containers). Edges are hard dependencies. Conditions on answers decide
-what is relevant. Blocking, dates, rank, and the frontier are derived by Cairn on every
-read; never compute them yourself. You act as the user who connected you, with the same
-capabilities; every write records you and that user.
+published versions; a **journey** is a live copy of one for one real situation, with its
+nodes (decisions, deliverables, actions, milestones, groups), the answers given, each
+node's state, who participates, and notes. Blocking, dates, rank, and the frontier are
+derived by Cairn on every read; never compute them yourself. You act as the user who
+connected you, and every write records you and that user.
 
 ## The loop
 
-1. **Read state first.** Call `get_snapshot` before anything else on a journey. It is an
-   overview with no node list: the answers in effect, counts, the top of the ranked acting
-   frontier, open decisions by rank, placeholders needing breakdown, unassigned items, and
-   shortfalls (each list is the top few; `counts` has the totals). Scope it with `subtree`
-   on a large journey. It says when completing the journey is suggested; completing it is
-   the person's call.
-2. **Look closer only where needed.** `list_nodes` pages nodes in rank order: every node,
-   or with `filters` those that need something (`next_up` is the acting frontier,
-   `decisions_needed`, `blocked`, `stale`, and the others its schema lists). Scope it with
-   `within` and `depth`. `get_node` explains one node: why it is relevant or
-   blocked, its dates, and why it ranks where it does. `get_level` shows the graph at one
+1. **Read state first.** Call `get_snapshot` before anything else on a journey: an
+   overview of the answers in effect, counts, the top of the ranked acting frontier, open
+   decisions, placeholders needing breakdown, unassigned items, and shortfalls. Scope it
+   with `subtree` on a large journey. It says when completing the journey is suggested;
+   completing it is the person's call.
+2. **Look closer only where needed.** `list_nodes` pages nodes in rank order, or with
+   `filters` those that need something (`next_up`, `decisions_needed`, `blocked`, `stale`,
+   and the others its schema lists), scoped by `within` and `depth`. `get_node` explains one
+   node: why it is relevant or blocked, its dates, and its rank. `get_level` shows one
    level of containment.
 3. **Write in small, named steps**, by the rules below. Every direct write is one patch of
    ordered mutations: `update_journey_state` records what happened in a journey (answers,

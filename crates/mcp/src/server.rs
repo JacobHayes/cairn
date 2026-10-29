@@ -81,11 +81,15 @@ impl ServerHandler for Server {
     ) -> impl Future<Output = Result<ListToolsResult, ErrorData>> + Send + '_ {
         let tools = ToolSet::definitions().into_iter().map(|definition| {
             let destructive = tools::spec(definition.name).is_some_and(|spec| spec.destructive);
-            let mut annotations = ToolAnnotations::new()
-                .read_only(!definition.writes.any())
-                .destructive(destructive);
-            // A write resubmitted under its patch id is answered from its receipt (H5).
-            annotations.idempotent_hint = Some(definition.writes.any());
+            // A hint equal to MCP's default (not read-only, destructive, not idempotent) is
+            // left out of the list, and so is a read's destructive hint. A write resubmitted under its patch id is answered from
+            // its receipt (H5), so a write is idempotent.
+            let mut annotations = ToolAnnotations::new();
+            let writes = definition.writes.any();
+            annotations.read_only_hint = (!writes).then_some(true);
+            // Destructiveness is meaningful only for a write.
+            annotations.destructive_hint = (writes && !destructive).then_some(false);
+            annotations.idempotent_hint = writes.then_some(true);
             // Output schemas stay out of the list: an agent reads the output it gets, and they
             // would multiply the list's size, per
             // decisions/2026-10-06-the-tool-list-carries-the-mutation-vocabulary-once-and-no.md.
