@@ -3,13 +3,14 @@
 // first draft, then its draft's canvas), or a route file imported. A new one's id is a slug from
 // its name, editable (folded) before it is made, and unique in the deployment (the engine refuses
 // one in use) and not `new`, which the form's own address shadows.
-import { RESERVED_ROUTE_ID, TITLE_BYTES_MAX } from "@cairn/client";
 import type { Schema } from "@cairn/client";
+import { useId } from "react";
 import { Link, useNavigate, useSearchParams } from "react-router";
 
-import { isSlug, slugOf } from "../authoring/keys.ts";
+import { useValueProblems } from "../authoring/form-problems.ts";
+import { slugOf } from "../authoring/keys.ts";
+import { CheckFailed, invalidAttrs, Problem } from "../authoring/parts.tsx";
 import { useDraft, writeDraft } from "../data/drafts.ts";
-import { overBytes } from "../authoring/limits.ts";
 import { RejectionView } from "../screens/RejectionView.tsx";
 import { WriteStatus } from "../screens/WriteStatus.tsx";
 import { useScreenWrite } from "../screens/write.ts";
@@ -25,23 +26,31 @@ function NewForm({ kind, disabled, refused, onStart }: { kind: Kind; disabled: b
   const [kept, setKept] = useDraft<{ name: string; id?: string }>("new-route");
   const name = kept?.name ?? "";
   const routeId = kept?.id ?? slugOf(name, "route");
-  const problem = name.trim() === "" ? undefined : (overBytes(name, TITLE_BYTES_MAX, "The name") ?? (isSlug(routeId) && routeId !== RESERVED_ROUTE_ID ? undefined : `An id is lowercase letters, digits, '_' and '-', and not '${RESERVED_ROUTE_ID}'.`));
+  const checks = useValueProblems([
+    { field: "name", kind: "title", what: "The name", value: name.trim(), optional: true },
+    { field: "id", kind: "route_id", what: "An id", value: routeId, optional: name.trim() === "" },
+  ]);
+  const [nameMessage, idMessage] = [useId(), useId()];
+  const nameProblem = checks.problems.name;
+  const idProblem = checks.problems.id;
   const word = kind === "segment" ? "segment" : "route";
   return (
     <form className="stack" onSubmit={(event) => { event.preventDefault(); onStart(name.trim(), routeId); }}>
       <label className="stack">
         <span className="label">Name</span>
-        <Input className="new-field" aria-label="New route name" placeholder={`Name of the ${word}`} autoFocus value={name} onChange={(event) => { setKept({ ...kept, name: event.target.value }); }} />
+        <Input className="new-field" aria-label="New route name" {...invalidAttrs(nameMessage, nameProblem)} placeholder={`Name of the ${word}`} autoFocus value={name} onChange={(event) => { setKept({ ...kept, name: event.target.value }); }} />
       </label>
-      <details key={String(refused)} open={refused}>
+      <details key={String(refused)} open={refused || idProblem !== undefined}>
         <summary className="muted">Change id</summary>
         <label className="stack">
           <span className="label">Id</span>
-          <Input className="new-field" aria-label="New route id" aria-invalid={refused} value={routeId} onChange={(event) => { setKept({ name, id: event.target.value }); }} />
+          <Input className="new-field" aria-label="New route id" {...(idProblem === undefined ? { "aria-invalid": refused } : invalidAttrs(idMessage, idProblem))} value={routeId} onChange={(event) => { setKept({ name, id: event.target.value }); }} />
         </label>
       </details>
-      {problem === undefined ? null : <span className="author-problem" role="alert">{problem}</span>}
-      <Button type="submit" primary disabled={disabled || name.trim() === "" || problem !== undefined} data-testid="new-create">
+      {nameProblem === undefined ? null : <Problem id={nameMessage}>{nameProblem}</Problem>}
+      {idProblem === undefined ? null : <Problem id={idMessage}>{idProblem}</Problem>}
+      <CheckFailed failure={checks.failure} retry={checks.retry} />
+      <Button type="submit" primary disabled={disabled || name.trim() === "" || !checks.checked || nameProblem !== undefined || idProblem !== undefined} data-testid="new-create">
         Create the {word}
       </Button>
     </form>

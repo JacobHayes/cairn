@@ -68,7 +68,10 @@ pub use domain::{
 };
 pub use event::{Actor, ChangeSet, ContentHash, Event, EventType, PatchReceipt, Subject};
 pub use field::{NodeField, NodeFieldValue};
-pub use form::{ChecklistValue, ChoiceValue, FieldProblem, NodeFormValues, node_form_problems};
+pub use form::{
+    ChecklistValue, ChoiceValue, DateRuleValue, FieldProblem, NodeFormValues, ValueCheck,
+    ValueKind, ValueProblem, node_form_problems, value_problems,
+};
 pub use graph::{
     Edge, FormatVersion, Graph, Insertion, OWNER_KIND_MULTI, ParticipationKind, RetiredKeys, Role,
     RouteFile, role_fits_slot,

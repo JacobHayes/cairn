@@ -4,17 +4,17 @@
 // a kind shows its cascade first (A18): every participation, filling decision, default owner,
 // and message draft placeholder naming it is rewritten in the same patch. Limits are checked
 // before sending.
-import { KIND_COUNT_MAX, OWNER_KIND, ROLE_COUNT_MAX, TITLE_BYTES_MAX } from "@cairn/client";
-import { useState } from "react";
+import { KIND_COUNT_MAX, OWNER_KIND, ROLE_COUNT_MAX } from "@cairn/client";
+import { useId, useState } from "react";
 
 import { useDraft } from "../data/drafts.ts";
 import { Button, Input } from "../ui/kit.tsx";
 import { CascadeDialog } from "./CascadeDialog.tsx";
 import { useRemovalPlan } from "./removal.ts";
 import { rolesForSlot, type Kind, type Mutation, type Role } from "./graph.ts";
-import { isSlug, mintKey, slugOf, uniqueId } from "./keys.ts";
-import { overBytes } from "./limits.ts";
-import { Picker } from "./parts.tsx";
+import { useValueProblems } from "./form-problems.ts";
+import { mintKey, slugOf, uniqueId } from "./keys.ts";
+import { CheckFailed, invalidAttrs, Picker, Problem } from "./parts.tsx";
 import { Refusal } from "./StructureEditors.tsx";
 import { domainOf, named, type Authored } from "./target.ts";
 import { useAuthorWrite, type AuthorWrite } from "./write.ts";
@@ -53,18 +53,15 @@ const KINDS: SlotKind = {
   prefix: "k_",
 };
 
-/** Why a slot cannot be sent: its id, its label, or (new) the count limit. */
+/** Why a slot cannot be sent that the graph decides, not the value: its id is another's, or (new) the count limit. The engine reads the id and the label themselves. */
 function slotProblem(slot: Slot, taken: ReadonlySet<string>, kind: SlotKind, count: number): string | undefined {
-  if (!isSlug(slot.id)) {
-    return "An id is lowercase letters, digits, '_' and '-'.";
-  }
   if (taken.has(slot.id)) {
     return `Another ${kind.words} has this id.`;
   }
   if (count > kind.max) {
     return `At most ${String(kind.max)} of these.`;
   }
-  return overBytes(slot.title ?? "", TITLE_BYTES_MAX, "The label");
+  return undefined;
 }
 
 /** A role or kind being edited, kept across reloads, with the revision its author opened it at (H5). */
@@ -83,12 +80,22 @@ function SlotForm({ editing, setEditing, kind, slots, write, revision }: { editi
   };
   const isNew = !slots.some((each) => each.key === slot.key);
   const taken = new Set(slots.filter((each) => each.key !== slot.key).map((each) => each.id));
-  const problem = slotProblem(slot, taken, kind, slots.length + (isNew ? 1 : 0));
+  const checks = useValueProblems([
+    { field: "id", kind: "id", what: "An id", value: slot.id },
+    { field: "label", kind: "title", what: "The label", value: slot.title ?? "", optional: true },
+  ]);
+  const idProblem = checks.problems.id ?? slotProblem(slot, taken, kind, slots.length + (isNew ? 1 : 0));
+  const labelProblem = checks.problems.label;
+  const [idMessage, labelMessage] = [useId(), useId()];
+  const sendable = checks.checked && idProblem === undefined && labelProblem === undefined;
   const save = (from = base) => {
     if (from !== base) {
       setEditing({ slot, base: from });
     }
-    void write.run([isNew ? kind.add(slot) : kind.edit(slot)], from).then((landed) => {
+    // A label left blank is none: the engine reads a label as a title, which is never blank.
+    const { title, ...unlabelled } = slot;
+    const sent: Slot = (title ?? "").trim() === "" ? unlabelled : slot;
+    void write.run([isNew ? kind.add(sent) : kind.edit(sent)], from).then((landed) => {
       if (landed) {
         onClose();
       }
@@ -97,16 +104,18 @@ function SlotForm({ editing, setEditing, kind, slots, write, revision }: { editi
   return (
     <span className="stack" data-testid={`${kind.name}-form`}>
       <span className="row">
-        <Input aria-label={`${kind.words} label`} placeholder="Label" value={slot.title ?? ""} onChange={(event) => { setSlot({ ...slot, title: event.target.value, ...(isNew ? { id: uniqueId(slugOf(event.target.value, kind.name), taken) } : {}) }); }} />
-        <Input aria-label={`${kind.words} id`} value={slot.id} onChange={(event) => { setSlot({ ...slot, id: event.target.value }); }} />
+        <Input aria-label={`${kind.words} label`} placeholder="Label" {...invalidAttrs(labelMessage, labelProblem)} value={slot.title ?? ""} onChange={(event) => { setSlot({ ...slot, title: event.target.value, ...(isNew ? { id: uniqueId(slugOf(event.target.value, kind.name), taken) } : {}) }); }} />
+        <Input aria-label={`${kind.words} id`} {...invalidAttrs(idMessage, idProblem)} value={slot.id} onChange={(event) => { setSlot({ ...slot, id: event.target.value }); }} />
         <label className="row">
           <input type="checkbox" checked={slot.multi ?? false} onChange={(event) => { setSlot({ ...slot, multi: event.target.checked }); }} />
           Several at once
         </label>
       </span>
-      {problem === undefined ? null : <span className="author-problem" role="alert">{problem}</span>}
+      {idProblem === undefined ? null : <Problem id={idMessage}>{idProblem}</Problem>}
+      {labelProblem === undefined ? null : <Problem id={labelMessage}>{labelProblem}</Problem>}
+      <CheckFailed failure={checks.failure} retry={checks.retry} />
       <span className="row">
-        <Button primary disabled={write.disabled || problem !== undefined} onClick={() => { save(); }}>
+        <Button primary disabled={write.disabled || !sendable} onClick={() => { save(); }}>
           {isNew ? `Add the ${kind.words}` : "Save"}
         </Button>
         <Button onClick={onClose}>Cancel</Button>

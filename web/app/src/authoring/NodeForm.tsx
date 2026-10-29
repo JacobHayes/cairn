@@ -2,8 +2,10 @@
 // patch of one-field mutations (an answer-type change replaces the node whole). The draft is
 // kept per tab across reloads (ARCHITECTURE, Web UI: drafts survive a reload). What it would
 // send is previewed with the wasm engine as the author types, so every violation shows at its
-// field before Save (A15); the engine's checks of its values stop one before it is sent (PRACTICES); and a journey's
+// field before Save (A15); the engine's checks of its values stop one before it is sent (PRACTICES), and a check that cannot be made says so and can be asked again; and a journey's
 // route-copied fields carry their local-edit marker (B4).
+import { useEffect } from "react";
+
 import { useDraft } from "../data/drafts.ts";
 import { Failed } from "../ui/Failed.tsx";
 import { Button } from "../ui/kit.tsx";
@@ -19,7 +21,7 @@ import { BasicsFields, CompletionFields, DecisionFields, StageFields, WeightFiel
 import type { Schema } from "@cairn/client";
 import type { Violation } from "../data/writes.ts";
 import { RejectionView } from "../screens/RejectionView.tsx";
-import { FieldBox, FormViolations, type FieldNotes } from "./parts.tsx";
+import { CheckFailed, FieldBox, FormViolations, type FieldNotes } from "./parts.tsx";
 import { domainOf, type Authored } from "./target.ts";
 import { byPlace, type Place } from "./violations.ts";
 import { useAuthorWrite, useLivePreview, type AuthorWrite } from "./write.ts";
@@ -134,6 +136,15 @@ export interface NodeFormProps {
   node: GraphNode;
 }
 
+/** Calls `drop` whenever `idle` holds. */
+function useDropped(idle: boolean, drop: () => void): void {
+  useEffect(() => {
+    if (idle) {
+      drop();
+    }
+  });
+}
+
 export function NodeForm({ authored, node }: NodeFormProps) {
   const write = useAuthorWrite(authored, `node-form:${node.key}`, node.title);
   const [kept, setKept] = useDraft<Kept>(`node-form:${domainOf(authored)}:${node.key}`);
@@ -143,13 +154,16 @@ export function NodeForm({ authored, node }: NodeFormProps) {
   const typed = typedItem(draft.checklist, ticked(authored, node).map((item) => item.id), kept?.newItem ?? "");
   const sending: NodeDraft = typed === undefined || !has({ kind: node.kind, draft }, "checklist") ? draft : { ...draft, checklist: [...draft.checklist, typed] };
   const changes = changesOf(node, sending, new Set([...Object.keys(edits), ...(sending === draft ? [] : ["checklist"])] as FormField[]));
-  const { checked, problems } = useDraftProblems(node.kind, sending);
+  const form = useDraftProblems(node.kind, sending);
+  const { checked, problems } = form;
   const sendable = changes.length > 0 && checked && Object.keys(problems).length === 0;
   const preview = useLivePreview(authored, sendable ? changes.map((change) => change.mutation) : undefined);
   const { violations, places: sent } = shownViolations(preview, write);
   const places = byPlace(violations, node.key, sent);
   const edited = editedFields(authored, node.key);
   const notes = (field: FormField): FieldNotes => ({ problem: problems[field], violations: places.get(field), edited: edited.has(field) });
+  // A draft that says nothing the node does not already say (what was typed was typed back) is no draft: nothing is left unsaved.
+  useDropped(kept !== undefined && changes.length === 0 && (kept.newItem ?? "").trim() === "", () => { setKept(undefined); });
   const change = (next: Partial<NodeDraft>) => {
     setKept({ ...kept, edits: { ...edits, ...next }, base: kept?.base ?? authored.revision });
     write.dismiss();
@@ -181,6 +195,7 @@ export function NodeForm({ authored, node }: NodeFormProps) {
         <Fields props={props} />
       </div>
       <FormViolations places={places} />
+      <CheckFailed failure={form.failure} retry={form.retry} />
       <WriteStatus view={write.status} />
       {write.failed === undefined ? <Receipt receipt={write.receipt} /> : write.failed.rejection.rejection === "invalid" ? null : <RejectionView rejection={write.failed.rejection} onRebase={() => void save(authored.revision)} onDismiss={discard} />}
       {kept === undefined && changes.length === 0 ? null : (

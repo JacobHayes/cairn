@@ -6,7 +6,7 @@ import { describe, expect, it } from "vitest";
 
 import { identityLabel } from "./label.ts";
 import { linkable } from "./You.tsx";
-import { aliasesOf, emailProblem, identityOf, mergeMutation, nameProblem, newIdentityKey } from "./model.ts";
+import { aliasesOf, emailProblem, identityOf, mergeMutation, newIdentityKey } from "./model.ts";
 
 describe("identities as sent (E6, H3)", () => {
   it("mints keys the host accepts that differ from one another and carry no name", () => {
@@ -53,13 +53,6 @@ describe("a merge (E6)", () => {
     const deployment = { revision: 3, aliases: { who_old: "who_keep", who_older: "who_keep", who_else: "who_other" } };
     expect(aliasesOf(deployment, "who_keep")).toEqual(["who_old", "who_older"]);
     expect(aliasesOf(deployment, "who_none")).toEqual([]);
-  });
-
-  it("refuses a name past the title limit, by its bytes, before sending it", () => {
-    expect(nameProblem("Ana Ruiz")).toBeUndefined();
-    expect(nameProblem("x".repeat(256))).toBeUndefined();
-    expect(nameProblem("x".repeat(257))).toBeDefined();
-    expect(nameProblem("é".repeat(129))).toBeDefined();
   });
 
   it("shows an identity by its name, else its first email, and sends a blank name as none (H3)", () => {

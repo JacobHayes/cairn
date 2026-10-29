@@ -11,6 +11,8 @@ import {
   type ApplyRequest,
   type ConditionProblem,
   type FieldProblem,
+  type ValueCheck,
+  type ValueProblem,
   type NodeFormValues,
   type DraftStored,
   type DerivationHandle,
@@ -199,6 +201,11 @@ export class DeriveWorker {
   /** A1a, A4, A9, G5: why each field of a node form's values cannot be sent, in words for the author; none when all can. */
   async nodeFormProblems(values: NodeFormValues): Promise<FieldProblem[]> {
     return parsed<FieldProblem[]>(await this.#ask({ op: "node_form_problems", values }));
+  }
+
+  /** A1a, A6, A7, E6: why each loose value of a form cannot be sent, in words for the author; none when all can. */
+  async valueProblems(checks: ValueCheck[]): Promise<ValueProblem[]> {
+    return parsed<ValueProblem[]>(await this.#ask({ op: "value_problems", checks }));
   }
 
   /** A18: what removing `target` from `graph` takes and leaves dangling, with the rewrites to send first; none when a node asked for is not in it. */

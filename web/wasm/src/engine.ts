@@ -9,6 +9,7 @@ import init, {
   applyRoute,
   conditionProblem,
   nodeFormProblems,
+  valueProblems,
   draftStored,
   draftWritten,
   exportRoute,
@@ -37,6 +38,7 @@ import {
   type NodeFormValues,
   type PreviewAnswer,
   type PreviewRequest,
+  type ValueCheck,
   type ProjectionAnswer,
   type ProjectionRequest,
   type RouteApplyRequest,
@@ -187,6 +189,11 @@ export class Engine {
   /** A1a, A4, A9, G5: the problems with a node form's values, as the module wrote them (a list; empty when all can be sent). */
   nodeFormProblemsText(values: NodeFormValues): string {
     return hosted(() => nodeFormProblems(JSON.stringify(values)));
+  }
+
+  /** A1a, A6, A7, E6: the problems with a form's loose values, as the module wrote them (a list; empty when all can be sent). */
+  valueProblemsText(checks: ValueCheck[]): string {
+    return hosted(() => valueProblems(JSON.stringify(checks)));
   }
 
   /** A18: what removing `target` from `graph` takes and leaves dangling, as the module wrote it (`null` when a node asked for is not there). */

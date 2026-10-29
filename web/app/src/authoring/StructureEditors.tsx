@@ -3,8 +3,8 @@
 // removed), where it sits (A2: moved into another container), who participates
 // by role (A6, A7, E2), its breakdown by hand (B10: children added; a journey's placeholder
 // marked atomic), and its removal with the cascade shown first (A18).
-import { EDGE_COUNT_PER_NODE_MAX, OWNER_KIND, TITLE_BYTES_MAX } from "@cairn/client";
-import { useState } from "react";
+import { EDGE_COUNT_PER_NODE_MAX, OWNER_KIND } from "@cairn/client";
+import { useId, useState } from "react";
 
 import { useDraft } from "../data/drafts.ts";
 import { RejectionView } from "../screens/RejectionView.tsx";
@@ -13,10 +13,10 @@ import { Button, Input } from "../ui/kit.tsx";
 import { CascadeDialog } from "./CascadeDialog.tsx";
 import { removalMutations, useRemovalPlan } from "./removal.ts";
 import { useConnecting } from "./connect.tsx";
-import { overBytes } from "./limits.ts";
+import { useValueProblems } from "./form-problems.ts";
 import { canHoldChildren, childrenOf, kindOption, moveTargets, nodesByPath, pathOf, rolesForSlot, titleIn, type GraphNode, type Mutation, type NodeKind } from "./graph.ts";
 import { mintKey, slugOf, uniqueId } from "./keys.ts";
-import { Picker } from "./parts.tsx";
+import { CheckFailed, invalidAttrs, Picker, Problem } from "./parts.tsx";
 import { domainOf, isJourney, named, type Authored } from "./target.ts";
 import { useAuthorWrite, type AuthorWrite } from "./write.ts";
 import { PIECE_KINDS } from "../detail/model.ts";
@@ -159,7 +159,7 @@ export function breakdownMutations(authored: Authored, parent: string, pieces: r
 }
 
 /** B10: the pieces of a breakdown, each a kind (action or deliverable) and a title, edited in place. */
-export function PieceRows({ pieces, onChange }: { pieces: Piece[]; onChange: (next: Piece[]) => void }) {
+export function PieceRows({ pieces, onChange, problems = {}, message }: { pieces: Piece[]; onChange: (next: Piece[]) => void; problems?: Record<string, string | undefined>; message?: string }) {
   const set = (at: number, piece: Partial<Piece>) => { onChange(pieces.map((each, index) => (index === at ? { ...each, ...piece } : each))); };
   return pieces.map((piece, at) => (
     <span key={at} className="row" data-testid="piece">
@@ -169,7 +169,7 @@ export function PieceRows({ pieces, onChange }: { pieces: Piece[]; onChange: (ne
       </label>
       <label className="field">
         <span className="label">Title</span>
-        <Input aria-label="Piece title" placeholder="What it is" value={piece.title} onChange={(event) => { set(at, { title: event.target.value }); }} />
+        <Input aria-label="Piece title" placeholder="What it is" {...invalidAttrs(message ?? "", problems[String(at)])} value={piece.title} onChange={(event) => { set(at, { title: event.target.value }); }} />
       </label>
     </span>
   ));
@@ -181,7 +181,9 @@ export function Breakdown({ authored, node }: NodeEditorProps) {
   const [kept, setPieces] = useDraft<Piece[]>(`breakdown:${domainOf(authored)}:${node.key}`);
   const pieces = kept ?? [{ kind: "action", title: "" }];
   const filled = pieces.filter((piece) => piece.title.trim() !== "");
-  const problem = filled.map((piece) => overBytes(piece.title, TITLE_BYTES_MAX, "A title")).find((each) => each !== undefined);
+  const checks = useValueProblems(pieces.flatMap((piece, at) => (piece.title.trim() === "" ? [] : [{ field: String(at), kind: "title" as const, what: "A title", value: piece.title.trim() }])));
+  const problem = Object.values(checks.problems).find((each) => each !== undefined);
+  const message = useId();
   const atomic = authored.graph.state?.nodes?.[node.key]?.atomic === true;
   const children = childrenOf(authored.tree, node.key).length;
   if (!canHoldChildren(node.kind) || node.kind === "group") {
@@ -190,12 +192,12 @@ export function Breakdown({ authored, node }: NodeEditorProps) {
   return (
     <div className="stack" data-testid="breakdown">
       <span className="muted small">{children === 0 ? "Nothing beneath it yet." : `${String(children)} beneath it.`}</span>
-      <PieceRows pieces={pieces} onChange={setPieces} />
+      <PieceRows pieces={pieces} onChange={setPieces} problems={checks.problems} message={message} />
       <span className="row">
         <Button onClick={() => { setPieces([...pieces, { kind: "action", title: "" }]); }}>Another piece</Button>
         <Button
           primary
-          disabled={write.disabled || filled.length === 0 || problem !== undefined}
+          disabled={write.disabled || filled.length === 0 || !checks.checked || problem !== undefined}
           onClick={() => void write.run(breakdownMutations(authored, node.key, filled)).then((landed) => { if (landed) { setPieces(undefined); } })}
         >
           Break it down
@@ -206,7 +208,8 @@ export function Breakdown({ authored, node }: NodeEditorProps) {
           </Button>
         ) : null}
       </span>
-      {problem === undefined ? null : <span className="author-problem">{problem}</span>}
+      {problem === undefined ? null : <Problem id={message}>{problem}</Problem>}
+      <CheckFailed failure={checks.failure} retry={checks.retry} />
       <Refusal write={write} />
     </div>
   );

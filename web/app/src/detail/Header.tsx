@@ -2,7 +2,10 @@
 // link) with its display state at the top right, its title (renamed in place from the menu),
 // one meta line (the owner; the date and rank are the Dates section's and the sentence's), the flags that are set, and, for an orphaned node, the choice it needs. Where the
 // node came from is not here: it is the Origin section.
+import { useId } from "react";
 import { Link } from "react-router";
+
+import { CheckFailed, invalidAttrs, Problem } from "../authoring/parts.tsx";
 
 import { RejectionView } from "../screens/RejectionView.tsx";
 import { WriteStatus } from "../screens/WriteStatus.tsx";
@@ -19,11 +22,13 @@ import { rebasedOnto, useNodeWrite } from "./write.ts";
 /** The title as an input: saving sends one `set_node_field` against the revision it was drafted on (H5), and from then on the edit manager owns the write. */
 function RenameForm({ view, title, rename }: { view: Ready; title: string; rename: Rename }) {
   const { write, text, base, busy } = rename;
+  const message = useId();
   return (
     <div className="stack" data-testid="rename">
       <span className="row">
         <Input
           aria-label={`New title for ${title}`}
+          {...invalidAttrs(message, rename.problem)}
           value={text}
           disabled={busy || write?.state === "gone"}
           onChange={(event) => { rename.change(event.target.value); }}
@@ -38,7 +43,8 @@ function RenameForm({ view, title, rename }: { view: Ready; title: string; renam
         </Button>
         {busy ? null : <Button onClick={rename.cancel}>Cancel</Button>}
       </span>
-      {rename.problem === undefined ? null : <span className="author-problem" role="alert" data-testid="problem">{rename.problem}</span>}
+      {rename.problem === undefined ? null : <Problem id={message}>{rename.problem}</Problem>}
+      <CheckFailed failure={rename.failure} retry={rename.retry} />
       {base !== undefined && base < view.journey.revision ? <span className="muted small">The journey has changed since you started this edit.</span> : null}
       {write?.state === "rejected" ? (
         <RejectionView rejection={write.rejection} onRebase={() => { rename.keep(rebasedOnto(write.rejection, view.journey.header.id, view.journey.revision)); }} />

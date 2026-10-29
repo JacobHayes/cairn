@@ -3,7 +3,7 @@
 // journey referring to any of the identities at the revision it was checked against, so the host
 // can recheck the set when it commits; reads resolve the merged key through its alias afterwards.
 import type { Schema } from "@cairn/client";
-import { EMAIL_BYTES_MAX, EMAIL_COUNT_PER_IDENTITY_MAX, TITLE_BYTES_MAX } from "@cairn/client";
+import { EMAIL_BYTES_MAX, EMAIL_COUNT_PER_IDENTITY_MAX } from "@cairn/client";
 
 import { overBytes } from "../authoring/limits.ts";
 import type { IdentityReferences } from "../data/host.ts";
@@ -34,11 +34,6 @@ export function emailProblem(email: string): string | undefined {
   const [local, domain, ...more] = email.split("@");
   const shaped = local !== undefined && local !== "" && domain !== undefined && domain !== "" && more.length === 0 && !/\s/.test(email);
   return shaped ? overBytes(email, EMAIL_BYTES_MAX, "The email") : `${email} is not an email address: write it as name@example.org.`;
-}
-
-/** What to do about a name past the title limit (in bytes, which the sentence does not ask the person to count), or undefined when it is within it. */
-export function nameProblem(name: string): string | undefined {
-  return overBytes(name.trim(), TITLE_BYTES_MAX, "The name") === undefined ? undefined : "Shorten the name to save it: it is too long.";
 }
 
 /** E6, H3: an identity as it should be: its name trimmed (none when blank) and its emails (already normalized chips) as the list it holds. */

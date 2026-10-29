@@ -3,13 +3,14 @@
 // unique among its siblings (Keys and references). A new decision asks its title as a
 // yes-or-no question until its form changes the answer type. In a journey it is local (B4).
 // The new node opens in its form once it lands.
-import { NODE_COUNT_MAX, TITLE_BYTES_MAX } from "@cairn/client";
+import { NODE_COUNT_MAX } from "@cairn/client";
+import { useId } from "react";
 import { useDraft } from "../data/drafts.ts";
 import { wrapRoots } from "../segments/model.ts";
 import { Button, Input } from "../ui/kit.tsx";
 import { canHoldChildren, childrenOf, kindOption, newNode, nodesByPath, pathOf, type GraphNode, type NodeKind } from "./graph.ts";
-import { overBytes } from "./limits.ts";
-import { Picker } from "./parts.tsx";
+import { useValueProblems } from "./form-problems.ts";
+import { CheckFailed, invalidAttrs, Picker, Problem } from "./parts.tsx";
 import { Refusal } from "./StructureEditors.tsx";
 import { domainOf, type Authored } from "./target.ts";
 import { useAuthorWrite } from "./write.ts";
@@ -54,7 +55,10 @@ export function AddNode({ authored, container, onAdded }: AddNodeProps) {
   };
   const containers = nodesByPath(authored.tree).filter((node) => canHoldChildren(node.kind));
   const full = authored.tree.byKey.size >= NODE_COUNT_MAX;
-  const problem = full ? `A graph holds at most ${String(NODE_COUNT_MAX)} nodes.` : overBytes(title, TITLE_BYTES_MAX, "The title");
+  const checks = useValueProblems([{ field: "title", kind: "title", what: "The title", value: title.trim(), optional: true }]);
+  const message = useId();
+  const problem = full ? `A graph holds at most ${String(NODE_COUNT_MAX)} nodes.` : checks.problems.title;
+  const unsendable = write.disabled || title.trim() === "" || !checks.checked || problem !== undefined;
   const added = (node: GraphNode) => (landed: boolean) => {
     if (landed) {
       setTitle("");
@@ -67,7 +71,7 @@ export function AddNode({ authored, container, onAdded }: AddNodeProps) {
   const root = roots[0];
   const second = authored.route?.header.kind === "segment" && parent === "" && root !== undefined;
   const add = () => {
-    if (second) {
+    if (second || unsendable) {
       return;
     }
     const node = newNode(authored.tree, kind, title, parent === "" ? undefined : parent);
@@ -84,16 +88,17 @@ export function AddNode({ authored, container, onAdded }: AddNodeProps) {
   return (
     <form className="stack" data-testid="add-node" onSubmit={(event) => { event.preventDefault(); add(); }}>
       <Picker aria-label="Kind" value={kind} options={KINDS.map(kindOption)} onChange={(event) => { setKind(event.target.value as NodeKind); }} />
-      <Input aria-label="New node title" placeholder="Title" value={title} onChange={(event) => { setTitle(event.target.value); }} />
+      <Input aria-label="New node title" placeholder="Title" {...invalidAttrs(message, problem)} value={title} onChange={(event) => { setTitle(event.target.value); }} />
+      {problem === undefined ? null : <Problem id={message}>{problem}</Problem>}
+      <CheckFailed failure={checks.failure} retry={checks.retry} />
       <Picker aria-label="Inside" value={parent} none="At the top level" options={containers.map((node) => ({ value: node.key, label: `${node.title} (${pathOf(authored.tree, node.key)})` }))} onChange={(event) => { setParent(event.target.value); }} />
       {second ? (
-        <OneRoot root={root} disabled={write.disabled || title.trim() === "" || problem !== undefined} onUnder={() => { addUnder(root); }} onWrap={() => { wrap(root); }} />
+        <OneRoot root={root} disabled={unsendable} onUnder={() => { addUnder(root); }} onWrap={() => { wrap(root); }} />
       ) : (
-        <Button type="submit" primary disabled={write.disabled || title.trim() === "" || problem !== undefined}>
+        <Button type="submit" primary disabled={unsendable}>
           Add
         </Button>
       )}
-      {problem === undefined ? null : <span className="author-problem">{problem}</span>}
       <Refusal write={write} />
     </form>
   );

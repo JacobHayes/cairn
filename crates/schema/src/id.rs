@@ -40,6 +40,7 @@ impl IdError {
             IdError::NotSlug(_) => format!(
                 "{what} is lowercase letters, digits, '_' and '-', starting with a letter or digit."
             ),
+            IdError::Reserved(text) => format!("{what} cannot be '{text}': the app keeps it."),
             other => format!("{what}: {other}."),
         }
     }

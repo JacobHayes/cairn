@@ -16,7 +16,8 @@ use cairn_schema::condition::ConditionError;
 use cairn_schema::{
     Actor, Clause, Condition, Consequences, Date, Deployment, Domain, DomainDocument, Graph,
     KeyRefs, Limit, Lineage, Markdown, NodeFormValues, NodeKey, Patch, PatchTarget, Proposal,
-    RemovalTarget, Route, RouteId, RouteVersion, Timestamp, node_form_problems,
+    RemovalTarget, Route, RouteId, RouteVersion, Timestamp, ValueCheck, node_form_problems,
+    value_problems,
 };
 use serde::{Deserialize, Serialize};
 use wasm_bindgen::prelude::wasm_bindgen;
@@ -403,6 +404,20 @@ pub fn condition_problem(clause: &str) -> String {
 pub fn node_form_problems_text(values: &str) -> Result<String, String> {
     let values: NodeFormValues = read("node form values", values)?;
     Ok(json(&node_form_problems(&values)))
+}
+
+/// A1a, A6, A7, E6: the JSON of the problems with the loose values of a form (the JSON of
+/// a list of [`ValueCheck`]), one `{"field", "message"}` per value that cannot be sent; `[]`
+/// when all can be. The rules are the types' own, the ones the patch reader builds the same
+/// values from.
+///
+/// # Errors
+///
+/// The JSON of a [`HostError`] when the checks do not read.
+#[wasm_bindgen(js_name = valueProblems)]
+pub fn value_problems_text(checks: &str) -> Result<String, String> {
+    let checks: Vec<ValueCheck> = read("value checks", checks)?;
+    Ok(json(&value_problems(&checks)))
 }
 
 /// A18: the JSON of a `RemovalPlan`: what removing `target` (a `RemovalTarget`) from `graph`

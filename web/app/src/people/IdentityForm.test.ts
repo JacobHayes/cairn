@@ -30,7 +30,6 @@ describe("what the form may send (E6, H3)", () => {
     [{ name: "", emails: [], emailText: "" }, false],
     [{ name: "  ", emails: [], emailText: "" }, false],
     [{ name: "Ana", emails: [], emailText: "ana@" }, false],
-    [{ name: "x".repeat(257), emails: [], emailText: "" }, false],
   ])("%j: %s", (typed, can) => {
     expect(sendable(typed)).toBe(can);
   });

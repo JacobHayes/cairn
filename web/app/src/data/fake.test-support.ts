@@ -327,6 +327,10 @@ export class FakeDeriver implements Deriver {
     return Promise.reject(new Error("no form checks in the fake"));
   }
 
+  valueProblems(): Promise<never> {
+    return Promise.reject(new Error("no value checks in the fake"));
+  }
+
   restoreNodes(): Promise<never> {
     return Promise.reject(new Error("no restores in the fake"));
   }

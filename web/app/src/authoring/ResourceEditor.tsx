@@ -2,20 +2,20 @@
 // a template, an example, or a reference, or a message draft. A draft's placeholders are
 // picked from what the graph holds (journey fields, each role's names, each decision's
 // answer) and written as a route file writes them, then stored with keys (Keys and
-// references), so renaming a role or moving a decision breaks nothing. Limits and a link's
-// form are checked before sending.
-import { BODY_BYTES_MAX, RESOURCE_COUNT_PER_NODE_MAX, TITLE_BYTES_MAX } from "@cairn/client";
+// references), so renaming a role or moving a decision breaks nothing. The engine checks
+// a resource's values (limits, a link's form) before it is sent.
+import { RESOURCE_COUNT_PER_NODE_MAX } from "@cairn/client";
 import type { Schema } from "@cairn/client";
 import { useDraft } from "../data/drafts.ts";
-import { useState } from "react";
+import { useId, useState } from "react";
 import { useSession } from "../data/react.ts";
 
 import type { Deriver } from "../data/host.ts";
 import { Button, Input } from "../ui/kit.tsx";
 import type { Resource } from "./graph.ts";
 import { mintKey } from "./keys.ts";
-import { overBytes, urlProblem } from "./limits.ts";
-import { Picker } from "./parts.tsx";
+import { useValueProblems } from "./form-problems.ts";
+import { CheckFailed, invalidAttrs, Picker, Problem } from "./parts.tsx";
 import { placeholderOptions, useDraftStored } from "./placeholders.ts";
 import { Refusal, type NodeEditorProps } from "./StructureEditors.tsx";
 import { domainOf, type Authored } from "./target.ts";
@@ -54,46 +54,27 @@ async function formOf(resource: Resource, authored: Authored, deriver: Deriver):
   return { key: resource.key, type, title: resource.title ?? "", body };
 }
 
-/** The resource a form makes, or why it cannot be sent; `draft` is the engine's answer for a draft's text. */
-export function resourceOf(form: ResourceForm, draft: { stored: string } | { problem: string } | undefined): { resource: Schema<"Resource"> } | { problem: string } {
-  const titleProblem = overBytes(form.title, TITLE_BYTES_MAX, "The title");
-  if (titleProblem !== undefined) {
-    return { problem: titleProblem };
-  }
-  if (form.body.trim() === "") {
-    return { problem: form.type === "tip" || form.type === "message_draft" ? "It needs some text." : "It needs an address." };
-  }
-  let content = form.body;
-  if (form.type === "message_draft") {
-    if (draft === undefined) {
-      return { problem: "Checking the placeholders..." };
-    }
-    if ("problem" in draft) {
-      return draft;
-    }
-    content = draft.stored;
-  }
-  const problem = form.type === "tip" || form.type === "message_draft" ? overBytes(content, BODY_BYTES_MAX, "The text") : urlProblem(content);
-  if (problem !== undefined) {
-    return { problem };
-  }
+/** The resource a form makes, once its content is settled (a draft's is the engine's reading of it). */
+function resourceFrom(form: ResourceForm, content: string): Schema<"Resource"> {
   const title = form.title.trim();
-  return { resource: { key: form.key ?? mintKey("a_"), ...(title === "" ? {} : { title }), [form.type]: content } };
+  return { key: form.key ?? mintKey("a_"), ...(title === "" ? {} : { title }), [form.type]: content };
 }
 
-function ResourceFields({ form, setForm, authored }: { form: ResourceForm; setForm: (next: ResourceForm) => void; authored: Authored }) {
+type ControlAttrs = ReturnType<typeof invalidAttrs>;
+
+function ResourceFields({ form, setForm, authored, titleAttrs, contentAttrs }: { form: ResourceForm; setForm: (next: ResourceForm) => void; authored: Authored; titleAttrs: ControlAttrs; contentAttrs: ControlAttrs }) {
   const options = placeholderOptions(authored.tree, authored.graph.roles ?? []);
   const multiline = form.type === "tip" || form.type === "message_draft";
   return (
     <>
       <span className="row">
         <Picker aria-label="Resource type" value={form.type} options={TYPES} disabled={form.key !== undefined} onChange={(event) => { setForm({ ...form, type: event.target.value as ResourceType }); }} />
-        <Input aria-label="Resource title" placeholder="Title" value={form.title} onChange={(event) => { setForm({ ...form, title: event.target.value }); }} />
+        <Input aria-label="Resource title" placeholder="Title" {...titleAttrs} value={form.title} onChange={(event) => { setForm({ ...form, title: event.target.value }); }} />
       </span>
       {multiline ? (
-        <textarea aria-label={form.type === "tip" ? "Tip" : "Message draft"} value={form.body} onChange={(event) => { setForm({ ...form, body: event.target.value }); }} />
+        <textarea aria-label={form.type === "tip" ? "Tip" : "Message draft"} {...contentAttrs} value={form.body} onChange={(event) => { setForm({ ...form, body: event.target.value }); }} />
       ) : (
-        <Input aria-label="Address" placeholder="https://..." value={form.body} onChange={(event) => { setForm({ ...form, body: event.target.value }); }} />
+        <Input aria-label="Address" placeholder="https://..." {...contentAttrs} value={form.body} onChange={(event) => { setForm({ ...form, body: event.target.value }); }} />
       )}
       {form.type === "message_draft" ? (
         <Picker
@@ -124,16 +105,28 @@ function ResourceFormView({ authored, node, editing, setEditing }: NodeEditorPro
   const onClose = () => {
     setEditing(undefined);
   };
-  const checked = useDraftStored(authored.graph, form.type === "message_draft" ? form.body : undefined);
-  const made = resourceOf(form, checked.result);
+  const stored = useDraftStored(authored.graph, form.type === "message_draft" ? form.body : undefined);
+  const multiline = form.type === "tip" || form.type === "message_draft";
+  // A draft is checked as the engine stores it; the rest as typed.
+  const content = form.type !== "message_draft" ? form.body : stored.result !== undefined && "stored" in stored.result ? stored.result.stored : undefined;
+  // A draft's own reading (the engine's placeholders) owns its validity; a tip's text and a link's address are read as the types they are.
+  const checks = useValueProblems([
+    { field: "title", kind: "title", what: "The title", value: form.title.trim(), optional: true },
+    ...(form.type === "message_draft" ? [] : [{ field: "content", kind: multiline ? ("markdown" as const) : ("url" as const), what: multiline ? "The text" : "The address", value: form.body }]),
+  ]);
+  const [titleMessage, contentMessage] = [useId(), useId()];
+  const titleProblem = checks.problems.title;
+  const contentProblem = form.body.trim() === "" ? undefined : stored.result !== undefined && "problem" in stored.result ? stored.result.problem : checks.problems.content;
+  const failure = checks.failure ?? stored.failure;
+  const made = content === undefined || form.body.trim() === "" || !checks.checked || !stored.checked || titleProblem !== undefined || checks.problems.content !== undefined ? undefined : resourceFrom(form, content);
   const save = (from = base) => {
-    if ("problem" in made) {
+    if (made === undefined) {
       return;
     }
     if (from !== base) {
       setEditing({ form, base: from });
     }
-    const mutation: Schema<"Mutation"> = form.key === undefined ? { op: "add_resource", node: node.key, resource: made.resource } : { op: "edit_resource", node: node.key, resource: made.resource };
+    const mutation: Schema<"Mutation"> = form.key === undefined ? { op: "add_resource", node: node.key, resource: made } : { op: "edit_resource", node: node.key, resource: made };
     void write.run([mutation], from).then((landed) => {
       if (landed) {
         onClose();
@@ -142,10 +135,12 @@ function ResourceFormView({ authored, node, editing, setEditing }: NodeEditorPro
   };
   return (
     <div className="stack" data-testid="resource-form">
-      <ResourceFields form={form} setForm={setForm} authored={authored} />
-      {"problem" in made && form.body !== "" && checked.checked ? <span className="author-problem" role="alert" data-testid="problem">{made.problem}</span> : null}
+      <ResourceFields form={form} setForm={setForm} authored={authored} titleAttrs={invalidAttrs(titleMessage, titleProblem)} contentAttrs={invalidAttrs(contentMessage, contentProblem)} />
+      {titleProblem === undefined ? null : <Problem id={titleMessage}>{titleProblem}</Problem>}
+      {contentProblem === undefined ? null : <Problem id={contentMessage}>{contentProblem}</Problem>}
+      <CheckFailed failure={failure} retry={() => { checks.retry(); stored.retry(); }} />
       <span className="row">
-        <Button primary disabled={write.disabled || "problem" in made} onClick={() => { save(); }}>
+        <Button primary disabled={write.disabled || made === undefined} onClick={() => { save(); }}>
           {form.key === undefined ? "Add the resource" : "Save the resource"}
         </Button>
         <Button onClick={onClose}>Cancel</Button>

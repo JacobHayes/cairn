@@ -11,7 +11,7 @@
 // the server host.
 import type { Schema } from "@cairn/client";
 
-import type { ApplyRequest, DerivationHandle, DerivationKey, DraftRequest, HostError, NodeFormValues, PreviewRequest, ProjectionRequest, RouteApplyRequest, RouteDeriveRequest, RouteNoticesRequest } from "./types.ts";
+import type { ApplyRequest, DerivationHandle, DerivationKey, DraftRequest, HostError, NodeFormValues, PreviewRequest, ValueCheck, ProjectionRequest, RouteApplyRequest, RouteDeriveRequest, RouteNoticesRequest } from "./types.ts";
 
 /** What the page asks the worker. */
 export type WorkerRequest =
@@ -31,6 +31,7 @@ export type WorkerRequest =
   | { op: "route_file_text"; file: Schema<"RouteFile"> }
   | { op: "condition_problem"; clause: Schema<"ConditionResolved"> }
   | { op: "node_form_problems"; values: NodeFormValues }
+  | { op: "value_problems"; checks: ValueCheck[] }
   | { op: "restore_nodes"; journey: Schema<"Graph">; version: Schema<"Graph">; key: string; seed: string }
   | { op: "removal_plan"; graph: Schema<"Graph">; target: Schema<"RemovalTarget"> }
   | { op: "draft_written"; graph: Schema<"Graph">; stored: string }

@@ -4,7 +4,7 @@
 import type { InBrowserHost } from "@cairn/wasm";
 import { beforeAll, describe, expect, it } from "vitest";
 
-import { boundOptions, CREATED_AT, partsOf, ruleOf, ruleProblem, sourceOptions } from "./dates.ts";
+import { boundOptions, CREATED_AT, partsOf, ruleOf, sourceOptions } from "./dates.ts";
 import { applyToDraft, seeded } from "./engine.test-support.ts";
 import { treeOf, type Graph, type GraphNode } from "./graph.ts";
 
@@ -40,12 +40,6 @@ describe("date rules (A8)", () => {
     for (const rule of [{ before: "n_kickoff", offset: 14 }, { after: ["n_kickoff", CREATED_AT] }]) {
       expect(ruleOf(partsOf(rule))).toEqual(rule);
     }
-  });
-
-  it("refuses a rule with no source, or an offset past a year, before sending", () => {
-    expect(ruleProblem({ direction: "after", sources: [], offset: 0 })).toBeDefined();
-    expect(ruleProblem({ direction: "after", sources: [CREATED_AT], offset: 366 })).toBeDefined();
-    expect(ruleProblem({ direction: "after", sources: [CREATED_AT], offset: 365 })).toBeUndefined();
   });
 });
 

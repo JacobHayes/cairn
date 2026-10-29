@@ -3,7 +3,7 @@
 // screen reused for another journey or node.
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-import { draftAt, readDraft, writeDraft } from "./drafts.ts";
+import { draftAt, draftKeys, readDraft, writeDraft } from "./drafts.ts";
 import { memoryStorage } from "./fake.test-support.ts";
 
 function storing(): void {
@@ -23,7 +23,26 @@ describe("drafts kept per tab", () => {
     expect(readDraft("title:j_a:n_x")).toBeUndefined();
   });
 
-  it("are kept in memory only when the storage refuses", () => {
+  it("are listed by what follows a prefix, so a screen can tell what is unsent", () => {
+    storing();
+    writeDraft("node-form:route:a:n_two", { edits: {} });
+    writeDraft("node-form:route:a:n_one", { edits: {} });
+    writeDraft("node-form:route:b:n_other", { edits: {} });
+    expect(draftKeys("node-form:route:a:")).toEqual(["n_one", "n_two"]);
+    writeDraft("node-form:route:a:n_one", undefined);
+    expect(draftKeys("node-form:route:a:")).toEqual(["n_two"]);
+  });
+
+  it("are listed when held in memory only, as storage refused them", () => {
+    vi.stubGlobal("sessionStorage", Object.assign(memoryStorage(), { setItem: () => { throw new Error("full"); } }));
+    writeDraft("node-form:route:c:n_held", { edits: {} });
+    expect(draftKeys("node-form:route:c:")).toEqual(["n_held"]);
+    expect(readDraft("node-form:route:c:n_held")).toEqual({ edits: {} });
+    writeDraft("node-form:route:c:n_held", undefined);
+    expect(draftKeys("node-form:route:c:")).toEqual([]);
+  });
+
+  it("come back from memory when the storage refuses them, and go once sent", () => {
     vi.stubGlobal("sessionStorage", {
       getItem: () => {
         throw new Error("blocked");
@@ -35,6 +54,8 @@ describe("drafts kept per tab", () => {
     expect(() => {
       writeDraft("title:j_a:n_x", "kept");
     }).not.toThrow();
+    expect(readDraft("title:j_a:n_x")).toBe("kept");
+    writeDraft("title:j_a:n_x", undefined);
     expect(readDraft("title:j_a:n_x")).toBeUndefined();
   });
 });

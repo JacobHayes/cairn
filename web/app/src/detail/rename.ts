@@ -4,8 +4,8 @@
 // manager and kept across screens and reloads, and the form shows it until it lands or is
 // discarded. Text typed after a rejection is a newer draft beside the write, and Keep my edit
 // takes that, else what the write sent.
-import { TITLE_BYTES_MAX } from "@cairn/client";
-import { overBytes } from "../authoring/limits.ts";
+import { useValueProblems } from "../authoring/form-problems.ts";
+import type { ReadError } from "../data/keyed-read.ts";
 import { useDraft } from "../data/drafts.ts";
 import { useWrite } from "../data/react.ts";
 import type { WriteView } from "../data/write-machine.ts";
@@ -32,8 +32,12 @@ export interface Rename {
   base: number | undefined;
   /** A write is out or may have committed: the field and Save wait for its answer. */
   busy: boolean;
-  /** Why the typed title cannot be sent: past the title limit (PRACTICES). */
+  /** Why the typed title cannot be sent, in the engine's words. */
   problem: string | undefined;
+  /** Why the engine's check of the title could not be made, when it could not. */
+  failure: ReadError | undefined;
+  /** Asks for the check again. */
+  retry: () => void;
   /** Whether Save would send something now. */
   canSave: boolean;
   start: () => void;
@@ -69,15 +73,18 @@ export function useRename(view: Ready, node: string, title: string): Rename {
   const writable = useWritable(view);
   const open = writable && (draft !== undefined || write !== undefined);
   const text = draft?.text ?? sentTitle(write) ?? "";
-  const problem = draft === undefined ? undefined : overBytes(draft.text, TITLE_BYTES_MAX, "The title");
+  const checks = useValueProblems([{ field: "title", kind: "title", what: "The title", value: draft?.text ?? "", optional: true }]);
+  const problem = draft === undefined ? undefined : checks.problems.title;
   return {
     write,
     open,
     text,
     problem,
+    failure: draft === undefined ? undefined : checks.failure,
+    retry: checks.retry,
     base: draft?.base,
     busy,
-    canSave: writable && draft !== undefined && draft.text.trim() !== "" && problem === undefined && !edit.disabled,
+    canSave: writable && draft !== undefined && draft.text.trim() !== "" && checks.checked && problem === undefined && !edit.disabled,
     start: () => {
       if (writable && !open) {
         setDraft({ text: title, base: view.journey.revision });
@@ -97,7 +104,7 @@ export function useRename(view: Ready, node: string, title: string): Rename {
       }
     },
     save: () => {
-      if (!writable || draft === undefined || draft.text.trim() === "" || problem !== undefined || edit.disabled) {
+      if (!writable || draft === undefined || draft.text.trim() === "" || !checks.checked || problem !== undefined || edit.disabled) {
         return;
       }
       const patch = patchOf({ target: { journey }, baseRevision: draft.base, mutations: [{ op: "set_node_field", node, value: { title: draft.text } }] });

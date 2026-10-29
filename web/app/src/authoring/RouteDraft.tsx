@@ -30,6 +30,7 @@ import { Badge, Button } from "../ui/kit.tsx";
 import { NoticeList } from "./RouteNotices.tsx";
 import type { Authored } from "./target.ts";
 import { usePublishPreviewRead } from "./write.ts";
+import { namedList } from "../ui/words.ts";
 import { RetiredBadge } from "../routes/RetiredBadge.tsx";
 import { DeleteRoute, deleteRouteLabel, DeletingRoute } from "../routes/DeleteRoute.tsx";
 import { Tip } from "../ui/Tip.tsx";
@@ -201,7 +202,7 @@ export function DraftCard({ route, violations, notices, hrefOf, write, blocked, 
       <h2>The draft</h2>
       <DraftFacts route={route} />
       {violations.length === 0 ? (
-        <p className="muted" data-testid="draft-clear">Nothing blocks publishing.</p>
+        blocked === undefined ? <p className="muted" data-testid="draft-clear">Nothing blocks publishing.</p> : <p data-testid="draft-held">{blocked}</p>
       ) : (
         <section className="stack" aria-label="Blocking publish" data-testid="draft-violations">
           <Badge tone="bad">Blocks publishing {violations.length}</Badge>
@@ -237,6 +238,11 @@ export function DraftCard({ route, violations, notices, hrefOf, write, blocked, 
       )}
     </aside>
   );
+}
+
+/** Why Publish is off while node forms hold changes not yet saved (they would be left out), or nothing. */
+export function unsavedWords(titles: readonly string[]): string | undefined {
+  return titles.length === 0 ? undefined : `Save or discard your changes to ${namedList(titles)} first.`;
 }
 
 /** The reason Publish is off while the draft breaks a rule, or nothing. */

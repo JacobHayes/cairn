@@ -4,10 +4,8 @@
 // are several constraints. F4: a stage's bounds are milestones outside it. The editors offer
 // only what the engine's table says a rule may measure from, so a source of the wrong kind
 // cannot be entered.
-import { OFFSET_DAYS_MAX } from "@cairn/client";
 import type { DateRule } from "./fields.ts";
 import { descendantsOf, nodesFor, pathOf, titleIn, type GraphNode, type Tree } from "./graph.ts";
-import { outOfRange } from "./limits.ts";
 import { plural } from "../ui/words.ts";
 
 /** The journey's creation, a source every graph has (A8). */
@@ -49,14 +47,6 @@ export function ruleOf(parts: RuleParts): DateRule {
   const sources = parts.sources.length === 1 ? parts.sources[0] : parts.sources;
   const rule: DateRule = parts.direction === "before" ? { before: sources ?? [] } : { after: sources ?? [] };
   return parts.offset === 0 ? rule : { ...rule, offset: parts.offset };
-}
-
-/** Why the rule cannot be sent: no source, or an offset past the limit. */
-export function ruleProblem(parts: RuleParts): string | undefined {
-  if (parts.sources.length === 0) {
-    return "A date rule measures from at least one source.";
-  }
-  return outOfRange(parts.offset, OFFSET_DAYS_MAX, "An offset in days");
 }
 
 /** A rule as people read it; `label` names a node by its title, and the journey's start is named here. */

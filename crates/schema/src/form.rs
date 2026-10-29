@@ -8,13 +8,14 @@ use serde::{Deserialize, Serialize};
 
 use crate::collections::{
     BoundedVec, ChecklistItemCountPerNode, ChoiceCountPerDecision, CollectionError,
+    EdgeCountPerNode, OneOrMany,
 };
 use crate::field::NodeField;
-use crate::id::Slug;
+use crate::id::{RouteId, Slug};
 use crate::limits::Limit;
 use crate::node::{Checklist, ChecklistItem, Choice, Choices};
 use crate::number::{Days, NumberError, Weight};
-use crate::text::{Markdown, Title};
+use crate::text::{Markdown, Title, Url};
 
 /// A choice as the form holds it: a bare id, or an id with a label.
 #[derive(Clone, Debug, Deserialize)]
@@ -64,6 +65,19 @@ pub struct NodeFormValues {
     pub choices: Option<Vec<ChoiceValue>>,
     /// A deliverable's or action's checklist.
     pub checklist: Option<Vec<ChecklistValue>>,
+    /// The `due_by` rule, when the node has one.
+    pub due_by: Option<DateRuleValue>,
+    /// The `not_before` rule, when the node has one.
+    pub not_before: Option<DateRuleValue>,
+}
+
+/// A date rule as its editor holds it: what it measures from, and the offset in days.
+#[derive(Clone, Debug, Deserialize)]
+pub struct DateRuleValue {
+    /// The sources, as the editor lists them.
+    pub sources: Vec<String>,
+    /// The offset in days; none when the box holds no number.
+    pub offset: Option<f64>,
 }
 
 /// Why one field of a node form cannot be sent.
@@ -143,7 +157,117 @@ pub fn node_form_problems(values: &NodeFormValues) -> Vec<FieldProblem> {
     if let Some(checklist) = &values.checklist {
         note(NodeField::Checklist, checklist_problem(checklist));
     }
+    problems.extend(date_rule_problems(values));
     problems
+}
+
+/// The problems with the node's date rules, in the order the form lists them.
+fn date_rule_problems(values: &NodeFormValues) -> Vec<FieldProblem> {
+    [
+        (NodeField::DueBy, &values.due_by),
+        (NodeField::NotBefore, &values.not_before),
+    ]
+    .into_iter()
+    .filter_map(|(field, rule)| {
+        let message = date_rule_problem(rule.as_ref()?)?;
+        Some(FieldProblem { field, message })
+    })
+    .collect()
+}
+
+/// What a loose value is read as: the types the patch reader builds the document's values from.
+#[derive(Clone, Copy, Debug, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum ValueKind {
+    /// An id ([`Slug`]).
+    Id,
+    /// A route's id ([`RouteId`]): a slug that is not the one the app keeps for itself.
+    RouteId,
+    /// A title, name or label ([`Title`]).
+    Title,
+    /// Markdown free text ([`Markdown`]).
+    Markdown,
+    /// A link's target ([`Url`]).
+    Url,
+}
+
+/// One value of a form that is not a node's: what it is read as and what the form calls it.
+#[derive(Clone, Debug, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct ValueCheck {
+    /// Names the value in the answer; the form's own name for the field.
+    pub field: String,
+    /// What the value is read as.
+    pub kind: ValueKind,
+    /// A phrase that starts a sentence and names the value, such as "The name".
+    pub what: String,
+    /// The value as typed.
+    pub value: String,
+    /// Whether a blank value is left out rather than refused.
+    #[serde(default)]
+    pub optional: bool,
+}
+
+/// Why one value of a form cannot be sent.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize)]
+pub struct ValueProblem {
+    /// The `field` of the check.
+    pub field: String,
+    /// What is wrong, in words for the person filling in the form.
+    pub message: String,
+}
+
+/// PRD: A1a, A6, A7, A9, E6. Every value of `checks` that cannot be sent, one problem
+/// each, in the order given, read through the types the patch reader builds the same values from.
+#[must_use]
+pub fn value_problems(checks: &[ValueCheck]) -> Vec<ValueProblem> {
+    checks
+        .iter()
+        .filter(|check| !(check.optional && check.value.trim().is_empty()))
+        .filter_map(|check| {
+            let what = check.what.as_str();
+            let value = check.value.as_str();
+            let message = match check.kind {
+                ValueKind::Id => value.parse::<Slug>().err().map(|e| e.words(what)),
+                ValueKind::RouteId => value.parse::<RouteId>().err().map(|e| e.words(what)),
+                ValueKind::Title => value.parse::<Title>().err().map(|e| e.words(what)),
+                ValueKind::Markdown => value.parse::<Markdown>().err().map(|e| e.words(what)),
+                ValueKind::Url => value.parse::<Url>().err().map(|e| e.words(what)),
+            };
+            message.map(|message| ValueProblem {
+                field: check.field.clone(),
+                message,
+            })
+        })
+        .collect()
+}
+
+/// A date rule that measures from nothing, from too many sources, or by an offset out of range.
+fn date_rule_problem(rule: &DateRuleValue) -> Option<String> {
+    if let Err(error) =
+        OneOrMany::<&str, EdgeCountPerNode>::new(rule.sources.iter().map(String::as_str))
+    {
+        return Some(match error {
+            CollectionError::Empty => "A date rule measures from at least one source.".to_owned(),
+            other => other.words("A date rule's sources"),
+        });
+    }
+    let ok = rule
+        .offset
+        .and_then(whole)
+        .is_some_and(|days| Days::try_from(days).is_ok());
+    (!ok).then(|| range_words("An offset in days", Limit::OffsetDays))
+}
+
+/// The whole number a float holds, as the number box reads `1.0` and `1e2`.
+fn whole(number: f64) -> Option<u32> {
+    (number.fract() == 0.0)
+        .then(|| number.to_string().parse::<u32>().ok())
+        .flatten()
+}
+
+fn range_words(what: &str, limit: Limit) -> String {
+    format!("{what} is a whole number from 0 to {}.", limit.max())
 }
 
 /// Free text that may be left blank.
@@ -165,15 +289,13 @@ fn whole_number(
     if text.trim().is_empty() {
         return None;
     }
-    // As the number box reads it: `1.0` and `1e2` are whole numbers.
-    let whole = text
+    let ok = text
         .trim()
         .parse::<f64>()
         .ok()
-        .filter(|number| number.fract() == 0.0)
-        .and_then(|number| number.to_string().parse::<u32>().ok());
-    let ok = whole.is_some_and(|n| check(n).is_ok());
-    (!ok).then(|| format!("{what} is a whole number from 0 to {}.", limit.max()))
+        .and_then(whole)
+        .is_some_and(|n| check(n).is_ok());
+    (!ok).then(|| range_words(what, limit))
 }
 
 fn choices_problem(values: &[ChoiceValue]) -> Option<String> {
@@ -299,6 +421,67 @@ mod tests {
         for (values, field) in cases {
             assert_eq!(fields(values), [field], "{values}");
         }
+    }
+
+    #[test]
+    fn date_rules_fail_without_a_source_or_past_the_offset() {
+        let rule = |sources: usize, offset: &str| {
+            let sources: Vec<String> = (0..sources).map(|at| format!("n_{at}")).collect();
+            format!(r#"{{"due_by": {{"sources": {sources:?}, "offset": {offset}}}}}"#)
+        };
+        assert_eq!(fields(&rule(1, "365")), []);
+        assert_eq!(fields(&rule(1, "0")), []);
+        assert_eq!(fields(&rule(0, "0")), [NodeField::DueBy]);
+        assert_eq!(fields(&rule(1, "366")), [NodeField::DueBy]);
+        assert_eq!(fields(&rule(1, "-1")), [NodeField::DueBy]);
+        assert_eq!(fields(&rule(1, "1.5")), [NodeField::DueBy]);
+        assert_eq!(fields(&rule(1, "null")), [NodeField::DueBy]);
+        assert_eq!(
+            fields(&rule(1, "366").replace("due_by", "not_before")),
+            [NodeField::NotBefore]
+        );
+        assert_eq!(fields(&rule(64, "0")), []);
+        assert_eq!(fields(&rule(65, "0")), [NodeField::DueBy]);
+        let twice = r#"{"due_by": {"sources": ["n_a", "n_a"], "offset": 0}}"#;
+        assert_eq!(fields(twice), [NodeField::DueBy]);
+    }
+
+    fn value_fields(checks: &str) -> Vec<String> {
+        let checks: Vec<ValueCheck> = serde_json::from_str(checks).unwrap();
+        value_problems(&checks)
+            .into_iter()
+            .map(|problem| problem.field)
+            .collect()
+    }
+
+    #[test]
+    fn loose_values_fail_at_the_rule_of_their_kind() {
+        let check = |kind: &str, value: &str, optional: bool| {
+            serde_json::json!([{"field": "f", "kind": kind, "what": "It", "value": value, "optional": optional}])
+                .to_string()
+        };
+        let (long_title, long_body) = ("t".repeat(257), "m".repeat(64 * 1024 + 1));
+        let cases = [
+            ("id", "ok-id", true),
+            ("id", "Not a slug", false),
+            ("route_id", "new", false),
+            ("route_id", "a-route", true),
+            ("title", "", false),
+            ("title", &long_title, false),
+            ("markdown", &long_body, false),
+            ("url", "https://example.org", true),
+            ("url", "no scheme", false),
+        ];
+        for (kind, value, ok) in cases {
+            let failed = value_fields(&check(kind, value, false));
+            assert_eq!(failed.is_empty(), ok, "{kind} {value:?}");
+        }
+        // A blank optional value is left out; a blank required one is refused.
+        assert_eq!(
+            value_fields(&check("title", "  ", true)),
+            Vec::<String>::new()
+        );
+        assert_eq!(value_fields(&check("title", "  ", false)), ["f"]);
     }
 
     #[test]

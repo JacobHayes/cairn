@@ -9,7 +9,7 @@ import { JOURNEY_FIELDS } from "@cairn/client";
 import type { Schema } from "@cairn/client";
 import type { DraftProblem } from "@cairn/wasm";
 
-import { DERIVE, type ReadKey, type ReadSource } from "../data/keyed-read.ts";
+import { DERIVE, type ReadError, type ReadKey, type ReadSource } from "../data/keyed-read.ts";
 import { useKeyedRead, useSession } from "../data/react.ts";
 import type { Deriver } from "../data/host.ts";
 import type { Role, Tree } from "./graph.ts";
@@ -50,12 +50,13 @@ const STORED: ReadSource<Args, { stored: string } | { problem: string }> = {
 };
 
 /** What the engine makes of a draft as written: stored with keys, or why it cannot be; unchecked until it answers. */
-export function useDraftStored(graph: Schema<"Graph">, written: string | undefined): { checked: boolean; result: { stored: string } | { problem: string } | undefined } {
+export function useDraftStored(graph: Schema<"Graph">, written: string | undefined): { checked: boolean; result: { stored: string } | { problem: string } | undefined; failure: ReadError | undefined; retry: () => void } {
   const { deriver } = useSession();
   const key: ReadKey<Args> | undefined = written === undefined ? undefined : { of: ["draft-stored"], freshness: [JSON.stringify(graph), written], args: { deriver, graph, written } };
-  const { view } = useKeyedRead(STORED, key);
+  const { view, refresh } = useKeyedRead(STORED, key);
   if (written === undefined) {
-    return { checked: true, result: undefined };
+    return { checked: true, result: undefined, failure: undefined, retry: refresh };
   }
-  return view.status === "current" ? { checked: true, result: view.value } : { checked: false, result: undefined };
+  const failure = view.status === "failed" || view.status === "behind" ? view.error : undefined;
+  return view.status === "current" ? { checked: true, result: view.value, failure, retry: refresh } : { checked: false, result: undefined, failure, retry: refresh };
 }

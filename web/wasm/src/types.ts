@@ -200,6 +200,34 @@ export interface NodeFormValues {
   help?: string;
   choices?: (string | { id: string; title: string })[];
   checklist?: { id: string; title: string }[];
+  due_by?: DateRuleValue;
+  not_before?: DateRuleValue;
+}
+
+/** `crates/schema` `DateRuleValue`: a date rule as its editor holds it. */
+export interface DateRuleValue {
+  sources: string[];
+  offset: number | null;
+}
+
+/** `crates/schema` `ValueKind`: what a loose value of a form is read as. */
+export type ValueKind = "id" | "route_id" | "title" | "markdown" | "url";
+
+/** `crates/schema` `ValueCheck`: one value of a form that is not a node's, as typed. */
+export interface ValueCheck {
+  field: string;
+  kind: ValueKind;
+  /** A phrase that starts a sentence and names the value, such as "The name". */
+  what: string;
+  value: string;
+  /** A blank value is left out rather than refused. */
+  optional?: boolean;
+}
+
+/** `crates/schema` `ValueProblem`: why one value cannot be sent, in words for the author. */
+export interface ValueProblem {
+  field: string;
+  message: string;
 }
 
 /** `crates/schema` `FieldProblem`: why one field of a node form cannot be sent, in words for the author. */

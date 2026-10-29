@@ -3,7 +3,7 @@
 // nothing. An edit already sent is no longer a draft: the edit manager keeps its record
 // (edit-manager.ts). Storage that refuses (a private window, a full quota) leaves the draft in
 // memory only.
-import { useCallback, useState } from "react";
+import { useCallback, useState, useSyncExternalStore } from "react";
 
 /** What every draft's storage key starts with. */
 export const DRAFT_PREFIX = "cairn:draft:";
@@ -23,14 +23,19 @@ export function tabStorage(): Storage | undefined {
 export function readDraft<T>(key: string): T | undefined {
   try {
     const text = tabStorage()?.getItem(PREFIX + key);
-    return text == null ? undefined : (JSON.parse(text) as T);
+    return text == null ? (memoryOnly.get(key) as T | undefined) : (JSON.parse(text) as T);
   } catch {
-    return undefined;
+    return memoryOnly.get(key) as T | undefined;
   }
 }
 
+const watchers = new Set<() => void>();
+/** The drafts storage refused: kept here for this page's life, so they still come back and still count as unsent. */
+const memoryOnly = new Map<string, unknown>();
+
 /** Keeps `value` under `key`, or forgets the draft when it is undefined (sent or abandoned). */
 export function writeDraft(key: string, value: unknown): void {
+  memoryOnly.delete(key);
   try {
     if (value === undefined) {
       tabStorage()?.removeItem(PREFIX + key);
@@ -38,8 +43,42 @@ export function writeDraft(key: string, value: unknown): void {
       tabStorage()?.setItem(PREFIX + key, JSON.stringify(value));
     }
   } catch {
-    // Kept in memory only.
+    if (value !== undefined) {
+      memoryOnly.set(key, value);
+    }
   }
+  for (const watcher of watchers) {
+    watcher();
+  }
+}
+
+/** The keys, after `prefix`, of the drafts this tab keeps whose key starts with it. */
+export function draftKeys(prefix: string): string[] {
+  const storage = tabStorage();
+  const kept = new Set([...memoryOnly.keys()].filter((key) => key.startsWith(prefix)).map((key) => key.slice(prefix.length)));
+  try {
+    for (let at = 0; at < (storage?.length ?? 0); at += 1) {
+      const key = storage?.key(at);
+      if (key?.startsWith(PREFIX + prefix) === true) {
+        kept.add(key.slice(PREFIX.length + prefix.length));
+      }
+    }
+  } catch {
+    // Only what this tab wrote.
+  }
+  return [...kept].sort();
+}
+
+/** The keys, after `prefix`, of the drafts kept under it, read again whenever a draft is kept or forgotten. */
+export function useDraftKeys(prefix: string): string[] {
+  const joined = useSyncExternalStore(
+    (notify) => {
+      watchers.add(notify);
+      return () => watchers.delete(notify);
+    },
+    () => draftKeys(prefix).join("\n"),
+  );
+  return joined === "" ? [] : joined.split("\n");
 }
 
 /** A draft held with the key it was read under. */

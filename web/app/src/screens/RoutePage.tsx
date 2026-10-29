@@ -18,9 +18,10 @@ import { use, useCallback, useEffect, useMemo, useState, type ReactNode } from "
 import { Link, useLocation, useNavigate, useParams } from "react-router";
 
 import { required } from "../address.ts";
+import { useDraftKeys } from "../data/drafts.ts";
 import { ConnectContext, DrawingBanner, useEdgeDrawing } from "../authoring/connect.tsx";
 import { RouteNodePanel } from "../authoring/RouteAuthoring.tsx";
-import { blockedWords, DraftCard, ResultBand, RouteHeader, useDraftViolations } from "../authoring/RouteDraft.tsx";
+import { blockedWords, DraftCard, ResultBand, RouteHeader, unsavedWords, useDraftViolations } from "../authoring/RouteDraft.tsx";
 import { DeletingRoute } from "../routes/DeleteRoute.tsx";
 import { useRouteNotices } from "../authoring/RouteNotices.tsx";
 import { StructureTools } from "../authoring/StructureTools.tsx";
@@ -194,13 +195,14 @@ function DraftFrame({ shown, derived, authored, selected, edge, write, result, s
   const inserting = useInserting(`route:${id}`);
   const { notices } = useRouteNotices(authored.graph);
   const violations = useDraftViolations(authored);
-  const blocked = blockedWords(violations);
+  const unsaved = useDraftKeys(`node-form:route:${id}:`);
   const wide = useMedia(COLUMN);
   const phone = useMedia(PHONE_WIDTH);
   const unanchored = useMemo(() => new Set(notices.map((notice) => notice.node)), [notices]);
   const here = (node: string | undefined) => routePath(id, { screen, node }, search);
   const hrefOf = (key: string) => here(key);
   const titleOf = (key: string) => titleIn(authored.tree, key);
+  const blocked = unsavedWords(unsaved.filter((key) => authored.tree.byKey.has(key)).map(titleOf)) ?? blockedWords(violations);
   const target = { route: id };
   const publish = () =>
     void write.run({ target, baseRevision: shown.route.revision, mutations: [{ op: "publish_draft" }] }, (found) => {

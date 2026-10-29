@@ -497,6 +497,18 @@ export function routeNotices(request: string): string;
  */
 export function start(): void;
 
+/**
+ * A1a, A6, A7, E6: the JSON of the problems with the loose values of a form (the JSON of
+ * a list of [`ValueCheck`]), one `{"field", "message"}` per value that cannot be sent; `[]`
+ * when all can be. The rules are the types' own, the ones the patch reader builds the same
+ * values from.
+ *
+ * # Errors
+ *
+ * The JSON of a [`HostError`] when the checks do not read.
+ */
+export function valueProblems(checks: string): string;
+
 export type InitInput = RequestInfo | URL | Response | BufferSource | WebAssembly.Module;
 
 export interface InitOutput {
@@ -558,6 +570,7 @@ export interface InitOutput {
     readonly routederivation_project: (a: number, b: number, c: number, d: number) => void;
     readonly routederivation_schedule: (a: number, b: number) => void;
     readonly start: () => void;
+    readonly valueProblems: (a: number, b: number, c: number) => void;
     readonly __wbindgen_add_to_stack_pointer: (a: number) => number;
     readonly __wbindgen_export: (a: number, b: number) => number;
     readonly __wbindgen_export2: (a: number, b: number, c: number, d: number) => number;

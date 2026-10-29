@@ -10,12 +10,11 @@ import { ConditionEditor } from "../authoring/ConditionEditor.tsx";
 import { removalMutations, useRemovalPlan } from "../authoring/removal.ts";
 import { DateRuleEditor } from "../authoring/DateRuleEditor.tsx";
 import { draftOf, nodeFrom, valueOf, type FormField, type NodeDraft } from "../authoring/fields.ts";
-import { checkDraft, useDraftProblems } from "../authoring/form-problems.ts";
+import { useDraftProblems } from "../authoring/form-problems.ts";
 import { canHoldChildren, kindOption, moveTargets, newNode, nodesByPath, nodesFor, pathOf, rolesForFill, type GraphNode, type Mutation, type NodeField, type NodeKind, type ReferenceField, type Role, type Tree } from "../authoring/graph.ts";
 import { BasicsFields, ChecklistEditor, type NewItem, ChoicesEditor, CompletionFields, DecisionFields, StageFields, WeightFields, has } from "../authoring/NodeFields.tsx";
-import { FieldBox, Picker } from "../authoring/parts.tsx";
+import { CheckFailed, FieldBox, Picker } from "../authoring/parts.tsx";
 import type { Deployment } from "../data/host.ts";
-import { useSession } from "../data/react.ts";
 import { subjectOf } from "../data/writes.ts";
 import { Input as AnswerInput } from "../detail/AnswerEditor.tsx";
 import { checklistOf, type Ready } from "../detail/model.ts";
@@ -79,28 +78,6 @@ function useSyncedDraft<T>(source: unknown, make: () => T): { draft: T; set: (dr
   };
 }
 
-/**
- * What an editor needs to write a value once the engine has checked it: the newest `onChange`
- * (the proposal may have changed meanwhile, and a write through an older one would undo that),
- * and whether the editor is still shown (a value checked for an editor that has gone is dropped).
- */
-function useLateWrite<T>(onChange: (value: T) => void): (write: T) => void {
-  const latest = useRef(onChange);
-  const shown = useRef(true);
-  useEffect(() => {
-    latest.current = onChange;
-  });
-  useEffect(() => {
-    shown.current = true;
-    return () => { shown.current = false; };
-  }, []);
-  return (write) => {
-    if (shown.current) {
-      latest.current(write);
-    }
-  };
-}
-
 /** The checklist's new-item text, held by the editor while it is open. */
 function useKeptItem(): [string, (value: string) => void] {
   return useState("");
@@ -116,23 +93,24 @@ function AddedNode({ editor, node, onChange, context }: { editor: string; node: 
   const synced = useSyncedDraft<NodeDraft>(node, () => draftOf(node));
   const kept = useKeptItem();
   const draft = synced.draft;
-  const { deriver } = useSession();
-  const { checked, problems } = useDraftProblems(node.kind, draft);
+  const form = useDraftProblems(node.kind, draft);
+  const { checked, problems } = form;
   useInvalid(context, editor, Object.keys(problems).length > 0 || !checked);
-  const latest = useRef(draft);
-  const write = useLateWrite(onChange);
+  const edited = useRef<NodeDraft | undefined>(undefined);
   const change = (next: Partial<NodeDraft>) => {
     const merged = { ...draft, ...next };
-    latest.current = merged;
+    edited.current = merged;
     synced.set(merged);
-    void checkDraft(deriver, node.kind, merged).then((found) => {
-      if (latest.current === merged && Object.keys(found).length === 0) {
-        const written = nodeFrom(node, merged);
-        synced.wrote(written);
-        write(written);
-      }
-    });
   };
+  // An edit is written once the engine has read it and found nothing wrong: the one check shows the messages and gates the write.
+  useEffect(() => {
+    if (edited.current === draft && checked && Object.keys(problems).length === 0) {
+      edited.current = undefined;
+      const written = nodeFrom(node, draft);
+      synced.wrote(written);
+      onChange(written);
+    }
+  });
   const props = {
     kind: node.kind,
     nodeKey: node.key,
@@ -145,6 +123,7 @@ function AddedNode({ editor, node, onChange, context }: { editor: string; node: 
   };
   return (
     <div className="stack" data-testid="added-node-form">
+      <CheckFailed failure={form.failure} retry={form.retry} />
       <Section title="Basics" open testId="added-basics">
         <BasicsFields props={props} />
       </Section>
@@ -153,10 +132,12 @@ function AddedNode({ editor, node, onChange, context }: { editor: string; node: 
           <DecisionFields props={props} />
         </Section>
       ) : null}
-      <Section title="Relevance and dates" testId="added-dates">
+      <Section title="Relevance and dates" open={problems.due_by !== undefined || problems.not_before !== undefined} testId="added-dates">
         <ConditionEditor value={draft.relevant_when} onChange={(next) => { change({ relevant_when: next }); }} tree={context.tree} node={node.key} identities={context.deployment.identities ?? []} today={context.today} />
         {(["due_by", "not_before"] as const).map((which) => (
-          <DateRuleEditor key={which} which={which} value={draft[which]} onChange={(next) => { change({ [which]: next }); }} tree={context.tree} node={node.key} />
+          <FieldBox key={which} label={fieldWords(which)} place={which} notes={{ problem: problems[which] }}>
+            <DateRuleEditor which={which} value={draft[which]} onChange={(next) => { change({ [which]: next }); }} tree={context.tree} node={node.key} />
+          </FieldBox>
         ))}
         {has(props, "opens_at") ? <StageFields props={props} /> : null}
       </Section>
@@ -196,30 +177,31 @@ function FieldValueOf({ editor, mutation, onChange, context, node }: { editor: s
   const synced = useSyncedDraft<NodeDraft>(mutation.value, () => draftOf(withFieldValue(node, mutation.value)));
   const draft = synced.draft;
   const kept = useKeptItem();
-  const { deriver } = useSession();
-  const latest = useRef(draft);
-  const write = useLateWrite(onChange);
   const form = useDraftProblems(node.kind, draft);
   const problem = form.problems[field];
   useInvalid(context, editor, problem !== undefined || !form.checked);
+  const edited = useRef<NodeDraft | undefined>(undefined);
   const change = (next: Partial<NodeDraft>) => {
     const merged = { ...draft, ...next };
-    latest.current = merged;
+    edited.current = merged;
     synced.set(merged);
-    void checkDraft(deriver, node.kind, merged).then((found) => {
-      if (latest.current === merged && found[field] === undefined) {
-        const value = valueOf(field, merged);
-        synced.wrote(value);
-        write({ ...mutation, value });
-      }
-    });
   };
+  // An edit is written once the engine has read it and found nothing wrong at this field.
+  useEffect(() => {
+    if (edited.current === draft && form.checked && problem === undefined) {
+      edited.current = undefined;
+      const value = valueOf(field, draft);
+      synced.wrote(value);
+      onChange({ ...mutation, value });
+    }
+  });
   // The items that carry a tick now, from the journey as it is, since the proposal's own graph may already have dropped them: a new item never takes their ids.
   const ticked = context.ready === undefined ? [] : checklistOf(context.ready, node.key).filter((item) => item.ticked).map(({ id, title }) => ({ id, title }));
   const props = { kind: node.kind, nodeKey: node.key, draft, change, notes: () => ({ problem }), tree: context.tree, roles: context.roles, ticked, newItem: newItemOf(kept, change) };
   const targets = includes(MILESTONE_FIELDS, field) ? nodesFor(context.tree, field).map((each) => ({ value: each.key, label: each.title })) : [];
   return (
     <FieldBox label={fieldWords(field)} place={field} notes={{ problem }}>
+      <CheckFailed failure={form.failure} retry={form.retry} />
       {includes(LINE_FIELDS, field) ? <Input aria-label={fieldWords(field)} value={draft[field]} onChange={(event) => { change({ [field]: event.target.value }); }} /> : null}
       {includes(MARKDOWN_FIELDS, field) ? <textarea aria-label={fieldWords(field)} value={draft[field]} onChange={(event) => { change({ [field]: event.target.value }); }} /> : null}
       {includes(NUMBER_FIELDS, field) ? <Input type="number" min={0} aria-label={fieldWords(field)} value={draft[field]} onChange={(event) => { change({ [field]: event.target.value }); }} /> : null}

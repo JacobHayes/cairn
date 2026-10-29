@@ -2,7 +2,7 @@
 // the identity's own inspector): a name and emails, either of which may be left out but not both.
 // Both stand in the inspector, never on the page. A new identity is made with a random key; an
 // edit is drafted against the deployment revision its author saw, and both drafts survive a reload.
-import { useEffect, useState } from "react";
+import { useEffect, useId, useState } from "react";
 import { useNavigate } from "react-router";
 
 import { pathTo } from "../address.ts";
@@ -14,7 +14,9 @@ import { WriteStatus } from "../screens/WriteStatus.tsx";
 import { useScreenWrite, type ScreenWrite } from "../screens/write.ts";
 import { ChipsInput } from "../ui/ChipsInput.tsx";
 import { Button, Input } from "../ui/kit.tsx";
-import { EMAIL_RULES, identityOf, nameProblem, newIdentityKey, type Identity } from "./model.ts";
+import { CheckFailed, invalidAttrs, Problem } from "../authoring/parts.tsx";
+import { useValueProblems, type Checked } from "../authoring/form-problems.ts";
+import { EMAIL_RULES, identityOf, newIdentityKey, type Identity } from "./model.ts";
 
 /** What is typed in the form, and the email typed and not yet taken as a chip. */
 interface Typed {
@@ -41,19 +43,31 @@ export function deploymentRebase(rejection: Rejection, held: number): number {
   return Math.max(held, ...reported);
 }
 
-/** Whether the typed identity may be sent: it names someone (a name, an email, or both), is within the limits, and holds no email still being typed. */
+/** Whether the typed identity may be sent: it names someone (a name, an email, or both) and holds no email still being typed. */
 export function sendable(typed: Typed): boolean {
-  return (typed.name.trim() !== "" || typed.emails.length > 0) && typed.emailText.trim() === "" && nameProblem(typed.name) === undefined;
+  return (typed.name.trim() !== "" || typed.emails.length > 0) && typed.emailText.trim() === "";
+}
+
+/** The engine's reading of the typed name (it may be left out, but not be too long), which the form waits for before it sends. */
+function useNameChecks(typed: Typed): Checked<Record<string, string | undefined>> {
+  return useValueProblems([{ field: "name", kind: "title", what: "The name", value: typed.name.trim(), optional: true }]);
+}
+
+/** Whether the form may send: the typed identity is sendable, and the engine has read its name and found it fine. */
+function mayBeSent(typed: Typed, checks: Checked<Record<string, string | undefined>>): boolean {
+  return sendable(typed) && checks.checked && checks.problems.name === undefined;
 }
 
 /** The name and emails fields, stacked so their labels and boxes share an edge. */
-function Fields({ typed, change }: { typed: Typed; change: (next: Typed) => void }) {
-  const problem = nameProblem(typed.name);
+function Fields({ typed, change, checks }: { typed: Typed; change: (next: Typed) => void; checks: Checked<Record<string, string | undefined>> }) {
+  const problem = checks.problems.name;
+  const message = useId();
   return (
     <>
-      <Input label="Name" value={typed.name} onChange={(event) => { change({ ...typed, name: event.target.value }); }} />
+      <Input label="Name" {...invalidAttrs(message, problem)} value={typed.name} onChange={(event) => { change({ ...typed, name: event.target.value }); }} />
       <ChipsInput label="Emails" placeholder="Add an email" inputMode="email" rules={EMAIL_RULES} values={typed.emails} text={typed.emailText} onChange={(emails, emailText) => { change({ ...typed, emails, emailText }); }} />
-      {problem === undefined ? null : <span className="ink-bad" role="alert">{problem}</span>}
+      {problem === undefined ? null : <Problem id={message}>{problem}</Problem>}
+      <CheckFailed failure={checks.failure} retry={checks.retry} />
     </>
   );
 }
@@ -79,6 +93,7 @@ export function NewIdentity({ deployment }: { deployment: Deployment }) {
   const write = useScreenWrite("new-identity");
   const [draft, setDraft] = useDraft<Typed>("identity-new");
   const typed = draft ?? { name: "", emails: [], emailText: "" };
+  const checks = useNameChecks(typed);
   const [made, setMade] = useState<string>();
   // The identity is opened when the deployment shows it, not when the write lands, so the inspector never looks for one that has not arrived.
   const arrived = made !== undefined && (deployment.identities ?? []).some((identity) => identity.key === made);
@@ -102,9 +117,9 @@ export function NewIdentity({ deployment }: { deployment: Deployment }) {
         <p className="muted">A person or team journeys can name. Give a name, an email, or both.</p>
       </div>
       <form className="stack" onSubmit={(event) => { event.preventDefault(); void add(); }}>
-        <Fields typed={typed} change={setDraft} />
+        <Fields typed={typed} change={setDraft} checks={checks} />
         <span className="row">
-          <Button primary type="submit" disabled={write.disabled || made !== undefined || !sendable(typed)}>Add identity</Button>
+          <Button primary type="submit" disabled={write.disabled || made !== undefined || !mayBeSent(typed, checks)}>Add identity</Button>
           <Button onClick={() => { setDraft(undefined); write.dismiss(); void navigate(pathTo("identities")); }}>Cancel</Button>
         </span>
       </form>
@@ -115,6 +130,7 @@ export function NewIdentity({ deployment }: { deployment: Deployment }) {
 
 /** Edit: the identity's name and emails, drafted against the deployment revision seen; the draft and the write are the panel's (so a save still out holds Edit shut), and Save or Cancel ends the draft. */
 export function EditIdentity({ identity, deployment, draft, setDraft, write }: { identity: Identity; deployment: Deployment; draft: IdentityDraft; setDraft: (draft: IdentityDraft | undefined) => void; write: ScreenWrite }) {
+  const checks = useNameChecks(draft);
   const save = async () => {
     if (await write.run({ target: "deployment", baseRevision: draft.base, mutations: [{ op: "edit_identity", identity: identityOf(identity.key, draft.name, draft.emails) }] })) {
       setDraft(undefined);
@@ -123,9 +139,9 @@ export function EditIdentity({ identity, deployment, draft, setDraft, write }: {
   return (
     <>
       <form className="stack" onSubmit={(event) => { event.preventDefault(); void save(); }}>
-        <Fields typed={draft} change={(next) => { setDraft({ ...draft, ...next }); }} />
+        <Fields typed={draft} change={(next) => { setDraft({ ...draft, ...next }); }} checks={checks} />
         <span className="row">
-          <Button primary type="submit" disabled={write.disabled || !sendable(draft)}>Save</Button>
+          <Button primary type="submit" disabled={write.disabled || !mayBeSent(draft, checks)}>Save</Button>
           <Button onClick={() => { setDraft(undefined); write.dismiss(); }}>Cancel</Button>
         </span>
       </form>
