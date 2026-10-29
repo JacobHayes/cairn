@@ -4,8 +4,7 @@
 //! A request whose answer did not arrive (a reset, a refused connect, a timeout, or the
 //! `client-loses-response` fault site) is sent again unchanged: the same patch id with the
 //! same content, which the server answers from its receipt if the first copy landed (H5).
-//! A stale patch is not resubmitted: the server applies it past what intervened when that
-//! cannot overlap it, and answers stale when it can, which the client surfaces.
+//! A stale patch is not resubmitted: the server answers it stale, which the client surfaces.
 
 use std::fmt;
 use std::future::Future;
@@ -67,7 +66,7 @@ pub enum Failure {
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct Ack {
     pub receipt: PatchReceipt,
-    /// The revision it was drafted at, which the server may have moved it past.
+    /// The revision it was drafted at.
     pub drafted: Revision,
     /// The next snapshot of its domain held it: at or past its revision, with its effect.
     pub visible: bool,
@@ -77,15 +76,12 @@ pub struct Ack {
 #[derive(Clone, Debug, Default, PartialEq, Eq)]
 pub struct Report {
     pub acks: Vec<Ack>,
-    /// Patches answered stale, where the server could not apply them past what intervened:
-    /// surfaced, so never applied.
+    /// Patches answered stale: surfaced, so never applied.
     pub surfaced: Vec<PatchId>,
     /// Any other rejection or server error, which none of the testbed's patches should get.
     pub unexpected: Vec<(PatchId, String)>,
     /// Requests sent again because an answer did not arrive.
     pub transport_retries: u64,
-    /// Stale patches the server applied past what intervened (H5).
-    pub applied_over: u64,
     /// Answers from a receipt: a resent patch had already landed.
     pub receipts: u64,
 }
@@ -97,7 +93,6 @@ impl Report {
         self.surfaced.extend(other.surfaced);
         self.unexpected.extend(other.unexpected);
         self.transport_retries += other.transport_retries;
-        self.applied_over += other.applied_over;
         self.receipts += other.receipts;
     }
 }
@@ -370,9 +365,6 @@ impl Client {
             report.receipts += counts.receipts.load(Ordering::Relaxed);
             match answer {
                 Ok(answer) => {
-                    let over = matches!(&answer, PatchAnswer::Applied { over: Some(_), .. });
-                    patina_dst::sometimes!(over, "stale-patch-applied-over");
-                    report.applied_over += u64::from(over);
                     let receipt = answer.receipt().clone();
                     let visible = self.next_snapshot_holds(setup, &draft, &receipt).await?;
                     report.acks.push(Ack {
@@ -381,15 +373,8 @@ impl Client {
                         visible,
                     });
                 }
-                Err(Refused::Rejected(Rejection::Stale {
-                    intervening,
-                    touched,
-                    ..
-                })) => {
-                    patina_dst::sometimes!(
-                        intervening.overlaps(&touched),
-                        "client-overlapping-conflict-surfaced"
-                    );
+                Err(Refused::Rejected(Rejection::Stale { .. })) => {
+                    patina_dst::reachable!("client-stale-conflict-surfaced");
                     report.surfaced.push(patch.id);
                 }
                 Err(Refused::Rejected(rejection)) => {

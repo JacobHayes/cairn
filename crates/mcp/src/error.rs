@@ -165,7 +165,6 @@ impl Serialize for Lean<'_> {
             Stale {
                 conflicts: &'a [RevisionConflict],
                 intervening: Touched,
-                touched: Touched,
             },
             PatchIdReused {
                 patch_id: &'a PatchId,
@@ -178,11 +177,9 @@ impl Serialize for Lean<'_> {
             Rejection::Stale {
                 conflicts,
                 intervening,
-                touched,
             } => Wire::Stale {
                 conflicts,
                 intervening: Touched::of(intervening),
-                touched: Touched::of(touched),
             },
             Rejection::PatchIdReused { patch_id } => Wire::PatchIdReused { patch_id },
             Rejection::Invalid { violations } => Wire::Invalid { violations },

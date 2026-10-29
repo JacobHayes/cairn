@@ -135,7 +135,7 @@ describe("a stale write that cannot be rebased", () => {
   it("is rejected once for a proposal, even where a patch would be rebased on the new revision, and is sent no more", async () => {
     const host = new FakeHost();
     const { edits, writes } = await startRoot({ host });
-    host.proposed = [{ outcome: "rejected", rejection: { rejection: "stale", conflicts: [{ of: { proposal: "pr_one" }, expected: 4, current: 5 }], intervening: [], touched: [] } }];
+    host.proposed = [{ outcome: "rejected", rejection: { rejection: "stale", conflicts: [{ of: { proposal: "pr_one" }, expected: 4, current: 5 }], intervening: [] } }];
     await submitWrite(edits, sentOf(paths[3] as Path, "p_a"));
     expect(host.called).toEqual(["apply"]);
     expect(problemsOf(writes(), false).map((problem) => problem.kind)).toEqual(["conflict"]);

@@ -82,7 +82,7 @@ describe("a rejection that arrives after the control is gone", () => {
     first.submit(renaming("p_a"));
     await settled();
     // The control is long gone by the time the answer comes.
-    held.resolve(refusal({ rejection: "stale", conflicts: [{ of: { domain: { journey: "j_one" } }, expected: 3, current: 0 }], intervening: [], touched: [] }));
+    held.resolve(refusal({ rejection: "stale", conflicts: [{ of: { domain: { journey: "j_one" } }, expected: 3, current: 0 }], intervening: [] }));
     await settled();
     expect(problemsOf(first.writes(), false)).toEqual([
       { id: "p_a", kind: "rejected", message: expect.stringMatching(/deleted/) as string, label: "Step n_a", address: undefined, retry: false },
@@ -96,7 +96,7 @@ describe("a rejection that arrives after the control is gone", () => {
   it("keeps a stale rejection with where it happened, as a conflict", async () => {
     const host = new FakeHost();
     const first = await startRoot({ host });
-    first.host.answers = [refusal({ rejection: "stale", conflicts: [{ of: { domain: { journey: "j_one" } }, expected: 3, current: 4 }], intervening: [], touched: [] })];
+    first.host.answers = [refusal({ rejection: "stale", conflicts: [{ of: { domain: { journey: "j_one" } }, expected: 3, current: 4 }], intervening: [] })];
     first.submit(renaming("p_a"));
     await settled();
     expect(problemsOf(first.writes(), false)).toEqual([
@@ -107,7 +107,7 @@ describe("a rejection that arrives after the control is gone", () => {
 
 describe("what the chip says of a write", () => {
   const base = { id: "p_a", about: aboutNode(), command: { kind: "patch" as const, patch: renaming("p_a") } };
-  const stale: Rejection = { rejection: "stale", conflicts: [], intervening: [], touched: [] };
+  const stale: Rejection = { rejection: "stale", conflicts: [], intervening: [] };
 
   it("calls a stale rejection a conflict and another refusal not saved, offers Retry only where a resend can help, and says nothing of a write still trying", () => {
     const words = (view: Parameters<typeof unlandedWords>[0], skewed = false) => {
@@ -126,7 +126,7 @@ describe("what the chip says of a write", () => {
 
   it("says what was removed, and offers no way back to it", async () => {
     const { host, submit, writes } = await startRoot();
-    host.answers = [refusal({ rejection: "stale", conflicts: [{ of: { domain: { journey: "j_one" } }, expected: 3, current: 0 }], intervening: [], touched: [] })];
+    host.answers = [refusal({ rejection: "stale", conflicts: [{ of: { domain: { journey: "j_one" } }, expected: 3, current: 0 }], intervening: [] })];
     submit(renaming("p_a"));
     await settled();
     const view = writeView(writes().p_a?.snapshot as WriteSnapshot);

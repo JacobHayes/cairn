@@ -18,7 +18,7 @@ const busy: Answered<HttpFailure> = { outcome: "failed", error: { status: 503, m
 const unauthorized: Answered<HttpFailure> = { outcome: "failed", error: { status: 401, message: "sign in" } };
 const stale = (current: number): Answered<HttpFailure> => ({
   outcome: "rejected",
-  rejection: { rejection: "stale", conflicts: [{ of: { domain: { journey: "j_one" } }, expected: 3, current }], intervening: [], touched: [] },
+  rejection: { rejection: "stale", conflicts: [{ of: { domain: { journey: "j_one" } }, expected: 3, current }], intervening: [] },
 });
 
 const patch: Patch = patchOf({ target: { journey: "j_one" }, baseRevision: 3, mutations: [{ op: "set_node_field", node: "n_a", value: { title: "Renamed" } }] }, "p_one");
@@ -249,7 +249,7 @@ const proposalLanded = { outcome: "answered", answer: saved } as const;
 describe("a proposal write or an import", () => {
   it("is sent once: a stale answer is a rejection, for a person to review again", async () => {
     const { host, actor, view } = setup([], applyCommand);
-    host.proposed = [{ outcome: "rejected", rejection: { rejection: "stale", conflicts: [], intervening: [], touched: [] } }];
+    host.proposed = [{ outcome: "rejected", rejection: { rejection: "stale", conflicts: [], intervening: [] } }];
     actor.send({ type: "submit" });
     await settled();
     expect(host.called).toEqual(["apply"]);
@@ -311,7 +311,7 @@ describe("a check before the first send", () => {
 
   it("says the subject is gone when the check's refusal is the shape of a missing one", async () => {
     const { actor, view } = setup();
-    const missing: Rejection = { rejection: "stale", conflicts: [{ of: { domain: { journey: "j_one" } }, expected: 3, current: 0 }], intervening: [], touched: [] };
+    const missing: Rejection = { rejection: "stale", conflicts: [{ of: { domain: { journey: "j_one" } }, expected: 3, current: 0 }], intervening: [] };
     actor.send({ type: "submit", check: () => Promise.resolve(missing) });
     await settled();
     expect(view()).toMatchObject({ state: "gone", removed: { journey: "j_one" } });

@@ -145,8 +145,7 @@ impl Client {
         self.read(&endpoints::DEPLOYMENT, &[], "").await
     }
 
-    /// H5: submits a domain patch. The server applies a stale one past what intervened when
-    /// that is safe, and its answer says so; this client does not resubmit.
+    /// H5: submits a domain patch. A stale one is refused; this client does not resubmit.
     ///
     /// # Errors
     ///

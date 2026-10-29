@@ -23,7 +23,7 @@ use cairn_store::{
     ProposalScope,
 };
 
-use crate::write::{OnStale, engine};
+use crate::write::engine;
 use crate::{Call, ReadError, Service, ServiceError, WriteError, Written, consequence, load};
 
 /// Which open proposals to list (C14, C16): the one set of listings every host offers, and the
@@ -399,7 +399,7 @@ impl Service {
             patina_dst::reachable!("service-proposal-apply-answered-from-receipt");
             return answer;
         }
-        self.write(call, &patch, note, OnStale::Refuse).await
+        self.write(call, &patch, note).await
     }
 
     /// I6, H5: what moved in `destination` since `drafted`, when it is not `current`.
@@ -515,7 +515,7 @@ impl Service {
         patch: &Patch,
         id: &ProposalId,
     ) -> Result<ProposalWritten, WriteError> {
-        match self.write(call, patch, None, OnStale::Refuse).await? {
+        match self.write(call, patch, None).await? {
             Written::Applied { receipt, .. } => {
                 let proposal = self.store.proposal(id).await?.ok_or_else(|| {
                     WriteError::Failed(ServiceError::Store(cairn_store::StoreError::Backend(

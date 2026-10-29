@@ -9,8 +9,7 @@ use std::time::Duration;
 
 use cairn_engine::Records;
 use cairn_schema::{
-    Deployment, Domain, Event, EventType, Journey, PatchId, Record, Revision, RevisionOf,
-    TouchedSet, Write,
+    Deployment, Domain, Event, EventType, Journey, PatchId, Record, Revision, RevisionOf, Write,
 };
 use cairn_service::Service;
 use cairn_store::{EventQuery, PageSize};
@@ -29,7 +28,7 @@ pub const INVARIANTS: [&str; 9] = [
     "surfaced-not-applied",
     "only-conflicts-refused",
     "revisions-gap-free",
-    "applied-over-only-when-safe",
+    "applied-at-drafted-revision",
     "replay-equals-state",
     "views-caught-up",
 ];
@@ -95,13 +94,12 @@ impl Truth {
 }
 
 /// One patch as the log holds it: its id, its domain, the revision its position there
-/// gives it (A17: each patch to a domain advances it by one), and what its events touched.
+/// gives it (A17: each patch to a domain advances it by one).
 #[derive(Clone, Debug, PartialEq, Eq)]
 struct Logged {
     patch: PatchId,
     domain: Domain,
     revision: Revision,
-    touched: TouchedSet,
 }
 
 /// The log's patches in commit order: a patch's events run from ordinal 0.
@@ -116,11 +114,7 @@ fn patches(log: &[Event]) -> Vec<Logged> {
                 patch: event.patch_id.clone(),
                 domain: event.log.clone(),
                 revision: Revision::try_from(*count).unwrap_or(Revision::NONE),
-                touched: TouchedSet::default(),
             });
-        }
-        if let Some(last) = logged.last_mut() {
-            last.touched.extend(event.touched());
         }
     }
     logged
@@ -211,8 +205,8 @@ impl Outcome {
     }
 
     /// What the log says of each patch against what its client was told: applied at most
-    /// once, acknowledged ones where their receipts say, nothing else applied, and a stale
-    /// patch applied past other commits only over ones that do not touch what it touches (H5).
+    /// once, acknowledged ones where their receipts say, nothing else applied, and each one
+    /// landed at the revision after the one it was drafted at, never past another commit (H5).
     fn patch_violations(&self, logged: &[Logged]) -> Vec<(&'static str, String)> {
         let mut violations = Vec::new();
         let mut at: BTreeMap<&PatchId, Vec<&Logged>> = BTreeMap::new();
@@ -239,23 +233,14 @@ impl Outcome {
                 );
                 violations.push(("acknowledged-visible", detail));
             }
-            // What the acknowledged patch really wrote, by its own events.
-            let wrote = held.map(|held| &held.touched);
-            let over = logged.iter().filter(|patch| {
-                patch.domain == receipt.domain
-                    && patch.revision > ack.drafted
-                    && patch.revision < receipt.revision
-                    && wrote.is_some_and(|wrote| patch.touched.overlaps(wrote))
-            });
-            for patch in over {
+            if receipt.revision != ack.drafted.next() {
                 let detail = format!(
-                    "{} drafted at revision {} landed at {} over {}, which touches what it does",
+                    "{} drafted at revision {} landed at {}",
                     receipt.patch_id,
                     ack.drafted.get(),
                     receipt.revision.get(),
-                    patch.patch
                 );
-                violations.push(("applied-over-only-when-safe", detail));
+                violations.push(("applied-at-drafted-revision", detail));
             }
         }
         violations.extend(self.unacknowledged(at.keys().copied()));
@@ -344,11 +329,10 @@ impl Outcome {
             .max()
             .map_or(0, Duration::as_micros);
         let detail = format!(
-            "acknowledged={} surfaced={} applied_over={} receipts={} transport_retries={} \
+            "acknowledged={} surfaced={} receipts={} transport_retries={} \
              journey_revision={} deployment_revision={} events={} writes_us={} caught_up_us={caught_up_us}",
             report.acks.len(),
             report.surfaced.len(),
-            report.applied_over,
             report.receipts,
             report.transport_retries,
             self.truth.journey.revision.get(),
@@ -453,7 +437,7 @@ mod tests {
         }
 
         /// Lands `draft` on the journey as it is now, acknowledged as drafted at `drafted`:
-        /// a draft from before the current revision, applied past the commits since by the server.
+        /// a draft from before the current revision if `drafted` is behind it.
         fn draft(&mut self, id: &str, draft: &Draft, drafted: u32) -> PatchReceipt {
             let current = self.records.journeys[&patches::journey()].revision;
             let patch = draft.patch(id, &patches::journey(), current);
@@ -489,12 +473,12 @@ mod tests {
         }
     }
 
-    /// Two renames of different nodes and a note, the second rename applied by the server
-    /// over the first: every invariant holds.
+    /// Two renames of different nodes and a note, each drafted at the revision before it
+    /// landed: every invariant holds.
     fn clean() -> History {
         let mut history = History::new();
         history.draft("p_one", &rename(0, "One"), 1);
-        history.draft("p_two", &rename(1, "Two"), 1);
+        history.draft("p_two", &rename(1, "Two"), 2);
         history.draft("p_note", &note("a_note"), 3);
         history
     }
@@ -571,14 +555,14 @@ mod tests {
         }
     }
 
-    /// H5: a rename that landed over another rename of the same node, after it was drafted,
-    /// was applied past it when that was not safe.
+    /// H5: a rename that landed after another commit that came after it was drafted was
+    /// applied past it.
     #[test]
-    fn a_write_applied_over_an_overlapping_commit_is_unsafe() {
+    fn a_write_applied_past_a_later_commit_is_caught() {
         let mut history = History::new();
         history.draft("p_one", &rename(0, "One"), 1);
         history.draft("p_two", &rename(0, "Two"), 1);
-        assert!(labels(&history.outcome()).contains("applied-over-only-when-safe"));
+        assert!(labels(&history.outcome()).contains("applied-at-drafted-revision"));
     }
 
     /// J3: a state the log does not replay to.

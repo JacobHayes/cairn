@@ -7,10 +7,7 @@ already ticked do?
 ## Call
 
 - A tick is a journey record of its own, one per ticked item (`Tick` with node and item), not
-  a set on the node's state. A tick and a node transition then touch different records, so a
-  tick made while someone else completes the node does not make either stale (the server
-  checks the records a patch touched against what moved). A tick overlaps its node's
-  checklist field, so a tick drafted against a checklist that was edited meanwhile is stale.
+  a set on the node's state.
 - A tick is removed exactly when its item leaves the node's checklist, in the same write:
   a field edit, a whole-node replace, an upgrade merge, and removing the node. An old tick
   therefore never attaches to a later item with the same id, and a recorded invariant
@@ -31,8 +28,6 @@ already ticked do?
 
 ## Alternatives
 
-- Ticks as a set on the node's state record: simpler to load, but every tick and every
-  transition would touch one record, so concurrent work on one node would go stale.
 - Refusing a repeated tick: noisy for agents that resend what they believe is current.
 - Dropping the empty event: the one-event-per-mutation rule is an engine invariant other
   code relies on, so filtering the history is the smaller change.

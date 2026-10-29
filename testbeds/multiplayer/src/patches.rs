@@ -2,9 +2,8 @@
 //! them, so a change to the patch schema fails the testbed's build rather than its run.
 //!
 //! Three kinds land on the shared journey or the deployment: a note (`annotate`), which
-//! touches only its own annotation, so a stale one is always safe to retry (H5); a rename
-//! of one of a few nodes (`rename`), which overlaps another rename of the same node, so
-//! some conflicts are surfaced; and an identity merge (`merge`), which moves the deployment
+//! touches only its own annotation; a rename of one of a few nodes (`rename`); and an
+//! identity merge (`merge`), which moves the deployment
 //! and ticks every view watching it (H6, E6).
 
 use std::collections::{BTreeMap, BTreeSet};

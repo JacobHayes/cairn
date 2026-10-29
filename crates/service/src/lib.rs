@@ -18,7 +18,6 @@ mod derived;
 mod document;
 mod drafting;
 mod error;
-mod limits;
 mod load;
 mod notices;
 mod observe;
@@ -37,7 +36,6 @@ pub use compose::{
 };
 pub use drafting::ProposeError;
 pub use error::ServiceError;
-pub use limits::STALE_ATTEMPT_COUNT_MAX;
 pub use observe::{DERIVE_DURATION, engine_call_active};
 pub use projections::{ChildEntry, History, NodeDetail, Projected, ReadError};
 pub use proposals::{ProposalListing, ProposalReview, ProposalWritten, StaleBase};

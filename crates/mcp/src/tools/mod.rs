@@ -9,9 +9,7 @@ mod writes;
 
 use std::collections::BTreeMap;
 
-use cairn_schema::{
-    AppliedOver, Consequences, Cursor, Date, JourneyId, Notice, Revision, RevisionConflict,
-};
+use cairn_schema::{Consequences, Cursor, Date, JourneyId, Notice, Revision};
 use cairn_service::{Projected, Written};
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
@@ -20,7 +18,6 @@ pub use proposals::{CreateProposal, EditProposal, ProposalCall, ProposalChange, 
 
 use crate::limits::PAGE_ITEM_COUNT_MAX;
 use crate::toolset::Spec;
-use crate::touched::Touched;
 
 /// The tool groups, each dispatched by its own module.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -175,15 +172,9 @@ pub struct WriteOutput {
     /// content and is answered from its receipt, with no consequences.
     status: WriteStatus,
     /// The journey's, route's or deployment's revision the write produced: the base of your
-    /// next write when the status is `applied` and there is no `over`. After `over` or
-    /// `already_applied`, read again first: it includes changes you have not seen.
+    /// next write when the status is `applied`. After `already_applied`, read again first:
+    /// others may have written since.
     revision: Revision,
-    // PRD: H5.
-    /// Present when your write named revisions that other people's writes had moved and was
-    /// applied past them anyway, because nothing they changed is anything it changes: the
-    /// revisions it moved past, and what those writes changed.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    over: Option<Over>,
     // PRD: D7, D4.
     /// What it caused in each journey it changed: newly stale nodes, shortfalls,
     /// finished work that may not apply while a decision is unanswered, relevance
@@ -196,24 +187,6 @@ pub struct WriteOutput {
     /// The write was accepted; add the missing edge or date rule, or leave it.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     notices: Vec<Notice>,
-}
-
-/// The revisions a write was applied past, and what the writes since changed.
-#[derive(Clone, Debug, Serialize, Deserialize, JsonSchema)]
-struct Over {
-    /// The revisions it named that had moved on.
-    conflicts: Vec<RevisionConflict>,
-    /// What the commits since changed, by graph and record kind.
-    intervening: Touched,
-}
-
-impl From<AppliedOver> for Over {
-    fn from(over: AppliedOver) -> Self {
-        Self {
-            intervening: Touched::of(&over.intervening),
-            conflicts: over.conflicts,
-        }
-    }
 }
 
 /// Whether a write was applied now or answered from its receipt.
@@ -246,18 +219,15 @@ impl From<Written> for WriteOutput {
                 receipt,
                 consequences,
                 notices,
-                over,
             } => Self {
                 status: WriteStatus::Applied,
                 revision: receipt.revision,
-                over: over.map(Over::from),
                 consequences,
                 notices,
             },
             Written::AlreadyApplied { receipt } => Self {
                 status: WriteStatus::AlreadyApplied,
                 revision: receipt.revision,
-                over: None,
                 consequences: BTreeMap::new(),
                 notices: Vec::new(),
             },

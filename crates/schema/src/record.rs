@@ -390,8 +390,7 @@ impl GraphRecord {
 
 impl GraphKey {
     /// The node the addressed records hang off, if any: what a node's removal reaches. An
-    /// edge hangs off its dependent; [`GraphKey::overlaps`] also gives it to its
-    /// requirement.
+    /// edge hangs off its dependent.
     #[must_use]
     pub fn node_scope(&self) -> Option<&NodeKey> {
         match self {
@@ -419,40 +418,6 @@ impl GraphKey {
             | GraphKey::RoleFill(_)
             | GraphKey::Annotation { node: None, .. } => None,
         }
-    }
-
-    /// Whether two addresses in one graph can name a common record: equal, the same
-    /// annotation however addressed, a whole node and something on it (an edge is on both
-    /// its ends), or a tick and its node's `checklist` field (an edit of the list can drop
-    /// or reuse the item the tick names, so neither is applied past the other).
-    #[must_use]
-    pub fn overlaps(&self, other: &GraphKey) -> bool {
-        let same_annotation = matches!(
-            (self, other),
-            (GraphKey::Annotation { annotation: first, .. }, GraphKey::Annotation { annotation: second, .. }) if first == second
-        );
-        self == other
-            || same_annotation
-            || self.contains(other)
-            || other.contains(self)
-            || self.is_tick_of_checklist(other)
-            || other.is_tick_of_checklist(self)
-    }
-
-    /// Whether this is a tick and `other` is the checklist field of its node.
-    fn is_tick_of_checklist(&self, other: &GraphKey) -> bool {
-        matches!((self, other), (
-            GraphKey::Tick { node, .. },
-            GraphKey::NodeField { node: field_node, field: NodeField::Checklist },
-        ) if node == field_node)
-    }
-
-    fn contains(&self, other: &GraphKey) -> bool {
-        let GraphKey::Node(node) = self else {
-            return false;
-        };
-        let requirement_end = matches!(other, GraphKey::Edge(edge) if edge.requires == *node);
-        requirement_end || other.node_scope() == Some(node)
     }
 }
 
@@ -501,38 +466,6 @@ impl RecordKey {
             RecordKey::Deleted(_) | RecordKey::Identity(_) | RecordKey::IdentityAlias(_) => {
                 Domain::Deployment
             }
-        }
-    }
-
-    /// Whether two addresses can name a common record: equal, one a whole domain or graph
-    /// holding the other, or overlapping inside one graph ([`GraphKey::overlaps`]).
-    #[must_use]
-    pub fn overlaps(&self, other: &RecordKey) -> bool {
-        match (self, other) {
-            (RecordKey::Domain(domain), key) | (key, RecordKey::Domain(domain)) => {
-                key.domain() == *domain
-            }
-            (
-                RecordKey::Graph(graph),
-                RecordKey::Graph(other_graph)
-                | RecordKey::InGraph {
-                    graph: other_graph, ..
-                },
-            )
-            | (
-                RecordKey::InGraph {
-                    graph: other_graph, ..
-                },
-                RecordKey::Graph(graph),
-            ) => graph == other_graph,
-            (
-                RecordKey::InGraph { graph, key },
-                RecordKey::InGraph {
-                    graph: other_graph,
-                    key: other_key,
-                },
-            ) => graph == other_graph && key.overlaps(other_key),
-            _ => self == other,
         }
     }
 }

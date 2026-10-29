@@ -250,11 +250,7 @@ impl State {
             return Ok(());
         }
         let intervening = self.intervening(&conflicts);
-        Err(backend::stale(
-            commit.target.domain(),
-            conflicts,
-            intervening,
-        ))
+        Err(backend::stale(conflicts, intervening))
     }
 
     fn intervening(&self, conflicts: &[RevisionConflict]) -> TouchedSet {

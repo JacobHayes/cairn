@@ -1,6 +1,6 @@
 // The patch types and the shape of one answer to a patch, shared by the hosts (H5). A patch is
-// sent once, as it is: the server decides a stale one, applying it past what intervened when
-// that is safe and answering it stale otherwise, so no client retries on its own.
+// sent once, as it is: the server answers a stale one stale, and the writer reads again and
+// decides again, so no client retries on its own.
 import type { components } from "../generated/api.ts";
 
 type Schemas = components["schemas"];

@@ -18,11 +18,8 @@ Setup creates journey `j_shared` with three nodes and one pair of identities. Th
 
 - **Clients** (`--clients`, default 4; `src/client.rs`): each drafts `--actions` patches
   (default 8), a seeded pause apart, against the journey or deployment as it last fetched
-  it: a note (touches only its own annotation, so a stale one is always safe to apply), a
-  rename of one of the three nodes (two renames of one node overlap, so some conflicts are
-  surfaced), and, for client 0 halfway through, an identity merge (moves the deployment). Each
-  patch is sent once to the server (H5: it applies a stale patch at the current revisions
-  when what intervened cannot overlap it, and answers it stale otherwise), over a transport
+  it: a note, a rename of one of the three nodes, and, for client 0 halfway through, an identity merge (moves the deployment). Each
+  patch is sent once to the server (H5: it answers a stale patch stale, and the client surfaces it), over a transport
   retry that resends a request whose answer did not arrive within 200 ms, unchanged, so a
   patch that landed is answered from its receipt. After each acknowledgement the client
   fetches the domain again: the next snapshot must hold the patch.
@@ -55,12 +52,12 @@ under `multiplayer-outcome` carries the counts, echoed as `MULTIPLAYER_RESULT`.
 | `surfaced-not-applied` | no patch surfaced as a conflict is in the log |
 | `only-conflicts-refused` | no patch got any rejection but stale, or a server error |
 | `revisions-gap-free` | each domain's revision equals the number of its patches in the log (A17) |
-| `applied-over-only-when-safe` | a patch that landed past the revision it was drafted at landed over no commit touching what it touches (H5) |
+| `applied-at-drafted-revision` | every acknowledged patch landed at the revision after the one it was drafted at, never past another commit (H5) |
 | `replay-equals-state` | replaying the whole log from nothing gives the store's journey and deployment (J3) |
 | `views-caught-up` | every view holds the store's revisions within 450 ms after writes stop: the coalescing interval plus one attempt's budget for the tick and the refetch (H6) |
 
 Coverage oracles (`sometimes!`, plus the `reachable!` sites in `cairn_service`'s write path,
-which the campaign also requires): a stale patch applied by the server past other commits, an overlapping conflict surfaced, a resubmission answered from its receipt
+which the campaign also requires): a stale conflict surfaced, a resubmission answered from its receipt
 (client and service), a coalesced tick, a deployment tick after the merge, a stale patch
 completed with what intervened, a stale patch whose original committed meanwhile, a patch that lost at commit, and a resubmission that raced its
 original to commit. Some of `cairn_service`'s sites are out of this testbed's reach and

@@ -29,7 +29,7 @@ Before a job a workflow covers, read it with `get_workflow`.
 
 - A new `patch_id` per write: `p_` and a slug you make up; never reuse one.
 - `base_revision` is the revision you last read of the target: from the read or your last write.
-- `over` or `already_applied` in an answer: read again before the next write.
+- `already_applied` in an answer: read again before the next write.
 - No answer (lost response): resubmit the same call, same `patch_id`; it is never applied twice.
 - Refused as `stale`: read again, check the change still makes sense, write with a new `patch_id`.
 - Rejected: every violation is listed with its path; fix them all. Nothing was written.

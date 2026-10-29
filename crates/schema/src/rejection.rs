@@ -221,39 +221,18 @@ pub struct RevisionConflict {
     pub current: Revision,
 }
 
-// PRD: H5.
-/// What a write that was applied past other people's changes tells its writer: the revisions
-/// it named that others' writes had moved, and what those writes changed, none of which this
-/// write changes. The writer's view is behind by exactly those changes, so it reads again
-/// before its next write.
-#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
-#[serde(deny_unknown_fields)]
-pub struct AppliedOver {
-    /// The revisions the write named that had moved on.
-    pub conflicts: Vec<RevisionConflict>,
-    /// What the commits since those revisions changed.
-    pub intervening: TouchedSet,
-}
-
 /// Why a patch was not applied.
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
 #[serde(tag = "rejection", rename_all = "snake_case", deny_unknown_fields)]
 pub enum Rejection {
     // PRD: H5.
-    /// A revision the patch named has advanced, and the patch was not applied past it:
-    /// what intervened overlaps what it would write at the current revisions, or it is a
-    /// write that is never applied over others' changes. Read again, check the change
-    /// still makes sense, and write again.
+    /// A revision the patch named has advanced, so nothing was written. Read again, check
+    /// the change still makes sense, and write again.
     Stale {
         /// The revisions that moved on.
         conflicts: Vec<RevisionConflict>,
         /// What the intervening events touched.
         intervening: TouchedSet,
-        /// What the patch would write at the current revisions, as applying it there writes
-        /// it; its whole domain when it would not apply there, or when the write is one that
-        /// is never applied over others' changes (a proposal's apply or edit, a route
-        /// import).
-        touched: TouchedSet,
     },
     // PRD: H5.
     /// The patch id was committed before with different content.

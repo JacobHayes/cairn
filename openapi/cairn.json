@@ -537,28 +537,6 @@
           }
         ]
       },
-      "AppliedOver": {
-        "additionalProperties": false,
-        "description": "What a write that was applied past other people's changes tells its writer: the revisions\nit named that others' writes had moved, and what those writes changed, none of which this\nwrite changes. The writer's view is behind by exactly those changes, so it reads again\nbefore its next write.",
-        "properties": {
-          "conflicts": {
-            "description": "The revisions the write named that had moved on.",
-            "items": {
-              "$ref": "#/components/schemas/RevisionConflict"
-            },
-            "type": "array"
-          },
-          "intervening": {
-            "$ref": "#/components/schemas/TouchedSet",
-            "description": "What the commits since those revisions changed."
-          }
-        },
-        "required": [
-          "conflicts",
-          "intervening"
-        ],
-        "type": "object"
-      },
       "AppliedReceipt": {
         "description": "What the report of an applied write names: the patch, its domain, and the revision it\nproduced.",
         "properties": {
@@ -10841,17 +10819,6 @@
                 "const": "applied",
                 "type": "string"
               },
-              "over": {
-                "anyOf": [
-                  {
-                    "$ref": "#/components/schemas/AppliedOver"
-                  },
-                  {
-                    "type": "null"
-                  }
-                ],
-                "description": "Present when the patch named revisions that other people's writes had moved and\nwas applied past them: which revisions, and what those writes changed, none of\nwhich this write changes. The receipt's revision then includes changes the\nwriter has not seen, so read again before the next write."
-              },
               "receipt": {
                 "$ref": "#/components/schemas/PatchReceipt",
                 "description": "The receipt: patch id, domain, content hash, and the revision produced."
@@ -10865,7 +10832,7 @@
           },
           {
             "additionalProperties": false,
-            "description": "The patch id was committed before with the same content: its receipt, and no\nconsequences, which are reported only the first time. It cannot say whether the\npatch was applied past other people's changes, so read again before the next write.",
+            "description": "The patch id was committed before with the same content: its receipt, and no\nconsequences, which are reported only the first time.",
             "properties": {
               "outcome": {
                 "const": "already_applied",
@@ -12837,7 +12804,7 @@
         "oneOf": [
           {
             "additionalProperties": false,
-            "description": "A revision the patch named has advanced, and the patch was not applied past it:\nwhat intervened overlaps what it would write at the current revisions, or it is a\nwrite that is never applied over others' changes. Read again, check the change\nstill makes sense, and write again.",
+            "description": "A revision the patch named has advanced, so nothing was written. Read again, check\nthe change still makes sense, and write again.",
             "properties": {
               "conflicts": {
                 "description": "The revisions that moved on.",
@@ -12853,17 +12820,12 @@
               "rejection": {
                 "const": "stale",
                 "type": "string"
-              },
-              "touched": {
-                "$ref": "#/components/schemas/TouchedSet",
-                "description": "What the patch would write at the current revisions, as applying it there writes\nit; its whole domain when it would not apply there, or when the write is one that\nis never applied over others' changes (a proposal's apply or edit, a route\nimport)."
               }
             },
             "required": [
               "rejection",
               "conflicts",
-              "intervening",
-              "touched"
+              "intervening"
             ],
             "type": "object"
           },

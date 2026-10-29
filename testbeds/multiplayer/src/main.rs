@@ -3,9 +3,8 @@
 //! One process runs Cairn's real HTTP server (the API's router over a service on the SQLite
 //! store) and N virtual clients, all as tasks on a multi-thread tokio runtime
 //! (`WORKER_THREADS` workers; decisions/2026-10-18-the-multiplayer-testbed-runs-a-multi-thread-runtime.md). Each client patches one
-//! shared journey through the real Rust client: a patch is submitted once and the server applies a stale
-//! one when what intervened cannot overlap it and rejects it when it can, and a transport
-//! retry resends a patch whose answer was lost, which the server answers from its receipt.
+//! shared journey through the real Rust client: a patch is submitted once and the server
+//! rejects a stale one, and a transport retry resends a patch whose answer was lost, which the server answers from its receipt.
 //! Each client also keeps a view current through its SSE subscription and H6's tracking.
 //! One more client is an agent calling the service in process, with the same transport
 //! retry, as an agent host does.
@@ -13,9 +12,8 @@
 //! When every client is done the run checks each invariant (`outcome.rs`): every
 //! acknowledged patch was visible in its client's next snapshot and sits in the log at its
 //! revision; no patch was applied twice; nothing unacknowledged or surfaced as a conflict
-//! was applied; nothing but conflicts was refused; every domain's revisions are gap-free; a
-//! stale patch the server applied past other commits landed only over commits that do not
-//! touch what it touches; replaying the log equals the state; and every view reached the store's
+//! was applied; nothing but conflicts was refused; every domain's revisions are gap-free; every
+//! acknowledged patch landed at the revision after the one it was drafted at; replaying the log equals the state; and every view reached the store's
 //! revisions within the catch-up deadline after writes stopped. `sometimes!` oracles show
 //! the interesting paths ran (`client.rs`, `view.rs`), and fault sites in the store make
 //! commits overlap (`faults.rs`).

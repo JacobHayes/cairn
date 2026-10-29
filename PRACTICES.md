@@ -147,7 +147,6 @@ Validation rejects a patch exceeding a limit; loops use the same constant. Every
 | requests in flight per process | 128 | Overflow is a 503 with `Retry-After`. |
 | store connections per process | 16 readers, plus the one writer | Reads borrow a reader; writes take the writer in turn. |
 | assistant turns in flight per process | 32 | |
-| attempts to commit one stale patch at moved revisions, per request | 8 | A runaway stop. |
 | automatic resends of a write with no answer | 5, waiting 250 ms, doubling, at most 15 s | Each waits for the connection; then the person retries by hand. |
 | journeys a tab keeps derived after their view closes | 8 | Least recently shown beyond this are released. |
 | canvas layouts a tab keeps | 32 views, 4 per view | Least recently laid out beyond this are forgotten. |

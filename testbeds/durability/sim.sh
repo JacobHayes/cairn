@@ -74,9 +74,7 @@ out_of_reach=(
   service-duplicate-original-committed-meanwhile
   service-patch-lost-at-commit
   service-resubmission-raced-original
-  service-stale-patch-applied-over
   service-stale-patch-completed-with-intervening
-  service-stale-patch-raced-at-commit
   # Derived reads, proposals, and route-file imports: the plan writes domain patches only.
   service-derived-read-answered-from-memo
   service-import-resubmission-rebuilt-from-receipt

@@ -208,13 +208,12 @@ pub fn arb_rejection() -> BoxedStrategy<Rejection> {
         })
     };
     prop_oneof![
-        (prop::collection::vec(conflict, 1..3), touched(), touched()).prop_map(
-            |(conflicts, intervening, touched)| Rejection::Stale {
+        (prop::collection::vec(conflict, 1..3), touched()).prop_map(|(conflicts, intervening)| {
+            Rejection::Stale {
                 conflicts,
                 intervening,
-                touched,
             }
-        ),
+        }),
         arb_patch_id().prop_map(|patch_id| Rejection::PatchIdReused { patch_id }),
         prop::collection::vec(arb_violation(), 1..4).prop_map(|violations| Rejection::Invalid {
             violations: match Violations::new(violations) {

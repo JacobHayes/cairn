@@ -1,6 +1,6 @@
 // The shell on the server host, against `cairn demo` (the `server` project of
 // playwright.config.ts): what only a live server shows. Writes from different pages meet
-// through the safe retry and the conflict (H5), a later page and a page on the index follow
+// through the conflict (H5), a later page and a page on the index follow
 // what another wrote (H6), a deployment tick re-derives what it moved, and an identity
 // signed in at the demo's stub issuer links to the user (H3). Each test makes what it
 // changes, so the fixtures other tests read stay as seeded. The tests tagged @serial change what
@@ -39,22 +39,24 @@ const patchId = () => `p_${crypto.randomUUID().replaceAll("-", "")}`;
 
 const title = (page: Parameters<typeof nodeCard>[0], node: string) => nodeCard(page, node).getByTestId("title");
 
-test("edits to different nodes both land, and edits to one field surface a conflict", async ({ context }) => {
+test("a write drafted before another page's write is refused, and the person keeps it on the current version", async ({ context }) => {
   const [one, two] = [await context.newPage(), await context.newPage()];
   await Promise.all([readable(one), readable(two)]);
   const { id } = await ownJourney(context.request, "hiring-loop");
   await openJourney(one, id);
   await openJourney(two, id);
-  // A stale write to another node is retried and lands with no conflict.
+  // A write drafted before another page's write is refused, whatever node it is about; the person keeps it on the current version.
   const [offer, screen] = [fresh("Offer"), fresh("Screen")];
   await startRename(two, "n_screen", screen);
   await rename(one, "n_offer", offer);
   await expect(title(two, "n_offer")).toHaveText(offer);
   await save(two, "n_screen");
+  await expect(two.locator('[data-testid="refused"][data-rejection="stale"]')).toBeVisible();
+  await two.getByRole("button", { name: "Keep my edit on the current version" }).click();
+  await save(two, "n_screen");
   await expect(title(two, "n_screen")).toHaveText(screen);
-  await expect(two.locator('[data-testid="refused"][data-rejection="stale"]')).toHaveCount(0);
   await expect(title(one, "n_screen")).toHaveText(screen);
-  // One to the same field is not: it is shown beside the other's, and kept on the current version when asked.
+  // One to the same field shows the other's value beside it.
   const [theirs, mine, later] = [fresh("Theirs"), fresh("Mine"), fresh("Later")];
   await startRename(two, "n_onsite", mine);
   await rename(one, "n_onsite", theirs);

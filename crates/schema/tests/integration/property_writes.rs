@@ -23,23 +23,6 @@ mod property {
         Ok(())
     }
 
-    /// The key itself, its domain, its graph, or the node it hangs off.
-    fn widened(key: cairn_schema::RecordKey, how: u8) -> cairn_schema::RecordKey {
-        use cairn_schema::{GraphKey, RecordKey};
-        match (how, &key) {
-            (1, _) => RecordKey::Domain(key.domain()),
-            (2, RecordKey::InGraph { graph, .. }) => RecordKey::Graph(graph.clone()),
-            (3, RecordKey::InGraph { graph, key: inner }) => match inner.node_scope() {
-                Some(node) => RecordKey::InGraph {
-                    graph: graph.clone(),
-                    key: GraphKey::Node(node.clone()),
-                },
-                None => key.clone(),
-            },
-            _ => key,
-        }
-    }
-
     proptest! {
         #[test]
         fn patches_round_trip(patch in arb_patch()) {
@@ -60,83 +43,6 @@ mod property {
         #[test]
         fn proposals_round_trip(proposal in arb_proposal()) {
             round_trip(&proposal)?;
-        }
-
-        #[test]
-        fn overlap_is_symmetric(
-            first in prop::collection::vec(arb_write(), 0..6),
-            second in prop::collection::vec(arb_write(), 0..6),
-        ) {
-            let touched = |writes: &[cairn_schema::Write]| writes.iter().flat_map(cairn_schema::Write::keys).collect::<cairn_schema::TouchedSet>();
-            let (first, second) = (touched(&first), touched(&second));
-            prop_assert_eq!(first.overlaps(&second), second.overlaps(&first));
-        }
-
-        #[test]
-        fn indexed_overlap_matches_the_pairwise_definition(
-            first in prop::collection::vec(arb_write(), 1..6),
-            second in prop::collection::vec(arb_write(), 0..4),
-            widen in prop::collection::vec((any::<prop::sample::Index>(), 0u8..4), 0..4),
-        ) {
-            let keys = |writes: &[cairn_schema::Write]| writes.iter().flat_map(cairn_schema::Write::keys).collect::<Vec<_>>();
-            let first = keys(&first);
-            // Mix in addresses that cover some of the first set's, so overlaps happen often.
-            let mut second = keys(&second);
-            for (index, how) in widen {
-                let key = index.get(&first).clone();
-                second.push(widened(key, how));
-            }
-            let pairwise = first.iter().any(|a| second.iter().any(|b| a.overlaps(b)));
-            let indexed = first.iter().cloned().collect::<cairn_schema::TouchedSet>().overlaps(&second.iter().cloned().collect());
-            prop_assert_eq!(indexed, pairwise);
-        }
-
-        #[test]
-        fn ticks_and_checklist_fields_overlap_by_node_in_both_definitions(
-            first in prop::collection::vec((0u8..3, 0u8..3, any::<bool>()), 1..5),
-            second in prop::collection::vec((0u8..3, 0u8..3, any::<bool>()), 1..5),
-        ) {
-            use cairn_schema::{GraphId, GraphKey, NodeField, RecordKey, TouchedSet};
-            let graph = GraphId::Journey("j_one".parse().unwrap());
-            // A tick of an item, or the checklist field, of one of three nodes.
-            let keys = |picks: &[(u8, u8, bool)]| -> Vec<RecordKey> {
-                picks
-                    .iter()
-                    .map(|(node, item, tick)| {
-                        let node: cairn_schema::NodeKey = format!("n_{node}").parse().unwrap();
-                        let key = if *tick {
-                            GraphKey::Tick { node, item: format!("i{item}").parse().unwrap() }
-                        } else {
-                            GraphKey::NodeField { node, field: NodeField::Checklist }
-                        };
-                        RecordKey::InGraph { graph: graph.clone(), key }
-                    })
-                    .collect()
-            };
-            let (first, second) = (keys(&first), keys(&second));
-            let pairwise = first.iter().any(|a| second.iter().any(|b| a.overlaps(b)));
-            let indexed = first.iter().cloned().collect::<TouchedSet>().overlaps(&second.iter().cloned().collect());
-            prop_assert_eq!(indexed, pairwise);
-            // A tick overlaps exactly the checklist field of its node and itself.
-            for (a, b) in first.iter().flat_map(|a| second.iter().map(move |b| (a, b))) {
-                if let (
-                    RecordKey::InGraph { key: GraphKey::Tick { node: tick, .. }, .. },
-                    RecordKey::InGraph { key: GraphKey::NodeField { node: field, .. }, .. },
-                ) = (a, b) {
-                    prop_assert_eq!(a.overlaps(b), tick == field);
-                }
-            }
-        }
-
-        #[test]
-        fn a_write_overlaps_its_own_graph(write in arb_write()) {
-            // Every address a write names belongs to a domain, and a whole-domain address
-            // overlaps it: what lets a coarse touch stand in for an unknown one (H5).
-            for key in write.keys() {
-                let domain = key.domain();
-                let whole = cairn_schema::RecordKey::Domain(domain);
-                prop_assert!(whole.overlaps(&key));
-            }
         }
 
         #[test]

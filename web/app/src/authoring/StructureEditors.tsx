@@ -28,7 +28,7 @@ export interface NodeEditorProps {
 }
 
 /**
- * A write's rejection, in a line each. A stale one (H5: someone changed the same thing since
+ * A write's rejection, in a line each. A stale one (H5: someone changed it since
  * the edit was opened) offers to keep the edit on the current version when the form can.
  */
 export function Refusal({ write, onRetry }: { write: AuthorWrite; onRetry?: (() => void) | undefined }) {

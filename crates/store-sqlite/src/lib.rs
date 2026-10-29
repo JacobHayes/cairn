@@ -198,14 +198,11 @@ impl SqliteStore {
         // landed since moved a conflicting revision past what this one expected too, so it
         // intervened as truly as those before.
         match committed {
-            Err(CommitError::Rejected(Rejection::Stale {
-                conflicts, touched, ..
-            })) => {
+            Err(CommitError::Rejected(Rejection::Stale { conflicts, .. })) => {
                 let intervening = self.intervening(&conflicts).await?;
                 Err(CommitError::Rejected(Rejection::Stale {
                     conflicts,
                     intervening,
-                    touched,
                 }))
             }
             other => other,

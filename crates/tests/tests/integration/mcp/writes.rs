@@ -529,20 +529,28 @@ async fn a_journey_is_created_with_owners_and_a_merge_moves_them_on() {
         .await;
     assert_eq!(owners(&snapshot["snapshot"]["journey"]), json!(["who_b"]));
 
-    // The deployment revision the create names is checked: it moved on (the merge), and the
-    // write, which touches nothing the merge did, lands over it and says so.
+    // The deployment revision the create names is checked: the merge moved it on, so the
+    // write is refused and nothing is created.
     let late = world
-        .ok(&ann, "apply_patch", create("j_late", "who_b", deployment))
+        .call(&ann, "apply_patch", create("j_late", "who_b", deployment))
         .await;
-    assert_eq!(
-        late["over"]["conflicts"][0]["of"],
-        json!({ "domain": "deployment" }),
-        "{late}"
+    assert!(
+        matches!(
+            late,
+            Err(ToolError::Rejected {
+                rejection: Rejection::Stale { .. }
+            })
+        ),
+        "{late:?}"
     );
-    let snapshot = world
-        .ok(&ann, "get_snapshot", json!({ "journey": "j_late" }))
-        .await;
-    assert_eq!(owners(&snapshot["snapshot"]["journey"]), json!(["who_b"]));
+    let listed = world.ok(&ann, "list_journeys", json!({})).await;
+    assert!(
+        listed["journeys"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .all(|journey| journey["id"] != "j_late")
+    );
 }
 
 /// Starting work that waits is a plain transition: no guard and no bypass, and the node reads

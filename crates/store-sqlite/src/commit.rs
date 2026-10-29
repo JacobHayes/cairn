@@ -301,11 +301,7 @@ fn check_revisions(
     }
     // What intervened is found after the writer is free (`SqliteStore::commit_timed`): it
     // reads every receipt, and holding the writer for that would stall every write.
-    Err(backend::stale(
-        commit.target.domain(),
-        conflicts,
-        TouchedSet::default(),
-    ))
+    Err(backend::stale(conflicts, TouchedSet::default()))
 }
 
 /// H5: the touched set of the events of every commit that moved a conflicting revision.

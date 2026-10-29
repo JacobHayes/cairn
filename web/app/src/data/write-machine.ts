@@ -18,9 +18,9 @@
 // settles it as landed, and a normal answer settles it either way. It resends after a backoff;
 // each attempt waits for the connection, so time offline uses none; it stops after
 // `RESEND_COUNT_MAX` attempts and asks the person to Retry. A reload loses it, and the browser
-// asks before one while a write is busy. Version skew stops it, as it stops all new work. A patch is sent as it is: the server
-// applies a stale one past what intervened when that is safe, and answers it stale otherwise,
-// as it does a proposal or an import that goes stale, for a person to review again.
+// asks before one while a write is busy. Version skew stops it, as it stops all new work. A patch
+// is sent as it is: the server answers a stale one stale, as it does a proposal or an import
+// that goes stale, for a person to read again and decide again.
 import { backoffDelayMs, networkFailure, sameDomain, targetDomain, type HttpFailure, type Patch, type Rejection } from "@cairn/client";
 import { and, assign, fromPromise, setup, type ActorRefFrom, type SnapshotFrom } from "xstate";
 
@@ -123,9 +123,8 @@ function callOf(proposals: ProposalHost, call: ProposalCall): Promise<ProposalWr
 }
 
 /**
- * H5: delivers the command, once as it is. The server decides a stale patch: it applies it past
- * what intervened when that is safe, and answers it stale otherwise, as it does a stale proposal
- * write or import, for a person to review again.
+ * H5: delivers the command, once as it is. The server answers a stale one stale, for a person
+ * to review again.
  */
 const deliver = fromPromise<Outcome, DeliverInput>(async ({ input }) => {
   const { command, env } = input;

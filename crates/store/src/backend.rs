@@ -308,19 +308,12 @@ pub fn expected_revisions(commit: &Commit, shape: &Shape) -> Vec<(RevisionOf, Re
     expected
 }
 
-/// The rejection for revisions that moved (H5), for a commit to `domain`. The store cannot
-/// tell what the patch would write at the current revisions, so it says the whole domain;
-/// the service, which can apply it there, says what it really writes.
+/// The rejection for revisions that moved (H5).
 #[must_use]
-pub fn stale(
-    domain: Domain,
-    conflicts: Vec<RevisionConflict>,
-    intervening: TouchedSet,
-) -> CommitError {
+pub fn stale(conflicts: Vec<RevisionConflict>, intervening: TouchedSet) -> CommitError {
     CommitError::Rejected(Rejection::Stale {
         conflicts,
         intervening,
-        touched: TouchedSet::whole(domain),
     })
 }
 

@@ -1,4 +1,4 @@
-//! What a stale refusal or an applied-over answer says was touched, grouped so an agent reads
+//! What a stale refusal says was touched, grouped so an agent reads
 //! it once: by the graph or domain the records are in, then by the kind of record, then the
 //! subjects. The same key in two graphs stays distinct, because the graph is the outer key.
 

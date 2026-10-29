@@ -12,8 +12,8 @@ use std::sync::Arc;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::time::Duration;
 
-use cairn_schema::{Domain, Patch, Rejection, TouchedSet};
-use cairn_service::{STALE_ATTEMPT_COUNT_MAX, Service, WriteError, Written};
+use cairn_schema::{Patch, Rejection, TouchedSet};
+use cairn_service::{Service, WriteError, Written};
 use cairn_store::{CommitPoint, Faults, MemoryStore, PauseHook};
 use cairn_store_sqlite::SqliteStore;
 use tokio::sync::Notify;
@@ -122,7 +122,7 @@ async fn beside_held(
 /// H5, A17 (the multiplayer testbed's planted bug, minimized): two renames of one node load revision 1; the
 /// second waits before its commit begins while the first lands, so only the commit's own
 /// revision check stands between it and a lost update. It is rejected stale, carrying the
-/// first's rename, which overlaps it; the journey holds the first's title at revision 2.
+/// first's rename; the journey holds the first's title at revision 2.
 async fn a_patch_that_loses_the_race_to_commit_is_rejected_stale(
     service: Service,
     gate: Arc<Gate>,
@@ -131,19 +131,12 @@ async fn a_patch_that_loses_the_race_to_commit_is_rejected_stale(
     let (second, first) = beside_held(&service, &gate, second, rename("p_first", 1, "First")).await;
     applied(first);
     match second {
-        Err(WriteError::Rejected(Rejection::Stale {
-            intervening,
-            touched,
-            ..
-        })) => {
-            assert!(
-                intervening.overlaps(&touched),
+        Err(WriteError::Rejected(Rejection::Stale { intervening, .. })) => {
+            assert_ne!(
+                intervening,
+                TouchedSet::default(),
                 "it carries the first's rename"
             );
-            // The commit found it stale; what it would write is still worked out by applying
-            // it over the journey as it is now, never left as the whole journey.
-            let journey = Domain::Journey("j_race".parse().unwrap());
-            assert_ne!(touched, TouchedSet::whole(journey));
         }
         other => panic!("expected a stale answer, got {other:#?}"),
     }
@@ -224,11 +217,10 @@ fn a_resubmission_while_its_original_commits_is_answered_from_its_receipt_on_sql
 }
 
 /// H5:
-/// a stale answer is the client's only evidence for retrying on its own, so it names no
-/// revision without what that revision touched. Two renames of one node from revision
-/// 1, one held in flight: the other is answered stale carrying the held one's rename,
-/// never naming the revision in flight with nothing intervening, which the client would
-/// take as safe to rebase onto.
+/// a stale answer names no revision without what that revision touched, so the writer
+/// knows what to read again. Two renames of one node from revision 1, one held in flight:
+/// the other is answered stale carrying the held one's rename, never naming the revision in
+/// flight with nothing intervening.
 async fn a_stale_answer_beside_a_commit_in_flight_carries_what_it_touches(
     service: Service,
     gate: Arc<Gate>,
@@ -237,13 +229,10 @@ async fn a_stale_answer_beside_a_commit_in_flight_carries_what_it_touches(
     let answers = beside_held(&service, &gate, rename("p_first", 1, "First"), second).await;
     let (_, stale) = split_applied(answers);
     match stale {
-        Err(WriteError::Rejected(Rejection::Stale {
+        Err(WriteError::Rejected(Rejection::Stale { intervening, .. })) => assert_ne!(
             intervening,
-            touched,
-            ..
-        })) => assert!(
-            intervening.overlaps(&touched),
-            "the rename in flight overlaps the other, so the answer must say so"
+            TouchedSet::default(),
+            "the rename in flight changed something, so the answer must say so"
         ),
         other => panic!("expected a stale answer, got {other:#?}"),
     }
@@ -263,189 +252,6 @@ fn a_stale_answer_beside_a_commit_in_flight_carries_what_it_touches_on_sqlite() 
         let (service, gate) = sqlite(CommitPoint::BeforeCommit).await;
         a_stale_answer_beside_a_commit_in_flight_carries_what_it_touches(service, gate).await;
     });
-}
-
-/// A service over a fresh store holding journey `j_race`, with no gate armed yet.
-async fn unarmed(on_sqlite: bool) -> (Service, Faults) {
-    let faults = Faults::default();
-    let store: Arc<dyn cairn_store::Store> = if on_sqlite {
-        let path = support::sqlite_path(TMP.as_ref());
-        Arc::new(SqliteStore::open_with_faults(&path, faults.clone()).unwrap())
-    } else {
-        Arc::new(MemoryStore::with_faults(faults.clone()))
-    };
-    let (service, _) = support::service_over(store);
-    created(&service).await;
-    (service, faults)
-}
-
-/// A node `n_x` added to `j_race`, drafted at `base`.
-fn node(id: &str, base: u32, key: &str) -> Patch {
-    let mutations =
-        format!("- op: add_node\n  node: {{key: {key}, id: {key}, kind: action, title: {key}}}\n");
-    patch(id, "{journey: j_race}", base, &mutations)
-}
-
-/// What a patch's events touched, from the journey's log.
-async fn touched_by(service: &Service, patch_id: &str) -> TouchedSet {
-    let query = cairn_store::EventQuery {
-        log: Some(Domain::Journey("j_race".parse().unwrap())),
-        patch: Some(patch_id.parse().unwrap()),
-        ..cairn_store::EventQuery::default()
-    };
-    let mut touched = TouchedSet::default();
-    for logged in service.events(&query).await.unwrap().items {
-        touched.extend(logged.event.touched());
-    }
-    touched
-}
-
-/// H5: a stale write that loses the race at commit is loaded and decided again against
-/// everything since the revision it names, not since the load it lost with. Patch A (a
-/// rename of `n_a`) is drafted at revision 1. C lands first (revision 2), so A loads at 2
-/// and applies over C. While A's commit is held, D lands (revision 3), so the commit is
-/// stale and A is decided again at 3, against C and D both.
-async fn a_stale_write_racing_a_commit_is_decided_against_everything_since_its_base(
-    on_sqlite: bool,
-    d_overlaps: bool,
-) {
-    let (service, faults) = unarmed(on_sqlite).await;
-    applied(
-        service
-            .patch(&call("u_lead", AT), &domain(node("p_c", 1, "n_c")))
-            .await,
-    );
-    let gate = Gate::on(&faults, CommitPoint::BeforeBegin);
-    let d = if d_overlaps {
-        rename("p_d", 2, "D")
-    } else {
-        node("p_d", 2, "n_d")
-    };
-    let (a, d) = beside_held(&service, &gate, rename("p_a", 1, "A"), d).await;
-    applied(d);
-    let journey = service
-        .journey(&"j_race".parse().unwrap())
-        .await
-        .unwrap()
-        .unwrap();
-    let title = |journey: &cairn_schema::Journey| {
-        journey
-            .graph
-            .nodes
-            .get(&"n_a".parse().unwrap())
-            .map(|node| node.title.to_string())
-    };
-    if d_overlaps {
-        let Err(WriteError::Rejected(Rejection::Stale {
-            intervening,
-            touched,
-            ..
-        })) = a
-        else {
-            panic!("D wrote what A writes: stale, not {a:#?}");
-        };
-        assert!(intervening.overlaps(&touched_by(&service, "p_d").await));
-        assert!(intervening.overlaps(&touched));
-        assert_eq!(journey.revision.get(), 3);
-        assert_eq!(title(&journey).as_deref(), Some("D"), "D's title is kept");
-    } else {
-        let Ok(Written::Applied {
-            receipt,
-            over: Some(over),
-            ..
-        }) = a
-        else {
-            panic!("A overlaps neither C nor D: applied over them, not {a:#?}");
-        };
-        assert_eq!(receipt.revision.get(), 4);
-        let moved: Vec<_> = over
-            .conflicts
-            .iter()
-            .map(|conflict| (conflict.expected.get(), conflict.current.get()))
-            .collect();
-        assert_eq!(moved, [(1, 3)], "decided at the revision the race left");
-        for other in ["p_c", "p_d"] {
-            assert!(
-                over.intervening
-                    .overlaps(&touched_by(&service, other).await),
-                "{other} intervened"
-            );
-        }
-        assert_eq!(journey.revision.get(), 4);
-        assert_eq!(title(&journey).as_deref(), Some("A"));
-        assert_eq!(journey.graph.nodes.len(), 3, "C and D are kept");
-    }
-}
-
-#[test]
-fn a_stale_write_racing_a_commit_is_decided_against_everything_since_its_base_on_memory() {
-    support::run(async {
-        for overlapping in [false, true] {
-            a_stale_write_racing_a_commit_is_decided_against_everything_since_its_base(
-                false,
-                overlapping,
-            )
-            .await;
-        }
-    });
-}
-
-#[test]
-fn a_stale_write_racing_a_commit_is_decided_against_everything_since_its_base_on_sqlite() {
-    support::run(async {
-        for overlapping in [false, true] {
-            a_stale_write_racing_a_commit_is_decided_against_everything_since_its_base(
-                true,
-                overlapping,
-            )
-            .await;
-        }
-    });
-}
-
-/// H5: a stale write that loses the race at commit is decided again only up to the attempt
-/// limit. A rename drafted at revision 1 applies over a node added at revision 2; each time
-/// its commit is held, another node lands, so it loses every race and is answered stale
-/// after exactly the limit's commits, though nothing it writes overlaps what landed.
-async fn a_stale_write_that_keeps_losing_the_race_is_answered_stale_at_the_limit(on_sqlite: bool) {
-    let (service, faults) = unarmed(on_sqlite).await;
-    applied(
-        service
-            .patch(&call("u_lead", AT), &domain(node("p_c", 1, "n_c")))
-            .await,
-    );
-    let gate = Gate::on(&faults, CommitPoint::BeforeBegin);
-    let held = submit(&service, rename("p_a", 1, "A"));
-    for round in 0..STALE_ATTEMPT_COUNT_MAX {
-        gate.reached.notified().await;
-        let key = format!("n_r{round}");
-        let landed = node(&format!("p_r{round}"), 2 + round, &key);
-        applied(service.patch(&call("u_lead", AT), &domain(landed)).await);
-        gate.armed.store(true, Ordering::SeqCst);
-        gate.release.notify_one();
-    }
-    let held = tokio::time::timeout(Duration::from_secs(10), held)
-        .await
-        .expect("the write is answered after the limit, not held again")
-        .unwrap();
-    assert!(
-        matches!(held, Err(WriteError::Rejected(Rejection::Stale { .. }))),
-        "stale after the limit, not {held:#?}"
-    );
-    assert!(
-        gate.armed.load(Ordering::SeqCst),
-        "no commit was held after the limit"
-    );
-}
-
-#[test]
-fn a_stale_write_that_keeps_losing_the_race_is_answered_stale_at_the_limit_on_memory() {
-    support::run(a_stale_write_that_keeps_losing_the_race_is_answered_stale_at_the_limit(false));
-}
-
-#[test]
-fn a_stale_write_that_keeps_losing_the_race_is_answered_stale_at_the_limit_on_sqlite() {
-    support::run(a_stale_write_that_keeps_losing_the_race_is_answered_stale_at_the_limit(true));
 }
 
 /// Journey `j_race` at revision 2, owned by `who_a`, which names no one else, beside `who_b`.
@@ -469,7 +275,7 @@ async fn owned(service: &Service) {
 
 /// E6, H5: a patch to a journey that names an identity only as an owner is held to the
 /// deployment revision it was validated against: an edit that names `who_b` as an owner,
-/// waiting while `who_b` is deleted, is decided again over what was committed and refused
+/// waiting while `who_b` is deleted, is answered stale and refused
 /// (it would apply nowhere), rather than committed with a dangling owner.
 async fn an_owner_edit_is_refused_beside_a_delete_of_that_owner(service: Service, gate: Arc<Gate>) {
     let edit = patch(

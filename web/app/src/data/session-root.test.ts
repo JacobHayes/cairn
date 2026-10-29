@@ -16,7 +16,7 @@ import { writeView, type WriteSnapshot } from "./write-machine.ts";
 const receipt = { patch_id: "p_x", domain: { journey: "j_one" }, content_hash: "h", revision: 4 };
 const applied: Answered<HttpFailure> = { outcome: "answered", answer: { outcome: "applied", receipt, consequences: {} } };
 const lost: Answered<HttpFailure> = { outcome: "failed", error: { status: 0, message: "network down" } };
-const stale: Answered<HttpFailure> = { outcome: "rejected", rejection: { rejection: "stale", conflicts: [{ of: { domain: { journey: "j_one" } }, expected: 3, current: 5 }], intervening: [], touched: [] } };
+const stale: Answered<HttpFailure> = { outcome: "rejected", rejection: { rejection: "stale", conflicts: [{ of: { domain: { journey: "j_one" } }, expected: 3, current: 5 }], intervening: [] } };
 
 describe("version skew", () => {
   it("stops a new write before it is sent, and says so", async () => {

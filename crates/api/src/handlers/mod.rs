@@ -135,8 +135,7 @@ pub(crate) async fn committed<T: Send + 'static>(
 /// conversion logs and counts an engine panic, so a second one would count it twice.
 pub(crate) fn written_outcome(answer: &Result<Written, ApiError>) -> &'static str {
     match answer {
-        Ok(Written::Applied { over: None, .. }) => "applied",
-        Ok(Written::Applied { over: Some(_), .. }) => "applied_over",
+        Ok(Written::Applied { .. }) => "applied",
         Ok(Written::AlreadyApplied { .. }) => "already_applied",
         Err(error) => refusal_outcome(error),
     }

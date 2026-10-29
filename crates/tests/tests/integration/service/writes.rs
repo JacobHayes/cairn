@@ -8,10 +8,8 @@ use std::collections::BTreeSet;
 use std::fmt::Write as _;
 
 use cairn_engine::Records;
-use cairn_schema::{
-    Domain, EventType, JourneyId, Rejection, RevisionOf, Subject, TouchedSet, ViolationCode,
-};
-use cairn_service::{DomainPatch, Service, WriteError, Written};
+use cairn_schema::{Domain, EventType, JourneyId, Rejection, RevisionOf, Subject, ViolationCode};
+use cairn_service::{DomainPatch, Service, Written};
 use cairn_store::{EventQuery, InProcessNotifier, Take, Tick, Watch};
 
 use support::{
@@ -51,9 +49,8 @@ on_both_stores!(
     a_subtree_removal_conflicts_with_an_edit_inside_it,
     a_removal_made_stale_by_an_insertion_beneath_it_is_not_widened,
     a_stale_role_removal_never_clears_a_fill_made_meanwhile,
-    a_lost_answer_after_a_write_applied_over_another_is_answered_from_its_receipt,
-    a_write_is_applied_over_a_deployment_change_that_moved_only_the_deployment,
-    a_merge_beside_an_unrelated_deployment_change_lands_over_it,
+    a_write_is_stale_beside_a_deployment_change_that_moved_only_the_deployment,
+    a_merge_beside_an_unrelated_deployment_change_is_stale,
     a_merge_that_breaks_a_referencing_journey_is_rejected_naming_it,
     a_merge_moves_emails_and_an_email_stays_on_one_identity,
     a_merge_is_stale_once_a_journey_it_checked_moves_or_a_new_one_refers,
@@ -219,8 +216,7 @@ const CHILD: &str = "{key: n_c, id: c, kind: action, title: C, parent: n_g}";
 const REMOVAL: &str = "- op: remove_node\n  removal: {node: n_g, descendants: [n_c]}\n";
 
 /// H5: a subtree removal drafted at revision 1 is stale once an edit inside the subtree
-/// lands; the rejection carries what the edit touched, which overlaps what the removal
-/// would write, so the server answers it stale.
+/// lands; the rejection carries what the edit touched.
 async fn a_subtree_removal_conflicts_with_an_edit_inside_it(
     service: &Service,
     _: &InProcessNotifier,
@@ -237,7 +233,6 @@ async fn a_subtree_removal_conflicts_with_an_edit_inside_it(
     let Rejection::Stale {
         conflicts,
         intervening,
-        touched,
     } = rejected(service.patch(&call("u_lead", AT), &domain(removal)).await)
     else {
         panic!("the removal is stale");
@@ -252,13 +247,11 @@ async fn a_subtree_removal_conflicts_with_an_edit_inside_it(
         (1, 2)
     );
     assert!(!intervening.as_set().is_empty());
-    assert!(intervening.overlaps(&touched), "not safe to apply past");
 }
 
-/// H5, A18: when what intervened is an insertion beneath the subtree, the removal would not
-/// apply at the new revision (it names only what its author saw), so the stale answer says
-/// it touches the whole journey and the server answers it stale; resubmitted there by hand,
-/// it is rejected rather than widened to the new node.
+/// H5, A18: when what intervened is an insertion beneath the subtree, the server answers the
+/// removal stale; resubmitted at the new revision by hand, it is rejected rather than widened
+/// to the new node.
 async fn a_removal_made_stale_by_an_insertion_beneath_it_is_not_widened(
     service: &Service,
     _: &InProcessNotifier,
@@ -272,17 +265,11 @@ async fn a_removal_made_stale_by_an_insertion_beneath_it_is_not_widened(
     );
     applied(service.patch(&call("u_other", AT), &domain(insert)).await);
     let removal = patch("p_remove", "{journey: j_tree}", 1, REMOVAL);
-    let Rejection::Stale { touched, .. } =
+    let Rejection::Stale { .. } =
         rejected(service.patch(&call("u_lead", AT), &domain(removal)).await)
     else {
         panic!("the removal is stale");
     };
-    let journey = Domain::Journey(journey_id("j_tree"));
-    assert_eq!(
-        touched,
-        TouchedSet::whole(journey),
-        "never applied past the insertion"
-    );
     let retry = patch("p_remove_retry", "{journey: j_tree}", 2, REMOVAL);
     let refused = rejected(service.patch(&call("u_lead", AT), &domain(retry)).await);
     assert!(
@@ -297,51 +284,8 @@ async fn a_removal_made_stale_by_an_insertion_beneath_it_is_not_widened(
     assert_eq!(journey.graph.nodes.len(), 3, "nothing was removed");
 }
 
-/// The answer to a role removal drafted at revision 1 after a fill moved the journey to 2:
-/// applied past the fill when it was another role's, stale when it was the removed role's.
-fn removal_answer_is(journey: &str, lands: bool, answer: Result<Written, WriteError>) {
-    if lands {
-        let Ok(Written::Applied {
-            receipt,
-            over: Some(over),
-            ..
-        }) = answer
-        else {
-            panic!("{journey}: applied over the fill, got {answer:#?}");
-        };
-        assert_eq!(receipt.revision.get(), 3, "{journey}");
-        let conflicts: Vec<_> = over
-            .conflicts
-            .iter()
-            .map(|conflict| {
-                (
-                    &conflict.of,
-                    conflict.expected.get(),
-                    conflict.current.get(),
-                )
-            })
-            .collect();
-        assert_eq!(
-            conflicts,
-            [(
-                &RevisionOf::Domain(Domain::Journey(journey_id(journey))),
-                1,
-                2
-            )],
-            "{journey}"
-        );
-    } else {
-        assert!(
-            matches!(rejected(answer), Rejection::Stale { .. }),
-            "{journey}"
-        );
-    }
-}
-
-/// H5: a role removal drafted while the role was empty is stale once someone fills it. What
-/// the removal would write now (the fill too) comes from applying it, so the server answers
-/// it stale instead of applying a removal that silently clears the fill; when the fill was
-/// another role's, it applies the removal over the fill, which stays.
+/// H5: a role removal drafted while the role was empty is stale once someone fills it,
+/// whichever role was filled: the server answers it stale, so the fill stays.
 async fn a_stale_role_removal_never_clears_a_fill_made_meanwhile(
     service: &Service,
     _: &InProcessNotifier,
@@ -349,7 +293,7 @@ async fn a_stale_role_removal_never_clears_a_fill_made_meanwhile(
     let (people_call, people) = crate::people::people_write();
     applied(service.patch(&people_call, &people).await);
     let deployment = service.deployment().await.unwrap().revision;
-    for (journey, filled, lands) in [("j_same", "r_lead", false), ("j_other", "r_alt", true)] {
+    for (journey, filled) in [("j_same", "r_lead"), ("j_other", "r_alt")] {
         let target = format!("{{journey: {journey}}}");
         let roles = "\
 - op: create_journey\n  name: Roles\n\
@@ -371,7 +315,10 @@ async fn a_stale_role_removal_never_clears_a_fill_made_meanwhile(
             "- op: remove_role\n  role: r_lead\n",
         );
         let answer = service.patch(&call("u_lead", AT), &domain(removal)).await;
-        removal_answer_is(journey, lands, answer);
+        assert!(
+            matches!(rejected(answer), Rejection::Stale { .. }),
+            "{journey}"
+        );
         let held = service
             .journey(&journey_id(journey))
             .await
@@ -388,50 +335,10 @@ async fn a_stale_role_removal_never_clears_a_fill_made_meanwhile(
     }
 }
 
-/// H5: a write applied over another's, whose answer is lost, is answered from its receipt
-/// when resubmitted unchanged (the receipt records the patch as submitted, not as moved),
-/// and nothing is applied twice.
-async fn a_lost_answer_after_a_write_applied_over_another_is_answered_from_its_receipt(
-    service: &Service,
-    _: &InProcessNotifier,
-) {
-    create(service, "j_lost", &[]).await;
-    let node = |id: &str, key: &str| {
-        patch(
-            id,
-            "{journey: j_lost}",
-            1,
-            &format!("- op: add_node\n  node: {{key: {key}, id: {key}, kind: action, title: T}}\n"),
-        )
-    };
-    applied(
-        service
-            .patch(&call("u_other", AT), &domain(node("p_b", "n_b")))
-            .await,
-    );
-    let mine = domain(node("p_a", "n_a"));
-    let Written::Applied { receipt, over, .. } =
-        applied(service.patch(&call("u_lead", AT), &mine).await)
-    else {
-        unreachable!("applied");
-    };
-    assert_eq!(receipt.revision.get(), 3);
-    assert!(over.is_some(), "it was applied over the other write");
-    let again = service.patch(&call("u_lead", AT), &mine).await;
-    assert_eq!(again, Ok(Written::AlreadyApplied { receipt }));
-    let journey = service
-        .journey(&journey_id("j_lost"))
-        .await
-        .unwrap()
-        .unwrap();
-    assert_eq!(journey.revision.get(), 3, "nothing was applied twice");
-    assert_eq!(journey.graph.nodes.len(), 2);
-}
-
 /// H5, E6: a journey write that names the deployment revision it was checked against is
-/// applied past an unrelated identity change that moved only the deployment: the journey has
-/// not moved, the answer names only the deployment, and the commit holds the current one.
-async fn a_write_is_applied_over_a_deployment_change_that_moved_only_the_deployment(
+/// stale once an unrelated identity change moves the deployment: the journey has not moved,
+/// and the answer names only the deployment.
+async fn a_write_is_stale_beside_a_deployment_change_that_moved_only_the_deployment(
     service: &Service,
     _: &InProcessNotifier,
 ) {
@@ -463,15 +370,12 @@ async fn a_write_is_applied_over_a_deployment_change_that_moved_only_the_deploym
             "- op: fill_role\n  role: r_lead\n  identities: [who_e7h2jv3nxc4yaw6t]\n",
         )
     };
-    let Written::Applied { receipt, over, .. } =
-        applied(service.patch(&call("u_lead", AT), &domain(fill)).await)
+    let Rejection::Stale { conflicts, .. } =
+        rejected(service.patch(&call("u_lead", AT), &domain(fill)).await)
     else {
-        unreachable!("applied");
+        panic!("the deployment moved");
     };
-    assert_eq!(receipt.revision.get(), 2, "the journey had not moved");
-    let over = over.expect("the deployment moved");
-    let moved: Vec<_> = over
-        .conflicts
+    let moved: Vec<_> = conflicts
         .iter()
         .map(|conflict| (&conflict.of, conflict.expected, conflict.current))
         .collect();
@@ -485,9 +389,9 @@ async fn a_write_is_applied_over_a_deployment_change_that_moved_only_the_deploym
     );
 }
 
-/// E6, H5: a merge drafted against the journeys that refer to its identities lands beside an
-/// unrelated change to the deployment, which the engine checks it against again at apply.
-async fn a_merge_beside_an_unrelated_deployment_change_lands_over_it(
+/// E6, H5: a merge drafted against the journeys that refer to its identities is stale beside
+/// an unrelated change to the deployment, and the identity is still there.
+async fn a_merge_beside_an_unrelated_deployment_change_is_stale(
     service: &Service,
     _: &InProcessNotifier,
 ) {
@@ -510,18 +414,17 @@ async fn a_merge_beside_an_unrelated_deployment_change_lands_over_it(
         deployment.get(),
         "- op: merge_identities\n  survivor: who_d4m6uk2eqf5rbhzs\n  merged: [who_e7h2jv3nxc4yaw6t]\n  journeys: {j_vendor_eval: 2}\n",
     );
-    let Written::Applied { over, .. } =
-        applied(service.patch(&call("u_lead", AT), &domain(merge)).await)
+    let Rejection::Stale { conflicts, .. } =
+        rejected(service.patch(&call("u_lead", AT), &domain(merge)).await)
     else {
-        unreachable!("applied");
+        panic!("the deployment moved");
     };
-    let over = over.expect("the deployment moved");
-    assert_eq!(over.conflicts.len(), 1);
+    assert_eq!(conflicts.len(), 1);
     let identities = service.deployment().await.unwrap().identities;
     assert!(
         identities
             .get(&"who_e7h2jv3nxc4yaw6t".parse().unwrap())
-            .is_none()
+            .is_some()
     );
 }
 

@@ -32,7 +32,7 @@ pub use derive::{Derived, check_plan, consequences, derive};
 pub use format::{export, from_file, import};
 pub use graph::{Document, Graph, Tree};
 pub use notices::notices;
-pub use pipeline::{Applied, AppliedAt, ApplyInputs, apply, apply_over, touched};
+pub use pipeline::{Applied, ApplyInputs, apply, touched};
 pub use project::{DerivedJourney, DraftContext, ProjectionError, history};
 pub use proposal::{
     Candidate, candidate, destination_after, preview, preview_of, resolve, resolve_partial,

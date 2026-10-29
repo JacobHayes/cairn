@@ -1,5 +1,5 @@
-//! The Rust client against a server in process (H5, H6): a stale patch the server applies
-//! past what intervened when that cannot overlap it and answers stale when it can, and views
+//! The Rust client against a server in process (H5, H6): a stale patch the server answers
+//! stale, and views
 //! kept current by their subscriptions.
 #![cfg(test)]
 
@@ -48,41 +48,49 @@ mod in_process {
         journey_patch(id, base, &mutations)
     }
 
-    /// H5: two people note the same journey from the same revision; the second is stale,
-    /// what intervened cannot overlap it, and the server applies it at the new revision and
-    /// says what it moved past.
+    /// H5: two people note the same journey from the same revision; the second is stale even
+    /// though what intervened overlaps nothing it writes, and is applied once the writer has
+    /// read again and drafted at the new revision.
     #[tokio::test]
-    async fn a_non_overlapping_conflict_is_applied_over_by_the_server() {
+    async fn a_stale_write_is_surfaced_and_applied_when_drafted_again() {
         let world = World::start().await;
         let (ann, bob) = (world.client("ann"), world.client("bob"));
         tree(&ann).await;
         landed(bob.submit(note("p_bob", "a_bob", 1), None).await);
-        let applied = landed(ann.submit(note("p_ann", "a_ann", 1), None).await);
-        let PatchAnswer::Applied { receipt, over, .. } = applied else {
-            panic!("applied, not {applied:#?}")
+        let rejection = rejected(ann.submit(note("p_ann", "a_ann", 1), None).await);
+        let Rejection::Stale { conflicts, .. } = rejection else {
+            panic!("stale, not {rejection:#?}")
         };
-        assert_eq!(receipt.revision.get(), 3);
-        let over = over.expect("applied past bob's note");
         assert_eq!(
-            over.conflicts
+            conflicts
                 .iter()
                 .map(|conflict| (conflict.expected.get(), conflict.current.get()))
                 .collect::<Vec<_>>(),
             [(1, 2)]
         );
         let journey = ann.journey(&"j_tree".parse().unwrap()).await.unwrap();
+        assert_eq!(journey.graph.state.annotations.len(), 1);
+        let again = landed(ann.submit(note("p_ann_again", "a_ann", 2), None).await);
+        let PatchAnswer::Applied { receipt, .. } = again else {
+            panic!("applied, not {again:#?}")
+        };
+        assert_eq!(receipt.revision.get(), 3);
+        let journey = ann.journey(&"j_tree".parse().unwrap()).await.unwrap();
         assert_eq!(journey.graph.state.annotations.len(), 2);
-        let answer = ann.submit(note("p_ann", "a_ann", 1), None).await.unwrap();
+        let answer = ann
+            .submit(note("p_ann_again", "a_ann", 2), None)
+            .await
+            .unwrap();
         assert!(
             matches!(answer, PatchAnswer::AlreadyApplied { .. }),
             "{answer:#?}"
         );
     }
 
-    /// H5: a subtree removal drafted before an edit inside the subtree overlaps it, so the
-    /// server answers stale rather than applying it.
+    /// H5: a subtree removal drafted before an edit inside the subtree is answered stale
+    /// rather than applied.
     #[tokio::test]
-    async fn an_overlapping_conflict_is_surfaced() {
+    async fn a_stale_subtree_removal_is_surfaced() {
         let world = World::start().await;
         let (ann, bob) = (world.client("ann"), world.client("bob"));
         tree(&ann).await;
@@ -101,8 +109,8 @@ mod in_process {
     }
 
     /// H5, A18: after an insertion beneath the subtree the removal would remove more than its
-    /// author saw, so it would not apply at the new revision; the stale answer says it
-    /// touches the whole journey and the server answers stale, never widening it.
+    /// author saw, so it would not apply at the new revision; the server answers stale,
+    /// never widening it.
     #[tokio::test]
     async fn a_removal_made_stale_beneath_it_is_surfaced_not_widened() {
         let world = World::start().await;
