@@ -7,7 +7,6 @@ use std::collections::BTreeMap;
 use serde_json::Value;
 
 use crate::limits::TOOL_CALL_FAILURE_REPEAT_COUNT_MAX;
-use crate::provider::Message;
 
 /// What a result dropped to fit the turn's limit says in its place.
 pub const DROPPED: &str = "{\"dropped\":\"this result was left out to keep the turn's context \
@@ -16,23 +15,22 @@ pub const DROPPED: &str = "{\"dropped\":\"this result was left out to keep the t
 /// Keeps the newest tool results of `messages` whose content adds up to at most `bytes_max`
 /// bytes, and replaces every older one with [`DROPPED`]. A result is kept whole or dropped
 /// whole, and once one is dropped so is every result older than it.
-pub fn keep_newest(messages: &mut [Message], bytes_max: u32) {
+pub fn keep_newest(messages: &mut [Value], bytes_max: u32) {
     let mut left = usize::try_from(bytes_max).unwrap_or(usize::MAX);
     let mut dropping = false;
     for message in messages.iter_mut().rev() {
-        let Message::ToolResults(results) = message else {
+        if message["role"] != "tool" {
             continue;
-        };
-        for result in results.iter_mut().rev() {
-            if result.content == DROPPED {
-                dropping = true;
-            }
-            if dropping || result.content.len() > left {
-                dropping = true;
-                DROPPED.clone_into(&mut result.content);
-            } else {
-                left -= result.content.len();
-            }
+        }
+        let content = message["content"].as_str().unwrap_or_default();
+        if content == DROPPED {
+            dropping = true;
+        }
+        if dropping || content.len() > left {
+            dropping = true;
+            message["content"] = Value::String(DROPPED.to_owned());
+        } else {
+            left -= content.len();
         }
     }
 }

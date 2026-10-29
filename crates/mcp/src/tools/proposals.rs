@@ -5,7 +5,7 @@
 //! as proposals and reach their destination only when one is applied (B7, B8, B9, I7).
 
 use cairn_schema::{
-    Actor, Domain, JourneyId, Lineage, Markdown, PatchId, Proposal, ProposalDraft, ProposalId,
+    Domain, JourneyId, Lineage, Markdown, PatchId, Proposal, ProposalDraft, ProposalId,
     ProposalStatus, Revision, RouteId, Title, VersionNumber,
 };
 use cairn_service::{Call, ProposalWritten};
@@ -54,52 +54,6 @@ pub(crate) const SPECS: &[Spec] = &[
 ];
 
 impl ToolSet {
-    // PRD: I5, I6.
-    /// Drafts a proposal as `actor`, as `create_proposal` does: what the assistant's write
-    /// wrapper drafts a write it does not apply directly into.
-    ///
-    /// # Errors
-    ///
-    /// What `create_proposal` answers.
-    pub async fn create_proposal_as(
-        &self,
-        actor: &Actor,
-        arguments: CreateProposal,
-    ) -> Result<ProposalOutput, ToolError> {
-        self.create_proposal(&self.call_as(actor), arguments).await
-    }
-
-    // PRD: I5, I6.
-    /// Changes an open proposal as `actor`, as `edit_proposal` does.
-    ///
-    /// # Errors
-    ///
-    /// What `edit_proposal` answers.
-    pub async fn edit_proposal_as(
-        &self,
-        actor: &Actor,
-        arguments: EditProposal,
-    ) -> Result<ProposalOutput, ToolError> {
-        self.edit_proposal(&self.call_as(actor), arguments).await
-    }
-
-    /// What a call of the proposal tool `name` with `arguments` is about, or `None` for
-    /// another tool or arguments that do not match its schema.
-    #[must_use]
-    pub fn proposal_call(name: &str, arguments: &Value) -> Option<ProposalCall> {
-        let arguments = arguments.clone();
-        let (proposal, discards) = match name {
-            "create_proposal" => (parse::<CreateProposal>(arguments).ok()?.proposal, false),
-            "edit_proposal" => {
-                let edit = parse::<EditProposal>(arguments).ok()?;
-                let discards = matches!(edit.change, ProposalChange::Discard);
-                (edit.proposal, discards)
-            }
-            _ => return None,
-        };
-        Some(ProposalCall { proposal, discards })
-    }
-
     /// Runs the proposal tool `name`.
     pub(crate) async fn propose(
         &self,
@@ -218,15 +172,6 @@ impl ToolSet {
     }
 }
 
-/// What a call of a proposal tool is about.
-#[derive(Clone, Debug, PartialEq, Eq)]
-pub struct ProposalCall {
-    /// The proposal it names.
-    pub proposal: ProposalId,
-    /// Whether it discards it.
-    pub discards: bool,
-}
-
 /// What a proposal write answers: where the proposal stands, not the draft that was sent.
 #[derive(Debug, Serialize, Deserialize, JsonSchema)]
 pub struct ProposalOutput {
@@ -266,10 +211,16 @@ impl ProposalOutput {
         &self.destination
     }
 
-    /// The proposal's editing revision, which its next change names.
+    /// Whether the answer says where the proposal stands (a receipt does not).
     #[must_use]
-    pub fn editing_revision(&self) -> Revision {
-        self.revision
+    pub fn state_known(&self) -> bool {
+        self.state.is_some()
+    }
+
+    /// Whether the answer says the proposal is discarded.
+    #[must_use]
+    pub fn is_discarded(&self) -> bool {
+        self.state == Some(ProposalStatus::Discarded)
     }
 
     fn held(status: ProposalStatusOutput, proposal: Proposal) -> Self {
@@ -355,25 +306,6 @@ enum ProposalContent {
 }
 
 impl CreateProposal {
-    /// A proposal of `draft` to `destination`.
-    #[must_use]
-    pub fn drafted(
-        proposal: ProposalId,
-        patch_id: PatchId,
-        destination: Domain,
-        draft: ProposalDraft,
-    ) -> Self {
-        Self {
-            proposal,
-            patch_id,
-            destination: Some(destination),
-            draft: Some(draft),
-            upgrade: None,
-            save_as_route: None,
-            relink: None,
-        }
-    }
-
     /// The proposal, the patch id, and its one content; refused at the argument that makes
     /// it none or more than one.
     fn content(self) -> Result<(ProposalId, PatchId, ProposalContent), ToolError> {

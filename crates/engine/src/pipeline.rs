@@ -280,30 +280,6 @@ fn stale(conflicts: Vec<RevisionConflict>) -> Rejection {
     }
 }
 
-// PRD: H5, I5.
-/// What `patch` writes applied to `records` at their revisions (its base and deployment
-/// revisions moved to theirs, whichever way they differ: this asks what the change would do
-/// now): the touched set of the
-/// change set apply builds there, from the handlers that write it (a role's fill, a node's
-/// bypass), never a prediction.
-///
-/// # Errors
-///
-/// The rejection that would refuse it there, which then writes nothing: invalid, or stale
-/// on a revision one of its mutations names.
-pub fn touched(
-    records: &Records,
-    patch: &Patch,
-    inputs: &ApplyInputs,
-) -> Result<TouchedSet, Rejection> {
-    let mut now = patch.clone();
-    now.base_revision = base_revision(records, patch).1;
-    if now.deployment_revision.is_some() {
-        now.deployment_revision = Some(records.deployment.revision);
-    }
-    apply(records, &now, inputs).map(|applied| applied.change_set().touched())
-}
-
 /// Whose revision a patch's base revision names, and what it is in `records`: its
 /// proposal's for a patch to a proposal, else its domain's.
 fn base_revision(records: &Records, patch: &Patch) -> (RevisionOf, Revision) {

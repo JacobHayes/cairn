@@ -4,7 +4,7 @@
 //! `/demo/` on the same port, so sign-in and the assistant can be tried and tested with no
 //! provider, account, or credential. They are configured as any deployment would configure
 //! them (a `builtin_oauth` provider, listed first so an agent's token acts as that agent and
-//! not as the dev user alone, an `oidc` provider and a `chat_completions` assistant, both at
+//! not as the dev user alone, an `oidc` provider and an assistant, both at
 //! this address), so the server runs its ordinary code against them.
 //!
 //! The stub issuer signs in whoever types an email, as that person, with the email verified.
@@ -82,7 +82,6 @@ issuer = "{issuer}"
 client_id = "cairn"
 
 [assistant]
-protocol = "chat_completions"
 endpoint = "http://{listen}/demo/assistant/v1"
 model = "scripted"
 "#,

@@ -43,8 +43,11 @@ export class HandHost implements AssistantHost {
 /** The conversation `cv_one` holding `messages`. */
 export const holding = (messages: ConversationEntry[]): Conversation => ({ conversation: "cv_one", messages });
 
-/** A turn answered with `reply`. */
-export const replied = (reply: string): TurnOutcome => ({ outcome: "answered", reply: { conversation: "cv_one", reply, ended: { status: "replied" } } });
+/** A turn in which the person said `asked` and was answered with `reply`. */
+export const replied = (reply: string, asked = "Hello?"): TurnOutcome => ({
+  outcome: "answered",
+  reply: { conversation: "cv_one", reply, ended: { status: "replied" }, messages: [said(asked, "t1"), answered(reply, "t2")] },
+});
 
 export const said = (content: string, at: string): ConversationEntry => ({ author: "user", at, content });
 export const answered = (content: string, at: string): ConversationEntry => ({ author: "assistant", at, content });

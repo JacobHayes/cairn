@@ -3,7 +3,7 @@
 // panel looks like and what it answers from the same facts the engine derived, and sends nothing.
 import { useMemo, useState } from "react";
 
-import { AssistantDock, journeyTitles, Transcript } from "../assistant/AssistantPanel.tsx";
+import { AssistantDock, Transcript } from "../assistant/AssistantPanel.tsx";
 import { assistantOffered } from "../assistant/model.ts";
 import { useJourney, useSession } from "../data/react.ts";
 import { AssistantSlot, useAssistantDock } from "../shell/frame.tsx";
@@ -16,14 +16,14 @@ function Example({ journey }: { journey: string }) {
   const view = useJourney(journey);
   const replied = tour?.replied === true;
   const entries = useMemo(
-    () => (view.status === "ready" && replied ? [{ entry: "said" as const, at: "tour-said", text: EXAMPLE_QUESTION }, { entry: "reply" as const, at: "tour-reply", text: exampleReply(factsOf(view)) }] : []),
+    () => (view.status === "ready" && replied ? [{ author: "user" as const, at: "tour-said", content: EXAMPLE_QUESTION }, { author: "assistant" as const, at: "tour-reply", content: exampleReply(factsOf(view)) }] : []),
     [view, replied],
   );
   return (
     <section className="panel assistant-panel" aria-label="Assistant" data-testid="tour-assistant-example">
       <div className="assistant-scroll inspector-body">
         <p className="muted small">Example only. No message is sent.</p>
-        <Transcript entries={entries} journey={journey} titleOf={view.status === "ready" ? journeyTitles(view) : undefined} />
+        <Transcript entries={entries} />
       </div>
       {replied ? null : (
         <form className="stack" onSubmit={(event) => { event.preventDefault(); }}>
@@ -55,11 +55,11 @@ function ExampleDock({ journey }: { journey: string }) {
 }
 
 /** The journey header's assistant: the example on the tour's practice journey, the live panel on every other. */
-export function JourneyAssistant({ journey, ...rest }: { journey: string } & Omit<Parameters<typeof AssistantDock>[0], "target">) {
+export function JourneyAssistant({ journey }: { journey: string }) {
   const tour = useTour();
   // Until the record is read it is not known which journey is the practice one, and the live panel must never open on it.
   if (tour?.reading === true) {
     return null;
   }
-  return tour?.practice === journey ? <ExampleDock journey={journey} /> : <AssistantDock target={{ journey }} {...rest} />;
+  return tour?.practice === journey ? <ExampleDock journey={journey} /> : <AssistantDock target={{ journey }} />;
 }

@@ -6,11 +6,9 @@
 import { answerFailure, networkFailure, type CairnClient, type HttpFailure, type Schema } from "@cairn/client";
 
 export type TurnReply = Schema<"TurnReply">;
-export type AssistantAction = Schema<"Action">;
+export type Proposed = Schema<"Proposed">;
 export type Conversation = Schema<"Conversation">;
 export type ConversationEntry = Schema<"ConversationEntry">;
-export type Ended = Schema<"Ended">;
-export type Because = Schema<"Because">;
 
 /** What a conversation is about: a journey, or a route's draft (which may not be open yet). */
 export type AssistantTarget = { journey: string } | { route: string };

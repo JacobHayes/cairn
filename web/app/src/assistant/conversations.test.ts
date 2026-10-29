@@ -3,17 +3,16 @@
 import { createActor } from "xstate";
 import { describe, expect, it } from "vitest";
 
-import { memoryTurns, settled } from "../data/fake.test-support.ts";
+import { settled } from "../data/fake.test-support.ts";
 import { conversationView, sendTurn } from "./conversation.ts";
 import { conversationManager } from "./conversations.ts";
-import { shown } from "./model.ts";
 import { HandHost, answered, holding, replied, said, target } from "./hand-host.test-support.ts";
 
 const other = { route: "r_one" };
 
 function manager(offered = true) {
   const host = new HandHost();
-  const ref = createActor(conversationManager, { input: { assistant: offered ? host : undefined, turns: memoryTurns() } }).start();
+  const ref = createActor(conversationManager, { input: { assistant: offered ? host : undefined } }).start();
   const held = (key: string) => ref.getSnapshot().context.conversations[key];
   return { host, ref, held };
 }
@@ -47,13 +46,10 @@ describe("the conversation manager", () => {
     await settled();
     host.reads.filter((each) => each.target === target).at(-1)?.answer(holding([said("Hello?", "t1"), answered("Hi.", "t2")]));
     await sent;
-    const words = (view: ReturnType<typeof conversationView>) => {
-      const messages = view.read.status === "ready" ? view.read.conversation.messages : [];
-      return shown(messages, view.kept, view.unsaved).flatMap((entry) => (entry.entry === "said" || entry.entry === "reply" ? [entry.text] : []));
-    };
+    const words = (view: ReturnType<typeof conversationView>) => (view.read.status === "ready" ? view.read.conversation.messages.map((entry) => entry.content) : []);
     expect(words(conversationView(first.getSnapshot()))).toEqual(["Hello?", "Hi."]);
     // The other target's conversation heard nothing of it.
-    expect(second && conversationView(second.getSnapshot())).toMatchObject({ read: { status: "loading" }, sending: undefined, kept: [], unsaved: [] });
+    expect(second && conversationView(second.getSnapshot())).toMatchObject({ read: { status: "loading" }, sending: undefined, proposals: [] });
     // Opening the first again shows the answer, which the host kept.
     ref.send({ type: "open", target });
     expect(words(conversationView(first.getSnapshot()))).toEqual(["Hello?", "Hi."]);

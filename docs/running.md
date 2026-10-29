@@ -47,10 +47,9 @@ name = "agents"
 sign_in_with = "sso"
 
 [assistant]                              # optional: the in-app assistant
-protocol = "anthropic_messages"          # or openai_responses, chat_completions
-endpoint = "https://api.anthropic.com/v1"
+endpoint = "https://openrouter.ai/api/v1"  # any OpenAI-compatible chat-completions base URL
 model = "a-model-name"
-api_key = "..."                          # required except for chat_completions; or CAIRN_ASSISTANT_API_KEY
+api_key = "..."                          # optional for a local server; or CAIRN_ASSISTANT_API_KEY
 ```
 
 Each provider kind's settings: `dev` (`user`, `verified_emails`, which must hold at least one email,

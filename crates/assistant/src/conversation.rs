@@ -1,8 +1,8 @@
 //! Conversations (ARCHITECTURE, Store trait: outside every domain, with no events): one per
 //! target per user, under an id derived from both, so a user returning to a journey or a
 //! route's draft picks up where they left off and no one else sees it. A conversation keeps
-//! the user's words, the assistant's replies, and Cairn's report of each write the assistant
-//! made; tool traffic is not kept, since every turn starts from a fresh read of its target.
+//! the user's words, the assistant's replies, and a plain line for each write the assistant
+//! made; tool traffic is not kept, since the assistant reads its target through tools each turn.
 //! It keeps its newest [`CONVERSATION_MESSAGE_COUNT_MAX`] messages
 //! (decisions/2026-10-06-conversations-are-one-per-target-per-user-keep-their-newest.md).
 
@@ -10,11 +10,12 @@ use std::fmt;
 
 use cairn_schema::{ConversationId, JourneyId, Markdown, RouteId, Timestamp, Title, UserId};
 use cairn_store::{ConversationMessage, ConversationRecord, MessageAuthor};
+use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
+use serde_json::{Value, json};
 use sha2::{Digest, Sha256};
 
 use crate::limits::CONVERSATION_MESSAGE_COUNT_MAX;
-use crate::provider::{Message, Reply};
 
 /// What a conversation is about (I5: the assistant reads a journey or a draft).
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
@@ -104,11 +105,11 @@ pub fn message(author: MessageAuthor, at: Timestamp, text: &str) -> Option<Conve
 }
 
 /// The conversation as a provider is sent it: the user's words as user messages, and the
-/// assistant's replies with Cairn's reports of its writes as the assistant's, each run of
-/// one side joined into one message. It holds the newest messages within `bytes_max`
-/// bytes of text, and starts with the user, as every protocol asks.
+/// assistant's replies with the lines about its writes as the assistant's, each run of one
+/// side joined into one message. It holds the newest messages within `bytes_max` bytes of
+/// text, and starts with the user.
 #[must_use]
-pub fn dialogue(record: &ConversationRecord, bytes_max: u32) -> Vec<Message> {
+pub fn dialogue(record: &ConversationRecord, bytes_max: u32) -> Vec<Value> {
     let budget = usize::try_from(bytes_max).unwrap_or(usize::MAX);
     let mut spent = 0_usize;
     let kept = record
@@ -121,32 +122,22 @@ pub fn dialogue(record: &ConversationRecord, bytes_max: u32) -> Vec<Message> {
         })
         .count();
     let newest = &record.messages[record.messages.len() - kept..];
-    let mut messages: Vec<Message> = Vec::new();
+    let mut runs: Vec<(bool, String)> = Vec::new();
     for held in newest {
-        let text = held.content.as_str();
         let user = held.author == MessageAuthor::User;
-        match messages.last_mut() {
-            Some(Message::User { text: last }) if user => {
-                last.push_str("\n\n");
-                last.push_str(text);
+        match runs.last_mut() {
+            Some((side, text)) if *side == user => {
+                text.push_str("\n\n");
+                text.push_str(held.content.as_str());
             }
-            Some(Message::Assistant(Reply {
-                text: Some(last), ..
-            })) if !user => {
-                last.push_str("\n\n");
-                last.push_str(text);
-            }
+            // Trimming can leave the assistant first.
             None if !user => {}
-            _ if user => messages.push(Message::User {
-                text: text.to_owned(),
-            }),
-            _ => messages.push(Message::Assistant(Reply {
-                text: Some(text.to_owned()),
-                ..Reply::default()
-            })),
+            _ => runs.push((user, held.content.as_str().to_owned())),
         }
     }
-    messages
+    runs.into_iter()
+        .map(|(user, text)| json!({ "role": if user { "user" } else { "assistant" }, "content": text }))
+        .collect()
 }
 
 #[cfg(test)]
@@ -187,10 +178,21 @@ mod tests {
         assert_eq!(ids[0], conversation_id(&journey, &ann), "stable");
     }
 
+    /// The roles and texts of a dialogue.
+    fn shown(held: &ConversationRecord, budget: u32) -> Vec<(String, String)> {
+        dialogue(held, budget)
+            .into_iter()
+            .map(|message| {
+                let field = |name: &str| message[name].as_str().unwrap().to_owned();
+                (field("role"), field("content"))
+            })
+            .collect()
+    }
+
     #[test]
     fn the_dialogue_starts_with_the_user_and_alternates() {
         use MessageAuthor::{Assistant, Tool, User};
-        type Case<'a> = (&'a [(MessageAuthor, &'a str)], &'a [&'a str]);
+        type Case<'a> = (&'a [(MessageAuthor, &'a str)], &'a [(&'a str, &'a str)]);
         let cases: [Case; 3] = [
             (
                 &[
@@ -199,23 +201,23 @@ mod tests {
                     (Assistant, "done"),
                     (User, "b"),
                 ],
-                &["user a", "assistant applied\n\ndone", "user b"],
+                &[
+                    ("user", "a"),
+                    ("assistant", "applied\n\ndone"),
+                    ("user", "b"),
+                ],
             ),
             // A turn that ended without a reply leaves two user messages in a row.
-            (&[(User, "a"), (User, "b")], &["user a\n\nb"]),
+            (&[(User, "a"), (User, "b")], &[("user", "a\n\nb")]),
             // Trimming can leave the assistant first.
-            (&[(Assistant, "x"), (User, "a")], &["user a"]),
+            (&[(Assistant, "x"), (User, "a")], &[("user", "a")]),
         ];
         for (held, expected) in cases {
-            let shown: Vec<String> = dialogue(&record(held), u32::MAX)
-                .into_iter()
-                .map(|message| match message {
-                    Message::User { text } => format!("user {text}"),
-                    Message::Assistant(reply) => format!("assistant {}", reply.text.unwrap()),
-                    Message::ToolResults(_) => unreachable!(),
-                })
+            let expected: Vec<(String, String)> = expected
+                .iter()
+                .map(|(role, text)| ((*role).to_owned(), (*text).to_owned()))
                 .collect();
-            assert_eq!(shown, expected, "{held:?}");
+            assert_eq!(shown(&record(held), u32::MAX), expected, "{held:?}");
         }
     }
 
@@ -230,21 +232,11 @@ mod tests {
         ]);
         let cases = [(u32::MAX, 4), (10, 2), (6, 2), (2, 0)];
         for (budget, count) in cases {
-            let replayed = dialogue(&held, budget);
-            let bytes: usize = replayed
-                .iter()
-                .map(|message| match message {
-                    Message::User { text } => text.len(),
-                    Message::Assistant(reply) => reply.text.as_ref().map_or(0, String::len),
-                    Message::ToolResults(_) => unreachable!(),
-                })
-                .sum();
+            let replayed = shown(&held, budget);
+            let bytes: usize = replayed.iter().map(|(_, text)| text.len()).sum();
             assert!(bytes <= budget as usize, "{budget}");
             assert_eq!(replayed.len(), count, "{budget}: {replayed:?}");
-            assert!(matches!(
-                replayed.first(),
-                None | Some(Message::User { .. })
-            ));
+            assert!(replayed.first().is_none_or(|(role, _)| role == "user"));
         }
     }
 
@@ -274,5 +266,49 @@ mod tests {
         assert!(kept.content.as_str().len() <= limit);
         assert!(kept.content.as_str().len() > limit - 2);
         assert_eq!(message(MessageAuthor::Assistant, at(0), "  "), None);
+    }
+}
+
+/// One kept message of a conversation, as the API shows it.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+#[serde(deny_unknown_fields)]
+pub struct ConversationEntry {
+    /// Who wrote it.
+    pub author: ConversationAuthor,
+    /// When it was kept.
+    pub at: Timestamp,
+    /// What it says.
+    pub content: Markdown,
+}
+
+/// Who wrote a conversation message.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+#[serde(rename_all = "snake_case")]
+pub enum ConversationAuthor {
+    /// The user.
+    User,
+    /// The assistant.
+    Assistant,
+    /// Cairn, reporting a write the assistant made or how a turn ended.
+    Cairn,
+}
+
+impl From<ConversationMessage> for ConversationEntry {
+    fn from(message: ConversationMessage) -> Self {
+        let ConversationMessage {
+            author,
+            at,
+            content,
+        } = message;
+        let author = match author {
+            MessageAuthor::User => ConversationAuthor::User,
+            MessageAuthor::Assistant => ConversationAuthor::Assistant,
+            MessageAuthor::Tool => ConversationAuthor::Cairn,
+        };
+        Self {
+            author,
+            at,
+            content,
+        }
     }
 }

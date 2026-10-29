@@ -4,7 +4,7 @@ import { streamStatus, type Patch } from "@cairn/client";
 import { SimulatedClock, createActor } from "xstate";
 
 import type { About } from "./edit-command.ts";
-import { FakeDeriver, FakeHost, memoryTurns, settled, writeEnv } from "./fake.test-support.ts";
+import { FakeDeriver, FakeHost, settled, writeEnv } from "./fake.test-support.ts";
 import { editsOf, landedEvents, sessionRoot, subscriptionOf, syncOf, type SessionRootRef } from "./session-root.ts";
 import { inFlightOf, problemsOf } from "./edit-manager.ts";
 import { syncInputOf, syncSummary, type SyncReading, type SyncSummary } from "./sync.ts";
@@ -38,7 +38,7 @@ export async function startRoot(options: StartOptions = {}) {
       open: host.openTicks,
       today: () => new Date("2026-10-06T12:00:00Z"),
       now: () => clock.now(),
-      conversations: { assistant: undefined, turns: memoryTurns() },
+      conversations: { assistant: undefined },
       edits: {
         // A landed write is logged, and told to the root as the session does.
         env: {

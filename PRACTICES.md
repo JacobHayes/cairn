@@ -133,8 +133,6 @@ Validation rejects a patch exceeding a limit; loops use the same constant. Every
 | assistant turn | 10 min | The iteration limit at typical latency. |
 | assistant tool-result bytes kept per turn | 256 KiB | Past this the oldest results are replaced by a note that they were dropped. |
 | identical failing tool calls per turn | 3 | The third failure ends the turn. |
-| assistant provider call retries | 2 | Only 429 and 5xx (529 included), with jittered backoff inside the turn's limits. Never a timeout: tokens may be billed. |
-| longest `Retry-After` honoured | 30 s | A longer wait fails the call at once. |
 | store connection acquire | 5 s | Longer is contention, a bug. |
 | outbound sign-in provider call (OIDC, IAP key set, Google token exchange), and a whole request to the IAP relay's endpoints | 10 s | The login fails. |
 | requests in flight at the IAP relay's endpoints, per process | 16 | Unauthenticated relay floods leave the rest of the 128 for signed-in requests. |
@@ -151,7 +149,6 @@ Validation rejects a patch exceeding a limit; loops use the same constant. Every
 | journeys a tab keeps derived after their view closes | 8 | Least recently shown beyond this are released. |
 | canvas layouts a tab keeps | 32 views, 4 per view | Least recently laid out beyond this are forgotten. |
 | saves the sync chip lists as Recent | 10 | Newest first. |
-| assistant turns a tab keeps per conversation | 50 | The newest. |
 | CI check part duration | 45 min | Main never cancels a run in flight, so a hung part would hold the next (`timeout-minutes` in `check.yml`). |
 
 ## Code conventions

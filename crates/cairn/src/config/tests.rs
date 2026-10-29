@@ -3,7 +3,6 @@
 
 use std::path::Path;
 
-use cairn_assistant::Protocol;
 use cairn_schema::RankConstants;
 
 use super::*;
@@ -180,7 +179,6 @@ kind = \"gcp_iap\"
 name = \"iap\"
 audience = \"/projects/1/global/backendServices/2\"
 [assistant]
-protocol = \"anthropic_messages\"
 endpoint = \"https://api.anthropic.com/v1\"
 model = \"a-model\"
 api_key = \"key\"
@@ -212,16 +210,14 @@ api_key = \"key\"
         .collect();
     assert_eq!(names, ["dev", "corp", "agents", "tailnet", "iap"]);
     let assistant = config.assistant.unwrap();
-    assert_eq!(assistant.protocol, Protocol::AnthropicMessages);
     assert!(assistant.credential.is_some());
 }
 
 /// An OpenAI-compatible server may need no key.
 #[test]
 fn a_chat_completions_assistant_needs_no_key() {
-    let text = format!(
-        "{MINIMAL}\n[assistant]\nprotocol = \"chat_completions\"\nendpoint = \"http://localhost:8000/v1\"\nmodel = \"m\""
-    );
+    let text =
+        format!("{MINIMAL}\n[assistant]\nendpoint = \"http://localhost:8000/v1\"\nmodel = \"m\"");
     let assistant = parsed(&text).unwrap().assistant.unwrap();
     assert!(assistant.credential.is_none());
 }
@@ -322,16 +318,8 @@ fn provider_mistakes_are_named_by_provider() {
             "auth.corp.issuer",
         ),
         (
-            "[assistant]\nprotocol = \"chat_completions\"\nendpoint = \"file:///x\"\nmodel = \"m\"",
+            "[assistant]\nendpoint = \"file:///x\"\nmodel = \"m\"",
             "assistant.endpoint",
-        ),
-        (
-            "[assistant]\nprotocol = \"anthropic_messages\"\nendpoint = \"https://api.anthropic.com/v1\"\nmodel = \"m\"",
-            "assistant.api_key",
-        ),
-        (
-            "[assistant]\nprotocol = \"openai_responses\"\nendpoint = \"https://api.openai.com/v1\"\nmodel = \"m\"\napi_key = \" \"",
-            "assistant.api_key",
         ),
         (
             "[[auth]]\nkind = \"builtin_oauth\"\nname = \"first\"\n[[auth]]\nkind = \"builtin_oauth\"\nname = \"second\"",

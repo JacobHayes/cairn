@@ -4,8 +4,7 @@ use std::collections::BTreeSet;
 use std::net::SocketAddr;
 use std::path::{Path, PathBuf};
 
-use cairn_assistant::Protocol;
-use cairn_assistant::protocol::{Credential, ProviderConfig};
+use cairn_assistant::chat::{Credential, ProviderConfig};
 use cairn_auth::{
     DevConfig, GcpIapConfig, OAuthConfig, OidcConfig, ProxySource, RelayClient, TailscaleConfig,
 };
@@ -420,7 +419,7 @@ fn proxy_sources(written: &[String], at: &mut At<'_>) -> Option<Vec<ProxySource>
     valid.then_some(sources)
 }
 
-/// The assistant's provider: protocol, endpoint, model, and the credential, if any.
+/// The assistant's provider: endpoint, model, and the credential, if any.
 fn assistant(written: AssistantFile, problems: &mut Vec<Problem>) -> Option<ProviderConfig> {
     let endpoint = match Url::parse(&written.endpoint) {
         Ok(url) if matches!(url.scheme(), "http" | "https") => Some(url),
@@ -447,17 +446,7 @@ fn assistant(written: AssistantFile, problems: &mut Vec<Problem>) -> Option<Prov
         .api_key
         .filter(|key| !key.trim().is_empty())
         .map(Credential::new);
-    // Only an OpenAI-compatible server may need no key; the two vendors' APIs always do, and a
-    // missing key would otherwise surface when someone sends a message.
-    if credential.is_none() && written.protocol != Protocol::ChatCompletions {
-        problems.push(Problem::new(
-            "assistant.api_key",
-            "is required for this protocol (or set CAIRN_ASSISTANT_API_KEY)",
-        ));
-        return None;
-    }
     Some(ProviderConfig {
-        protocol: written.protocol,
         endpoint: endpoint?,
         model: written.model,
         credential,

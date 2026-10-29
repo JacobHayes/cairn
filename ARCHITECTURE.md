@@ -40,7 +40,7 @@ Load-bearing decisions:
 2. **Whole domain in memory.** Every read loads one journey or route whole and derives once; every write validates a full candidate graph.
 3. **State and events in one transaction.** The patch applier is the only writer; row deltas and one event per mutation commit together or not at all (A17, J1, J2).
 4. **One engine, two places it runs.** Server and browser run the same crate; the browser runs the pure functions locally, against the server's answers.
-5. **Pluggable edges.** Storage, auth, notification, and the assistant provider are traits assembled in one composition root per host.
+5. **Pluggable edges.** Storage, auth, and notification are traits, and the assistant provider an endpoint, assembled in one composition root per host.
 6. **The engine owns every rule and derived value.** Hosts keep only presentation; they read rules from the engine (directly, via wasm, or the generated rule tables) and ask it (a derive, a check, a preview) for anything a table cannot say. No host copies a rule.
 
 ## Assumptions and limits
@@ -82,7 +82,7 @@ cairn/
     auth/          AuthProvider trait; dev, oidc, builtin-oauth, tailscale, Google Cloud IAP providers; users and logins
     api/           axum endpoints, the generated OpenAPI document, SSE, the Rust client; the wire types only the API has (assistant, agent tokens)
     mcp/           rmcp server: tools, prompt metadata, instructions
-    assistant/     provider trait, tool loop, proposal drafting
+    assistant/     chat-completions client, tool loop, receipts
     cairn/         the binary: CLI, config, composition root, embedded assets
     tests/         the library crates' integration tests, one test binary, a directory per crate under test
   web/
@@ -199,7 +199,7 @@ The J3 replay harness and scenario tests run against the engine with a fixed clo
 
 ### Store trait
 
-Whole-domain; nothing in it walks the graph. Async via `async-trait`, object-safe, no runtime named: every layer above holds `Arc<dyn Store>` (the same for auth and model provider traits). A conformance suite in `crates/store` runs against every backend.
+Whole-domain; nothing in it walks the graph. Async via `async-trait`, object-safe, no runtime named: every layer above holds `Arc<dyn Store>` (the same for the auth provider trait). A conformance suite in `crates/store` runs against every backend.
 
 - `load(target)`: one graph per call (`Journey`, `Route` with its draft, immutable `RouteVersion`, `Deployment`); size caps are per graph. History is a separate paged query.
 - `commit(target, base revision, preconditions, change_set)`: one transaction on the one writer. It rechecks the patch receipt (H5), verifies every revision precondition the commit depends on (the base; a proposal's revision, I6; for identity merges and deletes, hard deletes, and identity-referencing journey patches, the revisions and reference sets they were checked against, E6, A19), writes rows and events with patch id and ordinal, and bumps the revision.
@@ -257,11 +257,11 @@ The I4 guide ships in `instructions/`, served as MCP instructions and prompts an
 
 Optional (I5): a server-side loop over the in-process MCP tool set, so it differs from an external agent only in transport (I7).
 
-- The model provider is a vendor-neutral trait; v1 implements Anthropic Messages, OpenAI Responses, and generic OpenAI-compatible chat completions. One per deployment, configured with the deployment's credential, never stored in the database or taken from a user.
-- State changes the user asks for apply directly as one patch with no node cap and are reported with consequences (D7). Structural changes (every write to a route or draft counts) become proposals, as does anything the user wants reviewed or the assistant judges large or ambiguous. The wrapper drafts the proposal from the patch a tool would submit (`ToolSet::drafted_patch`). The assistant may not apply proposals or import route files. Every mutation records the assistant and its user; applying a proposal records the confirming user (H2).
-- Served at `/api/journeys/{id}/assistant` and `/api/routes/{id}/draft/assistant` (POST a turn, GET the conversation), behind auth; a turn is outside the request duration, held instead to provider and turn limits.
-- A turn carries only its target's essentials (a journey's snapshot and revision; a draft's name, revision, node count); the assistant reads more through tools. Requests are ordered stable first (tools, system text, conversation, turn context) for provider prefix caching.
-- One conversation per target per user keeps the dialogue and Cairn's report of each write, not tool traffic. A write's report says in words what changed, which nodes, and what it caused, each with its journey.
+- The model provider is one OpenAI-compatible chat-completions endpoint, called by one small hand-written client: no retries, no provider-specific translation. Prompt caching is the gateway's to provide. One per deployment, configured with the deployment's credential, never stored in the database or taken from a user.
+- The model is offered the MCP tool list less the tools it may not call (`apply_proposal`, `import_route`), and a call to anything else is answered with a refusal. Its system text is the guide with a short preamble naming the user and the target. There is no policy layer: the guide decides when a change is direct and when it is a proposal. Every mutation records the assistant and its user; applying a proposal records the confirming user (H2).
+- Each write is reported from the tool's own answer: the turn's answer lists every write (the patch, where it landed, the revision, what it newly caused) and every proposal (its id and destination), and the conversation keeps one plain line for each, in words and naming no id. What a write caused (D7) the assistant says in its reply.
+- Served at `/api/journeys/{id}/assistant` and `/api/routes/{id}/draft/assistant` (POST a turn, GET the conversation), behind auth; a turn is outside the request duration, held instead to provider and turn limits. A turn ends with a reply, or stopped with the reason, and the writes before it stand.
+- One conversation per target per user keeps the dialogue and one plain line per write, not tool traffic. A turn carries no snapshot of its target: the model reads through tools.
 
 ## Auth
 

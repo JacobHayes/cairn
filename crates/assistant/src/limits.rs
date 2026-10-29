@@ -15,18 +15,10 @@ pub const TOOL_RESULT_BYTES_PER_TURN_MAX: u32 = 256 * 1024;
 /// billed.
 pub const TOOL_CALL_FAILURE_REPEAT_COUNT_MAX: u32 = 3;
 
-/// Retries of one provider call that was answered with a rate limit or a server error. A
-/// timeout is never retried: the provider may have billed the tokens.
-pub const PROVIDER_RETRY_COUNT_MAX: u32 = 2;
-
-/// The longest a provider may ask a retry to wait (its `Retry-After`); asked for longer, the
-/// call fails instead.
-pub const PROVIDER_RETRY_WAIT_MAX: Duration = Duration::from_secs(30);
-
 /// Tool calls run from one model reply: a reply asking for more is answered with a refusal
 /// for each call past this, so a reply cannot run past the turn's limits on tool calls
 /// alone. Borrowed from the iteration limit
-/// (decisions/2026-10-06-the-write-wrapper-decides-on-the-patch-a-tool-would-submit.md).
+/// (decisions/2026-10-29-the-assistant-is-a-loop-over-the-tools.md).
 pub const TOOL_CALL_COUNT_PER_REPLY_MAX: u32 = TOOL_LOOP_ITERATION_COUNT_MAX;
 
 /// Provider calls in one turn: a runaway stop, not a budget. Structuring a journey is a few
@@ -59,20 +51,15 @@ pub const CONVERSATION_MESSAGE_COUNT_MAX: u32 = cairn_schema::limits::PAGE_ITEM_
 
 /// Bytes of a conversation replayed to the provider each turn, the newest kept: four
 /// message bodies, about 64 thousand tokens, well inside every current model's context
-/// (decisions/2026-10-06-the-write-wrapper-decides-on-the-patch-a-tool-would-submit.md:
-/// pending the owner's sign-off as a named limit).
+/// (decisions/2026-10-29-the-assistant-is-a-loop-over-the-tools.md: pending the
+/// owner's sign-off as a named limit).
 pub const DIALOGUE_REPLAY_BYTES_MAX: u32 = 4 * cairn_schema::limits::BODY_BYTES_MAX;
 
 /// Bytes of one provider response read: the largest body Cairn takes in a request, since a
 /// reply's tool calls are bounded by what the tools accept
-/// (decisions/2026-10-06-the-write-wrapper-decides-on-the-patch-a-tool-would-submit.md).
+/// (decisions/2026-10-29-the-assistant-is-a-loop-over-the-tools.md).
 pub const PROVIDER_RESPONSE_BYTES_MAX: u32 = cairn_schema::limits::REQUEST_BYTES_MAX;
 
-// A call's retries, at their longest, fit in the call.
-const _: () = assert!(
-    PROVIDER_RETRY_WAIT_MAX.as_secs() * (PROVIDER_RETRY_COUNT_MAX as u64)
-        < PROVIDER_CALL_DURATION_MAX.as_secs()
-);
 // A provider call fits in a turn, several times over.
 const _: () = assert!(PROVIDER_CALL_DURATION_MAX.as_secs() * 4 <= TURN_DURATION_MAX.as_secs());
 // A conversation at its cap, every message at the body cap, is stored whole.

@@ -269,8 +269,8 @@ mod in_process {
     /// endpoints are served too.
     #[tokio::test]
     async fn requests_without_credentials_or_over_the_body_limit_are_refused() {
-        let provider = std::sync::Arc::new(cairn_assistant::scripted::ScriptedProvider::default());
-        let world = World::start_with_assistant(provider).await;
+        let provider = crate::assistant::provider::Provider::start().await;
+        let world = World::start_with_assistant(&provider).await;
         let anonymous = world.anonymous();
         for endpoint in cairn_api::endpoints::ALL {
             let placeholders = endpoint.path.matches('{').count();

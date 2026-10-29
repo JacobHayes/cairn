@@ -2,12 +2,11 @@
 //! assistant crate's own type so the wire and the turn cannot drift, and the conversation as
 //! kept, for a panel opened again.
 
-use cairn_schema::{ConversationId, Markdown, Timestamp};
-use cairn_store::MessageAuthor;
+use cairn_schema::{ConversationId, Markdown};
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
-pub use cairn_assistant::TurnReply;
+pub use cairn_assistant::{ConversationAuthor, ConversationEntry, TurnReply};
 
 /// `POST /api/journeys/{id}/assistant` and `POST /api/routes/{id}/draft/assistant`: one message of
 /// the caller's conversation about that journey or draft.
@@ -30,48 +29,4 @@ pub struct Conversation {
     /// Its messages, oldest first.
     #[serde(default)]
     pub messages: Vec<ConversationEntry>,
-}
-
-/// One kept message of a conversation.
-#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
-#[serde(deny_unknown_fields)]
-pub struct ConversationEntry {
-    /// Who wrote it.
-    pub author: ConversationAuthor,
-    /// When it was kept.
-    pub at: Timestamp,
-    /// What it says.
-    pub content: Markdown,
-}
-
-/// Who wrote a conversation message.
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
-#[serde(rename_all = "snake_case")]
-pub enum ConversationAuthor {
-    /// The user.
-    User,
-    /// The assistant.
-    Assistant,
-    /// Cairn, reporting a write the assistant made or how a turn ended.
-    Cairn,
-}
-
-impl From<cairn_store::ConversationMessage> for ConversationEntry {
-    fn from(message: cairn_store::ConversationMessage) -> Self {
-        let cairn_store::ConversationMessage {
-            author,
-            at,
-            content,
-        } = message;
-        let author = match author {
-            MessageAuthor::User => ConversationAuthor::User,
-            MessageAuthor::Assistant => ConversationAuthor::Assistant,
-            MessageAuthor::Tool => ConversationAuthor::Cairn,
-        };
-        Self {
-            author,
-            at,
-            content,
-        }
-    }
 }

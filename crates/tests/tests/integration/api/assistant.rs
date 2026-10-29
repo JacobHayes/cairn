@@ -6,7 +6,6 @@
 
 mod in_process {
     use std::net::SocketAddr;
-    use std::sync::Arc;
     use std::time::Duration;
 
     use axum::body::Body;
@@ -16,27 +15,26 @@ mod in_process {
     use cairn_api::client::Reply;
     use cairn_api::endpoints::{self as at, Endpoint};
     use cairn_api::wire::{Conversation, ConversationAuthor, MintedToken, TurnReply};
-    use cairn_assistant::scripted::{ScriptedProvider, Step};
-    use cairn_assistant::{Action, Ended, Provider, Reply as ModelReply};
+    use cairn_assistant::Ended;
     use cairn_service::wire::{Capabilities, Problem, ProblemCode};
     use serde_json::{Value, json};
     use tower::ServiceExt;
 
-    use cairn_schema::{Domain, Mutation, NodeKey};
+    use cairn_schema::Domain;
 
-    use cairn_api::client::Transport;
-
-    use crate::api::support::{World, get, ok, post, scenario};
+    use crate::api::support::{World, get, ok, post};
+    use crate::assistant::provider::{Provider, Step};
 
     const JOURNEY: &str = "j_vendor_eval";
 
-    fn scripted(steps: Vec<Step>) -> Arc<ScriptedProvider> {
-        Arc::new(ScriptedProvider::new(steps))
+    async fn scripted(steps: Vec<Step>) -> Provider {
+        let provider = Provider::start().await;
+        provider.script(steps);
+        provider
     }
 
-    async fn with_assistant(provider: &Arc<ScriptedProvider>) -> World {
-        let shared: Arc<dyn Provider> = Arc::clone(provider) as Arc<dyn Provider>;
-        World::start_with_assistant(shared).await
+    async fn with_assistant(provider: &Provider) -> World {
+        World::start_with_assistant(provider).await
     }
 
     /// Where `reply` departs from the document's schema for `endpoint` at its status.
@@ -84,7 +82,7 @@ mod in_process {
             assert_eq!(read.status, StatusCode::NOT_FOUND, "{target}");
         }
 
-        let provider = scripted(vec![Step::say("Hello."), Step::say("Hello again.")]);
+        let provider = scripted(vec![Step::say("Hello."), Step::say("Hello again.")]).await;
         let with = with_assistant(&provider).await;
         let ann = with.vendor_after(1).await;
         let capabilities: Capabilities = get(&ann, "/api/capabilities").await;
@@ -122,7 +120,8 @@ mod in_process {
         let provider = scripted(vec![
             Step::call("update_journey_state", complete),
             Step::say("Kickoff is done."),
-        ]);
+        ])
+        .await;
         let world = with_assistant(&provider).await;
         let ann = world.vendor_after(2).await;
         let target = at::ASSISTANT_JOURNEY_CONVERSATION.path_with(&[JOURNEY]);
@@ -158,13 +157,15 @@ mod in_process {
             "mutations": [{ "op": "transition", "node": "n_kickoff", "transition": "complete" }] });
         let add = json!({ "op": "add_node", "node": { "key": "n_extra", "id": "extra",
             "kind": "action", "title": "An extra step" } });
-        let structure = json!({ "patch_id": "p_extra", "target": { "journey": JOURNEY },
-            "base_revision": 3, "mutations": [add] });
+        let create = json!({ "proposal": "pr_extra", "destination": { "journey": JOURNEY },
+            "draft": { "title": "Add a step", "destination_revision": 3, "mutations": [add] },
+            "patch_id": "p_extra" });
         let provider = scripted(vec![
             Step::call("update_journey_state", complete),
-            Step::call("apply_patch", structure),
+            Step::call("create_proposal", create),
             Step::say("Kickoff is done; the extra step is proposed."),
-        ]);
+        ])
+        .await;
         let world = with_assistant(&provider).await;
         let ann = world.vendor_after(2).await;
         let said = json!({ "message": "Kickoff happened; add an extra step." });
@@ -175,15 +176,16 @@ mod in_process {
         );
         let turn: TurnReply = ok(&reply);
         assert_eq!(turn.ended, Ended::Replied);
-        let [Action::Applied { nodes, .. }, Action::Proposed { .. }] = turn.actions.as_slice()
-        else {
-            panic!("{:?}", turn.actions);
+        let [write] = turn.writes.as_slice() else {
+            panic!("{:?}", turn.writes);
         };
-        let kickoff: NodeKey = "n_kickoff".parse().unwrap();
+        assert_eq!(write.revision.to_string(), "3");
+        let [proposed] = turn.proposals.as_slice() else {
+            panic!("{:?}", turn.proposals);
+        };
         assert_eq!(
-            nodes,
-            &[kickoff],
-            "the direct write names the node it wrote"
+            proposed.destination,
+            Domain::Journey(JOURNEY.parse().unwrap())
         );
         assert_eq!(
             world.revision(JOURNEY).await,
@@ -196,7 +198,7 @@ mod in_process {
     /// whatever it was asked; one that is not, such as listing the user's tokens, answers it.
     #[tokio::test]
     async fn every_endpoint_for_users_only_refuses_an_agent() {
-        let provider = scripted(Vec::new());
+        let provider = scripted(Vec::new()).await;
         let world = with_assistant(&provider).await;
         let ann = world.vendor_after(1).await;
         let minted = post(&ann, "/api/users/me/tokens", &json!({ "name": "Helper" })).await;
@@ -237,7 +239,7 @@ mod in_process {
     /// and no provider call is made.
     #[tokio::test]
     async fn a_turn_about_a_missing_journey_is_not_found() {
-        let provider = scripted(Vec::new());
+        let provider = scripted(Vec::new()).await;
         let world = with_assistant(&provider).await;
         let ann = world.vendor_after(1).await;
         let said = json!({ "message": "Hello." });
@@ -252,18 +254,18 @@ mod in_process {
             violations(&at::ASSISTANT_JOURNEY, &missing),
             Vec::<String>::new()
         );
-        assert_eq!(provider.exchanges().len(), 0, "no provider call was made");
+        assert_eq!(provider.request_count(), 0, "no provider call was made");
     }
 
     /// PRACTICES, Explicit limits: a turn is not held to the API's five-second request
     /// duration; a provider call past its own limit ends the turn, reported.
     #[tokio::test(start_paused = true)]
     async fn a_turn_runs_past_the_request_duration_under_its_own_limits() {
-        let slow = ModelReply {
-            text: Some("Done, slowly.".to_owned()),
-            ..ModelReply::default()
-        };
-        let provider = scripted(vec![Step::Slow(Duration::from_secs(30), slow), Step::Hang]);
+        let provider = scripted(vec![
+            Step::say("Done, slowly.").after(Duration::from_secs(30)),
+            Step::hang(),
+        ])
+        .await;
         let world = with_assistant(&provider).await;
         world.vendor_after(1).await;
         let turn = |message: &str| {
@@ -276,130 +278,29 @@ mod in_process {
                 .unwrap();
             world.router.clone().oneshot(request)
         };
-        for (message, ended) in [
-            ("Slowly.", Ended::Replied),
-            ("Again.", Ended::ProviderTimedOut),
-        ] {
+        let mut stopped = Vec::new();
+        for message in ["Slowly.", "Again."] {
             let response = turn(message).await.unwrap();
             assert_eq!(response.status(), StatusCode::OK, "{message}");
             let body = axum::body::to_bytes(response.into_body(), usize::MAX)
                 .await
                 .unwrap();
             let answered: TurnReply = serde_json::from_slice(&body).unwrap();
-            assert_eq!(answered.ended, ended, "{message}");
+            stopped.push(answered.ended);
         }
-    }
-
-    /// The mutations a scenario step's proposal drafts, as JSON.
-    fn proposed(fixture: &str, step: usize) -> Value {
-        let scenario = scenario(fixture);
-        let patch = &scenario.steps.as_slice()[step].patch;
-        let Mutation::CreateProposal { proposal } = &patch.mutations.as_slice()[0] else {
-            panic!("step {step} drafts no proposal");
-        };
-        serde_json::to_value(proposal.mutations.as_slice()).unwrap()
-    }
-
-    /// I5, I7, H2, D7, PRD Success criteria: a conversation over HTTP. An empty
-    /// journey with no route is structured through one proposal the user applies; a state
-    /// change applies directly with its consequences; and a provider that stops answering is
-    /// reported.
-    #[tokio::test(start_paused = true)]
-    async fn a_conversation_structures_reports_and_times_out() {
-        let provider = scripted(Vec::new());
-        let world = with_assistant(&provider).await;
-        let ann = world.vendor_after(1).await;
-        let bakeoff = scenario("bake-off");
-        let empty = json!({ "patch": bakeoff.steps.as_slice()[0].patch });
-        ok::<Value>(&post(&ann, "/api/journeys/j_bakeoff/patches", &empty).await);
-
-        structure_an_ad_hoc_journey(&world, &provider, &ann).await;
-        answer_directly(&world, &provider, &ann).await;
-        time_out(&world, &provider, &ann).await;
-    }
-
-    /// The empty bake-off journey structured through one proposal the user applies (H2, I7).
-    async fn structure_an_ad_hoc_journey(
-        world: &World,
-        provider: &ScriptedProvider,
-        ann: &Transport,
-    ) {
-        let structure = json!({ "patch_id": "p_bakeoff_structure",
-            "target": { "journey": "j_bakeoff" }, "base_revision": 1,
-            "mutations": proposed("bake-off", 1),
-            "note": "Structure a two-week bake-off between two options" });
-        let read = json!({ "journey": "j_bakeoff" });
-        provider.push([
-            Step::call("get_snapshot", read.clone()),
-            Step::call("apply_patch", structure),
-            Step::say("I drafted the bake-off's structure as one proposal for you to review."),
-        ]);
-        let said = json!({ "message": "A two-week bake-off between two options: three \
-            decisions, four deliverables, and a decision milestone. Set it up." });
-        let reply = post(ann, "/api/journeys/j_bakeoff/assistant", &said).await;
-        let turn: TurnReply = ok(&reply);
-        let [
-            Action::Proposed {
-                proposal,
-                destination,
-                ..
-            },
-        ] = turn.actions.as_slice()
-        else {
-            panic!("{:?}", turn.actions);
-        };
-        assert_eq!(*destination, Domain::Journey("j_bakeoff".parse().unwrap()));
-        assert_eq!(
-            world.revision("j_bakeoff").await,
-            1,
-            "drafting moves nothing"
-        );
-        let apply = json!({ "patch_id": "p_apply_bakeoff", "reviewed_revision": 1 });
-        let applied = post(
-            ann,
-            &format!("/api/journeys/j_bakeoff/proposals/{proposal}/apply"),
-            &apply,
-        )
-        .await;
-        ok::<Value>(&applied);
-        assert_eq!(world.revision("j_bakeoff").await, 2);
-        let events: Value = get(ann, "/api/events?patch=p_apply_bakeoff&size=1").await;
-        let event = &events["items"][0]["event"];
-        assert_eq!(event["actor"]["agent"], "ag_assistant");
-        assert_eq!(event["confirming_user"], event["actor"]["user"]);
-    }
-
-    /// The up-front decisions answered directly, reported with what they caused (D7).
-    async fn answer_directly(world: &World, provider: &ScriptedProvider, ann: &Transport) {
-        // The shared people are the deployment's revision 1.
-        let mut answers = proposed_answers();
-        for answer in answers.as_array_mut().unwrap() {
-            if answer["decision"] == "n_meeting_date" {
-                answer["value"] = json!({ "date": "2026-10-06" });
-            }
-        }
-        let answer = json!({ "patch_id": "p_up_front", "target": { "journey": JOURNEY },
-            "base_revision": 1, "deployment_revision": 1, "mutations": answers });
-        provider.push([
-            Step::call("apply_patch", answer),
-            Step::say("Answered. The decision meeting on the 6th leaves the work before it short."),
-        ]);
-        let said = json!({ "message": "Answer the up-front decisions: purchase, I own it, \
-            both stakeholders informed, no partner, and the meeting is on the 6th." });
-        let reply = post(ann, "/api/journeys/j_vendor_eval/assistant", &said).await;
-        let turn: TurnReply = ok(&reply);
+        assert_eq!(stopped[0], Ended::Replied);
         assert!(
-            matches!(turn.actions.as_slice(), [Action::Applied { consequences, .. }]
-            if consequences.values().any(|caused| !caused.shortfalls.is_empty()))
+            matches!(stopped[1], Ended::Stopped { .. }),
+            "{:?}",
+            stopped[1]
         );
-        assert_eq!(world.revision(JOURNEY).await, 2, "the answers landed");
     }
 
     /// A message sent while a reply in the same conversation is still being written is told
     /// to wait, with its own problem code, not the one for an overloaded process.
     #[tokio::test(start_paused = true)]
     async fn a_message_sent_during_a_reply_is_told_to_wait() {
-        let provider = scripted(vec![Step::Hang]);
+        let provider = scripted(vec![Step::hang()]).await;
         let world = with_assistant(&provider).await;
         let ann = world.vendor_after(1).await;
         let said = json!({ "message": "Hello." });
@@ -408,31 +309,5 @@ mod in_process {
         assert_eq!(again.status, StatusCode::CONFLICT);
         let problem = again.json::<Problem>().unwrap();
         assert_eq!(problem.error, ProblemCode::TurnInProgress);
-    }
-
-    /// A provider that stops answering, after a write that stands.
-    async fn time_out(world: &World, provider: &ScriptedProvider, ann: &Transport) {
-        let snooze =
-            json!({ "op": "snooze", "node": "n_access", "until": { "date": "2026-10-05" } });
-        let snooze = json!({ "journey": JOURNEY, "patch_id": "p_snooze_access", "base_revision": 2,
-            "mutations": [snooze] });
-        provider.push([Step::call("update_journey_state", snooze), Step::Hang]);
-        let said = json!({ "message": "Snooze the access request until Monday, then tell me \
-            what is next." });
-        let reply = post(ann, "/api/journeys/j_vendor_eval/assistant", &said).await;
-        let turn: TurnReply = ok(&reply);
-        assert_eq!(turn.ended, Ended::ProviderTimedOut);
-        assert!(matches!(turn.actions.as_slice(), [Action::Applied { .. }]));
-        assert_eq!(
-            world.revision(JOURNEY).await,
-            3,
-            "the write before it stands"
-        );
-    }
-
-    /// The vendor evaluation's up-front answers (its scenario's second step), as JSON.
-    fn proposed_answers() -> Value {
-        let scenario = scenario("vendor-evaluation");
-        serde_json::to_value(scenario.steps.as_slice()[1].patch.mutations.as_slice()).unwrap()
     }
 }

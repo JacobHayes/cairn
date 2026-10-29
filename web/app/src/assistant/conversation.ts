@@ -1,94 +1,47 @@
 // One conversation as the panel shows it (I5), held per target for the tab by the session's
-// conversation manager rather than by a mounted panel: what the host keeps, the tab's kept
-// turns beside it, a turn in flight, and any turn the host answered but did not keep. A panel
-// closed while a turn runs shows its answer when opened again, and a read begun before an
-// answer arrived never replaces the answer.
+// conversation manager rather than by a mounted panel: what the host keeps, a turn in flight,
+// and the proposals the last turn drafted. A panel closed while a turn runs shows its answer
+// when opened again, and a read begun before an answer arrived never replaces the answer.
 //
 // The read and the turn are invoked actors, and the guarantee holds by construction rather
-// than by counting: a turn stops the read in flight by leaving `reading`, it ends in a read of
-// its own (`rereading`, or `reading` when the turn failed), and nothing starts another read
-// while it is out. An answer that arrives after the conversation stopped (the session
-// closed) changes nothing, because a stopped actor hears nothing.
+// than by counting: a turn stops the read in flight by leaving `reading`, and nothing starts
+// another read while it is out. A turn's answer carries what it added to the conversation,
+// shown as it arrives and replaced by the host's own on the next read. An answer that arrives
+// after the conversation stopped (the session closed) changes nothing, because a stopped
+// actor hears nothing.
 import { networkFailure, type HttpFailure } from "@cairn/client";
 import { assign, fromPromise, setup, waitFor, type ActorRefFrom, type SnapshotFrom } from "xstate";
 
-import type { AssistantHost, AssistantTarget, Conversation, TurnOutcome, TurnReply } from "../data/assistant.ts";
-import { DRAFT_PREFIX, readDraft, writeDraft } from "../data/drafts.ts";
-import { answeredEntries, holdsTurn, keeping, keptTurn, latestAnswerAt, type KeptTurn, type Unsaved } from "./model.ts";
+import type { AssistantHost, AssistantTarget, Conversation, Proposed, TurnOutcome } from "../data/assistant.ts";
 
 export type Read = { status: "loading" } | { status: "failed"; message: string } | { status: "ready"; conversation: Conversation };
 
 /** What the panel shows of one conversation. */
 export interface ConversationView {
   read: Read;
-  kept: readonly KeptTurn[];
-  unsaved: readonly Unsaved[];
+  /** The proposals the last turn left for review. */
+  proposals: readonly Proposed[];
   /** The words of the turn in flight, if one is. */
   sending: string | undefined;
   /** Why the last turn was not answered, or its conversation not read again. */
   failure: HttpFailure | undefined;
 }
 
-/** The tab's kept turns of each conversation (session storage, beside the drafts). */
-export interface KeptTurns {
-  read(conversation: string): KeptTurn[];
-  write(conversation: string, turns: KeptTurn[]): void;
-}
-
-/** What every build's kept-turn keys start with, this one's included. */
-const KEPT_PREFIX = "assistant-turns";
-
-/**
- * Where a conversation's kept turns are stored. The version names the turns' shape: a tab open
- * across a deploy that changed it holds turns under an earlier version's key, which this build
- * never reads (a direct change kept before it said what it did has nothing to show).
- */
-export const keptKey = (conversation: string): string => `${KEPT_PREFIX}-3:${conversation}`;
-
-/**
- * Removes the turns an earlier build kept in `storage` (a tab's session storage; none where it
- * is unavailable), once at boot. Unread, they would only take space: without them the
- * conversation shows those turns' reports as Cairn kept them, as text.
- */
-export function forgetEarlierKeptTurns(storage: Storage | undefined): void {
-  if (storage === undefined) {
-    return;
-  }
-  const current = `${DRAFT_PREFIX}${keptKey("")}`;
-  const earlier = (key: string | null): key is string => key?.startsWith(`${DRAFT_PREFIX}${KEPT_PREFIX}`) === true && !key.startsWith(current);
-  try {
-    const keys = Array.from({ length: storage.length }, (_, at) => storage.key(at)).filter(earlier);
-    for (const key of keys) {
-      storage.removeItem(key);
-    }
-  } catch {
-    // Storage refused: the earlier keys stay, unread.
-  }
-}
-
-export const draftTurns: KeptTurns = {
-  read: (conversation) => readDraft<KeptTurn[]>(keptKey(conversation)) ?? [],
-  write: (conversation, turns) => {
-    writeDraft(keptKey(conversation), turns);
-  },
-};
-
 export interface ConversationInput {
   assistant: AssistantHost;
   target: AssistantTarget;
-  turns: KeptTurns;
 }
 
 interface ConversationContext extends ConversationInput {
   read: Read;
-  kept: readonly KeptTurn[];
-  unsaved: readonly Unsaved[];
+  proposals: readonly Proposed[];
   /** The words of the turn sent last. */
   text: string;
-  /** What the host answered it, until the conversation has been read again. */
-  reply: TurnReply | undefined;
   failure: HttpFailure | undefined;
 }
+
+/** What the failure says of a turn whose answer never arrived: it may have written. */
+export const ANSWER_LOST = "The reply did not arrive. The assistant may have made changes: check the journey before sending again.";
 
 export type ConversationEvent =
   /** Reads the conversation again, as the panel opens. */
@@ -97,6 +50,9 @@ export type ConversationEvent =
   | { type: "send"; text: string };
 
 const message = (thrown: unknown): string => (thrown instanceof Error ? thrown.message : String(thrown));
+
+/** A failure of a turn: when no answer came back (the connection, or a gateway in between, failed), the host may still have acted on it. */
+const unanswered = (failure: HttpFailure): HttpFailure => ([0, 502, 504].includes(failure.status) ? { status: 0, message: ANSWER_LOST } : failure);
 
 const answered = (outcome: TurnOutcome): outcome is Extract<TurnOutcome, { outcome: "answered" }> => outcome.outcome === "answered";
 
@@ -107,17 +63,12 @@ export const conversationMachine = setup({
     turn: fromPromise<TurnOutcome, ConversationInput & { text: string }>(({ input }) => input.assistant.turn(input.target, input.text)),
   },
   actions: {
-    begin: assign({ text: ({ event }) => (event as Extract<ConversationEvent, { type: "send" }>).text, failure: undefined, reply: undefined }),
-    // The turn's answer is kept beside the conversation when the host holds it too.
-    keep: ({ context }) => {
-      if (context.read.status === "ready") {
-        context.turns.write(context.read.conversation.conversation, [...context.kept]);
-      }
-    },
+    begin: assign({ text: ({ event }) => (event as Extract<ConversationEvent, { type: "send" }>).text, failure: undefined, proposals: [] }),
+    ready: assign({ read: ({ event }) => ({ status: "ready" as const, conversation: (event as unknown as { output: Conversation }).output }) }),
   },
 }).createMachine({
   id: "conversation",
-  context: ({ input }) => ({ ...input, read: { status: "loading" }, kept: [], unsaved: [], text: "", reply: undefined, failure: undefined }),
+  context: ({ input }) => ({ ...input, read: { status: "loading" }, proposals: [], text: "", failure: undefined }),
   initial: "reading",
   states: {
     idle: { on: { refresh: "reading", send: { target: "sending", actions: "begin" } } },
@@ -125,14 +76,8 @@ export const conversationMachine = setup({
     reading: {
       invoke: {
         src: "read",
-        input: ({ context }) => ({ assistant: context.assistant, target: context.target, turns: context.turns }),
-        onDone: {
-          target: "idle",
-          actions: assign(({ context, event }) => ({
-            read: { status: "ready" as const, conversation: event.output },
-            kept: context.turns.read(event.output.conversation),
-          })),
-        },
+        input: ({ context }) => ({ assistant: context.assistant, target: context.target }),
+        onDone: { target: "idle", actions: "ready" },
         onError: { target: "idle", actions: assign({ read: ({ event }) => ({ status: "failed" as const, message: message(event.error) }) }) },
       },
       on: { refresh: { target: "reading", reenter: true }, send: { target: "sending", actions: "begin" } },
@@ -142,58 +87,23 @@ export const conversationMachine = setup({
       tags: ["busy"],
       invoke: {
         src: "turn",
-        input: ({ context }) => ({ assistant: context.assistant, target: context.target, turns: context.turns, text: context.text }),
+        input: ({ context }) => ({ assistant: context.assistant, target: context.target, text: context.text }),
         onDone: [
-          { guard: ({ event }) => !answered(event.output), target: "reading", actions: assign({ failure: ({ event }) => (event.output.outcome === "failed" ? event.output.error : undefined) }) },
-          { target: "rereading", actions: assign({ reply: ({ event }) => (answered(event.output) ? event.output.reply : undefined) }) },
-        ],
-        onError: { target: "reading", actions: assign({ failure: ({ event }) => networkFailure(event.error) }) },
-      },
-    },
-    // The turn was answered: the conversation is read again, and the turn is kept or held out of it.
-    rereading: {
-      tags: ["busy"],
-      invoke: {
-        src: "read",
-        input: ({ context }) => ({ assistant: context.assistant, target: context.target, turns: context.turns }),
-        onDone: [
-          {
-            guard: ({ context, event }) => context.reply !== undefined && holdsTurn(event.output.messages, context.text, context.reply),
-            target: "idle",
-            actions: [
-              assign(({ context, event }) => {
-                const stored = context.turns.read(event.output.conversation);
-                const at = latestAnswerAt(event.output.messages);
-                const reply = context.reply;
-                return {
-                  read: { status: "ready" as const, conversation: event.output },
-                  kept: at === undefined || reply === undefined ? stored : keeping(stored, keptTurn(at, reply)),
-                  reply: undefined,
-                };
-              }),
-              "keep",
-            ],
-          },
+          { guard: ({ event }) => !answered(event.output), target: "reading", actions: assign({ failure: ({ event }) => (event.output.outcome === "failed" ? unanswered(event.output.error) : undefined) }) },
           {
             target: "idle",
-            actions: assign(({ context, event }) => ({
-              read: { status: "ready" as const, conversation: event.output },
-              unsaved: context.reply === undefined ? context.unsaved : [...context.unsaved, { after: event.output.messages.length, entries: answeredEntries(context.text, context.reply, new Date().toISOString()) }],
-              reply: undefined,
-            })),
+            actions: assign(({ context, event }) => {
+              const reply = answered(event.output) ? event.output.reply : undefined;
+              const held = context.read.status === "ready" ? context.read.conversation.messages : [];
+              return {
+                read: reply === undefined ? context.read : { status: "ready" as const, conversation: { conversation: reply.conversation, messages: [...held, ...(reply.messages)] } },
+                proposals: (reply?.proposals ?? []).filter((each) => each.discarded !== true),
+              };
+            }),
           },
         ],
-        onError: {
-          target: "idle",
-          actions: assign(({ context, event }) => ({
-            unsaved:
-              context.reply === undefined
-                ? context.unsaved
-                : [...context.unsaved, { after: context.read.status === "ready" ? context.read.conversation.messages.length : 0, entries: answeredEntries(context.text, context.reply, new Date().toISOString()) }],
-            failure: { status: 0, message: `the reply arrived, but the conversation could not be read again (${message(event.error)})` },
-            reply: undefined,
-          })),
-        },
+        // The request may have reached the host: what it wrote is in the conversation, read again.
+        onError: { target: "reading", actions: assign({ failure: ({ event }) => unanswered(networkFailure(event.error)) }) },
       },
     },
   },
@@ -204,14 +114,14 @@ export type ConversationSnapshot = SnapshotFrom<typeof conversationMachine>;
 
 /** What the panel shows of the conversation: the turn in flight is the state, not a field beside it. */
 export function conversationView(snapshot: ConversationSnapshot): ConversationView {
-  const { read, kept, unsaved, text, failure } = snapshot.context;
-  return { read, kept, unsaved, sending: snapshot.hasTag("busy") ? text : undefined, failure };
+  const { read, proposals, text, failure } = snapshot.context;
+  return { read, proposals, sending: snapshot.hasTag("busy") ? text : undefined, failure };
 }
 
 /**
- * I5: sends `text` as one turn; answers whether the host answered it, once the conversation
- * has been read again (also when that read failed). False for a turn the host did not answer,
- * one sent while another is out, and one whose conversation stopped meanwhile.
+ * I5: sends `text` as one turn; answers whether the host answered it. False for a turn the
+ * host did not answer, one sent while another is out, and one whose conversation stopped
+ * meanwhile.
  */
 export async function sendTurn(ref: ConversationRef, text: string): Promise<boolean> {
   if (ref.getSnapshot().hasTag("busy")) {
@@ -223,11 +133,7 @@ export async function sendTurn(ref: ConversationRef, text: string): Promise<bool
   }
   try {
     const left = await waitFor(ref, (snapshot) => !snapshot.matches("sending"), { timeout: Infinity });
-    if (!left.matches("rereading")) {
-      return false;
-    }
-    await waitFor(ref, (snapshot) => !snapshot.hasTag("busy"), { timeout: Infinity });
-    return true;
+    return left.matches("idle");
   } catch {
     return false;
   }

@@ -249,7 +249,7 @@ function DraftFrame({ shown, derived, schedule, authored, selected, edge, write,
   const columned = wide || phone;
   const head = (
     <>
-      <RouteHeader route={shown.route} of="draft" screen={screen} node={selected} write={write} blocked={blocked} onBlocked={onBlocked} onPublish={publish} titleOf={titleOf} imports={imports} />
+      <RouteHeader route={shown.route} of="draft" screen={screen} node={selected} write={write} blocked={blocked} onBlocked={onBlocked} onPublish={publish} imports={imports} />
       <ResultOf result={result} setResult={setResult} hrefOf={hrefOf} />
       {wide || screen !== "graph" ? null : <DraftSummary violations={violations.length} notices={notices.length} list={routeSwitched(id, search, "list", undefined)} />}
       <div className="row route-tools">
@@ -283,7 +283,6 @@ function VersionFrame({ shown, derived, schedule, selected, edge, write, result,
   const wide = useMedia(COLUMN);
   const phone = useMedia(PHONE_WIDTH);
   const tree = useMemo(() => treeOf(shown.graph), [shown.graph]);
-  const draftTitle = (key: string) => (shown.route.draft?.graph.nodes ?? []).find((node) => node.key === key)?.title;
   const version = shown.of === "draft" ? 0 : shown.of;
   const fills = screen === "graph";
   // The same address the canvas's background goes to: a bare address stays bare, a named version stays named.
@@ -292,7 +291,7 @@ function VersionFrame({ shown, derived, schedule, selected, edge, write, result,
   const card = read === undefined ? null : <VersionCard read={read} version={version} stages={<RouteStages shown={valueOf(derived)} schedule={schedule} framing={screen === "graph"} />} />;
   const head = (
     <>
-      <RouteHeader route={shown.route} of={shown.of} screen={screen} node={selected} write={write} blocked={undefined} onPublish={undefined} titleOf={draftTitle} imports={imports} />
+      <RouteHeader route={shown.route} of={shown.of} screen={screen} node={selected} write={write} blocked={undefined} onPublish={undefined} imports={imports} />
       <ResultOf result={result} setResult={setResult} hrefOf={undefined} />
     </>
   );
@@ -323,7 +322,7 @@ function EmptyRoute({ route, write, imports }: { route: Route; write: ScreenWrit
   return (
     <div className="ws-fill journey-frame route-frame" data-testid="route-frame" data-screen="empty">
       <div className="ws-head stack journey-head">
-        <RouteHeader route={route} of={undefined} screen={undefined} node={undefined} write={write} blocked={undefined} onPublish={undefined} titleOf={() => undefined} imports={imports} />
+        <RouteHeader route={route} of={undefined} screen={undefined} node={undefined} write={write} blocked={undefined} onPublish={undefined} imports={imports} />
       </div>
       <div className="journey-body journey-scroll stack">
         <div className="callout stack" data-testid="route-empty">
@@ -351,7 +350,7 @@ function LayerFrame({ shown, route, selected, imports, write }: { shown: Shown; 
   const id = route.header.id;
   const head = (
     <>
-      <RouteHeader route={route} of={shown.of} screen={screen} node={selected} write={write} blocked={undefined} onPublish={undefined} titleOf={() => undefined} imports={imports} />
+      <RouteHeader route={route} of={shown.of} screen={screen} node={selected} write={write} blocked={undefined} onPublish={undefined} imports={imports} />
       <Band />
     </>
   );

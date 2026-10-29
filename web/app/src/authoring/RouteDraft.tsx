@@ -61,8 +61,6 @@ export interface RouteHeaderProps {
   onPublish: (() => void) | undefined;
   /** The import workflow, owned above the frames so a discard that swaps the frame does not end it. */
   imports: ImportFlow;
-  /** The nodes' titles, for the assistant's view of the draft. */
-  titleOf: (key: string) => string | undefined;
 }
 
 /** The import control in the `⋯`: the menu closes once the file has landed. */
@@ -117,7 +115,7 @@ function RouteMenu({ route, of, write, imports, send, onDelete }: { route: Route
  * and on the right the View picker, the primary (Publish on the draft, Open a draft on a version
  * when none is open) and the `⋯` (RouteMenu); deleting the route asks under the header.
  */
-export function RouteHeader({ route, of, screen, node, write, blocked, onBlocked, onPublish, imports, titleOf }: RouteHeaderProps) {
+export function RouteHeader({ route, of, screen, node, write, blocked, onBlocked, onPublish, imports }: RouteHeaderProps) {
   const id = route.header.id;
   const { search } = useLocation();
   const drafting = of === "draft";
@@ -141,7 +139,7 @@ export function RouteHeader({ route, of, screen, node, write, blocked, onBlocked
         {of === undefined ? null : reviewing ? <Tip tip="The proposal is shown over this graph" tap><Badge data-testid="version-select">{of === "draft" ? draftWords(route) : `Version ${String(of)}`}</Badge></Tip> : <VersionSelect route={route} of={of} />}
         {route.header.retired === true ? <RetiredBadge kind={route.header.kind} /> : null}
         <span className="spacer" />
-        <AssistantDock target={{ route: id }} titleOf={titleOf} />
+        <AssistantDock target={{ route: id }} />
         {screen === undefined ? null : <ViewPicker screen={screen} screens={ROUTE_OFFERS.screens} to={(to) => routeSwitched(id, search, to, node, proposal)} tip={ROUTE_VIEW_TIP} />}
         {!writable || deleting.asking ? null : drafting ? (
           <Button primary disabled={write.disabled} held={write.disabled ? undefined : blocked} {...(onBlocked === undefined ? {} : { onHeld: onBlocked })} data-testid="publish-draft" onClick={onPublish}>

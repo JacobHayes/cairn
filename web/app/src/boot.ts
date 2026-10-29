@@ -7,8 +7,6 @@ import { DeriveWorker, compileEngine } from "@cairn/wasm";
 import wasmUrl from "../../wasm/dist/bindgen/cairn_wasm_bg.wasm?url";
 
 import { installTitleMeasure } from "./canvas/measure.ts";
-import { forgetEarlierKeptTurns } from "./assistant/conversation.ts";
-import { tabStorage } from "./data/drafts.ts";
 import { serverHost } from "./data/server-host.ts";
 import { Session } from "./data/session.ts";
 
@@ -25,6 +23,5 @@ export async function boot(): Promise<Session> {
   // Before any card is laid out: a card's size is counted from its title's width in the loaded face.
   const [deriver] = await Promise.all([DeriveWorker.start(module), installTitleMeasure()]);
   const host = serverHost(location.origin, build());
-  forgetEarlierKeptTurns(tabStorage());
   return Session.start({ host, deriver });
 }

@@ -1,130 +1,6 @@
 {
   "components": {
     "schemas": {
-      "Action": {
-        "description": "A write the assistant made, as the turn reports it (every direct write is reported\nwith its consequences).",
-        "oneOf": [
-          {
-            "description": "Applied directly, as one patch.",
-            "properties": {
-              "consequences": {
-                "additionalProperties": false,
-                "description": "What it newly caused in each journey it changed.",
-                "patternProperties": {
-                  "^j_[a-z0-9][a-z0-9_-]*$": {
-                    "$ref": "#/components/schemas/Consequences"
-                  }
-                },
-                "type": "object"
-              },
-              "nodes": {
-                "description": "The nodes it wrote, in key order (a direct change is reported with the nodes\nit affected, which the panel links to); none for a write to no journey's nodes.",
-                "items": {
-                  "$ref": "#/components/schemas/NodeKey"
-                },
-                "type": "array"
-              },
-              "outcome": {
-                "const": "applied",
-                "type": "string"
-              },
-              "receipt": {
-                "$ref": "#/components/schemas/AppliedReceipt",
-                "description": "Which patch, where, and the revision it produced."
-              },
-              "report": {
-                "description": "What it did, in words: each kind of change once in the order its patch first\nmakes it, the nodes it wrote, and what it newly caused, each node as\n`journey/node` code (\"Added a note, marked done: `j_one/n_kickoff`.\"). The panel\nshows it and the conversation keeps it, the same text.",
-                "type": "string"
-              }
-            },
-            "required": [
-              "outcome",
-              "report",
-              "receipt"
-            ],
-            "type": "object"
-          },
-          {
-            "description": "A write whose patch id was applied before, with the same content: answered from that\nwrite's receipt, and not applied again.",
-            "properties": {
-              "outcome": {
-                "const": "already_applied",
-                "type": "string"
-              },
-              "receipt": {
-                "$ref": "#/components/schemas/AppliedReceipt",
-                "description": "The earlier write's receipt."
-              },
-              "tool": {
-                "description": "The tool.",
-                "type": "string"
-              }
-            },
-            "required": [
-              "outcome",
-              "tool",
-              "receipt"
-            ],
-            "type": "object"
-          },
-          {
-            "description": "Drafted as a proposal for the user to review and apply.",
-            "properties": {
-              "because": {
-                "$ref": "#/components/schemas/Because",
-                "description": "Why it is a proposal."
-              },
-              "destination": {
-                "$ref": "#/components/schemas/Domain",
-                "description": "Its destination, under which it is addressed."
-              },
-              "outcome": {
-                "const": "proposed",
-                "type": "string"
-              },
-              "proposal": {
-                "$ref": "#/components/schemas/ProposalId",
-                "description": "The proposal."
-              },
-              "tool": {
-                "description": "The tool.",
-                "type": "string"
-              }
-            },
-            "required": [
-              "outcome",
-              "tool",
-              "proposal",
-              "destination",
-              "because"
-            ],
-            "type": "object"
-          },
-          {
-            "description": "An open proposal discarded, at the assistant's hand.",
-            "properties": {
-              "outcome": {
-                "const": "discarded",
-                "type": "string"
-              },
-              "proposal": {
-                "$ref": "#/components/schemas/ProposalId",
-                "description": "The proposal."
-              },
-              "tool": {
-                "description": "The tool.",
-                "type": "string"
-              }
-            },
-            "required": [
-              "outcome",
-              "tool",
-              "proposal"
-            ],
-            "type": "object"
-          }
-        ]
-      },
       "Actor": {
         "additionalProperties": false,
         "description": "Who made a change: a user, or an agent acting for one.",
@@ -537,29 +413,6 @@
           }
         ]
       },
-      "AppliedReceipt": {
-        "description": "What the report of an applied write names: the patch, its domain, and the revision it\nproduced.",
-        "properties": {
-          "domain": {
-            "$ref": "#/components/schemas/Domain",
-            "description": "The domain it was committed to."
-          },
-          "patch_id": {
-            "$ref": "#/components/schemas/PatchId",
-            "description": "The patch id."
-          },
-          "revision": {
-            "$ref": "#/components/schemas/Revision",
-            "description": "The revision it produced."
-          }
-        },
-        "required": [
-          "patch_id",
-          "domain",
-          "revision"
-        ],
-        "type": "object"
-      },
       "AssistantRequest": {
         "additionalProperties": false,
         "description": "`POST /api/journeys/{id}/assistant` and `POST /api/routes/{id}/draft/assistant`: one message of\nthe caller's conversation about that journey or draft.",
@@ -629,37 +482,6 @@
           "kind"
         ],
         "type": "object"
-      },
-      "Because": {
-        "description": "Why a write became a proposal.",
-        "oneOf": [
-          {
-            "description": "It changes structure, or writes a route or its draft.",
-            "properties": {
-              "reason": {
-                "const": "structural",
-                "type": "string"
-              }
-            },
-            "required": [
-              "reason"
-            ],
-            "type": "object"
-          },
-          {
-            "description": "The assistant drafted it as a proposal itself.",
-            "properties": {
-              "reason": {
-                "const": "asked",
-                "type": "string"
-              }
-            },
-            "required": [
-              "reason"
-            ],
-            "type": "object"
-          }
-        ]
       },
       "Blocker": {
         "additionalProperties": false,
@@ -2272,7 +2094,7 @@
       },
       "ConversationEntry": {
         "additionalProperties": false,
-        "description": "One kept message of a conversation.",
+        "description": "One kept message of a conversation, as the API shows it.",
         "properties": {
           "at": {
             "description": "When it was kept.",
@@ -3488,124 +3310,20 @@
             "type": "object"
           },
           {
-            "description": "The provider did not answer in time.",
-            "properties": {
-              "status": {
-                "const": "provider_timed_out",
-                "type": "string"
-              }
-            },
-            "required": [
-              "status"
-            ],
-            "type": "object"
-          },
-          {
-            "description": "The provider answered with an error.",
+            "description": "The turn stopped before an answer: the provider failed or is not set up, the reply\nwas cut off or declined, the model kept repeating a failed call or never stopped\ncalling tools, or the turn ran out of time.",
             "properties": {
               "message": {
-                "description": "What it said.",
+                "description": "Why, for the user.",
                 "type": "string"
               },
               "status": {
-                "const": "provider_failed",
+                "const": "stopped",
                 "type": "string"
               }
             },
             "required": [
               "status",
               "message"
-            ],
-            "type": "object"
-          },
-          {
-            "description": "The provider refused the deployment's credential: the assistant is not set up.",
-            "properties": {
-              "status": {
-                "const": "provider_not_set_up",
-                "type": "string"
-              }
-            },
-            "required": [
-              "status"
-            ],
-            "type": "object"
-          },
-          {
-            "description": "The reply hit the output limit and is cut off; none of its tool calls ran.",
-            "properties": {
-              "status": {
-                "const": "reply_cut_off",
-                "type": "string"
-              }
-            },
-            "required": [
-              "status"
-            ],
-            "type": "object"
-          },
-          {
-            "description": "The model declined to answer.",
-            "properties": {
-              "status": {
-                "const": "model_refused",
-                "type": "string"
-              }
-            },
-            "required": [
-              "status"
-            ],
-            "type": "object"
-          },
-          {
-            "description": "The provider paused the reply, which the assistant does not continue; none of its\ntool calls ran.",
-            "properties": {
-              "status": {
-                "const": "model_paused",
-                "type": "string"
-              }
-            },
-            "required": [
-              "status"
-            ],
-            "type": "object"
-          },
-          {
-            "description": "The model kept repeating a tool call that failed.",
-            "properties": {
-              "status": {
-                "const": "repeated_failure",
-                "type": "string"
-              }
-            },
-            "required": [
-              "status"
-            ],
-            "type": "object"
-          },
-          {
-            "description": "The model was still calling tools past the tool-loop limit.",
-            "properties": {
-              "status": {
-                "const": "iteration_limit",
-                "type": "string"
-              }
-            },
-            "required": [
-              "status"
-            ],
-            "type": "object"
-          },
-          {
-            "description": "The turn ran past the turn's time limit.",
-            "properties": {
-              "status": {
-                "const": "turn_timed_out",
-                "type": "string"
-              }
-            },
-            "required": [
-              "status"
             ],
             "type": "object"
           }
@@ -12194,6 +11912,29 @@
         ],
         "type": "object"
       },
+      "Proposed": {
+        "additionalProperties": false,
+        "description": "A proposal the assistant drafted, changed or discarded.",
+        "properties": {
+          "destination": {
+            "$ref": "#/components/schemas/Domain",
+            "description": "Where it would land, under which it is addressed."
+          },
+          "discarded": {
+            "description": "The assistant discarded it.",
+            "type": "boolean"
+          },
+          "proposal": {
+            "$ref": "#/components/schemas/ProposalId",
+            "description": "The proposal."
+          }
+        },
+        "required": [
+          "proposal",
+          "destination"
+        ],
+        "type": "object"
+      },
       "Provenance": {
         "description": "A node's origin in a journey.",
         "oneOf": [
@@ -15690,13 +15431,6 @@
         "additionalProperties": false,
         "description": "What one turn answers.",
         "properties": {
-          "actions": {
-            "description": "Every write the assistant made, in order: applied with its consequences, or drafted\nas a proposal for review.",
-            "items": {
-              "$ref": "#/components/schemas/Action"
-            },
-            "type": "array"
-          },
           "conversation": {
             "$ref": "#/components/schemas/ConversationId",
             "description": "The conversation the turn was added to: the user's, about its target."
@@ -15704,6 +15438,20 @@
           "ended": {
             "$ref": "#/components/schemas/Ended",
             "description": "How the turn ended."
+          },
+          "messages": {
+            "description": "What the turn added to the conversation, oldest first: the user's words, a line for each\nwrite, why the turn stopped if it did, and the reply. Given even when the conversation\ncould not be saved.",
+            "items": {
+              "$ref": "#/components/schemas/ConversationEntry"
+            },
+            "type": "array"
+          },
+          "proposals": {
+            "description": "Every proposal the assistant drafted, changed, or discarded, once each, for the user\nto review.",
+            "items": {
+              "$ref": "#/components/schemas/Proposed"
+            },
+            "type": "array"
           },
           "reply": {
             "anyOf": [
@@ -15715,10 +15463,18 @@
               }
             ],
             "description": "What the assistant said last, if anything."
+          },
+          "writes": {
+            "description": "Every write the assistant made to a journey, route, or the deployment, in order, with\nwhat it newly caused.",
+            "items": {
+              "$ref": "#/components/schemas/Write2"
+            },
+            "type": "array"
           }
         },
         "required": [
           "conversation",
+          "messages",
           "ended"
         ],
         "type": "object"
@@ -16144,6 +15900,49 @@
             "type": "object"
           }
         ]
+      },
+      "Write2": {
+        "additionalProperties": false,
+        "description": "A direct write the assistant made.",
+        "properties": {
+          "already_applied": {
+            "description": "The patch id was applied before with the same content, and nothing was written again.",
+            "type": "boolean"
+          },
+          "consequences": {
+            "additionalProperties": false,
+            "description": "What it newly caused in each journey it changed.",
+            "patternProperties": {
+              "^j_[a-z0-9][a-z0-9_-]*$": {
+                "$ref": "#/components/schemas/Consequences"
+              }
+            },
+            "type": "object"
+          },
+          "domain": {
+            "$ref": "#/components/schemas/Domain",
+            "description": "What it wrote to."
+          },
+          "patch_id": {
+            "$ref": "#/components/schemas/PatchId",
+            "description": "The patch id the write was sent under."
+          },
+          "revision": {
+            "$ref": "#/components/schemas/Revision",
+            "description": "The revision it produced, or that the patch id was already applied at."
+          },
+          "tool": {
+            "description": "The tool.",
+            "type": "string"
+          }
+        },
+        "required": [
+          "tool",
+          "patch_id",
+          "domain",
+          "revision"
+        ],
+        "type": "object"
       }
     },
     "securitySchemes": {

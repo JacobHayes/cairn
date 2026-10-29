@@ -5,12 +5,11 @@
 import { enqueueActions, setup, type ActorRefFrom } from "xstate";
 
 import { targetKey, type AssistantHost, type AssistantTarget } from "../data/assistant.ts";
-import { conversationMachine, type ConversationRef, type KeptTurns } from "./conversation.ts";
+import { conversationMachine, type ConversationRef } from "./conversation.ts";
 
 export interface ConversationsInput {
   /** The host's assistant; none, and nothing opens. */
   assistant: AssistantHost | undefined;
-  turns: KeptTurns;
 }
 
 interface ConversationsContext extends ConversationsInput {
@@ -34,7 +33,7 @@ export const conversationManager = setup({
       } else if (assistant !== undefined) {
         // A new conversation starts by reading.
         enqueue.assign(({ context: current, spawn }) => ({
-          conversations: { ...current.conversations, [key]: spawn("conversation", { id: key, input: { assistant, target: event.target, turns: current.turns } }) },
+          conversations: { ...current.conversations, [key]: spawn("conversation", { id: key, input: { assistant, target: event.target } }) },
         }));
       }
     }),

@@ -209,7 +209,6 @@ mod tests {
             audience = "/projects/1/global/backendServices/2"
             client_id = "relay"
             [assistant]
-            protocol = "chat_completions"
             endpoint = "https://models.example/v1"
             model = "m"
             "#,

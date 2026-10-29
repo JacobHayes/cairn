@@ -5,7 +5,6 @@
 //! missing one is reported by name, beside every other problem, rather than as a parse
 //! error.
 
-use cairn_assistant::Protocol;
 use serde::Deserialize;
 
 /// The whole file.
@@ -143,7 +142,6 @@ pub(crate) struct GcpIapFile {
 #[derive(Debug, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub(crate) struct AssistantFile {
-    pub protocol: Protocol,
     pub endpoint: String,
     pub model: String,
     pub api_key: Option<String>,

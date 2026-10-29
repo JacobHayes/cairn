@@ -45,7 +45,7 @@ pub struct Config {
     /// The auth providers, in the order a request is put to them.
     pub auth: Vec<Provider>,
     /// The assistant's provider, when the deployment offers the assistant (I5).
-    pub assistant: Option<cairn_assistant::protocol::ProviderConfig>,
+    pub assistant: Option<cairn_assistant::chat::ProviderConfig>,
 }
 
 impl Config {

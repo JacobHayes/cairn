@@ -6,7 +6,6 @@
 import { streamStatus } from "@cairn/client";
 import { createActor, waitFor, type ActorOptions, type Subscription } from "xstate";
 
-import { draftTurns } from "../assistant/conversation.ts";
 import type { TitleOf } from "./activity.ts";
 import { pendingOf, type EditsRef } from "./edit-manager.ts";
 import type { Capabilities, Deriver, Host } from "./host.ts";
@@ -177,7 +176,7 @@ export class Session {
         open: parts.host.openTicks,
         today: this.#now,
         now: this.#monotonic,
-        conversations: { assistant: parts.host.assistant, turns: draftTurns },
+        conversations: { assistant: parts.host.assistant },
         edits: {
           env: {
             host: parts.host,

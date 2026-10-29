@@ -451,15 +451,11 @@ dependencies = [
 name = "cairn-assistant"
 version = "0.0.0"
 dependencies = [
- "async-trait",
- "axum",
  "cairn-auth",
- "cairn-engine",
  "cairn-mcp",
  "cairn-schema",
  "cairn-service",
  "cairn-store",
- "jiff",
  "metrics",
  "patina-dst",
  "reqwest",

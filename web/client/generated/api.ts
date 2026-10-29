@@ -1072,57 +1072,6 @@ export interface paths {
 export type webhooks = Record<string, never>;
 export interface components {
     schemas: {
-        /**
-         * @description A write the assistant made, as the turn reports it (every direct write is reported
-         *     with its consequences).
-         */
-        Action: {
-            /** @description What it newly caused in each journey it changed. */
-            consequences?: {
-                [key: string]: components["schemas"]["Consequences"];
-            };
-            /**
-             * @description The nodes it wrote, in key order (a direct change is reported with the nodes
-             *     it affected, which the panel links to); none for a write to no journey's nodes.
-             */
-            nodes?: components["schemas"]["NodeKey"][];
-            /** @constant */
-            outcome: "applied";
-            /** @description Which patch, where, and the revision it produced. */
-            receipt: components["schemas"]["AppliedReceipt"];
-            /**
-             * @description What it did, in words: each kind of change once in the order its patch first
-             *     makes it, the nodes it wrote, and what it newly caused, each node as
-             *     `journey/node` code ("Added a note, marked done: `j_one/n_kickoff`."). The panel
-             *     shows it and the conversation keeps it, the same text.
-             */
-            report: string;
-        } | {
-            /** @constant */
-            outcome: "already_applied";
-            /** @description The earlier write's receipt. */
-            receipt: components["schemas"]["AppliedReceipt"];
-            /** @description The tool. */
-            tool: string;
-        } | {
-            /** @description Why it is a proposal. */
-            because: components["schemas"]["Because"];
-            /** @description Its destination, under which it is addressed. */
-            destination: components["schemas"]["Domain"];
-            /** @constant */
-            outcome: "proposed";
-            /** @description The proposal. */
-            proposal: components["schemas"]["ProposalId"];
-            /** @description The tool. */
-            tool: string;
-        } | {
-            /** @constant */
-            outcome: "discarded";
-            /** @description The proposal. */
-            proposal: components["schemas"]["ProposalId"];
-            /** @description The tool. */
-            tool: string;
-        };
         /** @description Who made a change: a user, or an agent acting for one. */
         Actor: {
             /** @description The agent acting for the user, if any. */
@@ -1244,18 +1193,6 @@ export interface components {
             identity_list: components["schemas"]["IdentityKey"][];
         };
         /**
-         * @description What the report of an applied write names: the patch, its domain, and the revision it
-         *     produced.
-         */
-        AppliedReceipt: {
-            /** @description The domain it was committed to. */
-            domain: components["schemas"]["Domain"];
-            /** @description The patch id. */
-            patch_id: components["schemas"]["PatchId"];
-            /** @description The revision it produced. */
-            revision: components["schemas"]["Revision"];
-        };
-        /**
          * @description `POST /api/journeys/{id}/assistant` and `POST /api/routes/{id}/draft/assistant`: one message of
          *     the caller's conversation about that journey or draft.
          */
@@ -1273,14 +1210,6 @@ export interface components {
             kind: components["schemas"]["AuthKind"];
             /** @description The provider's configured name. */
             name: components["schemas"]["Slug"];
-        };
-        /** @description Why a write became a proposal. */
-        Because: {
-            /** @constant */
-            reason: "structural";
-        } | {
-            /** @constant */
-            reason: "asked";
         };
         /** @description A dependency that blocks a node (Gating: Blocked). */
         Blocker: {
@@ -1785,7 +1714,7 @@ export interface components {
         };
         /** @description Who wrote a conversation message. */
         ConversationAuthor: "user" | "assistant" | "cairn";
-        /** @description One kept message of a conversation. */
+        /** @description One kept message of a conversation, as the API shows it. */
         ConversationEntry: {
             /**
              * Format: date-time
@@ -2125,34 +2054,10 @@ export interface components {
             /** @constant */
             status: "replied";
         } | {
-            /** @constant */
-            status: "provider_timed_out";
-        } | {
-            /** @description What it said. */
+            /** @description Why, for the user. */
             message: string;
             /** @constant */
-            status: "provider_failed";
-        } | {
-            /** @constant */
-            status: "provider_not_set_up";
-        } | {
-            /** @constant */
-            status: "reply_cut_off";
-        } | {
-            /** @constant */
-            status: "model_refused";
-        } | {
-            /** @constant */
-            status: "model_paused";
-        } | {
-            /** @constant */
-            status: "repeated_failure";
-        } | {
-            /** @constant */
-            status: "iteration_limit";
-        } | {
-            /** @constant */
-            status: "turn_timed_out";
+            status: "stopped";
         };
         /**
          * @description An append-only audit record of one mutation. The delta is the after-state of every
@@ -4785,6 +4690,15 @@ export interface components {
             /** @description What it proposes, in a line. */
             title: components["schemas"]["Title"];
         };
+        /** @description A proposal the assistant drafted, changed or discarded. */
+        Proposed: {
+            /** @description Where it would land, under which it is addressed. */
+            destination: components["schemas"]["Domain"];
+            /** @description The assistant discarded it. */
+            discarded?: boolean;
+            /** @description The proposal. */
+            proposal: components["schemas"]["ProposalId"];
+        };
         /** @description A node's origin in a journey. */
         Provenance: "from_route" | "local" | "orphaned" | "from_segment";
         /** @description What each of the four terms adds to a rank. */
@@ -5840,17 +5754,28 @@ export interface components {
         } | "reopen";
         /** @description What one turn answers. */
         TurnReply: {
-            /**
-             * @description Every write the assistant made, in order: applied with its consequences, or drafted
-             *     as a proposal for review.
-             */
-            actions?: components["schemas"]["Action"][];
             /** @description The conversation the turn was added to: the user's, about its target. */
             conversation: components["schemas"]["ConversationId"];
             /** @description How the turn ended. */
             ended: components["schemas"]["Ended"];
+            /**
+             * @description What the turn added to the conversation, oldest first: the user's words, a line for each
+             *     write, why the turn stopped if it did, and the reply. Given even when the conversation
+             *     could not be saved.
+             */
+            messages: components["schemas"]["ConversationEntry"][];
+            /**
+             * @description Every proposal the assistant drafted, changed, or discarded, once each, for the user
+             *     to review.
+             */
+            proposals?: components["schemas"]["Proposed"][];
             /** @description What the assistant said last, if anything. */
             reply?: components["schemas"]["Markdown"] | null;
+            /**
+             * @description Every write the assistant made to a journey, route, or the deployment, in order, with
+             *     what it newly caused.
+             */
+            writes?: components["schemas"]["Write2"][];
         };
         /**
          * @description Finished work newly undecided: a node completed or answered while
@@ -5982,6 +5907,23 @@ export interface components {
                 /** @description The graph written. */
                 to: components["schemas"]["GraphId"];
             };
+        };
+        /** @description A direct write the assistant made. */
+        Write2: {
+            /** @description The patch id was applied before with the same content, and nothing was written again. */
+            already_applied?: boolean;
+            /** @description What it newly caused in each journey it changed. */
+            consequences?: {
+                [key: string]: components["schemas"]["Consequences"];
+            };
+            /** @description What it wrote to. */
+            domain: components["schemas"]["Domain"];
+            /** @description The patch id the write was sent under. */
+            patch_id: components["schemas"]["PatchId"];
+            /** @description The revision it produced, or that the patch id was already applied at. */
+            revision: components["schemas"]["Revision"];
+            /** @description The tool. */
+            tool: string;
         };
     };
     responses: never;

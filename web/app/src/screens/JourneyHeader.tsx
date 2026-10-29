@@ -6,7 +6,6 @@
 import { useLayoutEffect, useRef, useState } from "react";
 import { Link, useLocation } from "react-router";
 
-import { journeyTitles } from "../assistant/AssistantPanel.tsx";
 import { graphPath, type GraphView } from "../canvas/settings.ts";
 import type { Ready } from "../detail/model.ts";
 import { JourneyAssistant } from "../tour/TourAssistantDock.tsx";
@@ -206,7 +205,7 @@ export function JourneyHeader({ ready, view, screen, selected }: { ready: Ready;
           </h1>
           <JourneyStatusBadge status={header.status} changed={was !== undefined && was.status !== header.status} />
         </div>
-        <JourneyAssistant journey={header.id} titleOf={journeyTitles(ready)} />
+        <JourneyAssistant journey={header.id} />
         <div className="journey-header-actions">
           <ViewPicker screen={screen} screens={JOURNEY_OFFERS.screens} to={(to) => screenSwitched(target, search, to)} tip={JOURNEY_VIEW_TIP} unavailable={unavailableScreens(target)} />
           <JourneyMenu ready={ready} view={view} screen={screen} selected={selected} write={write} onPanel={setPanel} />

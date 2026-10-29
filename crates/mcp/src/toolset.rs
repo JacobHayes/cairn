@@ -5,8 +5,8 @@
 //! same thing with a different transport (I7).
 
 use cairn_auth::Clock;
-use cairn_schema::{Actor, Patch, Rejection, TouchedSet};
-use cairn_service::{Call, DomainPatch, Service};
+use cairn_schema::Actor;
+use cairn_service::{Call, Service};
 use schemars::JsonSchema;
 use schemars::generate::SchemaSettings;
 use serde::Serialize;
@@ -35,14 +35,13 @@ pub struct ToolDefinition {
 }
 
 // PRD: I5, I7.
-/// What a tool writes: what the endpoint's annotations say of it, and what the assistant's
-/// write wrapper decides its calls by.
+/// What a tool writes: what the endpoint's annotations say of it, and which of them the
+/// assistant leaves to the user.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Writes {
     /// Nothing: it reads.
     Nothing,
-    /// One patch it drafts from its arguments, which [`ToolSet::drafted_patch`] works out
-    /// without writing.
+    /// One patch it drafts from its arguments.
     Patch,
     /// One patch Cairn builds from a file the caller hands it: what it writes is known only
     /// once it is written.
@@ -280,44 +279,6 @@ impl ToolSet {
             None => Err(ToolError::UnknownTool {
                 name: name.to_owned(),
             }),
-        }
-    }
-
-    // PRD: I5.
-    /// What `patch` writes applied now as `actor`, at the current revisions, without
-    /// writing it, or the rejection that would refuse it there: what the assistant's write
-    /// wrapper counts the nodes of.
-    ///
-    /// # Errors
-    ///
-    /// [`ToolError::Failed`] when the read fails.
-    pub async fn touched(
-        &self,
-        actor: &Actor,
-        patch: &Patch,
-    ) -> Result<Result<TouchedSet, Rejection>, ToolError> {
-        Ok(self.service.touched(&self.call_as(actor), patch).await?)
-    }
-
-    // PRD: I5.
-    /// The domain patch the direct-write tool `name` would submit for `arguments`, worked
-    /// out as [`call`](Self::call) would, without writing anything: what the assistant's
-    /// write wrapper reads to decide whether a write applies directly or becomes a proposal.
-    /// `None` for a tool that drafts no patch from its arguments (any but [`Writes::Patch`]).
-    ///
-    /// # Errors
-    ///
-    /// [`ToolError::Arguments`] when the arguments do not match the tool's schema; what
-    /// drafting reads can fail with otherwise.
-    pub async fn drafted_patch(
-        &self,
-        name: &str,
-        arguments: Value,
-    ) -> Result<Option<DomainPatch>, ToolError> {
-        match tools::spec(name).map(|spec| spec.writes) {
-            Some(Writes::Patch) => self.drafted_patch_of(name, arguments).await,
-            Some(Writes::Nothing | Writes::File | Writes::Proposal | Writes::Confirmation)
-            | None => Ok(None),
         }
     }
 }

@@ -1,159 +1,71 @@
-// The assistant panel (I5, I7): the caller's conversation with the in-app
-// assistant about a journey or a route's draft, in the inspector column's ASSISTANT tab. A
-// message is one turn on the host; the reply shows with each write the assistant made: a
-// direct change with the nodes it wrote and what it newly caused (D7), linked to those nodes,
-// and a structural change as a proposal to review in
-// proposal review (C14), where applying it is the user's click. Offered only when the host's
-// capabilities say there is an assistant (cairn demo never has one). The panel opens
-// from a toggle in the screen's header or the tab, and stays open across screens in this tab; the message
-// being typed is a draft that survives a reload (ARCHITECTURE, Web UI).
+// The assistant panel (I5, I7): the caller's conversation with the in-app assistant about a
+// journey or a route's draft, in the inspector column's ASSISTANT tab. A message is one turn on
+// the host; the conversation shows as the host keeps it: the user's words, Cairn's receipt for
+// each write, and the replies. A proposal the last turn drafted links to proposal review (C14),
+// where applying it is the user's click. Offered only when the host's capabilities say there is
+// an assistant (cairn demo never has one). The panel opens from a toggle in the screen's header
+// or the tab, and stays open across screens in this tab; the message being typed is a draft that
+// survives a reload (ARCHITECTURE, Web UI).
 import { useSelector } from "@xstate/react";
 import { useEffect, useLayoutEffect, useMemo, useRef } from "react";
 import { Link } from "react-router";
 
 import { proposalAddress } from "../address.ts";
-import { targetKey, type AssistantAction, type AssistantTarget } from "../data/assistant.ts";
+import { targetKey, type AssistantTarget, type ConversationEntry, type Proposed } from "../data/assistant.ts";
 import { useDraft } from "../data/drafts.ts";
 import { useSession } from "../data/react.ts";
-import type { Ready } from "../detail/model.ts";
 import { AssistantSlot, useAssistantDock } from "../shell/frame.tsx";
-import { journeyPath } from "../journeys/address.ts";
-import { Markdown, type CodeSpan } from "../ui/markdown.tsx";
+import { Markdown } from "../ui/markdown.tsx";
 import { Button } from "../ui/kit.tsx";
-import { aboutWords, assistantOffered, becauseWords, endedWords, shown, toolWords, type Entry } from "./model.ts";
+import { aboutWords, assistantOffered } from "./model.ts";
 import { conversationView, sendTurn, type ConversationRef } from "./conversation.ts";
 import "./assistant.css";
-import { NODE_GONE } from "../ui/gone.ts";
 import { Failed, kindOf } from "../ui/Failed.tsx";
-import { NodeLink } from "../detail/parts.tsx";
 
-/** A node's title, when the screen knows it. */
-export type TitleOf = (key: string) => string | undefined;
-
-/** A journey's node titles, as its document holds them. */
-export function journeyTitles(ready: Ready): TitleOf {
-  const nodes = ready.journey.graph.nodes ?? [];
-  return (key) => nodes.find((node) => node.key === key)?.title;
-}
-
-function AssistantNode({ journey, node, title }: { journey: string; node: string; title: string }) {
-  return <NodeLink node={node} title={title} to={journeyPath({ journey, node }, "graph")} data-testid="assistant-node" />;
-}
-
-/** A node a report names, as `journey/node` code. */
-const NAMED_NODE = /^(j_[^\s/]+)\/(n_[^\s/]+)$/;
-/** A node of a journey other than the one open, whose title this screen does not hold. */
-const NODE_ELSEWHERE = "an item in another journey";
-
-/**
- * How a report shows the nodes it names: a node of the open journey by its linked title, or in
- * words once the journey no longer holds it; another journey's node linked, said as one.
- */
-function namedNodes(journey: string | undefined, titleOf: TitleOf | undefined): CodeSpan {
-  return (text, at) => {
-    const [, named, node] = NAMED_NODE.exec(text) ?? [];
-    if (named === undefined || node === undefined) {
-      return undefined;
-    }
-    if (named !== journey) {
-      return <AssistantNode key={at} journey={named} node={node} title={NODE_ELSEWHERE} />;
-    }
-    const title = titleOf?.(node);
-    return title === undefined ? <span key={at}>{NODE_GONE}</span> : <AssistantNode key={at} journey={named} node={node} title={title} />;
-  };
-}
-
-/** I5, D7: Cairn's report of a write (what it did, the nodes it wrote, what it newly caused), the same as it lands and as the conversation keeps it. */
-function Receipt({ text, journey, titleOf, testId }: { text: string; journey: string | undefined; titleOf: TitleOf | undefined; testId: string }) {
-  return (
-    <div className="assistant-write card" data-testid={testId}>
-      <div className="card-head">
-        <span className="label">Cairn</span>
-      </div>
-      <div className="card-body">
-        <Markdown text={text} code={namedNodes(journey, titleOf)} />
-      </div>
-    </div>
-  );
-}
-
-/** I5, C14: a write drafted as a proposal, to review where the user applies it. */
-function Proposed({ action }: { action: Extract<AssistantAction, { outcome: "proposed" }> }) {
-  return (
-    <div className="assistant-write card" data-testid="assistant-proposed" data-proposal={action.proposal} data-because={action.because.reason}>
-      <div className="card-head">
-        <span className="label">Proposal</span>
-      </div>
-      <div className="card-body">
-        {toolWords(action.tool)}, drafted for review: {becauseWords(action.because)}.
-      </div>
-      <div className="card-actions">
-        <Link className="button primary" to={proposalAddress(action.destination, action.proposal)} data-testid="review-proposal">
-          Review proposal
-        </Link>
-      </div>
-    </div>
-  );
-}
-
-function Written({ action, journey, titleOf }: { action: AssistantAction; journey: string | undefined; titleOf: TitleOf | undefined }) {
-  switch (action.outcome) {
-    case "applied":
-      return <Receipt text={action.report} journey={journey} titleOf={titleOf} testId="assistant-applied" />;
-    case "already_applied":
-      return (
-        <div className="assistant-write muted small" data-testid="assistant-already-applied" data-tool={action.tool}>
-          {toolWords(action.tool)} was already applied.
-        </div>
-      );
-    case "proposed":
-      return <Proposed action={action} />;
-    case "discarded":
-      return (
-        <div className="assistant-write muted small" data-testid="assistant-discarded" data-proposal={action.proposal}>
-          Discarded proposal {action.proposal}.
-        </div>
-      );
-  }
-}
-
-function EntryView({ entry, journey, titleOf }: { entry: Entry; journey: string | undefined; titleOf: TitleOf | undefined }) {
-  switch (entry.entry) {
-    case "said":
+function EntryView({ entry }: { entry: ConversationEntry }) {
+  switch (entry.author) {
+    case "user":
       return (
         <div className="assistant-said" data-testid="assistant-said">
-          {entry.text}
+          {entry.content}
         </div>
       );
-    case "reply":
+    case "assistant":
       return (
         <div className="assistant-reply" data-testid="assistant-reply">
-          <Markdown text={entry.text} />
+          <Markdown text={entry.content} />
         </div>
       );
-    case "report":
-      return <Receipt text={entry.text} journey={journey} titleOf={titleOf} testId="assistant-report" />;
-    case "action":
-      return <Written action={entry.action} journey={journey} titleOf={titleOf} />;
-    case "ended":
+    case "cairn":
       return (
-        <div className="callout" data-testid="assistant-ended" data-status={entry.ended.status}>
-          {endedWords(entry.ended)}
-        </div>
+        <p className="assistant-receipt muted small" data-testid="assistant-report">
+          {entry.content}
+        </p>
       );
   }
 }
 
 /** The conversation's entries, oldest first. */
-export function Transcript({ entries, journey, titleOf }: { entries: readonly Entry[]; journey: string | undefined; titleOf: TitleOf | undefined }) {
+export function Transcript({ entries }: { entries: readonly ConversationEntry[] }) {
   return (
     <ol className="assistant-transcript" data-testid="assistant-transcript" aria-live="polite">
       {entries.map((entry, index) => (
         <li key={`${entry.at}:${String(index)}`}>
-          <EntryView entry={entry} journey={journey} titleOf={titleOf} />
+          <EntryView entry={entry} />
         </li>
       ))}
     </ol>
+  );
+}
+
+/** I5, C14: a proposal the last turn drafted or changed, to review where the user applies it. */
+function ProposedLink({ proposed }: { proposed: Proposed }) {
+  return (
+    <p data-testid="assistant-proposed" data-proposal={proposed.proposal}>
+      <Link className="button primary" to={proposalAddress(proposed.destination, proposed.proposal)} data-testid="review-proposal">
+        Review proposal
+      </Link>
+    </p>
   );
 }
 
@@ -224,22 +136,22 @@ function Composer({ target, ready, sending, send }: { target: AssistantTarget; r
 function Empty() {
   return (
     <p className="muted" data-testid="assistant-empty">
-      Changes are made directly and reported here. Changes to structure, or any change you ask to see first, come back as a proposal for you to review.
+      Changes are made directly and reported here. A change to structure, a large or unclear one, or one you ask to see first comes back as a proposal for you to review.
     </p>
   );
 }
 
 /** The panel itself: the conversation, and the message being typed. */
-function AssistantPanel({ target, titleOf }: { target: AssistantTarget; titleOf: TitleOf | undefined }) {
+function AssistantPanel({ target }: { target: AssistantTarget }) {
   const conversation = useConversation(target);
-  return conversation === undefined ? null : <Conversing conversation={conversation} target={target} titleOf={titleOf} />;
+  return conversation === undefined ? null : <Conversing conversation={conversation} target={target} />;
 }
 
-function Conversing({ conversation, target, titleOf }: { conversation: ConversationRef; target: AssistantTarget; titleOf: TitleOf | undefined }) {
+function Conversing({ conversation, target }: { conversation: ConversationRef; target: AssistantTarget }) {
   const key = targetKey(target);
   const snapshot = useSelector(conversation, (each) => each);
-  const { read, kept, unsaved, sending, failure } = useMemo(() => conversationView(snapshot), [snapshot]);
-  const entries = useMemo(() => shown(read.status === "ready" ? read.conversation.messages : [], kept, unsaved), [read, kept, unsaved]);
+  const { read, proposals, sending, failure } = useMemo(() => conversationView(snapshot), [snapshot]);
+  const entries = useMemo(() => (read.status === "ready" ? read.conversation.messages : []), [read]);
   const send = (text: string) => sendTurn(conversation, text);
   const scroller = useRef<HTMLDivElement>(null);
   // The newest turn in view: the transcript scrolls itself, never the page around it.
@@ -250,9 +162,19 @@ function Conversing({ conversation, target, titleOf }: { conversation: Conversat
     <section className="panel assistant-panel" aria-label="Assistant" data-testid="assistant-panel" data-target={key} data-status={sending === undefined ? "idle" : "working"}>
       <div ref={scroller} className="assistant-scroll inspector-body">
         {read.status === "loading" ? <p className="muted small">Reading the conversation...</p> : null}
-        {read.status === "failed" ? <p className="callout callout-bad"><Failed what="The conversation" error={read.message} /></p> : null}
+        {read.status === "failed" ? (
+          <p className="callout callout-bad">
+            <Failed what="The conversation" error={read.message} />{" "}
+            <Button type="button" data-testid="assistant-retry" onClick={() => { conversation.send({ type: "refresh" }); }}>
+              Try again
+            </Button>
+          </p>
+        ) : null}
         {read.status === "ready" && entries.length === 0 && sending === undefined ? <Empty /> : null}
-        <Transcript entries={entries} journey={"journey" in target ? target.journey : undefined} titleOf={titleOf} />
+        <Transcript entries={entries} />
+        {proposals.map((proposed) => (
+          <ProposedLink key={proposed.proposal} proposed={proposed} />
+        ))}
         {sending === undefined ? null : (
           <>
             <div className="assistant-said" data-testid="assistant-said">
@@ -266,7 +188,9 @@ function Conversing({ conversation, target, titleOf }: { conversation: Conversat
       </div>
       {failure === undefined ? null : (
         <p className="callout callout-bad" role="alert" data-testid="assistant-failed" data-status={failure.status}>
-          {failure.status === 503 ? (
+          {failure.status === 0 ? (
+            failure.message
+          ) : failure.status === 503 ? (
             "The assistant is busy; try again in a moment."
           ) : failure.status === 409 ? (
             "A reply is still in progress in this conversation; wait for it before sending another message."
@@ -284,7 +208,7 @@ function Conversing({ conversation, target, titleOf }: { conversation: Conversat
  * The panel when open, and its opener for the inspector column's tabs: nothing at all when the host
  * offers no assistant (capabilities gating).
  */
-export function AssistantDock({ target, titleOf }: { target: AssistantTarget; titleOf?: TitleOf }) {
+export function AssistantDock({ target }: { target: AssistantTarget }) {
   const session = useSession();
   const [open, setOpen] = useDraft<boolean>("assistant-open");
   const assistant = session.host.assistant;
@@ -306,7 +230,7 @@ export function AssistantDock({ target, titleOf }: { target: AssistantTarget; ti
   }
   return open === true ? (
     <AssistantSlot>
-      <AssistantPanel key={targetKey(target)} target={target} titleOf={titleOf} />
+      <AssistantPanel key={targetKey(target)} target={target} />
     </AssistantSlot>
   ) : null;
 }

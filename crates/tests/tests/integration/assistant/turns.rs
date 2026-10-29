@@ -1,35 +1,41 @@
-//! Turns (I5, I7, H2, A12, B10; PRD Success criteria): a scripted model drives the tool loop
-//! through the write wrapper over the memory store, and each turn reports its writes, keeps
-//! its conversation, and ends within its limits.
+//! Turns (I5, I7, H2, A12, B10; PRD Success criteria): a scripted model on a loopback server
+//! drives the tool loop over the memory store, and each turn reports its writes, keeps its
+//! conversation, and ends within its limits.
 #![cfg(test)]
 
-use crate::assistant::support;
-
 use std::collections::BTreeSet;
+use std::sync::Arc;
 use std::time::Duration;
 
 use cairn_assistant::limits::{
-    TOOL_CALL_COUNT_PER_REPLY_MAX, TOOL_CALL_FAILURE_REPEAT_COUNT_MAX,
+    DIALOGUE_REPLAY_BYTES_MAX, TOOL_CALL_COUNT_PER_REPLY_MAX, TOOL_CALL_FAILURE_REPEAT_COUNT_MAX,
     TOOL_LOOP_ITERATION_COUNT_MAX, TOOL_RESULT_BYTES_PER_TURN_MAX, TURN_DURATION_MAX,
     TURN_IN_FLIGHT_COUNT_MAX, TURN_SAVE_RESERVE,
 };
-use cairn_assistant::scripted::Step;
-use cairn_assistant::tool_results::{self, DROPPED};
-use cairn_assistant::{
-    Action, Because, Ended, Message, ProviderError, Reply, Stop, Target, ToolCall, ToolResult,
-    TurnError, Usage,
-};
-use cairn_schema::{JourneyId, NodeKey, StatusSummary};
-use cairn_service::Call;
+use cairn_assistant::tool_results::DROPPED;
+use cairn_assistant::{Ended, Target, TurnError, TurnReply};
+use cairn_mcp::{ToolSet, Writes, instructions};
+use cairn_schema::Domain;
+use cairn_schema::limits::BODY_BYTES_MAX;
 use cairn_store::{ConversationStore, MessageAuthor};
 use serde_json::{Value, json};
 
-use support::{World, proposed_mutations, scenario, step_mutations, user, vendor_target};
+use crate::assistant::support::{
+    KEY, Step, World, proposed_mutations, scenario, user, vendor_target,
+};
 
 const BAKEOFF: &str = "j_bakeoff";
+const VENDOR: &str = "j_vendor_eval";
 
 fn bakeoff() -> Target {
     Target::Journey(BAKEOFF.parse().unwrap())
+}
+
+fn stopped(turn: &TurnReply) -> &str {
+    match &turn.ended {
+        Ended::Stopped { message } => message,
+        Ended::Replied => panic!("the turn replied: {turn:?}"),
+    }
 }
 
 /// The journey's last patch, from its history.
@@ -41,25 +47,159 @@ async fn last_patch(world: &World, journey: &str) -> Value {
             json!({ "journey": journey }),
         )
         .await;
-    let patches = history["patches"].as_array().unwrap();
-    patches.last().unwrap().clone()
+    history["patches"]
+        .as_array()
+        .unwrap()
+        .last()
+        .unwrap()
+        .clone()
 }
 
-/// The PRD's success criterion with no route (I5, I7, H2): the owner starts an empty
-/// journey and describes the work; the assistant reads it and writes the structure, which
-/// arrives as one proposal while the journey stays where it was; the owner applies it, and
-/// the events record the assistant as the proposing agent and the owner as confirming.
+/// The roles and texts of the messages one request carried, in order.
+fn roles(request: &Value) -> Vec<(String, String)> {
+    request["messages"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .map(|message| {
+            let text = message["content"].as_str().unwrap_or_default();
+            (
+                message["role"].as_str().unwrap().to_owned(),
+                text.to_owned(),
+            )
+        })
+        .collect()
+}
+
+/// The `tool` messages a request carried, as JSON.
+fn results(request: &Value) -> Vec<Value> {
+    request["messages"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .filter(|message| message["role"] == "tool")
+        .map(|message| serde_json::from_str(message["content"].as_str().unwrap()).unwrap())
+        .collect()
+}
+
+fn complete_kickoff(patch: &str, base: u64) -> Value {
+    json!({ "journey": VENDOR, "patch_id": patch, "base_revision": base,
+        "mutations": [{ "op": "transition", "node": "n_kickoff", "transition": "complete" }] })
+}
+
+/// I7: the model is offered exactly the MCP tools but those that are the user's alone, with
+/// the guide every agent reads as its instructions, and the user's message as it was said.
+#[tokio::test]
+async fn the_model_is_offered_the_mcp_tools_and_the_guide() {
+    let world = World::new().await;
+    let lead = user("u_lead");
+    world.vendor_journey(&lead).await;
+    world.script([Step::say("Hello.")]);
+    world.turn(&lead, &vendor_target(), "What is next?").await;
+    let request = &world.provider.requests()[0];
+    let offered: BTreeSet<&str> = request["tools"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .map(|tool| tool["function"]["name"].as_str().unwrap())
+        .collect();
+    let expected: Vec<_> = ToolSet::definitions()
+        .into_iter()
+        .filter(|tool| !matches!(tool.writes, Writes::Confirmation | Writes::File))
+        .collect();
+    assert_eq!(
+        offered,
+        expected
+            .iter()
+            .map(|tool| tool.name)
+            .collect::<BTreeSet<_>>()
+    );
+    for tool in &expected {
+        let sent = request["tools"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .find(|sent| sent["function"]["name"] == tool.name)
+            .unwrap();
+        assert_eq!(sent["function"]["parameters"], json!(tool.input_schema));
+    }
+    let sent = roles(request);
+    assert_eq!(sent[0].0, "system");
+    assert!(sent[0].1.contains(instructions::guide()));
+    assert_eq!(sent[1..], [("user".to_owned(), "What is next?".to_owned())]);
+}
+
+/// I7: applying a proposal and importing a file are the user's alone: named anyway, they are
+/// refused and change nothing.
+#[tokio::test]
+async fn a_tool_outside_the_offered_list_is_refused_when_named() {
+    let world = World::new().await;
+    let owner = user("u_owner");
+    world.empty_bakeoff().await;
+    let structure = proposed_mutations(&scenario("bake-off"), 1);
+    let draft = json!({ "title": "Structure", "destination_revision": 1, "mutations": structure });
+    let create = json!({ "proposal": "pr_structure", "destination": { "journey": BAKEOFF },
+        "draft": draft, "patch_id": "p_structure" });
+    let apply =
+        json!({ "proposal": "pr_structure", "reviewed_revision": 1, "patch_id": "p_apply" });
+    let import = json!({ "patch_id": "p_import", "file": "route: x\nname: X\nnodes: []\n" });
+    world.script([
+        Step::call("create_proposal", create),
+        Step::calls([("apply_proposal", apply), ("import_route", import)]),
+        Step::say("Ready for your review."),
+    ]);
+    let turn = world
+        .turn(&owner, &bakeoff(), "Set it up and apply it.")
+        .await;
+    assert_eq!(turn.ended, Ended::Replied);
+    assert_eq!(
+        world.journey_revision(BAKEOFF).await,
+        1,
+        "nothing was applied"
+    );
+    let refusals = results(&world.provider.requests()[2]);
+    assert_eq!(refusals.len(), 3);
+    assert_eq!(refusals[1]["error"], "refused");
+    assert_eq!(refusals[2]["error"], "refused");
+}
+
+/// PRACTICES, Explicit limits: a tool the assistant may not run, named again and again, ends
+/// the turn like any other call that keeps failing.
+#[tokio::test]
+async fn a_forbidden_tool_named_again_ends_the_turn() {
+    let world = World::new().await;
+    let lead = user("u_lead");
+    world.vendor_journey(&lead).await;
+    let apply = json!({ "proposal": "pr_x", "reviewed_revision": 1, "patch_id": "p_apply" });
+    world.script(
+        (0..=TOOL_CALL_FAILURE_REPEAT_COUNT_MAX)
+            .map(|_| Step::call("apply_proposal", apply.clone())),
+    );
+    let turn = world.turn(&lead, &vendor_target(), "Apply it.").await;
+    stopped(&turn);
+    assert_eq!(
+        world.provider.request_count(),
+        TOOL_CALL_FAILURE_REPEAT_COUNT_MAX as usize
+    );
+}
+
+/// The PRD's success criterion with no route (I5, I7, H2): the owner describes the work; the
+/// assistant drafts the structure as a proposal while the journey stays where it was; the
+/// owner applies it, and the events record the assistant as proposing and the owner as
+/// confirming.
 #[tokio::test]
 async fn an_empty_journey_is_structured_through_a_proposal_the_user_applies() {
-    let world = World::new();
+    let world = World::new().await;
     world.empty_bakeoff().await;
     let owner = user("u_owner");
     let structure = proposed_mutations(&scenario("bake-off"), 1);
-    let patch = json!({ "patch_id": "p_structure", "target": { "journey": BAKEOFF },
-        "base_revision": 1, "mutations": structure, "note": "Structure the bake-off" });
+    let draft = json!({ "title": "Structure the bake-off", "destination_revision": 1,
+        "mutations": structure });
+    let create = json!({ "proposal": "pr_structure", "destination": { "journey": BAKEOFF },
+        "draft": draft, "patch_id": "p_structure" });
     world.script([
         Step::call("get_snapshot", json!({ "journey": BAKEOFF })),
-        Step::call("apply_patch", patch),
+        Step::call("create_proposal", create),
         Step::say("I drafted the bake-off's structure as a proposal for you to review."),
     ]);
     let turn = world
@@ -71,31 +211,25 @@ async fn an_empty_journey_is_structured_through_a_proposal_the_user_applies() {
         .await;
     assert_eq!(turn.ended, Ended::Replied);
     assert!(turn.reply.is_some());
-    let [
-        Action::Proposed {
-            proposal, because, ..
-        },
-    ] = turn.actions.as_slice()
-    else {
-        panic!("{:?}", turn.actions);
+    assert_eq!(turn.writes, []);
+    let [proposed] = turn.proposals.as_slice() else {
+        panic!("{:?}", turn.proposals);
     };
-    assert_eq!(*because, Because::Structural);
+    assert_eq!(
+        proposed.destination,
+        Domain::Journey(BAKEOFF.parse().unwrap())
+    );
+    assert!(!proposed.discarded);
     assert_eq!(
         world.journey_revision(BAKEOFF).await,
         1,
         "drafting moves nothing"
     );
 
-    let apply = json!({ "proposal": proposal, "reviewed_revision": 1, "patch_id": "p_apply" });
+    let apply = json!({ "proposal": proposed.proposal, "reviewed_revision": 1,
+        "patch_id": "p_apply" });
     world.ok(&owner, "apply_proposal", apply).await;
     assert_eq!(world.journey_revision(BAKEOFF).await, 2);
-    let snapshot = world
-        .ok(&owner, "get_snapshot", json!({ "journey": BAKEOFF }))
-        .await;
-    let open = snapshot["snapshot"]["counts"]["open_decisions"]
-        .as_u64()
-        .unwrap();
-    assert_ne!(open, 0, "the structure's decisions are open: {snapshot}");
     let patch = last_patch(&world, BAKEOFF).await;
     let events = patch["events"].as_array().unwrap();
     assert_ne!(events.as_slice(), [] as [Value; 0]);
@@ -105,58 +239,34 @@ async fn an_empty_journey_is_structured_through_a_proposal_the_user_applies() {
             .all(|event| event["confirming_user"] == "u_owner")
     );
     let held = world
-        .ok(&owner, "get_proposal", json!({ "proposal": proposal }))
+        .ok(
+            &owner,
+            "get_proposal",
+            json!({ "proposal": proposed.proposal }),
+        )
         .await;
     assert_eq!(held["proposal"]["proposing_agent"], "ag_assistant");
     assert_eq!(held["proposal"]["created_by"], "u_owner");
 }
 
-/// Asserts `report` names each of `nodes` with its journey.
-fn names_each<'a>(report: &str, journey: &JourneyId, nodes: impl Iterator<Item = &'a &'a NodeKey>) {
-    for node in nodes {
-        let named = format!("`{journey}/{node}`");
-        assert!(
-            report.contains(&named),
-            "the report names {named}: {report}"
-        );
-    }
-}
-
-/// The vendor evaluation's status summary, as the service derives it now.
-async fn summary(world: &World, actor: &cairn_schema::Actor) -> StatusSummary {
-    let call = Call {
-        actor: actor.clone(),
-        now: world.now(),
-    };
-    let journey = "j_vendor_eval".parse().unwrap();
-    let summary = world.service.status_summary(&call, &journey).await;
-    summary.unwrap().value
-}
-
-/// I5, D7, H2: a state change the user asks for applies directly and is reported with what
-/// it caused; its events record the assistant and the user it acts for.
+/// I5, D7, H2: a state change applies directly and is answered with its revision and what it
+/// caused; its events record the assistant and the user it acts for, and the conversation
+/// keeps a plain line for it.
 #[tokio::test]
-async fn a_direct_state_change_is_reported_with_its_consequences() {
-    let world = World::new();
+async fn a_direct_write_is_reported_and_recorded_as_the_assistant_for_its_user() {
+    let world = World::new().await;
     let lead = user("u_lead");
     world.vendor_journey(&lead).await;
-    let answers = step_mutations(&scenario("vendor-evaluation"), 1);
-    let mut answers: Vec<Value> = answers;
+    let mut answers = crate::assistant::support::step_mutations(&scenario("vendor-evaluation"), 1);
     // A meeting far sooner than the work feeding it can be done.
     for answer in &mut answers {
         if answer["decision"] == "n_meeting_date" {
             answer["value"] = json!({ "date": "2026-10-06" });
         }
     }
-    let vendor: JourneyId = "j_vendor_eval".parse().unwrap();
-    let before = summary(&world, &lead).await;
-    assert_eq!((before.overdue.len(), before.shortfalls.len()), (0, 0));
-    let patch = json!({ "patch_id": "p_answers", "target": { "journey": "j_vendor_eval" },
+    let patch = json!({ "patch_id": "p_answers", "target": { "journey": VENDOR },
         "base_revision": 1, "deployment_revision": 1, "mutations": answers });
-    world.script([
-        Step::call("apply_patch", patch),
-        Step::say("Answered; the decision meeting is now too soon for the work before it."),
-    ]);
+    world.script([Step::call("apply_patch", patch), Step::say("Answered.")]);
     let turn = world
         .turn(
             &lead,
@@ -164,224 +274,63 @@ async fn a_direct_state_change_is_reported_with_its_consequences() {
             "Answer the up-front decisions; meeting on the 6th.",
         )
         .await;
-    let [
-        Action::Applied {
-            report,
-            receipt,
-            consequences,
-            ..
-        },
-    ] = turn.actions.as_slice()
-    else {
-        panic!("{:?}", turn.actions);
+    assert_eq!(turn.ended, Ended::Replied);
+    let [write] = turn.writes.as_slice() else {
+        panic!("{:?}", turn.writes);
     };
-    let (did, _) = report.split_once(':').unwrap();
-    assert!(
-        !did.is_empty() && !did.contains(", "),
-        "every mutation is an answer, said once: {report}"
+    assert_eq!(write.tool, "apply_patch");
+    assert_eq!(write.patch_id.as_str(), "p_answers");
+    assert_eq!(write.domain, Domain::Journey(VENDOR.parse().unwrap()));
+    assert_eq!(write.revision.get(), 2);
+    let caused = &write.consequences[&VENDOR.parse().unwrap()];
+    assert_ne!(
+        caused.overdue,
+        [],
+        "the meeting leaves the earlier work overdue"
     );
-    assert_eq!(receipt.revision.get(), 2);
-    let caused = &consequences[&vendor];
-    // What it reports caused is what the journey now derives: nothing was overdue or short
-    // before, so every node overdue or short after is new.
-    let after = summary(&world, &lead).await;
-    let overdue: BTreeSet<&NodeKey> = caused.overdue.iter().collect();
-    assert_eq!(overdue, after.overdue.iter().collect(), "{consequences:?}");
-    let short: BTreeSet<&NodeKey> = caused.shortfalls.iter().map(|short| &short.node).collect();
-    assert_eq!(short, after.shortfalls.iter().collect(), "{consequences:?}");
-    names_each(report, &vendor, short.iter().chain(&overdue));
-    // Read on the 1st, every unfinished node due before it: the work up to the end of
-    // testing and the review's opening, which the meeting on the 6th leaves no time for.
-    let expected = [
-        "n_access",
-        "n_baseline",
-        "n_comparison_set",
-        "n_kickoff",
-        "n_plan",
-        "n_plan_draft",
-        "n_plan_review",
-        "n_review_opens",
-        "n_testing",
-    ];
-    let overdue: Vec<&str> = overdue.into_iter().map(NodeKey::as_str).collect();
-    assert_eq!(overdue, expected);
-    let patch = last_patch(&world, "j_vendor_eval").await;
     assert_eq!(
-        patch["actor"],
+        last_patch(&world, VENDOR).await["actor"],
         json!({ "user": "u_lead", "agent": "ag_assistant" })
     );
-}
-
-/// I5: a bulk state request, asked in conversation, applies directly like an external agent's
-/// and is reported with every node it wrote.
-#[tokio::test]
-async fn a_bulk_request_in_conversation_applies_directly() {
-    let world = World::new();
-    let lead = user("u_lead");
-    world.vendor_journey(&lead).await;
-    let nodes = [
-        "n_access",
-        "n_plan",
-        "n_plan_draft",
-        "n_plan_review",
-        "n_workload",
-        "n_baseline",
-        "n_criteria",
-        "n_partner_results",
-        "n_findings",
-        "n_final_report",
-        "n_decision_meeting",
-    ];
-    let mutations: Vec<Value> = nodes
-        .iter()
-        .map(|node| json!({ "op": "set_node_field", "node": node, "value": { "weight": 2 } }))
-        .collect();
-    let patch = json!({ "patch_id": "p_reweigh", "target": { "journey": "j_vendor_eval" },
-        "base_revision": 1, "mutations": mutations });
-    world.script([Step::call("apply_patch", patch), Step::say("Done.")]);
-    let turn = world
-        .turn(
-            &lead,
-            &vendor_target(),
-            "Lower every work item's weight to 2.",
-        )
-        .await;
-    let [Action::Applied { nodes: written, .. }] = turn.actions.as_slice() else {
-        panic!("{:?}", turn.actions);
-    };
-    assert_eq!(written.len(), nodes.len());
-    assert_eq!(world.journey_revision("j_vendor_eval").await, 2);
-}
-
-/// A12: a route drafted in conversation arrives as a proposal on its draft, creating the
-/// route when it does not exist yet; applied, the draft holds what was drafted.
-#[tokio::test]
-async fn a_route_drafted_in_conversation_arrives_as_a_proposal_on_its_draft() {
-    let world = World::new();
-    let author = user("u_author");
-    let node = |key: &str, id: &str, title: &str| {
-        json!({ "op": "add_node", "node": { "key": key, "id": id, "kind": "action",
-            "title": title } })
-    };
-    let mutations = json!([
-        { "op": "create_route", "name": "Checklist" },
-        { "op": "open_draft", "source": "edit" },
-        node("n_gather", "gather", "Gather what is needed"),
-        node("n_check", "check", "Check it"),
-    ]);
-    let patch = json!({ "patch_id": "p_checklist", "target": { "route": "checklist" },
-        "base_revision": 0, "mutations": mutations });
-    world.script([
-        Step::call("apply_patch", patch),
-        Step::say("Drafted the checklist."),
-    ]);
-    let target = Target::RouteDraft("checklist".parse().unwrap());
-    let turn = world
-        .turn(&author, &target, "A two-step checklist route.")
-        .await;
-    let [
-        Action::Proposed {
-            proposal, because, ..
-        },
-    ] = turn.actions.as_slice()
-    else {
-        panic!("{:?}", turn.actions);
-    };
-    assert_eq!(*because, Because::Structural);
+    let held = world
+        .store
+        .conversation(&turn.conversation)
+        .await
+        .unwrap()
+        .unwrap();
+    let authors: Vec<MessageAuthor> = held.messages.iter().map(|message| message.author).collect();
     assert_eq!(
-        world.route_revision("checklist").await,
-        0,
-        "nothing exists until applied"
+        authors,
+        [
+            MessageAuthor::User,
+            MessageAuthor::Tool,
+            MessageAuthor::Assistant
+        ]
     );
-    let context = &world.provider.exchanges()[0].messages[0];
+    let line = held.messages[1].content.as_str();
     assert!(
-        matches!(context, Message::User { text } if text.contains("not_found")),
-        "the turn read the missing draft"
+        !line.contains("p_answers") && !line.contains(VENDOR),
+        "a kept line names no id: {line}"
     );
-
-    let apply = json!({ "proposal": proposal, "reviewed_revision": 1, "patch_id": "p_apply" });
-    world.ok(&author, "apply_proposal", apply).await;
-    let draft = world
-        .ok(&author, "get_route", json!({ "route": "checklist" }))
-        .await;
-    assert_eq!(draft["graph"]["nodes"]["total"], 2, "{draft}");
 }
 
-/// B10: the assisted per-member breakdown drafts one child per member of a role, each with
-/// an explicit participation for its member, which the applied proposal keeps.
+/// I5: a write is reported even when a later provider call fails, and the conversation keeps
+/// it and how the turn stopped.
 #[tokio::test]
-async fn a_per_member_breakdown_writes_explicit_participations() {
-    let world = World::new();
+async fn a_write_stands_and_is_reported_when_the_provider_fails_after_it() {
+    let world = World::new().await;
     let lead = user("u_lead");
     world.vendor_journey(&lead).await;
-    let members = ["who_d4m6uk2eqf5rbhzs", "who_e7h2jv3nxc4yaw6t"];
-    let mut mutations = Vec::new();
-    for (index, member) in members.iter().enumerate() {
-        let key = format!("n_workload_member_{index}");
-        mutations.push(json!({ "op": "add_node", "node": { "key": key,
-            "id": format!("member-{index}"), "parent": "n_workload", "kind": "deliverable",
-            "title": format!("Workload for member {index}") } }));
-        mutations.push(
-            json!({ "op": "set_participation", "node": key, "kind": "k_owner",
-            "source": [member] }),
-        );
-    }
-    let draft = json!({ "title": "One workload per stakeholder", "destination_revision": 1,
-        "mutations": mutations });
-    let create = json!({ "proposal": "pr_per_member", "destination": { "journey": "j_vendor_eval" },
-        "draft": draft, "patch_id": "p_per_member" });
     world.script([
-        Step::call("create_proposal", create),
-        Step::say("Proposed."),
+        Step::call("update_journey_state", complete_kickoff("p_kickoff", 1)),
+        Step::status(503),
     ]);
-    let turn = world
-        .turn(
-            &lead,
-            &vendor_target(),
-            "Break the workload down per stakeholder.",
-        )
-        .await;
-    assert!(matches!(
-        turn.actions.as_slice(),
-        [Action::Proposed {
-            because: Because::Asked,
-            ..
-        }]
-    ));
-    let apply = json!({ "proposal": "pr_per_member", "reviewed_revision": 1,
-        "patch_id": "p_apply_per_member" });
-    world.ok(&lead, "apply_proposal", apply).await;
-    for (index, member) in members.iter().enumerate() {
-        let node = format!("n_workload_member_{index}");
-        let detail = world
-            .ok(
-                &lead,
-                "get_node",
-                json!({ "journey": "j_vendor_eval", "node": node }),
-            )
-            .await;
-        let text = detail.to_string();
-        assert!(text.contains(member), "{node} is {member}'s: {text}");
-    }
-}
-
-/// A provider that does not answer is reported as timed out once the provider call limit
-/// passes; the writes made before it stand and are reported, and the conversation keeps a
-/// note of how the turn ended.
-#[tokio::test(start_paused = true)]
-async fn a_provider_timeout_is_reported_and_the_writes_before_it_stand() {
-    let world = World::new();
-    let lead = user("u_lead");
-    world.vendor_journey(&lead).await;
-    let complete = json!({ "journey": "j_vendor_eval", "patch_id": "p_kickoff", "base_revision": 1,
-        "mutations": [{ "op": "transition", "node": "n_kickoff", "transition": "complete" }] });
-    world.script([Step::call("update_journey_state", complete), Step::Hang]);
     let turn = world
         .turn(&lead, &vendor_target(), "Kickoff happened.")
         .await;
-    assert_eq!(turn.ended, Ended::ProviderTimedOut);
-    assert!(matches!(turn.actions.as_slice(), [Action::Applied { .. }]));
-    assert_eq!(world.journey_revision("j_vendor_eval").await, 2);
+    assert!(stopped(&turn).contains("503"));
+    assert_eq!(turn.writes.len(), 1);
+    assert_eq!(world.journey_revision(VENDOR).await, 2);
     let held = world
         .store
         .conversation(&turn.conversation)
@@ -396,142 +345,108 @@ async fn a_provider_timeout_is_reported_and_the_writes_before_it_stand() {
             MessageAuthor::Tool,
             MessageAuthor::Tool
         ],
-        "the user's words, the write, and how the turn ended"
+        "the user's words, the write, and how the turn stopped"
     );
 }
 
-/// PRACTICES, Explicit limits: a model still calling tools after the iteration limit ends
-/// the turn there, and a turn that runs past its duration ends at its next provider call.
-#[tokio::test(start_paused = true)]
-async fn a_turn_ends_at_its_iteration_and_duration_limits() {
-    let world = World::new();
-    let lead = user("u_lead");
-    world.vendor_journey(&lead).await;
-    let read = || Step::call("get_snapshot", json!({ "journey": "j_vendor_eval" }));
-    world.script((0..=TOOL_LOOP_ITERATION_COUNT_MAX).map(|_| read()));
-    let turn = world.turn(&lead, &vendor_target(), "Look around.").await;
-    assert_eq!(turn.ended, Ended::IterationLimit);
-    assert_eq!(
-        world.provider.exchanges().len(),
-        TOOL_LOOP_ITERATION_COUNT_MAX as usize
-    );
-    assert_eq!(world.provider.remaining(), 1);
-
-    let slow = || {
-        let Step::Reply(reply) = read() else {
-            unreachable!()
-        };
-        Step::Slow(Duration::from_secs(100), reply)
-    };
-    let world = World::new();
-    world.vendor_journey(&lead).await;
-    world.script((0..10).map(|_| slow()));
-    let turn = world.turn(&lead, &vendor_target(), "Look slowly.").await;
-    assert_eq!(turn.ended, Ended::TurnTimedOut);
-    assert_eq!(
-        world.provider.exchanges().len(),
-        6,
-        "six calls fill ten minutes"
-    );
-}
-
-/// I5: a turn opens with its journey's essentials only; the assistant's own tools are what
-/// reach a node's details, and the context states the journey's counts and revision.
+/// H5: a patch id applied before is reported as already applied, not as a new write.
 #[tokio::test]
-async fn a_turn_opens_with_essentials_and_nodes_are_read_with_tools() {
-    let world = World::new();
+async fn a_write_applied_before_is_reported_as_already_applied() {
+    let world = World::new().await;
     let lead = user("u_lead");
     world.vendor_journey(&lead).await;
-    let read = world
-        .ok(&lead, "get_snapshot", json!({ "journey": "j_vendor_eval" }))
-        .await;
-    let snapshot = &read["snapshot"];
-    let frontier = world
-        .ok(
-            &lead,
-            "list_nodes",
-            json!({ "journey": "j_vendor_eval", "filters": ["next_up"] }),
-        )
-        .await;
-    let node = frontier["items"][0]["key"].as_str().unwrap().to_owned();
+    let patch = complete_kickoff("p_kickoff", 1);
     world.script([
-        Step::call(
-            "get_node",
-            json!({ "journey": "j_vendor_eval", "node": node }),
-        ),
-        Step::say("Read it."),
+        Step::calls([
+            ("update_journey_state", patch.clone()),
+            ("update_journey_state", patch),
+        ]),
+        Step::say("Done."),
     ]);
-    let turn = world.turn(&lead, &vendor_target(), "What is next?").await;
-    assert_eq!(turn.ended, Ended::Replied);
-
-    let exchanges = world.provider.exchanges();
-    let Message::User { text: context } = &exchanges[0].messages[0] else {
-        panic!("{:?}", exchanges[0].messages);
-    };
-    assert!(
-        !context.contains(&node),
-        "the frontier is not in the context: {context}"
-    );
-    assert!(context.contains(snapshot["journey"]["name"].as_str().unwrap()));
-    assert!(context.contains(&format!("\"revision\":{}", read["revision"])));
-    assert!(context.contains("\"in_scope\""));
-
-    let results = results_of(&exchanges[1].messages);
-    assert!(
-        results[0].content.contains(&node) && !results[0].is_error,
-        "get_node answers with the node: {}",
-        results[0].content
-    );
+    let turn = world
+        .turn(&lead, &vendor_target(), "Kickoff happened.")
+        .await;
+    let flags: Vec<bool> = turn
+        .writes
+        .iter()
+        .map(|write| write.already_applied)
+        .collect();
+    assert_eq!(flags, [false, true]);
+    assert_eq!(world.journey_revision(VENDOR).await, 2);
 }
 
-/// PRACTICES, Explicit limits: past the turns in flight, a turn is refused at once.
-#[tokio::test(start_paused = true)]
-async fn turns_past_the_in_flight_limit_are_refused() {
-    let world = std::sync::Arc::new(World::new());
+/// A12: naming a route that does not exist stores no conversation until a turn drafts one;
+/// a proposal the turn drafts and then discards is reported once, as discarded.
+#[tokio::test]
+async fn a_missing_route_keeps_no_conversation_and_a_discard_is_reported_as_one() {
+    let world = World::new().await;
+    world.script([Step::say("There is nothing here yet.")]);
+    let target = Target::RouteDraft("nowhere".parse().unwrap());
+    let turn = world.turn(&user("u_author"), &target, "Hello?").await;
+    assert_eq!(
+        world.store.conversation(&turn.conversation).await.unwrap(),
+        None
+    );
+
     let lead = user("u_lead");
     world.vendor_journey(&lead).await;
-    world.script((0..TURN_IN_FLIGHT_COUNT_MAX).map(|_| Step::Hang));
-    let mut running = Vec::new();
-    for index in 0..TURN_IN_FLIGHT_COUNT_MAX {
-        let world = std::sync::Arc::clone(&world);
-        // One user each: a conversation runs one turn at a time.
-        let member = user(&format!("u_member_{index}"));
-        running.push(tokio::spawn(async move {
-            world.turn(&member, &vendor_target(), "Wait.").await
-        }));
-    }
-    while world.provider.exchanges().len() < TURN_IN_FLIGHT_COUNT_MAX as usize {
-        tokio::task::yield_now().await;
-    }
-    let refused = world
-        .assistant
-        .turn(&lead, vendor_target(), "One more.".parse().unwrap())
+    let add = json!({ "op": "add_node", "node": { "key": "n_extra", "id": "extra",
+        "kind": "action", "title": "An extra step" } });
+    let create = json!({ "proposal": "pr_extra", "destination": { "journey": VENDOR },
+        "draft": { "title": "Add a step", "destination_revision": 1, "mutations": [add] },
+        "patch_id": "p_extra" });
+    let discard = json!({ "proposal": "pr_extra", "change": "discard", "base_revision": 1,
+        "patch_id": "p_discard_extra" });
+    world.script([
+        Step::call("create_proposal", create),
+        Step::calls([
+            ("edit_proposal", discard.clone()),
+            ("edit_proposal", discard),
+        ]),
+        Step::say("Drafted, then dropped."),
+    ]);
+    let turn = world
+        .turn(&lead, &vendor_target(), "Never mind the extra step.")
         .await;
-    assert_eq!(refused, Err(TurnError::Overloaded));
-    for turn in running {
-        assert_eq!(turn.await.unwrap().ended, Ended::ProviderTimedOut);
-    }
+    let [proposed] = turn.proposals.as_slice() else {
+        panic!(
+            "one report for the proposal, as it stands: {:?}",
+            turn.proposals
+        );
+    };
+    assert!(
+        proposed.discarded,
+        "a discard repeated from its receipt stays discarded"
+    );
+    // The turn answers what it added to the conversation, saved or not.
+    let [said, _receipt, reply] = turn.messages.as_slice() else {
+        panic!("{:?}", turn.messages);
+    };
+    assert_eq!(said.content.as_str(), "Never mind the extra step.");
+    assert_eq!(reply.content.as_str(), "Drafted, then dropped.");
 }
 
 /// I5: a turn about a journey that does not exist is refused, naming it.
 #[tokio::test]
 async fn a_turn_about_a_missing_journey_is_refused() {
-    let world = World::new();
+    let world = World::new().await;
     let missing = world
         .assistant
         .turn(&user("u_lead"), vendor_target(), "Hello.".parse().unwrap())
         .await;
     assert_eq!(missing, Err(TurnError::TargetMissing(vendor_target())));
+    assert_eq!(world.provider.request_count(), 0);
 }
 
-/// Conversations are one per target per user: a user's next turn is sent what they said
-/// before, and another user's is not.
+/// Conversations are one per target per user: a user's next turn is sent what they said and
+/// were told before, in order, and another user's is not.
 #[tokio::test]
 async fn a_conversation_carries_on_for_its_user_alone() {
-    let world = World::new();
+    let world = World::new().await;
     let lead = user("u_lead");
     world.vendor_journey(&lead).await;
     world.script([
+        Step::call("update_journey_state", complete_kickoff("p_kickoff", 1)),
         Step::say("First answer."),
         Step::say("Second answer."),
         Step::say("Other user's answer."),
@@ -545,188 +460,305 @@ async fn a_conversation_carries_on_for_its_user_alone() {
         .await;
     assert_eq!(first.conversation, second.conversation);
     assert_ne!(first.conversation, other.conversation);
-    let sent =
-        |index: usize| -> Vec<Message> { world.provider.exchanges()[index].messages.clone() };
-    let said = |text: &str| Message::User {
-        text: text.to_owned(),
-    };
-    let replied = |text: &str| {
-        Message::Assistant(Reply {
-            text: Some(text.to_owned()),
-            ..Reply::default()
-        })
-    };
-    // History replays as said; the turn's own message follows its context.
-    let history = sent(1);
+    let sent = world.provider.requests();
+    let history: Vec<(String, String)> = roles(&sent[2])[1..].to_vec();
+    assert_eq!(history.len(), 3, "{history:?}");
     assert_eq!(
-        history[..2],
-        [said("First question."), replied("First answer.")]
+        history[0],
+        ("user".to_owned(), "First question.".to_owned())
     );
-    let Message::User { text } = &history[2] else {
-        panic!("{history:?}");
-    };
-    assert!(text.ends_with("Second question."), "{text}");
-    let alone = sent(2);
-    let [Message::User { text }] = alone.as_slice() else {
-        panic!("{alone:?}");
-    };
-    assert!(text.ends_with("Mine."), "{text}");
-}
-
-/// The ten weight overrides as one call each: what a model asked for "every work item" may
-/// send instead of one patch.
-fn weight_calls(nodes: &[&str], first_base: usize) -> Vec<(&'static str, Value)> {
-    nodes
-        .iter()
-        .enumerate()
-        .map(|(index, node)| {
-            let patch = json!({ "patch_id": format!("p_weight_{index}"),
-                "target": { "journey": "j_vendor_eval" }, "base_revision": first_base + index,
-                "mutations": [{ "op": "set_node_field", "node": node, "value": { "weight": 2 } }] });
-            ("apply_patch", patch)
-        })
-        .collect()
-}
-
-const ELEVEN: [&str; 11] = [
-    "n_access",
-    "n_plan",
-    "n_plan_draft",
-    "n_plan_review",
-    "n_workload",
-    "n_baseline",
-    "n_criteria",
-    "n_partner_results",
-    "n_findings",
-    "n_final_report",
-    "n_decision_meeting",
-];
-
-/// I5: a request split into one call per node is eleven small changes, each applied directly
-/// and reported, however many calls the turn makes.
-#[tokio::test]
-async fn a_request_split_into_calls_applies_each_call() {
-    let world = World::new();
-    let lead = user("u_lead");
-    world.vendor_journey(&lead).await;
-    let calls = weight_calls(&ELEVEN, 1);
-    let (first, rest) = calls.split_at(6);
-    let again = |calls: &[(&'static str, Value)]| {
-        Step::calls(
-            calls
-                .iter()
-                .map(|(name, arguments)| (*name, arguments.clone()))
-                .collect::<Vec<_>>(),
-        )
-    };
-    world.script([again(first), again(rest), Step::say("Done.")]);
-    let turn = world
-        .turn(&lead, &vendor_target(), "Lower every weight.")
-        .await;
-    assert_eq!(turn.ended, Ended::Replied);
-    let applied = turn
-        .actions
-        .iter()
-        .filter(|action| matches!(action, Action::Applied { .. }))
-        .count();
-    assert_eq!(applied, ELEVEN.len(), "{:?}", turn.actions);
+    assert_eq!(history[1].0, "assistant");
+    // The write's line is replayed with the reply it came with.
+    assert!(history[1].1.ends_with("First answer.") && history[1].1.len() > "First answer.".len());
     assert_eq!(
-        world.journey_revision("j_vendor_eval").await,
-        1 + u64::try_from(ELEVEN.len()).unwrap()
+        history[2],
+        ("user".to_owned(), "Second question.".to_owned())
+    );
+    assert_eq!(
+        roles(&sent[3])[1..],
+        [("user".to_owned(), "Mine.".to_owned())]
     );
 }
 
-/// H5: a write whose patch id was applied before is reported as already applied, not as a
-/// change made now.
+/// The dialogue replayed is the newest within its byte budget.
 #[tokio::test]
-async fn a_write_applied_before_is_reported_as_already_applied() {
-    let world = World::new();
+async fn only_the_newest_dialogue_within_the_budget_is_replayed() {
+    let world = World::new().await;
     let lead = user("u_lead");
     world.vendor_journey(&lead).await;
-    let (name, patch) = weight_calls(&ELEVEN[..1], 1).remove(0);
-    world.ok(&lead, name, patch.clone()).await;
-    world.script([Step::call(name, patch), Step::say("Done.")]);
-    let turn = world
-        .turn(&lead, &vendor_target(), "Lower the weight.")
-        .await;
+    let big = "x".repeat(BODY_BYTES_MAX as usize / 2);
+    let turns = DIALOGUE_REPLAY_BYTES_MAX as usize / big.len() + 2;
+    world.script((0..=turns).map(|_| Step::say("Ok.")));
+    for turn in 0..turns {
+        world
+            .turn(&lead, &vendor_target(), &format!("{}{big}", turn % 10))
+            .await;
+    }
+    world.turn(&lead, &vendor_target(), "Last.").await;
+    let sent = roles(&world.provider.requests()[turns]);
+    let texts: Vec<&str> = sent[1..].iter().map(|(_, text)| text.as_str()).collect();
     assert!(
-        matches!(turn.actions.as_slice(), [Action::AlreadyApplied { .. }]),
-        "{:?}",
-        turn.actions
+        !texts.iter().any(|text| text.starts_with('0')),
+        "the oldest left out"
     );
+    assert!(
+        texts
+            .iter()
+            .any(|text| text.starts_with(&((turns - 1) % 10).to_string())),
+        "the newest kept"
+    );
+    assert_eq!(texts.last(), Some(&"Last."));
 }
 
-/// PRACTICES, Explicit limits: a reply's calls past the per-reply limit are refused, not run.
+/// PRACTICES, Explicit limits: a reply asking for more tool calls than it may run is answered
+/// with a result for every call, the ones past the limit refused.
 #[tokio::test]
 async fn calls_past_the_per_reply_limit_are_refused() {
-    let world = World::new();
+    let world = World::new().await;
     let lead = user("u_lead");
     world.vendor_journey(&lead).await;
-    let read = json!({ "journey": "j_vendor_eval" });
-    let count = TOOL_CALL_COUNT_PER_REPLY_MAX as usize + 2;
+    let read = json!({ "journey": VENDOR });
+    let count = TOOL_CALL_COUNT_PER_REPLY_MAX as usize + 3;
     world.script([
         Step::calls((0..count).map(|_| ("get_snapshot", read.clone()))),
-        Step::say("Done."),
+        Step::say("Looked."),
     ]);
-    world.turn(&lead, &vendor_target(), "Look.").await;
-    let sent = &world.provider.exchanges()[1].messages;
-    let Some(Message::ToolResults(results)) = sent.last() else {
-        panic!("{sent:?}");
-    };
-    let refused = results.iter().filter(|result| result.is_error).count();
-    assert_eq!((results.len(), refused), (count, 2));
+    world
+        .turn(&lead, &vendor_target(), "Look at everything.")
+        .await;
+    let answered = results(&world.provider.requests()[1]);
+    assert_eq!(answered.len(), count, "every call has its result");
+    let refused = answered
+        .iter()
+        .filter(|result| result["error"] == "refused")
+        .count();
+    assert_eq!(refused, 3);
 }
 
-/// PRACTICES, Explicit limits: the turn's deadline is checked before each tool call, so a
-/// reply's calls cannot run past it.
-#[tokio::test(start_paused = true)]
-async fn no_tool_call_runs_past_the_turn_deadline() {
-    let world = World::new();
+/// A reply that did not finish runs none of its tool calls, and the turn says it stopped.
+#[tokio::test]
+async fn an_unfinished_reply_runs_no_tool_call() {
+    for finish in ["length", "content_filter"] {
+        let world = World::new().await;
+        let lead = user("u_lead");
+        world.vendor_journey(&lead).await;
+        world.script([
+            Step::call("update_journey_state", complete_kickoff("p_cut", 1)).finishing(finish),
+        ]);
+        let turn = world
+            .turn(&lead, &vendor_target(), "Kickoff happened.")
+            .await;
+        stopped(&turn);
+        assert_eq!(turn.writes, [], "{finish}");
+        assert_eq!(world.journey_revision(VENDOR).await, 1, "{finish}");
+    }
+}
+
+/// PRACTICES, Explicit limits: a model still calling tools after the iteration limit ends
+/// the turn there.
+#[tokio::test]
+async fn a_turn_ends_at_its_iteration_limit() {
+    let world = World::new().await;
     let lead = user("u_lead");
     world.vendor_journey(&lead).await;
-    let complete = json!({ "journey": "j_vendor_eval", "patch_id": "p_late", "base_revision": 1,
-        "mutations": [{ "op": "transition", "node": "n_kickoff", "transition": "complete" }] });
-    let reply = |step: Step| {
-        let Step::Reply(reply) = step else {
-            unreachable!()
-        };
-        reply
+    let read = || Step::call("get_snapshot", json!({ "journey": VENDOR }));
+    world.script((0..=TOOL_LOOP_ITERATION_COUNT_MAX).map(|_| read()));
+    let turn = world.turn(&lead, &vendor_target(), "Look around.").await;
+    stopped(&turn);
+    assert_eq!(
+        world.provider.request_count(),
+        TOOL_LOOP_ITERATION_COUNT_MAX as usize
+    );
+}
+
+/// A tool call repeated after failing ends the turn at the third failure; different calls
+/// that fail are not counted together.
+#[tokio::test]
+async fn a_tool_call_repeated_after_failing_ends_the_turn() {
+    let world = World::new().await;
+    let lead = user("u_lead");
+    world.vendor_journey(&lead).await;
+    let bad = || {
+        Step::call(
+            "get_node",
+            json!({ "journey": VENDOR, "node": "n_nowhere" }),
+        )
     };
-    let read = reply(Step::call(
-        "get_snapshot",
-        json!({ "journey": "j_vendor_eval" }),
-    ));
-    let slow = Duration::from_secs(118);
-    let reads = (0..5).map(|_| Step::Slow(slow, read.clone()));
-    // Five slow reads leave a few seconds of the turn's work; the write lands exactly at its
-    // end, which keeps a reserve to save the conversation.
-    let work = TURN_DURATION_MAX.checked_sub(TURN_SAVE_RESERVE).unwrap();
-    let left = work.checked_sub(slow * 5).unwrap();
-    assert!(left > Duration::ZERO);
-    let write = Step::Slow(left, reply(Step::call("update_journey_state", complete)));
-    world.script(reads.chain([write, Step::say("Done.")]));
+    world.script((0..=TOOL_CALL_FAILURE_REPEAT_COUNT_MAX).map(|_| bad()));
+    let turn = world.turn(&lead, &vendor_target(), "Read it.").await;
+    stopped(&turn);
+    assert_eq!(
+        world.provider.request_count(),
+        TOOL_CALL_FAILURE_REPEAT_COUNT_MAX as usize
+    );
+
+    let world = World::new().await;
+    world.vendor_journey(&lead).await;
+    let missing = |node: &str| Step::call("get_node", json!({ "journey": VENDOR, "node": node }));
+    world.script([
+        missing("n_a"),
+        missing("n_b"),
+        missing("n_c"),
+        missing("n_d"),
+        Step::say("Gave up."),
+    ]);
+    let turn = world.turn(&lead, &vendor_target(), "Read them.").await;
+    assert_eq!(turn.ended, Ended::Replied);
+}
+
+/// The results a turn resends are bounded: the newest are kept whole and the oldest replaced
+/// by a note.
+#[tokio::test]
+async fn a_turns_tool_results_are_bounded_between_provider_calls() {
+    let world = World::new().await;
+    let lead = user("u_lead");
+    world.vendor_journey(&lead).await;
+    let read = json!({ "route": "vendor-evaluation", "version": 1 });
+    let size = world
+        .ok(&lead, "get_route", read.clone())
+        .await
+        .to_string()
+        .len();
+    let reads = TOOL_RESULT_BYTES_PER_TURN_MAX as usize / size + 2;
+    let per_reply = 16;
+    let replies = reads.div_ceil(per_reply);
+    assert!(
+        replies < TOOL_LOOP_ITERATION_COUNT_MAX as usize,
+        "{replies} replies of {size} bytes"
+    );
+    let rounds = replies * per_reply;
+    world.script(
+        (0..replies)
+            .map(|_| Step::calls((0..per_reply).map(|_| ("get_route", read.clone()))))
+            .chain([Step::say("Done.")]),
+    );
+    world.turn(&lead, &vendor_target(), "Read a lot.").await;
+    let last = world.provider.requests().pop().unwrap();
+    let kept: usize = last["messages"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .filter(|message| message["role"] == "tool")
+        .map(|message| message["content"].as_str().unwrap().len())
+        .sum();
+    assert!(kept <= TOOL_RESULT_BYTES_PER_TURN_MAX as usize + DROPPED.len() * rounds);
+    let dropped = last["messages"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .filter(|message| message["content"] == DROPPED)
+        .count();
+    assert!(dropped > 0, "the oldest results were dropped");
+}
+
+/// A provider that refuses the key, fails, or says too much ends the turn as stopped, and
+/// what it said never reaches the answer or the conversation.
+#[tokio::test]
+async fn a_provider_failure_stops_the_turn_without_echoing_what_it_said() {
+    for status in [401, 429, 500] {
+        let world = World::new().await;
+        let lead = user("u_lead");
+        world.vendor_journey(&lead).await;
+        world.script([Step::status(status)]);
+        let turn = world.turn(&lead, &vendor_target(), "Hello.").await;
+        let why = stopped(&turn);
+        assert!(!why.contains(KEY), "{status}: {why}");
+        assert_eq!(why.contains("not set up"), status == 401, "{status}: {why}");
+        let held = world
+            .store
+            .conversation(&turn.conversation)
+            .await
+            .unwrap()
+            .unwrap();
+        assert!(
+            held.messages
+                .iter()
+                .all(|message| !message.content.as_str().contains(KEY))
+        );
+        assert_eq!(world.provider.request_count(), 1, "{status}: no retry");
+    }
+}
+
+/// PRACTICES, Explicit limits: a provider call past its limit ends the turn, and the writes
+/// before it stand.
+#[tokio::test(start_paused = true)]
+async fn a_provider_timeout_is_reported_and_the_writes_before_it_stand() {
+    let world = World::new().await;
+    let lead = user("u_lead");
+    world.vendor_journey(&lead).await;
+    world.script([
+        Step::call("update_journey_state", complete_kickoff("p_kickoff", 1)),
+        Step::hang(),
+    ]);
     let turn = world
         .turn(&lead, &vendor_target(), "Kickoff happened.")
         .await;
-    assert_eq!(turn.ended, Ended::TurnTimedOut);
-    assert_eq!(turn.actions, Vec::<Action>::new());
-    assert_eq!(world.journey_revision("j_vendor_eval").await, 1);
+    assert!(stopped(&turn).contains("did not answer"));
+    assert_eq!(turn.writes.len(), 1);
+    assert_eq!(world.journey_revision(VENDOR).await, 2);
+}
+
+/// PRACTICES, Explicit limits: a turn that runs past its duration ends at its next provider
+/// call, and no tool call runs past its deadline.
+#[tokio::test(start_paused = true)]
+async fn a_turn_ends_at_its_duration_limit() {
+    let world = World::new().await;
+    let lead = user("u_lead");
+    world.vendor_journey(&lead).await;
+    let read = || Step::call("get_snapshot", json!({ "journey": VENDOR }));
+    world.script((0..10).map(|_| read().after(Duration::from_secs(100))));
+    let turn = world.turn(&lead, &vendor_target(), "Look slowly.").await;
+    assert!(stopped(&turn).contains("time limit"));
+    assert_eq!(
+        world.provider.request_count(),
+        6,
+        "six calls fill ten minutes"
+    );
+}
+
+/// PRACTICES, Explicit limits: past the turns in flight, a turn is refused at once.
+#[tokio::test(start_paused = true)]
+async fn turns_past_the_in_flight_limit_are_refused() {
+    let world = Arc::new(World::new().await);
+    let lead = user("u_lead");
+    world.vendor_journey(&lead).await;
+    world.script((0..TURN_IN_FLIGHT_COUNT_MAX).map(|_| Step::hang()));
+    let mut running = Vec::new();
+    for index in 0..TURN_IN_FLIGHT_COUNT_MAX {
+        let world = Arc::clone(&world);
+        // One user each: a conversation runs one turn at a time.
+        let member = user(&format!("u_member_{index}"));
+        running.push(tokio::spawn(async move {
+            world.turn(&member, &vendor_target(), "Wait.").await
+        }));
+    }
+    while world.provider.request_count() < TURN_IN_FLIGHT_COUNT_MAX as usize {
+        tokio::time::sleep(Duration::from_millis(1)).await;
+    }
+    let refused = world
+        .assistant
+        .turn(&lead, vendor_target(), "One more.".parse().unwrap())
+        .await;
+    assert_eq!(refused, Err(TurnError::Overloaded));
+    for turn in running {
+        stopped(&turn.await.unwrap());
+    }
 }
 
 /// A conversation runs one turn at a time, so a second submission cannot lose the first's
 /// messages; another user's conversation is not held up.
 #[tokio::test(start_paused = true)]
 async fn a_conversation_runs_one_turn_at_a_time() {
-    let world = std::sync::Arc::new(World::new());
+    let world = Arc::new(World::new().await);
     let lead = user("u_lead");
     world.vendor_journey(&lead).await;
-    world.script([Step::Hang, Step::say("Hello.")]);
+    world.script([Step::hang(), Step::say("Hello.")]);
     let first = {
-        let (world, lead) = (std::sync::Arc::clone(&world), lead.clone());
+        let (world, lead) = (Arc::clone(&world), lead.clone());
         tokio::spawn(async move { world.turn(&lead, &vendor_target(), "First.").await })
     };
-    while world.provider.exchanges().is_empty() {
-        tokio::task::yield_now().await;
+    while world.provider.request_count() == 0 {
+        tokio::time::sleep(Duration::from_millis(1)).await;
     }
     let again = world
         .assistant
@@ -735,45 +767,7 @@ async fn a_conversation_runs_one_turn_at_a_time() {
     assert_eq!(again, Err(TurnError::ConversationBusy));
     let other = world.turn(&user("u_other"), &vendor_target(), "Hi.").await;
     assert_eq!(other.ended, Ended::Replied);
-    assert_eq!(first.await.unwrap().ended, Ended::ProviderTimedOut);
-}
-
-/// Naming a route that does not exist stores no conversation until a turn drafts one; a
-/// discard is reported as a discard.
-#[tokio::test]
-async fn a_missing_route_keeps_no_conversation_and_a_discard_is_reported_as_one() {
-    let world = World::new();
-    let author = user("u_author");
-    world.script([Step::say("There is nothing here yet.")]);
-    let target = Target::RouteDraft("nowhere".parse().unwrap());
-    let turn = world.turn(&author, &target, "Hello?").await;
-    assert_eq!(
-        world.store.conversation(&turn.conversation).await.unwrap(),
-        None
-    );
-
-    let lead = user("u_lead");
-    world.vendor_journey(&lead).await;
-    let add = json!({ "op": "add_node", "node": { "key": "n_extra", "id": "extra",
-        "kind": "action", "title": "An extra step" } });
-    let create = json!({ "proposal": "pr_extra", "destination": { "journey": "j_vendor_eval" },
-        "draft": { "title": "Add a step", "destination_revision": 1, "mutations": [add] },
-        "patch_id": "p_extra" });
-    let discard = json!({ "proposal": "pr_extra", "change": "discard", "base_revision": 1,
-        "patch_id": "p_discard_extra" });
-    world.script([
-        Step::call("create_proposal", create),
-        Step::call("edit_proposal", discard),
-        Step::say("Drafted, then dropped."),
-    ]);
-    let turn = world
-        .turn(&lead, &vendor_target(), "Never mind the extra step.")
-        .await;
-    assert!(
-        matches!(turn.actions.as_slice(), [Action::Discarded { .. }]),
-        "one report for the proposal, as it stands: {:?}",
-        turn.actions
-    );
+    stopped(&first.await.unwrap());
 }
 
 /// I5 (every direct write is reported): a commit the turn's deadline overtakes, but which
@@ -781,52 +775,42 @@ async fn a_missing_route_keeps_no_conversation_and_a_discard_is_reported_as_one(
 #[tokio::test(start_paused = true)]
 async fn a_commit_landing_just_past_the_deadline_is_reported() {
     let faults = cairn_store::Faults::default();
-    let world = World::with_faults(faults.clone());
+    let world = World::with_faults(faults.clone()).await;
     let lead = user("u_lead");
     world.vendor_journey(&lead).await;
     // A second past the turn's deadline (its limit less the save reserve).
     let lands = tokio::time::Instant::now() + TURN_DURATION_MAX - TURN_SAVE_RESERVE
         + Duration::from_secs(1);
-    faults.pause_with(std::sync::Arc::new(move |_| {
-        Box::pin(tokio::time::sleep_until(lands))
-    }));
-    let complete = json!({ "journey": "j_vendor_eval", "patch_id": "p_late", "base_revision": 1,
-        "mutations": [{ "op": "transition", "node": "n_kickoff", "transition": "complete" }] });
+    faults.pause_with(Arc::new(move |_| Box::pin(tokio::time::sleep_until(lands))));
     world.script([
-        Step::call("update_journey_state", complete),
+        Step::call("update_journey_state", complete_kickoff("p_late", 1)),
         Step::say("Hello."),
     ]);
     let turn = world
         .turn(&lead, &vendor_target(), "Kickoff happened.")
         .await;
-    assert_eq!(turn.ended, Ended::TurnTimedOut);
-    assert!(
-        matches!(turn.actions.as_slice(), [Action::Applied { .. }]),
-        "the late write is reported: {:?}",
-        turn.actions
-    );
+    assert!(stopped(&turn).contains("time limit"));
+    assert_eq!(turn.writes.len(), 1, "the late write is reported");
 }
 
-/// PRACTICES, Explicit limits: a tool call whose commit stalls is held to the
-/// turn's limit; the turn ends, releases its conversation and its slot, and is saved.
+/// PRACTICES, Explicit limits: a tool call whose commit stalls is held to the turn's limit;
+/// the turn ends, releases its conversation and its slot, and is saved.
 #[tokio::test(start_paused = true)]
 async fn a_stalled_commit_cannot_hold_a_turn_past_its_limit() {
     let faults = cairn_store::Faults::default();
-    let world = World::with_faults(faults.clone());
+    let world = World::with_faults(faults.clone()).await;
     let lead = user("u_lead");
     world.vendor_journey(&lead).await;
-    faults.pause_with(std::sync::Arc::new(|_| Box::pin(std::future::pending())));
-    let complete = json!({ "journey": "j_vendor_eval", "patch_id": "p_stalled", "base_revision": 1,
-        "mutations": [{ "op": "transition", "node": "n_kickoff", "transition": "complete" }] });
+    faults.pause_with(Arc::new(|_| Box::pin(std::future::pending())));
     world.script([
-        Step::call("update_journey_state", complete),
+        Step::call("update_journey_state", complete_kickoff("p_stalled", 1)),
         Step::say("Hello."),
     ]);
     let started = tokio::time::Instant::now();
     let turn = world
         .turn(&lead, &vendor_target(), "Kickoff happened.")
         .await;
-    assert_eq!(turn.ended, Ended::TurnTimedOut);
+    assert!(stopped(&turn).contains("time limit"));
     assert!(started.elapsed() <= TURN_DURATION_MAX);
     let held = world.store.conversation(&turn.conversation).await.unwrap();
     assert!(held.is_some(), "the conversation is saved");
@@ -836,294 +820,4 @@ async fn a_stalled_commit_cannot_hold_a_turn_past_its_limit() {
         Ended::Replied,
         "the conversation is free again"
     );
-}
-
-/// A reply that did not finish runs none of its tool calls, and the turn ends with a status
-/// the person sees, whatever the reason.
-#[tokio::test]
-async fn an_unfinished_reply_runs_no_tool_call() {
-    let cases = [
-        (Stop::OutputLimit, Ended::ReplyCutOff),
-        (Stop::Refused, Ended::ModelRefused),
-        (Stop::Paused, Ended::ModelPaused),
-    ];
-    for (stop, ended) in cases {
-        let world = World::new();
-        let lead = user("u_lead");
-        world.vendor_journey(&lead).await;
-        let (name, arguments) = weight_calls(&ELEVEN[..1], 1).remove(0);
-        let call = ToolCall {
-            id: "call_0".to_owned(),
-            name: name.to_owned(),
-            arguments,
-        };
-        world.script([Step::Reply(Reply {
-            text: Some("Partly".to_owned()),
-            calls: vec![call],
-            stop,
-            ..Reply::default()
-        })]);
-        let turn = world.turn(&lead, &vendor_target(), "Go.").await;
-        assert_eq!(turn.ended, ended);
-        assert_eq!(turn.actions, Vec::<Action>::new(), "{stop:?}");
-        assert_eq!(world.journey_revision("j_vendor_eval").await, 1, "{stop:?}");
-    }
-}
-
-/// A provider that refuses the key ends the turn as not set up, the one status the person
-/// can act on; any other refusal is a failure.
-#[tokio::test]
-async fn a_refused_key_is_reported_as_not_set_up() {
-    let cases = [
-        (401, Ended::ProviderNotSetUp),
-        (
-            500,
-            Ended::ProviderFailed {
-                message: "status 500: down".to_owned(),
-            },
-        ),
-    ];
-    for (status, ended) in cases {
-        let world = World::new();
-        let lead = user("u_lead");
-        world.vendor_journey(&lead).await;
-        world.script([Step::Fail(ProviderError::Rejected {
-            status,
-            message: "down".to_owned(),
-        })]);
-        let turn = world.turn(&lead, &vendor_target(), "Hello.").await;
-        assert_eq!(turn.ended, ended);
-    }
-}
-
-/// What a provider said in an error is not kept in the conversation, where it would be sent
-/// back to the model as something the assistant said.
-#[tokio::test]
-async fn a_provider_error_text_is_not_kept_in_the_conversation() {
-    let world = World::new();
-    let lead = user("u_lead");
-    world.vendor_journey(&lead).await;
-    let marker = "zq-provider-words-zq";
-    world.script([Step::Fail(ProviderError::Rejected {
-        status: 500,
-        message: marker.to_owned(),
-    })]);
-    let turn = world.turn(&lead, &vendor_target(), "Hello.").await;
-    let kept = world.store.conversation(&turn.conversation).await.unwrap();
-    let kept = kept.expect("the turn is kept");
-    assert_ne!(kept.messages, [] as [cairn_store::ConversationMessage; 0]);
-    assert!(
-        kept.messages
-            .iter()
-            .all(|message| !message.content.as_str().contains(marker)),
-        "{:?}",
-        kept.messages
-    );
-}
-
-/// A model that repeats a tool call that failed is stopped, not left to spend the whole
-/// tool-loop limit.
-#[tokio::test]
-async fn a_tool_call_repeated_after_failing_ends_the_turn() {
-    let world = World::new();
-    let lead = user("u_lead");
-    world.vendor_journey(&lead).await;
-    let missing = json!({ "journey": "j_missing" });
-    let repeats = TOOL_CALL_FAILURE_REPEAT_COUNT_MAX as usize;
-    let steps = (0..=repeats).map(|_| Step::call("get_snapshot", missing.clone()));
-    world.script(steps);
-    let turn = world.turn(&lead, &vendor_target(), "Look.").await;
-    assert_eq!(turn.ended, Ended::RepeatedFailure);
-    assert_eq!(world.provider.exchanges().len(), repeats);
-}
-
-/// The same failing call is not the same as different failing calls: each is allowed its own
-/// repeats.
-#[tokio::test]
-async fn failures_of_different_calls_are_not_counted_together() {
-    let world = World::new();
-    let lead = user("u_lead");
-    world.vendor_journey(&lead).await;
-    let repeats = TOOL_CALL_FAILURE_REPEAT_COUNT_MAX as usize;
-    let steps = (0..repeats)
-        .map(|index| {
-            Step::call(
-                "get_snapshot",
-                json!({ "journey": format!("j_missing_{index}") }),
-            )
-        })
-        .chain([Step::say("Done.")]);
-    world.script(steps);
-    let turn = world.turn(&lead, &vendor_target(), "Look.").await;
-    assert_eq!(turn.ended, Ended::Replied);
-}
-
-fn results_of(messages: &[Message]) -> Vec<&ToolResult> {
-    messages
-        .iter()
-        .filter_map(|message| match message {
-            Message::ToolResults(results) => Some(results),
-            _ => None,
-        })
-        .flatten()
-        .collect()
-}
-
-/// Tool results a turn keeps are bounded: the newest stay whole, the older ones are replaced
-/// by a note, and none is cut in half.
-#[test]
-fn only_the_newest_tool_results_within_the_limit_are_kept() {
-    let result = |content: &str| ToolResult {
-        call_id: "c".to_owned(),
-        content: content.to_owned(),
-        is_error: false,
-    };
-    let mut messages = vec![
-        Message::ToolResults(vec![result("aaaa"), result("bbbb")]),
-        Message::ToolResults(vec![result("cc"), result("dd")]),
-    ];
-    tool_results::keep_newest(&mut messages, 6);
-    let kept: Vec<&str> = results_of(&messages)
-        .iter()
-        .map(|result| result.content.as_str())
-        .collect();
-    assert_eq!(kept, [DROPPED, DROPPED, "cc", "dd"]);
-    // A result that alone is over the limit is dropped, and so is everything older.
-    tool_results::keep_newest(&mut messages, 1);
-    assert!(
-        results_of(&messages)
-            .iter()
-            .all(|result| result.content == DROPPED)
-    );
-}
-
-/// The bound is applied between provider calls: reads that together pass it reach the next
-/// call with the older ones dropped.
-#[tokio::test]
-async fn a_turns_tool_results_are_bounded_between_provider_calls() {
-    let world = World::new();
-    let lead = user("u_lead");
-    world.vendor_journey(&lead).await;
-    let read = json!({ "journey": "j_vendor_eval" });
-    let one = world
-        .ok(&lead, "get_snapshot", read.clone())
-        .await
-        .to_string()
-        .len();
-    let per_reply = TOOL_CALL_COUNT_PER_REPLY_MAX as usize;
-    let replies = TOOL_RESULT_BYTES_PER_TURN_MAX as usize / (one * per_reply) + 2;
-    assert!(replies < TOOL_LOOP_ITERATION_COUNT_MAX as usize);
-    let mut steps: Vec<Step> = (0..replies)
-        .map(|_| Step::calls((0..per_reply).map(|_| ("get_snapshot", read.clone()))))
-        .collect();
-    steps.push(Step::say("Done."));
-    world.script(steps);
-    world.turn(&lead, &vendor_target(), "Look.").await;
-    let sent = world.provider.exchanges()[replies].messages.clone();
-    let results = results_of(&sent);
-    let kept: usize = results
-        .iter()
-        .filter(|result| result.content != DROPPED)
-        .map(|result| result.content.len())
-        .sum();
-    assert!(kept <= TOOL_RESULT_BYTES_PER_TURN_MAX as usize);
-    assert!(results.iter().any(|result| result.content == DROPPED));
-    assert_ne!(results.last().unwrap().content, DROPPED, "the newest stays");
-}
-
-/// What the debugging recorder holds for the counter `name`: its labels and total.
-fn counters(
-    snapshotter: &metrics_util::debugging::Snapshotter,
-    name: &str,
-) -> Vec<(Vec<(String, String)>, u64)> {
-    use metrics_util::debugging::DebugValue;
-    snapshotter
-        .snapshot()
-        .into_vec()
-        .into_iter()
-        .filter(|(key, _, _, _)| key.key().name() == name)
-        .filter_map(|(key, _, _, value)| {
-            let DebugValue::Counter(total) = value else {
-                return None;
-            };
-            let labels = key
-                .key()
-                .labels()
-                .map(|label| (label.key().to_owned(), label.value().to_owned()));
-            Some((labels.collect(), total))
-        })
-        .collect()
-}
-
-/// Observable: the tokens each provider call used are counted by kind, the cache's apart from
-/// the input, and a turn that ends on a refused provider call counts the status class.
-#[tokio::test]
-async fn provider_usage_and_refusals_are_counted() {
-    let recorder = metrics_util::debugging::DebuggingRecorder::new();
-    let snapshotter = recorder.snapshotter();
-    let _installed = metrics::set_default_local_recorder(&recorder);
-    let world = World::new();
-    let lead = user("u_lead");
-    world.vendor_journey(&lead).await;
-    world.script([
-        Step::Reply(Reply {
-            text: Some("Hi.".to_owned()),
-            usage: Usage {
-                input: 10,
-                output: 20,
-                cache_read: 300,
-                cache_write: 4000,
-            },
-            ..Reply::default()
-        }),
-        Step::Fail(ProviderError::Rejected {
-            status: 429,
-            message: "slow down".to_owned(),
-        }),
-    ]);
-    world.turn(&lead, &vendor_target(), "Hello.").await;
-    world.turn(&lead, &vendor_target(), "Again.").await;
-    let tokens: std::collections::BTreeMap<String, u64> =
-        counters(&snapshotter, cairn_assistant::PROVIDER_TOKENS_TOTAL)
-            .into_iter()
-            .map(|(labels, total)| (labels[0].1.clone(), total))
-            .collect();
-    assert_eq!(tokens["input"], 10);
-    assert_eq!(tokens["output"], 20);
-    assert_eq!(tokens["cache_read"], 300);
-    assert_eq!(tokens["cache_write"], 4000);
-    let ended = counters(&snapshotter, cairn_assistant::TURNS_TOTAL);
-    let has = |ended: &str, class: &str| {
-        self::counters(&snapshotter, cairn_assistant::TURNS_TOTAL)
-            .iter()
-            .any(|(labels, _)| {
-                labels.contains(&("ended".to_owned(), ended.to_owned()))
-                    && labels.contains(&("status_class".to_owned(), class.to_owned()))
-            })
-    };
-    assert!(has("replied", "none"), "{ended:?}");
-    assert!(has("provider_failed", "4xx"), "{ended:?}");
-}
-
-/// I4: the system prompt leaves every workflow's steps to `get_workflow`, which names each one
-/// among its tools, the same text on every request so a provider can cache it.
-#[tokio::test]
-async fn the_system_prompt_leaves_workflows_to_their_tool_and_stays_the_same() {
-    let world = World::new();
-    let lead = user("u_lead");
-    world.vendor_journey(&lead).await;
-    world.script([Step::say("Hello."), Step::say("Hello again.")]);
-    world.turn(&lead, &vendor_target(), "Hello?").await;
-    world.turn(&lead, &vendor_target(), "Still there?").await;
-    let exchanges = world.provider.exchanges();
-    let [first, second] = exchanges.as_slice() else {
-        panic!("{} exchanges", exchanges.len());
-    };
-    assert_eq!(first.system, second.system);
-    let tool = first.tools.iter().find(|tool| tool.name == "get_workflow");
-    let listed = serde_json::to_string(&tool.expect("get_workflow is offered").parameters).unwrap();
-    for workflow in cairn_mcp::instructions::workflows() {
-        assert!(listed.contains(workflow.name), "{}", workflow.name);
-        assert!(!first.system.contains(workflow.text), "{}", workflow.name);
-    }
 }

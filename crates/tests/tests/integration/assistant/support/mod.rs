@@ -1,5 +1,5 @@
 //! What the assistant's tests share: the assistant over a fresh memory store with a scripted
-//! provider, the tool set beneath it, a clock the test sets, actors, and set-up written
+//! loopback provider, the tool set beneath it, a clock the test sets, actors, and set-up written
 //! through the service: the fixtures' route published and the vendor evaluation started.
 #![allow(dead_code)]
 
@@ -7,7 +7,7 @@ use std::path::{Path, PathBuf};
 use std::sync::Arc;
 use std::sync::atomic::{AtomicI64, Ordering};
 
-use cairn_assistant::scripted::{ScriptedProvider, Step};
+use cairn_assistant::chat::{Credential, ProviderConfig};
 use cairn_assistant::{Assistant, Target, TurnReply, assistant_agent};
 use cairn_auth::Clock;
 use cairn_engine::from_file;
@@ -23,10 +23,12 @@ use cairn_store::{InProcessNotifier, MemoryStore};
 use jiff::tz::{Offset, TimeZone};
 use serde_json::{Value, json};
 
+pub use super::provider::{KEY, Provider, Step};
+
 /// The assistant over a fresh memory store, its provider's script, and what is beneath it.
 pub struct World {
     pub assistant: Assistant,
-    pub provider: Arc<ScriptedProvider>,
+    pub provider: Provider,
     pub tools: ToolSet,
     pub service: Service,
     pub store: Arc<MemoryStore>,
@@ -35,12 +37,12 @@ pub struct World {
 
 impl World {
     /// An empty deployment with the assistant, whose provider plays nothing yet.
-    pub fn new() -> Self {
-        Self::with_faults(cairn_store::Faults::default())
+    pub async fn new() -> Self {
+        Self::with_faults(cairn_store::Faults::default()).await
     }
 
     /// As [`World::new`], over a memory store whose commits `faults` can fail or hold.
-    pub fn with_faults(faults: cairn_store::Faults) -> Self {
+    pub async fn with_faults(faults: cairn_store::Faults) -> Self {
         let zone = TimeZone::fixed(Offset::constant(-5));
         let settings =
             DeploymentSettings::new("Etc/GMT+5".parse().unwrap(), zone, RankConstants::default());
@@ -60,12 +62,16 @@ impl World {
         let seconds = Arc::clone(&now);
         let clock =
             Clock::from_fn(move || Timestamp::from_second(seconds.load(Ordering::SeqCst)).unwrap());
-        let provider = Arc::new(ScriptedProvider::default());
+        let provider = Provider::start().await;
         let assistant = Assistant::new(
             service.clone(),
             Arc::<MemoryStore>::clone(&store),
             clock.clone(),
-            Arc::clone(&provider) as Arc<dyn cairn_assistant::Provider>,
+            ProviderConfig {
+                endpoint: provider.url().parse().unwrap(),
+                model: "scripted".to_owned(),
+                credential: Some(Credential::new(KEY.to_owned())),
+            },
         );
         let world = Self {
             assistant,
@@ -92,7 +98,7 @@ impl World {
 
     /// Appends `steps` to the provider's script.
     pub fn script(&self, steps: impl IntoIterator<Item = Step>) {
-        self.provider.push(steps);
+        self.provider.script(steps);
     }
 
     /// One turn of `actor`'s conversation about `target`, which must run.

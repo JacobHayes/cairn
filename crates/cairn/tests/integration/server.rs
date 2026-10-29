@@ -423,7 +423,7 @@ mod in_process {
     /// always are, with the configured sign-in methods in order.
     #[tokio::test]
     async fn the_capabilities_follow_the_configuration() {
-        let assistant = "[assistant]\nprotocol = \"chat_completions\"\nendpoint = \"http://127.0.0.1:9/v1\"\nmodel = \"m\"\n";
+        let assistant = "[assistant]\nendpoint = \"http://127.0.0.1:9/v1\"\nmodel = \"m\"\n";
         for (extra, offered) in [("", false), (assistant, true)] {
             let config = support::config(&format!("{}{extra}", support::dev_provider(None)));
             let app = root::app(

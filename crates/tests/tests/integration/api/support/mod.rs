@@ -6,6 +6,8 @@
 
 pub mod mcp;
 
+use crate::assistant::provider::{KEY, Provider};
+use cairn_assistant::chat::{Credential, ProviderConfig};
 use std::collections::BTreeSet;
 use std::net::SocketAddr;
 use std::path::{Path, PathBuf};
@@ -127,8 +129,13 @@ impl World {
 
     /// As [`World::start`], for a host whose root assembled the assistant over `provider`
     /// (I5): its capabilities offer it and its endpoints are served.
-    pub async fn start_with_assistant(provider: Arc<dyn cairn_assistant::Provider>) -> Self {
-        Self::begin(true, Some(provider), start_clock(), &Front::Team).await
+    pub async fn start_with_assistant(provider: &Provider) -> Self {
+        let config = ProviderConfig {
+            endpoint: provider.url().parse().unwrap(),
+            model: "scripted".to_owned(),
+            credential: Some(Credential::new(KEY.to_owned())),
+        };
+        Self::begin(true, Some(config), start_clock(), &Front::Team).await
     }
 
     /// As [`World::start`], for a root that serves no MCP endpoint (capability gating).
@@ -161,7 +168,7 @@ impl World {
 
     async fn begin(
         mcp: bool,
-        assistant: Option<Arc<dyn cairn_assistant::Provider>>,
+        assistant: Option<ProviderConfig>,
         clock: TestClock,
         front: &Front,
     ) -> Self {
@@ -188,9 +195,9 @@ impl World {
                 ..Capabilities::server(methods, assistant.is_some(), access, "dev")
             },
         });
-        let assistant = assistant.map(|provider| {
+        let assistant = assistant.map(|config| {
             let store = Arc::<MemoryStore>::clone(&store);
-            cairn_assistant::Assistant::new(service.clone(), store, clock.clock(), provider)
+            cairn_assistant::Assistant::new(service.clone(), store, clock.clock(), config)
         });
         let app = front.in_front_of(cairn_api::router_with_assistant(
             service.clone(),

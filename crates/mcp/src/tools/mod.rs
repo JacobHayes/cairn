@@ -14,7 +14,7 @@ use cairn_service::{Projected, Written};
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
-pub use proposals::{CreateProposal, EditProposal, ProposalCall, ProposalChange, ProposalOutput};
+pub use proposals::ProposalOutput;
 
 use crate::limits::PAGE_ITEM_COUNT_MAX;
 use crate::toolset::Spec;

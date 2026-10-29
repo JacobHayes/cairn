@@ -18,7 +18,6 @@ use axum::http::HeaderValue;
 use axum::middleware::map_response;
 use axum::response::Response;
 use cairn_assistant::Assistant;
-use cairn_assistant::protocol::HttpProvider;
 use cairn_auth::{
     Accounts, Auth, AuthProvider, Clock, DevProvider, GcpIapProvider, OAuthServer, OidcProvider,
     TailscaleProvider,
@@ -231,7 +230,7 @@ pub fn app(config: &Config, parts: Assembly) -> Result<Router, StartupError> {
             service.clone(),
             Arc::clone(&parts.store),
             parts.clock.clone(),
-            Arc::new(HttpProvider::new(provider)),
+            provider,
         )
     });
     let build = assets::digest(&parts.assets);

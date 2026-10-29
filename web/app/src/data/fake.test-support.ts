@@ -5,8 +5,6 @@ import type { Answered, HttpFailure, Patch, Tick, TickHandlers } from "@cairn/cl
 import type { DerivationHandle, Derived, Loaded } from "@cairn/wasm";
 import { SimulatedClock } from "xstate";
 
-import type { KeptTurn } from "../assistant/model.ts";
-import type { KeptTurns } from "../assistant/conversation.ts";
 import type { AssistantHost } from "./assistant.ts";
 import type { Answer, Command } from "./edit-command.ts";
 import type { Domain, ProposalHost, ProposalWritten } from "./proposals.ts";
@@ -360,17 +358,6 @@ export class FakeDeriver implements Deriver {
     }
     return Promise.resolve();
   }
-}
-
-/** The tab's kept assistant turns, in memory. */
-export function memoryTurns(): KeptTurns {
-  const kept = new Map<string, KeptTurn[]>();
-  return {
-    read: (conversation) => kept.get(conversation) ?? [],
-    write: (conversation, turns) => {
-      kept.set(conversation, turns);
-    },
-  };
 }
 
 /**

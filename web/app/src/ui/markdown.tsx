@@ -89,11 +89,8 @@ export function safeHref(href: string): boolean {
   return /^(https?:|mailto:)/i.test(href.trim());
 }
 
-/** How a screen shows a code span it knows, such as a node key it can link; undefined leaves it code. */
-export type CodeSpan = (text: string, at: number) => ReactNode;
-
-/** Inline markdown as React nodes, each code span shown by `code` where it says. */
-export function inline(text: string, code?: CodeSpan): ReactNode[] {
+/** Inline markdown as React nodes. */
+export function inline(text: string): ReactNode[] {
   const nodes: ReactNode[] = [];
   let last = 0;
   for (const match of text.matchAll(INLINE)) {
@@ -104,15 +101,15 @@ export function inline(text: string, code?: CodeSpan): ReactNode[] {
     const [whole, span, strong, emphasis, label, href] = match;
     if (span !== undefined) {
       const text = span.slice(1, -1);
-      nodes.push(code?.(text, at) ?? <code key={at}>{text}</code>);
+      nodes.push(<code key={at}>{text}</code>);
     } else if (strong !== undefined) {
-      nodes.push(<strong key={at}>{inline(strong.slice(2, -2), code)}</strong>);
+      nodes.push(<strong key={at}>{inline(strong.slice(2, -2))}</strong>);
     } else if (emphasis !== undefined) {
-      nodes.push(<em key={at}>{inline(emphasis.slice(1, -1), code)}</em>);
+      nodes.push(<em key={at}>{inline(emphasis.slice(1, -1))}</em>);
     } else if (label !== undefined && href !== undefined && safeHref(href)) {
       nodes.push(
         <a key={at} href={href} target="_blank" rel="noreferrer noopener">
-          {inline(label, code)}
+          {inline(label)}
         </a>,
       );
     } else {
@@ -126,12 +123,12 @@ export function inline(text: string, code?: CodeSpan): ReactNode[] {
   return nodes;
 }
 
-function renderBlock(block: Block, key: number, code: CodeSpan | undefined): ReactNode {
+function renderBlock(block: Block, key: number): ReactNode {
   switch (block.block) {
     case "heading":
       return (
         <p key={key} className="markdown-heading">
-          <strong>{inline(block.text, code)}</strong>
+          <strong>{inline(block.text)}</strong>
         </p>
       );
     case "code":
@@ -141,21 +138,21 @@ function renderBlock(block: Block, key: number, code: CodeSpan | undefined): Rea
         </pre>
       );
     case "list": {
-      const items = block.items.map((item, index) => <li key={index}>{inline(item, code)}</li>);
+      const items = block.items.map((item, index) => <li key={index}>{inline(item)}</li>);
       return block.ordered ? <ol key={key}>{items}</ol> : <ul key={key}>{items}</ul>;
     }
     case "quote":
-      return <blockquote key={key}>{inline(block.text, code)}</blockquote>;
+      return <blockquote key={key}>{inline(block.text)}</blockquote>;
     case "paragraph":
-      return <p key={key}>{inline(block.text, code)}</p>;
+      return <p key={key}>{inline(block.text)}</p>;
   }
 }
 
-/** Markdown text, rendered, each code span shown by `code` where it says. */
-export function Markdown({ text, className = "", code, "data-testid": testId }: { text: string; className?: string; code?: CodeSpan; "data-testid"?: string }) {
+/** Markdown text, rendered. */
+export function Markdown({ text, className = "", "data-testid": testId }: { text: string; className?: string; "data-testid"?: string }) {
   return (
     <div className={`markdown ${className}`.trim()} data-testid={testId}>
-      {blocks(text).map((block, key) => renderBlock(block, key, code))}
+      {blocks(text).map((block, key) => renderBlock(block, key))}
     </div>
   );
 }

@@ -11,7 +11,7 @@ use cairn_engine::{Applied, ApplyInputs, Records, apply};
 use cairn_schema::{
     Consequences, Domain, EventType, IdentityKey, JourneyId, Location, Markdown, Mutation, Notice,
     Patch, PatchReceipt, PatchTarget, ProposalId, Record, Rejection, Revision, RevisionOf, Subject,
-    TouchedSet, Violation, ViolationCode, Violations, Write,
+    Violation, ViolationCode, Violations, Write,
 };
 use cairn_store::{Commit, CommitError, Committed, EventQuery, PageSize};
 
@@ -158,38 +158,6 @@ impl Service {
             return Err(WriteError::Rejected(rejection));
         }
         self.write(call, patch, submitted.note.clone()).await
-    }
-
-    // PRD: H5, I5.
-    /// What `patch` writes applied as `call`'s actor to its domain as it stands now, at the
-    /// current revisions, without committing anything: the touched set of the change set
-    /// apply builds, so a caller counts what the handlers really write (a role's fill, a
-    /// node's bypass), or the rejection that would refuse it there, which writes nothing. A
-    /// patch id already committed with the same content writes nothing more: a write is
-    /// answered from its receipt before it is applied (H5). Its id is not otherwise checked,
-    /// since the caller may file the patch elsewhere under it (an assistant's proposal).
-    ///
-    /// # Errors
-    ///
-    /// [`WriteError::Failed`] when the store fails or the engine panics.
-    pub async fn touched(
-        &self,
-        call: &Call,
-        patch: &Patch,
-    ) -> Result<Result<TouchedSet, Rejection>, WriteError> {
-        if let Some(Ok(_)) = self.answer_from_receipt(patch).await? {
-            return Ok(Ok(TouchedSet::default()));
-        }
-        let loaded = load::records(&*self.store, patch).await?;
-        let inputs = ApplyInputs {
-            today: self.settings.today(call.now),
-            at: call.now,
-            actor: call.actor.clone(),
-            note: None,
-        };
-        Ok(engine(&patch.target.domain(), || {
-            cairn_engine::touched(&loaded.records, patch, &inputs)
-        })?)
     }
 
     // PRD: H5.

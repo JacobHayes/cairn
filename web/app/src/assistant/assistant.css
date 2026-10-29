@@ -75,9 +75,9 @@
   overflow-wrap: anywhere;
 }
 
-/* Cairn's report of a write, and a proposal drafted: a card on the edge token. */
-.assistant-write {
-  border-color: var(--color-edge);
+/* Cairn's receipt for a write: a quiet line between what you said and the reply. */
+.assistant-receipt {
+  margin: 0;
   overflow-wrap: anywhere;
 }
 
