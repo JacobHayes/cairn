@@ -38,7 +38,7 @@ export async function startRoot(options: StartOptions = {}) {
       open: host.openTicks,
       today: () => new Date("2026-10-06T12:00:00Z"),
       now: () => clock.now(),
-      conversations: { assistant: undefined },
+      conversations: { assistant: host.assistant },
       edits: {
         // A landed write is logged, and told to the root as the session does.
         env: {

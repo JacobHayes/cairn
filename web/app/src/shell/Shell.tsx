@@ -7,7 +7,6 @@ import { Suspense } from "react";
 import { Link, Outlet, useLocation } from "react-router";
 
 import { pathTo, sectionOf } from "../address.ts";
-import { useCapabilities } from "../data/react.ts";
 import { HOME_PATH, indexPath } from "../journeys/address.ts";
 import { ROUTES_INDEX_PATH } from "../routes/address.ts";
 import { FrameActionsContext, FrameStateContext } from "./frame.tsx";
@@ -27,7 +26,6 @@ import { Tip, TipLayer } from "../ui/Tip.tsx";
 function Rail({ pathname }: { pathname: string }) {
   const tour = useTour();
   const section = sectionOf(pathname);
-  const offersMcp = useCapabilities().mcp != null;
   const screens = [
     { to: HOME_PATH, label: "Home", on: section === "home" },
     { to: indexPath(), label: "Journeys", on: section === "journeys" },
@@ -60,13 +58,11 @@ function Rail({ pathname }: { pathname: string }) {
           </Link>
           <KeysHint />
         </span>
-        {offersMcp ? (
-          <Tip tip="Connect an AI agent such as Claude Code or Codex">
-            <Link to={pathTo("agents")} className="agents-link" {...(section === "agents" ? { "aria-current": "page" as const } : {})}>
-              Connect an agent
-            </Link>
-          </Tip>
-        ) : null}
+        <Tip tip="Connect an AI agent such as Claude Code or Codex">
+          <Link to={pathTo("agents")} className="agents-link" {...(section === "agents" ? { "aria-current": "page" as const } : {})}>
+            Connect an agent
+          </Link>
+        </Tip>
       </nav>
     </aside>
   );

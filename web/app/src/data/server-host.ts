@@ -90,7 +90,7 @@ function refused<T>(reply: Reply<T>): ReadFailed {
 }
 
 /** H2: the caller's agent tokens over the server's endpoints; a call that cannot be made is a failed read. */
-function serverAgentTokens(client: CairnClient): NonNullable<Host["agentTokens"]> {
+function serverAgentTokens(client: CairnClient): Host["agentTokens"] {
   const attempt = async <T>(call: () => Promise<Reply<T>>): Promise<Reply<T>> => {
     try {
       return await call();

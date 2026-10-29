@@ -1,4 +1,4 @@
-//! The composition: today per request in the deployment's zone, the capabilities document,
+//! The composition: today per request in the deployment's zone,
 //! the caller's identities from verified emails (H3), and a late subscriber learning the
 //! current revisions (H6).
 #![cfg(test)]
@@ -7,8 +7,7 @@ mod composition {
     use std::collections::BTreeSet;
     use std::sync::Arc;
 
-    use cairn_schema::{Date, Domain, Email, RevisionOf, Slug, Timestamp};
-    use cairn_service::{AgentSignIn, AuthKind, AuthMethod, Capabilities, McpAccess};
+    use cairn_schema::{Date, Domain, Email, RevisionOf, Timestamp};
     use cairn_store::build::{create_identity, create_journey, deployment_patch, identity};
     use cairn_store::{AuthStore, LoginRecord, MemoryStore, Store, Take, Tick, UserRecord, Watch};
 
@@ -30,26 +29,6 @@ mod composition {
                 "{now}"
             );
         }
-    }
-
-    #[test]
-    fn the_server_always_offers_mcp_and_sse_and_the_browser_neither() {
-        let dev = AuthMethod {
-            name: "dev".parse::<Slug>().unwrap(),
-            kind: AuthKind::Dev,
-        };
-        let access = McpAccess {
-            url: "http://127.0.0.1/api/mcp".to_owned(),
-            sign_in: vec![AgentSignIn::DevUser],
-            tokens: false,
-        };
-        let server = Capabilities::server(vec![dev.clone()], true, access.clone(), "1.2.3");
-        assert!(server.sse && server.assistant);
-        assert_eq!(server.version.as_deref(), Some("1.2.3"));
-        assert_eq!(server.mcp, Some(access));
-        assert_eq!(server.auth, vec![dev]);
-        let json = serde_json::to_string(&server).unwrap();
-        assert_eq!(serde_json::from_str::<Capabilities>(&json).unwrap(), server);
     }
 
     /// A store whose deployment holds `who_lead` (lead@example.org), `who_alias_holder`

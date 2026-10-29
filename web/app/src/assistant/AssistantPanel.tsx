@@ -17,7 +17,7 @@ import { useSession } from "../data/react.ts";
 import { AssistantSlot, useAssistantDock } from "../shell/frame.tsx";
 import { Markdown } from "../ui/markdown.tsx";
 import { Button } from "../ui/kit.tsx";
-import { aboutWords, assistantOffered } from "./model.ts";
+import { aboutWords } from "./model.ts";
 import { conversationView, sendTurn, type ConversationRef } from "./conversation.ts";
 import "./assistant.css";
 import { Failed, kindOf } from "../ui/Failed.tsx";
@@ -211,8 +211,7 @@ function Conversing({ conversation, target }: { conversation: ConversationRef; t
 export function AssistantDock({ target }: { target: AssistantTarget }) {
   const session = useSession();
   const [open, setOpen] = useDraft<boolean>("assistant-open");
-  const assistant = session.host.assistant;
-  const offered = assistantOffered(session) && assistant !== undefined;
+  const offered = session.capabilities.assistant;
   const dock = useMemo(
     () => ({
       open: () => {

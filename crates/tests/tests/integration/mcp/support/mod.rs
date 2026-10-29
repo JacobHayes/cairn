@@ -3,17 +3,12 @@
 //! the vendor evaluation started.
 #![allow(dead_code)]
 
-use std::path::{Path, PathBuf};
 use std::sync::Arc;
 use std::sync::atomic::{AtomicI64, Ordering};
 
 use cairn_auth::Clock;
-use cairn_engine::from_file;
 use cairn_mcp::{ToolError, ToolSet};
-use cairn_schema::{
-    Actor, DraftSource, Mutation, Mutations, Patch, PatchTarget, RankConstants, Revision,
-    RouteFile, Scenario, SequentialKeys, Timestamp, from_yaml,
-};
+use cairn_schema::{Actor, Patch, RankConstants, Scenario, Timestamp, from_yaml};
 use cairn_service::{
     Call, Capabilities, DeploymentSettings, DomainPatch, McpAccess, Parts, Service,
 };
@@ -39,12 +34,12 @@ impl World {
             store: Arc::new(MemoryStore::new()),
             notifier: Arc::new(InProcessNotifier::new()),
             settings,
-            capabilities: Capabilities::server(
-                Vec::new(),
-                false,
-                McpAccess::closed("http://127.0.0.1/api/mcp"),
-                "dev",
-            ),
+            capabilities: Capabilities {
+                auth: Vec::new(),
+                assistant: false,
+                mcp: McpAccess::closed("http://127.0.0.1/api/mcp"),
+                version: "dev".to_owned(),
+            },
         });
         let now = Arc::new(AtomicI64::new(0));
         let seconds = Arc::clone(&now);
@@ -169,58 +164,4 @@ pub fn agent(name: &str, user: &str) -> Actor {
     }
 }
 
-/// The repository's fixtures directory.
-pub fn fixtures_root() -> PathBuf {
-    Path::new(env!("CARGO_MANIFEST_DIR")).join("../../fixtures")
-}
-
-/// The patch that creates a fixture's route and publishes its file as version 1, as every
-/// scenario expects (fixtures/README.md).
-pub fn publish_fixture_route(name: &str) -> Patch {
-    let path = fixtures_root().join(name).join("route.yaml");
-    let file: RouteFile = from_yaml(&std::fs::read_to_string(&path).unwrap()).unwrap();
-    let graph = from_file(&file, &mut SequentialKeys::default())
-        .unwrap()
-        .into_document();
-    let mut mutations = vec![
-        Mutation::CreateRoute {
-            name: file.name.clone(),
-            description: file.description.clone(),
-            kind: file.kind,
-        },
-        Mutation::OpenDraft {
-            source: DraftSource::Import,
-        },
-    ];
-    mutations.extend(
-        graph
-            .roles
-            .values()
-            .cloned()
-            .map(|role| Mutation::AddRole { role }),
-    );
-    let kinds = graph.participation_kinds.values().cloned();
-    mutations.extend(kinds.map(|kind| Mutation::AddParticipationKind { kind }));
-    if let Some(role) = &graph.default_owner {
-        mutations.push(Mutation::SetDefaultOwner {
-            role: Some(role.clone()),
-        });
-    }
-    mutations.extend(
-        graph
-            .nodes
-            .values()
-            .cloned()
-            .map(|node| Mutation::AddNode { node }),
-    );
-    mutations.push(Mutation::PublishDraft {});
-    Patch {
-        id: format!("p_seed_{}", name.replace('-', "_"))
-            .parse()
-            .unwrap(),
-        target: PatchTarget::Route(file.route.clone()),
-        base_revision: Revision::NONE,
-        deployment_revision: None,
-        mutations: Mutations::new(mutations).unwrap(),
-    }
-}
+pub use crate::fixtures::{fixtures_root, publish_fixture_route};

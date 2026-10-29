@@ -2,13 +2,12 @@
 //! engine. Its operations are the shared vocabulary of the API, MCP, and the assistant, which
 //! shape their own surfaces but never bypass it.
 //!
-//! A [`Service`] is assembled once per host by its composition root from [`Parts`]: a store,
+//! A [`Service`] is assembled once by the composition root from [`Parts`]: a store,
 //! a notifier, the deployment's settings (time zone and rank constants), and the
 //! [`Capabilities`] the host offers. Every write takes a [`Call`]: who is acting (H2) and the
 //! request's clock, from which today is computed once, in the deployment's time zone.
 //!
-//! Runtime-free: no tokio, database driver, or transport, so it builds for
-//! `wasm32-unknown-unknown` (the lint step checks it), as the browser's engine module does.
+//! Runtime-free: no tokio, database driver, or transport.
 
 mod call;
 mod caller;

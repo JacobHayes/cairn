@@ -49,21 +49,12 @@ impl Drop for EngineCall {
     }
 }
 
-/// Runs a derive, recording its duration on the server. The wasm32 engine module has no
-/// monotonic clock the standard library can read, and its metrics would go nowhere, so
-/// there the derive runs untimed.
-#[cfg(not(target_arch = "wasm32"))]
+/// Runs a derive, recording its duration.
 pub(crate) fn timed_derive<T>(derive: impl FnOnce() -> T) -> T {
     let started = std::time::Instant::now();
     let derived = derive();
     metrics::histogram!(DERIVE_DURATION).record(started.elapsed().as_secs_f64());
     derived
-}
-
-/// Runs a derive (wasm32: untimed, see the server's version).
-#[cfg(target_arch = "wasm32")]
-pub(crate) fn timed_derive<T>(derive: impl FnOnce() -> T) -> T {
-    derive()
 }
 
 #[cfg(test)]

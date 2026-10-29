@@ -30,6 +30,9 @@ test("H3: emails are chips taken from the keyboard, refused with a reason, repla
   await openSheet(page);
   await checkpoint(page);
   await page.setViewportSize({ width: 1280, height: 800 });
+  // Back at a desktop's width the form is laid out again; typing waits for that, or an Enter lands on a field about to be replaced.
+  await expect(page.getByRole("button", { name: "Resize the inspector" })).toBeHidden();
+  await expect(chips(page)).toHaveCount(3);
 
   await field(page).fill("not-an-email");
   await field(page).press("Enter");

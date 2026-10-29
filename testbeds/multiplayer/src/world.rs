@@ -82,12 +82,12 @@ impl Server {
             store: Arc::<SqliteStore>::clone(&store),
             notifier: Arc::new(InProcessNotifier::new()),
             settings,
-            capabilities: Capabilities::server(
-                methods,
-                false,
-                McpAccess::closed("http://127.0.0.1/api/mcp"),
-                "dev",
-            ),
+            capabilities: Capabilities {
+                auth: methods,
+                assistant: false,
+                mcp: McpAccess::closed("http://127.0.0.1/api/mcp"),
+                version: "dev".to_owned(),
+            },
         });
         let app = cairn_api::router(service.clone(), &auth)
             .into_make_service_with_connect_info::<SocketAddr>();

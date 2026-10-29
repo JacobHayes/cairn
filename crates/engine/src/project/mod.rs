@@ -1,7 +1,7 @@
 //! Projections (ARCHITECTURE, Engine > Projections; I1, C2 risk mitigation): every read view
 //! the PRD names, as pure functions of a derived journey, so the browser (which derives
 //! locally) and the server (for agents and the API) produce the same values. Inputs and
-//! outputs are schema types, so a projection serializes to the API and the wasm host
+//! outputs are schema types, so a projection serializes to the API and the derive worker
 //! unchanged. Nothing here is stored (D3, D6).
 //!
 //! A [`DerivedJourney`] pairs a journey's graph with its [`Derived`]; each projection is a

@@ -40,7 +40,7 @@ Load-bearing decisions:
 2. **Whole domain in memory.** Every read loads one journey or route whole and derives once; every write validates a full candidate graph.
 3. **State and events in one transaction.** The patch applier is the only writer; row deltas and one event per mutation commit together or not at all (A17, J1, J2).
 4. **One engine, two places it runs.** Server and browser run the same crate; the browser runs the pure functions locally, against the server's answers.
-5. **Pluggable edges.** Storage, auth, and notification are traits, and the assistant provider an endpoint, assembled in one composition root per host.
+5. **Pluggable edges.** Storage, auth, and notification are traits, and the assistant provider an endpoint, assembled in one composition root.
 6. **The engine owns every rule and derived value.** Hosts keep only presentation; they read rules from the engine (directly, via wasm, or the generated rule tables) and ask it (a derive, a check, a preview) for anything a table cannot say. No host copies a rule.
 
 ## Assumptions and limits
@@ -63,10 +63,10 @@ PRD terms keep their meaning. Additionally:
 | **Domain document** | A journey's graph and state plus its derive inputs. Nothing derived, no proposals; the browser derives it locally. |
 | **Snapshot** | The I3 projection: a journey's facts and counts, for agents. |
 | **Change set** | The persistence-neutral result of an accepted patch: identities put and removed by key, events, patch id, next revision. A `schema` type, so stores depend on `schema`, not the engine; only the engine's `apply` produces one (inside `Applied`). |
-| **Notifier** | Announces "domain X is at revision N". In-process in both hosts. |
-| **Composition root** | The one function per host that picks store, notifier, auth providers, and assistant provider and assembles the service. |
-| **Capabilities document** | `GET /api/capabilities`: what the host offers (auth providers, assistant, MCP address and sign-in, SSE) and the server's release. The UI shows features from it. |
-| **Host** | The server binary or the browser bundle: something that assembles the engine with a composition root. |
+| **Notifier** | Announces "domain X is at revision N". In-process. |
+| **Composition root** | The one function that picks store, notifier, auth providers, and assistant provider and assembles the service. |
+| **Capabilities document** | `GET /api/capabilities`: what the host offers (auth providers, assistant, MCP address and sign-in) and the server's release. The UI shows features from it. |
+| **Host** | The server binary: it assembles the engine with the composition root. |
 
 ## Repository layout
 
@@ -78,7 +78,7 @@ cairn/
     schema/        serde types shared by engine and shell: document, patch, API payloads; JSON Schema export
     store/         Store and Notifier traits; memory backend; the store conformance test suite. No delta types of its own: it persists the change set from schema
     store-sqlite/  SQLite backend (rusqlite: embedded, WAL mode, one writer)
-    service/       service layer: load, call engine, commit; capabilities; composition root types; the wire types the API answers with (`wire`). Runtime-free: no tokio, database driver, or transport dependency, so it builds for wasm32-unknown-unknown
+    service/       service layer: load, call engine, commit; capabilities; composition root types; the wire types the API answers with (`wire`). Runtime-free: no tokio, database driver, or transport dependency
     auth/          AuthProvider trait; dev, oidc, builtin-oauth, tailscale, Google Cloud IAP providers; users and logins
     api/           axum endpoints, the generated OpenAPI document, SSE, the Rust client; the wire types only the API has (assistant, agent tokens)
     mcp/           rmcp server: tools, prompt metadata, instructions

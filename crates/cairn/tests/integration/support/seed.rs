@@ -25,15 +25,15 @@ pub async fn seed_fixtures(path: &Path) -> Result<(), String> {
         store,
         notifier: Arc::new(InProcessNotifier::new()),
         settings,
-        capabilities: Capabilities::server(
-            vec![AuthMethod {
+        capabilities: Capabilities {
+            auth: vec![AuthMethod {
                 name: "dev".parse().map_err(|error| format!("{error}"))?,
                 kind: AuthKind::Dev,
             }],
-            false,
-            McpAccess::closed("http://127.0.0.1/api/mcp"),
-            "dev",
-        ),
+            assistant: false,
+            mcp: McpAccess::closed("http://127.0.0.1/api/mcp"),
+            version: "dev".to_owned(),
+        },
     });
     cairn::fixtures::seed(&service)
         .await

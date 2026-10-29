@@ -6,6 +6,7 @@ import type { DerivationHandle, Derived, Loaded } from "@cairn/wasm";
 import { SimulatedClock } from "xstate";
 
 import type { AssistantHost } from "./assistant.ts";
+import { HandHost } from "../assistant/hand-host.test-support.ts";
 import type { Answer, Command } from "./edit-command.ts";
 import type { Domain, ProposalHost, ProposalWritten } from "./proposals.ts";
 import { Missing, ReadFailed, Skewed, type Deriver, type Host, type JourneyIndexQuery, type JourneyPage, type Route, type RouteFile, type RouteImport, type RouteVersion, type Caller, type AgentTokenHost, type Tour, type TourWrite, type TourWriteRequest } from "./host.ts";
@@ -37,11 +38,15 @@ export class FakeHost implements Host {
 
   /** Whether the capabilities offer the assistant, and the assistant the host has. */
   offersAssistant = false;
-  assistant: AssistantHost | undefined = undefined;
-  agentTokens: AgentTokenHost | undefined = undefined;
+  assistant: AssistantHost = new HandHost();
+  agentTokens: AgentTokenHost = {
+    list: () => Promise.resolve([]),
+    mint: () => Promise.reject(new Error("no token is minted in this fake")),
+    revoke: () => Promise.resolve(),
+  };
 
   capabilities() {
-    return Promise.resolve({ auth: [], assistant: this.offersAssistant, mcp: null, sse: true });
+    return Promise.resolve({ auth: [], assistant: this.offersAssistant, mcp: { url: "http://127.0.0.1/api/mcp", sign_in: [], tokens: false }, version: "dev" });
   }
 
   /** The index queries asked, in turn. */

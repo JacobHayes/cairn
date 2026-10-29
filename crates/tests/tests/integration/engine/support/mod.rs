@@ -1,15 +1,8 @@
 //! Shared helpers for the engine's tests: the fixtures (fixtures/) loaded through the model.
 #![allow(dead_code)]
 
-use std::path::{Path, PathBuf};
-
 use cairn_engine::{Graph, from_file};
-use cairn_schema::{RouteFile, Scenario, SequentialKeys, from_yaml};
-
-/// The repository's fixtures directory.
-pub fn fixtures_root() -> PathBuf {
-    Path::new(env!("CARGO_MANIFEST_DIR")).join("../../fixtures")
-}
+use cairn_schema::{RouteFile, SequentialKeys, from_yaml};
 
 /// The fixture directories with a scenario, sorted.
 pub fn fixture_names() -> Vec<String> {
@@ -28,12 +21,6 @@ pub fn route_file(name: &str) -> Option<RouteFile> {
     let path = fixtures_root().join(name).join("route.yaml");
     path.exists()
         .then(|| from_yaml(&std::fs::read_to_string(&path).unwrap()).unwrap())
-}
-
-/// A fixture's journey scenario.
-pub fn scenario(name: &str) -> Scenario {
-    let path = fixtures_root().join(name).join("journey.yaml");
-    from_yaml(&std::fs::read_to_string(&path).unwrap()).unwrap()
 }
 
 /// A fixture's route file built into a graph.
@@ -455,3 +442,5 @@ pub fn accepted_to(records: &Records, target: &str, mutations: &str) -> Records 
 pub fn derive_inputs_of(records: &Records) -> cairn_schema::DeriveInputs {
     cairn_engine::testing::derive_inputs(records.deployment.clone())
 }
+
+pub use crate::fixtures::{fixtures_root, scenario};

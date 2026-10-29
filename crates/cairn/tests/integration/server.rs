@@ -419,8 +419,8 @@ mod in_process {
         assert_eq!(refused.status, 403, "{}", refused.text());
     }
 
-    /// I5: the assistant is in the capabilities exactly when it is configured; MCP and SSE
-    /// always are, with the configured sign-in methods in order.
+    /// I5: the assistant is in the capabilities exactly when it is configured; MCP
+    /// always is, with the configured sign-in methods in order.
     #[tokio::test]
     async fn the_capabilities_follow_the_configuration() {
         let assistant = "[assistant]\nendpoint = \"http://127.0.0.1:9/v1\"\nmodel = \"m\"\n";
@@ -438,7 +438,6 @@ mod in_process {
                 capabilities["mcp"],
                 json!({ "url": format!("https://{PUBLIC_HOST}/api/mcp"), "sign_in": ["dev_user"], "tokens": false })
             );
-            assert_eq!(capabilities["sse"], json!(true));
             assert_eq!(
                 capabilities["auth"],
                 json!([{ "name": "dev", "kind": "dev" }])

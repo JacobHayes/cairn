@@ -13,7 +13,7 @@ mod mcp_in_process {
     use cairn_api::wire::MintedToken;
     use cairn_mcp::{instructions, limits};
     use cairn_schema::{Mutation, NextQuery};
-    use cairn_service::wire::{Problem, ProblemCode};
+
     use serde_json::{Value, json};
 
     use crate::api::support::mcp::Agent;
@@ -649,23 +649,6 @@ mod mcp_in_process {
         for (name, read_only, destructive, idempotent) in cases {
             assert_eq!(hint(name), (read_only, destructive, idempotent), "{name}");
         }
-    }
-
-    /// Capability gating: a host whose capabilities leave MCP out serves no endpoint.
-    #[tokio::test]
-    async fn a_host_without_mcp_serves_no_endpoint() {
-        let world = World::start_without_mcp().await;
-        let ann = world.signed_in("ann");
-        let reply = ann
-            .send(Method::POST, "/api/mcp", Some(&json!({})))
-            .await
-            .unwrap();
-        assert_eq!(reply.status, StatusCode::NOT_FOUND);
-        assert_eq!(
-            reply.json::<Problem>().unwrap().error,
-            ProblemCode::NoSuchEndpoint
-        );
-        assert!(Agent::try_connect(&world, Some("team-ann")).await.is_err());
     }
 
     /// The answers the vendor evaluation's second step gives, by decision.

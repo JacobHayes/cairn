@@ -341,19 +341,10 @@ function AllowedAgents({ mcp, client, tokens, user }: { mcp: McpAccess; client: 
 }
 
 export function Agents() {
-  const capabilities = useCapabilities();
-  const mcp = capabilities.mcp ?? undefined;
+  const mcp = useCapabilities().mcp;
   const { caller } = useCaller();
   const host = useSession().host;
   const [client, setClient] = useState<Client>("claude");
-  if (mcp === undefined) {
-    return (
-      <section className="stack agents" aria-label="Connect an agent" data-testid="agents-screen">
-        <h1>Connect an agent</h1>
-        <p>This copy of Cairn runs in your browser, so no agent can connect to it. A Cairn server has an address agents connect to.</p>
-      </section>
-    );
-  }
   const closed = agentSetup(mcp, client).closed;
   return (
     <section className="stack agents" aria-label="Connect an agent" data-testid="agents-screen">
@@ -373,7 +364,7 @@ export function Agents() {
               <Steps mcp={mcp} client={client} />
             </li>
           </NodePanel>
-          {mcp.tokens && host.agentTokens !== undefined && caller !== undefined ? <AllowedAgents key={caller.user} mcp={mcp} client={client} tokens={host.agentTokens} user={caller.user} /> : null}
+          {mcp.tokens && caller !== undefined ? <AllowedAgents key={caller.user} mcp={mcp} client={client} tokens={host.agentTokens} user={caller.user} /> : null}
         </>
       )}
     </section>

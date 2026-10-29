@@ -9,6 +9,7 @@ mod proposals;
 mod reads;
 mod users;
 
+pub use crate::{AgentSignIn, AuthKind, AuthMethod, Capabilities, McpAccess};
 pub use projections::{ChildEntry, History, Mine, NodeDetail, Projected};
 pub use proposals::{
     DestinationKind, DestinationNow, ProposalAnswer, ProposalApply, ProposalCreate, ProposalCursor,
@@ -27,7 +28,7 @@ pub use users::{
 use std::collections::BTreeMap;
 
 use cairn_schema::{
-    Consequences, JourneyId, Markdown, Notice, Patch, PatchReceipt, Revision, RevisionOf, Slug,
+    Consequences, JourneyId, Markdown, Notice, Patch, PatchReceipt, Revision, RevisionOf,
 };
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
@@ -119,126 +120,6 @@ pub enum HealthStatus {
     Ok,
     /// The store has failed closed: every call errs until the process is restarted.
     StoreFailedClosed,
-}
-
-/// The capabilities document (`GET /api/capabilities`): what this host offers.
-#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
-#[serde(deny_unknown_fields)]
-pub struct Capabilities {
-    /// How people sign in, in the order the host asks.
-    pub auth: Vec<AuthMethod>,
-    // PRD: I5.
-    /// Whether the in-app assistant is available.
-    pub assistant: bool,
-    // PRD: I2.
-    /// How an agent reaches this host's MCP server; null where the host serves none.
-    pub mcp: Option<McpAccess>,
-    // PRD: H6.
-    /// Whether the host streams revision ticks over SSE.
-    pub sse: bool,
-    /// The release this host runs (a version, or `dev` for a build without one); null where no
-    /// server binary serves the page.
-    pub version: Option<String>,
-}
-
-/// How an agent reaches this host's MCP server.
-#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
-#[serde(deny_unknown_fields)]
-pub struct McpAccess {
-    /// The MCP endpoint's absolute address: the public URL joined with the MCP path.
-    pub url: String,
-    /// How an agent signs in, in the order the providers are asked; empty when it cannot.
-    pub sign_in: Vec<AgentSignIn>,
-    /// Whether a person can make agent tokens here, and list and revoke theirs.
-    pub tokens: bool,
-}
-
-/// One way an agent signs in to the MCP server.
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
-#[serde(rename_all = "snake_case")]
-pub enum AgentSignIn {
-    /// The built-in OAuth server: a browser step on first use; the agent is recorded beside
-    /// the person.
-    Oauth,
-    /// Behind IAP, the relay to Google: a browser step with Google, the client signing in on
-    /// the machine it runs on.
-    GoogleOauth,
-    /// Tailscale, either mode: no sign-in step, from a machine in the tailnet signed in as a
-    /// person.
-    Tailnet,
-    /// The dev provider without a token: every request it accepts is its dev user.
-    DevUser,
-}
-
-// PRD: H1.
-/// One way to sign in.
-#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
-#[serde(deny_unknown_fields)]
-pub struct AuthMethod {
-    /// The provider's configured name.
-    pub name: Slug,
-    /// What kind of provider it is.
-    pub kind: AuthKind,
-}
-
-/// The kinds of sign-in a host can offer.
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
-#[serde(rename_all = "snake_case")]
-pub enum AuthKind {
-    // PRD: H1.
-    /// A static token or named dev user.
-    Dev,
-    /// OAuth or OIDC against a registered provider.
-    Oidc,
-    // PRD: I2.
-    /// The built-in OAuth server for MCP clients.
-    BuiltinOauth,
-    /// Tailscale login.
-    Tailscale,
-    /// Google Cloud Identity-Aware Proxy's signed assertion.
-    GcpIap,
-}
-
-impl From<&crate::Capabilities> for Capabilities {
-    fn from(capabilities: &crate::Capabilities) -> Self {
-        let crate::Capabilities {
-            auth,
-            assistant,
-            mcp,
-            sse,
-            version,
-        } = capabilities;
-        let auth = auth.iter().map(|method| AuthMethod {
-            name: method.name.clone(),
-            kind: match method.kind {
-                crate::AuthKind::Dev => AuthKind::Dev,
-                crate::AuthKind::Oidc => AuthKind::Oidc,
-                crate::AuthKind::BuiltinOauth => AuthKind::BuiltinOauth,
-                crate::AuthKind::Tailscale => AuthKind::Tailscale,
-                crate::AuthKind::GcpIap => AuthKind::GcpIap,
-            },
-        });
-        Self {
-            auth: auth.collect(),
-            assistant: *assistant,
-            mcp: mcp.as_ref().map(|access| McpAccess {
-                url: access.url.clone(),
-                sign_in: access
-                    .sign_in
-                    .iter()
-                    .map(|how| match how {
-                        crate::AgentSignIn::Oauth => AgentSignIn::Oauth,
-                        crate::AgentSignIn::GoogleOauth => AgentSignIn::GoogleOauth,
-                        crate::AgentSignIn::Tailnet => AgentSignIn::Tailnet,
-                        crate::AgentSignIn::DevUser => AgentSignIn::DevUser,
-                    })
-                    .collect(),
-                tokens: access.tokens,
-            }),
-            sse: *sse,
-            version: version.clone(),
-        }
-    }
 }
 
 // PRD: H6.

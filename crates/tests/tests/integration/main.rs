@@ -17,6 +17,7 @@ mod architecture;
 mod assistant;
 mod auth;
 mod engine;
+mod fixtures;
 mod mcp;
 mod people;
 mod served_text;

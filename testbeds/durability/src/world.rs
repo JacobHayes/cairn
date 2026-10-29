@@ -217,12 +217,12 @@ impl Open {
             store: Arc::<SqliteStore>::clone(&store),
             notifier: Arc::new(InProcessNotifier::new()),
             settings,
-            capabilities: Capabilities::server(
-                Vec::new(),
-                false,
-                McpAccess::closed("http://127.0.0.1/api/mcp"),
-                "dev",
-            ),
+            capabilities: Capabilities {
+                auth: Vec::new(),
+                assistant: false,
+                mcp: McpAccess::closed("http://127.0.0.1/api/mcp"),
+                version: "dev".to_owned(),
+            },
         });
         Ok(Open { store, service })
     }

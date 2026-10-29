@@ -9,14 +9,13 @@ screen at all, fit in? (Work: the Connect an agent page.)
 
 ## Call
 
-- The server says it. The capabilities document's MCP entry is `null` where the host serves no
-  MCP and otherwise holds the address (the configured public URL joined with the MCP path),
+- The server says it. The capabilities document's MCP entry holds the address (the configured public URL joined with the MCP path),
   how an agent signs in (the built-in OAuth server, the IAP relay, a tailnet, a dev user, or
   nothing), and whether agent tokens are accepted. The root works it out from the configured
   providers. The page reads neither provider kinds nor its own origin, so a deployment behind a
   proxy shows the address agents use, not the one the browser happens to see.
 - The page is "Connect an agent", a rail link above the You line (a phone reaches it from the
-  sync popover, beside You), present only where MCP is offered. The label says the job a
+  sync popover, beside You). The label says the job a
   first-time visitor has; "MCP" names the address panel only.
 - One client at a time (a Segmented control, Claude Code first) in one panel, so the page leads
   with the command, not a manual or a separate address: the bare address is under Other agent.

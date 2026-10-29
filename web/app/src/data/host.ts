@@ -118,7 +118,7 @@ export interface Host {
   /** H3: the names of `users` (at most a page of them); one that does not exist is left out. */
   userNames(users: readonly string[]): Promise<UserName[]>;
   /** H2: the caller's agent tokens. Auth state, not domain writes: a mint is never resent, for it would make a second secret. */
-  readonly agentTokens: AgentTokenHost | undefined;
+  readonly agentTokens: AgentTokenHost;
   /** A journey's domain document as the host wrote it; `Missing` when there is none, `Skewed` when another engine wrote it. */
   documentText(journey: string): Promise<string>;
   /** The deployment context (E6). */
@@ -135,8 +135,8 @@ export interface Host {
   send(patch: Patch, note?: Markdown): Promise<Answered<HttpFailure>>;
   /** I6, C14: proposals, and the upgrade, save-as-route, and re-link drafts (B7, B8, B9). */
   readonly proposals: ProposalHost;
-  /** I5: the assistant, when the server has one. */
-  readonly assistant: AssistantHost | undefined;
+  /** I5: the assistant's calls; the capabilities say whether the server has one. */
+  readonly assistant: AssistantHost;
   /** H6: the host's revision ticks. */
   readonly openTicks: OpenTicks;
 }

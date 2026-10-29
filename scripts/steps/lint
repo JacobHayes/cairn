@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Step lint of `mise run check` and `check:fast`: format, lint, typecheck (rustfmt, clippy,
-# workspace lints, the same over each testbed, patina site labels, the wasm32 build of the
-# runtime-free crates, the TypeScript typecheck, eslint, the CSS lint).
+# workspace lints, the same over each testbed, patina site labels, the engine's wasm32 build, the
+# TypeScript typecheck, eslint, the CSS lint).
 # PRACTICES, The validation ladder; Code conventions. This step runs tools, not tests: it
 # fails if a tool is missing or reports nothing checked. The TypeScript typecheck and
 # eslint joined with the first TypeScript package, web/client.
@@ -312,17 +312,12 @@ if [ "$rust" = 1 ]; then
   [ "$labels" -ge 0 ] || ladder_fail "a patina site label is not a kebab-case literal"
   ladder_suite "patina site labels" "$labels" sites
 
-  # ARCHITECTURE, Repository layout: the service is runtime-free (no tokio, database driver,
-  # or transport), so it builds for the browser with the engine, schema, and store beneath it,
-  # and the browser's engine module (crates/wasm) on top. A dependency that pulls in a runtime fails here.
-  wasm_crates=(cairn-service cairn-wasm)
-  wasm_packages=()
-  for name in "${wasm_crates[@]}"; do
-    wasm_packages+=(-p "$name")
-  done
-  ladder_run "a runtime-free crate's build for wasm32-unknown-unknown" \
-    "$ladder_timed" build cargo check -q --locked --target wasm32-unknown-unknown "${wasm_packages[@]}"
-  ladder_suite "wasm32-unknown-unknown build" "${#wasm_crates[@]}" crates
+  # ARCHITECTURE, Repository layout: the engine is I/O-free, so it builds for the browser with
+  # the schema beneath it and the wasm surface (crates/wasm) on top. A dependency that pulls in
+  # a runtime fails here.
+  ladder_run "the wasm surface's build for wasm32-unknown-unknown" \
+    "$ladder_timed" build cargo check -q --locked --target wasm32-unknown-unknown -p cairn-wasm
+  ladder_suite "wasm32-unknown-unknown build" 1 crates
 fi
 
 # The values written in more than one file because different tools read them (scripts/pins).

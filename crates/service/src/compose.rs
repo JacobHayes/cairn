@@ -11,6 +11,7 @@ use cairn_schema::{
 };
 use cairn_store::{Notifier, Store};
 use jiff::tz::TimeZone;
+use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
 /// What a composition root assembles a service from.
@@ -96,43 +97,25 @@ impl DeploymentSettings {
 
 /// The capabilities document (`GET /api/capabilities`): what this host offers, so the UI shows
 /// and hides features from it. Absence is the host's choice at its root, never a flag
-/// checked inside an operation.
-#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+/// checked inside an operation. The server always serves MCP and the revision stream.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
 #[serde(deny_unknown_fields)]
 pub struct Capabilities {
     /// How people sign in, in the order the host asks.
     pub auth: Vec<AuthMethod>,
-    /// Whether the in-app assistant is available (I5: the UI is fully usable without it).
+    /// Whether the in-app assistant is available.
     pub assistant: bool,
-    /// How an agent reaches this host's MCP server (I2); `None` where the host serves none.
-    pub mcp: Option<McpAccess>,
-    /// Whether the host streams revision ticks over SSE (H6).
-    pub sse: bool,
-    /// The release this host runs, as the binary reports it (a version, or `dev`); `None`
-    /// where no binary serves the page.
-    pub version: Option<String>,
+    /// How an agent reaches this host's MCP server.
+    pub mcp: McpAccess,
+    /// The release this host runs, as the binary reports it (a version, or `dev`).
+    pub version: String,
 }
 
-impl Capabilities {
-    /// The server's: MCP and SSE always (they are not optional on the server), the
-    /// configured sign-in methods, the assistant when one is configured, and the version the
-    /// binary reports.
-    #[must_use]
-    pub fn server(auth: Vec<AuthMethod>, assistant: bool, mcp: McpAccess, version: &str) -> Self {
-        Self {
-            auth,
-            assistant,
-            mcp: Some(mcp),
-            sse: true,
-            version: Some(version.to_owned()),
-        }
-    }
-}
-
-/// How an agent reaches this host's MCP server (I2): what the Connect an agent page tells a
+// PRD: I2.
+/// How an agent reaches this host's MCP server: what the Connect an agent page tells a
 /// person. The host's root works it out from its configuration, so the UI reads facts and
 /// never reasons about providers or builds an address.
-#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
 #[serde(deny_unknown_fields)]
 pub struct McpAccess {
     /// The MCP endpoint's absolute address: the public URL joined with the MCP path.
@@ -156,8 +139,10 @@ impl McpAccess {
     }
 }
 
-/// One way an agent signs in to the MCP server (I2).
-#[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
+/// One way an agent signs in to the MCP server.
+#[derive(
+    Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize, JsonSchema,
+)]
 #[serde(rename_all = "snake_case")]
 pub enum AgentSignIn {
     /// The built-in OAuth server: a browser step on first use; the agent is recorded beside
@@ -173,8 +158,9 @@ pub enum AgentSignIn {
     DevUser,
 }
 
-/// One way to sign in (H1).
-#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+// PRD: H1.
+/// One way to sign in.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
 #[serde(deny_unknown_fields)]
 pub struct AuthMethod {
     /// The provider's configured name, as logins record it.
@@ -183,15 +169,17 @@ pub struct AuthMethod {
     pub kind: AuthKind,
 }
 
-/// The kinds of sign-in a host can offer (ARCHITECTURE, Auth).
-#[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
+/// The kinds of sign-in a host can offer.
+#[derive(
+    Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize, JsonSchema,
+)]
 #[serde(rename_all = "snake_case")]
 pub enum AuthKind {
-    /// A static token or named dev user, for local development (H1).
+    /// A static token or named dev user, for local development.
     Dev,
-    /// OAuth or OIDC against a registered provider (H1).
+    /// OAuth or OIDC against a registered provider.
     Oidc,
-    /// The built-in OAuth server for MCP clients (I2).
+    /// The built-in OAuth server for MCP clients.
     BuiltinOauth,
     /// Tailscale login.
     Tailscale,

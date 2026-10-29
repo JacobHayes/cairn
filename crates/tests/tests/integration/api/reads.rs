@@ -191,8 +191,8 @@ mod in_process {
             "the login that names the identity is listed with its verified email"
         );
         let capabilities: Capabilities = get(&ann, "/api/capabilities").await;
-        assert_eq!(capabilities, Capabilities::from(service.capabilities()));
-        assert!(capabilities.sse && capabilities.mcp.is_some() && !capabilities.assistant);
+        assert_eq!(capabilities, service.capabilities().clone());
+        assert!(!capabilities.assistant);
     }
 
     /// PRACTICES, Explicit limits: arrival is part of the request, so a create that stalls
@@ -391,7 +391,7 @@ mod in_process {
     /// H2: where no provider accepts agent tokens, minting one is refused and stores nothing.
     #[tokio::test]
     async fn an_agent_token_is_not_made_where_none_is_accepted() {
-        let world = World::start_without_mcp().await;
+        let world = World::start_without_tokens().await;
         let ann = world.signed_in("ann");
         let named = serde_json::json!({ "name": "nightly report" });
         let reply = post(&ann, "/api/users/me/tokens", &named).await;

@@ -8,8 +8,8 @@ import { targetKey, type AssistantHost, type AssistantTarget } from "../data/ass
 import { conversationMachine, type ConversationRef } from "./conversation.ts";
 
 export interface ConversationsInput {
-  /** The host's assistant; none, and nothing opens. */
-  assistant: AssistantHost | undefined;
+  /** The host's assistant. */
+  assistant: AssistantHost;
 }
 
 interface ConversationsContext extends ConversationsInput {
@@ -30,7 +30,7 @@ export const conversationManager = setup({
       const { assistant } = context;
       if (held !== undefined) {
         enqueue.sendTo(held, { type: "refresh" });
-      } else if (assistant !== undefined) {
+      } else {
         // A new conversation starts by reading.
         enqueue.assign(({ context: current, spawn }) => ({
           conversations: { ...current.conversations, [key]: spawn("conversation", { id: key, input: { assistant, target: event.target } }) },

@@ -1208,7 +1208,7 @@ export interface components {
         AuthMethod: {
             /** @description What kind of provider it is. */
             kind: components["schemas"]["AuthKind"];
-            /** @description The provider's configured name. */
+            /** @description The provider's configured name, as logins record it. */
             name: components["schemas"]["Slug"];
         };
         /** @description A dependency that blocks a node (Gating: Blocked). */
@@ -1255,21 +1255,20 @@ export interface components {
             /** @description The user. */
             user: components["schemas"]["UserId"];
         };
-        /** @description The capabilities document (`GET /api/capabilities`): what this host offers. */
+        /**
+         * @description The capabilities document (`GET /api/capabilities`): what this host offers, so the UI shows
+         *     and hides features from it. Absence is the host's choice at its root, never a flag
+         *     checked inside an operation. The server always serves MCP and the revision stream.
+         */
         Capabilities: {
             /** @description Whether the in-app assistant is available. */
             assistant: boolean;
             /** @description How people sign in, in the order the host asks. */
             auth: components["schemas"]["AuthMethod"][];
-            /** @description How an agent reaches this host's MCP server; null where the host serves none. */
-            mcp?: components["schemas"]["McpAccess"] | null;
-            /** @description Whether the host streams revision ticks over SSE. */
-            sse: boolean;
-            /**
-             * @description The release this host runs (a version, or `dev` for a build without one); null where no
-             *     server binary serves the page.
-             */
-            version?: string | null;
+            /** @description How an agent reaches this host's MCP server. */
+            mcp: components["schemas"]["McpAccess"];
+            /** @description The release this host runs, as the binary reports it (a version, or `dev`). */
+            version: string;
         };
         /** @description A chain of constraints, with the dates fixed on it. */
         Chain: {
@@ -2919,11 +2918,15 @@ export interface components {
         };
         /** @description Markdown, at most body_bytes_max (64 KiB) bytes. */
         Markdown: string;
-        /** @description How an agent reaches this host's MCP server. */
+        /**
+         * @description How an agent reaches this host's MCP server: what the Connect an agent page tells a
+         *     person. The host's root works it out from its configuration, so the UI reads facts and
+         *     never reasons about providers or builds an address.
+         */
         McpAccess: {
             /** @description How an agent signs in, in the order the providers are asked; empty when it cannot. */
             sign_in: components["schemas"]["AgentSignIn"][];
-            /** @description Whether a person can make agent tokens here, and list and revoke theirs. */
+            /** @description Whether a person can make agent tokens here: some provider accepts them. */
             tokens: boolean;
             /** @description The MCP endpoint's absolute address: the public URL joined with the MCP path. */
             url: string;

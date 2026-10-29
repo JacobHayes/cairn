@@ -10,9 +10,9 @@ import { HandHost, answered, holding, replied, said, target } from "./hand-host.
 
 const other = { route: "r_one" };
 
-function manager(offered = true) {
+function manager() {
   const host = new HandHost();
-  const ref = createActor(conversationManager, { input: { assistant: offered ? host : undefined } }).start();
+  const ref = createActor(conversationManager, { input: { assistant: host } }).start();
   const held = (key: string) => ref.getSnapshot().context.conversations[key];
   return { host, ref, held };
 }
@@ -53,12 +53,5 @@ describe("the conversation manager", () => {
     // Opening the first again shows the answer, which the host kept.
     ref.send({ type: "open", target });
     expect(words(conversationView(first.getSnapshot()))).toEqual(["Hello?", "Hi."]);
-  });
-
-  it("starts nothing without an assistant", () => {
-    const { host, ref } = manager(false);
-    ref.send({ type: "open", target });
-    expect(ref.getSnapshot().context.conversations).toEqual({});
-    expect(host.reads).toEqual([]);
   });
 });

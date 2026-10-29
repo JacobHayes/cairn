@@ -45,13 +45,7 @@ pub async fn mint_token(
     Extension(actor): Extension<Actor>,
     JsonBody(request): JsonBody<TokenRequest>,
 ) -> Result<(StatusCode, Json<MintedToken>), ApiError> {
-    if !api
-        .service
-        .capabilities()
-        .mcp
-        .as_ref()
-        .is_some_and(|mcp| mcp.tokens)
-    {
+    if !api.service.capabilities().mcp.tokens {
         return Err(ApiError::problem(
             ProblemCode::TokensNotAccepted,
             "this deployment does not accept agent tokens",

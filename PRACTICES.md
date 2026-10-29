@@ -203,7 +203,7 @@ Tooling: mise installs `cargo-patina` from git at a pinned revision; `patina-dst
 
 | Step | Check |
 |---|---|
-| lint | `rustfmt`, `clippy` (each testbed too), kebab-case patina labels, TypeScript typecheck, `eslint`, CSS lint (`mise run lint:css`), `cargo-machete`, `knip`, the `wasm32-unknown-unknown` build of the runtime-free crates |
+| lint | `rustfmt`, `clippy` (each testbed too), kebab-case patina labels, TypeScript typecheck, `eslint`, CSS lint (`mise run lint:css`), `cargo-machete`, `knip`, the engine's `wasm32-unknown-unknown` build |
 | unit | Rust unit tests (every crate and testbed), engine scenarios, replay |
 | web-unit | Vitest |
 | generated | regenerate the generated paths; fail on any change |

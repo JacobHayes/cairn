@@ -4,7 +4,6 @@
 import { useMemo, useState } from "react";
 
 import { AssistantDock, Transcript } from "../assistant/AssistantPanel.tsx";
-import { assistantOffered } from "../assistant/model.ts";
 import { useJourney, useSession } from "../data/react.ts";
 import { AssistantSlot, useAssistantDock } from "../shell/frame.tsx";
 import { Button } from "../ui/kit.tsx";
@@ -46,7 +45,7 @@ function ExampleDock({ journey }: { journey: string }) {
   const session = useSession();
   const [open, setOpen] = useState(false);
   const dock = useMemo(() => ({ open: () => { setOpen(true); }, close: () => { setOpen(false); } }), []);
-  useAssistantDock(assistantOffered(session) ? dock : undefined);
+  useAssistantDock(session.capabilities.assistant ? dock : undefined);
   return open ? (
     <AssistantSlot>
       <Example journey={journey} />

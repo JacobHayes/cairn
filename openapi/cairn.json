@@ -439,7 +439,7 @@
         "oneOf": [
           {
             "const": "dev",
-            "description": "A static token or named dev user.",
+            "description": "A static token or named dev user, for local development.",
             "type": "string"
           },
           {
@@ -474,7 +474,7 @@
           },
           "name": {
             "$ref": "#/components/schemas/Slug",
-            "description": "The provider's configured name."
+            "description": "The provider's configured name, as logins record it."
           }
         },
         "required": [
@@ -600,7 +600,7 @@
       },
       "Capabilities": {
         "additionalProperties": false,
-        "description": "The capabilities document (`GET /api/capabilities`): what this host offers.",
+        "description": "The capabilities document (`GET /api/capabilities`): what this host offers, so the UI shows\nand hides features from it. Absence is the host's choice at its root, never a flag\nchecked inside an operation. The server always serves MCP and the revision stream.",
         "properties": {
           "assistant": {
             "description": "Whether the in-app assistant is available.",
@@ -614,32 +614,19 @@
             "type": "array"
           },
           "mcp": {
-            "anyOf": [
-              {
-                "$ref": "#/components/schemas/McpAccess"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "description": "How an agent reaches this host's MCP server; null where the host serves none."
-          },
-          "sse": {
-            "description": "Whether the host streams revision ticks over SSE.",
-            "type": "boolean"
+            "$ref": "#/components/schemas/McpAccess",
+            "description": "How an agent reaches this host's MCP server."
           },
           "version": {
-            "description": "The release this host runs (a version, or `dev` for a build without one); null where no\nserver binary serves the page.",
-            "type": [
-              "string",
-              "null"
-            ]
+            "description": "The release this host runs, as the binary reports it (a version, or `dev`).",
+            "type": "string"
           }
         },
         "required": [
           "auth",
           "assistant",
-          "sse"
+          "mcp",
+          "version"
         ],
         "type": "object"
       },
@@ -6005,7 +5992,7 @@
       },
       "McpAccess": {
         "additionalProperties": false,
-        "description": "How an agent reaches this host's MCP server.",
+        "description": "How an agent reaches this host's MCP server: what the Connect an agent page tells a\nperson. The host's root works it out from its configuration, so the UI reads facts and\nnever reasons about providers or builds an address.",
         "properties": {
           "sign_in": {
             "description": "How an agent signs in, in the order the providers are asked; empty when it cannot.",
@@ -6015,7 +6002,7 @@
             "type": "array"
           },
           "tokens": {
-            "description": "Whether a person can make agent tokens here, and list and revoke theirs.",
+            "description": "Whether a person can make agent tokens here: some provider accepts them.",
             "type": "boolean"
           },
           "url": {

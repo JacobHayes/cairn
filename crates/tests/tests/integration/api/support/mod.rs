@@ -10,7 +10,6 @@ use crate::assistant::provider::{KEY, Provider};
 use cairn_assistant::chat::{Credential, ProviderConfig};
 use std::collections::BTreeSet;
 use std::net::SocketAddr;
-use std::path::{Path, PathBuf};
 use std::sync::Arc;
 use std::sync::atomic::{AtomicI64, Ordering};
 
@@ -21,11 +20,7 @@ use cairn_auth::{
     Accounts, Auth, AuthProvider, Clock, GcpIapConfig, GcpIapProvider, GoogleEndpoints,
     OAuthConfig, OAuthServer, Presented, RelayClient, Verdict,
 };
-use cairn_engine::from_file;
-use cairn_schema::{
-    DraftSource, Login, Mutation, Mutations, Patch, PatchTarget, RankConstants, Revision,
-    RouteFile, Scenario, SequentialKeys, Slug, Timestamp, from_yaml,
-};
+use cairn_schema::{Login, Patch, RankConstants, Slug, Timestamp, from_yaml};
 use cairn_service::{
     AgentSignIn, AuthKind, AuthMethod, Capabilities, DeploymentSettings, McpAccess, Parts, Service,
 };
@@ -124,7 +119,7 @@ impl World {
     /// Starts a server over a fresh memory store on this runtime, its clock at the vendor
     /// evaluation's first step.
     pub async fn start() -> Self {
-        Self::begin(true, None, start_clock(), &Front::Team).await
+        Self::begin(None, start_clock(), &Front::Team).await
     }
 
     /// As [`World::start`], for a host whose root assembled the assistant over `provider`
@@ -135,12 +130,12 @@ impl World {
             model: "scripted".to_owned(),
             credential: Some(Credential::new(KEY.to_owned())),
         };
-        Self::begin(true, Some(config), start_clock(), &Front::Team).await
+        Self::begin(Some(config), start_clock(), &Front::Team).await
     }
 
-    /// As [`World::start`], for a root that serves no MCP endpoint (capability gating).
-    pub async fn start_without_mcp() -> Self {
-        Self::begin(false, None, start_clock(), &Front::Team).await
+    /// As [`World::start`], for a root whose providers accept no agent tokens.
+    pub async fn start_without_tokens() -> Self {
+        Self::begin(None, start_clock(), &Front::TeamOnly).await
     }
 
     /// A deployment behind Google Cloud IAP with the relay on (I2): the IAP provider alone,
@@ -163,15 +158,10 @@ impl World {
             token: google.token_url(),
         };
         let front = Front::Iap(Box::new((fake, endpoints)));
-        (Self::begin(true, None, clock, &front).await, google)
+        (Self::begin(None, clock, &front).await, google)
     }
 
-    async fn begin(
-        mcp: bool,
-        assistant: Option<ProviderConfig>,
-        clock: TestClock,
-        front: &Front,
-    ) -> Self {
+    async fn begin(assistant: Option<ProviderConfig>, clock: TestClock, front: &Front) -> Self {
         let faults = Faults::default();
         let store = Arc::new(MemoryStore::with_faults(faults.clone()));
         let notifier = Arc::new(InProcessNotifier::new());
@@ -181,18 +171,30 @@ impl World {
         let accounts = Accounts::new(Arc::<MemoryStore>::clone(&store), clock.clock());
         let (providers, methods) = front.providers(&accounts, &base, clock.clock());
         let auth = Auth::new(accounts, &base, providers);
+        // What an agent can do follows from the providers mounted, as the root works it out.
         let access = McpAccess {
             url: format!("http://{address}/api/mcp"),
-            sign_in: vec![AgentSignIn::Oauth],
-            tokens: true,
+            sign_in: methods
+                .iter()
+                .filter_map(|method| match method.kind {
+                    AuthKind::BuiltinOauth => Some(AgentSignIn::Oauth),
+                    AuthKind::GcpIap => Some(AgentSignIn::GoogleOauth),
+                    _ => None,
+                })
+                .collect(),
+            tokens: methods
+                .iter()
+                .any(|method| method.kind == AuthKind::BuiltinOauth),
         };
         let service = Service::new(Parts {
             store: Arc::<MemoryStore>::clone(&store),
             notifier: notifier.clone(),
             settings: settings(),
             capabilities: Capabilities {
-                mcp: mcp.then(|| access.clone()),
-                ..Capabilities::server(methods, assistant.is_some(), access, "dev")
+                auth: methods,
+                assistant: assistant.is_some(),
+                mcp: access,
+                version: "dev".to_owned(),
             },
         });
         let assistant = assistant.map(|config| {
@@ -296,6 +298,8 @@ fn start_clock() -> TestClock {
 enum Front {
     /// The test sign-in provider for the team, and the built-in OAuth server.
     Team,
+    /// The test sign-in provider alone: no agent signs in, and no token is accepted.
+    TeamOnly,
     /// The IAP provider with its relay, behind a fake IAP.
     Iap(Box<(FakeIap, GoogleEndpoints)>),
 }
@@ -308,6 +312,12 @@ impl Front {
         clock: Clock,
     ) -> (Vec<Arc<dyn AuthProvider>>, Vec<AuthMethod>) {
         match self {
+            Front::TeamOnly => (
+                vec![Arc::new(TeamProvider {
+                    name: "team".parse().unwrap(),
+                })],
+                vec![method("team", AuthKind::Oidc)],
+            ),
             Front::Team => {
                 let oauth = OAuthConfig {
                     name: "cairn".parse().unwrap(),
@@ -345,7 +355,7 @@ impl Front {
     /// The server as reached from outside.
     fn in_front_of(&self, router: axum::Router) -> axum::Router {
         match self {
-            Front::Team => router,
+            Front::Team | Front::TeamOnly => router,
             Front::Iap(iap) => iap.0.in_front_of(router),
         }
     }
@@ -384,62 +394,7 @@ pub fn ok<T: DeserializeOwned>(reply: &Reply) -> T {
     reply.json().unwrap()
 }
 
-/// The repository's fixtures directory.
-pub fn fixtures_root() -> PathBuf {
-    Path::new(env!("CARGO_MANIFEST_DIR")).join("../../fixtures")
-}
-
-/// A fixture's journey scenario.
-pub fn scenario(name: &str) -> Scenario {
-    let path = fixtures_root().join(name).join("journey.yaml");
-    from_yaml(&std::fs::read_to_string(&path).unwrap()).unwrap()
-}
-
-/// The patch that creates a fixture's route and publishes its file as version 1, as every
-/// scenario expects (fixtures/README.md).
-pub fn publish_fixture_route(name: &str) -> Patch {
-    let route = fixtures_root().join(name).join("route.yaml");
-    let path = if route.exists() {
-        route
-    } else {
-        fixtures_root().join(name).join("segment.yaml")
-    };
-    let file: RouteFile = from_yaml(&std::fs::read_to_string(&path).unwrap()).unwrap();
-    let graph = from_file(&file, &mut SequentialKeys::default())
-        .unwrap()
-        .into_document();
-    let mut mutations = vec![
-        Mutation::CreateRoute {
-            name: file.name.clone(),
-            description: file.description.clone(),
-            kind: file.kind,
-        },
-        Mutation::OpenDraft {
-            source: DraftSource::Import,
-        },
-    ];
-    let roles = graph.roles.values().cloned();
-    mutations.extend(roles.map(|role| Mutation::AddRole { role }));
-    let kinds = graph.participation_kinds.values().cloned();
-    mutations.extend(kinds.map(|kind| Mutation::AddParticipationKind { kind }));
-    if let Some(role) = &graph.default_owner {
-        mutations.push(Mutation::SetDefaultOwner {
-            role: Some(role.clone()),
-        });
-    }
-    let nodes = graph.nodes.values().cloned();
-    mutations.extend(nodes.map(|node| Mutation::AddNode { node }));
-    mutations.push(Mutation::PublishDraft {});
-    Patch {
-        id: format!("p_seed_{}", name.replace('-', "_"))
-            .parse()
-            .unwrap(),
-        target: PatchTarget::Route(file.route.clone()),
-        base_revision: Revision::NONE,
-        deployment_revision: None,
-        mutations: Mutations::new(mutations).unwrap(),
-    }
-}
+pub use crate::fixtures::{fixtures_root, publish_fixture_route, scenario};
 
 /// A patch from YAML: `id`, `target` (as YAML), the base revision, and the mutations.
 pub fn patch(id: &str, target: &str, base: u32, mutations: &str) -> Patch {

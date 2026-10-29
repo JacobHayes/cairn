@@ -377,7 +377,7 @@ fn the_mcp_access_follows_the_providers() {
     for (providers, sign_in, tokens) in cases {
         let text = format!("{head}public_url = \"https://cairn.example.org/\"\n{providers}");
         let config = parsed(&text).unwrap_or_else(|problems| panic!("{problems:?}\n{text}"));
-        let mcp = capabilities(&config).mcp.unwrap();
+        let mcp = capabilities(&config).mcp;
         assert_eq!((mcp.sign_in, mcp.tokens), (sign_in, tokens), "{providers}");
         assert_eq!(mcp.url, "https://cairn.example.org/api/mcp");
     }

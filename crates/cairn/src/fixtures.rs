@@ -87,29 +87,7 @@ impl Fixture {
                 source: DraftSource::Import,
             },
         ];
-        mutations.extend(
-            graph
-                .roles
-                .values()
-                .map(|role| Mutation::AddRole { role: role.clone() }),
-        );
-        mutations.extend(
-            graph
-                .participation_kinds
-                .values()
-                .map(|kind| Mutation::AddParticipationKind { kind: kind.clone() }),
-        );
-        if let Some(role) = &graph.default_owner {
-            mutations.push(Mutation::SetDefaultOwner {
-                role: Some(role.clone()),
-            });
-        }
-        mutations.extend(
-            graph
-                .nodes
-                .values()
-                .map(|node| Mutation::AddNode { node: node.clone() }),
-        );
+        mutations.extend(cairn_engine::format::content(&graph));
         mutations.push(Mutation::PublishDraft {});
         let id = format!("p_seed_{}", self.name.replace('-', "_"));
         Ok(Some(Patch {

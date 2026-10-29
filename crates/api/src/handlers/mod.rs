@@ -53,7 +53,7 @@ pub async fn health(State(api): State<Api>) -> Response {
 
 /// `GET /api/capabilities`.
 pub async fn capabilities(State(api): State<Api>) -> Json<Capabilities> {
-    Json(Capabilities::from(api.service.capabilities()))
+    Json(api.service.capabilities().clone())
 }
 
 /// `POST /api/journeys/{id}/patches`.

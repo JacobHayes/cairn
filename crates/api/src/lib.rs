@@ -58,7 +58,7 @@ impl Api {
 type Served = Vec<(&'static Endpoint, MethodRouter<Api>)>;
 
 /// The API: every endpoint but the health check behind `auth`'s layer, with the MCP
-/// endpoint at `/api/mcp` when the service's capabilities offer it (I2), auth's own routes
+/// endpoint at `/api/mcp` (I2), auth's own routes
 /// beside them, the request limits, and observability, over `service`. `auth` must share
 /// the service's store. No assistant: see [`router_with_assistant`].
 pub fn router(service: Service, auth: &Auth) -> Router {
@@ -204,10 +204,10 @@ pub fn router_beside(
         }
         routes.with_state(api.clone())
     });
-    let mcp = api.service.capabilities().mcp.is_some().then(|| {
-        let tools = cairn_mcp::ToolSet::new(api.service.clone(), auth.accounts().clock().clone());
-        cairn_mcp::router(tools, version)
-    });
+    let mcp = cairn_mcp::router(
+        cairn_mcp::ToolSet::new(api.service.clone(), auth.accounts().clock().clone()),
+        version,
+    );
     // The health check sits outside the auth layer, so a proxy's anonymous probe reaches
     // it, but inside the request limits and observation like everything else.
     let health = Router::new()
@@ -217,11 +217,8 @@ pub fn router_beside(
     let routes = routes
         .method_not_allowed_fallback(handle::method_not_allowed)
         .with_state(api);
-    // I2: the MCP endpoint, when the host offers it, behind the same auth layer and limits.
-    let routes = match mcp {
-        Some(mcp) => routes.merge(mcp),
-        None => routes,
-    };
+    // I2: the MCP endpoint, behind the same auth layer and limits.
+    let routes = routes.merge(mcp);
     // The duration limit is the API's, inside the auth layer: auth's own routes and layer
     // wait on sign-in providers under their own limit.
     // H3: arrival runs inside it, so a stalled lookup or create times out like any request.

@@ -101,24 +101,19 @@ function Recent({ saves, onGo }: { saves: readonly SaveEvent[]; onGo: () => void
   );
 }
 
-/** The release the server runs, as the head shows it: `v1.2.3`, or `dev build` for a build without one; none where no server serves the page. */
-function versionWords(version: string | null | undefined): string | undefined {
-  if (version == null) {
-    return undefined;
-  }
+/** The release the server runs, as the head shows it: `v1.2.3`, or `dev build` for a build without one. */
+function versionWords(version: string): string {
   return version === "dev" ? "dev build" : `v${version}`;
 }
 
-/** The head: the popover's name, which labels it, and at the right the release the server runs, when one does. */
-function Head({ heading, version }: { heading: string; version: string | undefined }) {
+/** The head: the popover's name, which labels it, and at the right the release the server runs. */
+function Head({ heading, version }: { heading: string; version: string }) {
   return (
     <div className="popover-head sync-head">
       <span id={heading}>Sync</span>
-      {version === undefined ? null : (
-        <span className="sync-version" data-testid="sync-version">
-          {version}
-        </span>
-      )}
+      <span className="sync-version" data-testid="sync-version">
+        {version}
+      </span>
     </div>
   );
 }
@@ -129,9 +124,7 @@ function Popover({ summary, anchor, onClose }: { summary: SyncSummary; anchor: A
   const saves = useSaves();
   const derivation = useDerivation();
   const skew = useSkew();
-  const capabilities = useCapabilities();
-  const offersMcp = capabilities.mcp != null;
-  const version = versionWords(capabilities.version);
+  const version = versionWords(useCapabilities().version);
   const heading = useId();
   // Just below the dot, kept inside the window (it is fixed, so the rail's scroller does not clip it).
   const popover = useRef<HTMLDivElement>(null);
@@ -164,11 +157,9 @@ function Popover({ summary, anchor, onClose }: { summary: SyncSummary; anchor: A
         <Link to={pathTo("me")} className="sync-you" onClick={onClose}>
           You: who you are here &rsaquo;
         </Link>
-        {offersMcp ? (
-          <Link to={pathTo("agents")} className="sync-you" onClick={onClose}>
-            Connect an agent &rsaquo;
-          </Link>
-        ) : null}
+        <Link to={pathTo("agents")} className="sync-you" onClick={onClose}>
+          Connect an agent &rsaquo;
+        </Link>
         {skew && (
           <p className="stack" data-testid="sync-skew">
             <span>Cairn was updated. Reload to keep saving.</span>

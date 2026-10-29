@@ -8,7 +8,6 @@ import { useActorRef, useSelector } from "@xstate/react";
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { Link, useLocation, useNavigate } from "react-router";
 
-import { assistantOffered } from "../assistant/model.ts";
 import { useJourney, useRetryJourney, useSession } from "../data/react.ts";
 import { useDraft } from "../data/drafts.ts";
 import type { Tour as TourRecord } from "../data/host.ts";
@@ -97,7 +96,7 @@ function useRunSteps(run: string | undefined, confirming: boolean) {
   const session = useSession();
   const { search } = useLocation();
   const navigate = useNavigate();
-  const steps = useMemo(() => stepsFor(assistantOffered(session)), [session]);
+  const steps = useMemo(() => stepsFor(session.capabilities.assistant), [session]);
   const [cursor, setCursor] = useDraft<number>(`tour:${run ?? ""}`);
   const [replied, setReplied] = useDraft<boolean>(`tour-replied:${run ?? ""}`);
   const arrive = useCallback(

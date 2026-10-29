@@ -3,7 +3,13 @@
 // serving its web build and the API on one port. Every test starts a demo of its own
 // (e2e/test.ts), so tests run side by side on free ports and none sees what another wrote.
 // `mise run check` builds the web build and the binary first.
+import { availableParallelism } from "node:os";
+
 import { defineConfig, devices } from "@playwright/test";
+
+// One worker per core, at most six: each worker is a Chromium and a `cairn demo`, and more of them on a
+// many-core machine crashed pages ("Target crashed") under load.
+const WORKERS_MAX = 6;
 
 export default defineConfig({
   testDir: "e2e",
@@ -13,8 +19,7 @@ export default defineConfig({
   forbidOnly: true,
   reporter: [["list"]],
   fullyParallel: true,
-  // A CI runner has four cores: one worker per core was a quarter faster than the default of half of them.
-  ...(process.env["CI"] === undefined ? {} : { workers: "100%" }),
+  workers: Math.min(availableParallelism(), WORKERS_MAX),
   // A trace is kept only for a failure: a flake in a long run leaves what happened (no measurable cost on green runs).
   // Reduced motion turns the app's motion off (DESIGN, Motion), so nothing a test reads is mid-animation.
   use: { trace: "retain-on-failure", contextOptions: { reducedMotion: "reduce" } },
