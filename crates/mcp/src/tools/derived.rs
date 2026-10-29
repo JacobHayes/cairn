@@ -12,7 +12,7 @@ use cairn_schema::{
     InstantPoint, JourneyId, KeyRefs, KindKey, Level, LevelDateLink, LevelDisplay, LevelNode,
     LevelQuery, ListFlag, ListQuery, LocalEdit, Markdown, Node, NodeDerived, NodeKey, NodeKind,
     NodeMove, NodeState, Overrides, Progress, Real, Relevance, RelevanceExplanation, RemovalRead,
-    Score, ShortChain, Snapshot, SnapshotScope, SnoozeTarget, SortBy, StaleReason, StillWaiting,
+    Score, ShortChain, Snapshot, SnoozeTarget, SortBy, StaleReason, StillWaiting,
 };
 use cairn_service::{Call, ChildEntry, NodeDetail};
 use schemars::JsonSchema;
@@ -27,9 +27,11 @@ use crate::{ToolError, ToolSet};
 pub(crate) const SPECS: &[Spec] = &[
     Spec {
         name: "get_snapshot",
-        description: "Read this first on a journey: answers, counts, the top of the ranked \
-            acting frontier, open decisions, placeholders to break down, unassigned items, \
-            shortfalls. No node list: `list_nodes` lists nodes. Scope with `subtree`.",
+        description: "Read this first on a journey: its name, status and revision, whether \
+            completing it is suggested, and counts (by state and display state; open \
+            decisions, placeholders to break down, unassigned, shortfalls, stalled). No \
+            nodes: `list_nodes` with the matching `filters` entry lists the ones a count \
+            totals.",
         writes: Writes::Nothing,
         destructive: false,
         schema: schema::<GetSnapshot>,
@@ -73,16 +75,12 @@ pub(crate) const SPECS: &[Spec] = &[
 #[serde(deny_unknown_fields)]
 pub(crate) struct GetSnapshot {
     journey: JourneyId,
-    #[serde(default)]
-    subtree: Option<NodeKey>,
 }
 
 /// The snapshot, at its revision.
 #[derive(Debug, Serialize, JsonSchema)]
 pub(crate) struct SnapshotOutput {
-    /// The bounded overview: answers, the acting frontier's top
-    /// `page_item_count_max` with the rest as keys, open decisions by rank, placeholders
-    /// needing breakdown, unassigned items, shortfalls, and counts.
+    /// The overview: the journey's facts, whether completing it is suggested, and counts.
     snapshot: Snapshot,
 }
 
@@ -614,13 +612,7 @@ impl ToolSet {
         call: &Call,
         arguments: GetSnapshot,
     ) -> Result<At<SnapshotOutput>, ToolError> {
-        let scope = SnapshotScope {
-            subtree: arguments.subtree,
-        };
-        let projected = self
-            .service
-            .snapshot(call, &arguments.journey, &scope)
-            .await?;
+        let projected = self.service.snapshot(call, &arguments.journey).await?;
         Ok(At::of(projected, |snapshot| SnapshotOutput { snapshot }))
     }
 

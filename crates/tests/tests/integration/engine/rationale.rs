@@ -7,9 +7,7 @@
 use crate::engine::support;
 
 use cairn_engine::{Applied, DerivedJourney, Records};
-use cairn_schema::{
-    AnswerValue, EventType, GraphRecord, Markdown, NodeKey, Snapshot, SnapshotScope, Write,
-};
+use cairn_schema::{AnswerValue, EventType, GraphRecord, Markdown, NodeKey, Write};
 use support::key;
 
 const HIRING: &str = "j_hiring";
@@ -67,19 +65,8 @@ fn recorded(events: &[cairn_schema::Event]) -> Vec<Option<String>> {
         .collect()
 }
 
-fn snapshot(records: &Records) -> Snapshot {
-    let graph = support::journey_graph(records, HIRING);
-    let derived = support::derived(records, HIRING);
-    DerivedJourney::new(&graph, &derived)
-        .snapshot(
-            &SnapshotScope::default(),
-            &support::journey_header(records, HIRING),
-        )
-        .unwrap()
-}
-
 /// B2, C8, C12, J1, J3: answer with a rationale, revise without one, revise with another, then
-/// revise only the reason. The current state, the decision view and the snapshot show only the
+/// revise only the reason. The current state and the decision view show only the
 /// current rationale, history shows all four answers each with its own.
 #[test]
 fn each_answer_keeps_its_own_rationale_and_none_carries_forward() {
@@ -137,11 +124,6 @@ fn each_answer_keeps_its_own_rationale_and_none_carries_forward() {
         .unwrap();
     assert_eq!(entry.answer, Some(AnswerValue::Boolean(true)));
     assert_eq!(entry.rationale.as_ref().map(Markdown::as_str), Some(THIRD));
-    let current = snapshot(&records);
-    assert_eq!(
-        current.rationales.get(&decision()).map(Markdown::as_str),
-        Some(THIRD)
-    );
 
     assert_eq!(
         recorded(&events),

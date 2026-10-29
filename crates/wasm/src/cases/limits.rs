@@ -16,7 +16,7 @@ use cairn_engine::testing::{derive_inputs, journey_id};
 use cairn_engine::{Graph, project};
 use cairn_schema::{
     Cursor, Deployment, DomainDocument, ExplainedField, Journey, LevelDisplay, LevelQuery,
-    ListFlag, ListQuery, NextQuery, NodeKey, NodeKind, Revision, SnapshotScope, from_yaml,
+    ListFlag, ListQuery, NextQuery, NodeKey, NodeKind, Revision, from_yaml,
 };
 
 use super::{Case, CaseCall, Group, run};
@@ -103,9 +103,7 @@ pub fn limits_group() -> Group {
         Projection::Mine {
             kinds: BTreeSet::new(),
         },
-        Projection::Snapshot {
-            scope: SnapshotScope::default(),
-        },
+        Projection::Snapshot,
     ];
     calls.extend(requests.into_iter().map(projection_call));
     group_of("at the limits", text, calls)

@@ -769,6 +769,10 @@ pub enum ListFlag {
     NextUp,
     /// A decision that can be answered now.
     DecisionsNeeded,
+    // PRD: B2.
+    /// A decision still open: undecided and not closed by a skip or a date, whether or not it
+    /// waits on anything (an open decision may be answered ahead of what it waits on).
+    OpenDecision,
     // PRD: B10.
     /// Placeholders that still need to be broken down.
     NeedsBreakdown,
@@ -790,6 +794,9 @@ pub enum ListFlag {
     // PRD: F6.
     /// Its plan can no longer be met.
     Shortfall,
+    // PRD: D5.
+    /// A node the journey's stalled diagnostic names: what a stalled journey waits on.
+    Stalled,
 }
 
 /// C9: which nodes the list shows and how it orders them. Every filter given must hold.
@@ -859,24 +866,6 @@ pub struct MineEntry {
     /// On the acting frontier: nothing holds it back now.
     #[serde(default, skip_serializing_if = "crate::serde_util::is_false")]
     pub acting: bool,
-}
-
-impl SnapshotScope {
-    /// Whether it is the whole journey.
-    #[must_use]
-    pub fn is_whole(&self) -> bool {
-        *self == Self::default()
-    }
-}
-
-// PRD: I3.
-/// Which part of the journey a snapshot covers.
-#[derive(Clone, Debug, Default, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
-#[serde(deny_unknown_fields)]
-pub struct SnapshotScope {
-    /// The subtree: this node and everything beneath it; the whole journey when none.
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub subtree: Option<NodeKey>,
 }
 
 // PRD: I3, C10.
@@ -999,59 +988,9 @@ impl AgentRow {
     }
 }
 
-// PRD: I3, C10.
-/// One entry of the snapshot's acting frontier: enough to say what is next; the node's row is
-/// in `list_nodes`.
-#[derive(Clone, Debug, PartialEq, Serialize, Deserialize, JsonSchema)]
-#[serde(deny_unknown_fields)]
-pub struct FrontierEntry {
-    /// The node.
-    pub key: NodeKey,
-    /// Its title.
-    pub title: Title,
-    /// Its kind.
-    pub kind: NodeKind,
-    /// The state every surface shows for the node.
-    pub display_state: DisplayState,
-    /// Its ancestors, root first: the breadcrumb.
-    #[serde(default, skip_serializing_if = "Vec::is_empty")]
-    pub ancestors: Vec<NodeKey>,
-    /// Its rank to three significant figures.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub rank: Option<Real>,
-}
-
-impl FrontierEntry {
-    /// C10: the entry of a frontier row.
-    #[must_use]
-    pub fn of(row: &NodeRow) -> Self {
-        Self {
-            key: row.key.clone(),
-            title: row.title.clone(),
-            kind: row.kind,
-            display_state: row.display_state,
-            ancestors: row.ancestors.clone(),
-            rank: row
-                .rank
-                .and_then(|terms| Real::three_figures(terms.rank.get())),
-        }
-    }
-}
-
 // PRD: I3.
-/// A node named in one of the snapshot's lists: its key and its title, so the list says what
-/// each is without a second read.
-#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
-#[serde(deny_unknown_fields)]
-pub struct NodeRef {
-    /// The node.
-    pub key: NodeKey,
-    /// Its title.
-    pub title: Title,
-}
-
-// PRD: I3.
-/// What a snapshot counts in its subtree.
+/// What a snapshot counts. Each count of nodes needing attention is the total `list_nodes`
+/// lists with the matching filter, in rank order, over the in-scope nodes.
 #[derive(Clone, Debug, Default, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
 #[serde(deny_unknown_fields)]
 pub struct SnapshotCounts {
@@ -1068,16 +1007,19 @@ pub struct SnapshotCounts {
     pub by_display_state: BTreeMap<DisplayState, u32>,
     /// The frontier.
     pub frontier: u32,
-    /// The acting frontier: its top N and the rest.
+    /// The acting frontier: `list_nodes` with the `next_up` filter.
     pub acting_frontier: u32,
-    /// Open decisions in all; the snapshot lists the top few.
+    /// Decisions still open, ready to answer or not: the `open_decision` filter.
     pub open_decisions: u32,
-    /// Placeholders needing breakdown in all.
+    /// Placeholders needing breakdown: the `needs_breakdown` filter.
     pub needs_breakdown: u32,
-    /// Open, in-scope nodes no one owns, in all.
+    /// Open, in-scope nodes no one owns: the `unassigned` filter.
     pub unassigned: u32,
-    /// Nodes whose plan can no longer be met, in all.
+    /// Nodes whose plan can no longer be met: the `shortfall` filter.
     pub shortfalls: u32,
+    /// The nodes a stalled journey waits on (gates, snoozed and scheduled nodes), none when it
+    /// is not stalled: the `stalled` filter.
+    pub stalled: u32,
 }
 
 // PRD: I3, C16.
@@ -1099,47 +1041,14 @@ pub struct SnapshotJourney {
 }
 
 // PRD: I3.
-/// The bounded agent overview of a journey, with no node list (`list_nodes` lists the nodes):
-/// answers, the ranked acting frontier's top N with the rest as keys, open decisions by rank, placeholders needing
-/// breakdown, unassigned items, shortfalls, and counts, scoped to a subtree.
-#[derive(Clone, Debug, PartialEq, Serialize, Deserialize, JsonSchema)]
+/// The agent overview of a journey, small at any journey size: its facts, whether completing it
+/// is suggested, and counts. It lists no nodes: `list_nodes` with a filter lists the ones a
+/// count totals, `get_node` reads one.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
 #[serde(deny_unknown_fields)]
 pub struct Snapshot {
     /// The journey's name, description, status and owners.
     pub journey: SnapshotJourney,
-    /// What it covers, when that is not the whole journey.
-    #[serde(default, skip_serializing_if = "SnapshotScope::is_whole")]
-    pub scope: SnapshotScope,
-    /// The answers in effect in the subtree.
-    #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
-    pub answers: BTreeMap<NodeKey, AnswerValue>,
-    // PRD: B2.
-    /// The rationales those answers were given with, for the answers that have one.
-    #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
-    pub rationales: BTreeMap<NodeKey, Markdown>,
-    /// The acting frontier's first `page_item_count_max` items, in rank order.
-    pub acting_frontier: Vec<FrontierEntry>,
-    /// The rest of the acting frontier, in rank order.
-    #[serde(default, skip_serializing_if = "Vec::is_empty")]
-    pub acting_frontier_rest: Vec<NodeKey>,
-    /// The top `snapshot_list_item_count_max` open, in-scope decisions, in rank order; the
-    /// counts say how many in all.
-    #[serde(default, skip_serializing_if = "Vec::is_empty")]
-    pub open_decisions: Vec<NodeRef>,
-    // PRD: B10.
-    /// The top placeholders needing breakdown, in rank order.
-    #[serde(default, skip_serializing_if = "Vec::is_empty")]
-    pub needs_breakdown: Vec<NodeRef>,
-    /// The top open, in-scope nodes no one owns, in rank order; `list_nodes` with the
-    /// `unassigned` filter lists the rest.
-    #[serde(default, skip_serializing_if = "Vec::is_empty")]
-    pub unassigned: Vec<NodeRef>,
-    /// The top nodes whose plan can no longer be met, in rank order.
-    #[serde(default, skip_serializing_if = "Vec::is_empty")]
-    pub shortfalls: Vec<NodeRef>,
-    /// The stalled diagnostic, when the journey is stalled.
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub stalled: Option<Stalled>,
     // PRD: B11.
     /// Completing the journey is suggested (see `StatusSummary`); completing it is the
     /// person's call.

@@ -23,13 +23,13 @@ mod views;
 pub use draft::DraftContext;
 pub use explain::history;
 
-use std::collections::BTreeSet;
+use std::collections::{BTreeMap, BTreeSet};
 use std::fmt;
 
 use cairn_schema::limits::NODE_COUNT_MAX;
 use cairn_schema::{
-    AnswerValue, DeriveInputs, DomainDocument, Journey, KeyRefs, Markdown, Node, NodeKey, NodeKind,
-    State,
+    AnswerValue, DeriveInputs, DisplayState, DomainDocument, Journey, KeyRefs, Markdown, Node,
+    NodeKey, NodeKind, State,
 };
 
 use crate::derive::{Derived, stored_state};
@@ -104,6 +104,32 @@ impl<'a> DerivedJourney<'a> {
     /// The node's stored state, or its kind's initial state where none is stored (a route).
     fn state(&self, key: &NodeKey) -> State {
         stored_state(self.graph.document(), self.node(key))
+    }
+
+    /// The in-scope nodes (relevant or undecided), in key order.
+    fn in_scope(&self) -> Vec<&'a NodeKey> {
+        self.graph
+            .document()
+            .nodes
+            .as_map()
+            .keys()
+            .filter(|key| self.derived.relevance().in_scope(key))
+            .collect()
+    }
+
+    /// The nodes `in_scope` by stored state, and by display state (D8).
+    fn state_counts(
+        &self,
+        in_scope: &[&NodeKey],
+    ) -> (BTreeMap<State, u32>, BTreeMap<DisplayState, u32>) {
+        let mut by_state: BTreeMap<State, u32> = BTreeMap::new();
+        let mut by_display_state: BTreeMap<DisplayState, u32> = BTreeMap::new();
+        for key in in_scope {
+            *by_state.entry(self.state(key)).or_default() += 1;
+            let shown = self.derived.display_state(self.graph, key);
+            *by_display_state.entry(shown).or_default() += 1;
+        }
+        (by_state, by_display_state)
     }
 
     /// C18: a decision still open: stored open, and not closed by a skip or a date.

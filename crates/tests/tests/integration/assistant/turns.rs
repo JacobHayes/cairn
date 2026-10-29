@@ -92,11 +92,10 @@ async fn an_empty_journey_is_structured_through_a_proposal_the_user_applies() {
     let snapshot = world
         .ok(&owner, "get_snapshot", json!({ "journey": BAKEOFF }))
         .await;
-    let open = snapshot["snapshot"]["open_decisions"].as_array().unwrap();
-    assert!(
-        !open.is_empty(),
-        "the structure's decisions are open: {snapshot}"
-    );
+    let open = snapshot["snapshot"]["counts"]["open_decisions"]
+        .as_u64()
+        .unwrap();
+    assert_ne!(open, 0, "the structure's decisions are open: {snapshot}");
     let patch = last_patch(&world, BAKEOFF).await;
     let events = patch["events"].as_array().unwrap();
     assert_ne!(events.as_slice(), [] as [Value; 0]);
@@ -447,10 +446,14 @@ async fn a_turn_opens_with_essentials_and_nodes_are_read_with_tools() {
         .ok(&lead, "get_snapshot", json!({ "journey": "j_vendor_eval" }))
         .await;
     let snapshot = &read["snapshot"];
-    let node = snapshot["acting_frontier"][0]["key"]
-        .as_str()
-        .unwrap()
-        .to_owned();
+    let frontier = world
+        .ok(
+            &lead,
+            "list_nodes",
+            json!({ "journey": "j_vendor_eval", "filters": ["next_up"] }),
+        )
+        .await;
+    let node = frontier["items"][0]["key"].as_str().unwrap().to_owned();
     world.script([
         Step::call(
             "get_node",

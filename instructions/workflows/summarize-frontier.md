@@ -5,15 +5,18 @@ description: Summarize where a journey stands and what to do next, from its snap
 # Summarize the frontier
 
 1. **Read the snapshot.** `get_snapshot` on the journey. Its counts (`by_display_state`) say
-   how much is in scope and done; `acting_frontier` is what can be acted on now, in rank order.
-2. **Lead with what is next.** Name the top few frontier items with their owners and why
+   how much is in scope and done; `acting_frontier` says how many nodes can be acted on now.
+2. **Lead with what is next.** `list_nodes` with `filters` `["next_up"]` gives them in rank
+   order. Name the top few frontier items with their owners and why
    they rank high (a deadline, how much waits on them). `get_node` explains one item's
    rank, blocking, and dates when the person asks why.
-3. **Then what needs attention.** Open decisions that block work; placeholders that need
-   breakdown; unassigned items; shortfalls (plans that can no longer be met); overdue and
-   stale items (`list_nodes` with the matching `filters`).
-4. **When nothing can move.** If the snapshot is `stalled`, say what it waits on: a date, a
-   snooze, or a blocker outside the journey. A container's snooze is named once, however
+3. **Then what needs attention.** The counts say whether any exist: open decisions that
+   block work; placeholders that need breakdown; unassigned items; shortfalls (plans that
+   can no longer be met); then list those with a count above zero, and overdue and stale
+   items, with `list_nodes` and the matching `filters`.
+4. **When nothing can move.** If the snapshot's `stalled` count is above zero, `list_nodes`
+   with `filters` `["stalled"]` names what it waits on: a date, a snooze, or a blocker
+   outside the journey. A container's snooze is named once, however
    many nodes it holds (their `snoozed_via` says which); offer to unsnooze that container.
 5. **For one person.** `list_nodes` with `filters` `["mine", "next_up"]`
    gives their own next steps.

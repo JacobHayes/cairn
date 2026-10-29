@@ -12,7 +12,7 @@ use cairn_engine::{Derived, DerivedJourney, DraftContext, Graph, ProjectionError
 use cairn_schema::{
     AttachmentKey, Cursor, Deployment, DomainDocument, ExplainedField, IdentityKey, JourneyHeader,
     KindKey, LevelQuery, ListQuery, NextQuery, NodeKey, NodeKind, RenderedDraft, ResourceContent,
-    SnapshotScope, Url,
+    Url,
 };
 use serde::{Deserialize, Serialize};
 use wasm_bindgen::prelude::wasm_bindgen;
@@ -70,12 +70,8 @@ pub enum Projection {
         #[serde(default)]
         kinds: BTreeSet<KindKey>,
     },
-    /// I3: the bounded agent snapshot.
-    Snapshot {
-        /// The subtree, depth, and page.
-        #[serde(default)]
-        scope: SnapshotScope,
-    },
+    /// I3: the agent snapshot.
+    Snapshot,
     /// C12: what each answer to a decision does to the journey's scope: brings in, drops,
     /// decided later, what it pins and fills.
     AnswerEffects {
@@ -154,11 +150,11 @@ pub(crate) fn projected(
         Projection::Next { query } => json(&journey.next(query, viewer).map_err(missing)?),
         Projection::List { query } => json(&journey.list(query, viewer).map_err(missing)?),
         Projection::Mine { kinds } => json(&journey.mine(viewer, kinds)),
-        Projection::Snapshot { scope } => {
+        Projection::Snapshot => {
             let header = header.ok_or_else(|| HostError::Missing {
                 message: "a route has no snapshot".to_owned(),
             })?;
-            json(&journey.snapshot(scope, header).map_err(missing)?)
+            json(&journey.snapshot(header))
         }
         Projection::Explanations { key, field, cursor } => json(
             &journey

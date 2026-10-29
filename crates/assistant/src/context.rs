@@ -1,26 +1,20 @@
 //! What a turn leads its user message with: the essentials of its target, not a full read.
 //! The assistant reads the rest with its tools when the message needs it.
 
-use cairn_schema::{
-    JourneyId, JourneyStatus, Revision, Route, RouteId, Snapshot, SnapshotCounts, Title,
-    VersionNumber,
-};
+use cairn_schema::{JourneyId, Revision, Route, RouteId, Snapshot, Title, VersionNumber};
 use cairn_service::Projected;
 use serde::Serialize;
 
 // PRD: I5.
-/// A journey as a turn opens: who it is, how current the read is, and the snapshot's counts.
+/// A journey as a turn opens: which it is, how current the read is, and its snapshot (its
+/// facts and counts), which is already the essentials.
 #[derive(Debug, Serialize)]
 pub(crate) struct JourneyEssentials {
-    pub journey: JourneyId,
-    pub name: Title,
-    pub status: JourneyStatus,
+    pub journey_id: JourneyId,
     /// The base of a write that follows, until a tool answer names a newer one.
     pub revision: Revision,
-    /// Completing it is suggested: the person's call.
-    #[serde(skip_serializing_if = "std::ops::Not::not")]
-    pub completion_suggested: bool,
-    pub counts: SnapshotCounts,
+    #[serde(flatten)]
+    pub snapshot: Snapshot,
 }
 
 /// A route's draft as a turn opens.
@@ -43,14 +37,10 @@ pub(crate) struct RouteDraftEssentials {
 impl JourneyEssentials {
     /// The essentials of `journey`'s snapshot.
     pub(crate) fn of(journey: &JourneyId, read: Projected<Snapshot>) -> Self {
-        let snapshot = read.value;
         Self {
-            journey: journey.clone(),
-            name: snapshot.journey.name,
-            status: snapshot.journey.status,
+            journey_id: journey.clone(),
             revision: read.revision,
-            completion_suggested: snapshot.completion_suggested,
-            counts: snapshot.counts,
+            snapshot: read.value,
         }
     }
 }

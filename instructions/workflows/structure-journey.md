@@ -20,6 +20,6 @@ but on the journey itself.
 4. **Review and hand over.** `get_proposal` with `review` shows the frontier the journey
    would have and any violations. Fix violations with `edit_proposal`, then summarize the
    structure and what would be first to do, and ask the person to apply it.
-5. **Afterwards.** Once applied, `get_snapshot` shows the journey as it now stands. If the
+5. **Afterwards.** Once applied, `get_snapshot` and `list_nodes` show the journey as it now stands. If the
    person wants to reuse the structure, `create_proposal` with `save_as_route` drafts a new
    route from it.

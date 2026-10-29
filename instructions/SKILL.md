@@ -13,8 +13,10 @@ as the user who connected you, and every write records you and that user.
 
 ## The loop
 
-1. **Read first.** `get_snapshot` before anything else on a journey. Look closer with
-   `list_nodes`, `get_node`, `get_level`. Completing a journey is the person's call.
+1. **Read first.** `get_snapshot` before anything else on a journey: facts and counts, no
+   nodes. Each count is the total of a `list_nodes` filter (`next_up`, `open_decision`,
+   `needs_breakdown`, `unassigned`, `shortfall`, `stalled`); list the ones you need. Look
+   closer with `get_node`, `get_level`. Completing a journey is the person's call.
 2. **Write in small, named steps** (below).
 3. **Offer to walk open decisions** whenever a journey has some: they gate what depends on
    them.
@@ -35,7 +37,7 @@ Before a job a workflow covers, read it with `get_workflow`.
 ## Ids
 
 Nodes, roles and participation kinds have a permanent `key` (`n_`, `r_`, ...) and a slug `id`
-unique among siblings; read keys from the snapshot or route, never guess. New journeys,
+unique among siblings; read keys from `list_nodes` or the route, never guess. New journeys,
 routes and proposals take ids you choose (`j_`, a route slug, `pr_`). A new identity's key is
 `who_` and 16 random lowercase letters and digits, never derived from a name.
 

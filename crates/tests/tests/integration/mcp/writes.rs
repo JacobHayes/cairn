@@ -329,12 +329,6 @@ async fn an_answers_rationale_is_written_and_read_back() {
     let node = json!({ "journey": "j_vendor_eval", "node": "n_purpose" });
     let node = world.ok(&ann, "get_node", node).await;
     assert_eq!(node["detail"]["rationale"], json!(rationale));
-    let snapshot = json!({ "journey": "j_vendor_eval" });
-    let snapshot = world.ok(&ann, "get_snapshot", snapshot).await;
-    assert_eq!(
-        snapshot["snapshot"]["rationales"]["n_purpose"],
-        json!(rationale)
-    );
 }
 
 /// I7: an agent's write records the agent and the user it acts for, with its note.
@@ -628,11 +622,10 @@ async fn a_new_person_rides_with_the_answer_that_names_them() {
     named["deployment_revision"] = json!(deployment);
     let applied = world.ok(&ann, "update_journey_state", named).await;
     assert_eq!(applied["revision"], 2);
-    let snapshot = world
-        .ok(&ann, "get_snapshot", json!({ "journey": "j_vendor_eval" }))
-        .await;
+    let node = json!({ "journey": "j_vendor_eval", "node": "n_who_owns" });
+    let node = world.ok(&ann, "get_node", node).await;
     assert_eq!(
-        snapshot["snapshot"]["answers"]["n_who_owns"],
+        node["detail"]["answer"],
         json!({ "identity": "who_p9n2x7k4q8r3t5vw" })
     );
     let found = world

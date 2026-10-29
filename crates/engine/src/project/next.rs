@@ -15,7 +15,8 @@ use std::collections::{BTreeMap, BTreeSet};
 use cairn_schema::limits::PAGE_ITEM_COUNT_MAX;
 use cairn_schema::{
     Annotation, AnnotationContent, DisplayState, IdentityKey, KindKey, ListFlag, ListPage,
-    ListQuery, MineEntry, Next, NextQuery, NodeKey, NodeKind, ResourceContent, State, Title,
+    ListQuery, MineEntry, Next, NextQuery, NodeKey, NodeKind, ResourceContent, Stalled, State,
+    Title,
 };
 
 use super::rows::{count, page};
@@ -32,6 +33,8 @@ pub(super) struct Matcher<'q, 'a> {
     text: Option<String>,
     viewer: BTreeSet<IdentityKey>,
     next_up: BTreeSet<&'a NodeKey>,
+    /// The nodes a stalled journey waits on; none when it is not stalled.
+    stalled: BTreeSet<&'a NodeKey>,
     notes: BTreeMap<&'q NodeKey, Vec<&'q Annotation>>,
 }
 
@@ -41,7 +44,7 @@ impl Matcher<'_, '_> {
         let journey = self.journey;
         self.flags
             .iter()
-            .all(|flag| journey.flag(*flag, key, &self.viewer, &self.next_up))
+            .all(|flag| journey.flag(*flag, key, &self.viewer, &self.next_up, &self.stalled))
             && self
                 .owner
                 .is_none_or(|owner| journey.owners(key).contains(owner))
@@ -160,6 +163,7 @@ impl<'a> DerivedJourney<'a> {
             text: text.map(|text| text.as_str().to_ascii_lowercase()),
             viewer: self.canonical_viewer(viewer),
             next_up: self.derived.ranking().acting_frontier().iter().collect(),
+            stalled: self.stalled_nodes(),
             notes: if text.is_some() {
                 self.annotations_by_node()
             } else {
@@ -221,13 +225,23 @@ impl<'a> DerivedJourney<'a> {
         depth.is_none_or(|most| self.ancestors(key).len() + 1 - top <= most as usize)
     }
 
+    /// D5: the nodes a stalled journey waits on; none when it is not stalled.
+    pub(super) fn stalled_nodes(&self) -> BTreeSet<&'a NodeKey> {
+        self.derived
+            .blocking()
+            .stalled()
+            .map(Stalled::nodes)
+            .unwrap_or_default()
+    }
+
     /// C9: one filter.
-    fn flag(
+    pub(super) fn flag(
         &self,
         flag: ListFlag,
         key: &NodeKey,
         viewer: &BTreeSet<IdentityKey>,
         next_up: &BTreeSet<&NodeKey>,
+        stalled: &BTreeSet<&NodeKey>,
     ) -> bool {
         let derived = self.derived;
         let blocking = derived.blocking();
@@ -237,6 +251,7 @@ impl<'a> DerivedJourney<'a> {
             ListFlag::Unassigned => derived.is_unassigned(self.graph, key),
             ListFlag::NextUp => next_up.contains(key),
             ListFlag::DecisionsNeeded => blocking.decision_needed(self.node(key).kind(), key),
+            ListFlag::OpenDecision => self.open_decision(key),
             ListFlag::NeedsBreakdown => blocking.needs_breakdown(key),
             ListFlag::Active => self.state(key) == State::Active,
             ListFlag::Blocked => derived.display_state(self.graph, key) == DisplayState::Blocked,
@@ -245,6 +260,7 @@ impl<'a> DerivedJourney<'a> {
             ListFlag::Snoozed => blocking.snoozed(key).is_some(),
             ListFlag::SnoozedAndOverdue => blocking.snoozed(key).is_some() && dates.overdue(key),
             ListFlag::Shortfall => dates.shortfall_days(key).is_some(),
+            ListFlag::Stalled => stalled.contains(key),
         }
     }
 

@@ -138,8 +138,8 @@ fn projections() -> Vec<Operation> {
     vec![
         projection::<Snapshot>(
             &at::SNAPSHOT,
-            "The bounded agent overview, scoped to a subtree; the nodes are `listNodes`.",
-            query::SNAPSHOT_PARAMS,
+            "The agent overview: the journey's facts and counts; the nodes are `listNodes`.",
+            &[],
         ),
         projection::<Level>(
             &at::LEVEL,

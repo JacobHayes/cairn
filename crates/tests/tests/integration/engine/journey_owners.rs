@@ -8,8 +8,7 @@ use crate::engine::support;
 
 use cairn_engine::{DerivedJourney, Records, save_as_route, upgrade};
 use cairn_schema::{
-    IdentityKey, JourneyId, Rejection, ReviewItem, SnapshotScope, Subject, VersionNumber,
-    ViolationCode,
+    IdentityKey, JourneyId, Rejection, ReviewItem, Subject, VersionNumber, ViolationCode,
 };
 
 const JOURNEY: &str = "j_vendor_eval";
@@ -53,11 +52,7 @@ fn snapshot_owners(records: &Records) -> Vec<String> {
     let graph = support::journey_graph(records, JOURNEY);
     let derived = support::derived(records, JOURNEY);
     DerivedJourney::new(&graph, &derived)
-        .snapshot(
-            &SnapshotScope::default(),
-            &support::journey_header(records, JOURNEY),
-        )
-        .unwrap()
+        .snapshot(&support::journey_header(records, JOURNEY))
         .journey
         .owners
         .iter()
@@ -181,7 +176,7 @@ fn a_journey_is_created_with_owners_an_earlier_mutation_made() {
     assert_eq!(header.owners.len(), 1);
 }
 
-/// B7: an upgrade keeps the owners. Owning makes no node anyone's: the unassigned list is the
+/// B7: an upgrade keeps the owners. Owning makes no node anyone's: the unassigned count is the
 /// same with and without owners.
 #[test]
 fn an_upgrade_keeps_owners_and_owning_assigns_nothing() {
@@ -199,11 +194,8 @@ fn an_upgrade_keeps_owners_and_owning_assigns_nothing() {
         let graph = support::journey_graph(records, JOURNEY);
         let derived = support::derived(records, JOURNEY);
         DerivedJourney::new(&graph, &derived)
-            .snapshot(
-                &SnapshotScope::default(),
-                &support::journey_header(records, JOURNEY),
-            )
-            .unwrap()
+            .snapshot(&support::journey_header(records, JOURNEY))
+            .counts
             .unassigned
     };
     assert_eq!(unassigned(&owned), unassigned(&records));

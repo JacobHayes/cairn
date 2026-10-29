@@ -11,8 +11,8 @@ use cairn_engine::{ApplyInputs, Graph, Records, consequences, derive};
 use cairn_schema::{
     Actor, Consequences, Cursor, Domain, DomainDocument, ExplainedField, JourneyId, KeyRefs,
     LevelDisplay, LevelQuery, ListFlag, ListQuery, NextQuery, Node, NodeKey, NodeKind, Patch,
-    PatchId, ProposalDraft, RankConstants, RouteFile, SnapshotScope, State, Timestamp,
-    VersionNumber, from_yaml, to_yaml,
+    PatchId, ProposalDraft, RankConstants, RouteFile, State, Timestamp, VersionNumber, from_yaml,
+    to_yaml,
 };
 use cairn_service::{
     Call, Capabilities, DeploymentSettings, DomainPatch, McpAccess, Parts, Service, Written,
@@ -139,13 +139,9 @@ fn server_projection(service: &Service, id: &JourneyId, request: &Projection) ->
         Projection::Mine { kinds } => {
             json(&served(now_or_never(service.mine(&call, id, kinds)), &read("mine")).value)
         }
-        Projection::Snapshot { scope } => json(
-            &served(
-                now_or_never(service.snapshot(&call, id, scope)),
-                &read("snapshot"),
-            )
-            .value,
-        ),
+        Projection::Snapshot => {
+            json(&served(now_or_never(service.snapshot(&call, id)), &read("snapshot")).value)
+        }
         Projection::Explanations { key, field, cursor } => json(
             &served(
                 now_or_never(service.explanations(&call, id, key, *field, *cursor)),
@@ -240,9 +236,7 @@ fn projections(document: &DomainDocument) -> Vec<Projection> {
         Projection::Mine {
             kinds: BTreeSet::new(),
         },
-        Projection::Snapshot {
-            scope: SnapshotScope::default(),
-        },
+        Projection::Snapshot,
     ]);
     for node in nodes {
         if node.kind() == NodeKind::Decision {

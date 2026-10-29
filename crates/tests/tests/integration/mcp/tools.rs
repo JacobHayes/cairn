@@ -108,7 +108,6 @@ async fn arguments_are_refused_by_path() {
     let cases = [
         (json!({ "journey": 5 }), "journey"),
         (json!({ "journey": "j_x", "colour": "blue" }), "colour"),
-        (json!({ "journey": "j_x", "subtree": 5 }), "subtree"),
         (json!({}), ""),
     ];
     for (arguments, path) in cases {
@@ -277,18 +276,45 @@ fn latest_start_left_out(key: &str, lean: &Value, dates: &cairn_schema::NodeDate
     Some(false)
 }
 
-/// I3, C8: the snapshot answers the revision a write names as its base, and with `filters` the
-/// node list lists what they hold for, each an open decision the snapshot names; `get_node`
-/// carries the still-waiting list and pages the same list under `still_waiting`.
+/// I3: the snapshot answers the revision a write names as its base and lists no node; each count
+/// of nodes needing attention is the total the node list gives under its filter.
 #[tokio::test]
-async fn the_snapshot_and_its_lists_agree() {
+async fn the_snapshot_counts_are_the_node_list_totals() {
     let world = World::new();
     let ann = user("u_ann");
     world.vendor_journey(&ann).await;
     let snapshot = json!({ "journey": "j_vendor_eval" });
     let snapshot = world.ok(&ann, "get_snapshot", snapshot).await;
     assert_eq!(snapshot["revision"], 1);
-    let open = keys(&snapshot["snapshot"]["open_decisions"]);
+    let counts = &snapshot["snapshot"]["counts"];
+    for (count, filter) in [
+        ("acting_frontier", "next_up"),
+        ("open_decisions", "open_decision"),
+        ("needs_breakdown", "needs_breakdown"),
+        ("unassigned", "unassigned"),
+        ("shortfalls", "shortfall"),
+        ("stalled", "stalled"),
+    ] {
+        let listed = json!({ "journey": "j_vendor_eval", "filters": [filter] });
+        let listed = world.ok(&ann, "list_nodes", listed).await;
+        assert_eq!(counts[count], listed["total"], "{count}");
+    }
+    assert!(
+        snapshot["snapshot"].get("acting_frontier").is_none(),
+        "the snapshot lists no nodes"
+    );
+}
+
+/// C8, C9: with `filters` the node list lists the decisions that can be answered now, each an
+/// open decision; `depth` lists the roots alone; `get_node` carries the still-waiting list and
+/// pages the same list under `still_waiting`.
+#[tokio::test]
+async fn the_node_list_and_node_reads_agree() {
+    let world = World::new();
+    let ann = user("u_ann");
+    world.vendor_journey(&ann).await;
+    let open = json!({ "journey": "j_vendor_eval", "filters": ["open_decision"] });
+    let open = keys(&world.ok(&ann, "list_nodes", open).await["items"]);
     let needed = json!({ "journey": "j_vendor_eval", "filters": ["decisions_needed"] });
     let needed = world.ok(&ann, "list_nodes", needed).await;
     assert_ne!(needed["total"], 0);

@@ -4011,53 +4011,6 @@
         "const": 1,
         "description": "The file format version."
       },
-      "FrontierEntry": {
-        "additionalProperties": false,
-        "description": "One entry of the snapshot's acting frontier: enough to say what is next; the node's row is\nin `list_nodes`.",
-        "properties": {
-          "ancestors": {
-            "description": "Its ancestors, root first: the breadcrumb.",
-            "items": {
-              "$ref": "#/components/schemas/NodeKey"
-            },
-            "type": "array"
-          },
-          "display_state": {
-            "$ref": "#/components/schemas/DisplayState",
-            "description": "The state every surface shows for the node."
-          },
-          "key": {
-            "$ref": "#/components/schemas/NodeKey",
-            "description": "The node."
-          },
-          "kind": {
-            "$ref": "#/components/schemas/NodeKind",
-            "description": "Its kind."
-          },
-          "rank": {
-            "anyOf": [
-              {
-                "$ref": "#/components/schemas/Real"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "description": "Its rank to three significant figures."
-          },
-          "title": {
-            "$ref": "#/components/schemas/Title",
-            "description": "Its title."
-          }
-        },
-        "required": [
-          "key",
-          "title",
-          "kind",
-          "display_state"
-        ],
-        "type": "object"
-      },
       "Graph": {
         "additionalProperties": false,
         "description": "The graph document (resolved): nodes, roles, and kinds by key, every reference a key,\nand, for a journey, its state. Collections serialize\nsorted by key, so a graph has one serialization.",
@@ -6146,6 +6099,11 @@
             "type": "string"
           },
           {
+            "const": "open_decision",
+            "description": "A decision still open: undecided and not closed by a skip or a date, whether or not it\nwaits on anything (an open decision may be answered ahead of what it waits on).",
+            "type": "string"
+          },
+          {
             "const": "needs_breakdown",
             "description": "Placeholders that still need to be broken down.",
             "type": "string"
@@ -6183,6 +6141,11 @@
           {
             "const": "shortfall",
             "description": "Its plan can no longer be met.",
+            "type": "string"
+          },
+          {
+            "const": "stalled",
+            "description": "A node the journey's stalled diagnostic names: what a stalled journey waits on.",
             "type": "string"
           }
         ]
@@ -9965,25 +9928,6 @@
             "type": "string"
           }
         ]
-      },
-      "NodeRef": {
-        "additionalProperties": false,
-        "description": "A node named in one of the snapshot's lists: its key and its title, so the list says what\neach is without a second read.",
-        "properties": {
-          "key": {
-            "$ref": "#/components/schemas/NodeKey",
-            "description": "The node."
-          },
-          "title": {
-            "$ref": "#/components/schemas/Title",
-            "description": "Its title."
-          }
-        },
-        "required": [
-          "key",
-          "title"
-        ],
-        "type": "object"
       },
       "NodeRow": {
         "additionalProperties": false,
@@ -14677,32 +14621,8 @@
       },
       "Snapshot": {
         "additionalProperties": false,
-        "description": "The bounded agent overview of a journey, with no node list (`list_nodes` lists the nodes):\nanswers, the ranked acting frontier's top N with the rest as keys, open decisions by rank, placeholders needing\nbreakdown, unassigned items, shortfalls, and counts, scoped to a subtree.",
+        "description": "The agent overview of a journey, small at any journey size: its facts, whether completing it\nis suggested, and counts. It lists no nodes: `list_nodes` with a filter lists the ones a\ncount totals, `get_node` reads one.",
         "properties": {
-          "acting_frontier": {
-            "description": "The acting frontier's first `page_item_count_max` items, in rank order.",
-            "items": {
-              "$ref": "#/components/schemas/FrontierEntry"
-            },
-            "type": "array"
-          },
-          "acting_frontier_rest": {
-            "description": "The rest of the acting frontier, in rank order.",
-            "items": {
-              "$ref": "#/components/schemas/NodeKey"
-            },
-            "type": "array"
-          },
-          "answers": {
-            "additionalProperties": false,
-            "description": "The answers in effect in the subtree.",
-            "patternProperties": {
-              "^n_[a-z0-9][a-z0-9_-]*$": {
-                "$ref": "#/components/schemas/AnswerValue"
-              }
-            },
-            "type": "object"
-          },
           "completion_suggested": {
             "description": "Completing the journey is suggested (see `StatusSummary`); completing it is the\nperson's call.",
             "type": "boolean"
@@ -14714,74 +14634,20 @@
           "journey": {
             "$ref": "#/components/schemas/SnapshotJourney",
             "description": "The journey's name, description, status and owners."
-          },
-          "needs_breakdown": {
-            "description": "The top placeholders needing breakdown, in rank order.",
-            "items": {
-              "$ref": "#/components/schemas/NodeRef"
-            },
-            "type": "array"
-          },
-          "open_decisions": {
-            "description": "The top `snapshot_list_item_count_max` open, in-scope decisions, in rank order; the\ncounts say how many in all.",
-            "items": {
-              "$ref": "#/components/schemas/NodeRef"
-            },
-            "type": "array"
-          },
-          "rationales": {
-            "additionalProperties": false,
-            "description": "The rationales those answers were given with, for the answers that have one.",
-            "patternProperties": {
-              "^n_[a-z0-9][a-z0-9_-]*$": {
-                "$ref": "#/components/schemas/Markdown"
-              }
-            },
-            "type": "object"
-          },
-          "scope": {
-            "$ref": "#/components/schemas/SnapshotScope",
-            "description": "What it covers, when that is not the whole journey."
-          },
-          "shortfalls": {
-            "description": "The top nodes whose plan can no longer be met, in rank order.",
-            "items": {
-              "$ref": "#/components/schemas/NodeRef"
-            },
-            "type": "array"
-          },
-          "stalled": {
-            "anyOf": [
-              {
-                "$ref": "#/components/schemas/Stalled"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "description": "The stalled diagnostic, when the journey is stalled."
-          },
-          "unassigned": {
-            "description": "The top open, in-scope nodes no one owns, in rank order; `list_nodes` with the\n`unassigned` filter lists the rest.",
-            "items": {
-              "$ref": "#/components/schemas/NodeRef"
-            },
-            "type": "array"
           }
         },
         "required": [
           "journey",
-          "acting_frontier",
           "counts"
         ],
         "type": "object"
       },
       "SnapshotCounts": {
         "additionalProperties": false,
-        "description": "What a snapshot counts in its subtree.",
+        "description": "What a snapshot counts. Each count of nodes needing attention is the total `list_nodes`\nlists with the matching filter, in rank order, over the in-scope nodes.",
         "properties": {
           "acting_frontier": {
-            "description": "The acting frontier: its top N and the rest.",
+            "description": "The acting frontier: `list_nodes` with the `next_up` filter.",
             "format": "uint32",
             "minimum": 0,
             "type": "integer"
@@ -14817,7 +14683,7 @@
             "type": "integer"
           },
           "needs_breakdown": {
-            "description": "Placeholders needing breakdown in all.",
+            "description": "Placeholders needing breakdown: the `needs_breakdown` filter.",
             "format": "uint32",
             "minimum": 0,
             "type": "integer"
@@ -14829,19 +14695,25 @@
             "type": "integer"
           },
           "open_decisions": {
-            "description": "Open decisions in all; the snapshot lists the top few.",
+            "description": "Decisions still open, ready to answer or not: the `open_decision` filter.",
             "format": "uint32",
             "minimum": 0,
             "type": "integer"
           },
           "shortfalls": {
-            "description": "Nodes whose plan can no longer be met, in all.",
+            "description": "Nodes whose plan can no longer be met: the `shortfall` filter.",
+            "format": "uint32",
+            "minimum": 0,
+            "type": "integer"
+          },
+          "stalled": {
+            "description": "The nodes a stalled journey waits on (gates, snoozed and scheduled nodes), none when it\nis not stalled: the `stalled` filter.",
             "format": "uint32",
             "minimum": 0,
             "type": "integer"
           },
           "unassigned": {
-            "description": "Open, in-scope nodes no one owns, in all.",
+            "description": "Open, in-scope nodes no one owns: the `unassigned` filter.",
             "format": "uint32",
             "minimum": 0,
             "type": "integer"
@@ -14857,7 +14729,8 @@
           "open_decisions",
           "needs_breakdown",
           "unassigned",
-          "shortfalls"
+          "shortfalls",
+          "stalled"
         ],
         "type": "object"
       },
@@ -14896,24 +14769,6 @@
           "name",
           "status"
         ],
-        "type": "object"
-      },
-      "SnapshotScope": {
-        "additionalProperties": false,
-        "description": "Which part of the journey a snapshot covers.",
-        "properties": {
-          "subtree": {
-            "anyOf": [
-              {
-                "$ref": "#/components/schemas/NodeKey"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "description": "The subtree: this node and everything beneath it; the whole journey when none."
-          }
-        },
         "type": "object"
       },
       "SnoozeTarget": {
@@ -21520,17 +21375,6 @@
             "schema": {
               "$ref": "#/components/schemas/JourneyId"
             }
-          },
-          {
-            "description": "This node and everything beneath it; the whole journey when none.",
-            "explode": true,
-            "in": "query",
-            "name": "subtree",
-            "required": false,
-            "schema": {
-              "$ref": "#/components/schemas/NodeKey"
-            },
-            "style": "form"
           }
         ],
         "responses": {
@@ -21610,7 +21454,7 @@
             "description": "A limit was reached or the request timed out; retry after `Retry-After`. Or: The auth layer could not ask a sign-in provider (in text, without `Retry-After`)."
           }
         },
-        "summary": "The bounded agent overview, scoped to a subtree; the nodes are `listNodes`."
+        "summary": "The agent overview: the journey's facts and counts; the nodes are `listNodes`."
       }
     },
     "/api/journeys/{id}/summary": {

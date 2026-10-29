@@ -12,8 +12,8 @@ use cairn_schema::limits::PAGE_ITEM_COUNT_MAX;
 use cairn_schema::{
     Cursor, DisplayState, Domain, EventType, IdentityKey, JourneyId, JourneyStatus, KindKey,
     LevelDisplay, LevelQuery, ListFlag, ListQuery, NextQuery, NodeKey, NodeKind, PatchId,
-    ProposalId, Revision, RevisionOf, RouteId, RouteKind, SnapshotScope, SortBy, State, Timestamp,
-    Title, UserId, VersionNumber,
+    ProposalId, Revision, RevisionOf, RouteId, RouteKind, SortBy, State, Timestamp, Title, UserId,
+    VersionNumber,
 };
 use cairn_store::{EventQuery, JourneyQuery, PageSize, ProposalCursor, SearchQuery, Watch};
 use schemars::{JsonSchema, Schema, SchemaGenerator};
@@ -251,12 +251,6 @@ const KINDS: ParamSpec =
     ParamSpec::many::<NodeKind>("kind", "Only nodes of these kinds; every kind when none.");
 
 const SORT: ParamSpec = ParamSpec::one::<SortBy>("sort", "The signal to sort by; rank when none.");
-
-/// `GET /api/journeys/{id}/snapshot` (I3).
-pub const SNAPSHOT_PARAMS: &[ParamSpec] = &[ParamSpec::one::<NodeKey>(
-    "subtree",
-    "This node and everything beneath it; the whole journey when none.",
-)];
 
 /// `GET /api/journeys/{id}/level` (C2).
 pub const LEVEL_PARAMS: &[ParamSpec] = &[
@@ -529,17 +523,6 @@ pub fn events(params: &Params) -> Result<EventQuery, ApiError> {
         until: params.one("until")?,
         after: params.one("after")?,
         size: params.size()?,
-    })
-}
-
-/// I3: the snapshot's scope.
-///
-/// # Errors
-///
-/// A bad request for a parameter that does not parse.
-pub fn snapshot(params: &Params) -> Result<SnapshotScope, ApiError> {
-    Ok(SnapshotScope {
-        subtree: params.one("subtree")?,
     })
 }
 

@@ -11,7 +11,7 @@ use std::time::Duration;
 
 use cairn_auth::Clock;
 use cairn_mcp::{ToolError, ToolSet, instructions};
-use cairn_schema::{Actor, AgentId, ChangeClass, ConversationId, Markdown, SnapshotScope};
+use cairn_schema::{Actor, AgentId, ChangeClass, ConversationId, Markdown};
 use cairn_service::{Call, ReadError, Service};
 use cairn_store::{ConversationMessage, ConversationRecord, MessageAuthor, Store};
 use schemars::JsonSchema;
@@ -470,10 +470,7 @@ impl Assistant {
         };
         let essentials = match target {
             Target::Journey(journey) => {
-                let read = self
-                    .service
-                    .snapshot(&call, journey, &SnapshotScope::default())
-                    .await;
+                let read = self.service.snapshot(&call, journey).await;
                 match read {
                     Ok(read) => serde_json::to_value(JourneyEssentials::of(journey, read)),
                     Err(ReadError::JourneyMissing(_)) => {

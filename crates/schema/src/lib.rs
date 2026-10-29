@@ -101,13 +101,12 @@ pub use patch::{
 pub use projection::{
     AffectedNodes, AgentRow, AnswerEffects, ChoiceEffect, Cursor, Dangling, DanglingKind, DateLink,
     DateLinkKind, DateRuleKind, DecisionEntry, DecisionView, EdgeOrigin, ExplainedField,
-    ExplanationPage, FrontierEntry, HiddenByFilter, HistoryPage, Level, LevelDateLink,
-    LevelDisplay, LevelEdge, LevelNode, LevelQuery, ListFlag, ListPage, ListQuery, MineEntry,
-    MissingPlaceholder, Next, NextQuery, NodeRef, NodeRow, OpenDecision, OutsideReference,
-    PatchEvents, RankAdds, RankTerms, ReferenceField, RemovalPlan, RemovalRead, RemovalTarget,
-    RenderedDraft, RenderedSegment, RollUp, RouteSchedule, ScheduleEntry, Snapshot, SnapshotCounts,
-    SnapshotJourney, SnapshotScope, SortBy, StatusSummary, Timeline, TimelineEntry, Trace,
-    UndatedEntry, UnderlyingEdge, UpcomingMilestone,
+    ExplanationPage, HiddenByFilter, HistoryPage, Level, LevelDateLink, LevelDisplay, LevelEdge,
+    LevelNode, LevelQuery, ListFlag, ListPage, ListQuery, MineEntry, MissingPlaceholder, Next,
+    NextQuery, NodeRow, OpenDecision, OutsideReference, PatchEvents, RankAdds, RankTerms,
+    ReferenceField, RemovalPlan, RemovalRead, RemovalTarget, RenderedDraft, RenderedSegment,
+    RollUp, RouteSchedule, ScheduleEntry, Snapshot, SnapshotCounts, SnapshotJourney, SortBy,
+    StatusSummary, Timeline, TimelineEntry, Trace, UndatedEntry, UnderlyingEdge, UpcomingMilestone,
 };
 pub use proposal::{
     Conflict, ConflictResolution, ConflictReview, DestinationAfter, Kept, OutlineFact,

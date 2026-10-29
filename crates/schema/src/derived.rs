@@ -922,6 +922,21 @@ pub struct Stalled {
     pub all_blocked: bool,
 }
 
+impl Stalled {
+    /// D5: the nodes it waits on: each gate, snoozed node and scheduled node, once.
+    #[must_use]
+    pub fn nodes(&self) -> BTreeSet<&NodeKey> {
+        self.waiting_on
+            .iter()
+            .map(|cause| match cause {
+                StallCause::Gate(node)
+                | StallCause::Snooze { node, .. }
+                | StallCause::Scheduled { node, .. } => node,
+            })
+            .collect()
+    }
+}
+
 // ARCHITECTURE: Read path: `Derived`.
 /// A derived journey.
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize, JsonSchema)]

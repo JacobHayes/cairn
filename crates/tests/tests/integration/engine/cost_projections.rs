@@ -16,7 +16,7 @@ mod cost {
     use cairn_schema::limits::{EXPLANATION_ENTRY_COUNT_MAX, NODE_COUNT_MAX, PAGE_ITEM_COUNT_MAX};
     use cairn_schema::{
         Cursor, Deployment, ExplainedField, LevelQuery, ListFlag, ListQuery, NextQuery, NodeKey,
-        NodeKind, SnapshotScope,
+        NodeKind,
     };
 
     /// The level, by kinds and filtered, within the nodes and the canvas edges.
@@ -127,13 +127,13 @@ mod cost {
         assert_eq!(nodes, NODE_COUNT_MAX as usize);
         levels_stay_within_their_bounds(&journey, &derived, nodes);
         let page = PAGE_ITEM_COUNT_MAX as usize;
-        let snapshot = journey
-            .snapshot(
-                &SnapshotScope::default(),
-                &cairn_store::build::journey_header("j_plain", "Plain", None),
-            )
-            .unwrap();
-        assert!(snapshot.acting_frontier.len() <= page);
+        let snapshot = journey.snapshot(&cairn_store::build::journey_header(
+            "j_plain", "Plain", None,
+        ));
+        assert_eq!(
+            snapshot.counts.acting_frontier as usize,
+            derived.ranking().acting_frontier().len()
+        );
         let list = journey
             .list(&ListQuery::default(), &BTreeSet::new())
             .unwrap();

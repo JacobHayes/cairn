@@ -383,7 +383,7 @@ fn a_decision_affects_what_the_decisions_it_rules_out_affect() {
 }
 
 /// C18, I3: a decision under a skipped container is closed (D1a), so neither the summary nor
-/// the snapshot lists it as open.
+/// the snapshot counts it as open.
 #[test]
 fn an_effectively_skipped_decision_is_not_open() {
     let records = support::journey(&support::add_nodes(&[
@@ -399,19 +399,14 @@ fn an_effectively_skipped_decision_is_not_open() {
     let journey = derive.journey();
     assert!(!derive.derived.open(&key("n_d")));
     assert_eq!(journey.status_summary().open_decisions.len(), 0);
-    let snapshot = journey
-        .snapshot(
-            &cairn_schema::SnapshotScope::default(),
-            &derive.header().header,
-        )
-        .unwrap();
-    assert_eq!(snapshot.open_decisions.len(), 0);
+    let snapshot = journey.snapshot(&derive.header().header);
+    assert_eq!(snapshot.counts.open_decisions, 0);
 }
 
-/// I3, C12, E6: an identity answer given before a merge names the survivor in the snapshot and
-/// the decision view, as owners do.
+/// C12, E6: an identity answer given before a merge names the survivor in the decision view, as
+/// owners do.
 #[test]
-fn a_merged_identity_answer_names_the_survivor_in_snapshot_and_decision_view() {
+fn a_merged_identity_answer_names_the_survivor_in_the_decision_view() {
     let derive = Derive::of(support::vendor_lead_merged(), VENDOR);
     let journey = derive.journey();
     let who = key("n_who_owns");
@@ -423,13 +418,6 @@ fn a_merged_identity_answer_names_the_survivor_in_snapshot_and_decision_view() {
         .find(|entry| entry.node == who)
         .unwrap();
     assert_eq!(entry.answer, survivor);
-    let snapshot = journey
-        .snapshot(
-            &cairn_schema::SnapshotScope::default(),
-            &derive.header().header,
-        )
-        .unwrap();
-    assert_eq!(snapshot.answers.get(&who).cloned(), survivor);
 }
 
 /// A decision `n_d1` that, answered yes, brings in a second decision `n_d2`, a third `n_d3`,

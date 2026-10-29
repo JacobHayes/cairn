@@ -611,7 +611,7 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** The bounded agent overview, scoped to a subtree; the nodes are `listNodes`. */
+        /** The agent overview: the journey's facts and counts; the nodes are `listNodes`. */
         get: operations["getJourneySnapshot"];
         put?: never;
         post?: never;
@@ -2297,24 +2297,6 @@ export interface components {
          */
         FormatVersion: 1;
         /**
-         * @description One entry of the snapshot's acting frontier: enough to say what is next; the node's row is
-         *     in `list_nodes`.
-         */
-        FrontierEntry: {
-            /** @description Its ancestors, root first: the breadcrumb. */
-            ancestors?: components["schemas"]["NodeKey"][];
-            /** @description The state every surface shows for the node. */
-            display_state: components["schemas"]["DisplayState"];
-            /** @description The node. */
-            key: components["schemas"]["NodeKey"];
-            /** @description Its kind. */
-            kind: components["schemas"]["NodeKind"];
-            /** @description Its rank to three significant figures. */
-            rank?: components["schemas"]["Real"] | null;
-            /** @description Its title. */
-            title: components["schemas"]["Title"];
-        };
-        /**
          * @description The graph document (resolved): nodes, roles, and kinds by key, every reference a key,
          *     and, for a journey, its state. Collections serialize
          *     sorted by key, so a graph has one serialization.
@@ -2997,7 +2979,7 @@ export interface components {
             verified_emails: components["schemas"]["Email"][];
         };
         /** @description A list filter that needs no argument. */
-        ListFlag: "mine" | "unassigned" | "next_up" | "decisions_needed" | "needs_breakdown" | "active" | "blocked" | "overdue" | "stale" | "snoozed" | "snoozed_and_overdue" | "shortfall";
+        ListFlag: "mine" | "unassigned" | "next_up" | "decisions_needed" | "open_decision" | "needs_breakdown" | "active" | "blocked" | "overdue" | "stale" | "snoozed" | "snoozed_and_overdue" | "shortfall" | "stalled";
         /** @description A page of the list. */
         ListPage: {
             /** @description Where the next page starts, when there is one. */
@@ -3897,16 +3879,6 @@ export interface components {
          *     what can be done to the node, for every surface to offer and none to work out again.
          */
         NodeMove: "start" | "stop" | "complete" | "complete_anyway" | "skip" | "mark_done" | "reopen" | "answer" | "insert_segment";
-        /**
-         * @description A node named in one of the snapshot's lists: its key and its title, so the list says what
-         *     each is without a second read.
-         */
-        NodeRef: {
-            /** @description The node. */
-            key: components["schemas"]["NodeKey"];
-            /** @description Its title. */
-            title: components["schemas"]["Title"];
-        };
         /**
          * @description One node as a row of the list, the next list, or the snapshot: what it is,
          *     where it sits, and its derived signals.
@@ -5469,19 +5441,11 @@ export interface components {
         /** @description An id: lowercase letters, digits, '_' and '-', at most id_bytes_max (64) bytes. */
         Slug: string;
         /**
-         * @description The bounded agent overview of a journey, with no node list (`list_nodes` lists the nodes):
-         *     answers, the ranked acting frontier's top N with the rest as keys, open decisions by rank, placeholders needing
-         *     breakdown, unassigned items, shortfalls, and counts, scoped to a subtree.
+         * @description The agent overview of a journey, small at any journey size: its facts, whether completing it
+         *     is suggested, and counts. It lists no nodes: `list_nodes` with a filter lists the ones a
+         *     count totals, `get_node` reads one.
          */
         Snapshot: {
-            /** @description The acting frontier's first `page_item_count_max` items, in rank order. */
-            acting_frontier: components["schemas"]["FrontierEntry"][];
-            /** @description The rest of the acting frontier, in rank order. */
-            acting_frontier_rest?: components["schemas"]["NodeKey"][];
-            /** @description The answers in effect in the subtree. */
-            answers?: {
-                [key: string]: components["schemas"]["AnswerValue"];
-            };
             /**
              * @description Completing the journey is suggested (see `StatusSummary`); completing it is the
              *     person's call.
@@ -5491,34 +5455,15 @@ export interface components {
             counts: components["schemas"]["SnapshotCounts"];
             /** @description The journey's name, description, status and owners. */
             journey: components["schemas"]["SnapshotJourney"];
-            /** @description The top placeholders needing breakdown, in rank order. */
-            needs_breakdown?: components["schemas"]["NodeRef"][];
-            /**
-             * @description The top `snapshot_list_item_count_max` open, in-scope decisions, in rank order; the
-             *     counts say how many in all.
-             */
-            open_decisions?: components["schemas"]["NodeRef"][];
-            /** @description The rationales those answers were given with, for the answers that have one. */
-            rationales?: {
-                [key: string]: components["schemas"]["Markdown"];
-            };
-            /** @description What it covers, when that is not the whole journey. */
-            scope?: components["schemas"]["SnapshotScope"];
-            /** @description The top nodes whose plan can no longer be met, in rank order. */
-            shortfalls?: components["schemas"]["NodeRef"][];
-            /** @description The stalled diagnostic, when the journey is stalled. */
-            stalled?: components["schemas"]["Stalled"] | null;
-            /**
-             * @description The top open, in-scope nodes no one owns, in rank order; `list_nodes` with the
-             *     `unassigned` filter lists the rest.
-             */
-            unassigned?: components["schemas"]["NodeRef"][];
         };
-        /** @description What a snapshot counts in its subtree. */
+        /**
+         * @description What a snapshot counts. Each count of nodes needing attention is the total `list_nodes`
+         *     lists with the matching filter, in rank order, over the in-scope nodes.
+         */
         SnapshotCounts: {
             /**
              * Format: uint32
-             * @description The acting frontier: its top N and the rest.
+             * @description The acting frontier: `list_nodes` with the `next_up` filter.
              */
             acting_frontier: number;
             /**
@@ -5545,7 +5490,7 @@ export interface components {
             in_scope: number;
             /**
              * Format: uint32
-             * @description Placeholders needing breakdown in all.
+             * @description Placeholders needing breakdown: the `needs_breakdown` filter.
              */
             needs_breakdown: number;
             /**
@@ -5555,17 +5500,23 @@ export interface components {
             not_relevant: number;
             /**
              * Format: uint32
-             * @description Open decisions in all; the snapshot lists the top few.
+             * @description Decisions still open, ready to answer or not: the `open_decision` filter.
              */
             open_decisions: number;
             /**
              * Format: uint32
-             * @description Nodes whose plan can no longer be met, in all.
+             * @description Nodes whose plan can no longer be met: the `shortfall` filter.
              */
             shortfalls: number;
             /**
              * Format: uint32
-             * @description Open, in-scope nodes no one owns, in all.
+             * @description The nodes a stalled journey waits on (gates, snoozed and scheduled nodes), none when it
+             *     is not stalled: the `stalled` filter.
+             */
+            stalled: number;
+            /**
+             * Format: uint32
+             * @description Open, in-scope nodes no one owns: the `unassigned` filter.
              */
             unassigned: number;
         };
@@ -5582,11 +5533,6 @@ export interface components {
             owners?: components["schemas"]["IdentityKey"][];
             /** @description Its status. */
             status: components["schemas"]["JourneyStatus"];
-        };
-        /** @description Which part of the journey a snapshot covers. */
-        SnapshotScope: {
-            /** @description The subtree: this node and everything beneath it; the whole journey when none. */
-            subtree?: components["schemas"]["NodeKey"] | null;
         };
         /** @description What a snooze waits for: exactly one of a date or a node. */
         SnoozeTarget: {
@@ -9795,10 +9741,7 @@ export interface operations {
     };
     getJourneySnapshot: {
         parameters: {
-            query?: {
-                /** @description This node and everything beneath it; the whole journey when none. */
-                subtree?: components["schemas"]["NodeKey"];
-            };
+            query?: never;
             header?: never;
             path: {
                 /** @description The journey. */

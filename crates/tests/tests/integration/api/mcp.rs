@@ -379,7 +379,13 @@ mod mcp_in_process {
     async fn answer_what_is_needed(agent: &Agent) -> u64 {
         let snapshot = json!({ "journey": JOURNEY });
         let snapshot = agent.ok("get_snapshot", snapshot).await;
-        let open: Vec<String> = keys(&snapshot["snapshot"]["open_decisions"]);
+        let open = json!({ "journey": JOURNEY, "filters": ["open_decision"] });
+        let open = agent.ok("list_nodes", open).await;
+        assert_eq!(
+            snapshot["snapshot"]["counts"]["open_decisions"], open["total"],
+            "the count is the filter's total"
+        );
+        let open: Vec<String> = keys(&open["items"]);
         let needed = json!({ "journey": JOURNEY, "filters": ["decisions_needed"] });
         let needed = keys(&agent.ok("list_nodes", needed).await["items"]);
         let ranked: Vec<&String> = open.iter().filter(|key| needed.contains(key)).collect();
@@ -433,10 +439,10 @@ mod mcp_in_process {
     async fn break_down_the_placeholder(agent: &Agent, revision: u64) {
         let snapshot = json!({ "journey": JOURNEY });
         let snapshot = agent.ok("get_snapshot", snapshot).await;
-        assert_eq!(
-            keys(&snapshot["snapshot"]["needs_breakdown"]),
-            ["n_workload"]
-        );
+        assert_eq!(snapshot["snapshot"]["counts"]["needs_breakdown"], 1);
+        let listed = json!({ "journey": JOURNEY, "filters": ["needs_breakdown"] });
+        let listed = agent.ok("list_nodes", listed).await;
+        assert_eq!(keys(&listed["items"]), ["n_workload"]);
         let create = json!({ "proposal": "pr_workload", "destination": { "journey": JOURNEY },
             "draft": breakdown(revision, "Break the workload down"),
             "patch_id": "p_propose_workload" });
@@ -450,8 +456,7 @@ mod mcp_in_process {
         let after = json!({ "journey": JOURNEY });
         let after = agent.ok("get_snapshot", after).await;
         assert_eq!(
-            after["snapshot"].get("needs_breakdown"),
-            None,
+            after["snapshot"]["counts"]["needs_breakdown"], 0,
             "it is broken down"
         );
     }

@@ -23,7 +23,7 @@ use cairn_engine::{
 use cairn_schema::{
     Cursor, Deployment, Event, JourneyId, Level, LevelQuery, Lineage, NextQuery, NodeKey, NodeKind,
     ResourceContent, Route, RouteFile, RouteHeader, RouteVersion, Scenario, SequentialKeys,
-    SnapshotScope, VersionNumber, from_yaml,
+    VersionNumber, from_yaml,
 };
 
 type Result<T> = std::result::Result<T, Box<dyn Error>>;
@@ -458,48 +458,13 @@ fn agent_snapshot(vendor: &Fixture, out: &mut String) -> Result<()> {
     let journey = DerivedJourney::new(&graph, &derived);
     writeln!(
         out,
-        "## The agent snapshot\n\nAfter step 3, the whole journey (I3): the acting frontier's top N (here all of it, under the page limit of 200) in rank order, the rest as keys, and the counts:\n"
+        "## The agent snapshot\n\nAfter step 3, the whole journey (I3): its facts and counts, no nodes (the node list lists them):\n"
     )?;
-    let snapshot = journey.snapshot(&SnapshotScope::default(), header)?;
-    let top: Vec<&NodeKey> = snapshot
-        .acting_frontier
-        .iter()
-        .map(|row| &row.key)
-        .collect();
-    writeln!(
-        out,
-        "- acting frontier: {}; the rest: {}",
-        codes(top),
-        codes(&snapshot.acting_frontier_rest)
-    )?;
-    writeln!(
-        out,
-        "- open decisions by rank: {}",
-        codes(snapshot.open_decisions.iter().map(|each| &each.key))
-    )?;
-    writeln!(
-        out,
-        "- needing breakdown: {}; unassigned: {}; shortfalls: {}",
-        codes(snapshot.needs_breakdown.iter().map(|each| &each.key)),
-        codes(snapshot.unassigned.iter().map(|each| &each.key)),
-        codes(snapshot.shortfalls.iter().map(|each| &each.key))
-    )?;
-    writeln!(out)?;
+    let snapshot = journey.snapshot(header);
     writeln!(
         out,
         "```json\n{}```\n",
-        cairn_schema::to_json_pretty(&snapshot.counts)?
-    )?;
-    let setup = journey.snapshot(
-        &SnapshotScope {
-            subtree: Some("n_setup".parse()?),
-        },
-        header,
-    )?;
-    writeln!(
-        out,
-        "Scoped to Setup: {} in scope.\n",
-        setup.counts.in_scope
+        cairn_schema::to_json_pretty(&snapshot)?
     )?;
     Ok(())
 }

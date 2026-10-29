@@ -11,8 +11,7 @@ use std::sync::Arc;
 use cairn_engine::{DerivedJourney, Graph, derive};
 use cairn_schema::limits::{EXPLANATION_ENTRY_COUNT_MAX, PAGE_ITEM_COUNT_MAX};
 use cairn_schema::{
-    Cursor, Email, ExplainedField, FrontierEntry, JourneyHeader, JourneyId, ListQuery, NextQuery,
-    NodeKey, SnapshotScope,
+    Cursor, Email, ExplainedField, JourneyHeader, JourneyId, ListQuery, NextQuery, NodeKey,
 };
 use cairn_service::{Call, ReadError, Service};
 use cairn_store::{LoginRecord, Store, UserRecord};
@@ -49,7 +48,7 @@ macro_rules! on_both_stores {
 on_both_stores!(
     merge_revisions_follow_an_alias,
     a_journey_reads_as_the_engine_alone_projects_it,
-    a_snapshot_scopes_to_a_subtree_and_the_node_list_pages,
+    the_node_list_scopes_to_a_subtree_and_pages,
     node_detail_caps_its_explanations_and_the_rest_page,
     cached_and_uncached_reads_agree_across_an_identity_merge,
     cached_and_uncached_reads_agree_across_midnight,
@@ -104,7 +103,7 @@ async fn reference(
 
 /// C10, I3, I1: the vendor evaluation after kickoff, read through the service, ranks its next
 /// list as the engine alone does (fixtures/README.md: `n_access`, `n_workload`), and the
-/// snapshot's acting frontier is that list.
+/// snapshot counts that list.
 async fn a_journey_reads_as_the_engine_alone_projects_it(store: Arc<dyn Store>) {
     let (service, _) = service_over(store);
     vendor_after(&service, 3).await;
@@ -126,16 +125,12 @@ async fn a_journey_reads_as_the_engine_alone_projects_it(store: Arc<dyn Store>) 
     assert_eq!(listed, documented);
     let journey = service.journey(&vendor()).await.unwrap().unwrap();
     assert_eq!(next.revision, journey.revision);
-    let snapshot = service
-        .snapshot(&reader, &vendor(), &SnapshotScope::default())
-        .await
-        .unwrap();
-    let entries: Vec<_> = next.value.items.iter().map(FrontierEntry::of).collect();
-    assert_eq!(snapshot.value.acting_frontier, entries);
+    let snapshot = service.snapshot(&reader, &vendor()).await.unwrap();
     assert_eq!(
-        snapshot.value,
-        engine.snapshot(&SnapshotScope::default(), &header).unwrap()
+        snapshot.value.counts.acting_frontier as usize,
+        next.value.items.len()
     );
+    assert_eq!(snapshot.value, engine.snapshot(&header));
     let missing = service
         .trace(&reader, &vendor(), &key("n_nowhere"))
         .await
@@ -151,22 +146,12 @@ async fn a_journey_reads_as_the_engine_alone_projects_it(store: Arc<dyn Store>) 
     );
 }
 
-/// I3, C9: a subtree scopes the snapshot's counts, and the node list scoped to it lists that
-/// node and what is beneath it, paged at `page_item_count_max`, its pages together listing
-/// each node once.
-async fn a_snapshot_scopes_to_a_subtree_and_the_node_list_pages(store: Arc<dyn Store>) {
+/// C9: the node list scoped to a subtree lists that node and what is beneath it, paged at
+/// `page_item_count_max`, its pages together listing each node once.
+async fn the_node_list_scopes_to_a_subtree_and_pages(store: Arc<dyn Store>) {
     let (service, _) = service_over(store);
     vendor_after(&service, 3).await;
     let reader = call("u_lead", AT);
-    let setup = SnapshotScope {
-        subtree: Some(key("n_setup")),
-    };
-    let scoped = service.snapshot(&reader, &vendor(), &setup).await.unwrap();
-    let whole = service
-        .snapshot(&reader, &vendor(), &SnapshotScope::default())
-        .await
-        .unwrap();
-    assert!(scoped.value.counts.in_scope < whole.value.counts.in_scope);
     let journey = service.journey(&vendor()).await.unwrap().unwrap();
     let deployment = service.deployment().await.unwrap();
     let graph = Graph::new(journey.graph, &deployment).unwrap();
@@ -375,15 +360,11 @@ async fn cached_and_uncached_reads_agree_across_midnight(store: Arc<dyn Store>) 
     // The deployment is five hours behind UTC: its midnight is 05:00 UTC.
     let evening = call("u_lead", "2026-10-07T04:59:59Z");
     let morning = call("u_lead", "2026-10-07T05:00:00Z");
-    let scope = SnapshotScope::default();
-    let before = cached.snapshot(&evening, &vendor(), &scope).await.unwrap();
-    let after = cached.snapshot(&morning, &vendor(), &scope).await.unwrap();
+    let before = cached.snapshot(&evening, &vendor()).await.unwrap();
+    let after = cached.snapshot(&morning, &vendor()).await.unwrap();
     assert_eq!(before.today.tomorrow().unwrap(), after.today);
     let (fresh, _) = service_over(store);
-    assert_eq!(
-        after,
-        fresh.snapshot(&morning, &vendor(), &scope).await.unwrap()
-    );
+    assert_eq!(after, fresh.snapshot(&morning, &vendor()).await.unwrap());
     let query = NextQuery::default();
     assert_eq!(
         cached.next(&morning, &vendor(), &query).await.unwrap(),
@@ -427,7 +408,7 @@ fn every_derived_read_can_be_awaited_on_another_thread() {
     fn reads(service: &Service) {
         let reader = call("u_lead", AT);
         let id = vendor();
-        send(&service.snapshot(&reader, &id, &SnapshotScope::default()));
+        send(&service.snapshot(&reader, &id));
         send(&service.next(&reader, &id, &NextQuery::default()));
         send(&service.node_detail(&reader, &id, &key("n_access")));
         send(&service.history(&id, None, None));

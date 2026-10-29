@@ -28,7 +28,7 @@ export type ProjectionRequest =
   | { projection: "next"; query?: NextQuery }
   | { projection: "list"; query?: ListQuery }
   | { projection: "mine"; kinds?: Schema<"KindKey">[] }
-  | { projection: "snapshot"; scope?: Schema<"SnapshotScope"> }
+  | { projection: "snapshot" }
   | { projection: "answer_effects"; key: NodeKey }
   | {
       projection: "explanations";

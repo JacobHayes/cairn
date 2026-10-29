@@ -1,5 +1,7 @@
 # The snapshot is an overview and `list_nodes` lists nodes
 
+Superseded in part by `2026-10-29-the-snapshot-is-facts-and-counts-only.md`: its lists, limits and subtree scope.
+
 - Question: after the lean rows work, a snapshot of a 214-node journey was still 19,500 tokens, nearly all of it the page of nodes, and the in-app assistant reads a snapshot on every exchange. What does an agent's first read hold, and where do nodes come from?
 - Call:
   - **The snapshot lists no nodes.** It is the answers in effect, counts by state and by display state, the top of the ranked acting frontier (the rest as keys), the open decisions by rank, the placeholders needing breakdown, the unassigned work, the shortfalls, the stalled diagnostic and whether completing the journey is suggested. A subtree still scopes it. Its depth and cursor are gone, and so is the count of listed nodes.

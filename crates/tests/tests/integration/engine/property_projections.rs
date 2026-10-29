@@ -27,9 +27,9 @@ mod property {
     use cairn_engine::{Derived, DerivedJourney, Graph, derive, history};
     use cairn_schema::limits::PAGE_ITEM_COUNT_MAX;
     use cairn_schema::{
-        AnswerSpec, Cursor, DateLinkKind, DateRuleKind, DateSource, Deployment, Event,
-        FrontierEntry, Level, LevelDisplay, LevelQuery, ListFlag, ListQuery, NextQuery, NodeKey,
-        NodeKind, PatchId, Payload, SnapshotScope, State, Title, Trace,
+        AnswerSpec, Cursor, DateLinkKind, DateRuleKind, DateSource, Deployment, Event, Level,
+        LevelDisplay, LevelQuery, ListFlag, ListQuery, NextQuery, NodeKey, NodeKind, PatchId,
+        Payload, State, Title, Trace,
     };
     use patina_dst_proptest::prelude::*;
 
@@ -422,20 +422,17 @@ mod property {
         }
     }
 
-    /// The snapshot: its frontier within the limit and the next list's, and the counts add up.
-    /// The node list within `scope`'s subtree and `depth`: every page within the limit; together
+    /// The snapshot's counts add up and its acting frontier is the next list's.
+    /// The node list within the subtree `top` and `depth`: every page within the limit; together
     /// the nodes within the depth, each once.
-    fn snapshot_holds(graph: &Graph, derived: &Derived, scope: &SnapshotScope, depth: Option<u32>) {
+    fn snapshot_holds(graph: &Graph, derived: &Derived, top: Option<&NodeKey>, depth: Option<u32>) {
         let journey = DerivedJourney::new(graph, derived);
         let limit = usize::try_from(PAGE_ITEM_COUNT_MAX).unwrap();
-        let first = journey
-            .snapshot(
-                scope,
-                &cairn_store::build::journey_header("j_plain", "Plain", None),
-            )
-            .unwrap();
-        assert!(first.acting_frontier.len() <= limit);
-        let top = first.scope.subtree.as_ref();
+        let counts = journey
+            .snapshot(&cairn_store::build::journey_header(
+                "j_plain", "Plain", None,
+            ))
+            .counts;
         let mut query = ListQuery {
             within: top.cloned(),
             depth,
@@ -473,20 +470,16 @@ mod property {
         let as_set = |keys: &[NodeKey]| keys.iter().cloned().collect::<BTreeSet<NodeKey>>();
         assert_eq!(as_set(&listed), as_set(&expected));
         assert_eq!(listed.len(), expected.len(), "each node once");
-        let counts = &first.counts;
         assert_eq!(counts.by_state.values().sum::<u32>(), counts.in_scope);
-        let shown = first.acting_frontier.len() + first.acting_frontier_rest.len();
-        assert_eq!(counts.acting_frontier as usize, shown);
-        let query = NextQuery {
-            within: top.cloned(),
-            ..NextQuery::default()
-        };
-        let next = journey.next(&query, &BTreeSet::new()).unwrap().items;
-        let entries: Vec<_> = next[..first.acting_frontier.len()]
-            .iter()
-            .map(FrontierEntry::of)
-            .collect();
-        assert_eq!(first.acting_frontier, entries);
+        assert_eq!(
+            counts.by_display_state.values().sum::<u32>(),
+            counts.in_scope
+        );
+        let next = journey
+            .next(&NextQuery::default(), &BTreeSet::new())
+            .unwrap()
+            .items;
+        assert_eq!(counts.acting_frontier as usize, next.len());
     }
 
     /// The vendor evaluation's events, the pool generated histories draw from.
@@ -590,7 +583,7 @@ mod property {
             trace_holds(&graph, &derived, &traces);
         }
 
-        /// I3, C9: the snapshot's scoping, counts, and frontier, and the node list's pages and depth.
+        /// I3, C9: the snapshot's counts, and the node list's pages and depth.
         #[test]
         fn snapshot_agrees_with_next_and_the_node_list_pages_are_bounded_and_complete(
             graph in arb_journey(1..=300),
@@ -599,10 +592,8 @@ mod property {
         ) {
             let derived = derived(&graph);
             let keys: Vec<&NodeKey> = graph.document().nodes.as_map().keys().collect();
-            let scope = SnapshotScope {
-                subtree: subtree.map(|at| keys[at % keys.len()].clone()),
-            };
-            snapshot_holds(&graph, &derived, &scope, depth);
+            let top = subtree.map(|at| keys[at % keys.len()].clone());
+            snapshot_holds(&graph, &derived, top.as_ref(), depth);
         }
 
         /// J4: history pages, followed from the start, are contiguous and complete: each

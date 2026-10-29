@@ -10,8 +10,8 @@ return to it later.
 Open decisions gate the work behind them: until one is answered, what depends on it is
 undecided. Walking them in rank order unblocks the most first.
 
-1. **List them.** `get_snapshot` gives the top `open_decisions` in rank order (`counts` the total); `list_nodes` with
-   `filters` `["decisions_needed"]` gives the actionable ones with their breadcrumbs.
+1. **List them.** `get_snapshot`'s `counts.open_decisions` says how many; `list_nodes` with
+   `filters` `["open_decision"]` gives them in rank order with their breadcrumbs.
 2. **Take one at a time.** For each, `get_node` shows its prompt, its answer type, its
    choices, who owns it, and what its answer affects (the nodes whose relevance it
    decides, a role it fills, a milestone it pins). Its `answer_effects` say, per choice, how
@@ -22,8 +22,8 @@ undecided. Walking them in rank order unblocks the most first.
 3. **Record what they have said** with `update_journey_state` (see record-answers). Answers the person has already given go in one write. Before asking
    the next question, read again whenever an answer changes which questions apply (it
    made work relevant or not, filled a role, pinned a date, or opened a decision that was
-   undecided before): the write's consequences say so, and `get_snapshot` has the
-   decisions now open.
+   undecided before): the write's consequences say so, and `list_nodes` with
+   `open_decision` has the decisions now open.
 4. **Move on.** Take the next decision in rank order. Stop when the person wants to, and
    summarize what was decided and what is now next.
 

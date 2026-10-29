@@ -14,8 +14,8 @@ use DisplayState::{
 };
 use cairn_engine::{Derived, DerivedJourney, Graph, Records};
 use cairn_schema::{
-    Deployment, DisplayState, JourneyHeader, LevelQuery, NextQuery, NodeKind, Relevance,
-    SnapshotScope, State, StatusSummary,
+    Deployment, DisplayState, JourneyHeader, LevelQuery, NextQuery, NodeKind, Relevance, State,
+    StatusSummary,
 };
 use support::{add_nodes as add, key};
 
@@ -295,11 +295,7 @@ fn counts_agree_everywhere_and_by_state_is_unchanged() {
         let journey = support::scenario(&name).journey.to_string();
         let seen = Seen::of(&support::finished(&name), &journey, "2026-12-01");
         let summary: StatusSummary = seen.journey().status_summary();
-        let snapshot = seen
-            .journey()
-            .snapshot(&SnapshotScope::default(), &seen.header)
-            .unwrap()
-            .counts;
+        let snapshot = seen.journey().snapshot(&seen.header).counts;
         let mut stored: BTreeMap<State, u32> = BTreeMap::new();
         let mut shown: BTreeMap<DisplayState, u32> = BTreeMap::new();
         for node in seen.graph.document().nodes.as_map().keys() {
@@ -380,10 +376,7 @@ fn unassigned_is_for_unfinished_in_scope_work() {
     assert!(!unassigned("n_finish"), "finished");
     assert!(!unassigned("n_branch"), "not relevant");
     assert!(!unassigned("n_inner"), "not relevant");
-    let row = seen
-        .journey()
-        .snapshot(&SnapshotScope::default(), &seen.header)
-        .unwrap();
+    let row = seen.journey().snapshot(&seen.header);
     let all = seen
         .graph
         .document()
@@ -395,12 +388,5 @@ fn unassigned_is_for_unfinished_in_scope_work() {
     assert_eq!(
         row.counts.unassigned as usize, all,
         "the count is the total"
-    );
-    assert!(row.unassigned.len() <= all);
-    assert!(
-        row.unassigned
-            .iter()
-            .all(|each| unassigned(each.key.as_str())),
-        "every listed node is unassigned"
     );
 }

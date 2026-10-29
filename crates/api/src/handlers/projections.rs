@@ -57,9 +57,8 @@ pub async fn snapshot(
     RawQuery(raw): RawQuery,
 ) -> Projection<Snapshot> {
     let id = journey(&id)?;
-    let params = Params::parse(raw.as_deref(), query::SNAPSHOT_PARAMS)?;
-    let scope = query::snapshot(&params)?;
-    let projected = api.service.snapshot(&api.call(actor), &id, &scope).await?;
+    Params::parse(raw.as_deref(), &[])?;
+    let projected = api.service.snapshot(&api.call(actor), &id).await?;
     Ok(Json(Projected::from_service(projected)))
 }
 

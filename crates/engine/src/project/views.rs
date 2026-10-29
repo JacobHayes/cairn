@@ -18,7 +18,7 @@ use std::collections::{BTreeMap, BTreeSet};
 use cairn_schema::{
     AnswerSpec, Condition, Date, DateOrigin, DateSource, DecisionEntry, DecisionView, DisplayState,
     Instant, KeyRefs, LevelQuery, Node, NodeKey, NodeKind, OpenDecision, Payload, Relevance,
-    RouteSchedule, ScheduleEntry, State, StatusSummary, Timeline, TimelineEntry, UndatedEntry,
+    RouteSchedule, ScheduleEntry, StatusSummary, Timeline, TimelineEntry, UndatedEntry,
     UpcomingMilestone,
 };
 
@@ -294,21 +294,8 @@ impl DerivedJourney<'_> {
     #[must_use]
     pub fn status_summary(&self) -> StatusSummary {
         let derived = self.derived;
-        let in_scope: Vec<&NodeKey> = self
-            .graph
-            .document()
-            .nodes
-            .as_map()
-            .keys()
-            .filter(|key| derived.relevance().in_scope(key))
-            .collect();
-        let mut by_state: BTreeMap<State, u32> = BTreeMap::new();
-        let mut by_display_state: BTreeMap<DisplayState, u32> = BTreeMap::new();
-        for key in &in_scope {
-            *by_state.entry(self.state(key)).or_default() += 1;
-            let shown = derived.display_state(self.graph, key);
-            *by_display_state.entry(shown).or_default() += 1;
-        }
+        let in_scope = self.in_scope();
+        let (by_state, by_display_state) = self.state_counts(&in_scope);
         let keep = |test: &dyn Fn(&NodeKey) -> bool| -> Vec<NodeKey> {
             in_scope
                 .iter()

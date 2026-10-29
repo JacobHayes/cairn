@@ -1,121 +1,30 @@
-//! I3, the snapshot: the bounded agent overview of a journey, cut from the same derived journey
-//! as the domain document. Scoped to a subtree (the node and everything beneath it). It lists no
-//! nodes (the node list does); the acting frontier's first `page_item_count_max` items are the
-//! next list's for the subtree (C10), and the rest are keys; the counts add up.
+//! I3, the snapshot: the agent overview of a journey, cut from the same derived journey as the
+//! domain document. It lists no nodes: the journey's facts, whether completing it is
+//! suggested, and counts, each count of nodes needing attention the total of the node list
+//! under the matching filter (C9).
 //!
-//! Cost at `node_count_max`: one pass over the subtree in tree order, and an entry per frontier
-//! item shown (at most 200); the next list, O(nodes log nodes).
+//! Cost at `node_count_max`: one pass over the nodes, testing each against each filter,
+//! O(nodes).
 
-use std::collections::{BTreeMap, BTreeSet};
+use std::collections::BTreeSet;
 
-use cairn_schema::limits::{PAGE_ITEM_COUNT_MAX, SNAPSHOT_LIST_ITEM_COUNT_MAX};
 use cairn_schema::{
-    DisplayState, FrontierEntry, IdentityKey, JourneyHeader, NextQuery, NodeKey, NodeRef,
-    Relevance, Snapshot, SnapshotCounts, SnapshotJourney, SnapshotScope, State,
+    IdentityKey, JourneyHeader, ListFlag, NodeKey, Relevance, Snapshot, SnapshotCounts,
+    SnapshotJourney,
 };
 
+use super::DerivedJourney;
 use super::rows::count;
-use super::{DerivedJourney, ProjectionError};
 
 impl DerivedJourney<'_> {
-    /// I3: the snapshot of the scope: answers in effect, the ranked acting frontier's top N with
-    /// the rest as keys, open decisions by rank, placeholders needing breakdown, unassigned
-    /// items, shortfalls, the stalled diagnostic, and counts.
-    ///
-    /// # Errors
-    ///
-    /// When the subtree is not a node of the journey.
-    pub fn snapshot(
-        &self,
-        scope: &SnapshotScope,
-        header: &JourneyHeader,
-    ) -> Result<Snapshot, ProjectionError> {
-        let subtree = scope.subtree.as_ref();
-        let mut scoped: Vec<&NodeKey> = Vec::new();
-        if let Some(top) = subtree {
-            self.known(top)?;
-            scoped.push(top);
-        }
-        scoped.extend(self.tree_order(subtree));
-        let derived = self.derived;
-        let relevance = derived.relevance();
-        let blocking = derived.blocking();
-        let in_scope: Vec<&NodeKey> = scoped
-            .iter()
-            .copied()
-            .filter(|key| relevance.in_scope(key))
-            .collect();
-        let query = NextQuery {
-            within: subtree.cloned(),
-            ..NextQuery::default()
-        };
-        let frontier = self.next(&query, &BTreeSet::new())?.items;
-        let limit = usize::try_from(PAGE_ITEM_COUNT_MAX).unwrap_or(usize::MAX);
-        let rest: Vec<NodeKey> = frontier
-            .iter()
-            .skip(limit)
-            .map(|row| row.key.clone())
-            .collect();
-        let attention = |test: &dyn Fn(&NodeKey) -> bool| self.attention(&in_scope, test);
-        let (open_decisions, open_count) = attention(&|key| self.open_decision(key));
-        let (needs_breakdown, breakdown_count) = attention(&|key| blocking.needs_breakdown(key));
-        let (unassigned, unassigned_count) =
-            attention(&|key| derived.is_unassigned(self.graph, key));
-        let (shortfalls, shortfall_count) =
-            attention(&|key| derived.dates().shortfall_days(key).is_some());
-        let mut counts = self.counts(&scoped, &in_scope, frontier.len(), subtree);
-        counts.open_decisions = open_count;
-        counts.needs_breakdown = breakdown_count;
-        counts.unassigned = unassigned_count;
-        counts.shortfalls = shortfall_count;
-        Ok(Snapshot {
+    /// I3: the snapshot: the journey's facts, whether completing it is suggested, and counts.
+    #[must_use]
+    pub fn snapshot(&self, header: &JourneyHeader) -> Snapshot {
+        Snapshot {
             journey: self.snapshot_journey(header),
-            scope: scope.clone(),
-            answers: in_scope
-                .iter()
-                .filter_map(|key| Some(((*key).clone(), self.answer(key)?)))
-                .collect(),
-            rationales: in_scope
-                .iter()
-                .filter_map(|key| Some(((*key).clone(), self.rationale(key)?)))
-                .collect(),
-            acting_frontier: frontier.iter().take(limit).map(FrontierEntry::of).collect(),
-            acting_frontier_rest: rest,
-            open_decisions,
-            needs_breakdown,
-            unassigned,
-            shortfalls,
-            stalled: blocking.stalled().cloned(),
             completion_suggested: self.completion_suggested(),
-            counts,
-        })
-    }
-
-    /// The top `snapshot_list_item_count_max` of the in-scope nodes `test` holds for, by rank,
-    /// and how many it holds for in all.
-    fn attention(
-        &self,
-        in_scope: &[&NodeKey],
-        test: &dyn Fn(&NodeKey) -> bool,
-    ) -> (Vec<NodeRef>, u32) {
-        let top = usize::try_from(SNAPSHOT_LIST_ITEM_COUNT_MAX).unwrap_or(usize::MAX);
-        let keys: Vec<NodeKey> = in_scope
-            .iter()
-            .filter(|key| test(key))
-            .map(|key| (*key).clone())
-            .collect();
-        let listed = self
-            .derived
-            .ranking()
-            .sorted(&keys)
-            .iter()
-            .take(top)
-            .map(|key| NodeRef {
-                key: key.clone(),
-                title: self.node(key).title.clone(),
-            })
-            .collect();
-        (listed, count(keys.len()))
+            counts: self.counts(),
+        }
     }
 
     /// The journey's facts, each owner as the identity it names now, once.
@@ -134,43 +43,42 @@ impl DerivedJourney<'_> {
         }
     }
 
-    /// I3: the scope's counts.
-    fn counts(
-        &self,
-        scoped: &[&NodeKey],
-        in_scope: &[&NodeKey],
-        acting: usize,
-        subtree: Option<&NodeKey>,
-    ) -> SnapshotCounts {
+    /// I3: the counts, over the in-scope nodes.
+    fn counts(&self) -> SnapshotCounts {
         let derived = self.derived;
-        let mut by_state: BTreeMap<State, u32> = BTreeMap::new();
-        let mut by_display_state: BTreeMap<DisplayState, u32> = BTreeMap::new();
-        for key in in_scope {
-            *by_state.entry(self.state(key)).or_default() += 1;
-            let shown = derived.display_state(self.graph, key);
-            *by_display_state.entry(shown).or_default() += 1;
-        }
-        let frontier = derived
-            .ranking()
-            .frontier()
-            .iter()
-            .filter(|key| {
-                subtree.is_none_or(|top| *key == top || self.graph.tree().is_ancestor(top, key))
-            })
-            .count();
+        let in_scope = self.in_scope();
+        let (by_state, by_display_state) = self.state_counts(&in_scope);
+        let viewer = BTreeSet::new();
+        let next_up: BTreeSet<&NodeKey> = derived.ranking().acting_frontier().iter().collect();
+        let stalled = self.stalled_nodes();
+        let flagged = |flag: ListFlag| {
+            count(
+                in_scope
+                    .iter()
+                    .filter(|key| self.flag(flag, key, &viewer, &next_up, &stalled))
+                    .count(),
+            )
+        };
         SnapshotCounts {
             in_scope: count(in_scope.len()),
             not_relevant: count(
-                scoped
-                    .iter()
+                self.graph
+                    .document()
+                    .nodes
+                    .as_map()
+                    .keys()
                     .filter(|key| derived.relevance().value(key) == Relevance::NotRelevant)
                     .count(),
             ),
             by_state,
             by_display_state,
-            frontier: count(frontier),
-            acting_frontier: count(acting),
-            ..SnapshotCounts::default()
+            frontier: count(derived.ranking().frontier().len()),
+            acting_frontier: flagged(ListFlag::NextUp),
+            open_decisions: flagged(ListFlag::OpenDecision),
+            needs_breakdown: flagged(ListFlag::NeedsBreakdown),
+            unassigned: flagged(ListFlag::Unassigned),
+            shortfalls: flagged(ListFlag::Shortfall),
+            stalled: flagged(ListFlag::Stalled),
         }
     }
 }

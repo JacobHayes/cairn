@@ -18,8 +18,7 @@ use cairn_schema::{
     Domain, ExplainedField, ExplanationPage, IdentityKey, JourneyId, KeyRefs, KindKey, Level,
     LevelQuery, ListPage, ListQuery, LocalEdit, Markdown, MineEntry, Next, NextQuery, Node,
     NodeDerived, NodeKey, NodeKind, NodeState, Overrides, PatchEvents, Path, ProposalId,
-    RemovalRead, Revision, Snapshot, SnapshotScope, State, StatusSummary, StillWaiting, Timeline,
-    Title, Trace,
+    RemovalRead, Revision, Snapshot, State, StatusSummary, StillWaiting, Timeline, Title, Trace,
 };
 use cairn_store::{EventQuery, PageSize};
 
@@ -156,23 +155,20 @@ pub struct History {
 }
 
 impl Service {
-    /// I3: the bounded agent snapshot, scoped to a subtree.
+    /// I3: the agent snapshot: the journey's facts and counts.
     ///
     /// # Errors
     ///
-    /// When the journey or the subtree's node does not exist, or the store fails.
+    /// When the journey does not exist, or the store fails.
     pub async fn snapshot(
         &self,
         call: &Call,
         id: &JourneyId,
-        scope: &SnapshotScope,
     ) -> Result<Projected<Snapshot>, ReadError> {
         let derivation = self.derivation(call, id).await?;
         let value = engine(&Domain::Journey(id.clone()), || {
-            let journey = DerivedJourney::new(&derivation.graph, &derivation.derived);
-            journey.snapshot(scope, &derivation.header)
-        })?
-        .map_err(ReadError::Projection)?;
+            DerivedJourney::new(&derivation.graph, &derivation.derived).snapshot(&derivation.header)
+        })?;
         Ok(projected(&derivation, value))
     }
 

@@ -1,6 +1,6 @@
 //! The derived reads over HTTP, in process against the memory store (PRACTICES, Shell: API
 //! tests): every projection answers what the service derives for the caller (I1, I3, C8),
-//! the snapshot and the list page through every node once (I3, C9), node detail carries its
+//! the node list pages through every node once (C9), node detail carries its
 //! explanation lists cut to the response limit with their totals and the rest page through
 //! (ARCHITECTURE, HTTP API: Size budgets), and each malformed read answers its problem.
 #![cfg(test)]
@@ -14,7 +14,7 @@ mod in_process {
     use cairn_schema::limits::{EXPLANATION_ENTRY_COUNT_MAX, PAGE_ITEM_COUNT_MAX};
     use cairn_schema::{
         Actor, ExplainedField, ExplanationPage, LevelDisplay, LevelQuery, ListFlag, ListPage,
-        ListQuery, NextQuery, NodeKey, NodeKind, RemovalRead, SnapshotScope, SortBy,
+        ListQuery, NextQuery, NodeKey, NodeKind, RemovalRead, SortBy,
     };
     use cairn_service::Call;
     use cairn_service::wire::{Caller, History, Mine, NodeDetail, Problem, ProblemCode, Projected};
@@ -78,9 +78,6 @@ mod in_process {
         let service = &world.service;
         let id = &"j_vendor_eval".parse().unwrap();
         let kickoff: &NodeKey = &"n_kickoff".parse().unwrap();
-        let scope = SnapshotScope {
-            subtree: Some("n_setup".parse().unwrap()),
-        };
 
         let blocked = ListQuery {
             flags: [ListFlag::Blocked].into(),
@@ -94,10 +91,7 @@ mod in_process {
         let next = service.next(call, id, &NextQuery::default()).await;
         let expected = [
             ("next", same(next.unwrap())),
-            (
-                "snapshot?subtree=n_setup",
-                same(service.snapshot(call, id, &scope).await.unwrap()),
-            ),
+            ("snapshot", same(service.snapshot(call, id).await.unwrap())),
             (
                 "nodes?flag=blocked&sort=gravity",
                 same(service.list(call, id, &blocked).await.unwrap()),
@@ -436,10 +430,6 @@ mod in_process {
                 ProblemCode::NotFound,
             ),
             (
-                "/api/journeys/j_vendor_eval/snapshot?subtree=n_nowhere",
-                ProblemCode::NotFound,
-            ),
-            (
                 "/api/journeys/j_vendor_eval/nodes/n_kickoff/explanations/urgency",
                 ProblemCode::BadRequest,
             ),
@@ -452,7 +442,7 @@ mod in_process {
                 ProblemCode::BadRequest,
             ),
             (
-                "/api/journeys/j_vendor_eval/snapshot?depth=deep",
+                "/api/journeys/j_vendor_eval/snapshot?subtree=n_setup",
                 ProblemCode::BadRequest,
             ),
             (
